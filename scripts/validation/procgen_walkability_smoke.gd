@@ -173,7 +173,7 @@ func _room_center(rooms: Array, room_id: String) -> Vector3:
 			var module_id: String = str(placement.get("module_id", placement.get("module", "")))
 			if module_id not in FLOOR_MODULES:
 				continue
-			var pos: Array = placement.get("position", [0, 0, 0])
+			var pos: Array = placement.get("world_position", placement.get("position", [0, 0, 0]))
 			if pos.size() < 3:
 				continue
 			total += Vector3(float(pos[0]), float(pos[1]) + FLOOR_Y_OFFSET, float(pos[2]))
@@ -192,7 +192,7 @@ func _build_navigation_region(rooms: Array, ship_root: Node3D) -> NavigationRegi
 			var module_id: String = str(placement.get("module_id", placement.get("module", "")))
 			if module_id not in FLOOR_MODULES:
 				continue
-			var pos: Array = placement.get("position", [0, 0, 0])
+			var pos: Array = placement.get("world_position", placement.get("position", [0, 0, 0]))
 			if pos.size() < 3:
 				continue
 			var center: Vector3 = Vector3(float(pos[0]), float(pos[1]) + FLOOR_Y_OFFSET, float(pos[2]))
@@ -261,6 +261,6 @@ func _link_endpoint_pos(link: Dictionary, cell_key: String, room_key: String, la
 					var z_str: String = String(parts[i + 1]).substr(1)
 					if x_str.is_valid_int() and z_str.is_valid_int():
 						if int(x_str) == target_x and int(z_str) == target_z:
-							var pos: Array = placement.get("position", [0, 0, 0])
+							var pos: Array = placement.get("world_position", placement.get("position", [0, 0, 0]))
 							return Vector3(float(pos[0]), float(pos[1]) + FLOOR_Y_OFFSET, float(pos[2]))
 	return Vector3.INF

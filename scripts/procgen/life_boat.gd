@@ -163,7 +163,7 @@ static func build_graph() -> RoomGraphScript:
 	for room_def in ROOMS:
 		graph.add_room(room_def["id"], room_def["role"], room_def["deck"])
 	graph.add_link("airlock_01", "cockpit_01", "door")
-	graph.add_link("cockpit_01", "engine_bay_01", "door")
+	graph.add_link("airlock_01", "engine_bay_01", "door")
 	return graph
 
 

@@ -103,7 +103,7 @@ func _initialize() -> void:
 			var module_id: String = str(placement.get("module_id", placement.get("module", "")))
 			if module_id not in FLOOR_MODULES:
 				continue
-			var pos: Array = placement.get("position", [0, 0, 0])
+			var pos: Array = placement.get("world_position", placement.get("position", [0, 0, 0]))
 			if pos.size() < 3:
 				continue
 			var center: Vector3 = Vector3(float(pos[0]), float(pos[1]) + FLOOR_Y_OFFSET, float(pos[2]))

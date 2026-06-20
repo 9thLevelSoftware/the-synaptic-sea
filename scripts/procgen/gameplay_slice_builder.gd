@@ -63,6 +63,7 @@ func build(layout: Dictionary) -> Dictionary:
 	var goal_room_dict: Dictionary = _find_room(rooms, goal_room)
 	var goal_approach: Array = _get_first_floor_cell(goal_room_dict)
 	if goal_approach.is_empty():
+		push_warning("GameplaySliceBuilder: goal room '%s' has no floor cells; using [0,0,0] fallback" % goal_room)
 		goal_approach = [0, 0, 0]
 	objectives.append({
 		"id": "obj_reach_goal",
@@ -93,11 +94,11 @@ func _find_room(rooms: Array, room_id: String) -> Dictionary:
 func _get_first_floor_cell(room: Dictionary) -> Array:
 	var placements: Array = room.get("structural_placements", [])
 	for placement in placements:
-		var name: String = str(placement.get("name", ""))
-		if not name.begins_with("floor_cell"):
+		var placement_name: String = str(placement.get("name", ""))
+		if not placement_name.begins_with("floor_cell"):
 			continue
 		# Parse floor_cell_x{X}_z{Z} or floor_cell_d{D}_x{X}_z{Z}
-		var parts: PackedStringArray = name.split("_")
+		var parts: PackedStringArray = placement_name.split("_")
 		for i in range(parts.size()):
 			if String(parts[i]).begins_with("x") and i + 1 < parts.size() and String(parts[i + 1]).begins_with("z"):
 				var x_str: String = String(parts[i]).substr(1)
