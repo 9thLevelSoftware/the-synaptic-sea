@@ -107,6 +107,10 @@ func layout(room_plan: Array[Dictionary], template: RefCounted, seed_value: int)
 
 	var adjacencies: Array[Dictionary] = _discover_adjacencies(placed)
 
+	# Add logical connections for cross-deck zone relationships
+	# (cell adjacency can't discover these since rooms are on separate deck grids)
+	_add_cross_deck_adjacencies(adjacencies, placed, room_zone_map, zone_rooms_map, template)
+
 	return {"rooms": placed, "adjacencies": adjacencies}
 
 
@@ -299,6 +303,66 @@ func _discover_adjacencies(placed: Dictionary) -> Array[Dictionary]:
 				})
 
 	return adjacencies
+
+
+func _add_cross_deck_adjacencies(adjacencies: Array[Dictionary], placed: Dictionary,
+		room_zone_map: Dictionary, zone_rooms_map: Dictionary, template: RefCounted) -> void:
+	# Build set of already-connected pairs
+	var existing_pairs: Dictionary = {}
+	for adj in adjacencies:
+		existing_pairs[_pair_key(str(adj["from_room"]), str(adj["to_room"]))] = true
+
+	# For each zone connection in the template, if the rooms are on different
+	# decks, add a logical adjacency between the last room in the parent zone
+	# and the first room in the child zone.
+	for zone in template.zones:
+		var child_zone_id: String = str(zone.get("id", ""))
+		var parent_zone_id: String = str(zone.get("attach_to", ""))
+		if parent_zone_id.is_empty():
+			continue
+
+		var parent_rooms: Array = zone_rooms_map.get(parent_zone_id, [])
+		var child_rooms: Array = zone_rooms_map.get(child_zone_id, [])
+		if parent_rooms.is_empty() or child_rooms.is_empty():
+			continue
+
+		# Use last placed room from parent, first placed room from child
+		var parent_rid: String = ""
+		for rid in parent_rooms:
+			if placed.has(rid):
+				parent_rid = rid
+		var child_rid: String = ""
+		for rid in child_rooms:
+			if placed.has(rid):
+				child_rid = rid
+				break
+
+		if parent_rid.is_empty() or child_rid.is_empty():
+			continue
+		if not placed.has(parent_rid) or not placed.has(child_rid):
+			continue
+
+		var parent_deck: int = int(placed[parent_rid].get("deck", 0))
+		var child_deck: int = int(placed[child_rid].get("deck", 0))
+		if parent_deck == child_deck:
+			continue  # Same-deck adjacencies are handled by cell discovery
+
+		var pk: String = _pair_key(parent_rid, child_rid)
+		if existing_pairs.has(pk):
+			continue
+
+		existing_pairs[pk] = true
+		var parent_cells: Array = placed[parent_rid].get("cells", [])
+		var child_cells: Array = placed[child_rid].get("cells", [])
+		var from_cell: Vector2i = parent_cells[0] if not parent_cells.is_empty() else Vector2i.ZERO
+		var to_cell: Vector2i = child_cells[0] if not child_cells.is_empty() else Vector2i.ZERO
+
+		adjacencies.append({
+			"from_room": parent_rid,
+			"to_room": child_rid,
+			"from_cell": from_cell,
+			"to_cell": to_cell,
+		})
 
 
 func _pair_key(a: String, b: String) -> String:
