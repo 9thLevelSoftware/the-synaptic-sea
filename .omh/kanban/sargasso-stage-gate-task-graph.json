@@ -1,0 +1,165 @@
+{
+  "board": "sargasso-stage-gate",
+  "created_at": "2026-06-19T17:44:34.593058+00:00",
+  "created_or_updated_by": "gpt-5.5-coordinator",
+  "board_created_this_run": true,
+  "default_workdir": "/Users/christopherwilloughby/the-sargasso-of-stars",
+  "inputs": [
+    "AGENTS.md",
+    "docs/game/README.md",
+    "docs/game/00_vision.md",
+    "docs/game/01_design_pillars.md",
+    "docs/game/02_core_loop.md",
+    "docs/game/03_gdd.md",
+    "docs/game/04_tdd.md",
+    "docs/game/05_requirements.md",
+    "docs/game/06_validation_plan.md",
+    "docs/game/07_risk_register.md",
+    "docs/game/08_milestone_gates.md",
+    "docs/game/adr/0001-adopt-stage-gate-kanban-godot-validation.md"
+  ],
+  "profiles": {
+    "sargassoworker": "Scoped Godot implementation worker",
+    "sargassodocs": "Documentation/planning/spec worker",
+    "sargassoreview": "Review and milestone gate worker"
+  },
+  "milestones": [
+    {
+      "id": "M0",
+      "name": "Framework bootstrap",
+      "tasks": [
+        "KICKOFF"
+      ]
+    },
+    {
+      "id": "M1",
+      "name": "Gate 1 missing decisions",
+      "tasks": [
+        "SPEC-HAZARD-LOOP",
+        "DEC-HUB-META",
+        "SPEC-GATE1-PLAYTEST",
+        "REVIEW-GATE1-PACKET"
+      ]
+    },
+    {
+      "id": "M2",
+      "name": "Next runtime system",
+      "tasks": [
+        "PLAN-NEXT-RUNTIME-SYSTEM",
+        "IMPL-NEXT-RUNTIME-SYSTEM",
+        "REVIEW-NEXT-RUNTIME-SYSTEM"
+      ]
+    },
+    {
+      "id": "M3",
+      "name": "Gate 1 review",
+      "tasks": [
+        "GATE1-MILESTONE-REVIEW",
+        "EVIDENCE-GATE1-PLAYTEST-ROUND"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "t_75ac7249",
+      "source_id": "KICKOFF",
+      "title": "KICKOFF: release Sargasso Stage-Gate queue",
+      "assignee": "sargassoreview",
+      "parents": [],
+      "priority": 1
+    },
+    {
+      "task_id": "t_fdf00056",
+      "source_id": "SPEC-HAZARD-LOOP",
+      "title": "SPEC: define Gate 1 hazard pressure loop",
+      "assignee": "sargassodocs",
+      "parents": [
+        "t_75ac7249"
+      ],
+      "priority": 10
+    },
+    {
+      "task_id": "t_941f0c39",
+      "source_id": "DEC-HUB-META",
+      "title": "DECISION: define Gate 1 hub/meta progression stance",
+      "assignee": "sargassodocs",
+      "parents": [
+        "t_75ac7249"
+      ],
+      "priority": 20
+    },
+    {
+      "task_id": "t_f38140e0",
+      "source_id": "SPEC-GATE1-PLAYTEST",
+      "title": "SPEC: create Gate 1 playtest protocol",
+      "assignee": "sargassodocs",
+      "parents": [
+        "t_75ac7249"
+      ],
+      "priority": 30
+    },
+    {
+      "task_id": "t_f35e4bca",
+      "source_id": "REVIEW-GATE1-PACKET",
+      "title": "REVIEW: Gate 1 decision packet",
+      "assignee": "sargassoreview",
+      "parents": [
+        "t_fdf00056",
+        "t_941f0c39",
+        "t_f38140e0"
+      ],
+      "priority": 40
+    },
+    {
+      "task_id": "t_24fadc1d",
+      "source_id": "PLAN-NEXT-RUNTIME-SYSTEM",
+      "title": "PLAN: next Gate 1 runtime system implementation",
+      "assignee": "sargassodocs",
+      "parents": [
+        "t_f35e4bca"
+      ],
+      "priority": 50
+    },
+    {
+      "task_id": "t_8041152c",
+      "source_id": "IMPL-NEXT-RUNTIME-SYSTEM",
+      "title": "IMPLEMENT: approved Gate 1 runtime system",
+      "assignee": "sargassoworker",
+      "parents": [
+        "t_24fadc1d"
+      ],
+      "priority": 60
+    },
+    {
+      "task_id": "t_b0f5fc4f",
+      "source_id": "REVIEW-NEXT-RUNTIME-SYSTEM",
+      "title": "REVIEW: approved Gate 1 runtime system",
+      "assignee": "sargassoreview",
+      "parents": [
+        "t_8041152c"
+      ],
+      "priority": 70
+    },
+    {
+      "task_id": "t_31bb8158",
+      "source_id": "GATE1-MILESTONE-REVIEW",
+      "title": "GATE: Gate 1 milestone review",
+      "assignee": "sargassoreview",
+      "parents": [
+        "t_b0f5fc4f"
+      ],
+      "priority": 80
+    },
+    {
+      "task_id": "t_d2ca5f04",
+      "source_id": "EVIDENCE-GATE1-PLAYTEST-ROUND",
+      "title": "EVIDENCE: run Gate 1 fresh-player playtest round",
+      "assignee": "sargassoreview",
+      "parents": [],
+      "priority": 90,
+      "initial_status": "blocked",
+      "created_from": "t_31bb8158"
+    }
+  ],
+  "release_policy": "Kickoff card is blocked; child cards are dependency-gated until explicitly released."
+}

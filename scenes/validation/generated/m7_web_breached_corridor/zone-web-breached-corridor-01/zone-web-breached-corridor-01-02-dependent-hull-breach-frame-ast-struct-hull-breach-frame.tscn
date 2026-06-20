@@ -1,0 +1,20 @@
+[gd_scene load_steps=2 format=3]
+[sub_resource type="BoxShape3D" id="BoxShape3D_1"]
+size = Vector3(1, 1, 1)
+
+[node name="Hull_Breach_Frame" type="Node3D"]
+
+[node name="Anchor_Wall_Left" type="Marker3D" parent="."]
+
+[node name="Anchor_Wall_Right" type="Marker3D" parent="."]
+
+[node name="Anchor_FloorCenter" type="Marker3D" parent="."]
+
+[node name="CollisionRoot" type="StaticBody3D" parent="."]
+collision_layer = 1
+collision_mask = 1
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="CollisionRoot"]
+shape = SubResource("BoxShape3D_1")
+
+[node name="Visual" type="Node3D" parent="."]

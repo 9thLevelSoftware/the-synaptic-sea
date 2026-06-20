@@ -1,0 +1,812 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "semantic_scene_generation",
+  "seed": 17,
+  "inputs": {
+    "zone_document": "/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/m7_web_breached_corridor/inputs/zone_web_breached_corridor.json",
+    "motif_library": "/Users/christopherwilloughby/off-the-rails-ai-infra/data/procgen/motifs.sample.yaml",
+    "asset_catalog": "/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/m7_web_breached_corridor/inputs/assets"
+  },
+  "zones": [
+    {
+      "zone_id": "zone-web-breached-corridor-01",
+      "selected_motif_id": "mot-airlock-web-breach-corridor",
+      "motif_report": {
+        "motif_id": "mot-airlock-web-breach-corridor",
+        "seed": 17,
+        "host_zone": "derelict-corridor",
+        "anchor_position": [
+          0.0,
+          2.0,
+          0.0
+        ],
+        "style_tags": [
+          "sealed",
+          "webbed",
+          "contaminated",
+          "hazard",
+          "industrial",
+          "gritty",
+          "organic"
+        ],
+        "placement_intents": [
+          {
+            "id": "anchor-pressure-door",
+            "role": "anchor",
+            "semantic": "pressure-door",
+            "category": "structural",
+            "position": [
+              0.0,
+              2.5,
+              0.0
+            ],
+            "rotation_degrees": 187.91420749649754,
+            "zone": "derelict-corridor",
+            "support_surface": "wall",
+            "footprint_size_m": [
+              0.8,
+              1.0,
+              0.8
+            ],
+            "clearance_m": 0.0,
+            "semantic_tags": [
+              "airlock",
+              "human",
+              "damaged",
+              "structural"
+            ],
+            "relation_tags": [],
+            "style_tags": [
+              "sealed",
+              "webbed",
+              "contaminated",
+              "hazard",
+              "industrial",
+              "gritty",
+              "organic"
+            ],
+            "nearby_objects": [
+              "anchor"
+            ],
+            "visibility": 1.0,
+            "gameplay_tags": [],
+            "collision_count": 0,
+            "nav_blocked": true,
+            "nav_blocking_allowed": true,
+            "support_load_bearing": true,
+            "total_score": 1.0,
+            "failure_reasons": [],
+            "notes": [
+              "support is load-bearing",
+              "support surface 'wall' matches the placement contract",
+              "candidate footprint is contained within the room bounds",
+              "candidate clearance 0.00m",
+              "required clearance 0.00m",
+              "no minimum clearance required",
+              "rotation 187.9\u00b0",
+              "no explicit relation tags; rotation is unconstrained",
+              "zone 'derelict-corridor' differs from target zone 'zone-web-breached-corridor-01'",
+              "no required semantic tags supplied",
+              "no preferred relation tags supplied",
+              "style overlap 1.00 against preferred tags ('sealed', 'webbed', 'contaminated', 'hazard', 'industrial', 'gritty', 'organic')",
+              "visibility 1.00",
+              "allowed range 0.00..1.00",
+              "visibility is at or above the preferred ceiling",
+              "no gameplay intent tags supplied"
+            ]
+          },
+          {
+            "id": "dependent-hull-breach-frame",
+            "role": "dependent",
+            "semantic": "hull-breach-frame",
+            "category": "structural",
+            "position": [
+              1.9852826384516333,
+              2.5,
+              -0.13577430710384591
+            ],
+            "rotation_degrees": 10.633008853545451,
+            "zone": "derelict-corridor",
+            "support_surface": "wall",
+            "footprint_size_m": [
+              0.8,
+              1.0,
+              0.8
+            ],
+            "clearance_m": 0.5,
+            "semantic_tags": [
+              "airlock",
+              "damaged",
+              "webbed",
+              "structural"
+            ],
+            "relation_tags": [
+              "near"
+            ],
+            "style_tags": [
+              "sealed",
+              "webbed",
+              "contaminated",
+              "hazard",
+              "industrial",
+              "gritty",
+              "organic"
+            ],
+            "nearby_objects": [
+              "anchor"
+            ],
+            "visibility": 1.0,
+            "gameplay_tags": [],
+            "collision_count": 0,
+            "nav_blocked": true,
+            "nav_blocking_allowed": true,
+            "support_load_bearing": true,
+            "total_score": 1.0,
+            "failure_reasons": [],
+            "notes": [
+              "support is load-bearing",
+              "support surface 'wall' matches the placement contract",
+              "candidate footprint is contained within the room bounds",
+              "candidate clearance 0.50m",
+              "required clearance 0.00m",
+              "no minimum clearance required",
+              "rotation 10.6\u00b0",
+              "relation tags ('near',) do not impose a rotation contract",
+              "zone 'derelict-corridor' differs from target zone 'zone-web-breached-corridor-01'",
+              "no required semantic tags supplied",
+              "no preferred relation tags supplied",
+              "style overlap 1.00 against preferred tags ('sealed', 'webbed', 'contaminated', 'hazard', 'industrial', 'gritty', 'organic')",
+              "visibility 1.00",
+              "allowed range 0.00..1.00",
+              "visibility is at or above the preferred ceiling",
+              "no gameplay intent tags supplied"
+            ]
+          },
+          {
+            "id": "dependent-biomatter-membrane",
+            "role": "dependent",
+            "semantic": "biomatter-membrane",
+            "category": "gameplay-prop",
+            "position": [
+              0.0,
+              3.0,
+              0.0
+            ],
+            "rotation_degrees": 193.12347584251867,
+            "zone": "derelict-corridor",
+            "support_surface": "anchor_surface",
+            "footprint_size_m": [
+              0.6,
+              1.0,
+              0.6
+            ],
+            "clearance_m": 0.1,
+            "semantic_tags": [
+              "web",
+              "organic",
+              "hazard",
+              "webbed",
+              "gameplay-prop"
+            ],
+            "relation_tags": [
+              "attached_to_surface"
+            ],
+            "style_tags": [
+              "sealed",
+              "webbed",
+              "contaminated",
+              "hazard",
+              "industrial",
+              "gritty",
+              "organic"
+            ],
+            "nearby_objects": [
+              "anchor"
+            ],
+            "visibility": 1.0,
+            "gameplay_tags": [],
+            "collision_count": 0,
+            "nav_blocked": true,
+            "nav_blocking_allowed": true,
+            "support_load_bearing": false,
+            "total_score": 0.94,
+            "failure_reasons": [],
+            "notes": [
+              "support is present but not flagged load-bearing",
+              "support surface 'anchor_surface' matches the placement contract",
+              "candidate footprint is contained within the room bounds",
+              "candidate clearance 0.10m",
+              "required clearance 0.00m",
+              "no minimum clearance required",
+              "rotation 193.1\u00b0",
+              "relation tags ('attached_to_surface',) do not impose a rotation contract",
+              "zone 'derelict-corridor' differs from target zone 'zone-web-breached-corridor-01'",
+              "no required semantic tags supplied",
+              "no preferred relation tags supplied",
+              "style overlap 1.00 against preferred tags ('sealed', 'webbed', 'contaminated', 'hazard', 'industrial', 'gritty', 'organic')",
+              "visibility 1.00",
+              "allowed range 0.00..1.00",
+              "visibility is at or above the preferred ceiling",
+              "no gameplay intent tags supplied"
+            ]
+          },
+          {
+            "id": "dependent-biomatter-tendril",
+            "role": "dependent",
+            "semantic": "biomatter-tendril",
+            "category": "dressing",
+            "position": [
+              0.0,
+              3.0,
+              0.0
+            ],
+            "rotation_degrees": 307.5260705693844,
+            "zone": "derelict-corridor",
+            "support_surface": "anchor_surface",
+            "footprint_size_m": [
+              0.3,
+              0.3,
+              0.3
+            ],
+            "clearance_m": 0.0,
+            "semantic_tags": [
+              "web",
+              "organic",
+              "webbed",
+              "dressing"
+            ],
+            "relation_tags": [
+              "attached_to_surface"
+            ],
+            "style_tags": [
+              "sealed",
+              "webbed",
+              "contaminated",
+              "hazard",
+              "industrial",
+              "gritty",
+              "organic"
+            ],
+            "nearby_objects": [
+              "anchor"
+            ],
+            "visibility": 1.0,
+            "gameplay_tags": [],
+            "collision_count": 0,
+            "nav_blocked": false,
+            "nav_blocking_allowed": false,
+            "support_load_bearing": false,
+            "total_score": 0.94,
+            "failure_reasons": [],
+            "notes": [
+              "support is present but not flagged load-bearing",
+              "support surface 'anchor_surface' matches the placement contract",
+              "candidate footprint is contained within the room bounds",
+              "candidate clearance 0.00m",
+              "required clearance 0.00m",
+              "no minimum clearance required",
+              "rotation 307.5\u00b0",
+              "relation tags ('attached_to_surface',) do not impose a rotation contract",
+              "zone 'derelict-corridor' differs from target zone 'zone-web-breached-corridor-01'",
+              "no required semantic tags supplied",
+              "no preferred relation tags supplied",
+              "style overlap 1.00 against preferred tags ('sealed', 'webbed', 'contaminated', 'hazard', 'industrial', 'gritty', 'organic')",
+              "visibility 1.00",
+              "allowed range 0.00..1.00",
+              "visibility is at or above the preferred ceiling",
+              "no gameplay intent tags supplied"
+            ]
+          },
+          {
+            "id": "dependent-biomatter-tendril",
+            "role": "dependent",
+            "semantic": "biomatter-tendril",
+            "category": "dressing",
+            "position": [
+              0.0,
+              3.0,
+              0.0
+            ],
+            "rotation_degrees": 26.01582612939294,
+            "zone": "derelict-corridor",
+            "support_surface": "anchor_surface",
+            "footprint_size_m": [
+              0.3,
+              0.3,
+              0.3
+            ],
+            "clearance_m": 0.0,
+            "semantic_tags": [
+              "web",
+              "organic",
+              "webbed",
+              "dressing"
+            ],
+            "relation_tags": [
+              "attached_to_surface"
+            ],
+            "style_tags": [
+              "sealed",
+              "webbed",
+              "contaminated",
+              "hazard",
+              "industrial",
+              "gritty",
+              "organic"
+            ],
+            "nearby_objects": [
+              "anchor"
+            ],
+            "visibility": 1.0,
+            "gameplay_tags": [],
+            "collision_count": 0,
+            "nav_blocked": false,
+            "nav_blocking_allowed": false,
+            "support_load_bearing": false,
+            "total_score": 0.94,
+            "failure_reasons": [],
+            "notes": [
+              "support is present but not flagged load-bearing",
+              "support surface 'anchor_surface' matches the placement contract",
+              "candidate footprint is contained within the room bounds",
+              "candidate clearance 0.00m",
+              "required clearance 0.00m",
+              "no minimum clearance required",
+              "rotation 26.0\u00b0",
+              "relation tags ('attached_to_surface',) do not impose a rotation contract",
+              "zone 'derelict-corridor' differs from target zone 'zone-web-breached-corridor-01'",
+              "no required semantic tags supplied",
+              "no preferred relation tags supplied",
+              "style overlap 1.00 against preferred tags ('sealed', 'webbed', 'contaminated', 'hazard', 'industrial', 'gritty', 'organic')",
+              "visibility 1.00",
+              "allowed range 0.00..1.00",
+              "visibility is at or above the preferred ceiling",
+              "no gameplay intent tags supplied"
+            ]
+          },
+          {
+            "id": "dependent-biomatter-tendril",
+            "role": "dependent",
+            "semantic": "biomatter-tendril",
+            "category": "dressing",
+            "position": [
+              0.0,
+              3.0,
+              0.0
+            ],
+            "rotation_degrees": 231.63527547517774,
+            "zone": "derelict-corridor",
+            "support_surface": "anchor_surface",
+            "footprint_size_m": [
+              0.3,
+              0.3,
+              0.3
+            ],
+            "clearance_m": 0.0,
+            "semantic_tags": [
+              "web",
+              "organic",
+              "webbed",
+              "dressing"
+            ],
+            "relation_tags": [
+              "attached_to_surface"
+            ],
+            "style_tags": [
+              "sealed",
+              "webbed",
+              "contaminated",
+              "hazard",
+              "industrial",
+              "gritty",
+              "organic"
+            ],
+            "nearby_objects": [
+              "anchor"
+            ],
+            "visibility": 1.0,
+            "gameplay_tags": [],
+            "collision_count": 0,
+            "nav_blocked": false,
+            "nav_blocking_allowed": false,
+            "support_load_bearing": false,
+            "total_score": 0.94,
+            "failure_reasons": [],
+            "notes": [
+              "support is present but not flagged load-bearing",
+              "support surface 'anchor_surface' matches the placement contract",
+              "candidate footprint is contained within the room bounds",
+              "candidate clearance 0.00m",
+              "required clearance 0.00m",
+              "no minimum clearance required",
+              "rotation 231.6\u00b0",
+              "relation tags ('attached_to_surface',) do not impose a rotation contract",
+              "zone 'derelict-corridor' differs from target zone 'zone-web-breached-corridor-01'",
+              "no required semantic tags supplied",
+              "no preferred relation tags supplied",
+              "style overlap 1.00 against preferred tags ('sealed', 'webbed', 'contaminated', 'hazard', 'industrial', 'gritty', 'organic')",
+              "visibility 1.00",
+              "allowed range 0.00..1.00",
+              "visibility is at or above the preferred ceiling",
+              "no gameplay intent tags supplied"
+            ]
+          },
+          {
+            "id": "dependent-biomatter-tendril",
+            "role": "dependent",
+            "semantic": "biomatter-tendril",
+            "category": "dressing",
+            "position": [
+              0.0,
+              3.0,
+              0.0
+            ],
+            "rotation_degrees": 250.0689238531549,
+            "zone": "derelict-corridor",
+            "support_surface": "anchor_surface",
+            "footprint_size_m": [
+              0.3,
+              0.3,
+              0.3
+            ],
+            "clearance_m": 0.0,
+            "semantic_tags": [
+              "web",
+              "organic",
+              "webbed",
+              "dressing"
+            ],
+            "relation_tags": [
+              "attached_to_surface"
+            ],
+            "style_tags": [
+              "sealed",
+              "webbed",
+              "contaminated",
+              "hazard",
+              "industrial",
+              "gritty",
+              "organic"
+            ],
+            "nearby_objects": [
+              "anchor"
+            ],
+            "visibility": 1.0,
+            "gameplay_tags": [],
+            "collision_count": 0,
+            "nav_blocked": false,
+            "nav_blocking_allowed": false,
+            "support_load_bearing": false,
+            "total_score": 0.94,
+            "failure_reasons": [],
+            "notes": [
+              "support is present but not flagged load-bearing",
+              "support surface 'anchor_surface' matches the placement contract",
+              "candidate footprint is contained within the room bounds",
+              "candidate clearance 0.00m",
+              "required clearance 0.00m",
+              "no minimum clearance required",
+              "rotation 250.1\u00b0",
+              "relation tags ('attached_to_surface',) do not impose a rotation contract",
+              "zone 'derelict-corridor' differs from target zone 'zone-web-breached-corridor-01'",
+              "no required semantic tags supplied",
+              "no preferred relation tags supplied",
+              "style overlap 1.00 against preferred tags ('sealed', 'webbed', 'contaminated', 'hazard', 'industrial', 'gritty', 'organic')",
+              "visibility 1.00",
+              "allowed range 0.00..1.00",
+              "visibility is at or above the preferred ceiling",
+              "no gameplay intent tags supplied"
+            ]
+          },
+          {
+            "id": "dressing-frost-overlay",
+            "role": "dressing",
+            "semantic": "frost-overlay",
+            "category": "dressing",
+            "position": [
+              0.0,
+              2.5,
+              0.0
+            ],
+            "rotation_degrees": 0.0,
+            "zone": "derelict-corridor",
+            "support_surface": null,
+            "footprint_size_m": [
+              0.1,
+              0.1,
+              0.1
+            ],
+            "clearance_m": 0.0,
+            "semantic_tags": [
+              "decompressed",
+              "contaminated"
+            ],
+            "relation_tags": [
+              "attached_to_surface"
+            ],
+            "style_tags": [
+              "sealed",
+              "webbed",
+              "contaminated",
+              "hazard",
+              "industrial",
+              "gritty",
+              "organic"
+            ],
+            "nearby_objects": [
+              "anchor"
+            ],
+            "visibility": 0.0,
+            "gameplay_tags": [],
+            "collision_count": 0,
+            "nav_blocked": false,
+            "nav_blocking_allowed": true,
+            "support_load_bearing": false,
+            "total_score": 0.0,
+            "failure_reasons": [],
+            "notes": [
+              "dressing is recorded as kept but not scored"
+            ]
+          }
+        ],
+        "dropped": [],
+        "corrections": [],
+        "failure_reasons": [],
+        "block_for_review": false,
+        "success": true,
+        "notes": []
+      },
+      "placements": [
+        {
+          "id": "anchor-pressure-door",
+          "role": "anchor",
+          "semantic": "pressure-door",
+          "category": "structural",
+          "asset_id": "ast-struct-pressure-door-webbed",
+          "asset_source": "/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/m7_web_breached_corridor/inputs/assets/pressure_door.json",
+          "score": 1.0,
+          "scene_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.tscn",
+          "manifest_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.manifest.json",
+          "input_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.input.json",
+          "position": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "rotation_degrees": 187.91420749649754,
+          "support_surface": "wall",
+          "clearance_m": 0.0,
+          "semantic_tags": [
+            "airlock",
+            "human",
+            "damaged",
+            "structural"
+          ],
+          "relation_tags": []
+        },
+        {
+          "id": "dependent-hull-breach-frame",
+          "role": "dependent",
+          "semantic": "hull-breach-frame",
+          "category": "structural",
+          "asset_id": "ast-struct-hull-breach-frame",
+          "asset_source": "/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/m7_web_breached_corridor/inputs/assets/breach_frame.json",
+          "score": 0.9,
+          "scene_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-02-dependent-hull-breach-frame-ast-struct-hull-breach-frame.tscn",
+          "manifest_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-02-dependent-hull-breach-frame-ast-struct-hull-breach-frame.manifest.json",
+          "input_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-02-dependent-hull-breach-frame-ast-struct-hull-breach-frame.input.json",
+          "position": [
+            1.9852826384516333,
+            2.5,
+            -0.13577430710384591
+          ],
+          "rotation_degrees": 10.633008853545451,
+          "support_surface": "wall",
+          "clearance_m": 0.5,
+          "semantic_tags": [
+            "airlock",
+            "damaged",
+            "webbed",
+            "structural"
+          ],
+          "relation_tags": [
+            "near"
+          ]
+        },
+        {
+          "id": "dependent-biomatter-membrane",
+          "role": "dependent",
+          "semantic": "biomatter-membrane",
+          "category": "gameplay-prop",
+          "asset_id": "ast-prop-biomatter-membrane",
+          "asset_source": "/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/m7_web_breached_corridor/inputs/assets/biomatter_membrane.json",
+          "score": 0.94,
+          "scene_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.tscn",
+          "manifest_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.manifest.json",
+          "input_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.input.json",
+          "position": [
+            0.0,
+            3.0,
+            0.0
+          ],
+          "rotation_degrees": 193.12347584251867,
+          "support_surface": "anchor_surface",
+          "clearance_m": 0.1,
+          "semantic_tags": [
+            "web",
+            "organic",
+            "hazard",
+            "webbed",
+            "gameplay-prop"
+          ],
+          "relation_tags": [
+            "attached_to_surface"
+          ]
+        },
+        {
+          "id": "dependent-biomatter-tendril",
+          "role": "dependent",
+          "semantic": "biomatter-tendril",
+          "category": "dressing",
+          "asset_id": "ast-dress-web-tendrils",
+          "asset_source": "/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/m7_web_breached_corridor/inputs/assets/web_tendrils.json",
+          "score": 0.9325,
+          "scene_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-04-dependent-biomatter-tendril-ast-dress-web-tendrils.tscn",
+          "manifest_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-04-dependent-biomatter-tendril-ast-dress-web-tendrils.manifest.json",
+          "input_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-04-dependent-biomatter-tendril-ast-dress-web-tendrils.input.json",
+          "position": [
+            0.0,
+            3.0,
+            0.0
+          ],
+          "rotation_degrees": 307.5260705693844,
+          "support_surface": "anchor_surface",
+          "clearance_m": 0.0,
+          "semantic_tags": [
+            "web",
+            "organic",
+            "webbed",
+            "dressing"
+          ],
+          "relation_tags": [
+            "attached_to_surface"
+          ]
+        },
+        {
+          "id": "dependent-biomatter-tendril",
+          "role": "dependent",
+          "semantic": "biomatter-tendril",
+          "category": "dressing",
+          "asset_id": "ast-dress-web-tendrils",
+          "asset_source": "/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/m7_web_breached_corridor/inputs/assets/web_tendrils.json",
+          "score": 0.9325,
+          "scene_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-05-dependent-biomatter-tendril-ast-dress-web-tendrils.tscn",
+          "manifest_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-05-dependent-biomatter-tendril-ast-dress-web-tendrils.manifest.json",
+          "input_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-05-dependent-biomatter-tendril-ast-dress-web-tendrils.input.json",
+          "position": [
+            0.0,
+            3.0,
+            0.0
+          ],
+          "rotation_degrees": 26.01582612939294,
+          "support_surface": "anchor_surface",
+          "clearance_m": 0.0,
+          "semantic_tags": [
+            "web",
+            "organic",
+            "webbed",
+            "dressing"
+          ],
+          "relation_tags": [
+            "attached_to_surface"
+          ]
+        },
+        {
+          "id": "dependent-biomatter-tendril",
+          "role": "dependent",
+          "semantic": "biomatter-tendril",
+          "category": "dressing",
+          "asset_id": "ast-dress-web-tendrils",
+          "asset_source": "/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/m7_web_breached_corridor/inputs/assets/web_tendrils.json",
+          "score": 0.9325,
+          "scene_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-06-dependent-biomatter-tendril-ast-dress-web-tendrils.tscn",
+          "manifest_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-06-dependent-biomatter-tendril-ast-dress-web-tendrils.manifest.json",
+          "input_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-06-dependent-biomatter-tendril-ast-dress-web-tendrils.input.json",
+          "position": [
+            0.0,
+            3.0,
+            0.0
+          ],
+          "rotation_degrees": 231.63527547517774,
+          "support_surface": "anchor_surface",
+          "clearance_m": 0.0,
+          "semantic_tags": [
+            "web",
+            "organic",
+            "webbed",
+            "dressing"
+          ],
+          "relation_tags": [
+            "attached_to_surface"
+          ]
+        },
+        {
+          "id": "dependent-biomatter-tendril",
+          "role": "dependent",
+          "semantic": "biomatter-tendril",
+          "category": "dressing",
+          "asset_id": "ast-dress-web-tendrils",
+          "asset_source": "/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/m7_web_breached_corridor/inputs/assets/web_tendrils.json",
+          "score": 0.9325,
+          "scene_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-07-dependent-biomatter-tendril-ast-dress-web-tendrils.tscn",
+          "manifest_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-07-dependent-biomatter-tendril-ast-dress-web-tendrils.manifest.json",
+          "input_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-07-dependent-biomatter-tendril-ast-dress-web-tendrils.input.json",
+          "position": [
+            0.0,
+            3.0,
+            0.0
+          ],
+          "rotation_degrees": 250.0689238531549,
+          "support_surface": "anchor_surface",
+          "clearance_m": 0.0,
+          "semantic_tags": [
+            "web",
+            "organic",
+            "webbed",
+            "dressing"
+          ],
+          "relation_tags": [
+            "attached_to_surface"
+          ]
+        },
+        {
+          "id": "dressing-frost-overlay",
+          "role": "dressing",
+          "semantic": "frost-overlay",
+          "category": "dressing",
+          "asset_id": "ast-dress-web-tendrils",
+          "asset_source": "/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/m7_web_breached_corridor/inputs/assets/web_tendrils.json",
+          "score": 0.77,
+          "scene_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-08-dressing-frost-overlay-ast-dress-web-tendrils.tscn",
+          "manifest_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-08-dressing-frost-overlay-ast-dress-web-tendrils.manifest.json",
+          "input_path": "zone-web-breached-corridor-01/zone-web-breached-corridor-01-08-dressing-frost-overlay-ast-dress-web-tendrils.input.json",
+          "position": [
+            0.0,
+            2.5,
+            0.0
+          ],
+          "rotation_degrees": 0.0,
+          "support_surface": null,
+          "clearance_m": 0.0,
+          "semantic_tags": [
+            "decompressed",
+            "contaminated"
+          ],
+          "relation_tags": [
+            "attached_to_surface"
+          ]
+        }
+      ],
+      "generated_bundles": [
+        "zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.tscn",
+        "zone-web-breached-corridor-01/zone-web-breached-corridor-01-02-dependent-hull-breach-frame-ast-struct-hull-breach-frame.tscn",
+        "zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.tscn",
+        "zone-web-breached-corridor-01/zone-web-breached-corridor-01-04-dependent-biomatter-tendril-ast-dress-web-tendrils.tscn",
+        "zone-web-breached-corridor-01/zone-web-breached-corridor-01-05-dependent-biomatter-tendril-ast-dress-web-tendrils.tscn",
+        "zone-web-breached-corridor-01/zone-web-breached-corridor-01-06-dependent-biomatter-tendril-ast-dress-web-tendrils.tscn",
+        "zone-web-breached-corridor-01/zone-web-breached-corridor-01-07-dependent-biomatter-tendril-ast-dress-web-tendrils.tscn",
+        "zone-web-breached-corridor-01/zone-web-breached-corridor-01-08-dressing-frost-overlay-ast-dress-web-tendrils.tscn"
+      ]
+    }
+  ],
+  "validation": {
+    "files_scanned": 8,
+    "files_with_findings": 0,
+    "total_findings": 0,
+    "severity_counts": {
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    }
+  }
+}

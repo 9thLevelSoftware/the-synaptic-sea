@@ -1,0 +1,96 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "asset_semantics",
+  "asset": {
+    "id": "ast-struct-hull-breach-frame",
+    "display_name": "Hull Breach Frame",
+    "source_asset_path": "assets/_source/derelict/hull_breach_frame.glb",
+    "category": "structural",
+    "tags": [
+      "airlock",
+      "damaged",
+      "webbed",
+      "structural"
+    ],
+    "bounds": {
+      "local_min_m": [
+        -1.8,
+        0.0,
+        -0.35
+      ],
+      "local_max_m": [
+        1.8,
+        2.9,
+        0.35
+      ],
+      "placement_origin": "floor-center"
+    },
+    "anchors": {
+      "policy": "required",
+      "exposed": [
+        {
+          "name": "Anchor_Wall_Left",
+          "kind": "wall",
+          "surface": "wall"
+        },
+        {
+          "name": "Anchor_Wall_Right",
+          "kind": "wall",
+          "surface": "wall"
+        },
+        {
+          "name": "Anchor_FloorCenter",
+          "kind": "floor-center",
+          "surface": "floor"
+        }
+      ]
+    },
+    "collision_policy": {
+      "kind": "static-body-proxy",
+      "proxy_shape": "box",
+      "nav_blocker": true,
+      "notes": "Breach frame spans the hull opening and remains an intentional blocker."
+    },
+    "support": {
+      "required_surfaces": [
+        "floor",
+        "wall"
+      ],
+      "clearance_radius_m": 0.5,
+      "load_bearing": true,
+      "supports": [
+        "on_floor",
+        "against_wall"
+      ]
+    },
+    "relations": {
+      "affordances": [
+        "on_floor",
+        "against_wall",
+        "blocks_door"
+      ],
+      "orientation_bias": "freeform",
+      "compatible_tags": [
+        "industrial",
+        "derelict",
+        "web"
+      ],
+      "incompatible_tags": [
+        "sterile"
+      ],
+      "preferred_neighbors": [
+        "pressure-door",
+        "web"
+      ],
+      "excluded_neighbors": [
+        "medical"
+      ]
+    },
+    "wrapper_scene": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-02-dependent-hull-breach-frame-ast-struct-hull-breach-frame.tscn",
+    "contract_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-02-dependent-hull-breach-frame-ast-struct-hull-breach-frame.contract.tres",
+    "inspection_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-02-dependent-hull-breach-frame-ast-struct-hull-breach-frame.inspection.json"
+  },
+  "wrapper_scene": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-02-dependent-hull-breach-frame-ast-struct-hull-breach-frame.tscn",
+  "contract_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-02-dependent-hull-breach-frame-ast-struct-hull-breach-frame.contract.tres",
+  "inspection_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-02-dependent-hull-breach-frame-ast-struct-hull-breach-frame.inspection.json"
+}

@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3 uid="uid://sargasso_playable_coherent_ship_002"]
+
+[ext_resource type="Script" path="res://scripts/procgen/playable_generated_ship.gd" id="1_playable_generated_ship"]
+
+[node name="PlayableCoherentShip002" type="Node3D"]
+script = ExtResource("1_playable_generated_ship")
+layout_path = "res://data/procgen/golden/coherent_ship_002/layout.json"
+kit_path = "res://data/kits/ship_structural_v0.json"
+gameplay_slice_path = "res://data/procgen/golden/coherent_ship_002/gameplay_slice.json"

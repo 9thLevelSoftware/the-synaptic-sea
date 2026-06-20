@@ -1,0 +1,159 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "ship_gameplay_slice",
+  "program_id": "prototype-ship-000017-8r-2d",
+  "start_room": "corridor_02",
+  "goal_room": "reactor_01",
+  "critical_path": [
+    "corridor_02",
+    "reactor_01"
+  ],
+  "objectives": [
+    {
+      "id": "cargo_01:cargo_01_loot_container",
+      "sequence": 1,
+      "type": "recover_supplies",
+      "room_id": "cargo_01",
+      "room_role": "cargo",
+      "placement_id": "cargo_01_loot_container",
+      "semantic": "loot_container",
+      "cell": [
+        20,
+        10,
+        1
+      ],
+      "approach_cell": [
+        20,
+        8,
+        1
+      ],
+      "approach_distance_cells": 2,
+      "interactable": true,
+      "complete_condition": {
+        "kind": "interact_with_placement",
+        "room_id": "cargo_01",
+        "placement_id": "cargo_01_loot_container",
+        "semantic": "loot_container",
+        "objective_type": "recover_supplies"
+      }
+    },
+    {
+      "id": "maintenance_01:junction_alpha",
+      "sequence": 2,
+      "type": "restore_systems",
+      "kind": "repair_junction",
+      "room_id": "maintenance_01",
+      "room_role": "maintenance",
+      "placement_id": "maintenance_01_tool_locker",
+      "semantic": "junction_box",
+      "cell": [
+        13,
+        0,
+        1
+      ],
+      "approach_cell": [
+        14,
+        0,
+        1
+      ],
+      "approach_distance_cells": 1,
+      "interactable": true,
+      "steps": [
+        {
+          "step_id": "primary_coupling",
+          "approach_cell": [
+            14,
+            0,
+            1
+          ]
+        },
+        {
+          "step_id": "secondary_coupling",
+          "approach_cell": [
+            13,
+            0,
+            1
+          ]
+        }
+      ],
+      "complete_condition": {
+        "kind": "interact_with_placement",
+        "room_id": "maintenance_01",
+        "placement_id": "maintenance_01_tool_locker",
+        "semantic": "junction_box",
+        "objective_type": "restore_systems"
+      }
+    },
+    {
+      "id": "bridge_01:bridge_01_command_console",
+      "sequence": 3,
+      "type": "download_logs",
+      "room_id": "bridge_01",
+      "room_role": "bridge",
+      "placement_id": "bridge_01_command_console",
+      "semantic": "command_console",
+      "cell": [
+        26,
+        0,
+        1
+      ],
+      "approach_cell": [
+        27,
+        0,
+        1
+      ],
+      "approach_distance_cells": 1,
+      "interactable": true,
+      "complete_condition": {
+        "kind": "interact_with_placement",
+        "room_id": "bridge_01",
+        "placement_id": "bridge_01_command_console",
+        "semantic": "command_console",
+        "objective_type": "download_logs"
+      }
+    },
+    {
+      "id": "reactor_01:reactor_01_reactor_control_panel",
+      "sequence": 4,
+      "type": "stabilize_reactor",
+      "room_id": "reactor_01",
+      "room_role": "reactor",
+      "placement_id": "reactor_01_reactor_control_panel",
+      "semantic": "reactor_control_panel",
+      "cell": [
+        10,
+        10,
+        1
+      ],
+      "approach_cell": [
+        8,
+        9,
+        1
+      ],
+      "approach_distance_cells": 3,
+      "interactable": true,
+      "complete_condition": {
+        "kind": "interact_with_placement",
+        "room_id": "reactor_01",
+        "placement_id": "reactor_01_reactor_control_panel",
+        "semantic": "reactor_control_panel",
+        "objective_type": "stabilize_reactor"
+      }
+    }
+  ],
+  "summary": {
+    "objective_count": 4,
+    "role_count": 4,
+    "roles": [
+      "cargo",
+      "maintenance",
+      "bridge",
+      "reactor"
+    ],
+    "has_goal_room_objective": true,
+    "missing_priority_roles": [
+      "medbay"
+    ],
+    "passes": true
+  }
+}

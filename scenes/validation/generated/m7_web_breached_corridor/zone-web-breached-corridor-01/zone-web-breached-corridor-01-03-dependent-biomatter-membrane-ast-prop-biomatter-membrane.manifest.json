@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "godot_wrapper_scene",
+  "asset": {
+    "id": "ast-prop-biomatter-membrane",
+    "display_name": "Biomatter Membrane",
+    "category": "gameplay-prop",
+    "anchors": {
+      "policy": "required",
+      "exposed": [
+        {
+          "name": "Anchor_FloorCenter",
+          "kind": "floor-center",
+          "surface": "floor"
+        },
+        {
+          "name": "Anchor_Facing",
+          "kind": "facing",
+          "surface": "floor"
+        },
+        {
+          "name": "Anchor_InteractionPoint",
+          "kind": "interaction",
+          "surface": "floor"
+        },
+        {
+          "name": "Anchor_Attach_Breach",
+          "kind": "attachment",
+          "surface": "wall"
+        },
+        {
+          "name": "Anchor_Attach_Surface",
+          "kind": "attachment",
+          "surface": "wall"
+        }
+      ]
+    },
+    "collision_policy": {
+      "kind": "static-body-proxy",
+      "nav_blocker": true,
+      "proxy_shape": "box",
+      "notes": "Used as the web membrane cutting through the breach."
+    },
+    "source_asset_path": "assets/_source/organic/biomatter_membrane.glb",
+    "wrapper_scene": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.tscn",
+    "contract_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.contract.tres",
+    "inspection_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.inspection.json",
+    "support": {
+      "required_surfaces": [
+        "wall",
+        "anchor_surface"
+      ],
+      "load_bearing": false,
+      "clearance_radius_m": 0.1
+    },
+    "relations": {
+      "affordances": [
+        "attached_to_surface",
+        "blocks_door"
+      ],
+      "orientation_bias": "wall-facing",
+      "compatible_tags": [
+        "web",
+        "organic",
+        "hazard"
+      ],
+      "incompatible_tags": [
+        "sterile",
+        "mechanical"
+      ],
+      "preferred_neighbors": [
+        "hull-breach-frame"
+      ],
+      "excluded_neighbors": [
+        "ceiling-hook"
+      ]
+    },
+    "notes": null
+  },
+  "generated": {
+    "scene_root": "Biomatter_Membrane",
+    "root_transform": "identity",
+    "visual_child": true,
+    "collision_root_type": "StaticBody3D",
+    "proxy_shape": "box",
+    "scene_lines": 24
+  }
+}

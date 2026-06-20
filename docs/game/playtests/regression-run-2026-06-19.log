@@ -1,0 +1,138 @@
+=== Sargasso regression bundle ===
+timestamp: 2026-06-19T19:57:06Z
+godot:     4.6.2.stable.official.71f334935
+project:   /Users/christopherwilloughby/the-sargasso-of-stars
+
+--- route_control_state_smoke ---
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+ROUTE CONTROL STATE PASS gates=2 opened=2 blockers=0 extraction=true
+ERROR: Capture not registered: 'gdaimcp'.
+   at: unregister_message_capture (core/debugger/engine_debugger.cpp:62)
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+     at: cleanup (core/object/object.cpp:2641)
+RESULT: PASS (route_control_state_smoke)
+
+--- main_playable_slice_route_control_smoke ---
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+The Sargasso of Stars coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=4 collision_shapes=31
+SHIP SYSTEM UPDATED sequence=1 type=recover_supplies power=18 reactor=22 extraction=false route_opened=0 blockers=1
+PLAYABLE INTERACTION interaction=objective:01:cargo_01:cargo_supply_cache objective=cargo_01:cargo_supply_cache sequence=1 type=recover_supplies room=cargo_01
+SHIP SYSTEM UPDATED sequence=2 type=restore_systems power=72 reactor=22 extraction=false route_opened=1 blockers=0
+PLAYABLE INTERACTION interaction=objective:02:maintenance_01:maintenance_breaker_panel objective=maintenance_01:maintenance_breaker_panel sequence=2 type=restore_systems room=maintenance_01
+SHIP SYSTEM UPDATED sequence=3 type=download_logs power=72 reactor=22 extraction=false route_opened=1 blockers=0
+PLAYABLE INTERACTION interaction=objective:03:medbay_01:medbay_terminal objective=medbay_01:medbay_terminal sequence=3 type=download_logs room=medbay_01
+SHIP SYSTEM UPDATED sequence=4 type=stabilize_reactor power=72 reactor=100 extraction=true route_opened=1 blockers=0
+PLAYABLE INTERACTION interaction=objective:04:reactor_01:reactor_control_panel objective=reactor_01:reactor_control_panel sequence=4 type=stabilize_reactor room=reactor_01
+PLAYABLE SLICE COMPLETE objectives_completed=4
+MAIN PLAYABLE ROUTE CONTROL PASS gates=1 opened=1 blockers=0 extraction=true
+ERROR: Capture not registered: 'gdaimcp'.
+   at: unregister_message_capture (core/debugger/engine_debugger.cpp:62)
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+     at: cleanup (core/object/object.cpp:2641)
+RESULT: PASS (main_playable_slice_route_control_smoke)
+
+--- oxygen_state_smoke ---
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+OXYGEN STATE PASS oxygen=100.0 breach_open=false breach_sealed=true passability_blocked=false recovery_threshold=30.0
+ERROR: Capture not registered: 'gdaimcp'.
+   at: unregister_message_capture (core/debugger/engine_debugger.cpp:62)
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+     at: cleanup (core/object/object.cpp:2641)
+RESULT: PASS (oxygen_state_smoke)
+
+--- main_playable_slice_hazard_smoke ---
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+The Sargasso of Stars coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=4 collision_shapes=31
+SHIP SYSTEM UPDATED sequence=1 type=recover_supplies power=18 reactor=22 extraction=false route_opened=0 blockers=1
+PLAYABLE INTERACTION interaction=objective:01:cargo_01:cargo_supply_cache objective=cargo_01:cargo_supply_cache sequence=1 type=recover_supplies room=cargo_01
+SHIP SYSTEM UPDATED sequence=2 type=restore_systems power=72 reactor=22 extraction=false route_opened=1 blockers=0
+PLAYABLE INTERACTION interaction=objective:02:maintenance_01:maintenance_breaker_panel objective=maintenance_01:maintenance_breaker_panel sequence=2 type=restore_systems room=maintenance_01
+SHIP SYSTEM UPDATED sequence=3 type=download_logs power=72 reactor=22 extraction=false route_opened=1 blockers=0
+PLAYABLE INTERACTION interaction=objective:03:medbay_01:medbay_terminal objective=medbay_01:medbay_terminal sequence=3 type=download_logs room=medbay_01
+SHIP SYSTEM UPDATED sequence=4 type=stabilize_reactor power=72 reactor=100 extraction=true route_opened=1 blockers=0
+PLAYABLE INTERACTION interaction=objective:04:reactor_01:reactor_control_panel objective=reactor_01:reactor_control_panel sequence=4 type=stabilize_reactor room=reactor_01
+PLAYABLE SLICE COMPLETE objectives_completed=4
+MAIN PLAYABLE HAZARD PASS oxygen=0.02388205555556 breach_open=false breach_sealed=true passability_blocked=false drain_consumed=7.78551488888883 regen_recovered=6.83522427777773
+ERROR: Capture not registered: 'gdaimcp'.
+   at: unregister_message_capture (core/debugger/engine_debugger.cpp:62)
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+     at: cleanup (core/object/object.cpp:2641)
+RESULT: PASS (main_playable_slice_hazard_smoke)
+
+--- main_playable_slice_ship_systems_smoke ---
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+The Sargasso of Stars coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=4 collision_shapes=31
+SHIP SYSTEM UPDATED sequence=1 type=recover_supplies power=18 reactor=22 extraction=false route_opened=0 blockers=1
+PLAYABLE INTERACTION interaction=objective:01:cargo_01:cargo_supply_cache objective=cargo_01:cargo_supply_cache sequence=1 type=recover_supplies room=cargo_01
+SHIP SYSTEM UPDATED sequence=2 type=restore_systems power=72 reactor=22 extraction=false route_opened=1 blockers=0
+PLAYABLE INTERACTION interaction=objective:02:maintenance_01:maintenance_breaker_panel objective=maintenance_01:maintenance_breaker_panel sequence=2 type=restore_systems room=maintenance_01
+SHIP SYSTEM UPDATED sequence=3 type=download_logs power=72 reactor=22 extraction=false route_opened=1 blockers=0
+PLAYABLE INTERACTION interaction=objective:03:medbay_01:medbay_terminal objective=medbay_01:medbay_terminal sequence=3 type=download_logs room=medbay_01
+SHIP SYSTEM UPDATED sequence=4 type=stabilize_reactor power=72 reactor=100 extraction=true route_opened=1 blockers=0
+PLAYABLE INTERACTION interaction=objective:04:reactor_01:reactor_control_panel objective=reactor_01:reactor_control_panel sequence=4 type=stabilize_reactor room=reactor_01
+PLAYABLE SLICE COMPLETE objectives_completed=4
+MAIN PLAYABLE SHIP SYSTEMS PASS supplies=true power=true logs=true reactor=true extraction=true blocked_visible=0 completed_systems=4
+ERROR: Capture not registered: 'gdaimcp'.
+   at: unregister_message_capture (core/debugger/engine_debugger.cpp:62)
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+     at: cleanup (core/object/object.cpp:2641)
+RESULT: PASS (main_playable_slice_ship_systems_smoke)
+
+--- main_playable_slice_completion_smoke ---
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+The Sargasso of Stars coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=4 collision_shapes=31
+SHIP SYSTEM UPDATED sequence=1 type=recover_supplies power=18 reactor=22 extraction=false route_opened=0 blockers=1
+PLAYABLE INTERACTION interaction=objective:01:cargo_01:cargo_supply_cache objective=cargo_01:cargo_supply_cache sequence=1 type=recover_supplies room=cargo_01
+SHIP SYSTEM UPDATED sequence=2 type=restore_systems power=72 reactor=22 extraction=false route_opened=1 blockers=0
+PLAYABLE INTERACTION interaction=objective:02:maintenance_01:maintenance_breaker_panel objective=maintenance_01:maintenance_breaker_panel sequence=2 type=restore_systems room=maintenance_01
+SHIP SYSTEM UPDATED sequence=3 type=download_logs power=72 reactor=22 extraction=false route_opened=1 blockers=0
+PLAYABLE INTERACTION interaction=objective:03:medbay_01:medbay_terminal objective=medbay_01:medbay_terminal sequence=3 type=download_logs room=medbay_01
+SHIP SYSTEM UPDATED sequence=4 type=stabilize_reactor power=72 reactor=100 extraction=true route_opened=1 blockers=0
+PLAYABLE INTERACTION interaction=objective:04:reactor_01:reactor_control_panel objective=reactor_01:reactor_control_panel sequence=4 type=stabilize_reactor room=reactor_01
+PLAYABLE SLICE COMPLETE objectives_completed=4
+MAIN PLAYABLE SLICE COMPLETE PASS completed=4 current_sequence=5 run_complete=true
+ERROR: Capture not registered: 'gdaimcp'.
+   at: unregister_message_capture (core/debugger/engine_debugger.cpp:62)
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+     at: cleanup (core/object/object.cpp:2641)
+RESULT: PASS (main_playable_slice_completion_smoke)
+
+--- main_playable_slice_input_smoke ---
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+The Sargasso of Stars coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=4 collision_shapes=31
+SHIP SYSTEM UPDATED sequence=1 type=recover_supplies power=18 reactor=22 extraction=false route_opened=0 blockers=1
+PLAYABLE INTERACTION interaction=objective:01:cargo_01:cargo_supply_cache objective=cargo_01:cargo_supply_cache sequence=1 type=recover_supplies room=cargo_01
+MAIN PLAYABLE INPUT LOOP PASS moved=true camera_followed=true interaction_input_path=true current_sequence=2
+ERROR: Capture not registered: 'gdaimcp'.
+   at: unregister_message_capture (core/debugger/engine_debugger.cpp:62)
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+     at: cleanup (core/object/object.cpp:2641)
+RESULT: PASS (main_playable_slice_input_smoke)
+
+--- main_playable_slice_readability_smoke ---
+Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
+
+The Sargasso of Stars coherent proof ship bootstrap loaded.
+PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=4 collision_shapes=31
+MAIN PLAYABLE SLICE READABILITY PASS objective_props=4 blocked=1 ramp=1 entry=1 destination=1 route_cues=4 labels=0
+ERROR: Capture not registered: 'gdaimcp'.
+   at: unregister_message_capture (core/debugger/engine_debugger.cpp:62)
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+     at: cleanup (core/object/object.cpp:2641)
+RESULT: PASS (main_playable_slice_readability_smoke)
+
+=== Summary ===
+pass=8 fail=0 total=8
+SARGASSO REGRESSION PASS commands=8 clean_output=true

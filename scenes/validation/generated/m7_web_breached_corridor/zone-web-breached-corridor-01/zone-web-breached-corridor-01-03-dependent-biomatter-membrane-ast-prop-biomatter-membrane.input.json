@@ -1,0 +1,104 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "asset_semantics",
+  "asset": {
+    "id": "ast-prop-biomatter-membrane",
+    "display_name": "Biomatter Membrane",
+    "source_asset_path": "assets/_source/organic/biomatter_membrane.glb",
+    "category": "gameplay-prop",
+    "tags": [
+      "web",
+      "organic",
+      "hazard",
+      "webbed"
+    ],
+    "bounds": {
+      "local_min_m": [
+        -1.0,
+        0.0,
+        -0.15
+      ],
+      "local_max_m": [
+        1.0,
+        1.2,
+        0.15
+      ],
+      "placement_origin": "author-defined"
+    },
+    "anchors": {
+      "policy": "required",
+      "exposed": [
+        {
+          "name": "Anchor_FloorCenter",
+          "kind": "floor-center",
+          "surface": "floor"
+        },
+        {
+          "name": "Anchor_Facing",
+          "kind": "facing",
+          "surface": "floor"
+        },
+        {
+          "name": "Anchor_InteractionPoint",
+          "kind": "interaction",
+          "surface": "floor"
+        },
+        {
+          "name": "Anchor_Attach_Breach",
+          "kind": "attachment",
+          "surface": "wall"
+        },
+        {
+          "name": "Anchor_Attach_Surface",
+          "kind": "attachment",
+          "surface": "wall"
+        }
+      ]
+    },
+    "collision_policy": {
+      "kind": "static-body-proxy",
+      "proxy_shape": "box",
+      "nav_blocker": true,
+      "notes": "Used as the web membrane cutting through the breach."
+    },
+    "support": {
+      "required_surfaces": [
+        "wall",
+        "anchor_surface"
+      ],
+      "clearance_radius_m": 0.1,
+      "load_bearing": false,
+      "supports": [
+        "attached_to_surface"
+      ]
+    },
+    "relations": {
+      "affordances": [
+        "attached_to_surface",
+        "blocks_door"
+      ],
+      "orientation_bias": "wall-facing",
+      "compatible_tags": [
+        "web",
+        "organic",
+        "hazard"
+      ],
+      "incompatible_tags": [
+        "sterile",
+        "mechanical"
+      ],
+      "preferred_neighbors": [
+        "hull-breach-frame"
+      ],
+      "excluded_neighbors": [
+        "ceiling-hook"
+      ]
+    },
+    "wrapper_scene": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.tscn",
+    "contract_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.contract.tres",
+    "inspection_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.inspection.json"
+  },
+  "wrapper_scene": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.tscn",
+  "contract_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.contract.tres",
+  "inspection_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.inspection.json"
+}

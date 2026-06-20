@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "run_id": "2026-06-13-20-14-scene-slop-detector",
+    "base_paths": [
+      "/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/m7_web_breached_corridor/generated"
+    ],
+    "format": "json",
+    "started_at": "2026-06-13T20:14:47.964402+00:00",
+    "completed_at": "2026-06-13T20:14:47.965669+00:00",
+    "files_scanned": 8,
+    "files_with_findings": 0,
+    "total_findings": 0,
+    "severity_counts": {
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    }
+  },
+  "findings": []
+}

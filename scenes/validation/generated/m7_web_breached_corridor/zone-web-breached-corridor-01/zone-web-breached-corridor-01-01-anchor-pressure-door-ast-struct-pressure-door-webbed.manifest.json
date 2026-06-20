@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "godot_wrapper_scene",
+  "asset": {
+    "id": "ast-struct-pressure-door-webbed",
+    "display_name": "Webbed Pressure Door",
+    "category": "structural",
+    "anchors": {
+      "policy": "required",
+      "exposed": [
+        {
+          "name": "Anchor_DoorFrame",
+          "kind": "doorframe",
+          "surface": "door"
+        },
+        {
+          "name": "Anchor_FloorCenter",
+          "kind": "floor-center",
+          "surface": "floor"
+        },
+        {
+          "name": "Anchor_Facing",
+          "kind": "facing",
+          "surface": "floor"
+        }
+      ]
+    },
+    "collision_policy": {
+      "kind": "static-body-proxy",
+      "nav_blocker": true,
+      "proxy_shape": "box",
+      "notes": "Intended as the sealed door anchor on the left side of the corridor."
+    },
+    "source_asset_path": "assets/_source/derelict/pressure_door_webbed.glb",
+    "wrapper_scene": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.tscn",
+    "contract_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.contract.tres",
+    "inspection_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.inspection.json",
+    "support": {
+      "required_surfaces": [
+        "floor",
+        "wall"
+      ],
+      "load_bearing": true,
+      "clearance_radius_m": 0.45
+    },
+    "relations": {
+      "affordances": [
+        "on_floor",
+        "against_wall",
+        "blocks_door"
+      ],
+      "orientation_bias": "freeform",
+      "compatible_tags": [
+        "industrial",
+        "derelict",
+        "web"
+      ],
+      "incompatible_tags": [
+        "sterile"
+      ],
+      "preferred_neighbors": [
+        "bulkhead",
+        "doorframe"
+      ],
+      "excluded_neighbors": [
+        "medical"
+      ]
+    },
+    "notes": null
+  },
+  "generated": {
+    "scene_root": "Webbed_Pressure_Door",
+    "root_transform": "identity",
+    "visual_child": true,
+    "collision_root_type": "StaticBody3D",
+    "proxy_shape": "box",
+    "scene_lines": 20
+  }
+}

@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="ModularAssetSpec" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/placement/modular_asset_spec.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+schema_version = "1.0.0"
+document_kind = "modular_asset_spec"
+asset_id = "ramp_up_1x2"
+module_id = "ramp_up_1x2"
+category = "structural"
+kit_id = "ship_structural_v0"
+module_family = "vertical_transition"
+grid_step_m = 4.0
+footprint_cells = [1, 2]
+bounds = {"local_min_m": [-2.0, 0.0, -4.0], "local_max_m": [2.0, 0.55, 4.0], "placement_origin": "edge-center", "mesh_origin_offset_m": [0.0, 0.0, 0.0]}
+sockets = [{"id": "floor_edge_south_01", "kind": "floor_edge", "position_m": [0.0, -4.0, 0.0], "compatible_kinds": ["ramp_edge", "floor_edge"]}, {"id": "floor_edge_north_01", "kind": "floor_edge", "position_m": [0.0, 4.0, 0.0], "compatible_kinds": ["ramp_edge", "floor_edge"]}]
+collision = {"kind": "static-body-proxy", "nav_blocker": false, "proxy_shape": "box", "notes": "authored simple proxy, never decorative collision"}
+provenance = {"source_platform": "self-authored", "license_state": "self-authored", "provenance_id": "ship_structural_v0:ramp_up_1x2"}
+source_asset_path = "assets/_processed/ship_structural_v0/ramp_up_1x2/ramp_up_1x2.glb"
+wrapper_scene = "res://scenes/wrappers/structural/ship_structural_v0/ramp_up_1x2.tscn"
+contract_path = "res://data/placement/contracts/structural/ship_structural_v0/ramp_up_1x2_contract.tres"
+asset = {"id": "ramp_up_1x2", "module_id": "ramp_up_1x2", "category": "structural", "kit": {"kit_id": "ship_structural_v0", "module_id": "ramp_up_1x2", "module_family": "vertical_transition", "pivot_policy": "edge-center"}, "bounds": {"local_min_m": [-2.0, 0.0, -4.0], "local_max_m": [2.0, 0.55, 4.0], "placement_origin": "edge-center", "mesh_origin_offset_m": [0.0, 0.0, 0.0]}, "footprint_cells": [1, 2], "sockets": [{"id": "floor_edge_south_01", "kind": "floor_edge", "position_m": [0.0, -4.0, 0.0], "compatible_kinds": ["ramp_edge", "floor_edge"]}, {"id": "floor_edge_north_01", "kind": "floor_edge", "position_m": [0.0, 4.0, 0.0], "compatible_kinds": ["ramp_edge", "floor_edge"]}], "collision": {"kind": "static-body-proxy", "nav_blocker": false, "proxy_shape": "box", "notes": "authored simple proxy, never decorative collision"}, "provenance": {"source_platform": "self-authored", "license_state": "self-authored", "provenance_id": "ship_structural_v0:ramp_up_1x2"}, "source_asset_path": "assets/_processed/ship_structural_v0/ramp_up_1x2/ramp_up_1x2.glb", "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/ramp_up_1x2.tscn", "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/ramp_up_1x2_contract.tres"}

@@ -1,0 +1,84 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "asset_semantics",
+  "asset": {
+    "id": "ast-dress-web-tendrils",
+    "display_name": "Web Tendril Strip",
+    "source_asset_path": "assets/_source/organic/web_tendril_strip.glb",
+    "category": "dressing",
+    "tags": [
+      "web",
+      "organic",
+      "gritty",
+      "decorative"
+    ],
+    "bounds": {
+      "local_min_m": [
+        -1.0,
+        0.0,
+        -0.1
+      ],
+      "local_max_m": [
+        1.0,
+        0.3,
+        0.1
+      ],
+      "placement_origin": "author-defined"
+    },
+    "anchors": {
+      "policy": "optional",
+      "exposed": [
+        {
+          "name": "Anchor_Attach_Surface",
+          "kind": "attachment",
+          "surface": "wall"
+        }
+      ]
+    },
+    "collision_policy": {
+      "kind": "dressing-no-collision",
+      "proxy_shape": "none",
+      "nav_blocker": false,
+      "notes": "Visual-only tendrils; must never affect pathfinding."
+    },
+    "support": {
+      "required_surfaces": [
+        "wall",
+        "anchor_surface"
+      ],
+      "clearance_radius_m": 0.05,
+      "load_bearing": false,
+      "supports": [
+        "attached_to_surface"
+      ]
+    },
+    "relations": {
+      "affordances": [
+        "attached_to_surface",
+        "decorates"
+      ],
+      "orientation_bias": "wall-facing",
+      "compatible_tags": [
+        "web",
+        "organic",
+        "gritty"
+      ],
+      "incompatible_tags": [
+        "sterile",
+        "mechanical"
+      ],
+      "preferred_neighbors": [
+        "biomatter-membrane"
+      ],
+      "excluded_neighbors": [
+        "ceiling-hook"
+      ]
+    },
+    "wrapper_scene": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-06-dependent-biomatter-tendril-ast-dress-web-tendrils.tscn",
+    "contract_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-06-dependent-biomatter-tendril-ast-dress-web-tendrils.contract.tres",
+    "inspection_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-06-dependent-biomatter-tendril-ast-dress-web-tendrils.inspection.json"
+  },
+  "wrapper_scene": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-06-dependent-biomatter-tendril-ast-dress-web-tendrils.tscn",
+  "contract_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-06-dependent-biomatter-tendril-ast-dress-web-tendrils.contract.tres",
+  "inspection_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-06-dependent-biomatter-tendril-ast-dress-web-tendrils.inspection.json"
+}

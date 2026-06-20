@@ -1,0 +1,889 @@
+{
+  "schema_version": "1.1.0",
+  "document_kind": "ship_layout",
+  "program_id": "coherent-proof-ship-003",
+  "kit_id": "ship_structural_v0",
+  "design_intent": "stacked two-deck ship with ramp up and elevator down; template C",
+  "cell_size": 4.0,
+  "rooms": [
+    {
+      "id": "airlock_03",
+      "room_role": "airlock",
+      "deck": 0,
+      "structural_placements": [
+        {
+          "name": "floor_cell_x0_z0",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "floor_cell_x1_z0",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            4.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "floor_cell_x0_z1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            0.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "name": "floor_cell_x1_z1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            4.0,
+            0.0,
+            4.0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "corridor_03",
+      "room_role": "corridor",
+      "deck": 0,
+      "structural_placements": [
+        {
+          "name": "floor_cell_x2_z0",
+          "module": "corridor_floor_1x1",
+          "module_id": "corridor_floor_1x1",
+          "world_position": [
+            8.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "floor_cell_x3_z0",
+          "module": "corridor_floor_1x1",
+          "module_id": "corridor_floor_1x1",
+          "world_position": [
+            12.0,
+            0.0,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lower_hub_03",
+      "room_role": "main_hub",
+      "deck": 0,
+      "structural_placements": [
+        {
+          "name": "floor_cell_x4_z-1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            16.0,
+            0.0,
+            -4.0
+          ]
+        },
+        {
+          "name": "floor_cell_x5_z-1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            20.0,
+            0.0,
+            -4.0
+          ]
+        },
+        {
+          "name": "floor_cell_x4_z0",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            16.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "floor_cell_x5_z0",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            20.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "floor_cell_x4_z1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            16.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "name": "floor_cell_x5_z1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            20.0,
+            0.0,
+            4.0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "storage_03",
+      "room_role": "storage",
+      "deck": 0,
+      "structural_placements": [
+        {
+          "name": "floor_cell_x6_z1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            24.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "name": "floor_cell_x7_z1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            28.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "name": "floor_cell_x6_z2",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            24.0,
+            0.0,
+            8.0
+          ]
+        },
+        {
+          "name": "floor_cell_x7_z2",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            28.0,
+            0.0,
+            8.0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tool_storage_03",
+      "room_role": "tool_storage",
+      "deck": 0,
+      "structural_placements": [
+        {
+          "name": "floor_cell_x6_z-1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            24.0,
+            0.0,
+            -4.0
+          ]
+        },
+        {
+          "name": "floor_cell_x7_z-1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            28.0,
+            0.0,
+            -4.0
+          ]
+        },
+        {
+          "name": "floor_cell_x6_z-2",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            24.0,
+            0.0,
+            -8.0
+          ]
+        },
+        {
+          "name": "floor_cell_x7_z-2",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            28.0,
+            0.0,
+            -8.0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ramp_03",
+      "room_role": "ramp",
+      "deck": 0,
+      "structural_placements": [
+        {
+          "name": "floor_cell_x6_z0",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            24.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "ramp_up_1x2",
+          "module": "ramp_up_1x2",
+          "module_id": "ramp_up_1x2",
+          "world_position": [
+            24.0,
+            0.0,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "elevator_03",
+      "room_role": "elevator_shaft",
+      "deck": 0,
+      "structural_placements": [
+        {
+          "name": "floor_cell_x8_z0",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            32.0,
+            0.0,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reactor_access_03",
+      "room_role": "corridor",
+      "deck": 0,
+      "structural_placements": [
+        {
+          "name": "floor_cell_x9_z0",
+          "module": "corridor_floor_1x1",
+          "module_id": "corridor_floor_1x1",
+          "world_position": [
+            36.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "floor_cell_x10_z0",
+          "module": "corridor_floor_1x1",
+          "module_id": "corridor_floor_1x1",
+          "world_position": [
+            40.0,
+            0.0,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reactor_03",
+      "room_role": "reactor",
+      "deck": 0,
+      "structural_placements": [
+        {
+          "name": "floor_cell_x11_z-1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            44.0,
+            0.0,
+            -4.0
+          ]
+        },
+        {
+          "name": "floor_cell_x12_z-1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            48.0,
+            0.0,
+            -4.0
+          ]
+        },
+        {
+          "name": "floor_cell_x11_z0",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            44.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "floor_cell_x12_z0",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            48.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "floor_cell_x11_z1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            44.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "name": "floor_cell_x12_z1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            48.0,
+            0.0,
+            4.0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "upper_hub_03",
+      "room_role": "main_hub",
+      "deck": 1,
+      "structural_placements": [
+        {
+          "name": "floor_cell_d1_x6_z-1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            24.0,
+            4.0,
+            -4.0
+          ]
+        },
+        {
+          "name": "floor_cell_d1_x7_z-1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            28.0,
+            4.0,
+            -4.0
+          ]
+        },
+        {
+          "name": "floor_cell_d1_x8_z-1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            32.0,
+            4.0,
+            -4.0
+          ]
+        },
+        {
+          "name": "floor_cell_d1_x6_z0",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            24.0,
+            4.0,
+            0.0
+          ]
+        },
+        {
+          "name": "floor_cell_d1_x7_z0",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            28.0,
+            4.0,
+            0.0
+          ]
+        },
+        {
+          "name": "floor_cell_d1_x8_z0",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            32.0,
+            4.0,
+            0.0
+          ]
+        },
+        {
+          "name": "floor_cell_d1_x6_z1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            24.0,
+            4.0,
+            4.0
+          ]
+        },
+        {
+          "name": "floor_cell_d1_x7_z1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            28.0,
+            4.0,
+            4.0
+          ]
+        },
+        {
+          "name": "floor_cell_d1_x8_z1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            32.0,
+            4.0,
+            4.0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "medbay_03",
+      "room_role": "medbay",
+      "deck": 1,
+      "structural_placements": [
+        {
+          "name": "floor_cell_d1_x9_z-2",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            36.0,
+            4.0,
+            -8.0
+          ]
+        },
+        {
+          "name": "floor_cell_d1_x10_z-2",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            40.0,
+            4.0,
+            -8.0
+          ]
+        },
+        {
+          "name": "floor_cell_d1_x9_z-1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            36.0,
+            4.0,
+            -4.0
+          ]
+        },
+        {
+          "name": "floor_cell_d1_x10_z-1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            40.0,
+            4.0,
+            -4.0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "maintenance_03",
+      "room_role": "maintenance",
+      "deck": 1,
+      "structural_placements": [
+        {
+          "name": "floor_cell_d1_x9_z1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            36.0,
+            4.0,
+            4.0
+          ]
+        },
+        {
+          "name": "floor_cell_d1_x10_z1",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            40.0,
+            4.0,
+            4.0
+          ]
+        },
+        {
+          "name": "floor_cell_d1_x9_z2",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            36.0,
+            4.0,
+            8.0
+          ]
+        },
+        {
+          "name": "floor_cell_d1_x10_z2",
+          "module": "floor_1x1",
+          "module_id": "floor_1x1",
+          "world_position": [
+            40.0,
+            4.0,
+            8.0
+          ]
+        }
+      ]
+    }
+  ],
+  "room_links": [
+    {
+      "id": "airlock_to_corridor",
+      "from_room": "airlock_03",
+      "to_room": "corridor_03",
+      "from_cell": [
+        1,
+        0,
+        0
+      ],
+      "to_cell": [
+        2,
+        0,
+        0
+      ],
+      "module_id": "doorway_frame_open_1x1"
+    },
+    {
+      "id": "corridor_to_lower_hub",
+      "from_room": "corridor_03",
+      "to_room": "lower_hub_03",
+      "from_cell": [
+        3,
+        0,
+        0
+      ],
+      "to_cell": [
+        4,
+        0,
+        0
+      ],
+      "module_id": "doorway_frame_open_1x1"
+    },
+    {
+      "id": "lower_hub_to_storage",
+      "from_room": "lower_hub_03",
+      "to_room": "storage_03",
+      "from_cell": [
+        5,
+        1,
+        0
+      ],
+      "to_cell": [
+        6,
+        1,
+        0
+      ],
+      "module_id": "doorway_frame_open_1x1"
+    },
+    {
+      "id": "lower_hub_to_tool_storage",
+      "from_room": "lower_hub_03",
+      "to_room": "tool_storage_03",
+      "from_cell": [
+        5,
+        -1,
+        0
+      ],
+      "to_cell": [
+        6,
+        -1,
+        0
+      ],
+      "module_id": "doorway_frame_open_1x1"
+    },
+    {
+      "id": "lower_hub_to_ramp",
+      "from_room": "lower_hub_03",
+      "to_room": "ramp_03",
+      "from_cell": [
+        5,
+        0,
+        0
+      ],
+      "to_cell": [
+        6,
+        0,
+        0
+      ],
+      "module_id": "doorway_frame_open_1x1"
+    },
+    {
+      "id": "ramp_to_upper_hub",
+      "from_room": "ramp_03",
+      "to_room": "upper_hub_03",
+      "from_cell": [
+        6,
+        0,
+        0
+      ],
+      "to_cell": [
+        6,
+        0,
+        1
+      ],
+      "module_id": "ramp_up_1x2"
+    },
+    {
+      "id": "upper_hub_to_medbay",
+      "from_room": "upper_hub_03",
+      "to_room": "medbay_03",
+      "from_cell": [
+        8,
+        -1,
+        1
+      ],
+      "to_cell": [
+        9,
+        -1,
+        1
+      ],
+      "module_id": "doorway_frame_open_1x1"
+    },
+    {
+      "id": "upper_hub_to_maintenance",
+      "from_room": "upper_hub_03",
+      "to_room": "maintenance_03",
+      "from_cell": [
+        8,
+        1,
+        1
+      ],
+      "to_cell": [
+        9,
+        1,
+        1
+      ],
+      "module_id": "doorway_frame_open_1x1"
+    },
+    {
+      "id": "elevator_to_reactor_access",
+      "from_room": "elevator_03",
+      "to_room": "reactor_access_03",
+      "from_cell": [
+        8,
+        0,
+        0
+      ],
+      "to_cell": [
+        9,
+        0,
+        0
+      ],
+      "module_id": "doorway_frame_open_1x1"
+    },
+    {
+      "id": "reactor_access_to_reactor",
+      "from_room": "reactor_access_03",
+      "to_room": "reactor_03",
+      "from_cell": [
+        10,
+        0,
+        0
+      ],
+      "to_cell": [
+        11,
+        0,
+        0
+      ],
+      "module_id": "doorway_frame_open_1x1"
+    }
+  ],
+  "blocked_links": [
+    {
+      "id": "reactor_access_to_reactor_blocked",
+      "from_room": "reactor_access_03",
+      "to_room": "reactor_03",
+      "from_cell": [
+        10,
+        0,
+        0
+      ],
+      "to_cell": [
+        11,
+        0,
+        0
+      ],
+      "module_id": "doorway_frame_blocked_1x1",
+      "reason": "biomatter blockage"
+    }
+  ],
+  "fire_zones": [
+    {
+      "id": "lower_hub_to_storage_fire",
+      "from_room": "lower_hub_03",
+      "to_room": "storage_03",
+      "from_cell": [
+        5,
+        1,
+        0
+      ],
+      "to_cell": [
+        6,
+        1,
+        0
+      ],
+      "module_id": "doorway_frame_open_1x1",
+      "kind": "timed_fire",
+      "rationale": "non-critical side link to optional loot room (objective 1); fire cannot trap the player or block any main objective"
+    }
+  ],
+  "arc_zones": [
+    {
+      "id": "lower_hub_to_tool_storage_arc",
+      "from_room": "lower_hub_03",
+      "to_room": "tool_storage_03",
+      "from_cell": [
+        5,
+        -1,
+        0
+      ],
+      "to_cell": [
+        6,
+        -1,
+        0
+      ],
+      "module_id": "doorway_frame_open_1x1",
+      "kind": "electrical_arc",
+      "rationale": "non-critical side link to the optional portable oxygen pump pickup room; arc cannot trap the player or block any main objective"
+    }
+  ],
+  "breach_zones": [
+    {
+      "id": "upper_hub_to_elevator_breach",
+      "from_room": "upper_hub_03",
+      "to_room": "elevator_03",
+      "from_cell": [
+        8,
+        0,
+        1
+      ],
+      "to_cell": [
+        8,
+        0,
+        0
+      ],
+      "module_id": "doorway_frame_open_1x1",
+      "kind": "oxygen_breach",
+      "rationale": "obj4-to-obj5 traversal corridor; sealed when main power is restored (sequence 2)"
+    }
+  ],
+  "vertical_connections": [
+    {
+      "id": "ramp_03_to_upper_hub_03",
+      "type": "ramp",
+      "module_id": "ramp_up_1x2",
+      "from_room": "ramp_03",
+      "from_cell": [
+        6,
+        0,
+        0
+      ],
+      "to_room": "upper_hub_03",
+      "to_cell": [
+        6,
+        0,
+        1
+      ]
+    },
+    {
+      "id": "elevator_03_to_upper_hub_03",
+      "type": "elevator_shaft",
+      "module_id": "elevator_shaft_1x1",
+      "from_room": "elevator_03",
+      "from_cell": [
+        8,
+        0,
+        0
+      ],
+      "to_room": "upper_hub_03",
+      "to_cell": [
+        8,
+        0,
+        1
+      ]
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "upper_hub_orange_beacon",
+      "room_id": "upper_hub_03",
+      "kind": "orientation_beacon",
+      "position": [
+        28.0,
+        4.15,
+        0.0
+      ],
+      "color": "orange"
+    },
+    {
+      "id": "reactor_green_core",
+      "room_id": "reactor_03",
+      "kind": "destination_core",
+      "position": [
+        46.0,
+        4.15,
+        0.0
+      ],
+      "color": "green"
+    }
+  ],
+  "critical_path": [
+    "airlock_03",
+    "corridor_03",
+    "lower_hub_03",
+    "ramp_03",
+    "upper_hub_03",
+    "elevator_03",
+    "reactor_access_03",
+    "reactor_03"
+  ],
+  "prototype": {
+    "start_room": "airlock_03",
+    "goal_room": "reactor_03"
+  }
+}

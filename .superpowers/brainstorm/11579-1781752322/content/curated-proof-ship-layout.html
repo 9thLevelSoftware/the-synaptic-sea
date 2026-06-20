@@ -1,0 +1,127 @@
+<h2>Curated 5–8 Room Proof Ship: Spatial Target</h2>
+<p class="subtitle">Goal: a single in-engine derelict that reads as one connected place, not isolated boxes. This is a design screen only — no implementation yet.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Recommended golden fixture layout: “Breach → Spine → Reactor”</div>
+  <div class="mockup-body">
+    <svg viewBox="0 0 980 540" style="width:100%;max-width:1100px;background:#111820;border-radius:14px;border:1px solid #2d3a46">
+      <defs>
+        <style>
+          .room{fill:#2e3a43;stroke:#8aa1b2;stroke-width:3;rx:8;}
+          .corr{fill:#1f2930;stroke:#6f8494;stroke-width:3;}
+          .door{stroke:#c6d66f;stroke-width:7;stroke-linecap:round;}
+          .blocked{stroke:#b15d49;stroke-width:8;stroke-linecap:round;stroke-dasharray:10 9;}
+          .route{fill:none;stroke:#54d08b;stroke-width:6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:12 10;opacity:.95;}
+          .label{font:700 18px ui-sans-serif,system-ui;fill:#e8eef2;}
+          .small{font:500 13px ui-sans-serif,system-ui;fill:#aebbc4;}
+          .note{font:600 14px ui-sans-serif,system-ui;fill:#ffd27a;}
+          .deck0{fill:#26313a;}
+          .deck1{fill:#32424d;}
+          .landmark{fill:#55b7e8;stroke:#c9f0ff;stroke-width:2;}
+          .bio{fill:#4cbf77;stroke:#a7f5c2;stroke-width:2;opacity:.82;}
+        </style>
+      </defs>
+
+      <!-- Deck 0 entry -->
+      <rect class="room deck0" x="55" y="250" width="125" height="95"/>
+      <text class="label" x="76" y="292">Airlock</text>
+      <text class="small" x="70" y="318">entry / breach</text>
+
+      <rect class="corr" x="180" y="283" width="160" height="32"/>
+      <text class="small" x="198" y="276">decompression corridor</text>
+      <line class="door" x1="180" y1="298" x2="180" y2="317"/>
+
+      <!-- Vertical transition -->
+      <polygon points="340,282 430,235 460,265 370,315" fill="#5b4a2e" stroke="#d9b46a" stroke-width="3"/>
+      <text class="label" x="352" y="226">Ramp / ladder</text>
+      <text class="note" x="348" y="248">visible deck change</text>
+
+      <!-- Deck 1 spine -->
+      <rect class="corr deck1" x="455" y="255" width="365" height="58"/>
+      <text class="label" x="570" y="290">Central Spine</text>
+      <circle class="landmark" cx="635" cy="284" r="16"/>
+      <text class="small" x="655" y="276">blue landmark</text>
+      <text class="small" x="655" y="294">orientation anchor</text>
+
+      <!-- Left/right branches -->
+      <rect class="corr deck1" x="600" y="155" width="58" height="100"/>
+      <rect class="corr deck1" x="600" y="313" width="58" height="102"/>
+      <line class="door" x1="626" y1="255" x2="646" y2="255"/>
+      <line class="door" x1="626" y1="313" x2="646" y2="313"/>
+
+      <rect class="room deck1" x="505" y="65" width="170" height="90"/>
+      <text class="label" x="550" y="108">Cargo</text>
+      <text class="small" x="528" y="132">open volume + cover</text>
+      <line class="door" x1="625" y1="155" x2="645" y2="155"/>
+
+      <rect class="room deck1" x="700" y="150" width="135" height="90"/>
+      <text class="label" x="722" y="193">Med Nook</text>
+      <text class="small" x="718" y="216">side room</text>
+      <line class="door" x1="700" y1="196" x2="700" y2="216"/>
+
+      <rect class="room deck1" x="500" y="415" width="160" height="90"/>
+      <text class="label" x="525" y="457">Maintenance</text>
+      <text class="small" x="528" y="480">repair beat</text>
+      <line class="door" x1="625" y1="415" x2="645" y2="415"/>
+
+      <rect class="room deck1" x="820" y="230" width="135" height="110"/>
+      <text class="label" x="847" y="276">Reactor</text>
+      <text class="small" x="842" y="301">destination</text>
+      <circle class="bio" cx="902" cy="318" r="18"/>
+      <line class="door" x1="820" y1="279" x2="820" y2="302"/>
+
+      <rect class="room deck1" x="735" y="370" width="145" height="85"/>
+      <text class="label" x="760" y="410">Control</text>
+      <text class="small" x="758" y="433">overlooks spine</text>
+      <line class="door" x1="782" y1="370" x2="805" y2="370"/>
+
+      <!-- Blocked path -->
+      <line class="blocked" x1="735" y1="342" x2="878" y2="368"/>
+      <text class="note" x="690" y="350">blocked biomatter route</text>
+
+      <!-- Route -->
+      <path class="route" d="M118 298 L260 298 L395 275 L505 284 L635 284 L812 284 L887 284"/>
+
+      <!-- Callouts -->
+      <text class="small" x="55" y="390">Deck 0 starts low, then player sees/uses a clear vertical transition.</text>
+      <text class="small" x="455" y="35">Deck 1 has a central spine, branches, landmarks, and visible destination.</text>
+      <text class="small" x="608" y="522">Not random yet: this is the canonical coherent fixture future generation should match.</text>
+    </svg>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Design intent for this slice</h3>
+  <div class="options" data-multiselect>
+    <div class="option" data-choice="approve-spatial-target" onclick="toggleSelect(this)">
+      <div class="letter">✓</div>
+      <div class="content">
+        <h3>Approve this spatial target</h3>
+        <p>One curated 7-room derelict with a spine, side rooms, a vertical transition, a blocked route, a landmark, and a reactor destination.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="more-vertical" onclick="toggleSelect(this)">
+      <div class="letter">V</div>
+      <div class="content">
+        <h3>Make vertical perspective stronger</h3>
+        <p>Emphasize catwalk/overlook/deck-height clarity more than room variety.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="more-claustrophobic" onclick="toggleSelect(this)">
+      <div class="letter">C</div>
+      <div class="content">
+        <h3>Make it more claustrophobic</h3>
+        <p>Narrower spine, more partial occlusion, more biomatter blockage — still readable.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="more-open" onclick="toggleSelect(this)">
+      <div class="letter">O</div>
+      <div class="content">
+        <h3>Make it more open and readable</h3>
+        <p>Wider central spaces and cleaner sightlines, less horror density for the proof.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">Please respond in the terminal after reviewing. You can also click one or more options here to mark preferences.</p>

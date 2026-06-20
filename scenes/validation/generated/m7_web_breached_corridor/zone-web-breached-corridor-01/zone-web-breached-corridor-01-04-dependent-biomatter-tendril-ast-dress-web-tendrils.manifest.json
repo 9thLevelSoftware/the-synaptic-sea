@@ -1,0 +1,68 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "godot_wrapper_scene",
+  "asset": {
+    "id": "ast-dress-web-tendrils",
+    "display_name": "Web Tendril Strip",
+    "category": "dressing",
+    "anchors": {
+      "policy": "optional",
+      "exposed": [
+        {
+          "name": "Anchor_Attach_Surface",
+          "kind": "attachment",
+          "surface": "wall"
+        }
+      ]
+    },
+    "collision_policy": {
+      "kind": "dressing-no-collision",
+      "nav_blocker": false,
+      "proxy_shape": "none",
+      "notes": "Visual-only tendrils; must never affect pathfinding."
+    },
+    "source_asset_path": "assets/_source/organic/web_tendril_strip.glb",
+    "wrapper_scene": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-04-dependent-biomatter-tendril-ast-dress-web-tendrils.tscn",
+    "contract_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-04-dependent-biomatter-tendril-ast-dress-web-tendrils.contract.tres",
+    "inspection_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-04-dependent-biomatter-tendril-ast-dress-web-tendrils.inspection.json",
+    "support": {
+      "required_surfaces": [
+        "wall",
+        "anchor_surface"
+      ],
+      "load_bearing": false,
+      "clearance_radius_m": 0.05
+    },
+    "relations": {
+      "affordances": [
+        "attached_to_surface",
+        "decorates"
+      ],
+      "orientation_bias": "wall-facing",
+      "compatible_tags": [
+        "web",
+        "organic",
+        "gritty"
+      ],
+      "incompatible_tags": [
+        "sterile",
+        "mechanical"
+      ],
+      "preferred_neighbors": [
+        "biomatter-membrane"
+      ],
+      "excluded_neighbors": [
+        "ceiling-hook"
+      ]
+    },
+    "notes": null
+  },
+  "generated": {
+    "scene_root": "Web_Tendril_Strip",
+    "root_transform": "identity",
+    "visual_child": true,
+    "collision_root_type": null,
+    "proxy_shape": "none",
+    "scene_lines": 6
+  }
+}

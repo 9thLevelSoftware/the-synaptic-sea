@@ -1,0 +1,224 @@
+{
+  "schema_version": "1.1.0",
+  "document_kind": "ship_layout",
+  "program_id": "coherent-proof-ship-002",
+  "kit_id": "ship_structural_v0",
+  "design_intent": "curated bifurcated 12-room proof ship with parallel left/right branches converging on reactor",
+  "cell_size": 4.0,
+  "rooms": [
+    {
+      "id": "arc_side_01",
+      "room_role": "side_storage",
+      "deck": 0,
+      "structural_placements": [
+        { "name": "floor_cell_x1_z-1", "module": "floor_1x1", "world_position": [4.0, 0.0, -4.0] }
+      ]
+    },
+    {
+      "id": "airlock_01",
+      "room_role": "airlock",
+      "deck": 0,
+      "structural_placements": [
+        { "name": "floor_cell_x0_z0", "module": "floor_1x1", "world_position": [0.0, 0.0, 0.0] },
+        { "name": "floor_cell_x1_z0", "module": "floor_1x1", "world_position": [4.0, 0.0, 0.0] },
+        { "name": "floor_cell_x0_z1", "module": "floor_1x1", "world_position": [0.0, 0.0, 4.0] },
+        { "name": "floor_cell_x1_z1", "module": "floor_1x1", "world_position": [4.0, 0.0, 4.0] }
+      ]
+    },
+    {
+      "id": "tool_storage_01",
+      "room_role": "storage",
+      "deck": 0,
+      "structural_placements": [
+        { "name": "floor_cell_x2_z1", "module": "floor_1x1", "world_position": [8.0, 0.0, 4.0] }
+      ]
+    },
+    {
+      "id": "corridor_01",
+      "room_role": "corridor",
+      "deck": 0,
+      "structural_placements": [
+        { "name": "floor_cell_x2_z0", "module": "corridor_floor_1x1", "world_position": [8.0, 0.0, 0.0] },
+        { "name": "floor_cell_x3_z0", "module": "corridor_floor_1x1", "world_position": [12.0, 0.0, 0.0] }
+      ]
+    },
+    {
+      "id": "hub_01",
+      "room_role": "main_spine",
+      "deck": 0,
+      "structural_placements": [
+        { "name": "floor_cell_x4_z0", "module": "corridor_floor_1x1", "world_position": [16.0, 0.0, 0.0] }
+      ]
+    },
+    {
+      "id": "left_arm_01",
+      "room_role": "corridor",
+      "deck": 0,
+      "structural_placements": [
+        { "name": "floor_cell_x4_z-1", "module": "corridor_floor_1x1", "world_position": [16.0, 0.0, -4.0] },
+        { "name": "floor_cell_x4_z-2", "module": "corridor_floor_1x1", "world_position": [16.0, 0.0, -8.0] }
+      ]
+    },
+    {
+      "id": "cargo_bay_01",
+      "room_role": "cargo",
+      "deck": 0,
+      "structural_placements": [
+        { "name": "floor_cell_x2_z-2", "module": "floor_1x1", "world_position": [8.0, 0.0, -8.0] },
+        { "name": "floor_cell_x3_z-2", "module": "floor_1x1", "world_position": [12.0, 0.0, -8.0] },
+        { "name": "floor_cell_x2_z-3", "module": "floor_1x1", "world_position": [8.0, 0.0, -12.0] },
+        { "name": "floor_cell_x3_z-3", "module": "floor_1x1", "world_position": [12.0, 0.0, -12.0] }
+      ]
+    },
+    {
+      "id": "maintenance_bay_01",
+      "room_role": "maintenance",
+      "deck": 0,
+      "structural_placements": [
+        { "name": "floor_cell_x5_z-2", "module": "floor_1x1", "world_position": [20.0, 0.0, -8.0] },
+        { "name": "floor_cell_x6_z-2", "module": "floor_1x1", "world_position": [24.0, 0.0, -8.0] },
+        { "name": "floor_cell_x5_z-3", "module": "floor_1x1", "world_position": [20.0, 0.0, -12.0] },
+        { "name": "floor_cell_x6_z-3", "module": "floor_1x1", "world_position": [24.0, 0.0, -12.0] }
+      ]
+    },
+    {
+      "id": "right_arm_01",
+      "room_role": "corridor",
+      "deck": 0,
+      "structural_placements": [
+        { "name": "floor_cell_x4_z1", "module": "corridor_floor_1x1", "world_position": [16.0, 0.0, 4.0] },
+        { "name": "floor_cell_x4_z2", "module": "corridor_floor_1x1", "world_position": [16.0, 0.0, 8.0] }
+      ]
+    },
+    {
+      "id": "medbay_01",
+      "room_role": "medbay",
+      "deck": 0,
+      "structural_placements": [
+        { "name": "floor_cell_x2_z2", "module": "floor_1x1", "world_position": [8.0, 0.0, 8.0] },
+        { "name": "floor_cell_x3_z2", "module": "floor_1x1", "world_position": [12.0, 0.0, 8.0] },
+        { "name": "floor_cell_x2_z3", "module": "floor_1x1", "world_position": [8.0, 0.0, 12.0] },
+        { "name": "floor_cell_x3_z3", "module": "floor_1x1", "world_position": [12.0, 0.0, 12.0] }
+      ]
+    },
+    {
+      "id": "bridge_01",
+      "room_role": "bridge",
+      "deck": 0,
+      "structural_placements": [
+        { "name": "floor_cell_x5_z2", "module": "floor_1x1", "world_position": [20.0, 0.0, 8.0] },
+        { "name": "floor_cell_x6_z2", "module": "floor_1x1", "world_position": [24.0, 0.0, 8.0] },
+        { "name": "floor_cell_x5_z3", "module": "floor_1x1", "world_position": [20.0, 0.0, 12.0] },
+        { "name": "floor_cell_x6_z3", "module": "floor_1x1", "world_position": [24.0, 0.0, 12.0] }
+      ]
+    },
+    {
+      "id": "convergence_01",
+      "room_role": "main_spine",
+      "deck": 0,
+      "structural_placements": [
+        { "name": "floor_cell_x5_z0", "module": "corridor_floor_1x1", "world_position": [20.0, 0.0, 0.0] },
+        { "name": "floor_cell_x6_z0", "module": "corridor_floor_1x1", "world_position": [24.0, 0.0, 0.0] }
+      ]
+    },
+    {
+      "id": "reactor_01",
+      "room_role": "reactor",
+      "deck": 0,
+      "structural_placements": [
+        { "name": "floor_cell_x7_z0", "module": "floor_1x1", "world_position": [28.0, 0.0, 0.0] },
+        { "name": "floor_cell_x8_z0", "module": "floor_1x1", "world_position": [32.0, 0.0, 0.0] },
+        { "name": "floor_cell_x7_z1", "module": "floor_1x1", "world_position": [28.0, 0.0, 4.0] },
+        { "name": "floor_cell_x8_z1", "module": "floor_1x1", "world_position": [32.0, 0.0, 4.0] }
+      ]
+    }
+  ],
+  "room_links": [
+    { "id": "airlock_to_corridor", "from_room": "airlock_01", "to_room": "corridor_01", "from_cell": [1, 0, 0], "to_cell": [2, 0, 0], "module_id": "doorway_frame_open_1x1" },
+    { "id": "corridor_to_arc_side", "from_room": "corridor_01", "to_room": "arc_side_01", "from_cell": [2, 0, 0], "to_cell": [1, -1, 0], "module_id": "doorway_frame_open_1x1" },
+    { "id": "corridor_to_hub", "from_room": "corridor_01", "to_room": "hub_01", "from_cell": [3, 0, 0], "to_cell": [4, 0, 0], "module_id": "doorway_frame_open_1x1" },
+    { "id": "hub_to_left_arm", "from_room": "hub_01", "to_room": "left_arm_01", "from_cell": [4, 0, 0], "to_cell": [4, -1, 0], "module_id": "doorway_frame_open_1x1" },
+    { "id": "left_arm_to_cargo", "from_room": "left_arm_01", "to_room": "cargo_bay_01", "from_cell": [4, -2, 0], "to_cell": [3, -2, 0], "module_id": "doorway_frame_open_1x1" },
+    { "id": "left_arm_to_maintenance", "from_room": "left_arm_01", "to_room": "maintenance_bay_01", "from_cell": [4, -2, 0], "to_cell": [5, -2, 0], "module_id": "doorway_frame_open_1x1" },
+    { "id": "hub_to_right_arm", "from_room": "hub_01", "to_room": "right_arm_01", "from_cell": [4, 0, 0], "to_cell": [4, 1, 0], "module_id": "doorway_frame_open_1x1" },
+    { "id": "right_arm_to_medbay", "from_room": "right_arm_01", "to_room": "medbay_01", "from_cell": [4, 2, 0], "to_cell": [3, 2, 0], "module_id": "doorway_frame_open_1x1" },
+    { "id": "right_arm_to_bridge", "from_room": "right_arm_01", "to_room": "bridge_01", "from_cell": [4, 2, 0], "to_cell": [5, 2, 0], "module_id": "doorway_frame_open_1x1" },
+    { "id": "hub_to_convergence", "from_room": "hub_01", "to_room": "convergence_01", "from_cell": [4, 0, 0], "to_cell": [5, 0, 0], "module_id": "doorway_frame_open_1x1" },
+    { "id": "convergence_to_reactor", "from_room": "convergence_01", "to_room": "reactor_01", "from_cell": [6, 0, 0], "to_cell": [7, 0, 0], "module_id": "doorway_frame_open_1x1" },
+    { "id": "airlock_to_tool_storage", "from_room": "airlock_01", "to_room": "tool_storage_01", "from_cell": [1, 1, 0], "to_cell": [2, 1, 0], "module_id": "doorway_frame_open_1x1" }
+  ],
+  "blocked_links": [
+    {
+      "id": "maintenance_to_convergence_shortcut",
+      "from_room": "maintenance_bay_01",
+      "to_room": "convergence_01",
+      "from_cell": [6, -2, 0],
+      "to_cell": [6, 0, 0],
+      "module_id": "doorway_frame_blocked_1x1",
+      "reason": "biomatter blockage"
+    },
+    {
+      "id": "bridge_to_convergence_shortcut",
+      "from_room": "bridge_01",
+      "to_room": "convergence_01",
+      "from_cell": [6, 2, 0],
+      "to_cell": [6, 0, 0],
+      "module_id": "doorway_frame_blocked_1x1",
+      "reason": "hull debris blockage"
+    }
+  ],
+  "fire_zones": [
+    {
+      "id": "tool_storage_fire",
+      "from_room": "tool_storage_01",
+      "to_room": "airlock_01",
+      "from_cell": [2, 1, 0],
+      "to_cell": [1, 1, 0],
+      "module_id": "doorway_frame_open_1x1",
+      "kind": "timed_fire",
+      "rationale": "non-critical side link to optional portable oxygen pump pickup; fire cannot trap the player or block any main objective"
+    }
+  ],
+  "arc_zones": [
+    {
+      "id": "corridor_to_arc_side_arc",
+      "from_room": "corridor_01",
+      "to_room": "arc_side_01",
+      "from_cell": [2, 0, 0],
+      "to_cell": [1, -1, 0],
+      "module_id": "doorway_frame_open_1x1",
+      "kind": "electrical_arc",
+      "rationale": "non-critical side branch off the main spine into the optional arc_side_01 storage pocket; arc cannot trap the player or block any main objective"
+    }
+  ],
+  "vertical_connections": [],
+  "landmarks": [
+    {
+      "id": "hub_orange_beacon",
+      "room_id": "hub_01",
+      "kind": "orientation_beacon",
+      "position": [16.0, 0.15, 0.0],
+      "color": "orange"
+    },
+    {
+      "id": "reactor_green_core",
+      "room_id": "reactor_01",
+      "kind": "destination_core",
+      "position": [30.0, 0.15, 2.0],
+      "color": "green"
+    }
+  ],
+  "critical_path": [
+    "airlock_01",
+    "corridor_01",
+    "hub_01",
+    "left_arm_01",
+    "cargo_bay_01",
+    "maintenance_bay_01",
+    "right_arm_01",
+    "medbay_01",
+    "bridge_01",
+    "convergence_01",
+    "reactor_01"
+  ]
+}

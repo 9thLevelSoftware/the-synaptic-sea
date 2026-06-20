@@ -1,0 +1,113 @@
+<h2>Design Section 1: Coherent Proof Ship Architecture</h2>
+<p class="subtitle">This section defines how the curated ship should be represented so it becomes part of the real game pipeline, not a one-off diorama.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Recommended architecture: hand-designed intent → data fixture → existing Godot loader → playable proof</div>
+  <div class="mockup-body">
+    <svg viewBox="0 0 1080 620" style="width:100%;max-width:1150px;background:#111820;border-radius:14px;border:1px solid #2d3a46">
+      <defs>
+        <style>
+          .box{fill:#26313a;stroke:#8aa1b2;stroke-width:3;rx:12;}
+          .box2{fill:#313d47;stroke:#9fc3da;stroke-width:3;rx:12;}
+          .gate{fill:#2c3e31;stroke:#61cf8f;stroke-width:3;rx:12;}
+          .warn{fill:#3d3326;stroke:#e0bb6e;stroke-width:3;rx:12;}
+          .fail{fill:#3b2830;stroke:#d27676;stroke-width:3;rx:12;}
+          .arrow{stroke:#b7c9d6;stroke-width:4;fill:none;marker-end:url(#arrowhead);}
+          .thin{stroke:#6f8494;stroke-width:3;fill:none;marker-end:url(#arrowhead);}
+          .label{font:700 20px ui-sans-serif,system-ui;fill:#edf4f8;}
+          .small{font:500 14px ui-sans-serif,system-ui;fill:#b8c5cd;}
+          .tiny{font:500 12px ui-sans-serif,system-ui;fill:#9fadb7;}
+        </style>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#b7c9d6"/>
+        </marker>
+      </defs>
+
+      <rect class="box2" x="40" y="70" width="210" height="110"/>
+      <text class="label" x="70" y="112">Spatial Intent</text>
+      <text class="small" x="62" y="142">7-room proof ship</text>
+      <text class="tiny" x="62" y="164">spine, branches, ramp, landmark</text>
+
+      <path class="arrow" d="M250 125 L325 125"/>
+
+      <rect class="box" x="325" y="50" width="235" height="150"/>
+      <text class="label" x="366" y="92">Golden Fixture Data</text>
+      <text class="small" x="350" y="122">layout.json</text>
+      <text class="small" x="350" y="146">gameplay_slice.json</text>
+      <text class="tiny" x="350" y="170">explicit rooms, doors, decks, blockers</text>
+
+      <path class="arrow" d="M560 125 L635 125"/>
+
+      <rect class="box" x="635" y="50" width="220" height="150"/>
+      <text class="label" x="675" y="92">Existing Loader</text>
+      <text class="small" x="660" y="122">GeneratedShipLoader</text>
+      <text class="small" x="660" y="146">wrapper scenes</text>
+      <text class="tiny" x="660" y="170">no separate hand-only scene path</text>
+
+      <path class="arrow" d="M855 125 L930 125"/>
+
+      <rect class="gate" x="930" y="70" width="120" height="110"/>
+      <text class="label" x="960" y="113">Godot</text>
+      <text class="small" x="953" y="142">playable</text>
+      <text class="tiny" x="953" y="164">capture + smoke</text>
+
+      <rect class="warn" x="130" y="300" width="210" height="120"/>
+      <text class="label" x="170" y="342">Schema Gaps</text>
+      <text class="small" x="154" y="372">doors, blockers, deck links</text>
+      <text class="tiny" x="154" y="394">only add fields if needed</text>
+
+      <rect class="box" x="435" y="300" width="230" height="120"/>
+      <text class="label" x="480" y="342">Proof Validators</text>
+      <text class="small" x="462" y="372">spatial continuity</text>
+      <text class="small" x="462" y="394">camera/readability</text>
+
+      <rect class="gate" x="760" y="300" width="235" height="120"/>
+      <text class="label" x="798" y="342">Acceptance Gate</text>
+      <text class="small" x="790" y="372">walkable, readable, connected</text>
+      <text class="tiny" x="790" y="394">not “boxes with a player”</text>
+
+      <path class="thin" d="M445 200 C415 250 350 285 295 315"/>
+      <path class="thin" d="M560 200 C575 250 580 278 575 300"/>
+      <path class="thin" d="M665 420 C690 472 746 488 822 426"/>
+
+      <rect class="fail" x="45" y="480" width="290" height="90"/>
+      <text class="label" x="78" y="520">Explicit Non-Goal</text>
+      <text class="small" x="70" y="548">Do not start a broad random generator rewrite yet.</text>
+
+      <rect class="gate" x="405" y="480" width="620" height="90"/>
+      <text class="label" x="438" y="520">Success means:</text>
+      <text class="small" x="438" y="548">A human can walk one curated ship and understand space, route, elevation, blockers, and destination.</text>
+    </svg>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Design decision</h3>
+  <p>The proof ship should be data-authored, not hand-only. We intentionally design the rooms, then encode them as a canonical fixture consumed by the same Godot runtime path. If the current schema cannot express a needed concept, we add the smallest explicit field for that concept.</p>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="approve-architecture" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Approve this architecture</h3>
+      <p>Proceed with a data-driven golden fixture using the existing loader, plus minimal schema additions for doors/decks/blockers only where necessary.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="prefer-hand-scene" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Prefer a hand-authored Godot scene</h3>
+      <p>Prioritize fast visual/spatial feel even if it temporarily bypasses the generated-data path.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="prefer-generator-first" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Prefer generator-first</h3>
+      <p>Invest in generation rules immediately, even if the next visible proof takes longer.</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">Please review this architecture section and reply in the terminal whether it looks right so far.</p>

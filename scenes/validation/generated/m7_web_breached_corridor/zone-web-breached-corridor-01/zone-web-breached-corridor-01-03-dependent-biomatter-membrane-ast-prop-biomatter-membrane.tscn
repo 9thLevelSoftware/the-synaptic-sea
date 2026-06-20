@@ -1,0 +1,24 @@
+[gd_scene load_steps=2 format=3]
+[sub_resource type="BoxShape3D" id="BoxShape3D_1"]
+size = Vector3(1, 1, 1)
+
+[node name="Biomatter_Membrane" type="Node3D"]
+
+[node name="Anchor_FloorCenter" type="Marker3D" parent="."]
+
+[node name="Anchor_Facing" type="Marker3D" parent="."]
+
+[node name="Anchor_InteractionPoint" type="Marker3D" parent="."]
+
+[node name="Anchor_Attach_Breach" type="Marker3D" parent="."]
+
+[node name="Anchor_Attach_Surface" type="Marker3D" parent="."]
+
+[node name="CollisionRoot" type="StaticBody3D" parent="."]
+collision_layer = 1
+collision_mask = 1
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="CollisionRoot"]
+shape = SubResource("BoxShape3D_1")
+
+[node name="Visual" type="Node3D" parent="."]

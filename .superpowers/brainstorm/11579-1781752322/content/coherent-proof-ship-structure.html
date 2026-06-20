@@ -1,0 +1,138 @@
+<h2>Design Section 2: Gameplay Structure & Spatial Requirements</h2>
+<p class="subtitle">This is the concrete ship we will design toward: a coherent 5–8 room derelict with clear route logic and readable perspective.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Rooms, functions, route logic, and “not just boxes” requirements</div>
+  <div class="mockup-body">
+    <svg viewBox="0 0 1100 700" style="width:100%;max-width:1180px;background:#10171f;border-radius:14px;border:1px solid #2d3a46">
+      <defs>
+        <style>
+          .room{fill:#2d3942;stroke:#91a8b8;stroke-width:3;rx:10;}
+          .spine{fill:#1f2b33;stroke:#7f95a5;stroke-width:3;rx:8;}
+          .objective{fill:#2f4a39;stroke:#69db96;stroke-width:3;rx:8;}
+          .hazard{fill:#493331;stroke:#d07165;stroke-width:3;rx:8;}
+          .vertical{fill:#514123;stroke:#e0bd62;stroke-width:3;rx:8;}
+          .arrow{stroke:#6ee39d;stroke-width:5;fill:none;marker-end:url(#arrowhead);stroke-linecap:round;stroke-linejoin:round;}
+          .sight{stroke:#64bde9;stroke-width:3;fill:none;stroke-dasharray:9 8;opacity:.8;}
+          .blocked{stroke:#d46d66;stroke-width:8;stroke-linecap:round;stroke-dasharray:12 10;}
+          .label{font:700 18px ui-sans-serif,system-ui;fill:#edf4f8;}
+          .small{font:500 13px ui-sans-serif,system-ui;fill:#b7c4cd;}
+          .tiny{font:500 12px ui-sans-serif,system-ui;fill:#94a4af;}
+        </style>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#6ee39d"/>
+        </marker>
+      </defs>
+
+      <!-- Main layout -->
+      <rect class="room" x="55" y="305" width="135" height="95"/>
+      <text class="label" x="82" y="345">1 Airlock</text>
+      <text class="small" x="75" y="370">safe entry + origin</text>
+
+      <rect class="spine" x="190" y="336" width="125" height="34"/>
+      <text class="tiny" x="202" y="328">decompression hall</text>
+
+      <rect class="vertical" x="315" y="300" width="120" height="105"/>
+      <text class="label" x="342" y="342">2 Ramp</text>
+      <text class="small" x="335" y="368">deck change</text>
+      <text class="tiny" x="330" y="389">must be visible</text>
+
+      <rect class="spine" x="435" y="315" width="380" height="70"/>
+      <text class="label" x="560" y="355">3 Central Spine</text>
+      <text class="small" x="520" y="378">long axis + landmark + sightline</text>
+
+      <rect class="room objective" x="520" y="115" width="170" height="105"/>
+      <text class="label" x="562" y="155">4 Cargo</text>
+      <text class="small" x="545" y="181">objective A</text>
+      <text class="tiny" x="545" y="202">open volume, cover silhouettes</text>
+
+      <rect class="room" x="720" y="165" width="150" height="95"/>
+      <text class="label" x="746" y="205">5 Med Nook</text>
+      <text class="small" x="745" y="231">identity side room</text>
+
+      <rect class="room objective" x="505" y="500" width="190" height="105"/>
+      <text class="label" x="535" y="540">6 Maintenance</text>
+      <text class="small" x="545" y="566">objective B / repair</text>
+      <text class="tiny" x="545" y="587">visual machinery marker</text>
+
+      <rect class="room" x="745" y="500" width="150" height="95"/>
+      <text class="label" x="780" y="540">7 Control</text>
+      <text class="small" x="765" y="566">overlook / window</text>
+
+      <rect class="room objective" x="850" y="295" width="180" height="115"/>
+      <text class="label" x="895" y="338">8 Reactor</text>
+      <text class="small" x="888" y="364">destination</text>
+      <text class="tiny" x="882" y="386">visible from spine</text>
+
+      <!-- branches -->
+      <path class="spine" d="M600 315 L600 220 L635 220 L635 315 Z"/>
+      <path class="spine" d="M615 385 L615 500 L650 500 L650 385 Z"/>
+      <path class="spine" d="M795 385 L795 500 L835 500 L835 385 Z"/>
+      <path class="spine" d="M815 333 L850 333 L850 372 L815 372 Z"/>
+
+      <!-- route and sightline -->
+      <path class="arrow" d="M120 352 L252 352 L375 352 L500 352 L640 352 L805 352 L930 352"/>
+      <path class="sight" d="M455 330 C555 260 740 260 930 330"/>
+      <text class="small" x="565" y="282">sightline to destination / landmark</text>
+
+      <!-- blocked shortcut -->
+      <line class="blocked" x1="705" y1="440" x2="900" y2="455"/>
+      <text class="small" x="735" y="432">blocked shortcut: biomatter / collapsed bulkhead</text>
+
+      <!-- Requirements sidebar -->
+      <rect x="52" y="35" width="425" height="215" rx="12" fill="#18232b" stroke="#40505b" stroke-width="2"/>
+      <text class="label" x="75" y="72">Hard requirements</text>
+      <text class="small" x="75" y="105">• 5–8 rooms total; recommend 7–8 including corridor/ramp.</text>
+      <text class="small" x="75" y="132">• At least one non-straight turn / branch.</text>
+      <text class="small" x="75" y="159">• At least one visible deck/elevation transition.</text>
+      <text class="small" x="75" y="186">• At least one blocked route that teaches structure.</text>
+      <text class="small" x="75" y="213">• At least one landmark visible from the spine.</text>
+      <text class="small" x="75" y="240">• Reactor/destination visible or foreshadowed before arrival.</text>
+
+      <rect x="545" y="35" width="480" height="185" rx="12" fill="#18232b" stroke="#40505b" stroke-width="2"/>
+      <text class="label" x="570" y="72">Acceptance feel</text>
+      <text class="small" x="570" y="105">The player should be able to say: “I entered here, climbed/transitioned there,</text>
+      <text class="small" x="570" y="132">followed the spine, saw the reactor, found side rooms, and understood why</text>
+      <text class="small" x="570" y="159">one path was blocked.”</text>
+      <text class="small" x="570" y="193">This is more important than combat, loot, or extra objective variety.</text>
+    </svg>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Proposed room set</h3>
+  <p>Airlock/breach, decompression corridor, visible ramp/ladder transition, central spine, cargo bay, med nook, maintenance room, control/overlook, reactor destination. If we need to keep it to 7 rooms, merge med nook into control or maintenance.</p>
+</div>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="approve-structure" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>Approve this structure</h3>
+      <p>Use this room set and route logic as the next spec target.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="fewer-rooms" onclick="toggleSelect(this)">
+    <div class="letter">7</div>
+    <div class="content">
+      <h3>Keep it tighter</h3>
+      <p>Reduce to 7 rooms by merging/removing med nook or control.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="more-horror" onclick="toggleSelect(this)">
+    <div class="letter">H</div>
+    <div class="content">
+      <h3>Make the structure more horror-forward</h3>
+      <p>More blocked/infested paths and claustrophobic bends, while preserving readability.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="more-open" onclick="toggleSelect(this)">
+    <div class="letter">R</div>
+    <div class="content">
+      <h3>Make the structure more readable/open</h3>
+      <p>Fewer branches and clearer sightlines, favoring proof clarity over horror density.</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">Please review the room/route structure and reply in the terminal.</p>

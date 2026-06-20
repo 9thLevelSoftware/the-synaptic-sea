@@ -1,0 +1,140 @@
+<h2>Design Section 3: Data Model, Loader Boundaries, and Validation Gates</h2>
+<p class="subtitle">This section defines how the curated ship becomes reliable data, how the Godot loader consumes it, and what must fail before we accept it.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Golden fixture data path and validation gates</div>
+  <div class="mockup-body">
+    <svg viewBox="0 0 1120 720" style="width:100%;max-width:1180px;background:#101820;border-radius:14px;border:1px solid #2d3a46">
+      <defs>
+        <style>
+          .data{fill:#26313d;stroke:#8fb3d1;stroke-width:3;rx:12;}
+          .loader{fill:#2f3940;stroke:#bcc8d1;stroke-width:3;rx:12;}
+          .runtime{fill:#263d32;stroke:#70d69a;stroke-width:3;rx:12;}
+          .gate{fill:#3a3324;stroke:#e2bf64;stroke-width:3;rx:12;}
+          .fail{fill:#40292d;stroke:#d26e78;stroke-width:3;rx:12;}
+          .arrow{stroke:#b7c9d6;stroke-width:4;fill:none;marker-end:url(#arrowhead);}
+          .thin{stroke:#7890a0;stroke-width:3;fill:none;marker-end:url(#arrowhead);stroke-dasharray:8 7;}
+          .label{font:700 19px ui-sans-serif,system-ui;fill:#edf4f8;}
+          .small{font:500 14px ui-sans-serif,system-ui;fill:#b7c5ce;}
+          .tiny{font:500 12px ui-sans-serif,system-ui;fill:#94a4af;}
+          .mono{font:600 13px ui-monospace,SFMono-Regular,Menlo,monospace;fill:#d8e8f2;}
+        </style>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#b7c9d6"/>
+        </marker>
+      </defs>
+
+      <rect class="data" x="45" y="65" width="235" height="160"/>
+      <text class="label" x="82" y="104">Layout Fixture</text>
+      <text class="mono" x="70" y="135">layout_golden_001.json</text>
+      <text class="small" x="70" y="165">rooms, cells, doors</text>
+      <text class="small" x="70" y="190">deck heights, blockers</text>
+      <text class="tiny" x="70" y="212">explicit route + visibility markers</text>
+
+      <rect class="data" x="45" y="285" width="235" height="150"/>
+      <text class="label" x="82" y="324">Gameplay Fixture</text>
+      <text class="mono" x="70" y="355">gameplay_golden_001.json</text>
+      <text class="small" x="70" y="385">start, destination</text>
+      <text class="small" x="70" y="410">2–3 spatial objectives</text>
+
+      <rect class="data" x="45" y="495" width="235" height="130"/>
+      <text class="label" x="93" y="534">Kit Catalog</text>
+      <text class="mono" x="70" y="565">ship_structural_v0.json</text>
+      <text class="small" x="70" y="595">wrapper scene paths</text>
+
+      <path class="arrow" d="M280 145 L385 205"/>
+      <path class="arrow" d="M280 360 L385 310"/>
+      <path class="arrow" d="M280 560 L385 410"/>
+
+      <rect class="loader" x="385" y="185" width="255" height="250"/>
+      <text class="label" x="435" y="225">GeneratedShipLoader</text>
+      <text class="small" x="415" y="260">loads curated fixture</text>
+      <text class="small" x="415" y="288">instances wrapper scenes</text>
+      <text class="small" x="415" y="316">creates explicit doors/blockers</text>
+      <text class="small" x="415" y="344">creates vertical transition nodes</text>
+      <text class="small" x="415" y="372">exports objective/spawn markers</text>
+      <text class="tiny" x="415" y="405">Should not own player/camera/UI logic</text>
+
+      <path class="arrow" d="M640 310 L735 310"/>
+
+      <rect class="runtime" x="735" y="85" width="315" height="125"/>
+      <text class="label" x="790" y="125">Playable Scene</text>
+      <text class="small" x="765" y="158">player, camera, prompt, tracker</text>
+      <text class="tiny" x="765" y="184">same runtime path as current playable prototype</text>
+
+      <rect class="runtime" x="735" y="255" width="315" height="125"/>
+      <text class="label" x="790" y="295">In-Engine Capture</text>
+      <text class="small" x="765" y="328">fresh viewport screenshot</text>
+      <text class="tiny" x="765" y="354">must show route + landmark + transition</text>
+
+      <rect class="gate" x="735" y="425" width="315" height="175"/>
+      <text class="label" x="782" y="465">Validation Smokes</text>
+      <text class="small" x="765" y="498">spatial continuity</text>
+      <text class="small" x="765" y="525">door/blocker semantics</text>
+      <text class="small" x="765" y="552">vertical transition reachability</text>
+      <text class="small" x="765" y="579">camera/readability capture exists</text>
+
+      <path class="thin" d="M890 210 L890 255"/>
+      <path class="thin" d="M890 380 L890 425"/>
+
+      <rect class="fail" x="355" y="520" width="285" height="135"/>
+      <text class="label" x="405" y="560">Fail Conditions</text>
+      <text class="small" x="380" y="592">rooms disconnected / box islands</text>
+      <text class="small" x="380" y="618">ramp exists only as nav metadata</text>
+      <text class="small" x="380" y="644">player reaches goal but view is unreadable</text>
+    </svg>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Data model decisions</h3>
+  <p>The curated proof ship gets its own named fixture files rather than modifying seed 17 in place. It should still use the current kit and loader path, but the fixture may add explicit metadata for concepts the current generated fixture only implies poorly: doors, blocked doors/routes, landmarks, and vertical transitions.</p>
+</div>
+
+<div class="section">
+  <h3>Component boundaries</h3>
+  <ul>
+    <li><strong>Fixture data</strong> says what the ship is: rooms, deck heights, portals, blockers, landmarks, objective markers.</li>
+    <li><strong>GeneratedShipLoader</strong> turns that data into structural nodes and queryable markers. It does not decide game progression.</li>
+    <li><strong>PlayableGeneratedShip</strong> wires player, camera, objectives, and prompts onto the loaded ship.</li>
+    <li><strong>Validation scripts</strong> prove the ship is connected, readable, and walkable before we accept it.</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3>Minimum validation gates</h3>
+  <ul>
+    <li>Topology: every room reachable from the airlock through declared doors/transitions.</li>
+    <li>Spatial continuity: the central spine connects branches without disconnected box islands.</li>
+    <li>Vertical clarity: deck transition has both data metadata and physical/visible runtime representation.</li>
+    <li>Blocker semantics: blocked route is visible and not accidentally traversable.</li>
+    <li>Player proof: player can traverse from airlock to reactor destination in the playable scene.</li>
+    <li>Visual proof: fresh Godot capture shows airlock/spine/transition/destination or enough of them to prove readability.</li>
+  </ul>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="approve-data-validation" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Approve data + validation design</h3>
+      <p>Use named golden fixture files, minimal schema additions, existing loader path, and explicit spatial/readability validation gates.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="keep-schema-strict" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Keep schema stricter</h3>
+      <p>Avoid new fields; express everything using existing layout/gameplay fields even if less direct.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="broader-schema" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Broaden schema now</h3>
+      <p>Define a richer ship DSL immediately for rooms, portals, hazards, landmarks, and gameplay beats.</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">Please review this data/validation section and reply in the terminal.</p>

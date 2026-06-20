@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://dhlsr0hfubhiq"]
+
+[ext_resource type="Script" uid="uid://dg65v3g7t8oyp" path="res://scripts/procgen/playable_generated_ship.gd" id="1_playable_generated_ship"]
+
+[node name="PlayableGeneratedShip" type="Node3D" unique_id=1709488627]
+script = ExtResource("1_playable_generated_ship")

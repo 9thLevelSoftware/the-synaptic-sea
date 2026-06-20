@@ -1,0 +1,8 @@
+# Paid/local GDAI MCP plugin: do not commit to public repos
+addons/gdai-mcp-plugin-godot/
+
+# Build artifacts
+build/
+exports/
+*.zip
+*.app/

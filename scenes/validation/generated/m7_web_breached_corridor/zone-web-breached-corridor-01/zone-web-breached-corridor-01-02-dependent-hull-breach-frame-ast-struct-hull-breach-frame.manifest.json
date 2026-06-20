@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "godot_wrapper_scene",
+  "asset": {
+    "id": "ast-struct-hull-breach-frame",
+    "display_name": "Hull Breach Frame",
+    "category": "structural",
+    "anchors": {
+      "policy": "required",
+      "exposed": [
+        {
+          "name": "Anchor_Wall_Left",
+          "kind": "wall",
+          "surface": "wall"
+        },
+        {
+          "name": "Anchor_Wall_Right",
+          "kind": "wall",
+          "surface": "wall"
+        },
+        {
+          "name": "Anchor_FloorCenter",
+          "kind": "floor-center",
+          "surface": "floor"
+        }
+      ]
+    },
+    "collision_policy": {
+      "kind": "static-body-proxy",
+      "nav_blocker": true,
+      "proxy_shape": "box",
+      "notes": "Breach frame spans the hull opening and remains an intentional blocker."
+    },
+    "source_asset_path": "assets/_source/derelict/hull_breach_frame.glb",
+    "wrapper_scene": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-02-dependent-hull-breach-frame-ast-struct-hull-breach-frame.tscn",
+    "contract_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-02-dependent-hull-breach-frame-ast-struct-hull-breach-frame.contract.tres",
+    "inspection_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-02-dependent-hull-breach-frame-ast-struct-hull-breach-frame.inspection.json",
+    "support": {
+      "required_surfaces": [
+        "floor",
+        "wall"
+      ],
+      "load_bearing": true,
+      "clearance_radius_m": 0.5
+    },
+    "relations": {
+      "affordances": [
+        "on_floor",
+        "against_wall",
+        "blocks_door"
+      ],
+      "orientation_bias": "freeform",
+      "compatible_tags": [
+        "industrial",
+        "derelict",
+        "web"
+      ],
+      "incompatible_tags": [
+        "sterile"
+      ],
+      "preferred_neighbors": [
+        "pressure-door",
+        "web"
+      ],
+      "excluded_neighbors": [
+        "medical"
+      ]
+    },
+    "notes": null
+  },
+  "generated": {
+    "scene_root": "Hull_Breach_Frame",
+    "root_transform": "identity",
+    "visual_child": true,
+    "collision_root_type": "StaticBody3D",
+    "proxy_shape": "box",
+    "scene_lines": 20
+  }
+}

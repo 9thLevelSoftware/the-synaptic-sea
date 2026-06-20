@@ -1,0 +1,96 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "asset_semantics",
+  "asset": {
+    "id": "ast-struct-pressure-door-webbed",
+    "display_name": "Webbed Pressure Door",
+    "source_asset_path": "assets/_source/derelict/pressure_door_webbed.glb",
+    "category": "structural",
+    "tags": [
+      "airlock",
+      "human",
+      "damaged",
+      "webbed",
+      "industrial"
+    ],
+    "bounds": {
+      "local_min_m": [
+        -1.2,
+        0.0,
+        -0.25
+      ],
+      "local_max_m": [
+        1.2,
+        2.8,
+        0.25
+      ],
+      "placement_origin": "floor-center"
+    },
+    "anchors": {
+      "policy": "required",
+      "exposed": [
+        {
+          "name": "Anchor_DoorFrame",
+          "kind": "doorframe",
+          "surface": "door"
+        },
+        {
+          "name": "Anchor_FloorCenter",
+          "kind": "floor-center",
+          "surface": "floor"
+        },
+        {
+          "name": "Anchor_Facing",
+          "kind": "facing",
+          "surface": "floor"
+        }
+      ]
+    },
+    "collision_policy": {
+      "kind": "static-body-proxy",
+      "proxy_shape": "box",
+      "nav_blocker": true,
+      "notes": "Intended as the sealed door anchor on the left side of the corridor."
+    },
+    "support": {
+      "required_surfaces": [
+        "floor",
+        "wall"
+      ],
+      "clearance_radius_m": 0.45,
+      "load_bearing": true,
+      "supports": [
+        "blocks_door"
+      ]
+    },
+    "relations": {
+      "affordances": [
+        "on_floor",
+        "against_wall",
+        "blocks_door"
+      ],
+      "orientation_bias": "freeform",
+      "compatible_tags": [
+        "industrial",
+        "derelict",
+        "web"
+      ],
+      "incompatible_tags": [
+        "sterile"
+      ],
+      "preferred_neighbors": [
+        "bulkhead",
+        "doorframe"
+      ],
+      "excluded_neighbors": [
+        "medical"
+      ]
+    },
+    "wrapper_scene": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.tscn",
+    "contract_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.contract.tres",
+    "inspection_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.inspection.json"
+  },
+  "wrapper_scene": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.tscn",
+  "contract_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.contract.tres",
+  "inspection_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.inspection.json"
+}

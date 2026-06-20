@@ -1,0 +1,275 @@
+{
+  "asset": {
+    "allowed_rotations": [
+      0,
+      90,
+      180,
+      270
+    ],
+    "anchors": {
+      "exposed": [
+        {
+          "kind": "floor-center",
+          "name": "Anchor_FloorCenter",
+          "surface": "floor"
+        },
+        {
+          "kind": "attachment",
+          "name": "Anchor_SOCK_portal_edge_west_01",
+          "surface": "custom"
+        },
+        {
+          "kind": "attachment",
+          "name": "Anchor_SOCK_portal_edge_east_01",
+          "surface": "custom"
+        },
+        {
+          "kind": "attachment",
+          "name": "Anchor_SOCK_portal_center_internal_01",
+          "surface": "custom"
+        }
+      ],
+      "policy": "required"
+    },
+    "bounds": {
+      "local_max_m": [
+        4.0,
+        3.2,
+        0.0
+      ],
+      "local_min_m": [
+        -4.0,
+        0.0,
+        0.0
+      ],
+      "mesh_origin_offset_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "placement_origin": "edge-center"
+    },
+    "category": "structural",
+    "collision_policy": {
+      "kind": "static-body-proxy",
+      "nav_blocker": true,
+      "notes": "authored simple proxy, never decorative collision",
+      "proxy_shape": "box"
+    },
+    "collision_proxy_records": [
+      {
+        "bounds": {
+          "dimensions_m": [
+            8.0,
+            0.4050000011920929,
+            2.7200000286102295
+          ],
+          "local_max_m": [
+            4.0,
+            0.20250000059604645,
+            2.7200000286102295
+          ],
+          "local_min_m": [
+            -4.0,
+            -0.20250000059604645,
+            0.0
+          ]
+        },
+        "collision_shape_m": {
+          "base_y_m": -0.20250000059604645,
+          "footprint_m": [
+            -4.0,
+            4.0,
+            0.0,
+            2.7200000286102295
+          ],
+          "height_m": 0.4050000011920929,
+          "kind": "box",
+          "name": "bulkhead_portal_2x1",
+          "nav_blocker": true
+        },
+        "proxy_name": "bulkhead_portal_2x1",
+        "source_object_name": "Collision_bulkhead_portal_2x1"
+      }
+    ],
+    "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/bulkhead_portal_2x1_contract.tres",
+    "display_name": "Bulkhead Portal 2x1",
+    "edge_role": "doorframe",
+    "id": "bulkhead_portal_2x1",
+    "kit": {
+      "kit_id": "ship_structural_v0",
+      "module_family": "portal",
+      "module_id": "bulkhead_portal_2x1",
+      "pivot_policy": "edge-center"
+    },
+    "material_palette": {
+      "collision_material": "SSV0_PORTAL_FRAME",
+      "entries": [
+        {
+          "families": [
+            "floor",
+            "corridor_floor"
+          ],
+          "name": "SSV0_DECK_PLATE",
+          "rgba": [
+            0.54,
+            0.6,
+            0.66,
+            1.0
+          ],
+          "roughness": 0.62
+        },
+        {
+          "families": [
+            "wall",
+            "corner",
+            "junction"
+          ],
+          "name": "SSV0_BULKHEAD",
+          "rgba": [
+            0.22,
+            0.25,
+            0.29,
+            1.0
+          ],
+          "roughness": 0.7
+        },
+        {
+          "families": [
+            "portal"
+          ],
+          "name": "SSV0_PORTAL_FRAME",
+          "rgba": [
+            0.52,
+            0.39,
+            0.22,
+            1.0
+          ],
+          "roughness": 0.6
+        },
+        {
+          "families": [
+            "vertical_transition"
+          ],
+          "name": "SSV0_RAMP_PLATE",
+          "rgba": [
+            0.41,
+            0.45,
+            0.5,
+            1.0
+          ],
+          "roughness": 0.63
+        },
+        {
+          "families": [
+            "support"
+          ],
+          "name": "SSV0_SUPPORT",
+          "rgba": [
+            0.34,
+            0.31,
+            0.28,
+            1.0
+          ],
+          "roughness": 0.68
+        },
+        {
+          "families": [
+            "occlusion"
+          ],
+          "name": "SSV0_OCCLUSION",
+          "rgba": [
+            0.13,
+            0.14,
+            0.16,
+            1.0
+          ],
+          "roughness": 0.8
+        }
+      ],
+      "palette_id": "ship_structural_v0_placeholder_v1",
+      "visual_material": "SSV0_PORTAL_FRAME"
+    },
+    "provenance": {
+      "license_state": "self-authored",
+      "provenance_id": "ship_structural_v0:bulkhead_portal_2x1",
+      "source_platform": "self-authored"
+    },
+    "relations": {
+      "affordances": [
+        "against_wall"
+      ],
+      "orientation_bias": "wall-facing"
+    },
+    "sockets": [
+      {
+        "compatible_kinds": [
+          "portal_edge",
+          "wall_edge"
+        ],
+        "id": "portal_edge_west_01",
+        "kind": "portal_edge",
+        "position_m": [
+          -4.0,
+          0.0,
+          0.0
+        ],
+        "span_m": 2.0
+      },
+      {
+        "compatible_kinds": [
+          "portal_edge",
+          "wall_edge"
+        ],
+        "id": "portal_edge_east_01",
+        "kind": "portal_edge",
+        "position_m": [
+          4.0,
+          0.0,
+          0.0
+        ],
+        "span_m": 2.0
+      },
+      {
+        "compatible_kinds": [
+          "portal_center"
+        ],
+        "id": "portal_center_internal_01",
+        "kind": "portal_center",
+        "position_m": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "span_m": 2.0
+      }
+    ],
+    "source_asset_path": "assets/_processed/ship_structural_v0/bulkhead_portal_2x1/bulkhead_portal_2x1.glb",
+    "support": {
+      "clearance_radius_m": 0.0,
+      "load_bearing": true,
+      "required_surfaces": [
+        "floor"
+      ]
+    },
+    "tags": [
+      "ship_structural_v0",
+      "portal",
+      "two-cell bulkhead/airlock portal; solves oversized door-frame issue explicitly",
+      "static-body-proxy",
+      "box"
+    ],
+    "texture_policy": {
+      "external_image_textures_allowed": false,
+      "linked_materials_allowed": false,
+      "mode": "solid-color-only",
+      "notes": "Project-owned Blender materials only; ship_structural_v0 uses color-only placeholder materials and no image textures.",
+      "policy_id": "ship_structural_v0_texture_policy_v1",
+      "procedural_textures_allowed": false
+    },
+    "visual_scene_path": "res://assets/imported/structural/ship_structural_v0/bulkhead_portal_2x1/bulkhead_portal_2x1.glb",
+    "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/bulkhead_portal_2x1.tscn"
+  },
+  "document_kind": "asset_semantics",
+  "schema_version": "1.0.0"
+}
