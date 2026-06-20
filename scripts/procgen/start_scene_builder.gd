@@ -118,6 +118,11 @@ static func build(seed_value: int) -> Node3D:
 
 	# ---- Step 6: Position life boat adjacent to derelict's dock room ----
 	var dock_pos: Vector3 = _find_dock_position(derelict_layout)
+	if dock_pos == Vector3.INF:
+		push_error("StartSceneBuilder: no dock room found in derelict layout; cannot position life boat")
+		derelict.queue_free()
+		life_boat.queue_free()
+		return null
 	life_boat.position = dock_pos + Vector3(0.0, 0.0, DOCK_GAP)
 
 	# ---- Step 7: Combine under a single root ----
@@ -137,9 +142,11 @@ static func _build_blueprint(archetype: Dictionary, seed_value: int) -> ShipBlue
 	return ShipBlueprintScript.new(size, condition, seed_value)
 
 
-# Finds the world position of the dock room in the derelict layout.
-# Returns the room center, or Vector3.ZERO if no dock room is found.
+# Finds the center of the dock room in the derelict layout.
+# Returns the average position of all floor cells (floor_1x1, corridor_floor_1x1)
+# in the dock room, or Vector3.INF if no dock room is found.
 static func _find_dock_position(layout: Dictionary) -> Vector3:
+	const FLOOR_MODULES: Array[String] = ["floor_1x1", "corridor_floor_1x1"]
 	var rooms: Array = layout.get("rooms", [])
 	for room_variant in rooms:
 		if typeof(room_variant) != TYPE_DICTIONARY:
@@ -149,20 +156,28 @@ static func _find_dock_position(layout: Dictionary) -> Vector3:
 		var rid: String = str(room.get("id", ""))
 		if role != "dock" and not rid.begins_with("dock"):
 			continue
-		# Find a floor placement to get the world position
+		# Compute the average position of all floor cells in this room.
 		var placements: Array = room.get("structural_placements", [])
+		var sum: Vector3 = Vector3.ZERO
+		var count: int = 0
 		for placement_variant in placements:
 			if typeof(placement_variant) != TYPE_DICTIONARY:
 				continue
 			var placement: Dictionary = placement_variant
+			var module_id: String = str(placement.get("module_id", placement.get("module", "")))
+			if module_id not in FLOOR_MODULES:
+				continue
 			var pos: Variant = placement.get("world_position", placement.get("position", null))
 			if pos == null or typeof(pos) != TYPE_ARRAY:
 				continue
 			var pos_arr: Array = pos
 			if pos_arr.size() < 3:
 				continue
-			return Vector3(float(pos_arr[0]), float(pos_arr[1]), float(pos_arr[2]))
-	return Vector3.ZERO
+			sum += Vector3(float(pos_arr[0]), float(pos_arr[1]), float(pos_arr[2]))
+			count += 1
+		if count > 0:
+			return sum / float(count)
+	return Vector3.INF
 
 
 # Writes a Dictionary to a JSON file. Returns true on success.
