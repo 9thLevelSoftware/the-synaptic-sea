@@ -33,7 +33,7 @@ func generate(blueprint, archetype: Dictionary = {}) -> Node3D:
 	assert(blueprint != null, "ShipGenerator: blueprint must not be null")
 
 	var graph = graph_generator.generate(blueprint, archetype)
-	var structure: Node3D = structural_placer.place_structure(graph)
+	var structure: Node3D = structural_placer.place_structure(graph, int(blueprint.seed_value))
 	if structure == null:
 		return null
 

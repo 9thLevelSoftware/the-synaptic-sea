@@ -293,17 +293,18 @@ func _connect_rooms(graph: RoomGraphScript) -> void:
 		var to_id: String = String(graph.rooms[i + 1]["id"])
 		graph.add_link(from_id, to_id, "door")
 
-	# Random branches for variety.
+	# Random branches for variety. Scale with ship size.
+	# v3: more branches for better 2D spread.
 	var room_count: int = graph.rooms.size()
-	var extra_target: int = int(round(sqrt(float(room_count)) / 2.0))
-	if extra_target > 4:
-		extra_target = 4
+	var extra_target: int = int(round(sqrt(float(room_count))))
+	if extra_target > 6:
+		extra_target = 6
 	if extra_target < 0:
 		extra_target = 0
 
 	var existing: Dictionary = _index_existing_links(graph)
 	var attempts: int = 0
-	var max_attempts: int = extra_target * 6 + 10
+	var max_attempts: int = extra_target * 8 + 15
 	var added: int = 0
 	while added < extra_target and attempts < max_attempts:
 		attempts += 1

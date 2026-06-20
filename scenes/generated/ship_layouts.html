@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+body { background: #0d0d1a; color: #eee; font-family: monospace; padding: 20px; margin: 0; }
+h1 { color: #FFD700; font-size: 22px; }
+h2 { color: #4682B4; margin-top: 25px; font-size: 16px; }
+.ship { margin: 15px 0; padding: 12px; background: #16213e; border-radius: 8px; border: 1px solid #333; overflow-x: auto; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; margin: 10px 0; font-size: 11px; }
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-color { width: 14px; height: 14px; border-radius: 3px; }
+.note { color: #888; font-size: 12px; margin: 3px 0; }
+.star { color: #FFD700; }
+</style></head><body>
+<h1>🚢 Synaptic Sea — Generated Ship Layouts</h1>
+<p class="note">Top-down XZ view. Gold border ★ = life boat. Each box width = module count.</p>
+<div class="legend">
+<div class="legend-item"><div class="legend-color" style="background:#8B4513"></div>Dock</div>
+<div class="legend-item"><div class="legend-color" style="background:#CD853F"></div>Bay</div>
+<div class="legend-item"><div class="legend-color" style="background:#A0522D"></div>Compartment</div>
+<div class="legend-item"><div class="legend-color" style="background:#D2B48C"></div>Corridor</div>
+<div class="legend-item"><div class="legend-color" style="background:#DEB887"></div>Quarters</div>
+<div class="legend-item"><div class="legend-color" style="background:#4682B4"></div>Airlock</div>
+<div class="legend-item"><div class="legend-color" style="background:#5F9EA0"></div>Cockpit</div>
+<div class="legend-item"><div class="legend-color" style="background:#B8860B"></div>Engine Bay</div>
+<div class="legend-item"><span class="star">★</span> = Life Boat</div>
+</div>
+<div class="ship"><svg width="500" height="295" xmlns="http://www.w3.org/2000/svg">
+<rect width="500" height="295" fill="#1a1a2e" rx="8"/>
+<text x="15" y="25" fill="#eee" font-size="14" font-family="monospace" font-weight="bold">Life Boat Standalone</text>
+<line x1="120" y1="175" x2="120" y2="100" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="100" x2="270" y2="100" stroke="#444" stroke-width="2"/>
+<rect x="80" y="155" width="104" height="40" rx="4" fill="#4682B4" stroke="#FFD700" stroke-width="2.5"/>
+<text x="86" y="171" fill="#000" font-size="10" font-family="monospace" font-weight="bold">Airlock ★</text>
+<text x="86" y="185" fill="#444" font-size="9" font-family="monospace">3 mod</text>
+<rect x="80" y="80" width="104" height="40" rx="4" fill="#5F9EA0" stroke="#FFD700" stroke-width="2.5"/>
+<text x="86" y="96" fill="#000" font-size="10" font-family="monospace" font-weight="bold">Cockpit ★</text>
+<text x="86" y="110" fill="#444" font-size="9" font-family="monospace">3 mod</text>
+<rect x="230" y="80" width="104" height="40" rx="4" fill="#CD853F" stroke="#FFD700" stroke-width="2.5"/>
+<text x="236" y="96" fill="#000" font-size="10" font-family="monospace" font-weight="bold">Engine Bay ★</text>
+<text x="236" y="110" fill="#444" font-size="9" font-family="monospace">3 mod</text>
+</svg></div><div class="ship"><svg width="545" height="670" xmlns="http://www.w3.org/2000/svg">
+<rect width="545" height="670" fill="#1a1a2e" rx="8"/>
+<text x="15" y="25" fill="#eee" font-size="14" font-family="monospace" font-weight="bold">Start Seed 42</text>
+<line x1="120" y1="475" x2="120" y2="400" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="400" x2="120" y2="325" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="325" x2="120" y2="250" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="250" x2="120" y2="175" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="175" x2="120" y2="100" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="100" x2="345" y2="325" stroke="#444" stroke-width="2"/>
+<line x1="345" y1="325" x2="345" y2="400" stroke="#444" stroke-width="2"/>
+<line x1="345" y1="400" x2="270" y2="325" stroke="#444" stroke-width="2"/>
+<line x1="270" y1="325" x2="270" y2="400" stroke="#444" stroke-width="2"/>
+<line x1="270" y1="400" x2="120" y2="550" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="550" x2="120" y2="475" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="475" x2="270" y2="475" stroke="#444" stroke-width="2"/>
+<rect x="80" y="455" width="104" height="40" rx="4" fill="#8B4513" stroke="#555" stroke-width="1"/>
+<text x="86" y="471" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Dock</text>
+<text x="86" y="485" fill="#999" font-size="9" font-family="monospace">3 mod</text>
+<rect x="80" y="380" width="104" height="40" rx="4" fill="#CD853F" stroke="#555" stroke-width="1"/>
+<text x="86" y="396" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Bay</text>
+<text x="86" y="410" fill="#999" font-size="9" font-family="monospace">3 mod</text>
+<rect x="80" y="305" width="104" height="40" rx="4" fill="#A0522D" stroke="#555" stroke-width="1"/>
+<text x="86" y="321" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Compartment</text>
+<text x="86" y="335" fill="#999" font-size="9" font-family="monospace">3 mod</text>
+<rect x="80" y="230" width="76" height="40" rx="4" fill="#D2B48C" stroke="#555" stroke-width="1"/>
+<text x="86" y="246" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Corridor</text>
+<text x="86" y="260" fill="#999" font-size="9" font-family="monospace">2 mod</text>
+<rect x="80" y="155" width="76" height="40" rx="4" fill="#DEB887" stroke="#555" stroke-width="1"/>
+<text x="86" y="171" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Quarters</text>
+<text x="86" y="185" fill="#999" font-size="9" font-family="monospace">2 mod</text>
+<rect x="80" y="80" width="104" height="40" rx="4" fill="#A0522D" stroke="#555" stroke-width="1"/>
+<text x="86" y="96" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Compartment</text>
+<text x="86" y="110" fill="#999" font-size="9" font-family="monospace">3 mod</text>
+<rect x="305" y="305" width="104" height="40" rx="4" fill="#CD853F" stroke="#555" stroke-width="1"/>
+<text x="311" y="321" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Bay</text>
+<text x="311" y="335" fill="#999" font-size="9" font-family="monospace">3 mod</text>
+<rect x="305" y="380" width="76" height="40" rx="4" fill="#DEB887" stroke="#555" stroke-width="1"/>
+<text x="311" y="396" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Quarters</text>
+<text x="311" y="410" fill="#999" font-size="9" font-family="monospace">2 mod</text>
+<rect x="230" y="305" width="76" height="40" rx="4" fill="#D2B48C" stroke="#555" stroke-width="1"/>
+<text x="236" y="321" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Corridor</text>
+<text x="236" y="335" fill="#999" font-size="9" font-family="monospace">2 mod</text>
+<rect x="230" y="380" width="76" height="40" rx="4" fill="#DEB887" stroke="#555" stroke-width="1"/>
+<text x="236" y="396" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Quarters</text>
+<text x="236" y="410" fill="#999" font-size="9" font-family="monospace">2 mod</text>
+<rect x="80" y="530" width="104" height="40" rx="4" fill="#4682B4" stroke="#FFD700" stroke-width="2.5"/>
+<text x="86" y="546" fill="#000" font-size="10" font-family="monospace" font-weight="bold">Airlock ★</text>
+<text x="86" y="560" fill="#444" font-size="9" font-family="monospace">3 mod</text>
+<rect x="80" y="455" width="104" height="40" rx="4" fill="#5F9EA0" stroke="#FFD700" stroke-width="2.5"/>
+<text x="86" y="471" fill="#000" font-size="10" font-family="monospace" font-weight="bold">Cockpit ★</text>
+<text x="86" y="485" fill="#444" font-size="9" font-family="monospace">3 mod</text>
+<rect x="230" y="455" width="104" height="40" rx="4" fill="#CD853F" stroke="#FFD700" stroke-width="2.5"/>
+<text x="236" y="471" fill="#000" font-size="10" font-family="monospace" font-weight="bold">Engine Bay ★</text>
+<text x="236" y="485" fill="#444" font-size="9" font-family="monospace">3 mod</text>
+</svg></div><div class="ship"><svg width="545" height="445" xmlns="http://www.w3.org/2000/svg">
+<rect width="545" height="445" fill="#1a1a2e" rx="8"/>
+<text x="15" y="25" fill="#eee" font-size="14" font-family="monospace" font-weight="bold">Start Seed 7777</text>
+<line x1="120" y1="250" x2="120" y2="175" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="175" x2="120" y2="100" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="100" x2="195" y2="175" stroke="#444" stroke-width="2"/>
+<line x1="195" y1="175" x2="195" y2="250" stroke="#444" stroke-width="2"/>
+<line x1="195" y1="250" x2="345" y2="250" stroke="#444" stroke-width="2"/>
+<line x1="345" y1="250" x2="345" y2="175" stroke="#444" stroke-width="2"/>
+<line x1="345" y1="175" x2="120" y2="325" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="325" x2="120" y2="250" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="250" x2="270" y2="250" stroke="#444" stroke-width="2"/>
+<rect x="80" y="230" width="104" height="40" rx="4" fill="#8B4513" stroke="#555" stroke-width="1"/>
+<text x="86" y="246" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Dock</text>
+<text x="86" y="260" fill="#999" font-size="9" font-family="monospace">3 mod</text>
+<rect x="80" y="155" width="76" height="40" rx="4" fill="#DEB887" stroke="#555" stroke-width="1"/>
+<text x="86" y="171" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Quarters</text>
+<text x="86" y="185" fill="#999" font-size="9" font-family="monospace">2 mod</text>
+<rect x="80" y="80" width="76" height="40" rx="4" fill="#D2B48C" stroke="#555" stroke-width="1"/>
+<text x="86" y="96" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Corridor</text>
+<text x="86" y="110" fill="#999" font-size="9" font-family="monospace">2 mod</text>
+<rect x="155" y="155" width="76" height="40" rx="4" fill="#D2B48C" stroke="#555" stroke-width="1"/>
+<text x="161" y="171" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Corridor</text>
+<text x="161" y="185" fill="#999" font-size="9" font-family="monospace">2 mod</text>
+<rect x="155" y="230" width="104" height="40" rx="4" fill="#CD853F" stroke="#555" stroke-width="1"/>
+<text x="161" y="246" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Bay</text>
+<text x="161" y="260" fill="#999" font-size="9" font-family="monospace">3 mod</text>
+<rect x="305" y="230" width="104" height="40" rx="4" fill="#A0522D" stroke="#555" stroke-width="1"/>
+<text x="311" y="246" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Compartment</text>
+<text x="311" y="260" fill="#999" font-size="9" font-family="monospace">3 mod</text>
+<rect x="305" y="155" width="76" height="40" rx="4" fill="#D2B48C" stroke="#555" stroke-width="1"/>
+<text x="311" y="171" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Corridor</text>
+<text x="311" y="185" fill="#999" font-size="9" font-family="monospace">2 mod</text>
+<rect x="80" y="305" width="104" height="40" rx="4" fill="#4682B4" stroke="#FFD700" stroke-width="2.5"/>
+<text x="86" y="321" fill="#000" font-size="10" font-family="monospace" font-weight="bold">Airlock ★</text>
+<text x="86" y="335" fill="#444" font-size="9" font-family="monospace">3 mod</text>
+<rect x="80" y="230" width="104" height="40" rx="4" fill="#5F9EA0" stroke="#FFD700" stroke-width="2.5"/>
+<text x="86" y="246" fill="#000" font-size="10" font-family="monospace" font-weight="bold">Cockpit ★</text>
+<text x="86" y="260" fill="#444" font-size="9" font-family="monospace">3 mod</text>
+<rect x="230" y="230" width="104" height="40" rx="4" fill="#CD853F" stroke="#FFD700" stroke-width="2.5"/>
+<text x="236" y="246" fill="#000" font-size="10" font-family="monospace" font-weight="bold">Engine Bay ★</text>
+<text x="236" y="260" fill="#444" font-size="9" font-family="monospace">3 mod</text>
+</svg></div><div class="ship"><svg width="545" height="520" xmlns="http://www.w3.org/2000/svg">
+<rect width="545" height="520" fill="#1a1a2e" rx="8"/>
+<text x="15" y="25" fill="#eee" font-size="14" font-family="monospace" font-weight="bold">Start Seed 999</text>
+<line x1="120" y1="325" x2="120" y2="250" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="250" x2="120" y2="175" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="175" x2="195" y2="250" stroke="#444" stroke-width="2"/>
+<line x1="195" y1="250" x2="195" y2="325" stroke="#444" stroke-width="2"/>
+<line x1="195" y1="325" x2="345" y2="325" stroke="#444" stroke-width="2"/>
+<line x1="345" y1="325" x2="345" y2="250" stroke="#444" stroke-width="2"/>
+<line x1="345" y1="250" x2="195" y2="100" stroke="#444" stroke-width="2"/>
+<line x1="195" y1="100" x2="195" y2="175" stroke="#444" stroke-width="2"/>
+<line x1="195" y1="175" x2="270" y2="175" stroke="#444" stroke-width="2"/>
+<line x1="270" y1="175" x2="120" y2="400" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="400" x2="120" y2="325" stroke="#444" stroke-width="2"/>
+<line x1="120" y1="325" x2="270" y2="325" stroke="#444" stroke-width="2"/>
+<rect x="80" y="305" width="104" height="40" rx="4" fill="#8B4513" stroke="#555" stroke-width="1"/>
+<text x="86" y="321" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Dock</text>
+<text x="86" y="335" fill="#999" font-size="9" font-family="monospace">3 mod</text>
+<rect x="80" y="230" width="76" height="40" rx="4" fill="#D2B48C" stroke="#555" stroke-width="1"/>
+<text x="86" y="246" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Corridor</text>
+<text x="86" y="260" fill="#999" font-size="9" font-family="monospace">2 mod</text>
+<rect x="80" y="155" width="104" height="40" rx="4" fill="#A0522D" stroke="#555" stroke-width="1"/>
+<text x="86" y="171" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Compartment</text>
+<text x="86" y="185" fill="#999" font-size="9" font-family="monospace">3 mod</text>
+<rect x="155" y="230" width="104" height="40" rx="4" fill="#CD853F" stroke="#555" stroke-width="1"/>
+<text x="161" y="246" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Bay</text>
+<text x="161" y="260" fill="#999" font-size="9" font-family="monospace">3 mod</text>
+<rect x="155" y="305" width="104" height="40" rx="4" fill="#CD853F" stroke="#555" stroke-width="1"/>
+<text x="161" y="321" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Bay</text>
+<text x="161" y="335" fill="#999" font-size="9" font-family="monospace">3 mod</text>
+<rect x="305" y="305" width="104" height="40" rx="4" fill="#A0522D" stroke="#555" stroke-width="1"/>
+<text x="311" y="321" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Compartment</text>
+<text x="311" y="335" fill="#999" font-size="9" font-family="monospace">3 mod</text>
+<rect x="305" y="230" width="76" height="40" rx="4" fill="#DEB887" stroke="#555" stroke-width="1"/>
+<text x="311" y="246" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Quarters</text>
+<text x="311" y="260" fill="#999" font-size="9" font-family="monospace">2 mod</text>
+<rect x="155" y="80" width="104" height="40" rx="4" fill="#A0522D" stroke="#555" stroke-width="1"/>
+<text x="161" y="96" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Compartment</text>
+<text x="161" y="110" fill="#999" font-size="9" font-family="monospace">3 mod</text>
+<rect x="155" y="155" width="76" height="40" rx="4" fill="#DEB887" stroke="#555" stroke-width="1"/>
+<text x="161" y="171" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Quarters</text>
+<text x="161" y="185" fill="#999" font-size="9" font-family="monospace">2 mod</text>
+<rect x="230" y="155" width="76" height="40" rx="4" fill="#D2B48C" stroke="#555" stroke-width="1"/>
+<text x="236" y="171" fill="#fff" font-size="10" font-family="monospace" font-weight="bold">Corridor</text>
+<text x="236" y="185" fill="#999" font-size="9" font-family="monospace">2 mod</text>
+<rect x="80" y="380" width="104" height="40" rx="4" fill="#4682B4" stroke="#FFD700" stroke-width="2.5"/>
+<text x="86" y="396" fill="#000" font-size="10" font-family="monospace" font-weight="bold">Airlock ★</text>
+<text x="86" y="410" fill="#444" font-size="9" font-family="monospace">3 mod</text>
+<rect x="80" y="305" width="104" height="40" rx="4" fill="#5F9EA0" stroke="#FFD700" stroke-width="2.5"/>
+<text x="86" y="321" fill="#000" font-size="10" font-family="monospace" font-weight="bold">Cockpit ★</text>
+<text x="86" y="335" fill="#444" font-size="9" font-family="monospace">3 mod</text>
+<rect x="230" y="305" width="104" height="40" rx="4" fill="#CD853F" stroke="#FFD700" stroke-width="2.5"/>
+<text x="236" y="321" fill="#000" font-size="10" font-family="monospace" font-weight="bold">Engine Bay ★</text>
+<text x="236" y="335" fill="#444" font-size="9" font-family="monospace">3 mod</text>
+</svg></div></body></html>

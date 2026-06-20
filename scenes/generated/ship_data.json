@@ -1,0 +1,283 @@
+{
+  "life_boat_standalone": [
+    {
+      "modules": 3,
+      "name": "airlock_01",
+      "ship": "life_boat",
+      "x": 12.0,
+      "z": -6.0
+    },
+    {
+      "modules": 3,
+      "name": "cockpit_01",
+      "ship": "life_boat",
+      "x": 0.0,
+      "z": -6.0
+    },
+    {
+      "modules": 3,
+      "name": "engine_bay_01",
+      "ship": "life_boat",
+      "x": 0.0,
+      "z": 0.0
+    }
+  ],
+  "start_seed_42": [
+    {
+      "modules": 3,
+      "name": "dock_01",
+      "ship": "derelict",
+      "x": 0.0,
+      "z": 0.0
+    },
+    {
+      "modules": 3,
+      "name": "bay_01",
+      "ship": "derelict",
+      "x": 0.0,
+      "z": -6.0
+    },
+    {
+      "modules": 3,
+      "name": "compartment_01",
+      "ship": "derelict",
+      "x": 0.0,
+      "z": -12.0
+    },
+    {
+      "modules": 2,
+      "name": "corridor_01",
+      "ship": "derelict",
+      "x": 6.0,
+      "z": 0.0
+    },
+    {
+      "modules": 2,
+      "name": "quarters_01",
+      "ship": "derelict",
+      "x": 12.0,
+      "z": 0.0
+    },
+    {
+      "modules": 3,
+      "name": "compartment_02",
+      "ship": "derelict",
+      "x": 12.0,
+      "z": -6.0
+    },
+    {
+      "modules": 3,
+      "name": "bay_02",
+      "ship": "derelict",
+      "x": -12.0,
+      "z": 0.0
+    },
+    {
+      "modules": 2,
+      "name": "quarters_02",
+      "ship": "derelict",
+      "x": -12.0,
+      "z": -6.0
+    },
+    {
+      "modules": 2,
+      "name": "corridor_02",
+      "ship": "derelict",
+      "x": -6.0,
+      "z": -12.0
+    },
+    {
+      "modules": 2,
+      "name": "quarters_03",
+      "ship": "derelict",
+      "x": -6.0,
+      "z": -6.0
+    },
+    {
+      "modules": 3,
+      "name": "airlock_01",
+      "ship": "life_boat",
+      "x": 12.0,
+      "z": 0.0
+    },
+    {
+      "modules": 3,
+      "name": "cockpit_01",
+      "ship": "life_boat",
+      "x": 0.0,
+      "z": 0.0
+    },
+    {
+      "modules": 3,
+      "name": "engine_bay_01",
+      "ship": "life_boat",
+      "x": 0.0,
+      "z": 6.0
+    }
+  ],
+  "start_seed_7777": [
+    {
+      "modules": 3,
+      "name": "dock_01",
+      "ship": "derelict",
+      "x": 0.0,
+      "z": 0.0
+    },
+    {
+      "modules": 2,
+      "name": "quarters_01",
+      "ship": "derelict",
+      "x": -6.0,
+      "z": 0.0
+    },
+    {
+      "modules": 2,
+      "name": "corridor_01",
+      "ship": "derelict",
+      "x": -6.0,
+      "z": -6.0
+    },
+    {
+      "modules": 2,
+      "name": "corridor_02",
+      "ship": "derelict",
+      "x": 12.0,
+      "z": -6.0
+    },
+    {
+      "modules": 3,
+      "name": "bay_01",
+      "ship": "derelict",
+      "x": 0.0,
+      "z": -6.0
+    },
+    {
+      "modules": 3,
+      "name": "compartment_01",
+      "ship": "derelict",
+      "x": 0.0,
+      "z": -12.0
+    },
+    {
+      "modules": 2,
+      "name": "corridor_03",
+      "ship": "derelict",
+      "x": 0.0,
+      "z": -18.0
+    },
+    {
+      "modules": 3,
+      "name": "airlock_01",
+      "ship": "life_boat",
+      "x": 12.0,
+      "z": 0.0
+    },
+    {
+      "modules": 3,
+      "name": "cockpit_01",
+      "ship": "life_boat",
+      "x": 0.0,
+      "z": 0.0
+    },
+    {
+      "modules": 3,
+      "name": "engine_bay_01",
+      "ship": "life_boat",
+      "x": 0.0,
+      "z": 6.0
+    }
+  ],
+  "start_seed_999": [
+    {
+      "modules": 3,
+      "name": "dock_01",
+      "ship": "derelict",
+      "x": 0.0,
+      "z": 0.0
+    },
+    {
+      "modules": 2,
+      "name": "corridor_01",
+      "ship": "derelict",
+      "x": 0.0,
+      "z": -6.0
+    },
+    {
+      "modules": 3,
+      "name": "compartment_01",
+      "ship": "derelict",
+      "x": 0.0,
+      "z": -12.0
+    },
+    {
+      "modules": 3,
+      "name": "bay_01",
+      "ship": "derelict",
+      "x": 6.0,
+      "z": -6.0
+    },
+    {
+      "modules": 3,
+      "name": "bay_02",
+      "ship": "derelict",
+      "x": 6.0,
+      "z": 0.0
+    },
+    {
+      "modules": 3,
+      "name": "compartment_02",
+      "ship": "derelict",
+      "x": 18.0,
+      "z": 0.0
+    },
+    {
+      "modules": 2,
+      "name": "quarters_01",
+      "ship": "derelict",
+      "x": -6.0,
+      "z": 0.0
+    },
+    {
+      "modules": 3,
+      "name": "compartment_03",
+      "ship": "derelict",
+      "x": -6.0,
+      "z": -6.0
+    },
+    {
+      "modules": 2,
+      "name": "quarters_02",
+      "ship": "derelict",
+      "x": 6.0,
+      "z": -12.0
+    },
+    {
+      "modules": 2,
+      "name": "corridor_02",
+      "ship": "derelict",
+      "x": 6.0,
+      "z": -18.0
+    },
+    {
+      "modules": 3,
+      "name": "airlock_01",
+      "ship": "life_boat",
+      "x": 12.0,
+      "z": 0.0
+    },
+    {
+      "modules": 3,
+      "name": "cockpit_01",
+      "ship": "life_boat",
+      "x": 0.0,
+      "z": 0.0
+    },
+    {
+      "modules": 3,
+      "name": "engine_bay_01",
+      "ship": "life_boat",
+      "x": 0.0,
+      "z": 6.0
+    }
+  ]
+}
