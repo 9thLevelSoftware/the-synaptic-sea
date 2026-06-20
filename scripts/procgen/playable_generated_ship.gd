@@ -2,6 +2,7 @@ extends Node3D
 class_name PlayableGeneratedShip
 
 const GeneratedShipLoaderScript := preload("res://scripts/procgen/generated_ship_loader.gd")
+const ShipGeneratorScript := preload("res://scripts/procgen/ship_generator.gd")
 const PlayerControllerScript := preload("res://scripts/player/player_controller.gd")
 const IsoCameraRigScript := preload("res://scripts/camera/iso_camera_rig.gd")
 const InteractableScript := preload("res://scripts/interaction/interactable.gd")
@@ -278,6 +279,42 @@ func get_playable_summary() -> Dictionary:
 		"start_position": player.global_position if player != null else Vector3.INF,
 		"goal_position": loader.get_goal_position() if loader != null else Vector3.INF,
 	}
+
+## Blueprint-driven entry point: build a GeneratedShip Node3D tree from a
+## ShipBlueprint via the ShipGenerator and add it as a direct child of this
+## playable scene. The generator returns a freshly-built root named
+## "GeneratedShip" with the "ShipStructure" Node3D nested inside it; we
+## re-parent that root under self so the existing playable infrastructure
+## (player spawn, camera rig, interactables) can reference it the same way
+## it references the GeneratedShipLoader output.
+##
+## This is intentionally orthogonal to loader.load_from_paths(): callers
+## who already have a ShipBlueprint (e.g. generated procedurally, replayed
+## from a save fixture, or seeded for tests) can use this seam to bypass
+## the layout/kit JSON paths entirely. The caller still owns subsequent
+## ship_loaded wiring (the loader's `ship_loaded` signal is the production
+## trigger for _on_ship_loaded — this method does NOT fire that signal,
+## since the loader has not run).
+##
+## Returns the generated root Node3D on success, or null if the blueprint
+## is null or the generator produced no ship.
+##
+## NOTE: parameter is intentionally untyped (`Variant`) because Godot
+## `class_name` globals are not always registered at parse time in
+## `godot --headless --script` mode. The runtime check via
+## `ShipBlueprintScript.new(...)` in ShipGenerator is the same pattern
+## used by ShipGenerator.generate(blueprint) itself.
+func load_from_blueprint(blueprint) -> Node3D:
+	if blueprint == null:
+		push_error("PlayableGeneratedShip.load_from_blueprint: blueprint must not be null")
+		return null
+	var generator: ShipGeneratorScript = ShipGeneratorScript.new()
+	var generated: Node3D = generator.generate(blueprint)
+	if generated == null:
+		push_error("PlayableGeneratedShip.load_from_blueprint: ShipGenerator failed to build a ship")
+		return null
+	add_child(generated)
+	return generated
 
 func get_current_objective_sequence() -> int:
 	return current_objective_sequence
