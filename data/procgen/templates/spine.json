@@ -1,0 +1,62 @@
+{
+  "id": "spine",
+  "description": "Linear backbone with side rooms branching off. Based on coherent_ship_001.",
+  "zones": [
+    {
+      "id": "entry",
+      "role_pool": ["airlock", "dock"],
+      "count": 1,
+      "position_hint": "bow",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": ""
+    },
+    {
+      "id": "entry_corridor",
+      "role_pool": ["corridor"],
+      "count": 1,
+      "position_hint": "bow",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": "entry"
+    },
+    {
+      "id": "spine",
+      "role_pool": ["corridor", "main_spine", "hub"],
+      "count": [3, 5],
+      "position_hint": "center",
+      "deck": 0,
+      "layout": "linear",
+      "attach_to": "entry_corridor"
+    },
+    {
+      "id": "side_branch",
+      "role_pool": ["engineering", "cargo", "crew_quarters", "medical", "maintenance", "life_support", "storage"],
+      "count": [2, 4],
+      "position_hint": "lateral",
+      "deck": 0,
+      "layout": "clustered",
+      "attach_to": "spine"
+    },
+    {
+      "id": "destination",
+      "role_pool": ["reactor", "bridge"],
+      "count": 1,
+      "position_hint": "stern",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": "spine"
+    }
+  ],
+  "connections": [
+    {"from": "entry", "to": "entry_corridor", "distribution": "adjacent"},
+    {"from": "entry_corridor", "to": "spine[0]", "distribution": "adjacent"},
+    {"from": "spine[*]", "to": "spine[*+1]", "distribution": "adjacent"},
+    {"from": "spine[*]", "to": "side_branch", "distribution": "spread"},
+    {"from": "spine[-1]", "to": "destination", "distribution": "adjacent"}
+  ],
+  "deck_config": {
+    "max_decks": 2,
+    "vertical_transition_probability": 0.4
+  }
+}

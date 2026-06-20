@@ -1,0 +1,102 @@
+{
+  "id": "bifurcated",
+  "description": "Y-shaped fork with two parallel branches converging. Based on coherent_ship_002.",
+  "zones": [
+    {
+      "id": "entry",
+      "role_pool": ["airlock", "dock"],
+      "count": 1,
+      "position_hint": "bow",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": ""
+    },
+    {
+      "id": "entry_corridor",
+      "role_pool": ["corridor"],
+      "count": 1,
+      "position_hint": "bow",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": "entry"
+    },
+    {
+      "id": "hub",
+      "role_pool": ["hub", "main_spine"],
+      "count": 1,
+      "position_hint": "center",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": "entry_corridor"
+    },
+    {
+      "id": "left_arm",
+      "role_pool": ["corridor"],
+      "count": 1,
+      "position_hint": "lateral",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": "hub"
+    },
+    {
+      "id": "right_arm",
+      "role_pool": ["corridor"],
+      "count": 1,
+      "position_hint": "lateral",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": "hub"
+    },
+    {
+      "id": "left_branch",
+      "role_pool": ["engineering", "cargo", "crew_quarters", "medical", "maintenance", "life_support", "storage"],
+      "count": [1, 2],
+      "position_hint": "lateral",
+      "deck": 0,
+      "layout": "clustered",
+      "attach_to": "left_arm"
+    },
+    {
+      "id": "right_branch",
+      "role_pool": ["engineering", "cargo", "crew_quarters", "medical", "maintenance", "life_support", "storage"],
+      "count": [1, 2],
+      "position_hint": "lateral",
+      "deck": 0,
+      "layout": "clustered",
+      "attach_to": "right_arm"
+    },
+    {
+      "id": "convergence",
+      "role_pool": ["main_spine", "hub"],
+      "count": 1,
+      "position_hint": "center",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": "left_arm"
+    },
+    {
+      "id": "destination",
+      "role_pool": ["reactor"],
+      "count": 1,
+      "position_hint": "stern",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": "convergence"
+    }
+  ],
+  "connections": [
+    {"from": "entry", "to": "entry_corridor", "distribution": "adjacent"},
+    {"from": "entry_corridor", "to": "hub", "distribution": "adjacent"},
+    {"from": "hub", "to": "left_arm", "distribution": "adjacent"},
+    {"from": "hub", "to": "right_arm", "distribution": "adjacent"},
+    {"from": "left_arm", "to": "left_branch", "distribution": "spread"},
+    {"from": "right_arm", "to": "right_branch", "distribution": "spread"},
+    {"from": "left_arm", "to": "convergence", "distribution": "adjacent"},
+    {"from": "right_arm", "to": "convergence", "distribution": "adjacent"},
+    {"from": "convergence", "to": "destination", "distribution": "adjacent"}
+  ],
+  "deck_config": {
+    "max_decks": 1,
+    "vertical_transition_probability": 0.0
+  }
+}

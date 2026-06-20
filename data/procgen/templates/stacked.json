@@ -1,0 +1,111 @@
+{
+  "id": "stacked",
+  "description": "Two decks connected by ramp and elevator. Based on coherent_ship_003.",
+  "zones": [
+    {
+      "id": "entry",
+      "role_pool": ["airlock", "dock"],
+      "count": 1,
+      "position_hint": "bow",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": ""
+    },
+    {
+      "id": "entry_corridor",
+      "role_pool": ["corridor"],
+      "count": 1,
+      "position_hint": "bow",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": "entry"
+    },
+    {
+      "id": "lower_hub",
+      "role_pool": ["hub", "main_spine"],
+      "count": 1,
+      "position_hint": "center",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": "entry_corridor"
+    },
+    {
+      "id": "lower_side",
+      "role_pool": ["engineering", "cargo", "crew_quarters", "medical", "maintenance", "life_support", "storage"],
+      "count": [1, 2],
+      "position_hint": "lateral",
+      "deck": 0,
+      "layout": "clustered",
+      "attach_to": "lower_hub"
+    },
+    {
+      "id": "ramp",
+      "role_pool": ["ramp"],
+      "count": 1,
+      "position_hint": "center",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": "lower_hub"
+    },
+    {
+      "id": "upper_hub",
+      "role_pool": ["hub", "main_spine"],
+      "count": 1,
+      "position_hint": "center",
+      "deck": 1,
+      "layout": "single",
+      "attach_to": "ramp"
+    },
+    {
+      "id": "upper_side",
+      "role_pool": ["engineering", "cargo", "crew_quarters", "medical", "maintenance", "life_support", "storage"],
+      "count": [1, 2],
+      "position_hint": "lateral",
+      "deck": 1,
+      "layout": "clustered",
+      "attach_to": "upper_hub"
+    },
+    {
+      "id": "elevator",
+      "role_pool": ["elevator"],
+      "count": 1,
+      "position_hint": "center",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": "upper_hub"
+    },
+    {
+      "id": "access_corridor",
+      "role_pool": ["corridor"],
+      "count": 1,
+      "position_hint": "center",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": "elevator"
+    },
+    {
+      "id": "destination",
+      "role_pool": ["reactor"],
+      "count": 1,
+      "position_hint": "stern",
+      "deck": 0,
+      "layout": "single",
+      "attach_to": "access_corridor"
+    }
+  ],
+  "connections": [
+    {"from": "entry", "to": "entry_corridor", "distribution": "adjacent"},
+    {"from": "entry_corridor", "to": "lower_hub", "distribution": "adjacent"},
+    {"from": "lower_hub", "to": "lower_side", "distribution": "spread"},
+    {"from": "lower_hub", "to": "ramp", "distribution": "adjacent"},
+    {"from": "ramp", "to": "upper_hub", "distribution": "adjacent"},
+    {"from": "upper_hub", "to": "upper_side", "distribution": "spread"},
+    {"from": "upper_hub", "to": "elevator", "distribution": "adjacent"},
+    {"from": "elevator", "to": "access_corridor", "distribution": "adjacent"},
+    {"from": "access_corridor", "to": "destination", "distribution": "adjacent"}
+  ],
+  "deck_config": {
+    "max_decks": 2,
+    "vertical_transition_probability": 1.0
+  }
+}
