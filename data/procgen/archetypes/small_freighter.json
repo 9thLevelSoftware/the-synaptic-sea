@@ -1,0 +1,13 @@
+{
+    "name": "Small Freighter",
+    "description": "Medium-sized cargo vessel",
+    "blueprint": {
+        "size": 1,
+        "condition": 1,
+        "seed_value": 0,
+        "room_count_range": {
+            "min": 4,
+            "max": 8
+        }
+    }
+}

@@ -1,0 +1,13 @@
+{
+    "name": "Medium Cruiser",
+    "description": "Large military or exploration vessel",
+    "blueprint": {
+        "size": 2,
+        "condition": 1,
+        "seed_value": 0,
+        "room_count_range": {
+            "min": 8,
+            "max": 12
+        }
+    }
+}
