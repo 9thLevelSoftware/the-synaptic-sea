@@ -1,106 +1,79 @@
 extends SceneTree
 
-# StructuralPlacer smoke. Builds a ShipBlueprint, runs it through
-# RoomGraphGenerator to get a connected RoomGraph, feeds the graph to
-# StructuralPlacer.place_structure(), and verifies the returned
-# ShipStructure root has one child per room with the expected module
-# counts.
+# StructuralPlacer smoke (v3 grid placement). Builds a ShipBlueprint,
+# runs it through RoomGraphGenerator to get a connected RoomGraph, feeds
+# the graph to StructuralPlacer.place_structure(), and verifies the
+# returned ShipStructure root.
+#
+# The v3 StructuralPlacer lays rooms out on a 2D grid via BFS with
+# directional preferences (not the v1 single-line +Z stack). Each room
+# node's world position is therefore an integer multiple of the grid
+# step (CELL_SIZE + ROOM_GAP) on both X and Z, with Y == 0. Modules
+# within a room are still spaced CELL_SIZE apart along local +Z.
 #
 # Verifies:
-#   1. place_structure() returns a non-null Node3D named "ShipStructure"
-#   2. The root has exactly one child per room in the graph
-#   3. Every child is a Node3D
-#   4. Each room node has the expected number of module children
-#      (matching ROOM_MODULES for known roles, 1 for the fallback)
-#   5. Modules are positioned in a non-overlapping line along +Z
-#      (each instance's Z equals room_offset + i * CELL_SIZE)
+#   1. place_structure() returns a non-null Node3D named "ShipStructure".
+#   2. The root has exactly one child per room in the graph.
+#   3. Every room child is a Node3D positioned on the grid
+#      (x and z are integer multiples of grid step; y == 0).
+#   4. No two rooms share the same origin cell (non-overlapping origins).
+#   5. Each room has the expected module count for its role (matching
+#      ROOM_MODULES; fallback 1 for unknown roles), with modules spaced
+#      CELL_SIZE apart on local +Z.
 #   6. A second, independently-seeded ship also places correctly
-#      (placer is not stateful across calls)
-#   7. An unknown role falls back to the single-floor footprint
-#      rather than crashing the placer
+#      (placer is not stateful across calls).
+#   7. Determinism: the same graph placed twice yields identical room
+#      positions.
+#   8. An unknown role falls back to the single-floor footprint rather
+#      than crashing the placer.
 #
-# On success prints a single PASS line with the room/module counts so
-# automated verification can grep for it; on any failure pushes an
-# error and quits with code 1 so a regression blocks the gate.
+# On success prints a single PASS line; on the FIRST failure pushes an
+# error and quits with code 1. IMPORTANT: in a SceneTree, quit() only
+# sets a flag — _initialize() keeps running — so each failing assertion
+# is surfaced by returning false up to _initialize(), which then quits
+# and returns immediately (the old version called quit() mid-helper and
+# fell through to a spurious PASS print).
 
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const RoomGraphScript := preload("res://scripts/procgen/room_graph.gd")
 const RoomGraphGeneratorScript := preload("res://scripts/procgen/room_graph_generator.gd")
 const StructuralPlacerScript := preload("res://scripts/procgen/structural_placer.gd")
 
+const GRID_STEP: float = StructuralPlacerScript.CELL_SIZE + StructuralPlacerScript.ROOM_GAP
+const EPS: float = 0.001
+
 
 func _initialize() -> void:
 	# --- Case 1: medium ship, deterministic seed ---------------------
 	var counts_a: Array = _run_ship_case(
-		"medium",
-		ShipBlueprintScript.Size.MEDIUM,
-		ShipBlueprintScript.Condition.PRISTINE,
-		314)
+		"medium", ShipBlueprintScript.Size.MEDIUM, ShipBlueprintScript.Condition.PRISTINE, 314)
+	if counts_a.is_empty():
+		quit(1)
+		return
 
-	# --- Case 2: small damaged ship, different seed -------------------
-	# Confirms the placer is stateless — a second generate/place
-	# cycle must produce the same shape for a fresh seed, not
-	# accumulate state from the first call.
+	# --- Case 2: small damaged ship, different seed ------------------
 	var counts_b: Array = _run_ship_case(
-		"small",
-		ShipBlueprintScript.Size.SMALL,
-		ShipBlueprintScript.Condition.DAMAGED,
-		2718)
-
-	# --- Case 3: unknown role falls back to a single floor -----------
-	# Hand-built graph (not generator output) so we can introduce a
-	# role the generator never produces. The placer must not crash;
-	# it should drop a single floor_1x1.
-	var graph_custom: RoomGraphScript = RoomGraphScript.new()
-	graph_custom.add_room("secret_01", "unknown_role_xyz", 0)
-	graph_custom.add_room("airlock_99", "airlock", 0)
-	graph_custom.add_link("secret_01", "airlock_99")
-
-	var placer: StructuralPlacerScript = StructuralPlacerScript.new()
-	var custom_root: Node3D = placer.place_structure(graph_custom)
-	if custom_root == null:
-		push_error("STRUCTURAL PLACER FAIL unknown-role case returned null root")
-		quit(1)
-		return
-	if custom_root.name != "ShipStructure":
-		push_error("STRUCTURAL PLACER FAIL unknown-role case root.name=%s expected=ShipStructure" % str(custom_root.name))
-		quit(1)
-		return
-	if custom_root.get_child_count() != 2:
-		push_error("STRUCTURAL PLACER FAIL unknown-role case children=%d expected=2" % custom_root.get_child_count())
-		quit(1)
-		return
-	var unknown_room: Node = custom_root.get_node("secret_01")
-	if unknown_room == null:
-		push_error("STRUCTURAL PLACER FAIL unknown-role case secret_01 missing")
-		quit(1)
-		return
-	# The unknown role's fallback is a single floor_1x1.
-	if unknown_room.get_child_count() != 1:
-		push_error("STRUCTURAL PLACER FAIL unknown-role case module count=%d expected=1 (fallback)" % unknown_room.get_child_count())
+		"small", ShipBlueprintScript.Size.SMALL, ShipBlueprintScript.Condition.DAMAGED, 2718)
+	if counts_b.is_empty():
 		quit(1)
 		return
 
-	# --- Pass ---------------------------------------------------------
+	# --- Case 3: unknown role falls back to a single floor ----------
+	if not _run_unknown_role_case():
+		quit(1)
+		return
+
 	print("STRUCTURAL PLACER PASS rooms=%d modules=%d second_rooms=%d second_modules=%d unknown_role_fallback=ok" % [
 		int(counts_a[0]), int(counts_a[1]), int(counts_b[0]), int(counts_b[1]),
 	])
 	quit(0)
 
 
-# Runs one full ship case (blueprint -> graph -> structure) and
-# asserts the standard placement invariants. On failure pushes an
-# error and quits with code 1 (so the test halts on the first
-# regression, matching the other smokes' style). On success returns
-# [room_count, module_count] so the PASS line can report totals.
-# GDScript ints are value-typed, so we return a small Array rather
-# than passing two ints by reference.
-func _run_ship_case(
-		label: String,
-		p_size: int,
-		p_condition: int,
-		p_seed: int) -> Array:
-
+# Runs one full ship case (blueprint -> graph -> structure) and asserts
+# the v3 grid placement invariants plus determinism. Returns
+# [room_count, module_count] on success, or [] on the first failure
+# (after pushing an error). Frees the structures it builds.
+func _run_ship_case(label: String, p_size: int, p_condition: int, p_seed: int) -> Array:
 	var bp: ShipBlueprintScript = ShipBlueprintScript.new(p_size, p_condition, p_seed)
 	var gen: RoomGraphGeneratorScript = RoomGraphGeneratorScript.new()
 	var graph: RoomGraphScript = gen.generate(bp)
@@ -108,134 +81,152 @@ func _run_ship_case(
 	var placer: StructuralPlacerScript = StructuralPlacerScript.new()
 	var root: Node3D = placer.place_structure(graph)
 
-	if root == null:
-		push_error("STRUCTURAL PLACER FAIL %s place_structure returned null" % label)
-		quit(1)
-		return [0, 0]
-	if not (root is Node3D):
-		push_error("STRUCTURAL PLACER FAIL %s root is not Node3D (got %s)" % [label, str(root)])
-		quit(1)
-		return [0, 0]
+	if root == null or not (root is Node3D):
+		push_error("STRUCTURAL PLACER FAIL %s place_structure returned null/non-Node3D" % label)
+		return []
 	if root.name != "ShipStructure":
 		push_error("STRUCTURAL PLACER FAIL %s root.name=%s expected=ShipStructure" % [label, str(root.name)])
-		quit(1)
-		return [0, 0]
-
-	# Root must have exactly one child per room in the graph.
+		root.free()
+		return []
 	if root.get_child_count() != graph.rooms.size():
 		push_error("STRUCTURAL PLACER FAIL %s children=%d expected=%d (rooms)" % [
-			label, root.get_child_count(), graph.rooms.size(),
-		])
-		quit(1)
-		return [0, 0]
+			label, root.get_child_count(), graph.rooms.size()])
+		root.free()
+		return []
 
-	# Walk each room and verify it has the expected module list, with
-	# modules spaced CELL_SIZE apart on +Z, and the room itself
-	# offset from origin by the cumulative Z of prior rooms.
-	var expected_z_cursor: float = 0.0
 	var total_modules: int = 0
+	var seen_origins: Dictionary = {}
 	for room in graph.rooms:
 		var rid: String = String(room["id"])
 		var rrole: String = String(room["role"])
 
-		var room_node: Node = root.get_node(rid)
-		if room_node == null:
-			push_error("STRUCTURAL PLACER FAIL %s room %s missing from structure" % [label, rid])
-			quit(1)
-			return [0, 0]
-		if not (room_node is Node3D):
-			push_error("STRUCTURAL PLACER FAIL %s room %s is not Node3D" % [label, rid])
-			quit(1)
-			return [0, 0]
-
-		# The room's position must match the running Z cursor.
+		var room_node: Node = root.get_node_or_null(NodePath(rid))
+		if room_node == null or not (room_node is Node3D):
+			push_error("STRUCTURAL PLACER FAIL %s room %s missing or not Node3D" % [label, rid])
+			root.free()
+			return []
 		var room_pos: Vector3 = (room_node as Node3D).position
-		if not _approx_equal(room_pos.z, expected_z_cursor):
-			push_error("STRUCTURAL PLACER FAIL %s room %s z=%f expected=%f" % [
-				label, rid, room_pos.z, expected_z_cursor,
-			])
-			quit(1)
-			return [0, 0]
 
-		# Module count for this role: matches the placer's mapping
-		# if the role is known, otherwise the fallback (1).
+		# Grid alignment: x and z are integer multiples of GRID_STEP, y == 0.
+		if absf(room_pos.y) > EPS:
+			push_error("STRUCTURAL PLACER FAIL %s room %s y=%f expected 0" % [label, rid, room_pos.y])
+			root.free()
+			return []
+		if not _is_grid_aligned(room_pos.x) or not _is_grid_aligned(room_pos.z):
+			push_error("STRUCTURAL PLACER FAIL %s room %s pos=%s not grid-aligned (step=%f)" % [
+				label, rid, str(room_pos), GRID_STEP])
+			root.free()
+			return []
+
+		# Non-overlapping origins.
+		var origin_key: String = "%d,%d" % [int(round(room_pos.x / GRID_STEP)), int(round(room_pos.z / GRID_STEP))]
+		if seen_origins.has(origin_key):
+			push_error("STRUCTURAL PLACER FAIL %s room %s origin %s collides with %s" % [
+				label, rid, origin_key, str(seen_origins[origin_key])])
+			root.free()
+			return []
+		seen_origins[origin_key] = rid
+
+		# Module count for this role.
 		var expected_module_count: int = _expected_module_count(rrole)
 		var actual_module_count: int = room_node.get_child_count()
 		if actual_module_count != expected_module_count:
 			push_error("STRUCTURAL PLACER FAIL %s room %s (role=%s) modules=%d expected=%d" % [
-				label, rid, rrole, actual_module_count, expected_module_count,
-			])
-			quit(1)
-			return [0, 0]
+				label, rid, rrole, actual_module_count, expected_module_count])
+			root.free()
+			return []
 
-		# Each module should sit at z = i * CELL_SIZE within the room.
+		# Each module sits at local z = i * CELL_SIZE (x == 0, y == 0).
 		for i in range(actual_module_count):
 			var module_node: Node = room_node.get_child(i)
 			if not (module_node is Node3D):
-				push_error("STRUCTURAL PLACER FAIL %s room %s module[%d] is not Node3D" % [label, rid, i])
-				quit(1)
-				return [0, 0]
+				push_error("STRUCTURAL PLACER FAIL %s room %s module[%d] not Node3D" % [label, rid, i])
+				root.free()
+				return []
 			var module_pos: Vector3 = (module_node as Node3D).position
 			var expected_module_z: float = float(i) * StructuralPlacerScript.CELL_SIZE
 			if not _approx_equal(module_pos.z, expected_module_z):
 				push_error("STRUCTURAL PLACER FAIL %s room %s module[%d] z=%f expected=%f" % [
-					label, rid, i, module_pos.z, expected_module_z,
-				])
-				quit(1)
-				return [0, 0]
+					label, rid, i, module_pos.z, expected_module_z])
+				root.free()
+				return []
 
 		total_modules += actual_module_count
-		expected_z_cursor += float(actual_module_count) * StructuralPlacerScript.CELL_SIZE
 
-	# Final assertion: no two rooms overlap. The last module's world
-	# Z must be ≤ the next room's Z (here, equal to the running cursor,
-	# which is also the start of the next room's offset).
-	# (For a graph with N rooms, the last module sits at
-	# expected_z_cursor - CELL_SIZE; just sanity-check the cursor
-	# matches the number of modules the placer actually placed.)
-	var expected_total_z: float = float(total_modules) * StructuralPlacerScript.CELL_SIZE
-	if not _approx_equal(expected_z_cursor, expected_total_z):
-		push_error("STRUCTURAL PLACER FAIL %s final z_cursor=%f expected=%f" % [
-			label, expected_z_cursor, expected_total_z,
-		])
-		quit(1)
-		return [0, 0]
+	# Determinism: placing the same graph again yields identical positions.
+	var placer2: StructuralPlacerScript = StructuralPlacerScript.new()
+	var root2: Node3D = placer2.place_structure(graph)
+	if root2 == null:
+		push_error("STRUCTURAL PLACER FAIL %s determinism second placement null" % label)
+		root.free()
+		return []
+	for room in graph.rooms:
+		var rid: String = String(room["id"])
+		var n1: Node = root.get_node_or_null(NodePath(rid))
+		var n2: Node = root2.get_node_or_null(NodePath(rid))
+		if n1 == null or n2 == null or (n1 as Node3D).position != (n2 as Node3D).position:
+			push_error("STRUCTURAL PLACER FAIL %s determinism room %s position differs" % [label, rid])
+			root.free()
+			root2.free()
+			return []
+	root.free()
+	root2.free()
 
 	return [graph.rooms.size(), total_modules]
 
 
-# Returns the expected number of modules for a given role, mirroring
-# the ROOM_MODULES mapping in StructuralPlacer. Kept in the smoke
-# (not imported from the placer) so the test reads as a clear
-# spec of the contract — a reader doesn't have to chase back to the
-# source to know what to expect.
+# Hand-built graph with a role the generator never produces: the placer
+# must not crash and must drop a single floor for the unknown role.
+func _run_unknown_role_case() -> bool:
+	var graph_custom: RoomGraphScript = RoomGraphScript.new()
+	graph_custom.add_room("secret_01", "unknown_role_xyz", 0)
+	graph_custom.add_room("airlock_99", "airlock", 0)
+	graph_custom.add_link("secret_01", "airlock_99")
+
+	var placer: StructuralPlacerScript = StructuralPlacerScript.new()
+	var custom_root: Node3D = placer.place_structure(graph_custom)
+	if custom_root == null or custom_root.name != "ShipStructure":
+		push_error("STRUCTURAL PLACER FAIL unknown-role root invalid")
+		if custom_root != null:
+			custom_root.free()
+		return false
+	if custom_root.get_child_count() != 2:
+		push_error("STRUCTURAL PLACER FAIL unknown-role children=%d expected=2" % custom_root.get_child_count())
+		custom_root.free()
+		return false
+	var unknown_room: Node = custom_root.get_node_or_null("secret_01")
+	if unknown_room == null:
+		push_error("STRUCTURAL PLACER FAIL unknown-role secret_01 missing")
+		custom_root.free()
+		return false
+	if unknown_room.get_child_count() != 1:
+		push_error("STRUCTURAL PLACER FAIL unknown-role module count=%d expected=1 (fallback)" % unknown_room.get_child_count())
+		custom_root.free()
+		return false
+	custom_root.free()
+	return true
+
+
+# Mirrors ROOM_MODULES in StructuralPlacer (kept here so the test reads
+# as a clear spec of the contract).
 func _expected_module_count(role: String) -> int:
 	match role:
-		"airlock":
-			return 3
-		"corridor":
-			return 2
-		"engineering":
-			return 3
-		"life_support":
-			return 3
-		"bridge":
-			return 3
-		"cargo":
-			return 2
-		"crew_quarters":
-			return 2
-		"medical":
-			return 2
-		"maintenance":
-			return 2
-		_:
-			return 1  # fallback
+		"airlock": return 3
+		"corridor": return 2
+		"engineering": return 3
+		"life_support": return 3
+		"bridge": return 3
+		"cargo": return 2
+		"crew_quarters": return 2
+		"medical": return 2
+		"maintenance": return 2
+		_: return 1  # fallback
 
 
-# Approximate float equality for world-space Z checks. Tolerance is
-# generous (1e-3) so floating-point drift from the engine's
-# transform math doesn't cause spurious failures; structural
-# placement is a coarse grid, so 1mm precision is plenty.
+func _is_grid_aligned(value: float) -> bool:
+	var ratio: float = value / GRID_STEP
+	return absf(ratio - round(ratio)) < EPS
+
+
 func _approx_equal(a: float, b: float) -> bool:
-	return abs(a - b) < 0.001
+	return abs(a - b) < EPS
