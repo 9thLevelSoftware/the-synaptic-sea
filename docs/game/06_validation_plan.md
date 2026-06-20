@@ -41,6 +41,11 @@ GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
 BASELINE_ERROR="^ERROR: Capture not registered: 'gdaimcp'\\.$"
 BASELINE_WARNING="^WARNING: ObjectDB instances leaked at exit \\(run with --verbose for details\\)\\.$"
 REQ012_WARNING="^WARNING: SaveLoadService: save file rejected by from_dict \\(missing fields or version mismatch\\)\$"
+# load_from_blueprint_smoke deliberately calls load_from_blueprint(null) to
+# verify the null-blueprint guard; that guard emits this push_error on the
+# rejection path. It is the expected signal, not a failure (mirrors the
+# REQ-012 save/load rejection WARNING above).
+BLUEPRINT_NULL_ERROR="^ERROR: PlayableGeneratedShip\\.load_from_blueprint: blueprint must not be null\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -49,7 +54,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$BLUEPRINT_NULL_ERROR" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -94,7 +99,11 @@ run_clean 'structural placer smoke' 'STRUCTURAL PLACER PASS' "$GODOT" --headless
 run_clean 'ship generator smoke' 'SHIP GENERATOR PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_generator_smoke.gd
 run_clean 'archetype load smoke' 'ARCHETYPE LOAD PASS archetypes=3 round_trip=3' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/archetype_load_smoke.gd
 run_clean 'load from blueprint integration' 'LOAD FROM BLUEPRINT INTEGRATION PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/load_from_blueprint_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=38 clean_output=true'
+run_clean 'gameplay slice builder smoke' 'GAMEPLAY_SLICE_BUILDER PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gameplay_slice_builder_smoke.gd
+run_clean 'life boat layout smoke' 'LIFE_BOAT_LAYOUT PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/life_boat_layout_smoke.gd
+run_clean 'start scenario smoke' 'START_SCENARIO PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/start_scenario_smoke.gd
+run_clean 'procgen walkability smoke' 'WALKABILITY PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_walkability_smoke.gd
+echo 'SARGASSO REGRESSION PASS commands=42 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
@@ -127,6 +136,17 @@ incompatible `slice_version` and asserts the service rejects it via
   Filtered by the strict ERROR/WARNING check above; any other
   `SaveLoadService:` warning (a real parse error, missing file on a
   fresh load, etc.) still fails the bundle.
+
+The Phase 1 `load_from_blueprint_smoke` adds one additional expected
+`ERROR:` line that is part of its null-guard contract test:
+
+- `ERROR: PlayableGeneratedShip.load_from_blueprint: blueprint must not be null`
+  — emitted by `scripts/procgen/playable_generated_ship.gd` when
+  `load_from_blueprint(null)` is called. The smoke deliberately calls it with
+  `null` to verify the guard rejects bad input; the ERROR is the expected
+  signal, not a failure. Filtered by the strict check above via
+  `$BLUEPRINT_NULL_ERROR`; any other `load_from_blueprint:` error still fails
+  the bundle.
 
 Evidence collection command (run before adding or removing a smoke from the
 bundle; any unexpected `ERROR:`/`WARNING:` line that is not on the allowlist
@@ -195,4 +215,10 @@ A Gate 1 Go decision requires the regression bundle plus either the automated pr
 - [x] Junction calibrator model smoke: `scripts/validation/junction_calibrator_state_smoke.gd` (expected marker `JUNCTION CALIBRATOR STATE PASS required_steps=2 consumed=true`) and main-scene smoke `scripts/validation/main_playable_slice_junction_calibrator_smoke.gd` (expected marker `MAIN PLAYABLE JUNCTION CALIBRATOR PASS acquired=true required_steps=2 consumed=true`) (REQ-014). Added to regression bundle. The main-scene smoke registers a synthetic 3-step junction through `register_junction_sequence_for_validation` so it asserts the exact `required_steps=2` post-calibration marker without depending on the seed template's exact step count (the seed template's sequence 2 is a 2-step junction; REQ-014's spec example requires a 3-step reduction target).
 - [x] Junction calibrator save/load smoke: `scripts/validation/main_playable_slice_junction_calibrator_save_load_smoke.gd` (expected marker `MAIN PLAYABLE JUNCTION CALIBRATOR SAVE LOAD PASS carried_load=true consumed_load=true next_frame_interaction=true`) — permanent regression for the two blocking findings from review t_80dcea4b. Drives the actual seed sequence 2 repair_junction through save/load in both carried and consumed/applied save states, including a real next-frame interaction after each load. Asserts the live coordinator path leaves the objective_progress model complete after the calibrator reduces a real 2-step junction to 1 (the pre-calibration `required_steps` snapshot lets `complete_step` fire on the first interaction instead of being skipped), and that post-load interactions survive the rebuild of the HUD layer / ObjectiveTracker that previously crashed with "Nonexistent function 'mark_completed' in base 'previously freed'". Also locks down the reload pickup-marker reconciliation (carried = hidden, spent = hidden) and the JSON-string-int-key round-trip in `ObjectiveProgressState.apply_summary` that would otherwise silently drop the per-sequence `calibrator_applied` flag. Added to regression bundle.
 - [x] Electrical-arc hazard model smoke: `scripts/validation/electrical_arc_state_smoke.gd` (expected marker `ARC STATE PASS cycles=2 phases=4 passability_switches=4`) and main-scene smoke `scripts/validation/main_playable_slice_arc_smoke.gd` (expected marker `MAIN PLAYABLE ARC PASS state=DISCHARGED cycles=2 blocked_arcing=true blocked_discharged=false`) (REQ-013). The pure model smoke advances the cycle through two full DISCHARGED -> ARCING -> DISCHARGED rounds and asserts the phase / passability counts match the ADR-0005 contract; it also round-trips the summary through `apply_summary()` and verifies a wrong `hazard_kind` is rejected. The main-scene smoke drives the same model through `playable.electrical_arc_state.tick(...)` against template 002 (which carries the new `arc_side_01` non-critical side branch) and asserts collision is enabled only while ARCING. Both are added to the regression bundle.
+- [x] Phase 1 walkable-ship gate smokes (procgen layout pipeline → walkable start scenario):
+  - `scripts/validation/gameplay_slice_builder_smoke.gd` (expected marker `GAMEPLAY_SLICE_BUILDER PASS`) — `GameplaySliceBuilder.build()` produces a valid gameplay slice (distinct start/goal rooms, sequenced objectives with `approach_cell`, empty hazard-zone arrays) across all 3 templates × 3 seeds.
+  - `scripts/validation/life_boat_layout_smoke.gd` (expected marker `LIFE_BOAT_LAYOUT PASS`) — `LifeBoatBuilder.build_layout()` emits a layout.json-compatible 3-room Dict (airlock/bridge/engineering) with structural placements, ≥2 room links, and a prototype carrying start/goal rooms.
+  - `scripts/validation/start_scenario_smoke.gd` (expected marker `START_SCENARIO PASS`) — full start scenario: derelict layout through the pipeline + gameplay slice loads via `GeneratedShipLoader`, a nav mesh bakes from floor cells, and the life boat layout builds. The transient loader Node3D is freed before quit so no instantiated geometry/physics/nav RIDs leak into the strict ERROR/WARNING check.
+  - `scripts/validation/procgen_walkability_smoke.gd` (expected marker `WALKABILITY PASS`) — definitive Phase 1 gate: generates a ship from seed, bakes a nav mesh, and walks a `NavigationAgent3D` from the start room through every objective room to the goal. Proves the spec exit criteria "rooms connect, geometry loads, player can walk through."
+  All four added to the regression bundle (`commands=42`).
 - [x] ADR-0005 hazard contract static smoke: `scripts/validation/hazard_contract_smoke.gd` (expected marker `HAZARD CONTRACT PASS models=3 phase_timer_owners=2 wrong_kind_rejected=3 configure_dict=3`) — structural (no runtime tick) assertion that catches the three review-recycle findings on REQ-013 / REQ-014 hazard models: (1) FireState and ElectricalArcState MUST own a `PhaseTimer` instance and translate its `Phase.A/B` output into their own enum, (2) `get_summary()` MUST include `hazard_kind` on every model, and (3) `apply_summary()` MUST reject a wrong-kind summary. Also asserts OxygenState does NOT own a `PhaseTimer` (negative decision from ADR-0005: resource-drain hazards do not need timer phases) and that the `PhaseTimer` helper itself does not carry a `HAZARD_KIND` discriminator. Locks down the `configure(config: Dictionary)` uniform boundary from the ADR-0005 HazardStateContract. Added to regression bundle.
