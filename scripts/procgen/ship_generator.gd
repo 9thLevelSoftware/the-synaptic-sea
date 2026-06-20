@@ -51,7 +51,6 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 		DirAccess.make_dir_absolute(temp_dir)
 
 	var layout_path: String = temp_dir + "/layout.json"
-	var kit_path: String = "res://data/procgen/golden/coherent_ship_001/layout.json"
 	var gameplay_path: String = temp_dir + "/gameplay_slice.json"
 
 	# Write layout
@@ -63,12 +62,11 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 	layout_file.store_string(layout_json)
 	layout_file.close()
 
-	# Build kit doc from the existing kit
-	# The GeneratedShipLoader needs the kit JSON, so we reference the shared one
-	kit_path = "res://data/ship_structural_v0_kit.json"
+	# The GeneratedShipLoader needs the shared structural module kit JSON.
+	var kit_path: String = "res://data/kits/ship_structural_v0.json"
 	if not FileAccess.file_exists(ProjectSettings.globalize_path(kit_path)):
-		# Fallback: look for kit alongside golden layouts
-		kit_path = "res://data/procgen/golden/coherent_ship_001/kit.json"
+		push_error("SHIP GENERATOR FAIL structural kit not found: %s" % kit_path)
+		return null
 
 	# Build gameplay slice via GameplaySliceBuilder
 	var gameplay_builder: GameplaySliceBuilderScript = GameplaySliceBuilderScript.new()
@@ -90,4 +88,7 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 		loader.queue_free()
 		return null
 
+	# Give the returned root a stable, meaningful name. The loader builds
+	# "StructuralRoot" (geometry + nav) and "ObjectiveRoot" children under it.
+	loader.name = "GeneratedShip"
 	return loader
