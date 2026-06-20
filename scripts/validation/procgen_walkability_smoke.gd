@@ -109,6 +109,13 @@ func _initialize() -> void:
 		if center != Vector3.INF:
 			waypoints.append(center)
 
+	var goal_center: Vector3 = _room_center(rooms, goal_room_id)
+	if goal_center == Vector3.INF:
+		push_error("WALKABILITY FAIL %s goal room center not found" % label)
+		quit(1)
+		return
+	waypoints.append(goal_center)
+
 	if waypoints.is_empty():
 		push_error("WALKABILITY FAIL %s no walkable waypoints" % label)
 		quit(1)
@@ -247,7 +254,6 @@ func _link_endpoint_pos(link: Dictionary, cell_key: String, room_key: String, la
 			# Match cell coordinates in placement name
 			var target_x: int = int(cell[0])
 			var target_z: int = int(cell[1])
-			var target_deck: int = int(cell[2]) if cell.size() >= 3 else 0
 			var parts: PackedStringArray = placement_name.split("_")
 			for i in range(parts.size()):
 				if String(parts[i]).begins_with("x") and i + 1 < parts.size() and String(parts[i + 1]).begins_with("z"):
