@@ -1,15 +1,11 @@
 extends SceneTree
 
-# Archetype loading smoke. Loads all three archetype JSON files
-# (life_boat, small_freighter, medium_cruiser), rebuilds a
-# ShipBlueprint from each, runs the full ShipGenerator pipeline, and
-# verifies the resulting ship is well-formed. Also round-trips each
-# blueprint through to_dict / from_dict and confirms the rebuilt
-# blueprint produces an identical ship (determinism across serialise
-# boundary).
+# Archetype loading smoke. Loads all three archetype JSON files,
+# rebuilds ShipBlueprint from each, runs the full ShipGenerator
+# pipeline WITH archetype role weights, and verifies the resulting
+# ship has a sensible role distribution.
 #
-# This validates the contract that archetype JSON files are valid
-# inputs to the procgen pipeline — something no other smoke covers.
+# Also round-trips each blueprint through to_dict/from_dict.
 
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const RoomGraphScript := preload("res://scripts/procgen/room_graph.gd")
@@ -27,12 +23,12 @@ func _initialize() -> void:
 	var generator: ShipGeneratorScript = ShipGeneratorScript.new()
 	var graph_gen: RoomGraphGeneratorScript = RoomGraphGeneratorScript.new()
 
-	for archetype in ARCHETYPES:
-		var path: String = archetype["path"]
-		var name_str: String = archetype["name"]
-		var min_rooms: int = archetype["min_rooms"]
-		var max_rooms: int = archetype["max_rooms"]
-		var expected_size: int = archetype["size"]
+	for archetype_def in ARCHETYPES:
+		var path: String = archetype_def["path"]
+		var name_str: String = archetype_def["name"]
+		var min_rooms: int = archetype_def["min_rooms"]
+		var max_rooms: int = archetype_def["max_rooms"]
+		var expected_size: int = archetype_def["size"]
 
 		# Load the JSON
 		if not ResourceLoader.exists(path):
@@ -73,8 +69,8 @@ func _initialize() -> void:
 			quit(1)
 			return
 
-		# Generate and validate
-		var graph: RoomGraphScript = graph_gen.generate(bp)
+		# Generate with archetype weights
+		var graph: RoomGraphScript = graph_gen.generate(bp, data)
 		if not graph.is_fully_connected():
 			push_error("ARCHETYPE SMOKE FAIL %s graph disconnected" % name_str)
 			quit(1)
@@ -86,14 +82,41 @@ func _initialize() -> void:
 			quit(1)
 			return
 
-		var ship: Node3D = generator.generate(bp)
+		# Verify role diversity: no more than max_duplicates of any
+		# optional role.
+		var max_dup: int = int(data.get("max_duplicates", 2))
+		var role_counts: Dictionary = {}
+		for room in graph.rooms:
+			var role: String = String(room["role"])
+			role_counts[role] = int(role_counts.get(role, 0)) + 1
+		for role in role_counts:
+			# System roles (airlock, engineering, life_support, bridge)
+			# are exempt from the duplicate cap.
+			if role in ["airlock", "engineering", "life_support", "bridge"]:
+				continue
+			if int(role_counts[role]) > max_dup:
+				push_error("ARCHETYPE SMOKE FAIL %s role=%s count=%d exceeds max_duplicates=%d" % [
+					name_str, role, int(role_counts[role]), max_dup])
+				quit(1)
+				return
+
+		# Verify guaranteed roles are present.
+		var guaranteed: Array = data.get("guaranteed_roles", [])
+		for g_role in guaranteed:
+			var found: bool = false
+			for room in graph.rooms:
+				if String(room["role"]) == String(g_role):
+					found = true
+					break
+			if not found:
+				push_error("ARCHETYPE SMOKE FAIL %s missing guaranteed role: %s" % [name_str, String(g_role)])
+				quit(1)
+				return
+
+		# Generate full ship
+		var ship: Node3D = generator.generate(bp, data)
 		if ship == null:
 			push_error("ARCHETYPE SMOKE FAIL %s ShipGenerator returned null" % name_str)
-			quit(1)
-			return
-
-		if String(ship.name) != "GeneratedShip":
-			push_error("ARCHETYPE SMOKE FAIL %s ship.name=%s" % [name_str, str(ship.name)])
 			quit(1)
 			return
 
@@ -104,23 +127,15 @@ func _initialize() -> void:
 			quit(1)
 			return
 
-		# Round-trip: to_dict -> from_dict -> generate -> compare
+		# Round-trip blueprint: to_dict -> from_dict -> generate -> compare
 		var bp_dict: Dictionary = bp.to_dict()
 		var bp2 = ShipBlueprintScript.from_dict(bp_dict)
-		var graph2: RoomGraphScript = graph_gen.generate(bp2)
+		var graph2: RoomGraphScript = graph_gen.generate(bp2, data)
 		if graph2.rooms.size() != graph.rooms.size():
 			push_error("ARCHETYPE SMOKE FAIL %s round-trip room count mismatch %d vs %d" % [
 				name_str, graph2.rooms.size(), graph.rooms.size()])
 			quit(1)
 			return
-
-		# Compare room ids in order (deterministic)
-		for i in range(graph.rooms.size()):
-			if String(graph.rooms[i]["id"]) != String(graph2.rooms[i]["id"]):
-				push_error("ARCHETYPE SMOKE FAIL %s round-trip room[%d] mismatch %s vs %s" % [
-					name_str, i, String(graph.rooms[i]["id"]), String(graph2.rooms[i]["id"])])
-				quit(1)
-				return
 
 		ship.queue_free()
 

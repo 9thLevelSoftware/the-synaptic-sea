@@ -9,5 +9,14 @@
             "min": 4,
             "max": 8
         }
-    }
+    },
+    "role_weights": {
+        "cargo": 4,
+        "corridor": 3,
+        "maintenance": 2,
+        "crew_quarters": 2,
+        "medical": 1
+    },
+    "guaranteed_roles": ["cargo"],
+    "max_duplicates": 2
 }
