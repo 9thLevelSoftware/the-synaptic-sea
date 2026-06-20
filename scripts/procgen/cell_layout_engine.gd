@@ -10,12 +10,32 @@ const DIR_SOUTH: Vector2i = Vector2i(0, 1)
 const DIR_WEST: Vector2i = Vector2i(-1, 0)
 const ALL_DIRS: Array[Vector2i] = [DIR_NORTH, DIR_EAST, DIR_SOUTH, DIR_WEST]
 
+# Ship axis: bow = +X (east), stern = -X (west).
+# Lateral = north/south (port/starboard).
 const HINT_DIRECTIONS: Dictionary = {
-	"bow":     [DIR_NORTH, DIR_EAST, DIR_WEST, DIR_SOUTH],
-	"stern":   [DIR_SOUTH, DIR_EAST, DIR_WEST, DIR_NORTH],
-	"lateral": [DIR_EAST, DIR_WEST, DIR_NORTH, DIR_SOUTH],
-	"center":  [DIR_EAST, DIR_SOUTH, DIR_NORTH, DIR_WEST],
+	"bow":     [DIR_EAST, DIR_NORTH, DIR_SOUTH, DIR_WEST],
+	"stern":   [DIR_WEST, DIR_NORTH, DIR_SOUTH, DIR_EAST],
+	"lateral": [DIR_SOUTH, DIR_NORTH, DIR_EAST, DIR_WEST],
+	"center":  [DIR_EAST, DIR_WEST, DIR_SOUTH, DIR_NORTH],
 }
+
+# Connective roles: these form the spine/skeleton of the ship.
+# Functional rooms should attach to these, not to each other.
+const CONNECTIVE_ROLES: Array[String] = [
+	"corridor", "main_spine", "hub", "ramp", "elevator", "airlock", "dock",
+]
+
+# Hazardous roles: loud, dangerous, should be isolated from crew areas.
+# These must NOT share a wall with crew comfort roles.
+const HAZARDOUS_ROLES: Array[String] = [
+	"reactor", "engineering",
+]
+
+# Crew comfort roles: living/working spaces that must be kept away from
+# hazardous areas. At least one corridor buffer between these and hazardous.
+const CREW_COMFORT_ROLES: Array[String] = [
+	"crew_quarters", "medical", "mess_hall", "bridge",
+]
 
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
@@ -36,11 +56,16 @@ func layout(room_plan: Array[Dictionary], template: RefCounted, seed_value: int)
 			zone_rooms_map[zid] = []
 		zone_rooms_map[zid].append(str(room["id"]))
 
+	# room_id -> role for anchor prioritization
+	var room_role_map: Dictionary = {}
+	for room in room_plan:
+		room_role_map[str(room["id"])] = str(room.get("role", ""))
+
 	var zone_order: Array[Dictionary] = _build_zone_order(template)
 
 	# deck -> (Vector2i -> room_id)
 	var occupied_per_deck: Dictionary = {}
-	# room_id -> {cells, origin, footprint, deck}
+	# room_id -> {cells, origin, footprint, deck, role}
 	var placed: Dictionary = {}
 
 	for zone_info in zone_order:
@@ -80,12 +105,13 @@ func layout(room_plan: Array[Dictionary], template: RefCounted, seed_value: int)
 				if preferred_anchor.is_empty():
 					preferred_anchor = _last_placed_id(placed)
 
+				var room_role: String = str(room.get("role", ""))
 				# Try preferred anchor first, then fall back to any placed room
 				# This guarantees physical adjacency for connectivity
-				origin = _find_adjacent_to_any(fp, hint, occupied, placed, preferred_anchor)
+				origin = _find_adjacent_to_any(fp, hint, occupied, placed, preferred_anchor, room_role)
 				if origin == Vector2i(-99999, -99999):
 					var rotated_fp: Vector2i = Vector2i(fp.y, fp.x)
-					origin = _find_adjacent_to_any(rotated_fp, hint, occupied, placed, preferred_anchor)
+					origin = _find_adjacent_to_any(rotated_fp, hint, occupied, placed, preferred_anchor, room_role)
 					if origin != Vector2i(-99999, -99999):
 						fp = rotated_fp
 
@@ -102,6 +128,7 @@ func layout(room_plan: Array[Dictionary], template: RefCounted, seed_value: int)
 				"origin": origin,
 				"footprint": fp,
 				"deck": deck,
+				"role": str(room.get("role", "")),
 			}
 			last_in_zone = rid
 
@@ -159,21 +186,39 @@ func _last_placed_id(placed: Dictionary) -> String:
 
 
 func _find_adjacent_to_any(new_fp: Vector2i, hint: String, occupied: Dictionary,
-		placed: Dictionary, preferred_anchor: String) -> Vector2i:
-	# Try preferred anchor first, then all others, so every placed room is
-	# physically adjacent to at least one existing room (guarantees connectivity).
+		placed: Dictionary, preferred_anchor: String, new_role: String = "") -> Vector2i:
+	# Build anchor order: preferred first, then connective rooms, then others.
+	# Functional rooms (non-connective) should prefer attaching to connective
+	# rooms (corridors, spines, hubs) rather than other functional rooms.
 	var anchor_order: Array = []
+	var is_functional: bool = not new_role.is_empty() and not CONNECTIVE_ROLES.has(new_role)
+
 	if not preferred_anchor.is_empty():
 		anchor_order.append(preferred_anchor)
-	for rid in placed.keys():
-		if str(rid) != preferred_anchor:
-			anchor_order.append(str(rid))
+
+	if is_functional:
+		# Prefer connective rooms as anchors for functional rooms
+		for rid in placed.keys():
+			if str(rid) != preferred_anchor:
+				var role: String = str(placed[rid].get("role", ""))
+				if CONNECTIVE_ROLES.has(role):
+					anchor_order.append(str(rid))
+		# Then allow non-connective as last resort
+		for rid in placed.keys():
+			if str(rid) != preferred_anchor:
+				var role: String = str(placed[rid].get("role", ""))
+				if not CONNECTIVE_ROLES.has(role):
+					anchor_order.append(str(rid))
+	else:
+		for rid in placed.keys():
+			if str(rid) != preferred_anchor:
+				anchor_order.append(str(rid))
 
 	for anchor_id in anchor_order:
 		var anchor_data: Dictionary = placed[anchor_id]
 		var anchor_origin: Vector2i = anchor_data.get("origin", Vector2i.ZERO)
 		var anchor_fp: Vector2i = anchor_data.get("footprint", Vector2i(1, 1))
-		var result: Vector2i = _find_placement_adjacent(anchor_origin, anchor_fp, new_fp, hint, occupied)
+		var result: Vector2i = _find_placement_adjacent(anchor_origin, anchor_fp, new_fp, hint, occupied, new_role, placed)
 		if result != Vector2i(-99999, -99999):
 			return result
 
@@ -181,18 +226,18 @@ func _find_adjacent_to_any(new_fp: Vector2i, hint: String, occupied: Dictionary,
 
 
 func _find_placement_adjacent(anchor_origin: Vector2i, anchor_fp: Vector2i, new_fp: Vector2i,
-		hint: String, occupied: Dictionary) -> Vector2i:
+		hint: String, occupied: Dictionary, new_role: String = "", placed: Dictionary = {}) -> Vector2i:
 	var preferred: Array = HINT_DIRECTIONS.get(hint, ALL_DIRS)
 
 	# Try each direction; for each direction, try aligned then shifted placements.
 	# Shifts stay within anchor bounds so new room always shares an edge with anchor.
 	for dir in preferred:
-		var result: Vector2i = _try_dir_with_shifts(anchor_origin, anchor_fp, new_fp, dir, occupied)
+		var result: Vector2i = _try_dir_with_shifts(anchor_origin, anchor_fp, new_fp, dir, occupied, new_role, placed)
 		if result != Vector2i(-99999, -99999):
 			return result
 
 	for dir in ALL_DIRS:
-		var result: Vector2i = _try_dir_with_shifts(anchor_origin, anchor_fp, new_fp, dir, occupied)
+		var result: Vector2i = _try_dir_with_shifts(anchor_origin, anchor_fp, new_fp, dir, occupied, new_role, placed)
 		if result != Vector2i(-99999, -99999):
 			return result
 
@@ -200,10 +245,10 @@ func _find_placement_adjacent(anchor_origin: Vector2i, anchor_fp: Vector2i, new_
 
 
 func _try_dir_with_shifts(anchor_origin: Vector2i, anchor_fp: Vector2i, new_fp: Vector2i,
-		dir: Vector2i, occupied: Dictionary) -> Vector2i:
+		dir: Vector2i, occupied: Dictionary, new_role: String = "", placed: Dictionary = {}) -> Vector2i:
 	# Base position: new room flush with anchor edge in direction dir
 	var base: Vector2i = _adjacent_origin(anchor_origin, anchor_fp, new_fp, dir)
-	if _can_place(base, new_fp, occupied):
+	if _can_place(base, new_fp, occupied) and _check_compatibility(base, new_fp, new_role, occupied, placed):
 		return base
 
 	# Shift along the perpendicular axis. Limit shifts so new room still
@@ -220,7 +265,7 @@ func _try_dir_with_shifts(anchor_origin: Vector2i, anchor_fp: Vector2i, new_fp: 
 			var anchor_right: int = anchor_origin.x + anchor_fp.x
 			if shifted.x >= anchor_right or new_right <= anchor_origin.x:
 				continue
-			if _can_place(shifted, new_fp, occupied):
+			if _can_place(shifted, new_fp, occupied) and _check_compatibility(shifted, new_fp, new_role, occupied, placed):
 				return shifted
 	else:
 		# Moving east/west: shift north/south within anchor height
@@ -233,7 +278,7 @@ func _try_dir_with_shifts(anchor_origin: Vector2i, anchor_fp: Vector2i, new_fp: 
 			var anchor_bottom: int = anchor_origin.y + anchor_fp.y
 			if shifted.y >= anchor_bottom or new_bottom <= anchor_origin.y:
 				continue
-			if _can_place(shifted, new_fp, occupied):
+			if _can_place(shifted, new_fp, occupied) and _check_compatibility(shifted, new_fp, new_role, occupied, placed):
 				return shifted
 
 	return Vector2i(-99999, -99999)
@@ -256,6 +301,38 @@ func _can_place(origin: Vector2i, fp: Vector2i, occupied: Dictionary) -> bool:
 		for dz in range(fp.y):
 			if occupied.has(Vector2i(origin.x + dx, origin.y + dz)):
 				return false
+	return true
+
+
+func _check_compatibility(origin: Vector2i, fp: Vector2i, new_role: String,
+		occupied: Dictionary, placed: Dictionary) -> bool:
+	# Skip check for connective roles — corridors can be next to anything.
+	if new_role.is_empty() or CONNECTIVE_ROLES.has(new_role):
+		return true
+
+	var is_hazardous: bool = HAZARDOUS_ROLES.has(new_role)
+	var is_comfort: bool = CREW_COMFORT_ROLES.has(new_role)
+	if not is_hazardous and not is_comfort:
+		return true  # Neutral roles (cargo, storage, armory, etc.) can neighbor anything
+
+	# Check every cell of the proposed footprint. For each cell, look at
+	# all 4 neighbors. If a neighbor belongs to an incompatible room, reject.
+	for dx in range(fp.x):
+		for dz in range(fp.y):
+			var cell: Vector2i = Vector2i(origin.x + dx, origin.y + dz)
+			for dir in ALL_DIRS:
+				var neighbor: Vector2i = Vector2i(cell.x + dir.x, cell.y + dir.y)
+				if not occupied.has(neighbor):
+					continue
+				var neighbor_rid: String = str(occupied[neighbor])
+				if not placed.has(neighbor_rid):
+					continue
+				var neighbor_role: String = str(placed[neighbor_rid].get("role", ""))
+				# Hazardous rooms must not touch crew comfort rooms
+				if is_hazardous and CREW_COMFORT_ROLES.has(neighbor_role):
+					return false
+				if is_comfort and HAZARDOUS_ROLES.has(neighbor_role):
+					return false
 	return true
 
 
