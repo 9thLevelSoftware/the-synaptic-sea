@@ -87,7 +87,14 @@ run_clean 'performance baseline smoke' 'PERFORMANCE BASELINE PASS templates=3' "
 run_clean 'arc hazard model smoke' 'ARC STATE PASS cycles=2 phases=4 passability_switches=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/electrical_arc_state_smoke.gd
 run_clean 'main arc smoke' 'MAIN PLAYABLE ARC PASS state=DISCHARGED cycles=2 blocked_arcing=true blocked_discharged=false' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_arc_smoke.gd
 run_clean 'ADR-0005 hazard contract static smoke' 'HAZARD CONTRACT PASS models=3 phase_timer_owners=2 wrong_kind_rejected=3 configure_dict=3' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_contract_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=30 clean_output=true'
+run_clean 'ship blueprint smoke' 'SHIP BLUEPRINT PASS sizes=3 conditions=3 serialization=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_blueprint_smoke.gd
+run_clean 'room graph smoke' 'ROOM GRAPH PASS rooms=3 links=2 connected=true disconnected_detected=true serialization=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_graph_smoke.gd
+run_clean 'room graph generator smoke' 'ROOM GRAPH GENERATOR PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_graph_generator_smoke.gd
+run_clean 'structural placer smoke' 'STRUCTURAL PLACER PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_placer_smoke.gd
+run_clean 'ship generator smoke' 'SHIP GENERATOR PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_generator_smoke.gd
+run_clean 'archetype load smoke' 'ARCHETYPE LOAD PASS archetypes=3 round_trip=3' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/archetype_load_smoke.gd
+run_clean 'load from blueprint integration' 'LOAD FROM BLUEPRINT INTEGRATION PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/load_from_blueprint_smoke.gd
+echo 'SARGASSO REGRESSION PASS commands=38 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
@@ -127,7 +134,7 @@ must block the change):
 
 ```bash
 ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
-for s in route_control_state_smoke main_playable_slice_route_control_smoke oxygen_state_smoke main_playable_slice_hazard_smoke fire_state_smoke main_playable_slice_fire_smoke main_playable_slice_ship_systems_smoke main_playable_slice_completion_smoke main_playable_slice_input_smoke main_playable_slice_readability_smoke save_load_service_smoke main_playable_slice_save_load_smoke objective_progress_state_smoke objective_progress_hud_label_smoke main_playable_slice_objective_variation_smoke req012_autosave_sequence_smoke main_playable_slice_text_scale_smoke electrical_arc_state_smoke main_playable_slice_arc_smoke main_playable_slice_junction_calibrator_save_load_smoke; do
+for s in route_control_state_smoke main_playable_slice_route_control_smoke oxygen_state_smoke main_playable_slice_hazard_smoke fire_state_smoke main_playable_slice_fire_smoke main_playable_slice_ship_systems_smoke main_playable_slice_completion_smoke main_playable_slice_input_smoke main_playable_slice_readability_smoke save_load_service_smoke main_playable_slice_save_load_smoke objective_progress_state_smoke objective_progress_hud_label_smoke main_playable_slice_objective_variation_smoke req012_autosave_sequence_smoke main_playable_slice_text_scale_smoke electrical_arc_state_smoke main_playable_slice_arc_smoke main_playable_slice_junction_calibrator_save_load_smoke ship_blueprint_smoke room_graph_smoke room_graph_generator_smoke structural_placer_smoke ship_generator_smoke archetype_load_smoke load_from_blueprint_smoke procgen_stress_test; do
   echo "=== $s ==="
   /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path "$ROOT" --script res://scripts/validation/$s.gd 2>&1 | grep -E '^(ERROR|WARNING):'
 done
