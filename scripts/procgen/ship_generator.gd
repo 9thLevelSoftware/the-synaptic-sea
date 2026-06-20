@@ -10,6 +10,7 @@ class_name ShipGenerator
 
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_generator.gd")
+const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
 
 var layout_generator: RefCounted = ShipLayoutGeneratorScript.new()
 
@@ -69,22 +70,9 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 		# Fallback: look for kit alongside golden layouts
 		kit_path = "res://data/procgen/golden/coherent_ship_001/kit.json"
 
-	# Write minimal gameplay slice
-	var proto: Dictionary = layout.get("prototype", {})
-	var gameplay: Dictionary = {
-		"start_room": str(proto.get("start_room", "")),
-		"goal_room": str(proto.get("goal_room", "")),
-		"objectives": [
-			{
-				"id": "obj_reach_goal",
-				"sequence": 1,
-				"type": "interact",
-				"kind": "single",
-				"room_id": str(proto.get("goal_room", "")),
-				"approach_cell": _get_goal_approach_cell(layout),
-			},
-		],
-	}
+	# Build gameplay slice via GameplaySliceBuilder
+	var gameplay_builder: GameplaySliceBuilderScript = GameplaySliceBuilderScript.new()
+	var gameplay: Dictionary = gameplay_builder.build(layout)
 	var gameplay_json: String = JSON.stringify(gameplay, "  ")
 	var gameplay_file: FileAccess = FileAccess.open(gameplay_path, FileAccess.WRITE)
 	if gameplay_file == null:
@@ -103,27 +91,3 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 		return null
 
 	return loader
-
-
-func _get_goal_approach_cell(layout: Dictionary) -> Array:
-	var proto: Dictionary = layout.get("prototype", {})
-	var goal_id: String = str(proto.get("goal_room", ""))
-	var rooms: Array = layout.get("rooms", [])
-	for room in rooms:
-		if str(room.get("id", "")) != goal_id:
-			continue
-		var placements: Array = room.get("structural_placements", [])
-		if placements.is_empty():
-			return [0, 0, 0]
-		# Return the first floor cell's grid coordinates
-		var name: String = str(placements[0].get("name", ""))
-		# Parse floor_cell_x{X}_z{Z} or floor_cell_d{D}_x{X}_z{Z}
-		var parts: PackedStringArray = name.split("_")
-		for i in range(parts.size()):
-			if String(parts[i]).begins_with("x") and i + 1 < parts.size() and String(parts[i + 1]).begins_with("z"):
-				var x_str: String = String(parts[i]).substr(1)
-				var z_str: String = String(parts[i + 1]).substr(1)
-				if x_str.is_valid_int() and z_str.is_valid_int():
-					var deck: int = int(room.get("deck", 0))
-					return [int(x_str), int(z_str), deck]
-	return [0, 0, 0]
