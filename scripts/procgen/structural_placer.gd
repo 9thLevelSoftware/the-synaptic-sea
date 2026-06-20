@@ -32,10 +32,15 @@ const ROOM_FOOTPRINTS: Dictionary = {
 	"bridge": Vector2i(2, 1),
 	"cargo": Vector2i(2, 1),
 	"life_support": Vector2i(2, 1),
+	"bay": Vector2i(2, 1),
 }
 
-# Module lists per role. Same as v1.
+# Module lists per role. Ship roles use the original ship_structural_v0
+# kit. Derelict roles (compartment, bay, quarters, dock) use the same
+# kit but with different module selections that evoke dead/abandoned
+# space — more bare floors, fewer walls.
 const ROOM_MODULES: Dictionary = {
+	# --- Ship roles ---
 	"airlock": [
 		"floor_1x1",
 		"floor_1x1",
@@ -76,6 +81,26 @@ const ROOM_MODULES: Dictionary = {
 		"floor_1x1",
 		"corridor_floor_1x1",
 	],
+	# --- Derelict roles ---
+	"compartment": [
+		"floor_1x1",
+		"floor_1x1",
+		"floor_1x1",
+	],
+	"bay": [
+		"floor_2x1",
+		"floor_2x1",
+		"floor_1x1",
+	],
+	"quarters": [
+		"floor_1x1",
+		"floor_1x1",
+	],
+	"dock": [
+		"floor_1x1",
+		"floor_1x1",
+		"doorway_frame_open_1x1",
+	],
 }
 
 const FALLBACK_MODULES: Array[String] = ["floor_1x1"]
@@ -97,6 +122,7 @@ const DIRECTION_PREFERENCES: Dictionary = {
 	"cargo": [1, 2, 3, 0],         # east, south, west, north (starboard)
 	"life_support": [3, 0, 1, 2],  # west, north, east, south (port)
 	"airlock": [0, 1, 2, 3],       # north first (entry faces forward)
+	"dock": [0, 1, 2, 3],          # north first (life boat attaches forward)
 }
 
 

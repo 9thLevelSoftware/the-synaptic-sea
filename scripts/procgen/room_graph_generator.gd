@@ -1,26 +1,20 @@
 extends RefCounted
 class_name RoomGraphGenerator
 
-# Preload the peer data classes. See the original implementation for
-# why preloaded script constants are used instead of bare class_name
-# references in headless --script mode.
+# Preload the peer data classes for headless --script compatibility.
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const RoomGraphScript := preload("res://scripts/procgen/room_graph.gd")
 
 # Generates a procedural RoomGraph from a ShipBlueprint.
 #
-# v2 changes from v1:
-#   - Weighted role selection: optional roles are picked from a
-#     weighted pool (archetype-supplied or default) instead of
-#     uniformly at random. This produces sensible role distributions
-#     (freighters get cargo, life boats get maintenance).
-#   - Role diversity cap: max N rooms of any single optional role
-#     (default 2, archetype-overridable via max_duplicates).
-#   - Guaranteed roles: archetypes can declare roles that must appear
-#     at least once (e.g. freighters always get cargo).
-#   - Archetype awareness: generate() accepts an optional archetype
-#     Dictionary (loaded from JSON) that supplies role_weights,
-#     guaranteed_roles, and max_duplicates.
+# v2: weighted role selection, archetype awareness, derelict support.
+#
+# Two generation modes:
+#   Ship mode (default): airlock + system rooms + optional fill.
+#     Used for functional ships (freighters, cruisers).
+#   Derelict mode (archetype.type == "derelict"): dock + generic
+#     compartments. No system rooms. Used for dead shells the player
+#     explores and scavenges.
 
 const REQUIRED_ROLES: Array[String] = ["airlock"]
 
@@ -32,6 +26,7 @@ const SYSTEM_ROLES: Dictionary = {
 	"scanners": "bridge",
 }
 
+# Ship-mode optional roles.
 const OPTIONAL_ROLES: Array[String] = [
 	"corridor",
 	"cargo",
@@ -40,7 +35,14 @@ const OPTIONAL_ROLES: Array[String] = [
 	"maintenance",
 ]
 
-# Default weights when no archetype supplies role_weights.
+# Derelict-mode roles. No systems — just structural space.
+const DERELICT_OPTIONAL_ROLES: Array[String] = [
+	"compartment",
+	"corridor",
+	"bay",
+	"quarters",
+]
+
 const DEFAULT_WEIGHTS: Dictionary = {
 	"corridor": 3,
 	"cargo": 2,
@@ -49,18 +51,18 @@ const DEFAULT_WEIGHTS: Dictionary = {
 	"medical": 1,
 }
 
-# Default max rooms of any single optional role.
+const DEFAULT_DERELICT_WEIGHTS: Dictionary = {
+	"compartment": 4,
+	"corridor": 3,
+	"bay": 2,
+	"quarters": 2,
+}
+
 const DEFAULT_MAX_DUPLICATES: int = 2
 
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 
-# Builds a RoomGraph from the given blueprint.
-#
-# `archetype` is an optional Dictionary loaded from an archetype JSON.
-# When present and containing role_weights / guaranteed_roles /
-# max_duplicates, those override the defaults. When absent (null), the
-# generator falls back to DEFAULT_WEIGHTS and DEFAULT_MAX_DUPLICATES.
 func generate(blueprint, archetype: Dictionary = {}) -> RoomGraphScript:
 	assert(blueprint != null, "RoomGraphGenerator: blueprint must not be null")
 
@@ -68,24 +70,79 @@ func generate(blueprint, archetype: Dictionary = {}) -> RoomGraphScript:
 
 	var graph: RoomGraphScript = RoomGraphScript.new()
 	var target_count: int = _pick_room_count(blueprint)
+	var is_derelict: bool = String(archetype.get("type", "")) == "derelict"
 
-	# Step 1: always-present airlock.
-	graph.add_room(_make_room_id("airlock", 1, graph), "airlock", 0)
+	if is_derelict:
+		_generate_derelict(graph, blueprint, archetype, target_count)
+	else:
+		_generate_ship(graph, blueprint, archetype, target_count)
 
-	# Step 2: size-conditional system rooms.
-	_add_required_rooms(graph, blueprint)
-
-	# Step 3: guaranteed roles from archetype.
-	_add_guaranteed_roles(graph, archetype, target_count)
-
-	# Step 4: fill remaining slots with weighted optional roles.
-	_fill_optional_rooms_weighted(graph, target_count, archetype)
-
-	# Step 5: wire connectivity.
 	_connect_rooms(graph)
-
 	return graph
 
+
+# --- Ship mode (functional ships) ---
+
+func _generate_ship(graph: RoomGraphScript, blueprint, archetype: Dictionary, target_count: int) -> void:
+	# Step 1: airlock.
+	graph.add_room(_make_room_id("airlock", 1, graph), "airlock", 0)
+
+	# Step 2: system rooms.
+	_add_required_rooms(graph, blueprint)
+
+	# Step 3: guaranteed roles.
+	_add_guaranteed_roles(graph, archetype, target_count)
+
+	# Step 4: weighted fill.
+	_fill_optional_rooms_weighted(graph, target_count, archetype)
+
+
+# --- Derelict mode (dead shells) ---
+
+func _generate_derelict(graph: RoomGraphScript, blueprint, archetype: Dictionary, target_count: int) -> void:
+	# Derelicts have no airlock or system rooms. The anchor room is
+	# the dock — the one fixed point where the life boat attaches.
+	graph.add_room(_make_room_id("dock", 1, graph), "dock", 0)
+
+	# Guaranteed roles (dock is already added, so this is a no-op
+	# unless the archetype guarantees other roles).
+	_add_guaranteed_roles(graph, archetype, target_count)
+
+	# Fill with derelict-specific roles.
+	_fill_derelict_rooms(graph, target_count, archetype)
+
+
+func _fill_derelict_rooms(graph: RoomGraphScript, target_count: int, archetype: Dictionary) -> void:
+	var weights: Dictionary = _build_derelict_weights(archetype)
+	var max_dup: int = int(archetype.get("max_duplicates", 3))
+	if max_dup < 1:
+		max_dup = 3
+
+	while graph.rooms.size() < target_count:
+		var role: String = _pick_weighted_role_from_pool(
+			graph, weights, max_dup, DERELICT_OPTIONAL_ROLES)
+		if role.is_empty():
+			role = "compartment"  # fallback
+		var idx: int = _next_index_for_role(graph, role)
+		graph.add_room(_make_room_id(role, idx, graph), role, 0)
+		if weights.has(role):
+			weights[role] = max(1, int(weights[role]) / 2)
+
+
+func _build_derelict_weights(archetype: Dictionary) -> Dictionary:
+	var weights: Dictionary = {}
+	var source: Dictionary = archetype.get("role_weights", DEFAULT_DERELICT_WEIGHTS)
+	for role in DERELICT_OPTIONAL_ROLES:
+		if source.has(role):
+			weights[role] = int(source[role])
+		elif DEFAULT_DERELICT_WEIGHTS.has(role):
+			weights[role] = int(DEFAULT_DERELICT_WEIGHTS[role])
+		else:
+			weights[role] = 1
+	return weights
+
+
+# --- Shared helpers ---
 
 func _pick_room_count(blueprint) -> int:
 	var lo: int = int(blueprint.room_count_range.x)
@@ -113,8 +170,6 @@ func _add_unique_role(graph: RoomGraphScript, role: String, instance_index: int)
 	graph.add_room(_make_room_id(role, idx, graph), role, 0)
 
 
-# Adds guaranteed roles from the archetype (if any). Each guaranteed
-# role gets exactly one room if it isn't already present.
 func _add_guaranteed_roles(graph: RoomGraphScript, archetype: Dictionary, target_count: int) -> void:
 	if archetype.is_empty():
 		return
@@ -123,7 +178,6 @@ func _add_guaranteed_roles(graph: RoomGraphScript, archetype: Dictionary, target
 		var role: String = String(role_entry)
 		if graph.rooms.size() >= target_count:
 			break
-		# Skip if already present (e.g. system rooms).
 		var already: bool = false
 		for room in graph.rooms:
 			if String(room["role"]) == role:
@@ -135,12 +189,6 @@ func _add_guaranteed_roles(graph: RoomGraphScript, archetype: Dictionary, target
 		graph.add_room(_make_room_id(role, idx, graph), role, 0)
 
 
-# Fills remaining slots with weighted optional role selection.
-# The weights are drawn from the archetype's role_weights (if present)
-# or DEFAULT_WEIGHTS. Each time a role is picked, its weight is halved
-# (floored at 1) so subsequent picks of the same role become less
-# likely. A per-role cap (max_duplicates) prevents any single optional
-# role from dominating the ship.
 func _fill_optional_rooms_weighted(graph: RoomGraphScript, target_count: int, archetype: Dictionary) -> void:
 	var weights: Dictionary = _build_weights(archetype)
 	var max_dup: int = int(archetype.get("max_duplicates", DEFAULT_MAX_DUPLICATES))
@@ -148,29 +196,16 @@ func _fill_optional_rooms_weighted(graph: RoomGraphScript, target_count: int, ar
 		max_dup = DEFAULT_MAX_DUPLICATES
 
 	while graph.rooms.size() < target_count:
-		var role: String = _pick_weighted_role(graph, weights, max_dup)
+		var role: String = _pick_weighted_role_from_pool(
+			graph, weights, max_dup, OPTIONAL_ROLES)
 		if role.is_empty():
-			# Pool exhausted — every role is at cap. Fill with
-			# corridors as the universal connector.
 			role = "corridor"
-			var already: bool = false
-			for room in graph.rooms:
-				if String(room["role"]) == role:
-					already = true
-					break
-			if already and _count_role(graph, role) >= max_dup + 2:
-				# Last resort: break the cap to fill the slot.
-				pass
 		var idx: int = _next_index_for_role(graph, role)
 		graph.add_room(_make_room_id(role, idx, graph), role, 0)
-
-		# Halve the weight so repeated picks become less likely.
 		if weights.has(role):
 			weights[role] = max(1, int(weights[role]) / 2)
 
 
-# Builds the weight table from archetype or defaults. Returns a
-# Dictionary of role -> weight for all OPTIONAL_ROLES.
 func _build_weights(archetype: Dictionary) -> Dictionary:
 	var weights: Dictionary = {}
 	var source: Dictionary = archetype.get("role_weights", DEFAULT_WEIGHTS)
@@ -184,16 +219,16 @@ func _build_weights(archetype: Dictionary) -> Dictionary:
 	return weights
 
 
-# Picks a role from the weighted pool, respecting the per-role
-# duplicate cap. Returns the chosen role string, or "" if every
-# role is at cap.
-func _pick_weighted_role(graph: RoomGraphScript, weights: Dictionary, max_dup: int) -> String:
-	# Build candidate list: roles under cap with weight > 0.
+func _pick_weighted_role_from_pool(
+		graph: RoomGraphScript,
+		weights: Dictionary,
+		max_dup: int,
+		pool: Array[String]) -> String:
 	var candidates: Array[String] = []
 	var candidate_weights: Array[int] = []
 	var total_weight: int = 0
 
-	for role in OPTIONAL_ROLES:
+	for role in pool:
 		if _count_role(graph, role) >= max_dup:
 			continue
 		var w: int = int(weights.get(role, 1))
@@ -206,7 +241,6 @@ func _pick_weighted_role(graph: RoomGraphScript, weights: Dictionary, max_dup: i
 	if candidates.is_empty():
 		return ""
 
-	# Weighted random pick.
 	var roll: int = rng.randi_range(1, total_weight)
 	var cumulative: int = 0
 	for i in range(candidates.size()):
@@ -214,7 +248,6 @@ func _pick_weighted_role(graph: RoomGraphScript, weights: Dictionary, max_dup: i
 		if roll <= cumulative:
 			return candidates[i]
 
-	# Fallback (shouldn't happen).
 	return candidates[0]
 
 
@@ -248,21 +281,19 @@ func _make_room_id(role: String, idx: int, _graph: RoomGraphScript) -> String:
 	return "%s_%02d" % [role, idx]
 
 
-# Connects rooms with a linear chain plus random branches.
-# The chain ensures connectivity; branches add variety.
-# v2: increased branch count for larger ships and capped
-# per-room degree at 3 so layouts stay walkable.
+# --- Connectivity ---
+
 func _connect_rooms(graph: RoomGraphScript) -> void:
 	if graph.rooms.size() < 2:
 		return
 
-	# Linear chain: room 0 -> room 1 -> ... -> room N-1.
+	# Linear chain ensures connectivity.
 	for i in range(graph.rooms.size() - 1):
 		var from_id: String = String(graph.rooms[i]["id"])
 		var to_id: String = String(graph.rooms[i + 1]["id"])
 		graph.add_link(from_id, to_id, "door")
 
-	# Random branches. Scale with ship size: sqrt(N)/2, capped at 4.
+	# Random branches for variety.
 	var room_count: int = graph.rooms.size()
 	var extra_target: int = int(round(sqrt(float(room_count)) / 2.0))
 	if extra_target > 4:
@@ -282,7 +313,6 @@ func _connect_rooms(graph: RoomGraphScript) -> void:
 			continue
 		if _degree(graph, a) >= 3 or _degree(graph, b) >= 3:
 			continue
-		# Skip adjacent rooms (already linked by chain).
 		if abs(a - b) == 1:
 			continue
 		var key: String = _link_key(a, b)
