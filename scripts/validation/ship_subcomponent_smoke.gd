@@ -4,7 +4,7 @@ const SubScript := preload("res://scripts/systems/ship_subcomponent.gd")
 
 func _initialize() -> void:
 	# Damaged part with one required part, one tool, min skill 2.
-	var sub = SubScript.new("reactor_core", ["power_cell"], ["welder"], 2, 10.0, 0.5)
+	var sub := SubScript.new("reactor_core", ["power_cell"], ["welder"], 2, 10.0, 0.5)
 	sub.health = 0.2
 
 	if sub.is_functional():
@@ -56,10 +56,10 @@ func _initialize() -> void:
 		return
 
 	# Summary round-trip.
-	var damaged = SubScript.new("co2_scrubber", [], [], 0, 5.0, 0.5)
+	var damaged := SubScript.new("co2_scrubber", [], [], 0, 5.0, 0.5)
 	damaged.health = 0.3
 	var summary: Dictionary = damaged.get_summary()
-	var restored = SubScript.new("co2_scrubber", [], [], 0, 5.0, 0.5)
+	var restored := SubScript.new("co2_scrubber", [], [], 0, 5.0, 0.5)
 	if not restored.apply_summary(summary):
 		push_error("SHIP SUBCOMPONENT FAIL apply_summary reported no change")
 		quit(1)

@@ -8,7 +8,7 @@ class_name LifeSupportSystem
 
 const OxygenStateScript := preload("res://scripts/systems/oxygen_state.gd")
 
-var oxygen_state
+var oxygen_state: OxygenStateScript
 
 func _init(p_system_id: String = "life_support", p_dependency_ids: Array[String] = []) -> void:
 	super(p_system_id, p_dependency_ids)
@@ -18,7 +18,7 @@ func _init(p_system_id: String = "life_support", p_dependency_ids: Array[String]
 	# by the operational flag we pass into tick().
 	oxygen_state.configure({"zone_ids": ["life_support"]})
 
-func get_oxygen_state():
+func get_oxygen_state() -> OxygenStateScript:
 	return oxygen_state
 
 ## Offline -> oxygen drains (player_in_breach_zone == true). Operational ->

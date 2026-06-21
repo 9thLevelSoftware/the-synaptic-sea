@@ -5,7 +5,7 @@ const SubScript := preload("res://scripts/systems/ship_subcomponent.gd")
 
 func _initialize() -> void:
 	var deps: Array[String] = ["power"]
-	var system = SystemScript.new("life_support", deps)
+	var system := SystemScript.new("life_support", deps)
 	system.add_subcomponent(SubScript.new("air_recycler", [], [], 0, 5.0, 0.5))
 	system.add_subcomponent(SubScript.new("co2_scrubber", [], [], 0, 5.0, 0.5))
 
@@ -51,7 +51,7 @@ func _initialize() -> void:
 
 	# Round-trip: damaged healths survive get_summary -> apply_summary.
 	var summary: Dictionary = system.get_summary()
-	var restored = SystemScript.new("life_support", deps)
+	var restored := SystemScript.new("life_support", deps)
 	restored.add_subcomponent(SubScript.new("air_recycler", [], [], 0, 5.0, 0.5))
 	restored.add_subcomponent(SubScript.new("co2_scrubber", [], [], 0, 5.0, 0.5))
 	if not restored.apply_summary(summary):

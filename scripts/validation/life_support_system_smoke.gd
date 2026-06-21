@@ -5,7 +5,7 @@ const SubScript := preload("res://scripts/systems/ship_subcomponent.gd")
 
 func _initialize() -> void:
 	var deps: Array[String] = ["power"]
-	var ls = LifeSupportScript.new("life_support", deps)
+	var ls := LifeSupportScript.new("life_support", deps)
 	ls.add_subcomponent(SubScript.new("air_recycler", [], [], 0, 5.0, 0.5))
 
 	var oxy = ls.get_oxygen_state()
@@ -37,7 +37,7 @@ func _initialize() -> void:
 		quit(1)
 		return
 	# Drive a fresh instance to a different oxygen level, then restore.
-	var fresh = LifeSupportScript.new("life_support", deps)
+	var fresh := LifeSupportScript.new("life_support", deps)
 	fresh.add_subcomponent(SubScript.new("air_recycler", [], [], 0, 5.0, 0.5))
 	fresh.advance(2.0, false)  # drain it to a different value
 	if not fresh.apply_summary(summary):

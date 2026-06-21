@@ -67,12 +67,13 @@ func _initialize() -> void:
 			quit(1)
 			return
 
-	# Repair Power back -> dependents that are themselves healthy come back.
+	# Repair Power back -> all five dependents that are themselves healthy come back.
 	mgr.get_system("power").get_subcomponent("reactor_core").health = 1.0
-	if not mgr.is_operational("life_support"):
-		push_error("SHIP SYSTEMS MANAGER FAIL life_support did not recover after power restored")
-		quit(1)
-		return
+	for sid in ["life_support", "gravity", "navigation", "propulsion", "scanners"]:
+		if not mgr.is_operational(sid):
+			push_error("SHIP SYSTEMS MANAGER FAIL %s did not recover after power restored" % sid)
+			quit(1)
+			return
 
 	# Break navigation -> scanners + propulsion go offline (need navigation), but gravity stays up.
 	mgr.get_system("navigation").get_subcomponent("nav_computer").health = 0.0

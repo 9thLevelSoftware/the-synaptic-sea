@@ -43,7 +43,7 @@ func configure(definitions: Dictionary, condition: int, seed_value: int) -> void
 		var deps: Array[String] = []
 		for d in sys_def.get("dependency_ids", []):
 			deps.append(str(d))
-		var system
+		var system: ShipSystemScript
 		if sid == "life_support":
 			system = LifeSupportSystemScript.new(sid, deps)
 		else:
@@ -112,9 +112,9 @@ func _resolve_operational(system_id: String, visiting: Dictionary) -> bool:
 	visiting[system_id] = true
 	for dep in system.dependency_ids:
 		if not _resolve_operational(dep, visiting):
-			visiting.erase(system_id)
+			visiting.erase(system_id)  # stack-pop: no longer an ancestor on the current path
 			return false
-	visiting.erase(system_id)
+	visiting.erase(system_id)  # stack-pop: no longer an ancestor on the current path
 	return true
 
 ## Flat, ordered list of every subcomponent health — used by smokes to assert
@@ -138,23 +138,27 @@ func advance(delta: float) -> void:
 func repair(system_id: String, subcomponent_id: String, available_parts: Array, available_tools: Array, skill_level: int) -> Dictionary:
 	if not systems.has(system_id):
 		return {"success": false, "reason": "unknown_system", "seconds": 0.0}
-	var sub = systems[system_id].get_subcomponent(subcomponent_id)
+	var sub: ShipSubcomponentScript = systems[system_id].get_subcomponent(subcomponent_id)
 	if sub == null:
 		return {"success": false, "reason": "unknown_subcomponent", "seconds": 0.0}
 	return sub.repair(available_parts, available_tools, skill_level)
 
+## Returns a lightweight {system_id: {operational, health}} dict for HUD/diagnostics.
 func get_status_summary() -> Dictionary:
 	var out: Dictionary = {}
 	for sid in system_order:
 		out[sid] = {"operational": is_operational(sid), "health": systems[sid].health()}
 	return out
 
+## Returns a full snapshot of every system's subcomponent state for save/load round-trips.
 func get_summary() -> Dictionary:
 	var sys_summaries: Dictionary = {}
 	for sid in system_order:
 		sys_summaries[sid] = systems[sid].get_summary()
 	return {"systems": sys_summaries, "system_order": system_order.duplicate()}
 
+## Restores per-system subcomponent state by id. Does NOT restore [code]system_order[/code]
+## (that is established by [code]configure[/code] and must match before calling this).
 func apply_summary(summary: Dictionary) -> bool:
 	if summary == null or summary.is_empty():
 		return false
