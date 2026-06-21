@@ -247,6 +247,13 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		_fail("old derelict scene_root still parented under coordinator after world reload-while-away (should be detached)")
 		return
 
+	# C1 regression: after a world-load taken aboard a derelict, the rebuilt home
+	# hull must NOT remain parented under the coordinator (otherwise it overlays
+	# the restored derelict at the local origin for the whole visit).
+	if playable.home_ship != null and playable.home_ship.scene_root != null and is_instance_valid(playable.home_ship.scene_root) and playable.home_ship.scene_root.get_parent() == playable:
+		_fail("home hull still parented under coordinator after derelict-restoring world load (overlays derelict)")
+		return
+
 	finished = true
 	print("TRAVEL INTEGRATION PASS start_wrapped=true scan_gated=true propulsion_gate=true swapped=true progression_persists=true world_recorded=true")
 	_teardown_and_quit(0)

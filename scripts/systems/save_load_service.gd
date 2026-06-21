@@ -20,15 +20,8 @@ func save_current_run(snapshot: RunSnapshot) -> bool:
 		return false
 	var data: Dictionary = snapshot.to_dict()
 	var json: String = JSON.stringify(data, "\t")
-	# Ensure the parent directory exists. `user://saves` may not exist on a
-	# fresh Godot install; without this, FileAccess.open silently returns
-	# null and the save would fail without a useful error.
-	var dir_path: String = SAVE_PATH.get_base_dir()
-	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(dir_path)):
-		var make_err: int = DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir_path))
-		if make_err != OK and make_err != ERR_ALREADY_EXISTS:
-			push_warning("SaveLoadService: failed to create save dir, error=%d" % make_err)
-			return false
+	if not _ensure_save_dir():
+		return false
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
 		push_warning("SaveLoadService: cannot open save file for writing, error=%d" % FileAccess.get_open_error())
@@ -68,12 +61,8 @@ func save_world(world_snapshot) -> bool:
 		push_warning("SaveLoadService: cannot save null world snapshot")
 		return false
 	var json: String = JSON.stringify(world_snapshot.to_dict(), "\t")
-	var dir_path: String = SAVE_PATH.get_base_dir()
-	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(dir_path)):
-		var make_err: int = DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir_path))
-		if make_err != OK and make_err != ERR_ALREADY_EXISTS:
-			push_warning("SaveLoadService: failed to create save dir, error=%d" % make_err)
-			return false
+	if not _ensure_save_dir():
+		return false
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
 		push_warning("SaveLoadService: cannot open save file for writing, error=%d" % FileAccess.get_open_error())
@@ -96,7 +85,7 @@ func load_world():
 	if json.is_empty():
 		push_warning("SaveLoadService: save file is empty")
 		return null
-	var parsed = JSON.parse_string(json)
+	var parsed: Variant = JSON.parse_string(json)
 	if parsed == null or typeof(parsed) != TYPE_DICTIONARY:
 		push_warning("SaveLoadService: save file is not valid JSON object")
 		return null
@@ -118,3 +107,16 @@ func delete_current_run() -> bool:
 
 func has_save() -> bool:
 	return FileAccess.file_exists(SAVE_PATH)
+
+## Ensures the save slot's parent directory exists. `user://saves` may not exist
+## on a fresh Godot install; without this, FileAccess.open silently returns null
+## and the save fails without a useful error. Shared by save_current_run and
+## save_world. Returns false only when directory creation genuinely fails.
+func _ensure_save_dir() -> bool:
+	var dir_path: String = SAVE_PATH.get_base_dir()
+	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(dir_path)):
+		var make_err: int = DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir_path))
+		if make_err != OK and make_err != ERR_ALREADY_EXISTS:
+			push_warning("SaveLoadService: failed to create save dir, error=%d" % make_err)
+			return false
+	return true

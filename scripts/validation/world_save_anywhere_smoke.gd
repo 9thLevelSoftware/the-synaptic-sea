@@ -47,6 +47,13 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	playable.get_save_load_service().delete_current_run()  # clean slot
 	_all_operational(playable.get_ship_systems_manager())
 
+	# I1 coverage: put the player at a KNOWN home position before traveling away,
+	# so travel_to captures it into _home_player_position. After an away-save +
+	# fresh-process reload, travel_home() must return the player here (not origin).
+	var known_home_pos: Vector3 = Vector3(5.0, 1.5, -3.0)
+	if playable.player != null and playable.player is Node3D:
+		(playable.player as Node3D).global_position = known_home_pos
+
 	# Travel to a derelict and mutate its systems to a recognisable state.
 	var world = playable.get_sargasso_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
@@ -69,6 +76,10 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	if not playable.request_save():
 		_fail("request_save while aboard a derelict should succeed (save-anywhere)")
 		return
+
+	# I1 coverage: simulate a fresh process — the in-memory _home_player_position
+	# is gone, so the world load must repopulate it from the saved home slice.
+	playable._home_player_position = Vector3.ZERO
 
 	# RELOAD — must restore the derelict location, state, and position.
 	if not playable.request_load():
@@ -95,6 +106,15 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	# Return home, save on home, reload — home restored, not away.
 	if not playable.travel_home():
 		_fail("travel_home failed before home-save check")
+		return
+	# I1 assertion: travel_home must teleport the player to the saved home
+	# position that the world load restored into _home_player_position, NOT origin.
+	if playable.player == null or not is_instance_valid(playable.player):
+		_fail("player invalid after travel_home")
+		return
+	var home_p: Vector3 = (playable.player as Node3D).global_position
+	if home_p.distance_to(known_home_pos) > 0.5:
+		_fail("travel_home did not restore saved home position from world load (got %s expected ~%s)" % [str(home_p), str(known_home_pos)])
 		return
 	if not playable.request_save():
 		_fail("request_save on the home ship should succeed")

@@ -1008,6 +1008,15 @@ func _reattach_starting_gameplay_roots() -> void:
 ## (revisit/first-visit) and world-load (_apply_world_snapshot). Does NOT re-home
 ## the player — callers position the player afterwards.
 func _attach_derelict_active(inst, new_root: Node3D) -> void:
+	# Detach the home hull if it is still parented under the coordinator. In a
+	# normal travel_to() the home loader/scene_root was already removed before
+	# this call, so this is a no-op there (get_parent() != self). It only fires
+	# on the world-load path, where _apply_world_snapshot rebuilds the home ship
+	# (leaving its scene_root parented) and then re-activates a derelict — without
+	# this detach both hulls overlap at the local origin for the whole visit.
+	# Detach-not-free: travel_home re-adds the same home scene_root.
+	if home_ship != null and home_ship.scene_root != null and is_instance_valid(home_ship.scene_root) and home_ship.scene_root.get_parent() == self:
+		remove_child(home_ship.scene_root)
 	_detach_starting_gameplay_roots()
 	inst.scene_root = new_root
 	add_child(new_root)
@@ -2821,6 +2830,12 @@ func _apply_world_snapshot(ws) -> bool:
 	if home_snap == null:
 		push_warning("PlayableGeneratedShip: world load rejected — embedded home slice incompatible")
 		return false
+	# Restore the home-departure position. On an away-save the home slice's
+	# player_position holds where the player left home from (see _build_world_snapshot);
+	# without copying it back, a later travel_home() after a fresh process would
+	# teleport the player to the origin instead of their saved home position.
+	if home_snap.player_position.size() >= 3:
+		_home_player_position = Vector3(home_snap.player_position[0], home_snap.player_position[1], home_snap.player_position[2])
 	if not _apply_run_snapshot(home_snap):
 		return false
 	# 2. World model. _apply_run_snapshot reset us to the home ship; home_ship is
