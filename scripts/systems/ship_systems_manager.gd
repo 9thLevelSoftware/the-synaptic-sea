@@ -125,3 +125,45 @@ func get_summary_health_list() -> Array:
 		for sub in systems[sid].subcomponents:
 			out.append(sub.health)
 	return out
+
+## Ticks every system with its resolved operational status. Only LifeSupport
+## acts on the time delta (oxygen drain when offline).
+func advance(delta: float) -> void:
+	for sid in system_order:
+		systems[sid].advance(delta, is_operational(sid))
+
+## Parameterized repair routed to the named subcomponent. Returns the
+## subcomponent's RepairResult, or an unknown_system / unknown_subcomponent
+## rejection.
+func repair(system_id: String, subcomponent_id: String, available_parts: Array, available_tools: Array, skill_level: int) -> Dictionary:
+	if not systems.has(system_id):
+		return {"success": false, "reason": "unknown_system", "seconds": 0.0}
+	var sub = systems[system_id].get_subcomponent(subcomponent_id)
+	if sub == null:
+		return {"success": false, "reason": "unknown_subcomponent", "seconds": 0.0}
+	return sub.repair(available_parts, available_tools, skill_level)
+
+func get_status_summary() -> Dictionary:
+	var out: Dictionary = {}
+	for sid in system_order:
+		out[sid] = {"operational": is_operational(sid), "health": systems[sid].health()}
+	return out
+
+func get_summary() -> Dictionary:
+	var sys_summaries: Dictionary = {}
+	for sid in system_order:
+		sys_summaries[sid] = systems[sid].get_summary()
+	return {"systems": sys_summaries, "system_order": system_order.duplicate()}
+
+func apply_summary(summary: Dictionary) -> bool:
+	if summary == null or summary.is_empty():
+		return false
+	var sys_summaries_variant: Variant = summary.get("systems", {})
+	if typeof(sys_summaries_variant) != TYPE_DICTIONARY:
+		return false
+	var changed: bool = false
+	for sid in (sys_summaries_variant as Dictionary):
+		if systems.has(sid):
+			if systems[sid].apply_summary((sys_summaries_variant as Dictionary)[sid]):
+				changed = true
+	return changed
