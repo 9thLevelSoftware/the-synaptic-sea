@@ -353,9 +353,20 @@ func get_objective_progress_summary() -> Dictionary:
 func get_interactable_by_sequence(sequence: int):
 	var group: Array = sequence_interactables.get(sequence, [])
 	for interactable in group:
-		if int(interactable.get("sequence")) == sequence:
+		if is_instance_valid(interactable) and int(interactable.get("sequence")) == sequence:
 			return interactable
 	return null
+
+## Validation seam: every interactable belonging to a sequence. Multi-step
+## objectives (e.g. the repair_junction at objective 2) expose one
+## interactable per step at distinct positions; drivers that only touch the
+## first (see get_interactable_by_sequence) cannot complete the junction.
+func get_interactables_by_sequence(sequence: int) -> Array:
+	var out: Array = []
+	for interactable in sequence_interactables.get(sequence, []):
+		if is_instance_valid(interactable) and int(interactable.get("sequence")) == sequence:
+			out.append(interactable)
+	return out
 
 func teleport_player_to_objective_for_validation(sequence: int) -> bool:
 	if player == null:
@@ -2319,13 +2330,11 @@ func _build_run_snapshot() -> RunSnapshot:
 	snapshot.current_objective_sequence = current_objective_sequence
 	if ship_systems_manager != null:
 		snapshot.ship_systems_summary = ship_systems_manager.get_summary()
+		# Persist only the authoritative objective record; flag-shaped fields
+		# (main_power_restored, emergency_supplies_recovered, ...) are derived
+		# live from manager health + this record via _manager_compat_summary(),
+		# never stored (ADR-0009).
 		snapshot.ship_systems_summary["completed_objective_types"] = completed_objective_types.keys()
-		# Merge compat keys into the snapshot so save/load smokes that check
-		# flag-shaped fields (emergency_supplies_recovered, etc.) still pass
-		# after ShipSystemState was retired (ADR-0009).
-		var _compat: Dictionary = _manager_compat_summary()
-		for _k in _compat:
-			snapshot.ship_systems_summary[_k] = _compat[_k]
 	if route_control_state != null:
 		snapshot.route_control_summary = get_route_control_summary()
 	if oxygen_state != null:

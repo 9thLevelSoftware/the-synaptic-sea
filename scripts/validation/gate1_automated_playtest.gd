@@ -171,14 +171,27 @@ func _interact_and_advance(obj_num: int, next_phase: String) -> void:
 	if phase_frames < SETTLE_FRAMES:
 		return
 
-	var interactable = playable.get_interactable_by_sequence(obj_num)
-	if interactable == null:
+	var group: Array = playable.get_interactables_by_sequence(obj_num)
+	if group.is_empty():
 		_fail("objective %d interactable missing" % obj_num)
 		return
 
-	if interactable.has_method("set_validation_player_in_range"):
-		interactable.set_validation_player_in_range(playable.player)
+	# Multi-step objectives (the repair_junction at objective 2 has two steps at
+	# different cells) require the player to REACH each step. Move to the first
+	# not-yet-completed step and interact from there — one step per frame — so a
+	# step at a broken or unreachable position cannot be completed from another
+	# step's location (that would be a false-positive in this Gate-1 evidence
+	# run). Mirrors complete_objective_sequence_for_validation's per-step walk.
+	for step_interactable in group:
+		if not (step_interactable is Node3D):
+			continue
+		if bool(step_interactable.get("completed")):
+			continue
+		playable.player.teleport_to((step_interactable as Node3D).global_position)
+		if step_interactable.has_method("set_validation_player_in_range"):
+			step_interactable.set_validation_player_in_range(playable.player)
 		playable.player.request_interact()
+		break
 
 	var new_seq: int = playable.get_current_objective_sequence()
 	if new_seq > obj_num:

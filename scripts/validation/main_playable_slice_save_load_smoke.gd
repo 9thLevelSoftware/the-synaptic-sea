@@ -85,8 +85,12 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	if last_snapshot.current_objective_sequence != 2:
 		_fail("saved snapshot sequence=%d expected 2" % last_snapshot.current_objective_sequence)
 		return
-	if not bool(last_snapshot.ship_systems_summary.get("emergency_supplies_recovered", false)):
-		_fail("saved snapshot missing emergency_supplies_recovered=true")
+	# The snapshot persists the authoritative objective record; the
+	# flag-shaped fields (emergency_supplies_recovered, etc.) are derived
+	# live from it via _manager_compat_summary(), not stored.
+	var saved_types: Array = last_snapshot.ship_systems_summary.get("completed_objective_types", [])
+	if not saved_types.has("recover_supplies"):
+		_fail("saved snapshot missing completed_objective_types=recover_supplies")
 		return
 
 	# Move the player so the load has somewhere to teleport back from.
