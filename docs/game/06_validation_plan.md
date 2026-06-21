@@ -115,7 +115,11 @@ run_clean 'class definitions smoke' 'CLASS DEFINITIONS PASS classes=8 engineer_r
 run_clean 'player progression model smoke' 'PLAYER PROGRESSION PASS class=engineer repair_start=3 leveled=4 round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_progression_state_smoke.gd
 run_clean 'progression repair integration smoke' 'PROGRESSION REPAIR INTEGRATION PASS rejected_low=true success_hi=true faster_at_higher_skill=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/progression_repair_integration_smoke.gd
 run_clean 'main progression smoke' 'MAIN PLAYABLE PROGRESSION PASS class=engineer repair_xp_gained=true hud=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_progression_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=54 clean_output=true'
+run_clean 'marker generator smoke' 'MARKER GENERATOR PASS deterministic=true per_cell=3 round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/marker_generator_smoke.gd
+run_clean 'sargasso world smoke' 'SARGASSO WORLD PASS in_range_sorted=true generated=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sargasso_world_smoke.gd
+run_clean 'scanner state smoke' 'SCANNER STATE PASS nav_off_empty=true scanners_off_detail1=true full_detail=6 round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_state_smoke.gd
+run_clean 'travel controller smoke' 'TRAVEL CONTROLLER PASS propulsion_gate=true range_gate=true generated_node=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_controller_smoke.gd
+echo 'SARGASSO REGRESSION PASS commands=58 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
