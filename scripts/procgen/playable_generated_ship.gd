@@ -19,6 +19,8 @@ const FireStateScript := preload("res://scripts/systems/fire_state.gd")
 const ElectricalArcStateScript := preload("res://scripts/systems/electrical_arc_state.gd")
 const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.gd")
 const RunSnapshotScript := preload("res://scripts/systems/run_snapshot.gd")
+const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
+const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -62,6 +64,7 @@ const ARC_ZONE_LABEL_TEXT_ARCING: String = "ARC LIVE — WAIT"
 @export var layout_path: String = DEFAULT_LAYOUT_PATH
 @export var kit_path: String = DEFAULT_KIT_PATH
 @export var gameplay_slice_path: String = DEFAULT_GAMEPLAY_SLICE_PATH
+@export var blueprint_path: String = "res://data/procgen/golden/coherent_ship_001/blueprint.json"
 var loader
 var player
 var camera_rig
@@ -86,6 +89,7 @@ var ready_summary: Dictionary = {}
 var playable_started: bool = false
 var last_failure_reason: String = ""
 var ship_systems: ShipSystemState
+var ship_systems_manager   # ShipSystemsManager (untyped: class_name globals unreliable under --headless --script)
 var route_control_state: RouteControlState
 var route_control_root: Node3D
 var route_gate_nodes: Array = []
@@ -789,6 +793,9 @@ func _title_from_snake(raw: String) -> String:
 
 func _build_runtime_nodes() -> void:
 	ship_systems = ShipSystemStateScript.new()
+	ship_systems_manager = ShipSystemsManagerScript.new()
+	var bp = _load_blueprint_for_systems()
+	ship_systems_manager.configure(ship_systems_manager.load_definitions(), bp.condition, bp.seed_value)
 	route_control_state = RouteControlStateScript.new()
 	route_gate_nodes.clear()
 	objective_progress_state = ObjectiveProgressStateScript.new()
@@ -835,6 +842,25 @@ func _build_runtime_nodes() -> void:
 	# REQ-012: current-run save/load service. Single slot at
 	# user://saves/current_run.json; deleted on playable_slice_completed.
 	save_load_service = SaveLoadServiceScript.new()
+
+## Loads the blueprint sidecar that seeds the ShipSystemsManager's condition
+## damage. Falls back to a DAMAGED/seed=17 default (never crashes the slice)
+## when the sidecar is absent or malformed.
+func _load_blueprint_for_systems():
+	var fallback = ShipBlueprintScript.new(ShipBlueprintScript.Size.MEDIUM, ShipBlueprintScript.Condition.DAMAGED, 17)
+	if blueprint_path.is_empty() or not FileAccess.file_exists(blueprint_path):
+		push_warning("PlayableGeneratedShip: blueprint sidecar missing at %s; using DAMAGED/seed=17 default" % blueprint_path)
+		return fallback
+	var text: String = FileAccess.get_file_as_string(blueprint_path)
+	var parsed: Variant = JSON.parse_string(text)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		push_warning("PlayableGeneratedShip: blueprint sidecar malformed at %s; using default" % blueprint_path)
+		return fallback
+	return ShipBlueprintScript.from_dict(parsed as Dictionary)
+
+## Validation seam: the live ShipSystemsManager (null before _build_runtime_nodes()).
+func get_ship_systems_manager():
+	return ship_systems_manager
 
 ## Allocates the HUD CanvasLayer and the ObjectiveTracker that lives
 ## inside it. Called from _build_runtime_nodes (initial slice setup)
@@ -1245,6 +1271,8 @@ func _process(delta: float) -> void:
 		return
 	if oxygen_state == null:
 		return
+	if ship_systems_manager != null:
+		ship_systems_manager.advance(delta)
 	_refresh_oxygen_state(false, delta)
 	if fire_state != null:
 		fire_state.tick(delta)
@@ -2464,6 +2492,9 @@ func _reset_runtime_for_reload() -> void:
 	# then has the snapshot re-applied.
 	if ship_systems != null:
 		ship_systems.reset()
+	if ship_systems_manager != null:
+		var bp_reset = _load_blueprint_for_systems()
+		ship_systems_manager.configure(ship_systems_manager.load_definitions(), bp_reset.condition, bp_reset.seed_value)
 	if route_control_state != null:
 		route_control_state.configure_from_blocked_routes([])
 	if oxygen_state != null:
