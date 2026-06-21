@@ -80,6 +80,7 @@ run_clean 'objective progress state smoke' 'OBJECTIVE PROGRESS STATE PASS sequen
 run_clean 'objective progress hud label smoke' 'OBJECTIVE PROGRESS HUD LABEL PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/objective_progress_hud_label_smoke.gd
 run_clean 'save/load service smoke' 'SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=7' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_load_service_smoke.gd
 run_clean 'main save/load smoke' 'MAIN PLAYABLE SAVE LOAD PASS saved_sequence=2 loaded_sequence=2 position_match=true supplies=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_save_load_smoke.gd
+run_clean 'main reload affordance smoke' 'MAIN PLAYABLE RELOAD AFFORDANCE PASS cleared_live=true cleared_after_reload=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_reload_affordance_smoke.gd
 run_clean 'REQ-012 auto-save sequence smoke' 'REQ012 AUTOSAVE SEQUENCE CHECK PASS live=2 snapshot=2 file=2 has_save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/req012_autosave_sequence_smoke.gd
 run_clean 'template C stacked layout main scenario smoke' 'TEMPLATE C MAIN SCENARIO PASS objectives=5 current_sequence=6 run_complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_c_main_scenario_smoke.gd
 run_clean 'junction calibrator model smoke' 'JUNCTION CALIBRATOR STATE PASS required_steps=2 consumed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/junction_calibrator_state_smoke.gd
@@ -110,7 +111,7 @@ run_clean 'ship systems definitions smoke' 'SHIP SYSTEMS DEFINITIONS PASS' "$GOD
 run_clean 'ship systems manager smoke' 'SHIP SYSTEMS MANAGER PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_systems_manager_smoke.gd
 run_clean 'ship systems manager force repair smoke' 'SHIP SYSTEMS MANAGER FORCE REPAIR PASS health=1.0 unknown_rejected=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_systems_manager_force_repair_smoke.gd
 run_clean 'playable manager built smoke' 'PLAYABLE MANAGER BUILT PASS systems=6' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/playable_manager_built_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=49 clean_output=true'
+echo 'SARGASSO REGRESSION PASS commands=50 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

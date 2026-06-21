@@ -2429,7 +2429,14 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		for t in snapshot.ship_systems_summary.get("completed_objective_types", []):
 			completed_objective_types[str(t)] = true
 		objective_completion_count = max(0, snapshot.current_objective_sequence - 1)
-		_apply_ship_systems_consequences("")
+		# Re-apply scene consequences for every completed objective. The reload
+		# rebuilds affordances visible (via _build_slice_affordance_labels), so a
+		# completed restore_systems must re-clear the blocked-biomatter props or
+		# they reappear after loading (PR #2 review finding). The handler is a
+		# no-op for objective types without scene consequences, so iterating all
+		# completed types is safe and future-proof.
+		for completed_type in completed_objective_types:
+			_apply_ship_systems_consequences(str(completed_type))
 		_refresh_route_control_from_ship_systems()
 		if oxygen_state != null:
 			oxygen_state.apply_ship_systems_summary(_manager_compat_summary())
