@@ -121,15 +121,18 @@ Per-category XP multipliers (technical / medical / navigation / survival / socia
 |-------|------|-----|-----|------|-----|--------------------------|
 | engineer | 1.5 | 0.7 | 1.0 | 1.0 | 0.8 | repair 3, diagnostics 2, welding 2, fabrication 1 |
 | mechanic | 1.5 | 0.7 | 0.9 | 1.1 | 0.8 | repair 4, welding 3, fabrication 1, scavenging 2 |
-| medic | 0.7 | 1.5 | 0.8 | 1.0 | 1.2 | repair 1, first_aid 3, pharmacology 2, surgery 1 |
+| medic | 0.7 | 1.5 | 0.8 | 1.0 | 1.2 | repair 1, first_aid 3, pharmacology 2, surgery 1, quarantine 2 |
 | pilot | 1.0 | 0.8 | 1.5 | 1.0 | 1.0 | repair 1, piloting 3, astrogation 2, scanner_operation 1 |
 | scientist | 1.2 | 1.0 | 1.2 | 0.7 | 0.9 | repair 2, diagnostics 2, signal_analysis 2, pharmacology 1 |
 | cook | 0.8 | 1.0 | 0.8 | 1.5 | 1.2 | repair 0, cooking 3, resource_management 2, scavenging 1 |
-| security | 0.9 | 0.9 | 1.0 | 1.2 | 1.1 | repair 1, intimidation 2, construction 1, scavenging 1 |
+| security | 0.9 | 0.9 | 1.0 | 1.2 | 1.1 | repair 1, intimidation 2, construction 1, scavenging 1, leadership 2 |
 | communications | 0.9 | 0.8 | 1.3 | 0.8 | 1.5 | repair 0, comms 3, signal_analysis 2, negotiation 1 |
 
-Skills not listed for a class start at 0. Any category not listed in a class's `xp_multipliers`
-defaults to 1.0. The default starting class for the live slice is **engineer** (coordinator
+Skills not listed for a class start at 0 (still trainable via cross-training XP). `quarantine`
+(medic) and `leadership` (security) are seeded so every skill in the catalog is a starting skill on
+at least one class — `class_definitions_smoke` asserts this coverage. Any category not listed in a
+class's `xp_multipliers` defaults to 1.0. The default starting class for the live slice is
+**engineer** (coordinator
 `@export var starting_class_id`).
 
 ---

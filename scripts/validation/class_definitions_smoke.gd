@@ -27,6 +27,15 @@ func _initialize() -> void:
 		_fail("unlisted category should default to 1.0")
 		return
 
+	# Catalog coverage: quarantine and leadership are seeded so every skill in
+	# skills.json is reachable as a starting skill on at least one class.
+	if int(classes["medic"].starting_skills.get("quarantine", 0)) < 1:
+		_fail("medic should seed quarantine")
+		return
+	if int(classes["security"].starting_skills.get("leadership", 0)) < 1:
+		_fail("security should seed leadership")
+		return
+
 	print("CLASS DEFINITIONS PASS classes=8 engineer_repair=3 technical=1.5 default=1.0")
 	quit(0)
 
