@@ -158,5 +158,12 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	print("SHIP SYSTEMS MANAGER PASS determinism=ok cascade=ok advance=ok repair=ok round_trip=ok")
+	# Malformed/corrupt snapshot: a known system id mapping to a non-Dictionary
+	# value must be rejected gracefully (no runtime type crash, no change).
+	if dst.apply_summary({"systems": {"power": []}}):
+		push_error("SHIP SYSTEMS MANAGER FAIL malformed nested system summary should be rejected")
+		quit(1)
+		return
+
+	print("SHIP SYSTEMS MANAGER PASS determinism=ok cascade=ok advance=ok repair=ok round_trip=ok malformed_rejected=ok")
 	quit(0)

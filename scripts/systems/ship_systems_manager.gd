@@ -30,6 +30,8 @@ func load_definitions() -> Dictionary:
 func configure(definitions: Dictionary, condition: int, seed_value: int) -> void:
 	systems.clear()
 	system_order.clear()
+	if definitions == null or definitions.is_empty():
+		return
 	var systems_variant: Variant = definitions.get("systems", [])
 	if typeof(systems_variant) != TYPE_ARRAY:
 		return
@@ -168,6 +170,8 @@ func apply_summary(summary: Dictionary) -> bool:
 	var changed: bool = false
 	for sid in (sys_summaries_variant as Dictionary):
 		if systems.has(sid):
-			if systems[sid].apply_summary((sys_summaries_variant as Dictionary)[sid]):
-				changed = true
+			var sys_summary: Variant = (sys_summaries_variant as Dictionary)[sid]
+			if typeof(sys_summary) == TYPE_DICTIONARY:
+				if systems[sid].apply_summary(sys_summary):
+					changed = true
 	return changed

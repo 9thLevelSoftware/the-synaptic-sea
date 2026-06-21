@@ -64,7 +64,9 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 
 	# The GeneratedShipLoader needs the shared structural module kit JSON.
 	var kit_path: String = "res://data/kits/ship_structural_v0.json"
-	if not FileAccess.file_exists(ProjectSettings.globalize_path(kit_path)):
+	# FileAccess.file_exists natively supports res:// and works in exported
+	# builds (.pck); ProjectSettings.globalize_path would break inside a pack.
+	if not FileAccess.file_exists(kit_path):
 		push_error("SHIP GENERATOR FAIL structural kit not found: %s" % kit_path)
 		return null
 

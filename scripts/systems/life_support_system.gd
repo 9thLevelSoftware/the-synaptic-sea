@@ -32,6 +32,8 @@ func get_summary() -> Dictionary:
 	return base
 
 func apply_summary(summary: Dictionary) -> bool:
+	if summary == null or summary.is_empty():
+		return false
 	var changed: bool = super.apply_summary(summary)
 	var oxy_variant: Variant = summary.get("oxygen", null)
 	if typeof(oxy_variant) == TYPE_DICTIONARY:
