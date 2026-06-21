@@ -2,7 +2,7 @@ extends SceneTree
 
 const RunSnapshotScript := preload("res://scripts/systems/run_snapshot.gd")
 const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.gd")
-const ShipSystemStateScript := preload("res://scripts/systems/ship_system_state.gd")
+const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
 const RouteControlStateScript := preload("res://scripts/systems/route_control_state.gd")
 const OxygenStateScript := preload("res://scripts/systems/oxygen_state.gd")
 const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd")
@@ -21,8 +21,9 @@ func _initialize() -> void:
 	service.delete_current_run()
 
 	# Build real model instances and seed them with a known state.
-	var ship := ShipSystemStateScript.new()
-	ship.apply_objective(1, "recover_supplies", "obj1", "cargo_01")
+	var ship := ShipSystemsManagerScript.new()
+	ship.configure(ship.load_definitions(), 1, 17)  # DAMAGED, seed 17
+	ship.force_repair("power", "battery_cells")       # force a known non-default health
 
 	var route := RouteControlStateScript.new()
 	route.configure_from_blocked_routes(["powered_route_gate_01"])
@@ -115,6 +116,9 @@ func _initialize() -> void:
 		return
 	if loaded.get_summary_count() != 7:
 		_fail("summary_count=%d expected 7" % loaded.get_summary_count())
+		return
+	if not loaded.ship_systems_summary.has("systems") or not loaded.ship_systems_summary.has("system_order"):
+		_fail("ship_systems_summary missing manager keys after round-trip")
 		return
 	if loaded.slice_version != original.slice_version:
 		_fail("slice_version mismatch")

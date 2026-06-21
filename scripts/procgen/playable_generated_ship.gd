@@ -2320,8 +2320,9 @@ func _build_run_snapshot() -> RunSnapshot:
 		var pos: Vector3 = (player as Node3D).global_position
 		snapshot.player_position = [pos.x, pos.y, pos.z]
 	snapshot.current_objective_sequence = current_objective_sequence
-	if ship_systems != null:
-		snapshot.ship_systems_summary = ship_systems.get_summary()
+	if ship_systems_manager != null:
+		snapshot.ship_systems_summary = ship_systems_manager.get_summary()
+		snapshot.ship_systems_summary["completed_objective_types"] = completed_objective_types.keys()
 	if route_control_state != null:
 		snapshot.route_control_summary = get_route_control_summary()
 	if oxygen_state != null:
@@ -2419,17 +2420,16 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		push_error("PlayableGeneratedShip: load failed because slice did not start")
 		return false
 	# Apply the saved model state to the freshly-built slice.
-	if ship_systems != null and not snapshot.ship_systems_summary.is_empty():
-		ship_systems.apply_summary(snapshot.ship_systems_summary)
-		# Re-derive the coordinator-level objective_completion_count from
-		# the restored model so the slice-completion arithmetic stays
-		# consistent with the saved sequence number.
-		var restored_sequences: Array = (ship_systems.get_summary().get("completed_sequences", []) as Array)
-		objective_completion_count = restored_sequences.size()
+	if ship_systems_manager != null and not snapshot.ship_systems_summary.is_empty():
+		ship_systems_manager.apply_summary(snapshot.ship_systems_summary)
+		completed_objective_types.clear()
+		for t in snapshot.ship_systems_summary.get("completed_objective_types", []):
+			completed_objective_types[str(t)] = true
+		objective_completion_count = max(0, snapshot.current_objective_sequence - 1)
 		_apply_ship_systems_consequences("")
 		_refresh_route_control_from_ship_systems()
 		if oxygen_state != null:
-			oxygen_state.apply_ship_systems_summary(ship_systems.get_summary())
+			oxygen_state.apply_ship_systems_summary(_manager_compat_summary())
 	if route_control_state != null and not snapshot.route_control_summary.is_empty():
 		route_control_state.apply_summary(snapshot.route_control_summary)
 		_apply_route_gate_scene_state()
@@ -2544,6 +2544,7 @@ func _reset_runtime_for_reload() -> void:
 	if ship_systems_manager != null:
 		var bp_reset = _load_blueprint_for_systems()
 		ship_systems_manager.configure(ship_systems_manager.load_definitions(), bp_reset.condition, bp_reset.seed_value)
+	completed_objective_types.clear()
 	if route_control_state != null:
 		route_control_state.configure_from_blocked_routes([])
 	if oxygen_state != null:
