@@ -7,6 +7,7 @@ const PlayerControllerScript := preload("res://scripts/player/player_controller.
 const IsoCameraRigScript := preload("res://scripts/camera/iso_camera_rig.gd")
 const InteractableScript := preload("res://scripts/interaction/interactable.gd")
 const ObjectiveTrackerScript := preload("res://scripts/ui/objective_tracker.gd")
+const ScannerPanelScript := preload("res://scripts/ui/scanner_panel.gd")
 const AccessibilitySettingsScript := preload("res://scripts/ui/accessibility_settings.gd")
 const ReadabilityPropFactoryScript := preload("res://scripts/procgen/readability_prop_factory.gd")
 const RouteControlStateScript := preload("res://scripts/systems/route_control_state.gd")
@@ -85,6 +86,7 @@ var loader
 var player
 var camera_rig
 var hud_layer: CanvasLayer
+var scanner_panel   # ScannerPanel
 var tracker
 var interaction_root: Node3D
 var affordance_root: Node3D
@@ -223,6 +225,7 @@ func ensure_default_input_actions() -> void:
 	# REQ-012: manual save/load input actions. F5 saves, F9 loads.
 	_ensure_key_action_set("save_run", DEFAULT_SAVE_RUN_BINDINGS)
 	_ensure_key_action_set("load_run", DEFAULT_LOAD_RUN_BINDINGS)
+	_ensure_key_action_set("toggle_scanner", [KEY_TAB])
 
 ## A11Y-P1-001: swap in a new accessibility settings object and re-apply
 ## its scale to the HUD tracker and all existing world Label3D nodes.
@@ -1038,6 +1041,19 @@ func _build_hud_layer() -> void:
 	if tracker.has_method("apply_accessibility_settings"):
 		tracker.apply_accessibility_settings(accessibility_settings)
 	hud_layer.add_child(tracker)
+	scanner_panel = ScannerPanelScript.new()
+	scanner_panel.name = "ScannerPanel"
+	scanner_panel.visible = false
+	hud_layer.add_child(scanner_panel)
+	scanner_panel.bind(self)
+	# Restore player control on every panel close path via the signal, not just
+	# the two close paths wired into _input.
+	scanner_panel.panel_closed.connect(_on_scanner_panel_closed)
+
+func _on_scanner_panel_closed() -> void:
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process_input(true)
 
 func _on_ship_loaded(summary: Dictionary) -> void:
 	if playable_started:
@@ -2690,6 +2706,7 @@ func _reset_runtime_for_reload() -> void:
 	# helper's idempotent guard would re-free the same node twice.
 	hud_layer = null
 	tracker = null
+	scanner_panel = null
 	interactables.clear()
 	sequence_interactables.clear()
 	affordance_labels.clear()
@@ -2754,6 +2771,29 @@ func _reset_runtime_for_reload() -> void:
 func _input(event: InputEvent) -> void:
 	if not playable_started or slice_complete:
 		return
+	# Phase 4.5: scanner panel toggle + navigation. Opening the panel freezes
+	# player movement/interaction so the shared arrow/Enter keys drive the panel.
+	# Control is restored on close by the panel_closed signal handler, which
+	# covers every close path — not just toggle-close / confirm-success.
+	if scanner_panel != null:
+		if event.is_action_pressed("toggle_scanner"):
+			scanner_panel.toggle()
+			if player != null and scanner_panel.is_open():
+				player.set_physics_process(false)
+				player.set_process_input(false)
+			get_viewport().set_input_as_handled()
+			return
+		if scanner_panel.is_open():
+			if event.is_action_pressed("ui_down"):
+				scanner_panel.move_selection(1)
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_up"):
+				scanner_panel.move_selection(-1)
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_accept"):
+				scanner_panel.confirm_selection()
+				get_viewport().set_input_as_handled()
+			return  # swallow other input while the scanner is open
 	if save_load_service == null:
 		return
 	if event.is_action_pressed("save_run"):
