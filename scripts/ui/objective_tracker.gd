@@ -227,9 +227,9 @@ func _current_objective_display() -> String:
 	return "%02d Objective" % current_sequence
 
 # Player-facing HUD label for an objective. REQ-011 requires `kind ==
-# "repair_junction"` to show as "Repair junction" even though the ship-system
-# `type` stays "restore_systems" (preserved for ShipSystemState.apply_objective()
-# and route-control integration).
+# "repair_junction" to show as "Repair junction" even though the ship-system
+# `type` stays "restore_systems" (the objective bridge maps it to manager
+# repairs + route-control integration).
 func _objective_label(objective: Dictionary) -> String:
 	var kind: String = str(objective.get("kind", ""))
 	if kind == "repair_junction":

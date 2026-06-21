@@ -145,6 +145,19 @@ func repair(system_id: String, subcomponent_id: String, available_parts: Array, 
 		return {"success": false, "reason": "unknown_subcomponent", "seconds": 0.0}
 	return sub.repair(available_parts, available_tools, skill_level)
 
+## Deterministically brings a subcomponent to full health (operational).
+## Used by the objective bridge, which has no parts/tools/skill inventory
+## feeding the gated repair() path yet (that arrives with Phase 6 inventory).
+## Returns false for an unknown system or subcomponent.
+func force_repair(system_id: String, subcomponent_id: String) -> bool:
+	if not systems.has(system_id):
+		return false
+	var sub = systems[system_id].get_subcomponent(subcomponent_id)
+	if sub == null:
+		return false
+	sub.health = 1.0
+	return true
+
 ## Returns a lightweight {system_id: {operational, health}} dict for HUD/diagnostics.
 func get_status_summary() -> Dictionary:
 	var out: Dictionary = {}
