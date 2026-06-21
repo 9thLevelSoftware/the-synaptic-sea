@@ -19,6 +19,7 @@ const FireStateScript := preload("res://scripts/systems/fire_state.gd")
 const ElectricalArcStateScript := preload("res://scripts/systems/electrical_arc_state.gd")
 const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.gd")
 const RunSnapshotScript := preload("res://scripts/systems/run_snapshot.gd")
+const WorldSnapshotScript := preload("res://scripts/systems/world_snapshot.gd")
 const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const PlayerProgressionScript := preload("res://scripts/systems/player_progression_state.gd")
@@ -2618,24 +2619,21 @@ func _auto_save_current_run() -> bool:
 		return true
 	return false
 
-## Manual save trigger (F5 / save_run input). Refuses to save if the
-## slice has not started or has already completed.
+## Manual save trigger (F5 / save_run input). Saves the whole world, so saving is
+## allowed anywhere — including aboard a traveled derelict (save-anywhere; ADR-0012
+## supersedes the Phase 4.5 away-save rejection). Refuses only before the slice has
+## started or after it has completed.
 func request_save() -> bool:
 	if not playable_started or slice_complete:
 		return false
-	# REQ-012 fix: block save while on a traveled derelict. The single-ship-slice
-	# snapshot format only captures starting-ship state; an away-state save would
-	# silently omit the derelict context and produce an unrestorable snapshot. The
-	# meta-world / multi-ship save (needed for mid-derelict persistence) does not
-	# exist yet. A push_warning surfaces the block without crashing.
-	if away_from_start:
-		push_warning("PlayableGeneratedShip: save blocked — cannot save while aboard a traveled derelict (away_from_start=true); return to the starting ship first")
-		return false
 	if save_load_service == null:
 		return false
-	var result: bool = _auto_save_current_run()
+	var ws = _build_world_snapshot()
+	if ws == null:
+		return false
+	var result: bool = save_load_service.save_world(ws)
 	if result:
-		print("PLAYABLE SHIP SAVED sequence=%d" % current_objective_sequence)
+		print("PLAYABLE SHIP SAVED location=%s sequence=%d" % [ws.current_location, current_objective_sequence])
 	return result
 
 ## Validation / public seam: the SaveLoadService instance. Returns null
@@ -2655,17 +2653,16 @@ func is_load_available() -> bool:
 		return false
 	return save_load_service.has_save()
 
-## Manual load trigger (F9 / load_run input). Reads the snapshot, resets
-## the slice, and applies the saved state before the next _process tick.
-## Returns true on success.
+## Manual load trigger (F9 / load_run input). Loads the whole world and applies it
+## (home ship + visited-ship registry + active location + in-ship position).
 func request_load() -> bool:
 	if save_load_service == null:
 		return false
-	var snapshot: RunSnapshot = save_load_service.load_current_run()
-	if snapshot == null:
-		push_warning("PlayableGeneratedShip: no compatible save to load")
+	var ws = save_load_service.load_world()
+	if ws == null:
+		push_warning("PlayableGeneratedShip: no compatible world save to load")
 		return false
-	return _apply_run_snapshot(snapshot)
+	return _apply_world_snapshot(ws)
 
 ## Reconstructs the slice through the normal load path, then applies
 ## the saved model summaries. Designed to be called from a fully
@@ -2762,6 +2759,83 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		snapshot.player_position[1],
 		snapshot.player_position[2],
 	])
+	return true
+
+## Builds a full WorldSnapshot from live state. The home-ship slice is the
+## existing RunSnapshot; when the player is aboard a derelict the home slice's
+## player_position is overridden with the position they left home from (the live
+## player position belongs to the derelict and is stored separately). Each
+## retained ShipInstance contributes its own slice; current_location names the
+## active ship.
+func _build_world_snapshot():
+	var ws = WorldSnapshotScript.new()
+	if sargasso_world != null:
+		ws.world_summary = sargasso_world.get_summary()
+	var home_snap = _build_run_snapshot()
+	if home_snap != null:
+		if away_from_start:
+			home_snap.player_position = [_home_player_position.x, _home_player_position.y, _home_player_position.z]
+		ws.home_ship = home_snap.to_dict()
+	ws.visited_ships = {}
+	for mid in visited_ships:
+		ws.visited_ships[String(mid)] = visited_ships[mid].get_summary()
+	ws.current_location = String(current_ship.marker_id) if current_ship != null else ""
+	if player != null and player is Node3D:
+		var p: Vector3 = (player as Node3D).global_position
+		ws.player_position_in_ship = [p.x, p.y, p.z]
+	ws.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
+	ws.godot_version = Engine.get_version_info()["string"]
+	ws.saved_at = Time.get_datetime_string_from_system(true)
+	return ws
+
+## Regenerates a derelict's geometry from its retained blueprint, makes it the
+## active ship (re-applying its persisted systems state is implicit — the
+## ShipInstance already holds it), and re-homes the player at pos_in_ship.
+func _activate_derelict_from_instance(inst, pos_in_ship: Array) -> bool:
+	if inst == null or ship_generator == null:
+		return false
+	var new_root: Node3D = ship_generator.generate(inst.blueprint)
+	if new_root == null:
+		return false
+	_attach_derelict_active(inst, new_root)
+	if player != null and player is Node3D and pos_in_ship.size() >= 3:
+		(player as Node3D).global_position = Vector3(float(pos_in_ship[0]), float(pos_in_ship[1]), float(pos_in_ship[2]))
+	return true
+
+## Applies a WorldSnapshot: rebuilds the home ship first (this resets the runtime
+## and returns to home if currently away), restores the SargassoWorld and the
+## visited-ships registry, then re-activates the saved derelict if the snapshot
+## was taken aboard one. Returns false on any hard failure.
+func _apply_world_snapshot(ws) -> bool:
+	if ws == null:
+		return false
+	# 1. Home ship via the existing single-ship reload path. Reconstruct a
+	#    RunSnapshot object from the embedded dict (version-gated like a disk load).
+	var home_snap = RunSnapshotScript.from_dict(ws.home_ship, SaveLoadServiceScript.CURRENT_SLICE_VERSION, Engine.get_version_info()["string"])
+	if home_snap == null:
+		push_warning("PlayableGeneratedShip: world load rejected — embedded home slice incompatible")
+		return false
+	if not _apply_run_snapshot(home_snap):
+		return false
+	# 2. World model. _apply_run_snapshot reset us to the home ship; home_ship is
+	#    re-wrapped by _on_ship_loaded during that reload.
+	if sargasso_world != null and not ws.world_summary.is_empty():
+		sargasso_world.apply_summary(ws.world_summary)
+	# 3. Rebuild the retained-derelict registry from the slices.
+	visited_ships.clear()
+	for mid in ws.visited_ships:
+		var inst = ShipInstanceScript.create("", "", ShipBlueprintScript.new(), null, null)
+		if inst.apply_summary(ws.visited_ships[mid]):
+			visited_ships[String(mid)] = inst
+	# 4. If saved aboard a derelict, re-activate it.
+	if String(ws.current_location) != "":
+		var active = visited_ships.get(String(ws.current_location), null)
+		if active == null:
+			push_warning("PlayableGeneratedShip: world load — current_location '%s' missing from visited_ships" % String(ws.current_location))
+			return true  # home is already correctly restored; treat as on-home
+		if not _activate_derelict_from_instance(active, ws.player_position_in_ship):
+			push_warning("PlayableGeneratedShip: world load — failed to re-activate derelict '%s'" % String(ws.current_location))
+			return true
 	return true
 
 ## Tear down every runtime child so a fresh load can rebuild the slice
