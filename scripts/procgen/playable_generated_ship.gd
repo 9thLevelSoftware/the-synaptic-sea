@@ -2979,6 +2979,14 @@ func _reset_runtime_for_reload() -> void:
 		_reattach_starting_gameplay_roots()
 		away_from_start = false
 		current_ship = null  # allow _on_ship_loaded to re-wrap the starting ship
+		# Sub-project #2 (I1): free the prior derelict's objective interactables on
+		# reload. _build_derelict_objectives (the only other caller of
+		# _clear_derelict_objectives) does not run on a reload-into-home path
+		# (_apply_world_snapshot skips re-activation when current_location == ""),
+		# so without this the Area3D interactables stay orphaned under
+		# derelict_objective_root, overlaying the home ship. Harmless on the
+		# reload-into-derelict path (_build_derelict_objectives re-clears anyway).
+		_clear_derelict_objectives()
 	# Player first so the camera unfollows before the rig is freed.
 	if player != null and is_instance_valid(player):
 		player.queue_free()
