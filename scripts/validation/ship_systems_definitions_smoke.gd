@@ -11,6 +11,15 @@ const EXPECTED := {
 	"scanners": ["power", "navigation"],
 }
 
+const EXPECTED_SUBCOMPONENTS := {
+	"power": ["reactor_core", "power_distribution", "battery_cells"],
+	"life_support": ["air_recycler", "co2_scrubber", "oxygen_tanks"],
+	"gravity": ["gravity_plating", "field_emitter", "inertial_dampeners"],
+	"navigation": ["star_charts", "nav_computer", "sensor_array"],
+	"propulsion": ["thruster_array", "fuel_injection", "nav_linkage"],
+	"scanners": ["scanner_dish", "signal_processor", "power_coupling"],
+}
+
 func _initialize() -> void:
 	var text: String = FileAccess.get_file_as_string(DEFINITIONS_PATH)
 	var parsed: Variant = JSON.parse_string(text)
@@ -63,11 +72,29 @@ func _initialize() -> void:
 				quit(1)
 				return
 			var sub: Dictionary = sub_variant
-			for key in ["subcomponent_id", "required_parts", "required_tools", "min_skill", "repair_seconds"]:
+			for key in ["subcomponent_id", "required_parts", "required_tools", "min_skill", "repair_seconds", "operational_threshold"]:
 				if not sub.has(key):
 					push_error("SHIP SYSTEMS DEFINITIONS FAIL %s subcomponent missing key '%s'" % [sid, key])
 					quit(1)
 					return
+			# Verify subcomponent_id matches the expected set for this system
+			var sub_id: String = str(sub.get("subcomponent_id", ""))
+			var expected_subs: Array = EXPECTED_SUBCOMPONENTS[sid]
+			if sub_id not in expected_subs:
+				push_error("SHIP SYSTEMS DEFINITIONS FAIL %s unexpected subcomponent_id '%s'" % [sid, sub_id])
+				quit(1)
+				return
+		# Check that all expected subcomponent IDs are present for this system
+		var found_sub_ids: Array[String] = []
+		for sub_variant in subs:
+			var sub: Dictionary = sub_variant
+			found_sub_ids.append(str(sub.get("subcomponent_id", "")))
+		var expected_subs: Array = EXPECTED_SUBCOMPONENTS[sid]
+		for exp_id in expected_subs:
+			if exp_id not in found_sub_ids:
+				push_error("SHIP SYSTEMS DEFINITIONS FAIL %s missing expected subcomponent '%s'" % [sid, exp_id])
+				quit(1)
+				return
 
 	for expected_id in EXPECTED.keys():
 		if expected_id not in seen_ids:
