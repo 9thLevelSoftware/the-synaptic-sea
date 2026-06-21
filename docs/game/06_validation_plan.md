@@ -28,8 +28,11 @@ Expected markers:
 
 ```bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
-GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
+# Honor GODOT/ROOT environment overrides (quoted to tolerate spaces in the
+# path, e.g. the Windows checkout "The Synaptic Sea"); fall back to the
+# original author's macOS paths when unset.
+ROOT="${ROOT:-/Users/christopherwilloughby/the-sargasso-of-stars}"
+GODOT="${GODOT:-/Users/christopherwilloughby/.local/bin/godot-4.6.2}"
 # Known baseline Godot shutdown lines that appear identically in every
 # unchanged smoke (route-control, completion, input, readability, oxygen,
 # hazard, ship-systems) and are NOT introduced by the Sargasso hazard code
@@ -46,6 +49,10 @@ REQ012_WARNING="^WARNING: SaveLoadService: save file rejected by from_dict \\(mi
 # rejection path. It is the expected signal, not a failure (mirrors the
 # REQ-012 save/load rejection WARNING above).
 BLUEPRINT_NULL_ERROR="^ERROR: PlayableGeneratedShip\\.load_from_blueprint: blueprint must not be null\$"
+# REQ-012 fix: travel_integration_smoke calls request_save() while aboard a
+# traveled derelict to verify the away-save block. The block emits this
+# push_warning as its expected signal; it is not a failure.
+REQ012_AWAY_SAVE_WARNING="^WARNING: PlayableGeneratedShip: save blocked — cannot save while aboard a traveled derelict \\(away_from_start=true\\); return to the starting ship first\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -54,7 +61,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$BLUEPRINT_NULL_ERROR" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$BLUEPRINT_NULL_ERROR|$REQ012_AWAY_SAVE_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -119,7 +126,10 @@ run_clean 'marker generator smoke' 'MARKER GENERATOR PASS deterministic=true per
 run_clean 'sargasso world smoke' 'SARGASSO WORLD PASS in_range_sorted=true generated=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sargasso_world_smoke.gd
 run_clean 'scanner state smoke' 'SCANNER STATE PASS nav_off_empty=true scanners_off_detail1=true full_detail=6 round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_state_smoke.gd
 run_clean 'travel controller smoke' 'TRAVEL CONTROLLER PASS propulsion_gate=true range_gate=true generated_node=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_controller_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=58 clean_output=true'
+run_clean 'ship instance smoke' 'SHIP INSTANCE PASS round_trip=true stubs_present=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_instance_smoke.gd
+run_clean 'travel integration smoke' 'TRAVEL INTEGRATION PASS start_wrapped=true scan_gated=true propulsion_gate=true swapped=true progression_persists=true world_recorded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_integration_smoke.gd
+run_clean 'scanner panel smoke' 'SCANNER PANEL PASS populated=true selection_moves=true travel_invoked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_panel_smoke.gd
+echo 'SARGASSO REGRESSION PASS commands=61 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
@@ -152,6 +162,18 @@ incompatible `slice_version` and asserts the service rejects it via
   Filtered by the strict ERROR/WARNING check above; any other
   `SaveLoadService:` warning (a real parse error, missing file on a
   fresh load, etc.) still fails the bundle.
+
+The REQ-012 reload-while-away fix adds one additional expected `WARNING:` line
+emitted by the travel integration smoke when it calls `request_save()` while
+aboard a traveled derelict to verify the away-save block:
+
+- `WARNING: PlayableGeneratedShip: save blocked — cannot save while aboard a traveled derelict (away_from_start=true); return to the starting ship first`
+  — emitted by `scripts/procgen/playable_generated_ship.gd` `request_save()`
+  when `away_from_start` is true. The `travel_integration_smoke` deliberately
+  calls `request_save()` in the away state to verify the guard rejects the
+  request; the WARNING is the expected signal, not a failure. Filtered by
+  `$REQ012_AWAY_SAVE_WARNING`; any other `PlayableGeneratedShip: save blocked`
+  warning still fails the bundle.
 
 The Phase 1 `load_from_blueprint_smoke` adds one additional expected
 `ERROR:` line that is part of its null-guard contract test:

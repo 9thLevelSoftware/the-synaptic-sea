@@ -7,6 +7,7 @@ const PlayerControllerScript := preload("res://scripts/player/player_controller.
 const IsoCameraRigScript := preload("res://scripts/camera/iso_camera_rig.gd")
 const InteractableScript := preload("res://scripts/interaction/interactable.gd")
 const ObjectiveTrackerScript := preload("res://scripts/ui/objective_tracker.gd")
+const ScannerPanelScript := preload("res://scripts/ui/scanner_panel.gd")
 const AccessibilitySettingsScript := preload("res://scripts/ui/accessibility_settings.gd")
 const ReadabilityPropFactoryScript := preload("res://scripts/procgen/readability_prop_factory.gd")
 const RouteControlStateScript := preload("res://scripts/systems/route_control_state.gd")
@@ -22,6 +23,10 @@ const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_ma
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const PlayerProgressionScript := preload("res://scripts/systems/player_progression_state.gd")
 const ClassDefinitionScript := preload("res://scripts/systems/class_definition.gd")
+const ShipInstanceScript := preload("res://scripts/systems/ship_instance.gd")
+const SargassoWorldScript := preload("res://scripts/systems/sargasso_world.gd")
+const ScannerStateScript := preload("res://scripts/systems/scanner_state.gd")
+const TravelControllerScript := preload("res://scripts/systems/travel_controller.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -81,6 +86,7 @@ var loader
 var player
 var camera_rig
 var hud_layer: CanvasLayer
+var scanner_panel   # ScannerPanel
 var tracker
 var interaction_root: Node3D
 var affordance_root: Node3D
@@ -102,6 +108,15 @@ var playable_started: bool = false
 var last_failure_reason: String = ""
 var ship_systems_manager   # ShipSystemsManager (untyped: class_name globals unreliable under --headless --script)
 var player_progression   # PlayerProgressionState (untyped: class_name unreliable headless)
+var current_ship           # ShipInstance (untyped: class_name globals unreliable headless)
+var sargasso_world         # SargassoWorld
+var scanner_state          # ScannerState
+var travel_controller      # TravelController
+var ship_generator         # ShipGenerator (injected into travel)
+# True while the player is aboard a traveled derelict (not the starting ship).
+# Gates the starting-ship hazard/objective _process so the unoccupied starting
+# ship does not keep simulating in the background.
+var away_from_start: bool = false
 const REPAIR_OBJECTIVE_XP: int = 50
 # Narrative objective flags with no manager backing (supplies/logs). Set on
 # completion; persisted in the snapshot; read by _manager_compat_summary().
@@ -210,6 +225,7 @@ func ensure_default_input_actions() -> void:
 	# REQ-012: manual save/load input actions. F5 saves, F9 loads.
 	_ensure_key_action_set("save_run", DEFAULT_SAVE_RUN_BINDINGS)
 	_ensure_key_action_set("load_run", DEFAULT_LOAD_RUN_BINDINGS)
+	_ensure_key_action_set("toggle_scanner", [KEY_TAB])
 
 ## A11Y-P1-001: swap in a new accessibility settings object and re-apply
 ## its scale to the HUD tracker and all existing world Label3D nodes.
@@ -870,6 +886,15 @@ func _build_runtime_nodes() -> void:
 	# REQ-012: current-run save/load service. Single slot at
 	# user://saves/current_run.json; deleted on playable_slice_completed.
 	save_load_service = SaveLoadServiceScript.new()
+	# Phase 4.5: Sargasso map + scanner + travel. Seed the world from the
+	# starting blueprint's seed so the marker field is deterministic per run.
+	# Player starts at Sargasso map origin (abstract X-Z map space — NOT the
+	# physical scene origin where ship geometry is instantiated).
+	var start_bp = _load_blueprint_for_systems()
+	sargasso_world = SargassoWorldScript.new(start_bp.seed_value, Vector3.ZERO)
+	scanner_state = ScannerStateScript.new()
+	travel_controller = TravelControllerScript.new()
+	ship_generator = ShipGeneratorScript.new()
 
 ## Configures the progression model from starting_class_id (defaults to engineer
 ## when the id is unknown). Idempotent: re-callable on reload.
@@ -904,6 +929,113 @@ func get_ship_systems_manager():
 ## Validation seam: the live PlayerProgressionState (null before _build_runtime_nodes()).
 func get_player_progression():
 	return player_progression
+
+## Phase 4.5 validation seam: the current ShipInstance (null before the first
+## ship loads).
+func get_current_ship():
+	return current_ship
+
+## Phase 4.5 validation seam: the SargassoWorld map model.
+func get_sargasso_world():
+	return sargasso_world
+
+## Operational status feeding scan/travel. On the STARTING ship this reflects the
+## real systems, so repairing propulsion/navigation/scanners enables travel — the
+## core loop. On a boarded DERELICT we report FULL capability: Phase 4.5 ships no
+## derelict repair/objective flow, so condition-gating would softlock the player
+## with no way to leave or repair. Condition-based stranding activates once the
+## derelict repair loop exists (see ADR-0011).
+func _current_systems_ops() -> Dictionary:
+	if away_from_start:
+		return {"navigation": true, "scanners": true, "propulsion": true}
+	var mgr = current_ship.systems_manager if current_ship != null else null
+	return {
+		"navigation": mgr != null and mgr.is_operational("navigation"),
+		"scanners": mgr != null and mgr.is_operational("scanners"),
+		"propulsion": mgr != null and mgr.is_operational("propulsion"),
+	}
+
+## Resolves the visible markers at the gated detail level, deriving operational
+## status from the CURRENT ship's systems and scanner skill from progression.
+func scan() -> Dictionary:
+	if current_ship == null or sargasso_world == null or scanner_state == null:
+		return {"detail_level": 0, "markers": []}
+	var ops: Dictionary = _current_systems_ops()
+	var skill: int = 0
+	if player_progression != null and player_progression.has_method("get_skill_level"):
+		skill = int(player_progression.get_skill_level("scanner_operation"))
+	return scanner_state.scan(sargasso_world, ops, skill)
+
+## Resolves a marker by id from the in-range set and travels to it. Returns
+## {success:false, reason:"unknown_marker"} if the id is not currently in range.
+func travel_to_marker_id(marker_id: String) -> Dictionary:
+	if sargasso_world == null or scanner_state == null:
+		return {"success": false, "reason": "not_ready", "ship": null}
+	for m in sargasso_world.markers_in_range(scanner_state.range_radius):
+		if String(m.marker_id) == marker_id:
+			return travel_to(m)
+	return {"success": false, "reason": "unknown_marker", "ship": null}
+
+## The starting ship's per-slice gameplay roots (siblings of the loader). They
+## sit at the coordinator's local origin, so while the player is aboard a
+## traveled derelict (also at origin) they must be detached from the tree —
+## otherwise their collision volumes / interactables overlay the boarded ship.
+func _starting_gameplay_roots() -> Array:
+	return [interaction_root, affordance_root, route_control_root, oxygen_root, tool_pickup_root, fire_root, arc_root]
+
+func _detach_starting_gameplay_roots() -> void:
+	for r in _starting_gameplay_roots():
+		if r != null and is_instance_valid(r) and r.get_parent() == self:
+			remove_child(r)
+
+func _reattach_starting_gameplay_roots() -> void:
+	for r in _starting_gameplay_roots():
+		if r != null and is_instance_valid(r) and r.get_parent() == null:
+			add_child(r)
+
+## Validates + executes a jump to a marker, swapping current_ship and re-homing
+## the player on success. Travel is gated by the CURRENT ship's propulsion.
+func travel_to(marker) -> Dictionary:
+	if current_ship == null or sargasso_world == null or travel_controller == null or ship_generator == null:
+		return {"success": false, "reason": "not_ready", "ship": null}
+	var ops_t: Dictionary = {"propulsion": bool(_current_systems_ops().get("propulsion", false))}
+	var result: Dictionary = travel_controller.attempt_travel(
+		marker, ops_t, sargasso_world, ship_generator, scanner_state.range_radius)
+	if not bool(result.get("success", false)):
+		return result
+	var new_root: Node3D = result.get("ship", null)
+	if new_root == null:
+		return {"success": false, "reason": "generation_failed", "ship": null}
+
+	# Detach/free the ship we are leaving. The starting ship is detached-not-freed
+	# (retains its persistent sim, frozen by removal from the tree); a traveled
+	# derelict is freed (stateless — regenerated from seed if revisited).
+	var leaving = current_ship
+	if leaving.scene_root != null and is_instance_valid(leaving.scene_root):
+		remove_child(leaving.scene_root)
+		if String(leaving.marker_id) != "":
+			leaving.scene_root.queue_free()
+	# When leaving the STARTING ship, detach its gameplay roots too (see
+	# _detach_starting_gameplay_roots) so their collision/interaction volumes do
+	# not overlay the boarded derelict at the shared local origin.
+	if String(leaving.marker_id) == "":
+		_detach_starting_gameplay_roots()
+
+	# Build a per-ship systems manager for the new derelict, seeded by its
+	# condition so a wrecked ship boards with mostly-offline systems.
+	var new_bp = ShipBlueprintScript.new(int(marker.size_class), int(marker.condition), int(marker.seed_value))
+	var new_mgr = ShipSystemsManagerScript.new()
+	new_mgr.configure(new_mgr.load_definitions(), new_bp.condition, new_bp.seed_value)
+
+	add_child(new_root)
+	current_ship = ShipInstanceScript.create("ship_%s" % String(marker.marker_id), String(marker.marker_id), new_bp, new_mgr, new_root)
+	away_from_start = String(marker.marker_id) != ""
+
+	# Re-home the existing player + camera into the new ship's spawn. The player
+	# node, camera, HUD, progression and inventory are NEVER freed (player-owned).
+	if player != null and new_root.has_method("get_start_transform"):
+		player.teleport_to(new_root.get_start_transform().origin + Vector3(0.0, PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR, 0.0))
+	return result
 
 ## Validation seam: true if any combined status line contains `token`.
 func get_combined_system_status_lines_contains(token: String) -> bool:
@@ -941,6 +1073,20 @@ func _build_hud_layer() -> void:
 	if tracker.has_method("apply_accessibility_settings"):
 		tracker.apply_accessibility_settings(accessibility_settings)
 	hud_layer.add_child(tracker)
+	scanner_panel = ScannerPanelScript.new()
+	scanner_panel.name = "ScannerPanel"
+	scanner_panel.visible = false
+	hud_layer.add_child(scanner_panel)
+	scanner_panel.bind(self)
+	# Restore player control on every panel close path via the signal, not just
+	# the two close paths wired into _input.
+	scanner_panel.panel_closed.connect(_on_scanner_panel_closed)
+
+func _on_scanner_panel_closed() -> void:
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process_input(true)
+		player.set_process_unhandled_input(true)
 
 func _on_ship_loaded(summary: Dictionary) -> void:
 	if playable_started:
@@ -955,6 +1101,11 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_build_hud_layer()
 	_spawn_player()
 	_spawn_camera()
+	# Phase 4.5: wrap the freshly-loaded starting ship as current_ship. Reuses
+	# the coordinator's existing ship_systems_manager (Approach A: the starting
+	# slice's systems are untouched). marker_id "" marks it as the home ship.
+	if current_ship == null:
+		current_ship = ShipInstanceScript.create("ship_start", "", _load_blueprint_for_systems(), ship_systems_manager, loader)
 	_build_interactables()
 	_build_slice_affordance_labels()
 	_build_route_control_gates()
@@ -1067,6 +1218,12 @@ func _add_interactable_to_sequence(sequence: int, interactable: Node) -> void:
 	sequence_interactables[sequence].append(interactable)
 
 func _on_player_interact_requested(player_body: PlayerController) -> void:
+	# Phase 4.5: while aboard a traveled derelict the starting ship's retained
+	# interactables/pickups are detached but still referenced here; gate them so
+	# a derelict cannot complete stale starting-ship objectives. Derelicts have
+	# no interactables of their own yet, so there is nothing to interact with.
+	if away_from_start:
+		return
 	# REQ-007: tool pickup is an interaction like any other. Try it first
 	# (before objective interactables) so the player can pick up the pump
 	# when standing in front of it.
@@ -1357,6 +1514,8 @@ func get_route_gate_collision_enabled_count() -> int:
 # and is intentionally a no-op before ship load completes.
 
 func _process(delta: float) -> void:
+	if away_from_start:
+		return
 	if not playable_started or slice_complete:
 		return
 	if oxygen_state == null:
@@ -2404,6 +2563,14 @@ func _auto_save_current_run() -> bool:
 func request_save() -> bool:
 	if not playable_started or slice_complete:
 		return false
+	# REQ-012 fix: block save while on a traveled derelict. The single-ship-slice
+	# snapshot format only captures starting-ship state; an away-state save would
+	# silently omit the derelict context and produce an unrestorable snapshot. The
+	# meta-world / multi-ship save (needed for mid-derelict persistence) does not
+	# exist yet. A push_warning surfaces the block without crashing.
+	if away_from_start:
+		push_warning("PlayableGeneratedShip: save blocked — cannot save while aboard a traveled derelict (away_from_start=true); return to the starting ship first")
+		return false
 	if save_load_service == null:
 		return false
 	var result: bool = _auto_save_current_run()
@@ -2541,6 +2708,41 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 ## cleanly. Mirrors the setup done by _build_runtime_nodes() and the
 ## various _build_*_zone helpers, but in reverse.
 func _reset_runtime_for_reload() -> void:
+	# REQ-012 fix: if the player is aboard a traveled derelict when a reload is
+	# triggered, we must return to the starting ship BEFORE rebuilding the slice.
+	# Without this block:
+	#   - away_from_start stays true → _process returns forever (sim wedged)
+	#   - current_ship still points at the stale derelict → _on_ship_loaded's
+	#     `if current_ship == null` guard is false → the reloaded starting ship
+	#     is never wrapped as current_ship
+	#   - the derelict root remains a child of this coordinator → leaked scene
+	#   - loader is still off-tree → load_from_paths rebuilds into an off-tree
+	#     loader, and the reloaded slice is never in the scene
+	# Fix: free the stateless derelict root, re-attach the detached start loader
+	# (so the subsequent load_from_paths builds in-tree), clear away_from_start,
+	# and null current_ship so _on_ship_loaded re-wraps the freshly-reloaded
+	# starting ship.
+	if away_from_start:
+		if current_ship != null and String(current_ship.marker_id) != "":
+			var derelict_root = current_ship.scene_root
+			if derelict_root != null and is_instance_valid(derelict_root):
+				if derelict_root.get_parent() == self:
+					remove_child(derelict_root)
+				# queue_free is the safe choice for a Node3D tree that may own
+				# physics bodies / navigation agents: it defers destruction to the
+				# end of the current frame so the engine can cleanly unregister
+				# those resources. The smoke asserts detachment (get_parent() !=
+				# playable), not immediate invalidation, so this is correct.
+				derelict_root.queue_free()
+		# The start loader was detached by travel_to (remove_child) but kept alive.
+		# Re-attach it so the subsequent load_from_paths() rebuilds the starting
+		# ship in-tree and _on_ship_loaded fires with the coordinator as parent.
+		var loader_node: Node = loader as Node
+		if loader_node != null and is_instance_valid(loader_node) and loader_node.get_parent() == null:
+			add_child(loader_node)
+		_reattach_starting_gameplay_roots()
+		away_from_start = false
+		current_ship = null  # allow _on_ship_loaded to re-wrap the starting ship
 	# Player first so the camera unfollows before the rig is freed.
 	if player != null and is_instance_valid(player):
 		player.queue_free()
@@ -2586,6 +2788,7 @@ func _reset_runtime_for_reload() -> void:
 	# helper's idempotent guard would re-free the same node twice.
 	hud_layer = null
 	tracker = null
+	scanner_panel = null
 	interactables.clear()
 	sequence_interactables.clear()
 	affordance_labels.clear()
@@ -2650,6 +2853,30 @@ func _reset_runtime_for_reload() -> void:
 func _input(event: InputEvent) -> void:
 	if not playable_started or slice_complete:
 		return
+	# Phase 4.5: scanner panel toggle + navigation. Opening the panel freezes
+	# player movement/interaction so the shared arrow/Enter keys drive the panel.
+	# Control is restored on close by the panel_closed signal handler, which
+	# covers every close path — not just toggle-close / confirm-success.
+	if scanner_panel != null:
+		if event.is_action_pressed("toggle_scanner"):
+			scanner_panel.toggle()
+			if player != null and scanner_panel.is_open():
+				player.set_physics_process(false)
+				player.set_process_input(false)
+				player.set_process_unhandled_input(false)
+			get_viewport().set_input_as_handled()
+			return
+		if scanner_panel.is_open():
+			if event.is_action_pressed("ui_down"):
+				scanner_panel.move_selection(1)
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_up"):
+				scanner_panel.move_selection(-1)
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_accept"):
+				scanner_panel.confirm_selection()
+				get_viewport().set_input_as_handled()
+			return  # swallow other input while the scanner is open
 	if save_load_service == null:
 		return
 	if event.is_action_pressed("save_run"):
