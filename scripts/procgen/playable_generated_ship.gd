@@ -2320,6 +2320,12 @@ func _build_run_snapshot() -> RunSnapshot:
 	if ship_systems_manager != null:
 		snapshot.ship_systems_summary = ship_systems_manager.get_summary()
 		snapshot.ship_systems_summary["completed_objective_types"] = completed_objective_types.keys()
+		# Merge compat keys into the snapshot so save/load smokes that check
+		# flag-shaped fields (emergency_supplies_recovered, etc.) still pass
+		# after ShipSystemState was retired (ADR-0009).
+		var _compat: Dictionary = _manager_compat_summary()
+		for _k in _compat:
+			snapshot.ship_systems_summary[_k] = _compat[_k]
 	if route_control_state != null:
 		snapshot.route_control_summary = get_route_control_summary()
 	if oxygen_state != null:
