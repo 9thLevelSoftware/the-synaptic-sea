@@ -16,8 +16,9 @@ func _initialize() -> void:
 	# Direct service smoke (REQ-012).
 	# Builds a RunSnapshot from a freshly configured set of Gate 2 models,
 	# writes it via SaveLoadService, reads it back, and asserts all
-	# summary fields round-trip cleanly with the canonical 6 summary
-	# entries. The marker line below is the spec contract.
+	# summary fields round-trip cleanly with the canonical 8 summary
+	# entries (RunSnapshot.SUMMARY_FIELDS). The marker line below is the
+	# spec contract.
 
 	var service := SaveLoadServiceScript.new()
 	service.delete_current_run()
