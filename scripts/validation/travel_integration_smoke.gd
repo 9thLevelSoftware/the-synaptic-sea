@@ -267,23 +267,62 @@ func _fail(reason: String) -> void:
 	push_error("TRAVEL INTEGRATION FAIL reason=%s" % reason)
 	_teardown_and_quit(1)
 
-## Frees the whole scene tree — main_node (which covers the traveled ship, since
-## it is parented under the coordinator) and the orphaned starting-ship root that
-## travel_to() detached-but-did-not-free. Uses immediate free() + a one-idle-frame
-## defer of quit() so the engine flushes the frees before exit; a deferred
-## queue_free() can fail to run before quit(), leaving the resources leaked at
-## exit and dirtying the clean-output bundle.
+## Frees the whole scene tree. main_node covers any in-tree ship roots; but the
+## world-load path (request_load in step 11) re-activates a derelict and leaves
+## the STARTING ship's gameplay roots (interaction/affordance/route/oxygen/tool/
+## fire/arc) AND the original home hull detached-not-freed. Those detached roots
+## are referenced only by the coordinator's fields, so main_node.free() does not
+## reach them — they would leak their physics/renderer RID trees at exit (~58
+## leaked-RID lines). Free each detached root explicitly here. Uses immediate
+## free() + a one-idle-frame defer of quit() so the engine flushes the frees
+## before exit; a deferred queue_free() can fail to run before quit().
 func _teardown_and_quit(code: int) -> void:
 	_exit_code = code
 	if orphaned_start_root != null and is_instance_valid(orphaned_start_root):
+		if orphaned_start_root.get_parent() != null:
+			orphaned_start_root.get_parent().remove_child(orphaned_start_root)
 		orphaned_start_root.free()
 		orphaned_start_root = null
+	var playable: PlayableGeneratedShip = _find_playable(main_node)
+	if playable != null:
+		# Detached starting-ship gameplay roots (left off-tree by the away-state
+		# travel that the world-load did not return home from). Each owns physics
+		# bodies / Area3Ds / mesh instances whose RIDs leak unless freed.
+		for root in [
+			playable.interaction_root,
+			playable.affordance_root,
+			playable.route_control_root,
+			playable.oxygen_root,
+			playable.tool_pickup_root,
+			playable.fire_root,
+			playable.arc_root,
+		]:
+			_free_detached_node(root)
+		# The original home hull (and any retained-derelict hulls) left detached.
+		_free_detached_ship_root(playable.home_ship)
+		for mid in playable.visited_ships:
+			_free_detached_ship_root(playable.visited_ships[mid])
 	if main_node != null and is_instance_valid(main_node):
 		main_node.free()
 		main_node = null
 	# Defer quit one idle frame so the freed nodes' resources are released before
 	# the engine shuts down.
 	call_deferred("_do_quit")
+
+## Frees a node only if it is valid and detached (parent == null), so in-tree
+## nodes owned by main_node are not double-freed.
+func _free_detached_node(node) -> void:
+	if node != null and is_instance_valid(node) and node.get_parent() == null:
+		node.free()
+
+## Frees a ShipInstance's scene_root only if it is detached, then nulls the field.
+func _free_detached_ship_root(inst) -> void:
+	if inst == null:
+		return
+	var root = inst.scene_root
+	if root != null and is_instance_valid(root) and root.get_parent() == null:
+		root.free()
+		inst.scene_root = null
 
 func _do_quit() -> void:
 	quit(_exit_code)

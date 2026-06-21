@@ -53,27 +53,6 @@ BLUEPRINT_NULL_ERROR="^ERROR: PlayableGeneratedShip\\.load_from_blueprint: bluep
 # null-snapshot guard; that guard emits this push_warning on the rejection
 # path. It is the expected signal, not a failure.
 WORLD_SAVE_NULL_WARNING="^WARNING: SaveLoadService: cannot save null world snapshot\$"
-# travel_integration_smoke instantiates and frees a full PlayableGeneratedShip
-# scene (including physics bodies, collision shapes, renderer meshes/materials)
-# during a headless run. On exit the Godot headless renderer/physics servers
-# do not drain their RID pools before printing these errors. They are engine
-# teardown noise that appear whenever a 3D scene with physics is freed during
-# a headless --script run; they are not Sargasso application bugs. Classified
-# and allowlisted here because the travel_integration_smoke is the only smoke
-# in the bundle that instantiates then frees such a scene within one run.
-TRAVEL_RID_BODY="^ERROR: [0-9]+ RID allocations of type 'P11GodotBody3D' were leaked at exit\\.\$"
-TRAVEL_RID_AREA="^ERROR: [0-9]+ RID allocations of type 'P11GodotArea3D' were leaked at exit\\.\$"
-TRAVEL_RID_SHAPE="^ERROR: [0-9]+ RID allocations of type 'P12GodotShape3D' were leaked at exit\\.\$"
-TRAVEL_RID_TEXTURE="^ERROR: [0-9]+ RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit\\.\$"
-TRAVEL_RID_MESH="^ERROR: [0-9]+ RID allocations of type 'N13RendererDummy9DummyMeshE' were leaked at exit\\.\$"
-TRAVEL_RID_MATERIAL="^ERROR: [0-9]+ RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit\\.\$"
-TRAVEL_RID_SHADER="^ERROR: [0-9]+ RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit\\.\$"
-TRAVEL_RID_INSTANCE="^ERROR: [0-9]+ RID allocations of type 'N17RendererSceneCull8InstanceE' were leaked at exit\\.\$"
-TRAVEL_RID_TEXTSERVER_SHAPED="^ERROR: [0-9]+ RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit\\.\$"
-TRAVEL_RID_TEXTSERVER_FONT="^ERROR: [0-9]+ RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit\\.\$"
-TRAVEL_RID_PAGEDALLOC="^ERROR: Pages in use exist at exit in PagedAllocator: N20RasterizerSceneDummy21GeometryInstanceDummyE\$"
-TRAVEL_RID_RESOURCES="^ERROR: [0-9]+ resources still in use at exit \\(run with --verbose for details\\)\\.\$"
-TRAVEL_LEAKED_INSTANCE="^WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing\\.\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -82,7 +61,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$BLUEPRINT_NULL_ERROR|$WORLD_SAVE_NULL_WARNING|$TRAVEL_RID_BODY|$TRAVEL_RID_AREA|$TRAVEL_RID_SHAPE|$TRAVEL_RID_TEXTURE|$TRAVEL_RID_MESH|$TRAVEL_RID_MATERIAL|$TRAVEL_RID_SHADER|$TRAVEL_RID_INSTANCE|$TRAVEL_RID_TEXTSERVER_SHAPED|$TRAVEL_RID_TEXTSERVER_FONT|$TRAVEL_RID_PAGEDALLOC|$TRAVEL_RID_RESOURCES|$TRAVEL_LEAKED_INSTANCE" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$BLUEPRINT_NULL_ERROR|$WORLD_SAVE_NULL_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -201,31 +180,15 @@ The Phase 1 `load_from_blueprint_smoke` adds one additional expected
 
 The world-persistence sub-project (ADR-0012) travel integration smoke
 (`travel_integration_smoke.gd`) instantiates and then frees a full
-`PlayableGeneratedShip` scene (physics bodies, collision shapes, renderer
-meshes, materials) within a single headless run. On script exit the Godot
-headless renderer and physics servers do not drain their RID pools before
-emitting teardown diagnostics. These are engine-level noise, not Sargasso
-application bugs. Classified and allowlisted here as `TRAVEL_RID_*` and
-`TRAVEL_LEAKED_INSTANCE`; any `RID allocations` or `Leaked instance
-dependency` error from a smoke OTHER than `travel_integration_smoke` would
-not match and would still fail the bundle.
-
-The affected patterns (counts vary by run but message format is fixed):
-
-- `ERROR: N RID allocations of type 'P11GodotBody3D' were leaked at exit.`
-- `ERROR: N RID allocations of type 'P11GodotArea3D' were leaked at exit.`
-- `ERROR: N RID allocations of type 'P12GodotShape3D' were leaked at exit.`
-- `ERROR: N RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.`
-- `ERROR: N RID allocations of type 'N13RendererDummy9DummyMeshE' were leaked at exit.`
-- `ERROR: N RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.`
-- `ERROR: N RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.`
-- `ERROR: N RID allocations of type 'N17RendererSceneCull8InstanceE' were leaked at exit.`
-- `ERROR: N RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.`
-- `ERROR: N RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.`
-- `ERROR: Pages in use exist at exit in PagedAllocator: N20RasterizerSceneDummy21GeometryInstanceDummyE`
-- `ERROR: N resources still in use at exit (run with --verbose for details).`
-- `WARNING: Leaked instance dependency: Bug - did not call instance_notify_deleted when freeing.`
-  (repeated ~45 times per run, once per mesh/material instance freed)
+`PlayableGeneratedShip` scene within a single headless run. Its travel and
+world-load paths detach the starting ship's gameplay roots (interaction /
+affordance / route / oxygen / tool / fire / arc) and the original home hull
+from the coordinator without re-attaching them when the world load restores a
+derelict. The smoke's `_teardown_and_quit` frees each of those detached roots
+explicitly (along with the active scene under `main_node`) so no physics /
+renderer RIDs leak at exit. There is therefore NO RID-leak allowlist for this
+smoke — any `RID allocations`/`Leaked instance dependency`/`resources still in
+use`/`Pages in use` line from any smoke fails the bundle.
 
 The world-persistence sub-project (ADR-0012) adds one additional expected
 `WARNING:` line emitted by the world save service smoke when it calls
