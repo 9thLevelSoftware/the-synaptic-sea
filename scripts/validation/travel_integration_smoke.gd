@@ -133,6 +133,15 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		_fail("new ship root not parented under the coordinator")
 		return
 
+	# FIX 1 coverage: after travel, starting-ship gameplay roots must be detached
+	# so their collision/interaction volumes do not overlay the boarded derelict.
+	if playable.oxygen_root != null and playable.oxygen_root.get_parent() == playable:
+		_fail("FIX1: oxygen_root still attached under coordinator after travel (collision volumes overlap derelict)")
+		return
+	if playable.interaction_root != null and playable.interaction_root.get_parent() == playable:
+		_fail("FIX1: interaction_root still attached under coordinator after travel (interactables overlay derelict)")
+		return
+
 	# 7. World recorded the generated marker and advanced player position.
 	if not world.is_generated(target_id):
 		_fail("world did not record generated marker")
@@ -180,6 +189,15 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		_fail("away_from_start still true after reload-while-away")
 		return
 
+	# FIX 1 coverage: after reload-while-away returns to start, gameplay roots
+	# must be re-attached so the starting-ship sim rebuilds its children in-tree.
+	if playable.oxygen_root != null and playable.oxygen_root.get_parent() != playable:
+		_fail("FIX1: oxygen_root not re-attached under coordinator after reload-while-away")
+		return
+	if playable.interaction_root != null and playable.interaction_root.get_parent() != playable:
+		_fail("FIX1: interaction_root not re-attached under coordinator after reload-while-away")
+		return
+
 	var reloaded_ship = playable.get_current_ship()
 	if reloaded_ship == null:
 		_fail("current_ship is null after reload-while-away")
@@ -191,9 +209,11 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		_fail("player invalid after reload-while-away")
 		return
 
-	# 13. Derelict root was freed (stateless — freed by _reset_runtime_for_reload).
-	if is_instance_valid(derelict_root_before_reload):
-		_fail("derelict scene_root still valid after reload-while-away (should be freed)")
+	# 13. Derelict root was detached (queue_free'd — stateless, regenerated from
+	# seed on each visit). queue_free defers destruction to end-of-frame so
+	# is_instance_valid may still be true synchronously; assert detachment instead.
+	if derelict_root_before_reload != null and is_instance_valid(derelict_root_before_reload) and derelict_root_before_reload.get_parent() == playable:
+		_fail("derelict scene_root still parented under coordinator after reload-while-away (should be detached)")
 		return
 
 	finished = true

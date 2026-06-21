@@ -965,6 +965,23 @@ func travel_to_marker_id(marker_id: String) -> Dictionary:
 			return travel_to(m)
 	return {"success": false, "reason": "unknown_marker", "ship": null}
 
+## The starting ship's per-slice gameplay roots (siblings of the loader). They
+## sit at the coordinator's local origin, so while the player is aboard a
+## traveled derelict (also at origin) they must be detached from the tree —
+## otherwise their collision volumes / interactables overlay the boarded ship.
+func _starting_gameplay_roots() -> Array:
+	return [interaction_root, affordance_root, route_control_root, oxygen_root, tool_pickup_root, fire_root, arc_root]
+
+func _detach_starting_gameplay_roots() -> void:
+	for r in _starting_gameplay_roots():
+		if r != null and is_instance_valid(r) and r.get_parent() == self:
+			remove_child(r)
+
+func _reattach_starting_gameplay_roots() -> void:
+	for r in _starting_gameplay_roots():
+		if r != null and is_instance_valid(r) and r.get_parent() == null:
+			add_child(r)
+
 ## Validates + executes a jump to a marker, swapping current_ship and re-homing
 ## the player on success. Travel is gated by the CURRENT ship's propulsion.
 func travel_to(marker) -> Dictionary:
@@ -988,6 +1005,11 @@ func travel_to(marker) -> Dictionary:
 		remove_child(leaving.scene_root)
 		if String(leaving.marker_id) != "":
 			leaving.scene_root.queue_free()
+	# When leaving the STARTING ship, detach its gameplay roots too (see
+	# _detach_starting_gameplay_roots) so their collision/interaction volumes do
+	# not overlay the boarded derelict at the shared local origin.
+	if String(leaving.marker_id) == "":
+		_detach_starting_gameplay_roots()
 
 	# Build a per-ship systems manager for the new derelict, seeded by its
 	# condition so a wrecked ship boards with mostly-offline systems.
@@ -997,7 +1019,7 @@ func travel_to(marker) -> Dictionary:
 
 	add_child(new_root)
 	current_ship = ShipInstanceScript.create("ship_%s" % String(marker.marker_id), String(marker.marker_id), new_bp, new_mgr, new_root)
-	away_from_start = true
+	away_from_start = String(marker.marker_id) != ""
 
 	# Re-home the existing player + camera into the new ship's spawn. The player
 	# node, camera, HUD, progression and inventory are NEVER freed (player-owned).
@@ -1054,6 +1076,7 @@ func _on_scanner_panel_closed() -> void:
 	if player != null:
 		player.set_physics_process(true)
 		player.set_process_input(true)
+		player.set_process_unhandled_input(true)
 
 func _on_ship_loaded(summary: Dictionary) -> void:
 	if playable_started:
@@ -2689,17 +2712,19 @@ func _reset_runtime_for_reload() -> void:
 			if derelict_root != null and is_instance_valid(derelict_root):
 				if derelict_root.get_parent() == self:
 					remove_child(derelict_root)
-				# Immediate free: the derelict is stateless (regenerated from seed
-				# on each visit) and has just been detached, so free() is safe and
-				# ensures is_instance_valid() returns false immediately — needed by
-				# the reload-while-away smoke assertion and cleaner than queue_free.
-				derelict_root.free()
+				# queue_free is the safe choice for a Node3D tree that may own
+				# physics bodies / navigation agents: it defers destruction to the
+				# end of the current frame so the engine can cleanly unregister
+				# those resources. The smoke asserts detachment (get_parent() !=
+				# playable), not immediate invalidation, so this is correct.
+				derelict_root.queue_free()
 		# The start loader was detached by travel_to (remove_child) but kept alive.
 		# Re-attach it so the subsequent load_from_paths() rebuilds the starting
 		# ship in-tree and _on_ship_loaded fires with the coordinator as parent.
 		var loader_node: Node = loader as Node
 		if loader_node != null and is_instance_valid(loader_node) and loader_node.get_parent() == null:
 			add_child(loader_node)
+		_reattach_starting_gameplay_roots()
 		away_from_start = false
 		current_ship = null  # allow _on_ship_loaded to re-wrap the starting ship
 	# Player first so the camera unfollows before the rig is freed.
@@ -2822,6 +2847,7 @@ func _input(event: InputEvent) -> void:
 			if player != null and scanner_panel.is_open():
 				player.set_physics_process(false)
 				player.set_process_input(false)
+				player.set_process_unhandled_input(false)
 			get_viewport().set_input_as_handled()
 			return
 		if scanner_panel.is_open():
