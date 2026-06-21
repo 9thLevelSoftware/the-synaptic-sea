@@ -357,6 +357,17 @@ func get_interactable_by_sequence(sequence: int):
 			return interactable
 	return null
 
+## Validation seam: every interactable belonging to a sequence. Multi-step
+## objectives (e.g. the repair_junction at objective 2) expose one
+## interactable per step at distinct positions; drivers that only touch the
+## first (see get_interactable_by_sequence) cannot complete the junction.
+func get_interactables_by_sequence(sequence: int) -> Array:
+	var out: Array = []
+	for interactable in sequence_interactables.get(sequence, []):
+		if int(interactable.get("sequence")) == sequence:
+			out.append(interactable)
+	return out
+
 func teleport_player_to_objective_for_validation(sequence: int) -> bool:
 	if player == null:
 		return false

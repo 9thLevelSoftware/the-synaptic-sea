@@ -171,14 +171,20 @@ func _interact_and_advance(obj_num: int, next_phase: String) -> void:
 	if phase_frames < SETTLE_FRAMES:
 		return
 
-	var interactable = playable.get_interactable_by_sequence(obj_num)
-	if interactable == null:
+	var group: Array = playable.get_interactables_by_sequence(obj_num)
+	if group.is_empty():
 		_fail("objective %d interactable missing" % obj_num)
 		return
 
-	if interactable.has_method("set_validation_player_in_range"):
-		interactable.set_validation_player_in_range(playable.player)
-		playable.player.request_interact()
+	# Multi-step objectives (the repair_junction at objective 2 has two steps at
+	# different positions) expose one interactable per step. Set every step in
+	# range and request interact; request_interact completes one pending step per
+	# call, so over consecutive frames each step finishes until the sequence
+	# advances. Driving only the first interactable leaves the junction stuck.
+	for step_interactable in group:
+		if step_interactable.has_method("set_validation_player_in_range"):
+			step_interactable.set_validation_player_in_range(playable.player)
+	playable.player.request_interact()
 
 	var new_seq: int = playable.get_current_objective_sequence()
 	if new_seq > obj_num:
