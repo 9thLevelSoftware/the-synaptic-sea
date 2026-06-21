@@ -28,8 +28,11 @@ Expected markers:
 
 ```bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
-GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
+# Honor GODOT/ROOT environment overrides (quoted to tolerate spaces in the
+# path, e.g. the Windows checkout "The Synaptic Sea"); fall back to the
+# original author's macOS paths when unset.
+ROOT="${ROOT:-/Users/christopherwilloughby/the-sargasso-of-stars}"
+GODOT="${GODOT:-/Users/christopherwilloughby/.local/bin/godot-4.6.2}"
 # Known baseline Godot shutdown lines that appear identically in every
 # unchanged smoke (route-control, completion, input, readability, oxygen,
 # hazard, ship-systems) and are NOT introduced by the Sargasso hazard code
