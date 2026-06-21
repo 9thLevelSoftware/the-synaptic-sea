@@ -49,6 +49,10 @@ REQ012_WARNING="^WARNING: SaveLoadService: save file rejected by from_dict \\(mi
 # rejection path. It is the expected signal, not a failure (mirrors the
 # REQ-012 save/load rejection WARNING above).
 BLUEPRINT_NULL_ERROR="^ERROR: PlayableGeneratedShip\\.load_from_blueprint: blueprint must not be null\$"
+# REQ-012 fix: travel_integration_smoke calls request_save() while aboard a
+# traveled derelict to verify the away-save block. The block emits this
+# push_warning as its expected signal; it is not a failure.
+REQ012_AWAY_SAVE_WARNING="^WARNING: PlayableGeneratedShip: save blocked — cannot save while aboard a traveled derelict \\(away_from_start=true\\); return to the starting ship first\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -57,7 +61,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$BLUEPRINT_NULL_ERROR" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$BLUEPRINT_NULL_ERROR|$REQ012_AWAY_SAVE_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -158,6 +162,18 @@ incompatible `slice_version` and asserts the service rejects it via
   Filtered by the strict ERROR/WARNING check above; any other
   `SaveLoadService:` warning (a real parse error, missing file on a
   fresh load, etc.) still fails the bundle.
+
+The REQ-012 reload-while-away fix adds one additional expected `WARNING:` line
+emitted by the travel integration smoke when it calls `request_save()` while
+aboard a traveled derelict to verify the away-save block:
+
+- `WARNING: PlayableGeneratedShip: save blocked — cannot save while aboard a traveled derelict (away_from_start=true); return to the starting ship first`
+  — emitted by `scripts/procgen/playable_generated_ship.gd` `request_save()`
+  when `away_from_start` is true. The `travel_integration_smoke` deliberately
+  calls `request_save()` in the away state to verify the guard rejects the
+  request; the WARNING is the expected signal, not a failure. Filtered by
+  `$REQ012_AWAY_SAVE_WARNING`; any other `PlayableGeneratedShip: save blocked`
+  warning still fails the bundle.
 
 The Phase 1 `load_from_blueprint_smoke` adds one additional expected
 `ERROR:` line that is part of its null-guard contract test:

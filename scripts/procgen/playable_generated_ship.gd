@@ -2524,6 +2524,14 @@ func _auto_save_current_run() -> bool:
 func request_save() -> bool:
 	if not playable_started or slice_complete:
 		return false
+	# REQ-012 fix: block save while on a traveled derelict. The single-ship-slice
+	# snapshot format only captures starting-ship state; an away-state save would
+	# silently omit the derelict context and produce an unrestorable snapshot. The
+	# meta-world / multi-ship save (needed for mid-derelict persistence) does not
+	# exist yet. A push_warning surfaces the block without crashing.
+	if away_from_start:
+		push_warning("PlayableGeneratedShip: save blocked — cannot save while aboard a traveled derelict (away_from_start=true); return to the starting ship first")
+		return false
 	if save_load_service == null:
 		return false
 	var result: bool = _auto_save_current_run()
@@ -2661,6 +2669,39 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 ## cleanly. Mirrors the setup done by _build_runtime_nodes() and the
 ## various _build_*_zone helpers, but in reverse.
 func _reset_runtime_for_reload() -> void:
+	# REQ-012 fix: if the player is aboard a traveled derelict when a reload is
+	# triggered, we must return to the starting ship BEFORE rebuilding the slice.
+	# Without this block:
+	#   - away_from_start stays true → _process returns forever (sim wedged)
+	#   - current_ship still points at the stale derelict → _on_ship_loaded's
+	#     `if current_ship == null` guard is false → the reloaded starting ship
+	#     is never wrapped as current_ship
+	#   - the derelict root remains a child of this coordinator → leaked scene
+	#   - loader is still off-tree → load_from_paths rebuilds into an off-tree
+	#     loader, and the reloaded slice is never in the scene
+	# Fix: free the stateless derelict root, re-attach the detached start loader
+	# (so the subsequent load_from_paths builds in-tree), clear away_from_start,
+	# and null current_ship so _on_ship_loaded re-wraps the freshly-reloaded
+	# starting ship.
+	if away_from_start:
+		if current_ship != null and String(current_ship.marker_id) != "":
+			var derelict_root = current_ship.scene_root
+			if derelict_root != null and is_instance_valid(derelict_root):
+				if derelict_root.get_parent() == self:
+					remove_child(derelict_root)
+				# Immediate free: the derelict is stateless (regenerated from seed
+				# on each visit) and has just been detached, so free() is safe and
+				# ensures is_instance_valid() returns false immediately — needed by
+				# the reload-while-away smoke assertion and cleaner than queue_free.
+				derelict_root.free()
+		# The start loader was detached by travel_to (remove_child) but kept alive.
+		# Re-attach it so the subsequent load_from_paths() rebuilds the starting
+		# ship in-tree and _on_ship_loaded fires with the coordinator as parent.
+		var loader_node: Node = loader as Node
+		if loader_node != null and is_instance_valid(loader_node) and loader_node.get_parent() == null:
+			add_child(loader_node)
+		away_from_start = false
+		current_ship = null  # allow _on_ship_loaded to re-wrap the starting ship
 	# Player first so the camera unfollows before the rig is freed.
 	if player != null and is_instance_valid(player):
 		player.queue_free()

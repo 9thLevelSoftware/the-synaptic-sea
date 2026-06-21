@@ -69,6 +69,13 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	var mgr = playable.get_ship_systems_manager()
 	_set_all_operational(mgr)
 
+	# REQ-012: save while on the starting ship — must succeed so we have a
+	# snapshot to reload from during the reload-while-away test below.
+	var save_result: bool = playable.request_save()
+	if not save_result:
+		_fail("request_save on starting ship should return true (got false)")
+		return
+
 	# 2. scan() gated by navigation: nav online -> markers; nav broken -> empty/detail 0.
 	var scan_on: Dictionary = playable.scan()
 	if int(scan_on.get("detail_level", 0)) < 1 or (scan_on.get("markers", []) as Array).is_empty():
@@ -145,6 +152,48 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		return
 	if start_root.get_parent() == playable:
 		_fail("starting ship root still attached after travel (should be removed)")
+		return
+
+	# REQ-012: reload-while-away verification block.
+	# Capture the derelict root now so we can verify it was freed after reload.
+	var derelict_root_before_reload: Node = new_ship.scene_root
+
+	# 10. save() is blocked while aboard a traveled derelict.
+	var away_save: bool = playable.request_save()
+	if away_save:
+		_fail("request_save while away should return false (away-state save blocked)")
+		return
+
+	# 11. reload while away: must restore the starting-ship slice cleanly.
+	var reload_result: bool = playable.request_load()
+	if not reload_result:
+		_fail("request_load while away should return true (snapshot from step 1a exists)")
+		return
+
+	# After reload the start loader is re-attached — orphaned_start_root is now
+	# back in-tree under main_node. Clear it so _teardown_and_quit does not
+	# double-free it (main_node.free() handles it).
+	orphaned_start_root = null
+
+	# 12. Slice returned to starting ship cleanly.
+	if playable.away_from_start:
+		_fail("away_from_start still true after reload-while-away")
+		return
+
+	var reloaded_ship = playable.get_current_ship()
+	if reloaded_ship == null:
+		_fail("current_ship is null after reload-while-away")
+		return
+	if String(reloaded_ship.marker_id) != "":
+		_fail("reloaded current_ship has non-empty marker_id (not starting ship)")
+		return
+	if playable.player == null or not is_instance_valid(playable.player):
+		_fail("player invalid after reload-while-away")
+		return
+
+	# 13. Derelict root was freed (stateless — freed by _reset_runtime_for_reload).
+	if is_instance_valid(derelict_root_before_reload):
+		_fail("derelict scene_root still valid after reload-while-away (should be freed)")
 		return
 
 	finished = true
