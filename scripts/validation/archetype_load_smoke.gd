@@ -113,19 +113,29 @@ func _initialize() -> void:
 				quit(1)
 				return
 
-		# Generate full ship
+		# Generate full ship through the v4 pipeline. NOTE: the legacy
+		# RoomGraphGenerator checks above validate the archetype's role
+		# distribution as a unit; the v4 ShipGenerator runs the separate
+		# ShipLayoutGenerator pipeline (which does not consume role_weights),
+		# so we validate it produces a fully-loaded ship rather than a
+		# graph-matching room count.
 		var ship: Node3D = generator.generate(bp, data)
 		if ship == null:
 			push_error("ARCHETYPE SMOKE FAIL %s ShipGenerator returned null" % name_str)
 			quit(1)
 			return
-
-		var structure: Node = ship.get_child(0)
-		if structure == null or structure.get_child_count() != graph.rooms.size():
-			push_error("ARCHETYPE SMOKE FAIL %s structure_children=%d graph_rooms=%d" % [
-				name_str, structure.get_child_count() if structure else 0, graph.rooms.size()])
+		if String(ship.name) != "GeneratedShip" or not ship.has_loaded_ship():
+			push_error("ARCHETYPE SMOKE FAIL %s ship not loaded (name=%s)" % [name_str, str(ship.name)])
+			ship.free()
 			quit(1)
 			return
+		var structure: Node = ship.get_node_or_null("StructuralRoot")
+		if structure == null or structure.get_child_count() < 1:
+			push_error("ARCHETYPE SMOKE FAIL %s StructuralRoot missing or empty" % name_str)
+			ship.free()
+			quit(1)
+			return
+		ship.free()
 
 		# Round-trip blueprint: to_dict -> from_dict -> generate -> compare
 		var bp_dict: Dictionary = bp.to_dict()
@@ -136,8 +146,6 @@ func _initialize() -> void:
 				name_str, graph2.rooms.size(), graph.rooms.size()])
 			quit(1)
 			return
-
-		ship.queue_free()
 
 	print("ARCHETYPE LOAD PASS archetypes=3 round_trip=3")
 	quit(0)

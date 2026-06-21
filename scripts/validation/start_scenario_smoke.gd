@@ -81,9 +81,13 @@ func _initialize() -> void:
 	var loader: Node3D = LoaderScript.new()
 	var success: bool = loader.load_from_paths(layout_path, kit_path, gameplay_path)
 	if not success:
+		loader.free()
 		push_error("START_SCENARIO FAIL GeneratedShipLoader.load_from_paths returned false")
 		quit(1)
 		return
+	# Loader instantiated the full ship into a detached Node3D (never added to the
+	# tree). Free it now so its geometry/physics/nav RIDs don't leak at quit().
+	loader.free()
 
 	# Test 4: Navigation mesh can be baked from floor cells
 	var floor_count: int = 0

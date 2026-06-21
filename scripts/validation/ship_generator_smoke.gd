@@ -1,31 +1,31 @@
 extends SceneTree
 
-# ShipGenerator smoke. Drives the full blueprint -> RoomGraph ->
-# ShipStructure pipeline and verifies that the returned Node3D tree
-# is well-formed. Covers the three cases the rest of the procgen
-# smokes use as their canonical example seeds:
+# ShipGenerator smoke (v4 pipeline). Drives the blueprint ->
+# ShipLayoutGenerator -> GeneratedShipLoader path and verifies the
+# returned Node3D tree is a fully-loaded ship.
 #
-#   1. life boat  — smallest valid ship (2-4 rooms, no bridge /
-#      life_support).
-#   2. small ship — mid-size (4-8 rooms, includes bridge + life_support).
-#   3. determinism — two calls with the same seed/size/condition
-#      produce structurally identical GeneratedShip roots.
+# The v4 ShipGenerator no longer returns a hand-placed "ShipStructure"
+# tree (the legacy RoomGraphGenerator/StructuralPlacer path). It returns
+# the GeneratedShipLoader root named "GeneratedShip" with two children:
+#   - "StructuralRoot": instantiated structural wrapper geometry + the
+#     baked NavigationRegion3D.
+#   - "ObjectiveRoot": gameplay objective volumes.
+# The loader also exposes accessors (has_loaded_ship, get_start_transform,
+# get_goal_position, get_objective_specs_copy, layout_doc) which are the
+# real contract this smoke asserts against.
 #
-# Prints a single `SHIP GENERATOR PASS life_boat=true small=true
-# deterministic=true` line on success so automated verification can
-# grep for it; on any failure pushes an error and quits with code 1
-# so a regression blocks the gate (matching the project's
-# `quit-on-first-failure` convention from the other smokes).
+# Cases:
+#   1. life boat seed   — pipeline runs end-to-end, ship is loaded.
+#   2. small seed       — independent seed also loads with geometry.
+#   3. determinism      — two calls with identical seed/size/condition
+#                         produce identical room id sets and child counts.
 #
-# NOTE: GDScript `class_name` globals may not be available at parse
-# time in `godot --headless --script` mode, so all cross-file type
-# references go through the preloaded `*Script` constants. This is
-# the same pattern RoomGraphGenerator and StructuralPlacer use.
+# Prints a single `SHIP GENERATOR PASS ...` line on success; on any
+# failure pushes an error and quits with code 1 (quit-on-first-failure).
+# Every generated ship is freed before the next case so the strict
+# ERROR/WARNING bundle check sees no leaked RIDs at exit.
 
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
-const RoomGraphScript := preload("res://scripts/procgen/room_graph.gd")
-const RoomGraphGeneratorScript := preload("res://scripts/procgen/room_graph_generator.gd")
-const StructuralPlacerScript := preload("res://scripts/procgen/structural_placer.gd")
 const ShipGeneratorScript := preload("res://scripts/procgen/ship_generator.gd")
 
 
@@ -33,39 +33,34 @@ func _init() -> void:
 	var generator: ShipGeneratorScript = ShipGeneratorScript.new()
 
 	# --- Case 1: life boat -----------------------------------------
-	# Smallest valid ship; pipeline must run end-to-end and produce
-	# a GeneratedShip with at least one ShipStructure child.
 	var ship_life: Node3D = generator.generate_from_seed(
 			42,
 			ShipBlueprintScript.Size.LIFE_BOAT,
 			ShipBlueprintScript.Condition.DAMAGED)
 	if not _assert_ship("life_boat", ship_life):
+		_free_node(ship_life)
 		quit(1)
 		return
+	var life_rooms: int = _room_count(ship_life)
+	_free_node(ship_life)
 
 	# --- Case 2: small ship ----------------------------------------
-	# Mid-size ship; we verify the ShipStructure child has a room
-	# count inside the SMALL range (4-8 rooms inclusive).
 	var ship_small: Node3D = generator.generate_from_seed(
 			123,
 			ShipBlueprintScript.Size.SMALL,
 			ShipBlueprintScript.Condition.PRISTINE)
 	if not _assert_ship("small", ship_small):
+		_free_node(ship_small)
 		quit(1)
 		return
-	var small_room_count: int = _room_count_for(ship_small)
-	if small_room_count < 4 or small_room_count > 8:
-		push_error("SHIP GENERATOR FAIL small room_count=%d expected in [4,8]" % small_room_count)
+	var small_rooms: int = _room_count(ship_small)
+	_free_node(ship_small)
+	if small_rooms < 1:
+		push_error("SHIP GENERATOR FAIL small room_count=%d expected >=1" % small_rooms)
 		quit(1)
 		return
 
 	# --- Case 3: determinism ---------------------------------------
-	# Two independent generations with identical inputs must produce
-	# structurally identical roots: same GeneratedShip name, same
-	# number of children, same room count, and the same set of room
-	# ids. We rebuild the graph via the same sub-generators so we
-	# can compare room ids without having to traverse the Node3D
-	# tree (which works but is noisier).
 	var ship_same1: Node3D = generator.generate_from_seed(
 			4242,
 			ShipBlueprintScript.Size.SMALL,
@@ -75,92 +70,99 @@ func _init() -> void:
 			ShipBlueprintScript.Size.SMALL,
 			ShipBlueprintScript.Condition.DAMAGED)
 
-	if ship_same1 == null or ship_same2 == null:
-		push_error("SHIP GENERATOR FAIL determinism ship_same1=%s ship_same2=%s" % [
-			str(ship_same1), str(ship_same2),
-		])
+	if not _assert_ship("determinism_a", ship_same1) or not _assert_ship("determinism_b", ship_same2):
+		_free_node(ship_same1)
+		_free_node(ship_same2)
 		quit(1)
 		return
 
-	if ship_same1.get_child_count() != ship_same2.get_child_count():
-		push_error("SHIP GENERATOR FAIL determinism child_count mismatch a=%d b=%d" % [
-			ship_same1.get_child_count(), ship_same2.get_child_count(),
-		])
-		quit(1)
-		return
-
-	var rooms1: Array[String] = _room_ids_for(ship_same1)
-	var rooms2: Array[String] = _room_ids_for(ship_same2)
+	var rooms1: Array[String] = _room_ids(ship_same1)
+	var rooms2: Array[String] = _room_ids(ship_same2)
+	var struct1: Node = ship_same1.get_node_or_null("StructuralRoot")
+	var struct2: Node = ship_same2.get_node_or_null("StructuralRoot")
+	var struct_children_match: bool = struct1 != null and struct2 != null \
+		and struct1.get_child_count() == struct2.get_child_count()
 	rooms1.sort()
 	rooms2.sort()
-	if str(rooms1) != str(rooms2):
+	var ids_match: bool = str(rooms1) == str(rooms2)
+	_free_node(ship_same1)
+	_free_node(ship_same2)
+
+	if not ids_match:
 		push_error("SHIP GENERATOR FAIL determinism room_ids mismatch a=%s b=%s" % [
 			str(rooms1), str(rooms2),
 		])
 		quit(1)
 		return
+	if not struct_children_match:
+		push_error("SHIP GENERATOR FAIL determinism structural child count mismatch")
+		quit(1)
+		return
 
 	# --- Pass ------------------------------------------------------
-	print("SHIP GENERATOR PASS life_boat=true small=true deterministic=true")
+	print("SHIP GENERATOR PASS life_boat=true small=true deterministic=true life_rooms=%d small_rooms=%d" % [
+		life_rooms, small_rooms,
+	])
 	quit(0)
 
 
-# Asserts that `ship` is a non-null Node3D named "GeneratedShip" with
-# at least one direct child (the ShipStructure root) and that the
-# ShipStructure has at least one child of its own (at least one room
-# placed). Returns true on success, pushes an error and returns false
-# on any failure.
+# Asserts that `ship` is a non-null Node3D named "GeneratedShip" that has
+# fully loaded: it must report has_loaded_ship(), carry a populated
+# "StructuralRoot" child (geometry instantiated), an "ObjectiveRoot" child,
+# a finite spawn transform, and at least one objective.
 func _assert_ship(label: String, ship: Node3D) -> bool:
 	if ship == null:
 		push_error("SHIP GENERATOR FAIL %s ship is null" % label)
 		return false
-	if not (ship is Node3D):
-		push_error("SHIP GENERATOR FAIL %s ship is not Node3D (got %s)" % [label, str(ship)])
-		return false
 	if String(ship.name) != "GeneratedShip":
-		push_error("SHIP GENERATOR FAIL %s ship.name=%s expected=GeneratedShip" % [
-			label, str(ship.name),
-		])
+		push_error("SHIP GENERATOR FAIL %s ship.name=%s expected=GeneratedShip" % [label, str(ship.name)])
 		return false
-	if ship.get_child_count() < 1:
-		push_error("SHIP GENERATOR FAIL %s ship has no children" % label)
+	if not ship.has_method("has_loaded_ship") or not ship.has_loaded_ship():
+		push_error("SHIP GENERATOR FAIL %s ship not loaded (has_loaded_ship false)" % label)
 		return false
 
-	# The ShipStructure root must be a child of the GeneratedShip.
-	var structure: Node = ship.get_child(0)
+	var structure: Node = ship.get_node_or_null("StructuralRoot")
 	if structure == null:
-		push_error("SHIP GENERATOR FAIL %s structure child is null" % label)
-		return false
-	if String(structure.name) != "ShipStructure":
-		push_error("SHIP GENERATOR FAIL %s structure.name=%s expected=ShipStructure" % [
-			label, str(structure.name),
-		])
+		push_error("SHIP GENERATOR FAIL %s missing StructuralRoot child" % label)
 		return false
 	if structure.get_child_count() < 1:
-		push_error("SHIP GENERATOR FAIL %s structure has no rooms" % label)
+		push_error("SHIP GENERATOR FAIL %s StructuralRoot has no geometry" % label)
+		return false
+
+	if ship.get_node_or_null("ObjectiveRoot") == null:
+		push_error("SHIP GENERATOR FAIL %s missing ObjectiveRoot child" % label)
+		return false
+
+	var spawn: Vector3 = ship.get_start_transform().origin
+	if spawn == Vector3.INF:
+		push_error("SHIP GENERATOR FAIL %s spawn position is INF" % label)
+		return false
+
+	if ship.get_objective_specs_copy().is_empty():
+		push_error("SHIP GENERATOR FAIL %s no objectives" % label)
 		return false
 
 	return true
 
 
-# Returns the number of room children inside a GeneratedShip's
-# ShipStructure sub-tree. Assumes the caller already validated that
-# `ship` is a non-null GeneratedShip with a ShipStructure child.
-func _room_count_for(ship: Node3D) -> int:
-	if ship == null or ship.get_child_count() < 1:
+# Number of rooms in the loaded layout document.
+func _room_count(ship: Node3D) -> int:
+	if ship == null:
 		return 0
-	return ship.get_child(0).get_child_count()
+	var rooms: Array = ship.layout_doc.get("rooms", [])
+	return rooms.size()
 
 
-# Returns the names of every room Node3D inside a GeneratedShip's
-# ShipStructure sub-tree. Used by the determinism check so we can
-# compare room sets without re-implementing a deep tree walk in the
-# test body.
-func _room_ids_for(ship: Node3D) -> Array[String]:
+# Room ids from the loaded layout document.
+func _room_ids(ship: Node3D) -> Array[String]:
 	var ids: Array[String] = []
-	if ship == null or ship.get_child_count() < 1:
+	if ship == null:
 		return ids
-	var structure: Node = ship.get_child(0)
-	for child in structure.get_children():
-		ids.append(String(child.name))
+	for room in ship.layout_doc.get("rooms", []):
+		ids.append(str(room.get("id", "")))
 	return ids
+
+
+func _free_node(node: Node) -> void:
+	if node != null and is_instance_valid(node):
+		node.free()

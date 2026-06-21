@@ -282,11 +282,12 @@ func get_playable_summary() -> Dictionary:
 
 ## Blueprint-driven entry point: build a GeneratedShip Node3D tree from a
 ## ShipBlueprint via the ShipGenerator and add it as a direct child of this
-## playable scene. The generator returns a freshly-built root named
-## "GeneratedShip" with the "ShipStructure" Node3D nested inside it; we
-## re-parent that root under self so the existing playable infrastructure
-## (player spawn, camera rig, interactables) can reference it the same way
-## it references the GeneratedShipLoader output.
+## playable scene. The generator returns a freshly-built GeneratedShipLoader
+## root named "GeneratedShip" with "StructuralRoot" (geometry + nav) and
+## "ObjectiveRoot" Node3D children nested inside it; we re-parent that root
+## under self so the existing playable infrastructure (player spawn, camera
+## rig, interactables) can reference it the same way it references the
+## GeneratedShipLoader output.
 ##
 ## This is intentionally orthogonal to loader.load_from_paths(): callers
 ## who already have a ShipBlueprint (e.g. generated procedurally, replayed
