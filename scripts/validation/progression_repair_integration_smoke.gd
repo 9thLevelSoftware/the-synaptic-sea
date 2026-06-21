@@ -33,6 +33,12 @@ func _initialize() -> void:
 	if not bool(r_hi.get("success", false)):
 		_fail("engineer repair should succeed, got %s" % str(r_hi))
 		return
+	# NOTE on the two "seconds" defaults below: they are intentionally
+	# asymmetric so a missing key fails LOUD, not silent. The baseline (slower)
+	# time defaults to 0.0 so that if it were absent, `faster >= 0.0` trips the
+	# failure; the faster time (line below) defaults to a large 999.0 so that if
+	# IT were absent, `999.0 >= baseline` also trips the failure. Do not "fix"
+	# this to match — making the baseline large would let a missing key pass.
 	var seconds_skill3: float = float(r_hi.get("seconds", 0.0))
 
 	# Raise engineer repair to a higher level via grant_xp, repair again: faster.

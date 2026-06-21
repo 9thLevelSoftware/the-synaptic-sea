@@ -140,4 +140,12 @@ func apply_summary(summary: Dictionary) -> bool:
 				if xp != int(skill_xp[sid]):
 					skill_xp[sid] = xp
 					changed = true
+	# Mirror grant_xp's cap behavior: a maxed skill carries no pending XP. A
+	# normally-progressed save never stores XP on a level-10 skill, so this only
+	# matters for a hand-edited or corrupt summary, but it keeps the invariant
+	# (level == MAX -> skill_xp == 0) consistent across both mutation paths.
+	for sid in skills:
+		if int(skills[sid]) >= MAX_SKILL_LEVEL and int(skill_xp.get(sid, 0)) != 0:
+			skill_xp[sid] = 0
+			changed = true
 	return changed
