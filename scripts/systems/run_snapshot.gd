@@ -22,11 +22,12 @@ var inventory_summary: Dictionary = {}
 var fire_summary: Dictionary = {}
 var electrical_arc_summary: Dictionary = {}
 var objective_progress_summary: Dictionary = {}
+var player_progression_summary: Dictionary = {}
 var slice_version: String = ""
 var godot_version: String = ""
 var saved_at: String = ""
 
-# The seven model summaries the snapshot carries. Used by the model
+# The eight model summaries the snapshot carries. Used by the model
 # smoke to assert the round-trip captured every required Gate 2 +
 # Alpha hazard model (REQ-013 adds the electrical-arc summary).
 const SUMMARY_FIELDS: Array = [
@@ -37,6 +38,7 @@ const SUMMARY_FIELDS: Array = [
 	"fire_summary",
 	"electrical_arc_summary",
 	"objective_progress_summary",
+	"player_progression_summary",
 ]
 
 func get_summary_count() -> int:
@@ -56,6 +58,7 @@ func to_dict() -> Dictionary:
 		"fire_summary": fire_summary.duplicate(true),
 		"electrical_arc_summary": electrical_arc_summary.duplicate(true),
 		"objective_progress_summary": objective_progress_summary.duplicate(true),
+		"player_progression_summary": player_progression_summary.duplicate(true),
 		"slice_version": slice_version,
 		"godot_version": godot_version,
 		"saved_at": saved_at,
@@ -91,6 +94,7 @@ static func from_dict(data: Variant, expected_slice_version: String, expected_go
 	snapshot.fire_summary = _deep_copy_dict(dict.get("fire_summary", {}))
 	snapshot.electrical_arc_summary = _deep_copy_dict(dict.get("electrical_arc_summary", {}))
 	snapshot.objective_progress_summary = _deep_copy_dict(dict.get("objective_progress_summary", {}))
+	snapshot.player_progression_summary = _deep_copy_dict(dict.get("player_progression_summary", {}))
 	snapshot.slice_version = str(dict.get("slice_version", ""))
 	snapshot.godot_version = str(dict.get("godot_version", ""))
 	snapshot.saved_at = str(dict.get("saved_at", ""))

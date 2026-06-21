@@ -20,6 +20,8 @@ const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.
 const RunSnapshotScript := preload("res://scripts/systems/run_snapshot.gd")
 const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
+const PlayerProgressionScript := preload("res://scripts/systems/player_progression_state.gd")
+const ClassDefinitionScript := preload("res://scripts/systems/class_definition.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -74,6 +76,7 @@ const OBJECTIVE_REPAIR_MAP: Dictionary = {
 @export var kit_path: String = DEFAULT_KIT_PATH
 @export var gameplay_slice_path: String = DEFAULT_GAMEPLAY_SLICE_PATH
 @export var blueprint_path: String = "res://data/procgen/golden/coherent_ship_001/blueprint.json"
+@export var starting_class_id: String = "engineer"
 var loader
 var player
 var camera_rig
@@ -98,6 +101,8 @@ var ready_summary: Dictionary = {}
 var playable_started: bool = false
 var last_failure_reason: String = ""
 var ship_systems_manager   # ShipSystemsManager (untyped: class_name globals unreliable under --headless --script)
+var player_progression   # PlayerProgressionState (untyped: class_name unreliable headless)
+const REPAIR_OBJECTIVE_XP: int = 50
 # Narrative objective flags with no manager backing (supplies/logs). Set on
 # completion; persisted in the snapshot; read by _manager_compat_summary().
 var completed_objective_types: Dictionary = {}
@@ -817,6 +822,8 @@ func _build_runtime_nodes() -> void:
 	ship_systems_manager = ShipSystemsManagerScript.new()
 	var bp = _load_blueprint_for_systems()
 	ship_systems_manager.configure(ship_systems_manager.load_definitions(), bp.condition, bp.seed_value)
+	player_progression = PlayerProgressionScript.new()
+	_configure_player_progression()
 	route_control_state = RouteControlStateScript.new()
 	route_gate_nodes.clear()
 	objective_progress_state = ObjectiveProgressStateScript.new()
@@ -864,6 +871,17 @@ func _build_runtime_nodes() -> void:
 	# user://saves/current_run.json; deleted on playable_slice_completed.
 	save_load_service = SaveLoadServiceScript.new()
 
+## Configures the progression model from starting_class_id (defaults to engineer
+## when the id is unknown). Idempotent: re-callable on reload.
+func _configure_player_progression() -> void:
+	if player_progression == null:
+		return
+	var classes: Dictionary = ClassDefinitionScript.load_all()
+	var class_def = classes.get(starting_class_id, classes.get("engineer", null))
+	if class_def == null:
+		push_error("PlayableGeneratedShip: no class definition for '%s' or fallback 'engineer' (data/player/classes.json missing or malformed)" % starting_class_id)
+	player_progression.configure(class_def, PlayerProgressionScript.load_skills_catalog())
+
 ## Loads the blueprint sidecar that seeds the ShipSystemsManager's condition
 ## damage. Falls back to a DAMAGED/seed=17 default (never crashes the slice)
 ## when the sidecar is absent or malformed.
@@ -882,6 +900,17 @@ func _load_blueprint_for_systems():
 ## Validation seam: the live ShipSystemsManager (null before _build_runtime_nodes()).
 func get_ship_systems_manager():
 	return ship_systems_manager
+
+## Validation seam: the live PlayerProgressionState (null before _build_runtime_nodes()).
+func get_player_progression():
+	return player_progression
+
+## Validation seam: true if any combined status line contains `token`.
+func get_combined_system_status_lines_contains(token: String) -> bool:
+	for line in _combined_system_status_lines():
+		if String(line).contains(token):
+			return true
+	return false
 
 ## Allocates the HUD CanvasLayer and the ObjectiveTracker that lives
 ## inside it. Called from _build_runtime_nodes (initial slice setup)
@@ -1099,6 +1128,8 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 		completed_objective_types[objective_type] = true
 		for pair in OBJECTIVE_REPAIR_MAP.get(objective_type, []):
 			ship_systems_manager.force_repair(str(pair[0]), str(pair[1]))
+		if player_progression != null and (objective_type == "restore_systems" or objective_type == "stabilize_reactor"):
+			player_progression.grant_xp("repair", REPAIR_OBJECTIVE_XP)
 		var compat: Dictionary = _manager_compat_summary()
 		_apply_ship_systems_consequences(objective_type)
 		_refresh_route_control_from_ship_systems()
@@ -1230,6 +1261,8 @@ func _combined_system_status_lines() -> PackedStringArray:
 	if inventory_state != null:
 		for line in inventory_state.get_status_lines():
 			lines.append(String(line))
+	if player_progression != null:
+		lines.append("Repair Skill: %d" % player_progression.get_skill_level("repair"))
 	return lines
 
 func get_combined_system_status_lines() -> PackedStringArray:
@@ -2347,6 +2380,8 @@ func _build_run_snapshot() -> RunSnapshot:
 		snapshot.electrical_arc_summary = electrical_arc_state.get_summary()
 	if objective_progress_state != null:
 		snapshot.objective_progress_summary = objective_progress_state.get_summary()
+	if player_progression != null:
+		snapshot.player_progression_summary = player_progression.get_summary()
 	snapshot.slice_version = SaveLoadServiceScript.CURRENT_SLICE_VERSION
 	snapshot.godot_version = Engine.get_version_info()["string"]
 	snapshot.saved_at = Time.get_datetime_string_from_system(true)
@@ -2469,6 +2504,8 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		_refresh_arc_state(true)
 	if objective_progress_state != null and not snapshot.objective_progress_summary.is_empty():
 		objective_progress_state.apply_summary(snapshot.objective_progress_summary)
+	if player_progression != null and not snapshot.player_progression_summary.is_empty():
+		player_progression.apply_summary(snapshot.player_progression_summary)
 	# REQ-014: reconcile the junction_calibrator pickup marker visibility
 	# with the restored inventory + objective_progress summaries. The
 	# marker is rebuilt visible by `_build_junction_calibrator_pickup`,
@@ -2561,6 +2598,7 @@ func _reset_runtime_for_reload() -> void:
 	if ship_systems_manager != null:
 		var bp_reset = _load_blueprint_for_systems()
 		ship_systems_manager.configure(ship_systems_manager.load_definitions(), bp_reset.condition, bp_reset.seed_value)
+	_configure_player_progression()
 	completed_objective_types.clear()
 	if route_control_state != null:
 		route_control_state.configure_from_blocked_routes([])
