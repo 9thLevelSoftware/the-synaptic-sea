@@ -9,7 +9,6 @@ const InteractableScript := preload("res://scripts/interaction/interactable.gd")
 const ObjectiveTrackerScript := preload("res://scripts/ui/objective_tracker.gd")
 const AccessibilitySettingsScript := preload("res://scripts/ui/accessibility_settings.gd")
 const ReadabilityPropFactoryScript := preload("res://scripts/procgen/readability_prop_factory.gd")
-const ShipSystemStateScript := preload("res://scripts/systems/ship_system_state.gd")
 const RouteControlStateScript := preload("res://scripts/systems/route_control_state.gd")
 const OxygenStateScript := preload("res://scripts/systems/oxygen_state.gd")
 const ObjectiveProgressStateScript := preload("res://scripts/systems/objective_progress_state.gd")
@@ -98,7 +97,6 @@ var slice_complete: bool = false
 var ready_summary: Dictionary = {}
 var playable_started: bool = false
 var last_failure_reason: String = ""
-var ship_systems: ShipSystemState
 var ship_systems_manager   # ShipSystemsManager (untyped: class_name globals unreliable under --headless --script)
 # Narrative objective flags with no manager backing (supplies/logs). Set on
 # completion; persisted in the snapshot; read by _manager_compat_summary().
@@ -805,7 +803,6 @@ func _title_from_snake(raw: String) -> String:
 	return " ".join(words)
 
 func _build_runtime_nodes() -> void:
-	ship_systems = ShipSystemStateScript.new()
 	ship_systems_manager = ShipSystemsManagerScript.new()
 	var bp = _load_blueprint_for_systems()
 	ship_systems_manager.configure(ship_systems_manager.load_definitions(), bp.condition, bp.seed_value)
@@ -1247,7 +1244,7 @@ func _sub_functional(system_id: String, sub_id: String) -> bool:
 
 ## Flag-shaped summary derived from manager subcomponent state + the narrative
 ## record. Feeds the unchanged route_control_state / breach oxygen_state models
-## and the HUD, replacing ShipSystemState.get_summary().
+## and the HUD (ShipSystemsManager is the sole source of truth for ship-system state).
 func _manager_compat_summary() -> Dictionary:
 	var power_restored: bool = _sub_functional("power", "power_distribution") and _sub_functional("power", "battery_cells")
 	var reactor_full: bool = _sub_health("power", "reactor_core") >= 1.0
@@ -2539,8 +2536,6 @@ func _reset_runtime_for_reload() -> void:
 	slice_complete = false
 	# Reset pure models so a fresh load starts from a clean state and
 	# then has the snapshot re-applied.
-	if ship_systems != null:
-		ship_systems.reset()
 	if ship_systems_manager != null:
 		var bp_reset = _load_blueprint_for_systems()
 		ship_systems_manager.configure(ship_systems_manager.load_definitions(), bp_reset.condition, bp_reset.seed_value)

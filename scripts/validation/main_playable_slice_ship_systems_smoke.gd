@@ -1,8 +1,8 @@
 extends SceneTree
 
 ## Manager-driven runtime-consequence smoke. Proves the live coordinator
-## derives gates/breach/extraction/HUD from ShipSystemsManager (not the
-## retired ShipSystemState). Deterministic: the smoke damages the relevant
+## derives gates/breach/extraction/HUD from ShipSystemsManager. Deterministic:
+## the smoke damages the relevant
 ## power subcomponents at setup, then drives objectives and asserts the
 ## derived consequences (independent of the blueprint's seeded damage set).
 
