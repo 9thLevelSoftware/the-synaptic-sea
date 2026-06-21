@@ -12,6 +12,11 @@ const SHIP_TYPES := ["shuttle", "freighter", "science_vessel", "derelict_hauler"
 
 ## Stable spatial hash (NOT Godot's hash(), which we do not rely on for save
 ## reproducibility). The large primes decorrelate adjacent cells.
+##
+## This XOR is NOT collision-free for very distant cells, so two far-apart cells
+## can share marker attributes/seeds. That is harmless: a marker's identity is
+## its marker_id ("cell_x:cell_y:index"), not its seed, so dedup and travel stay
+## correct. Collisions only ever recur outside normal play range.
 static func cell_seed(world_seed: int, cell: Vector2i) -> int:
 	return world_seed ^ (cell.x * 73856093) ^ (cell.y * 19349663)
 
