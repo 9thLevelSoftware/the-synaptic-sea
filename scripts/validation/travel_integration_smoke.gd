@@ -163,9 +163,44 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		_fail("starting ship root still attached after travel (should be removed)")
 		return
 
+	# PR #7 re-review FIX 2: derelict travel capability — no softlock.
+	# While away_from_start==true, scan() and travel_to_marker_id() must work
+	# regardless of the derelict's seeded systems (which may be offline).
+	# 9a. scan() returns full results on the boarded derelict.
+	var derelict_scan: Dictionary = playable.scan()
+	if int(derelict_scan.get("detail_level", 0)) < 1 or (derelict_scan.get("markers", []) as Array).is_empty():
+		_fail("derelict scan returned no markers — derelict travel-cap gate failed (FIX2)")
+		return
+	# 9b. Pick an in-range marker from the derelict world position and travel again.
+	var world2 = playable.get_sargasso_world()
+	var in_range2: Array = world2.markers_in_range(playable.scanner_state.range_radius)
+	if in_range2.is_empty():
+		_fail("no markers in range of the derelict position (FIX2 derelict→derelict jump)")
+		return
+	var target_id2: String = String(in_range2[0].marker_id)
+	# The second travel frees the first derelict (non-empty marker_id → queue_free'd
+	# by travel_to). The resulting second derelict root is a child of playable and is
+	# freed by main_node.free() in teardown — no extra orphan tracking needed.
+	var ok2: Dictionary = playable.travel_to_marker_id(target_id2)
+	if not bool(ok2.get("success", false)):
+		_fail("derelict→derelict travel failed: reason=%s (FIX2 softlock guard)" % String(ok2.get("reason", "")))
+		return
+
+	# PR #7 re-review FIX 1: interaction gate while aboard a derelict.
+	# _on_player_interact_requested must be a no-op while away_from_start==true
+	# so stale starting-ship objectives cannot be completed on a derelict.
+	# 9c. objective_completion_count is unchanged after interact while away.
+	var occ_before: int = playable.objective_completion_count
+	playable._on_player_interact_requested(playable.player)
+	if playable.objective_completion_count != occ_before:
+		_fail("interact while away incremented objective_completion_count (FIX1 gate broken)")
+		return
+
 	# REQ-012: reload-while-away verification block.
-	# Capture the derelict root now so we can verify it was freed after reload.
-	var derelict_root_before_reload: Node = new_ship.scene_root
+	# Capture the CURRENT derelict root (second derelict after the derelict→derelict
+	# jump above) so we can verify it is detached after reload. new_ship was the first
+	# derelict and was already queue_free'd by the second travel.
+	var derelict_root_before_reload: Node = playable.get_current_ship().scene_root
 
 	# 10. save() is blocked while aboard a traveled derelict.
 	var away_save: bool = playable.request_save()

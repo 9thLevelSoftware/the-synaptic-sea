@@ -31,8 +31,18 @@ coordinator owns scene-tree lifecycle (single ownership).
 
 ## Consequences
 
-- Travel is gated by the CURRENT ship's systems (board a wrecked derelict with dead
-  propulsion → stranded until repaired). Intended emergent mechanic.
+- Travel is gated by the CURRENT ship's systems. On the STARTING ship this is the
+  intended emergent mechanic: board a wrecked derelict with dead propulsion → stranded
+  until repaired. On a BOARDED DERELICT, however, Phase 4.5 ships no derelict
+  repair/objective flow, so condition-gating would softlock the player with no in-game
+  way to leave or repair. Therefore boarded derelicts report FULL scanner/travel
+  capability (`_current_systems_ops()` short-circuits to `{navigation:true,
+  scanners:true, propulsion:true}` when `away_from_start == true`). Stranding-by-
+  condition on derelicts is deferred to the future derelict repair loop.
+- While aboard a derelict, starting-ship interactions are gated off:
+  `_on_player_interact_requested` early-returns when `away_from_start == true`, so
+  pressing interact on a derelict cannot complete stale starting-ship objectives.
+  Derelicts have no interactables of their own yet, so nothing legitimate is lost.
 - Traveled derelicts are STATELESS: freed on leave, regenerated deterministically
   from seed on return. Loot/repairs on traveled ships do not persist yet. True world
   persistence is deferred to the meta-save phase (the current `RunSnapshot` is the

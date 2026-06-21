@@ -939,17 +939,28 @@ func get_current_ship():
 func get_sargasso_world():
 	return sargasso_world
 
+## Operational status feeding scan/travel. On the STARTING ship this reflects the
+## real systems, so repairing propulsion/navigation/scanners enables travel — the
+## core loop. On a boarded DERELICT we report FULL capability: Phase 4.5 ships no
+## derelict repair/objective flow, so condition-gating would softlock the player
+## with no way to leave or repair. Condition-based stranding activates once the
+## derelict repair loop exists (see ADR-0011).
+func _current_systems_ops() -> Dictionary:
+	if away_from_start:
+		return {"navigation": true, "scanners": true, "propulsion": true}
+	var mgr = current_ship.systems_manager if current_ship != null else null
+	return {
+		"navigation": mgr != null and mgr.is_operational("navigation"),
+		"scanners": mgr != null and mgr.is_operational("scanners"),
+		"propulsion": mgr != null and mgr.is_operational("propulsion"),
+	}
+
 ## Resolves the visible markers at the gated detail level, deriving operational
 ## status from the CURRENT ship's systems and scanner skill from progression.
 func scan() -> Dictionary:
 	if current_ship == null or sargasso_world == null or scanner_state == null:
 		return {"detail_level": 0, "markers": []}
-	var mgr = current_ship.systems_manager
-	var ops: Dictionary = {
-		"navigation": mgr != null and mgr.is_operational("navigation"),
-		"scanners": mgr != null and mgr.is_operational("scanners"),
-		"propulsion": mgr != null and mgr.is_operational("propulsion"),
-	}
+	var ops: Dictionary = _current_systems_ops()
 	var skill: int = 0
 	if player_progression != null and player_progression.has_method("get_skill_level"):
 		skill = int(player_progression.get_skill_level("scanner_operation"))
@@ -987,8 +998,7 @@ func _reattach_starting_gameplay_roots() -> void:
 func travel_to(marker) -> Dictionary:
 	if current_ship == null or sargasso_world == null or travel_controller == null or ship_generator == null:
 		return {"success": false, "reason": "not_ready", "ship": null}
-	var mgr = current_ship.systems_manager
-	var ops_t: Dictionary = {"propulsion": mgr != null and mgr.is_operational("propulsion")}
+	var ops_t: Dictionary = {"propulsion": bool(_current_systems_ops().get("propulsion", false))}
 	var result: Dictionary = travel_controller.attempt_travel(
 		marker, ops_t, sargasso_world, ship_generator, scanner_state.range_radius)
 	if not bool(result.get("success", false)):
@@ -1208,6 +1218,12 @@ func _add_interactable_to_sequence(sequence: int, interactable: Node) -> void:
 	sequence_interactables[sequence].append(interactable)
 
 func _on_player_interact_requested(player_body: PlayerController) -> void:
+	# Phase 4.5: while aboard a traveled derelict the starting ship's retained
+	# interactables/pickups are detached but still referenced here; gate them so
+	# a derelict cannot complete stale starting-ship objectives. Derelicts have
+	# no interactables of their own yet, so there is nothing to interact with.
+	if away_from_start:
+		return
 	# REQ-007: tool pickup is an interaction like any other. Try it first
 	# (before objective interactables) so the player can pick up the pump
 	# when standing in front of it.
