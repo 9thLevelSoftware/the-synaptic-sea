@@ -9,6 +9,8 @@ const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd"
 const FireStateScript := preload("res://scripts/systems/fire_state.gd")
 const ElectricalArcStateScript := preload("res://scripts/systems/electrical_arc_state.gd")
 const ObjectiveProgressStateScript := preload("res://scripts/systems/objective_progress_state.gd")
+const PlayerProgressionStateScript := preload("res://scripts/systems/player_progression_state.gd")
+const ClassDefinitionScript := preload("res://scripts/systems/class_definition.gd")
 
 func _initialize() -> void:
 	# Direct service smoke (REQ-012).
@@ -83,6 +85,10 @@ func _initialize() -> void:
 	original.fire_summary = fire.get_summary()
 	original.electrical_arc_summary = arc.get_summary()
 	original.objective_progress_summary = progress.get_summary()
+	var progression := PlayerProgressionStateScript.new()
+	progression.configure(ClassDefinitionScript.load_all()["engineer"], progression.load_skills_catalog())
+	progression.grant_xp("repair", 100)
+	original.player_progression_summary = progression.get_summary()
 	original.slice_version = SaveLoadServiceScript.CURRENT_SLICE_VERSION
 	original.godot_version = Engine.get_version_info()["string"]
 	original.saved_at = Time.get_datetime_string_from_system(true)
@@ -114,8 +120,8 @@ func _initialize() -> void:
 	if loaded.current_objective_sequence != original.current_objective_sequence:
 		_fail("current_objective_sequence mismatch")
 		return
-	if loaded.get_summary_count() != 7:
-		_fail("summary_count=%d expected 7" % loaded.get_summary_count())
+	if loaded.get_summary_count() != 8:
+		_fail("summary_count=%d expected 8" % loaded.get_summary_count())
 		return
 	if not loaded.ship_systems_summary.has("systems") or not loaded.ship_systems_summary.has("system_order"):
 		_fail("ship_systems_summary missing manager keys after round-trip")
@@ -146,6 +152,9 @@ func _initialize() -> void:
 		return
 	if not _dicts_equal(loaded.objective_progress_summary, original.objective_progress_summary):
 		_fail("objective_progress_summary mismatch")
+		return
+	if str(loaded.player_progression_summary.get("class_id", "")) != "engineer":
+		_fail("player_progression_summary class_id not restored")
 		return
 
 	# Version mismatch rejection: write a snapshot with the wrong slice_version
@@ -178,7 +187,7 @@ func _initialize() -> void:
 		_fail("delete_current_run did not remove the file")
 		return
 
-	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=7")
+	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=8")
 	quit(0)
 
 func _dicts_equal(a: Dictionary, b: Dictionary) -> bool:
