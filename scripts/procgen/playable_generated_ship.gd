@@ -2607,15 +2607,21 @@ func _build_run_snapshot() -> RunSnapshot:
 	snapshot.saved_at = Time.get_datetime_string_from_system(true)
 	return snapshot
 
-## Writes the current snapshot to disk. Returns true on success.
+## Writes the whole world to the single save slot. Routed through the
+## world-save format (ADR-0012) so every write to user://saves/current_run.json
+## — auto-save here AND manual request_save — is a WorldSnapshot. Otherwise an
+## auto-save on objective completion would overwrite a manual F5 world-save with
+## a RunSnapshot and fail the version gate on the next load. The in-memory
+## RunSnapshot seam (last_saved_snapshot / get_last_saved_snapshot) is preserved
+## because the auto-save regression smokes assert its current_objective_sequence.
 func _auto_save_current_run() -> bool:
 	if save_load_service == null or slice_complete:
 		return false
-	var snapshot: RunSnapshot = _build_run_snapshot()
-	if snapshot == null:
+	var ws = _build_world_snapshot()
+	if ws == null:
 		return false
-	if save_load_service.save_current_run(snapshot):
-		last_saved_snapshot = snapshot
+	if save_load_service.save_world(ws):
+		last_saved_snapshot = _build_run_snapshot()  # preserve in-memory RunSnapshot seam (get_last_saved_snapshot)
 		return true
 	return false
 

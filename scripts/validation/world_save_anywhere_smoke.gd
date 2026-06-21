@@ -108,6 +108,14 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	if String(playable.get_current_ship().marker_id) != "":
 		_fail("current ship after home-saved load is not the home ship")
 		return
+	# FIX 1 coverage: after a home-saved reload, the starting-ship gameplay roots
+	# must be re-attached under the coordinator so the home sim rebuilds in-tree.
+	if playable.oxygen_root == null or playable.oxygen_root.get_parent() != playable:
+		_fail("oxygen_root not re-attached under coordinator after home-saved reload")
+		return
+	if playable.interaction_root == null or playable.interaction_root.get_parent() != playable:
+		_fail("interaction_root not re-attached under coordinator after home-saved reload")
+		return
 
 	finished = true
 	print("WORLD SAVE ANYWHERE PASS away_save=true location_restored=true state_restored=true home_save=true")
