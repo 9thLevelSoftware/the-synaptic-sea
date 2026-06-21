@@ -22,6 +22,10 @@ const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_ma
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const PlayerProgressionScript := preload("res://scripts/systems/player_progression_state.gd")
 const ClassDefinitionScript := preload("res://scripts/systems/class_definition.gd")
+const ShipInstanceScript := preload("res://scripts/systems/ship_instance.gd")
+const SargassoWorldScript := preload("res://scripts/systems/sargasso_world.gd")
+const ScannerStateScript := preload("res://scripts/systems/scanner_state.gd")
+const TravelControllerScript := preload("res://scripts/systems/travel_controller.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -102,6 +106,15 @@ var playable_started: bool = false
 var last_failure_reason: String = ""
 var ship_systems_manager   # ShipSystemsManager (untyped: class_name globals unreliable under --headless --script)
 var player_progression   # PlayerProgressionState (untyped: class_name unreliable headless)
+var current_ship           # ShipInstance (untyped: class_name globals unreliable headless)
+var sargasso_world         # SargassoWorld
+var scanner_state          # ScannerState
+var travel_controller      # TravelController
+var ship_generator         # ShipGenerator (injected into travel)
+# True while the player is aboard a traveled derelict (not the starting ship).
+# Gates the starting-ship hazard/objective _process so the unoccupied starting
+# ship does not keep simulating in the background.
+var away_from_start: bool = false
 const REPAIR_OBJECTIVE_XP: int = 50
 # Narrative objective flags with no manager backing (supplies/logs). Set on
 # completion; persisted in the snapshot; read by _manager_compat_summary().
@@ -870,6 +883,15 @@ func _build_runtime_nodes() -> void:
 	# REQ-012: current-run save/load service. Single slot at
 	# user://saves/current_run.json; deleted on playable_slice_completed.
 	save_load_service = SaveLoadServiceScript.new()
+	# Phase 4.5: Sargasso map + scanner + travel. Seed the world from the
+	# starting blueprint's seed so the marker field is deterministic per run.
+	# Player starts at Sargasso map origin (abstract X-Z map space — NOT the
+	# physical scene origin where ship geometry is instantiated).
+	var start_bp = _load_blueprint_for_systems()
+	sargasso_world = SargassoWorldScript.new(start_bp.seed_value, Vector3.ZERO)
+	scanner_state = ScannerStateScript.new()
+	travel_controller = TravelControllerScript.new()
+	ship_generator = ShipGeneratorScript.new()
 
 ## Configures the progression model from starting_class_id (defaults to engineer
 ## when the id is unknown). Idempotent: re-callable on reload.
@@ -904,6 +926,81 @@ func get_ship_systems_manager():
 ## Validation seam: the live PlayerProgressionState (null before _build_runtime_nodes()).
 func get_player_progression():
 	return player_progression
+
+## Phase 4.5 validation seam: the current ShipInstance (null before the first
+## ship loads).
+func get_current_ship():
+	return current_ship
+
+## Phase 4.5 validation seam: the SargassoWorld map model.
+func get_sargasso_world():
+	return sargasso_world
+
+## Resolves the visible markers at the gated detail level, deriving operational
+## status from the CURRENT ship's systems and scanner skill from progression.
+func scan() -> Dictionary:
+	if current_ship == null or sargasso_world == null or scanner_state == null:
+		return {"detail_level": 0, "markers": []}
+	var mgr = current_ship.systems_manager
+	var ops: Dictionary = {
+		"navigation": mgr != null and mgr.is_operational("navigation"),
+		"scanners": mgr != null and mgr.is_operational("scanners"),
+		"propulsion": mgr != null and mgr.is_operational("propulsion"),
+	}
+	var skill: int = 0
+	if player_progression != null and player_progression.has_method("get_skill_level"):
+		skill = int(player_progression.get_skill_level("scanner_operation"))
+	return scanner_state.scan(sargasso_world, ops, skill)
+
+## Resolves a marker by id from the in-range set and travels to it. Returns
+## {success:false, reason:"unknown_marker"} if the id is not currently in range.
+func travel_to_marker_id(marker_id: String) -> Dictionary:
+	if sargasso_world == null or scanner_state == null:
+		return {"success": false, "reason": "not_ready", "ship": null}
+	for m in sargasso_world.markers_in_range(scanner_state.range_radius):
+		if String(m.marker_id) == marker_id:
+			return travel_to(m)
+	return {"success": false, "reason": "unknown_marker", "ship": null}
+
+## Validates + executes a jump to a marker, swapping current_ship and re-homing
+## the player on success. Travel is gated by the CURRENT ship's propulsion.
+func travel_to(marker) -> Dictionary:
+	if current_ship == null or sargasso_world == null or travel_controller == null or ship_generator == null:
+		return {"success": false, "reason": "not_ready", "ship": null}
+	var mgr = current_ship.systems_manager
+	var ops_t: Dictionary = {"propulsion": mgr != null and mgr.is_operational("propulsion")}
+	var result: Dictionary = travel_controller.attempt_travel(
+		marker, ops_t, sargasso_world, ship_generator, scanner_state.range_radius)
+	if not bool(result.get("success", false)):
+		return result
+	var new_root: Node3D = result.get("ship", null)
+	if new_root == null:
+		return {"success": false, "reason": "generation_failed", "ship": null}
+
+	# Detach/free the ship we are leaving. The starting ship is detached-not-freed
+	# (retains its persistent sim, frozen by removal from the tree); a traveled
+	# derelict is freed (stateless — regenerated from seed if revisited).
+	var leaving = current_ship
+	if leaving.scene_root != null and is_instance_valid(leaving.scene_root):
+		remove_child(leaving.scene_root)
+		if String(leaving.marker_id) != "":
+			leaving.scene_root.queue_free()
+
+	# Build a per-ship systems manager for the new derelict, seeded by its
+	# condition so a wrecked ship boards with mostly-offline systems.
+	var new_bp = ShipBlueprintScript.new(int(marker.size_class), int(marker.condition), int(marker.seed_value))
+	var new_mgr = ShipSystemsManagerScript.new()
+	new_mgr.configure(new_mgr.load_definitions(), new_bp.condition, new_bp.seed_value)
+
+	add_child(new_root)
+	current_ship = ShipInstanceScript.create("ship_%s" % String(marker.marker_id), String(marker.marker_id), new_bp, new_mgr, new_root)
+	away_from_start = true
+
+	# Re-home the existing player + camera into the new ship's spawn. The player
+	# node, camera, HUD, progression and inventory are NEVER freed (player-owned).
+	if player != null and new_root.has_method("get_start_transform"):
+		player.teleport_to(new_root.get_start_transform().origin + Vector3(0.0, PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR, 0.0))
+	return result
 
 ## Validation seam: true if any combined status line contains `token`.
 func get_combined_system_status_lines_contains(token: String) -> bool:
@@ -955,6 +1052,11 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_build_hud_layer()
 	_spawn_player()
 	_spawn_camera()
+	# Phase 4.5: wrap the freshly-loaded starting ship as current_ship. Reuses
+	# the coordinator's existing ship_systems_manager (Approach A: the starting
+	# slice's systems are untouched). marker_id "" marks it as the home ship.
+	if current_ship == null:
+		current_ship = ShipInstanceScript.create("ship_start", "", _load_blueprint_for_systems(), ship_systems_manager, loader)
 	_build_interactables()
 	_build_slice_affordance_labels()
 	_build_route_control_gates()
@@ -1357,6 +1459,8 @@ func get_route_gate_collision_enabled_count() -> int:
 # and is intentionally a no-op before ship load completes.
 
 func _process(delta: float) -> void:
+	if away_from_start:
+		return
 	if not playable_started or slice_complete:
 		return
 	if oxygen_state == null:
