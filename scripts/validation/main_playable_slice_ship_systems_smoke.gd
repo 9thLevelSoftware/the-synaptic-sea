@@ -1,8 +1,13 @@
 extends SceneTree
 
+## Manager-driven runtime-consequence smoke. Proves the live coordinator
+## derives gates/breach/extraction/HUD from ShipSystemsManager (not the
+## retired ShipSystemState). Deterministic: the smoke damages the relevant
+## power subcomponents at setup, then drives objectives and asserts the
+## derived consequences (independent of the blueprint's seeded damage set).
+
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const TIMEOUT_FRAMES: int = 300
-const EXPECTED_OBJECTIVE_COUNT: int = 4
 
 var main_node: Node
 var frame_count: int = 0
@@ -32,59 +37,35 @@ func _on_process_frame() -> void:
 	_validate(playable)
 
 func _validate(playable: PlayableGeneratedShip) -> void:
-	# Surface missing API explicitly so RED output is unambiguous.
-	if not playable.has_method("get_ship_systems_summary"):
-		_fail("get_ship_systems_summary missing")
-		return
-	if playable.ship_systems == null:
-		_fail("ship_systems null")
+	var mgr = playable.get_ship_systems_manager()
+	if mgr == null:
+		_fail("ship_systems_manager null")
 		return
 
-	# Initial state assertions ----------------------------------------------------
+	# Deterministic setup: break the power subcomponents the objectives repair.
+	mgr.get_system("power").get_subcomponent("power_distribution").health = 0.0
+	mgr.get_system("power").get_subcomponent("battery_cells").health = 0.0
+	mgr.get_system("power").get_subcomponent("reactor_core").health = 0.0
+
 	var initial: Dictionary = playable.get_ship_systems_summary()
-	for key in [
-		"emergency_supplies_recovered",
-		"main_power_restored",
-		"navigation_logs_downloaded",
-		"reactor_stabilized",
-		"blocked_routes_cleared",
-		"extraction_unlocked",
-	]:
-		if not initial.has(key):
-			_fail("summary missing key %s" % key)
-			return
-		if bool(initial[key]):
-			_fail("initial %s should be false" % key)
-			return
-	if int(initial.get("power_percent", -1)) != 18:
-		_fail("initial power_percent=%d expected 18" % int(initial.get("power_percent", -1)))
+	if bool(initial.get("main_power_restored", true)):
+		_fail("initial main_power_restored should be false after breaking power subs")
 		return
-	if int(initial.get("reactor_stability_percent", -1)) != 22:
-		_fail("initial reactor_stability_percent=%d expected 22" % int(initial.get("reactor_stability_percent", -1)))
-		return
-	if int(initial.get("blocked_affordance_visible_count", -1)) < 1:
-		_fail("initial blocked_affordance_visible_count=%d expected >=1" % int(initial.get("blocked_affordance_visible_count", -1)))
+	if bool(initial.get("extraction_unlocked", true)):
+		_fail("initial extraction_unlocked should be false")
 		return
 
-	# Objective 1: recover_supplies ----------------------------------------------
+	# Objective 1: recover_supplies (narrative flag, no system) -------------------
 	if not playable.complete_objective_sequence_for_validation(1):
-		_fail("complete_objective_sequence_for_validation(1) returned false")
+		_fail("complete obj1 returned false")
 		return
-	var s1: Dictionary = playable.get_ship_systems_summary()
-	if not bool(s1.get("emergency_supplies_recovered", false)):
+	if not bool(playable.get_ship_systems_summary().get("emergency_supplies_recovered", false)):
 		_fail("after obj1 emergency_supplies_recovered=false")
 		return
-	if int(s1.get("completed_system_count", 0)) != 1:
-		_fail("after obj1 completed_system_count=%d expected 1" % int(s1.get("completed_system_count", 0)))
-		return
-	var hud_text_1: String = playable.tracker.get_hud_text()
-	if not hud_text_1.contains("Systems:"):
-		_fail("after obj1 HUD missing 'Systems:' section")
-		return
 
-	# Objective 2: restore_systems -----------------------------------------------
+	# Objective 2: restore_systems -> power_distribution + battery_cells repaired -
 	if not playable.complete_objective_sequence_for_validation(2):
-		_fail("complete_objective_sequence_for_validation(2) returned false")
+		_fail("complete obj2 returned false")
 		return
 	var s2: Dictionary = playable.get_ship_systems_summary()
 	if not bool(s2.get("main_power_restored", false)):
@@ -93,69 +74,62 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	if not bool(s2.get("blocked_routes_cleared", false)):
 		_fail("after obj2 blocked_routes_cleared=false")
 		return
-	if int(s2.get("power_percent", 0)) != 72:
-		_fail("after obj2 power_percent=%d expected 72" % int(s2.get("power_percent", 0)))
-		return
 	if int(s2.get("blocked_affordance_visible_count", -1)) != 0:
-		_fail("after obj2 blocked_affordance_visible_count=%d expected 0" % int(s2.get("blocked_affordance_visible_count", -1)))
+		_fail("after obj2 blocked_affordance_visible_count!=0")
+		return
+	# Breach must have sealed (oxygen model fed the compat summary).
+	if not bool(playable.get_oxygen_summary().get("breach_sealed", false)):
+		_fail("after obj2 breach_sealed=false")
+		return
+	# Route gates opened (route-control fed the compat summary).
+	if int(playable.get_route_control_summary().get("opened_gate_count", 0)) < 1:
+		_fail("after obj2 no route gates opened")
+		return
+	# Extraction must still be locked (reactor not yet stabilized).
+	if bool(s2.get("extraction_unlocked", true)):
+		_fail("after obj2 extraction_unlocked should still be false")
 		return
 
-	# Objective 3: download_logs -------------------------------------------------
+	# Objective 3: download_logs (narrative flag) --------------------------------
 	if not playable.complete_objective_sequence_for_validation(3):
-		_fail("complete_objective_sequence_for_validation(3) returned false")
+		_fail("complete obj3 returned false")
 		return
-	var s3: Dictionary = playable.get_ship_systems_summary()
-	if not bool(s3.get("navigation_logs_downloaded", false)):
+	if not bool(playable.get_ship_systems_summary().get("navigation_logs_downloaded", false)):
 		_fail("after obj3 navigation_logs_downloaded=false")
 		return
 
-	# Objective 4: stabilize_reactor --------------------------------------------
+	# Objective 4: stabilize_reactor -> reactor_core full, extraction unlocks -----
 	if not playable.complete_objective_sequence_for_validation(4):
-		_fail("complete_objective_sequence_for_validation(4) returned false")
+		_fail("complete obj4 returned false")
 		return
 	var s4: Dictionary = playable.get_ship_systems_summary()
 	if not bool(s4.get("reactor_stabilized", false)):
 		_fail("after obj4 reactor_stabilized=false")
 		return
-	if int(s4.get("reactor_stability_percent", 0)) != 100:
-		_fail("after obj4 reactor_stability_percent=%d expected 100" % int(s4.get("reactor_stability_percent", 0)))
-		return
 	if not bool(s4.get("extraction_unlocked", false)):
 		_fail("after obj4 extraction_unlocked=false")
 		return
+	if int(s4.get("power_percent", 0)) != 100:
+		_fail("after obj4 power_percent=%d expected 100" % int(s4.get("power_percent", 0)))
+		return
+	if int(s4.get("reactor_stability_percent", 0)) != 100:
+		_fail("after obj4 reactor_stability_percent=%d expected 100" % int(s4.get("reactor_stability_percent", 0)))
+		return
 	if not bool(playable.get_slice_completion_summary().get("run_complete", false)):
-		_fail("after obj4 slice_complete=false")
+		_fail("after obj4 run_complete=false")
+		return
+	# Now the whole power system is operational (all subs functional).
+	if not mgr.is_operational("power"):
+		_fail("after obj4 is_operational(power)=false")
 		return
 
-	# Idempotence: re-applying obj4 must not duplicate sequence or counters.
-	playable.ship_systems.apply_objective(4, "stabilize_reactor", "reactor_01:reactor_01_reactor_control_panel", "reactor_01")
-	var s4b: Dictionary = playable.get_ship_systems_summary()
-	if int(s4b.get("completed_system_count", 0)) != 4:
-		_fail("idempotent reapply completed_system_count=%d expected 4" % int(s4b.get("completed_system_count", 0)))
-		return
-	var seq_array: Array = s4b.get("completed_sequences", [])
-	if seq_array.size() != 4:
-		_fail("completed_sequences size=%d expected 4" % seq_array.size())
-		return
-
-	# Direct model-level idempotence check (independent of slice lifecycle).
-	var model := ShipSystemState.new()
-	model.apply_objective(1, "recover_supplies", "obj1", "cargo_01")
-	model.apply_objective(1, "recover_supplies", "obj1", "cargo_01")
-	model.apply_objective(2, "restore_systems", "obj2", "maintenance_01")
-	if model.get_summary().get("completed_sequences", []).size() != 2:
-		_fail("direct model idempotence failed: completed_sequences size=%d expected 2" % model.get_summary().get("completed_sequences", []).size())
-		return
-	if int(model.get_summary().get("power_percent", 0)) != 72:
-		_fail("direct model idempotence: power_percent=%d expected 72 after second apply of restore_systems" % int(model.get_summary().get("power_percent", 0)))
-		return
-	if int(model.get_summary().get("completed_system_count", 0)) != 2:
-		_fail("direct model idempotence: completed_system_count=%d expected 2" % int(model.get_summary().get("completed_system_count", 0)))
+	# HUD includes the systems section.
+	if not playable.tracker.get_hud_text().contains("Systems:"):
+		_fail("HUD missing 'Systems:' section")
 		return
 
 	finished = true
-	print("MAIN PLAYABLE SHIP SYSTEMS PASS supplies=true power=true logs=true reactor=true extraction=true blocked_visible=0 completed_systems=4")
-	# Clean up the test-spawned main scene to avoid Godot leak warnings on quit.
+	print("MAIN PLAYABLE SHIP SYSTEMS PASS power=true breach_sealed=true gates_open=true logs=true reactor=true extraction=true power_pct=100")
 	if main_node != null and is_instance_valid(main_node):
 		main_node.queue_free()
 	quit(0)

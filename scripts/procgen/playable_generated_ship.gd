@@ -61,6 +61,16 @@ const ARC_ZONE_VISUAL_COLOR_ARCING: Color = Color(0.95, 0.32, 1.0, 0.82)
 const ARC_ZONE_LABEL_TEXT_DISCHARGED: String = "ARC GROUNDED — CROSS"
 const ARC_ZONE_LABEL_TEXT_ARCING: String = "ARC LIVE — WAIT"
 
+# Objective bridge: which manager subcomponents each objective brings operational.
+# restore_systems delivers main power (distribution + battery); stabilize_reactor
+# brings the reactor core to full health (extraction). download_logs/recover_supplies
+# are narrative beats with no system backing.
+const OBJECTIVE_REPAIR_MAP: Dictionary = {
+	"restore_systems": [["power", "power_distribution"], ["power", "battery_cells"]],
+	"download_logs": [["navigation", "nav_computer"]],
+	"stabilize_reactor": [["power", "reactor_core"]],
+}
+
 @export var layout_path: String = DEFAULT_LAYOUT_PATH
 @export var kit_path: String = DEFAULT_KIT_PATH
 @export var gameplay_slice_path: String = DEFAULT_GAMEPLAY_SLICE_PATH
@@ -90,6 +100,9 @@ var playable_started: bool = false
 var last_failure_reason: String = ""
 var ship_systems: ShipSystemState
 var ship_systems_manager   # ShipSystemsManager (untyped: class_name globals unreliable under --headless --script)
+# Narrative objective flags with no manager backing (supplies/logs). Set on
+# completion; persisted in the snapshot; read by _manager_compat_summary().
+var completed_objective_types: Dictionary = {}
 var route_control_state: RouteControlState
 var route_control_root: Node3D
 var route_gate_nodes: Array = []
@@ -1074,21 +1087,23 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 		# Fall through to single-step completion path exactly once.
 
 	objective_completion_count += 1
-	if ship_systems != null:
-		ship_systems.apply_objective(sequence, objective_type, objective_id, room_id)
+	if ship_systems_manager != null:
+		completed_objective_types[objective_type] = true
+		for pair in OBJECTIVE_REPAIR_MAP.get(objective_type, []):
+			ship_systems_manager.force_repair(str(pair[0]), str(pair[1]))
+		var compat: Dictionary = _manager_compat_summary()
 		_apply_ship_systems_consequences(objective_type)
 		_refresh_route_control_from_ship_systems()
 		if oxygen_state != null:
-			oxygen_state.apply_ship_systems_summary(ship_systems.get_summary())
+			oxygen_state.apply_ship_systems_summary(compat)
 			_refresh_oxygen_state(false, 0.0)
-		var ship_summary: Dictionary = ship_systems.get_summary()
 		var route_summary: Dictionary = get_route_control_summary()
 		print("SHIP SYSTEM UPDATED sequence=%d type=%s power=%d reactor=%d extraction=%s route_opened=%d blockers=%d" % [
 			sequence,
 			objective_type,
-			int(ship_summary.get("power_percent", 0)),
-			int(ship_summary.get("reactor_stability_percent", 0)),
-			str(bool(ship_summary.get("extraction_unlocked", false))),
+			int(compat.get("power_percent", 0)),
+			int(compat.get("reactor_stability_percent", 0)),
+			str(bool(compat.get("extraction_unlocked", false))),
 			int(route_summary.get("opened_gate_count", 0)),
 			int(route_summary.get("active_blocker_count", 0)),
 		])
@@ -1148,10 +1163,10 @@ func get_blocked_affordance_visible_count() -> int:
 	return count
 
 func _refresh_route_control_from_ship_systems() -> void:
-	if route_control_state == null or ship_systems == null:
+	if route_control_state == null or ship_systems_manager == null:
 		_refresh_tracker_system_status_lines()
 		return
-	route_control_state.apply_ship_systems_summary(ship_systems.get_summary())
+	route_control_state.apply_ship_systems_summary(_manager_compat_summary())
 	_apply_route_gate_scene_state()
 	_refresh_tracker_system_status_lines()
 
@@ -1189,12 +1204,14 @@ func _refresh_tracker_system_status_lines() -> void:
 
 func _combined_system_status_lines() -> PackedStringArray:
 	var lines: PackedStringArray = PackedStringArray()
-	if ship_systems != null:
-		for line in ship_systems.get_status_lines():
-			var text: String = String(line)
-			if text.begins_with("Routes:") or text.begins_with("Extraction:"):
-				continue
-			lines.append(text)
+	if ship_systems_manager != null:
+		var compat: Dictionary = _manager_compat_summary()
+		lines.append("Power: %d%%" % int(compat.get("power_percent", 0)))
+		lines.append("Reactor: %d%%" % int(compat.get("reactor_stability_percent", 0)))
+		lines.append("Supplies: %s" % ("OK" if bool(compat.get("emergency_supplies_recovered", false)) else "LOW"))
+		lines.append("Main Power: %s" % ("ON" if bool(compat.get("main_power_restored", false)) else "OFF"))
+		lines.append("Logs: %s" % ("DOWNLOADED" if bool(compat.get("navigation_logs_downloaded", false)) else "PENDING"))
+		lines.append("Reactor: %s" % ("STABLE" if bool(compat.get("reactor_stabilized", false)) else "UNSTABLE"))
 	if route_control_state != null:
 		for line in route_control_state.get_status_lines():
 			lines.append(String(line))
@@ -1210,22 +1227,54 @@ func _combined_system_status_lines() -> PackedStringArray:
 func get_combined_system_status_lines() -> PackedStringArray:
 	return _combined_system_status_lines()
 
+func _sub_health(system_id: String, sub_id: String) -> float:
+	if ship_systems_manager == null:
+		return 0.0
+	var system = ship_systems_manager.get_system(system_id)
+	if system == null:
+		return 0.0
+	var sub = system.get_subcomponent(sub_id)
+	return sub.health if sub != null else 0.0
+
+func _sub_functional(system_id: String, sub_id: String) -> bool:
+	if ship_systems_manager == null:
+		return false
+	var system = ship_systems_manager.get_system(system_id)
+	if system == null:
+		return false
+	var sub = system.get_subcomponent(sub_id)
+	return sub != null and sub.is_functional()
+
+## Flag-shaped summary derived from manager subcomponent state + the narrative
+## record. Feeds the unchanged route_control_state / breach oxygen_state models
+## and the HUD, replacing ShipSystemState.get_summary().
+func _manager_compat_summary() -> Dictionary:
+	var power_restored: bool = _sub_functional("power", "power_distribution") and _sub_functional("power", "battery_cells")
+	var reactor_full: bool = _sub_health("power", "reactor_core") >= 1.0
+	var power_health: float = 0.0
+	if ship_systems_manager != null and ship_systems_manager.get_system("power") != null:
+		power_health = ship_systems_manager.get_system("power").health()
+	return {
+		"emergency_supplies_recovered": completed_objective_types.has("recover_supplies"),
+		"main_power_restored": power_restored,
+		"navigation_logs_downloaded": completed_objective_types.has("download_logs"),
+		"reactor_stabilized": reactor_full,
+		"blocked_routes_cleared": power_restored,
+		"extraction_unlocked": reactor_full,
+		"power_percent": int(round(power_health * 100.0)),
+		"reactor_stability_percent": int(round(_sub_health("power", "reactor_core") * 100.0)),
+	}
+
 func get_ship_systems_summary() -> Dictionary:
 	var summary: Dictionary = {}
-	if ship_systems == null:
-		summary["emergency_supplies_recovered"] = false
+	if ship_systems_manager == null:
 		summary["main_power_restored"] = false
-		summary["navigation_logs_downloaded"] = false
-		summary["reactor_stabilized"] = false
-		summary["blocked_routes_cleared"] = false
 		summary["extraction_unlocked"] = false
 		summary["power_percent"] = 0
 		summary["reactor_stability_percent"] = 0
-		summary["completed_sequences"] = []
-		summary["completed_system_count"] = 0
 		summary["blocked_affordance_visible_count"] = 0
 		return summary
-	summary = ship_systems.get_summary()
+	summary = _manager_compat_summary()
 	summary["blocked_affordance_visible_count"] = get_blocked_affordance_visible_count()
 	return summary
 
