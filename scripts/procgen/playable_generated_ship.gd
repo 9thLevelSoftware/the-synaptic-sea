@@ -117,6 +117,14 @@ var ship_generator         # ShipGenerator (injected into travel)
 # Gates the starting-ship hazard/objective _process so the unoccupied starting
 # ship does not keep simulating in the background.
 var away_from_start: bool = false
+# Sub-project #1 (world persistence): every visited derelict is retained by
+# marker_id so its mutable state survives leaving. Only the ACTIVE ship has a
+# live scene_root; a derelict's geometry is regenerated from seed on revisit
+# while its systems_manager (and later objective/hazard/loot summaries) ride the
+# retained ShipInstance.
+var visited_ships: Dictionary = {}          # marker_id -> ShipInstance
+var home_ship = null                        # the home ShipInstance (marker_id "")
+var _home_player_position: Vector3 = Vector3.ZERO
 const REPAIR_OBJECTIVE_XP: int = 50
 # Narrative objective flags with no manager backing (supplies/logs). Set on
 # completion; persisted in the snapshot; read by _manager_compat_summary().
@@ -993,6 +1001,18 @@ func _reattach_starting_gameplay_roots() -> void:
 		if r != null and is_instance_valid(r) and r.get_parent() == null:
 			add_child(r)
 
+## Makes `inst` the active boarded derelict: detaches the home gameplay roots
+## (so they do not overlay the derelict at the shared local origin), attaches the
+## freshly built `new_root`, and flips away_from_start. Shared by travel_to
+## (revisit/first-visit) and world-load (_apply_world_snapshot). Does NOT re-home
+## the player — callers position the player afterwards.
+func _attach_derelict_active(inst, new_root: Node3D) -> void:
+	_detach_starting_gameplay_roots()
+	inst.scene_root = new_root
+	add_child(new_root)
+	current_ship = inst
+	away_from_start = true
+
 ## Validates + executes a jump to a marker, swapping current_ship and re-homing
 ## the player on success. Travel is gated by the CURRENT ship's propulsion.
 func travel_to(marker) -> Dictionary:
@@ -1007,35 +1027,72 @@ func travel_to(marker) -> Dictionary:
 	if new_root == null:
 		return {"success": false, "reason": "generation_failed", "ship": null}
 
-	# Detach/free the ship we are leaving. The starting ship is detached-not-freed
-	# (retains its persistent sim, frozen by removal from the tree); a traveled
-	# derelict is freed (stateless — regenerated from seed if revisited).
+	# Leaving the current ship. The HOME ship is detached-not-freed (retains its
+	# live sim); a DERELICT keeps its retained ShipInstance in visited_ships but
+	# frees its scene_root (geometry regenerates from seed on revisit).
 	var leaving = current_ship
-	if leaving.scene_root != null and is_instance_valid(leaving.scene_root):
-		remove_child(leaving.scene_root)
-		if String(leaving.marker_id) != "":
-			leaving.scene_root.queue_free()
-	# When leaving the STARTING ship, detach its gameplay roots too (see
-	# _detach_starting_gameplay_roots) so their collision/interaction volumes do
-	# not overlay the boarded derelict at the shared local origin.
 	if String(leaving.marker_id) == "":
+		_home_player_position = (player as Node3D).global_position if player != null and player is Node3D else _home_player_position
+		if leaving.scene_root != null and is_instance_valid(leaving.scene_root) and leaving.scene_root.get_parent() == self:
+			remove_child(leaving.scene_root)
 		_detach_starting_gameplay_roots()
+	else:
+		if leaving.scene_root != null and is_instance_valid(leaving.scene_root):
+			if leaving.scene_root.get_parent() == self:
+				remove_child(leaving.scene_root)
+			leaving.scene_root.queue_free()
+		leaving.scene_root = null  # retained instance, scene dropped
 
-	# Build a per-ship systems manager for the new derelict, seeded by its
-	# condition so a wrecked ship boards with mostly-offline systems.
-	var new_bp = ShipBlueprintScript.new(int(marker.size_class), int(marker.condition), int(marker.seed_value))
-	var new_mgr = ShipSystemsManagerScript.new()
-	new_mgr.configure(new_mgr.load_definitions(), new_bp.condition, new_bp.seed_value)
+	var mid: String = String(marker.marker_id)
+	var inst
+	if visited_ships.has(mid):
+		# Revisit: reuse the retained instance (its systems state is preserved);
+		# the freshly generated geometry replaces the freed scene.
+		inst = visited_ships[mid]
+	else:
+		# First visit: build the per-ship systems manager seeded by condition so a
+		# wrecked ship boards with mostly-offline systems, and register it.
+		var new_bp = ShipBlueprintScript.new(int(marker.size_class), int(marker.condition), int(marker.seed_value))
+		var new_mgr = ShipSystemsManagerScript.new()
+		new_mgr.configure(new_mgr.load_definitions(), new_bp.condition, new_bp.seed_value)
+		inst = ShipInstanceScript.create("ship_%s" % mid, mid, new_bp, new_mgr, null)
+		visited_ships[mid] = inst
 
-	add_child(new_root)
-	current_ship = ShipInstanceScript.create("ship_%s" % String(marker.marker_id), String(marker.marker_id), new_bp, new_mgr, new_root)
-	away_from_start = String(marker.marker_id) != ""
+	_attach_derelict_active(inst, new_root)
 
 	# Re-home the existing player + camera into the new ship's spawn. The player
 	# node, camera, HUD, progression and inventory are NEVER freed (player-owned).
 	if player != null and new_root.has_method("get_start_transform"):
 		player.teleport_to(new_root.get_start_transform().origin + Vector3(0.0, PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR, 0.0))
 	return result
+
+## Returns the player to the home ship instance: frees the active derelict's
+## scene (its retained instance stays in visited_ships), re-attaches the home
+## scene_root and gameplay roots, restores current_ship = home_ship, and re-homes
+## the player at the position they left from. Returns false if not currently away
+## or the home ship is unavailable.
+func travel_home() -> bool:
+	if not away_from_start or home_ship == null:
+		return false
+	var leaving = current_ship
+	if leaving != null and String(leaving.marker_id) != "":
+		if leaving.scene_root != null and is_instance_valid(leaving.scene_root):
+			if leaving.scene_root.get_parent() == self:
+				remove_child(leaving.scene_root)
+			leaving.scene_root.queue_free()
+		leaving.scene_root = null
+	if home_ship.scene_root != null and is_instance_valid(home_ship.scene_root) and home_ship.scene_root.get_parent() == null:
+		add_child(home_ship.scene_root)
+	_reattach_starting_gameplay_roots()
+	current_ship = home_ship
+	away_from_start = false
+	if player != null and player is Node3D:
+		(player as Node3D).global_position = _home_player_position
+	return true
+
+## Validation seam: the marker_ids of every retained visited derelict.
+func get_visited_ship_ids() -> Array:
+	return visited_ships.keys()
 
 ## Validation seam: true if any combined status line contains `token`.
 func get_combined_system_status_lines_contains(token: String) -> bool:
@@ -1106,6 +1163,9 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	# slice's systems are untouched). marker_id "" marks it as the home ship.
 	if current_ship == null:
 		current_ship = ShipInstanceScript.create("ship_start", "", _load_blueprint_for_systems(), ship_systems_manager, loader)
+		# Sub-project #1: keep a stable reference to the home ship so travel_home
+		# and world-load can restore it.
+		home_ship = current_ship
 	_build_interactables()
 	_build_slice_affordance_labels()
 	_build_route_control_gates()
