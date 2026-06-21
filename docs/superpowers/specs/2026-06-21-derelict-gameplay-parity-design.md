@@ -48,8 +48,10 @@ loop and nothing more.
 ## Requirements
 
 - Boarding a derelict spawns its generated objective loop (salvage per-room + `reach_goal`)
-  and the gameplay sim runs on the boarded ship (the `away_from_start` freeze is lifted for
-  the active derelict).
+  and its objectives are interactable on the boarded ship. Because #2 is objectives-only and
+  the loop is purely input-driven, only the Phase 4.5 interaction-gate is lifted for the
+  active derelict; the `_process` per-frame freeze stays (there is no derelict per-frame sim
+  until hazards land in #2b).
 - Completing a `salvage` objective marks it done; reaching `reach_goal` marks the derelict
   `cleared`. Both persist per-derelict.
 - Progress (objective state + `cleared`) survives leave/return and save/load via the
@@ -83,15 +85,16 @@ genuinely differ).
   in isolation. (Exact file boundary decided in the plan; it may be a thin RefCounted
   alongside `ObjectiveProgressState`, not a duplicate of it.)
 - Coordinator wiring: build/free the derelict's interactables on board/leave; lift the
-  `_process` freeze and the `_on_player_interact_requested` gate for the active derelict;
-  route the derelict's interactable-completion to the controller; capture/restore the
-  controller summary into the `ShipInstance` slice.
+  `_on_player_interact_requested` gate for the active derelict (the `_process` freeze stays —
+  no per-frame derelict sim in #2); route the derelict's interactable-completion to the
+  controller; capture/restore the controller summary into the `ShipInstance` slice.
 
 ### Lifecycle
 - **Board a derelict** (travel/world-load activation): build the derelict's objective loop
   from its loader specs into the derelict objective root; restore any persisted
   `ObjectiveProgressState` + `cleared` from the `ShipInstance` slice (so completed objectives
-  read as done and spent salvage is not respawned); run the sim (no `_process` freeze).
+  read as done and spent salvage is not respawned); the objectives are immediately
+  interactable (interaction gate lifted).
 - **Interact** on a derelict objective: the controller records completion; `reach_goal`
   completion sets `cleared`.
 - **Leave** (travel away / travel home / world-load to another ship): the derelict's
@@ -136,8 +139,9 @@ Gate-1 must stay clean):
 - **Pure-model smoke**: the derelict objective controller — register the generated objective
   set, complete salvage objectives (marked done), complete `reach_goal` (`is_cleared()`
   true), and assert `get_summary` / `apply_summary` round-trips progress + `cleared`.
-- **Main-scene smoke**: board a generated derelict → its objectives are present and the sim
-  runs (assert not frozen) → complete a salvage objective → reach goal → `cleared` set →
+- **Main-scene smoke**: board a generated derelict → its objectives are present and
+  interactable while aboard (the interaction gate is lifted) → complete a salvage objective →
+  reach goal → `cleared` set →
   leave → revisit → completed/cleared state restored and spent salvage not respawned →
   return home and assert the home objective loop is intact.
 
