@@ -353,7 +353,7 @@ func get_objective_progress_summary() -> Dictionary:
 func get_interactable_by_sequence(sequence: int):
 	var group: Array = sequence_interactables.get(sequence, [])
 	for interactable in group:
-		if int(interactable.get("sequence")) == sequence:
+		if is_instance_valid(interactable) and int(interactable.get("sequence")) == sequence:
 			return interactable
 	return null
 
@@ -364,7 +364,7 @@ func get_interactable_by_sequence(sequence: int):
 func get_interactables_by_sequence(sequence: int) -> Array:
 	var out: Array = []
 	for interactable in sequence_interactables.get(sequence, []):
-		if int(interactable.get("sequence")) == sequence:
+		if is_instance_valid(interactable) and int(interactable.get("sequence")) == sequence:
 			out.append(interactable)
 	return out
 
