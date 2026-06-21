@@ -10,6 +10,7 @@ class_name ShipInstance
 
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
+const DerelictObjectiveControllerScript := preload("res://scripts/systems/derelict_objective_controller.gd")
 
 var ship_id: String = ""
 var marker_id: String = ""          # "" for the starting ship; cell:cell:index for traveled ships
@@ -21,6 +22,10 @@ var scene_root: Node3D = null       # generated/loaded tree; null when not insta
 var parent_ship = null              # ShipInstance | null
 var docked_ships: Array = []        # Array[ShipInstance]
 var docking_ports: Array = []       # Array (DockingPort in Phase 5)
+
+# Sub-project #2: per-derelict objective loop state. Lazily created; null for the
+# home ship (which uses the coordinator's singleton loop, not this controller).
+var objective_controller = null          # DerelictObjectiveController | null
 
 # Static factory via load() self-reference (class_name globals unreliable under
 # --headless --script).
@@ -41,12 +46,15 @@ func get_summary() -> Dictionary:
 	var sys_dict: Dictionary = {}
 	if systems_manager != null and systems_manager.has_method("get_summary"):
 		sys_dict = systems_manager.get_summary()
-	return {
+	var result: Dictionary = {
 		"ship_id": ship_id,
 		"marker_id": marker_id,
 		"blueprint": bp_dict,
 		"systems": sys_dict,
 	}
+	if objective_controller != null:
+		result["objective"] = objective_controller.get_summary()
+	return result
 
 func apply_summary(summary) -> bool:
 	if typeof(summary) != TYPE_DICTIONARY or (summary as Dictionary).is_empty():
@@ -62,4 +70,15 @@ func apply_summary(summary) -> bool:
 			systems_manager = ShipSystemsManagerScript.new()
 			systems_manager.configure(systems_manager.load_definitions(), 0, 0)
 		systems_manager.apply_summary(sys_dict)
+	var obj_summary: Variant = summary.get("objective", null)
+	if typeof(obj_summary) == TYPE_DICTIONARY and not (obj_summary as Dictionary).is_empty():
+		if objective_controller == null:
+			objective_controller = DerelictObjectiveControllerScript.create()
+		objective_controller.apply_summary(obj_summary as Dictionary)
 	return true
+
+## Returns this ship's DerelictObjectiveController, creating it on first access.
+func get_objective_controller():
+	if objective_controller == null:
+		objective_controller = DerelictObjectiveControllerScript.create()
+	return objective_controller
