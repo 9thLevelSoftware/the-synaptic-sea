@@ -44,7 +44,12 @@ static func from_dict(data: Variant, expected_world_version: String, expected_go
 		return null
 	if str(dict.get("godot_version", "")) != expected_godot_version:
 		return null
-	var ws := WorldSnapshot.new()
+	# Construct via load() self-reference rather than WorldSnapshot.new():
+	# under --headless --script Godot does not rebuild the global class
+	# registry, so a freshly added class_name is not resolvable on a fresh
+	# checkout / CI / regenerated .godot. Mirrors ShipInstance.create.
+	var script: GDScript = load("res://scripts/systems/world_snapshot.gd")
+	var ws: WorldSnapshot = script.new()
 	ws.world_summary = _deep_copy_dict(dict.get("world_summary", {}))
 	ws.home_ship = _deep_copy_dict(dict.get("home_ship", {}))
 	ws.visited_ships = _deep_copy_dict(dict.get("visited_ships", {}))
