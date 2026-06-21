@@ -44,7 +44,7 @@ static func from_dict(data: Variant, expected_world_version: String, expected_go
 		return null
 	if str(dict.get("godot_version", "")) != expected_godot_version:
 		return null
-	var ws = new()
+	var ws := WorldSnapshot.new()
 	ws.world_summary = _deep_copy_dict(dict.get("world_summary", {}))
 	ws.home_ship = _deep_copy_dict(dict.get("home_ship", {}))
 	ws.visited_ships = _deep_copy_dict(dict.get("visited_ships", {}))
@@ -58,7 +58,7 @@ static func from_dict(data: Variant, expected_world_version: String, expected_go
 	ws.saved_at = str(dict.get("saved_at", ""))
 	return ws
 
-static func _deep_copy_dict(src) -> Dictionary:
+static func _deep_copy_dict(src: Variant) -> Dictionary:
 	if typeof(src) != TYPE_DICTIONARY:
 		return {}
 	return (src as Dictionary).duplicate(true)
