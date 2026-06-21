@@ -49,10 +49,10 @@ REQ012_WARNING="^WARNING: SaveLoadService: save file rejected by from_dict \\(mi
 # rejection path. It is the expected signal, not a failure (mirrors the
 # REQ-012 save/load rejection WARNING above).
 BLUEPRINT_NULL_ERROR="^ERROR: PlayableGeneratedShip\\.load_from_blueprint: blueprint must not be null\$"
-# REQ-012 fix: travel_integration_smoke calls request_save() while aboard a
-# traveled derelict to verify the away-save block. The block emits this
-# push_warning as its expected signal; it is not a failure.
-REQ012_AWAY_SAVE_WARNING="^WARNING: PlayableGeneratedShip: save blocked — cannot save while aboard a traveled derelict \\(away_from_start=true\\); return to the starting ship first\$"
+# world_save_service_smoke deliberately calls save_world(null) to verify the
+# null-snapshot guard; that guard emits this push_warning on the rejection
+# path. It is the expected signal, not a failure.
+WORLD_SAVE_NULL_WARNING="^WARNING: SaveLoadService: cannot save null world snapshot\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -61,7 +61,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$BLUEPRINT_NULL_ERROR|$REQ012_AWAY_SAVE_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$BLUEPRINT_NULL_ERROR|$WORLD_SAVE_NULL_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -129,7 +129,11 @@ run_clean 'travel controller smoke' 'TRAVEL CONTROLLER PASS propulsion_gate=true
 run_clean 'ship instance smoke' 'SHIP INSTANCE PASS round_trip=true stubs_present=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_instance_smoke.gd
 run_clean 'travel integration smoke' 'TRAVEL INTEGRATION PASS start_wrapped=true scan_gated=true propulsion_gate=true swapped=true progression_persists=true world_recorded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_integration_smoke.gd
 run_clean 'scanner panel smoke' 'SCANNER PANEL PASS populated=true selection_moves=true travel_invoked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_panel_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=61 clean_output=true'
+run_clean 'world snapshot smoke' 'WORLD SNAPSHOT PASS round_trip=true version_gated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_snapshot_smoke.gd
+run_clean 'world save service smoke' 'WORLD SAVE SERVICE PASS disk_round_trip=true rejects_null=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_save_service_smoke.gd
+run_clean 'world persist restore smoke' 'WORLD PERSIST RESTORE PASS registered=true state_preserved=true revisit_restores=true travel_home=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_persist_restore_smoke.gd
+run_clean 'world save anywhere smoke' 'WORLD SAVE ANYWHERE PASS away_save=true location_restored=true state_restored=true home_save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_save_anywhere_smoke.gd
+echo 'SARGASSO REGRESSION PASS commands=65 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
@@ -163,18 +167,6 @@ incompatible `slice_version` and asserts the service rejects it via
   `SaveLoadService:` warning (a real parse error, missing file on a
   fresh load, etc.) still fails the bundle.
 
-The REQ-012 reload-while-away fix adds one additional expected `WARNING:` line
-emitted by the travel integration smoke when it calls `request_save()` while
-aboard a traveled derelict to verify the away-save block:
-
-- `WARNING: PlayableGeneratedShip: save blocked — cannot save while aboard a traveled derelict (away_from_start=true); return to the starting ship first`
-  — emitted by `scripts/procgen/playable_generated_ship.gd` `request_save()`
-  when `away_from_start` is true. The `travel_integration_smoke` deliberately
-  calls `request_save()` in the away state to verify the guard rejects the
-  request; the WARNING is the expected signal, not a failure. Filtered by
-  `$REQ012_AWAY_SAVE_WARNING`; any other `PlayableGeneratedShip: save blocked`
-  warning still fails the bundle.
-
 The Phase 1 `load_from_blueprint_smoke` adds one additional expected
 `ERROR:` line that is part of its null-guard contract test:
 
@@ -185,6 +177,29 @@ The Phase 1 `load_from_blueprint_smoke` adds one additional expected
   signal, not a failure. Filtered by the strict check above via
   `$BLUEPRINT_NULL_ERROR`; any other `load_from_blueprint:` error still fails
   the bundle.
+
+The world-persistence sub-project (ADR-0012) travel integration smoke
+(`travel_integration_smoke.gd`) instantiates and then frees a full
+`PlayableGeneratedShip` scene within a single headless run. Its travel and
+world-load paths detach the starting ship's gameplay roots (interaction /
+affordance / route / oxygen / tool / fire / arc) and the original home hull
+from the coordinator without re-attaching them when the world load restores a
+derelict. The smoke's `_teardown_and_quit` frees each of those detached roots
+explicitly (along with the active scene under `main_node`) so no physics /
+renderer RIDs leak at exit. There is therefore NO RID-leak allowlist for this
+smoke — any `RID allocations`/`Leaked instance dependency`/`resources still in
+use`/`Pages in use` line from any smoke fails the bundle.
+
+The world-persistence sub-project (ADR-0012) adds one additional expected
+`WARNING:` line emitted by the world save service smoke when it calls
+`save_world(null)` to verify the null-snapshot guard:
+
+- `WARNING: SaveLoadService: cannot save null world snapshot`
+  — emitted by `scripts/systems/save_load_service.gd` `save_world()` when
+  called with a `null` argument. The `world_save_service_smoke` deliberately
+  passes `null` to verify the guard rejects the request; the WARNING is the
+  expected signal, not a failure. Filtered by `$WORLD_SAVE_NULL_WARNING`; any
+  other `SaveLoadService: cannot save` warning still fails the bundle.
 
 Evidence collection command (run before adding or removing a smoke from the
 bundle; any unexpected `ERROR:`/`WARNING:` line that is not on the allowlist

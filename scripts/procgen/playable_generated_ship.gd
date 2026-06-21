@@ -19,6 +19,7 @@ const FireStateScript := preload("res://scripts/systems/fire_state.gd")
 const ElectricalArcStateScript := preload("res://scripts/systems/electrical_arc_state.gd")
 const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.gd")
 const RunSnapshotScript := preload("res://scripts/systems/run_snapshot.gd")
+const WorldSnapshotScript := preload("res://scripts/systems/world_snapshot.gd")
 const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const PlayerProgressionScript := preload("res://scripts/systems/player_progression_state.gd")
@@ -117,6 +118,14 @@ var ship_generator         # ShipGenerator (injected into travel)
 # Gates the starting-ship hazard/objective _process so the unoccupied starting
 # ship does not keep simulating in the background.
 var away_from_start: bool = false
+# Sub-project #1 (world persistence): every visited derelict is retained by
+# marker_id so its mutable state survives leaving. Only the ACTIVE ship has a
+# live scene_root; a derelict's geometry is regenerated from seed on revisit
+# while its systems_manager (and later objective/hazard/loot summaries) ride the
+# retained ShipInstance.
+var visited_ships: Dictionary = {}          # marker_id -> ShipInstance
+var home_ship = null                        # the home ShipInstance (marker_id "")
+var _home_player_position: Vector3 = Vector3.ZERO
 const REPAIR_OBJECTIVE_XP: int = 50
 # Narrative objective flags with no manager backing (supplies/logs). Set on
 # completion; persisted in the snapshot; read by _manager_compat_summary().
@@ -993,6 +1002,27 @@ func _reattach_starting_gameplay_roots() -> void:
 		if r != null and is_instance_valid(r) and r.get_parent() == null:
 			add_child(r)
 
+## Makes `inst` the active boarded derelict: detaches the home gameplay roots
+## (so they do not overlay the derelict at the shared local origin), attaches the
+## freshly built `new_root`, and flips away_from_start. Shared by travel_to
+## (revisit/first-visit) and world-load (_apply_world_snapshot). Does NOT re-home
+## the player — callers position the player afterwards.
+func _attach_derelict_active(inst, new_root: Node3D) -> void:
+	# Detach the home hull if it is still parented under the coordinator. In a
+	# normal travel_to() the home loader/scene_root was already removed before
+	# this call, so this is a no-op there (get_parent() != self). It only fires
+	# on the world-load path, where _apply_world_snapshot rebuilds the home ship
+	# (leaving its scene_root parented) and then re-activates a derelict — without
+	# this detach both hulls overlap at the local origin for the whole visit.
+	# Detach-not-free: travel_home re-adds the same home scene_root.
+	if home_ship != null and home_ship.scene_root != null and is_instance_valid(home_ship.scene_root) and home_ship.scene_root.get_parent() == self:
+		remove_child(home_ship.scene_root)
+	_detach_starting_gameplay_roots()
+	inst.scene_root = new_root
+	add_child(new_root)
+	current_ship = inst
+	away_from_start = true
+
 ## Validates + executes a jump to a marker, swapping current_ship and re-homing
 ## the player on success. Travel is gated by the CURRENT ship's propulsion.
 func travel_to(marker) -> Dictionary:
@@ -1007,35 +1037,72 @@ func travel_to(marker) -> Dictionary:
 	if new_root == null:
 		return {"success": false, "reason": "generation_failed", "ship": null}
 
-	# Detach/free the ship we are leaving. The starting ship is detached-not-freed
-	# (retains its persistent sim, frozen by removal from the tree); a traveled
-	# derelict is freed (stateless — regenerated from seed if revisited).
+	# Leaving the current ship. The HOME ship is detached-not-freed (retains its
+	# live sim); a DERELICT keeps its retained ShipInstance in visited_ships but
+	# frees its scene_root (geometry regenerates from seed on revisit).
 	var leaving = current_ship
-	if leaving.scene_root != null and is_instance_valid(leaving.scene_root):
-		remove_child(leaving.scene_root)
-		if String(leaving.marker_id) != "":
-			leaving.scene_root.queue_free()
-	# When leaving the STARTING ship, detach its gameplay roots too (see
-	# _detach_starting_gameplay_roots) so their collision/interaction volumes do
-	# not overlay the boarded derelict at the shared local origin.
 	if String(leaving.marker_id) == "":
+		_home_player_position = (player as Node3D).global_position if player != null and player is Node3D else _home_player_position
+		if leaving.scene_root != null and is_instance_valid(leaving.scene_root) and leaving.scene_root.get_parent() == self:
+			remove_child(leaving.scene_root)
 		_detach_starting_gameplay_roots()
+	else:
+		if leaving.scene_root != null and is_instance_valid(leaving.scene_root):
+			if leaving.scene_root.get_parent() == self:
+				remove_child(leaving.scene_root)
+			leaving.scene_root.queue_free()
+		leaving.scene_root = null  # retained instance, scene dropped
 
-	# Build a per-ship systems manager for the new derelict, seeded by its
-	# condition so a wrecked ship boards with mostly-offline systems.
-	var new_bp = ShipBlueprintScript.new(int(marker.size_class), int(marker.condition), int(marker.seed_value))
-	var new_mgr = ShipSystemsManagerScript.new()
-	new_mgr.configure(new_mgr.load_definitions(), new_bp.condition, new_bp.seed_value)
+	var mid: String = String(marker.marker_id)
+	var inst
+	if visited_ships.has(mid):
+		# Revisit: reuse the retained instance (its systems state is preserved);
+		# the freshly generated geometry replaces the freed scene.
+		inst = visited_ships[mid]
+	else:
+		# First visit: build the per-ship systems manager seeded by condition so a
+		# wrecked ship boards with mostly-offline systems, and register it.
+		var new_bp = ShipBlueprintScript.new(int(marker.size_class), int(marker.condition), int(marker.seed_value))
+		var new_mgr = ShipSystemsManagerScript.new()
+		new_mgr.configure(new_mgr.load_definitions(), new_bp.condition, new_bp.seed_value)
+		inst = ShipInstanceScript.create("ship_%s" % mid, mid, new_bp, new_mgr, null)
+		visited_ships[mid] = inst
 
-	add_child(new_root)
-	current_ship = ShipInstanceScript.create("ship_%s" % String(marker.marker_id), String(marker.marker_id), new_bp, new_mgr, new_root)
-	away_from_start = String(marker.marker_id) != ""
+	_attach_derelict_active(inst, new_root)
 
 	# Re-home the existing player + camera into the new ship's spawn. The player
 	# node, camera, HUD, progression and inventory are NEVER freed (player-owned).
 	if player != null and new_root.has_method("get_start_transform"):
 		player.teleport_to(new_root.get_start_transform().origin + Vector3(0.0, PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR, 0.0))
 	return result
+
+## Returns the player to the home ship instance: frees the active derelict's
+## scene (its retained instance stays in visited_ships), re-attaches the home
+## scene_root and gameplay roots, restores current_ship = home_ship, and re-homes
+## the player at the position they left from. Returns false if not currently away
+## or the home ship is unavailable.
+func travel_home() -> bool:
+	if not away_from_start or home_ship == null:
+		return false
+	var leaving = current_ship
+	if leaving != null and String(leaving.marker_id) != "":
+		if leaving.scene_root != null and is_instance_valid(leaving.scene_root):
+			if leaving.scene_root.get_parent() == self:
+				remove_child(leaving.scene_root)
+			leaving.scene_root.queue_free()
+		leaving.scene_root = null
+	if home_ship.scene_root != null and is_instance_valid(home_ship.scene_root) and home_ship.scene_root.get_parent() == null:
+		add_child(home_ship.scene_root)
+	_reattach_starting_gameplay_roots()
+	current_ship = home_ship
+	away_from_start = false
+	if player != null and player is Node3D:
+		(player as Node3D).global_position = _home_player_position
+	return true
+
+## Validation seam: the marker_ids of every retained visited derelict.
+func get_visited_ship_ids() -> Array:
+	return visited_ships.keys()
 
 ## Validation seam: true if any combined status line contains `token`.
 func get_combined_system_status_lines_contains(token: String) -> bool:
@@ -1106,6 +1173,9 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	# slice's systems are untouched). marker_id "" marks it as the home ship.
 	if current_ship == null:
 		current_ship = ShipInstanceScript.create("ship_start", "", _load_blueprint_for_systems(), ship_systems_manager, loader)
+		# Sub-project #1: keep a stable reference to the home ship so travel_home
+		# and world-load can restore it.
+		home_ship = current_ship
 	_build_interactables()
 	_build_slice_affordance_labels()
 	_build_route_control_gates()
@@ -2546,36 +2616,39 @@ func _build_run_snapshot() -> RunSnapshot:
 	snapshot.saved_at = Time.get_datetime_string_from_system(true)
 	return snapshot
 
-## Writes the current snapshot to disk. Returns true on success.
+## Writes the whole world to the single save slot. Routed through the
+## world-save format (ADR-0012) so every write to user://saves/current_run.json
+## — auto-save here AND manual request_save — is a WorldSnapshot. Otherwise an
+## auto-save on objective completion would overwrite a manual F5 world-save with
+## a RunSnapshot and fail the version gate on the next load. The in-memory
+## RunSnapshot seam (last_saved_snapshot / get_last_saved_snapshot) is preserved
+## because the auto-save regression smokes assert its current_objective_sequence.
 func _auto_save_current_run() -> bool:
 	if save_load_service == null or slice_complete:
 		return false
-	var snapshot: RunSnapshot = _build_run_snapshot()
-	if snapshot == null:
+	var ws = _build_world_snapshot()
+	if ws == null:
 		return false
-	if save_load_service.save_current_run(snapshot):
-		last_saved_snapshot = snapshot
+	if save_load_service.save_world(ws):
+		last_saved_snapshot = _build_run_snapshot()  # preserve in-memory RunSnapshot seam (get_last_saved_snapshot)
 		return true
 	return false
 
-## Manual save trigger (F5 / save_run input). Refuses to save if the
-## slice has not started or has already completed.
+## Manual save trigger (F5 / save_run input). Saves the whole world, so saving is
+## allowed anywhere — including aboard a traveled derelict (save-anywhere; ADR-0012
+## supersedes the Phase 4.5 away-save rejection). Refuses only before the slice has
+## started or after it has completed.
 func request_save() -> bool:
 	if not playable_started or slice_complete:
 		return false
-	# REQ-012 fix: block save while on a traveled derelict. The single-ship-slice
-	# snapshot format only captures starting-ship state; an away-state save would
-	# silently omit the derelict context and produce an unrestorable snapshot. The
-	# meta-world / multi-ship save (needed for mid-derelict persistence) does not
-	# exist yet. A push_warning surfaces the block without crashing.
-	if away_from_start:
-		push_warning("PlayableGeneratedShip: save blocked — cannot save while aboard a traveled derelict (away_from_start=true); return to the starting ship first")
-		return false
 	if save_load_service == null:
 		return false
-	var result: bool = _auto_save_current_run()
+	var ws = _build_world_snapshot()
+	if ws == null:
+		return false
+	var result: bool = save_load_service.save_world(ws)
 	if result:
-		print("PLAYABLE SHIP SAVED sequence=%d" % current_objective_sequence)
+		print("PLAYABLE SHIP SAVED location=%s sequence=%d" % [ws.current_location, current_objective_sequence])
 	return result
 
 ## Validation / public seam: the SaveLoadService instance. Returns null
@@ -2595,17 +2668,16 @@ func is_load_available() -> bool:
 		return false
 	return save_load_service.has_save()
 
-## Manual load trigger (F9 / load_run input). Reads the snapshot, resets
-## the slice, and applies the saved state before the next _process tick.
-## Returns true on success.
+## Manual load trigger (F9 / load_run input). Loads the whole world and applies it
+## (home ship + visited-ship registry + active location + in-ship position).
 func request_load() -> bool:
 	if save_load_service == null:
 		return false
-	var snapshot: RunSnapshot = save_load_service.load_current_run()
-	if snapshot == null:
-		push_warning("PlayableGeneratedShip: no compatible save to load")
+	var ws = save_load_service.load_world()
+	if ws == null:
+		push_warning("PlayableGeneratedShip: no compatible world save to load")
 		return false
-	return _apply_run_snapshot(snapshot)
+	return _apply_world_snapshot(ws)
 
 ## Reconstructs the slice through the normal load path, then applies
 ## the saved model summaries. Designed to be called from a fully
@@ -2704,6 +2776,89 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	])
 	return true
 
+## Builds a full WorldSnapshot from live state. The home-ship slice is the
+## existing RunSnapshot; when the player is aboard a derelict the home slice's
+## player_position is overridden with the position they left home from (the live
+## player position belongs to the derelict and is stored separately). Each
+## retained ShipInstance contributes its own slice; current_location names the
+## active ship.
+func _build_world_snapshot():
+	var ws = WorldSnapshotScript.new()
+	if sargasso_world != null:
+		ws.world_summary = sargasso_world.get_summary()
+	var home_snap = _build_run_snapshot()
+	if home_snap != null:
+		if away_from_start:
+			home_snap.player_position = [_home_player_position.x, _home_player_position.y, _home_player_position.z]
+		ws.home_ship = home_snap.to_dict()
+	ws.visited_ships = {}
+	for mid in visited_ships:
+		ws.visited_ships[String(mid)] = visited_ships[mid].get_summary()
+	ws.current_location = String(current_ship.marker_id) if current_ship != null else ""
+	if player != null and player is Node3D:
+		var p: Vector3 = (player as Node3D).global_position
+		ws.player_position_in_ship = [p.x, p.y, p.z]
+	ws.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
+	ws.godot_version = Engine.get_version_info()["string"]
+	ws.saved_at = Time.get_datetime_string_from_system(true)
+	return ws
+
+## Regenerates a derelict's geometry from its retained blueprint, makes it the
+## active ship (re-applying its persisted systems state is implicit — the
+## ShipInstance already holds it), and re-homes the player at pos_in_ship.
+func _activate_derelict_from_instance(inst, pos_in_ship: Array) -> bool:
+	if inst == null or ship_generator == null:
+		return false
+	var new_root: Node3D = ship_generator.generate(inst.blueprint)
+	if new_root == null:
+		return false
+	_attach_derelict_active(inst, new_root)
+	if player != null and player is Node3D and pos_in_ship.size() >= 3:
+		(player as Node3D).global_position = Vector3(float(pos_in_ship[0]), float(pos_in_ship[1]), float(pos_in_ship[2]))
+	return true
+
+## Applies a WorldSnapshot: rebuilds the home ship first (this resets the runtime
+## and returns to home if currently away), restores the SargassoWorld and the
+## visited-ships registry, then re-activates the saved derelict if the snapshot
+## was taken aboard one. Returns false on any hard failure.
+func _apply_world_snapshot(ws) -> bool:
+	if ws == null:
+		return false
+	# 1. Home ship via the existing single-ship reload path. Reconstruct a
+	#    RunSnapshot object from the embedded dict (version-gated like a disk load).
+	var home_snap = RunSnapshotScript.from_dict(ws.home_ship, SaveLoadServiceScript.CURRENT_SLICE_VERSION, Engine.get_version_info()["string"])
+	if home_snap == null:
+		push_warning("PlayableGeneratedShip: world load rejected — embedded home slice incompatible")
+		return false
+	# Restore the home-departure position. On an away-save the home slice's
+	# player_position holds where the player left home from (see _build_world_snapshot);
+	# without copying it back, a later travel_home() after a fresh process would
+	# teleport the player to the origin instead of their saved home position.
+	if home_snap.player_position.size() >= 3:
+		_home_player_position = Vector3(home_snap.player_position[0], home_snap.player_position[1], home_snap.player_position[2])
+	if not _apply_run_snapshot(home_snap):
+		return false
+	# 2. World model. _apply_run_snapshot reset us to the home ship; home_ship is
+	#    re-wrapped by _on_ship_loaded during that reload.
+	if sargasso_world != null and not ws.world_summary.is_empty():
+		sargasso_world.apply_summary(ws.world_summary)
+	# 3. Rebuild the retained-derelict registry from the slices.
+	visited_ships.clear()
+	for mid in ws.visited_ships:
+		var inst = ShipInstanceScript.create("", "", ShipBlueprintScript.new(), null, null)
+		if inst.apply_summary(ws.visited_ships[mid]):
+			visited_ships[String(mid)] = inst
+	# 4. If saved aboard a derelict, re-activate it.
+	if String(ws.current_location) != "":
+		var active = visited_ships.get(String(ws.current_location), null)
+		if active == null:
+			push_warning("PlayableGeneratedShip: world load — current_location '%s' missing from visited_ships" % String(ws.current_location))
+			return true  # home is already correctly restored; treat as on-home
+		if not _activate_derelict_from_instance(active, ws.player_position_in_ship):
+			push_warning("PlayableGeneratedShip: world load — failed to re-activate derelict '%s'" % String(ws.current_location))
+			return true
+	return true
+
 ## Tear down every runtime child so a fresh load can rebuild the slice
 ## cleanly. Mirrors the setup done by _build_runtime_nodes() and the
 ## various _build_*_zone helpers, but in reverse.
@@ -2794,6 +2949,12 @@ func _reset_runtime_for_reload() -> void:
 	affordance_labels.clear()
 	affordance_props.clear()
 	route_gate_nodes.clear()
+	# Sub-project #1: drop retained visited-derelict instances on reload. The
+	# active derelict scene is already freed and current_ship nulled below; a
+	# stale ShipInstance left in visited_ships would make a post-reload revisit
+	# reuse pre-reload systems state instead of building a fresh condition-seeded
+	# instance. home_ship is NOT cleared — _on_ship_loaded reassigns it.
+	visited_ships.clear()
 	objective_completion_count = 0
 	slice_complete = false
 	# Reset pure models so a fresh load starts from a clean state and
