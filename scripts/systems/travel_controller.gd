@@ -8,6 +8,8 @@ class_name TravelController
 ## systems_ops: { "propulsion": bool }. radius: current scanner reach.
 ## Returns { success: bool, reason: String, ship: Node3D|null }.
 func attempt_travel(marker, systems_ops: Dictionary, world, generator, radius: float) -> Dictionary:
+	assert(world != null, "TravelController.attempt_travel: world must not be null")
+	assert(generator != null, "TravelController.attempt_travel: generator must not be null")
 	if marker == null:
 		return {"success": false, "reason": "null_marker", "ship": null}
 	var in_range: bool = false

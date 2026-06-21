@@ -13,6 +13,8 @@ var hardware_detail: int = 1      # base detail from scanner hardware (upgradeab
 ## systems_ops: { "navigation": bool, "scanners": bool }. scanner_skill: 0..10.
 ## Returns { "detail_level": int, "markers": Array[Dictionary] }.
 func scan(world, systems_ops: Dictionary, scanner_skill: int) -> Dictionary:
+	assert(world != null, "ScannerState.scan: world must not be null")
+	assert(scanner_skill >= 0, "ScannerState.scan: scanner_skill must be non-negative")
 	if not bool(systems_ops.get("navigation", false)):
 		return {"detail_level": 0, "markers": []}
 	var detail: int = 1

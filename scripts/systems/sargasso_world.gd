@@ -20,6 +20,7 @@ func _init(p_world_seed: int = 0, p_player_position: Vector3 = Vector3.ZERO) -> 
 ## Distinct markers within `radius` of player_position, sorted ascending by
 ## distance. Regenerates every cell overlapping the radius bounding box.
 func markers_in_range(radius: float) -> Array:
+	assert(radius >= 0.0, "SargassoWorld.markers_in_range: radius must be non-negative")
 	var out: Array = []
 	var seen: Dictionary = {}
 	var cs: float = MarkerGeneratorScript.CELL_SIZE
