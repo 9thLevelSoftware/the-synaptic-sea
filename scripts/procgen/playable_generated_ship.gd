@@ -878,6 +878,8 @@ func _configure_player_progression() -> void:
 		return
 	var classes: Dictionary = ClassDefinitionScript.load_all()
 	var class_def = classes.get(starting_class_id, classes.get("engineer", null))
+	if class_def == null:
+		push_error("PlayableGeneratedShip: no class definition for '%s' or fallback 'engineer' (data/player/classes.json missing or malformed)" % starting_class_id)
 	player_progression.configure(class_def, PlayerProgressionScript.load_skills_catalog())
 
 ## Loads the blueprint sidecar that seeds the ShipSystemsManager's condition

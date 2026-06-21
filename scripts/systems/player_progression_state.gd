@@ -71,6 +71,8 @@ func get_skill_level(skill_id: String) -> int:
 func grant_xp(skill_id: String, amount: int) -> bool:
 	if not skills.has(skill_id):
 		return false
+	if amount <= 0:
+		return false
 	var category: String = str(_skill_category.get(skill_id, ""))
 	var mult: float = float(_xp_multipliers.get(category, 1.0))
 	var effective: int = int(round(float(amount) * mult))
@@ -89,6 +91,17 @@ func grant_xp(skill_id: String, amount: int) -> bool:
 		skill_xp[skill_id] = 0
 	return changed
 
+## Reloads _xp_multipliers for the current class_id from the class catalog.
+## Uses load() (not preload) to match the headless-safe self-reference idiom
+## and avoid a compile-time dependency cycle. Empties the multipliers if the
+## class is unknown (grant_xp then falls back to a 1.0 multiplier per category).
+func _reload_class_multipliers() -> void:
+	var classes: Dictionary = load("res://scripts/systems/class_definition.gd").load_all()
+	if classes.has(class_id):
+		_xp_multipliers = (classes[class_id].xp_multipliers as Dictionary).duplicate()
+	else:
+		_xp_multipliers = {}
+
 func get_summary() -> Dictionary:
 	return {
 		"class_id": class_id,
@@ -105,6 +118,11 @@ func apply_summary(summary: Dictionary) -> bool:
 	var new_class: String = str(summary.get("class_id", class_id))
 	if new_class != class_id:
 		class_id = new_class
+		# Reload the class XP multipliers for the restored class. configure()
+		# set them for the ship's default class; without this a save whose
+		# class differs from the default would keep the wrong multipliers and
+		# grant_xp would level the wrong rates (PR #4 review).
+		_reload_class_multipliers()
 		changed = true
 	var skills_variant: Variant = summary.get("skills", {})
 	if typeof(skills_variant) == TYPE_DICTIONARY:

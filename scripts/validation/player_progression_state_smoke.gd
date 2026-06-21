@@ -61,6 +61,39 @@ func _initialize() -> void:
 		_fail("round-trip repair=%d expected 4" % prog2.get_skill_level("repair"))
 		return
 
+	# PR #4 review: apply_summary must reload the class XP multipliers so a save
+	# whose class differs from the configured default levels at the saved class's
+	# rate, not the default's. Engineer technical=1.5; medic technical=0.7.
+	var medic_prog = ProgressionScript.new()
+	medic_prog.configure(ClassDefinitionScript.load_all()["medic"], catalog)
+	var medic_summary: Dictionary = medic_prog.get_summary()
+	var prog_x = ProgressionScript.new()
+	prog_x.configure(eng, catalog)        # engineer multipliers (technical 1.5)
+	prog_x.apply_summary(medic_summary)   # becomes medic -> must reload multipliers
+	prog_x.grant_xp("repair", 100)        # medic technical 0.7 -> 70 (bug would give 150)
+	var cross_xp: int = int(prog_x.get_summary().get("skill_xp", {}).get("repair", 0))
+	if cross_xp != 70:
+		_fail("cross-class apply_summary did not reload multipliers: repair xp=%d expected 70 (medic 0.7x)" % cross_xp)
+		return
+
+	# grant_xp guards: amount <= 0 is a no-op (returns false).
+	var prog_guard = ProgressionScript.new()
+	prog_guard.configure(eng, catalog)
+	if prog_guard.grant_xp("repair", 0) or prog_guard.grant_xp("repair", -50):
+		_fail("grant_xp with amount<=0 should return false")
+		return
+
+	# Cap: massive XP stops at level 10; a maxed skill's grant_xp returns false.
+	var prog_cap = ProgressionScript.new()
+	prog_cap.configure(eng, catalog)
+	prog_cap.grant_xp("repair", 1000000)
+	if prog_cap.get_skill_level("repair") != 10:
+		_fail("cap: repair should be 10, got %d" % prog_cap.get_skill_level("repair"))
+		return
+	if prog_cap.grant_xp("repair", 1000):
+		_fail("cap: grant_xp at level 10 should return false")
+		return
+
 	print("PLAYER PROGRESSION PASS class=engineer repair_start=3 leveled=4 round_trip=true")
 	quit(0)
 

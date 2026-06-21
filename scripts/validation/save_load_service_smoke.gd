@@ -87,7 +87,7 @@ func _initialize() -> void:
 	original.electrical_arc_summary = arc.get_summary()
 	original.objective_progress_summary = progress.get_summary()
 	var progression := PlayerProgressionStateScript.new()
-	progression.configure(ClassDefinitionScript.load_all()["engineer"], progression.load_skills_catalog())
+	progression.configure(ClassDefinitionScript.load_all()["engineer"], PlayerProgressionStateScript.load_skills_catalog())
 	progression.grant_xp("repair", 100)
 	original.player_progression_summary = progression.get_summary()
 	original.slice_version = SaveLoadServiceScript.CURRENT_SLICE_VERSION
