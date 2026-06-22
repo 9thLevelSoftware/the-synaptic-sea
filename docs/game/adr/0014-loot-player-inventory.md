@@ -36,6 +36,12 @@ looted state rides `ShipInstance.looted_container_ids`; the player bag rides the
 - Loot is deterministic per seed, not random per visit, matching "ships persist once
   accessed." Re-rolling would let players farm one container — explicitly avoided.
 - `max_weight` is a fixed constant; capacity upgrades are future scope.
+- The deterministic seed derives from `String.hash()`, which is stable **only within a
+  Godot engine version**. Since only the *emptied* flag is persisted (never the rolled
+  contents), an unsearched container in an on-disk save could yield different loot after a
+  Godot upgrade. This is acceptable: already-looted containers stay empty (the flag is
+  authoritative), and unsearched loot is not a player-visible commitment. Do not persist a
+  container's expected contents on the assumption the roll is cross-version stable.
 
 ## Note: transitional
 
