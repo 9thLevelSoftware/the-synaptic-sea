@@ -44,11 +44,33 @@ func _initialize() -> void:
 		if mobile.parent_ship != null or host.docked_ships.has(mobile) or not mobile.docking_ports.is_empty():
 			ok = false; msg = "undock did not clear relationship"
 
+	# Double-undock is idempotent: a second undock on an already-undocked ship
+	# must not crash and must report not_docked.
+	if ok:
+		var res2: Dictionary = DockingManagerScript.undock(mobile)
+		if not bool(res2.get("success", false)) or str(res2.get("reason", "")) != "not_docked":
+			ok = false; msg = "double-undock not idempotent: %s" % str(res2)
+
+	# Malformed ports are rejected with dock_failed (no state mutation, no crash).
+	var rejects := false
+	if ok:
+		var bad_host := Node3D.new()
+		var bad_host_inst = ShipInstanceScript.create("bad_host", "", null, null, bad_host)
+		var bad_mobile := Node3D.new()
+		var bad_mobile_inst = ShipInstanceScript.create("bad_mobile", "", null, null, bad_mobile)
+		var bad_res: Dictionary = DockingManagerScript.dock(bad_host_inst, bad_mobile_inst, {}, mobile_port)
+		if bool(bad_res.get("success", true)) or str(bad_res.get("reason", "")) != "dock_failed":
+			ok = false; msg = "malformed port not rejected: %s" % str(bad_res)
+		else:
+			rejects = true
+		bad_host.free()
+		bad_mobile.free()
+
 	host_root.free()
 	mobile_root.free()
 
 	if ok:
-		print("DOCKING MANAGER PASS aligned=true relationship=true undock=true")
+		print("DOCKING MANAGER PASS aligned=true relationship=true undock=true rejects=%s" % str(rejects).to_lower())
 		quit(0)
 	else:
 		push_error("DOCKING MANAGER FAIL reason=%s" % msg)

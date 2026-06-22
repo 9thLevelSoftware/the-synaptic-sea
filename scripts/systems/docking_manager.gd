@@ -35,6 +35,8 @@ static func dock(host_inst, mobile_inst, host_port: Dictionary, mobile_port: Dic
 		return {"success": false, "reason": "dock_failed"}
 	if not _port_valid(host_port) or not _port_valid(mobile_port):
 		return {"success": false, "reason": "dock_failed"}
+	if not ("scene_root" in mobile_inst):
+		return {"success": false, "reason": "dock_failed"}
 	var root = mobile_inst.scene_root
 	if root == null or not is_instance_valid(root) or not (root is Node3D):
 		return {"success": false, "reason": "dock_failed"}
