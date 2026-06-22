@@ -27,6 +27,10 @@ var docking_ports: Array = []       # Array (DockingPort in Phase 5)
 # home ship (which uses the coordinator's singleton loop, not this controller).
 var objective_controller = null          # DerelictObjectiveController | null
 
+# Sub-project #3: ids of scattered loot containers already searched on this ship.
+# Salvage-point loot reuses the objective `completed` flag, so it is not listed here.
+var looted_container_ids: Array = []
+
 # Static factory via load() self-reference (class_name globals unreliable under
 # --headless --script).
 static func create(p_ship_id: String, p_marker_id: String, p_blueprint, p_systems_manager, p_scene_root) -> ShipInstance:
@@ -54,6 +58,8 @@ func get_summary() -> Dictionary:
 	}
 	if objective_controller != null:
 		result["objective"] = objective_controller.get_summary()
+	if not looted_container_ids.is_empty():
+		result["looted_containers"] = looted_container_ids.duplicate()
 	return result
 
 func apply_summary(summary) -> bool:
@@ -75,6 +81,11 @@ func apply_summary(summary) -> bool:
 		if objective_controller == null:
 			objective_controller = DerelictObjectiveControllerScript.create()
 		objective_controller.apply_summary(obj_summary as Dictionary)
+	var looted_variant: Variant = summary.get("looted_containers", null)
+	if typeof(looted_variant) == TYPE_ARRAY:
+		looted_container_ids = []
+		for cid in (looted_variant as Array):
+			looted_container_ids.append(String(cid))
 	return true
 
 ## Returns this ship's DerelictObjectiveController, creating it on first access.

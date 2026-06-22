@@ -86,7 +86,17 @@ func _initialize() -> void:
 		_fail("apply_summary did not restore derelict objective progress / cleared")
 		return
 
-	print("SHIP INSTANCE PASS round_trip=true stubs_present=true objective_round_trip=true")
+	# Sub-project #3: looted-container ids round-trip on the per-ship slice.
+	inst.looted_container_ids = ["crate_3", "locker_1"]
+	var s3: Dictionary = inst.get_summary()
+	var restored3 = ShipInstanceScript.create("x", "marker:1", null, null, null)
+	restored3.apply_summary(s3)
+	var looted_round_trip: bool = restored3.looted_container_ids == ["crate_3", "locker_1"]
+
+	print("SHIP INSTANCE PASS round_trip=true stubs_present=true objective_round_trip=true looted_round_trip=%s" % str(looted_round_trip).to_lower())
+	if not looted_round_trip:
+		quit(1)
+		return
 	quit(0)
 
 func _fail(reason: String) -> void:
