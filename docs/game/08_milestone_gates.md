@@ -11,6 +11,10 @@
 
 Gate 5 — Release candidate exited / ready for itch.io release; stage-gate pipeline closed.
 
+The stage-gate pipeline (concept → RC) is complete and historical. Post-RC
+open-world build state — what systems are built and what remains — is tracked
+in `09_system_roadmap.md` (the single live roadmap).
+
 ## Gate 0: Concept lock
 
 Status: Go, provisional.

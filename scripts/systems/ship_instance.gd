@@ -18,6 +18,15 @@ var blueprint                       # ShipBlueprint
 var systems_manager                 # ShipSystemsManager (this ship's own systems)
 var scene_root: Node3D = null       # generated/loaded tree; null when not instantiated
 
+# 5a: `ship_root` is the ship's positioned root — it IS scene_root, exposed
+# under the docking-domain name. Alias so DockingManager/occupancy read
+# naturally without renaming the coordinator's existing scene_root usage.
+var ship_root: Node3D:
+	get:
+		return scene_root
+	set(value):
+		scene_root = value
+
 # Phase 5 stubs — declared, unused this phase.
 var parent_ship = null              # ShipInstance | null
 var docked_ships: Array = []        # Array[ShipInstance]
@@ -93,3 +102,45 @@ func get_objective_controller():
 	if objective_controller == null:
 		objective_controller = DerelictObjectiveControllerScript.create()
 	return objective_controller
+
+## World-space AABB enclosing scene_root's visual instances. Used to build
+## occupancy entries.
+##
+## Contract: this is meaningful only when scene_root AND its geometry are in the
+## scene tree. That is the normal case — occupancy is computed only after a ship
+## is fully loaded into the tree.
+##
+## A fully off-tree, null, or geometry-less scene_root intentionally returns a
+## zero-size AABB at scene_root's origin (the "unbuilt retained instance"
+## fallback).
+##
+## Per-node out-of-tree VisualInstance3D children are skipped (their world
+## transform is unresolved, so they contribute nothing). This means an in-tree
+## scene_root whose child meshes are not yet attached would under-report its
+## AABB — a state that does not occur in the current load flow, where geometry
+## is attached before occupancy is queried.
+func interior_aabb() -> AABB:
+	if scene_root == null or not is_instance_valid(scene_root):
+		return AABB()
+	var acc := AABB()
+	var seeded := false
+	for node in _visual_descendants(scene_root):
+		if node.is_inside_tree():
+			var world: AABB = node.global_transform * node.get_aabb()
+			if not seeded:
+				acc = world
+				seeded = true
+			else:
+				acc = acc.merge(world)
+	if not seeded:
+		var o: Vector3 = scene_root.global_position if scene_root.is_inside_tree() else scene_root.position
+		return AABB(o, Vector3.ZERO)
+	return acc
+
+func _visual_descendants(node: Node) -> Array:
+	var out: Array = []
+	if node is VisualInstance3D:
+		out.append(node)
+	for child in node.get_children():
+		out.append_array(_visual_descendants(child))
+	return out
