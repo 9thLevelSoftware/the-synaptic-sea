@@ -3474,7 +3474,7 @@ func _reset_runtime_for_reload() -> void:
 	affordance_props.clear()
 	route_gate_nodes.clear()
 	# Sub-project #1: drop retained visited-derelict instances on reload. The
-	# active derelict scene is already freed and current_ship nulled below; a
+	# active derelict scene is already freed and current_ship nulled above; a
 	# stale ShipInstance left in visited_ships would make a post-reload revisit
 	# reuse pre-reload systems state instead of building a fresh condition-seeded
 	# instance. home_ship is NOT cleared — _on_ship_loaded reassigns it.
