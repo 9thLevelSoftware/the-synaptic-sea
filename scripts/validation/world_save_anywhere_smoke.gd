@@ -136,14 +136,29 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	if not playable.travel_home():
 		_fail("travel_home failed before home-save check")
 		return
-	# I1 assertion: travel_home must teleport the player to the saved home
-	# position that the world load restored into _home_player_position, NOT origin.
+	# Phase 5b Task 5 (physical-travel contract): travel_home no longer teleports the
+	# player to the saved _home_player_position. The player RIDES the piloted lifeboat,
+	# which physically undocks from the derelict and re-docks to home — so they end up
+	# aboard the lifeboat docked at home, not at a stored home floor coordinate. The
+	# I1 invariant is therefore re-expressed as "back at the home complex, not away":
+	# occupancy resolves to the home ship OR the lifeboat docked to home, and
+	# away_from_start is false. (Pre-5b this asserted the exact known_home_pos restore.)
 	if playable.player == null or not is_instance_valid(playable.player):
 		_fail("player invalid after travel_home")
 		return
-	var home_p: Vector3 = (playable.player as Node3D).global_position
-	if home_p.distance_to(known_home_pos) > 0.5:
-		_fail("travel_home did not restore saved home position from world load (got %s expected ~%s)" % [str(home_p), str(known_home_pos)])
+	playable.recompute_occupancy()
+	if playable.away_from_start:
+		_fail("travel_home left away_from_start true (player not back at home complex)")
+		return
+	var home_after = playable.get_home_ship_for_validation()
+	var lb_after = playable.get_lifeboat_ship_for_validation()
+	var occ_after = playable.get_current_occupancy_for_validation()
+	if occ_after != home_after and occ_after != lb_after:
+		_fail("travel_home did not return the player to the home complex (occupancy=%s)" % str(occ_after))
+		return
+	# The piloted lifeboat must be physically re-docked to the home ship.
+	if lb_after == null or lb_after.parent_ship != home_after:
+		_fail("travel_home did not re-dock the lifeboat to home (parent=%s)" % str(lb_after.parent_ship if lb_after != null else null))
 		return
 	if not playable.request_save():
 		_fail("request_save on the home ship should succeed")
