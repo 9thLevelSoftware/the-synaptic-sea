@@ -32,6 +32,8 @@ const LootContainerScript := preload("res://scripts/tools/loot_container.gd")
 const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
 const RepairPointScript := preload("res://scripts/tools/repair_point.gd")
 const ShipOccupancyScript := preload("res://scripts/systems/ship_occupancy.gd")
+const DockPortsScript := preload("res://scripts/systems/dock_ports.gd")
+const DockingManagerScript := preload("res://scripts/systems/docking_manager.gd")
 const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
 
 signal playable_ready(summary: Dictionary)
@@ -143,6 +145,7 @@ var home_ship = null                        # the home ShipInstance (marker_id "
 # Phase 5a Task 7: the physical lifeboat docked to the starting derelict.
 # Co-present at LIFEBOAT_DOCK_OFFSET; shares ship_systems_manager with the home ship.
 var lifeboat_ship = null                    # ShipInstance (docked to home_ship)
+var piloted_ship = null                     # the ShipInstance the player currently pilots (the lifeboat this cycle)
 # Sub-project #2: the active derelict's objective interactables live under a
 # dedicated root (empty while on the home ship). Separate from the home gameplay
 # roots so it stays attached when away_from_start.
@@ -1641,12 +1644,12 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 		# Sub-project #1: keep a stable reference to the home ship so travel_home
 		# and world-load can restore it.
 		home_ship = current_ship
+		# Store the layout so DockPorts can derive port descriptors for boot docking.
+		home_ship.built_layout = loader.get_layout_copy()
 		# Phase 5a Task 6: initialise occupancy to home ship (player starts here).
 		current_occupancy = home_ship
 		# Phase 5a Task 7: build the physical lifeboat docked to the starting derelict.
-		# The lifeboat is a 3-room Node3D placed at LIFEBOAT_DOCK_OFFSET, co-present
-		# with the home derelict. It shares ship_systems_manager so opening-damage,
-		# repair, and travel-gate semantics (#4) stay exactly as they are.
+		# The lifeboat is now port-aligned via DockingManager (replaces fixed LIFEBOAT_DOCK_OFFSET).
 		_build_lifeboat_at_home()
 	_build_interactables()
 	_build_slice_affordance_labels()
@@ -1731,22 +1734,37 @@ func _build_lifeboat_at_home() -> void:
 	# Create the ShipInstance: shared systems_manager so #4 opening-damage, travel-gate,
 	# and repair semantics stay exactly as they are.
 	lifeboat_ship = ShipInstanceScript.create("lifeboat", "", null, ship_systems_manager, lb_root)
+	lifeboat_ship.built_layout = LifeBoatBuilderScript.build_layout()
 
-	# Dock relationship: lifeboat is docked to the home derelict.
-	# Erase any stale lifeboat reference first (reload path: _reset_runtime_for_reload
-	# sets lifeboat_ship = null but home_ship stays, so docked_ships may still hold a
-	# stale entry from the previous load). erase (not clear) so a future task that
-	# docks OTHER ships to home is not wiped.
-	lifeboat_ship.parent_ship = home_ship
-	if home_ship != null:
-		home_ship.docked_ships.erase(lifeboat_ship)
-		home_ship.docked_ships.append(lifeboat_ship)
-
-	# Position at fixed anchor, clear of coherent_ship_001's extent and DERELICT_DOCK_OFFSET.
-	lb_root.position = LIFEBOAT_DOCK_OFFSET
-
-	# Add to the scene tree so it is co-present with the home derelict.
+	# Add to the scene tree FIRST so host/mobile global_transforms resolve, then
+	# port-align the lifeboat to the home dock via DockingManager (replaces the
+	# fixed LIFEBOAT_DOCK_OFFSET hack — boot is now a real port-aligned dock).
 	add_child(lb_root)
+	piloted_ship = lifeboat_ship
+	_dock_piloted_to(home_ship)
+
+## Port-aligns piloted_ship's airlock to host's dock port and writes the dock
+## relationship. host.scene_root must be in-tree. Returns the dock() result dict.
+func _dock_piloted_to(host) -> Dictionary:
+	if piloted_ship == null or host == null or host.scene_root == null:
+		return {"success": false, "reason": "dock_failed"}
+	var cc := 0 if host == home_ship else _ship_condition_class(host)
+	var host_local: Dictionary = DockPortsScript.for_derelict(host.built_layout, _ship_seed(host), cc)
+	var host_world: Dictionary = DockingManagerScript.host_port_to_world(host, host_local)
+	var mobile_local: Dictionary = DockPortsScript.for_lifeboat(piloted_ship.built_layout)
+	if not DockPortsScript.ports_compatible(host_world, mobile_local):
+		return {"success": false, "reason": "dock_incompatible"}
+	return DockingManagerScript.dock(host, piloted_ship, host_world, mobile_local)
+
+func _ship_seed(inst) -> int:
+	if inst != null and inst.blueprint != null and ("seed_value" in inst.blueprint):
+		return int(inst.blueprint.seed_value)
+	return 0
+
+func _ship_condition_class(inst) -> int:
+	if inst != null and inst.blueprint != null and ("condition" in inst.blueprint):
+		return int(inst.blueprint.condition)
+	return 0
 
 func _spawn_player() -> void:
 	player = PlayerControllerScript.new()

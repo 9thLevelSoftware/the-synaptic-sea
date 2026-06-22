@@ -69,6 +69,26 @@ static func dock(host_inst, mobile_inst, host_port: Dictionary, mobile_port: Dic
 	mobile_inst.docking_ports = [{"host_port": host_port, "mobile_port": mobile_port}]
 	return {"success": true, "reason": "ok"}
 
+## Lifts a ship-LOCAL dock port to WORLD space via the host's placed transform.
+## host_inst.scene_root must be in the scene tree for global_transform to be valid.
+## Returns {} when the host has no valid in-tree scene_root or local_port is empty.
+static func host_port_to_world(host_inst, local_port: Dictionary) -> Dictionary:
+	if host_inst == null or local_port.is_empty():
+		return {}
+	if not ("scene_root" in host_inst):
+		return {}
+	var root = host_inst.scene_root
+	if root == null or not is_instance_valid(root) or not (root is Node3D) or not (root as Node3D).is_inside_tree():
+		return {}
+	var x: Transform3D = (root as Node3D).global_transform
+	return {
+		"position": x * (local_port.get("position", Vector3.ZERO) as Vector3),
+		"facing": (x.basis * (local_port.get("facing", Vector3.FORWARD) as Vector3)).normalized(),
+		"type": str(local_port.get("type", "airlock")),
+		"size_class": int(local_port.get("size_class", 1)),
+		"condition": str(local_port.get("condition", "intact")),
+	}
+
 static func undock(mobile_inst) -> Dictionary:
 	if mobile_inst == null:
 		return {"success": false, "reason": "dock_failed"}

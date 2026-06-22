@@ -12,11 +12,15 @@ const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
 const DerelictObjectiveControllerScript := preload("res://scripts/systems/derelict_objective_controller.gd")
 
+const ROOM_HALF_EXTENT: float = 4.0   # generous per-room half-box in X/Z (covers 2x1 rooms + module chains)
+const ROOM_HALF_HEIGHT: float = 3.0   # half deck height + headroom
+
 var ship_id: String = ""
 var marker_id: String = ""          # "" for the starting ship; cell:cell:index for traveled ships
 var blueprint                       # ShipBlueprint
 var systems_manager                 # ShipSystemsManager (this ship's own systems)
 var scene_root: Node3D = null       # generated/loaded tree; null when not instantiated
+var built_layout: Dictionary = {}   # the layout dict scene_root was built from (for dock-port derivation)
 
 # 5a: `ship_root` is the ship's positioned root — it IS scene_root, exposed
 # under the docking-domain name. Alias so DockingManager/occupancy read
@@ -103,8 +107,9 @@ func get_objective_controller():
 		objective_controller = DerelictObjectiveControllerScript.create()
 	return objective_controller
 
-const ROOM_HALF_EXTENT: float = 4.0   # generous per-room half-box in X/Z (covers 2x1 rooms + module chains)
-const ROOM_HALF_HEIGHT: float = 3.0   # half deck height + headroom
+## Validation/runtime seam: the layout dict this ship's scene_root was built from.
+func blueprint_layout_for_validation() -> Dictionary:
+	return built_layout
 
 ## World-space AABB enclosing this ship's interior, derived from the built
 ## ShipStructure's room-node LOCAL positions (robust off-tree / headless, where

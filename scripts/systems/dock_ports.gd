@@ -23,6 +23,10 @@ static func for_lifeboat(layout: Dictionary) -> Dictionary:
 
 static func for_derelict(layout: Dictionary, seed_value: int = 0, condition_class: int = 0) -> Dictionary:
 	var center: Vector3 = _room_floor_center(layout, "dock", "dock")
+	# Fall back to the airlock room when no dock room exists (e.g. the home ship uses
+	# its airlock as the docking attachment point rather than a dedicated dock room).
+	if center == Vector3.INF:
+		center = _room_floor_center(layout, "airlock", "airlock")
 	if center == Vector3.INF:
 		return {}
 	return {
