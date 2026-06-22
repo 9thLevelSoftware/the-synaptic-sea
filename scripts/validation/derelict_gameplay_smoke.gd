@@ -79,6 +79,12 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	if not controller.is_cleared():
 		_fail("derelict not cleared after completing all objectives (incl. reach_goal)")
 		return
+	# HUD reflects derelict completion (codex P2): the tracker must show every
+	# completed sequence, not stay at 0/N.
+	if playable.tracker == null or playable.tracker.get_completed_count() != sequences.size():
+		_fail("derelict HUD did not reflect completions (tracker completed=%d expected=%d)" % [
+			(playable.tracker.get_completed_count() if playable.tracker != null else -1), sequences.size()])
+		return
 
 	# Leave to home, then revisit: progress + cleared must be restored, and the
 	# rebuilt interactables for completed objectives must read as completed.
@@ -99,6 +105,12 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		if not it.completed:
 			_fail("revisit: a previously-completed derelict interactable is not marked completed (respawned)")
 			return
+	# HUD reflects restored completion on revisit (codex P2): the rebuilt tracker
+	# must show the cleared derelict's completed sequences, not 0/N.
+	if playable.tracker == null or playable.tracker.get_completed_count() != sequences.size():
+		_fail("revisit derelict HUD did not reflect restored completions (tracker completed=%d expected=%d)" % [
+			(playable.tracker.get_completed_count() if playable.tracker != null else -1), sequences.size()])
+		return
 
 	# Home loop intact: return home and confirm the home objective sequence is unchanged.
 	if not playable.travel_home():

@@ -9,16 +9,18 @@ const ObjectiveProgressStateScript := preload("res://scripts/systems/objective_p
 const REACH_GOAL_ID: String = "obj_reach_goal"
 const STEP_ID: String = "done"  # single synthetic step per single-objective
 
-var progress                       # ObjectiveProgressState
+# Inline-initialized so the controller is always in a valid state with a non-null
+# progress, even if constructed directly via .new() rather than create().
+var progress = ObjectiveProgressStateScript.new()   # ObjectiveProgressState
 var reach_goal_sequence: int = 0
 var cleared: bool = false
 
 # Static factory via load() self-reference (class_name globals unreliable under
-# --headless --script; matches ShipInstance.create).
+# --headless --script; matches ShipInstance.create). progress is set by the inline
+# member initializer above.
 static func create() -> DerelictObjectiveController:
 	var script: GDScript = load("res://scripts/systems/derelict_objective_controller.gd")
 	var c: DerelictObjectiveController = script.new()
-	c.progress = ObjectiveProgressStateScript.new()
 	return c
 
 ## True once the objective set has been registered (or restored).

@@ -1040,7 +1040,7 @@ func _build_derelict_objectives() -> void:
 	if current_ship == null or String(current_ship.marker_id) == "":
 		return
 	var active_loader = current_ship.scene_root
-	if active_loader == null or not active_loader.has_method("get_objective_specs_copy"):
+	if not is_instance_valid(active_loader) or not active_loader.has_method("get_objective_specs_copy"):
 		return
 	var specs: Array = active_loader.get_objective_specs_copy()
 	var controller = current_ship.get_objective_controller()
@@ -1067,14 +1067,40 @@ func _build_derelict_objectives() -> void:
 			interactable.set_active(false)
 		derelict_objective_root.add_child(interactable)
 		derelict_interactables.append(interactable)
-	# Show the derelict's objectives in the HUD while aboard.
+	# Show the derelict's objectives in the HUD while aboard, then reflect any
+	# persisted/restored completion (set_objectives resets the tracker's completed
+	# set, so this must run after it).
 	if tracker != null:
 		tracker.set_objectives(specs)
+		_refresh_derelict_tracker()
+
+## Mirrors the active derelict's controller state into the ObjectiveTracker: marks
+## completed sequences, advances the "Current" pointer to the lowest incomplete
+## objective, and flags run-complete once the derelict is cleared. Idempotent
+## (tracker.mark_completed keys a dict), so it serves both restore-on-board and
+## per-completion updates. No-op on the home ship (driven by the singleton loop).
+func _refresh_derelict_tracker() -> void:
+	if tracker == null or current_ship == null or String(current_ship.marker_id) == "":
+		return
+	var controller = current_ship.get_objective_controller()
+	var first_incomplete: int = -1
+	for it in derelict_interactables:
+		if not is_instance_valid(it):
+			continue
+		var seq: int = int(it.sequence)
+		if controller.is_objective_complete(seq):
+			tracker.mark_completed(seq)
+		elif first_incomplete < 0 or seq < first_incomplete:
+			first_incomplete = seq
+	if controller.is_cleared():
+		tracker.mark_run_complete()
+	elif first_incomplete > 0:
+		tracker.set_current_sequence(first_incomplete)
 
 ## Frees the active derelict's interactables. The controller (state) lives on the
 ## ShipInstance and is untouched.
 func _clear_derelict_objectives() -> void:
-	if derelict_objective_root != null:
+	if is_instance_valid(derelict_objective_root):
 		for child in derelict_objective_root.get_children():
 			derelict_objective_root.remove_child(child)
 			child.queue_free()
@@ -1086,6 +1112,8 @@ func _on_derelict_interactable_completed(interaction_id: String, objective_id: S
 		return
 	var controller = current_ship.get_objective_controller()
 	controller.complete(sequence)
+	# Reflect the completion (and run-complete on clear) in the HUD.
+	_refresh_derelict_tracker()
 	print("DERELICT OBJECTIVE COMPLETE marker=%s sequence=%d type=%s cleared=%s" % [
 		String(current_ship.marker_id), sequence, objective_type, str(controller.is_cleared()).to_lower()])
 
@@ -1093,7 +1121,7 @@ func _on_derelict_interactable_completed(interaction_id: String, objective_id: S
 ## interaction path (bypassing proximity via set_validation_player_in_range).
 func complete_derelict_objective_for_validation(sequence: int) -> bool:
 	for it in derelict_interactables:
-		if int(it.sequence) == sequence and not it.completed:
+		if is_instance_valid(it) and int(it.sequence) == sequence and not it.completed:
 			it.set_validation_player_in_range(player)
 			return it.try_interact(player)
 	return false
@@ -1173,10 +1201,26 @@ func travel_home() -> bool:
 	away_from_start = false
 	_clear_derelict_objectives()
 	if tracker != null and loader != null and loader.has_method("get_objective_specs_copy"):
+		# set_objectives resets the tracker's completed set; re-apply the home loop's
+		# progress so returning home does not blank a partially-completed home HUD.
 		tracker.set_objectives(loader.get_objective_specs_copy())
+		_refresh_home_tracker_completed()
 	if player != null and player is Node3D:
 		(player as Node3D).global_position = _home_player_position
 	return true
+
+## Re-applies the home objective loop's completion state to the ObjectiveTracker
+## after a set_objectives reset (sequences below current_objective_sequence are
+## complete). Mirrors, for the home ship's singleton loop, what
+## _refresh_derelict_tracker does for a derelict.
+func _refresh_home_tracker_completed() -> void:
+	if tracker == null:
+		return
+	for s in range(1, current_objective_sequence):
+		tracker.mark_completed(s)
+	tracker.set_current_sequence(current_objective_sequence)
+	if slice_complete:
+		tracker.mark_run_complete()
 
 ## Validation seam: the marker_ids of every retained visited derelict.
 func get_visited_ship_ids() -> Array:
@@ -1372,7 +1416,7 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	if away_from_start:
 		# Sub-project #2: the boarded derelict has its own objective interactables.
 		for it in derelict_interactables:
-			if it.try_interact(player_body):
+			if is_instance_valid(it) and it.try_interact(player_body):
 				return
 		return
 	# REQ-007: tool pickup is an interaction like any other. Try it first
