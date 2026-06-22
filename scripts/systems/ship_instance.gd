@@ -103,44 +103,41 @@ func get_objective_controller():
 		objective_controller = DerelictObjectiveControllerScript.create()
 	return objective_controller
 
-## World-space AABB enclosing scene_root's visual instances. Used to build
-## occupancy entries.
+const ROOM_HALF_EXTENT: float = 4.0   # generous per-room half-box in X/Z (covers 2x1 rooms + module chains)
+const ROOM_HALF_HEIGHT: float = 3.0   # half deck height + headroom
+
+## World-space AABB enclosing this ship's interior, derived from the built
+## ShipStructure's room-node LOCAL positions (robust off-tree / headless, where
+## VisualInstance3D world AABBs are unresolved). The merged local AABB is
+## transformed by scene_root's world transform.
 ##
-## Contract: this is meaningful only when scene_root AND its geometry are in the
-## scene tree. That is the normal case — occupancy is computed only after a ship
-## is fully loaded into the tree.
-##
-## A fully off-tree, null, or geometry-less scene_root intentionally returns a
-## zero-size AABB at scene_root's origin (the "unbuilt retained instance"
-## fallback).
-##
-## Per-node out-of-tree VisualInstance3D children are skipped (their world
-## transform is unresolved, so they contribute nothing). This means an in-tree
-## scene_root whose child meshes are not yet attached would under-report its
-## AABB — a state that does not occur in the current load flow, where geometry
-## is attached before occupancy is queried.
+## Null/empty scene_root or no room nodes -> zero-size AABB at the root origin
+## (the "unbuilt retained instance" fallback).
 func interior_aabb() -> AABB:
 	if scene_root == null or not is_instance_valid(scene_root):
 		return AABB()
-	var acc := AABB()
+	var structure: Node = scene_root.get_node_or_null("ShipStructure")
+	if structure == null:
+		for c in scene_root.get_children():
+			if c.get_child_count() > 0:
+				structure = c
+				break
+	var local := AABB()
 	var seeded := false
-	for node in _visual_descendants(scene_root):
-		if node.is_inside_tree():
-			var world: AABB = node.global_transform * node.get_aabb()
+	if structure != null:
+		for room_node in structure.get_children():
+			if not (room_node is Node3D):
+				continue
+			var p: Vector3 = (room_node as Node3D).position
+			var box := AABB(p - Vector3(ROOM_HALF_EXTENT, ROOM_HALF_HEIGHT, ROOM_HALF_EXTENT),
+				Vector3(ROOM_HALF_EXTENT, ROOM_HALF_HEIGHT, ROOM_HALF_EXTENT) * 2.0)
 			if not seeded:
-				acc = world
+				local = box
 				seeded = true
 			else:
-				acc = acc.merge(world)
+				local = local.merge(box)
 	if not seeded:
 		var o: Vector3 = scene_root.global_position if scene_root.is_inside_tree() else scene_root.position
 		return AABB(o, Vector3.ZERO)
-	return acc
-
-func _visual_descendants(node: Node) -> Array:
-	var out: Array = []
-	if node is VisualInstance3D:
-		out.append(node)
-	for child in node.get_children():
-		out.append_array(_visual_descendants(child))
-	return out
+	var xform: Transform3D = scene_root.global_transform if scene_root.is_inside_tree() else Transform3D(Basis(), scene_root.position)
+	return xform * local
