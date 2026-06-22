@@ -44,6 +44,10 @@ func _run(p) -> void:
 	# lifeboat's interior (i.e. a room the player reaches after crossing the dock seam).
 	var der_pt = _room_outside(der, lb)
 	if der_pt == Vector3.INF: _fail("no derelict room outside the docked lifeboat"); return
+	# Phase 5b Task 6 ("must open the port to board"): the derelict's dock-seam barrier
+	# spawns CLOSED on travel and now gates host occupancy — a closed-seam host is NOT
+	# resolvable as occupied. Open it first so crossing into the host reads as boarded.
+	if not p.open_active_dock_barrier_for_validation(): _fail("derelict barrier did not open"); return
 	p.player.teleport_to(der_pt)
 	p.recompute_occupancy()
 	if p.get_current_occupancy_for_validation() != der: _fail("not aboard derelict after teleport"); return

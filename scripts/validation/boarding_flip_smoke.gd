@@ -40,7 +40,7 @@ func _run(p) -> void:
 	if not p.open_active_dock_barrier_for_validation(): _fail("barrier did not open"); return
 
 	# (c) Cross into the derelict -> occupancy flips to the host.
-	p.board_host_for_validation()
+	if not p.board_host_for_validation(): _fail("no host room outside the docked lifeboat AABB"); return
 	p.recompute_occupancy()
 	if p.get_current_occupancy_for_validation() != host: _fail("occupancy did not flip to host after boarding"); return
 

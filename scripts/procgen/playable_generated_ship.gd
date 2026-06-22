@@ -1016,11 +1016,26 @@ func _occupancy_entries() -> Array:
 	# home lifeboat occupancy (Phase 5a Task 7).
 	if lifeboat_ship != null and lifeboat_ship != piloted_ship and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root) and lifeboat_ship.scene_root.get_parent() == self:
 		entries.append({"inst": lifeboat_ship, "aabb": lifeboat_ship.interior_aabb()})
-	if home_ship != null and home_ship.scene_root != null and is_instance_valid(home_ship.scene_root):
+	# Phase 5b Task 6: a host (home or derelict) is only resolvable as "occupied" once
+	# the player has opened its dock-seam barrier — "you must open the port to board."
+	# The piloted ship and lifeboat are the player's own ride and are never gated.
+	if home_ship != null and home_ship.scene_root != null and is_instance_valid(home_ship.scene_root) and _ship_boardable(home_ship):
 		entries.append({"inst": home_ship, "aabb": home_ship.interior_aabb()})
-	if current_ship != null and current_ship != home_ship and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
+	if current_ship != null and current_ship != home_ship and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root) and _ship_boardable(current_ship):
 		entries.append({"inst": current_ship, "aabb": current_ship.interior_aabb()})
 	return entries
+
+## True if `inst` can be boarded: it has no dock barrier, or its dock barrier is open.
+## (The piloted ship and any ship without a seam barrier are always boardable.)
+func _ship_boardable(inst) -> bool:
+	if inst == null:
+		return false
+	if inst == piloted_ship:
+		return true
+	for b in dock_barriers:
+		if is_instance_valid(b) and String(b.marker_id) == String(inst.marker_id):
+			return b.opened
+	return true   # no barrier for this ship -> boardable (defensive)
 
 ## Phase 5a Task 6: derive current_occupancy from world position.
 ## Also keeps away_from_start consistent so existing hazard/persistence readers
@@ -2011,12 +2026,12 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# Phase 4.5: while aboard a traveled derelict the starting ship's retained
 	# interactables/pickups are detached but still referenced here; gate them so
 	# a derelict cannot complete stale starting-ship objectives.
+	# Phase 5b: barrier pass is unconditional — the home seam also has a barrier at boot,
+	# so opening/breaching the dock seam must work whether the player is at home or away.
+	for b in dock_barriers:
+		if is_instance_valid(b) and not b.opened and b.try_start(player_body):
+			return
 	if away_from_start:
-		# Phase 5b: opening/breaching the dock seam barrier takes precedence so the
-		# player can board the derelict before any in-derelict interaction.
-		for b in dock_barriers:
-			if is_instance_valid(b) and not b.opened and b.try_start(player_body):
-				return
 		# Sub-project #4: try repair points before loot/objectives.
 		for rp in repair_points:
 			if is_instance_valid(rp) and rp.try_start(player_body):
@@ -3859,12 +3874,13 @@ func open_active_dock_barrier_for_validation() -> bool:
 
 ## Phase 5b Task 6 validation seam: teleports the player to a room of current_ship
 ## that lies OUTSIDE the piloted ship's interior AABB (so occupancy resolves
-## unambiguously to the host, not the overlapping docked lifeboat). If no such
+## unambiguously to the host, not the overlapping docked lifeboat). Returns true on a
+## genuine outside-room teleport; returns FALSE (without moving the player) when no such
 ## room exists (host entirely inside the lifeboat AABB — unexpected for a multi-room
-## derelict), falls back to the host interior center and emits a warning.
-func board_host_for_validation() -> void:
+## derelict) so the smoke fails honestly rather than asserting against an ambiguous point.
+func board_host_for_validation() -> bool:
 	if current_ship == null or player == null or not (player is Node3D):
-		return
+		return false
 	# Find a room of current_ship whose world position is outside the piloted ship's AABB.
 	var lb_aabb: AABB = AABB()
 	if piloted_ship != null and piloted_ship.scene_root != null and is_instance_valid(piloted_ship.scene_root):
@@ -3884,7 +3900,7 @@ func board_host_for_validation() -> void:
 				var gp: Vector3 = (rn as Node3D).global_position
 				if not lb_aabb.grow(0.001).has_point(gp):
 					(player as Node3D).global_position = gp
-					return
-	# Fallback: use the host interior center (may land in overlap — report concern).
-	push_warning("board_host_for_validation: no host room found outside piloted AABB; using interior center (AABB overlap)")
-	(player as Node3D).global_position = current_ship.interior_aabb().get_center()
+					return true
+	# No room outside the piloted AABB — do NOT teleport to an ambiguous center.
+	push_error("board_host_for_validation: no host room found outside piloted AABB; cannot prove a genuine flip")
+	return false
