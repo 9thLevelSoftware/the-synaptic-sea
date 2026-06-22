@@ -56,6 +56,7 @@ func build(layout: Dictionary) -> Dictionary:
 			"kind": "single",
 			"room_id": rid,
 			"approach_cell": approach_cell,
+			"loot_table": _salvage_loot_table_for_role(role),
 		})
 		sequence += 1
 
@@ -74,10 +75,33 @@ func build(layout: Dictionary) -> Dictionary:
 		"approach_cell": goal_approach,
 	})
 
+	var loot_containers: Array = []
+	var container_index: int = 0
+	for room in rooms:
+		var rid2: String = str(room.get("id", ""))
+		var role2: String = str(room.get("room_role", ""))
+		if rid2 == start_room or rid2 == goal_room:
+			continue
+		if role2 in CONNECTIVE_ROLES:
+			continue
+		var cell2: Array = _get_first_floor_cell(room)
+		if cell2.is_empty():
+			continue
+		var kind2: String = "generic_locker" if container_index % 2 == 1 else "generic_crate"
+		loot_containers.append({
+			"id": "loot_%s" % rid2,
+			"kind": kind2,
+			"room_id": rid2,
+			"approach_cell": cell2,
+			"loot_table": kind2,
+		})
+		container_index += 1
+
 	return {
 		"start_room": start_room,
 		"goal_room": goal_room,
 		"objectives": objectives,
+		"loot_containers": loot_containers,
 		"fire_zones": [],
 		"arc_zones": [],
 		"breach_zones": [],
@@ -89,6 +113,17 @@ func _find_room(rooms: Array, room_id: String) -> Dictionary:
 		if str(room.get("id", "")) == room_id:
 			return room
 	return {}
+
+
+## Maps a room role to a salvage loot table key (defined in loot_tables.json).
+func _salvage_loot_table_for_role(role: String) -> String:
+	match role:
+		"engineering", "engine", "reactor", "machine_shop":
+			return "salvage_engineering"
+		"cargo", "storage", "hold":
+			return "salvage_cargo"
+		_:
+			return "salvage_cargo"
 
 
 func _get_first_floor_cell(room: Dictionary) -> Array:

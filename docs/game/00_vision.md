@@ -18,7 +18,7 @@ The long-term game is an open-world survival sim in the Project Zomboid mold, wh
 **derelict ships are buildings**. A derelict is not a level to "complete" — it is a
 persistent place you:
 
-1. **Loot** — scavenge parts, tools, and supplies into your inventory.
+1. **Loot** — scavenge parts, tools, and supplies into your inventory. (realized for derelicts in sub-project #3 — see ADR-0014).
 2. **Repair** — fix systems over multiple visits, gated by parts looted from other ships.
 3. **Occupy & fortify** — make it a base; reinforce doors and chokepoints.
 4. **Defend** — hold it against monsters (a later pillar).

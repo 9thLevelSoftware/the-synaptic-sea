@@ -81,6 +81,26 @@ func _initialize() -> void:
 					quit(1)
 					return
 
+			# Sub-project #3: a loot_containers array is emitted and salvage objectives carry a loot_table.
+			var loot_containers: Array = slice.get("loot_containers", [])
+			var has_containers: bool = loot_containers.size() > 0
+			var first: Dictionary = loot_containers[0] if has_containers else {}
+			var container_well_formed: bool = has_containers \
+				and first.has("id") and first.has("kind") \
+				and first.has("room_id") and first.has("approach_cell") and first.has("loot_table")
+			var salvage_has_table: bool = true
+			for obj in slice.get("objectives", []):
+				if str(obj.get("type", "")) == "salvage" and str(obj.get("loot_table", "")).is_empty():
+					salvage_has_table = false
+			if not container_well_formed:
+				push_error("GAMEPLAY_SLICE_BUILDER FAIL %s seed=%d loot_containers not well-formed (has_containers=%s)" % [template_id, seed_val, str(has_containers)])
+				quit(1)
+				return
+			if not salvage_has_table:
+				push_error("GAMEPLAY_SLICE_BUILDER FAIL %s seed=%d salvage objective missing loot_table" % [template_id, seed_val])
+				quit(1)
+				return
+
 			# start_room and goal_room must exist in layout rooms
 			var room_ids: Array[String] = []
 			for room in layout.get("rooms", []):
@@ -94,5 +114,5 @@ func _initialize() -> void:
 				quit(1)
 				return
 
-	print("GAMEPLAY_SLICE_BUILDER PASS all %d layouts produced valid slices" % test_count)
+	print("GAMEPLAY_SLICE_BUILDER PASS all %d layouts produced valid slices loot_containers=true salvage_tables=true" % test_count)
 	quit(0)

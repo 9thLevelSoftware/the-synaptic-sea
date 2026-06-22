@@ -115,16 +115,17 @@ func _finalize() -> void:
 
 	# Summary line: machine-readable JSON so the baseline doc / future ADR can
 	# ingest without parsing freeform prose.
+	var rss_mb: float = _read_rss_mb()
 	var summary: Dictionary = {
 		"profiles": profile_entries,
 		"reference_hardware": "Mac mini M4 (Apple Silicon), macOS 26.5.1",
 		"godot_version": Engine.get_version_info().get("string", "unknown"),
 		"headless": true,
-		"os_rss_mb": _read_rss_mb(),
+		"os_rss_mb": rss_mb,
 		"notes": [
 			"frame_time_ms is headless physics-frame delta, NOT rendered FPS",
 			"For windowed FPS measurement, see scripts/validation/windowed_fps_capture.gd",
-			"peak_memory_mb is Performance.MEMORY_STATIC (Godot-tracked); os_rss_mb is ps RSS",
+			"peak_memory_mb is Performance.MEMORY_STATIC (Godot-tracked); %s" % _rss_note(),
 		],
 	}
 	print("PERFORMANCE BASELINE PASS templates=%d os_rss_mb=%.3f summary_json=%s" % [profile_entries.size(), float(summary.get("os_rss_mb", -1.0)), JSON.stringify(summary)])
@@ -285,6 +286,8 @@ func _read_rss_mb() -> float:
 	# Best-effort OS resident-set-size in MB. Returns -1 if the helper is
 	# unavailable. Used only for the summary block; per-frame sampling stays
 	# on Performance.MEMORY_STATIC to avoid spawning ps every physics tick.
+	if OS.get_name() == "Windows":
+		return -1.0
 	var output: Array = []
 	var exit_code: int = OS.execute("ps", ["-o", "rss=", "-p", str(OS.get_process_id())], output)
 	if exit_code != 0:
@@ -298,6 +301,12 @@ func _read_rss_mb() -> float:
 	if not raw.is_valid_int():
 		return -1.0
 	return float(int(raw)) / 1024.0
+
+
+func _rss_note() -> String:
+	if OS.get_name() == "Windows":
+		return "os_rss_mb is unavailable on Windows headless validation and reports -1.0"
+	return "os_rss_mb is ps RSS"
 
 
 func _count_nodes(root: Node) -> int:

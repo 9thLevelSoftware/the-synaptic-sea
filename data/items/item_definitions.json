@@ -1,0 +1,7 @@
+{
+  "power_cell":   { "display_name": "Power Cell",   "category": "part",   "weight": 1.0, "max_stack": 10 },
+  "scrap_metal":  { "display_name": "Scrap Metal",  "category": "part",   "weight": 5.0, "max_stack": 20 },
+  "wiring_spool": { "display_name": "Wiring Spool",  "category": "part",   "weight": 2.0, "max_stack": 10 },
+  "ration_pack":  { "display_name": "Ration Pack",  "category": "supply", "weight": 0.5, "max_stack": 20 },
+  "medkit":       { "display_name": "Medkit",       "category": "supply", "weight": 1.5, "max_stack": 5  }
+}

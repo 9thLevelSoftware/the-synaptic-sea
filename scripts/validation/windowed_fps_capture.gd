@@ -75,8 +75,10 @@ func _on_process_frame() -> void:
 
 
 func _read_rss_mb() -> float:
-	# macOS ps -o rss= reports kilobytes; divide by 1024 for MB. Returns -1
-	# if ps is unavailable or the parse fails.
+	# macOS/Linux ps -o rss= reports kilobytes; divide by 1024 for MB. Returns
+	# -1 if ps is unavailable, unsupported on this platform, or the parse fails.
+	if OS.get_name() == "Windows":
+		return -1.0
 	var output: Array = []
 	var exit_code: int = OS.execute("ps", ["-o", "rss=", "-p", str(OS.get_process_id())], output)
 	if exit_code != 0:
