@@ -9,7 +9,7 @@ static func resolve(player_pos: Vector3, entries: Array) -> Variant:
 	for entry in entries:
 		if typeof(entry) != TYPE_DICTIONARY:
 			continue
-		var aabb = entry.get("aabb", null)
+		var aabb: Variant = entry.get("aabb", null)
 		if aabb == null or typeof(aabb) != TYPE_AABB:
 			continue
 		# AABB.has_point is half-open on the max face; grow a hair so a player

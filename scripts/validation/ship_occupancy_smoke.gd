@@ -24,9 +24,14 @@ func _initialize() -> void:
 		ok = false; msg = "seam overlap did not tiebreak to host (first entry)"
 	if ok and ShipOccupancyScript.resolve(Vector3(100, 0, 0), entries) != null:
 		ok = false; msg = "point outside all did not resolve to null"
+	# Malformed-entry regression: defensive guards must skip bad entries.
+	if ok and ShipOccupancyScript.resolve(Vector3(2, 0, 0), [42, {"inst": host, "aabb": host_aabb}]) != host:
+		ok = false; msg = "non-dict entry not skipped (host should still match)"
+	if ok and ShipOccupancyScript.resolve(Vector3(15, 0, 0), [{"inst": host, "aabb": "notanaabb"}, {"inst": mobile, "aabb": mobile_aabb}]) != mobile:
+		ok = false; msg = "wrong-type aabb not skipped (mobile should match)"
 
 	if ok:
-		print("SHIP OCCUPANCY PASS contained=true tiebreak=host outside=null")
+		print("SHIP OCCUPANCY PASS contained=true tiebreak=host outside=null malformed=true")
 		quit(0)
 	else:
 		push_error("SHIP OCCUPANCY FAIL reason=%s" % msg)
