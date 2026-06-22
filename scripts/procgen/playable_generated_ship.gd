@@ -50,10 +50,8 @@ const PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR: float = 0.55
 # 100 units ensures a generated layout (max radius ~24 units) does not overlap
 # the home hull (Task 8 will replace this fixed offset with real DockPorts wiring).
 const DERELICT_DOCK_OFFSET := Vector3(100.0, 0.0, 0.0)
-# Phase 5a Task 7: lifeboat anchor offset. The lifeboat is a 3-cell linear structure
-# (~12 m span centred at the offset). At -35 on X its near edge is ≈-29, ~5 m clear of
-# coherent_ship_001's ≈-24 -X extent. DERELICT_DOCK_OFFSET is +100, so no overlap there.
-const LIFEBOAT_DOCK_OFFSET := Vector3(-35.0, 0.0, 0.0)
+# Phase 5b: the lifeboat no longer parks at a fixed anchor offset — it port-docks to
+# the home ship's airlock via DockingManager at boot (see _build_lifeboat_at_home).
 const ROUTE_GATE_COLLISION_SIZE: Vector3 = Vector3(2.6, 2.2, 0.7)
 const ROUTE_GATE_VISUAL_COLOR_CLOSED: Color = Color(1.0, 0.22, 0.18, 0.82)
 const ROUTE_GATE_VISUAL_COLOR_OPEN: Color = Color(0.18, 0.75, 1.0, 0.18)
@@ -143,7 +141,7 @@ var away_from_start: bool = false
 var visited_ships: Dictionary = {}          # marker_id -> ShipInstance
 var home_ship = null                        # the home ShipInstance (marker_id "")
 # Phase 5a Task 7: the physical lifeboat docked to the starting derelict.
-# Co-present at LIFEBOAT_DOCK_OFFSET; shares ship_systems_manager with the home ship.
+# Port-docked to the home ship's airlock at boot; shares ship_systems_manager with it.
 var lifeboat_ship = null                    # ShipInstance (docked to home_ship)
 var piloted_ship = null                     # the ShipInstance the player currently pilots (the lifeboat this cycle)
 # Sub-project #2: the active derelict's objective interactables live under a
@@ -1005,8 +1003,8 @@ func _occupancy_entries() -> Array:
 	var entries: Array = []
 	if home_ship != null and home_ship.scene_root != null and is_instance_valid(home_ship.scene_root):
 		entries.append({"inst": home_ship, "aabb": home_ship.interior_aabb()})
-	# Phase 5a Task 7: lifeboat is co-present at LIFEBOAT_DOCK_OFFSET — include it
-	# after the home derelict so the player can walk into the docked lifeboat.
+	# Phase 5a Task 7: lifeboat is co-present, port-docked to the home airlock — include
+	# it after the home derelict so the player can walk into the docked lifeboat.
 	if lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root) and lifeboat_ship.scene_root.get_parent() == self:
 		entries.append({"inst": lifeboat_ship, "aabb": lifeboat_ship.interior_aabb()})
 	if current_ship != null and current_ship != home_ship and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
@@ -1257,9 +1255,9 @@ func _build_repair_points() -> void:
 	if mgr == null:
 		return
 	# Phase 5a fix (Codex P1): HOME repair points parent under lifeboat_ship.scene_root
-	# (at LIFEBOAT_DOCK_OFFSET), so their positions must be LIFEBOAT-LOCAL — otherwise the
-	# derelict-frame _distributed_room_positions() values get the lifeboat offset added and
-	# the (travel-gating) propulsion repair lands OUTSIDE the lifeboat, unreachable in-game.
+	# (now port-docked to the home airlock), so their positions must be LIFEBOAT-LOCAL —
+	# otherwise the derelict-frame _distributed_room_positions() values get the lifeboat
+	# transform added and the (travel-gating) propulsion repair lands OUTSIDE the lifeboat.
 	# The away-derelict branch parents under current_ship.scene_root, whose derelict-frame
 	# positions correctly match its geometry — so it keeps _distributed_room_positions().
 	var use_lifeboat: bool = (not away_from_start) and lifeboat_ship != null \
@@ -1737,11 +1735,13 @@ func _build_lifeboat_at_home() -> void:
 	lifeboat_ship.built_layout = LifeBoatBuilderScript.build_layout()
 
 	# Add to the scene tree FIRST so host/mobile global_transforms resolve, then
-	# port-align the lifeboat to the home dock via DockingManager (replaces the
-	# fixed LIFEBOAT_DOCK_OFFSET hack — boot is now a real port-aligned dock).
+	# port-align the lifeboat to the home airlock via DockingManager (the lifeboat now
+	# port-docks to the host instead of parking at a fixed anchor offset).
 	add_child(lb_root)
 	piloted_ship = lifeboat_ship
-	_dock_piloted_to(home_ship)
+	var dock_result: Dictionary = _dock_piloted_to(home_ship)
+	if not bool(dock_result.get("success", false)):
+		push_error("PlayableGeneratedShip: boot dock failed — reason=%s" % str(dock_result.get("reason", "?")))
 
 ## Port-aligns piloted_ship's airlock to host's dock port and writes the dock
 ## relationship. host.scene_root must be in-tree. Returns the dock() result dict.
@@ -3548,6 +3548,9 @@ func _reset_runtime_for_reload() -> void:
 	if home_ship != null:
 		home_ship.docked_ships.erase(lifeboat_ship)
 	lifeboat_ship = null
+	# Drop the stale piloted_ship handle so the reload path does not hold a freed
+	# ShipInstance reference between teardown and the next _build_lifeboat_at_home.
+	piloted_ship = null
 	if hud_layer != null and is_instance_valid(hud_layer):
 		hud_layer.queue_free()
 	# REQ-014 blocking finding B: null the hud_layer and tracker
