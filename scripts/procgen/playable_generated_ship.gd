@@ -32,6 +32,7 @@ const LootContainerScript := preload("res://scripts/tools/loot_container.gd")
 const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
 const RepairPointScript := preload("res://scripts/tools/repair_point.gd")
 const ShipOccupancyScript := preload("res://scripts/systems/ship_occupancy.gd")
+const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -47,6 +48,12 @@ const PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR: float = 0.55
 # 100 units ensures a generated layout (max radius ~24 units) does not overlap
 # the home hull (Task 8 will replace this fixed offset with real DockPorts wiring).
 const DERELICT_DOCK_OFFSET := Vector3(100.0, 0.0, 0.0)
+# Phase 5a Task 7: lifeboat anchor offset. The lifeboat is a 3-room linear structure
+# (3 cells × 4 m = 12 m span). Placed at -30 on X so it does not overlap
+# coherent_ship_001's extent (≈±24 units) and stays clear of DERELICT_DOCK_OFFSET (+100).
+# Net gap from derelict edge (≈-24) to lifeboat near edge (≈-30 + ~6 = -24): exact boundary.
+# Use -35 to give 11 m clearance from the derelict's -X extent.
+const LIFEBOAT_DOCK_OFFSET := Vector3(-35.0, 0.0, 0.0)
 const ROUTE_GATE_COLLISION_SIZE: Vector3 = Vector3(2.6, 2.2, 0.7)
 const ROUTE_GATE_VISUAL_COLOR_CLOSED: Color = Color(1.0, 0.22, 0.18, 0.82)
 const ROUTE_GATE_VISUAL_COLOR_OPEN: Color = Color(0.18, 0.75, 1.0, 0.18)
@@ -135,6 +142,9 @@ var away_from_start: bool = false
 # retained ShipInstance.
 var visited_ships: Dictionary = {}          # marker_id -> ShipInstance
 var home_ship = null                        # the home ShipInstance (marker_id "")
+# Phase 5a Task 7: the physical lifeboat docked to the starting derelict.
+# Co-present at LIFEBOAT_DOCK_OFFSET; shares ship_systems_manager with the home ship.
+var lifeboat_ship = null                    # ShipInstance (docked to home_ship)
 # Sub-project #2: the active derelict's objective interactables live under a
 # dedicated root (empty while on the home ship). Separate from the home gameplay
 # roots so it stays attached when away_from_start.
@@ -982,12 +992,22 @@ func get_current_ship():
 func get_home_ship_for_validation():
 	return home_ship
 
+## Phase 5a Task 7 validation seam: the docked lifeboat ShipInstance.
+func get_lifeboat_ship_for_validation():
+	return lifeboat_ship
+
 ## Phase 5a Task 6: build the occupancy-entry list for ShipOccupancy.resolve().
 ## Home ship is listed first (host priority) so dock-seam overlaps resolve to it.
+## Phase 5a Task 7: lifeboat is listed second (after home derelict) so the player
+## can occupy the docked lifeboat when standing inside it.
 func _occupancy_entries() -> Array:
 	var entries: Array = []
 	if home_ship != null and home_ship.scene_root != null and is_instance_valid(home_ship.scene_root):
 		entries.append({"inst": home_ship, "aabb": home_ship.interior_aabb()})
+	# Phase 5a Task 7: lifeboat is co-present at LIFEBOAT_DOCK_OFFSET — include it
+	# after the home derelict so the player can walk into the docked lifeboat.
+	if lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root) and lifeboat_ship.scene_root.get_parent() == self:
+		entries.append({"inst": lifeboat_ship, "aabb": lifeboat_ship.interior_aabb()})
 	if current_ship != null and current_ship != home_ship and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
 		entries.append({"inst": current_ship, "aabb": current_ship.interior_aabb()})
 	return entries
@@ -1012,11 +1032,15 @@ func get_current_occupancy_for_validation():
 
 ## Phase 5a Task 5 validation seam: count of distinct in-tree ship scene_roots
 ## currently parented under the coordinator. Returns 1 when only the home ship
-## is present (no active derelict), 2 when the home and a derelict are
-## co-present at distinct offsets.
+## is present (no lifeboat or derelict), 2 when the home derelict + lifeboat are
+## co-present at home (Task 7 canonical opening), or home + traveled derelict.
+## Returns 3 when home + lifeboat + derelict are all present.
 func active_ship_root_count_for_validation() -> int:
 	var count := 0
 	if home_ship != null and home_ship.scene_root != null and is_instance_valid(home_ship.scene_root) and home_ship.scene_root.get_parent() == self:
+		count += 1
+	# Phase 5a Task 7: lifeboat is a distinct in-tree root co-present at home.
+	if lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root) and lifeboat_ship.scene_root.get_parent() == self:
 		count += 1
 	if current_ship != null and current_ship != home_ship and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root) and current_ship.scene_root.get_parent() == self:
 		count += 1
@@ -1251,10 +1275,15 @@ func _build_repair_points() -> void:
 				rp.repair_completed.connect(_on_repair_completed)
 			# Phase 5a Task 5 (co-presence): derelict repair points parent under the
 			# derelict's scene_root so they inherit DERELICT_DOCK_OFFSET and are freed
-			# automatically with the derelict on departure. Home repair points (the
-			# lifeboat's nav_linkage blocker) continue to parent under repair_point_root.
+			# automatically with the derelict on departure.
+			# Phase 5a Task 7: HOME repair points (the lifeboat's nav_linkage blocker)
+			# parent under lifeboat_ship.scene_root so the player physically repairs
+			# inside the docked lifeboat. Falls back to repair_point_root if the
+			# lifeboat has not been built yet.
 			if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
 				current_ship.scene_root.add_child(rp)
+			elif lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root):
+				lifeboat_ship.scene_root.add_child(rp)
 			else:
 				repair_point_root.add_child(rp)
 			repair_points.append(rp)
@@ -1264,9 +1293,19 @@ func _clear_repair_points() -> void:
 		for child in repair_point_root.get_children():
 			repair_point_root.remove_child(child)
 			child.queue_free()
+	# Phase 5a Task 7: home repair points are now parented under lifeboat_ship.scene_root.
+	# Free any that are still parented there (e.g., on a same-ship reload that bypasses the
+	# derelict-departure path). Derelict repair points parent under current_ship.scene_root and
+	# are freed when that root is freed on departure — no action needed for them here.
+	for rp in repair_points:
+		if is_instance_valid(rp) and rp.get_parent() != repair_point_root:
+			var rp_parent = rp.get_parent()
+			if rp_parent != null and is_instance_valid(rp_parent):
+				rp_parent.remove_child(rp)
+			rp.queue_free()
 	# Phase 5a Task 5 (co-presence): derelict repair points parent under
 	# current_ship.scene_root rather than repair_point_root, so repair_point_root
-	# only holds home-ship (lifeboat) repair points. The derelict repair points
+	# only holds fallback home-ship repair points. The derelict repair points
 	# are freed when scene_root is freed on departure — just clear the array.
 	repair_points.clear()
 
@@ -1563,6 +1602,11 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 		home_ship = current_ship
 		# Phase 5a Task 6: initialise occupancy to home ship (player starts here).
 		current_occupancy = home_ship
+		# Phase 5a Task 7: build the physical lifeboat docked to the starting derelict.
+		# The lifeboat is a 3-room Node3D placed at LIFEBOAT_DOCK_OFFSET, co-present
+		# with the home derelict. It shares ship_systems_manager so opening-damage,
+		# repair, and travel-gate semantics (#4) stay exactly as they are.
+		_build_lifeboat_at_home()
 	_build_interactables()
 	_build_slice_affordance_labels()
 	_build_route_control_gates()
@@ -1601,6 +1645,43 @@ func _on_loader_failed(reason: String) -> void:
 	last_failure_reason = reason
 	push_error("PLAYABLE SHIP FAIL reason=%s" % reason)
 	emit_signal("playable_failed", reason)
+
+## Phase 5a Task 7: build the physical lifeboat and dock it to the home derelict.
+## Called from the home-wrap path in _on_ship_loaded (guarded by `current_ship == null`).
+## Safe to call multiple times — frees any prior lifeboat_ship.scene_root first.
+func _build_lifeboat_at_home() -> void:
+	# Free any prior lifeboat root (reload safety — should not be in-tree here since
+	# _reset_runtime_for_reload tears it down, but guard defensively).
+	if lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root):
+		var old_root: Node3D = lifeboat_ship.scene_root as Node3D
+		if old_root != null and old_root.get_parent() == self:
+			remove_child(old_root)
+		old_root.queue_free()
+		lifeboat_ship = null
+
+	var lb_root: Node3D = LifeBoatBuilderScript.build()
+	if lb_root == null:
+		push_error("PlayableGeneratedShip: LifeBoatBuilder.build() returned null; lifeboat not created")
+		return
+
+	# Create the ShipInstance: shared systems_manager so #4 opening-damage, travel-gate,
+	# and repair semantics stay exactly as they are.
+	lifeboat_ship = ShipInstanceScript.create("lifeboat", "", null, ship_systems_manager, lb_root)
+
+	# Dock relationship: lifeboat is docked to the home derelict.
+	# Clear prior entries first (reload path: _reset_runtime_for_reload sets
+	# lifeboat_ship = null but home_ship stays, so docked_ships may still hold a
+	# stale reference from the previous load).
+	lifeboat_ship.parent_ship = home_ship
+	if home_ship != null:
+		home_ship.docked_ships.clear()
+		home_ship.docked_ships.append(lifeboat_ship)
+
+	# Position at fixed anchor, clear of coherent_ship_001's extent and DERELICT_DOCK_OFFSET.
+	lb_root.position = LIFEBOAT_DOCK_OFFSET
+
+	# Add to the scene tree so it is co-present with the home derelict.
+	add_child(lb_root)
 
 func _spawn_player() -> void:
 	player = PlayerControllerScript.new()
@@ -3363,6 +3444,15 @@ func _reset_runtime_for_reload() -> void:
 		for child in arc_root.get_children():
 			arc_root.remove_child(child)
 			child.queue_free()
+	# Phase 5a Task 7: free the lifeboat scene_root on reload so _build_lifeboat_at_home()
+	# can build a fresh one. The lifeboat is NOT freed during the away-branch above
+	# (it is at home, not a traveled derelict), so it must be freed here unconditionally.
+	if lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root):
+		var lb_root: Node3D = lifeboat_ship.scene_root as Node3D
+		if lb_root != null and lb_root.get_parent() == self:
+			remove_child(lb_root)
+		lb_root.queue_free()
+	lifeboat_ship = null
 	if hud_layer != null and is_instance_valid(hud_layer):
 		hud_layer.queue_free()
 	# REQ-014 blocking finding B: null the hud_layer and tracker
