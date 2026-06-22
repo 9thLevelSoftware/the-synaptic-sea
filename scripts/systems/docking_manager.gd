@@ -5,6 +5,20 @@ class_name DockingManager
 ## port to a host ship's dock port (coincident position, opposing facing,
 ## yaw-only) and writes the parent/child fields already declared on ShipInstance.
 ## No scene-tree ownership: callers own add_child/remove_child of ship_roots.
+##
+## PORT-SPACE CONTRACT (important for the 5b integration):
+##   - host_port is WORLD-space (the host is already placed in the world).
+##   - mobile_port is MOBILE-LOCAL (relative to the mobile ship's own root); dock()
+##     computes the mobile root's transform that brings it onto the host port.
+## DockPorts.for_*() return SHIP-LOCAL descriptors. A caller docking a real, non-origin
+## host must therefore lift the host's local port to world FIRST, e.g.
+##   var hx := host_inst.scene_root.global_transform
+##   var host_world := {"position": hx * local.position,
+##                      "facing": (hx.basis * local.facing).normalized()}
+## (host_inst.scene_root must be in the scene tree for global_transform to be valid).
+## dock() deliberately stays scene-tree-free so it is pure/unit-testable; the lift is the
+## integration layer's job. Passing a local host port for a non-origin host mis-places the
+## mobile — that is a contract violation, not a dock() bug.
 
 ## Yaw (radians) that rotates `from` onto `to` in the X-Z plane.
 static func _yaw_between(from: Vector3, to: Vector3) -> float:
@@ -46,6 +60,8 @@ static func dock(host_inst, mobile_inst, host_port: Dictionary, mobile_port: Dic
 	# docked_ships list does not retain a stale reference to this mobile ship.
 	if mobile_inst.parent_ship != null:
 		undock(mobile_inst)
+	# host_port is WORLD-space per the port-space contract (see class docstring);
+	# mobile_port is mobile-local. compute_mobile_transform yields the mobile root transform.
 	(root as Node3D).transform = compute_mobile_transform(host_port, mobile_port)
 	mobile_inst.parent_ship = host_inst
 	if not host_inst.docked_ships.has(mobile_inst):

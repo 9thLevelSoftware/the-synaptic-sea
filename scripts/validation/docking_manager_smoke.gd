@@ -11,7 +11,9 @@ func _initialize() -> void:
 	var ok := true
 	var msg := ""
 
-	# Host placed 20 units down +X, its dock port facing +X (outward).
+	# Host placed 20 units down +X, its dock port facing +X (outward). Per DockingManager's
+	# port-space contract, host_port is WORLD-space (the host is already placed) — so the
+	# port sits at world (22,0,0). mobile_port (below) is mobile-local.
 	var host_root := Node3D.new()
 	host_root.position = Vector3(20.0, 0.0, 0.0)
 	var host = ShipInstanceScript.create("host", "", null, null, host_root)
@@ -26,7 +28,8 @@ func _initialize() -> void:
 	if not bool(res.get("success", false)):
 		ok = false; msg = "dock failed: %s" % str(res.get("reason", ""))
 
-	# Mobile port now in world space must coincide with the host port and face the opposite way.
+	# Mobile port now in world space must coincide with the (world-space) host port and
+	# face the opposite way.
 	var mobile_port_world: Vector3 = mobile_root.transform * (mobile_port["position"] as Vector3)
 	var mobile_facing_world: Vector3 = (mobile_root.transform.basis * (mobile_port["facing"] as Vector3)).normalized()
 	if ok and mobile_port_world.distance_to(host_port["position"]) > 0.001:
