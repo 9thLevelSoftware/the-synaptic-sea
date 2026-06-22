@@ -3564,10 +3564,47 @@ func _build_world_snapshot():
 	if player != null and player is Node3D:
 		var p: Vector3 = (player as Node3D).global_position
 		ws.player_position_in_ship = [p.x, p.y, p.z]
+	ws.dock_edges = _current_dock_edges()
+	ws.piloted_ship_id = piloted_ship.ship_id if piloted_ship != null else ""
+	ws.aboard_ship_id = current_occupancy.ship_id if current_occupancy != null else ""
+	ws.opened_ports = _opened_port_marker_ids()
 	ws.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
 	ws.godot_version = Engine.get_version_info()["string"]
 	ws.saved_at = Time.get_datetime_string_from_system(true)
 	return ws
+
+## Returns the current dock-edge set as a serialisable Array.
+## Each entry is {host: String, mobile: String, port_type: String}.
+## Only the piloted ship's edge is tracked (the sole dock in Phase 5b).
+func _current_dock_edges() -> Array:
+	var edges: Array = []
+	if piloted_ship != null and piloted_ship.parent_ship != null:
+		var host = piloted_ship.parent_ship
+		edges.append({"host": String(host.marker_id), "mobile": String(piloted_ship.ship_id), "port_type": "airlock"})
+	return edges
+
+## Returns the marker_ids of every dock barrier that is currently opened.
+func _opened_port_marker_ids() -> Array:
+	var out: Array = []
+	for b in dock_barriers:
+		if is_instance_valid(b) and b.opened:
+			out.append(String(b.marker_id))
+	return out
+
+## Task 7 validation seam: true iff the restored barrier for the given marker_id is opened.
+func restored_port_opened_for_validation(marker_id: String) -> bool:
+	for b in dock_barriers:
+		if is_instance_valid(b) and String(b.marker_id) == marker_id:
+			return b.opened
+	return false
+
+## Task 7 validation seam: calls request_save() (world save) and returns its result.
+func save_world_for_validation() -> bool:
+	return request_save()
+
+## Task 7 validation seam: calls request_load() (world load) and returns its result.
+func load_world_for_validation() -> bool:
+	return request_load()
 
 ## Regenerates a derelict's geometry from its retained blueprint, makes it the
 ## active ship (re-applying its persisted systems state is implicit — the
@@ -3631,6 +3668,14 @@ func _apply_world_snapshot(ws) -> bool:
 		if not _activate_derelict_from_instance(active, ws.player_position_in_ship):
 			push_warning("PlayableGeneratedShip: world load — failed to re-activate derelict '%s'" % String(ws.current_location))
 			return true
+	# 5. Restore opened-port flags (Task 7: dock-edge persistence).
+	# After ships are rebuilt and barriers spawned (step 4 / _attach_derelict_active),
+	# re-open any barriers that were opened at save time. This is not cosmetic: a host
+	# whose barrier is closed is non-boardable (_ship_boardable returns false), so a
+	# previously-breached derelict would become unboardable after load without this.
+	for b in dock_barriers:
+		if is_instance_valid(b) and ws.opened_ports.has(String(b.marker_id)):
+			b.set_opened(true)
 	return true
 
 ## Tear down every runtime child so a fresh load can rebuild the slice
