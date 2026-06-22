@@ -34,19 +34,29 @@ static func for_derelict(layout: Dictionary, seed_value: int = 0, condition_clas
 	}
 
 ## True iff both ports are non-empty, the same type, and the same size class.
-## Forward-structured: hangar/cargo_clamp are valid types here, just not yet spawned.
+## Missing size_class on either port fails closed (no asymmetric sentinels).
 static func ports_compatible(a: Dictionary, b: Dictionary) -> bool:
 	if a.is_empty() or b.is_empty():
 		return false
+	if not a.has("size_class") or not b.has("size_class"):
+		return false
 	if str(a.get("type", "")) != str(b.get("type", "")):
 		return false
-	return int(a.get("size_class", -1)) == int(b.get("size_class", -2))
+	return int(a["size_class"]) == int(b["size_class"])
 
-## Deterministic port condition. A derelict in poor condition (condition_class >= 2,
-## matching ShipBlueprint's worst tiers) has a broken dock port that needs a breach.
-## condition_class 0..1 (intact/light) -> intact; 2..3 (heavy/wreck) -> broken.
+## Deterministic port condition from the derelict's condition tier + seed.
+## Pristine/light tiers are always intact; wreck tier always broken; the middle
+## tiers (1,2) are split by the derelict's seed — same (seed, class) -> same result,
+## worse condition -> higher break chance. (Matches the spec: condition + seed.)
 static func condition_from_seed(seed_value: int, condition_class: int) -> String:
-	return "broken" if condition_class >= 2 else "intact"
+	if condition_class <= 0:
+		return "intact"
+	if condition_class >= 3:
+		return "broken"
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var broken_chance: float = 0.25 * float(condition_class)   # class1=0.25, class2=0.50
+	return "broken" if rng.randf() < broken_chance else "intact"
 
 ## Average world_position of floor placements in the first room whose room_role
 ## == role_match OR whose id begins with id_prefix. Returns Vector3.INF if none.

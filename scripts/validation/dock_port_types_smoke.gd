@@ -13,15 +13,31 @@ func _initialize() -> void:
 	if lb_port.is_empty() or str(lb_port.get("type", "")) != "airlock" or int(lb_port.get("size_class", -1)) != 1 or str(lb_port.get("condition", "")) != "intact":
 		ok = false; msg = "lifeboat port malformed: %s" % str(lb_port)
 
-	# condition_from_seed is deterministic and yields both values across the class range.
+	# condition_from_seed: tier extremes are fixed, middle band is seed-split.
 	if ok:
-		var intact := DockPortsScript.condition_from_seed(123, 0)   # good condition -> intact
-		var broken := DockPortsScript.condition_from_seed(123, 3)   # poor condition -> broken
-		if intact != "intact" or broken != "broken":
-			ok = false; msg = "condition_from_seed wrong: intact=%s broken=%s" % [intact, broken]
-		# Determinism: same inputs, same output.
-		if ok and DockPortsScript.condition_from_seed(123, 3) != broken:
-			ok = false; msg = "condition_from_seed not deterministic"
+		# Tier extremes: class 0 always intact, class 3 always broken.
+		if DockPortsScript.condition_from_seed(123, 0) != "intact":
+			ok = false; msg = "condition_from_seed(123, 0) should be intact"
+		if ok and DockPortsScript.condition_from_seed(123, 3) != "broken":
+			ok = false; msg = "condition_from_seed(123, 3) should be broken"
+		# Stability: same (seed, class) -> identical result.
+		if ok and DockPortsScript.condition_from_seed(123, 2) != DockPortsScript.condition_from_seed(123, 2):
+			ok = false; msg = "condition_from_seed not stable for same (seed, class)"
+		# Seed actually splits the middle band: across seeds 1..80 at class 2,
+		# both "intact" and "broken" must appear.
+		if ok:
+			var saw_intact := false
+			var saw_broken := false
+			for s in range(1, 81):
+				var c := DockPortsScript.condition_from_seed(s, 2)
+				if c == "intact":
+					saw_intact = true
+				elif c == "broken":
+					saw_broken = true
+			if not saw_intact:
+				ok = false; msg = "seed never produced an intact outcome at class 2"
+			elif not saw_broken:
+				ok = false; msg = "seed never produced a broken outcome at class 2"
 
 	# Compatibility matrix.
 	if ok:
