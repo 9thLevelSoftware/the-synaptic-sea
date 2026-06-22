@@ -46,19 +46,30 @@ func _run(p) -> void:
 		p.search_loot_container_for_validation(String(lc.container_id))
 	if p.inventory_state.get_quantity("circuit_board") < 1: _fail("derelict loot did not yield circuit_board"); return
 
-	# Phase 5a regression (Codex P1 re-review): the travel-gating propulsion repair point
-	# must sit INSIDE the docked lifeboat (parented under lifeboat.scene_root at a lifeboat-
-	# LOCAL position), not offset out into the void by a derelict-frame coordinate. The
-	# lifeboat is a 3-cell (~12u) structure, so a correctly-placed point is within ~8u of
-	# its root; the bug placed it up to ~24u away (derelict-frame + lifeboat offset).
-	var lb_o: Vector3 = lifeboat.scene_root.global_position
-	var found_rp := false
+	# Phase 5a regression (Codex P1 re-reviews): every home repair point must sit ON an
+	# ACTUAL lifeboat room floor, not (a) offset into the void by a derelict-frame coordinate,
+	# nor (b) at a hardcoded grid that StructuralPlacer's BFS layout doesn't honor. Read the
+	# real room positions from the built lifeboat structure and require each repair point to
+	# be within ~1 cell of one — and the travel-gating propulsion/nav_linkage point to exist.
+	var structure = lifeboat.scene_root.get_node_or_null("ShipStructure")
+	if structure == null:
+		for c in lifeboat.scene_root.get_children():
+			if c.get_child_count() > 0: structure = c; break
+	var lb_rooms: Array = []
+	if structure != null:
+		for rn in structure.get_children():
+			if rn is Node3D: lb_rooms.append((rn as Node3D).global_position)
+	if lb_rooms.is_empty(): _fail("could not read lifeboat room positions"); return
+	if p.repair_points.is_empty(): _fail("no home repair points built"); return
+	var found_prop := false
 	for rp in p.repair_points:
-		if rp.system_id == "propulsion" and rp.subcomponent_id == "nav_linkage":
-			found_rp = true
-			var dist: float = rp.global_position.distance_to(lb_o)
-			if dist > 8.0: _fail("propulsion repair point not inside lifeboat (dist=%.1f)" % dist); return
-	if not found_rp: _fail("no propulsion/nav_linkage repair point found"); return
+		var nearest := 1.0e9
+		for rpos in lb_rooms:
+			nearest = min(nearest, rp.global_position.distance_to(rpos))
+		if nearest > 3.0:
+			_fail("repair point %s/%s off lifeboat floor (nearest room %.1f)" % [str(rp.system_id), str(rp.subcomponent_id), nearest]); return
+		if rp.system_id == "propulsion" and rp.subcomponent_id == "nav_linkage": found_prop = true
+	if not found_prop: _fail("no propulsion/nav_linkage repair point found"); return
 
 	finished = true
 	print("CANONICAL OPENING PASS docked=true aboard_derelict=true prop_offline=true loot=true repair_in_lifeboat=true")

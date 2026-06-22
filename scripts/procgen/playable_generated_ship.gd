@@ -1365,14 +1365,33 @@ func advance_repair_channels_for_validation(delta: float) -> void:
 		if is_instance_valid(rp) and rp.channeling:
 			rp.advance_channel(delta)
 
-## LIFEBOAT-LOCAL repair-point positions (floor centers of the fixed LifeBoatBuilder rooms:
-## engine_bay/airlock/cockpit along X at cell -1/0/1 * CELL_SIZE=4). These are LOCAL to
-## lifeboat_ship.scene_root, so a repair point parented there lands INSIDE the lifeboat geometry
-## (rather than getting the lifeboat offset added to a derelict-frame coordinate). See the fix
-## note in _build_repair_points.
+## LIFEBOAT-LOCAL repair-point positions, derived from the ACTUAL built lifeboat room nodes.
+## LifeBoatBuilder.build() lays rooms via StructuralPlacer's BFS grid (CELL_SIZE+ROOM_GAP
+## spacing + airlock separation) — NOT the fixed ROOM_CELL_X cells — so hardcoding positions
+## places repair points off the real floor. We read each room node's local position from the
+## "ShipStructure" container (which sits at the scene_root origin, so its children's positions
+## are lifeboat-local). A repair point parented under lifeboat_ship.scene_root at one of these
+## therefore lands ON an actual lifeboat room. Returns [] if the structure can't be found
+## (caller then falls through to repair_point_root, never to an off-floor position).
 func _lifeboat_local_repair_positions() -> Array:
+	var out: Array = []
+	if lifeboat_ship == null or lifeboat_ship.scene_root == null or not is_instance_valid(lifeboat_ship.scene_root):
+		return out
 	var y: float = PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR
-	return [Vector3(-4.0, y, 0.0), Vector3(0.0, y, 0.0), Vector3(4.0, y, 0.0)]
+	var sr: Node3D = lifeboat_ship.scene_root
+	var structure: Node = sr.get_node_or_null("ShipStructure")
+	if structure == null:
+		# Fallback: the first child that contains room nodes.
+		for c in sr.get_children():
+			if c.get_child_count() > 0:
+				structure = c
+				break
+	if structure == null:
+		return out
+	for room_node in structure.get_children():
+		if room_node is Node3D:
+			out.append((room_node as Node3D).position + Vector3(0.0, y, 0.0))
+	return out
 
 ## Curates the lifeboat's propulsion so the opening blocker is a single low-skill repair:
 ## nav_linkage broken (circuit_board, skill 2, no tool), the other propulsion subs healthy.
