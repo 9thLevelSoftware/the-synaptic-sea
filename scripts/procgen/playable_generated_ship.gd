@@ -3591,6 +3591,10 @@ func _opened_port_marker_ids() -> Array:
 			out.append(String(b.marker_id))
 	return out
 
+## Task 7 validation seam: the live dock-edge set (same shape _build_world_snapshot saves).
+func current_dock_edges_for_validation() -> Array:
+	return _current_dock_edges()
+
 ## Task 7 validation seam: true iff the restored barrier for the given marker_id is opened.
 func restored_port_opened_for_validation(marker_id: String) -> bool:
 	for b in dock_barriers:
@@ -3676,7 +3680,68 @@ func _apply_world_snapshot(ws) -> bool:
 	for b in dock_barriers:
 		if is_instance_valid(b) and ws.opened_ports.has(String(b.marker_id)):
 			b.set_opened(true)
+	# 6. Re-apply the persisted docking snapshot (piloted pointer + dock-edge set +
+	# occupancy). This is the general N-ship persistence mechanism: the dock edges are
+	# the source of truth, not the implicit current_location-driven rebuild. Idempotent
+	# (a no-op confirm when step 4 already re-docked 5b's single mobile ship).
+	_apply_docking_snapshot(ws)
 	return true
+
+## Restores the piloted pointer, dock-edge set, and occupancy from the snapshot
+## (the general N-ship persistence mechanism). Idempotent: confirms/re-applies the
+## edge the current_location-driven rebuild already established for 5b's single ship.
+## Consumes ws.piloted_ship_id, ws.dock_edges, ws.aboard_ship_id — every saved
+## docking field is read here so persistence is genuine, not implicit.
+func _apply_docking_snapshot(ws) -> void:
+	# Piloted pointer (today the lifeboat; resolved by ship_id so it generalizes to N ships).
+	if String(ws.piloted_ship_id) != "":
+		var p = _find_ship_by_id(String(ws.piloted_ship_id))
+		if p != null:
+			piloted_ship = p
+	# Dock-edge set: ensure each mobile ship is docked to the host named in the snapshot.
+	# Edge shape (see _current_dock_edges): host = host.marker_id, mobile = mobile.ship_id.
+	for edge_v in ws.dock_edges:
+		if typeof(edge_v) != TYPE_DICTIONARY:
+			continue
+		var edge: Dictionary = edge_v
+		var mobile = _find_ship_by_id(String(edge.get("mobile", "")))
+		var host = _find_ship_by_id_or_marker(String(edge.get("host", "")))
+		if mobile != null and host != null and mobile.parent_ship != host:
+			# Re-establish only when the rebuild did not already dock this edge (idempotent).
+			# _dock_piloted_to reads the module-level piloted_ship, so swap it for the move.
+			var saved_piloted = piloted_ship
+			piloted_ship = mobile
+			_dock_piloted_to(host)
+			piloted_ship = saved_piloted
+	# Occupancy: restore the ship the player was aboard (by ship_id). Leave as set by
+	# _attach_derelict_active when the id does not resolve. Do NOT call
+	# recompute_occupancy() here — that breaks world_save_anywhere (player's saved world
+	# position may resolve to a different ship than the one they were logically aboard).
+	if String(ws.aboard_ship_id) != "":
+		var a = _find_ship_by_id(String(ws.aboard_ship_id))
+		if a != null:
+			current_occupancy = a
+
+## Resolves a ShipInstance by its ship_id across home/lifeboat/active/visited registries.
+func _find_ship_by_id(id: String):
+	if id == "":
+		return null
+	if home_ship != null and String(home_ship.ship_id) == id: return home_ship
+	if lifeboat_ship != null and String(lifeboat_ship.ship_id) == id: return lifeboat_ship
+	if current_ship != null and String(current_ship.ship_id) == id: return current_ship
+	for mid in visited_ships:
+		if String((visited_ships[mid]).ship_id) == id: return visited_ships[mid]
+	return null
+
+## Resolves a dock host. Edges store the host's marker_id ("" = home), so match on
+## marker_id first, then fall back to ship_id lookup.
+func _find_ship_by_id_or_marker(key: String):
+	if key == "" and home_ship != null: return home_ship
+	if current_ship != null and String(current_ship.marker_id) == key: return current_ship
+	if home_ship != null and String(home_ship.marker_id) == key: return home_ship
+	for mid in visited_ships:
+		if String((visited_ships[mid]).marker_id) == key: return visited_ships[mid]
+	return _find_ship_by_id(key)
 
 ## Tear down every runtime child so a fresh load can rebuild the slice
 ## cleanly. Mirrors the setup done by _build_runtime_nodes() and the
