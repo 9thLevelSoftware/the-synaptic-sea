@@ -107,7 +107,10 @@ run_clean 'structural placer smoke' 'STRUCTURAL PLACER PASS' "$GODOT" --headless
 run_clean 'ship generator smoke' 'SHIP GENERATOR PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_generator_smoke.gd
 run_clean 'archetype load smoke' 'ARCHETYPE LOAD PASS archetypes=3 round_trip=3' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/archetype_load_smoke.gd
 run_clean 'load from blueprint integration' 'LOAD FROM BLUEPRINT INTEGRATION PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/load_from_blueprint_smoke.gd
-run_clean 'gameplay slice builder smoke' 'GAMEPLAY_SLICE_BUILDER PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gameplay_slice_builder_smoke.gd
+run_clean 'gameplay slice builder smoke' 'GAMEPLAY_SLICE_BUILDER PASS all' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gameplay_slice_builder_smoke.gd
+run_clean 'item inventory smoke' 'ITEM INVENTORY PASS add=true weight_cap=true round_trip=true legacy_compat=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/item_inventory_smoke.gd
+run_clean 'loot table smoke' 'LOOT TABLE PASS deterministic=true varies_by_seed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/loot_table_smoke.gd
+run_clean 'derelict loot smoke' 'DERELICT LOOT PASS searched=true carried=true persists=true home_intact=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_loot_smoke.gd
 run_clean 'life boat layout smoke' 'LIFE_BOAT_LAYOUT PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/life_boat_layout_smoke.gd
 run_clean 'start scenario smoke' 'START_SCENARIO PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/start_scenario_smoke.gd
 run_clean 'procgen walkability smoke' 'WALKABILITY PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_walkability_smoke.gd
@@ -126,7 +129,7 @@ run_clean 'marker generator smoke' 'MARKER GENERATOR PASS deterministic=true per
 run_clean 'sargasso world smoke' 'SARGASSO WORLD PASS in_range_sorted=true generated=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sargasso_world_smoke.gd
 run_clean 'scanner state smoke' 'SCANNER STATE PASS nav_off_empty=true scanners_off_detail1=true full_detail=6 round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_state_smoke.gd
 run_clean 'travel controller smoke' 'TRAVEL CONTROLLER PASS propulsion_gate=true range_gate=true generated_node=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_controller_smoke.gd
-run_clean 'ship instance smoke' 'SHIP INSTANCE PASS round_trip=true stubs_present=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_instance_smoke.gd
+run_clean 'ship instance smoke' 'SHIP INSTANCE PASS round_trip=true stubs_present=true objective_round_trip=true looted_round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_instance_smoke.gd
 run_clean 'travel integration smoke' 'TRAVEL INTEGRATION PASS start_wrapped=true scan_gated=true propulsion_gate=true swapped=true progression_persists=true world_recorded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_integration_smoke.gd
 run_clean 'scanner panel smoke' 'SCANNER PANEL PASS populated=true selection_moves=true travel_invoked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_panel_smoke.gd
 run_clean 'world snapshot smoke' 'WORLD SNAPSHOT PASS round_trip=true version_gated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_snapshot_smoke.gd
@@ -135,7 +138,7 @@ run_clean 'world persist restore smoke' 'WORLD PERSIST RESTORE PASS registered=t
 run_clean 'world save anywhere smoke' 'WORLD SAVE ANYWHERE PASS away_save=true location_restored=true state_restored=true home_save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_save_anywhere_smoke.gd
 run_clean 'derelict objective controller smoke' 'DERELICT OBJECTIVE CONTROLLER PASS configure=true cleared_on_goal=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_objective_controller_smoke.gd
 run_clean 'derelict gameplay smoke' 'DERELICT GAMEPLAY PASS built=true cleared=true persists=true home_intact=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_gameplay_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=67 clean_output=true'
+echo 'SARGASSO REGRESSION PASS commands=70 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
