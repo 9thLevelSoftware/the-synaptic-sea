@@ -1182,7 +1182,13 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	if piloted_ship != null:
 		var carry := _capture_player_carry()
 		DockingManagerScript.undock(piloted_ship)
-		_dock_piloted_to(inst)
+		var dock_res: Dictionary = _dock_piloted_to(inst)
+		if not bool(dock_res.get("success", false)):
+			# Belt-and-suspenders: the travel_to precheck already rules out
+			# incompatibility, but if a dock ever fails after undocking, re-dock to home
+			# so the player is never physically stranded undocked.
+			push_error("PlayableGeneratedShip: travel dock failed (%s) — re-docking piloted ship to home" % str(dock_res.get("reason", "?")))
+			_dock_piloted_to(home_ship)
 		_apply_player_carry(carry)
 	_spawn_dock_barrier(inst)
 	# Phase 5b Task 5: occupancy is the piloted ship — the player rides it to the host
@@ -1612,6 +1618,16 @@ func travel_to(marker) -> Dictionary:
 	var new_root: Node3D = result.get("ship", null)
 	if new_root == null:
 		return {"success": false, "reason": "generation_failed", "ship": null}
+
+	# Spec edge case: abort with dock_incompatible BEFORE freeing the current host,
+	# so a port-mismatch never leaves a half-undocked state. ports_compatible needs only
+	# type/size (layout-derived), so the target's LOCAL port suffices here (no placement yet).
+	if piloted_ship != null and new_root.has_method("get_layout_copy"):
+		var target_local: Dictionary = DockPortsScript.for_derelict(new_root.get_layout_copy(), int(marker.seed_value), int(marker.condition))
+		var lb_local: Dictionary = DockPortsScript.for_lifeboat(piloted_ship.built_layout)
+		if not DockPortsScript.ports_compatible(target_local, lb_local):
+			new_root.queue_free()
+			return {"success": false, "reason": "dock_incompatible", "ship": null}
 
 	# Leaving the current ship.
 	# Phase 5a Task 5 (co-presence): the HOME ship is NO LONGER detached — it stays
