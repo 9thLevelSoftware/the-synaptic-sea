@@ -104,8 +104,21 @@ func get_objective_controller():
 	return objective_controller
 
 ## World-space AABB enclosing scene_root's visual instances. Used to build
-## occupancy entries. Returns a zero-size AABB at scene_root's global origin
-## when there is no geometry yet (e.g. an unbuilt retained instance).
+## occupancy entries.
+##
+## Contract: this is meaningful only when scene_root AND its geometry are in the
+## scene tree. That is the normal case — occupancy is computed only after a ship
+## is fully loaded into the tree.
+##
+## A fully off-tree, null, or geometry-less scene_root intentionally returns a
+## zero-size AABB at scene_root's origin (the "unbuilt retained instance"
+## fallback).
+##
+## Per-node out-of-tree VisualInstance3D children are skipped (their world
+## transform is unresolved, so they contribute nothing). This means an in-tree
+## scene_root whose child meshes are not yet attached would under-report its
+## AABB — a state that does not occur in the current load flow, where geometry
+## is attached before occupancy is queried.
 func interior_aabb() -> AABB:
 	if scene_root == null or not is_instance_valid(scene_root):
 		return AABB()
