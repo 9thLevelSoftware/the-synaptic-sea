@@ -974,11 +974,6 @@ func get_sargasso_world():
 ## strand the player; an unrepaired lifeboat simply cannot jump until its propulsion
 ## is restored. (Retires ADR-0011 placeholder.)
 func _current_systems_ops() -> Dictionary:
-	# Travel capability always comes from the player's functional ship — the lifeboat
-	# (the coordinator-owned starting systems manager) — whether the player is on the
-	# lifeboat or boarded on a docked derelict. The lifeboat is the guaranteed ride, so
-	# a boarded derelict's broken systems never strand the player; an unrepaired lifeboat
-	# simply cannot jump until its propulsion is restored. (Retires ADR-0011 placeholder.)
 	var mgr = ship_systems_manager
 	return {
 		"navigation": mgr != null and mgr.is_operational("navigation"),
