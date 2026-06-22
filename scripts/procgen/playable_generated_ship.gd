@@ -3396,7 +3396,6 @@ func _reset_runtime_for_reload() -> void:
 		# Phase 5a Task 6: keep occupancy in lockstep — reload returns to the home
 		# ship (home hull is never detached under co-presence, so home_ship is valid).
 		current_occupancy = home_ship
-		current_ship = null  # allow _on_ship_loaded to re-wrap the freshly-reloaded starting ship
 		# Sub-project #2 (I1): free the prior derelict's objective interactables on
 		# reload. _build_derelict_objectives (the only other caller of
 		# _clear_derelict_objectives) does not run on a reload-into-home path
@@ -3408,6 +3407,12 @@ func _reset_runtime_for_reload() -> void:
 		_clear_derelict_objectives()
 		_clear_loot_containers()
 		_clear_repair_points()
+	# Allow _on_ship_loaded to re-wrap the freshly-reloaded starting ship on
+	# every reload (home-save or away-save). Previously this was only inside
+	# `if away_from_start` — but when saving at home current_ship was never
+	# nulled, so _on_ship_loaded's `if current_ship == null` guard stayed false
+	# and _build_lifeboat_at_home() was never called on reload-from-home.
+	current_ship = null
 	# Player first so the camera unfollows before the rig is freed.
 	if player != null and is_instance_valid(player):
 		player.queue_free()
