@@ -1232,8 +1232,10 @@ func _distributed_room_positions() -> Array:
 
 func _on_repair_completed(system_id: String, subcomponent_id: String) -> void:
 	_refresh_inventory_hud()
+	var mgr = _active_systems_manager()
+	var operational: bool = mgr != null and mgr.is_operational(system_id)
 	print("REPAIR COMPLETED system=%s sub=%s operational=%s" % [
-		system_id, subcomponent_id, str(_active_systems_manager().is_operational(system_id)).to_lower()])
+		system_id, subcomponent_id, str(operational).to_lower()])
 
 ## Validation seam: start a repair-point channel via the real path, by subcomponent.
 func repair_subcomponent_for_validation(system_id: String, subcomponent_id: String) -> bool:
@@ -1386,6 +1388,8 @@ func travel_home() -> bool:
 	_clear_derelict_objectives()
 	_clear_loot_containers()
 	_clear_repair_points()
+	_build_loot_containers()
+	_build_repair_points()
 	if tracker != null and loader != null and loader.has_method("get_objective_specs_copy"):
 		# set_objectives resets the tracker's completed set; re-apply the home loop's
 		# progress so returning home does not blank a partially-completed home HUD.
@@ -3080,6 +3084,10 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	# though the calibrator is in the carried inventory (or already spent),
 	# which lets the reviewer probe re-acquire the calibrator after load.
 	_reconcile_junction_calibrator_marker_after_reload()
+	# Rebuild repair points after all systems summaries have been applied so
+	# only truly-damaged subcomponents get markers (Fix 2: stale markers
+	# built before apply_summary healed already-repaired subcomponents).
+	_build_repair_points()
 	# Restore the saved objective sequence AFTER all model state has
 	# been applied so the subsequent _activate_current_objective() call
 	# sees the right state.
