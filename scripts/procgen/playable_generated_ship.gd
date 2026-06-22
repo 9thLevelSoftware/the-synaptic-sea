@@ -1074,6 +1074,11 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	new_root.position = DERELICT_DOCK_OFFSET
 	current_ship = inst
 	away_from_start = true
+	# Phase 5a Task 6: keep occupancy in lockstep with away_from_start. The player
+	# is repositioned into the derelict by travel, so the position-independent truth
+	# here is the newly-active derelict instance (a position-based resolve would be
+	# premature). recompute_occupancy() takes over as the player walks between ships.
+	current_occupancy = inst
 	_build_derelict_objectives()
 	_build_loot_containers()
 	_build_repair_points()
@@ -1451,6 +1456,8 @@ func travel_home() -> bool:
 	# Home hull stays in-tree — no re-add needed (co-presence).
 	current_ship = home_ship
 	away_from_start = false
+	# Phase 5a Task 6: occupancy follows away_from_start back to the home ship.
+	current_occupancy = home_ship
 	_clear_derelict_objectives()
 	_clear_loot_containers()
 	_clear_repair_points()
@@ -3306,6 +3313,9 @@ func _reset_runtime_for_reload() -> void:
 		# Co-presence: home hull / loader / gameplay roots were never detached —
 		# no re-attach needed here (contrast with old single-active model).
 		away_from_start = false
+		# Phase 5a Task 6: keep occupancy in lockstep — reload returns to the home
+		# ship (home hull is never detached under co-presence, so home_ship is valid).
+		current_occupancy = home_ship
 		current_ship = null  # allow _on_ship_loaded to re-wrap the freshly-reloaded starting ship
 		# Sub-project #2 (I1): free the prior derelict's objective interactables on
 		# reload. _build_derelict_objectives (the only other caller of
