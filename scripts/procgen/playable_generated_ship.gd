@@ -28,6 +28,8 @@ const ShipInstanceScript := preload("res://scripts/systems/ship_instance.gd")
 const SargassoWorldScript := preload("res://scripts/systems/sargasso_world.gd")
 const ScannerStateScript := preload("res://scripts/systems/scanner_state.gd")
 const TravelControllerScript := preload("res://scripts/systems/travel_controller.gd")
+const LootContainerScript := preload("res://scripts/tools/loot_container.gd")
+const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -130,6 +132,11 @@ var home_ship = null                        # the home ShipInstance (marker_id "
 # roots so it stays attached when away_from_start.
 var derelict_objective_root: Node3D = null
 var derelict_interactables: Array = []
+# Sub-project #3: scattered loot containers for the active derelict.
+var loot_container_root: Node3D = null
+var loot_containers: Array = []
+var _loot_tables: Dictionary = {}
+var _salvage_loot_tables: Dictionary = {}   # objective_id -> loot_table key
 var _home_player_position: Vector3 = Vector3.ZERO
 const REPAIR_OBJECTIVE_XP: int = 50
 # Narrative objective flags with no manager backing (supplies/logs). Set on
@@ -899,6 +906,10 @@ func _build_runtime_nodes() -> void:
 	derelict_objective_root = Node3D.new()
 	derelict_objective_root.name = "DerelictObjectiveRoot"
 	add_child(derelict_objective_root)
+	loot_container_root = Node3D.new()
+	loot_container_root.name = "LootContainerRoot"
+	add_child(loot_container_root)
+	_loot_tables = LootRollerScript.load_tables()
 	_build_hud_layer()
 	# REQ-012: current-run save/load service. Single slot at
 	# user://saves/current_run.json; deleted on playable_slice_completed.
@@ -1031,12 +1042,14 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	current_ship = inst
 	away_from_start = true
 	_build_derelict_objectives()
+	_build_loot_containers()
 
 ## Builds the active derelict's objective interactables from its loader specs and
 ## restores completed/cleared state from its (retained or loaded) controller. Called
 ## whenever a derelict becomes active. No-op on the home ship.
 func _build_derelict_objectives() -> void:
 	_clear_derelict_objectives()
+	_salvage_loot_tables.clear()
 	if current_ship == null or String(current_ship.marker_id) == "":
 		return
 	var active_loader = current_ship.scene_root
@@ -1057,6 +1070,9 @@ func _build_derelict_objectives() -> void:
 		var position_variant: Variant = spec.get("position", Vector3.INF)
 		if typeof(position_variant) != TYPE_VECTOR3:
 			continue
+		# Record salvage objective loot tables for grant on completion.
+		if str(spec.get("type", "")) == "salvage":
+			_salvage_loot_tables[str(spec.get("id", ""))] = str(spec.get("loot_table", "salvage_cargo"))
 		var interactable = InteractableScript.new()
 		interactable.configure_from_objective(spec, position_variant, 1.8)
 		interactable.interaction_completed.connect(_on_derelict_interactable_completed)
@@ -1106,6 +1122,63 @@ func _clear_derelict_objectives() -> void:
 			child.queue_free()
 	derelict_interactables.clear()
 
+## Pushes the current inventory state to the HUD. Reuses _refresh_tracker_system_status_lines
+## so the full combined status (systems + oxygen + inventory) is always consistent.
+func _refresh_inventory_hud() -> void:
+	_refresh_tracker_system_status_lines()
+
+## Builds the active derelict's scattered loot containers (skipped on the home ship).
+## Containers already in the ship's looted_container_ids read as searched (no respawn).
+func _build_loot_containers() -> void:
+	_clear_loot_containers()
+	if current_ship == null or String(current_ship.marker_id) == "":
+		return
+	var active_loader = current_ship.scene_root
+	if not is_instance_valid(active_loader) or not active_loader.has_method("get_loot_container_specs_copy"):
+		return
+	var looted: Array = current_ship.looted_container_ids
+	for spec_variant in active_loader.get_loot_container_specs_copy():
+		if typeof(spec_variant) != TYPE_DICTIONARY:
+			continue
+		var spec: Dictionary = spec_variant
+		var cid: String = str(spec.get("id", ""))
+		var pos_variant: Variant = spec.get("position", Vector3.INF)
+		if cid.is_empty() or typeof(pos_variant) != TYPE_VECTOR3:
+			continue
+		var lc = LootContainerScript.new()
+		var seed_source: String = "%s:%s" % [String(current_ship.marker_id), cid]
+		lc.configure(cid, str(spec.get("loot_table", "generic_crate")), seed_source,
+			inventory_state, _loot_tables, pos_variant, 1.8)
+		if looted.has(cid):
+			lc.set_searched(true)
+		if not lc.container_searched.is_connected(_on_loot_container_searched):
+			lc.container_searched.connect(_on_loot_container_searched)
+		loot_container_root.add_child(lc)
+		loot_containers.append(lc)
+
+func _clear_loot_containers() -> void:
+	if is_instance_valid(loot_container_root):
+		for child in loot_container_root.get_children():
+			loot_container_root.remove_child(child)
+			child.queue_free()
+	loot_containers.clear()
+
+## Records a searched scattered container on the per-ship slice + refreshes the HUD.
+func _on_loot_container_searched(container_id: String, granted: Array) -> void:
+	if current_ship != null and not current_ship.looted_container_ids.has(container_id):
+		current_ship.looted_container_ids.append(container_id)
+	_refresh_inventory_hud()
+	print("LOOT CONTAINER SEARCHED marker=%s container=%s granted=%d" % [
+		String(current_ship.marker_id) if current_ship != null else "", container_id, granted.size()])
+
+## Validation seam: search a loot container by id through the real interaction path.
+func search_loot_container_for_validation(container_id: String) -> bool:
+	for lc in loot_containers:
+		if is_instance_valid(lc) and String(lc.container_id) == container_id and not lc.searched:
+			lc.set_validation_player_in_range(player)
+			return lc.try_interact(player)
+	return false
+
 ## Routes a derelict interactable completion to the active ship's controller.
 func _on_derelict_interactable_completed(interaction_id: String, objective_id: String, sequence: int, objective_type: String, room_id: String, step_id: String) -> void:
 	if current_ship == null:
@@ -1114,6 +1187,14 @@ func _on_derelict_interactable_completed(interaction_id: String, objective_id: S
 	controller.complete(sequence)
 	# Reflect the completion (and run-complete on clear) in the HUD.
 	_refresh_derelict_tracker()
+	# Sub-project #3: grant salvage-point loot on objective completion (once only —
+	# the interactable cannot re-fire after completed = true).
+	if objective_type == "salvage" and _salvage_loot_tables.has(objective_id):
+		var seed_source: String = "%s:%s" % [String(current_ship.marker_id), objective_id]
+		var rolled: Array = LootRollerScript.roll(_salvage_loot_tables[objective_id], seed_source, _loot_tables)
+		for entry in rolled:
+			inventory_state.add_item(str(entry.get("item_id", "")), int(entry.get("quantity", 0)))
+		_refresh_inventory_hud()
 	print("DERELICT OBJECTIVE COMPLETE marker=%s sequence=%d type=%s cleared=%s" % [
 		String(current_ship.marker_id), sequence, objective_type, str(controller.is_cleared()).to_lower()])
 
@@ -1200,6 +1281,7 @@ func travel_home() -> bool:
 	current_ship = home_ship
 	away_from_start = false
 	_clear_derelict_objectives()
+	_clear_loot_containers()
 	if tracker != null and loader != null and loader.has_method("get_objective_specs_copy"):
 		# set_objectives resets the tracker's completed set; re-apply the home loop's
 		# progress so returning home does not blank a partially-completed home HUD.
@@ -3031,6 +3113,7 @@ func _reset_runtime_for_reload() -> void:
 		# derelict_objective_root, overlaying the home ship. Harmless on the
 		# reload-into-derelict path (_build_derelict_objectives re-clears anyway).
 		_clear_derelict_objectives()
+		_clear_loot_containers()
 	# Player first so the camera unfollows before the rig is freed.
 	if player != null and is_instance_valid(player):
 		player.queue_free()
