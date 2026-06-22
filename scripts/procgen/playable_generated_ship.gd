@@ -31,6 +31,7 @@ const TravelControllerScript := preload("res://scripts/systems/travel_controller
 const LootContainerScript := preload("res://scripts/tools/loot_container.gd")
 const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
 const RepairPointScript := preload("res://scripts/tools/repair_point.gd")
+const ShipOccupancyScript := preload("res://scripts/systems/ship_occupancy.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -118,6 +119,7 @@ var last_failure_reason: String = ""
 var ship_systems_manager   # ShipSystemsManager (untyped: class_name globals unreliable under --headless --script)
 var player_progression   # PlayerProgressionState (untyped: class_name unreliable headless)
 var current_ship           # ShipInstance (untyped: class_name globals unreliable headless)
+var current_occupancy      # ShipInstance the player currently occupies (defaults to home_ship)
 var sargasso_world         # SargassoWorld
 var scanner_state          # ScannerState
 var travel_controller      # TravelController
@@ -980,6 +982,34 @@ func get_current_ship():
 func get_home_ship_for_validation():
 	return home_ship
 
+## Phase 5a Task 6: build the occupancy-entry list for ShipOccupancy.resolve().
+## Home ship is listed first (host priority) so dock-seam overlaps resolve to it.
+func _occupancy_entries() -> Array:
+	var entries: Array = []
+	if home_ship != null and home_ship.scene_root != null and is_instance_valid(home_ship.scene_root):
+		entries.append({"inst": home_ship, "aabb": home_ship.interior_aabb()})
+	if current_ship != null and current_ship != home_ship and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
+		entries.append({"inst": current_ship, "aabb": current_ship.interior_aabb()})
+	return entries
+
+## Phase 5a Task 6: derive current_occupancy from world position.
+## Also keeps away_from_start consistent so existing hazard/persistence readers
+## keep working unchanged.
+func recompute_occupancy() -> void:
+	if home_ship == null:
+		return
+	var resolved = home_ship
+	if player != null and player is Node3D:
+		var r = ShipOccupancyScript.resolve((player as Node3D).global_position, _occupancy_entries())
+		if r != null:
+			resolved = r
+	current_occupancy = resolved
+	away_from_start = (current_occupancy != home_ship)
+
+## Phase 5a Task 6 validation seam: returns current_occupancy.
+func get_current_occupancy_for_validation():
+	return current_occupancy
+
 ## Phase 5a Task 5 validation seam: count of distinct in-tree ship scene_roots
 ## currently parented under the coordinator. Returns 1 when only the home ship
 ## is present (no active derelict), 2 when the home and a derelict are
@@ -1524,6 +1554,8 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 		# Sub-project #1: keep a stable reference to the home ship so travel_home
 		# and world-load can restore it.
 		home_ship = current_ship
+		# Phase 5a Task 6: initialise occupancy to home ship (player starts here).
+		current_occupancy = home_ship
 	_build_interactables()
 	_build_slice_affordance_labels()
 	_build_route_control_gates()
