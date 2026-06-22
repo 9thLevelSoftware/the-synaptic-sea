@@ -22,11 +22,10 @@ const SUBS := {
 var main_node: Node
 var frame_count: int = 0
 var finished: bool = false
-# Holds the starting-ship root once a travel detaches it. travel_to()
-# intentionally does NOT free the starting ship (Approach A: it is retained to
-# return to), so it becomes orphaned in this smoke (no longer under main_node)
-# and its nav/physics/render resource tree leaks at exit unless teardown frees
-# it explicitly. Captured before the real travel in _validate.
+# Phase 5a Task 5 (co-presence): the starting-ship root is NO LONGER orphaned
+# after travel. The home hull stays in-tree at origin; the derelict is placed at
+# DERELICT_DOCK_OFFSET. orphaned_start_root is retained for teardown safety but
+# will remain null in the co-presence model (no orphan is created).
 var orphaned_start_root: Node = null
 var _exit_code: int = 0
 
@@ -108,9 +107,9 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		return
 
 	# 5. Capture the progression instance, repair propulsion, travel for real.
-	# Remember the starting-ship root so teardown can free the orphan that
-	# travel_to() detaches-but-does-not-free (otherwise its resource tree leaks).
-	orphaned_start_root = start_root
+	# Phase 5a Task 5 (co-presence): starting-ship root stays in-tree after travel,
+	# so there is no orphan to track. orphaned_start_root left null (teardown is safe).
+	# (Old model captured orphaned_start_root = start_root here.)
 	var progression_before = playable.get_player_progression()
 	_set_all_operational(mgr)
 	var ok: Dictionary = playable.travel_to_marker_id(target_id)
@@ -133,13 +132,15 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		_fail("new ship root not parented under the coordinator")
 		return
 
-	# FIX 1 coverage: after travel, starting-ship gameplay roots must be detached
-	# so their collision/interaction volumes do not overlay the boarded derelict.
-	if playable.oxygen_root != null and playable.oxygen_root.get_parent() == playable:
-		_fail("FIX1: oxygen_root still attached under coordinator after travel (collision volumes overlap derelict)")
+	# Phase 5a Task 5 (co-presence) replaces FIX 1 detach: home gameplay roots
+	# (oxygen_root, interaction_root, etc.) now STAY in-tree after travel.
+	# The derelict is placed at DERELICT_DOCK_OFFSET so no spatial overlap occurs.
+	# Verify the home roots are still in-tree (the co-presence invariant).
+	if playable.oxygen_root != null and playable.oxygen_root.get_parent() != playable:
+		_fail("copresence: oxygen_root detached from coordinator after travel (should stay in-tree)")
 		return
-	if playable.interaction_root != null and playable.interaction_root.get_parent() == playable:
-		_fail("FIX1: interaction_root still attached under coordinator after travel (interactables overlay derelict)")
+	if playable.interaction_root != null and playable.interaction_root.get_parent() != playable:
+		_fail("copresence: interaction_root detached from coordinator after travel (should stay in-tree)")
 		return
 
 	# 7. World recorded the generated marker and advanced player position.
@@ -155,12 +156,14 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		_fail("player freed across travel")
 		return
 
-	# 9. Starting ship detached but not freed (retains persistent sim).
+	# 9. Phase 5a Task 5 (co-presence): starting ship root stays in-tree and is NOT
+	# freed (it retains its persistent sim at origin). Old-model assertion was that
+	# it is "detached-not-freed" — in co-presence it is "in-tree-not-freed".
 	if not is_instance_valid(start_root):
-		_fail("starting ship root was freed (should be detached-not-freed)")
+		_fail("starting ship root was freed (should remain in-tree for co-presence)")
 		return
-	if start_root.get_parent() == playable:
-		_fail("starting ship root still attached after travel (should be removed)")
+	if start_root.get_parent() != playable:
+		_fail("starting ship root detached after travel (co-presence: should stay in-tree at origin)")
 		return
 
 	# PR #7 re-review FIX 2: derelict travel capability — no softlock.
@@ -218,9 +221,8 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		_fail("request_load while away should return true (world snapshot from step 10 exists)")
 		return
 
-	# After world load, the start loader was re-attached during the home-ship
-	# rebuild phase of _apply_world_snapshot, then the derelict was re-activated.
-	# Clear orphaned_start_root — it is back in-tree under main_node now.
+	# Co-presence: start loader / home hull was never detached, so orphaned_start_root
+	# is already null (set at step 5 comment). Nulling here is a no-op safety net.
 	orphaned_start_root = null
 
 	# 12. World load restored the saved location (derelict), so away_from_start
@@ -247,11 +249,13 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		_fail("old derelict scene_root still parented under coordinator after world reload-while-away (should be detached)")
 		return
 
-	# C1 regression: after a world-load taken aboard a derelict, the rebuilt home
-	# hull must NOT remain parented under the coordinator (otherwise it overlays
-	# the restored derelict at the local origin for the whole visit).
-	if playable.home_ship != null and playable.home_ship.scene_root != null and is_instance_valid(playable.home_ship.scene_root) and playable.home_ship.scene_root.get_parent() == playable:
-		_fail("home hull still parented under coordinator after derelict-restoring world load (overlays derelict)")
+	# Phase 5a Task 5 (co-presence) replaces C1 check: the home hull MUST be
+	# parented under the coordinator after a world-load (it was never detached).
+	# The old assertion that it must NOT be parented was the single-active-model
+	# workaround to prevent overlap — no longer needed since the derelict is at
+	# DERELICT_DOCK_OFFSET. Assert co-presence: home hull in-tree.
+	if playable.home_ship != null and playable.home_ship.scene_root != null and is_instance_valid(playable.home_ship.scene_root) and playable.home_ship.scene_root.get_parent() != playable:
+		_fail("copresence: home hull not parented under coordinator after derelict-restoring world load (should be co-present)")
 		return
 
 	finished = true
@@ -274,15 +278,12 @@ func _fail(reason: String) -> void:
 	push_error("TRAVEL INTEGRATION FAIL reason=%s" % reason)
 	_teardown_and_quit(1)
 
-## Frees the whole scene tree. main_node covers any in-tree ship roots; but the
-## world-load path (request_load in step 11) re-activates a derelict and leaves
-## the STARTING ship's gameplay roots (interaction/affordance/route/oxygen/tool/
-## fire/arc) AND the original home hull detached-not-freed. Those detached roots
-## are referenced only by the coordinator's fields, so main_node.free() does not
-## reach them — they would leak their physics/renderer RID trees at exit (~58
-## leaked-RID lines). Free each detached root explicitly here. Uses immediate
-## free() + a one-idle-frame defer of quit() so the engine flushes the frees
-## before exit; a deferred queue_free() can fail to run before quit().
+## Frees the whole scene tree. Phase 5a Task 5 (co-presence): the home hull
+## and gameplay roots stay in-tree after travel, so main_node.free() covers
+## them. _free_detached_node / _free_detached_ship_root are no-ops for
+## in-tree nodes (they guard get_parent() == null). This teardown is kept
+## for safety: any unexpected detached root is still freed, and the
+## deferred quit ensures the engine flushes frees before exit.
 func _teardown_and_quit(code: int) -> void:
 	_exit_code = code
 	if orphaned_start_root != null and is_instance_valid(orphaned_start_root):
@@ -292,9 +293,8 @@ func _teardown_and_quit(code: int) -> void:
 		orphaned_start_root = null
 	var playable: PlayableGeneratedShip = _find_playable(main_node)
 	if playable != null:
-		# Detached starting-ship gameplay roots (left off-tree by the away-state
-		# travel that the world-load did not return home from). Each owns physics
-		# bodies / Area3Ds / mesh instances whose RIDs leak unless freed.
+		# Co-presence model: gameplay roots stay in-tree; _free_detached_node is a
+		# no-op for in-tree nodes. Retained for safety against unexpected detachments.
 		for root in [
 			playable.interaction_root,
 			playable.affordance_root,
@@ -305,7 +305,7 @@ func _teardown_and_quit(code: int) -> void:
 			playable.arc_root,
 		]:
 			_free_detached_node(root)
-		# The original home hull (and any retained-derelict hulls) left detached.
+		# Co-presence: home hull stays in-tree; _free_detached_ship_root is a no-op here.
 		_free_detached_ship_root(playable.home_ship)
 		for mid in playable.visited_ships:
 			_free_detached_ship_root(playable.visited_ships[mid])

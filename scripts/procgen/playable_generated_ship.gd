@@ -41,6 +41,11 @@ const DEFAULT_LAYOUT_PATH: String = "res://data/procgen/smoke/seed_000017/layout
 const DEFAULT_KIT_PATH: String = "res://data/kits/ship_structural_v0.json"
 const DEFAULT_GAMEPLAY_SLICE_PATH: String = "res://data/procgen/smoke/seed_000017/gameplay_slice.json"
 const PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR: float = 0.55
+# Phase 5a Task 5: co-presence offset. A traveled derelict's scene_root is placed
+# at this world position so the derelict hull sits well clear of the home ship.
+# 100 units ensures a generated layout (max radius ~24 units) does not overlap
+# the home hull (Task 8 will replace this fixed offset with real DockPorts wiring).
+const DERELICT_DOCK_OFFSET := Vector3(100.0, 0.0, 0.0)
 const ROUTE_GATE_COLLISION_SIZE: Vector3 = Vector3(2.6, 2.2, 0.7)
 const ROUTE_GATE_VISUAL_COLOR_CLOSED: Color = Color(1.0, 0.22, 0.18, 0.82)
 const ROUTE_GATE_VISUAL_COLOR_OPEN: Color = Color(0.18, 0.75, 1.0, 0.18)
@@ -971,6 +976,22 @@ func get_player_progression():
 func get_current_ship():
 	return current_ship
 
+## Phase 5a Task 5 validation seam: the home ShipInstance.
+func get_home_ship_for_validation():
+	return home_ship
+
+## Phase 5a Task 5 validation seam: count of distinct in-tree ship scene_roots
+## currently parented under the coordinator. Returns 1 when only the home ship
+## is present (no active derelict), 2 when the home and a derelict are
+## co-present at distinct offsets.
+func active_ship_root_count_for_validation() -> int:
+	var count := 0
+	if home_ship != null and home_ship.scene_root != null and is_instance_valid(home_ship.scene_root) and home_ship.scene_root.get_parent() == self:
+		count += 1
+	if current_ship != null and current_ship != home_ship and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root) and current_ship.scene_root.get_parent() == self:
+		count += 1
+	return count
+
 ## Phase 4.5 validation seam: the SargassoWorld map model.
 func get_sargasso_world():
 	return sargasso_world
@@ -1010,41 +1031,17 @@ func travel_to_marker_id(marker_id: String) -> Dictionary:
 			return travel_to(m)
 	return {"success": false, "reason": "unknown_marker", "ship": null}
 
-## The starting ship's per-slice gameplay roots (siblings of the loader). They
-## sit at the coordinator's local origin, so while the player is aboard a
-## traveled derelict (also at origin) they must be detached from the tree —
-## otherwise their collision volumes / interactables overlay the boarded ship.
-func _starting_gameplay_roots() -> Array:
-	return [interaction_root, affordance_root, route_control_root, oxygen_root, tool_pickup_root, fire_root, arc_root]
-
-func _detach_starting_gameplay_roots() -> void:
-	for r in _starting_gameplay_roots():
-		if r != null and is_instance_valid(r) and r.get_parent() == self:
-			remove_child(r)
-
-func _reattach_starting_gameplay_roots() -> void:
-	for r in _starting_gameplay_roots():
-		if r != null and is_instance_valid(r) and r.get_parent() == null:
-			add_child(r)
-
-## Makes `inst` the active boarded derelict: detaches the home gameplay roots
-## (so they do not overlay the derelict at the shared local origin), attaches the
-## freshly built `new_root`, and flips away_from_start. Shared by travel_to
-## (revisit/first-visit) and world-load (_apply_world_snapshot). Does NOT re-home
-## the player — callers position the player afterwards.
+## Makes `inst` the active boarded derelict: attaches the freshly built
+## `new_root` at DERELICT_DOCK_OFFSET (so it is co-present with the home
+## ship, which stays in-tree at origin), and flips away_from_start. Shared
+## by travel_to (revisit/first-visit) and world-load (_apply_world_snapshot).
+## Does NOT re-home the player — callers position the player afterwards.
+## Phase 5a Task 5: home ship is NO LONGER detached. Home and derelict are
+## co-present at distinct world positions (origin vs DERELICT_DOCK_OFFSET).
 func _attach_derelict_active(inst, new_root: Node3D) -> void:
-	# Detach the home hull if it is still parented under the coordinator. In a
-	# normal travel_to() the home loader/scene_root was already removed before
-	# this call, so this is a no-op there (get_parent() != self). It only fires
-	# on the world-load path, where _apply_world_snapshot rebuilds the home ship
-	# (leaving its scene_root parented) and then re-activates a derelict — without
-	# this detach both hulls overlap at the local origin for the whole visit.
-	# Detach-not-free: travel_home re-adds the same home scene_root.
-	if home_ship != null and home_ship.scene_root != null and is_instance_valid(home_ship.scene_root) and home_ship.scene_root.get_parent() == self:
-		remove_child(home_ship.scene_root)
-	_detach_starting_gameplay_roots()
 	inst.scene_root = new_root
 	add_child(new_root)
+	new_root.position = DERELICT_DOCK_OFFSET
 	current_ship = inst
 	away_from_start = true
 	_build_derelict_objectives()
@@ -1088,7 +1085,10 @@ func _build_derelict_objectives() -> void:
 		if controller.is_objective_complete(sequence):
 			interactable.completed = true
 			interactable.set_active(false)
-		derelict_objective_root.add_child(interactable)
+		# Phase 5a Task 5 (co-presence): parent the interactable under the derelict's
+		# scene_root so it inherits the DERELICT_DOCK_OFFSET transform and is freed
+		# automatically when the derelict scene_root is freed on departure.
+		current_ship.scene_root.add_child(interactable)
 		derelict_interactables.append(interactable)
 	# Show the derelict's objectives in the HUD while aboard, then reflect any
 	# persisted/restored completion (set_objectives resets the tracker's completed
@@ -1122,6 +1122,11 @@ func _refresh_derelict_tracker() -> void:
 
 ## Frees the active derelict's interactables. The controller (state) lives on the
 ## ShipInstance and is untouched.
+## Phase 5a Task 5 (co-presence): interactables are parented under the derelict
+## scene_root (freed with it on departure) rather than derelict_objective_root
+## (which remains empty). derelict_objective_root is kept as an empty placeholder
+## so the coordinator structure is unchanged. Just clear the reference array here;
+## nodes parented under scene_root are freed when scene_root is freed.
 func _clear_derelict_objectives() -> void:
 	if is_instance_valid(derelict_objective_root):
 		for child in derelict_objective_root.get_children():
@@ -1161,7 +1166,14 @@ func _build_loot_containers() -> void:
 			lc.set_searched(true)
 		if not lc.container_searched.is_connected(_on_loot_container_searched):
 			lc.container_searched.connect(_on_loot_container_searched)
-		loot_container_root.add_child(lc)
+		# Phase 5a Task 5 (co-presence): derelict loot containers parent under the
+		# derelict's scene_root so they inherit DERELICT_DOCK_OFFSET and are freed
+		# automatically with the derelict on departure. Home loot containers continue
+		# to parent under the coordinator-owned loot_container_root at origin.
+		if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
+			current_ship.scene_root.add_child(lc)
+		else:
+			loot_container_root.add_child(lc)
 		loot_containers.append(lc)
 
 func _clear_loot_containers() -> void:
@@ -1169,6 +1181,10 @@ func _clear_loot_containers() -> void:
 		for child in loot_container_root.get_children():
 			loot_container_root.remove_child(child)
 			child.queue_free()
+	# Phase 5a Task 5 (co-presence): derelict loot containers parent under
+	# current_ship.scene_root rather than loot_container_root, so loot_container_root
+	# only holds home-ship containers. The derelict containers are freed when
+	# scene_root is freed on departure — just clear the reference array.
 	loot_containers.clear()
 
 ## Builds repair points for every currently-damaged subcomponent of the active ship,
@@ -1198,7 +1214,14 @@ func _build_repair_points() -> void:
 				pos, sub.repair_seconds, sub.min_skill, 1.8)
 			if not rp.repair_completed.is_connected(_on_repair_completed):
 				rp.repair_completed.connect(_on_repair_completed)
-			repair_point_root.add_child(rp)
+			# Phase 5a Task 5 (co-presence): derelict repair points parent under the
+			# derelict's scene_root so they inherit DERELICT_DOCK_OFFSET and are freed
+			# automatically with the derelict on departure. Home repair points (the
+			# lifeboat's nav_linkage blocker) continue to parent under repair_point_root.
+			if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
+				current_ship.scene_root.add_child(rp)
+			else:
+				repair_point_root.add_child(rp)
 			repair_points.append(rp)
 
 func _clear_repair_points() -> void:
@@ -1206,6 +1229,10 @@ func _clear_repair_points() -> void:
 		for child in repair_point_root.get_children():
 			repair_point_root.remove_child(child)
 			child.queue_free()
+	# Phase 5a Task 5 (co-presence): derelict repair points parent under
+	# current_ship.scene_root rather than repair_point_root, so repair_point_root
+	# only holds home-ship (lifeboat) repair points. The derelict repair points
+	# are freed when scene_root is freed on departure — just clear the array.
 	repair_points.clear()
 
 ## The systems manager of the ship the player is currently aboard: the derelict's when away,
@@ -1333,15 +1360,17 @@ func travel_to(marker) -> Dictionary:
 	if new_root == null:
 		return {"success": false, "reason": "generation_failed", "ship": null}
 
-	# Leaving the current ship. The HOME ship is detached-not-freed (retains its
-	# live sim); a DERELICT keeps its retained ShipInstance in visited_ships but
-	# frees its scene_root (geometry regenerates from seed on revisit).
+	# Leaving the current ship.
+	# Phase 5a Task 5 (co-presence): the HOME ship is NO LONGER detached — it stays
+	# in-tree at origin while the new derelict is placed at DERELICT_DOCK_OFFSET.
+	# The home gameplay roots (interaction_root, oxygen_root, etc.) also stay
+	# in-tree. A DERELICT (non-empty marker_id) keeps its retained ShipInstance in
+	# visited_ships but frees its scene_root (geometry regenerates from seed on revisit).
 	var leaving = current_ship
 	if String(leaving.marker_id) == "":
+		# Leaving home: record the player's position so travel_home can restore it.
 		_home_player_position = (player as Node3D).global_position if player != null and player is Node3D else _home_player_position
-		if leaving.scene_root != null and is_instance_valid(leaving.scene_root) and leaving.scene_root.get_parent() == self:
-			remove_child(leaving.scene_root)
-		_detach_starting_gameplay_roots()
+		# Home hull STAYS in-tree (co-presence — no remove_child).
 	else:
 		if leaving.scene_root != null and is_instance_valid(leaving.scene_root):
 			if leaving.scene_root.get_parent() == self:
@@ -1373,10 +1402,12 @@ func travel_to(marker) -> Dictionary:
 	return result
 
 ## Returns the player to the home ship instance: frees the active derelict's
-## scene (its retained instance stays in visited_ships), re-attaches the home
-## scene_root and gameplay roots, restores current_ship = home_ship, and re-homes
-## the player at the position they left from. Returns false if not currently away
-## or the home ship is unavailable.
+## scene (its retained instance stays in visited_ships), restores
+## current_ship = home_ship, and re-homes the player at the position they left
+## from. Returns false if not currently away or the home ship is unavailable.
+## Phase 5a Task 5 (co-presence): home hull was NEVER detached, so NO
+## add_child(home_ship.scene_root) and NO _reattach_starting_gameplay_roots().
+## #4 invariants preserved: repair-point/loot rebuild for the home ship.
 func travel_home() -> bool:
 	if not away_from_start or home_ship == null:
 		return false
@@ -1387,9 +1418,7 @@ func travel_home() -> bool:
 				remove_child(leaving.scene_root)
 			leaving.scene_root.queue_free()
 		leaving.scene_root = null
-	if home_ship.scene_root != null and is_instance_valid(home_ship.scene_root) and home_ship.scene_root.get_parent() == null:
-		add_child(home_ship.scene_root)
-	_reattach_starting_gameplay_roots()
+	# Home hull stays in-tree — no re-add needed (co-presence).
 	current_ship = home_ship
 	away_from_start = false
 	_clear_derelict_objectives()
@@ -3226,12 +3255,10 @@ func _reset_runtime_for_reload() -> void:
 	#     `if current_ship == null` guard is false → the reloaded starting ship
 	#     is never wrapped as current_ship
 	#   - the derelict root remains a child of this coordinator → leaked scene
-	#   - loader is still off-tree → load_from_paths rebuilds into an off-tree
-	#     loader, and the reloaded slice is never in the scene
-	# Fix: free the stateless derelict root, re-attach the detached start loader
-	# (so the subsequent load_from_paths builds in-tree), clear away_from_start,
-	# and null current_ship so _on_ship_loaded re-wraps the freshly-reloaded
-	# starting ship.
+	# Phase 5a Task 5 (co-presence) changes: the home hull and its gameplay
+	# roots are NEVER detached, so there is no "loader off-tree" or
+	# "gameplay roots off-tree" to re-attach here. Only the DERELICT root
+	# must be freed. _reattach_starting_gameplay_roots() is removed.
 	if away_from_start:
 		if current_ship != null and String(current_ship.marker_id) != "":
 			var derelict_root = current_ship.scene_root
@@ -3244,22 +3271,18 @@ func _reset_runtime_for_reload() -> void:
 				# those resources. The smoke asserts detachment (get_parent() !=
 				# playable), not immediate invalidation, so this is correct.
 				derelict_root.queue_free()
-		# The start loader was detached by travel_to (remove_child) but kept alive.
-		# Re-attach it so the subsequent load_from_paths() rebuilds the starting
-		# ship in-tree and _on_ship_loaded fires with the coordinator as parent.
-		var loader_node: Node = loader as Node
-		if loader_node != null and is_instance_valid(loader_node) and loader_node.get_parent() == null:
-			add_child(loader_node)
-		_reattach_starting_gameplay_roots()
+		# Co-presence: home hull / loader / gameplay roots were never detached —
+		# no re-attach needed here (contrast with old single-active model).
 		away_from_start = false
-		current_ship = null  # allow _on_ship_loaded to re-wrap the starting ship
+		current_ship = null  # allow _on_ship_loaded to re-wrap the freshly-reloaded starting ship
 		# Sub-project #2 (I1): free the prior derelict's objective interactables on
 		# reload. _build_derelict_objectives (the only other caller of
 		# _clear_derelict_objectives) does not run on a reload-into-home path
 		# (_apply_world_snapshot skips re-activation when current_location == ""),
 		# so without this the Area3D interactables stay orphaned under
-		# derelict_objective_root, overlaying the home ship. Harmless on the
-		# reload-into-derelict path (_build_derelict_objectives re-clears anyway).
+		# derelict_objective_root (or the freed scene_root in the co-presence
+		# model), overlaying the home ship. Harmless on the reload-into-derelict
+		# path (_build_derelict_objectives re-clears anyway).
 		_clear_derelict_objectives()
 		_clear_loot_containers()
 		_clear_repair_points()
