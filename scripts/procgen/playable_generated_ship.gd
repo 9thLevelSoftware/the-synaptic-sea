@@ -967,16 +967,19 @@ func get_current_ship():
 func get_sargasso_world():
 	return sargasso_world
 
-## Operational status feeding scan/travel. On the STARTING ship this reflects the
-## real systems, so repairing propulsion/navigation/scanners enables travel — the
-## core loop. On a boarded DERELICT we report FULL capability: Phase 4.5 ships no
-## derelict repair/objective flow, so condition-gating would softlock the player
-## with no way to leave or repair. Condition-based stranding activates once the
-## derelict repair loop exists (see ADR-0011).
+## Operational status feeding scan/travel. Travel capability always comes from the
+## player's functional ship — the lifeboat (the coordinator-owned starting systems
+## manager) — whether the player is on the lifeboat or boarded on a docked derelict.
+## The lifeboat is the guaranteed ride, so a boarded derelict's broken systems never
+## strand the player; an unrepaired lifeboat simply cannot jump until its propulsion
+## is restored. (Retires ADR-0011 placeholder.)
 func _current_systems_ops() -> Dictionary:
-	if away_from_start:
-		return {"navigation": true, "scanners": true, "propulsion": true}
-	var mgr = current_ship.systems_manager if current_ship != null else null
+	# Travel capability always comes from the player's functional ship — the lifeboat
+	# (the coordinator-owned starting systems manager) — whether the player is on the
+	# lifeboat or boarded on a docked derelict. The lifeboat is the guaranteed ride, so
+	# a boarded derelict's broken systems never strand the player; an unrepaired lifeboat
+	# simply cannot jump until its propulsion is restored. (Retires ADR-0011 placeholder.)
+	var mgr = ship_systems_manager
 	return {
 		"navigation": mgr != null and mgr.is_operational("navigation"),
 		"scanners": mgr != null and mgr.is_operational("scanners"),
