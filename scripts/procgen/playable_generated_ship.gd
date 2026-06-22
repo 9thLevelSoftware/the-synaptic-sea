@@ -1644,6 +1644,29 @@ func _on_loader_failed(reason: String) -> void:
 	push_error("PLAYABLE SHIP FAIL reason=%s" % reason)
 	emit_signal("playable_failed", reason)
 
+## Break the home_ship ↔ lifeboat_ship RefCounted cycle before this Node3D is
+## freed. Without this, both ShipInstances keep each other alive (and their
+## preloaded GDScript resources with them), producing the "7 resources still in
+## use at exit" error that breaks the regression bundle's clean_output contract.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_break_ship_instance_cycles()
+
+func _break_ship_instance_cycles() -> void:
+	# Break lifeboat → home cycle.
+	if lifeboat_ship != null:
+		lifeboat_ship.parent_ship = null
+		lifeboat_ship.docked_ships.clear()
+	# Break home → lifeboat cycle.
+	if home_ship != null:
+		home_ship.docked_ships.clear()
+	# Break any visited-derelict parent_ship back-pointers.
+	for mid in visited_ships:
+		var inst = visited_ships[mid]
+		if inst != null:
+			inst.parent_ship = null
+			inst.docked_ships.clear()
+
 ## Phase 5a Task 7: build the physical lifeboat and dock it to the home derelict.
 ## Called from the home-wrap path in _on_ship_loaded (guarded by `current_ship == null`).
 ## Safe to call multiple times — frees any prior lifeboat_ship.scene_root first.
@@ -3456,6 +3479,13 @@ func _reset_runtime_for_reload() -> void:
 		if lb_root != null and lb_root.get_parent() == self:
 			remove_child(lb_root)
 		lb_root.queue_free()
+	# Break the home_ship ↔ lifeboat_ship RefCounted cycle before releasing our
+	# reference. Without this, both ShipInstances keep each other alive via
+	# parent_ship / docked_ships and their preloaded GDScript resources leak.
+	if lifeboat_ship != null:
+		lifeboat_ship.parent_ship = null
+	if home_ship != null:
+		home_ship.docked_ships.erase(lifeboat_ship)
 	lifeboat_ship = null
 	if hud_layer != null and is_instance_valid(hud_layer):
 		hud_layer.queue_free()
