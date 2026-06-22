@@ -120,11 +120,9 @@ func _is_player_in_direct_range(player_body: Node) -> bool:
 	if not is_instance_valid(player_body) or not (player_body is Node3D):
 		return false
 	var pn: Node3D = player_body as Node3D
-	# For in-tree nodes, verify both are in the tree before distance check
-	if is_inside_tree() and pn.is_inside_tree():
-		return global_position.distance_to(pn.global_position) <= _interaction_radius()
-	# For out-of-tree test context, assume in range if player is passed directly
-	return true
+	if not is_inside_tree() or not pn.is_inside_tree():
+		return false
+	return global_position.distance_to(pn.global_position) <= _interaction_radius()
 
 func _ensure_collision(radius: float) -> void:
 	if collision_shape == null:

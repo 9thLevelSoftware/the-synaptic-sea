@@ -1,9 +1,23 @@
 extends SceneTree
 
+## DockPortBarrier breach interactable (pure node test — no main scene).
+## Interaction runs inside a process_frame callback (NOT _initialize): nodes added
+## via get_root().add_child() are only is_inside_tree()==true once the main loop is
+## iterating, which the barrier's strict range gate (matching repair_point.gd) requires.
+
 const DockPortBarrierScript := preload("res://scripts/tools/dock_port_barrier.gd")
 const PlayerControllerScript := preload("res://scripts/player/player_controller.gd")
 
+var _done: bool = false
+
 func _initialize() -> void:
+	process_frame.connect(_run)
+
+func _run() -> void:
+	if _done:
+		return
+	_done = true
+
 	var ok := true
 	var msg := ""
 
