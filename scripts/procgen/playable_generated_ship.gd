@@ -30,6 +30,7 @@ const ScannerStateScript := preload("res://scripts/systems/scanner_state.gd")
 const TravelControllerScript := preload("res://scripts/systems/travel_controller.gd")
 const LootContainerScript := preload("res://scripts/tools/loot_container.gd")
 const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
+const RepairPointScript := preload("res://scripts/tools/repair_point.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -135,6 +136,9 @@ var derelict_interactables: Array = []
 # Sub-project #3: scattered loot containers for the active derelict.
 var loot_container_root: Node3D = null
 var loot_containers: Array = []
+# Sub-project #4: timed repair points for damaged subcomponents.
+var repair_point_root: Node3D = null
+var repair_points: Array = []
 var _loot_tables: Dictionary = {}
 var _salvage_loot_tables: Dictionary = {}   # objective_id -> loot_table key
 var _home_player_position: Vector3 = Vector3.ZERO
@@ -859,6 +863,7 @@ func _build_runtime_nodes() -> void:
 	ship_systems_manager = ShipSystemsManagerScript.new()
 	var bp = _load_blueprint_for_systems()
 	ship_systems_manager.configure(ship_systems_manager.load_definitions(), bp.condition, bp.seed_value)
+	_apply_lifeboat_opening_damage()
 	player_progression = PlayerProgressionScript.new()
 	_configure_player_progression()
 	route_control_state = RouteControlStateScript.new()
@@ -909,6 +914,9 @@ func _build_runtime_nodes() -> void:
 	loot_container_root = Node3D.new()
 	loot_container_root.name = "LootContainerRoot"
 	add_child(loot_container_root)
+	repair_point_root = Node3D.new()
+	repair_point_root.name = "RepairPointRoot"
+	add_child(repair_point_root)
 	_loot_tables = LootRollerScript.load_tables()
 	_build_hud_layer()
 	# REQ-012: current-run save/load service. Single slot at
@@ -967,16 +975,14 @@ func get_current_ship():
 func get_sargasso_world():
 	return sargasso_world
 
-## Operational status feeding scan/travel. On the STARTING ship this reflects the
-## real systems, so repairing propulsion/navigation/scanners enables travel — the
-## core loop. On a boarded DERELICT we report FULL capability: Phase 4.5 ships no
-## derelict repair/objective flow, so condition-gating would softlock the player
-## with no way to leave or repair. Condition-based stranding activates once the
-## derelict repair loop exists (see ADR-0011).
+## Operational status feeding scan/travel. Travel capability always comes from the
+## player's functional ship — the lifeboat (the coordinator-owned starting systems
+## manager) — whether the player is on the lifeboat or boarded on a docked derelict.
+## The lifeboat is the guaranteed ride, so a boarded derelict's broken systems never
+## strand the player; an unrepaired lifeboat simply cannot jump until its propulsion
+## is restored. (Retires ADR-0011 placeholder.)
 func _current_systems_ops() -> Dictionary:
-	if away_from_start:
-		return {"navigation": true, "scanners": true, "propulsion": true}
-	var mgr = current_ship.systems_manager if current_ship != null else null
+	var mgr = ship_systems_manager
 	return {
 		"navigation": mgr != null and mgr.is_operational("navigation"),
 		"scanners": mgr != null and mgr.is_operational("scanners"),
@@ -1043,6 +1049,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	away_from_start = true
 	_build_derelict_objectives()
 	_build_loot_containers()
+	_build_repair_points()
 
 ## Builds the active derelict's objective interactables from its loader specs and
 ## restores completed/cleared state from its (retained or loaded) controller. Called
@@ -1127,13 +1134,14 @@ func _clear_derelict_objectives() -> void:
 func _refresh_inventory_hud() -> void:
 	_refresh_tracker_system_status_lines()
 
-## Builds the active derelict's scattered loot containers (skipped on the home ship).
+## Builds scattered loot containers for the active ship (derelict or home lifeboat).
 ## Containers already in the ship's looted_container_ids read as searched (no respawn).
+## Sub-project #4: the home ship early-return is removed; the home loader is used when home.
 func _build_loot_containers() -> void:
 	_clear_loot_containers()
-	if current_ship == null or String(current_ship.marker_id) == "":
+	if current_ship == null:
 		return
-	var active_loader = current_ship.scene_root
+	var active_loader = current_ship.scene_root if (away_from_start and current_ship != null) else loader
 	if not is_instance_valid(active_loader) or not active_loader.has_method("get_loot_container_specs_copy"):
 		return
 	var looted: Array = current_ship.looted_container_ids
@@ -1162,6 +1170,110 @@ func _clear_loot_containers() -> void:
 			loot_container_root.remove_child(child)
 			child.queue_free()
 	loot_containers.clear()
+
+## Builds repair points for every currently-damaged subcomponent of the active ship,
+## distributing them across the ship's rooms. Works for the lifeboat (home) and derelicts.
+func _build_repair_points() -> void:
+	_clear_repair_points()
+	if not is_instance_valid(repair_point_root):
+		return
+	var mgr = _active_systems_manager()
+	if mgr == null:
+		return
+	var positions: Array = _distributed_room_positions()
+	if positions.is_empty():
+		return
+	var idx: int = 0
+	for sid in mgr.system_order:
+		var system = mgr.get_system(sid)
+		if system == null:
+			continue
+		for sub in system.subcomponents:
+			if sub.is_functional():
+				continue
+			var pos: Vector3 = positions[idx % positions.size()]
+			idx += 1
+			var rp = RepairPointScript.new()
+			rp.configure(sid, sub.subcomponent_id, mgr, inventory_state, player_progression,
+				pos, sub.repair_seconds, sub.min_skill, 1.8)
+			if not rp.repair_completed.is_connected(_on_repair_completed):
+				rp.repair_completed.connect(_on_repair_completed)
+			repair_point_root.add_child(rp)
+			repair_points.append(rp)
+
+func _clear_repair_points() -> void:
+	if is_instance_valid(repair_point_root):
+		for child in repair_point_root.get_children():
+			repair_point_root.remove_child(child)
+			child.queue_free()
+	repair_points.clear()
+
+## The systems manager of the ship the player is currently aboard: the derelict's when away,
+## the lifeboat's when home. (Repair points act on the ship under the player's feet; the
+## travel gate separately reads the lifeboat — see _current_systems_ops.)
+func _active_systems_manager():
+	if away_from_start and current_ship != null and current_ship.systems_manager != null:
+		return current_ship.systems_manager
+	return ship_systems_manager
+
+## Floor-cell world positions distributed across the active ship's rooms, for repair-point
+## placement. Reuses the active loader's room/cell resolution where available.
+func _distributed_room_positions() -> Array:
+	var out: Array = []
+	var active_loader = current_ship.scene_root if (away_from_start and current_ship != null) else loader
+	if is_instance_valid(active_loader) and active_loader.has_method("get_objective_specs_copy"):
+		for spec in active_loader.get_objective_specs_copy():
+			if typeof(spec) == TYPE_DICTIONARY and typeof(spec.get("position", null)) == TYPE_VECTOR3:
+				out.append(spec["position"])
+	# Fallback: derive from loot container specs if no objective positions exist.
+	if out.is_empty() and is_instance_valid(active_loader) and active_loader.has_method("get_loot_container_specs_copy"):
+		for spec in active_loader.get_loot_container_specs_copy():
+			if typeof(spec) == TYPE_DICTIONARY and typeof(spec.get("position", null)) == TYPE_VECTOR3:
+				out.append(spec["position"])
+	return out
+
+func _on_repair_completed(system_id: String, subcomponent_id: String) -> void:
+	_refresh_inventory_hud()
+	var mgr = _active_systems_manager()
+	var operational: bool = mgr != null and mgr.is_operational(system_id)
+	print("REPAIR COMPLETED system=%s sub=%s operational=%s" % [
+		system_id, subcomponent_id, str(operational).to_lower()])
+
+## Validation seam: start a repair-point channel via the real path, by subcomponent.
+func repair_subcomponent_for_validation(system_id: String, subcomponent_id: String) -> bool:
+	if not is_instance_valid(player):
+		return false
+	for rp in repair_points:
+		if is_instance_valid(rp) and rp.system_id == system_id and rp.subcomponent_id == subcomponent_id and not rp.repaired:
+			# Put the player at the repair point so the real range gate (not a
+			# candidate_player bypass) admits the channel — mirrors the loot smoke seam.
+			if player.has_method("teleport_to"):
+				player.teleport_to(rp.global_position)
+			return rp.try_start(player)
+	return false
+
+## Validation seam: pump all channeling repair points by delta (deterministic timed advance).
+func advance_repair_channels_for_validation(delta: float) -> void:
+	for rp in repair_points:
+		if is_instance_valid(rp) and rp.channeling:
+			rp.advance_channel(delta)
+
+## Curates the lifeboat's propulsion so the opening blocker is a single low-skill repair:
+## nav_linkage broken (circuit_board, skill 2, no tool), the other propulsion subs healthy.
+## Propulsion is offline at boot (and stays so until repaired), making "repair the lifeboat to
+## travel" the opening. Other systems keep their deterministic condition damage (the existing
+## objective loop repairs power/navigation; nothing else depends on propulsion's start health).
+func _apply_lifeboat_opening_damage() -> void:
+	if ship_systems_manager == null:
+		return
+	var prop = ship_systems_manager.get_system("propulsion")
+	if prop == null:
+		return
+	for sub in prop.subcomponents:
+		sub.health = 1.0
+	var blocker = prop.get_subcomponent("nav_linkage")
+	if blocker != null:
+		blocker.health = ShipSystemsManagerScript.DAMAGED_HEALTH
 
 ## Records a searched scattered container on the per-ship slice + refreshes the HUD.
 func _on_loot_container_searched(container_id: String, granted: Array) -> void:
@@ -1282,6 +1394,9 @@ func travel_home() -> bool:
 	away_from_start = false
 	_clear_derelict_objectives()
 	_clear_loot_containers()
+	_clear_repair_points()
+	_build_loot_containers()
+	_build_repair_points()
 	if tracker != null and loader != null and loader.has_method("get_objective_specs_copy"):
 		# set_objectives resets the tracker's completed set; re-apply the home loop's
 		# progress so returning home does not blank a partially-completed home HUD.
@@ -1400,6 +1515,8 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_refresh_fire_state(true)
 	_build_arc_zone()
 	_refresh_arc_state(true)
+	_build_loot_containers()
+	_build_repair_points()
 	tracker.set_objectives(loader.get_objective_specs_copy())
 	current_objective_sequence = 1
 	slice_complete = false
@@ -1496,6 +1613,10 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# interactables/pickups are detached but still referenced here; gate them so
 	# a derelict cannot complete stale starting-ship objectives.
 	if away_from_start:
+		# Sub-project #4: try repair points before loot/objectives.
+		for rp in repair_points:
+			if is_instance_valid(rp) and rp.try_start(player_body):
+				return
 		# Sub-project #3: derelict loot containers are pickup-like interactables.
 		# Try them before objectives, matching the home ship's tool-pickup
 		# precedence when an objective and pickup share the same interaction area.
@@ -1507,6 +1628,10 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 			if is_instance_valid(it) and it.try_interact(player_body):
 				return
 		return
+	# Sub-project #4: try lifeboat repair points before pickups/objectives.
+	for rp in repair_points:
+		if is_instance_valid(rp) and rp.try_start(player_body):
+			return
 	# REQ-007: tool pickup is an interaction like any other. Try it first
 	# (before objective interactables) so the player can pick up the pump
 	# when standing in front of it.
@@ -2966,6 +3091,10 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	# though the calibrator is in the carried inventory (or already spent),
 	# which lets the reviewer probe re-acquire the calibrator after load.
 	_reconcile_junction_calibrator_marker_after_reload()
+	# Rebuild repair points after all systems summaries have been applied so
+	# only truly-damaged subcomponents get markers (Fix 2: stale markers
+	# built before apply_summary healed already-repaired subcomponents).
+	_build_repair_points()
 	# Restore the saved objective sequence AFTER all model state has
 	# been applied so the subsequent _activate_current_objective() call
 	# sees the right state.
@@ -3004,6 +3133,11 @@ func _build_world_snapshot():
 		if away_from_start:
 			home_snap.player_position = [_home_player_position.x, _home_player_position.y, _home_player_position.z]
 		ws.home_ship = home_snap.to_dict()
+	# The home ship's loot-search state rides the WorldSnapshot (RunSnapshot does not
+	# carry it). Without this, the #4 home loot-lift would respawn the starting
+	# containers unsearched after a fresh-process load → starter-part duplication.
+	if home_ship != null:
+		ws.home_looted_containers = home_ship.looted_container_ids.duplicate()
 	ws.visited_ships = {}
 	for mid in visited_ships:
 		ws.visited_ships[String(mid)] = visited_ships[mid].get_summary()
@@ -3051,6 +3185,14 @@ func _apply_world_snapshot(ws) -> bool:
 		_home_player_position = Vector3(home_snap.player_position[0], home_snap.player_position[1], home_snap.player_position[2])
 	if not _apply_run_snapshot(home_snap):
 		return false
+	# 1b. Restore the home ship's loot-search state and rebuild its containers so
+	#     already-searched starting containers read as searched (prevents starter-part
+	#     re-loot after a fresh-process load). We are home here (the reload reset us),
+	#     so current_ship == home_ship and _build_loot_containers targets the home ship.
+	if home_ship != null:
+		home_ship.looted_container_ids = ws.home_looted_containers.duplicate()
+		if not away_from_start:
+			_build_loot_containers()
 	# 2. World model. _apply_run_snapshot reset us to the home ship; home_ship is
 	#    re-wrapped by _on_ship_loaded during that reload.
 	if sargasso_world != null and not ws.world_summary.is_empty():
@@ -3120,6 +3262,7 @@ func _reset_runtime_for_reload() -> void:
 		# reload-into-derelict path (_build_derelict_objectives re-clears anyway).
 		_clear_derelict_objectives()
 		_clear_loot_containers()
+		_clear_repair_points()
 	# Player first so the camera unfollows before the rig is freed.
 	if player != null and is_instance_valid(player):
 		player.queue_free()
@@ -3184,6 +3327,7 @@ func _reset_runtime_for_reload() -> void:
 	if ship_systems_manager != null:
 		var bp_reset = _load_blueprint_for_systems()
 		ship_systems_manager.configure(ship_systems_manager.load_definitions(), bp_reset.condition, bp_reset.seed_value)
+		_apply_lifeboat_opening_damage()
 	_configure_player_progression()
 	completed_objective_types.clear()
 	if route_control_state != null:

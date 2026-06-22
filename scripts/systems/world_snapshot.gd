@@ -12,6 +12,7 @@ const WORLD_SLICE_VERSION: String = "world-1"
 
 var world_summary: Dictionary = {}
 var home_ship: Dictionary = {}                  # a RunSnapshot.to_dict()
+var home_looted_containers: Array = []          # home ship's searched loot-container ids
 var visited_ships: Dictionary = {}              # marker_id -> ShipInstance.get_summary()
 var current_location: String = ""               # "" = home ship, else marker_id
 var player_position_in_ship: Array = [0.0, 0.0, 0.0]
@@ -23,6 +24,7 @@ func to_dict() -> Dictionary:
 	return {
 		"world_summary": world_summary.duplicate(true),
 		"home_ship": home_ship.duplicate(true),
+		"home_looted_containers": home_looted_containers.duplicate(),
 		"visited_ships": visited_ships.duplicate(true),
 		"current_location": current_location,
 		"player_position_in_ship": player_position_in_ship.duplicate(),
@@ -52,6 +54,11 @@ static func from_dict(data: Variant, expected_world_version: String, expected_go
 	var ws: WorldSnapshot = script.new()
 	ws.world_summary = _deep_copy_dict(dict.get("world_summary", {}))
 	ws.home_ship = _deep_copy_dict(dict.get("home_ship", {}))
+	var looted_variant: Variant = dict.get("home_looted_containers", [])
+	if typeof(looted_variant) == TYPE_ARRAY:
+		ws.home_looted_containers = []
+		for cid in (looted_variant as Array):
+			ws.home_looted_containers.append(String(cid))
 	ws.visited_ships = _deep_copy_dict(dict.get("visited_ships", {}))
 	ws.current_location = str(dict.get("current_location", ""))
 	var pos = dict.get("player_position_in_ship", [0.0, 0.0, 0.0])

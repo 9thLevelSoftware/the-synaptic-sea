@@ -145,6 +145,28 @@ func repair(system_id: String, subcomponent_id: String, available_parts: Array, 
 		return {"success": false, "reason": "unknown_subcomponent", "seconds": 0.0}
 	return sub.repair(available_parts, available_tools, skill_level)
 
+## Gated repair fed by a player InventoryState. Gathers the carried part/tool ids,
+## runs the deterministic repair(), and on success consumes ONE of each required part.
+## Consumes nothing on failure. Returns the repair() result dict.
+func repair_with_inventory(system_id: String, subcomponent_id: String, inventory_state, skill_level: int) -> Dictionary:
+	if not systems.has(system_id):
+		return {"success": false, "reason": "unknown_system", "seconds": 0.0}
+	var sub = systems[system_id].get_subcomponent(subcomponent_id)
+	if sub == null:
+		return {"success": false, "reason": "unknown_subcomponent", "seconds": 0.0}
+	var available_parts: Array = []
+	var available_tools: Array = []
+	if inventory_state != null:
+		for entry in inventory_state.get_items_by_category("part"):
+			available_parts.append(String(entry["id"]))
+		for entry in inventory_state.get_items_by_category("tool"):
+			available_tools.append(String(entry["id"]))
+	var result: Dictionary = sub.repair(available_parts, available_tools, skill_level)
+	if bool(result.get("success", false)) and inventory_state != null:
+		for part in sub.required_parts:
+			inventory_state.remove_item(String(part), 1)
+	return result
+
 ## Deterministically brings a subcomponent to full health (operational).
 ## Used by the objective bridge, which has no parts/tools/skill inventory
 ## feeding the gated repair() path yet (that arrives with Phase 6 inventory).

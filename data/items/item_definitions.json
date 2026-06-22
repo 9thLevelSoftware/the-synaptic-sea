@@ -1,7 +1,18 @@
 {
-  "power_cell":   { "display_name": "Power Cell",   "category": "part",   "weight": 1.0, "max_stack": 10 },
-  "scrap_metal":  { "display_name": "Scrap Metal",  "category": "part",   "weight": 5.0, "max_stack": 20 },
-  "wiring_spool": { "display_name": "Wiring Spool",  "category": "part",   "weight": 2.0, "max_stack": 10 },
-  "ration_pack":  { "display_name": "Ration Pack",  "category": "supply", "weight": 0.5, "max_stack": 20 },
-  "medkit":       { "display_name": "Medkit",       "category": "supply", "weight": 1.5, "max_stack": 5  }
+  "power_cell":      { "display_name": "Power Cell",      "category": "part",   "weight": 1.0, "max_stack": 10 },
+  "scrap_metal":     { "display_name": "Scrap Metal",     "category": "part",   "weight": 5.0, "max_stack": 20 },
+  "wiring_spool":    { "display_name": "Wiring Spool",    "category": "part",   "weight": 2.0, "max_stack": 10 },
+  "ration_pack":     { "display_name": "Ration Pack",     "category": "supply", "weight": 0.5, "max_stack": 20 },
+  "medkit":          { "display_name": "Medkit",          "category": "supply", "weight": 1.5, "max_stack": 5  },
+  "reactor_core":    { "display_name": "Reactor Core",    "category": "part", "weight": 12.0, "max_stack": 2 },
+  "oxygen_filter":   { "display_name": "Oxygen Filter",   "category": "part", "weight": 1.5, "max_stack": 10 },
+  "sealant":         { "display_name": "Sealant",         "category": "part", "weight": 1.0, "max_stack": 20 },
+  "plating":         { "display_name": "Hull Plating",    "category": "part", "weight": 8.0, "max_stack": 10 },
+  "circuit_board":   { "display_name": "Circuit Board",   "category": "part", "weight": 1.0, "max_stack": 15 },
+  "data_core":       { "display_name": "Data Core",       "category": "part", "weight": 2.0, "max_stack": 10 },
+  "thruster_nozzle": { "display_name": "Thruster Nozzle", "category": "part", "weight": 9.0, "max_stack": 5 },
+  "fuel_line":       { "display_name": "Fuel Line",       "category": "part", "weight": 3.0, "max_stack": 10 },
+  "sensor_module":   { "display_name": "Sensor Module",   "category": "part", "weight": 2.5, "max_stack": 10 },
+  "welder":          { "display_name": "Welder",          "category": "tool", "weight": 3.0, "max_stack": 1 },
+  "plasma_cutter":   { "display_name": "Plasma Cutter",   "category": "tool", "weight": 5.0, "max_stack": 1 }
 }

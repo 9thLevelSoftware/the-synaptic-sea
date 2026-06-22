@@ -10,12 +10,13 @@ func _initialize() -> void:
 	var ok_weight: bool = _test_weight_cap()
 	var ok_round: bool = _test_round_trip()
 	var ok_legacy: bool = _test_legacy_compat()
-	if ok_add and ok_weight and ok_round and ok_legacy:
-		print("ITEM INVENTORY PASS add=true weight_cap=true round_trip=true legacy_compat=true")
+	var ok_repair: bool = _test_repair_vocabulary()
+	if ok_add and ok_weight and ok_round and ok_legacy and ok_repair:
+		print("ITEM INVENTORY PASS add=true weight_cap=true round_trip=true legacy_compat=true repair_vocab=%s" % str(ok_repair).to_lower())
 	else:
-		push_error("ITEM INVENTORY FAIL add=%s weight_cap=%s round_trip=%s legacy_compat=%s" % [
-			str(ok_add), str(ok_weight), str(ok_round), str(ok_legacy)])
-	quit(0 if (ok_add and ok_weight and ok_round and ok_legacy) else 1)
+		push_error("ITEM INVENTORY FAIL add=%s weight_cap=%s round_trip=%s legacy_compat=%s repair_vocab=%s" % [
+			str(ok_add), str(ok_weight), str(ok_round), str(ok_legacy), str(ok_repair)])
+	quit(0 if (ok_add and ok_weight and ok_round and ok_legacy and ok_repair) else 1)
 
 func _test_add_and_categories() -> bool:
 	var inv = InventoryStateScript.new()
@@ -80,4 +81,19 @@ func _test_legacy_compat() -> bool:
 	if not inv.has_tool("portable_oxygen_pump"): return false
 	if inv.get_drain_multiplier() != 0.5: return false
 	if inv.tool_ids != ["portable_oxygen_pump"]: return false
+	return true
+
+func _test_repair_vocabulary() -> bool:
+	var inv = InventoryStateScript.new()
+	# Every part required by systems.json must resolve as a 'part'.
+	for part_id in ["reactor_core", "power_cell", "oxygen_filter", "sealant", "plating",
+			"circuit_board", "data_core", "thruster_nozzle", "fuel_line", "sensor_module"]:
+		if inv.get_category(part_id) != "part":
+			return false
+		if inv.get_weight_each(part_id) <= 0.0:
+			return false
+	# The two repair tools must resolve as 'tool'.
+	for tool_id in ["welder", "plasma_cutter"]:
+		if inv.get_category(tool_id) != "tool":
+			return false
 	return true

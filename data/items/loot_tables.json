@@ -10,24 +10,49 @@
   "generic_locker": {
     "rolls": 2,
     "entries": [
-      { "item_id": "ration_pack", "qty_min": 1, "qty_max": 3, "weight": 5 },
-      { "item_id": "medkit",      "qty_min": 1, "qty_max": 1, "weight": 2 }
+      { "item_id": "ration_pack",   "qty_min": 1, "qty_max": 3, "weight": 5 },
+      { "item_id": "medkit",        "qty_min": 1, "qty_max": 1, "weight": 2 },
+      { "item_id": "welder",        "qty_min": 1, "qty_max": 1, "weight": 3 },
+      { "item_id": "plasma_cutter", "qty_min": 1, "qty_max": 1, "weight": 1 }
     ]
   },
   "salvage_engineering": {
     "rolls": 2,
     "entries": [
-      { "item_id": "power_cell",   "qty_min": 1, "qty_max": 2, "weight": 4 },
-      { "item_id": "wiring_spool", "qty_min": 1, "qty_max": 2, "weight": 4 },
-      { "item_id": "scrap_metal",  "qty_min": 1, "qty_max": 2, "weight": 2 }
+      { "item_id": "circuit_board",   "qty_min": 1, "qty_max": 2, "weight": 4 },
+      { "item_id": "fuel_line",       "qty_min": 1, "qty_max": 2, "weight": 3 },
+      { "item_id": "power_cell",      "qty_min": 1, "qty_max": 2, "weight": 3 },
+      { "item_id": "thruster_nozzle", "qty_min": 1, "qty_max": 1, "weight": 1 }
     ]
   },
   "salvage_cargo": {
     "rolls": 3,
     "entries": [
-      { "item_id": "scrap_metal",  "qty_min": 1, "qty_max": 4, "weight": 5 },
-      { "item_id": "ration_pack",  "qty_min": 1, "qty_max": 3, "weight": 4 },
-      { "item_id": "power_cell",   "qty_min": 1, "qty_max": 1, "weight": 1 }
+      { "item_id": "scrap_metal",   "qty_min": 1, "qty_max": 4, "weight": 5 },
+      { "item_id": "sealant",       "qty_min": 1, "qty_max": 3, "weight": 4 },
+      { "item_id": "plating",       "qty_min": 1, "qty_max": 2, "weight": 2 },
+      { "item_id": "oxygen_filter", "qty_min": 1, "qty_max": 2, "weight": 2 }
+    ]
+  },
+  "repair_parts_common": {
+    "rolls": 2,
+    "entries": [
+      { "item_id": "circuit_board", "qty_min": 1, "qty_max": 2, "weight": 5 },
+      { "item_id": "sensor_module", "qty_min": 1, "qty_max": 1, "weight": 3 },
+      { "item_id": "data_core",     "qty_min": 1, "qty_max": 1, "weight": 3 }
+    ]
+  },
+  "repair_parts_starter": {
+    "rolls": 1,
+    "entries": [
+      { "item_id": "circuit_board", "qty_min": 1, "qty_max": 1, "weight": 10 }
+    ]
+  },
+  "repair_tools": {
+    "rolls": 1,
+    "entries": [
+      { "item_id": "welder",        "qty_min": 1, "qty_max": 1, "weight": 5 },
+      { "item_id": "plasma_cutter", "qty_min": 1, "qty_max": 1, "weight": 2 }
     ]
   }
 }
