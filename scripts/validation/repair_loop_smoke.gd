@@ -59,6 +59,9 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	if playable.inventory_state.get_quantity("circuit_board") < 1:
 		_fail("starting loot did not guarantee a circuit_board"); return
 
+	# Capture the circuit_board count before repair.
+	var circuit_boards_before: int = playable.inventory_state.get_quantity("circuit_board")
+
 	# Start the timed channel and prove it is NOT instant.
 	if not playable.repair_subcomponent_for_validation("propulsion", "nav_linkage"):
 		_fail("could not start nav_linkage repair channel"); return
@@ -70,8 +73,8 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	if not channeled:
 		_fail("timed channel did not complete the repair (mid_not_done=%s)" % str(mid_not_done)); return
 	# One circuit_board consumed.
-	if playable.inventory_state.get_quantity("circuit_board") != 0:
-		_fail("repair did not consume the circuit_board"); return
+	if playable.inventory_state.get_quantity("circuit_board") != circuit_boards_before - 1:
+		_fail("repair did not consume exactly one circuit_board"); return
 	# Propulsion now operational; a jump that was blocked now succeeds.
 	if not mgr.is_operational("propulsion"):
 		_fail("propulsion not operational after repair"); return
