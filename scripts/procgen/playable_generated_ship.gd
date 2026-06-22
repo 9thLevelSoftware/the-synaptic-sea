@@ -1253,7 +1253,15 @@ func _build_repair_points() -> void:
 	var mgr = _active_systems_manager()
 	if mgr == null:
 		return
-	var positions: Array = _distributed_room_positions()
+	# Phase 5a fix (Codex P1): HOME repair points parent under lifeboat_ship.scene_root
+	# (at LIFEBOAT_DOCK_OFFSET), so their positions must be LIFEBOAT-LOCAL — otherwise the
+	# derelict-frame _distributed_room_positions() values get the lifeboat offset added and
+	# the (travel-gating) propulsion repair lands OUTSIDE the lifeboat, unreachable in-game.
+	# The away-derelict branch parents under current_ship.scene_root, whose derelict-frame
+	# positions correctly match its geometry — so it keeps _distributed_room_positions().
+	var use_lifeboat: bool = (not away_from_start) and lifeboat_ship != null \
+		and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root)
+	var positions: Array = _lifeboat_local_repair_positions() if use_lifeboat else _distributed_room_positions()
 	if positions.is_empty():
 		return
 	var idx: int = 0
@@ -1356,6 +1364,15 @@ func advance_repair_channels_for_validation(delta: float) -> void:
 	for rp in repair_points:
 		if is_instance_valid(rp) and rp.channeling:
 			rp.advance_channel(delta)
+
+## LIFEBOAT-LOCAL repair-point positions (floor centers of the fixed LifeBoatBuilder rooms:
+## engine_bay/airlock/cockpit along X at cell -1/0/1 * CELL_SIZE=4). These are LOCAL to
+## lifeboat_ship.scene_root, so a repair point parented there lands INSIDE the lifeboat geometry
+## (rather than getting the lifeboat offset added to a derelict-frame coordinate). See the fix
+## note in _build_repair_points.
+func _lifeboat_local_repair_positions() -> Array:
+	var y: float = PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR
+	return [Vector3(-4.0, y, 0.0), Vector3(0.0, y, 0.0), Vector3(4.0, y, 0.0)]
 
 ## Curates the lifeboat's propulsion so the opening blocker is a single low-skill repair:
 ## nav_linkage broken (circuit_board, skill 2, no tool), the other propulsion subs healthy.

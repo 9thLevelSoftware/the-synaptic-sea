@@ -46,8 +46,22 @@ func _run(p) -> void:
 		p.search_loot_container_for_validation(String(lc.container_id))
 	if p.inventory_state.get_quantity("circuit_board") < 1: _fail("derelict loot did not yield circuit_board"); return
 
+	# Phase 5a regression (Codex P1 re-review): the travel-gating propulsion repair point
+	# must sit INSIDE the docked lifeboat (parented under lifeboat.scene_root at a lifeboat-
+	# LOCAL position), not offset out into the void by a derelict-frame coordinate. The
+	# lifeboat is a 3-cell (~12u) structure, so a correctly-placed point is within ~8u of
+	# its root; the bug placed it up to ~24u away (derelict-frame + lifeboat offset).
+	var lb_o: Vector3 = lifeboat.scene_root.global_position
+	var found_rp := false
+	for rp in p.repair_points:
+		if rp.system_id == "propulsion" and rp.subcomponent_id == "nav_linkage":
+			found_rp = true
+			var dist: float = rp.global_position.distance_to(lb_o)
+			if dist > 8.0: _fail("propulsion repair point not inside lifeboat (dist=%.1f)" % dist); return
+	if not found_rp: _fail("no propulsion/nav_linkage repair point found"); return
+
 	finished = true
-	print("CANONICAL OPENING PASS docked=true aboard_derelict=true prop_offline=true loot=true")
+	print("CANONICAL OPENING PASS docked=true aboard_derelict=true prop_offline=true loot=true repair_in_lifeboat=true")
 	_teardown(0)
 
 func _find(n: Node):

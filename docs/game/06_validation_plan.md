@@ -147,7 +147,7 @@ run_clean 'ship instance dock fields smoke' 'SHIP INSTANCE DOCK FIELDS PASS alia
 run_clean 'dock ports model smoke' 'DOCK PORTS PASS lifeboat=true derelict=true empty_guard=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dock_ports_smoke.gd
 run_clean 'dock copresence smoke' 'DOCK COPRESENCE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dock_copresence_smoke.gd
 run_clean 'occupancy flip smoke' 'OCCUPANCY FLIP PASS derelict=true home=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/occupancy_flip_smoke.gd
-run_clean 'canonical opening smoke' 'CANONICAL OPENING PASS docked=true aboard_derelict=true prop_offline=true loot=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/canonical_opening_smoke.gd
+run_clean 'canonical opening smoke' 'CANONICAL OPENING PASS docked=true aboard_derelict=true prop_offline=true loot=true repair_in_lifeboat=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/canonical_opening_smoke.gd
 run_clean 'docking loop smoke' 'DOCKING LOOP PASS opening=true looped=true persisted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/docking_loop_smoke.gd
 echo 'SARGASSO REGRESSION PASS commands=81 clean_output=true'
 ```
