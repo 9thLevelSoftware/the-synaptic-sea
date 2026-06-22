@@ -948,47 +948,41 @@ git commit -m "feat(docking): canonical opening — physical lifeboat docked to 
 
 ---
 
-### Task 8: Travel re-expression + persistence
+### Task 8: Docking-loop persistence (lean Option A)
 
-**Goal:** travel becomes undock-here/dock-there gated on being aboard the lifeboat; the docking edge + occupancy + starting-derelict state persist across save/load and recompute geometry on load.
+**Goal (RESHAPED for lean Option A):** prove the canonical docked-pair opening + the full repair→travel→home loop survive a disk save/load — specifically that the docked lifeboat is correctly rebuilt and re-docked to the home derelict after `request_load`. Add the minimal persistence wiring ONLY if the lifeboat does not already round-trip.
+
+**Why this differs from the original plan:** the original Task 8 (a `not_aboard_ship` travel gate + "lifeboat undocks and docks to the destination derelict" + new WorldSnapshot fields) does NOT apply under the user-approved lean Option A: the lifeboat is a home-docked annex that SHARES `ship_systems_manager`, so (1) there is no separate lifeboat systems state to persist — it is deterministically rebuilt at home by `_build_lifeboat_at_home()` from `LifeBoatBuilder` + the shared (already-persisted) manager; (2) `#4`'s propulsion gate already enforces no-stranding, and an "aboard the lifeboat" gate is unimplementable here (lifeboat `interior_aabb()` is zero in headless) AND unnecessary — it is a 5c multi-ship-ownership concern; (3) travel keeps Task 5's co-present-away-derelict model (the lifeboat stays home). So Task 8 is primarily an integration+persistence SMOKE, plus a small fix only if needed.
 
 **Files:**
-- Modify: `scripts/procgen/playable_generated_ship.gd`, `scripts/systems/world_snapshot.gd`
-- Test: `scripts/validation/docking_loop_smoke.gd` (the spec's end-to-end main-scene smoke)
+- Test: `scripts/validation/docking_loop_smoke.gd` (new)
+- Modify ONLY IF the lifeboat fails to round-trip: `scripts/procgen/playable_generated_ship.gd` (and/or `scripts/systems/world_snapshot.gd`) — see Step 3.
 
-**Background to read first:** `travel_to` (L1212), `travel_home` (L1268), `_build_world_snapshot` (L2998), `_apply_world_snapshot` (L3037), `_activate_derelict_from_instance` (L3022), `world_snapshot.gd` (whole file — already has `home_looted_containers`).
+**Background to read first:** `repair_loop_smoke.gd` (the existing #4 end-to-end smoke — model the new smoke on it: it already does boot → loot → repair (via `repair_subcomponent_for_validation`/`advance_repair_channels_for_validation`) → travel → `request_save`/`request_load`), `_on_ship_loaded` + `_build_lifeboat_at_home()` (Task 7 — how the lifeboat is rebuilt), `_reset_runtime_for_reload` (sets `lifeboat_ship = null` so it rebuilds), `get_lifeboat_ship_for_validation()`/`get_home_ship_for_validation()`.
 
 **Decisions for the implementer:**
-- Travel precondition: `if current_occupancy != lifeboat_ship: return {"success": false, "reason": "not_aboard_ship", "ship": null}` at the top of `travel_to`. (The player pilots from the lifeboat.)
-- On travel: `DockingManager.undock(lifeboat_ship)` from the current host; free the previous derelict's `scene_root` (retain its `ShipInstance` by marker, as today); generate the target derelict; place it at a world transform and `DockingManager.dock(targetDerelict, lifeboat_ship, DockPorts.for_derelict(target_layout), DockPorts.for_lifeboat(lifeboat_layout))`; move the player with the lifeboat (teleport into the lifeboat spawn); `recompute_occupancy()`.
-- `travel_home`: undock from current derelict, free it, re-dock the lifeboat to the STARTING DERELICT (home), `recompute_occupancy()`.
-- Persistence (`world_snapshot.gd`): add `var docked_to: String = ""` (`"home"` or a marker_id) and `var occupancy: String = ""` (`"lifeboat"` or `"derelict:<id>"`) and `var lifeboat_ship: Dictionary = {}` (the lifeboat ShipInstance summary). Mirror the existing `home_looted_containers` add: include in `to_dict()`, parse defensively in `from_dict()`.
-- `_build_world_snapshot`: write `docked_to`, `occupancy`, and `lifeboat_ship = lifeboat_ship_instance.get_summary()`.
-- `_apply_world_snapshot`: after rebuilding home (starting derelict) + lifeboat, recompute the dock transform via `DockPorts`+`DockingManager`, restore occupancy, place the player; recompute geometry rather than storing transforms.
-- Update `repair_loop_smoke.gd` if the starting-loot relocation (Task 7) moved where it loots — it should now loot the starting derelict, repair the lifeboat, then travel. Keep its existing PASS marker text.
+- This task is a SMOKE FIRST. Do NOT add a `not_aboard_ship` gate, do NOT re-express travel as lifeboat-undock/dock, do NOT add WorldSnapshot fields up front. The lifeboat is rebuilt deterministically; verify that empirically.
+- Write `docking_loop_smoke.gd` (below). Run it. If it PASSES with no code change, the lifeboat already round-trips — commit just the smoke.
+- ONLY if the post-load assertions fail (lifeboat missing / not docked after `request_load`), make the SMALLEST fix to `_on_ship_loaded`/`_build_lifeboat_at_home`/`_reset_runtime_for_reload` so the lifeboat is rebuilt + `parent_ship`-linked after a disk load, and document exactly what you changed and why. Do not add persistence fields unless the lifeboat genuinely carries non-deterministic state (it should not).
 
 **Interfaces:**
-- Produces: travel returns reason `not_aboard_ship` when the player is not aboard the lifeboat; `WorldSnapshot` round-trips `docked_to`/`occupancy`/`lifeboat_ship`.
+- Produces: `docking_loop_smoke.gd` proving the docked-pair opening + repair→travel→home loop + lifeboat survival across save/load.
 
-- [ ] **Step 1: Write the failing smoke**
+- [ ] **Step 1: Write the smoke**
 
-Create `scripts/validation/docking_loop_smoke.gd` — the spec's end-to-end test: boot docked pair → loot derelict → walk to lifeboat → repair propulsion → undock+travel (lifeboat docks to the new derelict, starting derelict unloads) → travel_home re-docks to the starting derelict → save/load preserves docking edge + occupancy + loot/repair. (Model it on `repair_loop_smoke.gd`, adding: assert `travel_to` returns `not_aboard_ship` while the player stands in the derelict; then teleport into the lifeboat and assert travel succeeds; after load assert `get_lifeboat_ship_for_validation().parent_ship == get_home_ship_for_validation()` and occupancy restored.) Print marker `DOCKING LOOP PASS opening=true gated=true traveled=true persisted=true`.
+Create `scripts/validation/docking_loop_smoke.gd` — model on `repair_loop_smoke.gd`'s structure (the main-scene boot harness, the loot/repair/travel/save-load sequence). Assert, in order: (opening) `get_lifeboat_ship_for_validation()` is non-null and `.parent_ship == get_home_ship_for_validation()` and `active_ship_root_count_for_validation() >= 2`; (loop) loot the home derelict for a `circuit_board`, repair the lifeboat propulsion via `repair_subcomponent_for_validation`/`advance_repair_channels_for_validation`, assert `get_ship_systems_manager().is_operational("propulsion")`, travel to an in-range marker (success), `travel_home()`; (persist) `request_save()` then `request_load()`, then assert AGAIN that `get_lifeboat_ship_for_validation()` is non-null and `.parent_ship == get_home_ship_for_validation()` (lifeboat rebuilt + re-docked) and the propulsion repair persisted. Print marker `DOCKING LOOP PASS opening=true looped=true persisted=true`.
 
-(Author the full SceneTree smoke following the `repair_loop_smoke.gd` structure already in the repo; reuse its loot/repair/teleport sequence and the save/load calls `request_save`/`request_load`.)
+- [ ] **Step 2: Run it; observe** — it may PASS immediately (lifeboat already round-trips) or FAIL on a post-load assertion (lifeboat not rebuilt/re-docked).
 
-- [ ] **Step 2: Run it; verify it fails** (no `not_aboard_ship` gate; persistence fields absent).
+- [ ] **Step 3: Fix only if needed** — if Step 2's post-load assertions failed, apply the smallest coordinator fix so the lifeboat is rebuilt + `parent_ship`-linked after `request_load`, then re-run to PASS. If Step 2 passed, no code change.
 
-- [ ] **Step 3: Implement travel + persistence**
-
-Apply the decisions above. For `world_snapshot.gd`, mirror the existing `home_looted_containers` pattern exactly (field + `to_dict` entry + defensive `from_dict` parse). For the coordinator, re-express `travel_to`/`travel_home` as undock/dock and add the `not_aboard_ship` gate; extend `_build_world_snapshot`/`_apply_world_snapshot` with the docking edge + occupancy + lifeboat summary and the load-time transform recompute.
-
-- [ ] **Step 4: Run it; verify PASS** — `DOCKING LOOP PASS opening=true gated=true traveled=true persisted=true`. Then run the previously-touched smokes: `repair_loop_smoke`, `lifeboat_travel_gate_smoke`, `dock_copresence_smoke`, `occupancy_flip_smoke`, `canonical_opening_smoke`.
+- [ ] **Step 4: Verify PASS + regressions** — `DOCKING LOOP PASS opening=true looped=true persisted=true`, then run SERIALLY: `repair_loop_smoke`, `lifeboat_travel_gate_smoke`, `dock_copresence_smoke`, `occupancy_flip_smoke`, `canonical_opening_smoke` — all keep their existing PASS markers (pristine apart from allowlisted noise incl. the known `Failed to instantiate an autoload` local-drift line).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/procgen/playable_generated_ship.gd scripts/systems/world_snapshot.gd scripts/validation/docking_loop_smoke.gd scripts/validation/repair_loop_smoke.gd
-git commit -m "feat(docking): travel as undock/dock gated on lifeboat + docking persistence"
+git add scripts/validation/docking_loop_smoke.gd   # + playable_generated_ship.gd / world_snapshot.gd ONLY if Step 3 changed them
+git commit -m "test(docking): end-to-end docking-loop persistence smoke (lean Option A)"
 ```
 
 ---
