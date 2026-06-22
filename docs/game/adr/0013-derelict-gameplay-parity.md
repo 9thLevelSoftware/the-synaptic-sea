@@ -36,3 +36,14 @@ controller.
   (loot/parts) is deferred to sub-project #3 (player inventory).
 - Completed salvage objectives do not respawn on revisit; a cleared derelict reads as cleared
   across revisit and quit→resume.
+
+## Note: this framing is transitional
+
+Per the open-world survival North Star (`docs/game/00_vision.md`), a derelict is a building
+to loot / repair / occupy, not a level to "complete." The `objectives` / `reach_goal` /
+`cleared` model here is **scaffolding** built on the generated objective specs to give
+boarding immediate purpose. Salvage objectives are deliberately optional and un-ordered, and
+`cleared` means *extracted*, not *fully looted* — so a derelict can be cleared with salvage
+left, by design ("beeline to extract, or dig deeper"). The real "why board a derelict" is
+loot (sub-project #3) and repair (#4); expect this objective framing to be reframed or
+retired as those land. Do not treat `reach_goal` / `cleared` as permanent design.
