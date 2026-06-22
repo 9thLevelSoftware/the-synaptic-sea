@@ -64,8 +64,10 @@ func set_marker_visible(is_visible: bool) -> void:
 func try_interact(player_body: Node) -> bool:
 	if searched or player_body == null or inventory_state == null:
 		return false
-	# Mirrors Interactable's validation bypass: when set_validation_player_in_range
-	# was called with this exact player_body, skip the distance check.
+	# Mirrors Interactable's validation bypass (derelict-placed sibling), not ToolPickup's
+	# stricter always-check. Accepts risk of stale candidate_player after teleport-without-
+	# body_exited (false bypass: one-time early search from out of range), because a
+	# container is single-use, and the validation seam also relies on this pattern.
 	if candidate_player != player_body and not _is_player_in_direct_range(player_body):
 		return false
 	var rolled: Array = LootRollerScript.roll(loot_table, seed_source, tables)
