@@ -1906,6 +1906,9 @@ func _build_lifeboat_at_home() -> void:
 	var dock_result: Dictionary = _dock_piloted_to(home_ship)
 	if not bool(dock_result.get("success", false)):
 		push_error("PlayableGeneratedShip: boot dock failed — reason=%s" % str(dock_result.get("reason", "?")))
+	# Phase 5b Task 6: spawn the boot home barrier so boarding home at the canonical
+	# opening is consistent with boarding a travel target (both require seam interaction).
+	_spawn_dock_barrier(home_ship)
 
 ## Port-aligns piloted_ship's airlock to host's dock port and writes the dock
 ## relationship. host.scene_root must be in-tree. Returns the dock() result dict.
@@ -2009,6 +2012,11 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# interactables/pickups are detached but still referenced here; gate them so
 	# a derelict cannot complete stale starting-ship objectives.
 	if away_from_start:
+		# Phase 5b: opening/breaching the dock seam barrier takes precedence so the
+		# player can board the derelict before any in-derelict interaction.
+		for b in dock_barriers:
+			if is_instance_valid(b) and not b.opened and b.try_start(player_body):
+				return
 		# Sub-project #4: try repair points before loot/objectives.
 		for rp in repair_points:
 			if is_instance_valid(rp) and rp.try_start(player_body):
@@ -3833,3 +3841,50 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_pressed("load_run"):
 		request_load()
 		get_viewport().set_input_as_handled()
+
+## Phase 5b Task 6 validation seam: opens the first closed dock-seam barrier
+## without requiring player proximity. Returns true if the barrier is now opened.
+func open_active_dock_barrier_for_validation() -> bool:
+	for b in dock_barriers:
+		if is_instance_valid(b) and not b.opened:
+			if b.condition == "broken":
+				b.channeling = true
+				b._scaled_seconds = 0.01
+				b.advance_channel(100.0)
+			else:
+				b.set_opened(true)
+				b.emit_signal("breach_opened", b.marker_id)
+			return b.opened
+	return false
+
+## Phase 5b Task 6 validation seam: teleports the player to a room of current_ship
+## that lies OUTSIDE the piloted ship's interior AABB (so occupancy resolves
+## unambiguously to the host, not the overlapping docked lifeboat). If no such
+## room exists (host entirely inside the lifeboat AABB — unexpected for a multi-room
+## derelict), falls back to the host interior center and emits a warning.
+func board_host_for_validation() -> void:
+	if current_ship == null or player == null or not (player is Node3D):
+		return
+	# Find a room of current_ship whose world position is outside the piloted ship's AABB.
+	var lb_aabb: AABB = AABB()
+	if piloted_ship != null and piloted_ship.scene_root != null and is_instance_valid(piloted_ship.scene_root):
+		lb_aabb = piloted_ship.interior_aabb()
+	var sr = current_ship.scene_root
+	if sr != null and is_instance_valid(sr):
+		var st = sr.get_node_or_null("ShipStructure")
+		if st == null:
+			for c in sr.get_children():
+				if c.get_child_count() > 0:
+					st = c
+					break
+		if st != null:
+			for rn in st.get_children():
+				if not (rn is Node3D):
+					continue
+				var gp: Vector3 = (rn as Node3D).global_position
+				if not lb_aabb.grow(0.001).has_point(gp):
+					(player as Node3D).global_position = gp
+					return
+	# Fallback: use the host interior center (may land in overlap — report concern).
+	push_warning("board_host_for_validation: no host room found outside piloted AABB; using interior center (AABB overlap)")
+	(player as Node3D).global_position = current_ship.interior_aabb().get_center()
