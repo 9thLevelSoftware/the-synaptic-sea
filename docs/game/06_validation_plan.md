@@ -141,7 +141,7 @@ run_clean 'derelict gameplay smoke' 'DERELICT GAMEPLAY PASS built=true cleared=t
 run_clean 'repair loop smoke' 'REPAIR LOOP PASS opening=true channeled=true persists=true home_intact=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_loop_smoke.gd
 run_clean 'repair consume smoke' 'REPAIR CONSUME PASS repaired=true consumed=true cascade=true rejects=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_consume_smoke.gd
 run_clean 'lifeboat travel gate smoke' 'LIFEBOAT TRAVEL GATE PASS blocked_offline=true travels_after_repair=true home_always=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/lifeboat_travel_gate_smoke.gd
-run_clean 'docking manager model smoke' 'DOCKING MANAGER PASS aligned=true relationship=true undock=true rejects=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/docking_manager_smoke.gd
+run_clean 'docking manager model smoke' 'DOCKING MANAGER PASS aligned=true relationship=true undock=true rejects=true self_guard=true resevers=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/docking_manager_smoke.gd
 run_clean 'ship occupancy model smoke' 'SHIP OCCUPANCY PASS contained=true tiebreak=host outside=null malformed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_occupancy_smoke.gd
 run_clean 'ship instance dock fields smoke' 'SHIP INSTANCE DOCK FIELDS PASS alias=true aabb=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_instance_dock_fields_smoke.gd
 run_clean 'dock ports model smoke' 'DOCK PORTS PASS lifeboat=true derelict=true empty_guard=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dock_ports_smoke.gd

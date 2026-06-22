@@ -66,11 +66,38 @@ func _initialize() -> void:
 		bad_host.free()
 		bad_mobile.free()
 
+	# Self-docking is rejected (would create a self-referential cycle).
+	if ok:
+		var self_res: Dictionary = DockingManagerScript.dock(host, host, host_port, mobile_port)
+		if bool(self_res.get("success", true)) or str(self_res.get("reason", "")) != "dock_failed":
+			ok = false; msg = "self-dock not rejected: %s" % str(self_res)
+
+	# Re-docking a mobile ship to a NEW host severs the old host's reference
+	# (no stale entry left in the previous host's docked_ships).
+	var resevers := false
+	if ok:
+		var hostA_root := Node3D.new()
+		var hostA = ShipInstanceScript.create("hostA", "", null, null, hostA_root)
+		var hostB_root := Node3D.new()
+		var hostB = ShipInstanceScript.create("hostB", "", null, null, hostB_root)
+		var m_root := Node3D.new()
+		var m = ShipInstanceScript.create("m", "", null, null, m_root)
+		DockingManagerScript.dock(hostA, m, host_port, mobile_port)
+		DockingManagerScript.dock(hostB, m, host_port, mobile_port)
+		if m.parent_ship != hostB or hostA.docked_ships.has(m) or not hostB.docked_ships.has(m):
+			ok = false; msg = "re-dock did not sever old host (parent=%s A_has=%s B_has=%s)" % [str(m.parent_ship), str(hostA.docked_ships.has(m)), str(hostB.docked_ships.has(m))]
+		else:
+			resevers = true
+		# Break the m <-> hostB RefCounted cycle before the locals drop, else the
+		# two ShipInstances leak at exit (same cycle the coordinator guards against).
+		DockingManagerScript.undock(m)
+		hostA_root.free(); hostB_root.free(); m_root.free()
+
 	host_root.free()
 	mobile_root.free()
 
 	if ok:
-		print("DOCKING MANAGER PASS aligned=true relationship=true undock=true rejects=%s" % str(rejects).to_lower())
+		print("DOCKING MANAGER PASS aligned=true relationship=true undock=true rejects=%s self_guard=true resevers=%s" % [str(rejects).to_lower(), str(resevers).to_lower()])
 		quit(0)
 	else:
 		push_error("DOCKING MANAGER FAIL reason=%s" % msg)

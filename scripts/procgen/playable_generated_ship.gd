@@ -1469,8 +1469,15 @@ func travel_to(marker) -> Dictionary:
 
 	# Re-home the existing player + camera into the new ship's spawn. The player
 	# node, camera, HUD, progression and inventory are NEVER freed (player-owned).
+	# Phase 5a fix (Codex P1): new_root sits at DERELICT_DOCK_OFFSET, and
+	# get_start_transform() returns the loader's LOCAL spawn. Transform it to WORLD
+	# space via new_root's global transform — otherwise the player is teleported to
+	# the local spawn (near the home ship at origin) while the derelict and its
+	# loot / repair points / objectives (parented under new_root) are
+	# DERELICT_DOCK_OFFSET away and unreachable.
 	if player != null and new_root.has_method("get_start_transform"):
-		player.teleport_to(new_root.get_start_transform().origin + Vector3(0.0, PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR, 0.0))
+		var local_spawn: Vector3 = new_root.get_start_transform().origin + Vector3(0.0, PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR, 0.0)
+		player.teleport_to(new_root.global_transform * local_spawn)
 	return result
 
 ## Returns the player to the home ship instance: frees the active derelict's

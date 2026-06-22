@@ -51,8 +51,17 @@ func _validate(p) -> void:
 		if lc.global_position.distance_to(der_o) > lc.global_position.distance_to(home_o):
 			_fail("derelict loot not parented under moved derelict root"); return
 
+	# Phase 5a regression (Codex P1): after travel the player must be re-homed INTO
+	# the offset derelict, not left near the home ship — else the derelict's loot /
+	# repair points / objectives (all parented under the offset root) are unreachable
+	# and interactions route to the wrong ship.
+	if p.player != null and p.player is Node3D:
+		var player_pos: Vector3 = (p.player as Node3D).global_position
+		if player_pos.distance_to(der_o) > player_pos.distance_to(home_o):
+			_fail("player not re-homed into offset derelict (dist_der=%.1f dist_home=%.1f)" % [player_pos.distance_to(der_o), player_pos.distance_to(home_o)]); return
+
 	finished = true
-	print("DOCK COPRESENCE PASS roots=%d separated=true loot_aligned=true" % p.active_ship_root_count_for_validation())
+	print("DOCK COPRESENCE PASS roots=%d separated=true loot_aligned=true player_in_derelict=true" % p.active_ship_root_count_for_validation())
 	_teardown(0)
 
 func _find_playable(n: Node):

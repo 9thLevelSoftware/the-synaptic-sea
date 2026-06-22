@@ -31,7 +31,9 @@ static func _port_valid(p: Dictionary) -> bool:
 		and (p["facing"] as Vector3).length() > 0.0001
 
 static func dock(host_inst, mobile_inst, host_port: Dictionary, mobile_port: Dictionary) -> Dictionary:
-	if host_inst == null or mobile_inst == null:
+	# Reject null insts and self-docking (a ship docking to itself would create a
+	# self-referential parent_ship/docked_ships cycle).
+	if host_inst == null or mobile_inst == null or host_inst == mobile_inst:
 		return {"success": false, "reason": "dock_failed"}
 	if not _port_valid(host_port) or not _port_valid(mobile_port):
 		return {"success": false, "reason": "dock_failed"}
@@ -40,6 +42,10 @@ static func dock(host_inst, mobile_inst, host_port: Dictionary, mobile_port: Dic
 	var root = mobile_inst.scene_root
 	if root == null or not is_instance_valid(root) or not (root is Node3D):
 		return {"success": false, "reason": "dock_failed"}
+	# Sever any existing dock relationship first so the previous host's
+	# docked_ships list does not retain a stale reference to this mobile ship.
+	if mobile_inst.parent_ship != null:
+		undock(mobile_inst)
 	(root as Node3D).transform = compute_mobile_transform(host_port, mobile_port)
 	mobile_inst.parent_ship = host_inst
 	if not host_inst.docked_ships.has(mobile_inst):
