@@ -40,6 +40,12 @@
       { "item_id": "data_core",     "qty_min": 1, "qty_max": 1, "weight": 3 }
     ]
   },
+  "repair_parts_starter": {
+    "rolls": 1,
+    "entries": [
+      { "item_id": "circuit_board", "qty_min": 1, "qty_max": 1, "weight": 10 }
+    ]
+  },
   "repair_tools": {
     "rolls": 1,
     "entries": [
