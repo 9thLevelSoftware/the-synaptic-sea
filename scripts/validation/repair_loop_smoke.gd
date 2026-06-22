@@ -93,6 +93,13 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		_fail("save failed"); return
 	if not playable.request_load():
 		_fail("load failed"); return
+	# Home loot-search state must persist (else the guaranteed starter parts re-loot →
+	# duplication). All home containers were searched above; they must stay searched.
+	if playable.loot_containers.is_empty():
+		_fail("home loot containers missing after reload"); return
+	for lc2 in playable.loot_containers:
+		if not lc2.searched:
+			_fail("home loot-search state did not persist across save/load (re-lootable starter parts)"); return
 	var mgr2 = playable.get_ship_systems_manager()
 	var persists: bool = mgr2.get_system("propulsion").get_subcomponent("nav_linkage").is_functional()
 	if not persists:

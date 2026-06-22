@@ -10,8 +10,10 @@
   "generic_locker": {
     "rolls": 2,
     "entries": [
-      { "item_id": "ration_pack", "qty_min": 1, "qty_max": 3, "weight": 5 },
-      { "item_id": "medkit",      "qty_min": 1, "qty_max": 1, "weight": 2 }
+      { "item_id": "ration_pack",   "qty_min": 1, "qty_max": 3, "weight": 5 },
+      { "item_id": "medkit",        "qty_min": 1, "qty_max": 1, "weight": 2 },
+      { "item_id": "welder",        "qty_min": 1, "qty_max": 1, "weight": 3 },
+      { "item_id": "plasma_cutter", "qty_min": 1, "qty_max": 1, "weight": 1 }
     ]
   },
   "salvage_engineering": {

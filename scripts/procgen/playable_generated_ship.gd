@@ -1175,6 +1175,8 @@ func _clear_loot_containers() -> void:
 ## distributing them across the ship's rooms. Works for the lifeboat (home) and derelicts.
 func _build_repair_points() -> void:
 	_clear_repair_points()
+	if not is_instance_valid(repair_point_root):
+		return
 	var mgr = _active_systems_manager()
 	if mgr == null:
 		return
@@ -1239,9 +1241,14 @@ func _on_repair_completed(system_id: String, subcomponent_id: String) -> void:
 
 ## Validation seam: start a repair-point channel via the real path, by subcomponent.
 func repair_subcomponent_for_validation(system_id: String, subcomponent_id: String) -> bool:
+	if not is_instance_valid(player):
+		return false
 	for rp in repair_points:
 		if is_instance_valid(rp) and rp.system_id == system_id and rp.subcomponent_id == subcomponent_id and not rp.repaired:
-			rp.set_validation_player_in_range(player)
+			# Put the player at the repair point so the real range gate (not a
+			# candidate_player bypass) admits the channel — mirrors the loot smoke seam.
+			if player.has_method("teleport_to"):
+				player.teleport_to(rp.global_position)
 			return rp.try_start(player)
 	return false
 
@@ -3126,6 +3133,11 @@ func _build_world_snapshot():
 		if away_from_start:
 			home_snap.player_position = [_home_player_position.x, _home_player_position.y, _home_player_position.z]
 		ws.home_ship = home_snap.to_dict()
+	# The home ship's loot-search state rides the WorldSnapshot (RunSnapshot does not
+	# carry it). Without this, the #4 home loot-lift would respawn the starting
+	# containers unsearched after a fresh-process load → starter-part duplication.
+	if home_ship != null:
+		ws.home_looted_containers = home_ship.looted_container_ids.duplicate()
 	ws.visited_ships = {}
 	for mid in visited_ships:
 		ws.visited_ships[String(mid)] = visited_ships[mid].get_summary()
@@ -3173,6 +3185,14 @@ func _apply_world_snapshot(ws) -> bool:
 		_home_player_position = Vector3(home_snap.player_position[0], home_snap.player_position[1], home_snap.player_position[2])
 	if not _apply_run_snapshot(home_snap):
 		return false
+	# 1b. Restore the home ship's loot-search state and rebuild its containers so
+	#     already-searched starting containers read as searched (prevents starter-part
+	#     re-loot after a fresh-process load). We are home here (the reload reset us),
+	#     so current_ship == home_ship and _build_loot_containers targets the home ship.
+	if home_ship != null:
+		home_ship.looted_container_ids = ws.home_looted_containers.duplicate()
+		if not away_from_start:
+			_build_loot_containers()
 	# 2. World model. _apply_run_snapshot reset us to the home ship; home_ship is
 	#    re-wrapped by _on_ship_loaded during that reload.
 	if sargasso_world != null and not ws.world_summary.is_empty():

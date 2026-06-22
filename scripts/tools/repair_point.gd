@@ -83,10 +83,11 @@ func _player_skill() -> int:
 ## Begins the channel if the player is in range and a dry-run of the gated repair
 ## would succeed (carries parts/tools, meets skill). Returns true if the channel started.
 func try_start(player_body: Node) -> bool:
-	if repaired or channeling or player_body == null or target_manager == null:
+	if repaired or channeling or not is_instance_valid(player_body) or target_manager == null:
 		return false
-	# Mirrors Interactable's candidate bypass: a validation seam sets candidate_player.
-	if candidate_player != player_body and not _is_player_in_direct_range(player_body):
+	# Pure range gate (no candidate_player bypass): the player must be at the point to
+	# start. The validation seam teleports the player here, so tests pass the same gate.
+	if not _is_player_in_direct_range(player_body):
 		return false
 	# Dry-run precheck WITHOUT consuming (repair() only mutates on success; we check parts/tools/skill).
 	var sub = target_manager.get_system(system_id).get_subcomponent(subcomponent_id) if target_manager.get_system(system_id) != null else null
@@ -129,8 +130,12 @@ func _precheck_reason(sub, skill: int) -> String:
 func _process(delta: float) -> void:
 	if not channeling:
 		return
-	# Cancel if the player left range (unless a validation seam pinned candidate_player).
-	if _channel_player != null and candidate_player != _channel_player and not _is_player_in_direct_range(_channel_player):
+	# Cancel if the channelling player was freed or left range (PZ-style: walking away
+	# aborts with no part loss). Pure range check — no candidate_player bypass.
+	if not is_instance_valid(_channel_player):
+		_cancel()
+		return
+	if not _is_player_in_direct_range(_channel_player):
 		_cancel()
 		return
 	advance_channel(delta)
@@ -172,9 +177,11 @@ func _is_player_in_direct_range(player_body: Node) -> bool:
 	if not is_instance_valid(player_body) or not (player_body is Node3D):
 		return false
 	var player_node: Node3D = player_body as Node3D
-	var here: Vector3 = global_position if is_inside_tree() else position
-	var there: Vector3 = player_node.global_position if player_node.is_inside_tree() else player_node.position
-	return here.distance_to(there) <= _interaction_radius()
+	# Compare global positions only; mixing local/global across coordinate spaces yields
+	# wrong distances, so an out-of-tree node is simply treated as not in range.
+	if not is_inside_tree() or not player_node.is_inside_tree():
+		return false
+	return global_position.distance_to(player_node.global_position) <= _interaction_radius()
 
 func _ensure_collision(radius: float) -> void:
 	if collision_shape == null:
