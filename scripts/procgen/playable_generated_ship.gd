@@ -48,11 +48,9 @@ const PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR: float = 0.55
 # 100 units ensures a generated layout (max radius ~24 units) does not overlap
 # the home hull (Task 8 will replace this fixed offset with real DockPorts wiring).
 const DERELICT_DOCK_OFFSET := Vector3(100.0, 0.0, 0.0)
-# Phase 5a Task 7: lifeboat anchor offset. The lifeboat is a 3-room linear structure
-# (3 cells × 4 m = 12 m span). Placed at -30 on X so it does not overlap
-# coherent_ship_001's extent (≈±24 units) and stays clear of DERELICT_DOCK_OFFSET (+100).
-# Net gap from derelict edge (≈-24) to lifeboat near edge (≈-30 + ~6 = -24): exact boundary.
-# Use -35 to give 11 m clearance from the derelict's -X extent.
+# Phase 5a Task 7: lifeboat anchor offset. The lifeboat is a 3-cell linear structure
+# (~12 m span centred at the offset). At -35 on X its near edge is ≈-29, ~5 m clear of
+# coherent_ship_001's ≈-24 -X extent. DERELICT_DOCK_OFFSET is +100, so no overlap there.
 const LIFEBOAT_DOCK_OFFSET := Vector3(-35.0, 0.0, 0.0)
 const ROUTE_GATE_COLLISION_SIZE: Vector3 = Vector3(2.6, 2.2, 0.7)
 const ROUTE_GATE_VISUAL_COLOR_CLOSED: Color = Color(1.0, 0.22, 0.18, 0.82)
@@ -1669,12 +1667,13 @@ func _build_lifeboat_at_home() -> void:
 	lifeboat_ship = ShipInstanceScript.create("lifeboat", "", null, ship_systems_manager, lb_root)
 
 	# Dock relationship: lifeboat is docked to the home derelict.
-	# Clear prior entries first (reload path: _reset_runtime_for_reload sets
-	# lifeboat_ship = null but home_ship stays, so docked_ships may still hold a
-	# stale reference from the previous load).
+	# Erase any stale lifeboat reference first (reload path: _reset_runtime_for_reload
+	# sets lifeboat_ship = null but home_ship stays, so docked_ships may still hold a
+	# stale entry from the previous load). erase (not clear) so a future task that
+	# docks OTHER ships to home is not wiped.
 	lifeboat_ship.parent_ship = home_ship
 	if home_ship != null:
-		home_ship.docked_ships.clear()
+		home_ship.docked_ships.erase(lifeboat_ship)
 		home_ship.docked_ships.append(lifeboat_ship)
 
 	# Position at fixed anchor, clear of coherent_ship_001's extent and DERELICT_DOCK_OFFSET.
