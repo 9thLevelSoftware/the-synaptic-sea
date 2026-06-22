@@ -93,10 +93,11 @@ func _initialize() -> void:
 	restored3.apply_summary(s3)
 	var looted_round_trip: bool = restored3.looted_container_ids == ["crate_3", "locker_1"]
 
-	print("SHIP INSTANCE PASS round_trip=true stubs_present=true objective_round_trip=true looted_round_trip=%s" % str(looted_round_trip).to_lower())
 	if not looted_round_trip:
-		quit(1)
+		_fail("looted_container_ids round-trip failed")
 		return
+
+	print("SHIP INSTANCE PASS round_trip=true stubs_present=true objective_round_trip=true looted_round_trip=true")
 	quit(0)
 
 func _fail(reason: String) -> void:
