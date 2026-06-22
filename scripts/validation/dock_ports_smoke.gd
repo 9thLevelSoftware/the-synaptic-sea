@@ -16,6 +16,8 @@ func _initialize() -> void:
 		ok = false; msg = "lifeboat port missing fields"
 	elif (lb_port["facing"] as Vector3).distance_to(Vector3(-1, 0, 0)) > 0.001:
 		ok = false; msg = "lifeboat facing not -X"
+	elif (lb_port["position"] as Vector3).distance_to(Vector3(-2, 0, 0)) > 0.001:
+		ok = false; msg = "lifeboat port position not at expected -X nudge"
 
 	# A minimal derelict layout with one dock room at world x=12.
 	var der_layout := {
