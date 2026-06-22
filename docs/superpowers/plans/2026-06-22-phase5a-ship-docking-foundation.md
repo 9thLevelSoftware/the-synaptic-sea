@@ -830,24 +830,28 @@ git commit -m "feat(docking): occupancy-driven active ship context"
 
 ### Task 7: Canonical opening — starting derelict + lifeboat docked
 
-**Goal:** boot the runtime as a docked pair: a dead/unfixable starting derelict with the damaged lifeboat docked at its dock port, player spawned in the derelict, starting loot relocated onto the derelict.
+**Goal (Option A, user-approved — LEAN realization):** add a physical 3-room lifeboat docked to the existing rich home ship (the golden `coherent_ship_001`, which is now "the starting derelict" the player explores and loots), relocate the repair point's PARENTING into the lifeboat, and expose the lifeboat as a co-present `ShipInstance`. Keep #4's systems/travel/opening-damage wiring intact (the home ship's `ship_systems_manager` already IS "the lifeboat's" travel/repair systems per #4's own comments). Player still spawns in the derelict. This delivers the canonical opening (explore+loot the derelict → walk to the docked lifeboat → repair its propulsion → travel) with minimal disruption; a fuller systems separation is deferred (not needed until ship-ownership in 5c).
 
 **Files:**
-- Modify: `scripts/procgen/playable_generated_ship.gd`, `data/procgen/archetypes/derelict.json`, `data/items/loot_tables.json`
+- Modify: `scripts/procgen/playable_generated_ship.gd`
 - Test: `scripts/validation/canonical_opening_smoke.gd`
+- (NO archetype/loot-table changes needed — `coherent_ship_001`'s gameplay slice already carries the `repair_parts_starter` loot container with a guaranteed circuit_board.)
 
-**Background to read first:** `scripts/procgen/start_scene_builder.gd` (the existing derelict+lifeboat combiner — reuse its derelict-shell + dock-room approach but drive it through the coordinator's per-ship model from Tasks 5–6), `_build_runtime_nodes` (L858) and `_on_ship_loaded` (L1362, how the home ship is wrapped), `_build_loot_containers` (L1132), the `repair_parts_starter` table (already in `data/items/loot_tables.json`), and the #4 opening-damage method `_apply_lifeboat_opening_damage` (grep for it). Confirm the `derelict.json` archetype guarantees exactly one `dock` room; if not, add a guaranteed `dock` room role to the archetype (mirror how other guaranteed roles are expressed there).
+**Background to read first (locate by NAME; ~lines on the #4+Task5/6 coordinator):** `scripts/procgen/life_boat.gd` (`LifeBoatBuilder.build()` returns a 3-room Node3D; `build_layout()` for the layout dict), `_build_runtime_nodes` (~858) and `_on_ship_loaded` (~1506, where `home_ship` is wrapped + `current_ship`/`current_occupancy` set), `_build_repair_points` (~1227; HOME branch parents repair points under `repair_point_root`), `_apply_lifeboat_opening_damage` (~1328, damages `ship_systems_manager`), `_active_systems_manager` (~1276), `active_ship_root_count_for_validation` + `_occupancy_entries` (the Task 5/6 seams). `DockingManagerScript`/`DockPortsScript` are available.
 
-**Decisions for the implementer:**
-- The home `ShipInstance` becomes the STARTING DERELICT (a dead shell, `marker_id ""`), and a second always-present `ShipInstance` is the LIFEBOAT (the mobile player-owned ship). The lifeboat carries the systems manager + repair point + opening damage (relocated from today's home lifeboat); the starting derelict carries the starting loot containers (relocated off the lifeboat) and no functional systems.
-- Place the starting derelict `scene_root` at origin; dock the lifeboat to it using `DockPorts.for_derelict(derelict_layout)` + `DockPorts.for_lifeboat(lifeboat_layout)` + `DockingManager.dock(...)`. (This is the first real use of Tasks 1+4; the Task-5 `DERELICT_DOCK_OFFSET` constant remains the fallback for TRAVELED derelicts until Task 8 ports them too.)
-- Player spawns in the starting derelict.
-- Starting loot: ensure the starting derelict's gameplay slice places at least one `repair_parts_starter` container (guaranteed circuit_board). Remove the lifeboat's on-board starting loot placement.
+**Decisions for the implementer (LEAN Option A):**
+- `home_ship` STAYS the existing `coherent_ship_001` — unchanged content (objectives, hazards, route-control, loot) and its `ship_systems_manager` (which #4 already treats as the player's travel/repair "lifeboat" systems; opening damage + travel gate + repair stay on it). `home_ship` is conceptually "the derelict" the player explores. Do NOT make it a dead shell; do NOT touch its loot/objectives.
+- ADD a `var lifeboat_ship` ShipInstance: build a 3-room scene via `LifeBoatBuilder.build()` as its `scene_root`; set `lifeboat_ship.systems_manager = ship_systems_manager` (SHARED — it is the player's functional systems); place it co-present at a FIXED dock anchor offset from the home ship that does NOT collide with `coherent_ship_001`'s extent or with `DERELICT_DOCK_OFFSET` (e.g. `Vector3(-30, 0, 0)` — verify no overlap in the smoke); set `lifeboat_ship.parent_ship = home_ship` and append to `home_ship.docked_ships` (use `DockingManagerScript` if a clean port pair is available, else set the transform + relationship fields directly — `coherent_ship_001` has no `dock` room, so a fixed anchor is acceptable for the foundation). Parent `lifeboat_ship.scene_root` under the coordinator (in-tree, co-present).
+- Relocate the HOME repair point INTO the lifeboat: in `_build_repair_points`, the home (non-away) branch must parent the repair point(s) under `lifeboat_ship.scene_root` instead of `repair_point_root`, so the player physically repairs in the docked lifeboat. (Opening damage still applies to `ship_systems_manager`, so the nav_linkage repair point still appears at home — now located in the lifeboat.) Keep the away-derelict branch (parents under `current_ship.scene_root`) unchanged.
+- Player still spawns in the derelict (`coherent_ship_001`) — unchanged.
+- Update the Task 5/6 seams to know about the lifeboat at home: `active_ship_root_count_for_validation()` must also count `lifeboat_ship.scene_root` when in-tree (so the home pair reads as 2); `_occupancy_entries()` must include `lifeboat_ship` (host order: home derelict first, then lifeboat) so occupancy can distinguish the two co-present home ships.
+- Rebuild/teardown: ensure `lifeboat_ship` + its scene are rebuilt on reload and not leaked (mirror how `home_ship` is handled in `_on_ship_loaded`/`_reset_runtime_for_reload`).
 
 **Interfaces:**
 - Produces:
-  - `func get_lifeboat_ship_for_validation()` — returns the lifeboat `ShipInstance`.
-  - Existing `get_home_ship_for_validation()` now returns the STARTING DERELICT.
+  - `var lifeboat_ship` + `func get_lifeboat_ship_for_validation()` — returns the lifeboat `ShipInstance`.
+  - `get_home_ship_for_validation()` returns `home_ship` (the derelict `coherent_ship_001`) — unchanged.
+  - `get_ship_systems_manager()` unchanged (returns `ship_systems_manager`, the shared travel/repair systems — propulsion offline at boot via opening damage).
 
 - [ ] **Step 1: Write the failing smoke**
 
@@ -923,21 +927,23 @@ func _q() -> void: quit(_exit_code)
 
 - [ ] **Step 2: Run it; verify it fails** (boot is still lifeboat-only; no starting derelict / `get_lifeboat_ship_for_validation`).
 
-- [ ] **Step 3: Implement the canonical opening**
+- [ ] **Step 3: Implement the canonical opening (LEAN Option A)**
 
-- Add a guaranteed `dock` room to `data/procgen/archetypes/derelict.json` if absent (one dock room per derelict).
-- Ensure `data/items/loot_tables.json` `repair_parts_starter` is placed on the starting derelict's gameplay slice (the slice builder / objective-spec path that today seeds the lifeboat's starting loot — relocate it to the derelict). Keep `repair_parts_starter` yielding exactly one circuit_board.
-- In `_build_runtime_nodes`/`_on_ship_loaded`: build the starting derelict as the home `ShipInstance`, build the lifeboat `ShipInstance` (fixed `LifeBoatBuilder` layout) with its systems manager + repair point + opening damage, dock the lifeboat to the derelict via `DockPorts` + `DockingManager.dock`, parent both `scene_root`s under the coordinator, spawn the player in the derelict, set `current_occupancy = home_ship` (the derelict).
-- Add `func get_lifeboat_ship_for_validation(): return <lifeboat instance>` and store the lifeboat instance in a field (e.g. `var lifeboat_ship`).
-- The active `ship_systems_manager` for repair/HUD is the LIFEBOAT's (since the player repairs the lifeboat). Wire `get_ship_systems_manager()` to return the lifeboat's manager while at home (the derelict is dead). Keep the repair point + `_apply_lifeboat_opening_damage` targeting the lifeboat manager.
+- NO data changes. `coherent_ship_001`'s gameplay slice already has the `repair_parts_starter` loot container (guaranteed circuit_board), and `home_ship` stays `coherent_ship_001` with all its content.
+- Add `var lifeboat_ship` (untyped, `# ShipInstance`). In the home-wrap path of `_on_ship_loaded` (where `home_ship`/`current_ship`/`current_occupancy` are set), build the lifeboat: `var lb_root = LifeBoatBuilderScript.build()` (add a `const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")` if not already present); `lifeboat_ship = ShipInstanceScript.create("lifeboat", "", null, ship_systems_manager, lb_root)` (shares the travel/repair systems manager); position `lb_root` at a fixed anchor that does not overlap `coherent_ship_001` or `DERELICT_DOCK_OFFSET` (e.g. `Vector3(-30, 0, 0)`); set `lifeboat_ship.parent_ship = home_ship` and `home_ship.docked_ships.append(lifeboat_ship)`; `add_child(lb_root)` so it is co-present in-tree. Guard against double-build on reload (rebuild cleanly; free any prior `lifeboat_ship.scene_root`).
+- In `_build_repair_points`, change the HOME (non-away) branch to parent the repair point under `lifeboat_ship.scene_root` (when valid) instead of `repair_point_root`, so the player repairs physically inside the docked lifeboat. Leave the away-derelict branch unchanged. (`_apply_lifeboat_opening_damage` still damages `ship_systems_manager` → the nav_linkage repair point still appears at home, now inside the lifeboat.)
+- Update `active_ship_root_count_for_validation()` to also count `lifeboat_ship.scene_root` when it is a valid in-tree child of the coordinator (so the home pair reads as ≥2).
+- Update `_occupancy_entries()` to append `{inst: lifeboat_ship, aabb: lifeboat_ship.interior_aabb()}` after the home entry (host order: derelict first, lifeboat second) so occupancy distinguishes the two co-present home ships.
+- Add `func get_lifeboat_ship_for_validation(): return lifeboat_ship`. `get_home_ship_for_validation()` and `get_ship_systems_manager()` are unchanged.
+- Player spawn unchanged (already spawns in the derelict / `coherent_ship_001`).
 
-- [ ] **Step 4: Run it; verify PASS** — `CANONICAL OPENING PASS docked=true aboard_derelict=true prop_offline=true loot=true`. Re-run `repair_loop_smoke` (it must still complete the repair → travel loop; update it in Task 8 if the starting-loot relocation changes its assumptions).
+- [ ] **Step 4: Run it; verify PASS** — `CANONICAL OPENING PASS docked=true aboard_derelict=true prop_offline=true loot=true`. Then run the regression set and confirm each existing PASS marker (these should stay green because #4's systems/travel/repair semantics are unchanged — only the repair point's PARENT node moved): `repair_loop_smoke`, `lifeboat_travel_gate_smoke`, `occupancy_flip_smoke`, `dock_copresence_smoke`, `derelict_gameplay_smoke`, `world_save_anywhere_smoke`, `main_playable_slice_completion_smoke`, `travel_integration_smoke`. Run SERIALLY (procgen temp-file race under parallel main-scene smokes). If `repair_loop_smoke`/`lifeboat_travel_gate_smoke` regress because they assert the repair point's parent/location, update ONLY those locality assertions to the lifeboat (document which). If anything else regresses, STOP and report.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/procgen/playable_generated_ship.gd data/procgen/archetypes/derelict.json data/items/loot_tables.json scripts/validation/canonical_opening_smoke.gd
-git commit -m "feat(docking): canonical opening — start docked to the unfixable starting derelict"
+git add scripts/procgen/playable_generated_ship.gd scripts/validation/canonical_opening_smoke.gd
+git commit -m "feat(docking): canonical opening — physical lifeboat docked to the explorable derelict"
 ```
 
 ---
