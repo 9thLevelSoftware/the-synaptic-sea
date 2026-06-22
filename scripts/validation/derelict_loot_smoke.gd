@@ -50,9 +50,12 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	if playable.loot_containers.is_empty():
 		_fail("no loot containers built on board"); return
 	var weight_before: float = playable.inventory_state.get_total_weight()
-	var cid: String = String(playable.loot_containers[0].container_id)
-	if not playable.search_loot_container_for_validation(cid):
-		_fail("search of loot container failed"); return
+	var first_container = playable.loot_containers[0]
+	var cid: String = String(first_container.container_id)
+	playable.player.teleport_to(first_container.global_position)
+	playable.player.request_interact()
+	if not first_container.searched:
+		_fail("normal interact did not search loot container"); return
 	if playable.inventory_state.get_total_weight() <= weight_before:
 		_fail("searching granted no weight"); return
 	if not playable.loot_containers[0].searched:

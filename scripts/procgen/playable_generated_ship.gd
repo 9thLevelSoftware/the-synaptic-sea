@@ -1496,6 +1496,12 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# interactables/pickups are detached but still referenced here; gate them so
 	# a derelict cannot complete stale starting-ship objectives.
 	if away_from_start:
+		# Sub-project #3: derelict loot containers are pickup-like interactables.
+		# Try them before objectives, matching the home ship's tool-pickup
+		# precedence when an objective and pickup share the same interaction area.
+		for lc in loot_containers:
+			if is_instance_valid(lc) and lc.try_interact(player_body):
+				return
 		# Sub-project #2: the boarded derelict has its own objective interactables.
 		for it in derelict_interactables:
 			if is_instance_valid(it) and it.try_interact(player_body):

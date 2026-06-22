@@ -355,18 +355,19 @@ func _build_objective_specs(layout_doc: Dictionary, gameplay_doc: Dictionary, ga
 					"position": step_position,
 				})
 
-		objective_specs.append(
-			{
-				"id": objective_id,
-				"sequence": sequence,
-				"type": str(objective.get("type", "unknown")),
-				"kind": kind,
-				"room_id": room_id,
-				"position": target_position,
-				"radius": OBJECTIVE_TRIGGER_RADIUS,
-				"steps": step_specs,
-			}
-		)
+		var spec: Dictionary = {
+			"id": objective_id,
+			"sequence": sequence,
+			"type": str(objective.get("type", "unknown")),
+			"kind": kind,
+			"room_id": room_id,
+			"position": target_position,
+			"radius": OBJECTIVE_TRIGGER_RADIUS,
+			"steps": step_specs,
+		}
+		if objective.has("loot_table"):
+			spec["loot_table"] = str(objective.get("loot_table", ""))
+		objective_specs.append(spec)
 
 	return objective_specs
 

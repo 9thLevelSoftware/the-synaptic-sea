@@ -62,7 +62,7 @@ func set_marker_visible(is_visible: bool) -> void:
 		marker.visible = marker_visible and not searched
 
 func try_interact(player_body: Node) -> bool:
-	if searched or player_body == null or inventory_state == null:
+	if searched or not is_instance_valid(player_body) or inventory_state == null:
 		return false
 	# Mirrors Interactable's validation bypass (derelict-placed sibling), not ToolPickup's
 	# stricter always-check. Accepts risk of stale candidate_player after teleport-without-
@@ -91,7 +91,7 @@ func _interaction_radius() -> float:
 	return interaction_radius
 
 func _is_player_in_direct_range(player_body: Node) -> bool:
-	if not (player_body is Node3D):
+	if not is_instance_valid(player_body) or not (player_body is Node3D):
 		return false
 	var player_node: Node3D = player_body as Node3D
 	var here: Vector3 = global_position if is_inside_tree() else position

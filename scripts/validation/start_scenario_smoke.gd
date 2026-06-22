@@ -85,6 +85,32 @@ func _initialize() -> void:
 		push_error("START_SCENARIO FAIL GeneratedShipLoader.load_from_paths returned false")
 		quit(1)
 		return
+	var expected_loot_tables: Dictionary = {}
+	for objective_variant in gameplay.get("objectives", []):
+		if typeof(objective_variant) != TYPE_DICTIONARY:
+			continue
+		var objective: Dictionary = objective_variant
+		var table_key: String = str(objective.get("loot_table", ""))
+		if not table_key.is_empty():
+			expected_loot_tables[str(objective.get("id", ""))] = table_key
+	var loaded_loot_tables: Dictionary = {}
+	for spec_variant in loader.get_objective_specs_copy():
+		if typeof(spec_variant) != TYPE_DICTIONARY:
+			continue
+		var spec: Dictionary = spec_variant
+		var loaded_table: String = str(spec.get("loot_table", ""))
+		if not loaded_table.is_empty():
+			loaded_loot_tables[str(spec.get("id", ""))] = loaded_table
+	for objective_id in expected_loot_tables.keys():
+		if str(loaded_loot_tables.get(objective_id, "")) != str(expected_loot_tables[objective_id]):
+			loader.free()
+			push_error("START_SCENARIO FAIL loader dropped loot_table objective=%s expected=%s got=%s" % [
+				str(objective_id),
+				str(expected_loot_tables[objective_id]),
+				str(loaded_loot_tables.get(objective_id, "")),
+			])
+			quit(1)
+			return
 	# Loader instantiated the full ship into a detached Node3D (never added to the
 	# tree). Free it now so its geometry/physics/nav RIDs don't leak at quit().
 	loader.free()
