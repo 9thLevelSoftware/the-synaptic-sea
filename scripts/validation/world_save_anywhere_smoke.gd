@@ -68,6 +68,29 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	inst_a.systems_manager.force_repair("power", inst_a.systems_manager.get_system("power").subcomponents[0].subcomponent_id)
 	var expected_summary: Dictionary = inst_a.systems_manager.get_summary()
 
+	# M1: complete ONE non-reach_goal (salvage) derelict objective through the real
+	# interaction path before saving, so the disk round-trip below can prove the
+	# derelict's OBJECTIVE progress survives — not just its systems state.
+	if playable.derelict_interactables.is_empty():
+		_fail("no derelict objective interactables built on board")
+		return
+	var salvage_seq: int = -1
+	for it in playable.derelict_interactables:
+		var seq: int = int(it.sequence)
+		if String(it.objective_id) == "obj_reach_goal":
+			continue
+		if salvage_seq < 0 or seq < salvage_seq:
+			salvage_seq = seq
+	if salvage_seq < 0:
+		_fail("no non-reach_goal derelict objective to complete")
+		return
+	if not playable.complete_derelict_objective_for_validation(salvage_seq):
+		_fail("could not complete derelict salvage objective sequence %d" % salvage_seq)
+		return
+	if not playable.get_current_ship().get_objective_controller().is_objective_complete(salvage_seq):
+		_fail("derelict objective %d not marked complete after completion" % salvage_seq)
+		return
+
 	# Move the player to a recognisable in-ship position.
 	if playable.player != null and playable.player is Node3D:
 		(playable.player as Node3D).global_position = Vector3(12.0, 1.5, 7.0)
@@ -102,6 +125,12 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	if p.distance_to(Vector3(12.0, 1.5, 7.0)) > 0.5:
 		_fail("player in-ship position not restored from world save (got %s)" % str(p))
 		return
+	# M1: the derelict objective completed before the save must STILL read complete
+	# after the disk save -> reload round-trip (objective progress is persisted on the
+	# ShipInstance's DerelictObjectiveController, restored via its slice summary).
+	if not playable.get_current_ship().get_objective_controller().is_objective_complete(salvage_seq):
+		_fail("derelict objective %d did not survive the disk save->load round-trip" % salvage_seq)
+		return
 
 	# Return home, save on home, reload — home restored, not away.
 	if not playable.travel_home():
@@ -135,6 +164,17 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		return
 	if playable.interaction_root == null or playable.interaction_root.get_parent() != playable:
 		_fail("interaction_root not re-attached under coordinator after home-saved reload")
+		return
+	# I1 regression: once back on the home ship, NO derelict objective interactables
+	# may remain orphaned under derelict_objective_root, and the tracking array must
+	# be empty. A reload-into-home from aboard a derelict (or a travel_home) must have
+	# run _clear_derelict_objectives; otherwise the prior derelict's Area3D volumes
+	# overlay the home ship.
+	if playable.derelict_objective_root == null or playable.derelict_objective_root.get_child_count() != 0:
+		_fail("orphaned derelict interactables remain under derelict_objective_root on home ship (I1)")
+		return
+	if not playable.derelict_interactables.is_empty():
+		_fail("derelict_interactables not cleared on home ship (I1)")
 		return
 
 	finished = true

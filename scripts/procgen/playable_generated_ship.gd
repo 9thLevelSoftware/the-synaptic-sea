@@ -125,6 +125,11 @@ var away_from_start: bool = false
 # retained ShipInstance.
 var visited_ships: Dictionary = {}          # marker_id -> ShipInstance
 var home_ship = null                        # the home ShipInstance (marker_id "")
+# Sub-project #2: the active derelict's objective interactables live under a
+# dedicated root (empty while on the home ship). Separate from the home gameplay
+# roots so it stays attached when away_from_start.
+var derelict_objective_root: Node3D = null
+var derelict_interactables: Array = []
 var _home_player_position: Vector3 = Vector3.ZERO
 const REPAIR_OBJECTIVE_XP: int = 50
 # Narrative objective flags with no manager backing (supplies/logs). Set on
@@ -891,6 +896,9 @@ func _build_runtime_nodes() -> void:
 	arc_root = Node3D.new()
 	arc_root.name = "ElectricalArcRoot"
 	add_child(arc_root)
+	derelict_objective_root = Node3D.new()
+	derelict_objective_root.name = "DerelictObjectiveRoot"
+	add_child(derelict_objective_root)
 	_build_hud_layer()
 	# REQ-012: current-run save/load service. Single slot at
 	# user://saves/current_run.json; deleted on playable_slice_completed.
@@ -1022,6 +1030,101 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	add_child(new_root)
 	current_ship = inst
 	away_from_start = true
+	_build_derelict_objectives()
+
+## Builds the active derelict's objective interactables from its loader specs and
+## restores completed/cleared state from its (retained or loaded) controller. Called
+## whenever a derelict becomes active. No-op on the home ship.
+func _build_derelict_objectives() -> void:
+	_clear_derelict_objectives()
+	if current_ship == null or String(current_ship.marker_id) == "":
+		return
+	var active_loader = current_ship.scene_root
+	if not is_instance_valid(active_loader) or not active_loader.has_method("get_objective_specs_copy"):
+		return
+	var specs: Array = active_loader.get_objective_specs_copy()
+	var controller = current_ship.get_objective_controller()
+	# First visit registers the set; a retained/restored controller is already
+	# configured, so this is a no-op that preserves progress.
+	controller.configure(specs)
+	for spec_variant in specs:
+		if typeof(spec_variant) != TYPE_DICTIONARY:
+			continue
+		var spec: Dictionary = spec_variant
+		var sequence: int = int(spec.get("sequence", 0))
+		if sequence <= 0:
+			continue
+		var position_variant: Variant = spec.get("position", Vector3.INF)
+		if typeof(position_variant) != TYPE_VECTOR3:
+			continue
+		var interactable = InteractableScript.new()
+		interactable.configure_from_objective(spec, position_variant, 1.8)
+		interactable.interaction_completed.connect(_on_derelict_interactable_completed)
+		# Restore: a persisted-complete objective reads as done and cannot be re-fired
+		# (try_interact returns false when completed).
+		if controller.is_objective_complete(sequence):
+			interactable.completed = true
+			interactable.set_active(false)
+		derelict_objective_root.add_child(interactable)
+		derelict_interactables.append(interactable)
+	# Show the derelict's objectives in the HUD while aboard, then reflect any
+	# persisted/restored completion (set_objectives resets the tracker's completed
+	# set, so this must run after it).
+	if tracker != null:
+		tracker.set_objectives(specs)
+		_refresh_derelict_tracker()
+
+## Mirrors the active derelict's controller state into the ObjectiveTracker: marks
+## completed sequences, advances the "Current" pointer to the lowest incomplete
+## objective, and flags run-complete once the derelict is cleared. Idempotent
+## (tracker.mark_completed keys a dict), so it serves both restore-on-board and
+## per-completion updates. No-op on the home ship (driven by the singleton loop).
+func _refresh_derelict_tracker() -> void:
+	if tracker == null or current_ship == null or String(current_ship.marker_id) == "":
+		return
+	var controller = current_ship.get_objective_controller()
+	var first_incomplete: int = -1
+	for it in derelict_interactables:
+		if not is_instance_valid(it):
+			continue
+		var seq: int = int(it.sequence)
+		if controller.is_objective_complete(seq):
+			tracker.mark_completed(seq)
+		elif first_incomplete < 0 or seq < first_incomplete:
+			first_incomplete = seq
+	if controller.is_cleared():
+		tracker.mark_run_complete()
+	elif first_incomplete > 0:
+		tracker.set_current_sequence(first_incomplete)
+
+## Frees the active derelict's interactables. The controller (state) lives on the
+## ShipInstance and is untouched.
+func _clear_derelict_objectives() -> void:
+	if is_instance_valid(derelict_objective_root):
+		for child in derelict_objective_root.get_children():
+			derelict_objective_root.remove_child(child)
+			child.queue_free()
+	derelict_interactables.clear()
+
+## Routes a derelict interactable completion to the active ship's controller.
+func _on_derelict_interactable_completed(interaction_id: String, objective_id: String, sequence: int, objective_type: String, room_id: String, step_id: String) -> void:
+	if current_ship == null:
+		return
+	var controller = current_ship.get_objective_controller()
+	controller.complete(sequence)
+	# Reflect the completion (and run-complete on clear) in the HUD.
+	_refresh_derelict_tracker()
+	print("DERELICT OBJECTIVE COMPLETE marker=%s sequence=%d type=%s cleared=%s" % [
+		String(current_ship.marker_id), sequence, objective_type, str(controller.is_cleared()).to_lower()])
+
+## Validation seam: complete a derelict objective by sequence through the real
+## interaction path (bypassing proximity via set_validation_player_in_range).
+func complete_derelict_objective_for_validation(sequence: int) -> bool:
+	for it in derelict_interactables:
+		if is_instance_valid(it) and int(it.sequence) == sequence and not it.completed:
+			it.set_validation_player_in_range(player)
+			return it.try_interact(player)
+	return false
 
 ## Validates + executes a jump to a marker, swapping current_ship and re-homing
 ## the player on success. Travel is gated by the CURRENT ship's propulsion.
@@ -1096,9 +1199,28 @@ func travel_home() -> bool:
 	_reattach_starting_gameplay_roots()
 	current_ship = home_ship
 	away_from_start = false
+	_clear_derelict_objectives()
+	if tracker != null and loader != null and loader.has_method("get_objective_specs_copy"):
+		# set_objectives resets the tracker's completed set; re-apply the home loop's
+		# progress so returning home does not blank a partially-completed home HUD.
+		tracker.set_objectives(loader.get_objective_specs_copy())
+		_refresh_home_tracker_completed()
 	if player != null and player is Node3D:
 		(player as Node3D).global_position = _home_player_position
 	return true
+
+## Re-applies the home objective loop's completion state to the ObjectiveTracker
+## after a set_objectives reset (sequences below current_objective_sequence are
+## complete). Mirrors, for the home ship's singleton loop, what
+## _refresh_derelict_tracker does for a derelict.
+func _refresh_home_tracker_completed() -> void:
+	if tracker == null:
+		return
+	for s in range(1, current_objective_sequence):
+		tracker.mark_completed(s)
+	tracker.set_current_sequence(current_objective_sequence)
+	if slice_complete:
+		tracker.mark_run_complete()
 
 ## Validation seam: the marker_ids of every retained visited derelict.
 func get_visited_ship_ids() -> Array:
@@ -1290,9 +1412,12 @@ func _add_interactable_to_sequence(sequence: int, interactable: Node) -> void:
 func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# Phase 4.5: while aboard a traveled derelict the starting ship's retained
 	# interactables/pickups are detached but still referenced here; gate them so
-	# a derelict cannot complete stale starting-ship objectives. Derelicts have
-	# no interactables of their own yet, so there is nothing to interact with.
+	# a derelict cannot complete stale starting-ship objectives.
 	if away_from_start:
+		# Sub-project #2: the boarded derelict has its own objective interactables.
+		for it in derelict_interactables:
+			if is_instance_valid(it) and it.try_interact(player_body):
+				return
 		return
 	# REQ-007: tool pickup is an interaction like any other. Try it first
 	# (before objective interactables) so the player can pick up the pump
@@ -2898,6 +3023,14 @@ func _reset_runtime_for_reload() -> void:
 		_reattach_starting_gameplay_roots()
 		away_from_start = false
 		current_ship = null  # allow _on_ship_loaded to re-wrap the starting ship
+		# Sub-project #2 (I1): free the prior derelict's objective interactables on
+		# reload. _build_derelict_objectives (the only other caller of
+		# _clear_derelict_objectives) does not run on a reload-into-home path
+		# (_apply_world_snapshot skips re-activation when current_location == ""),
+		# so without this the Area3D interactables stay orphaned under
+		# derelict_objective_root, overlaying the home ship. Harmless on the
+		# reload-into-derelict path (_build_derelict_objectives re-clears anyway).
+		_clear_derelict_objectives()
 	# Player first so the camera unfollows before the rig is freed.
 	if player != null and is_instance_valid(player):
 		player.queue_free()

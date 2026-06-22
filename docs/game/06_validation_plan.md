@@ -133,7 +133,9 @@ run_clean 'world snapshot smoke' 'WORLD SNAPSHOT PASS round_trip=true version_ga
 run_clean 'world save service smoke' 'WORLD SAVE SERVICE PASS disk_round_trip=true rejects_null=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_save_service_smoke.gd
 run_clean 'world persist restore smoke' 'WORLD PERSIST RESTORE PASS registered=true state_preserved=true revisit_restores=true travel_home=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_persist_restore_smoke.gd
 run_clean 'world save anywhere smoke' 'WORLD SAVE ANYWHERE PASS away_save=true location_restored=true state_restored=true home_save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_save_anywhere_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=65 clean_output=true'
+run_clean 'derelict objective controller smoke' 'DERELICT OBJECTIVE CONTROLLER PASS configure=true cleared_on_goal=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_objective_controller_smoke.gd
+run_clean 'derelict gameplay smoke' 'DERELICT GAMEPLAY PASS built=true cleared=true persists=true home_intact=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_gameplay_smoke.gd
+echo 'SARGASSO REGRESSION PASS commands=67 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

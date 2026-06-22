@@ -58,7 +58,35 @@ func _initialize() -> void:
 		_fail("apply_summary should reject null/empty")
 		return
 
-	print("SHIP INSTANCE PASS round_trip=true stubs_present=true")
+	# Sub-project #2: ShipInstance carries a DerelictObjectiveController whose
+	# state round-trips through get_summary / apply_summary.
+	var controller = inst.get_objective_controller()
+	if controller == null:
+		_fail("get_objective_controller returned null")
+		return
+	controller.configure([
+		{"id": "obj_salvage_a", "sequence": 1, "type": "salvage", "kind": "single", "room_id": "a"},
+		{"id": "obj_reach_goal", "sequence": 2, "type": "interact", "kind": "single", "room_id": "b"},
+	])
+	controller.complete(1)
+	controller.complete(2)
+	if not controller.is_cleared():
+		_fail("controller should be cleared after reach_goal")
+		return
+	var full_summary: Dictionary = inst.get_summary()
+	if not full_summary.has("objective"):
+		_fail("get_summary missing 'objective' key when a controller exists")
+		return
+	var rebuilt2 = ShipInstanceScript.create("", "", ShipBlueprintScript.new(), ShipSystemsManagerScript.new(), null)
+	if not rebuilt2.apply_summary(full_summary):
+		_fail("apply_summary returned false for objective-bearing summary")
+		return
+	var rebuilt_controller = rebuilt2.get_objective_controller()
+	if not rebuilt_controller.is_objective_complete(1) or not rebuilt_controller.is_cleared():
+		_fail("apply_summary did not restore derelict objective progress / cleared")
+		return
+
+	print("SHIP INSTANCE PASS round_trip=true stubs_present=true objective_round_trip=true")
 	quit(0)
 
 func _fail(reason: String) -> void:
