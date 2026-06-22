@@ -1,0 +1,33 @@
+{
+  "generic_crate": {
+    "rolls": 2,
+    "entries": [
+      { "item_id": "scrap_metal",  "qty_min": 1, "qty_max": 3, "weight": 5 },
+      { "item_id": "wiring_spool", "qty_min": 1, "qty_max": 2, "weight": 3 },
+      { "item_id": "power_cell",   "qty_min": 1, "qty_max": 1, "weight": 2 }
+    ]
+  },
+  "generic_locker": {
+    "rolls": 2,
+    "entries": [
+      { "item_id": "ration_pack", "qty_min": 1, "qty_max": 3, "weight": 5 },
+      { "item_id": "medkit",      "qty_min": 1, "qty_max": 1, "weight": 2 }
+    ]
+  },
+  "salvage_engineering": {
+    "rolls": 2,
+    "entries": [
+      { "item_id": "power_cell",   "qty_min": 1, "qty_max": 2, "weight": 4 },
+      { "item_id": "wiring_spool", "qty_min": 1, "qty_max": 2, "weight": 4 },
+      { "item_id": "scrap_metal",  "qty_min": 1, "qty_max": 2, "weight": 2 }
+    ]
+  },
+  "salvage_cargo": {
+    "rolls": 3,
+    "entries": [
+      { "item_id": "scrap_metal",  "qty_min": 1, "qty_max": 4, "weight": 5 },
+      { "item_id": "ration_pack",  "qty_min": 1, "qty_max": 3, "weight": 4 },
+      { "item_id": "power_cell",   "qty_min": 1, "qty_max": 1, "weight": 1 }
+    ]
+  }
+}
