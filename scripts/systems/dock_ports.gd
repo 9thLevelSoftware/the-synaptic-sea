@@ -6,19 +6,47 @@ class_name DockPorts
 ## derelict exposes its guaranteed `dock` room opening (+X side outward).
 
 const HALF_CELL: float = 2.0   # CELL_SIZE (4.0) / 2
+const AIRLOCK_SIZE_CLASS: int = 1
 
 static func for_lifeboat(layout: Dictionary) -> Dictionary:
 	var center: Vector3 = _room_floor_center(layout, "airlock", "airlock")
 	if center == Vector3.INF:
 		return {}
 	# Airlock opening faces the dock (-X, away from the +X cockpit); nudge to the edge.
-	return {"position": center + Vector3(-HALF_CELL, 0.0, 0.0), "facing": Vector3(-1.0, 0.0, 0.0)}
+	return {
+		"position": center + Vector3(-HALF_CELL, 0.0, 0.0),
+		"facing": Vector3(-1.0, 0.0, 0.0),
+		"type": "airlock",
+		"size_class": AIRLOCK_SIZE_CLASS,
+		"condition": "intact",
+	}
 
-static func for_derelict(layout: Dictionary) -> Dictionary:
+static func for_derelict(layout: Dictionary, seed_value: int = 0, condition_class: int = 0) -> Dictionary:
 	var center: Vector3 = _room_floor_center(layout, "dock", "dock")
 	if center == Vector3.INF:
 		return {}
-	return {"position": center, "facing": Vector3(1.0, 0.0, 0.0)}
+	return {
+		"position": center,
+		"facing": Vector3(1.0, 0.0, 0.0),
+		"type": "airlock",
+		"size_class": AIRLOCK_SIZE_CLASS,
+		"condition": condition_from_seed(seed_value, condition_class),
+	}
+
+## True iff both ports are non-empty, the same type, and the same size class.
+## Forward-structured: hangar/cargo_clamp are valid types here, just not yet spawned.
+static func ports_compatible(a: Dictionary, b: Dictionary) -> bool:
+	if a.is_empty() or b.is_empty():
+		return false
+	if str(a.get("type", "")) != str(b.get("type", "")):
+		return false
+	return int(a.get("size_class", -1)) == int(b.get("size_class", -2))
+
+## Deterministic port condition. A derelict in poor condition (condition_class >= 2,
+## matching ShipBlueprint's worst tiers) has a broken dock port that needs a breach.
+## condition_class 0..1 (intact/light) -> intact; 2..3 (heavy/wreck) -> broken.
+static func condition_from_seed(seed_value: int, condition_class: int) -> String:
+	return "broken" if condition_class >= 2 else "intact"
 
 ## Average world_position of floor placements in the first room whose room_role
 ## == role_match OR whose id begins with id_prefix. Returns Vector3.INF if none.
