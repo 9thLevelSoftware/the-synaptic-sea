@@ -28,15 +28,16 @@ func _run(p) -> void:
 	if lifeboat.parent_ship != derelict: _fail("lifeboat not docked to starting derelict"); return
 	# Two ships co-present, separated.
 	if p.active_ship_root_count_for_validation() < 2: _fail("pair not co-present"); return
-	# Spatial-separation check: the player spawned on the derelict side — nearer the
-	# derelict than the docked lifeboat. AABB-independent (does NOT call
-	# recompute_occupancy, which falls back to home_ship in headless where the
-	# lifeboat's interior_aabb is zero-size and cannot distinguish the two ships).
+	# Phase 5b Task 5 (physical-travel contract): the player now BOOTS INSIDE the docked
+	# lifeboat (their ride), which is port-docked to the starting derelict's airlock. The
+	# lifeboat's interior fully overlaps the home hull at the dock seam, and occupancy
+	# prioritizes the piloted ship, so the player resolves to the LIFEBOAT — the new
+	# "aboard your ride, docked to the starting derelict" semantics. (Pre-5b this asserted
+	# occupancy == home derelict; the ride-aboard model supersedes teleport-into-derelict.)
 	if p.player == null: _fail("no player"); return
-	var pp: Vector3 = (p.player as Node3D).global_position
-	var d_to_derelict: float = pp.distance_to(derelict.scene_root.global_position)
-	var d_to_lifeboat: float = pp.distance_to(lifeboat.scene_root.global_position)
-	if d_to_derelict >= d_to_lifeboat: _fail("player not spawned on derelict side (nearer lifeboat)"); return
+	p.recompute_occupancy()
+	if p.get_current_occupancy_for_validation() != lifeboat:
+		_fail("player not aboard docked lifeboat at boot (occupancy != lifeboat)"); return
 	# Lifeboat propulsion offline at boot (opening damage retained).
 	var mgr = p.get_ship_systems_manager()
 	if mgr.is_operational("propulsion"): _fail("lifeboat propulsion should be offline at boot"); return

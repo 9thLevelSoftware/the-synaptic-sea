@@ -8,7 +8,7 @@ class_name WorldSnapshot
 ## stored — derelict hulls regenerate deterministically from seed; only mutable
 ## state rides the per-ship slices.
 
-const WORLD_SLICE_VERSION: String = "world-1"
+const WORLD_SLICE_VERSION: String = "world-2"
 
 var world_summary: Dictionary = {}
 var home_ship: Dictionary = {}                  # a RunSnapshot.to_dict()
@@ -16,6 +16,10 @@ var home_looted_containers: Array = []          # home ship's searched loot-cont
 var visited_ships: Dictionary = {}              # marker_id -> ShipInstance.get_summary()
 var current_location: String = ""               # "" = home ship, else marker_id
 var player_position_in_ship: Array = [0.0, 0.0, 0.0]
+var dock_edges: Array = []          # [{host: String, mobile: String, port_type: String}]
+var piloted_ship_id: String = ""
+var aboard_ship_id: String = ""
+var opened_ports: Array = []        # marker_ids with an opened dock barrier
 var slice_version: String = ""
 var godot_version: String = ""
 var saved_at: String = ""
@@ -28,6 +32,10 @@ func to_dict() -> Dictionary:
 		"visited_ships": visited_ships.duplicate(true),
 		"current_location": current_location,
 		"player_position_in_ship": player_position_in_ship.duplicate(),
+		"dock_edges": dock_edges.duplicate(true),
+		"piloted_ship_id": piloted_ship_id,
+		"aboard_ship_id": aboard_ship_id,
+		"opened_ports": opened_ports.duplicate(),
 		"slice_version": slice_version,
 		"godot_version": godot_version,
 		"saved_at": saved_at,
@@ -61,6 +69,16 @@ static func from_dict(data: Variant, expected_world_version: String, expected_go
 			ws.home_looted_containers.append(String(cid))
 	ws.visited_ships = _deep_copy_dict(dict.get("visited_ships", {}))
 	ws.current_location = str(dict.get("current_location", ""))
+	var edges_v: Variant = dict.get("dock_edges", [])
+	if typeof(edges_v) == TYPE_ARRAY:
+		ws.dock_edges = (edges_v as Array).duplicate(true)
+	ws.piloted_ship_id = str(dict.get("piloted_ship_id", ""))
+	ws.aboard_ship_id = str(dict.get("aboard_ship_id", ""))
+	var op_v: Variant = dict.get("opened_ports", [])
+	if typeof(op_v) == TYPE_ARRAY:
+		ws.opened_ports = []
+		for m in (op_v as Array):
+			ws.opened_ports.append(String(m))
 	var pos = dict.get("player_position_in_ship", [0.0, 0.0, 0.0])
 	if typeof(pos) == TYPE_ARRAY and (pos as Array).size() >= 3:
 		var pa: Array = pos as Array

@@ -176,6 +176,10 @@ func has_loaded_ship() -> bool:
 	return structural_root != null and not objective_specs.is_empty() and start_position != Vector3.INF and goal_position != Vector3.INF
 
 
+func get_layout_copy() -> Dictionary:
+	return layout_doc.duplicate(true)
+
+
 func get_start_transform() -> Transform3D:
 	var spawn_position: Vector3 = start_position
 	if spawn_position == Vector3.INF:
