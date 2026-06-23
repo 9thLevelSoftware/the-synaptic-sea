@@ -41,9 +41,16 @@ single-player / one-level slice is wired.
   from the start; a derelict becomes working once the player repairs its
   propulsion through the existing `RepairPoint` loop.
 - A **bridge terminal** (`BridgeTerminal extends Area3D`, mirroring
-  `DockPortBarrier`/`RepairPoint`) is spawned in each pilotable ship's `bridge`
+  `DockPortBarrier`/`RepairPoint`) is spawned in a pilotable ship's `bridge`
   room. Interacting = **log in**. The terminal is a sensor + signal only; the
   coordinator owns the consequence.
+- **Claimability requires a bridge room.** `bridge` is a *weighted* (not
+  guaranteed) procgen-derelict role: a derelict that rolled a bridge is claimable
+  at that helm; a derelict without one gets no terminal and is a loot/explore
+  space only. The lifeboat (`cockpit_01`, role `bridge`) and golden ships always
+  have a bridge. There is deliberately no entry-room fallback. (This required an
+  authorized change to `derelict_generator_smoke`'s "no system roles" invariant to
+  permit `bridge` on derelicts; the other system roles stay forbidden.)
 - **Pilot-switching** is physical and uniform across N ships: walk into the ship
   you want to fly and log in at its bridge terminal. No menu/HUD picker. The
   lifeboat's terminal is always working + owned, so the player can always switch

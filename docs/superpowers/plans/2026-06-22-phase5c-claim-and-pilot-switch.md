@@ -447,43 +447,83 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `data/procgen/archetypes/derelict.json`
+- Modify: `scripts/validation/derelict_generator_smoke.gd`
 
 **Interfaces:**
-- Produces: every procgen derelict layout now contains a room with `room_role == "bridge"` (so a `BridgeTerminal` can be placed on it). No new code symbols.
+- Produces: `bridge` is now a *possible* (weighted, NOT guaranteed) derelict room role. SOME derelicts generate a bridge room; those are claimable. Derelicts without one are just loot/explore areas (Task 5 spawns no terminal when there's no bridge). No new code symbols.
 
-**Context:** Derelicts currently guarantee only `["dock"]` and their `role_weights` never include `bridge`, so a claimed derelict would have no helm room. The lifeboat already has `cockpit_01` (role `bridge`); golden ships already have a `bridge` room. This task closes the gap for procgen derelicts. The code (Task 5) still carries a fallback for any ship lacking a bridge, so this is robustness-plus-fiction, not a hard dependency.
+**Design decision (adjudicated):** Claimability requires an actual `bridge` room. Derelicts are variable — some have a bridge (claimable, that's where you take command), some don't (loot only). So `bridge` goes in `role_weights` (probabilistic), NOT `guaranteed_roles` (which would force EVERY derelict to be claimable and contradicts "some derelicts are in pieces"). The existing `derelict_generator_smoke` invariant "derelicts never carry system roles" forbade `bridge` entirely; the user has explicitly decided derelicts MAY now carry a bridge, so removing `bridge` from that smoke's deny-list is an AUTHORIZED invariant change (record it in the task report). The other system roles (airlock/engineering/life_support/cargo/crew_quarters/medical/maintenance) stay denied.
 
-- [ ] **Step 1: Add `bridge` to guaranteed roles**
+- [ ] **Step 1: Add `bridge` to derelict role weights**
 
-In `data/procgen/archetypes/derelict.json`, change:
+In `data/procgen/archetypes/derelict.json`, change the `role_weights` block from:
 
 ```json
+    "role_weights": {
+        "compartment": 4,
+        "corridor": 3,
+        "bay": 2,
+        "quarters": 2
+    },
     "guaranteed_roles": ["dock"],
+```
+
+to (add `"bridge": 3` — common but not universal — and leave `guaranteed_roles` as `["dock"]`):
+
+```json
+    "role_weights": {
+        "compartment": 4,
+        "corridor": 3,
+        "bridge": 3,
+        "bay": 2,
+        "quarters": 2
+    },
+    "guaranteed_roles": ["dock"],
+```
+
+- [ ] **Step 2: Allow `bridge` as a derelict role in the generator smoke (authorized invariant change)**
+
+In `scripts/validation/derelict_generator_smoke.gd`, remove `"bridge"` from the `SYSTEM_ROLES` deny-list constant. Change:
+
+```gdscript
+const SYSTEM_ROLES: Array[String] = [
+	"airlock", "engineering", "life_support", "bridge",
+	"cargo", "crew_quarters", "medical", "maintenance",
+]
 ```
 
 to:
 
-```json
-    "guaranteed_roles": ["dock", "bridge"],
+```gdscript
+# Phase 5c: `bridge` removed from the deny-list — derelicts may now carry a bridge
+# room (the claim/pilot helm). All other system roles remain forbidden on a shell.
+const SYSTEM_ROLES: Array[String] = [
+	"airlock", "engineering", "life_support",
+	"cargo", "crew_quarters", "medical", "maintenance",
+]
 ```
 
-- [ ] **Step 2: Verify procgen smokes still pass**
+- [ ] **Step 3: Verify the derelict generator smoke + the broader procgen set**
 
-These exercise the generator end-to-end. Run each and confirm its PASS marker (check `06_validation_plan.md` for the exact marker if unsure):
+Run `derelict_generator_smoke` first (the directly affected one), then the broader set. For any whose marker you don't know, grep the smoke's `.gd` for its `print(...)` line.
 
-Run: `"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_generation_smoke.gd`
-Run: `"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/layout_pipeline_smoke.gd`
+Run: `"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_generator_smoke.gd`
+Run: `"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_generator_smoke.gd`  (marker `SHIP GENERATOR PASS`)
 Run: `"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_assigner_smoke.gd`
+Run: `"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_graph_generator_smoke.gd`  (marker `ROOM GRAPH GENERATOR PASS`)
+Run: `"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_walkability_smoke.gd`  (marker `WALKABILITY PASS`)
+Run: `"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_layout_stress_smoke.gd`
+Run: `"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_ship_gameplay_smoke.gd`
+Run: `"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd`
+Run: `"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_playable_ship_smoke.gd`
 
-Expected: each prints its PASS marker with no new ERROR/WARNING. If any smoke asserts an exact room-count or composition that the extra guaranteed room violates, STOP and report — that is a spec conflict to adjudicate, not something to silently "fix" by loosening the assertion.
+Expected: each prints its PASS marker, no new ERROR/WARNING. (Known pre-existing, IGNORE: `main_coherent_boot_smoke` fails baseline "expected 4 got 5" — not in the bundle, unrelated.) If any OTHER smoke fails on a room-composition assertion, STOP and report — do not loosen it without adjudication.
 
-> Note: the exact set of procgen smokes may differ; run every smoke in `06_validation_plan.md` whose label mentions generation / layout / room assignment / template. List the ones you ran in the task report.
-
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add data/procgen/archetypes/derelict.json
-git commit -m "feat(docking): guarantee a bridge room on procgen derelicts (claimable helm)
+git add data/procgen/archetypes/derelict.json scripts/validation/derelict_generator_smoke.gd
+git commit -m "feat(docking): allow a weighted bridge room on derelicts (claimable helm)
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
@@ -572,34 +612,37 @@ var bridge_terminals: Array = []
 (c) Add the bridge-room locator + spawn/clear helpers (place them next to `_spawn_dock_barrier` / `_clear_dock_barriers`):
 
 ```gdscript
-## Local-space center of `loader`'s bridge room (role == "bridge"). Falls back to
-## the ship's start-transform origin, then Vector3.ZERO. Positions are ship-local
-## (the terminal is parented under the ship's scene_root). Mirrors the dock-port
-## fallback discipline used by DockPorts.for_derelict.
+## Local-space center of `loader`'s bridge room (role == "bridge"), or Vector3.INF
+## if the ship has NO bridge room. Claimability requires a real bridge: a ship
+## without one is not pilotable (just a loot/explore space), so there is deliberately
+## NO entry-room fallback here. Positions are ship-local (the terminal is parented
+## under the ship's scene_root).
 func _command_room_local_center(loader) -> Vector3:
-	if loader == null or not loader.has_method("get_layout_copy"):
-		return Vector3.ZERO
+	if loader == null or not loader.has_method("get_layout_copy") or not loader.has_method("get_room_center"):
+		return Vector3.INF
 	var layout: Dictionary = loader.get_layout_copy()
 	var rooms_v: Variant = layout.get("rooms", [])
-	if typeof(rooms_v) == TYPE_ARRAY and loader.has_method("get_room_center"):
-		for room_v in (rooms_v as Array):
-			if typeof(room_v) != TYPE_DICTIONARY:
-				continue
-			if str((room_v as Dictionary).get("room_role", "")) == "bridge":
-				var c: Vector3 = loader.get_room_center(str((room_v as Dictionary).get("id", "")))
-				if c != Vector3.INF:
-					return c
-	if loader.has_method("get_start_transform"):
-		return loader.get_start_transform().origin
-	return Vector3.ZERO
+	if typeof(rooms_v) != TYPE_ARRAY:
+		return Vector3.INF
+	for room_v in (rooms_v as Array):
+		if typeof(room_v) != TYPE_DICTIONARY:
+			continue
+		if str((room_v as Dictionary).get("room_role", "")) == "bridge":
+			var c: Vector3 = loader.get_room_center(str((room_v as Dictionary).get("id", "")))
+			if c != Vector3.INF:
+				return c
+	return Vector3.INF
 
 ## Spawns the bridge terminal for a pilotable ship at its bridge room (ship-local),
 ## parented under the ship's scene_root so it inherits the ship transform and is
-## freed with it. The home ship is never pilotable -> no terminal.
+## freed with it. The home ship is never pilotable -> no terminal. A ship with NO
+## bridge room gets NO terminal (it cannot be claimed/piloted — loot space only).
 func _spawn_bridge_terminal(inst) -> void:
 	if inst == null or inst == home_ship or not is_instance_valid(inst.scene_root):
 		return
 	var local_center: Vector3 = _command_room_local_center(inst.scene_root)
+	if local_center == Vector3.INF:
+		return   # no bridge room -> not claimable
 	var terminal = BridgeTerminalScript.new()
 	(inst.scene_root as Node3D).add_child(terminal)
 	terminal.configure(String(inst.ship_id), local_center, 1.8)
@@ -698,19 +741,32 @@ func make_ship_working_for_validation(ship_id: String) -> void:
 func piloted_ship_id_for_validation() -> String:
 	return String(piloted_ship.ship_id) if piloted_ship != null else ""
 
-## 5c seam: registers an offline derelict-like ship with its own systems manager and a
-## bridge terminal, parented at a distinct world offset, for login tests. Returns its id.
+## 5c seam: registers an offline derelict-like ship that HAS a bridge room (so it is
+## claimable), with its own systems manager and a spawned bridge terminal, parented at
+## a distinct world offset, for login tests. Loops candidate seeds until the generated
+## layout contains a bridge room (bridge is weighted, not guaranteed). Returns its id,
+## or "" if no bridge-bearing layout was found in the search budget.
 func register_offline_test_ship_for_validation() -> String:
-	var bp = ShipBlueprintScript.new(1, 2, 777)       # size 1, condition 2 (wrecked), seed 777
-	var mgr = ShipSystemsManagerScript.new()
-	mgr.configure(mgr.load_definitions(), bp.condition, bp.seed_value)
-	var inst = ShipInstanceScript.create("ship_offline_test", "cell:cell:777", bp, mgr, null)
 	if ship_generator == null:
 		return ""
-	# Generation API (see travel_controller.attempt_travel): generate_from_seed(seed, size, condition).
-	var built = ship_generator.generate_from_seed(777, 1, 2)
+	var built = null
+	var chosen_seed := -1
+	for seed_try in range(0, 200):
+		var candidate = ship_generator.generate_from_seed(seed_try, 1, 2)   # size 1, condition 2 (wrecked -> propulsion offline)
+		if candidate == null:
+			continue
+		if candidate.has_method("get_layout_copy") and _layout_has_bridge(candidate.get_layout_copy()):
+			built = candidate
+			chosen_seed = seed_try
+			break
+		# Not claimable -> discard this candidate root so it does not leak.
+		candidate.queue_free()
 	if built == null:
 		return ""
+	var bp = ShipBlueprintScript.new(1, 2, chosen_seed)
+	var mgr = ShipSystemsManagerScript.new()
+	mgr.configure(mgr.load_definitions(), bp.condition, bp.seed_value)
+	var inst = ShipInstanceScript.create("ship_offline_test", "cell:cell:%d" % chosen_seed, bp, mgr, null)
 	inst.scene_root = built
 	add_child(built)
 	(built as Node3D).position = Vector3(0.0, 0.0, 60.0)
@@ -719,9 +775,27 @@ func register_offline_test_ship_for_validation() -> String:
 	visited_ships[String(inst.marker_id)] = inst
 	_spawn_bridge_terminal(inst)
 	return String(inst.ship_id)
+
+## True iff a layout dict contains a room with room_role == "bridge".
+func _layout_has_bridge(layout: Dictionary) -> bool:
+	var rooms_v: Variant = layout.get("rooms", [])
+	if typeof(rooms_v) != TYPE_ARRAY:
+		return false
+	for room_v in (rooms_v as Array):
+		if typeof(room_v) == TYPE_DICTIONARY and str((room_v as Dictionary).get("room_role", "")) == "bridge":
+			return true
+	return false
+
+## 5c seam: true iff the current active ship has a bridge room (is claimable).
+func current_ship_has_bridge_for_validation() -> bool:
+	if current_ship == null or not is_instance_valid(current_ship.scene_root):
+		return false
+	if not current_ship.scene_root.has_method("get_layout_copy"):
+		return false
+	return _layout_has_bridge(current_ship.scene_root.get_layout_copy())
 ```
 
-> `generate_from_seed(seed, size, condition)` is the confirmed API (used by `travel_controller.attempt_travel`). The seam's contract: register an in-tree ship with a bridge room (condition 2 keeps propulsion offline so it starts as a non-working vessel) whose terminal is spawned. If `generate_from_seed` returns a root without `get_layout_copy`, the bridge-room locator falls back to the start-transform origin — still valid for the login test.
+> `generate_from_seed(seed, size, condition)` is the confirmed API (used by `travel_controller.attempt_travel`). Because `bridge` is weighted (not guaranteed), the seam loops seeds until it finds a bridge-bearing layout so login tests are deterministic. Condition 2 keeps propulsion offline so the ship starts as a non-working vessel.
 
 - [ ] **Step 4: Run the smoke to confirm it passes**
 
@@ -870,14 +944,22 @@ func _init() -> void:
 	for _i in range(3):
 		await process_frame
 
-	# Make the lifeboat travel-capable and jump to a real derelict.
+	# Make the lifeboat travel-capable and jump to a CLAIMABLE (bridge-bearing) derelict.
+	# bridge is weighted (not guaranteed), so iterate in-range markers until one has a bridge.
 	ship.force_repair_all_for_validation()
 	var ids: Array = ship.scannable_marker_ids_for_validation()
 	assert(ids.size() > 0, "a derelict is in scanner range")
-	var res: Dictionary = ship.travel_to_marker_id(String(ids[0]))
-	assert(res.get("success", false), "travelled to derelict")
-	for _i in range(2):
-		await process_frame
+	var landed := false
+	for mid in ids:
+		var res: Dictionary = ship.travel_to_marker_id(String(mid))
+		if not res.get("success", false):
+			continue
+		for _i in range(2):
+			await process_frame
+		if ship.current_ship_has_bridge_for_validation():
+			landed = true
+			break
+	assert(landed, "found and travelled to a claimable (bridge-bearing) derelict")
 
 	# Claim the derelict and take command (its propulsion repaired so it is a working vessel).
 	var derelict_id: String = ship.current_ship_id_for_validation()
@@ -1108,9 +1190,17 @@ func _init() -> void:
 	ship.force_repair_all_for_validation()
 	var ids: Array = ship.scannable_marker_ids_for_validation()
 	assert(ids.size() > 0, "a derelict is in range")
-	assert(ship.travel_to_marker_id(String(ids[0])).get("success", false), "travelled")
-	for _i in range(2):
-		await process_frame
+	# Land on a CLAIMABLE (bridge-bearing) derelict (bridge is weighted, not guaranteed).
+	var landed := false
+	for mid in ids:
+		if not ship.travel_to_marker_id(String(mid)).get("success", false):
+			continue
+		for _i in range(2):
+			await process_frame
+		if ship.current_ship_has_bridge_for_validation():
+			landed = true
+			break
+	assert(landed, "travelled to a claimable derelict")
 
 	var derelict_id: String = ship.current_ship_id_for_validation()
 	ship.make_ship_working_for_validation(derelict_id)
@@ -1229,7 +1319,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write ADR-0018**
 
-Create `docs/game/adr/0018-claim-and-pilot-switch.md` documenting: the login-based ownership model (`ShipAccessState` owner_id + access set; `PLAYER_LOCAL_ID` single-player slice with the N-player seam), the `BridgeTerminal` working-vessel gate, `set_piloted_ship`, one-level rigid-pair travel (`_capture_docked_children`/`_reposition_docked_children`) and the never-free-piloted-ship rule, the general dock-edge persistence (`world-3`), and the guaranteed derelict bridge room. Cross-reference ADR-0016 and ADR-0017. State the deferrals explicitly: full hangar nesting → 5d; multiplayer netcode/UI → post-Phase-7.
+Create `docs/game/adr/0018-claim-and-pilot-switch.md` documenting: the login-based ownership model (`ShipAccessState` owner_id + access set; `PLAYER_LOCAL_ID` single-player slice with the N-player seam), the `BridgeTerminal` working-vessel gate, `set_piloted_ship`, one-level rigid-pair travel (`_capture_docked_children`/`_reposition_docked_children`) and the never-free-piloted-ship rule, the general dock-edge persistence (`world-3`), and the **claimability rule**: `bridge` is a weighted (not guaranteed) derelict role — derelicts with a bridge are claimable at that helm, derelicts without one are loot/explore spaces only (the adjudicated design + the authorized `derelict_generator_smoke` deny-list change). Cross-reference ADR-0016 and ADR-0017. State the deferrals explicitly: full hangar nesting → 5d; multiplayer netcode/UI → post-Phase-7.
 
 - [ ] **Step 2: Update the roadmap**
 
