@@ -62,7 +62,7 @@ func _run_section_b() -> void:
 
 	# Withdraw the category back out.
 	var withdrew: int = ship.cargo_withdraw_for_validation(home_id, "part")
-	assert(withdrew >= 1, "withdrew at least 1 (got %d)" % withdrew)
+	assert(withdrew == 6, "withdrew all 6 under player soft-cap (got %d)" % withdrew)
 
 	# Re-deposit so the hold is non-empty, then assert the home hold persists via
 	# WorldSnapshot.home_ship_inventory across an in-process save->load round-trip.
