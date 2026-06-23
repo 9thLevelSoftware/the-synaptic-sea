@@ -2,7 +2,8 @@ extends SceneTree
 
 ## CargoTransfer pure-logic smoke. Asserts:
 ##   - deposit_all moves part+supply, LEAVES tools on the player
-##   - withdraw_category respects the player carry-weight cap (partial fill)
+##   - withdraw_category pulls the whole category under player soft-cap (no partial-fill
+##     limit — the player may end over capacity / Heavy Load)
 ##   - the conservation invariant: summed per-id quantity across player+hold is
 ##     invariant under any transfer (no duplication, no loss)
 

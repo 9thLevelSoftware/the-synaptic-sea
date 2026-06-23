@@ -172,7 +172,11 @@ run_clean 'bay travel unbay smoke' 'BAY TRAVEL UNBAY SMOKE PASS' "$GODOT" --head
 run_clean 'ship inventory model smoke' 'SHIP INVENTORY SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_inventory_smoke.gd
 run_clean 'cargo transfer smoke' 'CARGO TRANSFER SMOKE PASS conserved=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cargo_transfer_smoke.gd
 run_clean 'cargo hold smoke' 'CARGO HOLD SMOKE PASS section_a=true deposited=6 withdrew=6 persisted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cargo_hold_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=104 clean_output=true'
+run_clean 'equipment defs smoke' 'EQUIPMENT DEFS SMOKE PASS slots=3 effects=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/equipment_defs_smoke.gd
+run_clean 'equipment state smoke' 'EQUIPMENT STATE SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/equipment_state_smoke.gd
+run_clean 'encumbrance curve smoke' 'EQUIPMENT ENCUMBRANCE SMOKE PASS floor=0.25' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encumbrance_smoke.gd
+run_clean 'equipment carts main-scene smoke' 'EQUIPMENT CARTS SMOKE PASS section_a=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/equipment_carts_smoke.gd
+echo 'SARGASSO REGRESSION PASS commands=108 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

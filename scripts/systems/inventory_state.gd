@@ -1,7 +1,9 @@
 extends RefCounted
 class_name InventoryState
 
-## Player-global inventory: quantitied, categorized (part/supply/tool), weight-capped.
+## Player-global inventory: quantitied, categorized (part/supply/tool), SOFT weight-capped
+## (PZ-style: carrying over capacity is allowed and penalized via Heavy Load movement, NOT
+## refused — see get_capacity/get_load_ratio/is_over_capacity; add_item gates on max_stack only).
 ## Pure model; never touches the scene tree. Tools are category 'tool' items, exposed
 ## through legacy shims (add_tool/has_tool/tool_ids/get_drain_multiplier) so OxygenState,
 ## ToolPickup, and the junction gate are untouched. Round-trips via get/apply_summary.

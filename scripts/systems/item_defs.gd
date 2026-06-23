@@ -30,6 +30,8 @@ static func load_definitions() -> Dictionary:
 		defs[tool_id] = def
 	var item_defs: Dictionary = _read_json_dict(ITEM_DEFINITIONS_PATH)
 	for item_id in item_defs:
+		if not (item_defs[item_id] is Dictionary):
+			continue   # skip malformed/corrupt item entries rather than store a non-dict def
 		defs[item_id] = item_defs[item_id]
 	var equip_defs: Dictionary = _read_json_dict(EQUIPMENT_DEFINITIONS_PATH)
 	for equip_id in equip_defs:
