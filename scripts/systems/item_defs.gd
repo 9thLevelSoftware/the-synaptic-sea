@@ -9,6 +9,7 @@ class_name ItemDefs
 
 const ITEM_DEFINITIONS_PATH: String = "res://data/items/item_definitions.json"
 const TOOL_DEFINITIONS_PATH: String = "res://data/tools/tool_definitions.json"
+const EQUIPMENT_DEFINITIONS_PATH: String = "res://data/items/equipment_definitions.json"
 const DEFAULT_TOOL_WEIGHT: float = 2.0
 const DEFAULT_MAX_STACK: int = 99
 
@@ -30,6 +31,12 @@ static func load_definitions() -> Dictionary:
 	var item_defs: Dictionary = _read_json_dict(ITEM_DEFINITIONS_PATH)
 	for item_id in item_defs:
 		defs[item_id] = item_defs[item_id]
+	var equip_defs: Dictionary = _read_json_dict(EQUIPMENT_DEFINITIONS_PATH)
+	for equip_id in equip_defs:
+		var raw_equip: Variant = equip_defs[equip_id]
+		if not (raw_equip is Dictionary):
+			continue   # skip malformed entries rather than crash
+		defs[equip_id] = raw_equip
 	return defs
 
 static func _read_json_dict(path: String) -> Dictionary:
@@ -60,3 +67,13 @@ static func max_stack(defs: Dictionary, item_id: String) -> int:
 static func display_name(defs: Dictionary, item_id: String) -> String:
 	var name: String = str(get_definition(defs, item_id).get("display_name", ""))
 	return name if not name.is_empty() else item_id.replace("_", " ").capitalize()
+
+static func equip_slot(defs: Dictionary, item_id: String) -> String:
+	return str(get_definition(defs, item_id).get("equip_slot", ""))
+
+static func container_capacity(defs: Dictionary, item_id: String) -> float:
+	return float(get_definition(defs, item_id).get("container_capacity", 0.0))
+
+static func effects(defs: Dictionary, item_id: String) -> Array:
+	var e: Variant = get_definition(defs, item_id).get("effects", [])
+	return e if e is Array else []
