@@ -3758,13 +3758,40 @@ func _build_world_snapshot():
 
 ## Returns the current dock-edge set as a serialisable Array.
 ## Each entry is {host: String, mobile: String, port_type: String}.
-## Only the piloted ship's edge is tracked (the sole dock in Phase 5b).
+## Emits an edge for EVERY known ship that has a parent_ship (de-duped), so the
+## lifeboat->claimed-derelict edge persists when the player pilots a derelict.
 func _current_dock_edges() -> Array:
 	var edges: Array = []
-	if piloted_ship != null and piloted_ship.parent_ship != null:
-		var host = piloted_ship.parent_ship
-		edges.append({"host": String(host.marker_id), "mobile": String(piloted_ship.ship_id), "port_type": "airlock"})
+	var seen: Dictionary = {}
+	for inst in _all_known_ships():
+		if inst == null or inst.parent_ship == null:
+			continue
+		var key: String = "%s>%s" % [String(inst.ship_id), String(inst.parent_ship.marker_id)]
+		if seen.has(key):
+			continue
+		seen[key] = true
+		edges.append({
+			"host": String(inst.parent_ship.marker_id),
+			"mobile": String(inst.ship_id),
+			"port_type": "airlock",
+		})
 	return edges
+
+## Every ShipInstance the coordinator currently tracks (home, lifeboat, current,
+## and all visited), de-duplicated.
+func _all_known_ships() -> Array:
+	var out: Array = []
+	var seen: Dictionary = {}
+	for inst in [home_ship, lifeboat_ship, current_ship]:
+		if inst != null and not seen.has(inst):
+			seen[inst] = true
+			out.append(inst)
+	for mid in visited_ships:
+		var inst = visited_ships[mid]
+		if inst != null and not seen.has(inst):
+			seen[inst] = true
+			out.append(inst)
+	return out
 
 ## Returns the marker_ids of every dock barrier that is currently opened.
 func _opened_port_marker_ids() -> Array:
@@ -4228,6 +4255,13 @@ func make_ship_working_for_validation(ship_id: String) -> void:
 ## 5c seam: the current piloted ship's id ("" if none).
 func piloted_ship_id_for_validation() -> String:
 	return String(piloted_ship.ship_id) if piloted_ship != null else ""
+
+## 5c seam: the owner_id recorded on ship_id ("" if unknown/unowned).
+func ship_owner_for_validation(ship_id: String) -> String:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null:
+		return ""
+	return inst.get_access().owner_id
 
 ## 5c seam: registers an offline derelict-like ship that HAS a bridge room (so it is
 ## claimable), with its own systems manager and a spawned bridge terminal, parented at

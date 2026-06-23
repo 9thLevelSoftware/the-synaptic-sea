@@ -8,7 +8,7 @@ class_name WorldSnapshot
 ## stored — derelict hulls regenerate deterministically from seed; only mutable
 ## state rides the per-ship slices.
 
-const WORLD_SLICE_VERSION: String = "world-2"
+const WORLD_SLICE_VERSION: String = "world-3"
 
 var world_summary: Dictionary = {}
 var home_ship: Dictionary = {}                  # a RunSnapshot.to_dict()
