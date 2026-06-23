@@ -43,9 +43,8 @@ func _init() -> void:
 	var inst = ShipInstanceScript.create("carrier", "cell:cell:1", null, null, null)
 	assert(inst.has_hangar() == false, "fresh ship has no bay")
 	assert(inst.get_summary().has("hangar") == false, "no bay -> no hangar key")
-	inst.get_hangar().slot_count = 1
-	inst.get_hangar().slot_size_class = 1
-	inst.get_hangar().slots = [""]
+	var bay2 = HangarBayScript.create(1, 1)
+	inst.hangar = bay2
 	inst.get_hangar().dock("ship_e", 1)
 	assert(inst.has_hangar() == true, "ship with slots has a bay")
 	var inst_summary: Dictionary = inst.get_summary()

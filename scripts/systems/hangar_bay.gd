@@ -9,7 +9,7 @@ class_name HangarBay
 
 var slot_count: int = 0
 var slot_size_class: int = 0
-var slots: Array = []   # length == slot_count; "" = empty, else a bayed ship_id
+var slots: Array[String] = []   # length == slot_count; "" = empty, else a bayed ship_id
 
 static func create(p_slot_count: int, p_slot_size_class: int) -> HangarBay:
 	var script: GDScript = load("res://scripts/systems/hangar_bay.gd")
