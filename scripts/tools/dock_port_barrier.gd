@@ -39,6 +39,7 @@ func configure(p_marker_id: String, p_condition: String, p_player_progression, w
 	condition = p_condition
 	player_progression = p_player_progression
 	breach_seconds = p_breach_seconds
+	assert(radius >= 0.0, "DockPortBarrier.configure: radius must be non-negative")
 	interaction_radius = radius
 	opened = false
 	channeling = false
@@ -106,13 +107,14 @@ func set_opened(value: bool) -> void:
 	opened = value
 	channeling = false
 	progress = 1.0 if value else 0.0
-	if collision_shape != null:
+	# Use is_instance_valid (not != null): a queue_free'd node is non-null but invalid.
+	if is_instance_valid(collision_shape):
 		collision_shape.disabled = opened   # opening removes the blocking collider
-	if marker != null:
+	if is_instance_valid(marker):
 		marker.visible = not opened
 
 func _interaction_radius() -> float:
-	if collision_shape != null and collision_shape.shape is SphereShape3D:
+	if is_instance_valid(collision_shape) and collision_shape.shape is SphereShape3D:
 		return (collision_shape.shape as SphereShape3D).radius
 	return interaction_radius
 
@@ -125,7 +127,7 @@ func _is_player_in_direct_range(player_body: Node) -> bool:
 	return global_position.distance_to(pn.global_position) <= _interaction_radius()
 
 func _ensure_collision(radius: float) -> void:
-	if collision_shape == null:
+	if not is_instance_valid(collision_shape):
 		collision_shape = CollisionShape3D.new()
 		collision_shape.name = "DockPortBarrierCollisionShape3D"
 		add_child(collision_shape)
@@ -135,7 +137,7 @@ func _ensure_collision(radius: float) -> void:
 	collision_shape.disabled = opened
 
 func _ensure_marker(radius: float) -> void:
-	if marker == null:
+	if not is_instance_valid(marker):
 		marker = MeshInstance3D.new()
 		marker.name = "DockPortBarrierMarker"
 		add_child(marker)

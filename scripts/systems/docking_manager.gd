@@ -54,7 +54,7 @@ static func dock(host_inst, mobile_inst, host_port: Dictionary, mobile_port: Dic
 	if not ("scene_root" in mobile_inst):
 		return {"success": false, "reason": "dock_failed"}
 	var root = mobile_inst.scene_root
-	if root == null or not is_instance_valid(root) or not (root is Node3D):
+	if not is_instance_valid(root) or not (root is Node3D):
 		return {"success": false, "reason": "dock_failed"}
 	# Sever any existing dock relationship first so the previous host's
 	# docked_ships list does not retain a stale reference to this mobile ship.
@@ -78,7 +78,7 @@ static func host_port_to_world(host_inst, local_port: Dictionary) -> Dictionary:
 	if not ("scene_root" in host_inst):
 		return {}
 	var root = host_inst.scene_root
-	if root == null or not is_instance_valid(root) or not (root is Node3D) or not (root as Node3D).is_inside_tree():
+	if not is_instance_valid(root) or not (root is Node3D) or not (root as Node3D).is_inside_tree():
 		return {}
 	var x: Transform3D = (root as Node3D).global_transform
 	return {

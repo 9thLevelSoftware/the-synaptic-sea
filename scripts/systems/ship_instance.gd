@@ -119,7 +119,7 @@ func blueprint_layout_for_validation() -> Dictionary:
 ## Null/empty scene_root or no room nodes -> zero-size AABB at the root origin
 ## (the "unbuilt retained instance" fallback).
 func interior_aabb() -> AABB:
-	if scene_root == null or not is_instance_valid(scene_root):
+	if not is_instance_valid(scene_root):
 		return AABB()
 	var structure: Node = scene_root.get_node_or_null("ShipStructure")
 	if structure == null:

@@ -48,6 +48,12 @@ func mark_generated(marker_id: String) -> void:
 func is_generated(marker_id: String) -> bool:
 	return generated_marker_ids.has(marker_id)
 
+## Reverses mark_generated — used to roll back a travel that materialized a target
+## but was then rejected (e.g. an incompatible dock port) so the world does not
+## retain a generated mark for a derelict the player never actually traveled to.
+func unmark_generated(marker_id: String) -> void:
+	generated_marker_ids.erase(marker_id)
+
 func set_player_position(pos: Vector3) -> void:
 	player_position = pos
 

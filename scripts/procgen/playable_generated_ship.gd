@@ -1082,7 +1082,7 @@ func has_closed_dock_barrier_for_validation() -> bool:
 ## Phase 5b Task 5 validation seam: true iff the piloted ship's lifted airlock port
 ## is within 0.5u of the host's lifted dock port (proves a real flush dock).
 func piloted_flush_to_host_for_validation() -> bool:
-	if piloted_ship == null or current_ship == null or current_ship.scene_root == null:
+	if piloted_ship == null or current_ship == null or not is_instance_valid(current_ship.scene_root):
 		return false
 	var cc := 0 if current_ship == home_ship else _ship_condition_class(current_ship)
 	var host_local: Dictionary = DockPortsScript.for_derelict(current_ship.built_layout, _ship_seed(current_ship), cc)
@@ -1090,7 +1090,7 @@ func piloted_flush_to_host_for_validation() -> bool:
 	if host_world.is_empty():
 		return false
 	var lb_local: Dictionary = DockPortsScript.for_lifeboat(piloted_ship.built_layout)
-	if piloted_ship.scene_root == null or not is_instance_valid(piloted_ship.scene_root) or not (piloted_ship.scene_root as Node3D).is_inside_tree():
+	if not is_instance_valid(piloted_ship.scene_root) or not (piloted_ship.scene_root as Node3D).is_inside_tree():
 		return false
 	var lb_world: Vector3 = (piloted_ship.scene_root as Node3D).global_transform * (lb_local["position"] as Vector3)
 	return lb_world.distance_to(host_world["position"] as Vector3) <= 0.5
@@ -1218,7 +1218,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 ## player can be carried when the piloted ship is repositioned by a dock. Returns
 ## {} when there is no player / piloted root to anchor against.
 func _capture_player_carry() -> Dictionary:
-	if piloted_ship == null or piloted_ship.scene_root == null or not is_instance_valid(piloted_ship.scene_root):
+	if piloted_ship == null or not is_instance_valid(piloted_ship.scene_root):
 		return {}
 	var root: Node3D = piloted_ship.scene_root as Node3D
 	if player == null or not (player is Node3D) or not root.is_inside_tree():
@@ -1230,7 +1230,7 @@ func _capture_player_carry() -> Dictionary:
 ## Re-applies a captured player carry after the piloted ship root moved, so the
 ## player ends up at the same spot INSIDE the (repositioned) piloted ship.
 func _apply_player_carry(carry: Dictionary) -> void:
-	if carry.is_empty() or piloted_ship == null or piloted_ship.scene_root == null or not is_instance_valid(piloted_ship.scene_root):
+	if carry.is_empty() or piloted_ship == null or not is_instance_valid(piloted_ship.scene_root):
 		return
 	var root: Node3D = piloted_ship.scene_root as Node3D
 	if player == null or not root.is_inside_tree() or not player.has_method("teleport_to"):
@@ -1241,7 +1241,7 @@ func _apply_player_carry(carry: Dictionary) -> void:
 ## condition from the derelict's seed/condition. Home derelict is always intact.
 func _spawn_dock_barrier(inst) -> void:
 	_clear_dock_barriers()
-	if inst == null or inst.scene_root == null or not is_instance_valid(inst.scene_root):
+	if inst == null or not is_instance_valid(inst.scene_root):
 		return
 	var local: Dictionary = DockPortsScript.for_derelict(inst.built_layout, _ship_seed(inst), _ship_condition_class(inst))
 	if local.is_empty():
@@ -1536,7 +1536,7 @@ func advance_repair_channels_for_validation(delta: float) -> void:
 ## (caller then falls through to repair_point_root, never to an off-floor position).
 func _lifeboat_local_repair_positions() -> Array:
 	var out: Array = []
-	if lifeboat_ship == null or lifeboat_ship.scene_root == null or not is_instance_valid(lifeboat_ship.scene_root):
+	if lifeboat_ship == null or not is_instance_valid(lifeboat_ship.scene_root):
 		return out
 	var y: float = PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR
 	var sr: Node3D = lifeboat_ship.scene_root
@@ -1625,6 +1625,10 @@ func travel_to(marker) -> Dictionary:
 	recompute_occupancy()
 	if piloted_ship != null and current_occupancy != piloted_ship:
 		return {"success": false, "reason": "not_aboard_ship", "ship": null}
+	# Capture the world state attempt_travel mutates on success (scanner position +
+	# generated mark) so the dock-compat check below can roll it back on rejection.
+	var prev_player_pos: Vector3 = sargasso_world.player_position
+	var was_generated: bool = sargasso_world.is_generated(String(marker.marker_id))
 	var ops_t: Dictionary = {"propulsion": bool(_current_systems_ops().get("propulsion", false))}
 	var result: Dictionary = travel_controller.attempt_travel(
 		marker, ops_t, sargasso_world, ship_generator, scanner_state.range_radius)
@@ -1642,6 +1646,12 @@ func travel_to(marker) -> Dictionary:
 		var lb_local: Dictionary = DockPortsScript.for_lifeboat(piloted_ship.built_layout)
 		if not DockPortsScript.ports_compatible(target_local, lb_local):
 			new_root.queue_free()
+			# Codex P2: attempt_travel already advanced the scanner position + generated
+			# mark; roll them back so a rejected target leaves no world/scanner state
+			# pointing at a derelict the player never docked to (current_ship is untouched).
+			sargasso_world.set_player_position(prev_player_pos)
+			if not was_generated:
+				sargasso_world.unmark_generated(String(marker.marker_id))
 			return {"success": false, "reason": "dock_incompatible", "ship": null}
 
 	# Leaving the current ship.
