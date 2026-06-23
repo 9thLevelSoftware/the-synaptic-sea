@@ -36,6 +36,7 @@ const DockPortsScript := preload("res://scripts/systems/dock_ports.gd")
 const DockingManagerScript := preload("res://scripts/systems/docking_manager.gd")
 const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
 const DockPortBarrierScript := preload("res://scripts/tools/dock_port_barrier.gd")
+const BridgeTerminalScript := preload("res://scripts/tools/bridge_terminal.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -148,6 +149,8 @@ var piloted_ship = null                     # the ShipInstance the player curren
 # Phase 5b Task 5: the active host's closed dock-seam barriers (Array[DockPortBarrier]).
 # Spawned closed when the piloted ship docks to a host; the player breaches one to board.
 var dock_barriers: Array = []
+const PLAYER_LOCAL_ID := "player_local"
+var bridge_terminals: Array = []
 # Sub-project #2: the active derelict's objective interactables live under a
 # dedicated root (empty while on the home ship). Separate from the home gameplay
 # roots so it stays attached when away_from_start.
@@ -1057,6 +1060,30 @@ func recompute_occupancy() -> void:
 		or (piloted_ship != null and current_occupancy == piloted_ship and piloted_ship.parent_ship == home_ship)
 	away_from_start = not at_home_complex
 
+## A bridge terminal fired login_requested. Gate on the ship being a working
+## vessel, then claim it for the local player and take command. Refused logins
+## leave piloted_ship unchanged.
+func _on_login_requested(ship_id: String) -> void:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null:
+		return
+	if not inst.is_working_vessel():
+		push_warning("PlayableGeneratedShip: login refused (vessel_not_operational) for %s" % ship_id)
+		return
+	inst.get_access().claim(PLAYER_LOCAL_ID)
+	set_piloted_ship(inst)
+
+## Re-points piloted_ship to `inst` (the player's active ride). Gated on the local
+## player having access. Recomputes occupancy. Returns {success, reason}.
+func set_piloted_ship(inst) -> Dictionary:
+	if inst == null:
+		return {"success": false, "reason": "unknown_ship"}
+	if not inst.get_access().has_access(PLAYER_LOCAL_ID):
+		return {"success": false, "reason": "no_access"}
+	piloted_ship = inst
+	recompute_occupancy()
+	return {"success": true, "reason": "ok"}
+
 ## Phase 5a Task 6 validation seam: returns current_occupancy.
 func get_current_occupancy_for_validation():
 	return current_occupancy
@@ -1206,6 +1233,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 			_dock_piloted_to(home_ship)
 		_apply_player_carry(carry)
 	_spawn_dock_barrier(inst)
+	_spawn_bridge_terminal(inst)
 	# Phase 5b Task 5: occupancy is the piloted ship — the player rides it to the host
 	# and stays aboard (no teleport into the derelict). recompute_occupancy() then
 	# tracks the player as they breach the dock seam and walk into the host.
@@ -1241,6 +1269,7 @@ func _apply_player_carry(carry: Dictionary) -> void:
 ## condition from the derelict's seed/condition. Home derelict is always intact.
 func _spawn_dock_barrier(inst) -> void:
 	_clear_dock_barriers()
+	_clear_bridge_terminals()
 	if inst == null or not is_instance_valid(inst.scene_root):
 		return
 	var local: Dictionary = DockPortsScript.for_derelict(inst.built_layout, _ship_seed(inst), _ship_condition_class(inst))
@@ -1265,6 +1294,51 @@ func _clear_dock_barriers() -> void:
 func _on_dock_barrier_opened(_marker_id: String) -> void:
 	# Boarding the derelict is now possible; occupancy flips as the player crosses.
 	recompute_occupancy()
+
+## Local-space center of `loader`'s bridge room (role == "bridge"), or Vector3.INF
+## if the ship has NO bridge room. Claimability requires a real bridge: a ship
+## without one is not pilotable (just a loot/explore space), so there is deliberately
+## NO entry-room fallback here. Positions are ship-local (the terminal is parented
+## under the ship's scene_root).
+func _command_room_local_center(loader) -> Vector3:
+	if loader == null or not loader.has_method("get_layout_copy") or not loader.has_method("get_room_center"):
+		return Vector3.INF
+	var layout: Dictionary = loader.get_layout_copy()
+	var rooms_v: Variant = layout.get("rooms", [])
+	if typeof(rooms_v) != TYPE_ARRAY:
+		return Vector3.INF
+	for room_v in (rooms_v as Array):
+		if typeof(room_v) != TYPE_DICTIONARY:
+			continue
+		if str((room_v as Dictionary).get("room_role", "")) == "bridge":
+			var c: Vector3 = loader.get_room_center(str((room_v as Dictionary).get("id", "")))
+			if c != Vector3.INF:
+				return c
+	return Vector3.INF
+
+## Spawns the bridge terminal for a pilotable ship at its bridge room (ship-local),
+## parented under the ship's scene_root so it inherits the ship transform and is
+## freed with it. The home ship is never pilotable -> no terminal. A ship with NO
+## bridge room gets NO terminal (it cannot be claimed/piloted — loot space only).
+func _spawn_bridge_terminal(inst) -> void:
+	if inst == null or inst == home_ship or not is_instance_valid(inst.scene_root):
+		return
+	var local_center: Vector3 = _command_room_local_center(inst.scene_root)
+	if local_center == Vector3.INF:
+		return   # no bridge room -> not claimable
+	var terminal = BridgeTerminalScript.new()
+	(inst.scene_root as Node3D).add_child(terminal)
+	terminal.configure(String(inst.ship_id), local_center, 1.8)
+	terminal.login_requested.connect(_on_login_requested)
+	bridge_terminals.append(terminal)
+
+func _clear_bridge_terminals() -> void:
+	for t in bridge_terminals:
+		if is_instance_valid(t):
+			if t.get_parent() != null:
+				t.get_parent().remove_child(t)
+			t.queue_free()
+	bridge_terminals.clear()
 
 ## Builds the active derelict's objective interactables from its loader specs and
 ## restores completed/cleared state from its (retained or loaded) controller. Called
@@ -1922,6 +1996,8 @@ func _build_lifeboat_at_home() -> void:
 	# and repair semantics stay exactly as they are.
 	lifeboat_ship = ShipInstanceScript.create("lifeboat", "", null, ship_systems_manager, lb_root)
 	lifeboat_ship.built_layout = LifeBoatBuilderScript.build_layout()
+	lifeboat_ship.get_access().claim(PLAYER_LOCAL_ID)
+	_spawn_bridge_terminal(lifeboat_ship)
 
 	# Add to the scene tree FIRST so host/mobile global_transforms resolve, then
 	# port-align the lifeboat to the home airlock via DockingManager (the lifeboat now
@@ -2040,6 +2116,9 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# so opening/breaching the dock seam must work whether the player is at home or away.
 	for b in dock_barriers:
 		if is_instance_valid(b) and not b.opened and b.try_start(player_body):
+			return
+	for t in bridge_terminals:
+		if is_instance_valid(t) and t.try_login(player_body):
 			return
 	if away_from_start:
 		# Sub-project #4: try repair points before loot/objectives.
@@ -3862,6 +3941,7 @@ func _reset_runtime_for_reload() -> void:
 	# host scene_root that may be freed on reload — clear the references to avoid a
 	# stale/leaked Array entry).
 	_clear_dock_barriers()
+	_clear_bridge_terminals()
 	if hud_layer != null and is_instance_valid(hud_layer):
 		hud_layer.queue_free()
 	# REQ-014 blocking finding B: null the hud_layer and tracker
@@ -4024,3 +4104,86 @@ func board_host_for_validation() -> bool:
 	# No room outside the piloted AABB — do NOT teleport to an ambiguous center.
 	push_error("board_host_for_validation: no host room found outside piloted AABB; cannot prove a genuine flip")
 	return false
+
+## 5c seam: drives the real login path for ship_id — teleports the player to that
+## ship's bridge terminal and calls try_login (so the real in-range gate admits it).
+## Returns true iff the login was accepted (piloted_ship changed to ship_id's instance).
+func login_at_terminal_for_validation(ship_id: String) -> bool:
+	for t in bridge_terminals:
+		if is_instance_valid(t) and String(t.ship_id) == ship_id:
+			if is_instance_valid(player) and player.has_method("teleport_to") and t.is_inside_tree():
+				player.teleport_to(t.global_position)
+			var before = piloted_ship
+			t.try_login(player)
+			return piloted_ship != before and piloted_ship != null and String(piloted_ship.ship_id) == ship_id
+	return false
+
+## 5c seam: force-repair every subcomponent of ship_id's OWN systems manager so its
+## propulsion reads operational (makes it a working vessel for tests).
+func make_ship_working_for_validation(ship_id: String) -> void:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null or inst.systems_manager == null:
+		return
+	for sid in inst.systems_manager.systems.keys():
+		var sys = inst.systems_manager.get_system(sid)
+		if sys == null:
+			continue
+		for sub in sys.subcomponents:
+			inst.systems_manager.force_repair(sid, sub.subcomponent_id)
+
+## 5c seam: the current piloted ship's id ("" if none).
+func piloted_ship_id_for_validation() -> String:
+	return String(piloted_ship.ship_id) if piloted_ship != null else ""
+
+## 5c seam: registers an offline derelict-like ship that HAS a bridge room (so it is
+## claimable), with its own systems manager and a spawned bridge terminal, parented at
+## a distinct world offset, for login tests. Loops candidate seeds until the generated
+## layout contains a bridge room (bridge is weighted, not guaranteed). Returns its id,
+## or "" if no bridge-bearing layout was found in the search budget.
+func register_offline_test_ship_for_validation() -> String:
+	if ship_generator == null:
+		return ""
+	var built = null
+	var chosen_seed := -1
+	for seed_try in range(0, 200):
+		var candidate = ship_generator.generate_from_seed(seed_try, 1, 2)   # size 1, condition 2 (wrecked -> propulsion offline)
+		if candidate == null:
+			continue
+		if candidate.has_method("get_layout_copy") and _layout_has_bridge(candidate.get_layout_copy()):
+			built = candidate
+			chosen_seed = seed_try
+			break
+		# Not claimable -> discard this candidate root so it does not leak.
+		candidate.queue_free()
+	if built == null:
+		return ""
+	var bp = ShipBlueprintScript.new(1, 2, chosen_seed)
+	var mgr = ShipSystemsManagerScript.new()
+	mgr.configure(mgr.load_definitions(), bp.condition, bp.seed_value)
+	var inst = ShipInstanceScript.create("ship_offline_test", "cell:cell:%d" % chosen_seed, bp, mgr, null)
+	inst.scene_root = built
+	add_child(built)
+	(built as Node3D).position = Vector3(0.0, 0.0, 60.0)
+	if inst.built_layout.is_empty() and built.has_method("get_layout_copy"):
+		inst.built_layout = built.get_layout_copy()
+	visited_ships[String(inst.marker_id)] = inst
+	_spawn_bridge_terminal(inst)
+	return String(inst.ship_id)
+
+## True iff a layout dict contains a room with room_role == "bridge".
+func _layout_has_bridge(layout: Dictionary) -> bool:
+	var rooms_v: Variant = layout.get("rooms", [])
+	if typeof(rooms_v) != TYPE_ARRAY:
+		return false
+	for room_v in (rooms_v as Array):
+		if typeof(room_v) == TYPE_DICTIONARY and str((room_v as Dictionary).get("room_role", "")) == "bridge":
+			return true
+	return false
+
+## 5c seam: true iff the current active ship has a bridge room (is claimable).
+func current_ship_has_bridge_for_validation() -> bool:
+	if current_ship == null or not is_instance_valid(current_ship.scene_root):
+		return false
+	if not current_ship.scene_root.has_method("get_layout_copy"):
+		return false
+	return _layout_has_bridge(current_ship.scene_root.get_layout_copy())
