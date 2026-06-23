@@ -731,7 +731,10 @@ var _deposit_emits: int = 0
 var _withdraw_cat: String = ""
 
 func _init() -> void:
-	_run_section_a()
+	# MUST await — _run_section_a contains `await process_frame`; calling it
+	# without `await` detaches the coroutine so its post-frame assertions never
+	# run before quit() (the marker would print regardless).
+	await _run_section_a()
 	# Section B is appended in Task 7; for now Section A alone prints the marker.
 	print("CARGO HOLD SMOKE PASS section_a=true deposited=0 withdrew=0 persisted=false")
 	quit()
@@ -1029,11 +1032,11 @@ Replace the `_init()` in `scripts/validation/cargo_hold_smoke.gd` with a version
 const PlayableGeneratedShipScript := preload("res://scripts/procgen/playable_generated_ship.gd")
 const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd")
 ```
-New `_init()`:
+New `_init()` — **both sections MUST be awaited** (each contains `await process_frame`; calling without `await` detaches the coroutine so its assertions never run before `quit()` — a real bug caught in Task 6's Section A). `_run_section_b` ends in the final `print(...)`/`quit()`:
 ```gdscript
 func _init() -> void:
-	_run_section_a()
-	_run_section_b()
+	await _run_section_a()
+	await _run_section_b()
 
 func _run_section_b() -> void:
 	var ship = PlayableGeneratedShipScript.new()
