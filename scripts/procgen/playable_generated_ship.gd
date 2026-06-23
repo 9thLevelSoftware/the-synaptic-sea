@@ -4598,6 +4598,13 @@ func bay_launch_for_validation(carrier_id: String) -> int:
 	_on_bay_launch_requested(carrier_id, -1)
 	return idx
 
+## 5d seam: drive the DFS rigid-pair capture/reposition directly (for a deterministic depth-2 guard).
+func capture_subtree_for_validation() -> Array:
+	return _capture_subtree()
+
+func reposition_subtree_for_validation(captured: Array) -> void:
+	_reposition_subtree(captured)
+
 ## 5d seam: true iff `child_id` resolves to a ship whose root's offset to the piloted
 ## root is finite (it is positioned in the piloted frame, i.e. it rode the subtree).
 func nested_child_tracks_piloted_for_validation(child_id: String) -> bool:

@@ -6,6 +6,7 @@ extends SceneTree
 ## is preserved within tolerance).
 
 const PlayableGeneratedShipScript := preload("res://scripts/procgen/playable_generated_ship.gd")
+const ShipInstanceScript := preload("res://scripts/systems/ship_instance.gd")
 
 func _init() -> void:
 	var ship = PlayableGeneratedShipScript.new()
@@ -56,6 +57,35 @@ func _init() -> void:
 				var lifeboat_id: String = ship.lifeboat_ship_id_for_validation()
 				assert(ship.ship_is_bayed_in_for_validation(lifeboat_id, derelict_id) == true,
 					"bayed lifeboat stayed bayed through nested travel")
+
+	# Deterministic depth-2 DFS guard (seed-independent): A piloted, B docked to A,
+	# C docked to B (depth 2). Capture in A's frame, move A, reposition, assert the
+	# grandchild C still holds its relative pose to A. This FAILS if the recursion
+	# (for grandchild in child.docked_ships) is ever dropped — a real regression guard.
+	var a = ShipInstanceScript.create("dfs_a", "cell:cell:a", null, null, Node3D.new())
+	var b = ShipInstanceScript.create("dfs_b", "cell:cell:b", null, null, Node3D.new())
+	var c = ShipInstanceScript.create("dfs_c", "cell:cell:c", null, null, Node3D.new())
+	ship.add_child(a.scene_root); ship.add_child(b.scene_root); ship.add_child(c.scene_root)
+	await process_frame
+	a.scene_root.global_transform = Transform3D(Basis(), Vector3(0, 0, 0))
+	b.scene_root.global_transform = Transform3D(Basis(), Vector3(5, 0, 0))
+	c.scene_root.global_transform = Transform3D(Basis(), Vector3(9, 0, 2))
+	a.docked_ships = [b]; b.parent_ship = a
+	b.docked_ships = [c]; c.parent_ship = b
+	var rel_before: Transform3D = (a.scene_root as Node3D).global_transform.affine_inverse() * (c.scene_root as Node3D).global_transform
+	var saved_piloted = ship.piloted_ship
+	ship.piloted_ship = a
+	var captured = ship.capture_subtree_for_validation()
+	assert(captured.size() == 2, "DFS captured both B and C (depth-2 reached)")
+	(a.scene_root as Node3D).global_transform = Transform3D(Basis().rotated(Vector3.UP, 0.7), Vector3(20, 0, -13))
+	ship.reposition_subtree_for_validation(captured)
+	var rel_after: Transform3D = (a.scene_root as Node3D).global_transform.affine_inverse() * (c.scene_root as Node3D).global_transform
+	ship.piloted_ship = saved_piloted
+	assert(rel_before.origin.distance_to(rel_after.origin) < 0.001, "depth-2 grandchild C preserved relative pose to piloted A")
+	# Sever cycles + free synthetic roots so the smoke ends clean (no resources still in use).
+	a.docked_ships = []; b.docked_ships = []; b.parent_ship = null; c.parent_ship = null
+	a.scene_root.queue_free(); b.scene_root.queue_free(); c.scene_root.queue_free()
+	await process_frame
 
 	print("RECURSIVE TRAVEL SMOKE PASS piloted_geom=%s" % str(ship.piloted_ship_has_geometry_for_validation()))
 	quit()
