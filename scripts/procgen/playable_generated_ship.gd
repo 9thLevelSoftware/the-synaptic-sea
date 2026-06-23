@@ -38,6 +38,8 @@ const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
 const DockPortBarrierScript := preload("res://scripts/tools/dock_port_barrier.gd")
 const BridgeTerminalScript := preload("res://scripts/tools/bridge_terminal.gd")
 const HangarBayControlScript := preload("res://scripts/tools/hangar_bay_control.gd")
+const CargoHoldControlScript := preload("res://scripts/tools/cargo_hold_control.gd")
+const CargoTransferScript := preload("res://scripts/systems/cargo_transfer.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -153,6 +155,7 @@ var dock_barriers: Array = []
 const PLAYER_LOCAL_ID := "player_local"
 var bridge_terminals: Array = []
 var hangar_controls: Array = []             # Array[HangarBayControl]
+var cargo_hold_controls: Array = []         # Array[CargoHoldControl]
 # Sub-project #2: the active derelict's objective interactables live under a
 # dedicated root (empty while on the home ship). Separate from the home gameplay
 # roots so it stays attached when away_from_start.
@@ -1274,6 +1277,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	_spawn_dock_barrier(inst)
 	_spawn_bridge_terminal(inst)
 	_spawn_hangar_control(inst)
+	_spawn_cargo_hold_control(inst)
 	# Phase 5b Task 5: occupancy is the piloted ship — the player rides it to the host
 	# and stays aboard (no teleport into the derelict). recompute_occupancy() then
 	# tracks the player as they breach the dock seam and walk into the host.
@@ -1488,6 +1492,55 @@ func _clear_hangar_controls() -> void:
 				c.get_parent().remove_child(c)
 			c.queue_free()
 	hangar_controls.clear()
+
+func _spawn_cargo_hold_control(inst) -> void:
+	if inst == null or not is_instance_valid(inst.scene_root):
+		return
+	var center: Vector3 = DockPortsScript._room_floor_center(inst.built_layout, "cargo", "cargo")
+	if center == Vector3.INF:
+		return   # no cargo room -> no hold, no lazy ShipInventory
+	# Prune dead entries + any existing control for this same carrier (idempotent).
+	var kept: Array = []
+	for c in cargo_hold_controls:
+		if not is_instance_valid(c):
+			continue
+		if String(c.carrier_id) == String(inst.ship_id):
+			if c.get_parent() != null:
+				c.get_parent().remove_child(c)
+			c.queue_free()
+			continue
+		kept.append(c)
+	cargo_hold_controls = kept
+	var control = CargoHoldControlScript.new()
+	(inst.scene_root as Node3D).add_child(control)
+	control.configure(String(inst.ship_id), center, 1.8)
+	control.cargo_deposit_requested.connect(_on_cargo_deposit_requested)
+	control.cargo_withdraw_requested.connect(_on_cargo_withdraw_requested)
+	cargo_hold_controls.append(control)
+
+func _clear_cargo_hold_controls() -> void:
+	for c in cargo_hold_controls:
+		if is_instance_valid(c):
+			if c.get_parent() != null:
+				c.get_parent().remove_child(c)
+			c.queue_free()
+	cargo_hold_controls.clear()
+
+func _on_cargo_deposit_requested(ship_id: String) -> void:
+	if inventory_state == null:
+		return
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null:
+		return
+	CargoTransferScript.deposit_all(inventory_state, inst.get_inventory())
+
+func _on_cargo_withdraw_requested(ship_id: String, category: String) -> void:
+	if inventory_state == null:
+		return
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null:
+		return
+	CargoTransferScript.withdraw_category(inst.get_inventory(), inventory_state, category)
 
 ## A ship currently airlock-docked to `carrier` (parent_ship == carrier) that is NOT
 ## already bayed there and whose airlock port size_class fits a free slot. null if none.
@@ -2195,6 +2248,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 		# Store the layout so DockPorts can derive port descriptors for boot docking.
 		home_ship.built_layout = loader.get_layout_copy()
 		_spawn_hangar_control(home_ship)
+		_spawn_cargo_hold_control(home_ship)
 		# Phase 5a Task 6: initialise occupancy to home ship (player starts here).
 		current_occupancy = home_ship
 		# Phase 5a Task 7: build the physical lifeboat docked to the starting derelict.
@@ -2302,6 +2356,7 @@ func _build_lifeboat_at_home() -> void:
 	# Spawned post-add_child so the terminal is in-tree for the login range gate.
 	_spawn_bridge_terminal(lifeboat_ship)
 	_spawn_hangar_control(lifeboat_ship)
+	_spawn_cargo_hold_control(lifeboat_ship)
 
 ## Port-aligns piloted_ship's airlock to host's dock port and writes the dock
 ## relationship. host.scene_root must be in-tree. Returns the dock() result dict.
@@ -2437,6 +2492,10 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		for it in derelict_interactables:
 			if is_instance_valid(it) and it.try_interact(player_body):
 				return
+		# Sub-project #6 (cargo): deposit is the lowest-priority fallback — only fires
+		# if nothing more specific (repair/loot/objective) claimed the interact here.
+		if _try_cargo_deposit(player_body):
+			return
 		return
 	# Sub-project #4: try lifeboat repair points before pickups/objectives.
 	for rp in repair_points:
@@ -2457,6 +2516,19 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		var interactable = interactable_variant
 		if interactable.try_interact(player_body):
 			return
+	# Sub-project #6 (cargo): deposit-all is the lowest-priority fallback at home too —
+	# walk up to the cargo hold and interact to dump salvage when nothing else claims it.
+	if _try_cargo_deposit(player_body):
+		return
+
+## Walk-up cargo deposit: deposits all haulable salvage into the hold of whichever
+## cargo control the player is standing at (strict in-range gate). Returns true iff a
+## deposit fired. Emit-only control + coordinator-owned transfer (single ownership).
+func _try_cargo_deposit(player_body) -> bool:
+	for ch in cargo_hold_controls:
+		if is_instance_valid(ch) and ch.try_deposit(player_body):
+			return true
+	return false
 
 func _on_interactable_completed(interaction_id: String, objective_id: String, sequence: int, objective_type: String, room_id: String, step_id: String) -> void:
 	if sequence != current_objective_sequence:
@@ -3948,6 +4020,7 @@ func _build_world_snapshot():
 	# containers unsearched after a fresh-process load → starter-part duplication.
 	if home_ship != null:
 		ws.home_looted_containers = home_ship.looted_container_ids.duplicate()
+		ws.home_ship_inventory = home_ship.get_inventory().get_summary()
 	ws.visited_ships = {}
 	for mid in visited_ships:
 		ws.visited_ships[String(mid)] = visited_ships[mid].get_summary()
@@ -4075,6 +4148,7 @@ func _ensure_derelict_geometry(inst) -> void:
 		inst.built_layout = new_root.get_layout_copy()
 	_spawn_bridge_terminal(inst)
 	_spawn_hangar_control(inst)
+	_spawn_cargo_hold_control(inst)
 
 ## Applies a WorldSnapshot: rebuilds the home ship first (this resets the runtime
 ## and returns to home if currently away), restores the SargassoWorld and the
@@ -4103,6 +4177,8 @@ func _apply_world_snapshot(ws) -> bool:
 	#     so current_ship == home_ship and _build_loot_containers targets the home ship.
 	if home_ship != null:
 		home_ship.looted_container_ids = ws.home_looted_containers.duplicate()
+		if not ws.home_ship_inventory.is_empty():
+			home_ship.get_inventory().apply_summary(ws.home_ship_inventory)
 		if not away_from_start:
 			_build_loot_containers()
 	# 2. World model. _apply_run_snapshot reset us to the home ship; home_ship is
@@ -4365,6 +4441,7 @@ func _reset_runtime_for_reload() -> void:
 	_clear_dock_barriers()
 	_clear_bridge_terminals()
 	_clear_hangar_controls()
+	_clear_cargo_hold_controls()
 	if hud_layer != null and is_instance_valid(hud_layer):
 		hud_layer.queue_free()
 	# REQ-014 blocking finding B: null the hud_layer and tracker
@@ -4603,6 +4680,7 @@ func register_offline_test_ship_for_validation() -> String:
 	visited_ships[String(inst.marker_id)] = inst
 	_spawn_bridge_terminal(inst)
 	_spawn_hangar_control(inst)
+	_spawn_cargo_hold_control(inst)
 	return String(inst.ship_id)
 
 ## True iff a layout dict contains a room with room_role == "bridge".
@@ -4622,6 +4700,57 @@ func current_ship_has_bridge_for_validation() -> bool:
 ## 5d seams: hangar-bay dock/launch validation surface.
 func home_ship_id_for_validation() -> String:
 	return String(home_ship.ship_id) if home_ship != null else ""
+
+func cargo_deposit_for_validation(ship_id: String) -> int:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null or inventory_state == null:
+		return 0
+	return int(CargoTransferScript.deposit_all(inventory_state, inst.get_inventory()).get("total_moved", 0))
+
+func cargo_withdraw_for_validation(ship_id: String, category: String) -> int:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null or inventory_state == null:
+		return 0
+	return int(CargoTransferScript.withdraw_category(inst.get_inventory(), inventory_state, category).get("total_moved", 0))
+
+func ship_hold_quantity_for_validation(ship_id: String, item_id: String) -> int:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null:
+		return 0
+	return inst.get_inventory().get_quantity(item_id)
+
+func ship_has_cargo_hold_for_validation(ship_id: String) -> bool:
+	for c in cargo_hold_controls:
+		if is_instance_valid(c) and String(c.carrier_id) == ship_id:
+			return true
+	return false
+
+## Drives the REAL player-interact dispatch (_on_player_interact_requested), NOT the
+## direct transfer seam: positions the player at the ship's cargo control so the strict
+## in-range gate admits it, fires interact, and returns how many items landed in the
+## hold. A return of 0 means the cargo control is not wired into the interact path.
+func cargo_interact_deposit_for_validation(ship_id: String) -> int:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null or player == null or not (player is Node3D):
+		return 0
+	var control = null
+	for c in cargo_hold_controls:
+		if is_instance_valid(c) and String(c.carrier_id) == ship_id:
+			control = c
+			break
+	if control == null or not control.is_inside_tree() or not (player as Node3D).is_inside_tree():
+		return 0
+	(player as Node3D).global_position = control.global_position
+	var before: int = _hold_item_total(inst)
+	_on_player_interact_requested(player)
+	return _hold_item_total(inst) - before
+
+func _hold_item_total(inst) -> int:
+	var total: int = 0
+	var hold = inst.get_inventory()
+	for k in hold.items:
+		total += int(hold.items[k])
+	return total
 
 func lifeboat_ship_id_for_validation() -> String:
 	return String(lifeboat_ship.ship_id) if lifeboat_ship != null else ""

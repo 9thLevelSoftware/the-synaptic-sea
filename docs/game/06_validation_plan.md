@@ -169,7 +169,10 @@ run_clean 'bay dock/launch smoke' 'BAY DOCK LAUNCH SMOKE PASS' "$GODOT" --headle
 run_clean 'recursive travel smoke' 'RECURSIVE TRAVEL SMOKE PASS piloted_geom=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recursive_travel_smoke.gd
 run_clean 'hangar persistence smoke' 'HANGAR PERSISTENCE SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_persistence_smoke.gd
 run_clean 'bay travel unbay smoke' 'BAY TRAVEL UNBAY SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bay_travel_unbay_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=101 clean_output=true'
+run_clean 'ship inventory model smoke' 'SHIP INVENTORY SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_inventory_smoke.gd
+run_clean 'cargo transfer smoke' 'CARGO TRANSFER SMOKE PASS conserved=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cargo_transfer_smoke.gd
+run_clean 'cargo hold smoke' 'CARGO HOLD SMOKE PASS section_a=true deposited=6 withdrew=6 persisted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cargo_hold_smoke.gd
+echo 'SARGASSO REGRESSION PASS commands=104 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

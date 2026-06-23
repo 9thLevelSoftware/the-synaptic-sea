@@ -36,7 +36,7 @@ and be validated independently before integration.
 | 3 | Player Progression (class + skills) | 🟢 **Slice built** | `class_definition.gd`, `player_progression_state.gd`; XP + repair-skill integration (ADR-0010). Repair skill speeds the repair channel. *Remaining:* full 8-class roster, full five-category skill tree, cross-training XP costs, training-by-item. |
 | 4 | Scanner & Travel | 🟢 **Slice built** | `scanner_state.gd`, `travel_controller.gd`, `marker_generator.gd`, `ship_marker.gd` (ADR-0011, phase4 + phase4.5 specs). Menu-based travel works; propulsion gates onward travel (repair loop). *Remaining:* multi-level scanner detail/upgrades (currently basic). |
 | 5 | Ship Docking & Ship-in-Ship | ✅ **Complete (5a + 5b + 5c + 5d)** | `docking_manager.gd`, `dock_ports.gd` (typed ports + compat + `for_hangar`/asymmetric compat), `ship_occupancy.gd`, `dock_port_barrier.gd` (welding-speeded breach); `ship_instance.gd` parent/child + real `interior_aabb`. Runtime port-aligned docking at boot+travel in `playable_generated_ship.gd` — travel is a real undock→dock loop (the piloted ship is the player's ride), NOT a menu teleport. Occupancy-gated boarding; dock-edge persistence. `ship_access_state.gd` (login-based ownership), `bridge_terminal.gd` (working-vessel gate), `set_piloted_ship` pilot-switch. `hangar_bay.gd` (fixed-slot bay), `hangar_bay_control.gd` (physical walk-up dock/launch), weighted `hangar` derelict role (+ home bay via cargo fallback), arbitrary-depth DFS rigid-pair travel (`_capture_subtree`/`_reposition_subtree`), `world-4` persistence (`port_type`/`slot_index`). Multiplayer access UI and the screen-space hangar/fleet UI are post-Phase-7 seams. ADR-0016, ADR-0017, ADR-0018, ADR-0019. |
-| 6 | Inventory & Equipment | 🟡 **~40% — player half done** | PlayerInventory (`inventory_state.gd`, weight-capped, categorized) ✅; loot (`loot_roller.gd`, `loot_container.gd`, `item_definitions.json`, `loot_tables.json`) ✅. *Remaining:* ShipInventory (per-ship storage), EquipmentSlots (suit/tool-belt/etc.), item transfer player↔ship↔ship, equipment & data item categories. |
+| 6 | Inventory & Equipment | 🟡 **~60% — player inventory + loot + ship cargo holds done** | PlayerInventory (`inventory_state.gd`, weight-capped, categorized) ✅; loot (`loot_roller.gd`, `loot_container.gd`, `item_definitions.json`, `loot_tables.json`) ✅; ship cargo holds (`ship_inventory.gd`, weight-capped 500, lazy on `ShipInstance.get_inventory()`), `CargoTransfer` (pure-static deposit-all/withdraw-by-category, tools excluded), `CargoHoldControl` (`Area3D` access point), additive persistence (ADR-0020) ✅. *Remaining:* carry containers (bags/trolleys/carts raising per-trip haul), EquipmentSlots (suit/tool-belt/etc.), rich item-transfer UI (Phase 7). |
 | 7 | Procedural Generation Details | ✅ **Complete** | Folded into System 1 — room roles, graph rules, structural placement, deterministic-per-seed all delivered in the procgen pipeline. |
 | 8 | Sargasso World & Scanner Display | ✅ **Complete** | `sargasso_world.gd` (registry + spatial grid), `scanner_panel.gd`, `marker_generator.gd`. Folded into System 4's delivery. |
 
@@ -71,10 +71,14 @@ repair flow. Out-of-order isolated delivery is the method working as intended.
 Two bodies of work, in the recommended order:
 
 ### A. Finish System 6 — Inventory & Equipment (Phase 6 remainder)
-Smallest, builds directly on shipped loot/inventory. Add ShipInventory
-(per-ship storage containers), EquipmentSlots (worn items that modify actions),
-and item transfer (player↔ship, ship↔ship when co-located). Unblocks "store
-salvage on your ship" and equipment-gated actions.
+Player inventory + loot + ship cargo holds (player↔ship physical transfer, ADR-0020) are
+done. The hold is a weight-capped `ShipInventory` on every `ShipInstance`, accessible via a
+physical `CargoHoldControl` walk-up node; `CargoTransfer` deposits parts/supplies and
+withdraws by category (tools excluded). Cross-ship transfer is emergent and physical (carry
+into personal inventory, walk to the next ship, deposit). Remaining: carry containers
+(bags/trolleys/carts raising per-trip haul capacity), EquipmentSlots (worn items that modify
+actions), and the rich item-transfer UI (Phase 7). Unblocks "store salvage on your ship"
+and equipment-gated actions.
 
 ### ✅ System 5 — Ship Docking & Ship-in-Ship (Phase 5) — COMPLETE
 **5a (foundation), 5b (physical docking + typed ports), 5c (claim + pilot-switch
@@ -102,7 +106,7 @@ and an inventory/weight panel), and balance (repair difficulty, loot
 distribution, scanner upgrades). This is where isolated systems stop being
 independently validated slices and become one game.
 
-**Net: two phases remain (6, 7); System 5 is complete, and 6 is already partly done.**
+**Net: two phases remain (6, 7); System 5 is complete, and 6 is ~60% done (player inventory + loot + ship cargo holds built; carry containers + EquipmentSlots + transfer UI remain).**
 
 ## Explicitly out of scope (future expansions)
 
