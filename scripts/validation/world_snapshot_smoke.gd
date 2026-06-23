@@ -64,6 +64,15 @@ func _initialize() -> void:
 	assert(rt != null, "home-cargo snapshot round-trips")
 	assert(int(rt.home_ship_inventory.get("items", {}).get("scrap_metal", 0)) == 5, "home_ship_inventory survived round-trip")
 
+	# --- player_equipment round-trip (slice 2, additive, no version bump) ---
+	var ws_eq = WorldSnapshotScript.new()
+	ws_eq.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
+	ws_eq.godot_version = godot_version
+	ws_eq.player_equipment = {"slots": {"back": "eva_backpack", "suit": "hardsuit"}}
+	var rt_eq = WorldSnapshotScript.from_dict(ws_eq.to_dict(), WorldSnapshotScript.WORLD_SLICE_VERSION, godot_version)
+	assert(rt_eq != null, "equipment snapshot round-trips")
+	assert(str(rt_eq.player_equipment.get("slots", {}).get("back", "")) == "eva_backpack", "player_equipment survived round-trip")
+
 	print("WORLD SNAPSHOT PASS round_trip=true version_gated=true")
 	quit(0)
 
