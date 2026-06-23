@@ -37,6 +37,7 @@ const DockingManagerScript := preload("res://scripts/systems/docking_manager.gd"
 const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
 const DockPortBarrierScript := preload("res://scripts/tools/dock_port_barrier.gd")
 const BridgeTerminalScript := preload("res://scripts/tools/bridge_terminal.gd")
+const HangarBayControlScript := preload("res://scripts/tools/hangar_bay_control.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -151,6 +152,7 @@ var piloted_ship = null                     # the ShipInstance the player curren
 var dock_barriers: Array = []
 const PLAYER_LOCAL_ID := "player_local"
 var bridge_terminals: Array = []
+var hangar_controls: Array = []             # Array[HangarBayControl]
 # Sub-project #2: the active derelict's objective interactables live under a
 # dedicated root (empty while on the home ship). Separate from the home gameplay
 # roots so it stays attached when away_from_start.
@@ -1270,6 +1272,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 		_reposition_docked_children(child_carry)
 	_spawn_dock_barrier(inst)
 	_spawn_bridge_terminal(inst)
+	_spawn_hangar_control(inst)
 	# Phase 5b Task 5: occupancy is the piloted ship — the player rides it to the host
 	# and stays aboard (no teleport into the derelict). recompute_occupancy() then
 	# tracks the player as they breach the dock seam and walk into the host.
@@ -1412,6 +1415,171 @@ func _clear_bridge_terminals() -> void:
 				t.get_parent().remove_child(t)
 			t.queue_free()
 	bridge_terminals.clear()
+
+## Reads inst.built_layout and (re)configures inst's HangarBay slot_count/size from
+## DockPorts.for_hangar. No-op (leaves a 0-slot bay) when the ship has no hangar/cargo
+## room. Returns the for_hangar descriptor (or {}).
+func _configure_bay_from_layout(inst) -> Dictionary:
+	if inst == null or typeof(inst.built_layout) != TYPE_DICTIONARY or (inst.built_layout as Dictionary).is_empty():
+		return {}
+	var desc: Dictionary = DockPortsScript.for_hangar(inst.built_layout, _ship_seed(inst))
+	if desc.is_empty():
+		return {}
+	var bay = inst.get_hangar()
+	# Preserve existing occupancy when re-configuring (e.g. on reload); only (re)size
+	# when the bay is unconfigured, so a restored slot map is never clobbered.
+	if bay.slot_count == 0:
+		bay.slot_count = int(desc.get("slot_count", 0))
+		bay.slot_size_class = int(desc.get("slot_size_class", 0))
+		bay.slots.clear()
+		for _i in range(bay.slot_count):
+			bay.slots.append("")
+	return desc
+
+## Spawns a HangarBayControl for a ship that has a bay (hangar room, or the home
+## ship's cargo fallback), parented under its scene_root. Unlike the bridge terminal,
+## the HOME ship IS allowed a bay. Idempotent: prunes any existing control for the
+## same carrier id. No-op when the ship has no bay.
+func _spawn_hangar_control(inst) -> void:
+	if inst == null or not is_instance_valid(inst.scene_root):
+		return
+	var desc: Dictionary = _configure_bay_from_layout(inst)
+	if desc.is_empty():
+		return
+	var anchors: Array = desc.get("slot_anchors", [])
+	if anchors.is_empty():
+		return
+	# Place the control at the centroid of the slot anchors (bay center).
+	var center := Vector3.ZERO
+	for a in anchors:
+		center += a as Vector3
+	center /= float(anchors.size())
+	# Prune dead entries + any existing control for this same carrier (idempotent).
+	var kept: Array = []
+	for c in hangar_controls:
+		if not is_instance_valid(c):
+			continue
+		if String(c.carrier_id) == String(inst.ship_id):
+			if c.get_parent() != null:
+				c.get_parent().remove_child(c)
+			c.queue_free()
+			continue
+		kept.append(c)
+	hangar_controls = kept
+	var control = HangarBayControlScript.new()
+	(inst.scene_root as Node3D).add_child(control)
+	control.configure(String(inst.ship_id), center, 1.8)
+	control.bay_dock_requested.connect(_on_bay_dock_requested)
+	control.bay_launch_requested.connect(_on_bay_launch_requested)
+	hangar_controls.append(control)
+
+func _clear_hangar_controls() -> void:
+	for c in hangar_controls:
+		if is_instance_valid(c):
+			if c.get_parent() != null:
+				c.get_parent().remove_child(c)
+			c.queue_free()
+	hangar_controls.clear()
+
+## A ship currently airlock-docked to `carrier` (parent_ship == carrier) that is NOT
+## already bayed there and whose airlock port size_class fits a free slot. null if none.
+func _bay_dock_candidate(carrier):
+	if carrier == null:
+		return null
+	var bay = carrier.get_hangar()
+	for child in carrier.docked_ships:
+		if child == null or not is_instance_valid(child.scene_root):
+			continue
+		if bay.slot_of(String(child.ship_id)) != -1:
+			continue   # already bayed
+		var size_class: int = _ship_dock_size_class(child)
+		if bay.free_slot_for(size_class) != -1:
+			return child
+	return null
+
+## A ship's own dock/airlock port size_class (1 today for every ship). Reads its
+## airlock port when present, else the dock port, else AIRLOCK_SIZE_CLASS.
+func _ship_dock_size_class(inst) -> int:
+	if inst == null or typeof(inst.built_layout) != TYPE_DICTIONARY:
+		return DockPortsScript.AIRLOCK_SIZE_CLASS
+	var p: Dictionary = DockPortsScript.for_lifeboat(inst.built_layout)
+	if p.is_empty():
+		p = DockPortsScript.for_derelict(inst.built_layout)
+	return int(p.get("size_class", DockPortsScript.AIRLOCK_SIZE_CLASS))
+
+func _first_occupied_slot(bay) -> int:
+	for i in range(bay.slots.size()):
+		if String(bay.slots[i]) != "":
+			return i
+	return -1
+
+## Places `mobile` at carrier-local slot anchor `slot_index` (world transform).
+func _place_in_slot(carrier, mobile, slot_index: int) -> void:
+	if carrier == null or mobile == null:
+		return
+	if not is_instance_valid(carrier.scene_root) or not is_instance_valid(mobile.scene_root):
+		return
+	if not (carrier.scene_root as Node3D).is_inside_tree():
+		return
+	var desc: Dictionary = DockPortsScript.for_hangar(carrier.built_layout, _ship_seed(carrier))
+	var anchors: Array = desc.get("slot_anchors", [])
+	if slot_index < 0 or slot_index >= anchors.size():
+		return
+	var anchor: Vector3 = anchors[slot_index]
+	(mobile.scene_root as Node3D).global_transform = (carrier.scene_root as Node3D).global_transform * Transform3D(Basis(), anchor)
+
+## Docks a co-present airlock-docked ship into a free hangar slot of `carrier_id`.
+## Silent refusal (no candidate / no slot / not co-present). slot_index is advisory
+## (-1 = first free).
+func _on_bay_dock_requested(carrier_id: String, slot_index: int) -> void:
+	var carrier = _find_ship_by_id(carrier_id)
+	if carrier == null:
+		return
+	var bay = carrier.get_hangar()
+	if bay.slot_count <= 0:
+		return
+	var candidate = _bay_dock_candidate(carrier)
+	if candidate == null:
+		return   # silent: not_co_present / no_free_slot / incompatible_size
+	var size_class: int = _ship_dock_size_class(candidate)
+	var idx: int = bay.dock(String(candidate.ship_id), size_class)
+	if idx == -1:
+		return
+	# Transition the candidate from airlock-docked to slot-bayed: drop its airlock
+	# alignment, keep it a dock child of the carrier, and re-peg it to the slot anchor.
+	DockingManagerScript.undock(candidate)
+	candidate.parent_ship = carrier
+	if not carrier.docked_ships.has(candidate):
+		carrier.docked_ships.append(candidate)
+	_place_in_slot(carrier, candidate, idx)
+	recompute_occupancy()
+
+## Launches a bayed ship of `carrier_id` back out to a co-present anchor near the
+## carrier. slot_index -1 = first occupied. Silent refusal when nothing is bayed.
+func _on_bay_launch_requested(carrier_id: String, slot_index: int) -> void:
+	var carrier = _find_ship_by_id(carrier_id)
+	if carrier == null:
+		return
+	var bay = carrier.get_hangar()
+	var idx := slot_index
+	if idx < 0:
+		idx = _first_occupied_slot(bay)
+	if idx < 0:
+		return
+	var ship_id: String = bay.launch(idx)
+	if ship_id == "":
+		return
+	var launched = _find_ship_by_id(ship_id)
+	if launched == null:
+		return
+	launched.parent_ship = null
+	carrier.docked_ships.erase(launched)
+	if is_instance_valid(launched.scene_root) and is_instance_valid(carrier.scene_root) \
+			and (carrier.scene_root as Node3D).is_inside_tree():
+		# Park it just outside the bay (carrier-local -Z), co-present and free.
+		(launched.scene_root as Node3D).global_transform = \
+			(carrier.scene_root as Node3D).global_transform * Transform3D(Basis(), Vector3(0.0, 0.0, -8.0))
+	recompute_occupancy()
 
 ## Builds the active derelict's objective interactables from its loader specs and
 ## restores completed/cleared state from its (retained or loaded) controller. Called
@@ -1999,6 +2167,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 		home_ship = current_ship
 		# Store the layout so DockPorts can derive port descriptors for boot docking.
 		home_ship.built_layout = loader.get_layout_copy()
+		_spawn_hangar_control(home_ship)
 		# Phase 5a Task 6: initialise occupancy to home ship (player starts here).
 		current_occupancy = home_ship
 		# Phase 5a Task 7: build the physical lifeboat docked to the starting derelict.
@@ -2105,6 +2274,7 @@ func _build_lifeboat_at_home() -> void:
 	# because that call clears bridge_terminals (it shares the dock-transition teardown).
 	# Spawned post-add_child so the terminal is in-tree for the login range gate.
 	_spawn_bridge_terminal(lifeboat_ship)
+	_spawn_hangar_control(lifeboat_ship)
 
 ## Port-aligns piloted_ship's airlock to host's dock port and writes the dock
 ## relationship. host.scene_root must be in-tree. Returns the dock() result dict.
@@ -3867,6 +4037,7 @@ func _ensure_derelict_geometry(inst) -> void:
 	if inst.built_layout.is_empty() and new_root.has_method("get_layout_copy"):
 		inst.built_layout = new_root.get_layout_copy()
 	_spawn_bridge_terminal(inst)
+	_spawn_hangar_control(inst)
 
 ## Applies a WorldSnapshot: rebuilds the home ship first (this resets the runtime
 ## and returns to home if currently away), restores the SargassoWorld and the
@@ -4125,6 +4296,7 @@ func _reset_runtime_for_reload() -> void:
 	# stale/leaked Array entry).
 	_clear_dock_barriers()
 	_clear_bridge_terminals()
+	_clear_hangar_controls()
 	if hud_layer != null and is_instance_valid(hud_layer):
 		hud_layer.queue_free()
 	# REQ-014 blocking finding B: null the hud_layer and tracker
@@ -4362,6 +4534,7 @@ func register_offline_test_ship_for_validation() -> String:
 		inst.built_layout = built.get_layout_copy()
 	visited_ships[String(inst.marker_id)] = inst
 	_spawn_bridge_terminal(inst)
+	_spawn_hangar_control(inst)
 	return String(inst.ship_id)
 
 ## True iff a layout dict contains a room with room_role == "bridge".
@@ -4377,3 +4550,43 @@ func _layout_has_bridge(layout: Dictionary) -> bool:
 ## 5c seam: true iff the current active ship has a bridge room (is claimable).
 func current_ship_has_bridge_for_validation() -> bool:
 	return current_ship != null and typeof(current_ship.built_layout) == TYPE_DICTIONARY and _layout_has_bridge(current_ship.built_layout)
+
+## 5d seams: hangar-bay dock/launch validation surface.
+func home_ship_id_for_validation() -> String:
+	return String(home_ship.ship_id) if home_ship != null else ""
+
+func lifeboat_ship_id_for_validation() -> String:
+	return String(lifeboat_ship.ship_id) if lifeboat_ship != null else ""
+
+func ship_bay_slot_count_for_validation(ship_id: String) -> int:
+	var inst = _find_ship_by_id(ship_id)
+	return inst.get_hangar().slot_count if inst != null else 0
+
+func ship_is_bayed_in_for_validation(mobile_id: String, carrier_id: String) -> bool:
+	var carrier = _find_ship_by_id(carrier_id)
+	if carrier == null:
+		return false
+	return carrier.get_hangar().slot_of(mobile_id) != -1
+
+func bay_dock_for_validation(carrier_id: String) -> int:
+	var carrier = _find_ship_by_id(carrier_id)
+	if carrier == null:
+		return -1
+	var before: int = _first_occupied_slot(carrier.get_hangar())
+	_on_bay_dock_requested(carrier_id, -1)
+	# Return the slot the candidate landed in (first occupied that was not before, else any occupied).
+	var candidate_slot: int = -1
+	for i in range(carrier.get_hangar().slots.size()):
+		if String(carrier.get_hangar().slots[i]) != "":
+			candidate_slot = i
+			if i != before:
+				break
+	return candidate_slot
+
+func bay_launch_for_validation(carrier_id: String) -> int:
+	var carrier = _find_ship_by_id(carrier_id)
+	if carrier == null:
+		return -1
+	var idx: int = _first_occupied_slot(carrier.get_hangar())
+	_on_bay_launch_requested(carrier_id, -1)
+	return idx
