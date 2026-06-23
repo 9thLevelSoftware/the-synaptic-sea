@@ -1538,6 +1538,7 @@ func _on_cargo_deposit_requested(ship_id: String) -> void:
 	if inst == null:
 		return
 	CargoTransferScript.deposit_all(inventory_state, inst.get_inventory())
+	_recompute_player_encumbrance()
 
 func _on_cargo_withdraw_requested(ship_id: String, category: String) -> void:
 	if inventory_state == null:
@@ -1546,6 +1547,7 @@ func _on_cargo_withdraw_requested(ship_id: String, category: String) -> void:
 	if inst == null:
 		return
 	CargoTransferScript.withdraw_category(inst.get_inventory(), inventory_state, category)
+	_recompute_player_encumbrance()
 
 ## Recompute the player's effective carry budget from worn equipment and apply the
 ## Heavy Load movement penalty (× any active cart push penalty). Called on every
@@ -3634,6 +3636,7 @@ func _resolve_tool_pickup_world_position() -> Vector3:
 func _on_tool_pickup_acquired(p_tool_id: String) -> void:
 	_refresh_tracker_system_status_lines()
 	print("PLAYABLE TOOL ACQUIRED tool_id=%s" % p_tool_id)
+	_recompute_player_encumbrance()
 
 # --- REQ-014: junction_calibrator pickup -------------------------------------
 # A second ToolPickup configured with tool_id = "junction_calibrator".
@@ -4784,13 +4787,17 @@ func cargo_deposit_for_validation(ship_id: String) -> int:
 	var inst = _find_ship_by_id(ship_id)
 	if inst == null or inventory_state == null:
 		return 0
-	return int(CargoTransferScript.deposit_all(inventory_state, inst.get_inventory()).get("total_moved", 0))
+	var moved: int = int(CargoTransferScript.deposit_all(inventory_state, inst.get_inventory()).get("total_moved", 0))
+	_recompute_player_encumbrance()
+	return moved
 
 func cargo_withdraw_for_validation(ship_id: String, category: String) -> int:
 	var inst = _find_ship_by_id(ship_id)
 	if inst == null or inventory_state == null:
 		return 0
-	return int(CargoTransferScript.withdraw_category(inst.get_inventory(), inventory_state, category).get("total_moved", 0))
+	var moved: int = int(CargoTransferScript.withdraw_category(inst.get_inventory(), inventory_state, category).get("total_moved", 0))
+	_recompute_player_encumbrance()
+	return moved
 
 func ship_hold_quantity_for_validation(ship_id: String, item_id: String) -> int:
 	var inst = _find_ship_by_id(ship_id)

@@ -44,4 +44,25 @@ func _run_section_a() -> void:
 	for _j in range(3):
 		await process_frame
 	assert(ship.player_equipped_for_validation("suit") == "hardsuit", "suit persisted across save/load")
+
+	# --- Cargo-transfer encumbrance recompute (Finding #1/#2 regression guard) ---
+	# Ensure a backpack is worn so effective capacity is ~90 (base + 40 bonus).
+	if ship.player_equipped_for_validation("back") != "eva_backpack":
+		ship.equip_for_validation("eva_backpack")
+	# Overload the player: scrap_metal x20 = 100 weight vs ~90 cap -> Heavy Load.
+	ship.overload_player_for_validation("scrap_metal", 20)
+	var slow: float = ship.player_move_speed_for_validation()
+	assert(slow < 6.0, "move_speed below default 6.0 when over-encumbered (got %s)" % str(slow))
+
+	# Deposit all cargo to the home hold: player weight drops, move_speed should recompute up.
+	var home_id: String = ship.home_ship_id_for_validation()
+	ship.cargo_deposit_for_validation(home_id)
+	var fast: float = ship.player_move_speed_for_validation()
+	assert(fast > slow, "deposit recomputed encumbrance: speed rose after unloading (%s -> %s)" % [str(slow), str(fast)])
+
+	# Withdraw the parts back: player weight rises again, move_speed should recompute down.
+	ship.cargo_withdraw_for_validation(home_id, "part")
+	var slow2: float = ship.player_move_speed_for_validation()
+	assert(slow2 < fast, "withdraw recomputed encumbrance: speed fell after reloading (%s -> %s)" % [str(fast), str(slow2)])
+
 	ship.queue_free()
