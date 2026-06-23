@@ -3958,10 +3958,20 @@ func _current_dock_edges() -> Array:
 		if seen.has(key):
 			continue
 		seen[key] = true
+		# A child is a HANGAR edge iff its parent's bay holds it in a slot; else airlock.
+		var port_type: String = "airlock"
+		var slot_index: int = -1
+		var parent = inst.parent_ship
+		if parent.hangar != null:
+			var s: int = parent.hangar.slot_of(String(inst.ship_id))
+			if s != -1:
+				port_type = "hangar"
+				slot_index = s
 		edges.append({
-			"host": String(inst.parent_ship.marker_id),
+			"host": String(parent.marker_id),
 			"mobile": String(inst.ship_id),
-			"port_type": "airlock",
+			"port_type": port_type,
+			"slot_index": slot_index,
 		})
 	return edges
 
@@ -4140,7 +4150,13 @@ func _apply_docking_snapshot(ws) -> void:
 		var edge: Dictionary = edge_v
 		var mobile = _find_ship_by_id(String(edge.get("mobile", "")))
 		var host = _find_ship_by_id_or_marker(String(edge.get("host", "")))
-		if mobile != null and host != null and mobile.parent_ship != host:
+		if mobile == null or host == null:
+			continue
+		if str(edge.get("port_type", "airlock")) == "hangar":
+			# Hangar edge: re-peg the carrier's bay + place at slot anchor. Do NOT run
+			# the airlock port-alignment (_dock_piloted_to) — bayed ships sit at slots.
+			_redock_bayed(mobile, host, int(edge.get("slot_index", -1)))
+		elif mobile.parent_ship != host:
 			# Re-establish only when the rebuild did not already dock this edge (idempotent).
 			# _dock_piloted_to reads the module-level piloted_ship, so swap it for the move.
 			var saved_piloted = piloted_ship
@@ -4155,6 +4171,25 @@ func _apply_docking_snapshot(ws) -> void:
 		var a = _find_ship_by_id(String(ws.aboard_ship_id))
 		if a != null:
 			current_occupancy = a
+
+## Restores a hangar edge: re-pegs the carrier's bay slot, re-establishes the
+## parent/child link, and places the bayed ship at its slot anchor. Configures the
+## carrier's bay from its layout first so slot_count/size exist after a fresh load.
+func _redock_bayed(mobile, host, slot_index: int) -> void:
+	if mobile == null or host == null:
+		return
+	if not is_instance_valid(mobile.scene_root) or not is_instance_valid(host.scene_root):
+		return
+	_configure_bay_from_layout(host)
+	var bay = host.get_hangar()
+	if slot_index >= 0 and slot_index < bay.slots.size():
+		bay.slots[slot_index] = String(mobile.ship_id)
+	else:
+		slot_index = bay.dock(String(mobile.ship_id), _ship_dock_size_class(mobile))
+	mobile.parent_ship = host
+	if not host.docked_ships.has(mobile):
+		host.docked_ships.append(mobile)
+	_place_in_slot(host, mobile, slot_index)
 
 ## Resolves a ShipInstance by its ship_id across home/lifeboat/active/visited registries.
 func _find_ship_by_id(id: String):
@@ -4221,6 +4256,12 @@ func _reset_runtime_for_reload() -> void:
 			if inst != null:
 				inst.parent_ship = null
 				inst.docked_ships = []
+				# 5d: clear bay slots too. A stale occupant id left in the home/lifeboat
+				# bay would desync the reload's slot re-peg (and keep a freed ship_id
+				# pinned). The reload re-pegs occupancy from the snapshot edges.
+				if inst.hangar != null:
+					for i in range(inst.hangar.slots.size()):
+						inst.hangar.slots[i] = ""
 		# Co-presence: home hull / loader / gameplay roots were never detached —
 		# no re-attach needed here (contrast with old single-active model).
 		away_from_start = false
