@@ -1269,7 +1269,6 @@ func _apply_player_carry(carry: Dictionary) -> void:
 ## condition from the derelict's seed/condition. Home derelict is always intact.
 func _spawn_dock_barrier(inst) -> void:
 	_clear_dock_barriers()
-	_clear_bridge_terminals()
 	if inst == null or not is_instance_valid(inst.scene_root):
 		return
 	var local: Dictionary = DockPortsScript.for_derelict(inst.built_layout, _ship_seed(inst), _ship_condition_class(inst))
@@ -1315,6 +1314,18 @@ func _spawn_bridge_terminal(inst) -> void:
 	var local_center: Vector3 = _command_room_local_center(inst)
 	if local_center == Vector3.INF:
 		return   # no bridge room -> not claimable
+	# Prune dead entries + any existing terminal for this same ship (idempotent re-spawn).
+	var kept: Array = []
+	for t in bridge_terminals:
+		if not is_instance_valid(t):
+			continue
+		if String(t.ship_id) == String(inst.ship_id):
+			if t.get_parent() != null:
+				t.get_parent().remove_child(t)
+			t.queue_free()
+			continue
+		kept.append(t)
+	bridge_terminals = kept
 	var terminal = BridgeTerminalScript.new()
 	(inst.scene_root as Node3D).add_child(terminal)
 	terminal.configure(String(inst.ship_id), local_center, 1.8)
