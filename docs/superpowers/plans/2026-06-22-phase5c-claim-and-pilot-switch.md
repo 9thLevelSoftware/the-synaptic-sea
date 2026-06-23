@@ -613,6 +613,11 @@ func _init() -> void:
 	assert(ship.login_at_terminal_for_validation(offline_id) == true, "working vessel login succeeds")
 	assert(ship.piloted_ship_id_for_validation() == offline_id, "piloted flips to the claimed ship")
 
+	# The lifeboat ALSO has a working bridge terminal (it has a cockpit/bridge room):
+	# logging in there takes command back. Proves the lifeboat terminal actually spawned.
+	assert(ship.login_at_terminal_for_validation(String(lifeboat.ship_id)) == true, "lifeboat terminal login succeeds")
+	assert(ship.piloted_ship_id_for_validation() == String(lifeboat.ship_id), "piloted switched back to lifeboat")
+
 	print("BRIDGE TERMINAL LOGIN SMOKE PASS piloted=%s" % ship.piloted_ship_id_for_validation())
 	quit()
 ```
@@ -643,27 +648,26 @@ var bridge_terminals: Array = []
 
 (c) Add the bridge-room locator + spawn/clear helpers (place them next to `_spawn_dock_barrier` / `_clear_dock_barriers`):
 
+First add a public static to `scripts/systems/dock_ports.gd` (reuses the existing `_room_floor_center` machinery so the bridge center is derived from a layout dict uniformly for ALL ship types):
+
 ```gdscript
-## Local-space center of `loader`'s bridge room (role == "bridge"), or Vector3.INF
-## if the ship has NO bridge room. Claimability requires a real bridge: a ship
-## without one is not pilotable (just a loot/explore space), so there is deliberately
-## NO entry-room fallback here. Positions are ship-local (the terminal is parented
-## under the ship's scene_root).
-func _command_room_local_center(loader) -> Vector3:
-	if loader == null or not loader.has_method("get_layout_copy") or not loader.has_method("get_room_center"):
+## Ship-local floor center of the `bridge` room, or Vector3.INF if none.
+static func bridge_center(layout: Dictionary) -> Vector3:
+	return _room_floor_center(layout, "bridge", "bridge")
+```
+
+Then the coordinator locator reads the ship's `built_layout` (populated for the lifeboat via `build_layout()`, for derelicts via `get_layout_copy()` on attach, and for the home ship from the loader) — NOT the scene_root loader, because the lifeboat's `scene_root` is a plain `Node3D` with no `get_room_center`:
+
+```gdscript
+## Ship-local center of `inst`'s bridge room (role == "bridge"), or Vector3.INF if the
+## ship has NO bridge room. Derived from inst.built_layout via DockPorts so it works
+## uniformly for the lifeboat (plain Node3D scene_root), procgen derelicts, and golden
+## ships. Claimability requires a real bridge: a ship without one is not pilotable
+## (just a loot/explore space) — deliberately NO entry-room fallback.
+func _command_room_local_center(inst) -> Vector3:
+	if inst == null or typeof(inst.built_layout) != TYPE_DICTIONARY or (inst.built_layout as Dictionary).is_empty():
 		return Vector3.INF
-	var layout: Dictionary = loader.get_layout_copy()
-	var rooms_v: Variant = layout.get("rooms", [])
-	if typeof(rooms_v) != TYPE_ARRAY:
-		return Vector3.INF
-	for room_v in (rooms_v as Array):
-		if typeof(room_v) != TYPE_DICTIONARY:
-			continue
-		if str((room_v as Dictionary).get("room_role", "")) == "bridge":
-			var c: Vector3 = loader.get_room_center(str((room_v as Dictionary).get("id", "")))
-			if c != Vector3.INF:
-				return c
-	return Vector3.INF
+	return DockPortsScript.bridge_center(inst.built_layout)
 
 ## Spawns the bridge terminal for a pilotable ship at its bridge room (ship-local),
 ## parented under the ship's scene_root so it inherits the ship transform and is
@@ -672,7 +676,7 @@ func _command_room_local_center(loader) -> Vector3:
 func _spawn_bridge_terminal(inst) -> void:
 	if inst == null or inst == home_ship or not is_instance_valid(inst.scene_root):
 		return
-	var local_center: Vector3 = _command_room_local_center(inst.scene_root)
+	var local_center: Vector3 = _command_room_local_center(inst)
 	if local_center == Vector3.INF:
 		return   # no bridge room -> not claimable
 	var terminal = BridgeTerminalScript.new()
@@ -832,7 +836,7 @@ func current_ship_has_bridge_for_validation() -> bool:
 - [ ] **Step 4: Run the smoke to confirm it passes**
 
 Run: `"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bridge_terminal_login_smoke.gd`
-Expected: `BRIDGE TERMINAL LOGIN SMOKE PASS piloted=ship_offline_test`, no unexpected ERROR/WARNING.
+Expected: `BRIDGE TERMINAL LOGIN SMOKE PASS piloted=lifeboat` (the smoke ends by switching command back to the lifeboat), no unexpected ERROR/WARNING.
 
 - [ ] **Step 5: Commit**
 
