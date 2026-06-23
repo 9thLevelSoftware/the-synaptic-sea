@@ -14,6 +14,7 @@ const DerelictObjectiveControllerScript := preload("res://scripts/systems/dereli
 const ShipAccessStateScript := preload("res://scripts/systems/ship_access_state.gd")
 const HangarBayScript := preload("res://scripts/systems/hangar_bay.gd")
 const ShipInventoryScript := preload("res://scripts/systems/ship_inventory.gd")
+const CartStateScript := preload("res://scripts/systems/cart_state.gd")
 
 const ROOM_HALF_EXTENT: float = 4.0   # generous per-room half-box in X/Z (covers 2x1 rooms + module chains)
 const ROOM_HALF_HEIGHT: float = 3.0   # half deck height + headroom
@@ -49,6 +50,10 @@ var hangar = null                        # HangarBay | null
 # Sub-project #6 (cargo): per-ship cargo hold (stores items). Lazily created;
 # persisted under "inventory" only when it actually holds something.
 var inventory = null                     # ShipInventory | null
+
+# Sub-project #6 (carts): carts parked on this ship. Persisted under "carts" only
+# when non-empty. Each entry is a CartState.
+var carts: Array = []                    # Array[CartState]
 
 # Sub-project #2: per-derelict objective loop state. Lazily created; null for the
 # home ship (which uses the coordinator's singleton loop, not this controller).
@@ -93,6 +98,11 @@ func get_summary() -> Dictionary:
 		result["hangar"] = hangar.get_summary()
 	if has_cargo():
 		result["inventory"] = inventory.get_summary()
+	if not carts.is_empty():
+		var cart_dicts: Array = []
+		for c in carts:
+			cart_dicts.append(c.get_summary())
+		result["carts"] = cart_dicts
 	return result
 
 func apply_summary(summary) -> bool:
@@ -128,6 +138,14 @@ func apply_summary(summary) -> bool:
 	var inventory_summary: Variant = summary.get("inventory", null)
 	if typeof(inventory_summary) == TYPE_DICTIONARY and not (inventory_summary as Dictionary).is_empty():
 		get_inventory().apply_summary(inventory_summary as Dictionary)
+	var carts_variant: Variant = summary.get("carts", null)
+	if typeof(carts_variant) == TYPE_ARRAY:
+		carts = []
+		for cd in (carts_variant as Array):
+			if typeof(cd) == TYPE_DICTIONARY:
+				var cart = CartStateScript.create()
+				cart.apply_summary(cd as Dictionary)
+				carts.append(cart)
 	return true
 
 ## Returns this ship's DerelictObjectiveController, creating it on first access.
@@ -161,6 +179,10 @@ func get_inventory():
 ## True iff this ship's hold exists and holds at least one item.
 func has_cargo() -> bool:
 	return inventory != null and not inventory.items.is_empty()
+
+## Returns this ship's live carts array (parked carts).
+func get_carts() -> Array:
+	return carts
 
 ## A "working vessel" can be piloted: its own propulsion system is operational.
 func is_working_vessel() -> bool:
