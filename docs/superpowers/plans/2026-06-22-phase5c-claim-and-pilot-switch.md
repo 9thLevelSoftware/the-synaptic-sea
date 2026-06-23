@@ -503,6 +503,32 @@ const SYSTEM_ROLES: Array[String] = [
 ]
 ```
 
+- [ ] **Step 2b: Fix the pre-existing stale assertion in `derelict_generator_smoke` (authorized)**
+
+`derelict_generator_smoke` check 5 (lines ~83-84) fails on EVERY seed even on pristine HEAD — verified independently, and it is NOT in the regression bundle (so it never blocked prior runs). It compares `ship.get_child(0).get_child_count()` (structural GEOMETRY modules, ~104 per ship under the `ShipLayoutGenerator` v4 pipeline) against `graph.rooms.size()` (~10) — categorically different quantities since the loader rewrite. This is a stale assertion to CORRECT, not loosen (per-room structural integrity is already covered by the passing loader/playable contract smokes). Replace:
+
+```gdscript
+		var structure: Node = ship.get_child(0)
+		if structure == null or structure.get_child_count() != graph.rooms.size():
+			failures.append("seed=%d structure mismatch" % seed_val)
+			continue
+```
+
+with:
+
+```gdscript
+		var structure: Node = ship.get_child(0)
+		# Phase 5c fix: the ShipGenerator pipeline (ShipLayoutGenerator v4) emits structural
+		# GEOMETRY modules under the structure root — many per room — so the old assertion
+		# `child_count == graph.rooms.size()` compared incomparable quantities (geometry
+		# modules vs rooms) and failed every seed post-loader-rewrite. Correct intent: the
+		# pipeline produced a non-null ship with a non-empty structure root. Per-room
+		# structural integrity is covered by the loader/playable contract smokes.
+		if structure == null or structure.get_child_count() <= 0:
+			failures.append("seed=%d empty structure" % seed_val)
+			continue
+```
+
 - [ ] **Step 3: Verify the derelict generator smoke + the broader procgen set**
 
 Run `derelict_generator_smoke` first (the directly affected one), then the broader set. For any whose marker you don't know, grep the smoke's `.gd` for its `print(...)` line.
@@ -524,6 +550,12 @@ Expected: each prints its PASS marker, no new ERROR/WARNING. (Known pre-existing
 ```bash
 git add data/procgen/archetypes/derelict.json scripts/validation/derelict_generator_smoke.gd
 git commit -m "feat(docking): allow a weighted bridge room on derelicts (claimable helm)
+
+Adds bridge to derelict role_weights and removes bridge from the
+derelict_generator_smoke deny-list (authorized invariant change). Also corrects
+a pre-existing stale check-5 assertion in the same smoke (geometry-module count
+vs room count) that failed every seed since the loader rewrite; unrelated to the
+bridge change but required for the smoke to verify and in the same file.
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
