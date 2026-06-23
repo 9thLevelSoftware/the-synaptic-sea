@@ -40,6 +40,8 @@ const BridgeTerminalScript := preload("res://scripts/tools/bridge_terminal.gd")
 const HangarBayControlScript := preload("res://scripts/tools/hangar_bay_control.gd")
 const CargoHoldControlScript := preload("res://scripts/tools/cargo_hold_control.gd")
 const CargoTransferScript := preload("res://scripts/systems/cargo_transfer.gd")
+const CartControlScript := preload("res://scripts/tools/cart_control.gd")
+const CartStateScript := preload("res://scripts/systems/cart_state.gd")
 const EquipmentStateScript := preload("res://scripts/systems/equipment_state.gd")
 const EncumbranceScript := preload("res://scripts/systems/encumbrance.gd")
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
@@ -159,6 +161,8 @@ const PLAYER_LOCAL_ID := "player_local"
 var bridge_terminals: Array = []
 var hangar_controls: Array = []             # Array[HangarBayControl]
 var cargo_hold_controls: Array = []         # Array[CargoHoldControl]
+var cart_controls: Array = []               # Array[CartControl]
+var grabbed_cart = null                     # CartState currently pushed by the player (or null)
 # Sub-project #2: the active derelict's objective interactables live under a
 # dedicated root (empty while on the home ship). Separate from the home gameplay
 # roots so it stays attached when away_from_start.
@@ -1283,6 +1287,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	_spawn_bridge_terminal(inst)
 	_spawn_hangar_control(inst)
 	_spawn_cargo_hold_control(inst)
+	_spawn_cart_controls_for_ship(inst)
 	# Phase 5b Task 5: occupancy is the piloted ship — the player rides it to the host
 	# and stays aboard (no teleport into the derelict). recompute_occupancy() then
 	# tracks the player as they breach the dock seam and walk into the host.
@@ -1531,6 +1536,77 @@ func _clear_cargo_hold_controls() -> void:
 			c.queue_free()
 	cargo_hold_controls.clear()
 
+## Spawn a CartControl node for an existing CartState parked on `inst`.
+## Idempotent per cart_id: prunes any existing control for the same cart_id first.
+func _spawn_cart_control(inst, cart) -> void:
+	if inst == null or cart == null or not is_instance_valid(inst.scene_root):
+		return
+	# Prune dead entries + any existing control for this same cart_id (idempotent).
+	var kept: Array = []
+	for c in cart_controls:
+		if not is_instance_valid(c):
+			continue
+		if String(c.cart_id) == String(cart.cart_id):
+			if c.get_parent() != null:
+				c.get_parent().remove_child(c)
+			c.queue_free()
+			continue
+		kept.append(c)
+	cart_controls = kept
+	var control = CartControlScript.new()
+	(inst.scene_root as Node3D).add_child(control)
+	control.configure(String(cart.cart_id), cart.parked_position, 1.8)
+	control.cart_grab_requested.connect(_on_cart_grab_requested)
+	control.cart_load_requested.connect(_on_cart_load_requested)
+	control.cart_unload_requested.connect(_on_cart_unload_requested)
+	cart_controls.append(control)
+
+func _spawn_cart_controls_for_ship(inst) -> void:
+	if inst == null:
+		return
+	for cart in inst.get_carts():
+		_spawn_cart_control(inst, cart)
+
+func _clear_cart_controls() -> void:
+	for c in cart_controls:
+		if is_instance_valid(c):
+			if c.get_parent() != null:
+				c.get_parent().remove_child(c)
+			c.queue_free()
+	cart_controls.clear()
+
+func _find_cart_by_id(cart_id: String) -> Dictionary:
+	for inst in _all_known_ships():
+		for cart in inst.get_carts():
+			if String(cart.cart_id) == cart_id:
+				return {"cart": cart, "ship": inst}
+	return {}
+
+func _on_cart_grab_requested(cart_id: String) -> void:
+	var hit: Dictionary = _find_cart_by_id(cart_id)
+	if hit.is_empty():
+		return
+	grabbed_cart = hit["cart"]
+	_recompute_player_encumbrance()      # applies the push penalty
+
+func _on_cart_load_requested(cart_id: String) -> void:
+	if inventory_state == null:
+		return
+	var hit: Dictionary = _find_cart_by_id(cart_id)
+	if hit.is_empty():
+		return
+	CargoTransferScript.deposit_all(inventory_state, hit["cart"].get_hold())
+	_recompute_player_encumbrance()
+
+func _on_cart_unload_requested(cart_id: String, category: String) -> void:
+	if inventory_state == null:
+		return
+	var hit: Dictionary = _find_cart_by_id(cart_id)
+	if hit.is_empty():
+		return
+	CargoTransferScript.withdraw_category(hit["cart"].get_hold(), inventory_state, category)
+	_recompute_player_encumbrance()
+
 func _on_cargo_deposit_requested(ship_id: String) -> void:
 	if inventory_state == null:
 		return
@@ -1604,12 +1680,11 @@ func _definitions_for_equip() -> Dictionary:
 	# static load (cheap, identical) to avoid reaching into inventory internals.
 	return ItemDefsScript.load_definitions()
 
-## Temporary cart stubs — replaced in Task 11 with real cart-backed bodies.
 func _is_cart_grabbed() -> bool:
-	return false
+	return grabbed_cart != null
 
 func _cart_push_multiplier() -> float:
-	return 1.0
+	return float(grabbed_cart.push_speed_multiplier) if grabbed_cart != null else 1.0
 
 ## A ship currently airlock-docked to `carrier` (parent_ship == carrier) that is NOT
 ## already bayed there and whose airlock port size_class fits a free slot. null if none.
@@ -2324,6 +2399,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 		home_ship.built_layout = loader.get_layout_copy()
 		_spawn_hangar_control(home_ship)
 		_spawn_cargo_hold_control(home_ship)
+		_spawn_cart_controls_for_ship(home_ship)
 		# Phase 5a Task 6: initialise occupancy to home ship (player starts here).
 		current_occupancy = home_ship
 		# Phase 5a Task 7: build the physical lifeboat docked to the starting derelict.
@@ -2432,6 +2508,7 @@ func _build_lifeboat_at_home() -> void:
 	_spawn_bridge_terminal(lifeboat_ship)
 	_spawn_hangar_control(lifeboat_ship)
 	_spawn_cargo_hold_control(lifeboat_ship)
+	_spawn_cart_controls_for_ship(lifeboat_ship)
 
 ## Port-aligns piloted_ship's airlock to host's dock port and writes the dock
 ## relationship. host.scene_root must be in-tree. Returns the dock() result dict.
@@ -2571,6 +2648,8 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		# if nothing more specific (repair/loot/objective) claimed the interact here.
 		if _try_cargo_deposit(player_body):
 			return
+		if _try_cart_interact(player_body):
+			return
 		return
 	# Sub-project #4: try lifeboat repair points before pickups/objectives.
 	for rp in repair_points:
@@ -2595,6 +2674,8 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# walk up to the cargo hold and interact to dump salvage when nothing else claims it.
 	if _try_cargo_deposit(player_body):
 		return
+	if _try_cart_interact(player_body):
+		return
 
 ## Walk-up cargo deposit: deposits all haulable salvage into the hold of whichever
 ## cargo control the player is standing at (strict in-range gate). Returns true iff a
@@ -2603,6 +2684,20 @@ func _try_cargo_deposit(player_body) -> bool:
 	for ch in cargo_hold_controls:
 		if is_instance_valid(ch) and ch.try_deposit(player_body):
 			return true
+	return false
+
+## Walk-up cart interact: grab if not held, else load salvage into it. Lowest-priority
+## fallback (Phase 7 will add the picker for unload/release; seam-driven for now).
+func _try_cart_interact(player_body) -> bool:
+	for c in cart_controls:
+		if not is_instance_valid(c):
+			continue
+		if grabbed_cart == null:
+			if c.try_grab(player_body):
+				return true
+		else:
+			if c.try_load(player_body):
+				return true
 	return false
 
 func _on_interactable_completed(interaction_id: String, objective_id: String, sequence: int, objective_type: String, room_id: String, step_id: String) -> void:
@@ -4097,6 +4192,10 @@ func _build_world_snapshot():
 	if home_ship != null:
 		ws.home_looted_containers = home_ship.looted_container_ids.duplicate()
 		ws.home_ship_inventory = home_ship.get_inventory().get_summary()
+		var home_cart_dicts: Array = []
+		for c in home_ship.get_carts():
+			home_cart_dicts.append(c.get_summary())
+		ws.home_ship_carts = home_cart_dicts
 	if equipment_state != null:
 		ws.player_equipment = equipment_state.get_summary()
 	ws.visited_ships = {}
@@ -4227,6 +4326,7 @@ func _ensure_derelict_geometry(inst) -> void:
 	_spawn_bridge_terminal(inst)
 	_spawn_hangar_control(inst)
 	_spawn_cargo_hold_control(inst)
+	_spawn_cart_controls_for_ship(inst)
 
 ## Applies a WorldSnapshot: rebuilds the home ship first (this resets the runtime
 ## and returns to home if currently away), restores the SargassoWorld and the
@@ -4257,6 +4357,15 @@ func _apply_world_snapshot(ws) -> bool:
 		home_ship.looted_container_ids = ws.home_looted_containers.duplicate()
 		if not ws.home_ship_inventory.is_empty():
 			home_ship.get_inventory().apply_summary(ws.home_ship_inventory)
+		# Restore home-ship carts BEFORE spawning their controls so the CartStates
+		# are in place when _spawn_cart_controls_for_ship iterates them.
+		home_ship.get_carts().clear()
+		for cd in ws.home_ship_carts:
+			if typeof(cd) == TYPE_DICTIONARY:
+				var cart = CartStateScript.create()
+				cart.apply_summary(cd as Dictionary)
+				home_ship.get_carts().append(cart)
+		_spawn_cart_controls_for_ship(home_ship)
 		if not away_from_start:
 			_build_loot_containers()
 	# 1c. Restore player equipment (player-global — runs regardless of home_ship branch).
@@ -4524,6 +4633,8 @@ func _reset_runtime_for_reload() -> void:
 	_clear_bridge_terminals()
 	_clear_hangar_controls()
 	_clear_cargo_hold_controls()
+	_clear_cart_controls()
+	grabbed_cart = null
 	if hud_layer != null and is_instance_valid(hud_layer):
 		hud_layer.queue_free()
 	# REQ-014 blocking finding B: null the hud_layer and tracker
@@ -4763,6 +4874,7 @@ func register_offline_test_ship_for_validation() -> String:
 	_spawn_bridge_terminal(inst)
 	_spawn_hangar_control(inst)
 	_spawn_cargo_hold_control(inst)
+	_spawn_cart_controls_for_ship(inst)
 	return String(inst.ship_id)
 
 ## True iff a layout dict contains a room with room_role == "bridge".
@@ -4918,3 +5030,49 @@ func overload_player_for_validation(item_id: String, qty: int) -> void:
 	if inventory_state != null:
 		inventory_state.add_item(item_id, qty)
 	_recompute_player_encumbrance()
+
+## Task 11 cart validation seams.
+func spawn_cart_for_validation(ship_id: String) -> String:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null:
+		return ""
+	var cart = CartStateScript.create("cart_%s" % ship_id, 200.0)
+	cart.parked_ship_id = ship_id
+	inst.get_carts().append(cart)
+	_spawn_cart_control(inst, cart)
+	return cart.cart_id
+
+func cart_grab_for_validation(cart_id: String) -> bool:
+	var hit: Dictionary = _find_cart_by_id(cart_id)
+	if hit.is_empty() or player == null or not (player is Node3D):
+		return false
+	var control = null
+	for c in cart_controls:
+		if is_instance_valid(c) and String(c.cart_id) == cart_id:
+			control = c
+			break
+	if control == null or not control.is_inside_tree() or not (player as Node3D).is_inside_tree():
+		return false
+	(player as Node3D).global_position = control.global_position
+	return control.try_grab(player)
+
+func cart_load_for_validation(cart_id: String) -> int:
+	var hit: Dictionary = _find_cart_by_id(cart_id)
+	if hit.is_empty() or inventory_state == null:
+		return 0
+	return int(CargoTransferScript.deposit_all(inventory_state, hit["cart"].get_hold()).get("total_moved", 0))
+
+func cart_unload_for_validation(cart_id: String, category: String) -> int:
+	var hit: Dictionary = _find_cart_by_id(cart_id)
+	if hit.is_empty() or inventory_state == null:
+		return 0
+	return int(CargoTransferScript.withdraw_category(hit["cart"].get_hold(), inventory_state, category).get("total_moved", 0))
+
+func cart_is_grabbed_for_validation() -> bool:
+	return _is_cart_grabbed()
+
+func cart_hold_quantity_for_validation(cart_id: String, item_id: String) -> int:
+	var hit: Dictionary = _find_cart_by_id(cart_id)
+	if hit.is_empty():
+		return 0
+	return hit["cart"].get_hold().get_quantity(item_id)
