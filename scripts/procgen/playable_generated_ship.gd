@@ -1259,7 +1259,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	# piloted ship root across the dock move (the dock changes that root's transform).
 	if piloted_ship != null:
 		var carry := _capture_player_carry()
-		var child_carry := _capture_docked_children()
+		var child_carry := _capture_subtree()
 		DockingManagerScript.undock(piloted_ship)
 		var dock_res: Dictionary = _dock_piloted_to(inst)
 		if not bool(dock_res.get("success", false)):
@@ -1269,7 +1269,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 			push_error("PlayableGeneratedShip: travel dock failed (%s) — re-docking piloted ship to home" % str(dock_res.get("reason", "?")))
 			_dock_piloted_to(home_ship)
 		_apply_player_carry(carry)
-		_reposition_docked_children(child_carry)
+		_reposition_subtree(child_carry)
 	_spawn_dock_barrier(inst)
 	_spawn_bridge_terminal(inst)
 	_spawn_hangar_control(inst)
@@ -1304,42 +1304,49 @@ func _apply_player_carry(carry: Dictionary) -> void:
 		return
 	player.teleport_to(root.global_transform * (carry["local"] as Vector3))
 
-## Captures each direct dock child's transform RELATIVE to the piloted ship's root,
-## BEFORE a dock move repositions that root. Returns [{inst, local_xform}, ...].
-func _capture_docked_children() -> Array:
+## Captures EVERY transitive dock descendant of the piloted ship (airlock children
+## and bayed children, any depth) relative to the piloted ship's root, BEFORE a dock
+## move repositions that root. Returns [{inst, local_xform}, ...]. DFS generalization
+## of the 5c one-level capture; depth-1 is just the first ring of the walk.
+func _capture_subtree() -> Array:
 	var out: Array = []
 	if piloted_ship == null or not is_instance_valid(piloted_ship.scene_root):
 		return out
-	var root: Node3D = piloted_ship.scene_root as Node3D
-	if not root.is_inside_tree():
+	var root_node: Node3D = piloted_ship.scene_root as Node3D
+	if not root_node.is_inside_tree():
 		return out
-	var inv: Transform3D = root.global_transform.affine_inverse()
-	for child in piloted_ship.docked_ships:
-		if child == null or not is_instance_valid(child.scene_root):
+	var inv: Transform3D = root_node.global_transform.affine_inverse()
+	var stack: Array = piloted_ship.docked_ships.duplicate()
+	var seen: Dictionary = {}
+	while not stack.is_empty():
+		var child = stack.pop_back()
+		if child == null or seen.has(child):
 			continue
-		var cr: Node3D = child.scene_root as Node3D
-		if not cr.is_inside_tree():
-			continue
-		out.append({"inst": child, "local_xform": inv * cr.global_transform})
+		seen[child] = true
+		if is_instance_valid(child.scene_root) and (child.scene_root as Node3D).is_inside_tree():
+			out.append({"inst": child, "local_xform": inv * (child.scene_root as Node3D).global_transform})
+		for grandchild in child.docked_ships:
+			if grandchild != null and not seen.has(grandchild):
+				stack.append(grandchild)
 	return out
 
-## Re-applies captured child relatives AFTER the piloted ship root moved, so each
-## direct dock child rides rigidly with it (the "rigid pair"). One level deep.
-func _reposition_docked_children(captured: Array) -> void:
+## Re-applies captured descendant relatives AFTER the piloted root moved, so the
+## whole nested group rides rigidly with it. Every descendant was captured in the
+## piloted root's frame, so a single re-peg per node is depth-agnostic.
+func _reposition_subtree(captured: Array) -> void:
 	if piloted_ship == null or not is_instance_valid(piloted_ship.scene_root):
 		return
-	var root: Node3D = piloted_ship.scene_root as Node3D
-	if not root.is_inside_tree():
+	var root_node: Node3D = piloted_ship.scene_root as Node3D
+	if not root_node.is_inside_tree():
 		return
 	for entry_v in captured:
 		var entry: Dictionary = entry_v
 		var child = entry.get("inst", null)
-		# child is a RefCounted ShipInstance (== null is the correct nil check); its
-		# scene_root is the Node3D. Guard is_inside_tree() before writing global_transform
-		# (symmetric with _capture_docked_children; avoids an orphan-node transform write).
+		# child is a RefCounted ShipInstance (== null is the correct nil check); guard
+		# is_inside_tree() before writing global_transform (no orphan-node write).
 		if child == null or not is_instance_valid(child.scene_root) or not (child.scene_root as Node3D).is_inside_tree():
 			continue
-		(child.scene_root as Node3D).global_transform = root.global_transform * (entry["local_xform"] as Transform3D)
+		(child.scene_root as Node3D).global_transform = root_node.global_transform * (entry["local_xform"] as Transform3D)
 
 ## Spawns the closed dock-seam barrier for `inst` at its dock-port world position,
 ## condition from the derelict's seed/condition. Home derelict is always intact.
@@ -2037,7 +2044,7 @@ func travel_home() -> bool:
 	# physically detaches before the host is freed (capture the player carry first so
 	# they ride the piloted ship back home rather than being left in the freed frame).
 	var carry := _capture_player_carry()
-	var child_carry := _capture_docked_children()
+	var child_carry := _capture_subtree()
 	if piloted_ship != null:
 		DockingManagerScript.undock(piloted_ship)
 	var leaving = current_ship
@@ -2070,7 +2077,7 @@ func travel_home() -> bool:
 	if piloted_ship != null:
 		_dock_piloted_to(home_ship)
 		_apply_player_carry(carry)
-		_reposition_docked_children(child_carry)
+		_reposition_subtree(child_carry)
 	_spawn_dock_barrier(home_ship)
 	current_occupancy = piloted_ship if piloted_ship != null else home_ship
 	recompute_occupancy()
@@ -4590,3 +4597,17 @@ func bay_launch_for_validation(carrier_id: String) -> int:
 	var idx: int = _first_occupied_slot(carrier.get_hangar())
 	_on_bay_launch_requested(carrier_id, -1)
 	return idx
+
+## 5d seam: true iff `child_id` resolves to a ship whose root's offset to the piloted
+## root is finite (it is positioned in the piloted frame, i.e. it rode the subtree).
+func nested_child_tracks_piloted_for_validation(child_id: String) -> bool:
+	if piloted_ship == null or not is_instance_valid(piloted_ship.scene_root):
+		return false
+	var child = _find_ship_by_id(child_id)
+	if child == null or not is_instance_valid(child.scene_root):
+		return false
+	var root_node: Node3D = piloted_ship.scene_root as Node3D
+	var cn: Node3D = child.scene_root as Node3D
+	if not root_node.is_inside_tree() or not cn.is_inside_tree():
+		return false
+	return root_node.global_position.distance_to(cn.global_position) < 1000.0
