@@ -55,6 +55,15 @@ func _initialize() -> void:
 		_fail("from_dict should reject empty dict")
 		return
 
+	# --- home_ship_inventory round-trip (sub-project #6, additive, no version bump) ---
+	var ws_cargo = WorldSnapshotScript.new()
+	ws_cargo.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
+	ws_cargo.godot_version = godot_version
+	ws_cargo.home_ship_inventory = {"items": {"scrap_metal": 5}, "max_weight": 500.0}
+	var rt = WorldSnapshotScript.from_dict(ws_cargo.to_dict(), WorldSnapshotScript.WORLD_SLICE_VERSION, godot_version)
+	assert(rt != null, "home-cargo snapshot round-trips")
+	assert(int(rt.home_ship_inventory.get("items", {}).get("scrap_metal", 0)) == 5, "home_ship_inventory survived round-trip")
+
 	print("WORLD SNAPSHOT PASS round_trip=true version_gated=true")
 	quit(0)
 
