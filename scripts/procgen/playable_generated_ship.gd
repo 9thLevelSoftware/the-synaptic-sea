@@ -202,6 +202,7 @@ var unsafe_room_marker: Label3D
 
 var inventory_state: InventoryState
 var equipment_state                  # EquipmentState (untyped: class_name unreliable headless)
+var _item_defs: Dictionary = {}      # cached merged item-def catalog (lazy; equip/encumbrance reads)
 var tool_pickup: ToolPickup
 var tool_pickup_root: Node3D
 const TOOL_PICKUP_INTERACTION_RADIUS: float = 1.8
@@ -1559,7 +1560,7 @@ func _recompute_player_encumbrance() -> void:
 	if equipment_state != null:
 		bonus = equipment_state.get_carry_capacity_bonus()   # + future strength bonus
 	inventory_state.bonus_capacity = bonus
-	if player != null:
+	if is_instance_valid(player):
 		var mult: float = EncumbranceScript.move_speed_multiplier(inventory_state.get_load_ratio())
 		player.move_speed = float(player.DEFAULT_MOVE_SPEED) * mult * _cart_push_multiplier()
 
@@ -1600,9 +1601,12 @@ func _unequip_to_inventory(slot: String) -> String:
 	return item_id
 
 func _definitions_for_equip() -> Dictionary:
-	# The merged item-def catalog. inventory_state already loaded it; reuse a fresh
-	# static load (cheap, identical) to avoid reaching into inventory internals.
-	return ItemDefsScript.load_definitions()
+	# The merged item-def catalog, lazily loaded once and cached. ItemDefs.load_definitions()
+	# does synchronous disk I/O parsing several JSON files; caching avoids repeating that on
+	# every equip / auto-equip during gameplay loops (the defs are static at runtime).
+	if _item_defs.is_empty():
+		_item_defs = ItemDefsScript.load_definitions()
+	return _item_defs
 
 ## Temporary cart stubs — replaced in Task 11 with real cart-backed bodies.
 func _is_cart_grabbed() -> bool:
@@ -2072,6 +2076,7 @@ func _on_derelict_interactable_completed(interaction_id: String, objective_id: S
 		for entry in rolled:
 			inventory_state.add_item(str(entry.get("item_id", "")), int(entry.get("quantity", 0)))
 		_refresh_inventory_hud()
+		_recompute_player_encumbrance()   # salvage rewards change carry weight -> refresh Heavy Load
 	print("DERELICT OBJECTIVE COMPLETE marker=%s sequence=%d type=%s cleared=%s" % [
 		String(current_ship.marker_id), sequence, objective_type, str(controller.is_cleared()).to_lower()])
 
@@ -4260,8 +4265,15 @@ func _apply_world_snapshot(ws) -> bool:
 		if not away_from_start:
 			_build_loot_containers()
 	# 1c. Restore player equipment (player-global — runs regardless of home_ship branch).
-	if equipment_state != null and not ws.player_equipment.is_empty():
-		equipment_state.apply_summary(ws.player_equipment)
+	#     Loading restores the EXACT saved state: a non-empty snapshot is applied; an EMPTY
+	#     snapshot (older save, or nothing was worn) clears any currently-worn gear so
+	#     pre-load equipment never leaks across a load (_reset_runtime_for_reload does not
+	#     touch equipment_state).
+	if equipment_state != null:
+		if not ws.player_equipment.is_empty():
+			equipment_state.apply_summary(ws.player_equipment)
+		else:
+			equipment_state.slots.clear()
 	_recompute_player_encumbrance()
 	# 2. World model. _apply_run_snapshot reset us to the home ship; home_ship is
 	#    re-wrapped by _on_ship_loaded during that reload.
@@ -4912,7 +4924,7 @@ func player_equipped_for_validation(slot: String) -> String:
 	return equipment_state.get_equipped(slot) if equipment_state != null else ""
 
 func player_move_speed_for_validation() -> float:
-	return float(player.move_speed) if player != null else 0.0
+	return float(player.move_speed) if is_instance_valid(player) else 0.0
 
 func overload_player_for_validation(item_id: String, qty: int) -> void:
 	if inventory_state != null:
