@@ -97,6 +97,18 @@ func _initialize() -> void:
 		_fail("looted_container_ids round-trip failed")
 		return
 
+	# --- cargo hold round-trip (sub-project #6) ---
+	# Empty hold: summary omits the "inventory" key.
+	assert(not inst.get_summary().has("inventory"), "empty hold omitted from summary")
+	# Non-empty hold round-trips.
+	inst.get_inventory().add_item("scrap_metal", 2)   # use a real weighted part id
+	assert(inst.has_cargo(), "has_cargo true after add")
+	var s2: Dictionary = inst.get_summary()
+	assert(s2.has("inventory"), "non-empty hold present in summary")
+	var clone = ShipInstanceScript.create(inst.ship_id, inst.marker_id, null, null, null)
+	assert(clone.apply_summary(s2) == true, "apply_summary accepts")
+	assert(clone.get_inventory().get_quantity("scrap_metal") == 2, "hold round-tripped")
+
 	print("SHIP INSTANCE PASS round_trip=true stubs_present=true objective_round_trip=true looted_round_trip=true")
 	quit(0)
 
