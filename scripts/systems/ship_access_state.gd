@@ -48,7 +48,7 @@ func apply_summary(summary) -> bool:
 	if typeof(summary) != TYPE_DICTIONARY:
 		return false
 	owner_id = str((summary as Dictionary).get("owner_id", ""))
-	access_ids = []
+	access_ids.clear()   # preserve the Array[String] static type (vs. reassigning to untyped [])
 	var raw: Variant = (summary as Dictionary).get("access_ids", [])
 	if typeof(raw) == TYPE_ARRAY:
 		for a in (raw as Array):

@@ -34,14 +34,36 @@ func _init() -> void:
 	assert(ship.login_at_terminal_for_validation(derelict_id) == true, "claimed derelict")
 	assert(ship.piloted_ship_id_for_validation() == derelict_id, "piloting derelict")
 
+	# Rigid-pair travel the claimed derelict to a SECOND host so that current_location
+	# (the new host) != piloted (the claimed derelict). This is the scenario the
+	# persistence fix targets: the piloted derelict becomes a mobile dock endpoint that is
+	# NOT current_location and must still reload WITH geometry (Codex P2). Without the fix
+	# it reloads scene_root == null and piloted_ship points at a geometry-less ship.
+	var ids2: Array = ship.scannable_marker_ids_for_validation()
+	var second := false
+	for mid2 in ids2:
+		if ship.is_marker_current_for_validation(String(mid2)):
+			continue
+		ship.board_piloted_ship_for_validation()
+		ship.recompute_occupancy()
+		if ship.travel_to_marker_id(String(mid2)).get("success", false):
+			second = true
+			for _i in range(2):
+				await process_frame
+			break
+	assert(second, "rigid-pair travelled the claimed derelict to a second host")
+	assert(ship.piloted_ship_id_for_validation() == derelict_id, "still piloting the claimed derelict")
+
 	assert(ship.save_world_for_validation() == true, "world saved")
 	assert(ship.load_world_for_validation() == true, "world loaded")
 	for _i in range(3):
 		await process_frame
 
-	# Owner, piloted pointer, and the lifeboat->derelict edge survive the round-trip.
+	# Owner, piloted pointer, the piloted ship's GEOMETRY, and the lifeboat->derelict edge
+	# all survive the round-trip — even though the piloted derelict was not current_location.
 	assert(ship.ship_owner_for_validation(derelict_id) == "player_local", "derelict ownership persisted")
 	assert(ship.piloted_ship_id_for_validation() == derelict_id, "piloted pointer persisted")
+	assert(ship.piloted_ship_has_geometry_for_validation() == true, "piloted derelict reloaded with geometry")
 	assert(ship.lifeboat_docked_to_piloted_for_validation() == true, "lifeboat->derelict edge persisted")
 
 	print("CLAIM PERSISTENCE SMOKE PASS piloted=%s owner=%s" % [ship.piloted_ship_id_for_validation(), ship.ship_owner_for_validation(derelict_id)])

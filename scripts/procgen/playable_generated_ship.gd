@@ -1331,7 +1331,10 @@ func _reposition_docked_children(captured: Array) -> void:
 	for entry_v in captured:
 		var entry: Dictionary = entry_v
 		var child = entry.get("inst", null)
-		if child == null or not is_instance_valid(child.scene_root):
+		# child is a RefCounted ShipInstance (== null is the correct nil check); its
+		# scene_root is the Node3D. Guard is_inside_tree() before writing global_transform
+		# (symmetric with _capture_docked_children; avoids an orphan-node transform write).
+		if child == null or not is_instance_valid(child.scene_root) or not (child.scene_root as Node3D).is_inside_tree():
 			continue
 		(child.scene_root as Node3D).global_transform = root.global_transform * (entry["local_xform"] as Transform3D)
 
@@ -1764,6 +1767,15 @@ func complete_derelict_objective_for_validation(sequence: int) -> bool:
 func travel_to(marker) -> Dictionary:
 	if current_ship == null or sargasso_world == null or travel_controller == null or ship_generator == null:
 		return {"success": false, "reason": "not_ready", "ship": null}
+	# Reject travel to the marker of the ship we are currently PILOTING. Selecting it would
+	# regenerate that ship's geometry: because current_ship == piloted_ship here,
+	# _attach_derelict_active would overwrite piloted_ship.scene_root (leaking the old root)
+	# and then dock the ship to itself — a failed/softlocked state. (Codex P2) This is
+	# narrowly scoped to current_ship == piloted_ship; the lifeboat-piloted "revisit in place"
+	# case (current_ship is the host derelict, piloted is the separate lifeboat) still works:
+	# the host is freed and regenerated and the lifeboat re-docks, as in 5b.
+	if piloted_ship != null and current_ship == piloted_ship and String(marker.marker_id) == String(current_ship.marker_id):
+		return {"success": false, "reason": "already_here", "ship": null}
 	# Phase 5b Task 5 precondition: the player must be aboard the piloted ship to
 	# travel — the ride physically takes them with it. Occupancy is authoritative.
 	recompute_occupancy()
@@ -3833,6 +3845,29 @@ func _activate_derelict_from_instance(inst, pos_in_ship: Array) -> bool:
 		(player as Node3D).global_position = Vector3(float(pos_in_ship[0]), float(pos_in_ship[1]), float(pos_in_ship[2]))
 	return true
 
+## Regenerates geometry (scene_root + bridge terminal) for a derelict ShipInstance
+## that is co-present but NOT the active current_ship — e.g. a claimed derelict the
+## player was PILOTING while docked to a different host (after rigid-pair travel). The
+## current_location-driven rebuild (_activate_derelict_from_instance) only materializes
+## the active host, so without this such a mobile endpoint would reload with
+## scene_root == null and the saved dock edge could not be re-established. (Codex P2)
+## No-op for home/lifeboat (marker_id "") and for ships that already have geometry.
+## Positions at DERELICT_DOCK_OFFSET; _apply_docking_snapshot then re-docks it flush.
+func _ensure_derelict_geometry(inst) -> void:
+	if inst == null or ship_generator == null:
+		return
+	if String(inst.marker_id) == "" or is_instance_valid(inst.scene_root):
+		return
+	var new_root: Node3D = ship_generator.generate(inst.blueprint)
+	if new_root == null:
+		return
+	inst.scene_root = new_root
+	add_child(new_root)
+	(new_root as Node3D).position = DERELICT_DOCK_OFFSET
+	if inst.built_layout.is_empty() and new_root.has_method("get_layout_copy"):
+		inst.built_layout = new_root.get_layout_copy()
+	_spawn_bridge_terminal(inst)
+
 ## Applies a WorldSnapshot: rebuilds the home ship first (this resets the runtime
 ## and returns to home if currently away), restores the SargassoWorld and the
 ## visited-ships registry, then re-activates the saved derelict if the snapshot
@@ -3889,6 +3924,18 @@ func _apply_world_snapshot(ws) -> bool:
 	for b in dock_barriers:
 		if is_instance_valid(b) and ws.opened_ports.has(String(b.marker_id)):
 			b.set_opened(true)
+	# 5c. Ensure every derelict that is an endpoint of a saved dock edge has geometry
+	# BEFORE re-docking. Step 4 only materializes current_location; a claimed derelict the
+	# player was PILOTING (docked to a different host after rigid-pair travel) is otherwise
+	# restored data-only (scene_root == null), which would leave piloted_ship geometry-less
+	# and the L->D / D->host edges undockable. (Codex P2) Idempotent: _ensure_derelict_geometry
+	# skips home/lifeboat and ships that already have geometry.
+	for edge_v in ws.dock_edges:
+		if typeof(edge_v) != TYPE_DICTIONARY:
+			continue
+		var edge: Dictionary = edge_v
+		_ensure_derelict_geometry(_find_ship_by_id(String(edge.get("mobile", ""))))
+		_ensure_derelict_geometry(_find_ship_by_id_or_marker(String(edge.get("host", ""))))
 	# 6. Re-apply the persisted docking snapshot (piloted pointer + dock-edge set +
 	# occupancy). This is the general N-ship persistence mechanism: the dock edges are
 	# the source of truth, not the implicit current_location-driven rebuild. Idempotent
@@ -3969,17 +4016,33 @@ func _reset_runtime_for_reload() -> void:
 	# "gameplay roots off-tree" to re-attach here. Only the DERELICT root
 	# must be freed. _reattach_starting_gameplay_roots() is removed.
 	if away_from_start:
-		if current_ship != null and String(current_ship.marker_id) != "":
-			var derelict_root = current_ship.scene_root
-			if derelict_root != null and is_instance_valid(derelict_root):
-				if derelict_root.get_parent() == self:
-					remove_child(derelict_root)
-				# queue_free is the safe choice for a Node3D tree that may own
-				# physics bodies / navigation agents: it defers destruction to the
-				# end of the current frame so the engine can cleanly unregister
-				# those resources. The smoke asserts detachment (get_parent() !=
-				# playable), not immediate invalidation, so this is correct.
-				derelict_root.queue_free()
+		# Free EVERY co-present derelict root, not just current_ship's. 5c: the player may be
+		# piloting a CLAIMED derelict that is docked to a DIFFERENT host, so the piloted
+		# derelict's root is a separate child of this coordinator — freeing only current_ship
+		# would orphan it (leaked scene + "resources still in use at exit"). Home/lifeboat
+		# roots (marker_id "") are intentionally NOT freed here: the home hull stays co-present,
+		# and the lifeboat is rebuilt (and its prior root freed) by _build_lifeboat_at_home.
+		# queue_free defers destruction to end-of-frame so physics/nav resources unregister
+		# cleanly; the reload's slice rebuild replaces the ShipInstances afterward.
+		for inst in _all_known_ships():
+			if inst == null or String(inst.marker_id) == "":
+				continue
+			var droot = inst.scene_root
+			if droot != null and is_instance_valid(droot):
+				if droot.get_parent() == self:
+					remove_child(droot)
+				droot.queue_free()
+			inst.scene_root = null
+		# Break dock-relationship cycles (parent_ship <-> docked_ships) among the old
+		# ShipInstances. RefCounted has no cycle collector, so once the reload's slice
+		# rebuild (visited_ships.clear()) and the lifeboat rebuild drop their dict/var
+		# references, a surviving D<->host cycle would keep the old instances and their
+		# sub-states alive — leaked RefCounted at exit. The reload re-establishes the
+		# dock graph from the snapshot, so severing it here is safe.
+		for inst in _all_known_ships():
+			if inst != null:
+				inst.parent_ship = null
+				inst.docked_ships = []
 		# Co-presence: home hull / loader / gameplay roots were never detached —
 		# no re-attach needed here (contrast with old single-active model).
 		away_from_start = false
@@ -4254,6 +4317,10 @@ func make_ship_working_for_validation(ship_id: String) -> void:
 ## 5c seam: the current piloted ship's id ("" if none).
 func piloted_ship_id_for_validation() -> String:
 	return String(piloted_ship.ship_id) if piloted_ship != null else ""
+
+## 5c seam: true iff the piloted ship exists AND has live geometry (a valid scene_root).
+func piloted_ship_has_geometry_for_validation() -> bool:
+	return piloted_ship != null and is_instance_valid(piloted_ship.scene_root)
 
 ## 5c seam: the owner_id recorded on ship_id ("" if unknown/unowned).
 func ship_owner_for_validation(ship_id: String) -> String:
