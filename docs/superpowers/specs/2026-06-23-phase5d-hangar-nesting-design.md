@@ -45,8 +45,12 @@ DFS over the subtree.
 - A **hangar** is a *weighted* (not guaranteed) procgen derelict room role,
   exactly how `bridge` gates claimability in 5c. A derelict that rolled a hangar
   exposes a bay; one that did not is loot/explore-only. The **home ship** also
-  has a bay (your base can hold your fleet) — see the home-layout prerequisite
-  below.
+  has a bay (your base can hold your fleet): rather than re-authoring the curated
+  golden home layout (high-risk — 31 fixture validators assert its room/link
+  graph), `for_hangar()` **falls back to the home's existing `cargo` room** when
+  no `hangar` room is present, mirroring how `for_derelict()` already falls back
+  dock→airlock. The home bay is therefore the cargo hold; derelicts use the real
+  weighted `hangar` role. Zero golden-fixture churn.
 - A bay has **fixed slots**. Slot count is derived deterministically from the
   hangar room's floor footprint (number of floor cells, integer-divided by a
   per-slot cell budget) so a bigger hangar holds more ships — no magic constant.
@@ -92,7 +96,9 @@ DFS over the subtree.
     slot_anchors:Array[Vector3]}` derived from the `hangar` room footprint
     (floor-cell centers give the per-slot anchors; `slot_count` =
     `floor(floor_cells / CELLS_PER_SLOT)`, min 1; `slot_size_class` from the
-    room's size). Returns `{}` when no hangar room exists.
+    room's footprint). When no `hangar` room exists, **falls back to the `cargo`
+    room** (the home ship's bay) before giving up. Returns `{}` only when neither
+    a hangar nor a cargo room exists.
   - `ports_compatible(a, b)` gains the asymmetric hangar branch described above,
     while the existing symmetric airlock path is unchanged.
 - `scripts/systems/ship_instance.gd` — lazy `hangar` (`HangarBay`) field +
@@ -103,12 +109,9 @@ DFS over the subtree.
 - `scripts/validation/derelict_generator_smoke.gd` — authorize `hangar` in the
   "no system roles on derelicts" invariant (the same precedent that admitted
   `bridge` in 5c); all other system roles stay forbidden.
-- `data/procgen/golden/coherent_ship_001/` (home-layout prerequisite) — add a
-  `hangar` room to the home ship's golden layout so the home bay has real volume
-  for slot anchors. **Risk to manage in the plan:** any standalone smoke that
-  asserts on `coherent_ship_001`'s exact room set / count must be updated in the
-  same task; the plan's first task adds the room and re-greens those smokes
-  before any 5d behavior is built.
+- (No golden-layout change.) The home bay reuses the existing `cargo` room via
+  the `for_hangar()` cargo fallback above — the curated `coherent_ship_001`
+  fixture and its 31 validators are left untouched.
 - `scripts/procgen/playable_generated_ship.gd` (coordinator)
   - `_spawn_hangar_controls(inst)` / `_clear_hangar_controls()` — spawn a
     `HangarBayControl` in each bay-bearing ship, wired to
@@ -193,8 +196,10 @@ Six new smokes, registered in `06_validation_plan.md` (commands 94 → 100):
 - `hangar_bay_smoke` — pure model: dock / launch / `free_slot_for`, size-class
   gate, slot-full refusal, `slot_of`, summary round-trip.
 - `hangar_port_smoke` — `DockPorts.for_hangar()` derives `slot_count` /
-  `slot_size_class` / anchors from a hangar layout; `ports_compatible` asymmetric
-  accept (small ship into big bay) and reject (oversize / no slot).
+  `slot_size_class` / anchors from a hangar layout, **falls back to the cargo
+  room** when no hangar room exists (home-bay path) and returns `{}` when neither
+  exists; `ports_compatible` asymmetric accept (small ship into big bay) and
+  reject (oversize / no slot).
 - `hangar_control_smoke` — node-level: in-range fires `bay_dock_requested` /
   `bay_launch_requested`; out-of-range no-op.
 - `bay_dock_launch_smoke` — coordinator: dock a co-present ship into a slot, then
