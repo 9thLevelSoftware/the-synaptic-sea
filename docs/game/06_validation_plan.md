@@ -153,10 +153,11 @@ run_clean 'dock port types model smoke' 'DOCK PORT TYPES PASS compat=true condit
 run_clean 'interior aabb model smoke' 'INTERIOR AABB PASS nondegenerate=true positioned=true contains=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interior_aabb_smoke.gd
 run_clean 'boot dock aligned smoke' 'BOOT DOCK ALIGNED PASS flush=true gap_lt_0p5=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/boot_dock_aligned_smoke.gd
 run_clean 'dock breach model smoke' 'DOCK BREACH PASS intact_instant=true broken_channel=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dock_breach_smoke.gd
+run_clean 'bridge terminal node smoke' 'BRIDGE TERMINAL SMOKE PASS ship=ship_test' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bridge_terminal_smoke.gd
 run_clean 'physical travel smoke' 'PHYSICAL TRAVEL PASS aboard_lifeboat=true flush=true barrier_closed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/physical_travel_smoke.gd
 run_clean 'boarding flip smoke' 'BOARDING FLIP PASS closed_in_lifeboat=true barrier_opens=true flips_to_host=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/boarding_flip_smoke.gd
 run_clean 'docking persistence smoke' 'DOCKING PERSISTENCE PASS dock_edge=true occupancy=true opened_port=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/docking_persistence_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=88 clean_output=true'
+echo 'SARGASSO REGRESSION PASS commands=89 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
