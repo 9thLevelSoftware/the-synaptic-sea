@@ -24,9 +24,12 @@ Project Zomboid's inventory mechanics:
   **entirely off** the player's personal encumbrance (a cart removes weight; a
   worn backpack only raises the cap). Pushing a cart occupies **both hands**,
   blocks hand actions, and applies a push speed penalty.
-- **Equipment effects beyond capacity**: a worn suit modifies the oxygen-drain
-  multiplier (ties into the existing oxygen hazard); the model is generic so more
-  effects can be added without new plumbing.
+- **Equipment effects beyond capacity**: a worn suit exposes an oxygen-drain
+  multiplier through a generic effect block (so more effects can be added without
+  new plumbing). The multiplier is **modeled and unit-tested this slice**; wiring it
+  into the live oxygen hazard's drain is a **Phase-7 integration** step (cross-system
+  wiring is deferred per the isolate-then-integrate roadmap), so this slice does not
+  touch `OxygenState`.
 
 The rich equip/unequip and item-transfer **UI is Phase-7-deferred** (same call as
 cargo-holds withdraw). This slice provides equipping via **auto-equip-best-
@@ -206,8 +209,10 @@ to assert the new accept-up-to-stack behavior; the conservation invariant
 3. Player grabs a cart → both hands busy, cart follows, push multiplier applied →
    loads salvage into the cart (off personal encumbrance) → hauls to another ship →
    unloads into that ship's hold via `CargoTransfer`.
-4. Suit equipped → `EquipmentState.get_oxygen_drain_multiplier()` feeds the oxygen
-   hazard's drain (composed with the existing `portable_oxygen_pump` tool shim).
+4. Suit equipped → `EquipmentState.get_oxygen_drain_multiplier()` is available for
+   the oxygen hazard to consume (composed with the existing `portable_oxygen_pump`
+   tool shim). That composition is wired in Phase-7 integration; this slice only
+   models and unit-tests the multiplier.
 
 ## 6. Persistence (additive, ADR to follow)
 
