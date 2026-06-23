@@ -43,5 +43,15 @@ func _init() -> void:
 	assert(control.try_dock(near, -1) == false, "out-of-range dock no-op")
 	assert(dock_fires == 1, "no extra dock fire out of range")
 
+	# Off-tree gate: a control NOT inside the tree refuses even an in-range body
+	# (the strict safety property — must not fire when off-tree).
+	near.global_position = Vector3.ZERO   # coincident = in distance range
+	root.remove_child(control)
+	await process_frame
+	assert(control.try_dock(near, -1) == false, "off-tree control refuses (strict gate)")
+	assert(control.try_launch(near, -1) == false, "off-tree control refuses launch")
+	assert(dock_fires == 1 and launch_fires == 1, "no signal fired while control off-tree")
+	root.add_child(control)
+
 	print("HANGAR CONTROL SMOKE PASS dock=%d launch=%d" % [dock_fires, launch_fires])
 	quit()
