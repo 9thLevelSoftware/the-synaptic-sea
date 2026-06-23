@@ -11,6 +11,7 @@ class_name ShipInstance
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
 const DerelictObjectiveControllerScript := preload("res://scripts/systems/derelict_objective_controller.gd")
+const ShipAccessStateScript := preload("res://scripts/systems/ship_access_state.gd")
 
 const ROOM_HALF_EXTENT: float = 4.0   # generous per-room half-box in X/Z (covers 2x1 rooms + module chains)
 const ROOM_HALF_HEIGHT: float = 3.0   # half deck height + headroom
@@ -35,6 +36,9 @@ var ship_root: Node3D:
 var parent_ship = null              # ShipInstance | null
 var docked_ships: Array = []        # Array[ShipInstance]
 var docking_ports: Array = []       # Array (DockingPort in Phase 5)
+
+# Sub-project 5c: per-ship ownership/access. Lazily created; persisted under "access".
+var access = null                        # ShipAccessState | null
 
 # Sub-project #2: per-derelict objective loop state. Lazily created; null for the
 # home ship (which uses the coordinator's singleton loop, not this controller).
@@ -73,6 +77,8 @@ func get_summary() -> Dictionary:
 		result["objective"] = objective_controller.get_summary()
 	if not looted_container_ids.is_empty():
 		result["looted_containers"] = looted_container_ids.duplicate()
+	if access != null:
+		result["access"] = access.get_summary()
 	return result
 
 func apply_summary(summary) -> bool:
@@ -99,6 +105,9 @@ func apply_summary(summary) -> bool:
 		looted_container_ids = []
 		for cid in (looted_variant as Array):
 			looted_container_ids.append(String(cid))
+	var access_summary: Variant = summary.get("access", null)
+	if typeof(access_summary) == TYPE_DICTIONARY and not (access_summary as Dictionary).is_empty():
+		get_access().apply_summary(access_summary as Dictionary)
 	return true
 
 ## Returns this ship's DerelictObjectiveController, creating it on first access.
@@ -106,6 +115,16 @@ func get_objective_controller():
 	if objective_controller == null:
 		objective_controller = DerelictObjectiveControllerScript.create()
 	return objective_controller
+
+## Returns this ship's ShipAccessState, creating it on first access.
+func get_access():
+	if access == null:
+		access = ShipAccessStateScript.create()
+	return access
+
+## A "working vessel" can be piloted: its own propulsion system is operational.
+func is_working_vessel() -> bool:
+	return systems_manager != null and systems_manager.is_operational("propulsion")
 
 ## Validation/runtime seam: the layout dict this ship's scene_root was built from.
 func blueprint_layout_for_validation() -> Dictionary:

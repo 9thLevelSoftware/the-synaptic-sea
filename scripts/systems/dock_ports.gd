@@ -37,6 +37,10 @@ static func for_derelict(layout: Dictionary, seed_value: int = 0, condition_clas
 		"condition": condition_from_seed(seed_value, condition_class),
 	}
 
+## Ship-local floor center of the `bridge` room, or Vector3.INF if none.
+static func bridge_center(layout: Dictionary) -> Vector3:
+	return _room_floor_center(layout, "bridge", "bridge")
+
 ## True iff both ports are non-empty, the same type, and the same size class.
 ## Missing size_class on either port fails closed (no asymmetric sentinels).
 static func ports_compatible(a: Dictionary, b: Dictionary) -> bool:

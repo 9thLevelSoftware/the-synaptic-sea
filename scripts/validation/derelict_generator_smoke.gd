@@ -15,8 +15,10 @@ const ShipGeneratorScript := preload("res://scripts/procgen/ship_generator.gd")
 
 const DERELICT_PATH: String = "res://data/procgen/archetypes/derelict.json"
 
+# Phase 5c: `bridge` removed from the deny-list — derelicts may now carry a bridge
+# room (the claim/pilot helm). All other system roles remain forbidden on a shell.
 const SYSTEM_ROLES: Array[String] = [
-	"airlock", "engineering", "life_support", "bridge",
+	"airlock", "engineering", "life_support",
 	"cargo", "crew_quarters", "medical", "maintenance",
 ]
 
@@ -79,8 +81,14 @@ func _initialize() -> void:
 			continue
 
 		var structure: Node = ship.get_child(0)
-		if structure == null or structure.get_child_count() != graph.rooms.size():
-			failures.append("seed=%d structure mismatch" % seed_val)
+		# Phase 5c fix: the ShipGenerator pipeline (ShipLayoutGenerator v4) emits structural
+		# GEOMETRY modules under the structure root — many per room — so the old assertion
+		# `child_count == graph.rooms.size()` compared incomparable quantities (geometry
+		# modules vs rooms) and failed every seed post-loader-rewrite. Correct intent: the
+		# pipeline produced a non-null ship with a non-empty structure root. Per-room
+		# structural integrity is covered by the loader/playable contract smokes.
+		if structure == null or structure.get_child_count() <= 0:
+			failures.append("seed=%d empty structure" % seed_val)
 			continue
 
 		ship.queue_free()

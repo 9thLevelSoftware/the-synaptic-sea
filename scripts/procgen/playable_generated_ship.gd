@@ -36,6 +36,7 @@ const DockPortsScript := preload("res://scripts/systems/dock_ports.gd")
 const DockingManagerScript := preload("res://scripts/systems/docking_manager.gd")
 const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
 const DockPortBarrierScript := preload("res://scripts/tools/dock_port_barrier.gd")
+const BridgeTerminalScript := preload("res://scripts/tools/bridge_terminal.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -144,10 +145,12 @@ var home_ship = null                        # the home ShipInstance (marker_id "
 # Phase 5a Task 7: the physical lifeboat docked to the starting derelict.
 # Port-docked to the home ship's airlock at boot; shares ship_systems_manager with it.
 var lifeboat_ship = null                    # ShipInstance (docked to home_ship)
-var piloted_ship = null                     # the ShipInstance the player currently pilots (the lifeboat this cycle)
+var piloted_ship = null                     # the ShipInstance the player currently pilots (lifeboat or any claimed working vessel)
 # Phase 5b Task 5: the active host's closed dock-seam barriers (Array[DockPortBarrier]).
 # Spawned closed when the piloted ship docks to a host; the player breaches one to board.
 var dock_barriers: Array = []
+const PLAYER_LOCAL_ID := "player_local"
+var bridge_terminals: Array = []
 # Sub-project #2: the active derelict's objective interactables live under a
 # dedicated root (empty while on the home ship). Separate from the home gameplay
 # roots so it stays attached when away_from_start.
@@ -1057,6 +1060,29 @@ func recompute_occupancy() -> void:
 		or (piloted_ship != null and current_occupancy == piloted_ship and piloted_ship.parent_ship == home_ship)
 	away_from_start = not at_home_complex
 
+## A bridge terminal fired login_requested. Gate on the ship being a working
+## vessel, then claim it for the local player and take command. Refused logins
+## leave piloted_ship unchanged.
+func _on_login_requested(ship_id: String) -> void:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null:
+		return
+	if not inst.is_working_vessel():
+		return   # silent: refusing a login on an unrepaired vessel is an expected player action
+	inst.get_access().claim(PLAYER_LOCAL_ID)
+	set_piloted_ship(inst)
+
+## Re-points piloted_ship to `inst` (the player's active ride). Gated on the local
+## player having access. Recomputes occupancy. Returns {success, reason}.
+func set_piloted_ship(inst) -> Dictionary:
+	if inst == null:
+		return {"success": false, "reason": "unknown_ship"}
+	if not inst.get_access().has_access(PLAYER_LOCAL_ID):
+		return {"success": false, "reason": "no_access"}
+	piloted_ship = inst
+	recompute_occupancy()
+	return {"success": true, "reason": "ok"}
+
 ## Phase 5a Task 6 validation seam: returns current_occupancy.
 func get_current_occupancy_for_validation():
 	return current_occupancy
@@ -1065,6 +1091,11 @@ func get_current_occupancy_for_validation():
 ## or home ship it is docked to). Equals current_ship.
 func get_current_host_for_validation():
 	return current_ship
+
+## 5c seam: calls set_piloted_ship for ship_id without the login/claim path
+## (used to exercise the no_access guard directly).
+func set_piloted_ship_by_id_for_validation(ship_id: String) -> Dictionary:
+	return set_piloted_ship(_find_ship_by_id(ship_id))
 
 ## Phase 5b Task 5 validation seam: teleport the player to the piloted ship's
 ## interior center so it reads as aboard the ride.
@@ -1094,6 +1125,33 @@ func piloted_flush_to_host_for_validation() -> bool:
 		return false
 	var lb_world: Vector3 = (piloted_ship.scene_root as Node3D).global_transform * (lb_local["position"] as Vector3)
 	return lb_world.distance_to(host_world["position"] as Vector3) <= 0.5
+
+## 5c seams for rigid-pair travel.
+func current_ship_id_for_validation() -> String:
+	return String(current_ship.ship_id) if current_ship != null else ""
+
+func is_marker_current_for_validation(marker_id: String) -> bool:
+	return current_ship != null and String(current_ship.marker_id) == marker_id
+
+func lifeboat_docked_to_piloted_for_validation() -> bool:
+	return lifeboat_ship != null and piloted_ship != null and lifeboat_ship.parent_ship == piloted_ship
+
+## True iff the lifeboat's lifted airlock port is within 0.5u of the piloted ship's
+## lifted dock port — i.e. the lifeboat is flush against the (moved) piloted ship.
+func lifeboat_flush_to_piloted_for_validation() -> bool:
+	if lifeboat_ship == null or piloted_ship == null:
+		return false
+	if not is_instance_valid(lifeboat_ship.scene_root) or not is_instance_valid(piloted_ship.scene_root):
+		return false
+	if not (lifeboat_ship.scene_root as Node3D).is_inside_tree() or not (piloted_ship.scene_root as Node3D).is_inside_tree():
+		return false
+	var piloted_local: Dictionary = _piloted_port_local()
+	var piloted_world: Dictionary = DockingManagerScript.host_port_to_world(piloted_ship, piloted_local)
+	if piloted_world.is_empty():
+		return false
+	var lb_local: Dictionary = DockPortsScript.for_lifeboat(lifeboat_ship.built_layout)
+	var lb_world: Vector3 = (lifeboat_ship.scene_root as Node3D).global_transform * (lb_local["position"] as Vector3)
+	return lb_world.distance_to(piloted_world["position"] as Vector3) <= 0.5
 
 ## Phase 5b Task 5 validation seam: force-repair every subcomponent of every system
 ## on the piloted ship's shared systems manager, so propulsion (and scanners/nav) read
@@ -1147,7 +1205,10 @@ func get_sargasso_world():
 ## strand the player; an unrepaired lifeboat simply cannot jump until its propulsion
 ## is restored. (Retires ADR-0011 placeholder.)
 func _current_systems_ops() -> Dictionary:
-	var mgr = ship_systems_manager
+	# Travel capability comes from the ship the player is PILOTING (5c: that may be a
+	# claimed derelict, not just the lifeboat). Fall back to the coordinator's starting
+	# manager before a piloted ship exists.
+	var mgr = piloted_ship.systems_manager if piloted_ship != null and piloted_ship.systems_manager != null else ship_systems_manager
 	return {
 		"navigation": mgr != null and mgr.is_operational("navigation"),
 		"scanners": mgr != null and mgr.is_operational("scanners"),
@@ -1196,6 +1257,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	# piloted ship root across the dock move (the dock changes that root's transform).
 	if piloted_ship != null:
 		var carry := _capture_player_carry()
+		var child_carry := _capture_docked_children()
 		DockingManagerScript.undock(piloted_ship)
 		var dock_res: Dictionary = _dock_piloted_to(inst)
 		if not bool(dock_res.get("success", false)):
@@ -1205,7 +1267,9 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 			push_error("PlayableGeneratedShip: travel dock failed (%s) — re-docking piloted ship to home" % str(dock_res.get("reason", "?")))
 			_dock_piloted_to(home_ship)
 		_apply_player_carry(carry)
+		_reposition_docked_children(child_carry)
 	_spawn_dock_barrier(inst)
+	_spawn_bridge_terminal(inst)
 	# Phase 5b Task 5: occupancy is the piloted ship — the player rides it to the host
 	# and stays aboard (no teleport into the derelict). recompute_occupancy() then
 	# tracks the player as they breach the dock seam and walk into the host.
@@ -1237,6 +1301,43 @@ func _apply_player_carry(carry: Dictionary) -> void:
 		return
 	player.teleport_to(root.global_transform * (carry["local"] as Vector3))
 
+## Captures each direct dock child's transform RELATIVE to the piloted ship's root,
+## BEFORE a dock move repositions that root. Returns [{inst, local_xform}, ...].
+func _capture_docked_children() -> Array:
+	var out: Array = []
+	if piloted_ship == null or not is_instance_valid(piloted_ship.scene_root):
+		return out
+	var root: Node3D = piloted_ship.scene_root as Node3D
+	if not root.is_inside_tree():
+		return out
+	var inv: Transform3D = root.global_transform.affine_inverse()
+	for child in piloted_ship.docked_ships:
+		if child == null or not is_instance_valid(child.scene_root):
+			continue
+		var cr: Node3D = child.scene_root as Node3D
+		if not cr.is_inside_tree():
+			continue
+		out.append({"inst": child, "local_xform": inv * cr.global_transform})
+	return out
+
+## Re-applies captured child relatives AFTER the piloted ship root moved, so each
+## direct dock child rides rigidly with it (the "rigid pair"). One level deep.
+func _reposition_docked_children(captured: Array) -> void:
+	if piloted_ship == null or not is_instance_valid(piloted_ship.scene_root):
+		return
+	var root: Node3D = piloted_ship.scene_root as Node3D
+	if not root.is_inside_tree():
+		return
+	for entry_v in captured:
+		var entry: Dictionary = entry_v
+		var child = entry.get("inst", null)
+		# child is a RefCounted ShipInstance (== null is the correct nil check); its
+		# scene_root is the Node3D. Guard is_inside_tree() before writing global_transform
+		# (symmetric with _capture_docked_children; avoids an orphan-node transform write).
+		if child == null or not is_instance_valid(child.scene_root) or not (child.scene_root as Node3D).is_inside_tree():
+			continue
+		(child.scene_root as Node3D).global_transform = root.global_transform * (entry["local_xform"] as Transform3D)
+
 ## Spawns the closed dock-seam barrier for `inst` at its dock-port world position,
 ## condition from the derelict's seed/condition. Home derelict is always intact.
 func _spawn_dock_barrier(inst) -> void:
@@ -1265,6 +1366,52 @@ func _clear_dock_barriers() -> void:
 func _on_dock_barrier_opened(_marker_id: String) -> void:
 	# Boarding the derelict is now possible; occupancy flips as the player crosses.
 	recompute_occupancy()
+
+## Ship-local center of `inst`'s bridge room (role == "bridge"), or Vector3.INF if the
+## ship has NO bridge room. Derived from inst.built_layout via DockPorts so it works
+## uniformly for the lifeboat (plain Node3D scene_root), procgen derelicts, and golden
+## ships. Claimability requires a real bridge: a ship without one is not pilotable
+## (just a loot/explore space) — deliberately NO entry-room fallback.
+func _command_room_local_center(inst) -> Vector3:
+	if inst == null or typeof(inst.built_layout) != TYPE_DICTIONARY or (inst.built_layout as Dictionary).is_empty():
+		return Vector3.INF
+	return DockPortsScript.bridge_center(inst.built_layout)
+
+## Spawns the bridge terminal for a pilotable ship at its bridge room (ship-local),
+## parented under the ship's scene_root so it inherits the ship transform and is
+## freed with it. The home ship is never pilotable -> no terminal. A ship with NO
+## bridge room gets NO terminal (it cannot be claimed/piloted — loot space only).
+func _spawn_bridge_terminal(inst) -> void:
+	if inst == null or inst == home_ship or not is_instance_valid(inst.scene_root):
+		return
+	var local_center: Vector3 = _command_room_local_center(inst)
+	if local_center == Vector3.INF:
+		return   # no bridge room -> not claimable
+	# Prune dead entries + any existing terminal for this same ship (idempotent re-spawn).
+	var kept: Array = []
+	for t in bridge_terminals:
+		if not is_instance_valid(t):
+			continue
+		if String(t.ship_id) == String(inst.ship_id):
+			if t.get_parent() != null:
+				t.get_parent().remove_child(t)
+			t.queue_free()
+			continue
+		kept.append(t)
+	bridge_terminals = kept
+	var terminal = BridgeTerminalScript.new()
+	(inst.scene_root as Node3D).add_child(terminal)
+	terminal.configure(String(inst.ship_id), local_center, 1.8)
+	terminal.login_requested.connect(_on_login_requested)
+	bridge_terminals.append(terminal)
+
+func _clear_bridge_terminals() -> void:
+	for t in bridge_terminals:
+		if is_instance_valid(t):
+			if t.get_parent() != null:
+				t.get_parent().remove_child(t)
+			t.queue_free()
+	bridge_terminals.clear()
 
 ## Builds the active derelict's objective interactables from its loader specs and
 ## restores completed/cleared state from its (retained or loaded) controller. Called
@@ -1478,7 +1625,7 @@ func _clear_repair_points() -> void:
 
 ## The systems manager of the ship the player is currently aboard: the derelict's when away,
 ## the lifeboat's when home. (Repair points act on the ship under the player's feet; the
-## travel gate separately reads the lifeboat — see _current_systems_ops.)
+## travel gate separately reads the PILOTED ship's systems — see _current_systems_ops.)
 func _active_systems_manager():
 	if away_from_start and current_ship != null and current_ship.systems_manager != null:
 		return current_ship.systems_manager
@@ -1620,6 +1767,15 @@ func complete_derelict_objective_for_validation(sequence: int) -> bool:
 func travel_to(marker) -> Dictionary:
 	if current_ship == null or sargasso_world == null or travel_controller == null or ship_generator == null:
 		return {"success": false, "reason": "not_ready", "ship": null}
+	# Reject travel to the marker of the ship we are currently PILOTING. Selecting it would
+	# regenerate that ship's geometry: because current_ship == piloted_ship here,
+	# _attach_derelict_active would overwrite piloted_ship.scene_root (leaking the old root)
+	# and then dock the ship to itself — a failed/softlocked state. (Codex P2) This is
+	# narrowly scoped to current_ship == piloted_ship; the lifeboat-piloted "revisit in place"
+	# case (current_ship is the host derelict, piloted is the separate lifeboat) still works:
+	# the host is freed and regenerated and the lifeboat re-docks, as in 5b.
+	if piloted_ship != null and current_ship == piloted_ship and String(marker.marker_id) == String(current_ship.marker_id):
+		return {"success": false, "reason": "already_here", "ship": null}
 	# Phase 5b Task 5 precondition: the player must be aboard the piloted ship to
 	# travel — the ride physically takes them with it. Occupancy is authoritative.
 	recompute_occupancy()
@@ -1643,7 +1799,7 @@ func travel_to(marker) -> Dictionary:
 	# type/size (layout-derived), so the target's LOCAL port suffices here (no placement yet).
 	if piloted_ship != null and new_root.has_method("get_layout_copy"):
 		var target_local: Dictionary = DockPortsScript.for_derelict(new_root.get_layout_copy(), int(marker.seed_value), int(marker.condition))
-		var lb_local: Dictionary = DockPortsScript.for_lifeboat(piloted_ship.built_layout)
+		var lb_local: Dictionary = _piloted_port_local()
 		if not DockPortsScript.ports_compatible(target_local, lb_local):
 			new_root.queue_free()
 			# Codex P2: attempt_travel already advanced the scanner position + generated
@@ -1666,11 +1822,15 @@ func travel_to(marker) -> Dictionary:
 		_home_player_position = (player as Node3D).global_position if player != null and player is Node3D else _home_player_position
 		# Home hull STAYS in-tree (co-presence — no remove_child).
 	else:
-		if leaving.scene_root != null and is_instance_valid(leaving.scene_root):
+		if leaving == piloted_ship:
+			# 5c: the player is piloting this ship — it is the ride, not a host to abandon.
+			# It will be re-docked to the new target below; do NOT free it.
+			pass
+		elif leaving.scene_root != null and is_instance_valid(leaving.scene_root):
 			if leaving.scene_root.get_parent() == self:
 				remove_child(leaving.scene_root)
 			leaving.scene_root.queue_free()
-		leaving.scene_root = null  # retained instance, scene dropped
+			leaving.scene_root = null  # retained instance, scene dropped
 
 	var mid: String = String(marker.marker_id)
 	var inst
@@ -1709,15 +1869,20 @@ func travel_home() -> bool:
 	# physically detaches before the host is freed (capture the player carry first so
 	# they ride the piloted ship back home rather than being left in the freed frame).
 	var carry := _capture_player_carry()
+	var child_carry := _capture_docked_children()
 	if piloted_ship != null:
 		DockingManagerScript.undock(piloted_ship)
 	var leaving = current_ship
 	if leaving != null and String(leaving.marker_id) != "":
-		if leaving.scene_root != null and is_instance_valid(leaving.scene_root):
+		if leaving == piloted_ship:
+			# 5c: the player is piloting this ship — it is the ride, not a host to abandon.
+			# It is re-docked to home below; do NOT free it.
+			pass
+		elif leaving.scene_root != null and is_instance_valid(leaving.scene_root):
 			if leaving.scene_root.get_parent() == self:
 				remove_child(leaving.scene_root)
 			leaving.scene_root.queue_free()
-		leaving.scene_root = null
+			leaving.scene_root = null
 	# Home hull stays in-tree — no re-add needed (co-presence).
 	current_ship = home_ship
 	away_from_start = false
@@ -1737,6 +1902,7 @@ func travel_home() -> bool:
 	if piloted_ship != null:
 		_dock_piloted_to(home_ship)
 		_apply_player_carry(carry)
+		_reposition_docked_children(child_carry)
 	_spawn_dock_barrier(home_ship)
 	current_occupancy = piloted_ship if piloted_ship != null else home_ship
 	recompute_occupancy()
@@ -1922,6 +2088,7 @@ func _build_lifeboat_at_home() -> void:
 	# and repair semantics stay exactly as they are.
 	lifeboat_ship = ShipInstanceScript.create("lifeboat", "", null, ship_systems_manager, lb_root)
 	lifeboat_ship.built_layout = LifeBoatBuilderScript.build_layout()
+	lifeboat_ship.get_access().claim(PLAYER_LOCAL_ID)
 
 	# Add to the scene tree FIRST so host/mobile global_transforms resolve, then
 	# port-align the lifeboat to the home airlock via DockingManager (the lifeboat now
@@ -1934,16 +2101,30 @@ func _build_lifeboat_at_home() -> void:
 	# Phase 5b Task 6: spawn the boot home barrier so boarding home at the canonical
 	# opening is consistent with boarding a travel target (both require seam interaction).
 	_spawn_dock_barrier(home_ship)
+	# 5c: the lifeboat's bridge terminal is spawned AFTER _spawn_dock_barrier(home_ship)
+	# because that call clears bridge_terminals (it shares the dock-transition teardown).
+	# Spawned post-add_child so the terminal is in-tree for the login range gate.
+	_spawn_bridge_terminal(lifeboat_ship)
 
 ## Port-aligns piloted_ship's airlock to host's dock port and writes the dock
 ## relationship. host.scene_root must be in-tree. Returns the dock() result dict.
+## The piloted ship's OWN dock port (ship-local). The lifeboat exposes an airlock
+## port; a claimed derelict exposes its dock-room port. Used both to dock the piloted
+## ship to a target and to pre-check compatibility before committing a travel.
+func _piloted_port_local() -> Dictionary:
+	if piloted_ship == null:
+		return {}
+	if piloted_ship == lifeboat_ship:
+		return DockPortsScript.for_lifeboat(piloted_ship.built_layout)
+	return DockPortsScript.for_derelict(piloted_ship.built_layout, _ship_seed(piloted_ship), _ship_condition_class(piloted_ship))
+
 func _dock_piloted_to(host) -> Dictionary:
 	if piloted_ship == null or host == null or host.scene_root == null:
 		return {"success": false, "reason": "dock_failed"}
 	var cc := 0 if host == home_ship else _ship_condition_class(host)
 	var host_local: Dictionary = DockPortsScript.for_derelict(host.built_layout, _ship_seed(host), cc)
 	var host_world: Dictionary = DockingManagerScript.host_port_to_world(host, host_local)
-	var mobile_local: Dictionary = DockPortsScript.for_lifeboat(piloted_ship.built_layout)
+	var mobile_local: Dictionary = _piloted_port_local()
 	if not DockPortsScript.ports_compatible(host_world, mobile_local):
 		return {"success": false, "reason": "dock_incompatible"}
 	return DockingManagerScript.dock(host, piloted_ship, host_world, mobile_local)
@@ -2040,6 +2221,9 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# so opening/breaching the dock seam must work whether the player is at home or away.
 	for b in dock_barriers:
 		if is_instance_valid(b) and not b.opened and b.try_start(player_body):
+			return
+	for t in bridge_terminals:
+		if is_instance_valid(t) and t.try_login(player_body):
 			return
 	if away_from_start:
 		# Sub-project #4: try repair points before loot/objectives.
@@ -3585,13 +3769,40 @@ func _build_world_snapshot():
 
 ## Returns the current dock-edge set as a serialisable Array.
 ## Each entry is {host: String, mobile: String, port_type: String}.
-## Only the piloted ship's edge is tracked (the sole dock in Phase 5b).
+## Emits an edge for EVERY known ship that has a parent_ship (de-duped), so the
+## lifeboat->claimed-derelict edge persists when the player pilots a derelict.
 func _current_dock_edges() -> Array:
 	var edges: Array = []
-	if piloted_ship != null and piloted_ship.parent_ship != null:
-		var host = piloted_ship.parent_ship
-		edges.append({"host": String(host.marker_id), "mobile": String(piloted_ship.ship_id), "port_type": "airlock"})
+	var seen: Dictionary = {}
+	for inst in _all_known_ships():
+		if inst == null or inst.parent_ship == null:
+			continue
+		var key: String = "%s>%s" % [String(inst.ship_id), String(inst.parent_ship.marker_id)]
+		if seen.has(key):
+			continue
+		seen[key] = true
+		edges.append({
+			"host": String(inst.parent_ship.marker_id),
+			"mobile": String(inst.ship_id),
+			"port_type": "airlock",
+		})
 	return edges
+
+## Every ShipInstance the coordinator currently tracks (home, lifeboat, current,
+## and all visited), de-duplicated.
+func _all_known_ships() -> Array:
+	var out: Array = []
+	var seen: Dictionary = {}
+	for inst in [home_ship, lifeboat_ship, current_ship]:
+		if inst != null and not seen.has(inst):
+			seen[inst] = true
+			out.append(inst)
+	for mid in visited_ships:
+		var inst = visited_ships[mid]
+		if inst != null and not seen.has(inst):
+			seen[inst] = true
+			out.append(inst)
+	return out
 
 ## Returns the marker_ids of every dock barrier that is currently opened.
 func _opened_port_marker_ids() -> Array:
@@ -3633,6 +3844,29 @@ func _activate_derelict_from_instance(inst, pos_in_ship: Array) -> bool:
 	if player != null and player is Node3D and pos_in_ship.size() >= 3:
 		(player as Node3D).global_position = Vector3(float(pos_in_ship[0]), float(pos_in_ship[1]), float(pos_in_ship[2]))
 	return true
+
+## Regenerates geometry (scene_root + bridge terminal) for a derelict ShipInstance
+## that is co-present but NOT the active current_ship — e.g. a claimed derelict the
+## player was PILOTING while docked to a different host (after rigid-pair travel). The
+## current_location-driven rebuild (_activate_derelict_from_instance) only materializes
+## the active host, so without this such a mobile endpoint would reload with
+## scene_root == null and the saved dock edge could not be re-established. (Codex P2)
+## No-op for home/lifeboat (marker_id "") and for ships that already have geometry.
+## Positions at DERELICT_DOCK_OFFSET; _apply_docking_snapshot then re-docks it flush.
+func _ensure_derelict_geometry(inst) -> void:
+	if inst == null or ship_generator == null:
+		return
+	if String(inst.marker_id) == "" or is_instance_valid(inst.scene_root):
+		return
+	var new_root: Node3D = ship_generator.generate(inst.blueprint)
+	if new_root == null:
+		return
+	inst.scene_root = new_root
+	add_child(new_root)
+	(new_root as Node3D).position = DERELICT_DOCK_OFFSET
+	if inst.built_layout.is_empty() and new_root.has_method("get_layout_copy"):
+		inst.built_layout = new_root.get_layout_copy()
+	_spawn_bridge_terminal(inst)
 
 ## Applies a WorldSnapshot: rebuilds the home ship first (this resets the runtime
 ## and returns to home if currently away), restores the SargassoWorld and the
@@ -3690,6 +3924,18 @@ func _apply_world_snapshot(ws) -> bool:
 	for b in dock_barriers:
 		if is_instance_valid(b) and ws.opened_ports.has(String(b.marker_id)):
 			b.set_opened(true)
+	# 5c. Ensure every derelict that is an endpoint of a saved dock edge has geometry
+	# BEFORE re-docking. Step 4 only materializes current_location; a claimed derelict the
+	# player was PILOTING (docked to a different host after rigid-pair travel) is otherwise
+	# restored data-only (scene_root == null), which would leave piloted_ship geometry-less
+	# and the L->D / D->host edges undockable. (Codex P2) Idempotent: _ensure_derelict_geometry
+	# skips home/lifeboat and ships that already have geometry.
+	for edge_v in ws.dock_edges:
+		if typeof(edge_v) != TYPE_DICTIONARY:
+			continue
+		var edge: Dictionary = edge_v
+		_ensure_derelict_geometry(_find_ship_by_id(String(edge.get("mobile", ""))))
+		_ensure_derelict_geometry(_find_ship_by_id_or_marker(String(edge.get("host", ""))))
 	# 6. Re-apply the persisted docking snapshot (piloted pointer + dock-edge set +
 	# occupancy). This is the general N-ship persistence mechanism: the dock edges are
 	# the source of truth, not the implicit current_location-driven rebuild. Idempotent
@@ -3770,17 +4016,33 @@ func _reset_runtime_for_reload() -> void:
 	# "gameplay roots off-tree" to re-attach here. Only the DERELICT root
 	# must be freed. _reattach_starting_gameplay_roots() is removed.
 	if away_from_start:
-		if current_ship != null and String(current_ship.marker_id) != "":
-			var derelict_root = current_ship.scene_root
-			if derelict_root != null and is_instance_valid(derelict_root):
-				if derelict_root.get_parent() == self:
-					remove_child(derelict_root)
-				# queue_free is the safe choice for a Node3D tree that may own
-				# physics bodies / navigation agents: it defers destruction to the
-				# end of the current frame so the engine can cleanly unregister
-				# those resources. The smoke asserts detachment (get_parent() !=
-				# playable), not immediate invalidation, so this is correct.
-				derelict_root.queue_free()
+		# Free EVERY co-present derelict root, not just current_ship's. 5c: the player may be
+		# piloting a CLAIMED derelict that is docked to a DIFFERENT host, so the piloted
+		# derelict's root is a separate child of this coordinator — freeing only current_ship
+		# would orphan it (leaked scene + "resources still in use at exit"). Home/lifeboat
+		# roots (marker_id "") are intentionally NOT freed here: the home hull stays co-present,
+		# and the lifeboat is rebuilt (and its prior root freed) by _build_lifeboat_at_home.
+		# queue_free defers destruction to end-of-frame so physics/nav resources unregister
+		# cleanly; the reload's slice rebuild replaces the ShipInstances afterward.
+		for inst in _all_known_ships():
+			if inst == null or String(inst.marker_id) == "":
+				continue
+			var droot = inst.scene_root
+			if droot != null and is_instance_valid(droot):
+				if droot.get_parent() == self:
+					remove_child(droot)
+				droot.queue_free()
+			inst.scene_root = null
+		# Break dock-relationship cycles (parent_ship <-> docked_ships) among the old
+		# ShipInstances. RefCounted has no cycle collector, so once the reload's slice
+		# rebuild (visited_ships.clear()) and the lifeboat rebuild drop their dict/var
+		# references, a surviving D<->host cycle would keep the old instances and their
+		# sub-states alive — leaked RefCounted at exit. The reload re-establishes the
+		# dock graph from the snapshot, so severing it here is safe.
+		for inst in _all_known_ships():
+			if inst != null:
+				inst.parent_ship = null
+				inst.docked_ships = []
 		# Co-presence: home hull / loader / gameplay roots were never detached —
 		# no re-attach needed here (contrast with old single-active model).
 		away_from_start = false
@@ -3862,6 +4124,7 @@ func _reset_runtime_for_reload() -> void:
 	# host scene_root that may be freed on reload — clear the references to avoid a
 	# stale/leaked Array entry).
 	_clear_dock_barriers()
+	_clear_bridge_terminals()
 	if hud_layer != null and is_instance_valid(hud_layer):
 		hud_layer.queue_free()
 	# REQ-014 blocking finding B: null the hud_layer and tracker
@@ -4024,3 +4287,93 @@ func board_host_for_validation() -> bool:
 	# No room outside the piloted AABB — do NOT teleport to an ambiguous center.
 	push_error("board_host_for_validation: no host room found outside piloted AABB; cannot prove a genuine flip")
 	return false
+
+## 5c seam: drives the real login path for ship_id — teleports the player to that
+## ship's bridge terminal and calls try_login (so the real in-range gate admits it).
+## Returns true iff the login was accepted (piloted_ship changed to ship_id's instance).
+func login_at_terminal_for_validation(ship_id: String) -> bool:
+	for t in bridge_terminals:
+		if is_instance_valid(t) and String(t.ship_id) == ship_id:
+			if is_instance_valid(player) and player.has_method("teleport_to") and t.is_inside_tree():
+				player.teleport_to(t.global_position)
+			var before = piloted_ship
+			t.try_login(player)
+			return piloted_ship != before and piloted_ship != null and String(piloted_ship.ship_id) == ship_id
+	return false
+
+## 5c seam: force-repair every subcomponent of ship_id's OWN systems manager so its
+## propulsion reads operational (makes it a working vessel for tests).
+func make_ship_working_for_validation(ship_id: String) -> void:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null or inst.systems_manager == null:
+		return
+	for sid in inst.systems_manager.systems.keys():
+		var sys = inst.systems_manager.get_system(sid)
+		if sys == null:
+			continue
+		for sub in sys.subcomponents:
+			inst.systems_manager.force_repair(sid, sub.subcomponent_id)
+
+## 5c seam: the current piloted ship's id ("" if none).
+func piloted_ship_id_for_validation() -> String:
+	return String(piloted_ship.ship_id) if piloted_ship != null else ""
+
+## 5c seam: true iff the piloted ship exists AND has live geometry (a valid scene_root).
+func piloted_ship_has_geometry_for_validation() -> bool:
+	return piloted_ship != null and is_instance_valid(piloted_ship.scene_root)
+
+## 5c seam: the owner_id recorded on ship_id ("" if unknown/unowned).
+func ship_owner_for_validation(ship_id: String) -> String:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null:
+		return ""
+	return inst.get_access().owner_id
+
+## 5c seam: registers an offline derelict-like ship that HAS a bridge room (so it is
+## claimable), with its own systems manager and a spawned bridge terminal, parented at
+## a distinct world offset, for login tests. Loops candidate seeds until the generated
+## layout contains a bridge room (bridge is weighted, not guaranteed). Returns its id,
+## or "" if no bridge-bearing layout was found in the search budget.
+func register_offline_test_ship_for_validation() -> String:
+	if ship_generator == null:
+		return ""
+	var built = null
+	var chosen_seed := -1
+	for seed_try in range(0, 200):
+		var candidate = ship_generator.generate_from_seed(seed_try, 1, 2)   # size 1, condition 2 (wrecked -> propulsion offline)
+		if candidate == null:
+			continue
+		if candidate.has_method("get_layout_copy") and _layout_has_bridge(candidate.get_layout_copy()):
+			built = candidate
+			chosen_seed = seed_try
+			break
+		# Not claimable -> discard this candidate root so it does not leak.
+		candidate.queue_free()
+	if built == null:
+		return ""
+	var bp = ShipBlueprintScript.new(1, 2, chosen_seed)
+	var mgr = ShipSystemsManagerScript.new()
+	mgr.configure(mgr.load_definitions(), bp.condition, bp.seed_value)
+	var inst = ShipInstanceScript.create("ship_offline_test", "cell:cell:%d" % chosen_seed, bp, mgr, null)
+	inst.scene_root = built
+	add_child(built)
+	(built as Node3D).position = Vector3(0.0, 0.0, 60.0)
+	if inst.built_layout.is_empty() and built.has_method("get_layout_copy"):
+		inst.built_layout = built.get_layout_copy()
+	visited_ships[String(inst.marker_id)] = inst
+	_spawn_bridge_terminal(inst)
+	return String(inst.ship_id)
+
+## True iff a layout dict contains a room with room_role == "bridge".
+func _layout_has_bridge(layout: Dictionary) -> bool:
+	var rooms_v: Variant = layout.get("rooms", [])
+	if typeof(rooms_v) != TYPE_ARRAY:
+		return false
+	for room_v in (rooms_v as Array):
+		if typeof(room_v) == TYPE_DICTIONARY and str((room_v as Dictionary).get("room_role", "")) == "bridge":
+			return true
+	return false
+
+## 5c seam: true iff the current active ship has a bridge room (is claimable).
+func current_ship_has_bridge_for_validation() -> bool:
+	return current_ship != null and typeof(current_ship.built_layout) == TYPE_DICTIONARY and _layout_has_bridge(current_ship.built_layout)
