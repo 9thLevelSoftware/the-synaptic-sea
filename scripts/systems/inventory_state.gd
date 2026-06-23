@@ -6,6 +6,8 @@ class_name InventoryState
 ## through legacy shims (add_tool/has_tool/tool_ids/get_drain_multiplier) so OxygenState,
 ## ToolPickup, and the junction gate are untouched. Round-trips via get/apply_summary.
 
+const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
+
 const ITEM_DEFINITIONS_PATH: String = "res://data/items/item_definitions.json"
 const TOOL_DEFINITIONS_PATH: String = "res://data/tools/tool_definitions.json"
 const MAX_WEIGHT: float = 50.0
@@ -19,50 +21,24 @@ func _init() -> void:
 	_load_definitions()
 
 func _load_definitions() -> void:
-	_definitions.clear()
-	# Tools first (so item_definitions can override if ever needed); tool defs get a
-	# synthetic 'tool' category + default weight while preserving their 'effect' field.
-	var tool_defs: Dictionary = _read_json_dict(TOOL_DEFINITIONS_PATH)
-	for tool_id in tool_defs:
-		var def: Dictionary = (tool_defs[tool_id] as Dictionary).duplicate(true)
-		def["category"] = "tool"
-		if not def.has("weight"):
-			def["weight"] = DEFAULT_TOOL_WEIGHT
-		_definitions[tool_id] = def
-	var item_defs: Dictionary = _read_json_dict(ITEM_DEFINITIONS_PATH)
-	for item_id in item_defs:
-		_definitions[item_id] = item_defs[item_id]
-
-func _read_json_dict(path: String) -> Dictionary:
-	if not FileAccess.file_exists(path):
-		return {}
-	var file := FileAccess.open(path, FileAccess.READ)
-	if file == null:
-		return {}
-	var text := file.get_as_text()
-	file.close()
-	var parsed: Variant = JSON.parse_string(text)
-	return parsed if parsed is Dictionary else {}
+	_definitions = ItemDefsScript.load_definitions()
 
 # --- definition helpers ---
 
 func get_definition(item_id: String) -> Dictionary:
-	var def: Variant = _definitions.get(item_id, {})
-	return def if def is Dictionary else {}
+	return ItemDefsScript.get_definition(_definitions, item_id)
 
 func get_category(item_id: String) -> String:
-	return str(get_definition(item_id).get("category", ""))
+	return ItemDefsScript.category(_definitions, item_id)
 
 func get_weight_each(item_id: String) -> float:
-	# Unknown items weigh 0 so a foreign save round-trips without corrupting the cap.
-	return float(get_definition(item_id).get("weight", 0.0))
+	return ItemDefsScript.weight_each(_definitions, item_id)
 
 func _max_stack(item_id: String) -> int:
-	return int(get_definition(item_id).get("max_stack", DEFAULT_MAX_STACK))
+	return ItemDefsScript.max_stack(_definitions, item_id)
 
 func get_display_name(item_id: String) -> String:
-	var name: String = str(get_definition(item_id).get("display_name", ""))
-	return name if not name.is_empty() else item_id.replace("_", " ").capitalize()
+	return ItemDefsScript.display_name(_definitions, item_id)
 
 # --- item API ---
 
