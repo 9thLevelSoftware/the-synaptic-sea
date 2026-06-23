@@ -4,6 +4,8 @@ extends SceneTree
 ## owner cannot be revoked, and summary round-trip.
 
 const ShipAccessStateScript := preload("res://scripts/systems/ship_access_state.gd")
+const ShipInstanceScript := preload("res://scripts/systems/ship_instance.gd")
+const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
 
 func _init() -> void:
 	var a = ShipAccessStateScript.create()
@@ -35,5 +37,22 @@ func _init() -> void:
 	assert(b.has_access("player_3"), "granted access round-trips")
 	assert(b.apply_summary("not a dict") == false, "apply_summary rejects non-dict")
 
-	print("SHIP ACCESS SMOKE PASS owner=%s access=%d" % [b.owner_id, b.access_ids.size()])
+	# ShipInstance owns a ShipAccessState that round-trips through its summary.
+	var inst = ShipInstanceScript.create("ship_test", "cell:cell:1", null, null, null)
+	assert(inst.get_access().owner_id == "", "fresh ship unowned")
+	inst.get_access().claim("player_local")
+	var inst_summary: Dictionary = inst.get_summary()
+	assert(inst_summary.has("access"), "ship summary carries access")
+	var inst2 = ShipInstanceScript.create("ship_test", "cell:cell:1", null, null, null)
+	inst2.apply_summary(inst_summary)
+	assert(inst2.get_access().owner_id == "player_local", "ship access round-trips")
+
+	# is_working_vessel reads the ship's own propulsion operational status.
+	assert(inst.is_working_vessel() == false, "no systems manager -> not working")
+	var mgr = ShipSystemsManagerScript.new()
+	mgr.configure(mgr.load_definitions(), 0, 0)   # condition 0 = pristine -> all operational
+	var working_inst = ShipInstanceScript.create("ship_ok", "cell:cell:2", null, mgr, null)
+	assert(working_inst.is_working_vessel() == true, "operational propulsion -> working vessel")
+
+	print("SHIP ACCESS SMOKE PASS owner=%s access=%d ship_owner=%s" % [b.owner_id, b.access_ids.size(), inst2.get_access().owner_id])
 	quit()
