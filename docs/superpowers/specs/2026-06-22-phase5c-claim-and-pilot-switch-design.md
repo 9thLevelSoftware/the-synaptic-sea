@@ -136,10 +136,12 @@ single-player / one-level slice is wired.
 
 ## Testing (validation smokes)
 
-Five new smokes, registered in `06_validation_plan.md` (commands 88 → 93):
+Six new smokes, registered in `06_validation_plan.md` (commands 89 → 94):
 
 - `ship_access_smoke` — pure model: claim/grant/revoke/has_access, owner cannot be
   revoked, summary round-trip.
+- `bridge_terminal_smoke` — node-level: range gate fires `login_requested` signal;
+  out-of-range does not fire.
 - `bridge_terminal_login_smoke` — login gated on working vessel; sets owner +
   piloted; refused (`vessel_not_operational`) when propulsion offline.
 - `pilot_switch_smoke` — two ships aboard/owned; logging in at each flips

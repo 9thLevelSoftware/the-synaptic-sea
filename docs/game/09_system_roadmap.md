@@ -35,7 +35,7 @@ and be validated independently before integration.
 | 2 | Ship Systems (6 systems + repair) | ✅ **Complete** | `ship_systems_manager.gd`, `ship_system.gd`, `ship_subcomponent.gd`, `life_support_system.gd`; dependency cascades (ADR-0008, ADR-0009); hazards (oxygen/fire/electrical_arc/route_control/junction_calibrator, ADR-0005); timed parts-gated repair (`repair_point.gd`, `repair_with_inventory`, ADR-0015). |
 | 3 | Player Progression (class + skills) | 🟢 **Slice built** | `class_definition.gd`, `player_progression_state.gd`; XP + repair-skill integration (ADR-0010). Repair skill speeds the repair channel. *Remaining:* full 8-class roster, full five-category skill tree, cross-training XP costs, training-by-item. |
 | 4 | Scanner & Travel | 🟢 **Slice built** | `scanner_state.gd`, `travel_controller.gd`, `marker_generator.gd`, `ship_marker.gd` (ADR-0011, phase4 + phase4.5 specs). Menu-based travel works; propulsion gates onward travel (repair loop). *Remaining:* multi-level scanner detail/upgrades (currently basic). |
-| 5 | Ship Docking & Ship-in-Ship | 🟢 **Foundation (5a) + physical docking & ports (5b) built** | `docking_manager.gd`, `dock_ports.gd` (typed ports + compat), `ship_occupancy.gd`, `dock_port_barrier.gd` (welding-speeded breach); `ship_instance.gd` parent/child + real `interior_aabb`. Runtime port-aligned docking at boot+travel in `playable_generated_ship.gd` — travel is now a real undock→dock loop (the piloted ship is the player's ride), NOT a menu teleport. Occupancy-gated boarding; dock-edge persistence. ADR-0016, ADR-0017. *Remaining (5c):* claim/pilot a repaired derelict, ship-in-ship hangar nesting. |
+| 5 | Ship Docking & Ship-in-Ship | 🟢 **Foundation (5a) + physical docking & ports (5b) + claim & pilot-switch (5c) built** | `docking_manager.gd`, `dock_ports.gd` (typed ports + compat), `ship_occupancy.gd`, `dock_port_barrier.gd` (welding-speeded breach); `ship_instance.gd` parent/child + real `interior_aabb`. Runtime port-aligned docking at boot+travel in `playable_generated_ship.gd` — travel is now a real undock→dock loop (the piloted ship is the player's ride), NOT a menu teleport. Occupancy-gated boarding; dock-edge persistence. `ship_access_state.gd` (login-based ownership), `bridge_terminal.gd` (working-vessel gate), `set_piloted_ship` pilot-switch, one-level rigid-pair travel (`_capture_docked_children`/`_reposition_docked_children`), `world-3` persistence. Multiplayer access UI is a post-Phase-7 seam. ADR-0016, ADR-0017, ADR-0018. *Remaining (5d):* full hangar nesting (recursive/arbitrary-depth ship-in-ship). |
 | 6 | Inventory & Equipment | 🟡 **~40% — player half done** | PlayerInventory (`inventory_state.gd`, weight-capped, categorized) ✅; loot (`loot_roller.gd`, `loot_container.gd`, `item_definitions.json`, `loot_tables.json`) ✅. *Remaining:* ShipInventory (per-ship storage), EquipmentSlots (suit/tool-belt/etc.), item transfer player↔ship↔ship, equipment & data item categories. |
 | 7 | Procedural Generation Details | ✅ **Complete** | Folded into System 1 — room roles, graph rules, structural placement, deterministic-per-seed all delivered in the procgen pipeline. |
 | 8 | Sargasso World & Scanner Display | ✅ **Complete** | `sargasso_world.gd` (registry + spatial grid), `scanner_panel.gd`, `marker_generator.gd`. Folded into System 4's delivery. |
@@ -57,7 +57,7 @@ glue and are done:
 | Phase 2 — Ship Systems | System 2 | ✅ done |
 | Phase 3 — Player Progression | System 3 | 🟢 slice |
 | Phase 4 — Scanner & Travel | Systems 4, 8 | 🟢 slice |
-| Phase 5 — Ship Docking & Ship-in-Ship | System 5 | 🟢 5a foundation + 5b physical docking & ports built; 5c (claim/pilot 2nd ship, hangar nesting) remains |
+| Phase 5 — Ship Docking & Ship-in-Ship | System 5 | 🟢 5a foundation + 5b physical docking & ports + 5c claim/pilot-switch & rigid-pair travel built; 5d (full hangar nesting) remains |
 | Phase 6 — Inventory & Equipment | System 6 | 🟡 partial |
 | Phase 7 — Integration & Polish | all (wire-together) | ⛔ not started |
 
@@ -77,18 +77,22 @@ and item transfer (player↔ship, ship↔ship when co-located). Unblocks "store
 salvage on your ship" and equipment-gated actions.
 
 ### B. Build System 5 — Ship Docking & Ship-in-Ship (Phase 5)
-The system that makes the world physical. **5a (foundation) and 5b (physical
-docking + typed ports) are built and merged:** the player's lifeboat is a
-functional ship that **physically docks** to a target derelict and stays docked
-as a guaranteed ride; travel is a real undock→dock loop (the menu-teleport
-abstraction is retired); typed dock ports gate boarding with a welding-speeded
-forced-entry breach; occupancy and the dock-edge graph persist. `DockingManager`,
-`DockPorts`, `DockPortBarrier`, and the parent/child `ShipInstance` hierarchy
-exist (ADR-0016, ADR-0017). **Remaining — 5c:** repairing a derelict's
-propulsion lets the player **claim a second functional ship**; ships nest in
-hangars (ship-in-ship) and travel together; piloting/switching the active ship.
-Depends on nothing from A, but sharing inventory across docked ships is cleaner
-once A exists.
+The system that makes the world physical. **5a (foundation), 5b (physical
+docking + typed ports), and 5c (claim + pilot-switch + rigid-pair travel) are
+all built and merged:** the player's lifeboat is a functional ship that
+**physically docks** to a target derelict and stays docked as a guaranteed ride;
+travel is a real undock→dock loop (the menu-teleport abstraction is retired);
+typed dock ports gate boarding with a welding-speeded forced-entry breach;
+occupancy and the dock-edge graph persist. Repairing a derelict's propulsion
+lets the player **claim it** by logging in at its bridge terminal and pilot it
+as their new vessel; the lifeboat stays docked as a rigid-pair travel companion.
+Pilot-switch is physical: walk to any ship's bridge and log in. `DockingManager`,
+`DockPorts`, `DockPortBarrier`, `ShipAccessState`, `BridgeTerminal`, and the
+parent/child `ShipInstance` hierarchy exist (ADR-0016, ADR-0017, ADR-0018).
+Multiplayer access UI (grant/revoke to other players) is a post-Phase-7 seam.
+**Remaining — 5d:** full hangar nesting — recursive / arbitrary-depth
+ship-in-ship, hangar-port-type gating, and hangar-bay UI. Depends on nothing
+from A, but sharing inventory across docked ships is cleaner once A exists.
 
 ### C. Phase 7 — Integration & Polish (the "wire it all together" step)
 The endgame the whole isolation strategy was building toward: connect all

@@ -53,6 +53,10 @@ BLUEPRINT_NULL_ERROR="^ERROR: PlayableGeneratedShip\\.load_from_blueprint: bluep
 # null-snapshot guard; that guard emits this push_warning on the rejection
 # path. It is the expected signal, not a failure.
 WORLD_SAVE_NULL_WARNING="^WARNING: SaveLoadService: cannot save null world snapshot\$"
+# bridge_terminal_login_smoke deliberately calls login on a non-working vessel
+# to verify the vessel_not_operational refusal path; that path emits this
+# push_warning. It is the expected signal, not a failure.
+VESSEL_NOT_OPERATIONAL_WARNING="^WARNING: PlayableGeneratedShip: login refused \(vessel_not_operational\) for .*\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -61,7 +65,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$BLUEPRINT_NULL_ERROR|$WORLD_SAVE_NULL_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$BLUEPRINT_NULL_ERROR|$WORLD_SAVE_NULL_WARNING|$VESSEL_NOT_OPERATIONAL_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -157,7 +161,12 @@ run_clean 'bridge terminal node smoke' 'BRIDGE TERMINAL SMOKE PASS ship=ship_tes
 run_clean 'physical travel smoke' 'PHYSICAL TRAVEL PASS aboard_lifeboat=true flush=true barrier_closed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/physical_travel_smoke.gd
 run_clean 'boarding flip smoke' 'BOARDING FLIP PASS closed_in_lifeboat=true barrier_opens=true flips_to_host=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/boarding_flip_smoke.gd
 run_clean 'docking persistence smoke' 'DOCKING PERSISTENCE PASS dock_edge=true occupancy=true opened_port=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/docking_persistence_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=89 clean_output=true'
+run_clean 'ship access smoke' 'SHIP ACCESS SMOKE PASS owner=player_local access=2 ship_owner=player_local' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_access_smoke.gd
+run_clean 'bridge terminal login smoke' 'BRIDGE TERMINAL LOGIN SMOKE PASS piloted=lifeboat' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bridge_terminal_login_smoke.gd
+run_clean 'pilot switch smoke' 'PILOT SWITCH SMOKE PASS piloted=lifeboat' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pilot_switch_smoke.gd
+run_clean 'rigid pair travel smoke' 'RIGID PAIR TRAVEL SMOKE PASS piloted=lifeboat' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/rigid_pair_travel_smoke.gd
+run_clean 'claim persistence smoke' 'CLAIM PERSISTENCE SMOKE PASS piloted=ship_0:0:0 owner=player_local' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/claim_persistence_smoke.gd
+echo 'SARGASSO REGRESSION PASS commands=94 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
@@ -224,6 +233,18 @@ The world-persistence sub-project (ADR-0012) adds one additional expected
   passes `null` to verify the guard rejects the request; the WARNING is the
   expected signal, not a failure. Filtered by `$WORLD_SAVE_NULL_WARNING`; any
   other `SaveLoadService: cannot save` warning still fails the bundle.
+
+Phase 5c `bridge_terminal_login_smoke` adds one additional expected `WARNING:`
+line emitted when the smoke deliberately calls login on a non-working vessel to
+verify the `vessel_not_operational` refusal path:
+
+- `WARNING: PlayableGeneratedShip: login refused (vessel_not_operational) for <ship_id>`
+  — emitted by `scripts/procgen/playable_generated_ship.gd`
+  `_on_login_requested()` when the target ship's propulsion is offline. The
+  smoke passes a ship with propulsion forced offline to verify the refusal; the
+  WARNING is the expected signal, not a failure. Filtered by
+  `$VESSEL_NOT_OPERATIONAL_WARNING`; any other `login refused` warning still
+  fails the bundle.
 
 Evidence collection command (run before adding or removing a smoke from the
 bundle; any unexpected `ERROR:`/`WARNING:` line that is not on the allowlist
