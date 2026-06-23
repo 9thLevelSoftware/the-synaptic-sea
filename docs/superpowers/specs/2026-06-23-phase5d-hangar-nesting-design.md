@@ -171,9 +171,16 @@ edge (`port_type`, `slot_index`). Load:
 - places bayed ships at their slot anchors, then re-establishes
   `parent_ship` / `docked_ships`.
 
-**Forward compatibility:** world-3 saves load under world-4 — a missing
-`port_type` defaults to `"airlock"` and a missing `slot_index` to `-1`, so a
-pre-5d save (airlock edges only) restores exactly as before.
+**Version compatibility:** per the project's save-versioning convention
+(ADR-0007/0012), the `WorldSnapshot.from_dict` version gate **rejects** any save
+whose `slice_version` is not `world-4` and falls back to a fresh run — exactly as
+the `world-1→world-2` (5b) and `world-2→world-3` (5c) bumps did. Pre-5d saves are
+therefore *not* migrated; they are dev-throwaway in this pre-release. The
+field-level defaulting (`port_type` absent ⇒ `"airlock"`, `slot_index` absent ⇒
+`-1`) applies only *within* a `world-4` document, so a `world-4` save written
+before any hangar edge existed still restores cleanly. (If save-compat across
+version bumps ever becomes a product requirement, migration is its own ADR — not a
+silent change to the version gate.)
 
 ## Error handling & edge cases
 

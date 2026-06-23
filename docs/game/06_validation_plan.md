@@ -168,7 +168,8 @@ run_clean 'hangar control node smoke' 'HANGAR CONTROL SMOKE PASS dock=1 launch=1
 run_clean 'bay dock/launch smoke' 'BAY DOCK LAUNCH SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bay_dock_launch_smoke.gd
 run_clean 'recursive travel smoke' 'RECURSIVE TRAVEL SMOKE PASS piloted_geom=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recursive_travel_smoke.gd
 run_clean 'hangar persistence smoke' 'HANGAR PERSISTENCE SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_persistence_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=100 clean_output=true'
+run_clean 'bay travel unbay smoke' 'BAY TRAVEL UNBAY SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bay_travel_unbay_smoke.gd
+echo 'SARGASSO REGRESSION PASS commands=101 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

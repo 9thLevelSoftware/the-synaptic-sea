@@ -1260,6 +1260,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	if piloted_ship != null:
 		var carry := _capture_player_carry()
 		var child_carry := _capture_subtree()
+		_unbay_from_parent(piloted_ship)   # clear a stale bay slot if the piloted ship was bayed (PR#16 P2)
 		DockingManagerScript.undock(piloted_ship)
 		var dock_res: Dictionary = _dock_piloted_to(inst)
 		if not bool(dock_res.get("success", false)):
@@ -1526,7 +1527,8 @@ func _place_in_slot(carrier, mobile, slot_index: int) -> void:
 		return
 	if not is_instance_valid(carrier.scene_root) or not is_instance_valid(mobile.scene_root):
 		return
-	if not (carrier.scene_root as Node3D).is_inside_tree():
+	# Both roots must be in-tree before a global_transform write (we write mobile's below).
+	if not (carrier.scene_root as Node3D).is_inside_tree() or not (mobile.scene_root as Node3D).is_inside_tree():
 		return
 	var desc: Dictionary = DockPortsScript.for_hangar(carrier.built_layout, _ship_seed(carrier))
 	var anchors: Array = desc.get("slot_anchors", [])
@@ -1582,11 +1584,28 @@ func _on_bay_launch_requested(carrier_id: String, slot_index: int) -> void:
 	launched.parent_ship = null
 	carrier.docked_ships.erase(launched)
 	if is_instance_valid(launched.scene_root) and is_instance_valid(carrier.scene_root) \
-			and (carrier.scene_root as Node3D).is_inside_tree():
+			and (carrier.scene_root as Node3D).is_inside_tree() \
+			and (launched.scene_root as Node3D).is_inside_tree():
 		# Park it just outside the bay (carrier-local -Z), co-present and free.
 		(launched.scene_root as Node3D).global_transform = \
 			(carrier.scene_root as Node3D).global_transform * Transform3D(Basis(), Vector3(0.0, 0.0, -8.0))
 	recompute_occupancy()
+
+## Clears `inst`'s hangar slot in its parent's bay BEFORE the ship leaves via a
+## non-launch path (the travel undock of a bayed piloted ship). Without this, a ship
+## that undocks while still occupying a bay slot leaves a stale slot id: the slot stays
+## unusable and the ship's next airlock re-dock is misclassified as a hangar edge by
+## _current_dock_edges (Codex PR#16 P2). Must run BEFORE DockingManager.undock (which
+## nulls parent_ship). No-op when the ship is not bayed.
+func _unbay_from_parent(inst) -> void:
+	if inst == null or inst.parent_ship == null:
+		return
+	var parent = inst.parent_ship
+	if parent.hangar == null:
+		return
+	var s: int = parent.hangar.slot_of(String(inst.ship_id))
+	if s != -1:
+		parent.hangar.launch(s)
 
 ## Builds the active derelict's objective interactables from its loader specs and
 ## restores completed/cleared state from its (retained or loaded) controller. Called
@@ -2046,6 +2065,7 @@ func travel_home() -> bool:
 	var carry := _capture_player_carry()
 	var child_carry := _capture_subtree()
 	if piloted_ship != null:
+		_unbay_from_parent(piloted_ship)   # clear a stale bay slot if the piloted ship was bayed (PR#16 P2)
 		DockingManagerScript.undock(piloted_ship)
 	var leaving = current_ship
 	if leaving != null and String(leaving.marker_id) != "":
