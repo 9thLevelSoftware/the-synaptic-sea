@@ -162,7 +162,13 @@ run_clean 'bridge terminal login smoke' 'BRIDGE TERMINAL LOGIN SMOKE PASS pilote
 run_clean 'pilot switch smoke' 'PILOT SWITCH SMOKE PASS piloted=lifeboat' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pilot_switch_smoke.gd
 run_clean 'rigid pair travel smoke' 'RIGID PAIR TRAVEL SMOKE PASS piloted=lifeboat' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/rigid_pair_travel_smoke.gd
 run_clean 'claim persistence smoke' 'CLAIM PERSISTENCE SMOKE PASS piloted=ship_0:0:0 owner=player_local' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/claim_persistence_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=94 clean_output=true'
+run_clean 'hangar bay model smoke' 'HANGAR BAY SMOKE PASS slots=2 size=1 occupant=0' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_bay_smoke.gd
+run_clean 'hangar port smoke' 'HANGAR PORT SMOKE PASS slots=3 size=2 cargo_slots=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_port_smoke.gd
+run_clean 'hangar control node smoke' 'HANGAR CONTROL SMOKE PASS dock=1 launch=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_control_smoke.gd
+run_clean 'bay dock/launch smoke' 'BAY DOCK LAUNCH SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bay_dock_launch_smoke.gd
+run_clean 'recursive travel smoke' 'RECURSIVE TRAVEL SMOKE PASS piloted_geom=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recursive_travel_smoke.gd
+run_clean 'hangar persistence smoke' 'HANGAR PERSISTENCE SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_persistence_smoke.gd
+echo 'SARGASSO REGRESSION PASS commands=100 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
