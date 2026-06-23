@@ -673,12 +673,26 @@ func _command_room_local_center(inst) -> Vector3:
 ## parented under the ship's scene_root so it inherits the ship transform and is
 ## freed with it. The home ship is never pilotable -> no terminal. A ship with NO
 ## bridge room gets NO terminal (it cannot be claimed/piloted — loot space only).
+## Idempotent: prunes invalid entries (whose ship scene_root was freed) and any prior
+## terminal for THIS ship before appending, so re-spawning never duplicates or leaks.
 func _spawn_bridge_terminal(inst) -> void:
 	if inst == null or inst == home_ship or not is_instance_valid(inst.scene_root):
 		return
 	var local_center: Vector3 = _command_room_local_center(inst)
 	if local_center == Vector3.INF:
 		return   # no bridge room -> not claimable
+	# Prune dead entries + any existing terminal for this same ship (idempotent re-spawn).
+	var kept: Array = []
+	for t in bridge_terminals:
+		if not is_instance_valid(t):
+			continue
+		if String(t.ship_id) == String(inst.ship_id):
+			if t.get_parent() != null:
+				t.get_parent().remove_child(t)
+			t.queue_free()
+			continue
+		kept.append(t)
+	bridge_terminals = kept
 	var terminal = BridgeTerminalScript.new()
 	(inst.scene_root as Node3D).add_child(terminal)
 	terminal.configure(String(inst.ship_id), local_center, 1.8)
@@ -743,7 +757,7 @@ func set_piloted_ship(inst) -> Dictionary:
 	_spawn_bridge_terminal(inst)
 ```
 
-(h) Clear terminals wherever dock barriers are cleared on teardown/reload. Find each call site of `_clear_dock_barriers()` and add `_clear_bridge_terminals()` directly after it. (At minimum: the reload/reset path. Use `grep -n "_clear_dock_barriers" scripts/procgen/playable_generated_ship.gd` to find them all.)
+(h) Clear terminals ONLY on full teardown/reload — NOT on every dock-barrier respawn. Bridge terminals are per-ship and persistent (a terminal lives as long as its ship's scene_root), whereas the dock barrier is a single transient seam respawned on every dock transition. So call `_clear_bridge_terminals()` in the reset/reload teardown path (`_reset_runtime_for_reload`, alongside the `_clear_dock_barriers()` there) — but do NOT add it inside `_spawn_dock_barrier`. If you did, every travel arrival would wipe the lifeboat's terminal (the next `_spawn_bridge_terminal` only respawns the derelict's), making the lifeboat unclaimable after travel. The `_spawn_bridge_terminal` prune logic above handles stale per-ship entries instead.
 
 (i) Add the validation seams (place with the other `*_for_validation` seams):
 
@@ -1022,6 +1036,12 @@ func _init() -> void:
 	# The piloted derelict still exists (never freed) and the lifeboat is flush to it.
 	assert(ship.piloted_ship_id_for_validation() == derelict_id, "still piloting the same derelict")
 	assert(ship.lifeboat_flush_to_piloted_for_validation() == true, "lifeboat flush to moved piloted ship")
+
+	# Lifecycle regression: the lifeboat's bridge terminal must SURVIVE travel (dock-barrier
+	# respawn must not wipe it). Logging in at the lifeboat terminal takes command back.
+	var lb_id: String = String(ship.get_lifeboat_ship_for_validation().ship_id)
+	assert(ship.login_at_terminal_for_validation(lb_id) == true, "lifeboat terminal survived travel")
+	assert(ship.piloted_ship_id_for_validation() == lb_id, "took command of lifeboat after travel")
 
 	print("RIGID PAIR TRAVEL SMOKE PASS piloted=%s" % ship.piloted_ship_id_for_validation())
 	quit()
