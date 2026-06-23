@@ -41,6 +41,7 @@ const DERELICT_OPTIONAL_ROLES: Array[String] = [
 	"corridor",
 	"bay",
 	"quarters",
+	"hangar",
 ]
 
 const DEFAULT_WEIGHTS: Dictionary = {

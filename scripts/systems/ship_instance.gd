@@ -12,6 +12,7 @@ const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
 const DerelictObjectiveControllerScript := preload("res://scripts/systems/derelict_objective_controller.gd")
 const ShipAccessStateScript := preload("res://scripts/systems/ship_access_state.gd")
+const HangarBayScript := preload("res://scripts/systems/hangar_bay.gd")
 
 const ROOM_HALF_EXTENT: float = 4.0   # generous per-room half-box in X/Z (covers 2x1 rooms + module chains)
 const ROOM_HALF_HEIGHT: float = 3.0   # half deck height + headroom
@@ -39,6 +40,10 @@ var docking_ports: Array = []       # Array (DockingPort in Phase 5)
 
 # Sub-project 5c: per-ship ownership/access. Lazily created; persisted under "access".
 var access = null                        # ShipAccessState | null
+
+# Sub-project 5d: per-ship hangar bay (stores other ships). Lazily created;
+# persisted under "hangar" only when it actually has slots.
+var hangar = null                        # HangarBay | null
 
 # Sub-project #2: per-derelict objective loop state. Lazily created; null for the
 # home ship (which uses the coordinator's singleton loop, not this controller).
@@ -79,6 +84,8 @@ func get_summary() -> Dictionary:
 		result["looted_containers"] = looted_container_ids.duplicate()
 	if access != null:
 		result["access"] = access.get_summary()
+	if hangar != null and hangar.slot_count > 0:
+		result["hangar"] = hangar.get_summary()
 	return result
 
 func apply_summary(summary) -> bool:
@@ -108,6 +115,9 @@ func apply_summary(summary) -> bool:
 	var access_summary: Variant = summary.get("access", null)
 	if typeof(access_summary) == TYPE_DICTIONARY and not (access_summary as Dictionary).is_empty():
 		get_access().apply_summary(access_summary as Dictionary)
+	var hangar_summary: Variant = summary.get("hangar", null)
+	if typeof(hangar_summary) == TYPE_DICTIONARY and not (hangar_summary as Dictionary).is_empty():
+		get_hangar().apply_summary(hangar_summary as Dictionary)
 	return true
 
 ## Returns this ship's DerelictObjectiveController, creating it on first access.
@@ -121,6 +131,16 @@ func get_access():
 	if access == null:
 		access = ShipAccessStateScript.create()
 	return access
+
+## Returns this ship's HangarBay, creating an empty (0-slot) one on first access.
+func get_hangar():
+	if hangar == null:
+		hangar = HangarBayScript.create(0, 0)
+	return hangar
+
+## True iff this ship has a configured bay (at least one slot).
+func has_hangar() -> bool:
+	return hangar != null and hangar.slot_count > 0
 
 ## A "working vessel" can be piloted: its own propulsion system is operational.
 func is_working_vessel() -> bool:

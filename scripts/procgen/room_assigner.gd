@@ -19,6 +19,7 @@ const ROOM_FOOTPRINT_OPTIONS: Dictionary = {
 	"bridge":         [Vector2i(3, 2), Vector2i(3, 3)],
 	"cargo":          [Vector2i(2, 2), Vector2i(3, 3), Vector2i(2, 3)],
 	"bay":            [Vector2i(2, 2), Vector2i(3, 3), Vector2i(2, 3)],
+	"hangar":         [Vector2i(2, 2), Vector2i(3, 3), Vector2i(2, 3)],
 	"medical":        [Vector2i(2, 2), Vector2i(2, 1)],
 	"crew_quarters":  [Vector2i(2, 2), Vector2i(2, 1)],
 	"mess_hall":      [Vector2i(2, 2), Vector2i(3, 2)],

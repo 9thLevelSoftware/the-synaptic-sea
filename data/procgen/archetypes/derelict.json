@@ -16,7 +16,8 @@
         "corridor": 3,
         "bridge": 3,
         "bay": 2,
-        "quarters": 2
+        "quarters": 2,
+        "hangar": 2
     },
     "guaranteed_roles": ["dock"],
     "max_duplicates": 3

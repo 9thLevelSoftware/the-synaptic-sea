@@ -8,7 +8,7 @@ class_name WorldSnapshot
 ## stored — derelict hulls regenerate deterministically from seed; only mutable
 ## state rides the per-ship slices.
 
-const WORLD_SLICE_VERSION: String = "world-3"
+const WORLD_SLICE_VERSION: String = "world-4"
 
 var world_summary: Dictionary = {}
 var home_ship: Dictionary = {}                  # a RunSnapshot.to_dict()
@@ -16,7 +16,7 @@ var home_looted_containers: Array = []          # home ship's searched loot-cont
 var visited_ships: Dictionary = {}              # marker_id -> ShipInstance.get_summary()
 var current_location: String = ""               # "" = home ship, else marker_id
 var player_position_in_ship: Array = [0.0, 0.0, 0.0]
-var dock_edges: Array = []          # [{host: String, mobile: String, port_type: String}]
+var dock_edges: Array = []          # [{host, mobile, port_type:"airlock"|"hangar", slot_index:int}]
 var piloted_ship_id: String = ""
 var aboard_ship_id: String = ""
 var opened_ports: Array = []        # marker_ids with an opened dock barrier
