@@ -50,10 +50,13 @@ func _run_section_b() -> void:
 	var home_id: String = ship.home_ship_id_for_validation()
 	assert(ship.ship_has_cargo_hold_for_validation(home_id), "home cargo hold control spawned")
 
-	# Seed the player inventory with a haulable part, then deposit-all into the home hold.
+	# Seed the player inventory with a haulable part, then deposit-all into the home hold
+	# by driving the REAL player-interact dispatch (walk up + interact), not the direct
+	# transfer seam. This is the regression guard for the cargo control being wired into
+	# _on_player_interact_requested — a return of 0 means it is NOT wired.
 	ship.inventory_state.add_item("scrap_metal", 6)   # scrap_metal: part, weight 5.0, max_stack 20
-	var deposited: int = ship.cargo_deposit_for_validation(home_id)
-	assert(deposited == 6, "deposited 6 into home hold (got %d)" % deposited)
+	var deposited: int = ship.cargo_interact_deposit_for_validation(home_id)
+	assert(deposited == 6, "interact at hold deposited 6 (got %d) — control wired into interact path" % deposited)
 	assert(ship.ship_hold_quantity_for_validation(home_id, "scrap_metal") == 6, "hold holds 6")
 	assert(ship.inventory_state.get_quantity("scrap_metal") == 0, "player emptied of part")
 

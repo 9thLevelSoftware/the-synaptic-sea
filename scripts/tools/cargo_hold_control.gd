@@ -93,5 +93,7 @@ func _on_body_entered(body: Node3D) -> void:
 		candidate_player = body
 
 func _on_body_exited(body: Node3D) -> void:
-	if body == candidate_player:
+	# Guard against comparing a freed candidate_player (Godot 4 throws on == with a
+	# freed object) — e.g. the player node is freed on reload without a body_exited.
+	if is_instance_valid(candidate_player) and body == candidate_player:
 		candidate_player = null

@@ -2492,6 +2492,10 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		for it in derelict_interactables:
 			if is_instance_valid(it) and it.try_interact(player_body):
 				return
+		# Sub-project #6 (cargo): deposit is the lowest-priority fallback — only fires
+		# if nothing more specific (repair/loot/objective) claimed the interact here.
+		if _try_cargo_deposit(player_body):
+			return
 		return
 	# Sub-project #4: try lifeboat repair points before pickups/objectives.
 	for rp in repair_points:
@@ -2512,6 +2516,19 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		var interactable = interactable_variant
 		if interactable.try_interact(player_body):
 			return
+	# Sub-project #6 (cargo): deposit-all is the lowest-priority fallback at home too —
+	# walk up to the cargo hold and interact to dump salvage when nothing else claims it.
+	if _try_cargo_deposit(player_body):
+		return
+
+## Walk-up cargo deposit: deposits all haulable salvage into the hold of whichever
+## cargo control the player is standing at (strict in-range gate). Returns true iff a
+## deposit fired. Emit-only control + coordinator-owned transfer (single ownership).
+func _try_cargo_deposit(player_body) -> bool:
+	for ch in cargo_hold_controls:
+		if is_instance_valid(ch) and ch.try_deposit(player_body):
+			return true
+	return false
 
 func _on_interactable_completed(interaction_id: String, objective_id: String, sequence: int, objective_type: String, room_id: String, step_id: String) -> void:
 	if sequence != current_objective_sequence:
@@ -4707,6 +4724,33 @@ func ship_has_cargo_hold_for_validation(ship_id: String) -> bool:
 		if is_instance_valid(c) and String(c.carrier_id) == ship_id:
 			return true
 	return false
+
+## Drives the REAL player-interact dispatch (_on_player_interact_requested), NOT the
+## direct transfer seam: positions the player at the ship's cargo control so the strict
+## in-range gate admits it, fires interact, and returns how many items landed in the
+## hold. A return of 0 means the cargo control is not wired into the interact path.
+func cargo_interact_deposit_for_validation(ship_id: String) -> int:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null or player == null or not (player is Node3D):
+		return 0
+	var control = null
+	for c in cargo_hold_controls:
+		if is_instance_valid(c) and String(c.carrier_id) == ship_id:
+			control = c
+			break
+	if control == null or not control.is_inside_tree() or not (player as Node3D).is_inside_tree():
+		return 0
+	(player as Node3D).global_position = control.global_position
+	var before: int = _hold_item_total(inst)
+	_on_player_interact_requested(player)
+	return _hold_item_total(inst) - before
+
+func _hold_item_total(inst) -> int:
+	var total: int = 0
+	var hold = inst.get_inventory()
+	for k in hold.items:
+		total += int(hold.items[k])
+	return total
 
 func lifeboat_ship_id_for_validation() -> String:
 	return String(lifeboat_ship.ship_id) if lifeboat_ship != null else ""

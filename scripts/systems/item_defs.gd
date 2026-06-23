@@ -19,7 +19,10 @@ static func load_definitions() -> Dictionary:
 	var defs: Dictionary = {}
 	var tool_defs: Dictionary = _read_json_dict(TOOL_DEFINITIONS_PATH)
 	for tool_id in tool_defs:
-		var def: Dictionary = (tool_defs[tool_id] as Dictionary).duplicate(true)
+		var raw_def: Variant = tool_defs[tool_id]
+		if not (raw_def is Dictionary):
+			continue   # skip malformed/corrupt tool entries rather than crash on .duplicate(null)
+		var def: Dictionary = (raw_def as Dictionary).duplicate(true)
 		def["category"] = "tool"
 		if not def.has("weight"):
 			def["weight"] = DEFAULT_TOOL_WEIGHT

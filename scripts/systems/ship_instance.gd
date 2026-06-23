@@ -91,7 +91,7 @@ func get_summary() -> Dictionary:
 		result["access"] = access.get_summary()
 	if hangar != null and hangar.slot_count > 0:
 		result["hangar"] = hangar.get_summary()
-	if inventory != null and not inventory.items.is_empty():
+	if has_cargo():
 		result["inventory"] = inventory.get_summary()
 	return result
 
