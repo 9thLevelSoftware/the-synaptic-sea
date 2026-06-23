@@ -37,6 +37,7 @@ func _initialize() -> void:
 
 	# Test across many seeds.
 	var failures: Array[String] = []
+	var hangar_seen: int = 0
 	for seed_val in range(100):
 		bp_data["seed_value"] = seed_val
 		var bp = ShipBlueprintScript.from_dict(bp_data)
@@ -74,6 +75,13 @@ func _initialize() -> void:
 			failures.append("seed=%d has system roles: %s" % [seed_val, str(bad_roles)])
 			continue
 
+		# 5d: `hangar` is a weighted derelict role (claimable storage). Count its
+		# appearances across the sweep to prove the role weight is wired.
+		for room in graph.rooms:
+			if String(room["role"]) == "hangar":
+				hangar_seen += 1
+				break
+
 		# 5. Full pipeline (ShipGenerator).
 		var ship: Node3D = gen.generate(bp, archetype)
 		if ship == null:
@@ -107,8 +115,13 @@ func _initialize() -> void:
 				failures.append("determinism seed=%d room[%d] mismatch" % [seed_val, i])
 				break
 
+	# 5d: with role_weights["hangar"] > 0 over 100 seeds, at least one derelict must
+	# roll a hangar room. Zero would mean the weight is missing/zeroed.
+	if hangar_seen <= 0:
+		failures.append("no hangar room appeared across 100 seeds (role weight missing?)")
+
 	if failures.is_empty():
-		print("DERELICT GENERATOR PASS seeds=100 determinism=3")
+		print("DERELICT GENERATOR PASS seeds=100 determinism=3 hangar_seeds=%d" % hangar_seen)
 	else:
 		for f in failures:
 			push_error("DERELICT FAIL: %s" % f)
