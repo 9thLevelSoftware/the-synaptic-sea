@@ -28,5 +28,13 @@ func _init() -> void:
 	assert(ship.login_at_terminal_for_validation(offline_id) == true, "working vessel login succeeds")
 	assert(ship.piloted_ship_id_for_validation() == offline_id, "piloted flips to the claimed ship")
 
+	# The lifeboat ALSO has a working bridge terminal (it has a cockpit/bridge room):
+	# logging in there takes command back. Proves the lifeboat terminal actually spawned.
+	# (The lifeboat boots with propulsion offline — opening damage — so make it a working
+	# vessel first, the same gate the offline derelict had to clear.)
+	ship.make_ship_working_for_validation(String(lifeboat.ship_id))
+	assert(ship.login_at_terminal_for_validation(String(lifeboat.ship_id)) == true, "lifeboat terminal login succeeds")
+	assert(ship.piloted_ship_id_for_validation() == String(lifeboat.ship_id), "piloted switched back to lifeboat")
+
 	print("BRIDGE TERMINAL LOGIN SMOKE PASS piloted=%s" % ship.piloted_ship_id_for_validation())
 	quit()
