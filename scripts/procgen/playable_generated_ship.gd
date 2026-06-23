@@ -1093,6 +1093,11 @@ func get_current_occupancy_for_validation():
 func get_current_host_for_validation():
 	return current_ship
 
+## 5c seam: calls set_piloted_ship for ship_id without the login/claim path
+## (used to exercise the no_access guard directly).
+func set_piloted_ship_by_id_for_validation(ship_id: String) -> Dictionary:
+	return set_piloted_ship(_find_ship_by_id(ship_id))
+
 ## Phase 5b Task 5 validation seam: teleport the player to the piloted ship's
 ## interior center so it reads as aboard the ride.
 func board_piloted_ship_for_validation() -> void:
@@ -1174,7 +1179,10 @@ func get_sargasso_world():
 ## strand the player; an unrepaired lifeboat simply cannot jump until its propulsion
 ## is restored. (Retires ADR-0011 placeholder.)
 func _current_systems_ops() -> Dictionary:
-	var mgr = ship_systems_manager
+	# Travel capability comes from the ship the player is PILOTING (5c: that may be a
+	# claimed derelict, not just the lifeboat). Fall back to the coordinator's starting
+	# manager before a piloted ship exists.
+	var mgr = piloted_ship.systems_manager if piloted_ship != null and piloted_ship.systems_manager != null else ship_systems_manager
 	return {
 		"navigation": mgr != null and mgr.is_operational("navigation"),
 		"scanners": mgr != null and mgr.is_operational("scanners"),
@@ -4185,8 +4193,4 @@ func _layout_has_bridge(layout: Dictionary) -> bool:
 
 ## 5c seam: true iff the current active ship has a bridge room (is claimable).
 func current_ship_has_bridge_for_validation() -> bool:
-	if current_ship == null or not is_instance_valid(current_ship.scene_root):
-		return false
-	if not current_ship.scene_root.has_method("get_layout_copy"):
-		return false
-	return _layout_has_bridge(current_ship.scene_root.get_layout_copy())
+	return current_ship != null and typeof(current_ship.built_layout) == TYPE_DICTIONARY and _layout_has_bridge(current_ship.built_layout)
