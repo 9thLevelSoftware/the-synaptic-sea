@@ -145,7 +145,7 @@ var home_ship = null                        # the home ShipInstance (marker_id "
 # Phase 5a Task 7: the physical lifeboat docked to the starting derelict.
 # Port-docked to the home ship's airlock at boot; shares ship_systems_manager with it.
 var lifeboat_ship = null                    # ShipInstance (docked to home_ship)
-var piloted_ship = null                     # the ShipInstance the player currently pilots (the lifeboat this cycle)
+var piloted_ship = null                     # the ShipInstance the player currently pilots (lifeboat or any claimed working vessel)
 # Phase 5b Task 5: the active host's closed dock-seam barriers (Array[DockPortBarrier]).
 # Spawned closed when the piloted ship docks to a host; the player breaches one to board.
 var dock_barriers: Array = []
@@ -1068,8 +1068,7 @@ func _on_login_requested(ship_id: String) -> void:
 	if inst == null:
 		return
 	if not inst.is_working_vessel():
-		push_warning("PlayableGeneratedShip: login refused (vessel_not_operational) for %s" % ship_id)
-		return
+		return   # silent: refusing a login on an unrepaired vessel is an expected player action
 	inst.get_access().claim(PLAYER_LOCAL_ID)
 	set_piloted_ship(inst)
 
