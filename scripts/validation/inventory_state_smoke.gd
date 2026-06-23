@@ -103,6 +103,15 @@ func _initialize() -> void:
 		_fail("inventory summary drain_multiplier with pump should be 0.5, got %s" % str(summary_multiplier_with_pump))
 		return
 
+	# --- PZ soft-cap (slice 2): weight never refuses; capacity/load queries ---
+	var sc := InventoryState.new()
+	sc.add_item("scrap_metal", 20)        # 20 * 5.0 = 100.0 weight, base cap 50.0
+	assert(sc.get_quantity("scrap_metal") == 20, "soft-cap accepted a full stack over weight")
+	assert(sc.is_over_capacity(), "over capacity after overload")
+	assert(sc.get_load_ratio() > 1.0, "load ratio > 1 when overloaded")
+	sc.bonus_capacity = 60.0              # a worn container raises the budget
+	assert(not sc.is_over_capacity(), "container bonus lifts player back under capacity")
+
 	print("INVENTORY STATE PASS tools=%d pump=%s drain_multiplier=%s" % [
 		tool_ids.size(),
 		str(pump_carried_at_multiplier).to_lower(),

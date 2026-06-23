@@ -15,6 +15,7 @@ const DEFAULT_TOOL_WEIGHT: float = 2.0
 const DEFAULT_MAX_STACK: int = 99
 
 var items: Dictionary = {}          # item_id: String -> quantity: int
+var bonus_capacity: float = 0.0     # added by worn containers (set by the coordinator)
 var _definitions: Dictionary = {}   # item_id -> def Dictionary (merged)
 
 func _init() -> void:
@@ -45,6 +46,17 @@ func get_display_name(item_id: String) -> String:
 func get_max_weight() -> float:
 	return MAX_WEIGHT
 
+## Effective carry budget = base cap + worn-container bonus (+ future strength).
+func get_capacity() -> float:
+	return MAX_WEIGHT + bonus_capacity
+
+## total_weight / capacity. >1.0 means over-encumbered (Heavy Load).
+func get_load_ratio() -> float:
+	return get_total_weight() / max(0.0001, get_capacity())
+
+func is_over_capacity() -> bool:
+	return get_total_weight() > get_capacity()
+
 func get_total_weight() -> float:
 	var total: float = 0.0
 	for item_id in items:
@@ -54,21 +66,15 @@ func get_total_weight() -> float:
 func get_quantity(item_id: String) -> int:
 	return int(items.get(item_id, 0))
 
-## Adds up to qty, honoring max_stack and the carry-weight cap. Returns the
-## quantity actually added (0 if none fit). Items with weight 0 ignore the cap.
+## Adds up to qty, honoring max_stack ONLY. Weight does NOT gate (PZ soft-cap):
+## the player may carry over capacity and suffer a Heavy Load movement penalty.
+## Returns the quantity actually added (0 if the stack is full).
 func add_item(item_id: String, qty: int) -> int:
 	if item_id.is_empty() or qty <= 0:
 		return 0
 	var current: int = get_quantity(item_id)
 	var stack_room: int = max(0, _max_stack(item_id) - current)
 	var want: int = min(qty, stack_room)
-	if want <= 0:
-		return 0
-	var w: float = get_weight_each(item_id)
-	if w > 0.0:
-		var remaining: float = get_max_weight() - get_total_weight()
-		var weight_room: int = int(floor(remaining / w + 0.0001))
-		want = min(want, max(0, weight_room))
 	if want <= 0:
 		return 0
 	items[item_id] = current + want
@@ -180,5 +186,5 @@ func get_status_lines() -> PackedStringArray:
 	for cat in ["part", "supply"]:
 		for entry in get_items_by_category(cat):
 			lines.append("item=%s x%d" % [String(entry["id"]), int(entry["quantity"])])
-	lines.append("weight=%s/%s" % [str(snappedf(get_total_weight(), 0.1)), str(get_max_weight())])
+	lines.append("weight=%s/%s" % [str(snappedf(get_total_weight(), 0.1)), str(snappedf(get_capacity(), 0.1))])
 	return lines

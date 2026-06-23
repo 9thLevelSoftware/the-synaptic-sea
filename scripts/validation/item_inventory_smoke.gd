@@ -43,16 +43,17 @@ func _test_add_and_categories() -> bool:
 
 func _test_weight_cap() -> bool:
 	var inv = InventoryStateScript.new()
-	# Fill near max with a heavy part, then assert a further add is rejected/partial.
-	var max_w: float = inv.get_max_weight()
-	# scrap_metal weight 5.0; how many fit fully:
-	var fit: int = int(floor(max_w / 5.0))
-	var added: int = inv.add_item("scrap_metal", fit + 5)  # request more than fits
-	if added != fit:
+	# PZ soft-cap: weight no longer gates add_item; max_stack is the only limit.
+	# scrap_metal has max_stack 20 and weight 5.0; base cap is 50.0 (10 items).
+	# All 20 should be accepted even though 20*5.0=100.0 > base cap of 50.0.
+	var added: int = inv.add_item("scrap_metal", 20)
+	if added != 20:
 		return false
-	if inv.get_total_weight() > max_w + 0.0001:
+	if not inv.is_over_capacity():
 		return false
-	# A further add of any weighted item returns 0 (full).
+	if inv.get_load_ratio() <= 1.0:
+		return false
+	# Stack is now full; a further add returns 0 (max_stack exhausted).
 	if inv.add_item("scrap_metal", 1) != 0:
 		return false
 	return true
