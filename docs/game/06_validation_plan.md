@@ -176,7 +176,9 @@ run_clean 'equipment defs smoke' 'EQUIPMENT DEFS SMOKE PASS slots=3 effects=1' "
 run_clean 'equipment state smoke' 'EQUIPMENT STATE SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/equipment_state_smoke.gd
 run_clean 'encumbrance curve smoke' 'EQUIPMENT ENCUMBRANCE SMOKE PASS floor=0.25' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encumbrance_smoke.gd
 run_clean 'equipment carts main-scene smoke' 'EQUIPMENT CARTS SMOKE PASS section_a=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/equipment_carts_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=108 clean_output=true'
+run_clean 'cart state model smoke' 'CART STATE SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_state_smoke.gd
+run_clean 'cart control node smoke' 'CART CONTROL SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_control_smoke.gd
+echo 'SARGASSO REGRESSION PASS commands=110 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
