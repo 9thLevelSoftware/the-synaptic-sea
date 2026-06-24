@@ -3152,6 +3152,9 @@ func _refresh_oxygen_state(force_initial: bool, delta_seconds: float) -> void:
 	# multiplier reflects any tools acquired this frame.
 	if inventory_state != null:
 		oxygen_state.apply_inventory_summary(inventory_state.get_summary())
+	if equipment_state != null:
+		oxygen_state.apply_equipment_summary(
+			{"drain_multiplier": equipment_state.get_oxygen_drain_multiplier()})
 	if force_initial:
 		oxygen_state.apply_ship_systems_summary({})  # no-op; recompute passability
 		_apply_breach_zone_scene_state()
