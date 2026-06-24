@@ -45,6 +45,11 @@ var last_player_in_breach_zone: bool = false
 # reads this summary before each tick to compute the effective drain
 # multiplier; it does not own the InventoryState itself.
 var _inventory_summary: Dictionary = {}
+# Equipment summary cache populated by apply_equipment_summary(...). The worn
+# suit's oxygen-drain multiplier stacks multiplicatively with the inventory
+# (tool) multiplier; like the inventory summary it is recomputed live each
+# frame by the coordinator and is intentionally not restored by apply_summary.
+var _equipment_summary: Dictionary = {}
 var effective_drain_rate: float = DEFAULT_DRAIN_RATE
 
 # configure(config: Dictionary) -> void
@@ -91,6 +96,7 @@ func configure(config: Dictionary) -> void:
 	passability_blocked = false
 	last_player_in_breach_zone = false
 	_inventory_summary = {}
+	_equipment_summary = {}
 	effective_drain_rate = drain_rate
 	_recompute_passability_blocked()
 
@@ -145,18 +151,35 @@ func tick(delta_seconds: float, context = null) -> bool:
 # drain itself is suppressed by `breach_open and not breach_sealed` in
 # tick(); keeping the multiplier at 1.0 there avoids masking inventory
 # state from the summary consumer.
+#
+# Phase 7 sub-project B: the worn equipment's oxygen-drain multiplier
+# (EquipmentState.get_oxygen_drain_multiplier()) stacks multiplicatively
+# with the inventory multiplier, both gated to 1.0 when sealed/closed.
 func _compute_drain_multiplier() -> float:
 	if breach_sealed or not breach_open:
 		return 1.0
-	var summary_multiplier: Variant = _inventory_summary.get("drain_multiplier", 1.0)
-	if summary_multiplier is float or summary_multiplier is int:
-		return float(summary_multiplier)
+	return _summary_drain_mult(_inventory_summary) * _summary_drain_mult(_equipment_summary)
+
+# Reads a numeric "drain_multiplier" from a source summary (inventory or
+# equipment), defaulting to the neutral 1.0 when absent or non-numeric.
+func _summary_drain_mult(summary: Dictionary) -> float:
+	var value: Variant = summary.get("drain_multiplier", 1.0)
+	if value is float or value is int:
+		return float(value)
 	return 1.0
 
 # Public seam: the scene coordinator calls this before each tick so the
 # inventory state is current when the drain multiplier is evaluated.
 func apply_inventory_summary(summary: Dictionary) -> void:
 	_inventory_summary = summary.duplicate(true)
+
+# Public seam: the scene coordinator calls this before each tick so the worn
+# equipment's oxygen-drain multiplier (EquipmentState.get_oxygen_drain_multiplier())
+# is current when the drain multiplier is evaluated. Stacks multiplicatively with
+# the inventory (tool) multiplier; both are gated to 1.0 when the breach is
+# sealed/closed by _compute_drain_multiplier().
+func apply_equipment_summary(summary: Dictionary) -> void:
+	_equipment_summary = summary.duplicate(true)
 
 func seal_breach(_zone_id: String) -> bool:
 	if not breach_open:
@@ -206,6 +229,7 @@ func get_summary() -> Dictionary:
 		"drain_rate": drain_rate,
 		"effective_drain_rate": effective_drain_rate,
 		"drain_multiplier": _compute_drain_multiplier(),
+		"equipment_drain_multiplier": _summary_drain_mult(_equipment_summary),
 		"regen_rate": regen_rate,
 		"recovery_threshold": recovery_threshold,
 		"safe_threshold": safe_threshold,
