@@ -71,7 +71,7 @@ func _run_section_a() -> void:
 	assert("Transfer" in labels and "Transfer all" in labels and "Split…" in labels, "menu has transfer/all/split")
 	cmenu.free()
 	# dispatch Transfer all from the container -> everything back to the player
-	panel._on_context_id(panel._ACT_TRANSFER_ALL, "container", 0, null)
+	panel._on_context_id(panel._ACT_TRANSFER_ALL, "container", 0)
 	assert(inv.get_quantity("plating") >= 4, "context Transfer all pulled plating to player")
 
 	panel.queue_free()

@@ -21,6 +21,7 @@ var _defs: Dictionary = {}
 var _selected: bool = false
 
 static func create(p_panel, p_pane: String, p_index: int, p_item_id: String, p_defs: Dictionary):
+	assert(p_panel != null, "InventoryRow.create: panel dependency must not be null")
 	var script: GDScript = load("res://scripts/ui/inventory_row.gd")
 	var r = script.new()
 	r.panel = p_panel

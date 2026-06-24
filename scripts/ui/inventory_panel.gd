@@ -232,7 +232,10 @@ func row_context(pane: String, index: int, global_pos: Vector2) -> void:
 	var menu: PopupMenu = _build_context_menu(pane, index)
 	add_child(menu)
 	menu.position = global_pos
-	menu.id_pressed.connect(_on_context_id.bind(pane, index, menu))
+	menu.id_pressed.connect(_on_context_id.bind(pane, index))
+	# PopupMenu is a Window: it is NOT auto-freed on dismissal. popup_hide fires on every
+	# close path (selection, outside-click, Esc), so it is the single owner of the free.
+	menu.popup_hide.connect(menu.queue_free)
 	menu.popup()
 
 ## True iff `data` can drop on `target` ("self"/"container" pane, or "slot:<id>").
@@ -248,7 +251,9 @@ func zone_can_accept(target: String, data) -> bool:
 			if _equip != null and ItemDefsScript.equip_slot(_defs, String(id)) == slot:
 				return true
 		return false
-	return _mode == "transfer" and target != from_pane
+	# Mirror zone_drop's guard exactly: a true here must imply a real drop, or the drag
+	# preview would advertise a drop the drop handler then silently ignores.
+	return _mode == "transfer" and target != from_pane and (from_pane == "self" or from_pane == "container")
 
 func zone_drop(target: String, data) -> void:
 	if not (data is Dictionary):
@@ -289,7 +294,9 @@ func slot_context(slot_id: String, global_pos: Vector2) -> void:
 	menu.add_item("Unequip", _ACT_UNEQUIP)
 	add_child(menu)
 	menu.position = global_pos
-	menu.id_pressed.connect(func(_id): unequip_slot(slot_id); menu.queue_free())
+	menu.id_pressed.connect(func(_id): unequip_slot(slot_id))
+	# popup_hide is the single owner of the free — covers Unequip, outside-click, and Esc.
+	menu.popup_hide.connect(menu.queue_free)
 	menu.popup()
 
 func pane_quantity(pane: String, id: String) -> int:
@@ -314,7 +321,7 @@ func _build_context_menu(pane: String, index: int) -> PopupMenu:
 			"unequip": menu.add_item("Unequip", _ACT_UNEQUIP)
 	return menu
 
-func _on_context_id(id: int, pane: String, index: int, menu) -> void:
+func _on_context_id(id: int, pane: String, index: int) -> void:
 	if id == _ACT_TRANSFER:
 		transfer_selected(pane)
 	elif id == _ACT_TRANSFER_ALL:
@@ -324,10 +331,10 @@ func _on_context_id(id: int, pane: String, index: int, menu) -> void:
 		var item_id: String = String(ids[index]) if index >= 0 and index < ids.size() else ""
 		_open_split_picker(pane, item_id)
 	elif id == _ACT_EQUIP:
+		# Equip is offered for SELF rows only (context_actions suppresses it for container
+		# rows), so _model_for_pane(pane) here is always _sel_self — the model equip_selected reads.
 		_model_for_pane(pane).select_single(index)
 		equip_selected()
-	if is_instance_valid(menu):
-		menu.queue_free()
 
 ## Interaction-only (popup); split amount picker -> transfer_quantity.
 func _open_split_picker(pane: String, item_id: String) -> void:

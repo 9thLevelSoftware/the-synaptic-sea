@@ -9,6 +9,7 @@ var panel                       # InventoryPanel
 var target: String = ""
 
 static func create(p_panel, p_target: String):
+	assert(p_panel != null, "InventoryDropZone.create: panel dependency must not be null")
 	var script: GDScript = load("res://scripts/ui/inventory_drop_zone.gd")
 	var z = script.new()
 	z.panel = p_panel
