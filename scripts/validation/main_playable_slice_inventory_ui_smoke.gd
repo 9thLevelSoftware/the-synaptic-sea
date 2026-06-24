@@ -47,19 +47,19 @@ func _run() -> void:
 	ship._refresh_oxygen_state(false, 0.0)
 	ship.oxygen_state.breach_open = true
 	ship.oxygen_state.breach_sealed = false
-	var with_pump: float = float(ship.oxygen_state.get_summary().get("drain_multiplier", 1.0))
+	var with_pump: float = float(ship.oxygen_state.get_summary()["drain_multiplier"])
 	assert(abs(with_pump - 0.5) < 0.001, "pump on player -> drain 0.5 (got %s)" % str(with_pump))
 	var dep: int = ship.inventory_transfer_first_to_container_for_validation("portable_oxygen_pump")
 	assert(dep == 1, "deposited the pump into the hold")
 	ship.oxygen_state.breach_open = true
 	ship.oxygen_state.breach_sealed = false
-	var stored: float = float(ship.oxygen_state.get_summary().get("drain_multiplier", 1.0))
+	var stored: float = float(ship.oxygen_state.get_summary()["drain_multiplier"])
 	assert(abs(stored - 1.0) < 0.001, "pump stored -> drain 1.0 (got %s)" % str(stored))
 	var wd: int = ship.inventory_transfer_first_from_container_for_validation("portable_oxygen_pump")
 	assert(wd == 1, "withdrew the pump")
 	ship.oxygen_state.breach_open = true
 	ship.oxygen_state.breach_sealed = false
-	var restored: float = float(ship.oxygen_state.get_summary().get("drain_multiplier", 1.0))
+	var restored: float = float(ship.oxygen_state.get_summary()["drain_multiplier"])
 	assert(abs(restored - 0.5) < 0.001, "pump back -> drain 0.5 (got %s)" % str(restored))
 	ship.inventory_close_for_validation()
 	ship.queue_free()
