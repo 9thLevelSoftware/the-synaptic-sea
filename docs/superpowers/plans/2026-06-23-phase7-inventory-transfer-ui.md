@@ -1132,18 +1132,28 @@ func _run() -> void:
 	assert(back == 6, "withdrew 6 back to the player (got %d)" % back)
 	ship.inventory_close_for_validation()
 
-	# Tool storage drives the oxygen drain multiplier live.
+	# Tool storage drives the oxygen drain multiplier live. NOTE: the effective drain
+	# multiplier is breach-gated — OxygenState._compute_drain_multiplier returns 1.0
+	# unless `breach_open and not breach_sealed`. Force the gate open before each read
+	# so the assertion isolates the inventory-driven (pump) factor under test, instead
+	# of depending on the home ship's current objective/breach state.
 	ship.inventory_state.add_tool("portable_oxygen_pump")
 	ship._open_transfer_panel_for_ship(home_id)
 	ship._refresh_oxygen_state(false, 0.0)
+	ship.oxygen_state.breach_open = true
+	ship.oxygen_state.breach_sealed = false
 	var with_pump: float = float(ship.oxygen_state.get_summary().get("drain_multiplier", 1.0))
 	assert(abs(with_pump - 0.5) < 0.001, "pump on player -> drain 0.5 (got %s)" % str(with_pump))
 	var dep: int = ship.inventory_transfer_first_to_container_for_validation("portable_oxygen_pump")
 	assert(dep == 1, "deposited the pump into the hold")
+	ship.oxygen_state.breach_open = true
+	ship.oxygen_state.breach_sealed = false
 	var stored: float = float(ship.oxygen_state.get_summary().get("drain_multiplier", 1.0))
 	assert(abs(stored - 1.0) < 0.001, "pump stored -> drain 1.0 (got %s)" % str(stored))
 	var wd: int = ship.inventory_transfer_first_from_container_for_validation("portable_oxygen_pump")
 	assert(wd == 1, "withdrew the pump")
+	ship.oxygen_state.breach_open = true
+	ship.oxygen_state.breach_sealed = false
 	var restored: float = float(ship.oxygen_state.get_summary().get("drain_multiplier", 1.0))
 	assert(abs(restored - 0.5) < 0.001, "pump back -> drain 0.5 (got %s)" % str(restored))
 	ship.inventory_close_for_validation()
