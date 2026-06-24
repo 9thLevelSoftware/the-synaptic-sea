@@ -62,6 +62,21 @@ func _run() -> void:
 	var restored: float = float(ship.oxygen_state.get_summary()["drain_multiplier"])
 	assert(abs(restored - 0.5) < 0.001, "pump back -> drain 0.5 (got %s)" % str(restored))
 	ship.inventory_close_for_validation()
+
+	# Scanner/inventory mutual exclusivity: toggle_scanner is SWALLOWED while the
+	# inventory panel is open, so the freeze invariant cannot leak. (This path never
+	# reaches set_input_as_handled — the scanner branch is guarded out and the inventory
+	# block's swallow returns without it — so calling _input directly is clean.)
+	assert(ship.inventory_open_self_for_validation(), "inventory open for exclusivity check")
+	var tog := InputEventAction.new()
+	tog.action = "toggle_scanner"
+	tog.pressed = true
+	ship._input(tog)
+	assert(not ship.scanner_panel.is_open(), "toggle_scanner swallowed while inventory open")
+	assert(ship.inventory_panel_is_open_for_validation(), "inventory stays open")
+	assert(ship.player_frozen_for_validation(), "player stays frozen — invariant held")
+	ship.inventory_close_for_validation()
+
 	ship.queue_free()
 
 	print("INVENTORY UI SLICE SMOKE PASS moved=%d stored_mult=%s" % [moved, str(stored)])

@@ -4762,7 +4762,7 @@ func _input(event: InputEvent) -> void:
 	# Control is restored on close by the panel_closed signal handler, which
 	# covers every close path — not just toggle-close / confirm-success.
 	if scanner_panel != null:
-		if event.is_action_pressed("toggle_scanner"):
+		if event.is_action_pressed("toggle_scanner") and (inventory_panel == null or not inventory_panel.is_open()):
 			scanner_panel.toggle()
 			if player != null and scanner_panel.is_open():
 				player.set_physics_process(false)
