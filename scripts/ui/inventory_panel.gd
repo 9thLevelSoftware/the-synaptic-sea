@@ -205,6 +205,150 @@ func _after_mutation() -> void:
 	transfer_completed.emit()
 	_render()
 
+# --- interactive-widget coordinator callbacks (rows/zones forward here) ---
+
+const _ACT_TRANSFER := 0
+const _ACT_TRANSFER_ALL := 1
+const _ACT_SPLIT := 2
+const _ACT_EQUIP := 3
+const _ACT_UNEQUIP := 4
+
+func row_clicked(pane: String, index: int, additive: bool, range_sel: bool) -> void:
+	select_row(pane, index, additive, range_sel)
+
+func row_drag_payload(pane: String, index: int) -> Variant:
+	var m = _model_for_pane(pane)
+	if not m.is_selected(index):
+		m.select_single(index)
+	var data: Dictionary = _build_drag_payload(pane)
+	return null if (data["ids"] as Array).is_empty() else data
+
+func row_context(pane: String, index: int, global_pos: Vector2) -> void:
+	var m = _model_for_pane(pane)
+	if not m.is_selected(index):
+		m.select_single(index)
+		_render()
+	var menu: PopupMenu = _build_context_menu(pane, index)
+	add_child(menu)
+	menu.position = global_pos
+	menu.id_pressed.connect(_on_context_id.bind(pane, index, menu))
+	menu.popup()
+
+## True iff `data` can drop on `target` ("self"/"container" pane, or "slot:<id>").
+func zone_can_accept(target: String, data) -> bool:
+	if not (data is Dictionary):
+		return false
+	var from_pane: String = String((data as Dictionary).get("from_pane", ""))
+	if target.begins_with("slot:"):
+		if from_pane != "self":
+			return false   # equip only from your own inventory
+		var slot: String = target.substr(5)
+		for id in ((data as Dictionary).get("ids", []) as Array):
+			if _equip != null and ItemDefsScript.equip_slot(_defs, String(id)) == slot:
+				return true
+		return false
+	return _mode == "transfer" and target != from_pane
+
+func zone_drop(target: String, data) -> void:
+	if not (data is Dictionary):
+		return
+	var from_pane: String = String((data as Dictionary).get("from_pane", ""))
+	if target.begins_with("slot:"):
+		if from_pane != "self":
+			return
+		var slot: String = target.substr(5)
+		_rebuild_models()   # ensure ids are current before find/select
+		for id in ((data as Dictionary).get("ids", []) as Array):
+			if _equip != null and ItemDefsScript.equip_slot(_defs, String(id)) == slot:
+				_sel_self.select_single(_ids_for_pane("self").find(String(id)))
+				equip_selected()
+				return
+		return
+	if _mode == "transfer" and target != from_pane:
+		transfer_selected(from_pane)
+
+## Move every id in `pane` to the other pane (manual — includes tools). Distinct from the
+## Deposit All button, which uses deposit_all (parts/supplies only). Returns total moved.
+func transfer_all_from(pane: String) -> int:
+	var src = _inv_for_pane(pane)
+	var dst = _inv_for_pane(_other_pane(pane))
+	if src == null or dst == null:
+		return 0
+	var id_to_qty: Dictionary = {}
+	for id in _ids_for_pane(pane):
+		id_to_qty[String(id)] = int(src.get_quantity(String(id)))
+	var moved: int = CargoTransferScript.move_items(src, dst, id_to_qty)
+	if moved > 0:
+		_after_mutation()
+	return moved
+
+func slot_context(slot_id: String, global_pos: Vector2) -> void:
+	if _equip == null or not _equip.is_slot_occupied(slot_id):
+		return
+	var menu := PopupMenu.new()
+	menu.add_item("Unequip", _ACT_UNEQUIP)
+	add_child(menu)
+	menu.position = global_pos
+	menu.id_pressed.connect(func(_id): unequip_slot(slot_id); menu.queue_free())
+	menu.popup()
+
+func pane_quantity(pane: String, id: String) -> int:
+	var inv = _inv_for_pane(pane)
+	return int(inv.get_quantity(id)) if inv != null else 0
+
+## Builds (does NOT pop) the right-click menu for a row, from context_actions.
+func _build_context_menu(pane: String, index: int) -> PopupMenu:
+	var menu := PopupMenu.new()
+	var ids: Array = _ids_for_pane(pane)
+	if index < 0 or index >= ids.size():
+		return menu
+	var item_id: String = String(ids[index])
+	var actions: PackedStringArray = InventorySelectionModelScript.context_actions(
+		item_id, _defs, _mode == "transfer", pane == "container", false)
+	for a in actions:
+		match String(a):
+			"transfer": menu.add_item("Transfer", _ACT_TRANSFER)
+			"transfer_all": menu.add_item("Transfer all", _ACT_TRANSFER_ALL)
+			"split": menu.add_item("Split…", _ACT_SPLIT)
+			"equip": menu.add_item("Equip", _ACT_EQUIP)
+			"unequip": menu.add_item("Unequip", _ACT_UNEQUIP)
+	return menu
+
+func _on_context_id(id: int, pane: String, index: int, menu) -> void:
+	if id == _ACT_TRANSFER:
+		transfer_selected(pane)
+	elif id == _ACT_TRANSFER_ALL:
+		transfer_all_from(pane)
+	elif id == _ACT_SPLIT:
+		var ids: Array = _ids_for_pane(pane)
+		var item_id: String = String(ids[index]) if index >= 0 and index < ids.size() else ""
+		_open_split_picker(pane, item_id)
+	elif id == _ACT_EQUIP:
+		_model_for_pane(pane).select_single(index)
+		equip_selected()
+	if is_instance_valid(menu):
+		menu.queue_free()
+
+## Interaction-only (popup); split amount picker -> transfer_quantity.
+func _open_split_picker(pane: String, item_id: String) -> void:
+	var src = _inv_for_pane(pane)
+	if src == null or item_id == "":
+		return
+	var maxq: int = int(src.get_quantity(item_id))
+	if maxq <= 0:
+		return
+	var dlg := AcceptDialog.new()
+	dlg.title = "Split %s" % _name(item_id)
+	var spin := SpinBox.new()
+	spin.min_value = 1
+	spin.max_value = maxq
+	spin.value = max(1, int(maxq / 2.0))
+	dlg.add_child(spin)
+	add_child(dlg)
+	dlg.confirmed.connect(func(): transfer_quantity(pane, item_id, int(spin.value)); dlg.queue_free())
+	dlg.canceled.connect(func(): dlg.queue_free())
+	dlg.popup_centered()
+
 # --- transfer (TRANSFER mode) ---
 
 func _other_pane(pane: String) -> String:
