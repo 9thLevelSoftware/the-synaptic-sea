@@ -8,6 +8,7 @@ const IsoCameraRigScript := preload("res://scripts/camera/iso_camera_rig.gd")
 const InteractableScript := preload("res://scripts/interaction/interactable.gd")
 const ObjectiveTrackerScript := preload("res://scripts/ui/objective_tracker.gd")
 const ScannerPanelScript := preload("res://scripts/ui/scanner_panel.gd")
+const InventoryPanelScript := preload("res://scripts/ui/inventory_panel.gd")
 const AccessibilitySettingsScript := preload("res://scripts/ui/accessibility_settings.gd")
 const ReadabilityPropFactoryScript := preload("res://scripts/procgen/readability_prop_factory.gd")
 const RouteControlStateScript := preload("res://scripts/systems/route_control_state.gd")
@@ -112,6 +113,7 @@ var player
 var camera_rig
 var hud_layer: CanvasLayer
 var scanner_panel   # ScannerPanel
+var inventory_panel
 var tracker
 var interaction_root: Node3D
 var affordance_root: Node3D
@@ -288,6 +290,7 @@ func ensure_default_input_actions() -> void:
 	_ensure_key_action_set("save_run", DEFAULT_SAVE_RUN_BINDINGS)
 	_ensure_key_action_set("load_run", DEFAULT_LOAD_RUN_BINDINGS)
 	_ensure_key_action_set("toggle_scanner", [KEY_TAB])
+	_ensure_key_action_set("toggle_inventory", [KEY_I])
 
 ## A11Y-P1-001: swap in a new accessibility settings object and re-apply
 ## its scale to the HUD tracker and all existing world Label3D nodes.
@@ -1591,40 +1594,16 @@ func _on_cart_grab_requested(cart_id: String) -> void:
 	_recompute_player_encumbrance()      # applies the push penalty
 
 func _on_cart_load_requested(cart_id: String) -> void:
-	if inventory_state == null:
-		return
-	var hit: Dictionary = _find_cart_by_id(cart_id)
-	if hit.is_empty():
-		return
-	CargoTransferScript.deposit_all(inventory_state, hit["cart"].get_hold())
-	_recompute_player_encumbrance()
+	_open_transfer_panel_for_cart(cart_id)
 
-func _on_cart_unload_requested(cart_id: String, category: String) -> void:
-	if inventory_state == null:
-		return
-	var hit: Dictionary = _find_cart_by_id(cart_id)
-	if hit.is_empty():
-		return
-	CargoTransferScript.withdraw_category(hit["cart"].get_hold(), inventory_state, category)
-	_recompute_player_encumbrance()
+func _on_cart_unload_requested(cart_id: String, _category: String) -> void:
+	_open_transfer_panel_for_cart(cart_id)
 
 func _on_cargo_deposit_requested(ship_id: String) -> void:
-	if inventory_state == null:
-		return
-	var inst = _find_ship_by_id(ship_id)
-	if inst == null:
-		return
-	CargoTransferScript.deposit_all(inventory_state, inst.get_inventory())
-	_recompute_player_encumbrance()
+	_open_transfer_panel_for_ship(ship_id)
 
-func _on_cargo_withdraw_requested(ship_id: String, category: String) -> void:
-	if inventory_state == null:
-		return
-	var inst = _find_ship_by_id(ship_id)
-	if inst == null:
-		return
-	CargoTransferScript.withdraw_category(inst.get_inventory(), inventory_state, category)
-	_recompute_player_encumbrance()
+func _on_cargo_withdraw_requested(ship_id: String, _category: String) -> void:
+	_open_transfer_panel_for_ship(ship_id)
 
 ## Recompute the player's effective carry budget from worn equipment and apply the
 ## Heavy Load movement penalty (× any active cart push penalty). Called on every
@@ -2372,12 +2351,60 @@ func _build_hud_layer() -> void:
 	# Restore player control on every panel close path via the signal, not just
 	# the two close paths wired into _input.
 	scanner_panel.panel_closed.connect(_on_scanner_panel_closed)
+	inventory_panel = InventoryPanelScript.new()
+	inventory_panel.name = "InventoryPanel"
+	inventory_panel.visible = false
+	hud_layer.add_child(inventory_panel)
+	inventory_panel.panel_closed.connect(_on_inventory_panel_closed)
+	inventory_panel.transfer_completed.connect(_on_inventory_transfer_completed)
 
 func _on_scanner_panel_closed() -> void:
 	if player != null:
 		player.set_physics_process(true)
 		player.set_process_input(true)
 		player.set_process_unhandled_input(true)
+
+func _freeze_player_for_panel() -> void:
+	if player != null:
+		player.set_physics_process(false)
+		player.set_process_input(false)
+		player.set_process_unhandled_input(false)
+
+func _on_inventory_panel_closed() -> void:
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process_input(true)
+		player.set_process_unhandled_input(true)
+
+## A transfer/equip mutated player state: refresh carry budget (Heavy Load) and oxygen
+## (the O2-pump drain benefit follows the pump in/out of the player inventory).
+func _on_inventory_transfer_completed() -> void:
+	_recompute_player_encumbrance()
+	_refresh_oxygen_state(false, 0.0)
+
+func _open_inventory_self() -> void:
+	if inventory_panel == null or inventory_state == null:
+		return
+	inventory_panel.open_self(inventory_state, equipment_state)
+	_freeze_player_for_panel()
+
+func _open_transfer_panel_for_ship(ship_id: String) -> void:
+	if inventory_panel == null or inventory_state == null:
+		return
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null:
+		return
+	inventory_panel.open_transfer(inventory_state, inst.get_inventory(), "HOLD", equipment_state)
+	_freeze_player_for_panel()
+
+func _open_transfer_panel_for_cart(cart_id: String) -> void:
+	if inventory_panel == null or inventory_state == null:
+		return
+	var hit: Dictionary = _find_cart_by_id(cart_id)
+	if hit.is_empty():
+		return
+	inventory_panel.open_transfer(inventory_state, hit["cart"].get_hold(), "CART", equipment_state)
+	_freeze_player_for_panel()
 
 func _on_ship_loaded(summary: Dictionary) -> void:
 	if playable_started:
@@ -4658,6 +4685,7 @@ func _reset_runtime_for_reload() -> void:
 	hud_layer = null
 	tracker = null
 	scanner_panel = null
+	inventory_panel = null
 	interactables.clear()
 	sequence_interactables.clear()
 	affordance_labels.clear()
@@ -4753,6 +4781,16 @@ func _input(event: InputEvent) -> void:
 				scanner_panel.confirm_selection()
 				get_viewport().set_input_as_handled()
 			return  # swallow other input while the scanner is open
+	if inventory_panel != null:
+		if inventory_panel.is_open():
+			if event.is_action_pressed("toggle_inventory") or event.is_action_pressed("ui_cancel"):
+				inventory_panel.close()
+				get_viewport().set_input_as_handled()
+			return  # swallow other keys while the inventory panel is open (mouse drives it)
+		if event.is_action_pressed("toggle_inventory"):
+			_open_inventory_self()
+			get_viewport().set_input_as_handled()
+			return
 	if save_load_service == null:
 		return
 	if event.is_action_pressed("save_run"):
@@ -4923,6 +4961,47 @@ func cargo_withdraw_for_validation(ship_id: String, category: String) -> int:
 	_recompute_player_encumbrance()
 	return moved
 
+func inventory_panel_is_open_for_validation() -> bool:
+	return inventory_panel != null and inventory_panel.is_open()
+
+func inventory_open_self_for_validation() -> bool:
+	_open_inventory_self()
+	return inventory_panel_is_open_for_validation()
+
+func inventory_close_for_validation() -> void:
+	if inventory_panel != null and inventory_panel.is_open():
+		inventory_panel.close()
+
+func inventory_panel_deposit_all_for_validation() -> int:
+	if inventory_panel == null or not inventory_panel.is_open():
+		return 0
+	return int(inventory_panel.deposit_all_to_container())
+
+func inventory_transfer_first_to_container_for_validation(item_id: String) -> int:
+	# Open-transfer must already be active. Selects item_id on the YOU pane and moves the
+	# whole stack into the container; returns moved.
+	if inventory_panel == null or not inventory_panel.is_open():
+		return 0
+	var ids: Array = inventory_panel.get_pane_ids("self")
+	var idx: int = ids.find(item_id)
+	if idx < 0:
+		return 0
+	inventory_panel.select_row("self", idx, false, false)
+	return int(inventory_panel.transfer_selected("self"))
+
+func inventory_transfer_first_from_container_for_validation(item_id: String) -> int:
+	if inventory_panel == null or not inventory_panel.is_open():
+		return 0
+	var ids: Array = inventory_panel.get_pane_ids("container")
+	var idx: int = ids.find(item_id)
+	if idx < 0:
+		return 0
+	inventory_panel.select_row("container", idx, false, false)
+	return int(inventory_panel.transfer_selected("container"))
+
+func player_frozen_for_validation() -> bool:
+	return player != null and not player.is_physics_processing()
+
 func ship_hold_quantity_for_validation(ship_id: String, item_id: String) -> int:
 	var inst = _find_ship_by_id(ship_id)
 	if inst == null:
@@ -4952,7 +5031,8 @@ func cargo_interact_deposit_for_validation(ship_id: String) -> int:
 		return 0
 	(player as Node3D).global_position = control.global_position
 	var before: int = _hold_item_total(inst)
-	_on_player_interact_requested(player)
+	_on_player_interact_requested(player)   # opens the transfer panel for this hold
+	inventory_panel_deposit_all_for_validation()
 	return _hold_item_total(inst) - before
 
 func _hold_item_total(inst) -> int:
