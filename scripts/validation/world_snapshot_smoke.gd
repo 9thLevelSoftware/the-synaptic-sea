@@ -73,6 +73,16 @@ func _initialize() -> void:
 	assert(rt_eq != null, "equipment snapshot round-trips")
 	assert(str(rt_eq.player_equipment.get("slots", {}).get("back", "")) == "eva_backpack", "player_equipment survived round-trip")
 
+	# --- home_ship_carts round-trip (slice 2, additive, no version bump) ---
+	var ws_hc = WorldSnapshotScript.new()
+	ws_hc.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
+	ws_hc.godot_version = godot_version
+	ws_hc.home_ship_carts = [{"cart_id": "cart_home", "hold": {"items": {"scrap_metal": 4}, "max_weight": 200.0}}]
+	var rt_hc = WorldSnapshotScript.from_dict(ws_hc.to_dict(), WorldSnapshotScript.WORLD_SLICE_VERSION, godot_version)
+	assert(rt_hc != null, "home_ship_carts snapshot round-trips")
+	assert((rt_hc.home_ship_carts as Array).size() == 1, "home_ship_carts survived round-trip")
+	assert(str(rt_hc.home_ship_carts[0].get("cart_id", "")) == "cart_home", "cart entry intact")
+
 	print("WORLD SNAPSHOT PASS round_trip=true version_gated=true")
 	quit(0)
 

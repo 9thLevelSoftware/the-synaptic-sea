@@ -5,6 +5,7 @@ extends SceneTree
 const ShipInstanceScript := preload("res://scripts/systems/ship_instance.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
+const CartStateScript := preload("res://scripts/systems/cart_state.gd")
 
 func _initialize() -> void:
 	var bp = ShipBlueprintScript.new(ShipBlueprintScript.Size.SMALL, ShipBlueprintScript.Condition.DAMAGED, 4242)
@@ -108,6 +109,18 @@ func _initialize() -> void:
 	var clone = ShipInstanceScript.create(inst.ship_id, inst.marker_id, null, null, null)
 	assert(clone.apply_summary(s2) == true, "apply_summary accepts")
 	assert(clone.get_inventory().get_quantity("scrap_metal") == 2, "hold round-tripped")
+
+	# --- carts round-trip (slice 2) ---
+	assert(not inst.get_summary().has("carts"), "no carts -> omitted from summary")
+	var cart = CartStateScript.create("cart_a", 200.0)
+	cart.get_hold().add_item("scrap_metal", 3)
+	inst.get_carts().append(cart)
+	var sc: Dictionary = inst.get_summary()
+	assert(sc.has("carts") and (sc["carts"] as Array).size() == 1, "carts present in summary")
+	var clone2 = ShipInstanceScript.create(inst.ship_id, inst.marker_id, null, null, null)
+	assert(clone2.apply_summary(sc) == true, "apply_summary accepts carts")
+	assert(clone2.get_carts().size() == 1, "carts round-tripped")
+	assert(clone2.get_carts()[0].get_hold().get_quantity("scrap_metal") == 3, "cart contents round-tripped")
 
 	print("SHIP INSTANCE PASS round_trip=true stubs_present=true objective_round_trip=true looted_round_trip=true")
 	quit(0)

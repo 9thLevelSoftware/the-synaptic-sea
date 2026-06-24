@@ -9,10 +9,13 @@ extends SceneTree
 
 const PlayableGeneratedShipScript := preload("res://scripts/procgen/playable_generated_ship.gd")
 
+var _b_loaded: int = 0
+var _b_persisted: bool = false
+
 func _init() -> void:
 	await _run_section_a()
-	# Section B is appended in Task 11; for now Section A alone prints the marker.
-	print("EQUIPMENT CARTS SMOKE PASS section_a=true cap_bonus=40 slowed=true cart_loaded=0 persisted=true")
+	await _run_section_b()
+	print(_section_b_marker())
 	quit()
 
 func _run_section_a() -> void:
@@ -66,3 +69,52 @@ func _run_section_a() -> void:
 	assert(slow2 < fast, "withdraw recomputed encumbrance: speed fell after reloading (%s -> %s)" % [str(fast), str(slow2)])
 
 	ship.queue_free()
+
+func _run_section_b() -> void:
+	var ship = PlayableGeneratedShipScript.new()
+	root.add_child(ship)
+	for _i in range(3):
+		await process_frame
+	var home_id: String = ship.home_ship_id_for_validation()
+	var cart_id: String = ship.spawn_cart_for_validation(home_id)
+	assert(cart_id != "", "cart spawned on the home ship")
+	for _k in range(2):
+		await process_frame
+
+	# Grab: cart marked grabbed + push penalty lowers move_speed.
+	var pre_speed: float = ship.player_move_speed_for_validation()
+	assert(ship.cart_grab_for_validation(cart_id) == true, "cart grabbed in range")
+	assert(ship.cart_is_grabbed_for_validation() == true, "cart marked grabbed")
+	assert(ship.player_move_speed_for_validation() < pre_speed, "push penalty slowed the player")
+
+	# Load salvage into the cart (it leaves the player inventory -> off personal
+	# encumbrance), then unload it straight back out.
+	ship.overload_player_for_validation("scrap_metal", 5)
+	_b_loaded = ship.cart_load_for_validation(cart_id)
+	assert(_b_loaded == 5, "loaded 5 into the cart (got %d)" % _b_loaded)
+	assert(ship.cart_hold_quantity_for_validation(cart_id, "scrap_metal") == 5, "cart holds 5")
+	var unloaded: int = ship.cart_unload_for_validation(cart_id, "part")
+	assert(unloaded == 5, "unloaded all 5 back to the player (got %d)" % unloaded)
+	assert(ship.cart_hold_quantity_for_validation(cart_id, "scrap_metal") == 0, "cart emptied after unload")
+	# Clear the inventory before re-loading so the cart ends up with exactly 5 items
+	# (post-unload inventory holds the 5 just returned; we flush them to the home hold).
+	ship.cargo_deposit_for_validation(home_id)
+	# Re-load so the parked cart is non-empty for the persistence check.
+	ship.overload_player_for_validation("scrap_metal", 5)
+	ship.cart_load_for_validation(cart_id)
+
+	# Persist a parked cart across save->load.
+	assert(ship.save_world_for_validation() == true, "world saved")
+	assert(ship.load_world_for_validation() == true, "world loaded")
+	for _j in range(3):
+		await process_frame
+	var home2: String = ship.home_ship_id_for_validation()
+	# After reload the cart_id is deterministic ("cart_<ship_id>") and the parked
+	# cart's contents persist via WorldSnapshot.home_ship_carts.
+	var persisted_qty: int = ship.cart_hold_quantity_for_validation("cart_%s" % home2, "scrap_metal")
+	_b_persisted = persisted_qty == 5
+	assert(_b_persisted, "parked home cart persisted across save/load (got %d)" % persisted_qty)
+	ship.queue_free()
+
+func _section_b_marker() -> String:
+	return "EQUIPMENT CARTS SMOKE PASS section_a=true cap_bonus=40 slowed=true cart_loaded=%d persisted=%s" % [_b_loaded, str(_b_persisted)]
