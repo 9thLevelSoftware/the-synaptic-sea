@@ -182,7 +182,8 @@ run_clean 'cargo move-item primitive' 'CARGO MOVE ITEM SMOKE PASS' "$GODOT" --he
 run_clean 'inventory selection model' 'INVENTORY SELECTION MODEL SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_selection_model_smoke.gd
 run_clean 'inventory panel' 'INVENTORY PANEL SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_panel_smoke.gd
 run_clean 'inventory UI slice' 'INVENTORY UI SLICE SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_inventory_ui_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=114 clean_output=true'
+run_clean 'inventory widget layer' 'INVENTORY WIDGET SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_widget_smoke.gd
+echo 'SARGASSO REGRESSION PASS commands=115 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
