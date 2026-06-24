@@ -11,7 +11,8 @@ const ShipInventoryScript := preload("res://scripts/systems/ship_inventory.gd")
 
 func _init() -> void:
 	await _run_section_a()
-	print("INVENTORY WIDGET SMOKE PASS section_a=true")
+	await _run_section_b()
+	print("INVENTORY WIDGET SMOKE PASS section_a=true section_b=true")
 	quit()
 
 func _run_section_a() -> void:
@@ -72,5 +73,49 @@ func _run_section_a() -> void:
 	# dispatch Transfer all from the container -> everything back to the player
 	panel._on_context_id(panel._ACT_TRANSFER_ALL, "container", 0, null)
 	assert(inv.get_quantity("plating") >= 4, "context Transfer all pulled plating to player")
+
+	panel.queue_free()
+
+func _run_section_b() -> void:
+	var inv = InventoryStateScript.new()
+	inv.add_item("scrap_metal", 6)
+	inv.add_item("eva_backpack", 1)
+	var hold = ShipInventoryScript.create(1000.0)
+	hold.add_item("plating", 4)
+	var equip = EquipmentStateScript.create()
+
+	var panel = InventoryPanelScript.new()
+	root.add_child(panel)
+	await process_frame
+	panel.open_transfer(inv, hold, "HOLD", equip)
+	await process_frame   # let the row Controls' _ready run
+
+	# a real row exists and a synthetic left-click selects it
+	var ids := panel.get_pane_ids("self")
+	var ri := ids.find("scrap_metal")
+	var row := panel.row_at("self", ri)
+	assert(row != null, "row Control was built for scrap_metal")
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	row._gui_input(click)
+	assert(panel.get_selected_ids("self") == ["scrap_metal"], "synthetic click selected the row")
+
+	# the row yields a non-empty drag payload; dropping on the container zone transfers
+	var payload = row._get_drag_data(Vector2.ZERO)
+	assert(payload != null and (payload as Dictionary)["from_pane"] == "self", "row drag payload built")
+	var czone := panel.zone_for("container")
+	assert(czone != null, "container drop zone exists")
+	assert(czone._can_drop_data(Vector2.ZERO, payload) == true, "container zone accepts the drop")
+	czone._drop_data(Vector2.ZERO, payload)
+	assert(hold.get_quantity("scrap_metal") == 6, "drag->drop moved the stack into the hold")
+
+	# dropping the backpack on the back equipment slot equips it
+	var bp_row := panel.row_at("self", panel.get_pane_ids("self").find("eva_backpack"))
+	var bp_payload = bp_row._get_drag_data(Vector2.ZERO)
+	var back_zone := panel.zone_for("slot:back")
+	assert(back_zone != null and back_zone._can_drop_data(Vector2.ZERO, bp_payload) == true, "back slot accepts the backpack")
+	back_zone._drop_data(Vector2.ZERO, bp_payload)
+	assert(equip.get_equipped("back") == "eva_backpack", "slot drop equipped via the widget")
 
 	panel.queue_free()
