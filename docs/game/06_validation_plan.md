@@ -178,7 +178,11 @@ run_clean 'encumbrance curve smoke' 'EQUIPMENT ENCUMBRANCE SMOKE PASS floor=0.25
 run_clean 'equipment carts main-scene smoke' 'EQUIPMENT CARTS SMOKE PASS section_a=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/equipment_carts_smoke.gd
 run_clean 'cart state model smoke' 'CART STATE SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_state_smoke.gd
 run_clean 'cart control node smoke' 'CART CONTROL SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_control_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=110 clean_output=true'
+run_clean 'cargo move-item primitive' 'CARGO MOVE ITEM SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cargo_move_item_smoke.gd
+run_clean 'inventory selection model' 'INVENTORY SELECTION MODEL SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_selection_model_smoke.gd
+run_clean 'inventory panel' 'INVENTORY PANEL SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_panel_smoke.gd
+run_clean 'inventory UI slice' 'INVENTORY UI SLICE SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_inventory_ui_smoke.gd
+echo 'SARGASSO REGRESSION PASS commands=114 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

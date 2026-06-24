@@ -60,3 +60,29 @@ static func withdraw_category(hold, player, category: String) -> Dictionary:
 			moved[item_id] = int(moved.get(item_id, 0)) + pulled
 			total += pulled
 	return {"moved": moved, "total_moved": total}
+
+## Moves up to `qty` of one item_id from src -> dst. The destination enforces its own
+## cap inside add_item (player InventoryState = soft-cap/full accept; ShipInventory =
+## hard weight-cap/partial fill), and src loses EXACTLY what dst accepted, so the
+## per-id total across src+dst is invariant. Returns the count actually moved.
+static func move_item(src, dst, item_id: String, qty: int) -> int:
+	if src == null or dst == null or item_id.is_empty() or qty <= 0:
+		return 0
+	var have: int = int(src.get_quantity(item_id))
+	var want: int = min(qty, have)
+	if want <= 0:
+		return 0
+	var accepted: int = int(dst.add_item(item_id, want))
+	if accepted <= 0:
+		return 0
+	return int(src.remove_item(item_id, accepted))
+
+## Applies move_item per entry (ids sorted for determinism). Returns total moved.
+## Used by multi-selection drags and "transfer all".
+static func move_items(src, dst, id_to_qty: Dictionary) -> int:
+	var total: int = 0
+	var ids: Array = id_to_qty.keys()
+	ids.sort()
+	for id_v in ids:
+		total += move_item(src, dst, String(id_v), int(id_to_qty[id_v]))
+	return total
