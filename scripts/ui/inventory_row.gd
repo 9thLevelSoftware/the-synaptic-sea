@@ -38,7 +38,7 @@ func _ready() -> void:
 	sw.color = SWATCH.get(ItemDefsScript.category(_defs, item_id), Color(0.5, 0.5, 0.5))
 	h.add_child(sw)
 	var lbl := Label.new()
-	var qty: int = int(panel.pane_quantity(pane, item_id)) if panel != null else 0
+	var qty: int = int(panel.pane_quantity(pane, item_id)) if is_instance_valid(panel) else 0
 	lbl.text = "%s  x%d" % [ItemDefsScript.display_name(_defs, item_id), qty]
 	h.add_child(lbl)
 	add_child(h)
@@ -55,6 +55,8 @@ func _apply_style() -> void:
 	add_theme_stylebox_override("panel", sb)
 
 func _gui_input(event: InputEvent) -> void:
+	if not is_instance_valid(panel):
+		return
 	if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
@@ -63,6 +65,8 @@ func _gui_input(event: InputEvent) -> void:
 			panel.row_context(pane, index, mb.global_position)
 
 func _get_drag_data(_at_position: Vector2) -> Variant:
+	if not is_instance_valid(panel):
+		return null
 	var data = panel.row_drag_payload(pane, index)
 	if data == null:
 		return null
@@ -73,7 +77,9 @@ func _get_drag_data(_at_position: Vector2) -> Variant:
 
 # A row is also a drop target for its own pane (drop on a row == drop on the pane).
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
-	return panel.zone_can_accept(pane, data)
+	return is_instance_valid(panel) and panel.zone_can_accept(pane, data)
 
 func _drop_data(_at_position: Vector2, data: Variant) -> void:
+	if not is_instance_valid(panel):
+		return
 	panel.zone_drop(pane, data)
