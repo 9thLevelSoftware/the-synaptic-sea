@@ -79,3 +79,6 @@ static func container_capacity(defs: Dictionary, item_id: String) -> float:
 static func effects(defs: Dictionary, item_id: String) -> Array:
 	var e: Variant = get_definition(defs, item_id).get("effects", [])
 	return e if e is Array else []
+
+static func icon(defs: Dictionary, item_id: String) -> String:
+	return str(get_definition(defs, item_id).get("icon", ""))
