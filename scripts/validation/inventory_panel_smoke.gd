@@ -130,7 +130,10 @@ func _run_section_b() -> void:
 	# drag-data round-trips through the logical API
 	# (use container pane — player pane is empty after deposit_all moves all haulables)
 	panel.select_row("container", 0, false, false)
+	var cids: Array = panel.get_pane_ids("container")
 	var drag = panel._build_drag_payload("container")
-	assert(drag.get("from_pane") == "container" and (drag.get("ids") as Array).size() >= 1, "drag payload carries selection")
+	assert(drag.get("from_pane") == "container", "drag payload names the source pane")
+	assert((drag.get("ids") as Array).size() >= 1, "drag payload carries a selection")
+	assert((drag.get("ids") as Array)[0] == cids[0], "drag payload carries the selected id")
 
 	panel.queue_free()

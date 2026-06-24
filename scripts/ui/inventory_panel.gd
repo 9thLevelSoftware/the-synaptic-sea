@@ -224,6 +224,8 @@ func transfer_quantity(from_pane: String, item_id: String, qty: int) -> int:
 		return 0
 	var src = _inv_for_pane(from_pane)
 	var dst = _inv_for_pane(_other_pane(from_pane))
+	if src == null or dst == null:
+		return 0
 	var moved: int = CargoTransferScript.move_item(src, dst, item_id, qty)
 	if moved > 0:
 		_after_mutation()
