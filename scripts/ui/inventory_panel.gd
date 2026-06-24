@@ -257,14 +257,13 @@ func zone_drop(target: String, data) -> void:
 		if from_pane != "self":
 			return
 		var slot: String = target.substr(5)
-		_rebuild_models()   # ensure ids are current before find/select
 		for id in ((data as Dictionary).get("ids", []) as Array):
 			if _equip != null and ItemDefsScript.equip_slot(_defs, String(id)) == slot:
 				_sel_self.select_single(_ids_for_pane("self").find(String(id)))
 				equip_selected()
 				return
 		return
-	if _mode == "transfer" and target != from_pane:
+	if _mode == "transfer" and target != from_pane and (from_pane == "self" or from_pane == "container"):
 		transfer_selected(from_pane)
 
 ## Move every id in `pane` to the other pane (manual — includes tools). Distinct from the

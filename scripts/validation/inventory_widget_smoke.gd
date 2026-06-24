@@ -49,11 +49,12 @@ func _run_section_a() -> void:
 	# transfer_all_from moves every id (incl tools) from a pane
 	inv.add_tool("portable_oxygen_pump")
 	var moved_all := panel.transfer_all_from("self")
-	assert(moved_all >= 1 and hold.get_quantity("portable_oxygen_pump") == 1, "transfer_all moved tool too")
+	assert(moved_all == 5 and hold.get_quantity("portable_oxygen_pump") == 1, "transfer_all moved everything incl tool (got %d)" % moved_all)
 	assert(panel.get_pane_ids("self").is_empty(), "YOU emptied by transfer_all")
 
 	# equipment-slot drop equips (from the self pane only)
 	inv.add_item("eva_backpack", 1)  # back in the player inventory again
+	panel._rebuild_models()   # smoke mutated inv directly (bypassing the panel) -> resync the selection models
 	var slot_pay := {"from_pane": "self", "ids": ["eva_backpack"]}
 	assert(panel.zone_can_accept("slot:back", slot_pay) == true, "back slot accepts the backpack")
 	assert(panel.zone_can_accept("slot:suit", slot_pay) == false, "suit slot rejects a back item")
