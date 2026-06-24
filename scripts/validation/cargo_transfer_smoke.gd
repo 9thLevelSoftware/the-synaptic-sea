@@ -2,7 +2,8 @@ extends SceneTree
 
 ## CargoTransfer pure-logic smoke. Asserts:
 ##   - deposit_all moves part+supply, LEAVES tools on the player
-##   - withdraw_category respects the player carry-weight cap (partial fill)
+##   - withdraw_category pulls the whole category under player soft-cap (no partial-fill
+##     limit — the player may end over capacity / Heavy Load)
 ##   - the conservation invariant: summed per-id quantity across player+hold is
 ##     invariant under any transfer (no duplication, no loss)
 
@@ -43,8 +44,9 @@ func _init() -> void:
 	assert(_total(player.items, hold.items, SUPPLY_ITEM) == before_supply, "supply conserved")
 	assert(_total(player.items, hold.items, TOOL_ITEM) == before_tool, "tool conserved")
 
-	# --- withdraw_category honors the player carry cap (partial fill) ---
-	# Fill the hold heavily, then withdraw 'part' into a near-full player bag.
+	# --- withdraw_category: player soft-cap — whole category is pulled ---
+	# Fill the hold heavily, then withdraw 'part'. Under soft-cap the player
+	# accepts the whole category regardless of weight; no partial-fill limit.
 	hold.add_item(PART_ITEM, 90)
 	var pre_player: int = player.get_quantity(PART_ITEM)
 	var pre_hold: int = hold.get_quantity(PART_ITEM)
@@ -53,8 +55,10 @@ func _init() -> void:
 	assert(moved > 0, "withdraw moved at least one item (got %d)" % moved)
 	# conservation across the withdraw
 	assert(player.get_quantity(PART_ITEM) + hold.get_quantity(PART_ITEM) == pre_player + pre_hold, "part conserved across withdraw")
-	# player never exceeds its weight cap
-	assert(player.get_total_weight() <= player.get_max_weight() + 0.0001, "player cap respected")
+	# Player soft-cap: withdraw is NOT limited by the player's weight cap; it pulls
+	# the whole category and the player may end over capacity (Heavy Load).
+	assert(hold.get_quantity(PART_ITEM) == 0, "withdraw pulled the whole part stock from the hold")
+	assert(moved == pre_hold, "withdrew the full hold quantity (got %d of %d)" % [moved, pre_hold])
 
 	print("CARGO TRANSFER SMOKE PASS conserved=true deposited=%d withdrew=%d" % [int(dep.get("total_moved", 0)), moved])
 	quit()

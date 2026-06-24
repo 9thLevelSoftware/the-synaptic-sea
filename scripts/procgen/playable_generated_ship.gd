@@ -40,6 +40,9 @@ const BridgeTerminalScript := preload("res://scripts/tools/bridge_terminal.gd")
 const HangarBayControlScript := preload("res://scripts/tools/hangar_bay_control.gd")
 const CargoHoldControlScript := preload("res://scripts/tools/cargo_hold_control.gd")
 const CargoTransferScript := preload("res://scripts/systems/cargo_transfer.gd")
+const EquipmentStateScript := preload("res://scripts/systems/equipment_state.gd")
+const EncumbranceScript := preload("res://scripts/systems/encumbrance.gd")
+const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -198,6 +201,8 @@ var unsafe_room_marker: Label3D
 # removes the calibrator from inventory and hides the pickup marker.
 
 var inventory_state: InventoryState
+var equipment_state                  # EquipmentState (untyped: class_name unreliable headless)
+var _item_defs: Dictionary = {}      # cached merged item-def catalog (lazy; equip/encumbrance reads)
 var tool_pickup: ToolPickup
 var tool_pickup_root: Node3D
 const TOOL_PICKUP_INTERACTION_RADIUS: float = 1.8
@@ -919,6 +924,7 @@ func _build_runtime_nodes() -> void:
 	# (RefCounted); tool_pickup_root is the parent for any ToolPickup node
 	# the coordinator spawns during ship load.
 	inventory_state = InventoryStateScript.new()
+	equipment_state = EquipmentStateScript.create()
 	tool_pickup_root = Node3D.new()
 	tool_pickup_root.name = "ToolPickupRoot"
 	add_child(tool_pickup_root)
@@ -1533,6 +1539,7 @@ func _on_cargo_deposit_requested(ship_id: String) -> void:
 	if inst == null:
 		return
 	CargoTransferScript.deposit_all(inventory_state, inst.get_inventory())
+	_recompute_player_encumbrance()
 
 func _on_cargo_withdraw_requested(ship_id: String, category: String) -> void:
 	if inventory_state == null:
@@ -1541,6 +1548,72 @@ func _on_cargo_withdraw_requested(ship_id: String, category: String) -> void:
 	if inst == null:
 		return
 	CargoTransferScript.withdraw_category(inst.get_inventory(), inventory_state, category)
+	_recompute_player_encumbrance()
+
+## Recompute the player's effective carry budget from worn equipment and apply the
+## Heavy Load movement penalty (× any active cart push penalty). Called on every
+## inventory/equipment/cart change.
+func _recompute_player_encumbrance() -> void:
+	if inventory_state == null:
+		return
+	var bonus: float = 0.0
+	if equipment_state != null:
+		bonus = equipment_state.get_carry_capacity_bonus()   # + future strength bonus
+	inventory_state.bonus_capacity = bonus
+	if is_instance_valid(player):
+		var mult: float = EncumbranceScript.move_speed_multiplier(inventory_state.get_load_ratio())
+		player.move_speed = float(player.DEFAULT_MOVE_SPEED) * mult * _cart_push_multiplier()
+
+## Equip item_id from the player inventory into its slot. Honors the both-hands
+## cart block. `auto` (pickup path) only fills EMPTY slots; manual equip displaces
+## the worn item back into inventory. Returns true on success.
+func _equip_from_inventory(item_id: String, auto: bool) -> bool:
+	if equipment_state == null or inventory_state == null:
+		return false
+	if not equipment_state.can_equip(item_id):
+		return false
+	var slot: String = ItemDefsScript.equip_slot(_definitions_for_equip(), item_id)
+	if (slot == "primary_hand" or slot == "secondary_hand") and _is_cart_grabbed():
+		return false   # both hands occupied by a grabbed cart
+	if auto and equipment_state.is_slot_occupied(slot):
+		return false   # auto-equip never swaps a filled slot
+	if inventory_state.get_quantity(item_id) <= 0:
+		return false
+	inventory_state.remove_item(item_id, 1)
+	var res: Dictionary = equipment_state.equip(item_id)
+	if not bool(res.get("ok", false)):
+		inventory_state.add_item(item_id, 1)   # equip failed -> put it back
+		return false
+	var displaced: String = str(res.get("displaced", ""))
+	if displaced != "":
+		inventory_state.add_item(displaced, 1)
+	_recompute_player_encumbrance()
+	return true
+
+## Unequip a slot back into the player inventory. Returns the unequipped id ("" if empty).
+func _unequip_to_inventory(slot: String) -> String:
+	if equipment_state == null or inventory_state == null:
+		return ""
+	var item_id: String = equipment_state.unequip(slot)
+	if item_id != "":
+		inventory_state.add_item(item_id, 1)
+		_recompute_player_encumbrance()
+	return item_id
+
+func _definitions_for_equip() -> Dictionary:
+	# The merged item-def catalog, lazily loaded once and cached. ItemDefs.load_definitions()
+	# does synchronous disk I/O parsing several JSON files; caching avoids repeating that on
+	# every equip / auto-equip during gameplay loops (the defs are static at runtime).
+	if _item_defs.is_empty():
+		_item_defs = ItemDefsScript.load_definitions()
+	return _item_defs
+
+## Temporary cart stubs — replaced in Task 11 with real cart-backed bodies.
+func _is_cart_grabbed() -> bool:
+	return false
+
+func _cart_push_multiplier() -> float:
+	return 1.0
 
 ## A ship currently airlock-docked to `carrier` (parent_ship == carrier) that is NOT
 ## already bayed there and whose airlock port size_class fits a free slot. null if none.
@@ -1970,6 +2043,12 @@ func _on_loot_container_searched(container_id: String, granted: Array) -> void:
 	if current_ship != null and not current_ship.looted_container_ids.has(container_id):
 		current_ship.looted_container_ids.append(container_id)
 	_refresh_inventory_hud()
+	# Auto-equip granted containers into empty slots (Phase-7 deferral: no equip UI yet).
+	for entry in granted:
+		var gid: String = str(entry.get("item_id", ""))
+		if gid != "" and equipment_state != null and equipment_state.can_equip(gid):
+			_equip_from_inventory(gid, true)
+	_recompute_player_encumbrance()
 	print("LOOT CONTAINER SEARCHED marker=%s container=%s granted=%d" % [
 		String(current_ship.marker_id) if current_ship != null else "", container_id, granted.size()])
 
@@ -1997,6 +2076,7 @@ func _on_derelict_interactable_completed(interaction_id: String, objective_id: S
 		for entry in rolled:
 			inventory_state.add_item(str(entry.get("item_id", "")), int(entry.get("quantity", 0)))
 		_refresh_inventory_hud()
+		_recompute_player_encumbrance()   # salvage rewards change carry weight -> refresh Heavy Load
 	print("DERELICT OBJECTIVE COMPLETE marker=%s sequence=%d type=%s cleared=%s" % [
 		String(current_ship.marker_id), sequence, objective_type, str(controller.is_cleared()).to_lower()])
 
@@ -3561,6 +3641,7 @@ func _resolve_tool_pickup_world_position() -> Vector3:
 func _on_tool_pickup_acquired(p_tool_id: String) -> void:
 	_refresh_tracker_system_status_lines()
 	print("PLAYABLE TOOL ACQUIRED tool_id=%s" % p_tool_id)
+	_recompute_player_encumbrance()
 
 # --- REQ-014: junction_calibrator pickup -------------------------------------
 # A second ToolPickup configured with tool_id = "junction_calibrator".
@@ -4021,6 +4102,8 @@ func _build_world_snapshot():
 	if home_ship != null:
 		ws.home_looted_containers = home_ship.looted_container_ids.duplicate()
 		ws.home_ship_inventory = home_ship.get_inventory().get_summary()
+	if equipment_state != null:
+		ws.player_equipment = equipment_state.get_summary()
 	ws.visited_ships = {}
 	for mid in visited_ships:
 		ws.visited_ships[String(mid)] = visited_ships[mid].get_summary()
@@ -4181,6 +4264,17 @@ func _apply_world_snapshot(ws) -> bool:
 			home_ship.get_inventory().apply_summary(ws.home_ship_inventory)
 		if not away_from_start:
 			_build_loot_containers()
+	# 1c. Restore player equipment (player-global — runs regardless of home_ship branch).
+	#     Loading restores the EXACT saved state: a non-empty snapshot is applied; an EMPTY
+	#     snapshot (older save, or nothing was worn) clears any currently-worn gear so
+	#     pre-load equipment never leaks across a load (_reset_runtime_for_reload does not
+	#     touch equipment_state).
+	if equipment_state != null:
+		if not ws.player_equipment.is_empty():
+			equipment_state.apply_summary(ws.player_equipment)
+		else:
+			equipment_state.slots.clear()
+	_recompute_player_encumbrance()
 	# 2. World model. _apply_run_snapshot reset us to the home ship; home_ship is
 	#    re-wrapped by _on_ship_loaded during that reload.
 	if sargasso_world != null and not ws.world_summary.is_empty():
@@ -4705,13 +4799,17 @@ func cargo_deposit_for_validation(ship_id: String) -> int:
 	var inst = _find_ship_by_id(ship_id)
 	if inst == null or inventory_state == null:
 		return 0
-	return int(CargoTransferScript.deposit_all(inventory_state, inst.get_inventory()).get("total_moved", 0))
+	var moved: int = int(CargoTransferScript.deposit_all(inventory_state, inst.get_inventory()).get("total_moved", 0))
+	_recompute_player_encumbrance()
+	return moved
 
 func cargo_withdraw_for_validation(ship_id: String, category: String) -> int:
 	var inst = _find_ship_by_id(ship_id)
 	if inst == null or inventory_state == null:
 		return 0
-	return int(CargoTransferScript.withdraw_category(inst.get_inventory(), inventory_state, category).get("total_moved", 0))
+	var moved: int = int(CargoTransferScript.withdraw_category(inst.get_inventory(), inventory_state, category).get("total_moved", 0))
+	_recompute_player_encumbrance()
+	return moved
 
 func ship_hold_quantity_for_validation(ship_id: String, item_id: String) -> int:
 	var inst = _find_ship_by_id(ship_id)
@@ -4808,3 +4906,27 @@ func nested_child_tracks_piloted_for_validation(child_id: String) -> bool:
 	if not root_node.is_inside_tree() or not cn.is_inside_tree():
 		return false
 	return root_node.global_position.distance_to(cn.global_position) < 1000.0
+
+## Task 7 equipment seams.
+func equip_for_validation(item_id: String) -> bool:
+	# Seed one into inventory if absent so the seam can drive equip deterministically.
+	if inventory_state != null and inventory_state.get_quantity(item_id) <= 0:
+		inventory_state.add_item(item_id, 1)
+	return _equip_from_inventory(item_id, false)
+
+func unequip_for_validation(slot: String) -> String:
+	return _unequip_to_inventory(slot)
+
+func player_capacity_for_validation() -> float:
+	return inventory_state.get_capacity() if inventory_state != null else 0.0
+
+func player_equipped_for_validation(slot: String) -> String:
+	return equipment_state.get_equipped(slot) if equipment_state != null else ""
+
+func player_move_speed_for_validation() -> float:
+	return float(player.move_speed) if is_instance_valid(player) else 0.0
+
+func overload_player_for_validation(item_id: String, qty: int) -> void:
+	if inventory_state != null:
+		inventory_state.add_item(item_id, qty)
+	_recompute_player_encumbrance()
