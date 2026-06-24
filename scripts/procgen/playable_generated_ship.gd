@@ -5000,7 +5000,7 @@ func inventory_transfer_first_from_container_for_validation(item_id: String) -> 
 	return int(inventory_panel.transfer_selected("container"))
 
 func player_frozen_for_validation() -> bool:
-	return player != null and not player.is_physics_processing()
+	return is_instance_valid(player) and not player.is_physics_processing()
 
 func ship_hold_quantity_for_validation(ship_id: String, item_id: String) -> int:
 	var inst = _find_ship_by_id(ship_id)
