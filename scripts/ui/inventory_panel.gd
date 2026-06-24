@@ -2,15 +2,19 @@ extends Control
 class_name InventoryPanel
 
 ## Thin view over the System 6 models. Hand-built dark-teal panel matching the HUD.
-## Mouse interaction (drag-drop, multi-select, context menus) is layered on top in
-## Task 4; every decision delegates to InventorySelectionModel + CargoTransfer, and a
+## Every decision delegates to InventorySelectionModel + CargoTransfer, and a
 ## headless-queryable logical API lets smokes drive the same code paths without input.
+## NOTE: this slice renders a single text mirror and exposes the drag/drop/select LOGIC
+## (and the Godot DnD entry points), but the INTERACTIVE per-row widget layer
+## (mouse-down select, draggable rows, per-pane/slot drop hit-testing, right-click
+## menus) is a tracked follow-up — until it lands, mouse drag/select is driven only
+## through the logical API (select_row/transfer_selected/...), not real per-row mouse input.
 
 signal panel_closed         # emitted on every close() so the coordinator restores control
 signal transfer_completed   # emitted after any state mutation so the coordinator recomputes
 
 const InventorySelectionModelScript := preload("res://scripts/systems/inventory_selection_model.gd")
-const CargoTransferScript := preload("res://scripts/systems/cargo_transfer.gd")  # used by TRANSFER mode (next task)
+const CargoTransferScript := preload("res://scripts/systems/cargo_transfer.gd")  # used by TRANSFER mode
 const EncumbranceScript := preload("res://scripts/systems/encumbrance.gd")
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
 
@@ -34,7 +38,7 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_CENTER)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_defs = ItemDefsScript.load_definitions()
-	if _root_label == null:
+	if not is_instance_valid(_root_label):
 		var bg := PanelContainer.new()
 		bg.position = Vector2(200, 120)
 		bg.custom_minimum_size = Vector2(680, 420)
@@ -59,6 +63,8 @@ func _ready() -> void:
 # --- lifecycle ---
 
 func open_self(inv, equip) -> void:
+	assert(inv != null, "InventoryState dependency must not be null")
+	assert(equip != null, "EquipmentState dependency must not be null")
 	_player_inv = inv
 	_equip = equip
 	_container = null
@@ -74,6 +80,8 @@ func close() -> void:
 	panel_closed.emit()
 
 func open_transfer(player_inv, container_hold, container_label: String, equip) -> void:
+	assert(player_inv != null, "Player inventory dependency must not be null")
+	assert(container_hold != null, "Container hold dependency must not be null")
 	_player_inv = player_inv
 	_container = container_hold
 	_container_label = container_label
@@ -190,9 +198,12 @@ func _move_speed_mult() -> float:
 # --- shared post-mutation hook ---
 
 func _after_mutation() -> void:
+	# Emit BEFORE rendering: the coordinator updates inventory_state.bonus_capacity from
+	# worn gear inside the transfer_completed handler, so the weight line / Heavy-Load badge
+	# must render with the post-recompute capacity (equipping a capacity bag changes it).
 	_rebuild_models()
-	_render()
 	transfer_completed.emit()
+	_render()
 
 # --- transfer (TRANSFER mode) ---
 
@@ -247,12 +258,17 @@ func _build_drag_payload(pane: String) -> Dictionary:
 	return {"from_pane": pane, "ids": _model_for_pane(pane).get_selected_ids()}
 
 func _get_drag_data(_at_position: Vector2) -> Variant:
-	# In the full visual build the dragged pane is resolved from the row under the
-	# cursor; the logical move is identical to _build_drag_payload + _drop_*.
+	# The interactive per-row widget layer (mouse-down select + row hit-testing against
+	# `_at_position`) is a follow-up; this build renders a text mirror, so a real drag has
+	# no per-row path to populate a selection first. Until that lands, only a row already
+	# selected through the logical API yields a payload — return null otherwise so Godot
+	# does not begin an empty, no-op drag.
 	var pane: String = "self"
 	if _mode == "transfer" and _sel_container.get_selected_ids().size() > 0:
 		pane = "container"
 	var data: Dictionary = _build_drag_payload(pane)
+	if (data["ids"] as Array).is_empty():
+		return null
 	var preview := Label.new()
 	preview.text = "%d item(s)" % (data["ids"] as Array).size()
 	set_drag_preview(preview)
@@ -286,7 +302,7 @@ func _drop_data(_at_position: Vector2, data: Variant) -> void:
 # --- rendering (text mirror; the visual pass is the hand-built panel above) ---
 
 func _render() -> void:
-	if _root_label == null:
+	if not is_instance_valid(_root_label):
 		return
 	var lines: PackedStringArray = PackedStringArray()
 	if _mode == "self":

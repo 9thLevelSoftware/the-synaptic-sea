@@ -2383,13 +2383,13 @@ func _on_inventory_transfer_completed() -> void:
 	_refresh_oxygen_state(false, 0.0)
 
 func _open_inventory_self() -> void:
-	if inventory_panel == null or inventory_state == null:
+	if not is_instance_valid(inventory_panel) or inventory_state == null:
 		return
 	inventory_panel.open_self(inventory_state, equipment_state)
 	_freeze_player_for_panel()
 
 func _open_transfer_panel_for_ship(ship_id: String) -> void:
-	if inventory_panel == null or inventory_state == null:
+	if not is_instance_valid(inventory_panel) or inventory_state == null:
 		return
 	var inst = _find_ship_by_id(ship_id)
 	if inst == null:
@@ -2398,7 +2398,7 @@ func _open_transfer_panel_for_ship(ship_id: String) -> void:
 	_freeze_player_for_panel()
 
 func _open_transfer_panel_for_cart(cart_id: String) -> void:
-	if inventory_panel == null or inventory_state == null:
+	if not is_instance_valid(inventory_panel) or inventory_state == null:
 		return
 	var hit: Dictionary = _find_cart_by_id(cart_id)
 	if hit.is_empty():
@@ -4762,7 +4762,7 @@ func _input(event: InputEvent) -> void:
 	# Control is restored on close by the panel_closed signal handler, which
 	# covers every close path — not just toggle-close / confirm-success.
 	if scanner_panel != null:
-		if event.is_action_pressed("toggle_scanner") and (inventory_panel == null or not inventory_panel.is_open()):
+		if event.is_action_pressed("toggle_scanner") and (not is_instance_valid(inventory_panel) or not inventory_panel.is_open()):
 			scanner_panel.toggle()
 			if player != null and scanner_panel.is_open():
 				player.set_physics_process(false)
@@ -4781,7 +4781,7 @@ func _input(event: InputEvent) -> void:
 				scanner_panel.confirm_selection()
 				get_viewport().set_input_as_handled()
 			return  # swallow other input while the scanner is open
-	if inventory_panel != null:
+	if is_instance_valid(inventory_panel):
 		if inventory_panel.is_open():
 			if event.is_action_pressed("toggle_inventory") or event.is_action_pressed("ui_cancel"):
 				inventory_panel.close()
@@ -4962,25 +4962,25 @@ func cargo_withdraw_for_validation(ship_id: String, category: String) -> int:
 	return moved
 
 func inventory_panel_is_open_for_validation() -> bool:
-	return inventory_panel != null and inventory_panel.is_open()
+	return is_instance_valid(inventory_panel) and inventory_panel.is_open()
 
 func inventory_open_self_for_validation() -> bool:
 	_open_inventory_self()
 	return inventory_panel_is_open_for_validation()
 
 func inventory_close_for_validation() -> void:
-	if inventory_panel != null and inventory_panel.is_open():
+	if is_instance_valid(inventory_panel) and inventory_panel.is_open():
 		inventory_panel.close()
 
 func inventory_panel_deposit_all_for_validation() -> int:
-	if inventory_panel == null or not inventory_panel.is_open():
+	if not is_instance_valid(inventory_panel) or not inventory_panel.is_open():
 		return 0
 	return int(inventory_panel.deposit_all_to_container())
 
 func inventory_transfer_first_to_container_for_validation(item_id: String) -> int:
 	# Open-transfer must already be active. Selects item_id on the YOU pane and moves the
 	# whole stack into the container; returns moved.
-	if inventory_panel == null or not inventory_panel.is_open():
+	if not is_instance_valid(inventory_panel) or not inventory_panel.is_open():
 		return 0
 	var ids: Array = inventory_panel.get_pane_ids("self")
 	var idx: int = ids.find(item_id)
@@ -4990,7 +4990,7 @@ func inventory_transfer_first_to_container_for_validation(item_id: String) -> in
 	return int(inventory_panel.transfer_selected("self"))
 
 func inventory_transfer_first_from_container_for_validation(item_id: String) -> int:
-	if inventory_panel == null or not inventory_panel.is_open():
+	if not is_instance_valid(inventory_panel) or not inventory_panel.is_open():
 		return 0
 	var ids: Array = inventory_panel.get_pane_ids("container")
 	var idx: int = ids.find(item_id)
