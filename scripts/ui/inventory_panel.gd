@@ -10,7 +10,7 @@ signal panel_closed         # emitted on every close() so the coordinator restor
 signal transfer_completed   # emitted after any state mutation so the coordinator recomputes
 
 const InventorySelectionModelScript := preload("res://scripts/systems/inventory_selection_model.gd")
-const CargoTransferScript := preload("res://scripts/systems/cargo_transfer.gd")
+const CargoTransferScript := preload("res://scripts/systems/cargo_transfer.gd")  # used by TRANSFER mode (next task)
 const EncumbranceScript := preload("res://scripts/systems/encumbrance.gd")
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
 
@@ -136,10 +136,14 @@ func equip_selected() -> bool:
 	var res: Dictionary = _equip.equip(item_id)
 	if not bool(res.get("ok", false)):
 		return false
-	_player_inv.remove_item(item_id, 1)
 	var displaced: String = str(res.get("displaced", ""))
 	if displaced != "":
-		_player_inv.add_item(displaced, 1)
+		if int(_player_inv.add_item(displaced, 1)) < 1:
+			# No carry room for the displaced item — abort atomically so nothing is lost.
+			# item_id was NOT removed from inventory yet; restore the slot to displaced.
+			_equip.equip(displaced)
+			return false
+	_player_inv.remove_item(item_id, 1)
 	_after_mutation()
 	return true
 
@@ -149,7 +153,10 @@ func unequip_slot(slot_id: String) -> bool:
 	var item_id: String = _equip.unequip(slot_id)
 	if item_id == "":
 		return false
-	_player_inv.add_item(item_id, 1)
+	if int(_player_inv.add_item(item_id, 1)) < 1:
+		# No carry room — restore the worn item rather than destroy it.
+		_equip.equip(item_id)
+		return false
 	_after_mutation()
 	return true
 
