@@ -11,7 +11,8 @@ const EquipmentStateScript := preload("res://scripts/systems/equipment_state.gd"
 
 func _init() -> void:
 	await _run_section_a()
-	print("INVENTORY PANEL SMOKE PASS section_a=true")
+	await _run_section_b()
+	print("INVENTORY PANEL SMOKE PASS section_a=true section_b=true")
 	quit()
 
 func _run_section_a() -> void:
@@ -88,4 +89,48 @@ func _run_section_a() -> void:
 	panel.panel_closed.connect(func(): closed[0] = true)
 	panel.close()
 	assert(panel.is_open() == false and closed[0], "close emits panel_closed")
+	panel.queue_free()
+
+func _run_section_b() -> void:
+	const ShipInventoryScript := preload("res://scripts/systems/ship_inventory.gd")
+	var inv = InventoryStateScript.new()
+	inv.add_item("scrap_metal", 6)        # part
+	inv.add_tool("portable_oxygen_pump")  # tool (transferable manually)
+	var hold = ShipInventoryScript.create(1000.0)
+	hold.add_item("plating", 4)
+	var equip = EquipmentStateScript.create()
+
+	var panel = InventoryPanelScript.new()
+	root.add_child(panel)
+	await process_frame
+	panel.open_transfer(inv, hold, "HOLD", equip)
+	assert(panel.get_mode() == "transfer", "transfer mode")
+
+	# select the scrap row on YOU and transfer the whole stack into the hold
+	var you_ids: Array = panel.get_pane_ids("self")
+	panel.select_row("self", you_ids.find("scrap_metal"), false, false)
+	var moved: int = panel.transfer_selected("self")
+	assert(moved == 6, "moved the whole scrap stack (got %d)" % moved)
+	assert(hold.get_quantity("scrap_metal") == 6 and inv.get_quantity("scrap_metal") == 0, "scrap now in hold")
+
+	# split: move 1 plating back to the player
+	var one: int = panel.transfer_quantity("container", "plating", 1)
+	assert(one == 1 and inv.get_quantity("plating") == 1 and hold.get_quantity("plating") == 3, "split moved exactly 1")
+
+	# tool is transferable into the hold
+	panel.select_row("self", panel.get_pane_ids("self").find("portable_oxygen_pump"), false, false)
+	assert(panel.transfer_selected("self") == 1, "tool transferred to hold")
+	assert(hold.get_quantity("portable_oxygen_pump") == 1, "tool stored in hold")
+
+	# deposit-all convenience excludes tools and remaining items move
+	inv.add_item("ration_pack", 3)
+	var bulk: int = panel.deposit_all_to_container()
+	assert(bulk >= 3, "deposit-all moved the supplies (got %d)" % bulk)
+
+	# drag-data round-trips through the logical API
+	# (use container pane — player pane is empty after deposit_all moves all haulables)
+	panel.select_row("container", 0, false, false)
+	var drag = panel._build_drag_payload("container")
+	assert(drag.get("from_pane") == "container" and (drag.get("ids") as Array).size() >= 1, "drag payload carries selection")
+
 	panel.queue_free()

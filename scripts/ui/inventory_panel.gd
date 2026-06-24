@@ -73,6 +73,16 @@ func close() -> void:
 	visible = false
 	panel_closed.emit()
 
+func open_transfer(player_inv, container_hold, container_label: String, equip) -> void:
+	_player_inv = player_inv
+	_container = container_hold
+	_container_label = container_label
+	_equip = equip
+	_mode = "transfer"
+	visible = true
+	_rebuild_models()
+	_render()
+
 func is_open() -> bool:
 	return _mode != "closed"
 
@@ -183,6 +193,93 @@ func _after_mutation() -> void:
 	_rebuild_models()
 	_render()
 	transfer_completed.emit()
+
+# --- transfer (TRANSFER mode) ---
+
+func _other_pane(pane: String) -> String:
+	return "container" if pane == "self" or pane == "you" else "self"
+
+func _inv_for_pane(pane: String):
+	return _container if pane == "container" else _player_inv
+
+## Move every selected whole stack from from_pane to the other pane. Returns total moved.
+func transfer_selected(from_pane: String) -> int:
+	if _mode != "transfer":
+		return 0
+	var src = _inv_for_pane(from_pane)
+	var dst = _inv_for_pane(_other_pane(from_pane))
+	if src == null or dst == null:
+		return 0
+	var id_to_qty: Dictionary = {}
+	for id in _model_for_pane(from_pane).get_selected_ids():
+		id_to_qty[String(id)] = int(src.get_quantity(String(id)))
+	var moved: int = CargoTransferScript.move_items(src, dst, id_to_qty)
+	if moved > 0:
+		_after_mutation()
+	return moved
+
+## Split: move exactly qty of one id from from_pane to the other pane.
+func transfer_quantity(from_pane: String, item_id: String, qty: int) -> int:
+	if _mode != "transfer":
+		return 0
+	var src = _inv_for_pane(from_pane)
+	var dst = _inv_for_pane(_other_pane(from_pane))
+	var moved: int = CargoTransferScript.move_item(src, dst, item_id, qty)
+	if moved > 0:
+		_after_mutation()
+	return moved
+
+## "A" convenience: bulk deposit part+supply (tools excluded) into the container.
+func deposit_all_to_container() -> int:
+	if _mode != "transfer" or _player_inv == null or _container == null:
+		return 0
+	var moved: int = int(CargoTransferScript.deposit_all(_player_inv, _container).get("total_moved", 0))
+	if moved > 0:
+		_after_mutation()
+	return moved
+
+# --- Godot drag-and-drop overrides (thin; the smokes call the logical API above) ---
+
+## The drag payload the mouse path and the smokes both use.
+func _build_drag_payload(pane: String) -> Dictionary:
+	return {"from_pane": pane, "ids": _model_for_pane(pane).get_selected_ids()}
+
+func _get_drag_data(_at_position: Vector2) -> Variant:
+	# In the full visual build the dragged pane is resolved from the row under the
+	# cursor; the logical move is identical to _build_drag_payload + _drop_*.
+	var pane: String = "self"
+	if _mode == "transfer" and _sel_container.get_selected_ids().size() > 0:
+		pane = "container"
+	var data: Dictionary = _build_drag_payload(pane)
+	var preview := Label.new()
+	preview.text = "%d item(s)" % (data["ids"] as Array).size()
+	set_drag_preview(preview)
+	return data
+
+func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
+	return data is Dictionary and (data as Dictionary).has("from_pane")
+
+## drop_target: "self"/"container" pane, or "slot:<slot_id>" for an equipment slot.
+func _drop_to(drop_target: String, data: Dictionary) -> void:
+	var from_pane: String = String(data.get("from_pane", ""))
+	if drop_target.begins_with("slot:"):
+		# equip the first dragged equippable
+		for id in (data.get("ids", []) as Array):
+			if _equip != null and _equip.can_equip(String(id)):
+				_model_for_pane(from_pane).select_single(_ids_for_pane(from_pane).find(String(id)))
+				equip_selected()
+				return
+		return
+	if _mode == "transfer" and drop_target != from_pane:
+		transfer_selected(from_pane)
+
+func _drop_data(_at_position: Vector2, data: Variant) -> void:
+	if not (data is Dictionary):
+		return
+	# Default visual drop target is the opposite pane; the full build resolves the
+	# control under the cursor. Smokes exercise transfer_selected/_drop_to directly.
+	var from_pane: String = String((data as Dictionary).get("from_pane", "self"))
+	_drop_to(_other_pane(from_pane), data as Dictionary)
 
 # --- rendering (text mirror; the visual pass is the hand-built panel above) ---
 
