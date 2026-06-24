@@ -6,7 +6,7 @@ const ModelScript := preload("res://scripts/systems/inventory_selection_model.gd
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
 
 func _init() -> void:
-	var m = ModelScript.new()
+	var m: ModelScript = ModelScript.new()
 	m.set_ids(["a", "b", "c", "d", "e"])
 
 	# single replaces + sets anchor
@@ -20,6 +20,11 @@ func _init() -> void:
 	# ctrl toggle removes one
 	m.toggle(2)
 	assert(m.get_selected_ids() == ["b", "d"], "toggle off c")
+
+	# reverse range: anchor below the click still selects the contiguous block
+	m.select_single(3)
+	m.select_range_to(1)
+	assert(m.get_selected_ids() == ["b", "c", "d"], "reverse range b..d")
 
 	# new single clears the rest
 	m.select_single(4)

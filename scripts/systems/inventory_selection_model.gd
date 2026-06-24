@@ -7,7 +7,7 @@ class_name InventorySelectionModel
 
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
 
-var ids: Array = []                # ordered item ids currently shown in this list
+var ids: Array[String] = []        # ordered item ids currently shown in this list
 var _selected: Dictionary = {}     # index:int -> true
 var _anchor: int = -1
 
@@ -61,8 +61,10 @@ func select_range_to(index: int) -> void:
 func is_selected(index: int) -> bool:
 	return _selected.has(index)
 
-func get_selected_indices() -> Array:
-	var out: Array = _selected.keys()
+func get_selected_indices() -> Array[int]:
+	var out: Array[int] = []
+	for k in _selected:
+		out.append(int(k))
 	out.sort()
 	return out
 
