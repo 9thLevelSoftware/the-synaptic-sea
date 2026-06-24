@@ -417,7 +417,6 @@ func _render() -> void:
 		_content.add_child(_make_pane_section("self", "-- Carrying --"))
 	elif _mode == "transfer":
 		_content.add_child(_make_header())
-		_content.add_child(_make_equipment_section())
 		var body := HBoxContainer.new()
 		body.add_child(_make_pane_section("self", "YOU"))
 		body.add_child(_make_pane_section("container", _container_label))

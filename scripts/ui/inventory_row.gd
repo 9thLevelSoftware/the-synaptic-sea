@@ -66,11 +66,9 @@ func _get_drag_data(_at_position: Vector2) -> Variant:
 	var data = panel.row_drag_payload(pane, index)
 	if data == null:
 		return null
-	# set_drag_preview requires an active OS drag gesture (not headless-drivable); guard it.
-	if is_inside_tree() and get_viewport() != null and get_viewport().gui_is_dragging():
-		var preview := Label.new()
-		preview.text = "%d item(s)" % ((data as Dictionary)["ids"] as Array).size()
-		set_drag_preview(preview)
+	var preview := Label.new()
+	preview.text = "%d item(s)" % ((data as Dictionary)["ids"] as Array).size()
+	set_drag_preview(preview)
 	return data
 
 # A row is also a drop target for its own pane (drop on a row == drop on the pane).

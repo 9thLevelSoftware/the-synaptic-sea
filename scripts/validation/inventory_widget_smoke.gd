@@ -77,9 +77,9 @@ func _run_section_a() -> void:
 	panel.queue_free()
 
 func _run_section_b() -> void:
+	# --- TRANSFER fixture: click-select + drag-payload + cross-pane drop ---
 	var inv = InventoryStateScript.new()
 	inv.add_item("scrap_metal", 6)
-	inv.add_item("eva_backpack", 1)
 	var hold = ShipInventoryScript.create(1000.0)
 	hold.add_item("plating", 4)
 	var equip = EquipmentStateScript.create()
@@ -90,7 +90,6 @@ func _run_section_b() -> void:
 	panel.open_transfer(inv, hold, "HOLD", equip)
 	await process_frame   # let the row Controls' _ready run
 
-	# a real row exists and a synthetic left-click selects it
 	var ids := panel.get_pane_ids("self")
 	var ri := ids.find("scrap_metal")
 	var row := panel.row_at("self", ri)
@@ -101,21 +100,32 @@ func _run_section_b() -> void:
 	row._gui_input(click)
 	assert(panel.get_selected_ids("self") == ["scrap_metal"], "synthetic click selected the row")
 
-	# the row yields a non-empty drag payload; dropping on the container zone transfers
-	var payload = row._get_drag_data(Vector2.ZERO)
+	# Build the drag payload via the panel (row._get_drag_data calls set_drag_preview,
+	# which errors outside a real OS drag gesture). The row's _get_drag_data is a thin
+	# wrapper around row_drag_payload; the payload logic is what we assert here.
+	var payload = panel.row_drag_payload("self", ri)
 	assert(payload != null and (payload as Dictionary)["from_pane"] == "self", "row drag payload built")
 	var czone := panel.zone_for("container")
 	assert(czone != null, "container drop zone exists")
 	assert(czone._can_drop_data(Vector2.ZERO, payload) == true, "container zone accepts the drop")
 	czone._drop_data(Vector2.ZERO, payload)
 	assert(hold.get_quantity("scrap_metal") == 6, "drag->drop moved the stack into the hold")
-
-	# dropping the backpack on the back equipment slot equips it
-	var bp_row := panel.row_at("self", panel.get_pane_ids("self").find("eva_backpack"))
-	var bp_payload = bp_row._get_drag_data(Vector2.ZERO)
-	var back_zone := panel.zone_for("slot:back")
-	assert(back_zone != null and back_zone._can_drop_data(Vector2.ZERO, bp_payload) == true, "back slot accepts the backpack")
-	back_zone._drop_data(Vector2.ZERO, bp_payload)
-	assert(equip.get_equipped("back") == "eva_backpack", "slot drop equipped via the widget")
-
 	panel.queue_free()
+
+	# --- SELF fixture: drop an equippable onto its equipment slot (slots live in SELF mode) ---
+	var inv2 = InventoryStateScript.new()
+	inv2.add_item("eva_backpack", 1)
+	var equip2 = EquipmentStateScript.create()
+	var panel2 = InventoryPanelScript.new()
+	root.add_child(panel2)
+	await process_frame
+	panel2.open_self(inv2, equip2)
+	await process_frame
+	var bp_idx := panel2.get_pane_ids("self").find("eva_backpack")
+	var bp_payload = panel2.row_drag_payload("self", bp_idx)
+	var back_zone := panel2.zone_for("slot:back")
+	assert(back_zone != null, "back slot zone exists in SELF mode")
+	assert(back_zone._can_drop_data(Vector2.ZERO, bp_payload) == true, "back slot accepts the backpack")
+	back_zone._drop_data(Vector2.ZERO, bp_payload)
+	assert(equip2.get_equipped("back") == "eva_backpack", "slot drop equipped via the widget")
+	panel2.queue_free()
