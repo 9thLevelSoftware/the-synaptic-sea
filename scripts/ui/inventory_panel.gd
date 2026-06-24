@@ -4,11 +4,8 @@ class_name InventoryPanel
 ## Thin view over the System 6 models. Hand-built dark-teal panel matching the HUD.
 ## Every decision delegates to InventorySelectionModel + CargoTransfer, and a
 ## headless-queryable logical API lets smokes drive the same code paths without input.
-## NOTE: this slice renders a single text mirror and exposes the drag/drop/select LOGIC
-## (and the Godot DnD entry points), but the INTERACTIVE per-row widget layer
-## (mouse-down select, draggable rows, per-pane/slot drop hit-testing, right-click
-## menus) is a tracked follow-up — until it lands, mouse drag/select is driven only
-## through the logical API (select_row/transfer_selected/...), not real per-row mouse input.
+## The panel builds a real widget tree of InventoryRow + InventoryDropZone controls so
+## mouse drag/select is driven by real per-row mouse input as well as the logical API.
 
 signal panel_closed         # emitted on every close() so the coordinator restores control
 signal transfer_completed   # emitted after any state mutation so the coordinator recomputes
@@ -17,6 +14,8 @@ const InventorySelectionModelScript := preload("res://scripts/systems/inventory_
 const CargoTransferScript := preload("res://scripts/systems/cargo_transfer.gd")  # used by TRANSFER mode
 const EncumbranceScript := preload("res://scripts/systems/encumbrance.gd")
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
+const InventoryRowScript := preload("res://scripts/ui/inventory_row.gd")
+const InventoryDropZoneScript := preload("res://scripts/ui/inventory_drop_zone.gd")
 
 const PANEL_COLOR: Color = Color(0.03, 0.05, 0.07, 0.92)
 const PANEL_BORDER_COLOR: Color = Color(0.22, 0.72, 1.0, 0.65)
@@ -32,16 +31,19 @@ var _sel_self := InventorySelectionModelScript.new()
 var _sel_container := InventorySelectionModelScript.new()
 
 var _defs: Dictionary = {}
-var _root_label: Label              # single text mirror of the panel for headless query + display
+
+var _content: VBoxContainer
+var _rows: Dictionary = {"self": [], "container": []}   # pane -> Array[InventoryRow]
+var _zones: Dictionary = {}                             # target -> InventoryDropZone
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_CENTER)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_defs = ItemDefsScript.load_definitions()
-	if not is_instance_valid(_root_label):
+	if not is_instance_valid(_content):
 		var bg := PanelContainer.new()
 		bg.position = Vector2(200, 120)
-		bg.custom_minimum_size = Vector2(680, 420)
+		bg.custom_minimum_size = Vector2(700, 440)
 		var style := StyleBoxFlat.new()
 		style.bg_color = PANEL_COLOR
 		style.border_color = PANEL_BORDER_COLOR
@@ -50,14 +52,13 @@ func _ready() -> void:
 		bg.add_theme_stylebox_override("panel", style)
 		add_child(bg)
 		var margin := MarginContainer.new()
-		margin.add_theme_constant_override("margin_left", 16)
-		margin.add_theme_constant_override("margin_top", 14)
-		margin.add_theme_constant_override("margin_right", 16)
-		margin.add_theme_constant_override("margin_bottom", 14)
+		margin.add_theme_constant_override("margin_left", 14)
+		margin.add_theme_constant_override("margin_top", 12)
+		margin.add_theme_constant_override("margin_right", 14)
+		margin.add_theme_constant_override("margin_bottom", 12)
 		bg.add_child(margin)
-		_root_label = Label.new()
-		_root_label.add_theme_color_override("font_color", Color.WHITE)
-		margin.add_child(_root_label)
+		_content = VBoxContainer.new()
+		margin.add_child(_content)
 	visible = false
 
 # --- lifecycle ---
@@ -205,6 +206,156 @@ func _after_mutation() -> void:
 	transfer_completed.emit()
 	_render()
 
+# --- interactive-widget coordinator callbacks (rows/zones forward here) ---
+
+const _ACT_TRANSFER := 0
+const _ACT_TRANSFER_ALL := 1
+const _ACT_SPLIT := 2
+const _ACT_EQUIP := 3
+const _ACT_UNEQUIP := 4
+
+func row_clicked(pane: String, index: int, additive: bool, range_sel: bool) -> void:
+	select_row(pane, index, additive, range_sel)
+
+func row_drag_payload(pane: String, index: int) -> Variant:
+	var m = _model_for_pane(pane)
+	if not m.is_selected(index):
+		m.select_single(index)
+	var data: Dictionary = _build_drag_payload(pane)
+	return null if (data["ids"] as Array).is_empty() else data
+
+func row_context(pane: String, index: int, global_pos: Vector2) -> void:
+	var m = _model_for_pane(pane)
+	if not m.is_selected(index):
+		m.select_single(index)
+		_render()
+	var menu: PopupMenu = _build_context_menu(pane, index)
+	add_child(menu)
+	menu.position = global_pos
+	menu.id_pressed.connect(_on_context_id.bind(pane, index))
+	# PopupMenu is a Window: it is NOT auto-freed on dismissal. popup_hide fires on every
+	# close path (selection, outside-click, Esc), so it is the single owner of the free.
+	menu.popup_hide.connect(menu.queue_free)
+	menu.popup()
+
+## True iff `data` can drop on `target` ("self"/"container" pane, or "slot:<id>").
+func zone_can_accept(target: String, data) -> bool:
+	if not (data is Dictionary):
+		return false
+	var from_pane: String = String((data as Dictionary).get("from_pane", ""))
+	if target.begins_with("slot:"):
+		if from_pane != "self":
+			return false   # equip only from your own inventory
+		var slot: String = target.substr(5)
+		for id in ((data as Dictionary).get("ids", []) as Array):
+			if _equip != null and ItemDefsScript.equip_slot(_defs, String(id)) == slot:
+				return true
+		return false
+	# Mirror zone_drop's guard exactly: a true here must imply a real drop, or the drag
+	# preview would advertise a drop the drop handler then silently ignores.
+	return _mode == "transfer" and target != from_pane and (from_pane == "self" or from_pane == "container")
+
+func zone_drop(target: String, data) -> void:
+	if not (data is Dictionary):
+		return
+	var from_pane: String = String((data as Dictionary).get("from_pane", ""))
+	if target.begins_with("slot:"):
+		if from_pane != "self":
+			return
+		var slot: String = target.substr(5)
+		for id in ((data as Dictionary).get("ids", []) as Array):
+			if _equip != null and ItemDefsScript.equip_slot(_defs, String(id)) == slot:
+				_sel_self.select_single(_ids_for_pane("self").find(String(id)))
+				equip_selected()
+				return
+		return
+	if _mode == "transfer" and target != from_pane and (from_pane == "self" or from_pane == "container"):
+		transfer_selected(from_pane)
+
+## Move every id in `pane` to the other pane (manual — includes tools). Distinct from the
+## Deposit All button, which uses deposit_all (parts/supplies only). Returns total moved.
+func transfer_all_from(pane: String) -> int:
+	var src = _inv_for_pane(pane)
+	var dst = _inv_for_pane(_other_pane(pane))
+	if src == null or dst == null:
+		return 0
+	var id_to_qty: Dictionary = {}
+	for id in _ids_for_pane(pane):
+		id_to_qty[String(id)] = int(src.get_quantity(String(id)))
+	var moved: int = CargoTransferScript.move_items(src, dst, id_to_qty)
+	if moved > 0:
+		_after_mutation()
+	return moved
+
+func slot_context(slot_id: String, global_pos: Vector2) -> void:
+	if _equip == null or not _equip.is_slot_occupied(slot_id):
+		return
+	var menu := PopupMenu.new()
+	menu.add_item("Unequip", _ACT_UNEQUIP)
+	add_child(menu)
+	menu.position = global_pos
+	menu.id_pressed.connect(func(_id): unequip_slot(slot_id))
+	# popup_hide is the single owner of the free — covers Unequip, outside-click, and Esc.
+	menu.popup_hide.connect(menu.queue_free)
+	menu.popup()
+
+func pane_quantity(pane: String, id: String) -> int:
+	var inv = _inv_for_pane(pane)
+	return int(inv.get_quantity(id)) if inv != null else 0
+
+## Builds (does NOT pop) the right-click menu for a row, from context_actions.
+func _build_context_menu(pane: String, index: int) -> PopupMenu:
+	var menu := PopupMenu.new()
+	var ids: Array = _ids_for_pane(pane)
+	if index < 0 or index >= ids.size():
+		return menu
+	var item_id: String = String(ids[index])
+	var actions: PackedStringArray = InventorySelectionModelScript.context_actions(
+		item_id, _defs, _mode == "transfer", pane == "container", false)
+	for a in actions:
+		match String(a):
+			"transfer": menu.add_item("Transfer", _ACT_TRANSFER)
+			"transfer_all": menu.add_item("Transfer all", _ACT_TRANSFER_ALL)
+			"split": menu.add_item("Split…", _ACT_SPLIT)
+			"equip": menu.add_item("Equip", _ACT_EQUIP)
+			"unequip": menu.add_item("Unequip", _ACT_UNEQUIP)
+	return menu
+
+func _on_context_id(id: int, pane: String, index: int) -> void:
+	if id == _ACT_TRANSFER:
+		transfer_selected(pane)
+	elif id == _ACT_TRANSFER_ALL:
+		transfer_all_from(pane)
+	elif id == _ACT_SPLIT:
+		var ids: Array = _ids_for_pane(pane)
+		var item_id: String = String(ids[index]) if index >= 0 and index < ids.size() else ""
+		_open_split_picker(pane, item_id)
+	elif id == _ACT_EQUIP:
+		# Equip is offered for SELF rows only (context_actions suppresses it for container
+		# rows), so _model_for_pane(pane) here is always _sel_self — the model equip_selected reads.
+		_model_for_pane(pane).select_single(index)
+		equip_selected()
+
+## Interaction-only (popup); split amount picker -> transfer_quantity.
+func _open_split_picker(pane: String, item_id: String) -> void:
+	var src = _inv_for_pane(pane)
+	if src == null or item_id == "":
+		return
+	var maxq: int = int(src.get_quantity(item_id))
+	if maxq <= 0:
+		return
+	var dlg := AcceptDialog.new()
+	dlg.title = "Split %s" % _name(item_id)
+	var spin := SpinBox.new()
+	spin.min_value = 1
+	spin.max_value = maxq
+	spin.value = max(1, int(maxq / 2.0))
+	dlg.add_child(spin)
+	add_child(dlg)
+	dlg.confirmed.connect(func(): transfer_quantity(pane, item_id, int(spin.value)); dlg.queue_free())
+	dlg.canceled.connect(func(): dlg.queue_free())
+	dlg.popup_centered()
+
 # --- transfer (TRANSFER mode) ---
 
 func _other_pane(pane: String) -> String:
@@ -251,78 +402,97 @@ func deposit_all_to_container() -> int:
 		_after_mutation()
 	return moved
 
-# --- Godot drag-and-drop overrides (thin; the smokes call the logical API above) ---
+# --- drag payload (kept: smokes call this directly) ---
 
 ## The drag payload the mouse path and the smokes both use.
 func _build_drag_payload(pane: String) -> Dictionary:
 	return {"from_pane": pane, "ids": _model_for_pane(pane).get_selected_ids()}
 
-func _get_drag_data(_at_position: Vector2) -> Variant:
-	# The interactive per-row widget layer (mouse-down select + row hit-testing against
-	# `_at_position`) is a follow-up; this build renders a text mirror, so a real drag has
-	# no per-row path to populate a selection first. Until that lands, only a row already
-	# selected through the logical API yields a payload — return null otherwise so Godot
-	# does not begin an empty, no-op drag.
-	var pane: String = "self"
-	if _mode == "transfer" and _sel_container.get_selected_ids().size() > 0:
-		pane = "container"
-	var data: Dictionary = _build_drag_payload(pane)
-	if (data["ids"] as Array).is_empty():
-		return null
-	var preview := Label.new()
-	preview.text = "%d item(s)" % (data["ids"] as Array).size()
-	set_drag_preview(preview)
-	return data
-
-func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
-	return data is Dictionary and (data as Dictionary).has("from_pane")
-
-## drop_target: "self"/"container" pane, or "slot:<slot_id>" for an equipment slot.
-func _drop_to(drop_target: String, data: Dictionary) -> void:
-	var from_pane: String = String(data.get("from_pane", ""))
-	if drop_target.begins_with("slot:"):
-		# equip the first dragged equippable
-		for id in (data.get("ids", []) as Array):
-			if _equip != null and _equip.can_equip(String(id)):
-				_model_for_pane(from_pane).select_single(_ids_for_pane(from_pane).find(String(id)))
-				equip_selected()
-				return
-		return
-	if _mode == "transfer" and drop_target != from_pane:
-		transfer_selected(from_pane)
-
-func _drop_data(_at_position: Vector2, data: Variant) -> void:
-	if not (data is Dictionary):
-		return
-	# Default visual drop target is the opposite pane; the full build resolves the
-	# control under the cursor. Smokes exercise transfer_selected/_drop_to directly.
-	var from_pane: String = String((data as Dictionary).get("from_pane", "self"))
-	_drop_to(_other_pane(from_pane), data as Dictionary)
-
-# --- rendering (text mirror; the visual pass is the hand-built panel above) ---
+# --- rendering (widget-tree rebuild) ---
 
 func _render() -> void:
-	if not is_instance_valid(_root_label):
+	if not is_instance_valid(_content):
 		return
-	var lines: PackedStringArray = PackedStringArray()
+	for c in _content.get_children():
+		_content.remove_child(c)
+		c.queue_free()
+	_rows = {"self": [], "container": []}
+	_zones = {}
 	if _mode == "self":
-		lines.append("INVENTORY + GEAR")
-		lines.append(_weight_line())
-		lines.append("-- Equipment --")
-		for slot in _equip.SLOTS if _equip != null else []:
-			var worn: String = _equip.get_equipped(slot) if _equip != null else ""
-			lines.append("  %s: %s" % [slot, ("(empty)" if worn == "" else _name(worn))])
-		lines.append("-- Carrying --")
-		for id in _ids_for_pane("self"):
-			lines.append("  %s" % _row_text(_player_inv, id))
+		_content.add_child(_make_header())
+		_content.add_child(_make_equipment_section())
+		_content.add_child(_make_pane_section("self", "-- Carrying --"))
 	elif _mode == "transfer":
-		lines.append("TRANSFER  |  %s" % _container_label)
-		lines.append("YOU  %s" % _weight_line())
-		for id in _ids_for_pane("self"):
-			lines.append("  Y %s" % _row_text(_player_inv, id))
-		for id in _ids_for_pane("container"):
-			lines.append("  C %s" % _row_text(_container, id))
-	_root_label.text = "\n".join(lines)
+		_content.add_child(_make_header())
+		var body := HBoxContainer.new()
+		body.add_child(_make_pane_section("self", "YOU"))
+		body.add_child(_make_pane_section("container", _container_label))
+		_content.add_child(body)
+		_content.add_child(_make_footer())
+
+func _make_header() -> Control:
+	var l := Label.new()
+	var title: String = "INVENTORY + GEAR" if _mode == "self" else "TRANSFER  |  %s" % _container_label
+	l.text = "%s\n%s" % [title, _weight_line()]
+	return l
+
+func _make_equipment_section() -> Control:
+	var box := VBoxContainer.new()
+	var hdr := Label.new()
+	hdr.text = "-- Equipment --"
+	box.add_child(hdr)
+	for slot in (_equip.SLOTS if _equip != null else []):
+		var zone = InventoryDropZoneScript.create(self, "slot:%s" % String(slot))
+		zone.custom_minimum_size = Vector2(300, 0)
+		var worn: String = _equip.get_equipped(String(slot)) if _equip != null else ""
+		var lbl := Label.new()
+		lbl.text = "%s  [%s]" % [String(slot), ("(empty)" if worn == "" else _name(worn))]
+		zone.add_child(lbl)
+		_zones["slot:%s" % String(slot)] = zone
+		box.add_child(zone)
+	return box
+
+func _make_pane_section(pane: String, title: String) -> Control:
+	var box := VBoxContainer.new()
+	var t := Label.new()
+	var cap: String = ""
+	if pane == "container" and _container != null:
+		cap = "  %d/%d" % [int(_container.get_total_weight()), int(_container.get_max_weight())]
+	t.text = "%s%s" % [title, cap]
+	box.add_child(t)
+	var zone = InventoryDropZoneScript.create(self, pane)
+	zone.custom_minimum_size = Vector2(320, 200)
+	var rows_vbox := VBoxContainer.new()
+	zone.add_child(rows_vbox)
+	var ids: Array = _ids_for_pane(pane)
+	for i in range(ids.size()):
+		var row = InventoryRowScript.create(self, pane, i, String(ids[i]), _defs)
+		rows_vbox.add_child(row)
+		(_rows[pane] as Array).append(row)
+		row.set_selected(_model_for_pane(pane).is_selected(i))
+	_zones[pane] = zone
+	box.add_child(zone)
+	return box
+
+func _make_footer() -> Control:
+	var h := HBoxContainer.new()
+	var dep := Button.new()
+	dep.text = "Deposit All"
+	dep.pressed.connect(deposit_all_to_container)
+	h.add_child(dep)
+	var cl := Button.new()
+	cl.text = "Close"
+	cl.pressed.connect(close)
+	h.add_child(cl)
+	return h
+
+## Test/inspection seams: fetch a built row / drop zone after a render.
+func row_at(pane: String, index: int) -> Control:
+	var arr: Array = _rows.get(pane, []) as Array
+	return arr[index] if index >= 0 and index < arr.size() else null
+
+func zone_for(target: String) -> Control:
+	return _zones.get(target, null)
 
 func _weight_line() -> String:
 	if _player_inv == null:
@@ -331,9 +501,6 @@ func _weight_line() -> String:
 		_player_inv.get_total_weight(), _player_inv.get_capacity(),
 		get_load_badge(), _move_speed_mult(),
 	]
-
-func _row_text(inv, id: String) -> String:
-	return "%s x%d" % [_name(id), int(inv.get_quantity(id))]
 
 func _name(id: String) -> String:
 	return ItemDefsScript.display_name(_defs, id)

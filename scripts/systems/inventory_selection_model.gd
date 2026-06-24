@@ -74,9 +74,11 @@ func get_selected_ids() -> Array:
 		out.append(ids[int(i)])
 	return out
 
-## Resolve the right-click menu action set for one row. `dest_is_container` is accepted
-## for forward-compat (deposit vs withdraw labelling) but does not branch behaviour yet.
-static func context_actions(item_id: String, defs: Dictionary, in_transfer_mode: bool, dest_is_container: bool, is_equipped_slot: bool) -> PackedStringArray:
+## Resolve the right-click menu action set for one row. `row_is_container` is true when the
+## right-clicked row lives in the container pane. Equipment is player-inventory-scoped
+## (equip_selected reads the SELF pane / player inventory), so "equip" is never offered for a
+## container row — the player transfers it to their own inventory first, then equips.
+static func context_actions(item_id: String, defs: Dictionary, in_transfer_mode: bool, row_is_container: bool, is_equipped_slot: bool) -> PackedStringArray:
 	var actions: PackedStringArray = PackedStringArray()
 	if is_equipped_slot:
 		actions.append("unequip")
@@ -86,7 +88,7 @@ static func context_actions(item_id: String, defs: Dictionary, in_transfer_mode:
 		actions.append("transfer")
 		actions.append("transfer_all")
 		actions.append("split")
-		if equippable:
+		if equippable and not row_is_container:
 			actions.append("equip")
 	elif equippable:
 		actions.append("equip")

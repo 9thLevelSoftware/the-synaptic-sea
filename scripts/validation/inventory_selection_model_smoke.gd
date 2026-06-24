@@ -43,6 +43,13 @@ func _init() -> void:
 	# an equippable suit in SELF mode: equip
 	var suit_actions: PackedStringArray = ModelScript.context_actions("hardsuit", defs, false, false, false)
 	assert(Array(suit_actions) == ["equip"], "suit equip action in self mode")
+	# an equippable in TRANSFER mode: equip is offered for a SELF row (row_is_container=false)...
+	var self_row_actions: PackedStringArray = ModelScript.context_actions("hardsuit", defs, true, false, false)
+	assert("equip" in Array(self_row_actions), "self-pane equippable offers equip in transfer mode")
+	# ...but suppressed for a CONTAINER row — equip_selected reads the SELF pane only, so offering
+	# it there would no-op or equip the wrong item (PR #21 Codex P2).
+	var container_row_actions: PackedStringArray = ModelScript.context_actions("hardsuit", defs, true, true, false)
+	assert(not ("equip" in Array(container_row_actions)), "container-pane equippable does NOT offer equip")
 	# an occupied equipment slot: unequip
 	var slot_actions: PackedStringArray = ModelScript.context_actions("hardsuit", defs, false, false, true)
 	assert(Array(slot_actions) == ["unequip"], "occupied slot unequips")
