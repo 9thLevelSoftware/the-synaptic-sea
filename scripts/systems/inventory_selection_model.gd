@@ -75,9 +75,11 @@ func get_selected_ids() -> Array:
 	return out
 
 ## Resolve the right-click menu action set for one row. `row_is_container` is true when the
-## right-clicked row lives in the container pane. Equipment is player-inventory-scoped
-## (equip_selected reads the SELF pane / player inventory), so "equip" is never offered for a
-## container row — the player transfers it to their own inventory first, then equips.
+## right-clicked row lives in the container pane; it is retained as pane context (as it was when
+## first introduced as `dest_is_container`, forward-compat) but no longer gates equip. Equippable
+## rows offer "equip" in BOTH panes: a SELF row equips directly; a CONTAINER row triggers
+## equip-from-container — auto-transfer one unit into the player inventory, then equip atomically
+## (ADR-0026).
 static func context_actions(item_id: String, defs: Dictionary, in_transfer_mode: bool, row_is_container: bool, is_equipped_slot: bool) -> PackedStringArray:
 	var actions: PackedStringArray = PackedStringArray()
 	if is_equipped_slot:
@@ -88,7 +90,7 @@ static func context_actions(item_id: String, defs: Dictionary, in_transfer_mode:
 		actions.append("transfer")
 		actions.append("transfer_all")
 		actions.append("split")
-		if equippable and not row_is_container:
+		if equippable:
 			actions.append("equip")
 	elif equippable:
 		actions.append("equip")
