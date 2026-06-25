@@ -150,7 +150,9 @@ func _run_section_c() -> void:
 	assert(inv.get_quantity("eva_backpack") == 0, "equipped unit is worn, not left in carry")
 	panel.queue_free()
 
-	# Drag a container row onto its equipment slot -> equip-from-container.
+	# Drag a container row onto its equipment slot -> equip-from-container. Drive the REAL
+	# rendered drop-zone widget (not zone_drop directly) so the test proves the slot:* targets
+	# actually exist in TRANSFER mode — the bug a direct zone_drop call would have masked.
 	var inv2 = InventoryStateScript.new()
 	var hold2 = ShipInventoryScript.create(1000.0)
 	hold2.add_item("eva_backpack", 1)
@@ -159,9 +161,12 @@ func _run_section_c() -> void:
 	root.add_child(panel2)
 	await process_frame
 	panel2.open_transfer(inv2, hold2, "HOLD", equip2)
+	await process_frame   # let the rendered row/zone Controls' _ready run
+	var back_zone := panel2.zone_for("slot:back")
+	assert(back_zone != null, "back slot drop zone is rendered in TRANSFER mode (drag-to-slot target)")
 	var pay := {"from_pane": "container", "ids": ["eva_backpack"]}
-	assert(panel2.zone_can_accept("slot:back", pay) == true, "back slot accepts a container backpack (equip-from-container)")
-	panel2.zone_drop("slot:back", pay)
+	assert(back_zone._can_drop_data(Vector2.ZERO, pay) == true, "rendered back slot accepts a container backpack drag")
+	back_zone._drop_data(Vector2.ZERO, pay)
 	assert(equip2.get_equipped("back") == "eva_backpack", "drag-from-container equipped the backpack")
 	assert(hold2.get_quantity("eva_backpack") == 0, "container lost the dragged-equipped unit")
 	panel2.queue_free()

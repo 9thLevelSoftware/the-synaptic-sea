@@ -196,8 +196,9 @@ func equip_from_container(item_id: String) -> bool:
 	# Equip failed after the transfer — roll the unit back into the container. This provably
 	# succeeds: it returns the exact unit just removed from _container, synchronously with no
 	# intervening mutation, so _container has room for it (the move-out freed precisely this weight).
-	var rolled_back: int = int(CargoTransferScript.move_item(_player_inv, _container, item_id, 1))
-	assert(rolled_back >= 1, "equip_from_container: rollback move failed — unit stranded in carry")
+	# Prefixed with _ because `assert` is stripped from release exports, leaving the var unused.
+	var _rolled_back: int = int(CargoTransferScript.move_item(_player_inv, _container, item_id, 1))
+	assert(_rolled_back >= 1, "equip_from_container: rollback move failed — unit stranded in carry")
 	return false
 
 func unequip_slot(slot_id: String) -> bool:
@@ -469,6 +470,10 @@ func _render() -> void:
 		body.add_child(_make_pane_section("self", "YOU"))
 		body.add_child(_make_pane_section("container", _container_label))
 		_content.add_child(body)
+		# Equipment slots are rendered in transfer mode too so a container (HOLD/cart) row can be
+		# dragged onto a slot for equip-from-container (ADR-0026); without this the slot:* drop
+		# targets only existed in SELF mode and the drag trigger was unreachable.
+		_content.add_child(_make_equipment_section())
 		_content.add_child(_make_footer())
 
 func _make_header() -> Control:
