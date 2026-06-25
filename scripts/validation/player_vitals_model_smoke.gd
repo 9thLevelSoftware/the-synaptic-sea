@@ -33,6 +33,23 @@ func _initialize() -> void:
 		_fail("no repair line expected when idle, got %s" % str(lines))
 		return
 
+	var vs: Dictionary = m.get_vitals_summary()
+	if int(vs.get("oxygen", -1)) != 87:
+		_fail("vitals_summary oxygen should be 87, got %s" % str(vs.get("oxygen")))
+		return
+	if String(vs.get("breach_state", "")) != "breach":
+		_fail("vitals_summary breach_state should be 'breach', got %s" % str(vs.get("breach_state")))
+		return
+	if int(vs.get("suit_drain_percent", -1)) != 25:
+		_fail("vitals_summary suit_drain_percent should be 25, got %s" % str(vs.get("suit_drain_percent")))
+		return
+	if int(vs.get("load_percent", -1)) != 78:
+		_fail("vitals_summary load_percent should be 78, got %s" % str(vs.get("load_percent")))
+		return
+	if bool(vs.get("heavy", true)) != false:
+		_fail("vitals_summary heavy should be false at load 0.78, got %s" % str(vs.get("heavy")))
+		return
+
 	# Sealed breach -> (SEALED), and no suit line when the multiplier is neutral.
 	m.apply_oxygen_summary({
 		"oxygen": 87.0, "breach_open": true, "breach_sealed": true,
@@ -53,6 +70,15 @@ func _initialize() -> void:
 	})
 	if not _has(m.get_status_lines(), "Oxygen: 20 LOW"):
 		_fail("expected 'Oxygen: 20 LOW', got %s" % str(m.get_status_lines()))
+		return
+
+	# Inclusive boundary: oxygen == recovery_threshold should also show LOW.
+	m.apply_oxygen_summary({
+		"oxygen": 30.0, "breach_open": false, "breach_sealed": false,
+		"recovery_threshold": 30.0, "equipment_drain_multiplier": 1.0,
+	})
+	if not _has(m.get_status_lines(), "Oxygen: 30 LOW"):
+		_fail("expected 'Oxygen: 30 LOW' at boundary oxygen==recovery_threshold, got %s" % str(m.get_status_lines()))
 		return
 
 	# Heavy load -> HEAVY with the move penalty.
