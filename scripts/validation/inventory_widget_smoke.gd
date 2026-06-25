@@ -12,7 +12,8 @@ const ShipInventoryScript := preload("res://scripts/systems/ship_inventory.gd")
 func _init() -> void:
 	await _run_section_a()
 	await _run_section_b()
-	print("INVENTORY WIDGET SMOKE PASS section_a=true section_b=true")
+	await _run_section_c()
+	print("INVENTORY WIDGET SMOKE PASS section_a=true section_b=true section_c=true")
 	quit()
 
 func _run_section_a() -> void:
@@ -129,3 +130,56 @@ func _run_section_b() -> void:
 	back_zone._drop_data(Vector2.ZERO, bp_payload)
 	assert(equip2.get_equipped("back") == "eva_backpack", "slot drop equipped via the widget")
 	panel2.queue_free()
+
+func _run_section_c() -> void:
+	# --- equip-from-container (ADR-0026): right-click Equip + drag-to-slot + rollback ---
+	# Right-click "Equip" on a container row -> transfer one unit + equip.
+	var inv = InventoryStateScript.new()
+	var hold = ShipInventoryScript.create(1000.0)
+	hold.add_item("eva_backpack", 1)        # equippable (back), in the container only
+	var equip = EquipmentStateScript.create()
+	var panel = InventoryPanelScript.new()
+	root.add_child(panel)
+	await process_frame
+	panel.open_transfer(inv, hold, "HOLD", equip)
+	var ci := panel.get_pane_ids("container").find("eva_backpack")
+	assert(ci >= 0, "eva_backpack present in the container pane")
+	panel._on_context_id(panel._ACT_EQUIP, "container", ci)
+	assert(equip.get_equipped("back") == "eva_backpack", "right-click equip-from-container equipped the backpack")
+	assert(hold.get_quantity("eva_backpack") == 0, "container lost the equipped unit")
+	assert(inv.get_quantity("eva_backpack") == 0, "equipped unit is worn, not left in carry")
+	panel.queue_free()
+
+	# Drag a container row onto its equipment slot -> equip-from-container.
+	var inv2 = InventoryStateScript.new()
+	var hold2 = ShipInventoryScript.create(1000.0)
+	hold2.add_item("eva_backpack", 1)
+	var equip2 = EquipmentStateScript.create()
+	var panel2 = InventoryPanelScript.new()
+	root.add_child(panel2)
+	await process_frame
+	panel2.open_transfer(inv2, hold2, "HOLD", equip2)
+	var pay := {"from_pane": "container", "ids": ["eva_backpack"]}
+	assert(panel2.zone_can_accept("slot:back", pay) == true, "back slot accepts a container backpack (equip-from-container)")
+	panel2.zone_drop("slot:back", pay)
+	assert(equip2.get_equipped("back") == "eva_backpack", "drag-from-container equipped the backpack")
+	assert(hold2.get_quantity("eva_backpack") == 0, "container lost the dragged-equipped unit")
+	panel2.queue_free()
+
+	# Rollback: transfer succeeds but the displaced occupant has no carry room -> nothing moves.
+	var inv3 = InventoryStateScript.new()
+	inv3.add_item("eva_backpack", 1)            # carry already full of eva_backpack (max_stack 1)
+	var hold3 = ShipInventoryScript.create(1000.0)
+	hold3.add_item("field_pack", 1)             # a second back-slot item, in the container
+	var equip3 = EquipmentStateScript.create()
+	equip3.equip("eva_backpack")                # back slot occupied
+	var panel3 = InventoryPanelScript.new()
+	root.add_child(panel3)
+	await process_frame
+	panel3.open_transfer(inv3, hold3, "HOLD", equip3)
+	assert(panel3.equip_from_container("field_pack") == false, "equip-from-container fails when the displaced occupant cannot return")
+	assert(equip3.get_equipped("back") == "eva_backpack", "worn slot unchanged after rollback")
+	assert(hold3.get_quantity("field_pack") == 1, "container unit restored after rollback")
+	assert(inv3.get_quantity("field_pack") == 0, "transferred unit rolled back out of carry")
+	assert(inv3.get_quantity("eva_backpack") == 1, "carry untouched after rollback")
+	panel3.queue_free()

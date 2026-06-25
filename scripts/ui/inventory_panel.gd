@@ -149,7 +149,18 @@ func equip_selected() -> bool:
 	var sel: Array = _sel_self.get_selected_ids()
 	if sel.size() != 1:
 		return false
-	var item_id: String = String(sel[0])
+	if _equip_in_inventory(String(sel[0])):
+		_after_mutation()
+		return true
+	return false
+
+## Atomic equip of an item that is ALREADY in the player carry list. Returns true on success;
+## on any failure (absent / can't equip / no carry room for a displaced occupant) it leaves the
+## player inventory and equipment byte-identical to entry. Shared by equip_selected() and
+## equip_from_container(). Does NOT call _after_mutation — the caller does, once.
+func _equip_in_inventory(item_id: String) -> bool:
+	if _player_inv == null or _equip == null:
+		return false
 	if _player_inv.get_quantity(item_id) <= 0 or not _equip.can_equip(item_id):
 		return false
 	var res: Dictionary = _equip.equip(item_id)
@@ -163,8 +174,26 @@ func equip_selected() -> bool:
 			_equip.equip(displaced)
 			return false
 	_player_inv.remove_item(item_id, 1)
-	_after_mutation()
 	return true
+
+## Equip-from-container (ADR-0026): auto-transfer one unit of an equippable from the container
+## (hold/cart) into the player inventory, then equip it atomically. On equip failure the transfer
+## is rolled back, leaving BOTH inventories byte-identical to entry. Returns true on success.
+func equip_from_container(item_id: String) -> bool:
+	if _container == null or _player_inv == null or _equip == null:
+		return false
+	if ItemDefsScript.equip_slot(_defs, item_id).is_empty():
+		return false
+	if int(_container.get_quantity(item_id)) <= 0:
+		return false
+	if int(CargoTransferScript.move_item(_container, _player_inv, item_id, 1)) < 1:
+		return false   # transfer failed (e.g. player stack full) — nothing changed
+	if _equip_in_inventory(item_id):
+		_after_mutation()
+		return true
+	# Equip failed after the transfer — roll the unit back into the container.
+	CargoTransferScript.move_item(_player_inv, _container, item_id, 1)
+	return false
 
 func unequip_slot(slot_id: String) -> bool:
 	if _player_inv == null or _equip == null:
@@ -244,8 +273,8 @@ func zone_can_accept(target: String, data) -> bool:
 		return false
 	var from_pane: String = String((data as Dictionary).get("from_pane", ""))
 	if target.begins_with("slot:"):
-		if from_pane != "self":
-			return false   # equip only from your own inventory
+		if from_pane != "self" and from_pane != "container":
+			return false   # equip only from your own inventory or a container (equip-from-container)
 		var slot: String = target.substr(5)
 		for id in ((data as Dictionary).get("ids", []) as Array):
 			if _equip != null and ItemDefsScript.equip_slot(_defs, String(id)) == slot:
@@ -260,13 +289,16 @@ func zone_drop(target: String, data) -> void:
 		return
 	var from_pane: String = String((data as Dictionary).get("from_pane", ""))
 	if target.begins_with("slot:"):
-		if from_pane != "self":
+		if from_pane != "self" and from_pane != "container":
 			return
 		var slot: String = target.substr(5)
 		for id in ((data as Dictionary).get("ids", []) as Array):
 			if _equip != null and ItemDefsScript.equip_slot(_defs, String(id)) == slot:
-				_sel_self.select_single(_ids_for_pane("self").find(String(id)))
-				equip_selected()
+				if from_pane == "container":
+					equip_from_container(String(id))
+				else:
+					_sel_self.select_single(_ids_for_pane("self").find(String(id)))
+					equip_selected()
 				return
 		return
 	if _mode == "transfer" and target != from_pane and (from_pane == "self" or from_pane == "container"):
@@ -331,10 +363,14 @@ func _on_context_id(id: int, pane: String, index: int) -> void:
 		var item_id: String = String(ids[index]) if index >= 0 and index < ids.size() else ""
 		_open_split_picker(pane, item_id)
 	elif id == _ACT_EQUIP:
-		# Equip is offered for SELF rows only (context_actions suppresses it for container
-		# rows), so _model_for_pane(pane) here is always _sel_self — the model equip_selected reads.
-		_model_for_pane(pane).select_single(index)
-		equip_selected()
+		if pane == "container":
+			# Equip-from-container: transfer one unit into the player inventory, then equip (ADR-0026).
+			var ids: Array = _ids_for_pane("container")
+			if index >= 0 and index < ids.size():
+				equip_from_container(String(ids[index]))
+		else:
+			_model_for_pane(pane).select_single(index)
+			equip_selected()
 
 ## Interaction-only (popup); split amount picker -> transfer_quantity.
 func _open_split_picker(pane: String, item_id: String) -> void:

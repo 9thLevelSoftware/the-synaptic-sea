@@ -46,10 +46,10 @@ func _init() -> void:
 	# an equippable in TRANSFER mode: equip is offered for a SELF row (row_is_container=false)...
 	var self_row_actions: PackedStringArray = ModelScript.context_actions("hardsuit", defs, true, false, false)
 	assert("equip" in Array(self_row_actions), "self-pane equippable offers equip in transfer mode")
-	# ...but suppressed for a CONTAINER row — equip_selected reads the SELF pane only, so offering
-	# it there would no-op or equip the wrong item (PR #21 Codex P2).
+	# ...and now ALSO offered for a CONTAINER row — equip-from-container auto-transfers one unit
+	# into the player inventory and equips it atomically (ADR-0026, supersedes the ADR-0023 Amendment).
 	var container_row_actions: PackedStringArray = ModelScript.context_actions("hardsuit", defs, true, true, false)
-	assert(not ("equip" in Array(container_row_actions)), "container-pane equippable does NOT offer equip")
+	assert("equip" in Array(container_row_actions), "container-pane equippable offers equip (equip-from-container)")
 	# an occupied equipment slot: unequip
 	var slot_actions: PackedStringArray = ModelScript.context_actions("hardsuit", defs, false, false, true)
 	assert(Array(slot_actions) == ["unequip"], "occupied slot unequips")
