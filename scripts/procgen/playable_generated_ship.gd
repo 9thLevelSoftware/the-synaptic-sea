@@ -2917,13 +2917,16 @@ func _combined_system_status_lines() -> PackedStringArray:
 	if route_control_state != null:
 		for line in route_control_state.get_status_lines():
 			lines.append(String(line))
-	if oxygen_state != null:
-		for line in oxygen_state.get_status_lines():
-			lines.append(String(line))
-	# REQ-007: surface carried tools on the HUD via inventory status lines.
+	# ADR-0027: player oxygen + breach now live solely in the bottom-left
+	# PlayerVitalsPanel; the tracker no longer mirrors oxygen_state lines.
+	# REQ-007: still surface carried tools/items, but the inventory weight
+	# readout is owned by the vitals panel's Load line, so drop the weight= line.
 	if inventory_state != null:
 		for line in inventory_state.get_status_lines():
-			lines.append(String(line))
+			var inv_text: String = String(line)
+			if inv_text.begins_with("weight="):
+				continue
+			lines.append(inv_text)
 	if player_progression != null:
 		lines.append("Repair Skill: %d" % player_progression.get_skill_level("repair"))
 	return lines
