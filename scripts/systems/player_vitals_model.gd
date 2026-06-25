@@ -13,6 +13,7 @@ const DEFAULT_RECOVERY_THRESHOLD: float = 30.0
 var _oxygen_summary: Dictionary = {}
 var _load_ratio: float = 0.0
 var _move_multiplier: float = 1.0
+var _weight_saved: float = 0.0
 var _repair_channeling: bool = false
 var _repair_progress: float = 0.0
 var _blocked_reason: String = ""
@@ -21,9 +22,10 @@ var _blocked_remaining: float = 0.0
 func apply_oxygen_summary(summary: Dictionary) -> void:
 	_oxygen_summary = summary.duplicate(true)
 
-func apply_inventory_load(load_ratio: float, move_multiplier: float) -> void:
+func apply_inventory_load(load_ratio: float, move_multiplier: float, weight_saved: float = 0.0) -> void:
 	_load_ratio = maxf(0.0, load_ratio)
 	_move_multiplier = move_multiplier
+	_weight_saved = maxf(0.0, weight_saved)
 
 func set_repair_progress(channeling: bool, progress: float) -> void:
 	_repair_channeling = channeling
@@ -97,10 +99,12 @@ func _suit_line() -> String:
 
 func _load_line() -> String:
 	var pct: int = int(round(_load_ratio * 100.0))
+	var saved_kg: int = int(round(_weight_saved))
+	var suffix: String = " (bags -%dkg)" % saved_kg if saved_kg >= 1 else ""
 	if _load_ratio > 1.0:
 		var penalty: int = int(round((1.0 - _move_multiplier) * 100.0))
-		return "Load: %d%% HEAVY (-%d%% move)" % [pct, penalty]
-	return "Load: %d%%" % pct
+		return "Load: %d%% HEAVY (-%d%% move)%s" % [pct, penalty, suffix]
+	return "Load: %d%%%s" % [pct, suffix]
 
 func _repair_line() -> String:
 	if _repair_channeling:

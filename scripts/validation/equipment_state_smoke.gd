@@ -29,6 +29,15 @@ func _init() -> void:
 	eq.equip("hardsuit")
 	assert(eq.get_oxygen_drain_multiplier() == 0.75, "hardsuit drain multiplier 0.75")
 
+	# get_container_reductions: worn containers only (suit excluded, capacity 0).
+	var reds: Array = eq.get_container_reductions()
+	assert(reds.size() == 2, "two worn containers (suit excluded), got %d" % reds.size())
+	var by_cap: Dictionary = {}
+	for r in reds:
+		by_cap[float(r["capacity"])] = float(r["reduction"])
+	assert(by_cap.has(40.0) and absf(by_cap[40.0] - 0.30) < 0.0001, "backpack 40 -> 0.30")
+	assert(by_cap.has(12.0) and absf(by_cap[12.0] - 0.10) < 0.0001, "tool_belt 12 -> 0.10")
+
 	# Displacement: a second back item displaces the backpack.
 	var r2: Dictionary = eq.equip("field_pack")
 	assert(r2.get("ok") == true and str(r2.get("displaced")) == "eva_backpack", "field_pack displaced the backpack")

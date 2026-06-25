@@ -111,6 +111,24 @@ func _initialize() -> void:
 		_fail("blocked line should clear after the display window, got %s" % str(m.get_status_lines()))
 		return
 
+	# --- per-container weight reduction marker (slice D) ---
+	m.apply_inventory_load(0.56, 1.0, 13.2)
+	if not _has(m.get_status_lines(), "Load: 56% (bags -13kg)"):
+		_fail("expected bag-reduction marker, got %s" % str(m.get_status_lines()))
+		return
+	m.apply_inventory_load(1.40, 0.70, 13.2)
+	if not _has(m.get_status_lines(), "Load: 140% HEAVY (-30% move) (bags -13kg)"):
+		_fail("expected heavy + bag marker, got %s" % str(m.get_status_lines()))
+		return
+	m.apply_inventory_load(0.56, 1.0, 0.0)
+	if not _has(m.get_status_lines(), "Load: 56%"):
+		_fail("expected no marker at zero reduction, got %s" % str(m.get_status_lines()))
+		return
+	m.apply_inventory_load(0.56, 1.0, 0.4)   # rounds to 0 -> no marker
+	if not _has(m.get_status_lines(), "Load: 56%"):
+		_fail("sub-1kg reduction should not show a marker, got %s" % str(m.get_status_lines()))
+		return
+
 	print("PLAYER VITALS MODEL SMOKE PASS suit=-25 heavy=-30 repair=47")
 	quit(0)
 

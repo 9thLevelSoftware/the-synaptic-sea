@@ -25,5 +25,20 @@ func _init() -> void:
 		assert(m <= prev + 0.0001, "monotonic non-increasing at r=%s" % str(r))
 		prev = m
 
+	# --- per-container weight reduction (slice D): capacity-share, best-first ---
+	assert(_approx(EncumbranceScript.weight_reduction_saved(100.0, []), 0.0), "no containers -> 0 saved")
+	# Single container, weight under its capacity -> covers all weight.
+	assert(_approx(EncumbranceScript.weight_reduction_saved(30.0, [{"capacity": 40.0, "reduction": 0.30}]), 9.0), "30kg x0.30 = 9 saved")
+	# Single container, weight over its capacity -> covers only its capacity.
+	assert(_approx(EncumbranceScript.weight_reduction_saved(100.0, [{"capacity": 40.0, "reduction": 0.30}]), 12.0), "40kg cap x0.30 = 12 saved")
+	# Best-first ordering matters when weight runs out mid-fill: 40kg across
+	# caps 30(0.10) + 30(0.50). Best-first fills the 0.50 bag first:
+	# 30x0.50 + 10x0.10 = 16.0  (list order would give 30x0.10 + 10x0.50 = 8.0).
+	assert(_approx(EncumbranceScript.weight_reduction_saved(40.0, [{"capacity": 30.0, "reduction": 0.10}, {"capacity": 30.0, "reduction": 0.50}]), 16.0), "best-first fill saves 16, not 8")
+	# Worked spec example: 70kg, EVA(40,0.30) + belt(12,0.10) = 13.2 saved.
+	assert(_approx(EncumbranceScript.weight_reduction_saved(70.0, [{"capacity": 40.0, "reduction": 0.30}, {"capacity": 12.0, "reduction": 0.10}]), 13.2), "spec example saves 13.2")
+	# Non-positive weight -> 0 saved.
+	assert(_approx(EncumbranceScript.weight_reduction_saved(-5.0, [{"capacity": 40.0, "reduction": 0.30}]), 0.0), "negative weight saves 0")
+
 	print("EQUIPMENT ENCUMBRANCE SMOKE PASS floor=0.25")
 	quit()

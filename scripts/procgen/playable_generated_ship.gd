@@ -1618,9 +1618,13 @@ func _recompute_player_encumbrance() -> void:
 	if inventory_state == null:
 		return
 	var bonus: float = 0.0
+	var saved: float = 0.0
 	if equipment_state != null:
 		bonus = equipment_state.get_carry_capacity_bonus()   # + future strength bonus
+		saved = EncumbranceScript.weight_reduction_saved(
+			inventory_state.get_total_weight(), equipment_state.get_container_reductions())
 	inventory_state.bonus_capacity = bonus
+	inventory_state.weight_reduction = saved
 	if is_instance_valid(player):
 		var mult: float = EncumbranceScript.move_speed_multiplier(inventory_state.get_load_ratio())
 		player.move_speed = float(player.DEFAULT_MOVE_SPEED) * mult * _cart_push_multiplier()
@@ -2031,6 +2035,13 @@ func _distributed_room_positions() -> Array:
 
 func _on_repair_completed(system_id: String, subcomponent_id: String) -> void:
 	_refresh_inventory_hud()
+	# Repairs consume parts from the player inventory (RepairPoint is configured
+	# with inventory_state), so carry weight drops here. Recompute encumbrance so
+	# the cached weight_reduction / bonus_capacity (and the Heavy-Load penalty)
+	# reflect the post-consume load instead of going stale until the next
+	# equip/transfer. Restores the ADR-0028 invariant: every inventory-content
+	# change refreshes the reduction cache.
+	_recompute_player_encumbrance()
 	var mgr = _active_systems_manager()
 	var operational: bool = mgr != null and mgr.is_operational(system_id)
 	print("REPAIR COMPLETED system=%s sub=%s operational=%s" % [
@@ -3205,7 +3216,7 @@ func _refresh_player_vitals(delta_seconds: float) -> void:
 		vitals_model.apply_oxygen_summary(oxygen_state.get_summary())
 	if inventory_state != null:
 		var ratio: float = inventory_state.get_load_ratio()
-		vitals_model.apply_inventory_load(ratio, EncumbranceScript.move_speed_multiplier(ratio))
+		vitals_model.apply_inventory_load(ratio, EncumbranceScript.move_speed_multiplier(ratio), inventory_state.weight_reduction)
 	var channeling: bool = false
 	var progress: float = 0.0
 	for rp in repair_points:

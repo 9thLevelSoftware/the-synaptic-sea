@@ -57,6 +57,20 @@ func get_carry_capacity_bonus() -> float:
 		bonus += ItemDefsScript.container_capacity(_defs, str(slots[slot]))
 	return bonus
 
+## [{capacity, reduction}] for each worn item that is a container (capacity > 0).
+## The suit (no container_capacity) is excluded. Pure data; feeds
+## Encumbrance.weight_reduction_saved at the coordinator.
+func get_container_reductions() -> Array:
+	var out: Array = []
+	for slot in slots:
+		var cap: float = ItemDefsScript.container_capacity(_defs, str(slots[slot]))
+		if cap > 0.0:
+			out.append({
+				"capacity": cap,
+				"reduction": ItemDefsScript.weight_reduction(_defs, str(slots[slot])),
+			})
+	return out
+
 ## Product of all worn 'oxygen_drain' effect values (default 1.0 = neutral).
 func get_oxygen_drain_multiplier() -> float:
 	var mult: float = 1.0
