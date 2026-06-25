@@ -40,7 +40,9 @@ func set_status_lines(lines: PackedStringArray) -> void:
 	label.text = "\n".join(lines)
 
 func get_hud_text() -> String:
-	if label == null:
+	# A freed Node stays non-null in Godot, so guard child access with
+	# is_instance_valid (not == null) — a hud_layer teardown frees these.
+	if not is_instance_valid(label):
 		return ""
 	return label.text
 
@@ -51,7 +53,10 @@ func apply_accessibility_settings(settings: RefCounted) -> void:
 	if settings == null:
 		return
 	accessibility_settings = settings
-	if label != null:
+	# is_instance_valid, not != null: a freed Node stays non-null in Godot.
+	# Pre-_ready the nodes are not built yet (invalid) — store settings now and
+	# let _ready -> _ensure_nodes build at the stored scale.
+	if is_instance_valid(label):
 		_apply_scaled_layout()
 
 func _ensure_nodes() -> void:
@@ -115,10 +120,11 @@ func _apply_scaled_layout() -> void:
 	# Bottom-anchored: grow upward from a fixed bottom margin so a larger scale
 	# does not push the panel off the bottom edge.
 	position = Vector2(LEFT_MARGIN, -(scaled_panel.y + BOTTOM_MARGIN))
-	if panel != null:
+	# is_instance_valid, not != null: a freed child Node stays non-null in Godot.
+	if is_instance_valid(panel):
 		panel.size = scaled_panel
 		panel.custom_minimum_size = scaled_panel
-	if label != null:
+	if is_instance_valid(label):
 		label.custom_minimum_size = scaled_label_min
 		label.size = scaled_label_min
 		label.add_theme_font_size_override("font_size", scaled_font)
