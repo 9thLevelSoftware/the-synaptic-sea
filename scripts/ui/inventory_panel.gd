@@ -170,7 +170,9 @@ func _equip_in_inventory(item_id: String) -> bool:
 	if displaced != "":
 		if int(_player_inv.add_item(displaced, 1)) < 1:
 			# No carry room for the displaced item — abort atomically so nothing is lost.
-			# item_id was NOT removed from inventory yet; restore the slot to displaced.
+			# _player_inv still holds item_id (remove_item below hasn't run), so restoring the
+			# slot to displaced leaves item_id in carry. The second equip returns item_id as the
+			# newly-displaced value; it is intentionally ignored — item_id stays put in carry.
 			_equip.equip(displaced)
 			return false
 	_player_inv.remove_item(item_id, 1)
@@ -191,8 +193,11 @@ func equip_from_container(item_id: String) -> bool:
 	if _equip_in_inventory(item_id):
 		_after_mutation()
 		return true
-	# Equip failed after the transfer — roll the unit back into the container.
-	CargoTransferScript.move_item(_player_inv, _container, item_id, 1)
+	# Equip failed after the transfer — roll the unit back into the container. This provably
+	# succeeds: it returns the exact unit just removed from _container, synchronously with no
+	# intervening mutation, so _container has room for it (the move-out freed precisely this weight).
+	var rolled_back: int = int(CargoTransferScript.move_item(_player_inv, _container, item_id, 1))
+	assert(rolled_back >= 1, "equip_from_container: rollback move failed — unit stranded in carry")
 	return false
 
 func unequip_slot(slot_id: String) -> bool:
