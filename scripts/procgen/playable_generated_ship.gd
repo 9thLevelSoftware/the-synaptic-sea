@@ -309,6 +309,8 @@ func apply_accessibility_settings(settings: RefCounted) -> void:
 	accessibility_settings = settings
 	if tracker != null and tracker.has_method("apply_accessibility_settings"):
 		tracker.apply_accessibility_settings(settings)
+	if is_instance_valid(vitals_panel) and vitals_panel.has_method("apply_accessibility_settings"):
+		vitals_panel.apply_accessibility_settings(settings)
 	_apply_world_label_scale()
 
 func _apply_world_label_scale() -> void:
@@ -2356,6 +2358,11 @@ func _build_hud_layer() -> void:
 	vitals_model = PlayerVitalsModelScript.new()
 	vitals_panel = PlayerVitalsPanelScript.new()
 	vitals_panel.name = "PlayerVitalsPanel"
+	# A11Y parity (ADR-0027): drive the vitals panel font/size from the same
+	# accessibility seam as the tracker, before it is parented (its _ready then
+	# builds at the stored scale).
+	if vitals_panel.has_method("apply_accessibility_settings"):
+		vitals_panel.apply_accessibility_settings(accessibility_settings)
 	hud_layer.add_child(vitals_panel)
 	scanner_panel = ScannerPanelScript.new()
 	scanner_panel.name = "ScannerPanel"
@@ -2917,13 +2924,16 @@ func _combined_system_status_lines() -> PackedStringArray:
 	if route_control_state != null:
 		for line in route_control_state.get_status_lines():
 			lines.append(String(line))
-	if oxygen_state != null:
-		for line in oxygen_state.get_status_lines():
-			lines.append(String(line))
-	# REQ-007: surface carried tools on the HUD via inventory status lines.
+	# ADR-0027: player oxygen + breach now live solely in the bottom-left
+	# PlayerVitalsPanel; the tracker no longer mirrors oxygen_state lines.
+	# REQ-007: still surface carried tools/items, but the inventory weight
+	# readout is owned by the vitals panel's Load line, so drop the weight= line.
 	if inventory_state != null:
 		for line in inventory_state.get_status_lines():
-			lines.append(String(line))
+			var inv_text: String = String(line)
+			if inv_text.begins_with("weight="):
+				continue
+			lines.append(inv_text)
 	if player_progression != null:
 		lines.append("Repair Skill: %d" % player_progression.get_skill_level("repair"))
 	return lines
