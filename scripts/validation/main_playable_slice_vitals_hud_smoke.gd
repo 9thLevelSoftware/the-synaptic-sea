@@ -45,6 +45,8 @@ func _on_process_frame() -> void:
 			_check_suit()
 		"settle_heavy":
 			_check_heavy()
+		"settle_bags":
+			_check_bags()
 		"settle_repair":
 			_check_repair()
 		"settle_blocked":
@@ -119,6 +121,24 @@ func _check_heavy() -> void:
 		return
 	if not _line_with(playable.get_player_vitals_lines(), "Load:", "HEAVY"):
 		_fail("expected a Load line containing HEAVY, got %s" % str(playable.get_player_vitals_lines()))
+		return
+	# Equip a backpack and recompute: it raises the cap AND reduces effective
+	# weight, so the Load line gains the bag-reduction marker.
+	var bag: Dictionary = playable.equipment_state.equip("eva_backpack")
+	if not bool(bag.get("ok", false)):
+		_fail("equipping eva_backpack failed")
+		return
+	playable._recompute_player_encumbrance()
+	phase = "settle_bags"
+	phase_frames = 0
+
+func _check_bags() -> void:
+	phase_frames += 1
+	if phase_frames < SETTLE_FRAMES:
+		return
+	# 100 kg of scrap, EVA backpack cap 40 / 30% -> saves 12 kg.
+	if not _line_with(playable.get_player_vitals_lines(), "Load:", "(bags -12kg)"):
+		_fail("expected a Load line with the bag-reduction marker, got %s" % str(playable.get_player_vitals_lines()))
 		return
 	# Drive an active repair channel directly on a repair point.
 	repair_point = playable.repair_points[0]

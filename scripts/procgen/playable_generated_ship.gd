@@ -1618,9 +1618,13 @@ func _recompute_player_encumbrance() -> void:
 	if inventory_state == null:
 		return
 	var bonus: float = 0.0
+	var saved: float = 0.0
 	if equipment_state != null:
 		bonus = equipment_state.get_carry_capacity_bonus()   # + future strength bonus
+		saved = EncumbranceScript.weight_reduction_saved(
+			inventory_state.get_total_weight(), equipment_state.get_container_reductions())
 	inventory_state.bonus_capacity = bonus
+	inventory_state.weight_reduction = saved
 	if is_instance_valid(player):
 		var mult: float = EncumbranceScript.move_speed_multiplier(inventory_state.get_load_ratio())
 		player.move_speed = float(player.DEFAULT_MOVE_SPEED) * mult * _cart_push_multiplier()
@@ -3205,7 +3209,7 @@ func _refresh_player_vitals(delta_seconds: float) -> void:
 		vitals_model.apply_oxygen_summary(oxygen_state.get_summary())
 	if inventory_state != null:
 		var ratio: float = inventory_state.get_load_ratio()
-		vitals_model.apply_inventory_load(ratio, EncumbranceScript.move_speed_multiplier(ratio))
+		vitals_model.apply_inventory_load(ratio, EncumbranceScript.move_speed_multiplier(ratio), inventory_state.weight_reduction)
 	var channeling: bool = false
 	var progress: float = 0.0
 	for rp in repair_points:
