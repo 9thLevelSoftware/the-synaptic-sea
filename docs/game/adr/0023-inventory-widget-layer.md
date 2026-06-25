@@ -59,3 +59,7 @@ equip (or a failed transfer) leaves both inventories unchanged. Re-enable the `e
 container rows in `context_actions` and route `_ACT_EQUIP` for container panes through that new
 path. Cover with a smoke: container-only equippable → right-click Equip → item is worn and the
 hold count dropped by one; and a no-carry-room case asserting nothing moved.
+
+**Shipped (2026-06-24):** the deferred equip-from-container enhancement is now implemented per
+this sketch — see ADR-0026. Container equippable rows offer *Equip* again, and equipment slots
+accept container-pane drags.
