@@ -5,7 +5,8 @@
     "weight": 3.0,
     "max_stack": 1,
     "equip_slot": "back",
-    "container_capacity": 40.0
+    "container_capacity": 40.0,
+    "weight_reduction": 0.30
   },
   "field_pack": {
     "display_name": "Field Pack",
@@ -13,7 +14,8 @@
     "weight": 1.5,
     "max_stack": 1,
     "equip_slot": "back",
-    "container_capacity": 15.0
+    "container_capacity": 15.0,
+    "weight_reduction": 0.15
   },
   "tool_belt": {
     "display_name": "Tool Belt",
@@ -21,7 +23,8 @@
     "weight": 1.0,
     "max_stack": 1,
     "equip_slot": "waist",
-    "container_capacity": 12.0
+    "container_capacity": 12.0,
+    "weight_reduction": 0.10
   },
   "hardsuit": {
     "display_name": "Salvage Hardsuit",

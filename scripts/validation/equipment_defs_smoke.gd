@@ -6,6 +6,9 @@ extends SceneTree
 
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
 
+func _approx(a: float, b: float) -> bool:
+	return absf(a - b) <= 0.0001
+
 func _init() -> void:
 	var defs: Dictionary = ItemDefsScript.load_definitions()
 	assert(defs.has("eva_backpack"), "equipment defs merged into the catalog")
@@ -16,6 +19,12 @@ func _init() -> void:
 	assert(ItemDefsScript.container_capacity(defs, "eva_backpack") == 40.0, "backpack capacity 40")
 	assert(ItemDefsScript.container_capacity(defs, "tool_belt") == 12.0, "tool_belt capacity 12")
 	assert(ItemDefsScript.container_capacity(defs, "hardsuit") == 0.0, "suit is not a container")
+
+	assert(_approx(ItemDefsScript.weight_reduction(defs, "eva_backpack"), 0.30), "backpack reduces 30%")
+	assert(_approx(ItemDefsScript.weight_reduction(defs, "field_pack"), 0.15), "field_pack reduces 15%")
+	assert(_approx(ItemDefsScript.weight_reduction(defs, "tool_belt"), 0.10), "tool_belt reduces 10%")
+	assert(ItemDefsScript.weight_reduction(defs, "hardsuit") == 0.0, "suit has no weight reduction")
+	assert(ItemDefsScript.weight_reduction(defs, "scrap_metal") == 0.0, "plain item has no weight reduction")
 
 	var fx: Array = ItemDefsScript.effects(defs, "hardsuit")
 	assert(fx.size() == 1 and str(fx[0].get("type", "")) == "oxygen_drain", "suit carries an oxygen_drain effect")

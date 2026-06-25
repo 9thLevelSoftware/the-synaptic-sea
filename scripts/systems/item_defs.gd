@@ -76,6 +76,9 @@ static func equip_slot(defs: Dictionary, item_id: String) -> String:
 static func container_capacity(defs: Dictionary, item_id: String) -> float:
 	return float(get_definition(defs, item_id).get("container_capacity", 0.0))
 
+static func weight_reduction(defs: Dictionary, item_id: String) -> float:
+	return clampf(float(get_definition(defs, item_id).get("weight_reduction", 0.0)), 0.0, 1.0)
+
 static func effects(defs: Dictionary, item_id: String) -> Array:
 	var e: Variant = get_definition(defs, item_id).get("effects", [])
 	return e if e is Array else []
