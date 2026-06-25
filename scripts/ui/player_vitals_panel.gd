@@ -99,6 +99,14 @@ func _ensure_nodes() -> void:
 	_apply_scaled_layout()
 
 func _apply_scaled_layout() -> void:
+	# Unlike ObjectiveTracker.apply_accessibility_settings, this intentionally
+	# omits the update_minimum_size()/clip_contents reflow flush. That flush only
+	# matters for a runtime scale-DOWN (a PanelContainer that grew at a larger
+	# scale staying sticky when the scale drops back). The vitals panel has no
+	# scale-down path: AccessibilitySettings resolves its scale once at startup
+	# (env/project-setting) and the panel rebuilds per scene load, so the layout
+	# only ever grows monotonically. If a runtime scale-down seam is added later
+	# (e.g. a settings menu), mirror the tracker's flush here.
 	var scaled_panel: Vector2 = accessibility_settings.scaled_hud_panel_size(BASE_PANEL_SIZE)
 	var scaled_label_min: Vector2 = accessibility_settings.scaled_hud_minimum_size(BASE_LABEL_MIN_SIZE)
 	var scaled_font: int = accessibility_settings.scaled_hud_font_size(BASE_HUD_FONT_SIZE)
