@@ -18,6 +18,7 @@ const DEFAULT_MAX_STACK: int = 99
 
 var items: Dictionary = {}          # item_id: String -> quantity: int
 var bonus_capacity: float = 0.0     # added by worn containers (set by the coordinator)
+var weight_reduction: float = 0.0   # saved kg from worn containers (set by the coordinator)
 var _definitions: Dictionary = {}   # item_id -> def Dictionary (merged)
 
 func _init() -> void:
@@ -52,12 +53,17 @@ func get_max_weight() -> float:
 func get_capacity() -> float:
 	return MAX_WEIGHT + bonus_capacity
 
-## total_weight / capacity. >1.0 means over-encumbered (Heavy Load).
+## Raw weight minus the worn-container weight reduction (saved kg), floored at 0.
+## get_total_weight() stays the true mass; this is what encumbrance keys off.
+func get_effective_weight() -> float:
+	return maxf(0.0, get_total_weight() - weight_reduction)
+
+## effective_weight / capacity. >1.0 means over-encumbered (Heavy Load).
 func get_load_ratio() -> float:
-	return get_total_weight() / max(0.0001, get_capacity())
+	return get_effective_weight() / max(0.0001, get_capacity())
 
 func is_over_capacity() -> bool:
-	return get_total_weight() > get_capacity()
+	return get_effective_weight() > get_capacity()
 
 func get_total_weight() -> float:
 	var total: float = 0.0
