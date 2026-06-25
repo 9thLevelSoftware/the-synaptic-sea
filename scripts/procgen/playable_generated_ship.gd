@@ -3021,6 +3021,10 @@ func get_route_gate_collision_enabled_count() -> int:
 
 func _process(delta: float) -> void:
 	if away_from_start:
+		# Keep the vitals panel live on a boarded derelict: Heavy-Load, repair
+		# progress, and the repair_blocked message + its countdown still apply
+		# away from home, even though the home oxygen/hazard loop is paused here.
+		_refresh_player_vitals(delta)
 		return
 	if not playable_started or slice_complete:
 		return
@@ -3183,7 +3187,9 @@ func _refresh_oxygen_state(force_initial: bool, delta_seconds: float) -> void:
 	_refresh_player_vitals(delta_seconds)
 
 func _refresh_player_vitals(delta_seconds: float) -> void:
-	if vitals_model == null or vitals_panel == null:
+	# A freed Node stays non-null in Godot, so guard the panel with
+	# is_instance_valid (a hud_layer teardown on reload frees it).
+	if vitals_model == null or not is_instance_valid(vitals_panel):
 		return
 	if oxygen_state != null:
 		vitals_model.apply_oxygen_summary(oxygen_state.get_summary())
