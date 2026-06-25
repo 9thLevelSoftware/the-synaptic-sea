@@ -57,7 +57,7 @@ func _validate_hud(playable: PlayableGeneratedShip) -> void:
 	var required: Array[String] = [
 		"Sargasso First Playable",
 		"Current: 01 Recover Supplies",
-		"Controls: WASD move / E interact",
+		"Controls: WASD or Arrows move / E or Enter or Space interact",
 		"Progress: 0/4",
 	]
 	for token in required:

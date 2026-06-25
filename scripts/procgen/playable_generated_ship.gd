@@ -45,6 +45,8 @@ const CartControlScript := preload("res://scripts/tools/cart_control.gd")
 const CartStateScript := preload("res://scripts/systems/cart_state.gd")
 const EquipmentStateScript := preload("res://scripts/systems/equipment_state.gd")
 const EncumbranceScript := preload("res://scripts/systems/encumbrance.gd")
+const PlayerVitalsModelScript := preload("res://scripts/systems/player_vitals_model.gd")
+const PlayerVitalsPanelScript := preload("res://scripts/ui/player_vitals_panel.gd")
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
 
 signal playable_ready(summary: Dictionary)
@@ -115,6 +117,8 @@ var hud_layer: CanvasLayer
 var scanner_panel   # ScannerPanel
 var inventory_panel
 var tracker
+var vitals_model            # PlayerVitalsModel
+var vitals_panel            # PlayerVitalsPanel
 var interaction_root: Node3D
 var affordance_root: Node3D
 var affordance_labels: Dictionary = {}
@@ -1961,6 +1965,8 @@ func _build_repair_points() -> void:
 				pos, sub.repair_seconds, sub.min_skill, 1.8)
 			if not rp.repair_completed.is_connected(_on_repair_completed):
 				rp.repair_completed.connect(_on_repair_completed)
+			if not rp.repair_blocked.is_connected(_on_repair_blocked):
+				rp.repair_blocked.connect(_on_repair_blocked)
 			# Phase 5a Task 5 (co-presence): derelict repair points parent under the
 			# derelict's scene_root so they inherit DERELICT_DOCK_OFFSET and are freed
 			# automatically with the derelict on departure.
@@ -2027,6 +2033,10 @@ func _on_repair_completed(system_id: String, subcomponent_id: String) -> void:
 	var operational: bool = mgr != null and mgr.is_operational(system_id)
 	print("REPAIR COMPLETED system=%s sub=%s operational=%s" % [
 		system_id, subcomponent_id, str(operational).to_lower()])
+
+func _on_repair_blocked(_system_id: String, _subcomponent_id: String, reason: String) -> void:
+	if vitals_model != null:
+		vitals_model.notify_repair_blocked(reason)
 
 ## Validation seam: start a repair-point channel via the real path, by subcomponent.
 func repair_subcomponent_for_validation(system_id: String, subcomponent_id: String) -> bool:
@@ -2343,6 +2353,10 @@ func _build_hud_layer() -> void:
 	if tracker.has_method("apply_accessibility_settings"):
 		tracker.apply_accessibility_settings(accessibility_settings)
 	hud_layer.add_child(tracker)
+	vitals_model = PlayerVitalsModelScript.new()
+	vitals_panel = PlayerVitalsPanelScript.new()
+	vitals_panel.name = "PlayerVitalsPanel"
+	hud_layer.add_child(vitals_panel)
 	scanner_panel = ScannerPanelScript.new()
 	scanner_panel.name = "ScannerPanel"
 	scanner_panel.visible = false
@@ -3007,6 +3021,10 @@ func get_route_gate_collision_enabled_count() -> int:
 
 func _process(delta: float) -> void:
 	if away_from_start:
+		# Keep the vitals panel live on a boarded derelict: Heavy-Load, repair
+		# progress, and the repair_blocked message + its countdown still apply
+		# away from home, even though the home oxygen/hazard loop is paused here.
+		_refresh_player_vitals(delta)
 		return
 	if not playable_started or slice_complete:
 		return
@@ -3159,12 +3177,40 @@ func _refresh_oxygen_state(force_initial: bool, delta_seconds: float) -> void:
 		oxygen_state.apply_ship_systems_summary({})  # no-op; recompute passability
 		_apply_breach_zone_scene_state()
 		_refresh_tracker_system_status_lines()
+		_refresh_player_vitals(delta_seconds)
 		return
 	# Per-tick path: read player position, decide breach presence, tick.
 	var player_in_zone: bool = is_player_in_breach_zone()
 	oxygen_state.tick(delta_seconds, player_in_zone)
 	_apply_breach_zone_scene_state()
 	_refresh_tracker_system_status_lines()
+	_refresh_player_vitals(delta_seconds)
+
+func _refresh_player_vitals(delta_seconds: float) -> void:
+	# A freed Node stays non-null in Godot, so guard the panel with
+	# is_instance_valid (a hud_layer teardown on reload frees it).
+	if vitals_model == null or not is_instance_valid(vitals_panel):
+		return
+	if oxygen_state != null:
+		vitals_model.apply_oxygen_summary(oxygen_state.get_summary())
+	if inventory_state != null:
+		var ratio: float = inventory_state.get_load_ratio()
+		vitals_model.apply_inventory_load(ratio, EncumbranceScript.move_speed_multiplier(ratio))
+	var channeling: bool = false
+	var progress: float = 0.0
+	for rp in repair_points:
+		if is_instance_valid(rp) and rp.channeling:
+			channeling = true
+			progress = rp.progress
+			break
+	vitals_model.set_repair_progress(channeling, progress)
+	vitals_model.tick(delta_seconds)
+	vitals_panel.set_status_lines(vitals_model.get_status_lines())
+
+func get_player_vitals_lines() -> PackedStringArray:
+	if vitals_model == null:
+		return PackedStringArray()
+	return vitals_model.get_status_lines()
 
 func _apply_breach_zone_scene_state() -> void:
 	if oxygen_state == null or breach_zone_node == null:
