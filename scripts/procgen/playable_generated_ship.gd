@@ -3204,9 +3204,6 @@ func _refresh_player_vitals(delta_seconds: float) -> void:
 func get_player_vitals_lines() -> PackedStringArray:
 	if vitals_model == null:
 		return PackedStringArray()
-	# Live-read: refresh the model from current state before returning, so callers
-	# (e.g. validation smokes) always get up-to-date data regardless of frame order.
-	_refresh_player_vitals(0.0)
 	return vitals_model.get_status_lines()
 
 func _apply_breach_zone_scene_state() -> void:

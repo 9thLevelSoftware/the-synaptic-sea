@@ -132,9 +132,8 @@ func _process(delta: float) -> void:
 		return
 	# Cancel if the channelling player was freed or left range (PZ-style: walking away
 	# aborts with no part loss). Pure range check — no candidate_player bypass.
-	# If _channel_player was never set (e.g. channeling was assigned directly by a
-	# validation seam), skip the range check and advance — do NOT auto-cancel.
 	if not is_instance_valid(_channel_player):
+		_cancel()
 		return
 	if not _is_player_in_direct_range(_channel_player):
 		_cancel()

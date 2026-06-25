@@ -118,6 +118,7 @@ func _check_heavy() -> void:
 		return
 	# Drive an active repair channel directly on a repair point.
 	repair_point = playable.repair_points[0]
+	repair_point.set_process(false)   # stop RepairPoint self-cancelling the directly-set channel
 	repair_point.channeling = true
 	repair_point.progress = 0.47
 	phase = "settle_repair"
