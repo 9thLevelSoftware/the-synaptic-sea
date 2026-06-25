@@ -2035,6 +2035,13 @@ func _distributed_room_positions() -> Array:
 
 func _on_repair_completed(system_id: String, subcomponent_id: String) -> void:
 	_refresh_inventory_hud()
+	# Repairs consume parts from the player inventory (RepairPoint is configured
+	# with inventory_state), so carry weight drops here. Recompute encumbrance so
+	# the cached weight_reduction / bonus_capacity (and the Heavy-Load penalty)
+	# reflect the post-consume load instead of going stale until the next
+	# equip/transfer. Restores the ADR-0028 invariant: every inventory-content
+	# change refreshes the reduction cache.
+	_recompute_player_encumbrance()
 	var mgr = _active_systems_manager()
 	var operational: bool = mgr != null and mgr.is_operational(system_id)
 	print("REPAIR COMPLETED system=%s sub=%s operational=%s" % [
