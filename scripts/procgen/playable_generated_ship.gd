@@ -309,6 +309,8 @@ func apply_accessibility_settings(settings: RefCounted) -> void:
 	accessibility_settings = settings
 	if tracker != null and tracker.has_method("apply_accessibility_settings"):
 		tracker.apply_accessibility_settings(settings)
+	if is_instance_valid(vitals_panel) and vitals_panel.has_method("apply_accessibility_settings"):
+		vitals_panel.apply_accessibility_settings(settings)
 	_apply_world_label_scale()
 
 func _apply_world_label_scale() -> void:
@@ -2356,6 +2358,11 @@ func _build_hud_layer() -> void:
 	vitals_model = PlayerVitalsModelScript.new()
 	vitals_panel = PlayerVitalsPanelScript.new()
 	vitals_panel.name = "PlayerVitalsPanel"
+	# A11Y parity (ADR-0027): drive the vitals panel font/size from the same
+	# accessibility seam as the tracker, before it is parented (its _ready then
+	# builds at the stored scale).
+	if vitals_panel.has_method("apply_accessibility_settings"):
+		vitals_panel.apply_accessibility_settings(accessibility_settings)
 	hud_layer.add_child(vitals_panel)
 	scanner_panel = ScannerPanelScript.new()
 	scanner_panel.name = "ScannerPanel"
