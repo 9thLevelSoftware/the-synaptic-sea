@@ -66,6 +66,10 @@ func _setup() -> void:
 	if not is_equal_approx(panel.anchor_top, 1.0) or not is_equal_approx(panel.anchor_left, 0.0):
 		_fail("vitals_panel is not anchored bottom-left (top=%s left=%s)" % [str(panel.anchor_top), str(panel.anchor_left)])
 		return
+	var model = playable.get("vitals_model")
+	if model == null:
+		_fail("vitals_model is null - coordinator failed to build the model")
+		return
 	# Source models must exist.
 	if playable.get("oxygen_state") == null or playable.get("inventory_state") == null or playable.get("equipment_state") == null:
 		_fail("a source model (oxygen/inventory/equipment) is null")

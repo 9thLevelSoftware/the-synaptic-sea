@@ -16,12 +16,9 @@ const PANEL_BORDER_COLOR: Color = Color(0.22, 0.72, 1.0, 0.65)
 var panel: PanelContainer
 var margin: MarginContainer
 var label: Label
+var _laid_out: bool = false
 
 func _ready() -> void:
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	position = PANEL_POSITION
-	custom_minimum_size = PANEL_SIZE
 	_ensure_nodes()
 
 func set_status_lines(lines: PackedStringArray) -> void:
@@ -34,6 +31,12 @@ func get_hud_text() -> String:
 	return label.text
 
 func _ensure_nodes() -> void:
+	if not _laid_out:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+		position = PANEL_POSITION
+		custom_minimum_size = PANEL_SIZE
+		_laid_out = true
 	if panel == null:
 		panel = PanelContainer.new()
 		panel.name = "VitalsPanel"
