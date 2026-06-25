@@ -18,3 +18,21 @@ static func move_speed_multiplier(load_ratio: float) -> float:
 	if load_ratio <= 1.75:
 		return lerpf(MULT_AT_125, FLOOR_MULTIPLIER, (load_ratio - 1.25) / 0.50)
 	return FLOOR_MULTIPLIER
+
+## Capacity-share, best-first weight reduction. container_reductions is an Array
+## of { "capacity": float, "reduction": float }. Sorts best-first (highest
+## reduction), lets each container cover up to its capacity of the remaining
+## weight at its reduction rate, and returns the total kg saved (>= 0). Weight
+## beyond all containers is uncovered. Never exceeds total_weight.
+static func weight_reduction_saved(total_weight: float, container_reductions: Array) -> float:
+	var sorted: Array = container_reductions.duplicate()
+	sorted.sort_custom(func(a, b): return float(a["reduction"]) > float(b["reduction"]))
+	var remaining: float = maxf(0.0, total_weight)
+	var saved: float = 0.0
+	for c in sorted:
+		if remaining <= 0.0:
+			break
+		var covered: float = minf(remaining, maxf(0.0, float(c["capacity"])))
+		saved += covered * clampf(float(c["reduction"]), 0.0, 1.0)
+		remaining -= covered
+	return saved
