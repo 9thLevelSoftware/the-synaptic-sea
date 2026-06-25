@@ -185,7 +185,9 @@ run_clean 'inventory UI slice' 'INVENTORY UI SLICE SMOKE PASS' "$GODOT" --headle
 run_clean 'inventory widget layer' 'INVENTORY WIDGET SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_widget_smoke.gd
 run_clean 'oxygen+equipment drain' 'OXYGEN EQUIPMENT DRAIN SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/oxygen_equipment_drain_smoke.gd
 run_clean 'suit oxygen slice' 'SUIT OXYGEN SLICE SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_suit_oxygen_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=117 clean_output=true'
+run_clean 'player vitals model' 'PLAYER VITALS MODEL SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_vitals_model_smoke.gd
+run_clean 'player vitals hud' 'MAIN PLAYABLE VITALS HUD PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_vitals_hud_smoke.gd
+echo 'SARGASSO REGRESSION PASS commands=119 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
