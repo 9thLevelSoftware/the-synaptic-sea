@@ -41,6 +41,13 @@ func _ready() -> void:
 		body_exited.connect(_on_body_exited)
 
 func configure(p_station_kind: String, p_crafting_state, p_material_state, p_inventory_state, p_deconstruction_resolver, p_player_progression, world_position: Vector3, radius := 1.8) -> void:
+	# Debug-build guards for the required dependencies (player_progression is intentionally
+	# optional — _player_skill() null-guards it, mirroring repair_point.gd).
+	assert(p_crafting_state != null, "p_crafting_state must not be null")
+	assert(p_material_state != null, "p_material_state must not be null")
+	assert(p_inventory_state != null, "p_inventory_state must not be null")
+	assert(p_deconstruction_resolver != null, "p_deconstruction_resolver must not be null")
+	assert(radius >= 0.0, "radius must be non-negative")
 	station_kind = p_station_kind
 	crafting_state = p_crafting_state
 	material_state = p_material_state
@@ -64,7 +71,7 @@ func set_powered(value: bool) -> void:
 
 func set_marker_visible(is_visible: bool) -> void:
 	marker_visible = is_visible
-	if marker != null:
+	if is_instance_valid(marker):
 		marker.visible = marker_visible
 
 func _player_skill() -> int:
@@ -125,7 +132,7 @@ func _try_salvage() -> bool:
 	return false
 
 func _interaction_radius() -> float:
-	if collision_shape != null and collision_shape.shape is SphereShape3D:
+	if is_instance_valid(collision_shape) and collision_shape.shape is SphereShape3D:
 		return (collision_shape.shape as SphereShape3D).radius
 	return interaction_radius
 
@@ -138,7 +145,8 @@ func _is_player_in_direct_range(player_body: Node) -> bool:
 	return global_position.distance_to(player_node.global_position) <= _interaction_radius()
 
 func _ensure_collision(radius: float) -> void:
-	if collision_shape == null:
+	assert(radius >= 0.0, "radius must be non-negative")
+	if not is_instance_valid(collision_shape):
 		collision_shape = CollisionShape3D.new()
 		collision_shape.name = "CraftingStationCollisionShape3D"
 		add_child(collision_shape)
@@ -147,7 +155,8 @@ func _ensure_collision(radius: float) -> void:
 	collision_shape.shape = sphere
 
 func _ensure_marker(radius: float) -> void:
-	if marker == null:
+	assert(radius >= 0.0, "radius must be non-negative")
+	if not is_instance_valid(marker):
 		marker = MeshInstance3D.new()
 		marker.name = "CraftingStationMarker"
 		add_child(marker)

@@ -2490,7 +2490,7 @@ func _clear_crafting_stations() -> void:
 	for st in crafting_stations:
 		if is_instance_valid(st):
 			var p = st.get_parent()
-			if p != null and is_instance_valid(p):
+			if is_instance_valid(p):
 				p.remove_child(st)
 			st.queue_free()
 	crafting_stations.clear()

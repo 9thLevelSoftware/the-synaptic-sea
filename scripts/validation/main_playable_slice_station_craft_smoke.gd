@@ -175,12 +175,12 @@ func _validate(playable) -> void:
 	finished = true
 	print("MAIN PLAYABLE STATION CRAFT PASS crafted=%s salvaged=%s field=%s reachable=%s" % [
 		str(crafted).to_lower(), str(salvaged).to_lower(), str(field).to_lower(), str(reachable).to_lower()])
-	if main_node != null and is_instance_valid(main_node):
+	if is_instance_valid(main_node):
 		main_node.queue_free()
 	quit(0)
 
 func _find_playable(node: Node):
-	if node == null:
+	if not is_instance_valid(node):
 		return null
 	if node.get_script() == load("res://scripts/procgen/playable_generated_ship.gd"):
 		return node
@@ -195,6 +195,6 @@ func _fail(reason: String) -> void:
 		return
 	finished = true
 	push_error("MAIN PLAYABLE STATION CRAFT FAIL reason=%s" % reason)
-	if main_node != null and is_instance_valid(main_node):
+	if is_instance_valid(main_node):
 		main_node.queue_free()
 	quit(1)
