@@ -26,8 +26,10 @@ The E2E systems wave has validated runtime/doc packages for survival, food/cooki
 A reachability audit of the E2E batch (commit `5445480`) found that **30 of the
 102 new runtime scripts are not reachable from the live main scene** — they have
 passing model/smokes but are never mounted in the actual derelict run. "Validated"
-in the table above therefore means *unit-tested*, not *player-reachable*. The
-entire menu/settings/meta-screen UI shell remains validated-but-unreachable.
+in the table above therefore means *unit-tested*, not *player-reachable*. As of
+2026-06-26 the crafting/salvage economy (Bucket 2) and the menu/meta-screen UI shell
+(Bucket 3) are both wired into the live run; a fresh reachability audit reports
+**92 reachable / 10 unreachable** (the 10 are Bucket-1 infra tooling + `junk_yield_resolver`).
 
 > **Update — crafting/salvage now player-reachable (ADR-0038, Bucket 2).** The
 > crafting/salvage economy is wired into the live run: `playable_generated_ship.gd`
@@ -41,6 +43,19 @@ entire menu/settings/meta-screen UI shell remains validated-but-unreachable.
 > MVP limits: one active craft at a time; no recipe-picker UI (auto-selects first craftable);
 > powered-station crafts pause while away from home. See
 > [integration_debt.md](integration_debt.md) for the residual debt.
+
+> **Update — menu/meta-screen shell now player-reachable (Bucket 3).** The ten
+> built-but-dark screens (achievements, audio log, audio settings, skill tree, hub
+> upgrades, class roster, language, save/load, build info, credits) are reachable from
+> a new **Records** submenu on the live in-run `MenuCoordinator`, which mounts them and
+> injects each screen's coordinator-owned dependency (`bind_meta_screens()`).
+> `playable_generated_ship.gd` constructs the previously-missing deps
+> (`LocalizationCatalog`, `BuildMetadataState`, `SaveLoadMenu`, and a live per-run
+> `AchievementState`). No new `RunSnapshot` field, no new ADR, no new keybind. Proven by
+> `scripts/validation/main_playable_meta_screens_smoke.gd` →
+> `MAIN PLAYABLE META SCREENS PASS screens=10 reachable=true`. MVP limits: screens are
+> read-only on open; reached from the in-run pause menu (no separate pre-run main-menu
+> shell yet).
 
 See [integration_debt.md](integration_debt.md) for the full classification and the
 integration actions required before depth/content work builds on these foundations.

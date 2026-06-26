@@ -20,6 +20,23 @@ const MinimapPanelScript := preload("res://scripts/ui/minimap_panel.gd")
 const HotbarPanelScript := preload("res://scripts/ui/hotbar_panel.gd")
 const TooltipPanelScript := preload("res://scripts/ui/tooltip_panel.gd")
 const TutorialOverlayPanelScript := preload("res://scripts/ui/tutorial_overlay_panel.gd")
+# Bucket 3 meta screens (ADR-0038 follow-on: menu/meta-UI shell made player-reachable).
+const AchievementsPanelScript := preload("res://scripts/ui/achievements_panel.gd")
+const SkillTreePanelScript := preload("res://scripts/ui/skill_tree_panel.gd")
+const HubUpgradePanelScript := preload("res://scripts/ui/hub_upgrade_panel.gd")
+const ClassPanelScript := preload("res://scripts/ui/class_panel.gd")
+const AudioLogPanelScript := preload("res://scripts/ui/audio_log_panel.gd")
+const AudioSettingsPanelScript := preload("res://scripts/ui/audio_settings_panel.gd")
+const LanguageSelectorScript := preload("res://scripts/ui/language_selector.gd")
+const ReleaseBadgeOverlayScript := preload("res://scripts/ui/release_badge_overlay.gd")
+const CreditsScreenScript := preload("res://scripts/ui/credits_screen.gd")
+
+## The ten records/meta screens in display order. The same ids are the menu item ids
+## in `records_menu` (data/ui/menu_definitions.json) and the keys of `_meta_panels`.
+const META_SCREEN_IDS: Array[String] = [
+	"achievements", "skill_tree", "hub_upgrades", "class", "audio_log",
+	"audio_settings", "language", "save_load", "release_badge", "credits",
+]
 
 var accessibility_settings: RefCounted = null
 var menu_state = MenuStateScript.new()
@@ -35,6 +52,23 @@ var minimap_panel
 var hotbar_panel
 var tooltip_panel
 var tutorial_overlay_panel
+
+# Bucket 3 meta screens + the slot model (save_load_menu is a RefCounted presenter,
+# surfaced through _save_load_panel — a plain label — since it has no Control of its own).
+var achievements_panel
+var skill_tree_panel
+var hub_upgrade_panel
+var class_panel
+var audio_log_panel
+var audio_settings_panel
+var language_selector
+var release_badge_overlay
+var credits_screen
+var save_load_menu                       # SaveLoadMenu (RefCounted model)
+var _save_load_panel: RichTextLabel
+var _meta_panels: Dictionary = {}        # screen_id -> CanvasItem (visibility-toggled)
+var _active_meta_screen: String = ""     # "" when the records list (or no menu) is shown
+var _meta_bound: bool = false
 
 var _menu_catalog: Dictionary = {}
 var _codex_entries: Dictionary = {}
@@ -66,6 +100,7 @@ func _ready() -> void:
 	tutorial_overlay_panel = TutorialOverlayPanelScript.new()
 	tutorial_overlay_panel.name = "TutorialOverlayPanel"
 	add_child(tutorial_overlay_panel)
+	_build_meta_screens()
 	menu_state.menu_changed.connect(_on_menu_changed)
 	tutorial_state.triggered.connect(_on_tutorial_triggered)
 	tutorial_state.dismissed.connect(_on_tutorial_dismissed)
@@ -119,6 +154,20 @@ func handle_ui_input(event: InputEvent) -> bool:
 		minimap_panel.visible = not minimap_panel.visible
 		return true
 	if menu_state.is_in_play():
+		return false
+	# While a meta screen is displayed it owns the input: cancel returns to the records
+	# list. Swallow ONLY the menu-list navigation/accept actions so the list behind the
+	# screen doesn't move — but let every other event (mouse clicks, slider drags, key
+	# typing) fall through (return false) so the visible screen's own Controls (the
+	# Language OptionButton, Audio Settings sliders, Audio Log ItemList) stay operable.
+	if not _active_meta_screen.is_empty():
+		if event.is_action_pressed("ui_cancel"):
+			_close_meta_screen()
+			return true
+		if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down") \
+				or event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right") \
+				or event.is_action_pressed("ui_accept"):
+			return true
 		return false
 	if event.is_action_pressed("ui_down"):
 		menu_state.navigate(0, 1)
@@ -252,8 +301,14 @@ func _confirm_current_item() -> void:
 				"resume": menu_state.close_all()
 				"settings": menu_state.open_menu("settings_menu")
 				"codex": menu_state.open_menu("codex")
+				"records": menu_state.open_menu("records_menu")
 				"save": save_requested.emit()
 				"quit_main": quit_requested.emit()
+		"records_menu":
+			if item_id == "back":
+				menu_state.close_top()
+			else:
+				_open_meta_screen(item_id)
 		"settings_menu":
 			if item_id == "back":
 				menu_state.close_top()
@@ -320,6 +375,208 @@ func _cycle_array_setting(field: String, values: Array, current: String, directi
 		"difficulty": settings_state.set_difficulty(str(values[index]))
 		"glyph_scheme": settings_state.set_glyph_scheme(str(values[index]))
 
+# --- Bucket 3 meta screens -----------------------------------------------------------
+
+func _build_meta_screens() -> void:
+	achievements_panel = AchievementsPanelScript.new()
+	achievements_panel.name = "AchievementsPanel"
+	add_child(achievements_panel)
+	skill_tree_panel = SkillTreePanelScript.new()
+	skill_tree_panel.name = "SkillTreePanel"
+	add_child(skill_tree_panel)
+	hub_upgrade_panel = HubUpgradePanelScript.new()
+	hub_upgrade_panel.name = "HubUpgradePanel"
+	add_child(hub_upgrade_panel)
+	class_panel = ClassPanelScript.new()
+	class_panel.name = "ClassPanel"
+	add_child(class_panel)
+	audio_log_panel = AudioLogPanelScript.new()
+	audio_log_panel.name = "AudioLogPanel"
+	add_child(audio_log_panel)
+	audio_settings_panel = AudioSettingsPanelScript.new()
+	audio_settings_panel.name = "AudioSettingsPanel"
+	add_child(audio_settings_panel)
+	language_selector = LanguageSelectorScript.new()
+	language_selector.name = "LanguageSelector"
+	add_child(language_selector)
+	release_badge_overlay = ReleaseBadgeOverlayScript.new()
+	release_badge_overlay.name = "ReleaseBadgeOverlay"
+	add_child(release_badge_overlay)
+	credits_screen = CreditsScreenScript.new()
+	credits_screen.name = "CreditsScreen"
+	add_child(credits_screen)
+	# save_load_menu is a RefCounted model; its rows render into this label.
+	_save_load_panel = RichTextLabel.new()
+	_save_load_panel.name = "SaveLoadList"
+	_save_load_panel.bbcode_enabled = true
+	_save_load_panel.fit_content = true
+	add_child(_save_load_panel)
+	_meta_panels = {
+		"achievements": achievements_panel,
+		"skill_tree": skill_tree_panel,
+		"hub_upgrades": hub_upgrade_panel,
+		"class": class_panel,
+		"audio_log": audio_log_panel,
+		"audio_settings": audio_settings_panel,
+		"language": language_selector,
+		"save_load": _save_load_panel,
+		"release_badge": release_badge_overlay,
+		"credits": credits_screen,
+	}
+	for sid in _meta_panels:
+		var node = _meta_panels[sid]
+		if is_instance_valid(node):
+			node.visible = false
+
+## Inject each meta screen's coordinator-owned data dependency. Idempotent; re-callable
+## on a HUD rebuild. The coordinator constructs/owns every required dependency before
+## calling this, so a null is a wiring bug — asserted in debug. The catalog-backed panels
+## need an explicit render() after binding (their setters assign data but don't redraw).
+func bind_meta_screens(p_achievement_state, p_audio_manager, p_skill_tree_state, p_player_progression, p_hub_upgrade_state, p_meta_progression_state, p_localization_catalog, p_build_metadata_state, p_save_load_menu, p_a11y) -> void:
+	assert(p_achievement_state != null, "p_achievement_state dependency is missing")
+	assert(p_audio_manager != null, "p_audio_manager dependency is missing")
+	assert(p_skill_tree_state != null, "p_skill_tree_state dependency is missing")
+	assert(p_player_progression != null, "p_player_progression dependency is missing")
+	assert(p_hub_upgrade_state != null, "p_hub_upgrade_state dependency is missing")
+	assert(p_meta_progression_state != null, "p_meta_progression_state dependency is missing")
+	assert(p_localization_catalog != null, "p_localization_catalog dependency is missing")
+	assert(p_build_metadata_state != null, "p_build_metadata_state dependency is missing")
+	assert(p_save_load_menu != null, "p_save_load_menu dependency is missing")
+	# p_a11y stays optional (its body use is null-guarded), matching the rest of the
+	# coordinator, which tolerates a null accessibility_settings.
+	save_load_menu = p_save_load_menu
+	# Catalog-backed panels: set data, then render() (the setters do not auto-redraw, so
+	# without this the panel is visible but its RichTextLabel stays blank).
+	if is_instance_valid(achievements_panel):
+		achievements_panel.load_catalog()
+		achievements_panel.set_state(p_achievement_state)
+		achievements_panel.render()
+	if is_instance_valid(skill_tree_panel):
+		skill_tree_panel.set_tree(p_skill_tree_state)
+		skill_tree_panel.set_progression(p_player_progression)
+		skill_tree_panel.render()
+	if is_instance_valid(hub_upgrade_panel):
+		hub_upgrade_panel.set_catalog(p_hub_upgrade_state)
+		hub_upgrade_panel.set_meta_state(p_meta_progression_state)
+		hub_upgrade_panel.render()
+	if is_instance_valid(class_panel):
+		class_panel.load_catalog()
+		if p_player_progression != null and p_player_progression.has_method("get_class_id"):
+			class_panel.set_selected_class(str(p_player_progression.get_class_id()))
+		class_panel.render()
+	# These panels self-render in their setters (set_audio_manager / set_catalog /
+	# set_metadata) or in load_catalog (credits) — no explicit render() needed.
+	if is_instance_valid(audio_log_panel):
+		audio_log_panel.set_audio_manager(p_audio_manager)
+	if is_instance_valid(audio_settings_panel):
+		audio_settings_panel.set_audio_manager(p_audio_manager)
+		if p_a11y != null:
+			audio_settings_panel.set_accessibility_settings(p_a11y)
+	if is_instance_valid(language_selector):
+		language_selector.set_catalog(p_localization_catalog)
+	if is_instance_valid(release_badge_overlay):
+		release_badge_overlay.set_metadata(p_build_metadata_state)
+	if is_instance_valid(credits_screen):
+		credits_screen.load_catalog()
+	_refresh_save_load_panel()
+	_meta_bound = true
+
+func _refresh_save_load_panel() -> void:
+	if not is_instance_valid(_save_load_panel):
+		return
+	var lines := PackedStringArray()
+	lines.append("SAVE / LOAD")
+	var rows: Array = []
+	if save_load_menu != null:
+		var refreshed: Variant = save_load_menu.refresh()
+		if typeof(refreshed) == TYPE_ARRAY:
+			rows = refreshed
+	if rows.is_empty():
+		lines.append("(no save slots)")
+	else:
+		# list_slots() returns SaveSlotState objects (RefCounted, with to_dict()), not
+		# dictionaries — normalize both shapes so the rows show real slot metadata
+		# instead of an object identity string.
+		for row in rows:
+			var d: Dictionary = {}
+			if typeof(row) == TYPE_DICTIONARY:
+				d = row
+			elif row != null and (row as Object).has_method("to_dict"):
+				d = (row as Object).to_dict()
+			if d.is_empty():
+				lines.append("- %s" % str(row))
+			else:
+				lines.append("- %s | %s" % [str(d.get("slot_id", "?")), str(d.get("display_name", ""))])
+	_save_load_panel.text = "\n".join(lines)
+
+func _open_meta_screen(screen_id: String) -> void:
+	if not _meta_panels.has(screen_id):
+		return
+	if screen_id == "save_load":
+		_refresh_save_load_panel()
+	_active_meta_screen = screen_id
+	_refresh_all()
+
+func _close_meta_screen() -> void:
+	_active_meta_screen = ""
+	_refresh_all()
+
+func _refresh_meta_screens() -> void:
+	for sid in _meta_panels:
+		var node = _meta_panels[sid]
+		if is_instance_valid(node):
+			node.visible = (sid == _active_meta_screen)
+
+## Validation/host seam: open the records list directly.
+func open_records_menu() -> void:
+	menu_state.open_menu("records_menu")
+	_refresh_all()
+
+## Validation/host seam: open one meta screen (opening the records list first if needed).
+func open_meta_screen(screen_id: String) -> void:
+	if menu_state.get_current_menu() != "records_menu":
+		menu_state.open_menu("records_menu")
+	_open_meta_screen(screen_id)
+
+func get_active_meta_screen() -> String:
+	return _active_meta_screen
+
+func get_meta_screen_ids() -> Array:
+	return META_SCREEN_IDS.duplicate()
+
+func get_meta_screen_panel(screen_id: String):
+	return _meta_panels.get(screen_id, null)
+
+func get_save_load_menu():
+	return save_load_menu
+
+## Per-screen "mounted + populated" check. Centralizes content knowledge so the
+## reachability smoke stays generic. Returns true when the screen has live content.
+func meta_screen_is_populated(screen_id: String) -> bool:
+	match screen_id:
+		"achievements":
+			return is_instance_valid(achievements_panel) and achievements_panel.get_total_count() > 0
+		"skill_tree":
+			return is_instance_valid(skill_tree_panel) and skill_tree_panel.get_status_lines().size() >= 1
+		"hub_upgrades":
+			return is_instance_valid(hub_upgrade_panel) and hub_upgrade_panel.get_upgrade_count() > 0
+		"class":
+			return is_instance_valid(class_panel) and class_panel.get_class_count() > 0
+		"audio_log":
+			return is_instance_valid(audio_log_panel) and audio_log_panel.audio_manager != null
+		"audio_settings":
+			return is_instance_valid(audio_settings_panel) and audio_settings_panel.audio_manager != null
+		"language":
+			return is_instance_valid(language_selector) and language_selector.get_known_languages().size() > 0
+		"save_load":
+			# save_load_menu is a RefCounted model, not a node — keep the null check.
+			return save_load_menu != null and typeof(save_load_menu.refresh()) == TYPE_ARRAY
+		"release_badge":
+			return is_instance_valid(release_badge_overlay) and not release_badge_overlay.get_badge_text().is_empty()
+		"credits":
+			return is_instance_valid(credits_screen) and credits_screen.get_entry_count() > 0
+	return false
+
 func _apply_accessibility_to_children() -> void:
 	if accessibility_settings == null:
 		return
@@ -333,12 +590,14 @@ func _refresh_all() -> void:
 	_refresh_minimap()
 	_refresh_hotbar()
 	_refresh_tutorial()
+	_refresh_meta_screens()
 
 func _refresh_menu_panel() -> void:
 	if menu_panel == null:
 		return
 	var current_menu: String = menu_state.get_current_menu()
-	menu_panel.visible = not current_menu.is_empty() and current_menu != "codex"
+	# Hidden for the codex (its own panel) and while a meta screen overlays the records list.
+	menu_panel.visible = not current_menu.is_empty() and current_menu != "codex" and _active_meta_screen.is_empty()
 	if not menu_panel.visible:
 		return
 	var title: String = current_menu.capitalize()
@@ -437,6 +696,9 @@ func _refresh_tutorial() -> void:
 
 func _on_menu_changed(new_menu_id: String, previous_menu_id: String) -> void:
 	_last_closed_menu = previous_menu_id
+	# Leaving the records menu always tears down any displayed meta screen.
+	if new_menu_id != "records_menu" and not _active_meta_screen.is_empty():
+		_active_meta_screen = ""
 	if previous_menu_id.is_empty() and not new_menu_id.is_empty():
 		modal_opened.emit(new_menu_id)
 	elif not previous_menu_id.is_empty() and new_menu_id.is_empty():
