@@ -21,9 +21,20 @@ The E2E systems wave has validated runtime/doc packages for survival, food/cooki
 | M10 Integration Gate | t_12bf9f4a, t_cc483347, t_4e47145d | Validated | Cross-system audit, rigid-pair recovery, and live controller-path probe all have board-backed PASS evidence. |
 | M11 Documentation Currency | t_c7ac4d08 | Validated by focused validators | Keep validators updated whenever packages or board links change. |
 
+## "Validated" means unit-tested, not player-reachable
+
+A reachability audit of the E2E batch (commit `5445480`) found that **30 of the
+102 new runtime scripts are not reachable from the live main scene** — they have
+passing model/smokes but are never mounted in the actual derelict run. "Validated"
+in the table above therefore means *unit-tested*, not *player-reachable*. The
+crafting/salvage economy (ADR-0038) and the entire menu/settings/meta-screen UI
+shell are validated-but-unreachable. See `docs/game/integration_debt.md` for the
+full classification and the integration actions required before depth/content work
+builds on these foundations.
+
 ## Roadmap principles after Task 15
 
-1. Treat Tasks 01-15 as the source-backed baseline; do not re-open “missing system” language unless a validator or smoke proves a regression.
+1. Treat Tasks 01-15 as the source-backed baseline; do not re-open “missing system” language unless a validator or smoke proves a regression. **Exception:** integration debt proven by the reachability audit (`integration_debt.md`) is a documented gap, not a regression — un-integrated systems may be wired into the live scene without a new ADR re-opening the system itself.
 2. `t_4e47145d` completed the live main-scene/controller-path e2e strengthening probe with marker `LIVE MAIN PREPARE UPGRADE PROBE PASS stages=7`; it complements, rather than replaces, Task 14's model/composite integration gate.
 3. External release evidence remains intentionally separate from local release scaffolding. Task 13 validates export/readiness models; release ops must still provide real signed/platform/store evidence.
 4. Future content should expand depth (art/audio/content/bosses/hub/vendor/faction/store assets) rather than rebuild the validated system foundations.
