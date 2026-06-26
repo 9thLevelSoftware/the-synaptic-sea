@@ -100,7 +100,7 @@ run_clean 'ADR-0038 station craft reachability smoke' 'MAIN PLAYABLE STATION CRA
 run_clean 'systems map currency' 'SYSTEMS MAP CURRENCY PASS' python3 "$ROOT/scripts/validation/doc_currency_validators.py" systems-map
 run_clean 'requirement trace' 'REQUIREMENT TRACE PASS' python3 "$ROOT/scripts/validation/doc_currency_validators.py" requirement-trace
 run_clean 'kanban manifest currency' 'KANBAN MANIFEST' python3 "$ROOT/scripts/validation/doc_currency_validators.py" kanban-manifest
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=34 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=35 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
