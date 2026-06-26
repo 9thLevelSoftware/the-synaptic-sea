@@ -1,0 +1,17 @@
+extends SceneTree
+const SettingsStateScript := preload("res://scripts/systems/settings_state.gd")
+const AccessibilitySettingsScript := preload("res://scripts/ui/accessibility_settings.gd")
+func _init() -> void:
+	var state = SettingsStateScript.new()
+	assert(state.set_text_scale(1.5))
+	assert(state.set_colorblind_mode("deuteranopia"))
+	assert(state.set_hold_to_tap(true))
+	assert(state.set_glyph_scheme("keyboard"))
+	var a11y: RefCounted = AccessibilitySettingsScript.new()
+	assert(state.apply_to_accessibility(a11y))
+	var summary: Dictionary = state.get_summary()
+	var restored = SettingsStateScript.new()
+	assert(restored.apply_summary(summary))
+	assert(str(restored.get_text_scale()) == "1.5")
+	print("SETTINGS STATE PASS text_scale=%s hold_to_tap=%s glyph=%s" % [str(restored.get_text_scale()), str(restored.is_hold_to_tap()), restored.get_glyph_scheme()])
+	quit()

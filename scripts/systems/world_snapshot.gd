@@ -12,6 +12,8 @@ const WORLD_SLICE_VERSION: String = "world-4"
 
 var world_summary: Dictionary = {}
 var home_ship: Dictionary = {}                  # a RunSnapshot.to_dict()
+var meta_progression_summary: Dictionary = {}   # MetaProgressionState.to_dict()
+var unique_item_summary: Dictionary = {}        # UniqueItemState.get_summary()
 var home_looted_containers: Array = []          # home ship's searched loot-container ids
 var home_ship_inventory: Dictionary = {}        # home ship's ShipInventory.get_summary()
 var home_ship_carts: Array = []                  # home ship's [CartState.get_summary()...]
@@ -31,6 +33,8 @@ func to_dict() -> Dictionary:
 	return {
 		"world_summary": world_summary.duplicate(true),
 		"home_ship": home_ship.duplicate(true),
+		"meta_progression_summary": meta_progression_summary.duplicate(true),
+		"unique_item_summary": unique_item_summary.duplicate(true),
 		"home_looted_containers": home_looted_containers.duplicate(),
 		"home_ship_inventory": home_ship_inventory.duplicate(true),
 		"home_ship_carts": home_ship_carts.duplicate(true),
@@ -68,6 +72,8 @@ static func from_dict(data: Variant, expected_world_version: String, expected_go
 	var ws: WorldSnapshot = script.new()
 	ws.world_summary = _deep_copy_dict(dict.get("world_summary", {}))
 	ws.home_ship = _deep_copy_dict(dict.get("home_ship", {}))
+	ws.meta_progression_summary = _deep_copy_dict(dict.get("meta_progression_summary", {}))
+	ws.unique_item_summary = _deep_copy_dict(dict.get("unique_item_summary", {}))
 	var looted_variant: Variant = dict.get("home_looted_containers", [])
 	if typeof(looted_variant) == TYPE_ARRAY:
 		ws.home_looted_containers = []

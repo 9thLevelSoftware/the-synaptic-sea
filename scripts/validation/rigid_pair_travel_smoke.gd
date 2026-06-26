@@ -13,14 +13,17 @@ func _init() -> void:
 		await process_frame
 
 	# Make the lifeboat travel-capable and jump to a CLAIMABLE (bridge-bearing) derelict.
-	# bridge is weighted (not guaranteed), so iterate in-range markers until one has a bridge.
-	ship.force_repair_all_for_validation()
+	# Nearby bridge rooms are weighted, not guaranteed, so filter the in-range markers
+	# through the playable's claimable-marker seam before travelling.
+	var lifeboat_id: String = String(ship.get_lifeboat_ship_for_validation().ship_id)
+	ship.make_ship_working_for_validation(lifeboat_id)
+	ship.set_manual_power_route_for_validation("propulsion", 30.0)
 	# 5b precondition: the player must be aboard the piloted ship (the lifeboat) before
 	# travelling — the ride physically takes them with it. Mirror physical_travel_smoke.
 	ship.board_piloted_ship_for_validation()
 	ship.recompute_occupancy()
-	var ids: Array = ship.scannable_marker_ids_for_validation()
-	assert(ids.size() > 0, "a derelict is in scanner range")
+	var ids: Array = ship.claimable_marker_ids_for_validation()
+	assert(ids.size() > 0, "a claimable derelict is in scanner range")
 	var landed := false
 	for mid in ids:
 		ship.board_piloted_ship_for_validation()
@@ -30,7 +33,7 @@ func _init() -> void:
 			continue
 		for _i in range(2):
 			await process_frame
-		if ship.current_ship_has_bridge_for_validation():
+		if ship.current_ship_has_bridge_for_validation() and ship.current_ship_id_for_validation() != "":
 			landed = true
 			break
 	assert(landed, "found and travelled to a claimable (bridge-bearing) derelict")
@@ -66,7 +69,7 @@ func _init() -> void:
 
 	# Lifecycle regression: the lifeboat's bridge terminal must SURVIVE travel (dock-barrier
 	# respawn must not wipe it). Logging in at the lifeboat terminal takes command back.
-	var lb_id: String = String(ship.get_lifeboat_ship_for_validation().ship_id)
+	var lb_id: String = lifeboat_id
 	assert(ship.login_at_terminal_for_validation(lb_id) == true, "lifeboat terminal survived travel")
 	assert(ship.piloted_ship_id_for_validation() == lb_id, "took command of lifeboat after travel")
 

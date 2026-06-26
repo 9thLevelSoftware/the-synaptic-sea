@@ -37,9 +37,27 @@ const ROOM_FOOTPRINT_OPTIONS: Dictionary = {
 const DEFAULT_FOOTPRINT: Vector2i = Vector2i(2, 2)
 
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var variant_selector: RefCounted = null  # set by assign() if RoomVariantSelector is passed
 
 
 func assign(template: RefCounted, blueprint: RefCounted, archetype: Dictionary) -> Array[Dictionary]:
+	return assign_with_selector(template, blueprint, archetype, null)
+
+
+# Same as assign() but additionally accepts a RoomVariantSelector
+# (or any RefCounted with a `pick(role, room_index, seed, biome)`
+# method). When supplied, every room dict gets a `variant` key
+# written from the deterministic variant pick. When null, the room
+# dict still gets `variant = "standard"` so downstream consumers
+# can rely on the key existing.
+func assign_with_selector(
+		template: RefCounted,
+		blueprint: RefCounted,
+		archetype: Dictionary,
+		selector,
+		biome: String = "") -> Array[Dictionary]:
+	variant_selector = selector
+
 	rng.seed = int(blueprint.seed_value)
 
 	var room_plan: Array[Dictionary] = []
@@ -64,10 +82,12 @@ func assign(template: RefCounted, blueprint: RefCounted, archetype: Dictionary) 
 			var idx: int = _next_index(role, role_counter)
 			var room_id: String = "%s_%02d" % [role, idx]
 			var footprint: Vector2i = _pick_footprint(role, blueprint)
+			var variant: String = _pick_variant(role, room_plan.size(), blueprint, biome)
 
 			room_plan.append({
 				"id": room_id,
 				"role": role,
+				"variant": variant,
 				"zone_id": zone_id,
 				"deck": deck,
 				"position_hint": position_hint,
@@ -76,6 +96,16 @@ func assign(template: RefCounted, blueprint: RefCounted, archetype: Dictionary) 
 			})
 
 	return room_plan
+
+
+# Picks a variant string via the supplied selector (if any). Falls
+# back to "standard" so the room dict always has a `variant` key.
+func _pick_variant(role: String, room_index: int, blueprint: RefCounted, biome: String) -> String:
+	if variant_selector == null:
+		return "standard"
+	if not variant_selector.has_method("pick"):
+		return "standard"
+	return str(variant_selector.pick(role, int(room_index), int(blueprint.seed_value), biome))
 
 
 func _resolve_count(count_value: Variant) -> int:

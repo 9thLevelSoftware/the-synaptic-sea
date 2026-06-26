@@ -9,6 +9,7 @@ class_name InventoryPanel
 
 signal panel_closed         # emitted on every close() so the coordinator restores control
 signal transfer_completed   # emitted after any state mutation so the coordinator recomputes
+signal use_requested(item_id: String, use_all: bool)
 
 const InventorySelectionModelScript := preload("res://scripts/systems/inventory_selection_model.gd")
 const CargoTransferScript := preload("res://scripts/systems/cargo_transfer.gd")  # used by TRANSFER mode
@@ -248,6 +249,8 @@ const _ACT_TRANSFER_ALL := 1
 const _ACT_SPLIT := 2
 const _ACT_EQUIP := 3
 const _ACT_UNEQUIP := 4
+const _ACT_USE := 5
+const _ACT_USE_ALL := 6
 
 func row_clicked(pane: String, index: int, additive: bool, range_sel: bool) -> void:
 	select_row(pane, index, additive, range_sel)
@@ -357,6 +360,8 @@ func _build_context_menu(pane: String, index: int) -> PopupMenu:
 			"split": menu.add_item("Split…", _ACT_SPLIT)
 			"equip": menu.add_item("Equip", _ACT_EQUIP)
 			"unequip": menu.add_item("Unequip", _ACT_UNEQUIP)
+			"use": menu.add_item("Use", _ACT_USE)
+			"use_all": menu.add_item("Use All", _ACT_USE_ALL)
 	return menu
 
 func _on_context_id(id: int, pane: String, index: int) -> void:
@@ -377,6 +382,10 @@ func _on_context_id(id: int, pane: String, index: int) -> void:
 		else:
 			_model_for_pane(pane).select_single(index)
 			equip_selected()
+	elif id == _ACT_USE or id == _ACT_USE_ALL:
+		var ids: Array = _ids_for_pane(pane)
+		if index >= 0 and index < ids.size():
+			use_requested.emit(String(ids[index]), id == _ACT_USE_ALL)
 
 ## Interaction-only (popup); split amount picker -> transfer_quantity.
 func _open_split_picker(pane: String, item_id: String) -> void:

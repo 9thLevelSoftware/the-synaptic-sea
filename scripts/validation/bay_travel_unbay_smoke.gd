@@ -24,12 +24,14 @@ func _init() -> void:
 
 	# Travel away while piloting the (now-bayed) lifeboat. The undock path must unbay it.
 	ship.force_repair_all_for_validation()
+	ship.make_ship_working_for_validation(lifeboat_id)
+	ship.set_manual_power_route_for_validation("propulsion", 30.0)
 	var ids: Array = ship.scannable_marker_ids_for_validation()
 	assert(ids.size() > 0, "a derelict is in scanner range")
-	ship.board_piloted_ship_for_validation()
-	ship.recompute_occupancy()
 	var travelled := false
 	for mid in ids:
+		ship.board_piloted_ship_for_validation()
+		ship.recompute_occupancy()
 		if ship.travel_to_marker_id(String(mid)).get("success", false):
 			travelled = true
 			for _i in range(2):

@@ -1,165 +1,119 @@
-# Feature: Save / Load Run Persistence
+# Feature: Save / Load, Persistence, Multi-Slot, Auto-Save, and Cloud Readiness
 
 ## Status
+Approved for Gate 2 implementation and Task 11 E2E validation.
 
-Approved for Gate 2 implementation
+## Package source of truth
+- `docs/game/build-plans/11-save-load-persistence-e2e.md`
+- `docs/game/adr/0007-save-load-service-scope.md`
+- `docs/game/adr/0031-multi-slot-save-architecture.md`
+- `docs/game/adr/0032-migration-permadeath-cloud-manifest.md`
+- `docs/game/05_requirements.md` REQ-SL-001..012
 
 ## Requirement cross-reference
-
-- REQ-012 Save/load run persistence (new Gate 2 requirement)
-- Current-run only; explicitly excludes REQ-008/REQ-009 hub/meta persistence.
-- Preserves REQ-001..003 (route gate, system, and extraction state restore correctly), REQ-006/REQ-007/REQ-010/REQ-011 (hazard, tool, fire, and objective-progress state restore correctly).
+- REQ-SL-001 Save slot identity and manual/autosave/quicksave distinction
+- REQ-SL-002 Save index lists and resolves slots
+- REQ-SL-003 Corruption detection backs up rather than loads
+- REQ-SL-004 Manual saves are listed, loadable, and versioned
+- REQ-SL-005 Quicksave overwrites a single dedicated slot
+- REQ-SL-006 Autosave policy fires on cadence + event triggers
+- REQ-SL-007 Save migration service moves old saves forward
+- REQ-SL-008 Meta / world / run scopes do not leak
+- REQ-SL-009 Permadeath resolver freezes the run and blocks invalid reloads
+- REQ-SL-010 Cloud-ready manifest captures build + device + sync eligibility
+- REQ-SL-011 Save/load menu UI seam reads the slot index
+- REQ-SL-012 Main-scene multi-slot save flow is end-to-end
 
 ## Design pillar alignment
-
-- Runtime systems over proof artifacts: save/load is a real service that writes and reads runtime state, not a proof-of-concept file dump.
-- Small vertical slices before broad systems: one save slot per run, auto-save on objective completion, manual save/load input optional; no hub meta-currency, no cross-run unlocks, no cloud saves.
+- Runtime systems over proof artifacts: the package writes and restores production runtime state through Godot services and pure models.
+- Pure-model-first gameplay state: slot rows, the index, migrations, autosave policy, cloud manifests, and permadeath records are headlessly testable models or services.
+- No scope leakage: current-run state, world state, and future meta progression remain explicitly separated.
 
 ## Player fantasy
-
-The player can suspend and resume an expedition. The ship state, tool inventory, and current objective are restored exactly as left.
+The player can suspend a doomed boarding run, resume it from a named slot, rely on autosaves during tense progress, inspect failed/corrupt saves instead of losing them silently, and carry the consequences of death forward through a frozen run record.
 
 ## Gameplay problem
-
-Gate 1 ends when the slice completes or the process exits; there is no way to preserve progress mid-run. Gate 2 needs current-run persistence so a 5-minute derelict run can be interrupted and resumed.
+The original Gate 2 save/load slice only supported a single current-run save. Task 11 requires a production persistence package: distinct manual/autosave/quicksave slots, slot listing, corruption handling, migration, death freeze, and cloud-ready sidecars without accidentally turning the system into hub/meta persistence.
 
 ## Core behavior
-
-- One save slot per run: `user://saves/current_run.json`.
-- Auto-save triggers after every objective completion.
-- Manual save is available via an input action (`save_run`, bound to `F5` by default) when the slice is active.
-- Manual load is available from the title/main menu or via an input action (`load_run`, bound to `F9`) when no slice is active.
-- Loading reconstructs the same ship slice, restores pure model state, teleports the player to the saved position, and resumes at the saved objective sequence.
-- The save file is deleted when the run completes (reactor stabilized / extraction unlocked) to prevent stale resumes.
-- Cross-run persistence is out of scope: starting a new run overwrites the slot; no hub ship state, no meta-currency, no unlocks are saved.
+- Manual saves write to named slots `slot_01`..`slot_06`.
+- Autosaves rotate across `autosave_a`..`autosave_c` with cadence, event-pressure, and forced-save triggers.
+- Legacy/current-run autosave compatibility is preserved through `user://saves/current_run.json` as the active autosave alias.
+- Quicksave writes to a dedicated `quicksave` slot with a 10 s cooldown.
+- World persistence writes to `user://saves/world.json` and stays separate from run-slot payloads.
+- Every saved slot writes a cloud-ready manifest sidecar under `user://saves/.cloud/<slot_id>.manifest.json`.
+- Corrupt, malformed, or version-incompatible slot files are backed up to `user://saves/.corrupt/` and flagged in the slot index instead of being silently loaded.
+- Older save payloads are migrated forward deterministically on load and the migrated form is written to `<slot_id>.migrated.json`.
+- Death freezes a slot through `user://saves/<slot_id>.death.json`; frozen slots cannot be loaded until the death record is cleared.
+- Loading a manual slot restores the active run without overwriting world/meta state outside the run snapshot scope.
 
 ## Inputs
-
-- Save trigger (auto on objective completion, manual on input).
-- Load trigger (menu selection or manual input).
-- Runtime state from `PlayableGeneratedShip` and its owned models.
+- Objective-completion autosave triggers from `PlayableGeneratedShip`.
+- Manual save/load and quicksave/quickload UI actions.
+- Runtime state from `PlayableGeneratedShip`, `RunSnapshot`, `WorldSnapshot`, and pure-model summaries.
+- Existing slot files, index rows, migrated siblings, death records, and cloud manifests.
 
 ## Outputs
-
-- `user://saves/current_run.json` written or read.
-- Load result event: success or failure reason.
-- Restored player position, objective sequence, and all model summaries.
+- `user://saves/current_run.json` active autosave alias.
+- `user://saves/<slot_id>.json` manual/autosave/quicksave payloads.
+- `user://saves/world.json` world payload.
+- `user://saves/index.json` slot index.
+- `user://saves/.cloud/<slot_id>.manifest.json` cloud-ready manifests.
+- `user://saves/.corrupt/<slot_id>.<epoch>.<basename>.bak` corruption backups.
+- `user://saves/<slot_id>.migrated.json` migrated payloads.
+- `user://saves/<slot_id>.death.json` death/epitaph records.
 
 ## Rules
-
-- Save captures only current-run state: ship layout identifiers, player transform, objective sequence, and model summaries.
-- Save does not capture scene nodes, props, VFX, audio state, or camera zoom.
-- Load must reject a save file whose `slice_version` or `godot_version` does not match; failure prints a clear reason and starts a fresh run.
-- Load restores model state before the first `_process` tick so the resumed run is deterministic from the saved frame.
-- If a save file is missing or corrupt, the load action starts a fresh run and logs a warning.
-- Auto-save on objective completion runs only if the completion succeeded (i.e., not during validation-only forced completions unless explicitly requested).
+- Save payloads must contain `slot_id` and `slot_kind` for every persisted slot.
+- Manual, autosave, quicksave, and world slots are distinct families; they must never collide on disk.
+- The slot index is a cache and review surface, not the authoritative payload; slot files remain the source of truth.
+- Loading rejects malformed JSON, incompatible versions, and manifest SHA mismatches.
+- Corrupt slot files are moved aside before returning `null`.
+- Migration is forward-only and deterministic; newer-than-current saves are rejected rather than downgraded.
+- Manual run loads may restore active run state but must not trample world or meta persistence boundaries.
+- Completion/death flow may clear the active run alias while preserving intended manual-slot review data.
 
 ## Non-goals
-
-- No hub ship state, derelict selection state, meta-currency, unlocks, or faction progress.
-- No multiple named save slots, quicksaves, or save-scumming support.
-- No cloud, Steam, or cross-device sync.
-- No save-file encryption or compression in Gate 2.
-- No mid-animation or mid-physics state preservation.
-- No save/load during real-time hazard transitions; auto-save fires at stable objective-completion boundaries.
+- No live networked cloud adapter, sync transport, account auth, or provider SDK integration yet.
+- No hub/meta progression persistence inside `RunSnapshot`.
+- No encryption/compression pipeline in this package.
+- No broad persistence rewrite outside the Task 11 ADR boundaries.
+- No silent salvage of malformed saves beyond explicit migration/defaulting rules.
 
 ## Technical design
-
-- New service: `scripts/systems/save_load_service.gd` (`SaveLoadService` extending `RefCounted`).
-  - Owned by `PlayableGeneratedShip`, not an autoload.
-  - Inputs:
-    - `save_current_run(ctx: RunSnapshot) -> bool`
-    - `load_current_run() -> RunSnapshot` (returns null/empty on failure)
-    - `delete_current_run() -> bool`
-  - File path: `user://saves/current_run.json`.
-  - Uses `FileAccess` and `JSON.stringify` / `JSON.parse_string`.
-- New pure data class: `scripts/systems/run_snapshot.gd` (`RunSnapshot` extending `RefCounted` or `Resource`).
-  - Fields: `layout_path`, `kit_path`, `gameplay_slice_path`, `player_position` (Vector3 array), `current_objective_sequence`, `ship_systems_summary`, `route_control_summary`, `oxygen_summary`, `inventory_summary`, `fire_summary`, `objective_progress_summary`, `slice_version`, `godot_version`, `saved_at`.
-- Coordinator changes in `scripts/procgen/playable_generated_ship.gd`:
-  - After each objective completion, build a `RunSnapshot` and call `save_load_service.save_current_run()`.
-  - Expose `request_save()` and `request_load()` methods for manual triggers.
-  - On load, re-run `_ready` with saved paths, then apply the snapshot to each model before spawning the player.
-- Model support:
-  - `ShipSystemState` adds `apply_summary(summary: Dictionary) -> void` (or constructor from summary).
-  - `RouteControlState` adds `apply_summary(summary: Dictionary) -> void`.
-  - `OxygenState` adds `apply_summary(summary: Dictionary) -> void`.
-  - `InventoryState` adds `apply_summary(summary: Dictionary) -> void`.
-  - `FireState` adds `apply_summary(summary: Dictionary) -> void`.
-  - `ObjectiveProgressState` adds `apply_summary(summary: Dictionary) -> void`.
-- Direct model smoke: `scripts/validation/save_load_service_smoke.gd` creates a snapshot, writes it, reads it back, and asserts all summaries round-trip.
-- Main-scene smoke: `scripts/validation/main_playable_slice_save_load_smoke.gd` loads the slice, completes objective 1, saves, reloads, and asserts the player position, sequence, and ship-system flags match the saved frame.
-
-## Data model additions
-
-- `RunSnapshot` data class.
-- `SaveLoadService` service class.
-- `apply_summary()` methods on all Gate 2 runtime models.
-- New input actions `save_run` and `load_run` registered in `PlayableGeneratedShip.ensure_default_input_actions()`.
-
-## Trigger / preconditions / postconditions
-
-- **Trigger (auto-save):** `PlayableGeneratedShip` emits `playable_interaction_completed` for an objective that advances `current_objective_sequence`.
-- **Trigger (manual save):** Player presses the `save_run` input while a slice is active.
-- **Trigger (load):** Player selects "Resume Run" from the main menu or presses `load_run` from a no-slice state.
-- **Preconditions for save:**
-  - `PlayableGeneratedShip` has fired `playable_ready`.
-  - The run is not already complete (`slice_complete == false`).
-- **Postconditions for save:**
-  - `user://saves/current_run.json` exists and contains a valid `RunSnapshot`.
-  - All model summaries and player position are captured.
-- **Preconditions for load:**
-  - A compatible save file exists.
-- **Postconditions for load:**
-  - The same slice is reconstructed.
-  - All model summaries are applied before the first tick.
-  - Player is teleported to the saved position.
-  - `current_objective_sequence` matches the save.
-
-## Edge cases and failure modes
-
-- **Missing save file:** `load_current_run()` returns an empty snapshot; the caller starts a fresh run.
-  - Smoke asserts this path does not crash.
-- **Corrupt JSON:** Caught by `JSON.parse_string` returning null; service logs and returns empty snapshot.
-- **Version mismatch:** `slice_version` or `godot_version` differs; service rejects load and returns empty snapshot.
-- **Saved model state references unknown zone/tool:** Gracefully ignored by `apply_summary()` (e.g., unknown tool id is added but has no effect; unknown fire zone id is dropped).
-- **Load while a slice is already running:** Unload the current slice first, then load; if unload fails, load is rejected.
-- **Headless smoke cleanup:** Smokes delete `user://saves/current_run.json` before and after running so they do not pollute the user's real save slot.
-- **Save during zero-oxygen passability block:** Captures oxygen value and passability state; on load the player is still blocked until oxygen recovers.
+- `scripts/systems/save_load_service.gd`: current-run + multi-slot persistence service with index, corruption backup, world slot, manifest writes, and migration hooks.
+- `scripts/systems/save_slot_state.gd`: one slot row summary for menu/index use.
+- `scripts/systems/save_index_state.gd`: on-disk slot index.
+- `scripts/systems/save_migration_service.gd`: deterministic forward-only migration table.
+- `scripts/systems/autosave_policy.gd`: cadence/event/force autosave policy with rotation and quicksave cooldown.
+- `scripts/systems/permadeath_resolver.gd`: death/epitaph record service.
+- `scripts/systems/cloud_manifest_state.gd`: cloud-ready manifest sidecar model.
+- `scripts/ui/save_load_menu.gd`: pure UI seam over the slot index.
+- `scripts/procgen/playable_generated_ship.gd`: integration owner for save/load service and runtime triggers.
 
 ## Acceptance criteria
-
-- Given a fresh slice, when objective 1 completes, then `user://saves/current_run.json` exists and contains `current_objective_sequence == 2`.
-- Given a saved run, when `SaveLoadService.load_current_run()` is called, then the returned `RunSnapshot` matches the saved values for player position, sequence, and all model summaries.
-- Given a saved run, when the main-scene load smoke reloads the slice, then the player position matches within `0.01` units, `current_objective_sequence` matches, and `ship_systems.emergency_supplies_recovered == true`.
-- Given a run where the reactor is stabilized, when extraction unlocks, then the save file is deleted.
-- Given a corrupt save file, when load is requested, then the service returns an empty snapshot and logs a clear reason.
-- Given the model smoke runs in isolation, when it writes and reads a snapshot, then it prints `SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=6`.
-- Given the main playable slice load, when the save/load smoke runs, then it prints `MAIN PLAYABLE SAVE LOAD PASS saved_sequence=2 loaded_sequence=2 position_match=true supplies=true`.
+- Given manual/autosave/quicksave/world writes, when the index is listed, then each slot family appears with stable identity and expected ordering.
+- Given a malformed slot payload, when it is loaded, then the service returns `null`, writes a `.corrupt` backup, and leaves a `corrupt=true` review row.
+- Given an old save payload, when it is loaded, then the migration service upgrades it deterministically and writes `<slot_id>.migrated.json`.
+- Given a death-frozen slot, when it is loaded, then the load is rejected and the epitaph record remains available.
+- Given a main-scene playable run that writes manual save `slot_01`, quicksave, and world save, when the end-to-end smoke runs, then the slot reload succeeds and the corruption backup path is exercised.
 
 ## Validation
+Focused Task 11 markers:
+- `SAVE SLOT STATE PASS`
+- `SAVE MIGRATION SERVICE PASS`
+- `AUTOSAVE POLICY PASS`
+- `MAIN PLAYABLE MULTISLOT SAVE PASS`
 
-- Direct model smoke:
-  ```bash
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/save_load_service_smoke.gd
-  ```
-  Expected marker: `SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=6`
-
-- Main-scene smoke:
-  ```bash
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_save_load_smoke.gd
-  ```
-  Expected marker: `MAIN PLAYABLE SAVE LOAD PASS saved_sequence=2 loaded_sequence=2 position_match=true supplies=true`
-
-- Regression inclusion: add both smokes to the bundle in `docs/game/06_validation_plan.md` before the feature is marked done.
+Bundle registration and strict warning/error handling live in `docs/game/06_validation_plan.md`.
 
 ## Risks
-
-- Risk: save/load becomes a vector for hub/meta persistence by accident. Mitigation: `RunSnapshot` explicitly excludes hub fields; code review checklist checks for any hub/meta data in the snapshot.
-- Risk: model summaries drift out of sync with `apply_summary()` methods. Mitigation: each model smoke asserts round-trip; if a new field is added to `get_summary()` without a matching loader, the smoke fails.
-- Risk: `user://` path differs between editor and exported builds. Mitigation: always use `user://saves/current_run.json` via `ProjectSettings`; never hard-code an absolute path.
-- Risk: loading from a snapshot skips initialization side effects (e.g., route gate scene nodes). Mitigation: load path re-uses the normal `_ready` flow and only applies model summaries after scene nodes are built.
+- Corrupt-save review UX could silently regress if corrupt rows disappear from the index; `save_slot_state_smoke.gd` locks the contract.
+- Cleanup between validation runs can pollute slot counts; Task 11 smokes now explicitly remove their owned slots before and after running.
+- Persistence scope creep could leak world/meta state into run slots; ADR-0007, ADR-0031, and REQ-SL-008 remain the cut line.
 
 ## ADRs
-
 - `docs/game/adr/0001-adopt-stage-gate-kanban-godot-validation.md`
-- ADR-0007 required before implementation: `docs/game/adr/0007-save-load-service-scope.md` records the current-run-only boundary, the single-slot design, the model-summary contract, and the explicit exclusion of hub/meta state. **Status: Accepted.**
+- `docs/game/adr/0007-save-load-service-scope.md`
+- `docs/game/adr/0031-multi-slot-save-architecture.md`
+- `docs/game/adr/0032-migration-permadeath-cloud-manifest.md`

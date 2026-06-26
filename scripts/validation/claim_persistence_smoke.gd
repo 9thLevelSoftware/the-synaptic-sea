@@ -11,10 +11,13 @@ func _init() -> void:
 	for _i in range(3):
 		await process_frame
 
-	ship.force_repair_all_for_validation()
-	var ids: Array = ship.scannable_marker_ids_for_validation()
-	assert(ids.size() > 0, "a derelict is in range")
-	# Land on a CLAIMABLE (bridge-bearing) derelict (bridge is weighted, not guaranteed).
+	var lifeboat_id: String = String(ship.get_lifeboat_ship_for_validation().ship_id)
+	ship.make_ship_working_for_validation(lifeboat_id)
+	ship.set_manual_power_route_for_validation("propulsion", 30.0)
+	var ids: Array = ship.claimable_marker_ids_for_validation()
+	assert(ids.size() > 0, "a claimable derelict is in range")
+	# Land on a CLAIMABLE (bridge-bearing) derelict. Nearby bridge rooms are weighted,
+	# so filter the in-range markers through the playable's claimable-marker seam.
 	var landed := false
 	for mid in ids:
 		# 5b precondition: the player must be aboard the piloted ship before travelling.
@@ -24,7 +27,7 @@ func _init() -> void:
 			continue
 		for _i in range(2):
 			await process_frame
-		if ship.current_ship_has_bridge_for_validation():
+		if ship.current_ship_has_bridge_for_validation() and ship.current_ship_id_for_validation() != "":
 			landed = true
 			break
 	assert(landed, "travelled to a claimable derelict")

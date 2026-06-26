@@ -90,8 +90,15 @@ static func context_actions(item_id: String, defs: Dictionary, in_transfer_mode:
 		actions.append("transfer")
 		actions.append("transfer_all")
 		actions.append("split")
+		if not row_is_container and ItemDefsScript.category(defs, item_id) in ["medicine", "stimulant", "ammo", "utility", "food", "drink"]:
+			actions.append("use")
+			actions.append("use_all")
 		if equippable:
 			actions.append("equip")
-	elif equippable:
-		actions.append("equip")
+	else:
+		if ItemDefsScript.category(defs, item_id) in ["medicine", "stimulant", "ammo", "utility", "food", "drink"]:
+			actions.append("use")
+			actions.append("use_all")
+		if equippable:
+			actions.append("equip")
 	return actions

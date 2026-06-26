@@ -775,6 +775,18 @@ func get_room_links() -> Array:
 	return out
 
 
+func get_encounter_markers() -> Array:
+	var out: Array = []
+	var raw: Variant = layout_doc.get("encounters", [])
+	if typeof(raw) != TYPE_ARRAY:
+		return out
+	for entry in (raw as Array):
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		out.append((entry as Dictionary).duplicate(true))
+	return out
+
+
 func get_blocked_links() -> Array:
 	var out: Array = []
 	var raw: Variant = layout_doc.get("blocked_links", [])

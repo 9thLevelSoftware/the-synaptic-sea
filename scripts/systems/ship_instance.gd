@@ -63,6 +63,11 @@ var objective_controller = null          # DerelictObjectiveController | null
 # Salvage-point loot reuses the objective `completed` flag, so it is not listed here.
 var looted_container_ids: Array = []
 
+# Task 06: per-ship combat/threat persistence. The live ThreatManager node belongs to
+# the coordinator; this summary lets traveled ships free/rebuild scene roots without
+# losing threat positions, detection memory, or the last combat result.
+var combat_summary: Dictionary = {}
+
 # Static factory via load() self-reference (class_name globals unreliable under
 # --headless --script).
 static func create(p_ship_id: String, p_marker_id: String, p_blueprint, p_systems_manager, p_scene_root) -> ShipInstance:
@@ -92,6 +97,8 @@ func get_summary() -> Dictionary:
 		result["objective"] = objective_controller.get_summary()
 	if not looted_container_ids.is_empty():
 		result["looted_containers"] = looted_container_ids.duplicate()
+	if not combat_summary.is_empty():
+		result["combat"] = combat_summary.duplicate(true)
 	if access != null:
 		result["access"] = access.get_summary()
 	if hangar != null and hangar.slot_count > 0:
@@ -129,6 +136,9 @@ func apply_summary(summary) -> bool:
 		looted_container_ids = []
 		for cid in (looted_variant as Array):
 			looted_container_ids.append(String(cid))
+	var combat_variant: Variant = summary.get("combat", null)
+	if typeof(combat_variant) == TYPE_DICTIONARY:
+		combat_summary = (combat_variant as Dictionary).duplicate(true)
 	var access_summary: Variant = summary.get("access", null)
 	if typeof(access_summary) == TYPE_DICTIONARY and not (access_summary as Dictionary).is_empty():
 		get_access().apply_summary(access_summary as Dictionary)

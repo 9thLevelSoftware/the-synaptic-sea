@@ -5,7 +5,7 @@ class_name LootContainer
 ## (seed = container's seed_source) and grants the result to the player InventoryState,
 ## then marks itself searched. Mirrors ToolPickup's interaction/range contract.
 
-const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
+const LootDistributionScript := preload("res://scripts/systems/loot_distribution.gd")
 
 signal container_searched(container_id: String, granted: Array)
 
@@ -14,6 +14,7 @@ var loot_table: String = ""
 var seed_source: String = ""
 var inventory_state                       # InventoryState
 var tables: Dictionary = {}
+var loot_context: Dictionary = {}
 var interaction_radius: float = 1.8
 var searched: bool = false
 var candidate_player: Node
@@ -31,12 +32,13 @@ func _ready() -> void:
 	if not body_exited.is_connected(_on_body_exited):
 		body_exited.connect(_on_body_exited)
 
-func configure(p_container_id: String, p_loot_table: String, p_seed_source: String, p_inventory_state, p_tables: Dictionary, world_position: Vector3, radius := 1.8) -> void:
+func configure(p_container_id: String, p_loot_table: String, p_seed_source: String, p_inventory_state, p_tables: Dictionary, world_position: Vector3, radius := 1.8, p_loot_context: Dictionary = {}) -> void:
 	container_id = p_container_id
 	loot_table = p_loot_table
 	seed_source = p_seed_source
 	inventory_state = p_inventory_state
 	tables = p_tables
+	loot_context = p_loot_context.duplicate(true)
 	interaction_radius = radius
 	searched = false
 	candidate_player = null
@@ -70,7 +72,7 @@ func try_interact(player_body: Node) -> bool:
 	# container is single-use, and the validation seam also relies on this pattern.
 	if candidate_player != player_body and not _is_player_in_direct_range(player_body):
 		return false
-	var rolled: Array = LootRollerScript.roll(loot_table, seed_source, tables)
+	var rolled: Array = LootDistributionScript.roll(loot_table, seed_source, tables, loot_context)
 	var granted: Array = []
 	for entry in rolled:
 		var item_id: String = str((entry as Dictionary).get("item_id", ""))
@@ -79,7 +81,9 @@ func try_interact(player_body: Node) -> bool:
 			continue
 		var added: int = inventory_state.add_item(item_id, qty)
 		if added > 0:
-			granted.append({ "item_id": item_id, "quantity": added })
+			var grant_entry: Dictionary = (entry as Dictionary).duplicate(true)
+			grant_entry["quantity"] = added
+			granted.append(grant_entry)
 	# Searching consumes the container even if the bag was full (no re-roll on revisit).
 	set_searched(true)
 	emit_signal("container_searched", container_id, granted)

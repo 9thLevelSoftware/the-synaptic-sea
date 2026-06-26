@@ -75,7 +75,7 @@ func _initialize() -> void:
 			quit(1)
 			return
 
-	if str(layout["schema_version"]) != "1.1.0":
+	if str(layout["schema_version"]) != "1.2.0":
 		push_error("LAYOUT SERIALIZER FAIL schema_version=%s" % str(layout["schema_version"]))
 		quit(1)
 		return
@@ -158,5 +158,5 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	print("LAYOUT SERIALIZER PASS keys=valid rooms=2 schema=1.1.0 golden_format=true prototype=valid critical_path=valid")
+	print("LAYOUT SERIALIZER PASS keys=valid rooms=2 schema=1.2.0 golden_format=true prototype=valid critical_path=valid")
 	quit(0)

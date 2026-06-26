@@ -10,6 +10,7 @@ const ObjectiveTrackerScript := preload("res://scripts/ui/objective_tracker.gd")
 const ScannerPanelScript := preload("res://scripts/ui/scanner_panel.gd")
 const InventoryPanelScript := preload("res://scripts/ui/inventory_panel.gd")
 const AccessibilitySettingsScript := preload("res://scripts/ui/accessibility_settings.gd")
+const MenuCoordinatorScript := preload("res://scripts/ui/menu_coordinator.gd")
 const ReadabilityPropFactoryScript := preload("res://scripts/procgen/readability_prop_factory.gd")
 const RouteControlStateScript := preload("res://scripts/systems/route_control_state.gd")
 const OxygenStateScript := preload("res://scripts/systems/oxygen_state.gd")
@@ -18,6 +19,7 @@ const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd"
 const ToolPickupScript := preload("res://scripts/tools/tool_pickup.gd")
 const FireStateScript := preload("res://scripts/systems/fire_state.gd")
 const ElectricalArcStateScript := preload("res://scripts/systems/electrical_arc_state.gd")
+const AudioManagerScript := preload("res://scripts/audio/audio_manager.gd")
 const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.gd")
 const RunSnapshotScript := preload("res://scripts/systems/run_snapshot.gd")
 const WorldSnapshotScript := preload("res://scripts/systems/world_snapshot.gd")
@@ -31,6 +33,11 @@ const ScannerStateScript := preload("res://scripts/systems/scanner_state.gd")
 const TravelControllerScript := preload("res://scripts/systems/travel_controller.gd")
 const LootContainerScript := preload("res://scripts/tools/loot_container.gd")
 const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
+const LootDistributionScript := preload("res://scripts/systems/loot_distribution.gd")
+const UniqueItemStateScript := preload("res://scripts/systems/unique_item_state.gd")
+const RarityTierScript := preload("res://scripts/systems/rarity_tier.gd")
+const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
+const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
 const RepairPointScript := preload("res://scripts/tools/repair_point.gd")
 const ShipOccupancyScript := preload("res://scripts/systems/ship_occupancy.gd")
 const DockPortsScript := preload("res://scripts/systems/dock_ports.gd")
@@ -47,7 +54,38 @@ const EquipmentStateScript := preload("res://scripts/systems/equipment_state.gd"
 const EncumbranceScript := preload("res://scripts/systems/encumbrance.gd")
 const PlayerVitalsModelScript := preload("res://scripts/systems/player_vitals_model.gd")
 const PlayerVitalsPanelScript := preload("res://scripts/ui/player_vitals_panel.gd")
+const HotbarPanelScript := preload("res://scripts/ui/hotbar_panel.gd")
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
+const ThreatManagerScript := preload("res://scripts/systems/threat_manager.gd")
+const TrainingEventBusScript := preload("res://scripts/systems/training_event_bus.gd")
+const SkillTreeStateScript := preload("res://scripts/systems/skill_tree_state.gd")
+const HubUpgradeStateScript := preload("res://scripts/systems/hub_upgrade_state.gd")
+const MetaProgressionStateScript := preload("res://scripts/systems/meta_progression_state.gd")
+const UnlockRegistryScript := preload("res://scripts/systems/unlock_registry.gd")
+const VitalsStateScript := preload("res://scripts/systems/vitals_state.gd")
+const SanityStateScript := preload("res://scripts/systems/sanity_state.gd")
+const RadiationStateScript := preload("res://scripts/systems/radiation_state.gd")
+const BodyTemperatureStateScript := preload("res://scripts/systems/body_temperature_state.gd")
+const StatusEffectsStateScript := preload("res://scripts/systems/status_effects_state.gd")
+const SpoilageStateScript := preload("res://scripts/systems/spoilage_state.gd")
+const CookingStateScript := preload("res://scripts/systems/cooking_state.gd")
+const HydroponicsStateScript := preload("res://scripts/systems/hydroponics_state.gd")
+const SynthesizerStateScript := preload("res://scripts/systems/synthesizer_state.gd")
+const WaterRecyclerStateScript := preload("res://scripts/systems/water_recycler_state.gd")
+const PowerGridStateScript := preload("res://scripts/systems/power_grid_state.gd")
+const LifeSupportExpandedStateScript := preload("res://scripts/systems/life_support_state.gd")
+const HullIntegrityStateScript := preload("res://scripts/systems/hull_integrity_state.gd")
+const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
+const PropulsionExpandedStateScript := preload("res://scripts/systems/propulsion_state.gd")
+const ShieldStateScript := preload("res://scripts/systems/shield_state.gd")
+const SustenanceStateScript := preload("res://scripts/systems/sustenance_state.gd")
+const EffectDispatcherScript := preload("res://scripts/systems/effect_dispatcher.gd")
+const ConsumableStateScript := preload("res://scripts/systems/consumable_state.gd")
+const MedicineStateScript := preload("res://scripts/systems/medicine_state.gd")
+const StimulantStateScript := preload("res://scripts/systems/stimulant_state.gd")
+const AddictionStateScript := preload("res://scripts/systems/addiction_state.gd")
+const AmmoStateScript := preload("res://scripts/systems/ammo_state.gd")
+const UtilityItemResolverScript := preload("res://scripts/systems/utility_item_resolver.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -94,6 +132,10 @@ const ARC_ZONE_VISUAL_COLOR_DISCHARGED: Color = Color(0.35, 0.85, 1.0, 0.35)
 const ARC_ZONE_VISUAL_COLOR_ARCING: Color = Color(0.95, 0.32, 1.0, 0.82)
 const ARC_ZONE_LABEL_TEXT_DISCHARGED: String = "ARC GROUNDED — CROSS"
 const ARC_ZONE_LABEL_TEXT_ARCING: String = "ARC LIVE — WAIT"
+const POWER_GRID_CONFIG_PATH: String = "res://data/ship_systems/power_budget_tables.json"
+const HULL_COMPARTMENTS_CONFIG_PATH: String = "res://data/ship_systems/hull_compartments.json"
+const FACILITY_UPGRADES_CONFIG_PATH: String = "res://data/ship_systems/facility_upgrades.json"
+const SHIP_SUBSYSTEM_TUNING_PATH: String = "res://data/ship_systems/subsystem_tuning.json"
 
 # Objective bridge: which manager subcomponents each objective brings operational.
 # restore_systems delivers main power (distribution + battery); stabilize_reactor
@@ -119,6 +161,8 @@ var inventory_panel
 var tracker
 var vitals_model            # PlayerVitalsModel
 var vitals_panel            # PlayerVitalsPanel
+var hotbar_panel            # HotbarPanel
+var menu_coordinator
 var interaction_root: Node3D
 var affordance_root: Node3D
 var affordance_labels: Dictionary = {}
@@ -139,6 +183,11 @@ var playable_started: bool = false
 var last_failure_reason: String = ""
 var ship_systems_manager   # ShipSystemsManager (untyped: class_name globals unreliable under --headless --script)
 var player_progression   # PlayerProgressionState (untyped: class_name unreliable headless)
+var training_event_bus   # TrainingEventBus (REQ-PM-002 / ADR-0033)
+var skill_tree_state     # SkillTreeState (REQ-PM-003)
+var hub_upgrade_state    # HubUpgradeState (REQ-PM-007)
+var meta_progression_state # MetaProgressionState (REQ-PM-006)
+var unlock_registry      # UnlockRegistry (REQ-PM-009)
 var current_ship           # ShipInstance (untyped: class_name globals unreliable headless)
 var current_occupancy      # ShipInstance the player currently occupies (defaults to home_ship)
 var sargasso_world         # SargassoWorld
@@ -182,6 +231,9 @@ var repair_point_root: Node3D = null
 var repair_points: Array = []
 var _loot_tables: Dictionary = {}
 var _salvage_loot_tables: Dictionary = {}   # objective_id -> loot_table key
+var unique_item_state
+var _loot_biome_ids_cache: Array[String] = []
+var _last_loot_feedback_line: String = ""
 var _home_player_position: Vector3 = Vector3.ZERO
 const REPAIR_OBJECTIVE_XP: int = 50
 # Narrative objective flags with no manager backing (supplies/logs). Set on
@@ -217,6 +269,12 @@ var tool_pickup: ToolPickup
 var tool_pickup_root: Node3D
 const TOOL_PICKUP_INTERACTION_RADIUS: float = 1.8
 const TOOL_PICKUP_FALLBACK_OFFSET: Vector3 = Vector3(4.0, 0.0, 0.0)
+# REQ-RL-003 / REQ-RL-004: per-run achievement service. Loaded at boot
+# when an `AchievementState` was injected by the build script; emits
+# unlock events when gameplay milestones fire (tool pickup, objective
+# completion, reactor stabilization, run complete). Cross-run state is
+# a deferred Steamworks concern (ADR-0029); this is the per-run hook.
+var achievement_state: AchievementState
 # REQ-014: junction calibrator pickup. Sits in a different side room so
 # the player can pick it up independently of the oxygen pump.
 var junction_calibrator_pickup: ToolPickup
@@ -242,6 +300,41 @@ var fire_zone_resolved_room_id: String = ""
 # StaticBody3D whose collision is toggled; arc_zone_label is the
 # localized Label3D that swaps between DISCHARGED and ARCING text.
 var electrical_arc_state: ElectricalArcState
+# ADR-0034: food / cooking / spoilage / sustenance runtime state.
+# Untyped because class_name globals are unreliable under --headless --script.
+var spoilage_state  # SpoilageState
+var cooking_state   # CookingState
+var hydroponics_state  # HydroponicsState
+var synthesizer_state  # SynthesizerState
+var water_recycler_state  # WaterRecyclerState
+var power_grid_state  # PowerGridState
+var life_support_expanded_state  # LifeSupportState
+var hull_integrity_state  # HullIntegrityState
+var fire_suppression_state  # FireSuppressionState
+var propulsion_expanded_state  # PropulsionState
+var shield_state  # ShieldState
+var sustenance_state  # SustenanceState
+# Task 05 consumables runtime state.
+var effect_dispatcher  # EffectDispatcher
+var consumable_state  # ConsumableState
+var medicine_state  # MedicineState
+var stimulant_state  # StimulantState
+var addiction_state  # AddictionState
+var ammo_state  # AmmoState
+var utility_item_state  # UtilityItemResolver
+var threat_manager  # ThreatManager
+var _last_weapon_hotbar_text: String = ""
+# REQ-SV: survival vitals runtime state.  Untyped for headless reliability.
+var vitals_state  # VitalsState
+var sanity_state  # SanityState
+var radiation_state  # RadiationState
+var body_temperature_state  # BodyTemperatureState
+var status_effects_state  # StatusEffectsState
+# REQ-AU-001..010: audio runtime. audio_manager is owned by the playable
+# (NOT an autoload, per AGENTS.md). audio_root is a Node3D parent for any
+# spatial AudioStreamPlayer3D the manager spawns.
+var audio_manager: Node
+var audio_root: Node3D
 var arc_root: Node3D
 var arc_zone_node: StaticBody3D
 var arc_zone_label: Label3D
@@ -285,16 +378,27 @@ const DEFAULT_MOVE_BINDINGS: Dictionary = {
 const DEFAULT_INTERACT_BINDINGS: Array[Key] = [KEY_E, KEY_ENTER, KEY_SPACE, KEY_KP_ENTER]
 const DEFAULT_SAVE_RUN_BINDINGS: Array[Key] = [KEY_F5]
 const DEFAULT_LOAD_RUN_BINDINGS: Array[Key] = [KEY_F9]
+const DEFAULT_ATTACK_BINDINGS: Array[Key] = [KEY_F]
 
 func ensure_default_input_actions() -> void:
 	for action_name in DEFAULT_MOVE_BINDINGS:
 		_ensure_key_action_set(action_name, DEFAULT_MOVE_BINDINGS[action_name])
 	_ensure_key_action_set("interact", DEFAULT_INTERACT_BINDINGS)
+	_ensure_key_action_set("attack_primary", DEFAULT_ATTACK_BINDINGS)
 	# REQ-012: manual save/load input actions. F5 saves, F9 loads.
 	_ensure_key_action_set("save_run", DEFAULT_SAVE_RUN_BINDINGS)
 	_ensure_key_action_set("load_run", DEFAULT_LOAD_RUN_BINDINGS)
 	_ensure_key_action_set("toggle_scanner", [KEY_TAB])
 	_ensure_key_action_set("toggle_inventory", [KEY_I])
+	_ensure_key_action_set("ui_up", [KEY_UP])
+	_ensure_key_action_set("ui_down", [KEY_DOWN])
+	_ensure_key_action_set("ui_left", [KEY_LEFT])
+	_ensure_key_action_set("ui_right", [KEY_RIGHT])
+	_ensure_key_action_set("ui_accept", [KEY_ENTER, KEY_SPACE, KEY_KP_ENTER])
+	_ensure_key_action_set("ui_cancel", [KEY_ESCAPE])
+	_ensure_key_action_set("ui_pause", [KEY_ESCAPE])
+	_ensure_key_action_set("ui_open_codex", [KEY_F1])
+	_ensure_key_action_set("ui_open_map", [KEY_M])
 
 ## A11Y-P1-001: swap in a new accessibility settings object and re-apply
 ## its scale to the HUD tracker and all existing world Label3D nodes.
@@ -311,6 +415,10 @@ func apply_accessibility_settings(settings: RefCounted) -> void:
 		tracker.apply_accessibility_settings(settings)
 	if is_instance_valid(vitals_panel) and vitals_panel.has_method("apply_accessibility_settings"):
 		vitals_panel.apply_accessibility_settings(settings)
+	if is_instance_valid(hotbar_panel) and hotbar_panel.has_method("apply_accessibility_settings"):
+		hotbar_panel.apply_accessibility_settings(settings)
+	if is_instance_valid(menu_coordinator) and menu_coordinator.has_method("apply_accessibility_settings"):
+		menu_coordinator.apply_accessibility_settings(settings)
 	_apply_world_label_scale()
 
 func _apply_world_label_scale() -> void:
@@ -912,6 +1020,46 @@ func _build_runtime_nodes() -> void:
 	_apply_lifeboat_opening_damage()
 	player_progression = PlayerProgressionScript.new()
 	_configure_player_progression()
+	# REQ-PM-002 / ADR-0033 — training event bus resolves every gameplay
+	# loop (repair / combat / crafting / discovery) into a deterministic
+	# XP grant on player_progression. Configured after player_progression
+	# so the bus can read the player's class multipliers.
+	training_event_bus = TrainingEventBusScript.new()
+	training_event_bus.configure()
+	# REQ-PM-003 / ADR-0033 — skill tree + book prereqs.
+	skill_tree_state = SkillTreeStateScript.new()
+	skill_tree_state.configure(
+		PlayerProgressionScript.load_skills_catalog(),
+		PlayerProgressionScript.load_books_catalog(),
+	)
+	skill_tree_state.load_prerequisites()
+	# REQ-PM-006 / ADR-0033 — meta state (cross-run). Loaded from
+	# user://meta_progression.json; missing file defaults to zeroed.
+	meta_progression_state = MetaProgressionStateScript.new()
+	if not meta_progression_state.load_from_disk():
+		meta_progression_state.reset_all()
+	# REQ-PM-007 / ADR-0033 — hub upgrade catalog.
+	hub_upgrade_state = HubUpgradeStateScript.new()
+	hub_upgrade_state.configure()
+	# REQ-PM-009 / ADR-0033 — cross-run unlock registry (codex / scenes /
+	# classes). Loaded from user://unlock_registry.json.
+	unlock_registry = UnlockRegistryScript.new()
+	var unlock_catalog_path: String = "res://data/player/unlock_tables.json"
+	if FileAccess.file_exists(unlock_catalog_path):
+		var unlock_text: String = FileAccess.get_file_as_string(unlock_catalog_path)
+		var unlock_parsed: Variant = JSON.parse_string(unlock_text)
+		if typeof(unlock_parsed) == TYPE_DICTIONARY:
+			unlock_registry.configure(unlock_parsed)
+		else:
+			unlock_registry.configure()
+	else:
+		unlock_registry.configure()
+	unlock_registry.load_from_disk()
+	unique_item_state = UniqueItemStateScript.new()
+	unique_item_state.configure()
+	# Re-run progression setup after loading cross-run meta + hub state so
+	# persistent starting-skill and XP-multiplier bonuses are actually applied.
+	_configure_player_progression()
 	route_control_state = RouteControlStateScript.new()
 	route_gate_nodes.clear()
 	objective_progress_state = ObjectiveProgressStateScript.new()
@@ -955,6 +1103,48 @@ func _build_runtime_nodes() -> void:
 	arc_root = Node3D.new()
 	arc_root.name = "ElectricalArcRoot"
 	add_child(arc_root)
+	# REQ-SV: instantiate survival vitals models.
+	vitals_state = VitalsStateScript.new()
+	sanity_state = SanityStateScript.new()
+	radiation_state = RadiationStateScript.new()
+	body_temperature_state = BodyTemperatureStateScript.new()
+	status_effects_state = StatusEffectsStateScript.new()
+	# ADR-0034: instantiate food / cooking / spoilage / sustenance models.
+	spoilage_state = SpoilageStateScript.new()
+	cooking_state = CookingStateScript.new()
+	hydroponics_state = HydroponicsStateScript.new()
+	synthesizer_state = SynthesizerStateScript.new()
+	water_recycler_state = WaterRecyclerStateScript.new()
+	_configure_expanded_ship_system_models()
+	effect_dispatcher = EffectDispatcherScript.new()
+	effect_dispatcher.configure({})
+	consumable_state = ConsumableStateScript.new()
+	consumable_state.configure({})
+	medicine_state = MedicineStateScript.new()
+	medicine_state.configure({})
+	stimulant_state = StimulantStateScript.new()
+	stimulant_state.configure({})
+	addiction_state = AddictionStateScript.new()
+	addiction_state.configure({})
+	ammo_state = AmmoStateScript.new()
+	ammo_state.configure({})
+	utility_item_state = UtilityItemResolverScript.new()
+	utility_item_state.configure({})
+	threat_manager = ThreatManagerScript.new()
+	threat_manager.name = "ThreatManager"
+	add_child(threat_manager)
+	# REQ-AU-001..010: build the AudioManager service. The manager owns
+	# six pure models (bus_config, ambient, sfx_router, music, spatial,
+	# meta_event) and a per-bus AudioStreamPlayer pool. Constructed after
+	# the hazards so the manager's music-state engine can read engagement /
+	# hazard / vitals signals from the same models the rest of the scene
+	# uses.
+	audio_manager = AudioManagerScript.new()
+	audio_manager.name = "AudioManager"
+	add_child(audio_manager)
+	audio_root = Node3D.new()
+	audio_root.name = "AudioRoot"
+	add_child(audio_root)
 	derelict_objective_root = Node3D.new()
 	derelict_objective_root.name = "DerelictObjectiveRoot"
 	add_child(derelict_objective_root)
@@ -988,7 +1178,31 @@ func _configure_player_progression() -> void:
 	var class_def = classes.get(starting_class_id, classes.get("engineer", null))
 	if class_def == null:
 		push_error("PlayableGeneratedShip: no class definition for '%s' or fallback 'engineer' (data/player/classes.json missing or malformed)" % starting_class_id)
-	player_progression.configure(class_def, PlayerProgressionScript.load_skills_catalog())
+	player_progression.configure(
+		class_def,
+		PlayerProgressionScript.load_skills_catalog(),
+		PlayerProgressionScript.load_books_catalog(),
+	)
+	# REQ-PM-007 / ADR-0033 — apply persistent starting-skill bonuses
+	# purchased as hub upgrades on prior runs.
+	if hub_upgrade_state != null and meta_progression_state != null:
+		var bonuses: Dictionary = hub_upgrade_state.compose_starting_skill_bonuses(meta_progression_state)
+		for sid in bonuses:
+			if player_progression.skills.has(sid):
+				var current: int = int(player_progression.skills[sid])
+				var bonus: int = int(bonuses[sid])
+				player_progression.skills[sid] = clampi(current + bonus, 0, PlayerProgressionScript.MAX_SKILL_LEVEL)
+	# REQ-PM-007 — apply persistent XP multiplier bonuses.
+	if hub_upgrade_state != null and meta_progression_state != null:
+		var mults: Dictionary = hub_upgrade_state.compose_xp_multipliers(meta_progression_state)
+		for cat in mults:
+			var m: float = float(mults[cat])
+			if m > 1.0:
+				# PlayerProgressionState._xp_multipliers is keyed by category;
+				# multiplicative composition means the upgrade bonus layers
+				# on top of the class multiplier already in place.
+				var existing: float = float(player_progression._xp_multipliers.get(cat, 1.0))
+				player_progression._xp_multipliers[cat] = existing * m
 
 ## Loads the blueprint sidecar that seeds the ShipSystemsManager's condition
 ## damage. Falls back to a DAMAGED/seed=17 default (never crashes the slice)
@@ -1005,6 +1219,121 @@ func _load_blueprint_for_systems():
 		return fallback
 	return ShipBlueprintScript.from_dict(parsed as Dictionary)
 
+func _load_json_dict(path: String) -> Dictionary:
+	if path.is_empty() or not FileAccess.file_exists(path):
+		return {}
+	var text: String = FileAccess.get_file_as_string(path)
+	var parsed: Variant = JSON.parse_string(text)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {}
+	return parsed as Dictionary
+
+func _configure_expanded_ship_system_models() -> void:
+	power_grid_state = PowerGridStateScript.new()
+	power_grid_state.configure(_load_json_dict(POWER_GRID_CONFIG_PATH))
+	hull_integrity_state = HullIntegrityStateScript.new()
+	hull_integrity_state.configure(_load_json_dict(HULL_COMPARTMENTS_CONFIG_PATH))
+	var tuning: Dictionary = _load_json_dict(SHIP_SUBSYSTEM_TUNING_PATH)
+	life_support_expanded_state = LifeSupportExpandedStateScript.new()
+	life_support_expanded_state.configure(tuning.get("life_support", {}))
+	fire_suppression_state = FireSuppressionStateScript.new()
+	fire_suppression_state.configure(tuning.get("fire_suppression", {}))
+	propulsion_expanded_state = PropulsionExpandedStateScript.new()
+	propulsion_expanded_state.configure(tuning.get("propulsion", {}))
+	shield_state = ShieldStateScript.new()
+	shield_state.configure(tuning.get("shields", {}))
+	sustenance_state = SustenanceStateScript.new()
+	sustenance_state.configure(_load_json_dict(FACILITY_UPGRADES_CONFIG_PATH))
+
+func _manager_broken_systems() -> Array[String]:
+	var broken: Array[String] = []
+	if ship_systems_manager == null:
+		return broken
+	for subsystem_id in ["life_support", "propulsion"]:
+		if not ship_systems_manager.systems.has(subsystem_id) or not ship_systems_manager.is_operational(subsystem_id):
+			broken.append(subsystem_id)
+	return broken
+
+func _recompute_expanded_ship_systems(delta: float) -> void:
+	if power_grid_state == null:
+		return
+	var power_health: float = 0.0
+	if ship_systems_manager != null and ship_systems_manager.get_system("power") != null:
+		power_health = ship_systems_manager.get_system("power").health()
+	power_grid_state.rebalance(power_health, _manager_broken_systems())
+	if propulsion_expanded_state != null and hull_integrity_state != null:
+		propulsion_expanded_state.tick(delta, {
+			"powered_ratio": power_grid_state.get_allocation_ratio("propulsion"),
+			"manager_operational": ship_systems_manager != null and ship_systems_manager.is_operational("propulsion"),
+			"hull_penalty": 1.0 - hull_integrity_state.average_integrity(),
+		})
+	if shield_state != null:
+		shield_state.tick(delta, {"powered_ratio": power_grid_state.get_allocation_ratio("shields")})
+	if life_support_expanded_state != null and hull_integrity_state != null:
+		var recycled_water: float = 0.0
+		if water_recycler_state != null:
+			recycled_water = float(water_recycler_state.output_ready)
+		life_support_expanded_state.tick(delta, {
+			"powered_ratio": power_grid_state.get_allocation_ratio("life_support"),
+			"breach_count": hull_integrity_state.get_breach_count(),
+			"recycled_water": recycled_water,
+		})
+	if fire_suppression_state != null:
+		fire_suppression_state.tick(delta, {"powered_ratio": power_grid_state.get_allocation_ratio("stations")})
+	if sustenance_state != null:
+		sustenance_state.tick(delta, {
+			"powered_ratio": power_grid_state.get_allocation_ratio("sustenance"),
+			"hydroponics_summary": hydroponics_state.get_summary() if hydroponics_state != null else {},
+			"synthesizer_summary": synthesizer_state.get_summary() if synthesizer_state != null else {},
+			"water_recycler_summary": water_recycler_state.get_summary() if water_recycler_state != null else {},
+		})
+
+func _expanded_ship_systems_summary() -> Dictionary:
+	return {
+		"power_grid_summary": power_grid_state.get_summary() if power_grid_state != null else {},
+		"life_support_state_summary": life_support_expanded_state.get_summary() if life_support_expanded_state != null else {},
+		"hull_integrity_summary": hull_integrity_state.get_summary() if hull_integrity_state != null else {},
+		"fire_suppression_summary": fire_suppression_state.get_summary() if fire_suppression_state != null else {},
+		"propulsion_state_summary": propulsion_expanded_state.get_summary() if propulsion_expanded_state != null else {},
+		"shield_state_summary": shield_state.get_summary() if shield_state != null else {},
+		"sustenance_state_summary": sustenance_state.get_summary() if sustenance_state != null else {},
+	}
+
+func get_ship_systems_expanded_summary() -> Dictionary:
+	return _expanded_ship_systems_summary()
+
+func set_manual_power_route_for_validation(subsystem_id: String, units: float) -> bool:
+	if power_grid_state == null:
+		return false
+	var ok: bool = power_grid_state.set_manual_route(subsystem_id, units)
+	_recompute_expanded_ship_systems(0.0)
+	_refresh_tracker_system_status_lines()
+	return ok
+
+func force_hull_breach_for_validation(compartment_id: String, amount: float = 0.6) -> bool:
+	if hull_integrity_state == null:
+		return false
+	var ok: bool = hull_integrity_state.damage_compartment(compartment_id, amount, true)
+	_recompute_expanded_ship_systems(0.0)
+	_refresh_tracker_system_status_lines()
+	return ok
+
+func seal_hull_breach_for_validation(compartment_id: String, amount: float = 1.0) -> bool:
+	if hull_integrity_state == null:
+		return false
+	var ok: bool = hull_integrity_state.seal_compartment(compartment_id, amount)
+	_recompute_expanded_ship_systems(0.0)
+	_refresh_tracker_system_status_lines()
+	return ok
+
+func ignite_compartment_for_validation(compartment_id: String, intensity: float = 1.0) -> bool:
+	if fire_suppression_state == null:
+		return false
+	var ok: bool = fire_suppression_state.ignite(compartment_id, intensity)
+	_recompute_expanded_ship_systems(0.0)
+	_refresh_tracker_system_status_lines()
+	return ok
+
 ## Validation seam: the live ShipSystemsManager (null before _build_runtime_nodes()).
 func get_ship_systems_manager():
 	return ship_systems_manager
@@ -1012,6 +1341,52 @@ func get_ship_systems_manager():
 ## Validation seam: the live PlayerProgressionState (null before _build_runtime_nodes()).
 func get_player_progression():
 	return player_progression
+
+## REQ-PM-002 / ADR-0033 validation seam.
+func get_training_event_bus():
+	return training_event_bus
+
+## REQ-PM-003 / ADR-0033 validation seam.
+func get_skill_tree_state():
+	return skill_tree_state
+
+## REQ-PM-007 / ADR-0033 validation seam.
+func get_hub_upgrade_state():
+	return hub_upgrade_state
+
+## REQ-PM-006 / ADR-0033 validation seam.
+func get_meta_progression_state():
+	return meta_progression_state
+
+## REQ-PM-009 / ADR-0033 validation seam.
+func get_unlock_registry():
+	return unlock_registry
+
+## REQ-PM-008 / ADR-0033 — explicit end-of-run trigger (death, extraction,
+## abandon). Applies the meta payout, persists meta + unlock state, then
+## wipes the current-run save file so a fresh run starts clean.
+##
+## Returns the payout amount in meta_currency. Idempotent: a second call
+## after the slice is already complete returns 0 and is a no-op.
+func end_run(reason: String = "extraction") -> int:
+	if slice_complete:
+		return 0
+	slice_complete = true
+	tracker.mark_run_complete()
+	var payout: int = int(_apply_meta_payout_and_persist(reason))
+	if save_load_service != null:
+		save_load_service.delete_current_run()
+	emit_signal("playable_slice_completed", get_slice_completion_summary())
+	return payout
+
+## REQ-PM-002 / ADR-0033 — public seam for gameplay code (repair points,
+## combat, cooking, scanners, etc.) to fire a deterministic training event
+## through the bus. Returns the resolved (skill_id, base_xp) record or
+## null on rejection (unknown event, missing progression, suppressed).
+func emit_training_event(event_id: String, target_id: String = ""):
+	if training_event_bus == null or player_progression == null:
+		return null
+	return training_event_bus.emit(event_id, target_id, player_progression)
 
 ## Phase 4.5 validation seam: the current ShipInstance (null before the first
 ## ship loads).
@@ -1202,6 +1577,29 @@ func scannable_marker_ids_for_validation() -> Array:
 		out.append(String(m.marker_id))
 	return out
 
+## Validation seam: the subset of in-range markers whose generated layouts actually
+## contain a bridge room and are therefore claimable/pilotable. This makes smokes
+## deterministic when nearby marker geometry changes: bridge presence is weighted,
+## so raw in-range markers are no longer guaranteed to include a claimable host.
+func claimable_marker_ids_for_validation() -> Array:
+	var out: Array = []
+	if sargasso_world == null or scanner_state == null or ship_generator == null:
+		return out
+	for marker in sargasso_world.markers_in_range(scanner_state.range_radius):
+		if _marker_has_bridge_for_validation(marker):
+			out.append(String(marker.marker_id))
+	return out
+
+func _marker_has_bridge_for_validation(marker) -> bool:
+	if marker == null or ship_generator == null:
+		return false
+	var built = ship_generator.generate_from_seed(int(marker.seed_value), int(marker.size_class), int(marker.condition))
+	if built == null:
+		return false
+	var has_bridge: bool = built.has_method("get_layout_copy") and _layout_has_bridge(built.get_layout_copy())
+	built.queue_free()
+	return has_bridge
+
 ## Phase 5a Task 5 validation seam: count of distinct in-tree ship scene_roots
 ## currently parented under the coordinator. Returns 1 when only the home ship
 ## is present (no lifeboat or derelict), 2 when the home derelict + lifeboat are
@@ -1233,10 +1631,13 @@ func _current_systems_ops() -> Dictionary:
 	# claimed derelict, not just the lifeboat). Fall back to the coordinator's starting
 	# manager before a piloted ship exists.
 	var mgr = piloted_ship.systems_manager if piloted_ship != null and piloted_ship.systems_manager != null else ship_systems_manager
+	var propulsion_ok: bool = mgr != null and mgr.is_operational("propulsion")
+	if propulsion_expanded_state != null:
+		propulsion_ok = propulsion_ok and propulsion_expanded_state.can_propel()
 	return {
 		"navigation": mgr != null and mgr.is_operational("navigation"),
 		"scanners": mgr != null and mgr.is_operational("scanners"),
-		"propulsion": mgr != null and mgr.is_operational("propulsion"),
+		"propulsion": propulsion_ok,
 	}
 
 ## Resolves the visible markers at the gated detail level, deriving operational
@@ -1257,7 +1658,10 @@ func travel_to_marker_id(marker_id: String) -> Dictionary:
 		return {"success": false, "reason": "not_ready", "ship": null}
 	for m in sargasso_world.markers_in_range(scanner_state.range_radius):
 		if String(m.marker_id) == marker_id:
-			return travel_to(m)
+			var result: Dictionary = travel_to(m)
+			if bool(result.get("success", false)) and is_instance_valid(menu_coordinator):
+				menu_coordinator.trigger_tutorial("ship_traveled", "any")
+			return result
 	return {"success": false, "reason": "unknown_marker", "ship": null}
 
 ## Makes `inst` the active boarded derelict: attaches the freshly built
@@ -1910,7 +2314,7 @@ func _build_loot_containers() -> void:
 		var lc = LootContainerScript.new()
 		var seed_source: String = "%s:%s" % [String(current_ship.marker_id), cid]
 		lc.configure(cid, str(spec.get("loot_table", "generic_crate")), seed_source,
-			inventory_state, _loot_tables, pos_variant, 1.8)
+			inventory_state, _loot_tables, pos_variant, 1.8, _build_loot_context(spec))
 		if looted.has(cid):
 			lc.set_searched(true)
 		if not lc.container_searched.is_connected(_on_loot_container_searched):
@@ -2119,6 +2523,7 @@ func _apply_lifeboat_opening_damage() -> void:
 func _on_loot_container_searched(container_id: String, granted: Array) -> void:
 	if current_ship != null and not current_ship.looted_container_ids.has(container_id):
 		current_ship.looted_container_ids.append(container_id)
+	_postprocess_loot_grants(granted, container_id)
 	_refresh_inventory_hud()
 	# Auto-equip granted containers into empty slots (Phase-7 deferral: no equip UI yet).
 	for entry in granted:
@@ -2149,13 +2554,30 @@ func _on_derelict_interactable_completed(interaction_id: String, objective_id: S
 	# the interactable cannot re-fire after completed = true).
 	if objective_type == "salvage" and _salvage_loot_tables.has(objective_id):
 		var seed_source: String = "%s:%s" % [String(current_ship.marker_id), objective_id]
-		var rolled: Array = LootRollerScript.roll(_salvage_loot_tables[objective_id], seed_source, _loot_tables)
+		var rolled: Array = LootDistributionScript.roll(_salvage_loot_tables[objective_id], seed_source, _loot_tables, {
+			"biome_id": _resolve_current_loot_biome_id(),
+			"depth": _resolve_current_loot_depth(),
+			"condition": _resolve_current_loot_condition(),
+			"container_kind": "salvage_objective",
+			"item_definitions": ItemDefsScript.load_definitions(),
+			"unique_state": unique_item_state,
+		})
+		var granted: Array = []
 		for entry in rolled:
-			inventory_state.add_item(str(entry.get("item_id", "")), int(entry.get("quantity", 0)))
+			var added: int = inventory_state.add_item(str(entry.get("item_id", "")), int(entry.get("quantity", 0)))
+			if added > 0:
+				var granted_entry: Dictionary = (entry as Dictionary).duplicate(true)
+				granted_entry["quantity"] = added
+				granted.append(granted_entry)
+		_postprocess_loot_grants(granted, objective_id)
 		_refresh_inventory_hud()
 		_recompute_player_encumbrance()   # salvage rewards change carry weight -> refresh Heavy Load
 	print("DERELICT OBJECTIVE COMPLETE marker=%s sequence=%d type=%s cleared=%s" % [
 		String(current_ship.marker_id), sequence, objective_type, str(controller.is_cleared()).to_lower()])
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("objective_completed", objective_type)
+		if not room_id.is_empty():
+			menu_coordinator.reveal_room(room_id)
 
 ## Validation seam: complete a derelict objective by sequence through the real
 ## interaction path (bypassing proximity via set_validation_player_in_range).
@@ -2220,6 +2642,7 @@ func travel_to(marker) -> Dictionary:
 	# The home gameplay roots (interaction_root, oxygen_root, etc.) also stay
 	# in-tree. A DERELICT (non-empty marker_id) keeps its retained ShipInstance in
 	# visited_ships but frees its scene_root (geometry regenerates from seed on revisit).
+	_sync_current_ship_combat_summary()
 	var leaving = current_ship
 	if String(leaving.marker_id) == "":
 		# Leaving home: record the player's position so travel_home can restore it.
@@ -2252,6 +2675,7 @@ func travel_to(marker) -> Dictionary:
 		visited_ships[mid] = inst
 
 	_attach_derelict_active(inst, new_root)
+	_configure_threat_runtime_for_current_ship()
 	# Phase 5b Task 5: NO player teleport into the derelict. The player rides the
 	# piloted ship, which docked flush to the target; _attach_derelict_active carried
 	# the player along. They cross the (closed) dock barrier themselves to board the
@@ -2269,6 +2693,7 @@ func travel_to(marker) -> Dictionary:
 func travel_home() -> bool:
 	if not away_from_start or home_ship == null:
 		return false
+	_sync_current_ship_combat_summary()
 	# Phase 5b Task 5: undock the piloted ship from the current derelict so the ride
 	# physically detaches before the host is freed (capture the player carry first so
 	# they ride the piloted ship back home rather than being left in the freed frame).
@@ -2291,6 +2716,7 @@ func travel_home() -> bool:
 	# Home hull stays in-tree — no re-add needed (co-presence).
 	current_ship = home_ship
 	away_from_start = false
+	_configure_threat_runtime_for_current_ship()
 	_clear_derelict_objectives()
 	_clear_loot_containers()
 	_clear_repair_points()
@@ -2375,6 +2801,11 @@ func _build_hud_layer() -> void:
 	if vitals_panel.has_method("apply_accessibility_settings"):
 		vitals_panel.apply_accessibility_settings(accessibility_settings)
 	hud_layer.add_child(vitals_panel)
+	hotbar_panel = HotbarPanelScript.new()
+	hotbar_panel.name = "WeaponHotbarPanel"
+	if hotbar_panel.has_method("apply_accessibility_settings"):
+		hotbar_panel.apply_accessibility_settings(accessibility_settings)
+	hud_layer.add_child(hotbar_panel)
 	scanner_panel = ScannerPanelScript.new()
 	scanner_panel.name = "ScannerPanel"
 	scanner_panel.visible = false
@@ -2389,6 +2820,32 @@ func _build_hud_layer() -> void:
 	hud_layer.add_child(inventory_panel)
 	inventory_panel.panel_closed.connect(_on_inventory_panel_closed)
 	inventory_panel.transfer_completed.connect(_on_inventory_transfer_completed)
+	inventory_panel.use_requested.connect(_on_inventory_use_requested)
+	menu_coordinator = MenuCoordinatorScript.new()
+	menu_coordinator.name = "MenuCoordinator"
+	hud_layer.add_child(menu_coordinator)
+	menu_coordinator.modal_opened.connect(_on_ui_modal_opened)
+	menu_coordinator.modal_closed.connect(_on_ui_modal_closed)
+	menu_coordinator.save_requested.connect(request_save)
+	menu_coordinator.load_requested.connect(request_load)
+	menu_coordinator.quit_requested.connect(_on_ui_quit_requested)
+	menu_coordinator.settings_changed.connect(_on_ui_settings_changed)
+	var configured: bool = menu_coordinator.configure(
+		_load_json_dict("res://data/ui/menu_definitions.json"),
+		_load_json_dict("res://data/ui/tutorial_triggers.json"),
+		_load_json_dict("res://data/ui/codex_entries.json"),
+		_load_json_dict("res://data/ui/input_glyphs.json"),
+		_load_json_dict("res://data/ui/tooltip_catalog.json"),
+		_load_json_dict("res://data/ui/accessibility_presets.json"),
+		_build_ui_bindings_table(),
+		accessibility_settings,
+	)
+	if not configured:
+		push_warning("PlayableGeneratedShip: MenuCoordinator configure returned false")
+	menu_coordinator.set_load_available(is_load_available())
+	menu_coordinator.set_inventory_items(_inventory_hotbar_ids())
+	menu_coordinator.set_hotbar_slots(_get_consumable_slot_labels())
+	menu_coordinator.open_main_menu()
 
 func _on_scanner_panel_closed() -> void:
 	if player != null:
@@ -2412,12 +2869,20 @@ func _on_inventory_panel_closed() -> void:
 ## (the O2-pump drain benefit follows the pump in/out of the player inventory).
 func _on_inventory_transfer_completed() -> void:
 	_recompute_player_encumbrance()
+	_ensure_consumable_hotbar_assignments()
 	_refresh_oxygen_state(false, 0.0)
+	_refresh_consumable_ui()
+	_refresh_weapon_hotbar()
+
+func _on_inventory_use_requested(item_id: String, use_all: bool) -> void:
+	_use_consumable_item(item_id, use_all)
 
 func _open_inventory_self() -> void:
 	if not is_instance_valid(inventory_panel) or inventory_state == null:
 		return
 	inventory_panel.open_self(inventory_state, equipment_state)
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("inventory_opened", "any")
 	_freeze_player_for_panel()
 
 func _open_transfer_panel_for_ship(ship_id: String) -> void:
@@ -2438,6 +2903,312 @@ func _open_transfer_panel_for_cart(cart_id: String) -> void:
 	inventory_panel.open_transfer(inventory_state, hit["cart"].get_hold(), "CART", equipment_state)
 	_freeze_player_for_panel()
 
+func _build_ui_bindings_table() -> Dictionary:
+	var table: Dictionary = {
+		"interact": get_input_action_keycodes_for_validation("interact"),
+		"move_up": get_input_action_keycodes_for_validation("move_forward"),
+		"move_down": get_input_action_keycodes_for_validation("move_back"),
+		"move_left": get_input_action_keycodes_for_validation("move_left"),
+		"move_right": get_input_action_keycodes_for_validation("move_right"),
+		"toggle_inventory": get_input_action_keycodes_for_validation("toggle_inventory"),
+		"toggle_scanner": get_input_action_keycodes_for_validation("toggle_scanner"),
+		"ui_pause": get_input_action_keycodes_for_validation("ui_pause"),
+		"ui_cancel": get_input_action_keycodes_for_validation("ui_cancel"),
+		"ui_accept": get_input_action_keycodes_for_validation("ui_accept"),
+		"save_run": get_input_action_keycodes_for_validation("save_run"),
+		"load_run": get_input_action_keycodes_for_validation("load_run"),
+		"ui_open_codex": get_input_action_keycodes_for_validation("ui_open_codex"),
+		"ui_open_map": get_input_action_keycodes_for_validation("ui_open_map"),
+	}
+	for action_name in ["move_forward", "move_back", "move_left", "move_right"]:
+		if not InputMap.has_action(action_name):
+			continue
+	return table
+
+func _inventory_hotbar_ids() -> Array:
+	if inventory_state == null:
+		return []
+	var ids: Array = inventory_state.items.keys()
+	ids.sort()
+	var out: Array = []
+	for id_variant in ids:
+		out.append(String(id_variant))
+	return out
+
+func _weapon_ammo_item_id(weapon_id: String) -> String:
+	match weapon_id:
+		"flare_pistol":
+			return "flare_round"
+		"shock_probe":
+			return "capacitor_cell"
+		"welding_lance":
+			return "fuel_canister"
+		_:
+			return ""
+
+func _equipped_primary_weapon_id() -> String:
+	if equipment_state == null:
+		return ""
+	for slot_id in ["primary_hand", "secondary_hand"]:
+		var item_id: String = str(equipment_state.get_equipped(slot_id))
+		if item_id == "capacitor_cell":
+			return "shock_probe"
+		if item_id in ["crowbar", "flare_pistol", "welding_lance"]:
+			return item_id
+	return ""
+
+func _player_armor_profile() -> Dictionary:
+	var profile: Dictionary = {
+		"flat_reduction": {},
+		"resistance": {},
+		"durability": 0.0,
+		"max_durability": 0.0,
+		"wear_factor": 0.35,
+	}
+	if equipment_state == null:
+		return profile
+	var suit_id: String = str(equipment_state.get_equipped("suit"))
+	if suit_id == "hardsuit":
+		profile["resistance"] = {
+			"physical": 0.20,
+			"bleed": 0.15,
+			"fire": 0.25,
+			"electric": 0.20,
+		}
+		profile["durability"] = 40.0
+		profile["max_durability"] = 40.0
+	return profile
+
+func _combat_anchor_for_current_ship() -> Vector3:
+	if current_ship != null and is_instance_valid(current_ship.scene_root):
+		return (current_ship.scene_root as Node3D).global_position
+	return Vector3.ZERO
+
+func _combat_layout_for_current_ship() -> Dictionary:
+	if current_ship != null and typeof(current_ship.built_layout) == TYPE_DICTIONARY and not current_ship.built_layout.is_empty():
+		return current_ship.built_layout
+	if loader != null and loader.has_method("get_layout_copy"):
+		return loader.get_layout_copy()
+	return {}
+
+func _combat_markers_for_current_ship() -> Array:
+	var layout: Dictionary = _combat_layout_for_current_ship()
+	var raw: Variant = layout.get("encounters", [])
+	if raw is Array and not (raw as Array).is_empty():
+		return (raw as Array).duplicate(true)
+	if loader != null and loader.has_method("get_encounter_markers"):
+		return loader.get_encounter_markers()
+	return []
+
+func _sync_current_ship_combat_summary() -> void:
+	if current_ship == null or threat_manager == null:
+		return
+	current_ship.combat_summary = threat_manager.get_summary()
+
+func _configure_threat_runtime_for_current_ship() -> void:
+	if threat_manager == null:
+		return
+	var anchor: Vector3 = _combat_anchor_for_current_ship()
+	threat_manager.fallback_anchor = anchor
+	if current_ship != null and not current_ship.combat_summary.is_empty():
+		threat_manager.apply_summary(current_ship.combat_summary)
+	else:
+		threat_manager.configure_for_layout(_combat_layout_for_current_ship(), _combat_markers_for_current_ship(), anchor)
+	_refresh_weapon_hotbar()
+
+func _refresh_weapon_hotbar() -> void:
+	if not is_instance_valid(hotbar_panel):
+		return
+	var weapon_id: String = _equipped_primary_weapon_id()
+	if weapon_id.is_empty():
+		_last_weapon_hotbar_text = "Weapon: unarmed | Threat: %.2f | Hostiles: %d" % [
+			threat_manager.awareness_indicator if threat_manager != null else 0.0,
+			threat_manager.get_active_threat_count() if threat_manager != null else 0,
+		]
+		hotbar_panel.set_hotbar_text(_last_weapon_hotbar_text)
+		return
+	var weapon_name: String = ItemDefsScript.display_name(_definitions_for_equip(), weapon_id)
+	var ammo_item_id: String = _weapon_ammo_item_id(weapon_id)
+	var ammo_text: String = "melee"
+	if not ammo_item_id.is_empty() and inventory_state != null:
+		ammo_text = "%s=%d" % [ammo_item_id, inventory_state.get_quantity(ammo_item_id)]
+	var combat_text: String = "idle"
+	if threat_manager != null:
+		combat_text = "combat" if threat_manager.has_combat_engagement() else "stealth"
+	_last_weapon_hotbar_text = "%s | %s | Threat %.2f | %s" % [
+		weapon_name,
+		ammo_text,
+		threat_manager.awareness_indicator if threat_manager != null else 0.0,
+		combat_text,
+	]
+	hotbar_panel.set_hotbar_text(_last_weapon_hotbar_text)
+
+func _attack_with_equipped_weapon() -> Dictionary:
+	if threat_manager == null:
+		return {"ok": false, "reason": "threat_manager_missing"}
+	var weapon_id: String = _equipped_primary_weapon_id()
+	if weapon_id.is_empty():
+		weapon_id = "crowbar"
+	var result: Dictionary = threat_manager.attack_with_weapon(weapon_id, inventory_state, equipment_state)
+	if bool(result.get("ok", false)):
+		_refresh_inventory_hud()
+		_refresh_player_vitals(0.0)
+		_sync_current_ship_combat_summary()
+	_refresh_weapon_hotbar()
+	return result
+
+func _tick_threat_runtime(delta: float) -> void:
+	if threat_manager == null:
+		return
+	var player_pos: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
+	threat_manager.set_player_signals(
+		0.2 if player != null and player.has_method("is_moving") and player.is_moving() else 0.05,
+		0.35,
+		0.55,
+		false,
+		"",
+	)
+	threat_manager.tick_threats(delta, vitals_state, status_effects_state, _player_armor_profile(), player_pos)
+	_sync_current_ship_combat_summary()
+	_refresh_weapon_hotbar()
+
+func _consumable_pipeline_context() -> Dictionary:
+	return {
+		"effect_dispatcher": effect_dispatcher,
+		"consumable_state": consumable_state,
+		"medicine_state": medicine_state,
+		"stimulant_state": stimulant_state,
+		"addiction_state": addiction_state,
+		"ammo_state": ammo_state,
+		"utility_state": utility_item_state,
+		"vitals_state": vitals_state,
+		"sanity_state": sanity_state,
+		"radiation_state": radiation_state,
+		"body_temperature_state": body_temperature_state,
+		"status_effects_state": status_effects_state,
+	}
+
+func _get_consumable_slot_labels() -> Array:
+	var out: Array = []
+	if consumable_state == null:
+		return out
+	for item_id_variant in consumable_state.hotbar_slots:
+		var item_id: String = str(item_id_variant)
+		if item_id.is_empty():
+			out.append("(empty)")
+		else:
+			var qty: int = inventory_state.get_quantity(item_id) if inventory_state != null else 0
+			out.append("%s x%d" % [ItemDefsScript.display_name(_definitions_for_equip(), item_id), qty])
+	return out
+
+func _refresh_consumable_ui(selected_index: int = 0) -> void:
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.set_inventory_items(_inventory_hotbar_ids())
+		menu_coordinator.set_hotbar_slots(_get_consumable_slot_labels(), selected_index)
+
+func _ensure_consumable_hotbar_assignments() -> void:
+	if consumable_state == null or inventory_state == null:
+		return
+	var usable: Array = []
+	for item_id_variant in _inventory_hotbar_ids():
+		var item_id: String = str(item_id_variant)
+		if inventory_state.get_quantity(item_id) > 0 and consumable_state.has_use_action(item_id):
+			usable.append(item_id)
+	for slot_index in range(consumable_state.hotbar_slots.size()):
+		var current: String = str(consumable_state.hotbar_slots[slot_index])
+		if current.is_empty() or inventory_state.get_quantity(current) <= 0 or not consumable_state.has_use_action(current):
+			consumable_state.assign_hotbar_slot(slot_index, usable[slot_index] if slot_index < usable.size() else "")
+
+func _use_consumable_item(item_id: String, use_all: bool = false) -> Dictionary:
+	if consumable_state == null or inventory_state == null:
+		return {"ok": false, "reason": "consumable_pipeline_missing"}
+	var result: Dictionary = consumable_state.use_item(item_id, inventory_state, _consumable_pipeline_context(), use_all)
+	if bool(result.get("ok", false)):
+		_ensure_consumable_hotbar_assignments()
+		_recompute_player_encumbrance()
+		_refresh_oxygen_state(false, 0.0)
+		_refresh_player_vitals(0.0)
+		_refresh_consumable_ui()
+	return result
+
+func _use_consumable_hotbar_slot(slot_index: int) -> Dictionary:
+	if consumable_state == null or inventory_state == null:
+		return {"ok": false, "reason": "consumable_pipeline_missing"}
+	var result: Dictionary = consumable_state.use_hotbar_slot(slot_index, inventory_state, _consumable_pipeline_context())
+	if bool(result.get("ok", false)):
+		_ensure_consumable_hotbar_assignments()
+		_recompute_player_encumbrance()
+		_refresh_oxygen_state(false, 0.0)
+		_refresh_player_vitals(0.0)
+		_refresh_consumable_ui(slot_index)
+	return result
+
+func _build_ui_room_payload() -> Dictionary:
+	var room_set: Dictionary = {}
+	var neighbours: Dictionary = {}
+	if loader != null and loader.has_method("get_room_links"):
+		for link_variant in loader.get_room_links():
+			if typeof(link_variant) != TYPE_DICTIONARY:
+				continue
+			var link: Dictionary = link_variant
+			var from_room: String = str(link.get("from_room", ""))
+			var to_room: String = str(link.get("to_room", ""))
+			if from_room.is_empty() or to_room.is_empty():
+				continue
+			room_set[from_room] = true
+			room_set[to_room] = true
+			if not neighbours.has(from_room):
+				neighbours[from_room] = []
+			if not neighbours.has(to_room):
+				neighbours[to_room] = []
+			if not (neighbours[from_room] as Array).has(to_room):
+				(neighbours[from_room] as Array).append(to_room)
+			if not (neighbours[to_room] as Array).has(from_room):
+				(neighbours[to_room] as Array).append(from_room)
+	for objective in loader.get_objective_specs_copy() if loader != null and loader.has_method("get_objective_specs_copy") else []:
+		if typeof(objective) == TYPE_DICTIONARY:
+			var room_id: String = str((objective as Dictionary).get("room_id", ""))
+			if not room_id.is_empty():
+				room_set[room_id] = true
+	for room_id in [fire_zone_resolved_room_id, arc_zone_resolved_room_id]:
+		if not String(room_id).is_empty():
+			room_set[String(room_id)] = true
+	var rooms: Array = room_set.keys()
+	rooms.sort()
+	for room_id in rooms:
+		if not neighbours.has(room_id):
+			neighbours[room_id] = []
+	return {"rooms": rooms, "neighbours": neighbours}
+
+func _refresh_ui_shell_runtime() -> void:
+	if not is_instance_valid(menu_coordinator):
+		return
+	menu_coordinator.set_load_available(is_load_available())
+	menu_coordinator.set_inventory_items(_inventory_hotbar_ids())
+	menu_coordinator.set_hotbar_slots(_get_consumable_slot_labels())
+	_refresh_weapon_hotbar()
+	menu_coordinator.configure_map(_build_ui_room_payload())
+	if loader != null and loader.has_method("get_critical_path"):
+		var critical: Array[String] = loader.get_critical_path()
+		if not critical.is_empty():
+			menu_coordinator.track_room(critical[0])
+
+func _on_ui_modal_opened(_menu_id: String) -> void:
+	_freeze_player_for_panel()
+
+func _on_ui_modal_closed(_previous_menu_id: String) -> void:
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process_input(true)
+		player.set_process_unhandled_input(true)
+
+func _on_ui_quit_requested() -> void:
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.open_main_menu()
+
+func _on_ui_settings_changed(_summary: Dictionary) -> void:
+	apply_accessibility_settings(accessibility_settings)
+
 func _on_ship_loaded(summary: Dictionary) -> void:
 	if playable_started:
 		return
@@ -2451,6 +3222,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_build_hud_layer()
 	_spawn_player()
 	_spawn_camera()
+	_refresh_ui_shell_runtime()
 	# Phase 4.5: wrap the freshly-loaded starting ship as current_ship. Reuses
 	# the coordinator's existing ship_systems_manager (Approach A: the starting
 	# slice's systems are untouched). marker_id "" marks it as the home ship.
@@ -2469,6 +3241,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 		# Phase 5a Task 7: build the physical lifeboat docked to the starting derelict.
 		# The lifeboat is now port-aligned via DockingManager (replaces fixed LIFEBOAT_DOCK_OFFSET).
 		_build_lifeboat_at_home()
+	_configure_threat_runtime_for_current_ship()
 	_build_interactables()
 	_build_slice_affordance_labels()
 	_build_route_control_gates()
@@ -2479,12 +3252,15 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	# tool_pickup_root and reads its world position from a side room
 	# (tool_storage_01 if defined) with a player-spawn fallback.
 	_build_tool_pickup()
+	_ensure_consumable_hotbar_assignments()
+	_refresh_consumable_ui()
 	# REQ-014: spawn the junction_calibrator pickup in a different side
 	# room (galley_01 with a player-spawn fallback offset on the
 	# opposite side of the spawn). Same parent root as the oxygen pump
 	# so the existing reset/reload teardown covers it.
 	_build_junction_calibrator_pickup()
 	_refresh_oxygen_state(true, 0.0)
+	_refresh_weapon_hotbar()
 	_build_fire_zone()
 	_refresh_fire_state(true)
 	_build_arc_zone()
@@ -2811,6 +3587,10 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 			ship_systems_manager.force_repair(str(pair[0]), str(pair[1]))
 		if player_progression != null and (objective_type == "restore_systems" or objective_type == "stabilize_reactor"):
 			player_progression.grant_xp("repair", REPAIR_OBJECTIVE_XP)
+			# REQ-PM-002 — funnel the objective-completion XP through the
+			# training bus so the log captures the deterministic event.
+			if training_event_bus != null:
+				training_event_bus.emit("repair_full_system", str(sequence), player_progression)
 		var compat: Dictionary = _manager_compat_summary()
 		_apply_ship_systems_consequences(objective_type)
 		_refresh_route_control_from_ship_systems()
@@ -2841,6 +3621,9 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 		current_objective_sequence = total_sequences + 1
 		tracker.mark_run_complete()
 		print("PLAYABLE SLICE COMPLETE objectives_completed=%d" % objective_completion_count)
+		# REQ-PM-008 / ADR-0033 — apply the meta payout and persist
+		# meta + unlock state before wiping the run snapshot.
+		_apply_meta_payout_and_persist("completion")
 		# REQ-012: drop the current-run save file so a stale snapshot
 		# cannot be resumed into a finished run. A fresh run
 		# automatically starts with no save file (delete returns true
@@ -2945,6 +3728,32 @@ func _combined_system_status_lines() -> PackedStringArray:
 			if inv_text.begins_with("weight="):
 				continue
 			lines.append(inv_text)
+	if not _last_loot_feedback_line.is_empty():
+		lines.append(_last_loot_feedback_line)
+	if unique_item_state != null:
+		for line in unique_item_state.get_status_lines():
+			lines.append(String(line))
+	if power_grid_state != null:
+		for line in power_grid_state.get_status_lines():
+			lines.append(String(line))
+	if life_support_expanded_state != null:
+		for line in life_support_expanded_state.get_status_lines():
+			lines.append(String(line))
+	if hull_integrity_state != null:
+		for line in hull_integrity_state.get_status_lines():
+			lines.append(String(line))
+	if fire_suppression_state != null:
+		for line in fire_suppression_state.get_status_lines():
+			lines.append(String(line))
+	if propulsion_expanded_state != null:
+		for line in propulsion_expanded_state.get_status_lines():
+			lines.append(String(line))
+	if shield_state != null:
+		for line in shield_state.get_status_lines():
+			lines.append(String(line))
+	if sustenance_state != null:
+		for line in sustenance_state.get_status_lines():
+			lines.append(String(line))
 	if player_progression != null:
 		lines.append("Repair Skill: %d" % player_progression.get_skill_level("repair"))
 	return lines
@@ -3001,6 +3810,8 @@ func get_ship_systems_summary() -> Dictionary:
 		return summary
 	summary = _manager_compat_summary()
 	summary["blocked_affordance_visible_count"] = get_blocked_affordance_visible_count()
+	for key in _expanded_ship_systems_summary().keys():
+		summary[key] = _expanded_ship_systems_summary()[key]
 	return summary
 
 func get_route_control_summary() -> Dictionary:
@@ -3045,14 +3856,17 @@ func _process(delta: float) -> void:
 		# Keep the vitals panel live on a boarded derelict: Heavy-Load, repair
 		# progress, and the repair_blocked message + its countdown still apply
 		# away from home, even though the home oxygen/hazard loop is paused here.
+		_tick_threat_runtime(delta)
 		_refresh_player_vitals(delta)
 		return
 	if not playable_started or slice_complete:
 		return
 	if oxygen_state == null:
 		return
+	_tick_threat_runtime(delta)
 	if ship_systems_manager != null:
 		ship_systems_manager.advance(delta)
+	_recompute_expanded_ship_systems(delta)
 	_refresh_oxygen_state(false, delta)
 	if fire_state != null:
 		fire_state.tick(delta)
@@ -3064,6 +3878,60 @@ func _process(delta: float) -> void:
 	if electrical_arc_state != null:
 		electrical_arc_state.tick(delta, {})
 		_refresh_arc_state(false)
+	if stimulant_state != null:
+		stimulant_state.tick(delta, addiction_state, _consumable_pipeline_context())
+	if addiction_state != null:
+		addiction_state.tick(delta, status_effects_state)
+	# REQ-SV: tick survival vitals and cascades.
+	if vitals_state != null:
+		var temp_mult: float = 1.0
+		if body_temperature_state != null:
+			temp_mult = body_temperature_state.get_thirst_multiplier()
+		var rad_drain: float = 0.0
+		if radiation_state != null:
+			rad_drain = radiation_state.get_health_drain_per_second()
+		var status_mult: float = 1.0
+		if status_effects_state != null:
+			status_mult = status_effects_state.get_modifier("stamina_recovery")
+		vitals_state.tick(delta, {
+			"temperature_thirst_mult": temp_mult,
+			"radiation_health_drain": rad_drain,
+			"status_stamina_recovery_mult": status_mult,
+			"moving": player != null and player.has_method("is_moving") and player.is_moving(),
+		})
+	if sanity_state != null:
+		# Sargasso field = not in a safe zone (away_from_start or breach open)
+		var in_safe: bool = not away_from_start and (oxygen_state == null or not oxygen_state.get_summary().get("breach_open", false))
+		sanity_state.in_safe_zone = in_safe
+		sanity_state.tick(delta)
+	if radiation_state != null:
+		# Radiation zones are active on derelicts or when breach is open.
+		var in_rad: bool = away_from_start or (oxygen_state != null and oxygen_state.get_summary().get("breach_open", false))
+		radiation_state.in_radiation_zone = in_rad
+		radiation_state.tick(delta)
+	if body_temperature_state != null:
+		body_temperature_state.in_extreme_zone = away_from_start
+		body_temperature_state.tick(delta)
+	if status_effects_state != null:
+		status_effects_state.tick(delta)
+	# ADR-0034: tick food / cooking / spoilage / sustenance models.
+	if spoilage_state != null:
+		spoilage_state.tick(delta)
+	if cooking_state != null and cooking_state.state == CookingStateScript.State.COOKING:
+		cooking_state.tick(delta)
+	if hydroponics_state != null and hydroponics_state.state == HydroponicsStateScript.State.PLANTED:
+		hydroponics_state.tick(delta)
+	if synthesizer_state != null and synthesizer_state._cooking.state == CookingStateScript.State.COOKING:
+		synthesizer_state.tick(delta)
+	if water_recycler_state != null and water_recycler_state.state == WaterRecyclerStateScript.State.RECYCLING:
+		water_recycler_state.tick(delta)
+	# REQ-AU-001..010: tick the audio manager. The manager advances the
+	# ambient crossfade, music layer crossfade, sfx cooldowns + captions,
+	# and the meta-event scheduler. Tick before any HUD caption drain so
+	# the audio summary the HUD reads is at most one frame stale.
+	if audio_manager != null and audio_manager.has_method("tick"):
+		audio_manager.tick(delta)
+		_refresh_audio_state(false, delta)
 
 func _build_breach_zone() -> void:
 	if oxygen_root == null:
@@ -3225,6 +4093,17 @@ func _refresh_player_vitals(delta_seconds: float) -> void:
 			progress = rp.progress
 			break
 	vitals_model.set_repair_progress(channeling, progress)
+	# REQ-SV: feed survival vitals into the HUD model.
+	if vitals_state != null:
+		vitals_model.apply_vitals_summary(vitals_state.get_summary())
+	if sanity_state != null:
+		vitals_model.apply_sanity_summary(sanity_state.get_summary())
+	if radiation_state != null:
+		vitals_model.apply_radiation_summary(radiation_state.get_summary())
+	if body_temperature_state != null:
+		vitals_model.apply_temperature_summary(body_temperature_state.get_summary())
+	if status_effects_state != null:
+		vitals_model.apply_status_effects_summary(status_effects_state.get_summary())
 	vitals_model.tick(delta_seconds)
 	vitals_panel.set_status_lines(vitals_model.get_status_lines())
 
@@ -3353,6 +4232,19 @@ func get_input_action_keycodes_for_validation(action_name: String) -> Array:
 			var key_event: InputEventKey = event
 			out.append(int(key_event.keycode))
 	return out
+
+func get_menu_coordinator_for_validation():
+	return menu_coordinator
+
+func dismiss_latest_tutorial_for_validation() -> bool:
+	if not is_instance_valid(menu_coordinator):
+		return false
+	return menu_coordinator.dismiss_latest_tutorial()
+
+func apply_ui_settings_summary_for_validation(summary: Dictionary) -> bool:
+	if not is_instance_valid(menu_coordinator):
+		return false
+	return menu_coordinator.apply_settings_summary(summary)
 
 # --- Hazard / FireState integration -----------------------------------------
 # Per the Gate 2 timed fire-zone feature spec, FireState cycles between
@@ -3797,6 +4689,70 @@ func teleport_player_to_arc_zone_for_validation() -> bool:
 	player.teleport_to(arc_zone_node.global_position)
 	return true
 
+# REQ-AU-001..010: audio runtime refresh. Mirrors _refresh_fire_state /
+# _refresh_arc_state: the AudioManager owns the per-bus AudioStreamPlayer
+# pool and pushes volumes from its summaries; this method is the per-frame
+# seam that re-syncs the scene tree with the model's state. `force_initial`
+# is true on first build / save-reload to push the summary even when no
+# delta exists.
+func _refresh_audio_state(force_initial: bool, _delta_seconds: float = 0.0) -> void:
+	if audio_manager == null:
+		return
+	# Update the music-state flags based on the current gameplay signals.
+	# Engagement defaults to false (no hostile AI in the vertical slice);
+	# hazard_active is true when ANY hazard model reports non-safe state.
+	var hazard_active: bool = false
+	if oxygen_state != null and bool(oxygen_state.is_passability_blocked()):
+		hazard_active = true
+	if fire_state != null and bool(fire_state.is_passability_blocked()):
+		hazard_active = true
+	if electrical_arc_state != null and bool(electrical_arc_state.is_passability_blocked()):
+		hazard_active = true
+	# vitals_critical: derived from vitals_model oxygen <= 0 OR hp below
+	# critical. vitals_model is optional in the playable scene; default
+	# to false when missing.
+	var vitals_critical: bool = false
+	if vitals_model != null and vitals_model.has_method("get_summary"):
+		var vs: Dictionary = vitals_model.get_summary()
+		if float(vs.get("oxygen", 1.0)) <= 0.0:
+			vitals_critical = true
+		elif float(vs.get("hp", 1.0)) < 0.25:
+			vitals_critical = true
+	audio_manager.update_music_flags(false, hazard_active, vitals_critical)
+	# Attach the AudioListener to the player when a player anchor exists.
+	if player != null and is_instance_valid(player) and player is Node3D:
+		audio_manager.attach_listener(player as Node3D)
+	audio_manager.update_listener_transform()
+	audio_manager.apply_spatial_attenuation()
+
+## Validation seam: full audio summary from the manager. Used by the
+## main playable slice audio smoke and by the audio_save_load smoke.
+func get_audio_summary() -> Dictionary:
+	if audio_manager == null:
+		return {}
+	return audio_manager.get_summary()
+
+## Validation seam: convenience accessors used by smokes that need to
+## inspect the audio manager's state without poking at its internals.
+func get_audio_manager() -> Node:
+	return audio_manager
+
+func get_audio_bus_player_count() -> int:
+	if audio_manager == null:
+		return 0
+	var count: int = 0
+	for bus_id in ["sfx", "music", "voice", "ui", "ambient", "meta"]:
+		if audio_manager.has_method("get_bus_player") and audio_manager.get_bus_player(StringName(bus_id)) != null:
+			count += 1
+	return count
+
+func get_audio_spatial_player_count() -> int:
+	if audio_manager == null:
+		return 0
+	if not audio_manager.has_method("get_spatial_player_count"):
+		return 0
+	return int(audio_manager.get_spatial_player_count())
+
 # --- Inventory / Tool pickup integration -------------------------------------
 # REQ-007: a single ToolPickup carrying the portable_oxygen_pump lives in a
 # fixed side room (tool_storage_01 if the loader defines it, otherwise a
@@ -3834,6 +4790,15 @@ func _on_tool_pickup_acquired(p_tool_id: String) -> void:
 	_refresh_tracker_system_status_lines()
 	print("PLAYABLE TOOL ACQUIRED tool_id=%s" % p_tool_id)
 	_recompute_player_encumbrance()
+	_ensure_consumable_hotbar_assignments()
+	_refresh_consumable_ui()
+	# REQ-RL-003 / REQ-RL-004: route the tool pickup into the achievement
+	# service when one is attached. Silent no-op when no service is
+	# injected (the per-run achievement service is opt-in for tests).
+	if achievement_state != null:
+		var unlocked_id: String = achievement_state.unlock_for_trigger("tool_acquired", p_tool_id)
+		if not unlocked_id.is_empty():
+			print("ACHIEVEMENT UNLOCKED trigger=tool_acquired target=%s id=%s" % [p_tool_id, unlocked_id])
 
 # --- REQ-014: junction_calibrator pickup -------------------------------------
 # A second ToolPickup configured with tool_id = "junction_calibrator".
@@ -4090,12 +5055,17 @@ func _build_run_snapshot() -> RunSnapshot:
 		# live from manager health + this record via _manager_compat_summary(),
 		# never stored (ADR-0009).
 		snapshot.ship_systems_summary["completed_objective_types"] = completed_objective_types.keys()
+		for key in _expanded_ship_systems_summary().keys():
+			snapshot.ship_systems_summary[key] = _expanded_ship_systems_summary()[key]
 	if route_control_state != null:
 		snapshot.route_control_summary = get_route_control_summary()
 	if oxygen_state != null:
 		snapshot.oxygen_summary = get_oxygen_summary()
 	if inventory_state != null:
 		snapshot.inventory_summary = inventory_state.get_summary()
+	if threat_manager != null:
+		snapshot.inventory_summary["combat_hotbar_text"] = _last_weapon_hotbar_text
+		snapshot.inventory_summary["threat_summary"] = threat_manager.get_summary()
 	if fire_state != null:
 		snapshot.fire_summary = fire_state.get_summary()
 	if electrical_arc_state != null:
@@ -4104,6 +5074,42 @@ func _build_run_snapshot() -> RunSnapshot:
 		snapshot.objective_progress_summary = objective_progress_state.get_summary()
 	if player_progression != null:
 		snapshot.player_progression_summary = player_progression.get_summary()
+	if is_instance_valid(menu_coordinator):
+		snapshot.settings_summary = menu_coordinator.get_settings_summary()
+	if audio_manager != null:
+		snapshot.audio_summary = audio_manager.get_summary()
+	# REQ-SV: capture survival vitals summaries.
+	if vitals_state != null:
+		snapshot.vitals_summary = vitals_state.get_summary()
+	if sanity_state != null:
+		snapshot.sanity_summary = sanity_state.get_summary()
+	if radiation_state != null:
+		snapshot.radiation_summary = radiation_state.get_summary()
+	if body_temperature_state != null:
+		snapshot.temperature_summary = body_temperature_state.get_summary()
+	if status_effects_state != null:
+		snapshot.status_effects_summary = status_effects_state.get_summary()
+	# ADR-0034: capture food / cooking / spoilage summaries.
+	if spoilage_state != null:
+		snapshot.spoilage_summary = spoilage_state.get_summary()
+	if cooking_state != null:
+		snapshot.cooking_summary = cooking_state.get_summary()
+	if hydroponics_state != null:
+		snapshot.hydroponics_summary = hydroponics_state.get_summary()
+	if synthesizer_state != null:
+		snapshot.synthesizer_summary = synthesizer_state.get_summary()
+	if consumable_state != null:
+		snapshot.consumable_summary = consumable_state.get_summary()
+	if medicine_state != null:
+		snapshot.medicine_summary = medicine_state.get_summary()
+	if stimulant_state != null:
+		snapshot.stimulant_summary = stimulant_state.get_summary()
+	if addiction_state != null:
+		snapshot.addiction_summary = addiction_state.get_summary()
+	if ammo_state != null:
+		snapshot.ammo_summary = ammo_state.get_summary()
+	if utility_item_state != null:
+		snapshot.utility_summary = utility_item_state.get_summary()
 	snapshot.slice_version = SaveLoadServiceScript.CURRENT_SLICE_VERSION
 	snapshot.godot_version = Engine.get_version_info()["string"]
 	snapshot.saved_at = Time.get_datetime_string_from_system(true)
@@ -4127,6 +5133,47 @@ func _auto_save_current_run() -> bool:
 		return true
 	return false
 
+## REQ-PM-008 / ADR-0033 — at run-end, fold the run summary into the
+## meta_progression_state (currency + counters), persist the meta + unlock
+## state to disk, and emit the resolved unlock events from the bus log so
+## codex / scene / class unlocks can record themselves on the registry.
+##
+## `reason` is "completion" or "death". The payout is the same either way
+## (per the spec: death still earns currency for what was accomplished).
+func _apply_meta_payout_and_persist(reason: String = "completion") -> int:
+	if meta_progression_state == null:
+		return 0
+	var summary: Dictionary = get_slice_completion_summary() if has_method("get_slice_completion_summary") else {}
+	var completed: int = int(summary.get("completed_objectives", objective_completion_count))
+	var skill_levels: Dictionary = {}
+	if player_progression != null:
+		for sid in player_progression.skills:
+			skill_levels[sid] = int(player_progression.skills[sid])
+	var run_summary: Dictionary = {
+		"completed_objectives": completed,
+		"skill_levels": skill_levels,
+		"discoveries": 0,
+		"reason": reason,
+	}
+	var payout: int = int(meta_progression_state.apply_meta_payout(run_summary))
+	# Persist meta + unlocks to disk so the next run picks them up.
+	meta_progression_state.save_to_disk()
+	if unlock_registry != null:
+		if training_event_bus != null:
+			for entry in training_event_bus.get_log():
+				var evt: String = str(entry.get("event_id", ""))
+				var tgt: String = str(entry.get("target_id", ""))
+				if not evt.is_empty():
+					unlock_registry.unlock_for_trigger(evt, tgt)
+		unlock_registry.save_to_disk()
+	print("META PAYOUT reason=%s payout=%d meta_currency=%d runs_completed=%d" % [
+		reason,
+		payout,
+		int(meta_progression_state.meta_currency),
+		int(meta_progression_state.total_runs_completed),
+	])
+	return payout
+
 ## Manual save trigger (F5 / save_run input). Saves the whole world, so saving is
 ## allowed anywhere — including aboard a traveled derelict (save-anywhere; ADR-0012
 ## supersedes the Phase 4.5 away-save rejection). Refuses only before the slice has
@@ -4142,6 +5189,9 @@ func request_save() -> bool:
 	var result: bool = save_load_service.save_world(ws)
 	if result:
 		print("PLAYABLE SHIP SAVED location=%s sequence=%d" % [ws.current_location, current_objective_sequence])
+		if is_instance_valid(menu_coordinator):
+			menu_coordinator.trigger_tutorial("run_saved", "any")
+			menu_coordinator.set_load_available(true)
 	return result
 
 ## Validation / public seam: the SaveLoadService instance. Returns null
@@ -4170,7 +5220,10 @@ func request_load() -> bool:
 	if ws == null:
 		push_warning("PlayableGeneratedShip: no compatible world save to load")
 		return false
-	return _apply_world_snapshot(ws)
+	var loaded: bool = _apply_world_snapshot(ws)
+	if loaded and is_instance_valid(menu_coordinator):
+		menu_coordinator.set_load_available(true)
+	return loaded
 
 ## Reconstructs the slice through the normal load path, then applies
 ## the saved model summaries. Designed to be called from a fully
@@ -4201,6 +5254,20 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	# Apply the saved model state to the freshly-built slice.
 	if ship_systems_manager != null and not snapshot.ship_systems_summary.is_empty():
 		ship_systems_manager.apply_summary(snapshot.ship_systems_summary)
+		if power_grid_state != null:
+			power_grid_state.apply_summary(snapshot.ship_systems_summary.get("power_grid_summary", {}))
+		if life_support_expanded_state != null:
+			life_support_expanded_state.apply_summary(snapshot.ship_systems_summary.get("life_support_state_summary", {}))
+		if hull_integrity_state != null:
+			hull_integrity_state.apply_summary(snapshot.ship_systems_summary.get("hull_integrity_summary", {}))
+		if fire_suppression_state != null:
+			fire_suppression_state.apply_summary(snapshot.ship_systems_summary.get("fire_suppression_summary", {}))
+		if propulsion_expanded_state != null:
+			propulsion_expanded_state.apply_summary(snapshot.ship_systems_summary.get("propulsion_state_summary", {}))
+		if shield_state != null:
+			shield_state.apply_summary(snapshot.ship_systems_summary.get("shield_state_summary", {}))
+		if sustenance_state != null:
+			sustenance_state.apply_summary(snapshot.ship_systems_summary.get("sustenance_state_summary", {}))
 		completed_objective_types.clear()
 		for t in snapshot.ship_systems_summary.get("completed_objective_types", []):
 			completed_objective_types[str(t)] = true
@@ -4213,6 +5280,7 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		# completed types is safe and future-proof.
 		for completed_type in completed_objective_types:
 			_apply_ship_systems_consequences(str(completed_type))
+		_recompute_expanded_ship_systems(0.0)
 		_refresh_route_control_from_ship_systems()
 		if oxygen_state != null:
 			oxygen_state.apply_ship_systems_summary(_manager_compat_summary())
@@ -4224,6 +5292,11 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		_refresh_oxygen_state(true, 0.0)
 	if inventory_state != null and not snapshot.inventory_summary.is_empty():
 		inventory_state.apply_summary(snapshot.inventory_summary)
+		_last_weapon_hotbar_text = str(snapshot.inventory_summary.get("combat_hotbar_text", _last_weapon_hotbar_text))
+		var threat_summary: Variant = snapshot.inventory_summary.get("threat_summary", {})
+		if threat_manager != null and threat_summary is Dictionary and not (threat_summary as Dictionary).is_empty():
+			threat_manager.apply_summary(threat_summary as Dictionary)
+			_sync_current_ship_combat_summary()
 	if fire_state != null and not snapshot.fire_summary.is_empty():
 		fire_state.apply_summary(snapshot.fire_summary)
 		_refresh_fire_state(true)
@@ -4238,6 +5311,47 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		objective_progress_state.apply_summary(snapshot.objective_progress_summary)
 	if player_progression != null and not snapshot.player_progression_summary.is_empty():
 		player_progression.apply_summary(snapshot.player_progression_summary)
+	if is_instance_valid(menu_coordinator) and not snapshot.settings_summary.is_empty():
+		menu_coordinator.apply_settings_summary(snapshot.settings_summary)
+	# REQ-AU-010: re-apply the audio summary to the AudioManager so save/load
+	# restores per-bus volume, ambient role, sfx router cooldowns, music
+	# state, spatial resolver config, and meta-event schedule.
+	if audio_manager != null and not snapshot.audio_summary.is_empty():
+		audio_manager.apply_summary(snapshot.audio_summary)
+	# REQ-SV: restore survival vitals summaries.
+	if vitals_state != null and not snapshot.vitals_summary.is_empty():
+		vitals_state.apply_summary(snapshot.vitals_summary)
+	if sanity_state != null and not snapshot.sanity_summary.is_empty():
+		sanity_state.apply_summary(snapshot.sanity_summary)
+	if radiation_state != null and not snapshot.radiation_summary.is_empty():
+		radiation_state.apply_summary(snapshot.radiation_summary)
+	if body_temperature_state != null and not snapshot.temperature_summary.is_empty():
+		body_temperature_state.apply_summary(snapshot.temperature_summary)
+	if status_effects_state != null and not snapshot.status_effects_summary.is_empty():
+		status_effects_state.apply_summary(snapshot.status_effects_summary)
+	# ADR-0034: restore food / cooking / spoilage summaries.
+	if spoilage_state != null and not snapshot.spoilage_summary.is_empty():
+		spoilage_state.apply_summary(snapshot.spoilage_summary)
+	if cooking_state != null and not snapshot.cooking_summary.is_empty():
+		cooking_state.apply_summary(snapshot.cooking_summary)
+	if hydroponics_state != null and not snapshot.hydroponics_summary.is_empty():
+		hydroponics_state.apply_summary(snapshot.hydroponics_summary)
+	if synthesizer_state != null and not snapshot.synthesizer_summary.is_empty():
+		synthesizer_state.apply_summary(snapshot.synthesizer_summary)
+	if consumable_state != null and not snapshot.consumable_summary.is_empty():
+		consumable_state.apply_summary(snapshot.consumable_summary)
+	if medicine_state != null and not snapshot.medicine_summary.is_empty():
+		medicine_state.apply_summary(snapshot.medicine_summary)
+	if stimulant_state != null and not snapshot.stimulant_summary.is_empty():
+		stimulant_state.apply_summary(snapshot.stimulant_summary)
+	if addiction_state != null and not snapshot.addiction_summary.is_empty():
+		addiction_state.apply_summary(snapshot.addiction_summary)
+	if ammo_state != null and not snapshot.ammo_summary.is_empty():
+		ammo_state.apply_summary(snapshot.ammo_summary)
+	if utility_item_state != null and not snapshot.utility_summary.is_empty():
+		utility_item_state.apply_summary(snapshot.utility_summary)
+	_ensure_consumable_hotbar_assignments()
+	_refresh_consumable_ui()
 	# REQ-014: reconcile the junction_calibrator pickup marker visibility
 	# with the restored inventory + objective_progress summaries. The
 	# marker is rebuilt visible by `_build_junction_calibrator_pickup`,
@@ -4255,6 +5369,7 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	# sees the right state.
 	current_objective_sequence = max(1, snapshot.current_objective_sequence)
 	_activate_current_objective()
+	_refresh_weapon_hotbar()
 	# Teleport the player to the saved position last so any spawn-side
 	# effects (e.g. hazard proximity) do not overwrite the snapshot.
 	if player != null and player is Node3D and snapshot.player_position.size() >= 3:
@@ -4280,9 +5395,14 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 ## retained ShipInstance contributes its own slice; current_location names the
 ## active ship.
 func _build_world_snapshot():
+	_sync_current_ship_combat_summary()
 	var ws = WorldSnapshotScript.new()
 	if sargasso_world != null:
 		ws.world_summary = sargasso_world.get_summary()
+	if meta_progression_state != null:
+		ws.meta_progression_summary = meta_progression_state.to_dict()
+	if unique_item_state != null:
+		ws.unique_item_summary = unique_item_state.get_summary()
 	var home_snap = _build_run_snapshot()
 	if home_snap != null:
 		if away_from_start:
@@ -4400,6 +5520,7 @@ func _activate_derelict_from_instance(inst, pos_in_ship: Array) -> bool:
 	if new_root == null:
 		return false
 	_attach_derelict_active(inst, new_root)
+	_configure_threat_runtime_for_current_ship()
 	if player != null and player is Node3D and pos_in_ship.size() >= 3:
 		(player as Node3D).global_position = Vector3(float(pos_in_ship[0]), float(pos_in_ship[1]), float(pos_in_ship[2]))
 	return true
@@ -4481,6 +5602,10 @@ func _apply_world_snapshot(ws) -> bool:
 		else:
 			equipment_state.slots.clear()
 	_recompute_player_encumbrance()
+	if meta_progression_state != null and not ws.meta_progression_summary.is_empty():
+		meta_progression_state.apply_summary(ws.meta_progression_summary)
+	if unique_item_state != null:
+		unique_item_state.apply_summary(ws.unique_item_summary)
 	# 2. World model. _apply_run_snapshot reset us to the home ship; home_ship is
 	#    re-wrapped by _on_ship_loaded during that reload.
 	if sargasso_world != null and not ws.world_summary.is_empty():
@@ -4607,6 +5732,85 @@ func _find_ship_by_id_or_marker(key: String):
 	for mid in visited_ships:
 		if String((visited_ships[mid]).marker_id) == key: return visited_ships[mid]
 	return _find_ship_by_id(key)
+
+func _build_loot_context(spec: Dictionary) -> Dictionary:
+	return {
+		"biome_id": _resolve_current_loot_biome_id(),
+		"depth": _resolve_current_loot_depth(),
+		"condition": _resolve_current_loot_condition(),
+		"container_kind": str(spec.get("kind", spec.get("loot_table", "generic_crate"))),
+		"item_definitions": ItemDefsScript.load_definitions(),
+		"unique_state": unique_item_state,
+	}
+
+func _resolve_current_loot_biome_id() -> String:
+	var biome_ids: Array[String] = _loot_biome_ids()
+	if biome_ids.is_empty():
+		return "abyssal_sargasso"
+	var seed_value: int = 0
+	if current_ship != null and current_ship.blueprint != null:
+		seed_value = int(current_ship.blueprint.seed_value)
+	return BiomeProfileScript.select_biome(seed_value, biome_ids)
+
+func _resolve_current_loot_depth() -> int:
+	if current_ship == null or current_ship.blueprint == null:
+		return 0
+	var blueprint = current_ship.blueprint
+	return maxi(0, int(blueprint.size) * 2 + int(blueprint.condition) + (1 if away_from_start else 0))
+
+func _resolve_current_loot_condition() -> String:
+	if current_ship == null or current_ship.blueprint == null:
+		return "damaged"
+	match int(current_ship.blueprint.condition):
+		0:
+			return "pristine"
+		1:
+			return "damaged"
+		_:
+			return "wrecked"
+
+func _loot_biome_ids() -> Array[String]:
+	if not _loot_biome_ids_cache.is_empty():
+		return _loot_biome_ids_cache
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://data/items/biome_definitions.json"))
+	if parsed is Dictionary:
+		var biomes_v: Variant = (parsed as Dictionary).get("biomes", {})
+		if biomes_v is Dictionary:
+			for biome_id in (biomes_v as Dictionary).keys():
+				_loot_biome_ids_cache.append(String(biome_id))
+	_loot_biome_ids_cache.sort()
+	if _loot_biome_ids_cache.is_empty():
+		_loot_biome_ids_cache.append("abyssal_sargasso")
+	return _loot_biome_ids_cache
+
+func _postprocess_loot_grants(granted: Array, source_id: String) -> void:
+	if granted.is_empty():
+		_last_loot_feedback_line = "Loot: %s empty" % source_id
+		return
+	for entry in granted:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var item_id: String = str((entry as Dictionary).get("item_id", ""))
+		var unique_id: String = str((entry as Dictionary).get("unique_id", ""))
+		var seed_key: String = str((entry as Dictionary).get("seed_key", ""))
+		var codex_entry_id: String = str((entry as Dictionary).get("codex_entry_id", ""))
+		if unique_item_state != null and not unique_id.is_empty():
+			unique_item_state.claim(unique_id, seed_key, codex_entry_id)
+		elif unique_item_state != null and not codex_entry_id.is_empty():
+			unique_item_state.record_codex_unlock(codex_entry_id)
+		if meta_progression_state != null and not codex_entry_id.is_empty():
+			meta_progression_state.unlock_codex_entry(codex_entry_id)
+		if equipment_state != null and item_id != "" and equipment_state.can_equip(item_id):
+			_equip_from_inventory(item_id, true)
+	var first: Dictionary = granted[0] as Dictionary
+	var rarity_text: String = RarityTierScript.label(str(first.get("rarity", "common")))
+	_last_loot_feedback_line = "Loot: %s x%d [%s]" % [
+		ItemDefsScript.display_name(ItemDefsScript.load_definitions(), str(first.get("item_id", ""))),
+		int(first.get("quantity", 0)),
+		rarity_text,
+	]
+	if audio_manager != null and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
 
 ## Tear down every runtime child so a fresh load can rebuild the slice
 ## cleanly. Mirrors the setup done by _build_runtime_nodes() and the
@@ -4802,6 +6006,17 @@ func _reset_runtime_for_reload() -> void:
 			"arcing_duration": ElectricalArcStateScript.DEFAULT_ARCING_DURATION,
 			"discharged_duration": ElectricalArcStateScript.DEFAULT_DISCHARGED_DURATION,
 		})
+	# REQ-SV: reset survival vitals models on reload.
+	if vitals_state != null:
+		vitals_state.configure({})
+	if sanity_state != null:
+		sanity_state.configure({})
+	if radiation_state != null:
+		radiation_state.configure({})
+	if body_temperature_state != null:
+		body_temperature_state.configure({})
+	if status_effects_state != null:
+		status_effects_state.configure({})
 	if objective_progress_state != null:
 		objective_progress_state.reset()
 	breach_zone_node = null
@@ -4861,7 +6076,34 @@ func _input(event: InputEvent) -> void:
 			_open_inventory_self()
 			get_viewport().set_input_as_handled()
 			return
+	if is_instance_valid(menu_coordinator):
+		if menu_coordinator.handle_ui_input(event):
+			if event.is_action_pressed("ui_open_map"):
+				menu_coordinator.reveal_room(menu_coordinator.map_fog_state.get_tracked_room_id())
+			get_viewport().set_input_as_handled()
+			return
+		for action_name in ["move_forward", "move_back", "move_left", "move_right"]:
+			if event.is_action_pressed(action_name):
+				menu_coordinator.trigger_tutorial("player_moved", "any")
+				break
 	if save_load_service == null:
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_1:
+			_use_consumable_hotbar_slot(0)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.keycode == KEY_2:
+			_use_consumable_hotbar_slot(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.keycode == KEY_3:
+			_use_consumable_hotbar_slot(2)
+			get_viewport().set_input_as_handled()
+			return
+	if event.is_action_pressed("attack_primary"):
+		_attack_with_equipped_weapon()
+		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("save_run"):
 		request_save()
@@ -4869,6 +6111,20 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_pressed("load_run"):
 		request_load()
 		get_viewport().set_input_as_handled()
+
+func use_inventory_item_for_validation(item_id: String, use_all: bool = false) -> Dictionary:
+	return _use_consumable_item(item_id, use_all)
+
+func assign_hotbar_slot_for_validation(slot_index: int, item_id: String) -> bool:
+	if consumable_state == null:
+		return false
+	var ok: bool = consumable_state.assign_hotbar_slot(slot_index, item_id)
+	if ok:
+		_refresh_consumable_ui(slot_index)
+	return ok
+
+func use_hotbar_slot_for_validation(slot_index: int) -> Dictionary:
+	return _use_consumable_hotbar_slot(slot_index)
 
 ## Phase 5b Task 6 validation seam: opens the first closed dock-seam barrier
 ## without requiring player proximity. Returns true if the barrier is now opened.

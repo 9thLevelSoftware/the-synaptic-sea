@@ -161,5 +161,12 @@
       "created_from": "t_31bb8158"
     }
   ],
-  "release_policy": "Kickoff card is blocked; child cards are dependency-gated until explicitly released."
+  "release_policy": "Kickoff card is blocked; child cards are dependency-gated until explicitly released.",
+  "currency_note": {
+    "status": "historical_stage_gate_bootstrap_manifest",
+    "current_execution_manifest": ".omh/kanban/synaptic-sea-e2e-systems-task-graph.json",
+    "current_execution_board": "synaptic-sea-e2e-systems",
+    "current_task15": "t_c7ac4d08",
+    "reason": "Task 15 validates the active Synaptic Sea E2E systems graph; this older manifest is retained for the original stage-gate bootstrap history."
+  }
 }

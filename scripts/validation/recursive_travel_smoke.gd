@@ -15,8 +15,11 @@ func _init() -> void:
 		await process_frame
 
 	ship.force_repair_all_for_validation()
-	var ids: Array = ship.scannable_marker_ids_for_validation()
-	assert(ids.size() > 0, "a derelict is in range")
+	var lifeboat_id: String = String(ship.get_lifeboat_ship_for_validation().ship_id)
+	ship.make_ship_working_for_validation(lifeboat_id)
+	ship.set_manual_power_route_for_validation("propulsion", 30.0)
+	var ids: Array = ship.claimable_marker_ids_for_validation()
+	assert(ids.size() > 0, "a claimable derelict is in range")
 
 	# Travel the piloted lifeboat to a derelict. The lifeboat is the piloted ship; the
 	# derelict it docks to is its host. Build a depth-2 chain by baying the lifeboat into
@@ -27,12 +30,15 @@ func _init() -> void:
 	ship.recompute_occupancy()
 	var landed := false
 	for mid in ids:
+		ship.board_piloted_ship_for_validation()
+		ship.recompute_occupancy()
 		if ship.travel_to_marker_id(String(mid)).get("success", false):
-			landed = true
 			for _i in range(2):
 				await process_frame
-			break
-	assert(landed, "travelled to a derelict (depth-1 rigid pair holds)")
+			if ship.current_ship_has_bridge_for_validation() and ship.current_ship_id_for_validation() != "":
+				landed = true
+				break
+	assert(landed, "travelled to a claimable derelict (depth-1 rigid pair holds)")
 
 	# The lifeboat (a direct dock child of nothing here, but the piloted ship) — verify the
 	# subtree capture/reposition ran without stranding: the piloted ship still has geometry
@@ -54,8 +60,8 @@ func _init() -> void:
 				assert(ship.travel_home() == true, "rigid-pair travelled the nested group home")
 				for _i in range(2):
 					await process_frame
-				var lifeboat_id: String = ship.lifeboat_ship_id_for_validation()
-				assert(ship.ship_is_bayed_in_for_validation(lifeboat_id, derelict_id) == true,
+				var bayed_lifeboat_id: String = ship.lifeboat_ship_id_for_validation()
+				assert(ship.ship_is_bayed_in_for_validation(bayed_lifeboat_id, derelict_id) == true,
 					"bayed lifeboat stayed bayed through nested travel")
 
 	# Deterministic depth-2 DFS guard (seed-independent): A piloted, B docked to A,

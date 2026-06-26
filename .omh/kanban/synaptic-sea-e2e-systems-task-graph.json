@@ -1,0 +1,509 @@
+{
+  "board": "synaptic-sea-e2e-systems",
+  "created_at": "2026-06-25T19:59:51-04:00",
+  "workdir": "/Users/christopherwilloughby/the-synaptic-sea",
+  "inputs": [
+    "docs/SYNAPTIC_SEA_COMPLETE_SYSTEMS_MAP.md",
+    "docs/PLANNING_SYNTHESIS.md",
+    "docs/game/00_vision.md",
+    "docs/game/02_core_loop.md",
+    "docs/game/06_validation_plan.md",
+    "docs/game/09_system_roadmap.md",
+    "AGENTS.md"
+  ],
+  "profile_map": {
+    "sargassoworker": "MiniMax-M3 implementation worker for production-grade package implementation",
+    "sargassodocs": "Kimi docs/planning support profile (available, not primary assignee for this board)",
+    "sargassoreview": "GPT-5.5 reviewer/final approver and integration gate executor"
+  },
+  "kickoff_task_id": "t_0228a857",
+  "kickoff_status": "blocked_until_user_says_begin_implementation",
+  "milestones": [
+    {
+      "id": "M1",
+      "name": "M1 Survival Foundation",
+      "tasks": [
+        "t_34d0483b",
+        "t_d569eba2"
+      ]
+    },
+    {
+      "id": "M2",
+      "name": "M2 Production Economy",
+      "tasks": [
+        "t_be88f847",
+        "t_af66b721",
+        "t_67389b76"
+      ]
+    },
+    {
+      "id": "M3",
+      "name": "M3 Hostile Derelicts",
+      "tasks": [
+        "t_cbe56420"
+      ]
+    },
+    {
+      "id": "M4",
+      "name": "M4 Ship Survival Infrastructure",
+      "tasks": [
+        "t_290ec958"
+      ]
+    },
+    {
+      "id": "M5",
+      "name": "M5 Long-Arc Progression",
+      "tasks": [
+        "t_02146c59"
+      ]
+    },
+    {
+      "id": "M6",
+      "name": "M6 Presentation & Operability",
+      "tasks": [
+        "t_7a6849cb",
+        "t_9e328a9f"
+      ]
+    },
+    {
+      "id": "M7",
+      "name": "M7 Persistence & Platform Reliability",
+      "tasks": [
+        "t_2d267b26"
+      ]
+    },
+    {
+      "id": "M8",
+      "name": "M8 World Variety",
+      "tasks": [
+        "t_4faf58cf"
+      ]
+    },
+    {
+      "id": "M9",
+      "name": "M9 Release Readiness",
+      "tasks": [
+        "t_3b217838"
+      ]
+    },
+    {
+      "id": "M10",
+      "name": "M10 Integration Gate",
+      "tasks": [
+        "t_12bf9f4a"
+      ]
+    },
+    {
+      "id": "M11",
+      "name": "M11 Documentation Currency",
+      "tasks": [
+        "t_c7ac4d08"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "task_id": "t_34d0483b",
+      "source_id": "TASK-01",
+      "title": "Survival Vitals",
+      "package_plan": "docs/game/build-plans/01-survival-vitals-e2e.md",
+      "milestone": "M1 Survival Foundation",
+      "assignee": "sargassoworker",
+      "parents": [
+        "t_0228a857"
+      ],
+      "priority": 1,
+      "verification": [
+        "VITALS STATE PASS",
+        "SANITY STATE PASS",
+        "RADIATION STATE PASS",
+        "MAIN PLAYABLE VITALS FULL PASS"
+      ],
+      "status_at_creation": "todo_dependency_gated_by_blocked_kickoff"
+    },
+    {
+      "task_id": "t_d569eba2",
+      "source_id": "TASK-02",
+      "title": "Food, Cooking, Spoilage & Sustenance Inputs",
+      "package_plan": "docs/game/build-plans/02-food-cooking-spoilage-e2e.md",
+      "milestone": "M1 Survival Foundation",
+      "assignee": "sargassoworker",
+      "parents": [
+        "t_0228a857"
+      ],
+      "priority": 2,
+      "verification": [
+        "FOOD STATE PASS",
+        "SPOILAGE STATE PASS",
+        "COOKING STATE PASS",
+        "MAIN PLAYABLE COOKING PASS"
+      ],
+      "status_at_creation": "todo_dependency_gated_by_blocked_kickoff"
+    },
+    {
+      "task_id": "t_be88f847",
+      "source_id": "TASK-03",
+      "title": "Crafting, Materials, Recipes & Stations",
+      "package_plan": "docs/game/build-plans/03-crafting-materials-recipes-e2e.md",
+      "milestone": "M2 Production Economy",
+      "assignee": "sargassoworker",
+      "parents": [
+        "t_0228a857"
+      ],
+      "priority": 3,
+      "verification": [
+        "MATERIAL STATE PASS",
+        "CRAFTING STATE PASS",
+        "RECIPE RESOURCE PASS",
+        "MAIN PLAYABLE CRAFTING PASS"
+      ],
+      "status_at_creation": "todo_dependency_gated_by_blocked_kickoff"
+    },
+    {
+      "task_id": "t_af66b721",
+      "source_id": "TASK-04",
+      "title": "Loot Ecosystem, Rarity, Containers & Unique Finds",
+      "package_plan": "docs/game/build-plans/04-loot-ecosystem-e2e.md",
+      "milestone": "M2 Production Economy",
+      "assignee": "sargassoworker",
+      "parents": [
+        "t_0228a857"
+      ],
+      "priority": 4,
+      "verification": [
+        "RARITY TIER PASS",
+        "LOOT DISTRIBUTION PASS",
+        "UNIQUE ITEM STATE PASS",
+        "MAIN PLAYABLE LOOT ECOSYSTEM PASS"
+      ],
+      "status_at_creation": "todo_dependency_gated_by_blocked_kickoff"
+    },
+    {
+      "task_id": "t_67389b76",
+      "source_id": "TASK-05",
+      "title": "Consumables, Medicine, Stimulants, Ammo & Utility Items",
+      "package_plan": "docs/game/build-plans/05-consumables-medicine-stimulants-e2e.md",
+      "milestone": "M2 Production Economy",
+      "assignee": "sargassoworker",
+      "parents": [
+        "t_0228a857"
+      ],
+      "priority": 5,
+      "verification": [
+        "EFFECT DISPATCHER PASS",
+        "CONSUMABLE STATE PASS",
+        "STIMULANT STATE PASS",
+        "MAIN PLAYABLE CONSUMABLES PASS"
+      ],
+      "status_at_creation": "todo_dependency_gated_by_blocked_kickoff"
+    },
+    {
+      "task_id": "t_cbe56420",
+      "source_id": "TASK-06",
+      "title": "Combat, Threat AI, Damage, Stealth & Encounters",
+      "package_plan": "docs/game/build-plans/06-combat-threat-ai-e2e.md",
+      "milestone": "M3 Hostile Derelicts",
+      "assignee": "sargassoworker",
+      "parents": [
+        "t_0228a857"
+      ],
+      "priority": 6,
+      "verification": [
+        "DAMAGE PIPELINE PASS",
+        "THREAT AI STATE PASS",
+        "DETECTION STATE PASS",
+        "MAIN PLAYABLE COMBAT ENCOUNTER PASS"
+      ],
+      "status_at_creation": "todo_dependency_gated_by_blocked_kickoff"
+    },
+    {
+      "task_id": "t_290ec958",
+      "source_id": "TASK-07",
+      "title": "Ship Systems, Power Grid, Hull, Life Support & Sustenance Infrastructure",
+      "package_plan": "docs/game/build-plans/07-ship-systems-sustenance-e2e.md",
+      "milestone": "M4 Ship Survival Infrastructure",
+      "assignee": "sargassoworker",
+      "parents": [
+        "t_0228a857"
+      ],
+      "priority": 7,
+      "verification": [
+        "POWER GRID STATE PASS",
+        "LIFE SUPPORT STATE PASS",
+        "SUSTENANCE STATE PASS",
+        "MAIN PLAYABLE SHIP SYSTEMS EXPANDED PASS"
+      ],
+      "status_at_creation": "todo_dependency_gated_by_blocked_kickoff"
+    },
+    {
+      "task_id": "t_02146c59",
+      "source_id": "TASK-08",
+      "title": "Player Progression, Skills, Classes, Hub & Meta-Progression",
+      "package_plan": "docs/game/build-plans/08-progression-skills-meta-e2e.md",
+      "milestone": "M5 Long-Arc Progression",
+      "assignee": "sargassoworker",
+      "parents": [
+        "t_0228a857"
+      ],
+      "priority": 8,
+      "verification": [
+        "PLAYER PROGRESSION FULL PASS",
+        "META PROGRESSION STATE PASS",
+        "META SNAPSHOT PASS",
+        "SKILL TREE PANEL PASS"
+      ],
+      "status_at_creation": "todo_dependency_gated_by_blocked_kickoff"
+    },
+    {
+      "task_id": "t_7a6849cb",
+      "source_id": "TASK-09",
+      "title": "UI/UX, HUD, Menus, Tutorials, Controller & Accessibility",
+      "package_plan": "docs/game/build-plans/09-ui-ux-accessibility-e2e.md",
+      "milestone": "M6 Presentation & Operability",
+      "assignee": "sargassoworker",
+      "parents": [
+        "t_0228a857"
+      ],
+      "priority": 9,
+      "verification": [
+        "MENU STATE PASS",
+        "SETTINGS STATE PASS",
+        "TUTORIAL STATE PASS",
+        "MAIN PLAYABLE UI SHELL PASS"
+      ],
+      "status_at_creation": "todo_dependency_gated_by_blocked_kickoff"
+    },
+    {
+      "task_id": "t_9e328a9f",
+      "source_id": "TASK-10",
+      "title": "Audio, Music, Spatial Sound, Voice & Meta Events",
+      "package_plan": "docs/game/build-plans/10-audio-music-spatial-e2e.md",
+      "milestone": "M6 Presentation & Operability",
+      "assignee": "sargassoworker",
+      "parents": [
+        "t_0228a857"
+      ],
+      "priority": 10,
+      "verification": [
+        "AUDIO BUS CONFIG PASS",
+        "SFX EVENT ROUTER PASS",
+        "DYNAMIC MUSIC STATE PASS",
+        "MAIN PLAYABLE AUDIO PASS"
+      ],
+      "status_at_creation": "todo_dependency_gated_by_blocked_kickoff"
+    },
+    {
+      "task_id": "t_2d267b26",
+      "source_id": "TASK-11",
+      "title": "Save/Load, Persistence, Multi-Slot, Auto-Save & Cloud Readiness",
+      "package_plan": "docs/game/build-plans/11-save-load-persistence-e2e.md",
+      "milestone": "M7 Persistence & Platform Reliability",
+      "assignee": "sargassoworker",
+      "parents": [
+        "t_0228a857"
+      ],
+      "priority": 11,
+      "verification": [
+        "SAVE SLOT STATE PASS",
+        "SAVE MIGRATION SERVICE PASS",
+        "AUTOSAVE POLICY PASS",
+        "MAIN PLAYABLE MULTISLOT SAVE PASS"
+      ],
+      "status_at_creation": "todo_dependency_gated_by_blocked_kickoff"
+    },
+    {
+      "task_id": "t_4faf58cf",
+      "source_id": "TASK-12",
+      "title": "Procedural Generation Expansion, Templates, Biomes & Encounter Injection",
+      "package_plan": "docs/game/build-plans/12-procedural-generation-expansion-e2e.md",
+      "milestone": "M8 World Variety",
+      "assignee": "sargassoworker",
+      "parents": [
+        "t_0228a857"
+      ],
+      "priority": 12,
+      "verification": [
+        "TEMPLATE C TRAVERSAL PASS",
+        "ROOM VARIANT SELECTOR PASS",
+        "ENCOUNTER INJECTOR PASS",
+        "SEED DETERMINISM PASS"
+      ],
+      "status_at_creation": "todo_dependency_gated_by_blocked_kickoff"
+    },
+    {
+      "task_id": "t_3b217838",
+      "source_id": "TASK-13",
+      "title": "Distribution, Store, Achievements, Demo, Localization & Post-Launch Ops",
+      "package_plan": "docs/game/build-plans/13-distribution-store-postlaunch-e2e.md",
+      "milestone": "M9 Release Readiness",
+      "assignee": "sargassoworker",
+      "parents": [
+        "t_0228a857"
+      ],
+      "priority": 13,
+      "verification": [
+        "EXPORT PRESETS PASS",
+        "ACHIEVEMENT STATE PASS",
+        "LOCALIZATION CATALOG PASS",
+        "RELEASE READINESS LEDGER PASS"
+      ],
+      "status_at_creation": "todo_dependency_gated_by_blocked_kickoff"
+    },
+    {
+      "task_id": "t_12bf9f4a",
+      "source_id": "TASK-14",
+      "title": "Cross-System Integration, Balance, Product Audit & Gap Closure",
+      "package_plan": "docs/game/build-plans/14-cross-system-integration-review-e2e.md",
+      "milestone": "M10 Integration Gate",
+      "assignee": "sargassoreview",
+      "parents": [
+        "t_0228a857",
+        "t_34d0483b",
+        "t_d569eba2",
+        "t_be88f847",
+        "t_af66b721",
+        "t_67389b76",
+        "t_cbe56420",
+        "t_290ec958",
+        "t_02146c59",
+        "t_7a6849cb",
+        "t_9e328a9f",
+        "t_2d267b26",
+        "t_4faf58cf",
+        "t_3b217838"
+      ],
+      "priority": 14,
+      "verification": [
+        "CROSS SYSTEM DEPENDENCY PASS",
+        "E2E SURVIVAL LOOP PASS",
+        "E2E COMBAT LOOT CRAFT PASS",
+        "PRODUCT AUDIT PASS"
+      ],
+      "status_at_creation": "todo_dependency_gated_by_blocked_kickoff"
+    },
+    {
+      "task_id": "t_c7ac4d08",
+      "source_id": "TASK-15",
+      "title": "Systems Map, Roadmap, Requirements, Manifest & Final Board Currency",
+      "package_plan": "docs/game/build-plans/15-systems-map-task-graph-update-e2e.md",
+      "milestone": "M11 Documentation Currency",
+      "assignee": "sargassoreview",
+      "parents": [
+        "t_0228a857",
+        "t_34d0483b",
+        "t_d569eba2",
+        "t_be88f847",
+        "t_af66b721",
+        "t_67389b76",
+        "t_cbe56420",
+        "t_290ec958",
+        "t_02146c59",
+        "t_7a6849cb",
+        "t_9e328a9f",
+        "t_2d267b26",
+        "t_4faf58cf",
+        "t_3b217838",
+        "t_12bf9f4a"
+      ],
+      "priority": 15,
+      "verification": [
+        "SYSTEMS MAP CURRENCY PASS",
+        "REQUIREMENT TRACE PASS",
+        "KANBAN MANIFEST PASS"
+      ],
+      "status_at_creation": "todo_dependency_gated_by_blocked_kickoff"
+    }
+  ],
+  "dependency_strategy": "Tasks 1-13 are independent after kickoff. Task 14 depends on Tasks 1-13. Task 15 depends on Tasks 1-14.",
+  "policy": {
+    "no_stubs": true,
+    "no_generic_human_review_blocks": true,
+    "reviewer_profile": "sargassoreview",
+    "validation_root": "/Users/christopherwilloughby/the-synaptic-sea"
+  },
+  "recovery_notes": [
+    {
+      "created_at": "2026-06-26T17:15:27.549499+00:00",
+      "kind": "dependency_edge_repair",
+      "reason": "Task 14 blocked on rigid-pair regression fix but the fix card was accidentally a child of blocked Task 14, so it could not dispatch.",
+      "changes": [
+        {
+          "unlink": [
+            "t_12bf9f4a",
+            "t_cc483347"
+          ]
+        },
+        {
+          "link": [
+            "t_cc483347",
+            "t_12bf9f4a"
+          ]
+        },
+        {
+          "unblocked_to_dependency_gated_todo": "t_12bf9f4a"
+        },
+        {
+          "dispatched": "t_cc483347"
+        }
+      ],
+      "backup": "kanban.db.edge-repair-20260626_131402.bak",
+      "followup_tasks": {
+        "t_cc483347": "Task 14 follow-up: fix rigid-pair travel regression smoke timeout",
+        "t_4e47145d": "Task 14 follow-up: live main-scene prepare-to-upgrade e2e probe"
+      }
+    }
+  ],
+  "board_currency": {
+    "captured_at": "2026-06-26T00:00:00Z",
+    "validated_by_task": "t_c7ac4d08",
+    "board_db_path": "/Users/christopherwilloughby/.hermes/kanban/boards/synaptic-sea-e2e-systems/kanban.db",
+    "task_count": 18,
+    "link_count": 44,
+    "status_counts": {
+      "done": 17,
+      "running": 1
+    },
+    "additional_tasks": [
+      {
+        "id": "t_0228a857",
+        "status": "done",
+        "title": "KICKOFF: staged Synaptic Sea E2E systems implementation wave"
+      },
+      {
+        "id": "t_4e47145d",
+        "status": "done",
+        "title": "Task 14 follow-up: live main-scene prepare-to-upgrade e2e probe"
+      },
+      {
+        "id": "t_cc483347",
+        "status": "done",
+        "title": "Task 14 follow-up: fix rigid-pair travel regression smoke timeout"
+      }
+    ],
+    "additional_links": [
+      [
+        "t_12bf9f4a",
+        "t_4e47145d"
+      ],
+      [
+        "t_cc483347",
+        "t_12bf9f4a"
+      ]
+    ],
+    "validation_markers": [
+      "SYSTEMS MAP CURRENCY PASS",
+      "REQUIREMENT TRACE PASS",
+      "KANBAN MANIFEST PASS"
+    ],
+    "allowed_status_counts": [
+      {
+        "done": 17,
+        "running": 1
+      },
+      {
+        "done": 18
+      }
+    ]
+  },
+  "currency_status": "validated_by_task15_focused_doc_validators"
+}

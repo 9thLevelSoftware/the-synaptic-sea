@@ -30,12 +30,14 @@ func serialize(cell_grid: Dictionary, geometry: Dictionary,
 	var rooms_data: Dictionary = cell_grid.get("rooms", {})
 	var adjacencies: Array = cell_grid.get("adjacencies", [])
 
-	# Build room role lookup
+	# Build room role / variant lookup
 	var room_roles: Dictionary = {}
+	var room_variants: Dictionary = {}
 	var room_order: Array[String] = []
 	for room in room_plan:
 		var rid: String = str(room["id"])
 		room_roles[rid] = str(room.get("role", ""))
+		room_variants[rid] = str(room.get("variant", "standard"))
 		room_order.append(rid)
 
 	# Assemble rooms array
@@ -54,6 +56,7 @@ func serialize(cell_grid: Dictionary, geometry: Dictionary,
 		var room_dict: Dictionary = {
 			"id": rid,
 			"room_role": role,
+			"variant": str(room_variants.get(rid, "standard")),
 			"deck": deck,
 			"structural_placements": placements,
 		}
@@ -89,7 +92,7 @@ func serialize(cell_grid: Dictionary, geometry: Dictionary,
 	var critical_path: Array = _build_critical_path(entry_id, dest_id, adjacencies)
 
 	return {
-		"schema_version": "1.1.0",
+		"schema_version": "1.2.0",
 		"document_kind": "ship_layout",
 		"program_id": "procgen-%s-seed-%d" % [archetype_name, seed_value],
 		"kit_id": "ship_structural_v0",
@@ -104,6 +107,7 @@ func serialize(cell_grid: Dictionary, geometry: Dictionary,
 		"fire_zones": [],
 		"arc_zones": [],
 		"breach_zones": [],
+		"encounters": [],  # populated by EncounterInjector (Task 12)
 		"prototype": {
 			"start_room": entry_id,
 			"goal_room": dest_id,

@@ -30,9 +30,12 @@ func _run_section_a() -> void:
 	assert(ship.player_equipped_for_validation("back") == "eva_backpack", "back slot holds backpack")
 	assert(ship.player_capacity_for_validation() == base_cap + 40.0, "capacity rose by 40 (base=%s now=%s)" % [str(base_cap), str(ship.player_capacity_for_validation())])
 
-	# Overload -> Heavy Load -> move_speed drops below the default.
+	# Overload -> Heavy Load -> move_speed drops below the default. The EVA
+	# backpack now applies a 30% worn-container weight reduction, so use two
+	# heavy part stacks rather than scrap alone to stay over capacity.
 	var default_speed: float = ship.player_move_speed_for_validation()
-	ship.overload_player_for_validation("scrap_metal", 20)   # 100 weight vs ~90 cap -> over 100%
+	ship.overload_player_for_validation("scrap_metal", 20)
+	ship.overload_player_for_validation("plating", 10)
 	var slowed_speed: float = ship.player_move_speed_for_validation()
 	assert(slowed_speed < default_speed, "move_speed dropped under Heavy Load (%s -> %s)" % [str(default_speed), str(slowed_speed)])
 

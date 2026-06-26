@@ -6,6 +6,7 @@ class_name InventoryRow
 ## load()-self-reference factory so it resolves under --headless --script.
 
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
+const RarityTierScript := preload("res://scripts/systems/rarity_tier.gd")
 const SWATCH := {
 	"part": Color(0.55, 0.70, 0.95),
 	"supply": Color(0.60, 0.90, 0.60),
@@ -52,6 +53,11 @@ func set_selected(v: bool) -> void:
 func _apply_style() -> void:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = SEL_BG if _selected else Color(0, 0, 0, 0)
+	sb.border_width_left = 2
+	sb.border_width_top = 2
+	sb.border_width_right = 2
+	sb.border_width_bottom = 2
+	sb.border_color = RarityTierScript.color(ItemDefsScript.rarity(_defs, item_id))
 	sb.set_corner_radius_all(4)
 	add_theme_stylebox_override("panel", sb)
 

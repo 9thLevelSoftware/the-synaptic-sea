@@ -38,7 +38,25 @@ const DEFAULT_TEXT_SCALE: float = 1.0
 const PROJECT_SETTING_KEY: String = "sargasso/accessibility/text_scale"
 const ENV_VAR_NAME: String = "SARGASSO_TEXT_SCALE"
 
+# REQ-UI-008 / ADR-0033: extended accessibility seam. New fields live on
+# the same instance so the existing text-scale smoke and the
+# A11Y-P1-001 contract stay green. Defaults reproduce the pre-package
+# behaviour exactly: text_scale=1.0, colorblind_mode="none",
+# motion_reduce=false, captions=true, hold_to_tap=false,
+# preset_id="default", difficulty="standard", glyph_scheme="auto".
+const VALID_COLORBLIND_MODES: Array[String] = ["none", "protanopia", "deuteranopia", "tritanopia"]
+const VALID_DIFFICULTIES: Array[String] = ["standard", "hardened", "deep_dive"]
+const VALID_GLYPH_SCHEMES: Array[String] = ["auto", "keyboard", "gamepad_xbox", "gamepad_ps"]
+const DEFAULT_PRESET_ID: String = "default"
+
 var _text_scale: float = DEFAULT_TEXT_SCALE
+var _colorblind_mode: String = "none"
+var _motion_reduce: bool = false
+var _captions: bool = true
+var _hold_to_tap: bool = false
+var _preset_id: String = DEFAULT_PRESET_ID
+var _difficulty: String = "standard"
+var _glyph_scheme: String = "auto"
 
 func _init() -> void:
 	_text_scale = _resolve_initial_scale()
@@ -113,3 +131,87 @@ static func _read_project_setting_scale() -> float:
 
 static func _clamp_scale(value: float) -> float:
 	return clampf(value, MIN_TEXT_SCALE, MAX_TEXT_SCALE)
+
+## --- REQ-UI-008 / ADR-0033 extended accessibility fields ---
+## All getters / setters clamp / validate against the allowlist so a
+## malformed input never produces an invalid state. The defaults are
+## chosen so the existing A11Y-P1-001 text-scale smoke stays green.
+
+func get_colorblind_mode() -> String:
+	return _colorblind_mode
+
+func set_colorblind_mode(mode: String) -> void:
+	if VALID_COLORBLIND_MODES.has(mode):
+		_colorblind_mode = mode
+
+func is_motion_reduce() -> bool:
+	return _motion_reduce
+
+func set_motion_reduce(value: bool) -> void:
+	_motion_reduce = value
+
+func is_captions_enabled() -> bool:
+	return _captions
+
+func set_captions_enabled(value: bool) -> void:
+	_captions = value
+
+func is_hold_to_tap() -> bool:
+	return _hold_to_tap
+
+func set_hold_to_tap(value: bool) -> void:
+	_hold_to_tap = value
+
+func get_preset_id() -> String:
+	return _preset_id
+
+func set_preset_id(id: String) -> void:
+	if not id.is_empty():
+		_preset_id = id
+
+func get_difficulty() -> String:
+	return _difficulty
+
+func set_difficulty(difficulty: String) -> void:
+	if VALID_DIFFICULTIES.has(difficulty):
+		_difficulty = difficulty
+
+func get_glyph_scheme() -> String:
+	return _glyph_scheme
+
+func set_glyph_scheme(scheme: String) -> void:
+	if VALID_GLYPH_SCHEMES.has(scheme):
+		_glyph_scheme = scheme
+
+## Difficulty multiplier (REQ-UI-014). 1.0 = standard; the higher presets
+## multiply hazard drain / spawn rate. Returns 1.0 for an unknown preset
+## so a malformed catalog entry never causes a divide-by-zero downstream.
+func get_difficulty_multiplier() -> float:
+	match _difficulty:
+		"standard": return 1.0
+		"hardened": return 1.5
+		"deep_dive": return 2.0
+	return 1.0
+
+## Apply a full preset dict to this instance. Used by the settings menu
+## after loading `data/ui/accessibility_presets.json`. Unknown keys are
+## ignored; out-of-range values are clamped.
+func apply_preset_dict(preset: Dictionary) -> void:
+	if preset == null:
+		return
+	if preset.has("text_scale"):
+		set_text_scale(float(preset.get("text_scale", DEFAULT_TEXT_SCALE)))
+	if preset.has("colorblind_mode"):
+		set_colorblind_mode(str(preset.get("colorblind_mode", "none")))
+	if preset.has("motion_reduce"):
+		set_motion_reduce(bool(preset.get("motion_reduce", false)))
+	if preset.has("captions"):
+		set_captions_enabled(bool(preset.get("captions", true)))
+	if preset.has("hold_to_tap"):
+		set_hold_to_tap(bool(preset.get("hold_to_tap", false)))
+	if preset.has("difficulty"):
+		set_difficulty(str(preset.get("difficulty", "standard")))
+	if preset.has("glyph_scheme"):
+		set_glyph_scheme(str(preset.get("glyph_scheme", "auto")))
+	if preset.has("id"):
+		set_preset_id(str(preset.get("id", DEFAULT_PRESET_ID)))

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="AudioBusConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/systems/audio_bus_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+buses = [
+	{"id": &"master", "parent_id": &"", "volume_db": 0.0, "muted": false},
+	{"id": &"sfx", "parent_id": &"master", "volume_db": -3.0, "muted": false},
+	{"id": &"music", "parent_id": &"master", "volume_db": -6.0, "muted": false},
+	{"id": &"voice", "parent_id": &"master", "volume_db": -3.0, "muted": false},
+	{"id": &"ui", "parent_id": &"master", "volume_db": -6.0, "muted": false},
+	{"id": &"ambient", "parent_id": &"master", "volume_db": -9.0, "muted": false},
+	{"id": &"meta", "parent_id": &"master", "volume_db": -6.0, "muted": false}
+]

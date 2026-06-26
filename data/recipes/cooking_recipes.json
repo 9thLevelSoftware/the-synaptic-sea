@@ -1,0 +1,67 @@
+{
+  "recipes": [
+    {
+      "recipe_id": "cooked_meal_basic",
+      "display_name": "Basic Cooked Meal",
+      "ingredients": {
+        "ration_pack": 1,
+        "purified_water": 1
+      },
+      "produces": {
+        "item_id": "cooked_meal",
+        "quantity": 1
+      },
+      "power_cost": 5.0,
+      "cook_time_seconds": 10.0,
+      "required_skill_level": 0,
+      "station_kind": "galley"
+    },
+    {
+      "recipe_id": "cooked_meal_protein",
+      "display_name": "Protein Fry",
+      "ingredients": {
+        "scavenged_protein": 1,
+        "purified_water": 1
+      },
+      "produces": {
+        "item_id": "cooked_meal",
+        "quantity": 2
+      },
+      "power_cost": 8.0,
+      "cook_time_seconds": 15.0,
+      "required_skill_level": 1,
+      "station_kind": "galley"
+    },
+    {
+      "recipe_id": "cooked_meal_alien",
+      "display_name": "Cauterized Flora",
+      "ingredients": {
+        "alien_flora": 2,
+        "purified_water": 1
+      },
+      "produces": {
+        "item_id": "cooked_meal",
+        "quantity": 1
+      },
+      "power_cost": 6.0,
+      "cook_time_seconds": 12.0,
+      "required_skill_level": 2,
+      "station_kind": "galley"
+    },
+    {
+      "recipe_id": "synthesized_paste_batch",
+      "display_name": "Nutrient Paste Batch",
+      "ingredients": {
+        "ration_pack": 2
+      },
+      "produces": {
+        "item_id": "synthesized_paste",
+        "quantity": 3
+      },
+      "power_cost": 15.0,
+      "cook_time_seconds": 20.0,
+      "required_skill_level": 0,
+      "station_kind": "synthesizer"
+    }
+  ]
+}
