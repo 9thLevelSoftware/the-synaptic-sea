@@ -101,7 +101,7 @@ These were tracked defects, not regressions.
    aspirational and cannot be confirmed from this checkout. The `kanban-manifest`
    validator therefore cannot run as a gate here without the board DB.
 
-Real fix (implemented in PR #30, pending merge): auto-detect the repo root in the
+Real fix (implemented in PR #30): auto-detect the repo root in the
 validators, register the host-only `systems-map` and `requirement-trace` in
 `06_validation_plan.md`, gate `kanban-manifest` on board-DB availability, and author
 the missing requirement entries from (1). See the resolution note at the top of this
