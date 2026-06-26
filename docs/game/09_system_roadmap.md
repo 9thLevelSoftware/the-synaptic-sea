@@ -28,7 +28,7 @@ A reachability audit of the E2E batch (commit `5445480`) found that **30 of the
 passing model/smokes but are never mounted in the actual derelict run. "Validated"
 in the table above therefore means *unit-tested*, not *player-reachable*. The
 crafting/salvage economy (ADR-0038) and the entire menu/settings/meta-screen UI
-shell are validated-but-unreachable. See `docs/game/integration_debt.md` for the
+shell are validated-but-unreachable. See [integration_debt.md](integration_debt.md) for the
 full classification and the integration actions required before depth/content work
 builds on these foundations.
 
