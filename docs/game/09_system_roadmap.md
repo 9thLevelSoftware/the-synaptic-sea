@@ -59,8 +59,19 @@ builds on these foundations.
 ## Documentation-currency caveats (verified 2026-06-26)
 
 A direct check of the claims above against the working tree found that the M11
-"Documentation Currency — Validated by focused validators" lane does not hold up.
-These are tracked defects, not regressions:
+"Documentation Currency — Validated by focused validators" lane did not hold up.
+These were tracked defects, not regressions.
+
+> **Resolution — PR #30 (`fix/doc-currency-validators`).** Defects
+> (1)–(3) below are fixed there: the validators auto-detect the repo root and gate
+> `kanban-manifest` on board-DB availability; all 57 requirement entries are authored
+> into `05_requirements.md`; and `systems-map` / `requirement-trace` / `kanban-manifest`
+> are registered in the regression bundle (`commands 30 → 33`). Verified there:
+> `SYSTEMS MAP CURRENCY PASS`, `REQUIREMENT TRACE PASS`, `KANBAN MANIFEST SKIP`,
+> `SYNAPTIC_SEA REGRESSION PASS commands=33`. Defect (4) is inherent: the live board
+> SQLite DB is not on this machine, so `kanban-manifest` skips here by design and runs
+> as a full check only where the board DB exists (or via `KANBAN_DB`). The original
+> defect list is kept below for the audit trail.
 
 1. **`05_requirements.md` is missing the entire E2E requirements taxonomy.** When
    `doc_currency_validators.py requirement-trace` is run with `ROOT` set, it reports
@@ -90,7 +101,8 @@ These are tracked defects, not regressions:
    aspirational and cannot be confirmed from this checkout. The `kanban-manifest`
    validator therefore cannot run as a gate here without the board DB.
 
-Real fix (separate from this roadmap edit): auto-detect the repo root in the
-validators, register the host-only `systems-map` (and `requirement-trace` once its
-gaps are closed) in `06_validation_plan.md`, gate `kanban-manifest` on board-DB
-availability, and author the missing requirement entries from (1).
+Real fix (implemented in PR #30): auto-detect the repo root in the
+validators, register the host-only `systems-map` and `requirement-trace` in
+`06_validation_plan.md`, gate `kanban-manifest` on board-DB availability, and author
+the missing requirement entries from (1). See the resolution note at the top of this
+section.
