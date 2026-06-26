@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Project root: `/Users/christopherwilloughby/the-sargasso-of-stars`.
+- Project root: `/Users/christopherwilloughby/the-synapse-sea-of-stars`.
 - Godot binary: `/Users/christopherwilloughby/.local/bin/godot-4.6.2`.
 - Workspace state checked on 2026-06-19: `GIT_INSIDE=false`.
 - Do not create HTML, PNG, contact sheets, screenshot galleries, or proof documents for this milestone.
@@ -21,7 +21,7 @@
 - The route-control milestone has no proof artifacts as deliverables; validation is command-output smokes only.
 - Preserve existing objective sequence and validation seams: `complete_objective_sequence_for_validation()`, `complete_all_objectives_for_validation()`, and existing smokes must keep working.
 - Output from validation commands must be clean of unexpected lines beginning with `ERROR:` or `WARNING:`.
-- Because this is not a git repository, every task uses the no-git ledger fallback at `/tmp/sargasso_route_control_no_git_changes.log` instead of assuming `git commit` works.
+- Because this is not a git repository, every task uses the no-git ledger fallback at `/tmp/synapse_sea_route_control_no_git_changes.log` instead of assuming `git commit` works.
 
 ---
 
@@ -330,7 +330,7 @@ func _cleanup_and_quit(code: int) -> void:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
 ```
 
 Expected red result:
@@ -344,7 +344,7 @@ Expected red result:
 Run:
 
 ```bash
-printf '%s\n' 'NO_GIT Task 1 RED route-control smoke added and failed for missing route-control implementation: scripts/validation/main_playable_slice_route_control_smoke.gd' >> /tmp/sargasso_route_control_no_git_changes.log
+printf '%s\n' 'NO_GIT Task 1 RED route-control smoke added and failed for missing route-control implementation: scripts/validation/main_playable_slice_route_control_smoke.gd' >> /tmp/synapse_sea_route_control_no_git_changes.log
 ```
 
 ---
@@ -484,7 +484,7 @@ func _fail(reason: String) -> void:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/route_control_state_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/route_control_state_smoke.gd
 ```
 
 Expected red result:
@@ -584,7 +584,7 @@ func _opened_gate_count() -> int:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --import
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --import
 ```
 
 Expected result:
@@ -597,7 +597,7 @@ Expected result:
 Run:
 
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/route_control_state_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/route_control_state_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'ROUTE CONTROL STATE PASS gates=2 opened=2 blockers=0 extraction=true'
 if printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' >/dev/null; then
@@ -617,7 +617,7 @@ ROUTE CONTROL STATE PASS gates=2 opened=2 blockers=0 extraction=true
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
 ```
 
 Expected result:
@@ -630,11 +630,11 @@ Expected result:
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/systems/route_control_state.gd scripts/validation/route_control_state_smoke.gd scripts/systems/route_control_state.gd.uid
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m 'feat: add route control state model'
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/systems/route_control_state.gd scripts/validation/route_control_state_smoke.gd scripts/systems/route_control_state.gd.uid
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'feat: add route control state model'
 else
-  printf '%s\n' 'NO_GIT Task 2 changed: scripts/systems/route_control_state.gd scripts/validation/route_control_state_smoke.gd scripts/systems/route_control_state.gd.uid' >> /tmp/sargasso_route_control_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 2 changed: scripts/systems/route_control_state.gd scripts/validation/route_control_state_smoke.gd scripts/systems/route_control_state.gd.uid' >> /tmp/synapse_sea_route_control_no_git_changes.log
 fi
 ```
 
@@ -960,7 +960,7 @@ func get_route_gate_collision_enabled_count() -> int:
 Run:
 
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_route_control_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_route_control_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'MAIN PLAYABLE ROUTE CONTROL PASS'
 if printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' >/dev/null; then
@@ -982,11 +982,11 @@ If the project has more than one blocked route in the loaded fixture, a higher `
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_route_control_smoke.gd
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m 'feat: add runtime route gates'
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_route_control_smoke.gd
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'feat: add runtime route gates'
 else
-  printf '%s\n' 'NO_GIT Task 3 changed: scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_route_control_smoke.gd' >> /tmp/sargasso_route_control_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 3 changed: scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_route_control_smoke.gd' >> /tmp/synapse_sea_route_control_no_git_changes.log
 fi
 ```
 
@@ -1001,7 +1001,7 @@ fi
 - Read: `scripts/validation/main_playable_slice_completion_smoke.gd`
 - Read: `scripts/validation/main_playable_slice_input_smoke.gd`
 - Read: `scripts/validation/main_playable_slice_readability_smoke.gd`
-- Read: `/tmp/sargasso_route_control_no_git_changes.log`
+- Read: `/tmp/synapse_sea_route_control_no_git_changes.log`
 
 **Interfaces:**
 - Consumes all implemented route-control APIs.
@@ -1014,7 +1014,7 @@ Run:
 
 ```bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
+ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
 GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
 run_clean() {
   label="$1"
@@ -1050,7 +1050,7 @@ Run:
 
 ```bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
+ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
 find "$ROOT/docs/superpowers/proofs" -maxdepth 1 -type f -newer "$ROOT/docs/superpowers/specs/2026-06-19-route-control-system-design.md" -print 2>/dev/null || true
 find "$ROOT/.superpowers" -type f \( -name '*.html' -o -name '*.png' \) -newer "$ROOT/docs/superpowers/specs/2026-06-19-route-control-system-design.md" -print 2>/dev/null || true
 ```
@@ -1065,13 +1065,13 @@ Expected result:
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars status --short
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/systems/route_control_state.gd scripts/systems/route_control_state.gd.uid scripts/validation/route_control_state_smoke.gd scripts/validation/main_playable_slice_route_control_smoke.gd scripts/procgen/playable_generated_ship.gd
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m 'test: verify route control regression bundle'
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars status --short
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/systems/route_control_state.gd scripts/systems/route_control_state.gd.uid scripts/validation/route_control_state_smoke.gd scripts/validation/main_playable_slice_route_control_smoke.gd scripts/procgen/playable_generated_ship.gd
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'test: verify route control regression bundle'
 else
-  printf '%s\n' 'NO_GIT Task 4 verified: route_control_state_smoke PASS + main_route_control_smoke PASS + ship_systems_smoke PASS + completion_smoke PASS + input_smoke PASS + readability_smoke PASS, no errors/warnings' >> /tmp/sargasso_route_control_no_git_changes.log
-  tail -n 10 /tmp/sargasso_route_control_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 4 verified: route_control_state_smoke PASS + main_route_control_smoke PASS + ship_systems_smoke PASS + completion_smoke PASS + input_smoke PASS + readability_smoke PASS, no errors/warnings' >> /tmp/synapse_sea_route_control_no_git_changes.log
+  tail -n 10 /tmp/synapse_sea_route_control_no_git_changes.log
 fi
 ```
 

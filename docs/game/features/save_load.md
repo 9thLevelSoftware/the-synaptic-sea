@@ -140,13 +140,13 @@ Gate 1 ends when the slice completes or the process exits; there is no way to pr
 
 - Direct model smoke:
   ```bash
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/save_load_service_smoke.gd
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/save_load_service_smoke.gd
   ```
   Expected marker: `SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=6`
 
 - Main-scene smoke:
   ```bash
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_save_load_smoke.gd
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_save_load_smoke.gd
   ```
   Expected marker: `MAIN PLAYABLE SAVE LOAD PASS saved_sequence=2 loaded_sequence=2 position_match=true supplies=true`
 

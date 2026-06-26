@@ -3,7 +3,7 @@ extends SceneTree
 ##
 ## Usage:
 ##   /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-##     --path /Users/christopherwilloughby/the-sargasso-of-stars \
+##     --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
 ##     --script res://scripts/validation/procgen_ship_gameplay_smoke.gd -- \
 ##     --layout /abs/path/to/layout.json --kit /abs/path/to/ship_structural_v0.json \
 ##     --gameplay-slice /abs/path/to/gameplay_slice.json [--timeout-frames 1200]

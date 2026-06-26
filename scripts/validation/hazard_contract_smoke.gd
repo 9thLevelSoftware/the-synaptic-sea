@@ -14,7 +14,7 @@ extends SceneTree
 #
 # Headless:
 #   /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless
-#     --path /Users/christopherwilloughby/the-sargasso-of-stars
+#     --path /Users/christopherwilloughby/the-synapse-sea-of-stars
 #     --script res://scripts/validation/hazard_contract_smoke.gd
 
 func _initialize() -> void:

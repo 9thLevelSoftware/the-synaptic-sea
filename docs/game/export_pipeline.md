@@ -43,8 +43,8 @@ Useful environment overrides:
 
 ```bash
 GODOT=/path/to/godot-4.6.2 \
-SARGASSO_VERSION=v0.1.0 \
-SARGASSO_BUILD_STAMP=20260620T000000Z \
+SYNAPSE_SEA_VERSION=v0.1.0 \
+SYNAPSE_SEA_BUILD_STAMP=20260620T000000Z \
 scripts/export/build_release.sh web macos
 ```
 
@@ -52,10 +52,10 @@ scripts/export/build_release.sh web macos
 
 Raw Godot exports are written under `build/exports/`. Packaged release artifacts are written under `build/release/` using stamped names:
 
-- `sargasso-of-stars-v0.1.0-<stamp>-web.zip`
-- `sargasso-of-stars-v0.1.0-<stamp>-linux-x86_64.zip`
-- `sargasso-of-stars-v0.1.0-<stamp>-macos.zip`
-- `sargasso-of-stars-v0.1.0-<stamp>-windows-x86_64.zip`
+- `synapse-sea-of-stars-v0.1.0-<stamp>-web.zip`
+- `synapse-sea-of-stars-v0.1.0-<stamp>-linux-x86_64.zip`
+- `synapse-sea-of-stars-v0.1.0-<stamp>-macos.zip`
+- `synapse-sea-of-stars-v0.1.0-<stamp>-windows-x86_64.zip`
 - `artifacts.sha256`
 
 ## Verification
@@ -63,7 +63,7 @@ Raw Godot exports are written under `build/exports/`. Packaged release artifacts
 1. Static pipeline check:
 
 ```bash
-python3 tools/check_export_pipeline.py /Users/christopherwilloughby/the-sargasso-of-stars
+python3 tools/check_export_pipeline.py /Users/christopherwilloughby/the-synapse-sea-of-stars
 ```
 
 Expected marker:
@@ -75,13 +75,13 @@ EXPORT PIPELINE CHECK PASS presets=4 build_script=true docs=true
 2. Export smoke for at least two platforms:
 
 ```bash
-SARGASSO_BUILD_STAMP=<stamp> scripts/export/build_release.sh web macos
+SYNAPSE_SEA_BUILD_STAMP=<stamp> scripts/export/build_release.sh web macos
 ```
 
 Expected marker:
 
 ```text
-SARGASSO EXPORT PASS version=v0.1.0 stamp=<stamp> targets=web macos release_dir=.../build/release
+SYNAPSE_SEA EXPORT PASS version=v0.1.0 stamp=<stamp> targets=web macos release_dir=.../build/release
 ```
 
 3. Launch smoke:

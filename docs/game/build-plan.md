@@ -1,18 +1,18 @@
-# Sargasso Kanban Build Plan
+# Synapse Sea Kanban Build Plan
 
 ## Board
 
-`sargasso-stage-gate`
+`synapse-sea-stage-gate`
 
 ## Purpose
 
-Convert the Sargasso operating model into a durable execution queue for Gate 1 and future milestone work.
+Convert the Synapse Sea operating model into a durable execution queue for Gate 1 and future milestone work.
 
 ## Profiles
 
-- `sargassoworker` — scoped Godot implementation worker.
-- `sargassodocs` — documentation/planning worker.
-- `sargassoreview` — review and gate-check worker.
+- `synapse_sea_worker` — scoped Godot implementation worker.
+- `synapse_sea_docs` — documentation/planning worker.
+- `synapse_sea_review` — review and gate-check worker.
 - `default` — GPT-5.5 coordinator/final integrator.
 
 ## Board strategy
@@ -25,7 +25,7 @@ The repository is currently not a git workspace, so shared-workspace concurrency
 
 - Create docs/game operating model.
 - Create ADR-0001.
-- Create Sargasso profiles.
+- Create Synapse Sea profiles.
 - Create board and task graph.
 - Verify MCP/tooling state.
 
@@ -59,4 +59,4 @@ Every card must include objective, source requirements, scope, out of scope, ste
 
 The task graph manifest lives at:
 
-`.omh/kanban/sargasso-stage-gate-task-graph.json`
+`.omh/kanban/synapse-sea-stage-gate-task-graph.json`

@@ -1,4 +1,4 @@
-[gd_scene load_steps=2 format=3 uid="uid://sargasso_playable_coherent_ship"]
+[gd_scene load_steps=2 format=3 uid="uid://synapse_sea_playable_coherent_ship"]
 
 [ext_resource type="Script" path="res://scripts/procgen/playable_generated_ship.gd" id="1_playable_generated_ship"]
 

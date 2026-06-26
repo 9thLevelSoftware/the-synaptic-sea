@@ -48,7 +48,7 @@ Current evidence:
 - Completion/input/readability smokes pass.
 - Hazard pressure loop (REQ-006 oxygen breach) implemented and validated by the direct model smoke, main-scene smoke, and regression bundle.
 - Hub/meta progression deferred past Gate 1 by ADR-0002 / REQ-008.
-- Fresh 2026-06-19 regression bundle from `docs/game/06_validation_plan.md` passed with `SARGASSO REGRESSION PASS commands=8 clean_output=true`; no unexpected `ERROR:`/`WARNING:` lines were emitted beyond the two accepted baseline Godot teardown lines.
+- Fresh 2026-06-19 regression bundle from `docs/game/06_validation_plan.md` passed with `SYNAPSE_SEA REGRESSION PASS commands=8 clean_output=true`; no unexpected `ERROR:`/`WARNING:` lines were emitted beyond the two accepted baseline Godot teardown lines.
 - Gate 1 automated playtest passed via `docs/game/playtests/automated-playtest-protocol.md` and `docs/game/playtests/gate-1-automated-2026-06-19.md`: `GATE 1 AUTOMATED PLAYTEST PASS`, `pass_decision=GO`, all five rubric dimensions scored 2/2, `overall_average=2.00`.
 - Rubric aggregation in `docs/game/playtests/gate-1-rubric-summary.md` passes the Gate 1 threshold on the approved automated evidence path: all dimension means 2.00, no hard-criterion zeros.
 - 2026-06-19 artifact scope guard printed no proof-only artifact paths.
@@ -84,7 +84,7 @@ Status: Go / exited (Gate 2 exit review 2026-06-19).
 
 Entry criteria:
 - Gate 1 exits with Go.
-- **Hub/meta re-decision card has been resolved on board `sargasso-stage-gate`**: ADR-0003 selects Option A and defers hub/meta through Gate 2 (see REQ-009). Re-decision card: `t_3dc29a93`.
+- **Hub/meta re-decision card has been resolved on board `synapse-sea-stage-gate`**: ADR-0003 selects Option A and defers hub/meta through Gate 2 (see REQ-009). Re-decision card: `t_3dc29a93`.
 - Feature backlog is decomposed into Kanban cards with requirements.
 - Validation strategy covers all core systems.
 
@@ -172,7 +172,7 @@ Evidence:
 - REQ-010 timed fire hazard accepted by review card `t_d357d336`; the earlier placement/bundle blockers were resolved by linked repair cards before acceptance.
 - REQ-011 repair-junction objective accepted by review card `t_d2ebf6cf`; the earlier bundle/HUD blockers were resolved before acceptance.
 - REQ-012 current-run save/load implementation was recycled by `t_39bb7c87` for an auto-save ordering defect, then fixed by `t_4d1bd5ab` and covered by permanent smoke `req012_autosave_sequence_smoke.gd`.
-- Full regression report `docs/game/regression_report_2026-06-19.md` records `SARGASSO REGRESSION PASS commands=19 clean_output=true` across 8 Gate 1 smokes and 11 Gate 2 smokes, with zero P0/P1/P2 failures and zero follow-up cards required.
+- Full regression report `docs/game/regression_report_2026-06-19.md` records `SYNAPSE_SEA REGRESSION PASS commands=19 clean_output=true` across 8 Gate 1 smokes and 11 Gate 2 smokes, with zero P0/P1/P2 failures and zero follow-up cards required.
 
 Gate 2 exit checklist:
 - [x] REQ-007 inventory/tool loop implemented and validated.
@@ -198,7 +198,7 @@ Entry evidence:
 - Gate 2 exit is confirmed above with all selected production features implemented and validated.
 - Alpha content-complete target is defined in `docs/game/content_complete_target.md`: 3 ship layout templates, 5 objective types, 3 hazard types, 2 tools, 4–6 minute run length, and 1 derelict run per session.
 - Alpha content gaps are tracked as REQ-013 (Alpha hazard variety) and REQ-014 (Alpha tool variety) in `docs/game/05_requirements.md`.
-- Bug triage process is active in `docs/game/bug_triage.md`, with P0/P1/P2 severities, daily/per-regression/weekly cadence, and `sargassoreview` as owner.
+- Bug triage process is active in `docs/game/bug_triage.md`, with P0/P1/P2 severities, daily/per-regression/weekly cadence, and `synapse_sea_review` as owner.
 - Fresh regression classification in `docs/game/regression_report_2026-06-19.md` found zero P0, zero P1, zero P2, and zero unclassified failures.
 - Hub/meta remains deferred for Alpha by default per ADR-0003; no new Alpha entry ADR is required unless Gate 3 planning intentionally re-decides it.
 
@@ -234,8 +234,8 @@ Decision: **Go** — Gate 3 Alpha exits to Gate 4 Beta.
 Exit evidence:
 - Content-complete target is defined in `docs/game/content_complete_target.md` and cites the concrete Alpha counts: 3 ship layout templates, 5 objective types, 3 hazard types, 2 tools, 4–6 minute target run length, and one derelict run per Alpha session.
 - Gate 3 content gaps are tracked as requirements and implementation/review cards: Template B `t_24497c06`, Template C `t_f663e769`, REQ-013 electrical_arc spec `t_1bd2e356`, ADR-0005 `t_edbb33ea`, electrical_arc implementation `t_de2e0e20`, electrical_arc review `t_71a89737`, REQ-014 junction_calibrator spec `t_b8febb2f`, junction_calibrator implementation `t_d2d593f1`, and junction_calibrator review `t_80dcea4b`.
-- Bug triage process is active in `docs/game/bug_triage.md`, with `sargassoreview` as owner and P0/P1 core-loop blockers routed through Kanban.
-- Fresh reviewer regression run for Gate 4 kickoff printed `SARGASSO REGRESSION PASS commands=25 clean_output=true` with log `/tmp/sargasso_gate4_kickoff_20260620T011426Z/regression_bundle.log`; all 25 current bundle commands passed their markers and no unallowlisted `ERROR:`/`WARNING:` lines appeared.
+- Bug triage process is active in `docs/game/bug_triage.md`, with `synapse_sea_review` as owner and P0/P1 core-loop blockers routed through Kanban.
+- Fresh reviewer regression run for Gate 4 kickoff printed `SYNAPSE_SEA REGRESSION PASS commands=25 clean_output=true` with log `/tmp/synapse_sea_gate4_kickoff_20260620T011426Z/regression_bundle.log`; all 25 current bundle commands passed their markers and no unallowlisted `ERROR:`/`WARNING:` lines appeared.
 - No P0/P1 core-loop blocker is open against the build under review. Open Gate 4 work below is forward-looking Beta work, not a Gate 3 exit blocker.
 
 Gate 3 exit checklist:
@@ -265,7 +265,7 @@ Content-complete lane:
 - REQ-014 second tool spec: `t_b8febb2f`.
 - REQ-014 junction_calibrator implementation/review: `t_d2d593f1` -> `t_80dcea4b`.
 - Gate 4 content-complete review: `t_d4098c17`.
-- Gate 4 content-complete decision (2026-06-20, card `t_bab72bd0`): **GO** — REQ-014 `junction_calibrator` focused markers passed (`JUNCTION CALIBRATOR STATE PASS required_steps=2 consumed=true`, `MAIN PLAYABLE JUNCTION CALIBRATOR PASS acquired=true required_steps=2 consumed=true`, and `MAIN PLAYABLE JUNCTION CALIBRATOR SAVE LOAD PASS carried_load=true consumed_load=true next_frame_interaction=true`); scoped static review found no P0/P1 blocker; full regression evidence at `/Users/christopherwilloughby/.hermes/kanban/boards/sargasso-stage-gate/workspaces/t_1606c9ec/evidence/regression_results.tsv` and `/Users/christopherwilloughby/.hermes/kanban/boards/sargasso-stage-gate/workspaces/t_1606c9ec/evidence/regression_full.log` records `total=31 pass=31 fail=0` / `SARGASSO REGRESSION commands=31 pass=31 fail=0 clean_output=true`.
+- Gate 4 content-complete decision (2026-06-20, card `t_bab72bd0`): **GO** — REQ-014 `junction_calibrator` focused markers passed (`JUNCTION CALIBRATOR STATE PASS required_steps=2 consumed=true`, `MAIN PLAYABLE JUNCTION CALIBRATOR PASS acquired=true required_steps=2 consumed=true`, and `MAIN PLAYABLE JUNCTION CALIBRATOR SAVE LOAD PASS carried_load=true consumed_load=true next_frame_interaction=true`); scoped static review found no P0/P1 blocker; full regression evidence at `/Users/christopherwilloughby/.hermes/kanban/boards/synapse-sea-stage-gate/workspaces/t_1606c9ec/evidence/regression_results.tsv` and `/Users/christopherwilloughby/.hermes/kanban/boards/synapse-sea-stage-gate/workspaces/t_1606c9ec/evidence/regression_full.log` records `total=31 pass=31 fail=0` / `SYNAPSE_SEA REGRESSION commands=31 pass=31 fail=0 clean_output=true`.
 
 Performance lane:
 - Baseline profiling pass: `t_e3fbaad1`.
@@ -303,7 +303,7 @@ Accessibility review baseline:
 - Review disposition: no P0 accessibility blocker and no P0 issue without a workaround found in the current slice.
 - Baseline P1 accessibility cards were `t_18c36407` (scalable HUD/world text) and `t_ec529103` (alternate keyboard bindings or remap seam).
 
-Accessibility pass (2026-06-20, card `t_d9d85bad`): **Go** — A11Y-P1-001 and A11Y-P1-002 are closed. Fresh focused smokes passed input, readability, HUD label, text scale, and alternate input coverage, including `MAIN PLAYABLE TEXT SCALE PASS scales=3 default=1.0x1.5x2.0 runtime_text=present` and `MAIN PLAYABLE ALTERNATE INPUT PASS moves_alt=1 interact_alt=1`. The current full regression bundle passed with `SARGASSO REGRESSION PASS commands=29 clean_output=true`; only accepted Godot teardown baseline lines and the expected REQ-012 contract warning were observed. No unresolved P0/P1 accessibility blocker remains.
+Accessibility pass (2026-06-20, card `t_d9d85bad`): **Go** — A11Y-P1-001 and A11Y-P1-002 are closed. Fresh focused smokes passed input, readability, HUD label, text scale, and alternate input coverage, including `MAIN PLAYABLE TEXT SCALE PASS scales=3 default=1.0x1.5x2.0 runtime_text=present` and `MAIN PLAYABLE ALTERNATE INPUT PASS moves_alt=1 interact_alt=1`. The current full regression bundle passed with `SYNAPSE_SEA REGRESSION PASS commands=29 clean_output=true`; only accepted Godot teardown baseline lines and the expected REQ-012 contract warning were observed. No unresolved P0/P1 accessibility blocker remains.
 
 Exit criteria:
 - Content complete.
@@ -322,14 +322,14 @@ Gate 4 exit requires the RC task list to exist and to cover:
 - Release notes format (internal `docs/game/release_notes/RC_v0.1.0.md` and packaged `CHANGELOG.txt`).
 - Postmortem template and preliminary notes for the Gate 5 exit review.
 
-Each task in the RC list has an owner (`sargassoworker`, `sargassodocs`, `sargassoreview`, or `default`), an effort estimate, and a stop condition.
+Each task in the RC list has an owner (`synapse_sea_worker`, `synapse_sea_docs`, `synapse_sea_review`, or `default`), an effort estimate, and a stop condition.
 
 ### Gate 4 exit decision (2026-06-20)
 
 Decision: **Go** — Gate 4 Beta exits to Gate 5 Release candidate.
 
 Exit evidence:
-- Content complete: Gate 4 content-complete review and decision accepted 3 ship layout templates, 5 objective types, 3 hazard types, and 2 tools; the current full regression evidence records `total=31 pass=31 fail=0` / `SARGASSO REGRESSION commands=31 pass=31 fail=0 clean_output=true`.
+- Content complete: Gate 4 content-complete review and decision accepted 3 ship layout templates, 5 objective types, 3 hazard types, and 2 tools; the current full regression evidence records `total=31 pass=31 fail=0` / `SYNAPSE_SEA REGRESSION commands=31 pass=31 fail=0 clean_output=true`.
 - Performance pass: the 2026-06-19 re-baseline in `docs/game/performance_baseline.md` meets all four Gate 4 targets (frame time, memory, scene load, and procgen), with no stop condition tripped.
 - Accessibility pass: A11Y-P1-001 text scale and A11Y-P1-002 alternate/remap input are closed; fresh focused smokes and the full regression bundle passed with only classified warnings.
 - Save/input pass: card `t_6195cced` accepted save/load robustness, auto-save ordering, junction-calibrator save/load, original input, alternate input, and text-scale coverage.
@@ -373,7 +373,7 @@ Gate 5 exit requires the store/platform requirements checklist to exist and to c
 - Steam as a documented stretch target, explicitly excluded from Gate 5 blockers.
 - Cross-platform release notes format and save-data notice requirements.
 
-Each checklist item has an owner (`sargassodocs`, `sargassoworker`, `sargassoreview`, or `default`) and a status, and references the relevant RC tasks in `docs/game/rc_task_list.md` where applicable.
+Each checklist item has an owner (`synapse_sea_docs`, `synapse_sea_worker`, `synapse_sea_review`, or `default`) and a status, and references the relevant RC tasks in `docs/game/rc_task_list.md` where applicable.
 
 ### Release notes and postmortem
 
@@ -387,7 +387,7 @@ Decision: **Go** — the v0.1.0 release candidate is ready for itch.io release. 
 Exit evidence:
 - Export/build pipeline verified for Web/HTML5 and macOS using `export_presets.cfg` (4 presets), `scripts/export/build_release.sh`, and `docs/game/export_pipeline.md`; the static pipeline check passed with `EXPORT PIPELINE CHECK PASS presets=4 build_script=true docs=true`.
 - Official Godot 4.6.2 export templates were present; Web/HTML5 and macOS release exports passed with stamp `20260620T000000Z`.
-- Final exported-pack regression passed on both RC artifact targets: `SARGASSO EXPORT REGRESSION PASS target=web commands=31 clean_output=true` and `SARGASSO EXPORT REGRESSION PASS target=macos commands=31 clean_output=true` in `docs/game/export_regression_report.md`.
+- Final exported-pack regression passed on both RC artifact targets: `SYNAPSE_SEA EXPORT REGRESSION PASS target=web commands=31 clean_output=true` and `SYNAPSE_SEA EXPORT REGRESSION PASS target=macos commands=31 clean_output=true` in `docs/game/export_regression_report.md`.
 - Store/platform requirements were checked against itch.io as the primary target in `docs/game/store_requirements.md`; Steam remains documented as a stretch target and is explicitly not a Gate 5 blocker.
 - Release notes and postmortem templates are prepared at `docs/game/release_notes_template.md` and `docs/game/postmortem_template.md`.
 

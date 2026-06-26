@@ -1,9 +1,9 @@
 {
-  "board": "sargasso-stage-gate",
+  "board": "synapse-sea-stage-gate",
   "created_at": "2026-06-19T17:44:34.593058+00:00",
   "created_or_updated_by": "gpt-5.5-coordinator",
   "board_created_this_run": true,
-  "default_workdir": "/Users/christopherwilloughby/the-sargasso-of-stars",
+  "default_workdir": "/Users/christopherwilloughby/the-synapse-sea-of-stars",
   "inputs": [
     "AGENTS.md",
     "docs/game/README.md",
@@ -19,9 +19,9 @@
     "docs/game/adr/0001-adopt-stage-gate-kanban-godot-validation.md"
   ],
   "profiles": {
-    "sargassoworker": "Scoped Godot implementation worker",
-    "sargassodocs": "Documentation/planning/spec worker",
-    "sargassoreview": "Review and milestone gate worker"
+    "synapse_sea_worker": "Scoped Godot implementation worker",
+    "synapse_sea_docs": "Documentation/planning/spec worker",
+    "synapse_sea_review": "Review and milestone gate worker"
   },
   "milestones": [
     {
@@ -63,8 +63,8 @@
     {
       "task_id": "t_75ac7249",
       "source_id": "KICKOFF",
-      "title": "KICKOFF: release Sargasso Stage-Gate queue",
-      "assignee": "sargassoreview",
+      "title": "KICKOFF: release Synapse Sea Stage-Gate queue",
+      "assignee": "synapse_sea_review",
       "parents": [],
       "priority": 1
     },
@@ -72,7 +72,7 @@
       "task_id": "t_fdf00056",
       "source_id": "SPEC-HAZARD-LOOP",
       "title": "SPEC: define Gate 1 hazard pressure loop",
-      "assignee": "sargassodocs",
+      "assignee": "synapse_sea_docs",
       "parents": [
         "t_75ac7249"
       ],
@@ -82,7 +82,7 @@
       "task_id": "t_941f0c39",
       "source_id": "DEC-HUB-META",
       "title": "DECISION: define Gate 1 hub/meta progression stance",
-      "assignee": "sargassodocs",
+      "assignee": "synapse_sea_docs",
       "parents": [
         "t_75ac7249"
       ],
@@ -92,7 +92,7 @@
       "task_id": "t_f38140e0",
       "source_id": "SPEC-GATE1-PLAYTEST",
       "title": "SPEC: create Gate 1 playtest protocol",
-      "assignee": "sargassodocs",
+      "assignee": "synapse_sea_docs",
       "parents": [
         "t_75ac7249"
       ],
@@ -102,7 +102,7 @@
       "task_id": "t_f35e4bca",
       "source_id": "REVIEW-GATE1-PACKET",
       "title": "REVIEW: Gate 1 decision packet",
-      "assignee": "sargassoreview",
+      "assignee": "synapse_sea_review",
       "parents": [
         "t_fdf00056",
         "t_941f0c39",
@@ -114,7 +114,7 @@
       "task_id": "t_24fadc1d",
       "source_id": "PLAN-NEXT-RUNTIME-SYSTEM",
       "title": "PLAN: next Gate 1 runtime system implementation",
-      "assignee": "sargassodocs",
+      "assignee": "synapse_sea_docs",
       "parents": [
         "t_f35e4bca"
       ],
@@ -124,7 +124,7 @@
       "task_id": "t_8041152c",
       "source_id": "IMPL-NEXT-RUNTIME-SYSTEM",
       "title": "IMPLEMENT: approved Gate 1 runtime system",
-      "assignee": "sargassoworker",
+      "assignee": "synapse_sea_worker",
       "parents": [
         "t_24fadc1d"
       ],
@@ -134,7 +134,7 @@
       "task_id": "t_b0f5fc4f",
       "source_id": "REVIEW-NEXT-RUNTIME-SYSTEM",
       "title": "REVIEW: approved Gate 1 runtime system",
-      "assignee": "sargassoreview",
+      "assignee": "synapse_sea_review",
       "parents": [
         "t_8041152c"
       ],
@@ -144,7 +144,7 @@
       "task_id": "t_31bb8158",
       "source_id": "GATE1-MILESTONE-REVIEW",
       "title": "GATE: Gate 1 milestone review",
-      "assignee": "sargassoreview",
+      "assignee": "synapse_sea_review",
       "parents": [
         "t_b0f5fc4f"
       ],
@@ -154,7 +154,7 @@
       "task_id": "t_d2ca5f04",
       "source_id": "EVIDENCE-GATE1-PLAYTEST-ROUND",
       "title": "EVIDENCE: run Gate 1 fresh-player playtest round",
-      "assignee": "sargassoreview",
+      "assignee": "synapse_sea_review",
       "parents": [],
       "priority": 90,
       "initial_status": "blocked",

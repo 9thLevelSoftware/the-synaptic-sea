@@ -2,7 +2,7 @@
 
 ## Overview
 
-Template B (`coherent_ship_002`) is the second hand-authored ship layout for Sargasso Alpha. It is a single-deck, Y-shaped derelict in which the player spawns in an airlock, reaches a central hub, and must explore two major side branches before the route to the reactor unlocks.
+Template B (`coherent_ship_002`) is the second hand-authored ship layout for Synapse Sea Alpha. It is a single-deck, Y-shaped derelict in which the player spawns in an airlock, reaches a central hub, and must explore two major side branches before the route to the reactor unlocks.
 
 This template is intentionally distinct from Template A (`coherent_ship_001`), which is a two-deck horizontal spine with side rooms reached by a ramp. Template B has no vertical deck transitions and no long central spine; instead, the critical path forks, loops through side rooms, and converges.
 

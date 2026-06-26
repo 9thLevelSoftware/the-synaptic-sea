@@ -4,25 +4,25 @@
 
 - **Result:** PASS — all smokes green, no failures to classify.
 - **Bundle source:** `docs/game/06_validation_plan.md` regression bundle script.
-- **Bundle result line:** `SARGASSO REGRESSION PASS commands=19 clean_output=true`.
+- **Bundle result line:** `SYNAPSE_SEA REGRESSION PASS commands=19 clean_output=true`.
 - **Allowlist sweep:** 19/19 smokes emit only the three allowlisted lines
   (`ERROR: Capture not registered: 'gdaimcp'.`,
   `WARNING: ObjectDB instances leaked at exit ...`,
   `WARNING: SaveLoadService: save file rejected by from_dict ...`).
 - **Environment:** Godot 4.6.2.stable.official.71f334935 at
   `/Users/christopherwilloughby/.local/bin/godot-4.6.2` invoked headless against
-  project root `/Users/christopherwilloughby/the-sargasso-of-stars`.
-- **Triage owner:** `sargassoreview` (per `docs/game/bug_triage.md`).
+  project root `/Users/christopherwilloughby/the-synapse-sea-of-stars`.
+- **Triage owner:** `synapse_sea_review` (per `docs/game/bug_triage.md`).
 - **Outcome:** No P0, P1, or P2 defects to record. No follow-up Kanban cards
   required for this run. Stop conditions in the kickoff body are not
   triggered.
 
 ## Gate 3 entry reviewer rerun
 
-- **Runner:** `sargassoreview` for `t_f4c0c74e` Gate 3 Alpha entry.
+- **Runner:** `synapse_sea_review` for `t_f4c0c74e` Gate 3 Alpha entry.
 - **Result:** PASS — `GATE3_ENTRY_REGRESSION_SUMMARY commands=19 failures=0 p0=0 p1=0 p2=0 unclassified=0`.
-- **Bundle result line:** `SARGASSO REGRESSION PASS commands=19 clean_output=true`.
-- **Log:** `/tmp/sargasso_gate3_entry_20260620T001642Z/regression_bundle.log`.
+- **Bundle result line:** `SYNAPSE_SEA REGRESSION PASS commands=19 clean_output=true`.
+- **Log:** `/tmp/synapse_sea_gate3_entry_20260620T001642Z/regression_bundle.log`.
 - **Classification:** zero failures, zero P0, zero P1, zero P2, zero unclassified `ERROR:`/`WARNING:` lines.
 - **Follow-up cards:** none required.
 
@@ -114,7 +114,7 @@ and the line would default to P0. None did.
 The exact bundle that produced this report:
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
+ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
 GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
 BASELINE_ERROR="^ERROR: Capture not registered: 'gdaimcp'\\.$"
 BASELINE_WARNING="^WARNING: ObjectDB instances leaked at exit \\(run with --verbose for details\\)\\.$"
@@ -153,7 +153,7 @@ run_clean 'objective progress hud label smoke'  'OBJECTIVE PROGRESS HUD LABEL PA
 run_clean 'save/load service smoke'             'SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=6' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_load_service_smoke.gd
 run_clean 'main save/load smoke'                'MAIN PLAYABLE SAVE LOAD PASS saved_sequence=2 loaded_sequence=2 position_match=true supplies=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_save_load_smoke.gd
 run_clean 'REQ-012 auto-save sequence smoke'    'REQ012 AUTOSAVE SEQUENCE CHECK PASS live=2 snapshot=2 file=2 has_save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/req012_autosave_sequence_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=19 clean_output=true'
+echo 'SYNAPSE_SEA REGRESSION PASS commands=19 clean_output=true'
 ```
 
 ## Disposition for downstream `t_f4c0c74e` (KICKOFF: Gate 3 Alpha entry)
@@ -162,7 +162,7 @@ echo 'SARGASSO REGRESSION PASS commands=19 clean_output=true'
   no data to act on: every smoke that defaulted to P0-if-failed is currently
   green, so no card was created.
 - The "No open P0/P1 blockers in core loop" Gate 3 exit criterion is met on
-  the build under review as of 2026-06-19 (run by `@sargassoworker`).
+  the build under review as of 2026-06-19 (run by `@synapse_sea_worker`).
 - The bundle count drift (17 vs 19) is the only structural observation; the
   reviewer may want to update the kickoff card body / `08_milestone_gates.md`
   Gate 2 exit language from "8 Gate 1 + 9 Gate 2" to "8 Gate 1 + 11 Gate 2"

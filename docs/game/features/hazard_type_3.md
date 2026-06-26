@@ -120,13 +120,13 @@ The shorter safe window and shorter overall cycle make the arc feel complementar
 
 - Direct model smoke:
   ```bash
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/electrical_arc_state_smoke.gd
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/electrical_arc_state_smoke.gd
   ```
   Expected marker: `ARC STATE PASS cycles=2 phases=4 passability_switches=4`
 
 - Main-scene smoke:
   ```bash
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_arc_smoke.gd
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_arc_smoke.gd
   ```
   Expected marker: `MAIN PLAYABLE ARC PASS state=DISCHARGED cycles=2 blocked_arcing=true blocked_discharged=false`
 

@@ -96,8 +96,8 @@ The hazard is intentionally narrow: one resource, one breach zone, one seal acti
 - Both are part of the regression bundle in `docs/game/06_validation_plan.md`.
 - Verification commands:
   ```
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/oxygen_state_smoke.gd
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_hazard_smoke.gd
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/oxygen_state_smoke.gd
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_hazard_smoke.gd
   ```
 - Expected model-smoke marker: `OXYGEN STATE PASS oxygen=... breach_open=false breach_sealed=true passability_blocked=false recovery_threshold=...`
 - Expected main-smoke marker: `MAIN PLAYABLE HAZARD PASS oxygen=... breach_open=false breach_sealed=true passability_blocked=false`

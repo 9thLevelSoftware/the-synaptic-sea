@@ -2,15 +2,15 @@
 
 ## Working title
 
-The Sargasso of Stars
+The Synapse Sea
 
 ## Current locked premise
 
-A locked-isometric 3D Godot game about a player hub ship trapped in a biomatter web / cosmic Sargasso, exploring procedurally generated derelict spacecraft interiors to survive, repair, and escape.
+A locked-isometric 3D Godot game about a player hub ship trapped in a biomatter web / cosmic Synapse Sea, exploring procedurally generated derelict spacecraft interiors to survive, repair, and escape.
 
 ## One-sentence pitch
 
-Explore trapped derelict ships from a readable locked-isometric view, restore ship systems through real runtime interactions, and carve routes through the Sargasso toward extraction.
+Explore trapped derelict ships from a readable locked-isometric view, restore ship systems through real runtime interactions, and carve routes through the Synapse Sea toward extraction.
 
 ## Target player fantasy
 

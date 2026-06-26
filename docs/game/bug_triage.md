@@ -23,11 +23,11 @@ Severity is assigned at triage and can be changed only by the triage owner or a 
 
 ## Triage owner
 
-`sargassoreview` owns triage during Gate 3.
+`synapse_sea_review` owns triage during Gate 3.
 
 Responsibilities:
 - Read incoming bug reports and assign severity.
-- Create or request Kanban cards on `sargasso-stage-gate` for every P0 and P1 bug.
+- Create or request Kanban cards on `synapse-sea-stage-gate` for every P0 and P1 bug.
 - Decide whether a P2 bug is accepted into Alpha or deferred to Beta.
 - Update this document and `docs/game/08_milestone_gates.md` if the process itself changes.
 - Chair the Gate 3 exit bug review and certify the blocker list.
@@ -46,14 +46,14 @@ Discovery -> Report -> Triage -> Card -> Fix -> Verify -> Close
    - Expected vs. observed behavior.
    - Severity suggestion (optional).
    - Environment (Godot version, commit or workspace date, local vs. CI).
-3. **Triage.** `sargassoreview` assigns P0/P1/P2 within one cadence window and updates the report with the assigned severity.
-4. **Card.** For P0 and P1, create a Kanban card on board `sargasso-stage-gate` that:
+3. **Triage.** `synapse_sea_review` assigns P0/P1/P2 within one cadence window and updates the report with the assigned severity.
+4. **Card.** For P0 and P1, create a Kanban card on board `synapse-sea-stage-gate` that:
    - Cites this document.
    - Cites the affected requirement or feature spec (`docs/game/05_requirements.md`, `docs/game/features/*.md`).
    - Lists allowed files and non-goals.
    - Includes the exact verification command.
-5. **Fix.** `sargassoworker` implements the fix and runs the relevant smoke plus the regression bundle.
-6. **Verify.** `sargassoreview` re-runs the verification command and confirms the regression bundle still passes.
+5. **Fix.** `synapse_sea_worker` implements the fix and runs the relevant smoke plus the regression bundle.
+6. **Verify.** `synapse_sea_review` re-runs the verification command and confirms the regression bundle still passes.
 7. **Close.** Card moved to done; report marked closed with the commit/workspace reference.
 
 P2 bugs may be batched into a single "Alpha polish pass" card unless they are trivial one-line fixes.
@@ -71,7 +71,7 @@ Mapping from regression failure to severity:
 | Smoke passes but prints degraded metrics compared to the previous run (e.g., lower completion count, longer frame time). | P1 | Create card and bisect the regression within 48 hours. |
 | Accepted baseline teardown noise (GDAI capture, ObjectDB leak, REQ-012 save-rejection contract warning). | None | No card; monitor for changes in count or pattern. |
 
-Regression failures discovered during a feature card's verification belong to that card until the card is complete. After completion, any remaining regression failure is routed through this triage process and owned by `sargassoreview`.
+Regression failures discovered during a feature card's verification belong to that card until the card is complete. After completion, any remaining regression failure is routed through this triage process and owned by `synapse_sea_review`.
 
 ## Gate 3 Alpha exit criteria
 

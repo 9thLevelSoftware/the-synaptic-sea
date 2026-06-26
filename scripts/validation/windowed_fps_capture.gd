@@ -12,7 +12,7 @@ extends SceneTree
 #
 # Usage (NOT in the regression bundle -- needs a display server):
 #   /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
-#     --path /Users/christopherwilloughby/the-sargasso-of-stars \
+#     --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
 #     --script res://scripts/validation/windowed_fps_capture.gd
 #
 # Pass marker (on stdout):

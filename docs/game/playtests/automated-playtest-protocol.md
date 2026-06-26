@@ -17,14 +17,14 @@ This protocol is an **alternative evidence source** to `gate-1-playtest-protocol
 
 1. Regression bundle in `docs/game/06_validation_plan.md` passes on the build under test
 2. Godot 4.6.2 at `/Users/christopherwilloughby/.local/bin/godot-4.6.2`
-3. Project at `/Users/christopherwilloughby/the-sargasso-of-stars`
+3. Project at `/Users/christopherwilloughby/the-synapse-sea-of-stars`
 
 ## Execution
 
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/gate1_automated_playtest.gd
 ```
 

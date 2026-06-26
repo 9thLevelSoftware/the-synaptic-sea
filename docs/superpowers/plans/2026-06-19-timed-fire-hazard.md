@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Project root: `/Users/christopherwilloughby/the-sargasso-of-stars`.
+- Project root: `/Users/christopherwilloughby/the-synapse-sea-of-stars`.
 - Godot binary: `/Users/christopherwilloughby/.local/bin/godot-4.6.2`.
 - Workspace state checked on 2026-06-19: `GIT_INSIDE=false`.
 - Do not create HTML, PNG, contact sheets, screenshot galleries, or proof documents for this milestone.
@@ -21,7 +21,7 @@
 - The fire milestone has no proof artifacts as deliverables; validation is command-output smokes only.
 - Preserve existing objective sequence and validation seams: `complete_objective_sequence_for_validation()`, `complete_all_objectives_for_validation()`, `complete_first_interaction_for_validation()`, and all existing Gate 1/2 smokes must keep passing unchanged.
 - Output from validation commands must be clean of unexpected lines beginning with `ERROR:` or `WARNING:` (baseline Godot teardown noise already classified in `docs/game/06_validation_plan.md` may be filtered).
-- Because this is not a git repository, every task uses the no-git ledger fallback at `/tmp/sargasso_timed_fire_no_git_changes.log` instead of assuming `git commit` works.
+- Because this is not a git repository, every task uses the no-git ledger fallback at `/tmp/synapse_sea_timed_fire_no_git_changes.log` instead of assuming `git commit` works.
 - Do not collapse `FireState` into `OxygenState`, `ShipSystemState`, or `RouteControlState`; keep separate responsibility, parallel to the oxygen architecture.
 - Do not delete the fire-zone node when toggling phases — enable/disable collision, update metadata, and toggle the Label3D so the state remains inspectable.
 - Do not introduce health/damage-over-time, fire spread, audio cues, particle VFX, lighting changes, random ignition, procedural placement, or fire-oxygen interaction.
@@ -218,7 +218,7 @@ func _fail(reason: String) -> void:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/fire_state_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/fire_state_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'FIRE STATE PASS' || true
 ```
@@ -232,11 +232,11 @@ Expected (RED) result:
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/validation/fire_state_smoke.gd
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m 'test(fire): RED fire model smoke'
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/validation/fire_state_smoke.gd
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'test(fire): RED fire model smoke'
 else
-  printf '%s\n' 'NO_GIT Task 1 RED: scripts/validation/fire_state_smoke.gd added and failed for missing FireState implementation' >> /tmp/sargasso_timed_fire_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 1 RED: scripts/validation/fire_state_smoke.gd added and failed for missing FireState implementation' >> /tmp/synapse_sea_timed_fire_no_git_changes.log
 fi
 ```
 
@@ -342,7 +342,7 @@ func _recompute_passability_blocked() -> void:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/fire_state_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/fire_state_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'FIRE STATE PASS cycles=2 phases=4 passability_switches=4'
 if printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' >/dev/null; then
@@ -359,11 +359,11 @@ Expected (GREEN) result:
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/systems/fire_state.gd scripts/validation/fire_state_smoke.gd
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m 'feat(fire): FireState model and model smoke'
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/systems/fire_state.gd scripts/validation/fire_state_smoke.gd
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'feat(fire): FireState model and model smoke'
 else
-  printf '%s\n' 'NO_GIT Task 2 GREEN: scripts/systems/fire_state.gd and scripts/validation/fire_state_smoke.gd added and passing' >> /tmp/sargasso_timed_fire_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 2 GREEN: scripts/systems/fire_state.gd and scripts/validation/fire_state_smoke.gd added and passing' >> /tmp/synapse_sea_timed_fire_no_git_changes.log
 fi
 ```
 
@@ -425,7 +425,7 @@ func _add_fire_zone_markers(layout_doc: Dictionary, ship_root: Node3D) -> void:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_hazard_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_hazard_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'MAIN PLAYABLE HAZARD PASS'
 ```
@@ -669,7 +669,7 @@ func teleport_player_to_fire_zone_for_validation() -> bool:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_hazard_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_hazard_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'MAIN PLAYABLE HAZARD PASS'
 ```
@@ -851,7 +851,7 @@ func _cleanup_and_quit(code: int) -> void:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_fire_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_fire_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'MAIN PLAYABLE FIRE PASS state=CLEARED cycles=2 blocked_burning=true blocked_cleared=false'
 if printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' >/dev/null; then
@@ -882,7 +882,7 @@ run_clean 'main fire smoke' 'MAIN PLAYABLE FIRE PASS' "$GODOT" --headless --path
 
 Update the final echo to reflect the new command count (from 8 to 10):
 ```bash
-echo 'SARGASSO REGRESSION PASS commands=10 clean_output=true'
+echo 'SYNAPSE_SEA REGRESSION PASS commands=10 clean_output=true'
 ```
 
 - [ ] **Step 2: Update future-validation list**
@@ -900,7 +900,7 @@ to:
 
 Run:
 ```bash
-ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
+ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
 GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
 BASELINE_ERROR="^ERROR: Capture not registered: 'gdaimcp'\\.$"
 BASELINE_WARNING="^WARNING: ObjectDB instances leaked at exit \\(run with --verbose for details\\)\\.$"
@@ -929,12 +929,12 @@ run_clean 'ship systems smoke' 'MAIN PLAYABLE SHIP SYSTEMS PASS supplies=true po
 run_clean 'completion smoke' 'MAIN PLAYABLE SLICE COMPLETE PASS completed=4 current_sequence=5 run_complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_completion_smoke.gd
 run_clean 'input smoke' 'MAIN PLAYABLE INPUT LOOP PASS moved=true camera_followed=true interaction_input_path=true current_sequence=2' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_input_smoke.gd
 run_clean 'readability smoke' 'MAIN PLAYABLE SLICE READABILITY PASS objective_props=4 blocked=1 ramp=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_readability_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=10 clean_output=true'
+echo 'SYNAPSE_SEA REGRESSION PASS commands=10 clean_output=true'
 ```
 
 Expected:
 - All smokes print their pass markers.
-- `SARGASSO REGRESSION PASS commands=10 clean_output=true` is printed.
+- `SYNAPSE_SEA REGRESSION PASS commands=10 clean_output=true` is printed.
 - No unexpected `ERROR:` / `WARNING:` lines.
 
 ---
@@ -949,13 +949,13 @@ The downstream REQ-012 implementation will need to serialize `FireState.phase` a
 
 Direct model smoke:
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/fire_state_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/fire_state_smoke.gd
 ```
 Expected marker: `FIRE STATE PASS cycles=2 phases=4 passability_switches=4`
 
 Main-scene smoke:
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_fire_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_fire_smoke.gd
 ```
 Expected marker: `MAIN PLAYABLE FIRE PASS state=CLEARED cycles=2 blocked_burning=true blocked_cleared=false`
 
@@ -963,7 +963,7 @@ Regression bundle:
 ```bash
 # Run the updated bundle in docs/game/06_validation_plan.md
 ```
-Expected marker: `SARGASSO REGRESSION PASS commands=10 clean_output=true`
+Expected marker: `SYNAPSE_SEA REGRESSION PASS commands=10 clean_output=true`
 
 ---
 
@@ -976,7 +976,7 @@ Expected marker: `SARGASSO REGRESSION PASS commands=10 clean_output=true`
 - `scripts/procgen/generated_ship_loader.gd`
 - `scripts/procgen/playable_generated_ship.gd`
 - `docs/game/06_validation_plan.md`
-- `/tmp/sargasso_timed_fire_no_git_changes.log` (no-git ledger)
+- `/tmp/synapse_sea_timed_fire_no_git_changes.log` (no-git ledger)
 
 ---
 

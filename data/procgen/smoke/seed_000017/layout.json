@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "document_kind": "ship_layout",
-  "source_program": "/private/tmp/sargasso_runtime_demo_fixture/seed_000017/program.json",
+  "source_program": "/private/tmp/synapse_sea_runtime_demo_fixture/seed_000017/program.json",
   "program_id": "prototype-ship-000017-8r-2d",
   "kit_id": "ship_structural_v0",
   "rooms": [
@@ -5992,8 +5992,8 @@
     "errors": []
   },
   "top_down_proof": {
-    "svg_path": "/private/tmp/sargasso_runtime_demo_fixture/seed_000017/topdown.topdown.svg",
-    "json_path": "/private/tmp/sargasso_runtime_demo_fixture/seed_000017/topdown.topdown.json",
+    "svg_path": "/private/tmp/synapse_sea_runtime_demo_fixture/seed_000017/topdown.topdown.svg",
+    "json_path": "/private/tmp/synapse_sea_runtime_demo_fixture/seed_000017/topdown.topdown.json",
     "passes": true,
     "program_id": "prototype-ship-000017-8r-2d",
     "metadata": {

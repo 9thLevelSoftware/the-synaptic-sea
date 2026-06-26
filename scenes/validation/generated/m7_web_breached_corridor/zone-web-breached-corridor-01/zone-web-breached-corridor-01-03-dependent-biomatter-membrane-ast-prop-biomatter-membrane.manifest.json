@@ -42,9 +42,9 @@
       "notes": "Used as the web membrane cutting through the breach."
     },
     "source_asset_path": "assets/_source/organic/biomatter_membrane.glb",
-    "wrapper_scene": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.tscn",
-    "contract_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.contract.tres",
-    "inspection_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.inspection.json",
+    "wrapper_scene": "/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.tscn",
+    "contract_path": "/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.contract.tres",
+    "inspection_path": "/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-03-dependent-biomatter-membrane-ast-prop-biomatter-membrane.inspection.json",
     "support": {
       "required_surfaces": [
         "wall",

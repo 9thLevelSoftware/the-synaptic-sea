@@ -28,12 +28,12 @@ Each sample uses a simple primitive preview mesh so the preview image shows read
 
 Primary preview file:
 
-`/Users/christopherwilloughby/the-sargasso-of-stars/artifacts/validation-previews/locked-iso-readability.png`
+`/Users/christopherwilloughby/the-synapse-sea-of-stars/artifacts/validation-previews/locked-iso-readability.png`
 
 ## Screenshot / preview command
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2   --windowed   --resolution 1600x900   --path /Users/christopherwilloughby/the-sargasso-of-stars   --scene res://scenes/validation/locked_iso_readability_harness.tscn   --write-movie /Users/christopherwilloughby/the-sargasso-of-stars/artifacts/validation-previews/locked-iso-readability.png   --quit-after 1
+/Users/christopherwilloughby/.local/bin/godot-4.6.2   --windowed   --resolution 1600x900   --path /Users/christopherwilloughby/the-synapse-sea-of-stars   --scene res://scenes/validation/locked_iso_readability_harness.tscn   --write-movie /Users/christopherwilloughby/the-synapse-sea-of-stars/artifacts/validation-previews/locked-iso-readability.png   --quit-after 1
 ```
 
 On this machine, Godot's movie-maker output writes a numbered frame sequence. Copy the first frame (for example `locked-iso-readability00000000.png`) to the canonical preview path above so the validation preview has a stable filename. If the screenshot command is unavailable on a given machine, use the same scene and the checklist below.
