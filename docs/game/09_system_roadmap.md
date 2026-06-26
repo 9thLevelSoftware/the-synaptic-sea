@@ -62,25 +62,35 @@ A direct check of the claims above against the working tree found that the M11
 "Documentation Currency — Validated by focused validators" lane does not hold up.
 These are tracked defects, not regressions:
 
-1. **`REQ-DOC-001..008` does not exist in `05_requirements.md`.** The family is
-   referenced in six places (this roadmap, ADR-0040, build-plans, the systems map,
-   and `doc_currency_validators.py`) but was never written into the requirements
-   document, which uses the numeric `REQ-001..REQ-014` scheme. Fix: add the
-   REQ-DOC entries, or remove the dangling references.
+1. **`05_requirements.md` is missing the entire E2E requirements taxonomy.** When
+   `doc_currency_validators.py requirement-trace` is run with `ROOT` set, it reports
+   **57 missing requirement entries**: `REQ-DOC-001..008` (8) plus **49 matrix
+   requirements** across 14 families (`REQ-SV/FC/CS/LE/CN/D/SS/PM/UI/AU/SL/PG/RL/INT-*`)
+   that `data/integration/cross_system_integration_matrix.json` references but were
+   never written into the requirements document (which still holds only the numeric
+   `REQ-001..REQ-014` from Gate 1/2). Fix: author the missing entries (large), or
+   reconcile the matrix/validator against a smaller intended set.
 2. **The Python doc-currency validators are not registered in the regression
    bundle.** `06_validation_plan.md` references them zero times, so they never run
-   as part of the gate.
-3. **Those validators are broken on this machine and fail open.** They hardcode the
-   original macOS paths (`/Users/christopherwilloughby/the-synaptic-sea/...`) and
-   raise `FileNotFoundError` here — yet **exit 0 on failure**, so even if registered
-   they would report false-green. This is why defects (1) went undetected: the
-   "currency validators" do not run, cannot run here, and misreport their status.
+   as part of the gate. The validator itself flags this (the three Task-15 markers
+   `SYSTEMS MAP CURRENCY PASS` / `REQUIREMENT TRACE PASS` / `KANBAN MANIFEST PASS`
+   are absent from the validation plan).
+3. **The validators default to the original macOS root path.** `ROOT_DEFAULT` is
+   `/Users/christopherwilloughby/the-synaptic-sea`, so run bare on this machine they
+   raise `FileNotFoundError`. They **do** honor a `ROOT` env override and **exit
+   non-zero on failure** (they are not fail-open — an earlier note here claimed
+   "exit 0", which was a measurement artifact of piping to `tail`; corrected).
+   `systems-map` passes today with `ROOT` set; `requirement-trace` fails on the 57
+   gaps in (1); `kanban-manifest` cannot pass here because it needs the live board
+   SQLite DB (see (4)).
 4. **The board snapshot is a frozen point-in-time capture, unverifiable here.**
    `board_currency.board_db_path` is a macOS path
    (`/Users/christopherwilloughby/.hermes/...`) not present on this machine, and the
    snapshot is fixed at `{"done": 17, "running": 1}`. The "`{"done": 18}`" state is
-   aspirational and cannot be confirmed from this checkout.
+   aspirational and cannot be confirmed from this checkout. The `kanban-manifest`
+   validator therefore cannot run as a gate here without the board DB.
 
-Real fix (separate from this roadmap edit): repair the validators' paths + non-zero
-exit on failure, register them in `06_validation_plan.md`, then land the REQ-DOC
-entries so the validators pass for the right reason.
+Real fix (separate from this roadmap edit): auto-detect the repo root in the
+validators, register the host-only `systems-map` (and `requirement-trace` once its
+gaps are closed) in `06_validation_plan.md`, gate `kanban-manifest` on board-DB
+availability, and author the missing requirement entries from (1).
