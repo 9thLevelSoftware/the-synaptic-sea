@@ -62,7 +62,7 @@ A direct check of the claims above against the working tree found that the M11
 "Documentation Currency — Validated by focused validators" lane did not hold up.
 These were tracked defects, not regressions.
 
-> **Resolution — PR #30 (`fix/doc-currency-validators`, pending merge).** Defects
+> **Resolution — PR #30 (`fix/doc-currency-validators`).** Defects
 > (1)–(3) below are fixed there: the validators auto-detect the repo root and gate
 > `kanban-manifest` on board-DB availability; all 57 requirement entries are authored
 > into `05_requirements.md`; and `systems-map` / `requirement-trace` / `kanban-manifest`
