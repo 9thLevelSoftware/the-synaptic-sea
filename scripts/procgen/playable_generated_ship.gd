@@ -22,6 +22,10 @@ const ElectricalArcStateScript := preload("res://scripts/systems/electrical_arc_
 const AudioManagerScript := preload("res://scripts/audio/audio_manager.gd")
 const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.gd")
 const RunSnapshotScript := preload("res://scripts/systems/run_snapshot.gd")
+const SaveSlotStateScript := preload("res://scripts/systems/save_slot_state.gd")
+# Timed/rotating autosave loop (ADR-0031/0032). Owned + ticked here so the
+# borderline-Bucket-1 AutosavePolicy model is finally wired into the live run.
+const AutosavePolicyScript := preload("res://scripts/systems/autosave_policy.gd")
 # Bucket 3 meta-screen shell deps (constructed here, injected into MenuCoordinator).
 const LocalizationCatalogScript := preload("res://scripts/systems/localization_catalog.gd")
 const BuildMetadataStateScript := preload("res://scripts/systems/build_metadata_state.gd")
@@ -364,6 +368,12 @@ var sequence_interactables: Dictionary = {}
 var save_load_service: SaveLoadService
 var last_saved_snapshot: RunSnapshot
 var _is_reloading: bool = false
+# Timed/rotating autosave loop. Additive to the REQ-012 checkpoint save
+# (_auto_save_current_run -> save_world -> current_run.json); writes rotating
+# autosave_a/b/c slots the SaveLoadMenu surfaces. No new RunSnapshot field.
+var autosave_policy               # AutosavePolicy (RefCounted)
+var _autosave_run_seconds: float = 0.0
+var _last_autosave_result: Dictionary = {}
 # Bucket 3 meta-screen shell deps (injected into MenuCoordinator.bind_meta_screens).
 var localization_catalog          # LocalizationCatalog
 var build_metadata_state          # BuildMetadataState
@@ -1195,6 +1205,10 @@ func _build_runtime_nodes() -> void:
 	# Constructed BEFORE _build_hud_layer() because the menu shell's meta-screen
 	# binding (below) consumes save_load_menu / localization_catalog / build_metadata.
 	save_load_service = SaveLoadServiceScript.new()
+	# Timed/rotating autosave loop (additive to the REQ-012 checkpoint save).
+	# Defaults: 90 in-game-second cadence, 8-event cadence, 5 s real-time budget
+	# guard, rotating autosave_a/b/c. Driven from _process via _tick_autosave_policy().
+	autosave_policy = AutosavePolicyScript.new()
 	# Bucket 3 meta-screen shell deps: localization catalog + build metadata from the
 	# release data bundle, and the save-slot presenter bound to the live save service.
 	localization_catalog = LocalizationCatalogScript.new()
@@ -3921,6 +3935,11 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 	# player back on the same objective they just finished.
 	current_objective_sequence += 1
 	_auto_save_current_run()
+	# Also flag the rotating autosave loop so the next tick captures this
+	# checkpoint into an autosave_a/b/c slot (visible in the SaveLoadMenu),
+	# not just the REQ-012 current_run.json snapshot above.
+	if autosave_policy != null:
+		autosave_policy.force = true
 	_activate_current_objective()
 
 func _apply_ship_systems_consequences(objective_type: String) -> void:
@@ -4141,11 +4160,15 @@ func _process(delta: float) -> void:
 		# crafts pause while away, by design — only field_crafting_state advances here).
 		if field_crafting_state != null and field_crafting_state.tick(delta):
 			_on_field_craft_completed()
+		# Timed autosave still advances on a derelict — a long boarding run is
+		# exactly the data-loss case it protects (the checkpoint save also runs away).
+		_tick_autosave_policy(delta)
 		return
 	if not playable_started or slice_complete:
 		return
 	if oxygen_state == null:
 		return
+	_tick_autosave_policy(delta)
 	_tick_threat_runtime(delta)
 	if ship_systems_manager != null:
 		ship_systems_manager.advance(delta)
@@ -5424,6 +5447,57 @@ func _auto_save_current_run() -> bool:
 		last_saved_snapshot = _build_run_snapshot()  # preserve in-memory RunSnapshot seam (get_last_saved_snapshot)
 		return true
 	return false
+
+## Monotonically-growing activity proxy for the autosave policy's event channel
+## (objective checkpoints + every logged training/run event). Used by
+## AutosavePolicy.cadence_events to fire an autosave after enough activity.
+func _autosave_event_count() -> int:
+	var count: int = objective_completion_count
+	if training_event_bus != null:
+		count += training_event_bus.get_log().size()
+	return count
+
+## Timed/rotating autosave loop. Additive to the REQ-012 checkpoint save —
+## writes a RunSnapshot into a rotating autosave_a/b/c slot whenever the policy
+## fires (time cadence, event cadence, or a forced checkpoint). Never touches the
+## current_run.json path the resume smokes depend on.
+func _tick_autosave_policy(delta: float) -> void:
+	if autosave_policy == null or save_load_service == null or slice_complete:
+		return
+	_autosave_run_seconds += delta
+	var r: Dictionary = autosave_policy.tick(_autosave_run_seconds, _autosave_event_count())
+	if not bool(r.get("should_save", false)):
+		return
+	var snap: RunSnapshot = _build_run_snapshot()
+	if snap == null:
+		return
+	var slot_id: String = str(r.get("slot_id", ""))
+	if slot_id.is_empty():
+		return
+	if save_load_service.save_to_slot(slot_id, snap, SaveSlotStateScript.SLOT_KIND_AUTO, false, "Autosave"):
+		last_saved_snapshot = snap
+		_last_autosave_result = r
+
+## Validation seam: the live AutosavePolicy instance (null before runtime build).
+func get_autosave_policy_for_validation():
+	return autosave_policy
+
+## Validation seam: the last {should_save, slot_id, reason} the autosave loop acted on.
+func get_last_autosave_result() -> Dictionary:
+	return _last_autosave_result
+
+## Validation seam: force a single rotating autosave through the real coordinator
+## path (no 90 s wait) and return the policy's result dict.
+func force_autosave_for_validation() -> Dictionary:
+	if autosave_policy == null:
+		return {}
+	autosave_policy.force = true
+	_tick_autosave_policy(0.0)
+	# If the policy had never been ticked, its first tick only seeds counters
+	# (the force flag survives the seed branch); tick once more to actually fire.
+	if autosave_policy.force:
+		_tick_autosave_policy(0.0)
+	return _last_autosave_result
 
 ## REQ-PM-008 / ADR-0033 — at run-end, fold the run summary into the
 ## meta_progression_state (currency + counters), persist the meta + unlock
