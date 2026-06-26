@@ -156,15 +156,17 @@ shell); cross-run achievement reconciliation (Steamworks, ADR-0029/0030) remains
 > (`objective_completion_count` + the training-event-bus log size); and on a fire writes a
 > `RunSnapshot` into a rotating `autosave_a`/`b`/`c` slot through
 > `save_load_service.save_to_slot(..., SLOT_KIND_AUTO, ...)` — the same slots the now-reachable
-> `SaveLoadMenu` (Bucket 3) lists. At each objective-completion checkpoint it also sets
-> `autosave_policy.force = true` so the rotating slots capture checkpoints, not only timed
-> saves. **This is purely additive: the REQ-012 checkpoint path
+> `SaveLoadMenu` (Bucket 3) lists. **This is purely additive: the REQ-012 checkpoint path
 > (`_auto_save_current_run` → `save_world` → `current_run.json`) and its resume smokes are
 > untouched** (`REQ012 AUTOSAVE SEQUENCE CHECK PASS` + `AUTOSAVE POLICY PASS` still green;
-> no new `RunSnapshot` field — `summaries=27` unchanged; no new ADR). Proven coordinator-driven
-> by `scripts/validation/main_playable_meta_autosave_smoke.gd`, which forces an autosave
-> through the live coordinator seam and asserts a rotating `SLOT_KIND_AUTO` slot actually hits
-> disk → `MAIN PLAYABLE META AUTOSAVE PASS slot_rotated=true reachable=true`.
+> no new `RunSnapshot` field — `summaries=27` unchanged; no new ADR). Lifecycle handling:
+> `_reset_runtime_for_reload()` reseeds the policy (`reset()` + zeroes the run-clock) so a stale
+> event count/clock can't carry across a load, and slice completion deletes the rotating
+> `autosave_a/b/c` slots alongside `delete_current_run()` so a finished run leaves no resumable
+> rows. Proven coordinator-driven by `scripts/validation/main_playable_meta_autosave_smoke.gd`,
+> which forces an autosave through the live coordinator seam and asserts a rotating
+> `SLOT_KIND_AUTO` slot actually hits disk →
+> `MAIN PLAYABLE META AUTOSAVE PASS slot_rotated=true reachable=true`.
 >
 > **Residual MVP limits (follow-ups, not blockers):** manual quicksave (`AutosavePolicy.try_quicksave`)
 > is **not** wired — there is no quicksave keybind yet, so only the autosave loop runs; cadence

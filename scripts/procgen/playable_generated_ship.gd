@@ -3923,6 +3923,13 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 		# when the file is already absent).
 		if save_load_service != null:
 			save_load_service.delete_current_run()
+			# Also drop the rotating autosave_a/b/c slots written during this run.
+			# delete_current_run() only clears the current_run/world rows; without
+			# this, a completed run's timed-autosave snapshots survive into the next
+			# run and show up in SaveLoadMenu.list_slots() as resumable rows —
+			# defeating the REQ-012 stale-resume guard above (Codex review on PR #35).
+			for slot_id in SaveSlotStateScript.AUTOSAVE_SLOT_IDS:
+				save_load_service.delete_slot(slot_id)
 		emit_signal("playable_slice_completed", get_slice_completion_summary())
 		return
 	# REQ-012: auto-save at every stable objective-completion boundary.
@@ -3935,11 +3942,11 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 	# player back on the same objective they just finished.
 	current_objective_sequence += 1
 	_auto_save_current_run()
-	# Also flag the rotating autosave loop so the next tick captures this
-	# checkpoint into an autosave_a/b/c slot (visible in the SaveLoadMenu),
-	# not just the REQ-012 current_run.json snapshot above.
-	if autosave_policy != null:
-		autosave_policy.force = true
+	# NOTE: we deliberately do NOT force a rotating autosave here. The checkpoint
+	# is already persisted to current_run.json above (the REQ-012 resume point), and
+	# the timed/event cadence captures rotating autosave_a/b/c snapshots on its own.
+	# Forcing a second synchronous disk write on the same objective-completion frame
+	# was redundant and risked a save-stutter (Gemini review on PR #35).
 	_activate_current_objective()
 
 func _apply_ship_systems_consequences(objective_type: String) -> void:
@@ -6411,6 +6418,15 @@ func _reset_runtime_for_reload() -> void:
 	# REQ-014: clear the per-sequence kind lookup so a reload reflects
 	# the freshly-built interactable group, not the prior run's.
 	sequence_kinds.clear()
+	# Reset the timed autosave loop: the same PlayableGeneratedShip + AutosavePolicy
+	# instances are reused across a reload, so a stale run-clock or event count would
+	# carry over. Without this the loaded run's (lower) event count drives a negative
+	# delta that blocks event autosaves, and the carried-over clock fires a redundant
+	# autosave on the next tick. reset() reseeds the policy's counters/budget.
+	_autosave_run_seconds = 0.0
+	_last_autosave_result = {}
+	if autosave_policy != null:
+		autosave_policy.reset()
 	# The loader's own load_from_paths() entry point calls
 	# clear_loaded_ship() first, so re-driving it is safe without any
 	# extra reset here.

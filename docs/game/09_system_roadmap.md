@@ -62,9 +62,10 @@ Bucket-1 infra tooling + `junk_yield_resolver`).
 > autosaved only at objective-completion checkpoints; the borderline-unreachable
 > `AutosavePolicy` is now owned + ticked every frame by `playable_generated_ship.gd`
 > (home and away), writing rotating `autosave_a/b/c` slots (surfaced by the Bucket-3
-> `SaveLoadMenu`) on a 90 s / 8-event cadence, plus a forced rotation at each objective
-> checkpoint. Purely additive — the REQ-012 `current_run.json` checkpoint path and its
-> resume smokes are untouched (no new `RunSnapshot` field, no new ADR, no new keybind).
+> `SaveLoadMenu`) on a 90 s / 8-event cadence. Purely additive — the REQ-012
+> `current_run.json` checkpoint path and its resume smokes are untouched (no new
+> `RunSnapshot` field, no new ADR, no new keybind); the policy is reseeded on reload and its
+> rotating slots are cleared on run completion so finished runs leave no resumable rows.
 > Proven by `scripts/validation/main_playable_meta_autosave_smoke.gd` →
 > `MAIN PLAYABLE META AUTOSAVE PASS slot_rotated=true reachable=true`. MVP limit: manual
 > quicksave is not yet wired (no quicksave keybind).
