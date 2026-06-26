@@ -27,7 +27,7 @@ func _run(p) -> void:
 		var sys = mgr.get_system(sid)
 		if sys != null:
 			for sub in sys.subcomponents: mgr.force_repair(sid, sub.subcomponent_id)
-	var world = p.get_sargasso_world()
+	var world = p.get_synapse_sea_world()
 	var ir: Array = world.markers_in_range(p.scanner_state.range_radius)
 	if ir.is_empty(): _fail("no markers"); return
 	if not bool(p.travel_to_marker_id(String(ir[0].marker_id)).get("success", false)):

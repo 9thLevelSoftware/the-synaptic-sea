@@ -3,7 +3,7 @@
 Date: 2026-06-21
 Status: Approved (pre-implementation)
 Phase: Sub-project #2 of the "target session loop" decomposition (follows #1 world persistence; precedes #3 inventory/loot)
-Related: ADR-0011 (ShipInstance & travel integration), ADR-0012 (world persistence model), `docs/superpowers/specs/2026-06-20-sargasso-core-systems-design.md` (System 4/8), `docs/game/02_core_loop.md`
+Related: ADR-0011 (ShipInstance & travel integration), ADR-0012 (world persistence model), `docs/superpowers/specs/2026-06-20-synapse-sea-core-systems-design.md` (System 4/8), `docs/game/02_core_loop.md`
 
 ## Why this sub-project exists
 

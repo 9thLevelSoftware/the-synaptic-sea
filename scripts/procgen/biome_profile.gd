@@ -1,14 +1,14 @@
 extends RefCounted
 class_name BiomeProfile
 
-# BiomeProfile — pure data class describing a Sargasso biome and
+# BiomeProfile — pure data class describing a Synapse Sea biome and
 # its multipliers on hazard density, loot quality, and encounter
 # density. Loads from a JSON file or Dictionary and exposes
 # modifier(dial) -> float plus a deterministic biome selector.
 #
 # JSON schema (any field may be omitted; defaults apply):
 #   {
-#     "id": "abyssal_sargasso",
+#     "id": "abyssal_synapse_sea",
 #     "description": "Deep-sea baseline",
 #     "hazard_modifier": 1.0,
 #     "loot_quality_modifier": 1.0,

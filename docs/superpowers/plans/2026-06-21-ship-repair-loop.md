@@ -326,7 +326,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Create (test): `scripts/validation/lifeboat_travel_gate_smoke.gd`
 
 **Interfaces:**
-- Consumes: `ship_systems_manager` (the lifeboat's manager, coordinator-owned), `travel_to_marker_id`, `travel_home`, `get_ship_systems_manager`, `get_sargasso_world`, `scanner_state`.
+- Consumes: `ship_systems_manager` (the lifeboat's manager, coordinator-owned), `travel_to_marker_id`, `travel_home`, `get_ship_systems_manager`, `get_synapse_sea_world`, `scanner_state`.
 - Produces: `_current_systems_ops()` returns the starting ship's (lifeboat's) real operational status in BOTH home and away states; `travel_home()` remains always-available.
 
 - [ ] **Step 1: Read the current `_current_systems_ops` and `travel_home`**
@@ -382,7 +382,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		_fail("propulsion should be offline after breaking nav_linkage"); return
 
 	# A marker must be in range to attempt travel.
-	var world = playable.get_sargasso_world()
+	var world = playable.get_synapse_sea_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
 	if in_range.is_empty():
 		_fail("no markers in range"); return
@@ -1001,7 +1001,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	# Propulsion now operational; a jump that was blocked now succeeds.
 	if not mgr.is_operational("propulsion"):
 		_fail("propulsion not operational after repair"); return
-	var world = playable.get_sargasso_world()
+	var world = playable.get_synapse_sea_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
 	if in_range.is_empty():
 		_fail("no markers in range"); return
@@ -1095,7 +1095,7 @@ Bump the bundle count 70 → 73: grep the doc for `commands=70` and update every
 - [ ] **Step 2: Run the FULL regression bundle**
 
 Run the bash block in `docs/game/06_validation_plan.md` with `GODOT`/`ROOT` set to the Windows values, to completion (sequential — never concurrent with any other smoke; do not launch a background Godot process during this task).
-Expected final line: `SARGASSO REGRESSION PASS commands=73 clean_output=true`. If any smoke is missing its marker or emits an un-allowlisted ERROR/WARNING, fix it. Do NOT add broad allowlist patterns to hide output.
+Expected final line: `SYNAPSE_SEA REGRESSION PASS commands=73 clean_output=true`. If any smoke is missing its marker or emits an un-allowlisted ERROR/WARNING, fix it. Do NOT add broad allowlist patterns to hide output.
 
 - [ ] **Step 3: Run the Gate-1 automated playtest**
 

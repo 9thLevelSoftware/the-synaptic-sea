@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Project root: `/Users/christopherwilloughby/the-sargasso-of-stars`.
+- Project root: `/Users/christopherwilloughby/the-synapse-sea-of-stars`.
 - Godot binary: `/Users/christopherwilloughby/.local/bin/godot-4.6.2`.
 - Workspace state checked on 2026-06-19: `GIT_INSIDE=false`.
 - Do not create HTML, PNG, contact sheets, screenshot galleries, or proof documents for this milestone.
@@ -21,7 +21,7 @@
 - The hazard milestone has no proof artifacts as deliverables; validation is command-output smokes only.
 - Preserve existing objective sequence and validation seams: `complete_objective_sequence_for_validation()`, `complete_all_objectives_for_validation()`, `complete_first_interaction_for_validation()`, and existing smokes (`route_control_state_smoke`, `main_playable_slice_route_control_smoke`, ship_systems / completion / input / readability smokes) must keep passing unchanged.
 - Output from validation commands must be clean of unexpected lines beginning with `ERROR:` or `WARNING:`.
-- Because this is not a git repository, every task uses the no-git ledger fallback at `/tmp/sargasso_hazard_pressure_no_git_changes.log` instead of assuming `git commit` works.
+- Because this is not a git repository, every task uses the no-git ledger fallback at `/tmp/synapse_sea_hazard_pressure_no_git_changes.log` instead of assuming `git commit` works.
 - Do not collapse `OxygenState` into `ShipSystemState` or `RouteControlState`; keep separate responsibility, parallel to the route-control architecture.
 - Do not delete the breach-zone node when sealing the breach or blocking traversal — disable collision, update metadata, and toggle visibility so the state remains inspectable.
 - Do not introduce save/load of hazard state, oxygen tanks, pickups, audio cues, particle VFX, or animation polish in this slice (those are non-goals in `docs/game/features/hazards.md`).
@@ -316,7 +316,7 @@ func _fail(reason: String) -> void:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/oxygen_state_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/oxygen_state_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'OXYGEN STATE PASS' || true
 ```
@@ -330,11 +330,11 @@ Expected (RED) result:
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/validation/oxygen_state_smoke.gd
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m 'test(hazard): RED oxygen model smoke'
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/validation/oxygen_state_smoke.gd
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'test(hazard): RED oxygen model smoke'
 else
-  printf '%s\n' 'NO_GIT Task 1 RED: scripts/validation/oxygen_state_smoke.gd added and failed for missing OxygenState implementation' >> /tmp/sargasso_hazard_pressure_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 1 RED: scripts/validation/oxygen_state_smoke.gd added and failed for missing OxygenState implementation' >> /tmp/synapse_sea_hazard_pressure_no_git_changes.log
 fi
 ```
 
@@ -493,7 +493,7 @@ func _recompute_passability_blocked() -> void:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/oxygen_state_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/oxygen_state_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'OXYGEN STATE PASS'
 if printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' >/dev/null; then
@@ -513,11 +513,11 @@ OXYGEN STATE PASS oxygen=... breach_open=false breach_sealed=true passability_bl
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/systems/oxygen_state.gd scripts/systems/oxygen_state.gd.uid scripts/validation/oxygen_state_smoke.gd
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m 'feat(hazard): implement OxygenState model'
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/systems/oxygen_state.gd scripts/systems/oxygen_state.gd.uid scripts/validation/oxygen_state_smoke.gd
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'feat(hazard): implement OxygenState model'
 else
-  printf '%s\n' 'NO_GIT Task 2 changed: scripts/systems/oxygen_state.gd scripts/systems/oxygen_state.gd.uid scripts/validation/oxygen_state_smoke.gd' >> /tmp/sargasso_hazard_pressure_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 2 changed: scripts/systems/oxygen_state.gd scripts/systems/oxygen_state.gd.uid scripts/validation/oxygen_state_smoke.gd' >> /tmp/synapse_sea_hazard_pressure_no_git_changes.log
 fi
 ```
 
@@ -784,7 +784,7 @@ func _cleanup_and_quit(code: int) -> void:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_hazard_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_hazard_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'MAIN PLAYABLE HAZARD PASS' || true
 ```
@@ -798,11 +798,11 @@ Expected (RED) result:
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/validation/main_playable_slice_hazard_smoke.gd
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m 'test(hazard): RED main-scene hazard smoke'
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/validation/main_playable_slice_hazard_smoke.gd
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'test(hazard): RED main-scene hazard smoke'
 else
-  printf '%s\n' 'NO_GIT Task 3 RED: scripts/validation/main_playable_slice_hazard_smoke.gd added and failed for missing PlayableGeneratedShip hazard integration' >> /tmp/sargasso_hazard_pressure_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 3 RED: scripts/validation/main_playable_slice_hazard_smoke.gd added and failed for missing PlayableGeneratedShip hazard integration' >> /tmp/synapse_sea_hazard_pressure_no_git_changes.log
 fi
 ```
 
@@ -1094,7 +1094,7 @@ func is_player_in_breach_zone() -> bool:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_hazard_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_hazard_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'MAIN PLAYABLE HAZARD PASS'
 if printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' >/dev/null; then
@@ -1112,11 +1112,11 @@ MAIN PLAYABLE HAZARD PASS oxygen=100.0 breach_open=false breach_sealed=true pass
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/procgen/generated_ship_loader.gd scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_hazard_smoke.gd
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m 'feat(hazard): wire oxygen state into main playable slice'
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/procgen/generated_ship_loader.gd scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_hazard_smoke.gd
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'feat(hazard): wire oxygen state into main playable slice'
 else
-  printf '%s\n' 'NO_GIT Task 3 changed: scripts/procgen/generated_ship_loader.gd scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_hazard_smoke.gd' >> /tmp/sargasso_hazard_pressure_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 3 changed: scripts/procgen/generated_ship_loader.gd scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_hazard_smoke.gd' >> /tmp/synapse_sea_hazard_pressure_no_git_changes.log
 fi
 ```
 
@@ -1128,7 +1128,7 @@ fi
 - Modify: `docs/game/06_validation_plan.md`
 - Modify: `docs/game/02_core_loop.md`
 - Read: all existing smokes
-- Read: `/tmp/sargasso_hazard_pressure_no_git_changes.log`
+- Read: `/tmp/synapse_sea_hazard_pressure_no_git_changes.log`
 
 **Interfaces:**
 - All previously-validated smokes still pass.
@@ -1149,7 +1149,7 @@ run_clean 'ship systems smoke' 'MAIN PLAYABLE SHIP SYSTEMS PASS supplies=true po
 run_clean 'completion smoke' 'MAIN PLAYABLE SLICE COMPLETE PASS completed=4 current_sequence=5 run_complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_completion_smoke.gd
 run_clean 'input smoke' 'MAIN PLAYABLE INPUT LOOP PASS moved=true camera_followed=true interaction_input_path=true current_sequence=2' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_input_smoke.gd
 run_clean 'readability smoke' 'MAIN PLAYABLE SLICE READABILITY PASS objective_props=4 blocked=1 ramp=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_readability_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=8 clean_output=true'
+echo 'SYNAPSE_SEA REGRESSION PASS commands=8 clean_output=true'
 ```
 
 In the same file, remove the first two items from "Future validation additions" so the list now starts with `Inventory/tool model smoke`:
@@ -1193,7 +1193,7 @@ Replace "Loop gaps to resolve before Gate 1 exit" so the hazard line is removed 
 Run:
 ```bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
+ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
 GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
 run_clean() {
   label="$1"
@@ -1216,12 +1216,12 @@ run_clean 'ship systems smoke' 'MAIN PLAYABLE SHIP SYSTEMS PASS supplies=true po
 run_clean 'completion smoke' 'MAIN PLAYABLE SLICE COMPLETE PASS completed=4 current_sequence=5 run_complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_completion_smoke.gd
 run_clean 'input smoke' 'MAIN PLAYABLE INPUT LOOP PASS moved=true camera_followed=true interaction_input_path=true current_sequence=2' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_input_smoke.gd
 run_clean 'readability smoke' 'MAIN PLAYABLE SLICE READABILITY PASS objective_props=4 blocked=1 ramp=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_readability_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=8 clean_output=true'
+echo 'SYNAPSE_SEA REGRESSION PASS commands=8 clean_output=true'
 ```
 
 Expected final marker:
 ```text
-SARGASSO REGRESSION PASS commands=8 clean_output=true
+SYNAPSE_SEA REGRESSION PASS commands=8 clean_output=true
 ```
 
 - [ ] **Step 4: Confirm no artifact deliverables were created for this hazard milestone**
@@ -1229,7 +1229,7 @@ SARGASSO REGRESSION PASS commands=8 clean_output=true
 Run:
 ```bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
+ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
 find "$ROOT/docs/superpowers/proofs" -maxdepth 1 -type f -newer "$ROOT/docs/game/features/hazards.md" -print 2>/dev/null || true
 find "$ROOT/.superpowers" -type f \( -name '*.html' -o -name '*.png' \) -newer "$ROOT/docs/game/features/hazards.md" -print 2>/dev/null || true
 ```
@@ -1242,13 +1242,13 @@ Expected result:
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars status --short
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/systems/oxygen_state.gd scripts/systems/oxygen_state.gd.uid scripts/validation/oxygen_state_smoke.gd scripts/procgen/generated_ship_loader.gd scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_hazard_smoke.gd docs/game/06_validation_plan.md docs/game/02_core_loop.md
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m 'test: verify hazard pressure loop regression bundle'
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars status --short
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/systems/oxygen_state.gd scripts/systems/oxygen_state.gd.uid scripts/validation/oxygen_state_smoke.gd scripts/procgen/generated_ship_loader.gd scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_hazard_smoke.gd docs/game/06_validation_plan.md docs/game/02_core_loop.md
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'test: verify hazard pressure loop regression bundle'
 else
-  printf '%s\n' 'NO_GIT Task 4 verified: oxygen_state_smoke PASS + main_hazard_smoke PASS + route_control_state_smoke PASS + main_route_control_smoke PASS + ship_systems_smoke PASS + completion_smoke PASS + input_smoke PASS + readability_smoke PASS, no errors/warnings' >> /tmp/sargasso_hazard_pressure_no_git_changes.log
-  tail -n 10 /tmp/sargasso_hazard_pressure_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 4 verified: oxygen_state_smoke PASS + main_hazard_smoke PASS + route_control_state_smoke PASS + main_route_control_smoke PASS + ship_systems_smoke PASS + completion_smoke PASS + input_smoke PASS + readability_smoke PASS, no errors/warnings' >> /tmp/synapse_sea_hazard_pressure_no_git_changes.log
+  tail -n 10 /tmp/synapse_sea_hazard_pressure_no_git_changes.log
 fi
 ```
 

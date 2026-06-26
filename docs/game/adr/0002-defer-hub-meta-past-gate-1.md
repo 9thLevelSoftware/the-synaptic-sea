@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The vision (`00_vision.md`) describes a player hub ship trapped in a Sargasso, exploring derelict interiors. The core loop doc (`02_core_loop.md`) lists a session loop whose final step is "Apply gains/losses to the hub ship. Unlock next decisions." This implies a hub/meta progression layer on top of the per-ship loop.
+The vision (`00_vision.md`) describes a player hub ship trapped in a Synapse Sea, exploring derelict interiors. The core loop doc (`02_core_loop.md`) lists a session loop whose final step is "Apply gains/losses to the hub ship. Unlock next decisions." This implies a hub/meta progression layer on top of the per-ship loop.
 
 Gate 1 (`08_milestone_gates.md`) is defined as "Pre-production / playable systems slice" with a representative 60–120 second slice, coherent navigation, route/system state, one risk/pressure loop, and clean validation. At the time of this ADR, "Hub/meta progression definition" was listed as missing Gate 1 evidence, but the doc did not specify whether it was a Gate 1 deliverable or a deferred concern.
 
@@ -23,8 +23,8 @@ Hub/meta progression is **deferred past Gate 1** with the following cut line:
 
 - **In scope for Gate 1:** one generated derelict ship slice, the four-objective sequence, system/route state, extraction as a completion signal. The reactor-stabilization completion state satisfies the "return progress to hub" step of the session loop for Gate 1 purposes.
 - **Out of scope for Gate 1:** hub ship scene/UI, derelict selection or queueing, persistent unlocks across runs, meta-currency/economy, faction/narrative progression, save/load of hub state, narrative arcs that span derelicts.
-- **Feature spec `features/hub_progression.md` is NOT authored during Gate 1.** Doing so would imply in-scope work and is treated as a scope violation by `sargassoreview`.
-- **Re-decision trigger:** before Gate 2 begins, a hub/meta re-decision card on board `sargasso-stage-gate` must select exactly one of:
+- **Feature spec `features/hub_progression.md` is NOT authored during Gate 1.** Doing so would imply in-scope work and is treated as a scope violation by `synapse_seareview`.
+- **Re-decision trigger:** before Gate 2 begins, a hub/meta re-decision card on board `synapse-sea-stage-gate` must select exactly one of:
   - (a) Re-affirm deferral with a Gate 3 or Gate 4 anchor (recorded as a patched ADR), OR
   - (b) Escalate into an early Gate 2 implementation card with `features/hub_progression.md` authored before any implementation work.
 - **Gate 2 entry criteria updated** to require resolution of the hub/meta re-decision card.
@@ -58,7 +58,7 @@ Mitigations:
 
 ## Verification
 
-- Documentation review by `sargassoreview` confirms:
+- Documentation review by `synapse_seareview` confirms:
   - All five docs above reflect consistent deferral language.
   - No Gate 1 acceptance criterion requires hub/meta state.
   - REQ-008 and REQ-009 are present and approved.

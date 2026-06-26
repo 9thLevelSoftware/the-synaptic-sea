@@ -1,7 +1,7 @@
 extends RefCounted
 class_name WorldSnapshot
 
-## Top-level world save. Wraps the SargassoWorld summary, the home ship's
+## Top-level world save. Wraps the SynapseSeaWorld summary, the home ship's
 ## RunSnapshot (unchanged), a per-derelict slice registry keyed by marker_id,
 ## the player's current location, and the in-ship player position. Pure data;
 ## serialization-agnostic (SaveLoadService owns file I/O). Geometry is never

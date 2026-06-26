@@ -4,7 +4,7 @@ Source package: `docs/game/build-plans/10-audio-music-spatial-e2e.md`
 Architecture: `docs/game/adr/0029-audio-music-spatial-architecture.md`
 Requirements covered: REQ-AU-001..010
 Concept lock: Greenfield production audio layer (bus layout, ambient zones, SFX catalog, dynamic music layers, spatial attenuation/occlusion, voice/audio logs, meta-events).
-Sargasso influence (not copy): ambient tension, directional SFX (creaks, groans, biomatter pulses), meta-events replacing the PZ helicopter/gunshot palette (biomatter pulses, distress beacons, hull groans).
+Synapse Sea influence (not copy): ambient tension, directional SFX (creaks, groans, biomatter pulses), meta-events replacing the PZ helicopter/gunshot palette (biomatter pulses, distress beacons, hull groans).
 
 ## Player experience
 
@@ -12,7 +12,7 @@ A boarded player on a derelict hears a low ambient hum that shifts as they cross
 
 ## In-character translation
 
-| PZ influence | Sargasso translation |
+| PZ influence | Synapse Sea translation |
 |---|---|
 | Helicopter pass-by | Distress beacon (deterministic, scripted) |
 | Gunshot audio cues | Hull groan meta-event + structural SFX |

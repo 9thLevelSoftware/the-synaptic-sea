@@ -1,6 +1,6 @@
 {
   "id": "biomatter_lurker",
-  "description": "Biomatter lurker encounter table. Lurkers spawn in non-critical compartments, corridors, cargo holds, and crew quarters. Default encounter table for abyssal_sargasso and breach_field biomes.",
+  "description": "Biomatter lurker encounter table. Lurkers spawn in non-critical compartments, corridors, cargo holds, and crew quarters. Default encounter table for abyssal_synapse_sea and breach_field biomes.",
   "version": 1,
   "default_count": 1,
   "rolls": [

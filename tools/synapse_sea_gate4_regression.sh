@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
+ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
 GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
-LOG_DIR=${1:-/tmp/sargasso_gate4_kickoff_$(date -u +%Y%m%dT%H%M%SZ)}
+LOG_DIR=${1:-/tmp/synapse_sea_gate4_kickoff_$(date -u +%Y%m%dT%H%M%SZ)}
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/regression_bundle.log"
 : > "$LOG"
@@ -66,4 +66,4 @@ run_clean 'A11Y-P1-001 text scale smoke' 'MAIN PLAYABLE TEXT SCALE PASS scales=3
 run_clean 'performance baseline smoke' 'PERFORMANCE BASELINE PASS templates=3' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/performance_profiler.gd
 run_clean 'arc hazard model smoke' 'ARC STATE PASS cycles=2 phases=4 passability_switches=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/electrical_arc_state_smoke.gd
 run_clean 'main arc smoke' 'MAIN PLAYABLE ARC PASS state=DISCHARGED cycles=2 blocked_arcing=true blocked_discharged=false' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_arc_smoke.gd
-echo "SARGASSO REGRESSION PASS commands=$commands clean_output=true log=$LOG" | tee -a "$LOG"
+echo "SYNAPSE_SEA REGRESSION PASS commands=$commands clean_output=true log=$LOG" | tee -a "$LOG"

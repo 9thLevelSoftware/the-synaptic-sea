@@ -40,7 +40,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		if sys != null:
 			for sub in sys.subcomponents:
 				playable.get_ship_systems_manager().force_repair(sid, sub.subcomponent_id)
-	var world = playable.get_sargasso_world()
+	var world = playable.get_synapse_sea_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
 	if in_range.is_empty():
 		_fail("no markers in range")

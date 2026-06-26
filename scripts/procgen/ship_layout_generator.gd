@@ -115,13 +115,13 @@ func generate_with_options(
 
 
 # Resolves a biome dictionary from `biome_id`. When `biome_id` is
-# empty, returns a minimal abyssal_sargasso default so the encounter
+# empty, returns a minimal abyssal_synapse_sea default so the encounter
 # injector still runs (but the encounter density stays at 1.0 and
 # the resulting encounter list is typically empty for the standard
 # difficulty).
 func _resolve_biome(biome_id: String) -> Dictionary:
 	if biome_id.is_empty():
-		return {"id": "abyssal_sargasso"}
+		return {"id": "abyssal_synapse_sea"}
 	# Try to load the JSON file first; fall back to a built-in
 	# default for the three known biomes so the smoke bundle works
 	# even without a fully populated data/ tree.
@@ -152,7 +152,7 @@ func _resolve_biome(biome_id: String) -> Dictionary:
 			}
 		_:
 			return {
-				"id": "abyssal_sargasso",
+				"id": "abyssal_synapse_sea",
 				"hazard_modifier": 1.0,
 				"loot_quality_modifier": 1.0,
 				"encounter_density_modifier": 1.0,

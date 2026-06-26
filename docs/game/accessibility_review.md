@@ -1,8 +1,8 @@
 # Accessibility Review
 
 Date: 2026-06-19; final Gate 4 pass accepted 2026-06-20
-Reviewer: `sargassoreview`
-Scope: basic accessibility pass for the current Sargasso playable slice, Gate 4 readiness planning, and final Gate 4 accessibility acceptance.
+Reviewer: `synapse_seareview`
+Scope: basic accessibility pass for the current Synapse Sea playable slice, Gate 4 readiness planning, and final Gate 4 accessibility acceptance.
 
 ## Summary
 
@@ -41,11 +41,11 @@ Source/code review:
 Baseline focused validation run during initial review:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_input_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_readability_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/objective_progress_hud_label_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_hazard_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_fire_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_input_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_readability_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/objective_progress_hud_label_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_hazard_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_fire_smoke.gd
 ```
 
 Observed pass markers:
@@ -181,7 +181,7 @@ Fresh focused validation for card `t_d9d85bad` passed all required accessibility
 - `MAIN PLAYABLE TEXT SCALE PASS scales=3 default=1.0x1.5x2.0 runtime_text=present`
 - `MAIN PLAYABLE ALTERNATE INPUT PASS moves_alt=1 interact_alt=1`
 
-The current full regression bundle in `docs/game/06_validation_plan.md` also passed with `SARGASSO REGRESSION PASS commands=29 clean_output=true`. The only `ERROR:`/`WARNING:` lines observed were the accepted Godot teardown baseline lines (`Capture not registered: 'gdaimcp'`, `ObjectDB instances leaked at exit`) plus the expected REQ-012 incompatible-save contract warning.
+The current full regression bundle in `docs/game/06_validation_plan.md` also passed with `SYNAPSE_SEA REGRESSION PASS commands=29 clean_output=true`. The only `ERROR:`/`WARNING:` lines observed were the accepted Godot teardown baseline lines (`Capture not registered: 'gdaimcp'`, `ObjectDB instances leaked at exit`) plus the expected REQ-012 incompatible-save contract warning.
 
 ## Gate and backlog implications
 

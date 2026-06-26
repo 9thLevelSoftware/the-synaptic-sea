@@ -28,7 +28,7 @@ const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const PlayerProgressionScript := preload("res://scripts/systems/player_progression_state.gd")
 const ClassDefinitionScript := preload("res://scripts/systems/class_definition.gd")
 const ShipInstanceScript := preload("res://scripts/systems/ship_instance.gd")
-const SargassoWorldScript := preload("res://scripts/systems/sargasso_world.gd")
+const SynapseSeaWorldScript := preload("res://scripts/systems/synapse_sea_world.gd")
 const ScannerStateScript := preload("res://scripts/systems/scanner_state.gd")
 const TravelControllerScript := preload("res://scripts/systems/travel_controller.gd")
 const LootContainerScript := preload("res://scripts/tools/loot_container.gd")
@@ -190,7 +190,7 @@ var meta_progression_state # MetaProgressionState (REQ-PM-006)
 var unlock_registry      # UnlockRegistry (REQ-PM-009)
 var current_ship           # ShipInstance (untyped: class_name globals unreliable headless)
 var current_occupancy      # ShipInstance the player currently occupies (defaults to home_ship)
-var sargasso_world         # SargassoWorld
+var synapse_sea_world         # SynapseSeaWorld
 var scanner_state          # ScannerState
 var travel_controller      # TravelController
 var ship_generator         # ShipGenerator (injected into travel)
@@ -1159,12 +1159,12 @@ func _build_runtime_nodes() -> void:
 	# REQ-012: current-run save/load service. Single slot at
 	# user://saves/current_run.json; deleted on playable_slice_completed.
 	save_load_service = SaveLoadServiceScript.new()
-	# Phase 4.5: Sargasso map + scanner + travel. Seed the world from the
+	# Phase 4.5: Synapse Sea map + scanner + travel. Seed the world from the
 	# starting blueprint's seed so the marker field is deterministic per run.
-	# Player starts at Sargasso map origin (abstract X-Z map space — NOT the
+	# Player starts at Synapse Sea map origin (abstract X-Z map space — NOT the
 	# physical scene origin where ship geometry is instantiated).
 	var start_bp = _load_blueprint_for_systems()
-	sargasso_world = SargassoWorldScript.new(start_bp.seed_value, Vector3.ZERO)
+	synapse_sea_world = SynapseSeaWorldScript.new(start_bp.seed_value, Vector3.ZERO)
 	scanner_state = ScannerStateScript.new()
 	travel_controller = TravelControllerScript.new()
 	ship_generator = ShipGeneratorScript.new()
@@ -1571,9 +1571,9 @@ func force_repair_all_for_validation() -> void:
 ## via markers_in_range), returning just the ids.
 func scannable_marker_ids_for_validation() -> Array:
 	var out: Array = []
-	if sargasso_world == null or scanner_state == null:
+	if synapse_sea_world == null or scanner_state == null:
 		return out
-	for m in sargasso_world.markers_in_range(scanner_state.range_radius):
+	for m in synapse_sea_world.markers_in_range(scanner_state.range_radius):
 		out.append(String(m.marker_id))
 	return out
 
@@ -1583,9 +1583,9 @@ func scannable_marker_ids_for_validation() -> Array:
 ## so raw in-range markers are no longer guaranteed to include a claimable host.
 func claimable_marker_ids_for_validation() -> Array:
 	var out: Array = []
-	if sargasso_world == null or scanner_state == null or ship_generator == null:
+	if synapse_sea_world == null or scanner_state == null or ship_generator == null:
 		return out
-	for marker in sargasso_world.markers_in_range(scanner_state.range_radius):
+	for marker in synapse_sea_world.markers_in_range(scanner_state.range_radius):
 		if _marker_has_bridge_for_validation(marker):
 			out.append(String(marker.marker_id))
 	return out
@@ -1616,9 +1616,9 @@ func active_ship_root_count_for_validation() -> int:
 		count += 1
 	return count
 
-## Phase 4.5 validation seam: the SargassoWorld map model.
-func get_sargasso_world():
-	return sargasso_world
+## Phase 4.5 validation seam: the SynapseSeaWorld map model.
+func get_synapse_sea_world():
+	return synapse_sea_world
 
 ## Operational status feeding scan/travel. Travel capability always comes from the
 ## player's functional ship — the lifeboat (the coordinator-owned starting systems
@@ -1643,20 +1643,20 @@ func _current_systems_ops() -> Dictionary:
 ## Resolves the visible markers at the gated detail level, deriving operational
 ## status from the CURRENT ship's systems and scanner skill from progression.
 func scan() -> Dictionary:
-	if current_ship == null or sargasso_world == null or scanner_state == null:
+	if current_ship == null or synapse_sea_world == null or scanner_state == null:
 		return {"detail_level": 0, "markers": []}
 	var ops: Dictionary = _current_systems_ops()
 	var skill: int = 0
 	if player_progression != null and player_progression.has_method("get_skill_level"):
 		skill = int(player_progression.get_skill_level("scanner_operation"))
-	return scanner_state.scan(sargasso_world, ops, skill)
+	return scanner_state.scan(synapse_sea_world, ops, skill)
 
 ## Resolves a marker by id from the in-range set and travels to it. Returns
 ## {success:false, reason:"unknown_marker"} if the id is not currently in range.
 func travel_to_marker_id(marker_id: String) -> Dictionary:
-	if sargasso_world == null or scanner_state == null:
+	if synapse_sea_world == null or scanner_state == null:
 		return {"success": false, "reason": "not_ready", "ship": null}
-	for m in sargasso_world.markers_in_range(scanner_state.range_radius):
+	for m in synapse_sea_world.markers_in_range(scanner_state.range_radius):
 		if String(m.marker_id) == marker_id:
 			var result: Dictionary = travel_to(m)
 			if bool(result.get("success", false)) and is_instance_valid(menu_coordinator):
@@ -2591,7 +2591,7 @@ func complete_derelict_objective_for_validation(sequence: int) -> bool:
 ## Validates + executes a jump to a marker, swapping current_ship and re-homing
 ## the player on success. Travel is gated by the CURRENT ship's propulsion.
 func travel_to(marker) -> Dictionary:
-	if current_ship == null or sargasso_world == null or travel_controller == null or ship_generator == null:
+	if current_ship == null or synapse_sea_world == null or travel_controller == null or ship_generator == null:
 		return {"success": false, "reason": "not_ready", "ship": null}
 	# Reject travel to the marker of the ship we are currently PILOTING. Selecting it would
 	# regenerate that ship's geometry: because current_ship == piloted_ship here,
@@ -2609,11 +2609,11 @@ func travel_to(marker) -> Dictionary:
 		return {"success": false, "reason": "not_aboard_ship", "ship": null}
 	# Capture the world state attempt_travel mutates on success (scanner position +
 	# generated mark) so the dock-compat check below can roll it back on rejection.
-	var prev_player_pos: Vector3 = sargasso_world.player_position
-	var was_generated: bool = sargasso_world.is_generated(String(marker.marker_id))
+	var prev_player_pos: Vector3 = synapse_sea_world.player_position
+	var was_generated: bool = synapse_sea_world.is_generated(String(marker.marker_id))
 	var ops_t: Dictionary = {"propulsion": bool(_current_systems_ops().get("propulsion", false))}
 	var result: Dictionary = travel_controller.attempt_travel(
-		marker, ops_t, sargasso_world, ship_generator, scanner_state.range_radius)
+		marker, ops_t, synapse_sea_world, ship_generator, scanner_state.range_radius)
 	if not bool(result.get("success", false)):
 		return result
 	var new_root: Node3D = result.get("ship", null)
@@ -2631,9 +2631,9 @@ func travel_to(marker) -> Dictionary:
 			# Codex P2: attempt_travel already advanced the scanner position + generated
 			# mark; roll them back so a rejected target leaves no world/scanner state
 			# pointing at a derelict the player never docked to (current_ship is untouched).
-			sargasso_world.set_player_position(prev_player_pos)
+			synapse_sea_world.set_player_position(prev_player_pos)
 			if not was_generated:
-				sargasso_world.unmark_generated(String(marker.marker_id))
+				synapse_sea_world.unmark_generated(String(marker.marker_id))
 			return {"success": false, "reason": "dock_incompatible", "ship": null}
 
 	# Leaving the current ship.
@@ -3900,7 +3900,7 @@ func _process(delta: float) -> void:
 			"moving": player != null and player.has_method("is_moving") and player.is_moving(),
 		})
 	if sanity_state != null:
-		# Sargasso field = not in a safe zone (away_from_start or breach open)
+		# Synapse Sea field = not in a safe zone (away_from_start or breach open)
 		var in_safe: bool = not away_from_start and (oxygen_state == null or not oxygen_state.get_summary().get("breach_open", false))
 		sanity_state.in_safe_zone = in_safe
 		sanity_state.tick(delta)
@@ -5397,8 +5397,8 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 func _build_world_snapshot():
 	_sync_current_ship_combat_summary()
 	var ws = WorldSnapshotScript.new()
-	if sargasso_world != null:
-		ws.world_summary = sargasso_world.get_summary()
+	if synapse_sea_world != null:
+		ws.world_summary = synapse_sea_world.get_summary()
 	if meta_progression_state != null:
 		ws.meta_progression_summary = meta_progression_state.to_dict()
 	if unique_item_state != null:
@@ -5552,7 +5552,7 @@ func _ensure_derelict_geometry(inst) -> void:
 	_spawn_cart_controls_for_ship(inst)
 
 ## Applies a WorldSnapshot: rebuilds the home ship first (this resets the runtime
-## and returns to home if currently away), restores the SargassoWorld and the
+## and returns to home if currently away), restores the SynapseSeaWorld and the
 ## visited-ships registry, then re-activates the saved derelict if the snapshot
 ## was taken aboard one. Returns false on any hard failure.
 func _apply_world_snapshot(ws) -> bool:
@@ -5608,8 +5608,8 @@ func _apply_world_snapshot(ws) -> bool:
 		unique_item_state.apply_summary(ws.unique_item_summary)
 	# 2. World model. _apply_run_snapshot reset us to the home ship; home_ship is
 	#    re-wrapped by _on_ship_loaded during that reload.
-	if sargasso_world != null and not ws.world_summary.is_empty():
-		sargasso_world.apply_summary(ws.world_summary)
+	if synapse_sea_world != null and not ws.world_summary.is_empty():
+		synapse_sea_world.apply_summary(ws.world_summary)
 	# 3. Rebuild the retained-derelict registry from the slices.
 	visited_ships.clear()
 	for mid in ws.visited_ships:
@@ -5746,7 +5746,7 @@ func _build_loot_context(spec: Dictionary) -> Dictionary:
 func _resolve_current_loot_biome_id() -> String:
 	var biome_ids: Array[String] = _loot_biome_ids()
 	if biome_ids.is_empty():
-		return "abyssal_sargasso"
+		return "abyssal_synapse_sea"
 	var seed_value: int = 0
 	if current_ship != null and current_ship.blueprint != null:
 		seed_value = int(current_ship.blueprint.seed_value)
@@ -5780,7 +5780,7 @@ func _loot_biome_ids() -> Array[String]:
 				_loot_biome_ids_cache.append(String(biome_id))
 	_loot_biome_ids_cache.sort()
 	if _loot_biome_ids_cache.is_empty():
-		_loot_biome_ids_cache.append("abyssal_sargasso")
+		_loot_biome_ids_cache.append("abyssal_synapse_sea")
 	return _loot_biome_ids_cache
 
 func _postprocess_loot_grants(granted: Array, source_id: String) -> void:

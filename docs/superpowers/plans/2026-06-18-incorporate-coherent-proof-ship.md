@@ -10,10 +10,10 @@
 
 ## Global Constraints
 
-- Project root is `/Users/christopherwilloughby/the-sargasso-of-stars`.
+- Project root is `/Users/christopherwilloughby/the-synapse-sea-of-stars`.
 - Godot binary is `/Users/christopherwilloughby/.local/bin/godot-4.6.2`.
 - Main scene in `project.godot` remains `run/main_scene="res://scenes/main.tscn"`.
-- The project path is not expected to be a git repository from the shell; every record step must use a commit-or-record fallback writing to `/tmp/sargasso_coherent_incorporation_no_git_changes.log` if `git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree` fails.
+- The project path is not expected to be a git repository from the shell; every record step must use a commit-or-record fallback writing to `/tmp/synapse_sea_coherent_incorporation_no_git_changes.log` if `git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree` fails.
 - Do not mutate seed-17 data: `data/procgen/smoke/seed_000017/layout.json` and `data/procgen/smoke/seed_000017/gameplay_slice.json`.
 - Do not mutate the coherent golden fixture JSON: `data/procgen/golden/coherent_ship_001/layout.json` and `data/procgen/golden/coherent_ship_001/gameplay_slice.json`.
 - Do not rewrite the procgen loader or playable scene internals: `scripts/procgen/generated_ship_loader.gd`, `scripts/procgen/playable_generated_ship.gd`, and `scenes/procgen/playable_coherent_ship.tscn` are out of scope.
@@ -152,7 +152,7 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/main_coherent_boot_smoke.gd
 ```
 
@@ -169,11 +169,11 @@ If the command fails with a parser error instead, fix the parser error in `scrip
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/validation/main_coherent_boot_smoke.gd
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "test: add main coherent boot smoke"
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/validation/main_coherent_boot_smoke.gd
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "test: add main coherent boot smoke"
 else
-  printf '%s\n' 'NO_GIT Incorporation Task 1 changed: scripts/validation/main_coherent_boot_smoke.gd' >> /tmp/sargasso_coherent_incorporation_no_git_changes.log
+  printf '%s\n' 'NO_GIT Incorporation Task 1 changed: scripts/validation/main_coherent_boot_smoke.gd' >> /tmp/synapse_sea_coherent_incorporation_no_git_changes.log
 fi
 ```
 
@@ -205,7 +205,7 @@ var playable_instance: PlayableGeneratedShip
 
 
 func _ready() -> void:
-	print("The Sargasso of Stars coherent proof ship bootstrap loaded.")
+	print("The Synapse Sea coherent proof ship bootstrap loaded.")
 	if playable_ship_scene == null:
 		push_error("MAIN BOOT FAIL reason=missing playable_ship_scene")
 		return
@@ -222,7 +222,7 @@ func _ready() -> void:
 Replace the entire file `scenes/main.tscn` with:
 
 ```text
-[gd_scene load_steps=2 format=3 uid="uid://sargasso_main"]
+[gd_scene load_steps=2 format=3 uid="uid://synapse_sea_main"]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 
@@ -243,14 +243,14 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/main_coherent_boot_smoke.gd
 ```
 
 Expected: exit code `0` and output contains:
 
 ```text
-The Sargasso of Stars coherent proof ship bootstrap loaded.
+The Synapse Sea coherent proof ship bootstrap loaded.
 PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=4 collision_shapes=31
 MAIN COHERENT BOOT PASS scene=playable_coherent_ship objectives=4 critical_path=5 landmarks=2
 ```
@@ -262,8 +262,8 @@ The `frames=` value at the end of the pass marker may vary and is not part of th
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/coherent_playable_scene_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/procgen_playable_ship_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/coherent_playable_scene_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/procgen_playable_ship_smoke.gd
 ```
 
 Expected pass markers:
@@ -278,11 +278,11 @@ PLAYABLE SHIP SMOKE PASS
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/main.gd scenes/main.tscn
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "feat: boot coherent proof ship from main scene"
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/main.gd scenes/main.tscn
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "feat: boot coherent proof ship from main scene"
 else
-  printf '%s\n' 'NO_GIT Incorporation Task 2 changed: scripts/main.gd scenes/main.tscn' >> /tmp/sargasso_coherent_incorporation_no_git_changes.log
+  printf '%s\n' 'NO_GIT Incorporation Task 2 changed: scripts/main.gd scenes/main.tscn' >> /tmp/synapse_sea_coherent_incorporation_no_git_changes.log
 fi
 ```
 
@@ -305,7 +305,7 @@ Run:
 ```bash
 mkdir -p /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/main_coherent_capture.gd \
   -- \
   --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png \
@@ -463,7 +463,7 @@ Run:
 ```bash
 mkdir -p /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/main_coherent_capture.gd \
   -- \
   --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png \
@@ -515,11 +515,11 @@ Expected: exit code `0`.
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/validation/main_coherent_capture.gd
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "test: capture coherent ship through main scene"
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/validation/main_coherent_capture.gd
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "test: capture coherent ship through main scene"
 else
-  printf '%s\n' 'NO_GIT Incorporation Task 3 changed: scripts/validation/main_coherent_capture.gd' >> /tmp/sargasso_coherent_incorporation_no_git_changes.log
+  printf '%s\n' 'NO_GIT Incorporation Task 3 changed: scripts/validation/main_coherent_capture.gd' >> /tmp/synapse_sea_coherent_incorporation_no_git_changes.log
 fi
 ```
 
@@ -536,11 +536,11 @@ fi
 
 - [ ] **Step 1: Append proof-log evidence using captured command outputs**
 
-Run this shell block from `/Users/christopherwilloughby/the-sargasso-of-stars`:
+Run this shell block from `/Users/christopherwilloughby/the-synapse-sea-of-stars`:
 
 ```bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
+ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
 GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
 ARTIFACT=/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png
 PROOF=$ROOT/docs/superpowers/proofs/coherent-proof-ship.md
@@ -616,7 +616,7 @@ Run:
 ```bash
 python3 - <<'PY'
 from pathlib import Path
-p = Path('/Users/christopherwilloughby/the-sargasso-of-stars/docs/superpowers/proofs/coherent-proof-ship.md')
+p = Path('/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md')
 text = p.read_text()
 required = [
     '## Main-Scene Incorporation',
@@ -643,11 +643,11 @@ MAIN INCORPORATION PROOF LOG PASS markers=5
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add docs/superpowers/proofs/coherent-proof-ship.md
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "docs: record coherent ship main-scene incorporation"
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add docs/superpowers/proofs/coherent-proof-ship.md
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "docs: record coherent ship main-scene incorporation"
 else
-  printf '%s\n' 'NO_GIT Incorporation Task 4 changed: docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/sargasso_coherent_incorporation_no_git_changes.log
+  printf '%s\n' 'NO_GIT Incorporation Task 4 changed: docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/synapse_sea_coherent_incorporation_no_git_changes.log
 fi
 ```
 
@@ -678,7 +678,7 @@ for script in \
   echo "=== $script ==="
   /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
     --headless \
-    --path /Users/christopherwilloughby/the-sargasso-of-stars \
+    --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
     --script "$script"
 done
 ```
@@ -708,7 +708,7 @@ for script in \
   echo "=== $script ==="
   /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
     --headless \
-    --path /Users/christopherwilloughby/the-sargasso-of-stars \
+    --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
     --script "$script"
 done
 ```
@@ -729,13 +729,13 @@ Run:
 ```bash
 mkdir -p /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/coherent_proof_ship_capture.gd \
   -- \
   --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/coherent_proof_ship_viewport.png \
   --capture-frame 180
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/main_coherent_capture.gd \
   -- \
   --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png \
@@ -756,7 +756,7 @@ Run this shell block to append the acceptance checklist after all validation com
 ```bash
 python3 - <<'PY'
 from pathlib import Path
-proof = Path('/Users/christopherwilloughby/the-sargasso-of-stars/docs/superpowers/proofs/coherent-proof-ship.md')
+proof = Path('/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md')
 text = proof.read_text().rstrip()
 section = '''
 
@@ -788,7 +788,7 @@ Run:
 ```bash
 python3 - <<'PY'
 from pathlib import Path
-p = Path('/Users/christopherwilloughby/the-sargasso-of-stars/docs/superpowers/proofs/coherent-proof-ship.md')
+p = Path('/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md')
 text = p.read_text()
 required = [
     '## Main-Scene Incorporation',
@@ -817,11 +817,11 @@ MAIN INCORPORATION FINAL PROOF PASS markers=7
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add docs/superpowers/proofs/coherent-proof-ship.md
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "docs: record coherent ship main-path acceptance"
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add docs/superpowers/proofs/coherent-proof-ship.md
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "docs: record coherent ship main-path acceptance"
 else
-  printf '%s\n' 'NO_GIT Incorporation Task 5 changed: docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/sargasso_coherent_incorporation_no_git_changes.log
+  printf '%s\n' 'NO_GIT Incorporation Task 5 changed: docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/synapse_sea_coherent_incorporation_no_git_changes.log
 fi
 ```
 
@@ -833,7 +833,7 @@ Run this command before claiming the plan is complete:
 
 ```bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
+ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
 GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
 ARTIFACT_DIR=/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship
 mkdir -p "$ARTIFACT_DIR"
@@ -905,7 +905,7 @@ The final `sha256:` line must contain one 64-character lowercase hexadecimal has
 - The coherent proof ship is still a structural/proof-quality in-engine scene. This plan does not add art dressing, hull silhouettes, lighting polish, camera choreography, animation, or user-facing menus.
 - The main-scene capture proves the `project.godot` main path renders a real viewport. It does not prove hand-play feel beyond the existing player/interactable smoke coverage.
 - `PlayableGeneratedShip` still depends on synchronous `GeneratedShipLoader.load_from_paths()` behavior. This plan preserves that behavior and adds no asynchronous loading.
-- The no-git ledger is outside the repo at `/tmp/sargasso_coherent_incorporation_no_git_changes.log`; implementers must not create repo-local audit logs.
+- The no-git ledger is outside the repo at `/tmp/synapse_sea_coherent_incorporation_no_git_changes.log`; implementers must not create repo-local audit logs.
 
 ---
 
@@ -914,7 +914,7 @@ The final `sha256:` line must contain one 64-character lowercase hexadecimal has
 - Spec coverage: the plan promotes the coherent proof ship into `scenes/main.tscn`, adds main-scene boot validation, adds main-scene viewport capture, preserves seed-17 regression, records proof evidence, and includes final validation.
 - Placeholder scan: the plan contains no `TBD`, no `TODO`, no unspecified error-handling step, no `fill in details`, and no code step that omits actual code.
 - Type consistency: `PlayableGeneratedShip`, `get_playable_summary()`, `loader.get_critical_path()`, `loader.get_landmark_nodes()`, `loader.has_loaded_ship()`, and pass-marker names are consistent across tasks.
-- No-git condition: every record step uses the required commit-or-record fallback and writes to `/tmp/sargasso_coherent_incorporation_no_git_changes.log` when the workspace is not a git repo.
+- No-git condition: every record step uses the required commit-or-record fallback and writes to `/tmp/synapse_sea_coherent_incorporation_no_git_changes.log` when the workspace is not a git repo.
 
 ---
 

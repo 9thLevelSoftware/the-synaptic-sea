@@ -1237,7 +1237,7 @@ run_clean 'inventory UI slice' 'INVENTORY UI SLICE SMOKE PASS' "$GODOT" --headle
 Update the final line to:
 
 ```bash
-echo 'SARGASSO REGRESSION PASS commands=114 clean_output=true'
+echo 'SYNAPSE_SEA REGRESSION PASS commands=114 clean_output=true'
 ```
 
 > Sanity: `grep -c '^run_clean' docs/game/06_validation_plan.md` will report **115** — that counts the `run_clean() {` definition line plus 114 invocations. The echo says `commands=114`.
@@ -1251,7 +1251,7 @@ git stash push -- project.godot
 bash docs/game/06_validation_plan.md   # or the documented bundle runner with GODOT/ROOT set
 git stash pop
 ```
-Expected tail: `SARGASSO REGRESSION PASS commands=114 clean_output=true`. Do not commit or revert the `project.godot` drift.
+Expected tail: `SYNAPSE_SEA REGRESSION PASS commands=114 clean_output=true`. Do not commit or revert the `project.godot` drift.
 
 - [ ] **Step 5: Commit:**
 

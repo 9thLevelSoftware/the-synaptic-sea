@@ -42,7 +42,7 @@
       { "item_id": "plating",       "qty_min": 1, "qty_max": 2, "weight": 2, "rarity": "common" },
       { "item_id": "oxygen_filter", "qty_min": 1, "qty_max": 2, "weight": 2, "rarity": "common" },
       { "item_id": "biomatter_tangle", "qty_min": 1, "qty_max": 2, "weight": 3, "rarity": "common", "biome_weights": { "breach_field": 1.6 } },
-      { "item_id": "sargasso_reliquary", "qty_min": 1, "qty_max": 1, "weight": 0.25, "rarity": "epic", "unique_id": "sargasso_reliquary", "codex_entry_id": "sargasso_reliquary", "biome_weights": { "dead_fleet": 1.6, "abyssal_sargasso": 1.1 }, "container_weights": { "hidden_cache": 2.2, "industrial_crate": 0.5 } }
+      { "item_id": "synapse_sea_reliquary", "qty_min": 1, "qty_max": 1, "weight": 0.25, "rarity": "epic", "unique_id": "synapse_sea_reliquary", "codex_entry_id": "synapse_sea_reliquary", "biome_weights": { "dead_fleet": 1.6, "abyssal_synapse_sea": 1.1 }, "container_weights": { "hidden_cache": 2.2, "industrial_crate": 0.5 } }
     ]
   },
   "repair_parts_common": {
@@ -76,7 +76,7 @@
       { "item_id": "medkit", "qty_min": 1, "qty_max": 1, "weight": 3, "rarity": "uncommon" },
       { "item_id": "data_core", "qty_min": 1, "qty_max": 1, "weight": 2, "rarity": "rare" },
       { "item_id": "captains_black_box", "qty_min": 1, "qty_max": 1, "weight": 0.15, "rarity": "legendary", "unique_id": "captains_black_box", "codex_entry_id": "captains_black_box" },
-      { "item_id": "sargasso_reliquary", "qty_min": 1, "qty_max": 1, "weight": 0.20, "rarity": "epic", "unique_id": "sargasso_reliquary", "codex_entry_id": "sargasso_reliquary" }
+      { "item_id": "synapse_sea_reliquary", "qty_min": 1, "qty_max": 1, "weight": 0.20, "rarity": "epic", "unique_id": "synapse_sea_reliquary", "codex_entry_id": "synapse_sea_reliquary" }
     ]
   }
 }

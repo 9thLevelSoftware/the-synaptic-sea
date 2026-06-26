@@ -37,14 +37,14 @@
       "unlock_id": "codex_piloting_intro",
       "category": "codex",
       "display_name": "Piloting — Drift Compensation",
-      "description": "Keep the bow into the Sargasso, not the hull.",
+      "description": "Keep the bow into the Synapse Sea, not the hull.",
       "trigger_event": "plot_course",
       "trigger_target": "any"
     },
     {
       "unlock_id": "codex_astrogation_intro",
       "category": "codex",
-      "display_name": "Astrogation — Sargasso Drift Maps",
+      "display_name": "Astrogation — Synapse Sea Drift Maps",
       "description": "Reading the seven drift patterns.",
       "trigger_event": "complete_astrogation",
       "trigger_target": "any"

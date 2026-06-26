@@ -1,12 +1,12 @@
-# The Sargasso of Stars Project Workspace
+# The Synapse Sea Project Workspace
 
 Canonical Godot project root:
 
-`/Users/christopherwilloughby/the-sargasso-of-stars`
+`/Users/christopherwilloughby/the-synapse-sea-of-stars`
 
 Godot project file:
 
-`/Users/christopherwilloughby/the-sargasso-of-stars/project.godot`
+`/Users/christopherwilloughby/the-synapse-sea-of-stars/project.godot`
 
 Locked premise:
 

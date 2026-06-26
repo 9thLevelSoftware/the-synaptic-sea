@@ -1,6 +1,6 @@
 extends SceneTree
 
-const WorldScript := preload("res://scripts/systems/sargasso_world.gd")
+const WorldScript := preload("res://scripts/systems/synapse_sea_world.gd")
 const ScannerScript := preload("res://scripts/systems/scanner_state.gd")
 
 func _initialize() -> void:

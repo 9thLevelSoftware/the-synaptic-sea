@@ -24,7 +24,7 @@ func _on_frame() -> void:
 
 func _validate(p) -> void:
 	# Pick any in-range marker and travel.
-	var world = p.get_sargasso_world()
+	var world = p.get_synapse_sea_world()
 	var in_range: Array = world.markers_in_range(p.scanner_state.range_radius)
 	if in_range.is_empty(): _fail("no markers in range"); return
 	# Force propulsion operational so travel is allowed (foundation test, not gate test).

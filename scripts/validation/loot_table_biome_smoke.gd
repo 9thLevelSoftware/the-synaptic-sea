@@ -11,7 +11,7 @@ func _initialize() -> void:
 	var item_defs: Dictionary = item_defs_script.load_definitions()
 	var base_seed: String = "biome-smoke-seed"
 	var a: Array = dist_script.roll("salvage_cargo", base_seed, tables, {
-		"biome_id": "abyssal_sargasso",
+		"biome_id": "abyssal_synapse_sea",
 		"depth": 0,
 		"condition": "damaged",
 		"container_kind": "industrial_crate",

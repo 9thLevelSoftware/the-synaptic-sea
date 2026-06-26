@@ -11,5 +11,5 @@
   ],
   "valid_build_kinds": ["dev", "demo", "release"],
   "release_date": "2026-Q4",
-  "telemetry_endpoint_placeholder": "https://telemetry.sargasso.example/api/v1"
+  "telemetry_endpoint_placeholder": "https://telemetry.synapse_sea.example/api/v1"
 }

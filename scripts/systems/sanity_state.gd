@@ -2,7 +2,7 @@ extends RefCounted
 class_name SanityState
 
 ## Pure model for player sanity.  Per REQ-SV-002.
-## Drains while in the Sargasso field, recovers in safe zones.
+## Drains while in the Synapse Sea field, recovers in safe zones.
 
 const DEFAULT_MAX_SANITY: float = 100.0
 const DEFAULT_DRAIN_RATE: float = 1.5

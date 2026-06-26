@@ -1215,7 +1215,7 @@ Expected: `SHIP SYSTEMS MANAGER PASS determinism=ok cascade=ok advance=ok repair
 
 - [ ] **Step 5: Register all five new smokes in the regression bundle**
 
-In `docs/game/06_validation_plan.md`, inside the `## Regression bundle` script, add these five lines immediately before the final `echo 'SARGASSO REGRESSION PASS ...'` line:
+In `docs/game/06_validation_plan.md`, inside the `## Regression bundle` script, add these five lines immediately before the final `echo 'SYNAPSE_SEA REGRESSION PASS ...'` line:
 
 ```bash
 run_clean 'ship subcomponent smoke' 'SHIP SUBCOMPONENT PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_subcomponent_smoke.gd
@@ -1228,7 +1228,7 @@ run_clean 'ship systems manager smoke' 'SHIP SYSTEMS MANAGER PASS' "$GODOT" --he
 Then change the final line from `commands=42` to `commands=47`:
 
 ```bash
-echo 'SARGASSO REGRESSION PASS commands=47 clean_output=true'
+echo 'SYNAPSE_SEA REGRESSION PASS commands=47 clean_output=true'
 ```
 
 Add a documentation bullet under `## Future validation additions`:
@@ -1245,7 +1245,7 @@ awk '/^## Regression bundle/{f=1} f&&/^```bash/{c=1;next} f&&/^```/{if(c)exit} c
   | sed "s#^ROOT=.*#ROOT=\"$ROOT\"#; s#^GODOT=.*#GODOT=\"$GODOT\"#" > /tmp/regression_bundle.sh
 bash /tmp/regression_bundle.sh 2>&1 | tail -3
 ```
-Expected final line: `SARGASSO REGRESSION PASS commands=47 clean_output=true`.
+Expected final line: `SYNAPSE_SEA REGRESSION PASS commands=47 clean_output=true`.
 
 - [ ] **Step 7: Commit**
 

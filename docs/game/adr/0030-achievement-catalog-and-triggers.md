@@ -17,7 +17,7 @@ Steam achievements (and itch / GOG equivalents) require:
 4. A separation between per-run state (current run's unlock set) and
    cross-run state (the "you have X points" total Steam shows).
 
-The Sargasso had none of this. Adding achievements without a clean
+The Synapse Sea had none of this. Adding achievements without a clean
 catalog/unlock/persistence triad would have meant hand-coding `if (event)
 { Steam.unlock(...) }` at every gameplay milestone — a recipe for missed
 unlocks and double-unlocks.

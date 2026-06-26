@@ -435,7 +435,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	_all_operational(playable.get_ship_systems_manager())
 
 	# Board a derelict.
-	var world = playable.get_sargasso_world()
+	var world = playable.get_synapse_sea_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
 	if in_range.is_empty():
 		_fail("no markers in range")
@@ -750,7 +750,7 @@ the live bundle's exact `run_clean '<label>' '<MARKER>' "$GODOT" --headless --pa
 run_clean 'derelict objective controller smoke' 'DERELICT OBJECTIVE CONTROLLER PASS configure=true cleared_on_goal=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_objective_controller_smoke.gd
 run_clean 'derelict gameplay smoke' 'DERELICT GAMEPLAY PASS built=true cleared=true persists=true home_intact=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_gameplay_smoke.gd
 ```
-Then change the success line `echo 'SARGASSO REGRESSION PASS commands=65 clean_output=true'` from `commands=65` to `commands=67`. (Read the actual current count line and increment by 2.)
+Then change the success line `echo 'SYNAPSE_SEA REGRESSION PASS commands=65 clean_output=true'` from `commands=65` to `commands=67`. (Read the actual current count line and increment by 2.)
 
 - [ ] **Step 3: Run the FULL regression bundle**
 
@@ -759,7 +759,7 @@ Set env and run the bundle block from `docs/game/06_validation_plan.md`:
 export GODOT="C:/Users/dasbl/Documents/Godot/Godot_v4.6.2-stable_win64_console.exe"
 export ROOT="C:/Users/dasbl/Documents/The Synaptic Sea"
 ```
-Expected final line: `SARGASSO REGRESSION PASS commands=67 clean_output=true`, with no unexpected `ERROR:`/`WARNING:` lines. If any smoke fails or unexpected noise appears, STOP and report the exact line — do not paper over it (no new allowlist entries without a root-cause justification).
+Expected final line: `SYNAPSE_SEA REGRESSION PASS commands=67 clean_output=true`, with no unexpected `ERROR:`/`WARNING:` lines. If any smoke fails or unexpected noise appears, STOP and report the exact line — do not paper over it (no new allowlist entries without a root-cause justification).
 
 - [ ] **Step 4: Run the Gate-1 automated playtest**
 

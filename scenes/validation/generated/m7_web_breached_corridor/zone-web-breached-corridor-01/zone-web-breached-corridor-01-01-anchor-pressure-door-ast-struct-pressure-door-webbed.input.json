@@ -86,11 +86,11 @@
         "medical"
       ]
     },
-    "wrapper_scene": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.tscn",
-    "contract_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.contract.tres",
-    "inspection_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.inspection.json"
+    "wrapper_scene": "/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.tscn",
+    "contract_path": "/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.contract.tres",
+    "inspection_path": "/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.inspection.json"
   },
-  "wrapper_scene": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.tscn",
-  "contract_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.contract.tres",
-  "inspection_path": "/Users/christopherwilloughby/the-sargasso-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.inspection.json"
+  "wrapper_scene": "/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.tscn",
+  "contract_path": "/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.contract.tres",
+  "inspection_path": "/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.inspection.json"
 }

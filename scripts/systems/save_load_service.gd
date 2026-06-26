@@ -406,7 +406,7 @@ func _index_run_slot(slot_id: String, slot_kind: String, display_name: String, s
 	row.slot_id = slot_id
 	row.slot_kind = slot_kind
 	row.display_name = display_name if not display_name.is_empty() else slot_id
-	row.sargasso_seed = int(snapshot.player_position[0] * 1000) if snapshot.player_position.size() >= 3 else 0  # placeholder
+	row.synapse_sea_seed = int(snapshot.player_position[0] * 1000) if snapshot.player_position.size() >= 3 else 0  # placeholder
 	row.player_class = str(snapshot.player_progression_summary.get("class_id", ""))
 	row.current_location = str(snapshot.player_position[0]) if snapshot.player_position.size() >= 3 else ""
 	row.objective_sequence = int(snapshot.current_objective_sequence)

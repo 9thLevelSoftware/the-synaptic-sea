@@ -10,20 +10,20 @@
 
 ## Global Constraints
 
-- Godot project root: `/Users/christopherwilloughby/the-sargasso-of-stars`.
-- Approved design spec: `/Users/christopherwilloughby/the-sargasso-of-stars/docs/superpowers/specs/2026-06-17-coherent-proof-ship-design.md`.
+- Godot project root: `/Users/christopherwilloughby/the-synapse-sea-of-stars`.
+- Approved design spec: `/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/specs/2026-06-17-coherent-proof-ship-design.md`.
 - Godot version: `4.6.2.stable.official.71f334935`.
 - Godot binary: `/Users/christopherwilloughby/.local/bin/godot-4.6.2`.
 - Do not mutate the seed-17 smoke fixture at `data/procgen/smoke/seed_000017/`; the coherent proof ship is a sibling under `data/procgen/golden/coherent_ship_001/`.
 - Preserve the existing playable prototype path: `res://scenes/procgen/playable_generated_ship.tscn` should continue to use the seed-17 smoke fixture unless explicitly superseded by the final regression task.
 - Do not implement combat, inventory, oxygen, repair mechanics, save/load, final art, broad random generation, multi-seed statistics, or production room dressing in this plan.
 - The workspaces are not git repositories at plan time. Every task must use the commit-or-record fallback shown below instead of assuming `git commit` works.
-- Record fallback log: `/tmp/sargasso_coherent_proof_ship_no_git_changes.log`.
+- Record fallback log: `/tmp/synapse_sea_coherent_proof_ship_no_git_changes.log`.
 - The visual companion session created during brainstorming is not part of implementation; do not edit `.superpowers/brainstorm/` files.
 
 ### Commit-or-record fallback used by every task
 
-Each task includes its own exact command with the task-specific file list and message. Use those task-local commands verbatim. They commit when this workspace is later placed under git, and otherwise append the changed paths to `/tmp/sargasso_coherent_proof_ship_no_git_changes.log`.
+Each task includes its own exact command with the task-specific file list and message. Use those task-local commands verbatim. They commit when this workspace is later placed under git, and otherwise append the changed paths to `/tmp/synapse_sea_coherent_proof_ship_no_git_changes.log`.
 
 ---
 
@@ -74,10 +74,10 @@ Each task includes its own exact command with the task-specific file list and me
 ### Task 1: Add the golden fixture data and static topology validator
 
 **Files:**
-- Create: `/Users/christopherwilloughby/the-sargasso-of-stars/data/procgen/golden/coherent_ship_001/layout.json`
-- Create: `/Users/christopherwilloughby/the-sargasso-of-stars/data/procgen/golden/coherent_ship_001/gameplay_slice.json`
-- Create: `/Users/christopherwilloughby/the-sargasso-of-stars/scripts/validation/coherent_static_fixture_validator.gd`
-- Create: `/Users/christopherwilloughby/the-sargasso-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
+- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/golden/coherent_ship_001/layout.json`
+- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/golden/coherent_ship_001/gameplay_slice.json`
+- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/coherent_static_fixture_validator.gd`
+- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
 
 **Interfaces:**
 - Consumes: JSON fixture files at `res://data/procgen/golden/coherent_ship_001/layout.json` and `res://data/procgen/golden/coherent_ship_001/gameplay_slice.json`.
@@ -171,7 +171,7 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/coherent_static_fixture_validator.gd
 ```
 
@@ -354,7 +354,7 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/coherent_static_fixture_validator.gd
 ```
 
@@ -387,15 +387,15 @@ COHERENT STATIC FIXTURE PASS rooms=8 traversable_links=7 blocked_links=1 vertica
 Then run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add \
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add \
     data/procgen/golden/coherent_ship_001/layout.json \
     data/procgen/golden/coherent_ship_001/gameplay_slice.json \
     scripts/validation/coherent_static_fixture_validator.gd \
     docs/superpowers/proofs/coherent-proof-ship.md
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "test: add coherent proof ship static fixture"
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "test: add coherent proof ship static fixture"
 else
-  printf '%s\n' 'NO_GIT Task 1 changed: data/procgen/golden/coherent_ship_001/layout.json data/procgen/golden/coherent_ship_001/gameplay_slice.json scripts/validation/coherent_static_fixture_validator.gd docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/sargasso_coherent_proof_ship_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 1 changed: data/procgen/golden/coherent_ship_001/layout.json data/procgen/golden/coherent_ship_001/gameplay_slice.json scripts/validation/coherent_static_fixture_validator.gd docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/synapse_sea_coherent_proof_ship_no_git_changes.log
 fi
 ```
 
@@ -404,9 +404,9 @@ fi
 ### Task 2: Add loader metadata accessors without changing seed-17 behavior
 
 **Files:**
-- Modify: `/Users/christopherwilloughby/the-sargasso-of-stars/scripts/procgen/generated_ship_loader.gd`
-- Create: `/Users/christopherwilloughby/the-sargasso-of-stars/scripts/validation/coherent_loader_metadata_smoke.gd`
-- Modify: `/Users/christopherwilloughby/the-sargasso-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
+- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/generated_ship_loader.gd`
+- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/coherent_loader_metadata_smoke.gd`
+- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
 
 **Interfaces:**
 - Consumes: golden fixture from Task 1.
@@ -480,7 +480,7 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/coherent_loader_metadata_smoke.gd
 ```
 
@@ -550,7 +550,7 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/procgen_playable_ship_smoke.gd
 ```
 
@@ -565,14 +565,14 @@ PLAYABLE SHIP SMOKE PASS
 Append the pass markers from Steps 4 and 5 to `docs/superpowers/proofs/coherent-proof-ship.md`, then run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add \
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add \
     scripts/procgen/generated_ship_loader.gd \
     scripts/validation/coherent_loader_metadata_smoke.gd \
     docs/superpowers/proofs/coherent-proof-ship.md
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "feat: expose coherent ship loader metadata"
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "feat: expose coherent ship loader metadata"
 else
-  printf '%s\n' 'NO_GIT Task 2 changed: scripts/procgen/generated_ship_loader.gd scripts/validation/coherent_loader_metadata_smoke.gd docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/sargasso_coherent_proof_ship_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 2 changed: scripts/procgen/generated_ship_loader.gd scripts/validation/coherent_loader_metadata_smoke.gd docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/synapse_sea_coherent_proof_ship_no_git_changes.log
 fi
 ```
 
@@ -581,9 +581,9 @@ fi
 ### Task 3: Add runtime nodes for landmarks, visible vertical transitions, and blocked routes
 
 **Files:**
-- Modify: `/Users/christopherwilloughby/the-sargasso-of-stars/scripts/procgen/generated_ship_loader.gd`
-- Create: `/Users/christopherwilloughby/the-sargasso-of-stars/scripts/validation/coherent_runtime_loader_smoke.gd`
-- Modify: `/Users/christopherwilloughby/the-sargasso-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
+- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/generated_ship_loader.gd`
+- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/coherent_runtime_loader_smoke.gd`
+- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
 
 **Interfaces:**
 - Consumes: loader metadata getters from Task 2.
@@ -650,7 +650,7 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/coherent_runtime_loader_smoke.gd
 ```
 
@@ -819,8 +819,8 @@ The exact collision shape count can vary, but it must be greater than zero.
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/coherent_static_fixture_validator.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/procgen_playable_ship_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/coherent_static_fixture_validator.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/procgen_playable_ship_smoke.gd
 ```
 
 Expected outputs contain:
@@ -835,14 +835,14 @@ PLAYABLE SHIP SMOKE PASS
 Append Task 3 pass markers to `docs/superpowers/proofs/coherent-proof-ship.md`, then run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add \
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add \
     scripts/procgen/generated_ship_loader.gd \
     scripts/validation/coherent_runtime_loader_smoke.gd \
     docs/superpowers/proofs/coherent-proof-ship.md
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "feat: add coherent proof runtime markers"
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "feat: add coherent proof runtime markers"
 else
-  printf '%s\n' 'NO_GIT Task 3 changed: scripts/procgen/generated_ship_loader.gd scripts/validation/coherent_runtime_loader_smoke.gd docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/sargasso_coherent_proof_ship_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 3 changed: scripts/procgen/generated_ship_loader.gd scripts/validation/coherent_runtime_loader_smoke.gd docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/synapse_sea_coherent_proof_ship_no_git_changes.log
 fi
 ```
 
@@ -851,10 +851,10 @@ fi
 ### Task 4: Add a sibling playable scene for the coherent proof ship
 
 **Files:**
-- Modify: `/Users/christopherwilloughby/the-sargasso-of-stars/scripts/procgen/playable_generated_ship.gd`
-- Create: `/Users/christopherwilloughby/the-sargasso-of-stars/scenes/procgen/playable_coherent_ship.tscn`
-- Create: `/Users/christopherwilloughby/the-sargasso-of-stars/scripts/validation/coherent_playable_scene_smoke.gd`
-- Modify: `/Users/christopherwilloughby/the-sargasso-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
+- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/playable_generated_ship.gd`
+- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/procgen/playable_coherent_ship.tscn`
+- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/coherent_playable_scene_smoke.gd`
+- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
 
 **Interfaces:**
 - Consumes: runtime loader markers from Task 3.
@@ -929,7 +929,7 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/coherent_playable_scene_smoke.gd
 ```
 
@@ -971,7 +971,7 @@ func teleport_player_to_room_for_validation(room_id: String) -> bool:
 Create `scenes/procgen/playable_coherent_ship.tscn`:
 
 ```text
-[gd_scene load_steps=2 format=3 uid="uid://sargasso_playable_coherent_ship"]
+[gd_scene load_steps=2 format=3 uid="uid://synapse_sea_playable_coherent_ship"]
 
 [ext_resource type="Script" path="res://scripts/procgen/playable_generated_ship.gd" id="1_playable_generated_ship"]
 
@@ -1000,7 +1000,7 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/procgen_playable_ship_smoke.gd
 ```
 
@@ -1015,15 +1015,15 @@ PLAYABLE SHIP SMOKE PASS
 Append Task 4 pass markers to `docs/superpowers/proofs/coherent-proof-ship.md`, then run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add \
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add \
     scripts/procgen/playable_generated_ship.gd \
     scenes/procgen/playable_coherent_ship.tscn \
     scripts/validation/coherent_playable_scene_smoke.gd \
     docs/superpowers/proofs/coherent-proof-ship.md
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "feat: add playable coherent proof ship scene"
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "feat: add playable coherent proof ship scene"
 else
-  printf '%s\n' 'NO_GIT Task 4 changed: scripts/procgen/playable_generated_ship.gd scenes/procgen/playable_coherent_ship.tscn scripts/validation/coherent_playable_scene_smoke.gd docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/sargasso_coherent_proof_ship_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 4 changed: scripts/procgen/playable_generated_ship.gd scenes/procgen/playable_coherent_ship.tscn scripts/validation/coherent_playable_scene_smoke.gd docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/synapse_sea_coherent_proof_ship_no_git_changes.log
 fi
 ```
 
@@ -1032,8 +1032,8 @@ fi
 ### Task 5: Add playable traversal validation for critical path, side room, blocker, and interaction
 
 **Files:**
-- Create: `/Users/christopherwilloughby/the-sargasso-of-stars/scripts/validation/coherent_playable_traversal_smoke.gd`
-- Modify: `/Users/christopherwilloughby/the-sargasso-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
+- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/coherent_playable_traversal_smoke.gd`
+- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
 
 **Interfaces:**
 - Consumes: `playable_coherent_ship.tscn` from Task 4.
@@ -1169,7 +1169,7 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/coherent_playable_traversal_smoke.gd
 ```
 
@@ -1186,10 +1186,10 @@ If it fails with `player not above floor`, fix floor placement coordinates or pl
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/floor_wrapper_collision_footprint_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/player_gravity_floor_snap_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/interactable_distance_fallback_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/procgen_playable_ship_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/floor_wrapper_collision_footprint_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/player_gravity_floor_snap_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/interactable_distance_fallback_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/procgen_playable_ship_smoke.gd
 ```
 
 Expected pass markers:
@@ -1206,13 +1206,13 @@ PLAYABLE SHIP SMOKE PASS
 Append Task 5 pass markers to `docs/superpowers/proofs/coherent-proof-ship.md`, then run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add \
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add \
     scripts/validation/coherent_playable_traversal_smoke.gd \
     docs/superpowers/proofs/coherent-proof-ship.md
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "test: verify coherent proof ship traversal"
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "test: verify coherent proof ship traversal"
 else
-  printf '%s\n' 'NO_GIT Task 5 changed: scripts/validation/coherent_playable_traversal_smoke.gd docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/sargasso_coherent_proof_ship_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 5 changed: scripts/validation/coherent_playable_traversal_smoke.gd docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/synapse_sea_coherent_proof_ship_no_git_changes.log
 fi
 ```
 
@@ -1221,8 +1221,8 @@ fi
 ### Task 6: Add fresh in-engine capture for the coherent proof ship
 
 **Files:**
-- Create: `/Users/christopherwilloughby/the-sargasso-of-stars/scripts/validation/coherent_proof_ship_capture.gd`
-- Modify: `/Users/christopherwilloughby/the-sargasso-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
+- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/coherent_proof_ship_capture.gd`
+- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
 
 **Interfaces:**
 - Consumes: `res://scenes/procgen/playable_coherent_ship.tscn`.
@@ -1262,7 +1262,7 @@ Run:
 ```bash
 mkdir -p /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/coherent_proof_ship_capture.gd \
   -- \
   --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/coherent_proof_ship_viewport.png \
@@ -1313,13 +1313,13 @@ The capture must read as one connected derelict ship area, not disconnected boxe
 Append capture command, pass marker, PNG metadata, and human review note to `docs/superpowers/proofs/coherent-proof-ship.md`, then run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add \
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add \
     scripts/validation/coherent_proof_ship_capture.gd \
     docs/superpowers/proofs/coherent-proof-ship.md
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "test: capture coherent proof ship viewport"
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "test: capture coherent proof ship viewport"
 else
-  printf '%s\n' 'NO_GIT Task 6 changed: scripts/validation/coherent_proof_ship_capture.gd docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/sargasso_coherent_proof_ship_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 6 changed: scripts/validation/coherent_proof_ship_capture.gd docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/synapse_sea_coherent_proof_ship_no_git_changes.log
 fi
 ```
 
@@ -1328,7 +1328,7 @@ fi
 ### Task 7: Run final regression bundle and document acceptance
 
 **Files:**
-- Modify: `/Users/christopherwilloughby/the-sargasso-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
+- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
 
 **Interfaces:**
 - Consumes all validation scripts and fixtures from Tasks 1–6.
@@ -1349,7 +1349,7 @@ for script in \
   echo "=== $script ==="
   /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
     --headless \
-    --path /Users/christopherwilloughby/the-sargasso-of-stars \
+    --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
     --script "$script"
 done
 ```
@@ -1378,7 +1378,7 @@ for script in \
   echo "=== $script ==="
   /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
     --headless \
-    --path /Users/christopherwilloughby/the-sargasso-of-stars \
+    --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
     --script "$script"
 done
 ```
@@ -1429,11 +1429,11 @@ Append this checklist to `docs/superpowers/proofs/coherent-proof-ship.md` and ma
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add docs/superpowers/proofs/coherent-proof-ship.md
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "docs: record coherent proof ship acceptance"
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add docs/superpowers/proofs/coherent-proof-ship.md
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "docs: record coherent proof ship acceptance"
 else
-  printf '%s\n' 'NO_GIT Task 7 changed: docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/sargasso_coherent_proof_ship_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 7 changed: docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/synapse_sea_coherent_proof_ship_no_git_changes.log
 fi
 ```
 

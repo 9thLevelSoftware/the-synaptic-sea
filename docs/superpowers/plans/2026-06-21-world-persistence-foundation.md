@@ -4,7 +4,7 @@
 
 **Goal:** Make every visited ship persist and the whole world serializable at any instant (save anywhere), by wrapping the single-ship `RunSnapshot` in a new `WorldSnapshot` and replacing regenerate-on-revisit derelicts with persist-and-restore.
 
-**Architecture:** A new pure-data `WorldSnapshot` holds the `SargassoWorld` summary, the home ship's existing `RunSnapshot` (unchanged), a `visited_ships` registry of per-derelict slices keyed by `marker_id`, the current location, and the in-ship player position. The coordinator keeps a live `visited_ships: Dictionary` of `ShipInstance`s — only the active ship has a live `scene_root`; derelict geometry is regenerated deterministically from seed on revisit while mutable state rides the `ShipInstance` summaries. Save/load operate on the whole `WorldSnapshot`, removing the Phase 4.5 away-save rejection.
+**Architecture:** A new pure-data `WorldSnapshot` holds the `Synapse SeaWorld` summary, the home ship's existing `RunSnapshot` (unchanged), a `visited_ships` registry of per-derelict slices keyed by `marker_id`, the current location, and the in-ship player position. The coordinator keeps a live `visited_ships: Dictionary` of `ShipInstance`s — only the active ship has a live `scene_root`; derelict geometry is regenerated deterministically from seed on revisit while mutable state rides the `ShipInstance` summaries. Save/load operate on the whole `WorldSnapshot`, removing the Phase 4.5 away-save rejection.
 
 **Tech Stack:** Godot 4.6.2, typed GDScript, headless `--script` validation smokes (each prints a single PASS marker line that is the contract).
 
@@ -138,7 +138,7 @@ Create `scripts/systems/world_snapshot.gd`:
 extends RefCounted
 class_name WorldSnapshot
 
-## Top-level world save. Wraps the SargassoWorld summary, the home ship's
+## Top-level world save. Wraps the Synapse SeaWorld summary, the home ship's
 ## RunSnapshot (unchanged), a per-derelict slice registry keyed by marker_id,
 ## the player's current location, and the in-ship player position. Pure data;
 ## serialization-agnostic (SaveLoadService owns file I/O). Geometry is never
@@ -455,7 +455,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	_all_operational(playable.get_ship_systems_manager())
 
 	# Travel to derelict A.
-	var world = playable.get_sargasso_world()
+	var world = playable.get_synapse_sea_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
 	if in_range.size() < 1:
 		_fail("no markers in range of the home position")
@@ -719,7 +719,7 @@ git commit -m "feat(persistence): retain visited ships + persist-and-restore tra
 - Test: `scripts/validation/world_save_anywhere_smoke.gd`
 
 **Interfaces:**
-- Consumes: Task 1 `WorldSnapshotScript`; Task 2 `save_load_service.save_world()/load_world()`; Task 3 `visited_ships`, `home_ship`, `_home_player_position`, `_attach_derelict_active`; existing `_build_run_snapshot()`, `_apply_run_snapshot(snapshot)`, `RunSnapshotScript.from_dict(...)`, `sargasso_world.get_summary()/apply_summary()`, `ship_generator.generate(blueprint)`.
+- Consumes: Task 1 `WorldSnapshotScript`; Task 2 `save_load_service.save_world()/load_world()`; Task 3 `visited_ships`, `home_ship`, `_home_player_position`, `_attach_derelict_active`; existing `_build_run_snapshot()`, `_apply_run_snapshot(snapshot)`, `RunSnapshotScript.from_dict(...)`, `synapse_sea_world.get_summary()/apply_summary()`, `ship_generator.generate(blueprint)`.
 - Produces on the coordinator:
   - `const WorldSnapshotScript := preload("res://scripts/systems/world_snapshot.gd")` (top-of-file, with the other preloads).
   - `func _build_world_snapshot() -> WorldSnapshot`.
@@ -782,7 +782,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	_all_operational(playable.get_ship_systems_manager())
 
 	# Travel to a derelict and mutate its systems to a recognisable state.
-	var world = playable.get_sargasso_world()
+	var world = playable.get_synapse_sea_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
 	if in_range.is_empty():
 		_fail("no markers in range")
@@ -905,8 +905,8 @@ Add these near `_build_run_snapshot` / `_apply_run_snapshot` (e.g. after `_apply
 ## active ship.
 func _build_world_snapshot() -> WorldSnapshot:
 	var ws := WorldSnapshotScript.new()
-	if sargasso_world != null:
-		ws.world_summary = sargasso_world.get_summary()
+	if synapse_sea_world != null:
+		ws.world_summary = synapse_sea_world.get_summary()
 	var home_snap = _build_run_snapshot()
 	if home_snap != null:
 		if away_from_start:
@@ -939,7 +939,7 @@ func _activate_derelict_from_instance(inst, pos_in_ship: Array) -> bool:
 	return true
 
 ## Applies a WorldSnapshot: rebuilds the home ship first (this resets the runtime
-## and returns to home if currently away), restores the SargassoWorld and the
+## and returns to home if currently away), restores the Synapse SeaWorld and the
 ## visited-ships registry, then re-activates the saved derelict if the snapshot
 ## was taken aboard one. Returns false on any hard failure.
 func _apply_world_snapshot(ws: WorldSnapshot) -> bool:
@@ -955,8 +955,8 @@ func _apply_world_snapshot(ws: WorldSnapshot) -> bool:
 		return false
 	# 2. World model. _apply_run_snapshot reset us to the home ship; home_ship is
 	#    re-wrapped by _on_ship_loaded during that reload.
-	if sargasso_world != null and not ws.world_summary.is_empty():
-		sargasso_world.apply_summary(ws.world_summary)
+	if synapse_sea_world != null and not ws.world_summary.is_empty():
+		synapse_sea_world.apply_summary(ws.world_summary)
 	# 3. Rebuild the retained-derelict registry from the slices.
 	visited_ships.clear()
 	for mid in ws.visited_ships:
@@ -1094,7 +1094,7 @@ repair) and saving to work anywhere (Project-Zomboid style).
 
 ## Decision
 
-Introduce `WorldSnapshot` (RefCounted, pure data): wraps the `SargassoWorld`
+Introduce `WorldSnapshot` (RefCounted, pure data): wraps the `Synapse SeaWorld`
 summary, the home ship's unchanged `RunSnapshot`, a `visited_ships` registry of
 per-derelict slices keyed by `marker_id`, the `current_location`, and the in-ship
 player position. The coordinator keeps a live `visited_ships: Dictionary` of
@@ -1132,7 +1132,7 @@ run_clean "world_persist_restore" "res://scripts/validation/world_persist_restor
 run_clean "world_save_anywhere" "res://scripts/validation/world_save_anywhere_smoke.gd" "WORLD SAVE ANYWHERE PASS away_save=true location_restored=true state_restored=true home_save=true"
 ```
 
-(That is four `run_clean` lines — `world_snapshot`, `world_save_service`, `world_persist_restore`, `world_save_anywhere` — taking the count from 61 to 65. Update the final success line's expected count accordingly: `SARGASSO REGRESSION PASS commands=65 clean_output=true`. Read the bundle's actual count line and increment by 4 from whatever it currently reads.)
+(That is four `run_clean` lines — `world_snapshot`, `world_save_service`, `world_persist_restore`, `world_save_anywhere` — taking the count from 61 to 65. Update the final success line's expected count accordingly: `SYNAPSE_SEA REGRESSION PASS commands=65 clean_output=true`. Read the bundle's actual count line and increment by 4 from whatever it currently reads.)
 
 - [ ] **Step 3: Update the allowlist for the new expected warning**
 
@@ -1141,7 +1141,7 @@ In `docs/game/06_validation_plan.md`, the `world_save_service` smoke deliberatel
 - [ ] **Step 4: Run the FULL regression bundle**
 
 Run the bundle block from `docs/game/06_validation_plan.md` with the Windows `GODOT`/`ROOT` env values set (per CLAUDE.md). 
-Expected final line: `SARGASSO REGRESSION PASS commands=65 clean_output=true` (or the correct incremented count), with no unexpected `ERROR:`/`WARNING:` lines.
+Expected final line: `SYNAPSE_SEA REGRESSION PASS commands=65 clean_output=true` (or the correct incremented count), with no unexpected `ERROR:`/`WARNING:` lines.
 
 - [ ] **Step 5: Run the automated Gate-1 playtest**
 

@@ -7,13 +7,13 @@
 | Date | 2026-06-19 (UTC) |
 | Run timestamp | 2026-06-19T19:57:06Z |
 | Godot | 4.6.2.stable.official.71f334935 at `/Users/christopherwilloughby/.local/bin/godot-4.6.2` |
-| Project | `/Users/christopherwilloughby/the-sargasso-of-stars` |
+| Project | `/Users/christopherwilloughby/the-synapse-sea-of-stars` |
 | Bundle source | `docs/game/06_validation_plan.md` (Regression bundle, 8 commands) |
 | Pass / fail | **8 / 0** |
 | Clean output | **true** (no unfiltered `ERROR:`/`WARNING:` lines) |
 | Decision | **PASS** — bundle green, ready for the next Gate 1 evidence step |
 
-**Result line:** `SARGASSO REGRESSION PASS commands=8 clean_output=true`
+**Result line:** `SYNAPSE_SEA REGRESSION PASS commands=8 clean_output=true`
 
 ## Full command
 
@@ -28,7 +28,7 @@ Per-smoke commands (8):
 
 ```bash
 GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
-ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
+ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
 
 $GODOT --headless --path "$ROOT" --script res://scripts/validation/route_control_state_smoke.gd
 $GODOT --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
@@ -113,7 +113,7 @@ Regression prerequisite: docs/game/playtests/gate-1-regression-2026-06-19.md (PA
 
 ## Workspace state
 
-The Sargasso project root is not a git repository
+The Synapse Sea project root is not a git repository
 (`git status` returns "fatal: not a git repository"). Per
 `AGENTS.md §Operating model`, the no-git ledger is updated via
 `docs/` artifacts like this one. No source files were modified

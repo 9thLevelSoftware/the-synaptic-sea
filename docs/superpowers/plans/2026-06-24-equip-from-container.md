@@ -17,7 +17,7 @@
 - **Both edited smokes use `assert()` (existing style) — match it.** A failed `assert` does NOT abort a `--script` SceneTree run (it prints `Assertion failed: …` and execution continues to the PASS marker). So a smoke's RED state shows an `Assertion failed:`/runtime-error line and (for a missing method) no PASS marker; GREEN shows the PASS marker and no `Assertion failed:`/`SCRIPT ERROR` line.
 - **Marker contracts:** `inventory_selection_model_smoke` keeps `INVENTORY SELECTION MODEL SMOKE PASS …`; `inventory_widget_smoke` extends its marker to `INVENTORY WIDGET SMOKE PASS section_a=true section_b=true section_c=true` (the bundle greps the `INVENTORY WIDGET SMOKE PASS` prefix, so this still matches). Both smokes are already bundle-registered → the bundle total stays **commands=119** (no new smoke).
 - **Never stage/commit** `project.godot`, `.godot/`, `*.uid`, `addons/`. Selective `git add <explicit paths>` only.
-- **Full bundle** must end `SARGASSO REGRESSION PASS commands=119 clean_output=true`; stash `project.godot` before the run, pop after.
+- **Full bundle** must end `SYNAPSE_SEA REGRESSION PASS commands=119 clean_output=true`; stash `project.godot` before the run, pop after.
 - Godot binary: `C:/Users/dasbl/Documents/Godot/Godot_v4.6.2-stable_win64_console.exe`. Project root: `C:/Users/dasbl/Documents/The Synaptic Sea`. Branch: `equip-from-container`.
 
 ---
@@ -419,7 +419,7 @@ status=$?
 git stash pop
 echo "bundle exit=$status"
 ```
-Expected final line: `SARGASSO REGRESSION PASS commands=119 clean_output=true`. (If `git stash push` reports "No local changes to save," skip the `git stash pop`.) If the bundle does not end with that exact line, STOP and report BLOCKED with the failing output — do not edit unrelated smokes.
+Expected final line: `SYNAPSE_SEA REGRESSION PASS commands=119 clean_output=true`. (If `git stash push` reports "No local changes to save," skip the `git stash pop`.) If the bundle does not end with that exact line, STOP and report BLOCKED with the failing output — do not edit unrelated smokes.
 
 - [ ] **Step 5: Commit**
 

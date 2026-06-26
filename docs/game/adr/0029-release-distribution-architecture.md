@@ -9,7 +9,7 @@ Relates to: ADR-0007 (save/load boundary), ADR-0012 (world persistence),
 
 ## Context
 
-The Sargasso reached Gate 2 with working gameplay but no production-readiness
+The Synapse Sea reached Gate 2 with working gameplay but no production-readiness
 plumbing. Every shipping concern was implicit:
 
 - `export_presets.cfg` had four presets but no validator — a bad path would only

@@ -1,7 +1,7 @@
 # Save/Load Persistence Package — Contract and Gap Review
 
 Package: `docs/game/build-plans/11-save-load-persistence-e2e.md`
-Author: sargassoworker (Task 11, board `synaptic-sea-e2e-systems`)
+Author: synapse_seaworker (Task 11, board `synaptic-sea-e2e-systems`)
 Date: 2026-06-25
 
 ## Existing seams to extend (not replace)
@@ -22,7 +22,7 @@ Date: 2026-06-25
 
 | Path | Role |
 |---|---|
-| `scripts/systems/save_slot_state.gd` | Pure data class representing one row in the save index. `slot_id`, `slot_kind` ("manual"/"auto"/"quick"/"world"), `display_name`, `sargasso_seed`, `player_class`, `current_location`, `objective_sequence`, `play_time_seconds`, `saved_at`, `world_slot_id` (for embedded ship slots inside a world), `corrupt` (bool). |
+| `scripts/systems/save_slot_state.gd` | Pure data class representing one row in the save index. `slot_id`, `slot_kind` ("manual"/"auto"/"quick"/"world"), `display_name`, `synapse_sea_seed`, `player_class`, `current_location`, `objective_sequence`, `play_time_seconds`, `saved_at`, `world_slot_id` (for embedded ship slots inside a world), `corrupt` (bool). |
 | `scripts/systems/save_index_state.gd` | Pure data class representing the on-disk index file (`user://saves/index.json`). `version`, `godot_version`, `updated_at`, `slots: Array[Dictionary]`. |
 | `scripts/systems/save_migration_service.gd` | Pure model. Owns the migration table. Each entry maps `from_version -> to_version` and applies a transform on a parsed Dictionary. `migrate(parsed, from_version) -> {dict, to_version}` is deterministic. |
 | `scripts/systems/autosave_policy.gd` | Pure model. Tracks last autosave wall-clock + game-time + scene-tick + event-count. `tick(seconds, event_count) -> bool` returns true when a save should fire. Owns the autosave-slot rotation (current/previous/older) and a 5-second minimum-interval budget. |

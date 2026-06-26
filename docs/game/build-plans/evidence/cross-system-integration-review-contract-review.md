@@ -2,7 +2,7 @@
 
 Task: `t_12bf9f4a`
 Plan: `docs/game/build-plans/14-cross-system-integration-review-e2e.md`
-Reviewer: `sargassoreview` / GPT-5.5
+Reviewer: `synapse_seareview` / GPT-5.5
 
 ## Existing files read
 

@@ -65,7 +65,7 @@ func _build_layout(room_count: int, with_critical_path: bool) -> Dictionary:
 func _initialize() -> void:
 	# --- Case 1: Standard biome + standard difficulty produces few markers ---
 	var layout_std: Dictionary = _build_layout(6, true)
-	var biome_std = BiomeProfileScript.from_dict({"id": "abyssal_sargasso"})
+	var biome_std = BiomeProfileScript.from_dict({"id": "abyssal_synapse_sea"})
 	var diff_std = DifficultyProfileScript.from_dict({"id": "standard"})
 	var injector_std: RefCounted = EncounterInjectorScript.new()
 	injector_std.inject(layout_std, biome_std, diff_std, 314)

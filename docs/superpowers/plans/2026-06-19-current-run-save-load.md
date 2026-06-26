@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Project root: `/Users/christopherwilloughby/the-sargasso-of-stars`.
+- Project root: `/Users/christopherwilloughby/the-synapse-sea-of-stars`.
 - Godot binary: `/Users/christopherwilloughby/.local/bin/godot-4.6.2`.
 - Workspace state checked on 2026-06-19: `GIT_INSIDE=false`.
 - Do not create HTML, PNG, contact sheets, screenshot galleries, or proof documents for this milestone.
@@ -21,7 +21,7 @@
 - The dependent models (`InventoryState`, `FireState`, `ObjectiveProgressState`) may not exist when this plan is written. The plan defines their `apply_summary()` contract; if a model is missing, implement a minimal stub version only for the save/load round-trip to compile, and leave full model behavior to the REQ-007/010/011 implement cards.
 - Preserve existing objective sequence and validation seams: `complete_objective_sequence_for_validation()`, `complete_all_objectives_for_validation()`, and existing smokes must keep working.
 - Output from validation commands must be clean of unexpected lines beginning with `ERROR:` or `WARNING:`.
-- Because this is not a git repository, every task uses the no-git ledger fallback at `/tmp/sargasso_save_load_no_git_changes.log` instead of assuming `git commit` works.
+- Because this is not a git repository, every task uses the no-git ledger fallback at `/tmp/synapse_sea_save_load_no_git_changes.log` instead of assuming `git commit` works.
 
 ---
 
@@ -322,7 +322,7 @@ func _fail(reason: String) -> void:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/save_load_service_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/save_load_service_smoke.gd
 ```
 
 Expected red result:
@@ -336,7 +336,7 @@ Expected red result:
 Run:
 
 ```bash
-printf '%s\n' 'NO_GIT Task 1 RED save_load_service_smoke added and failed for missing service: scripts/validation/save_load_service_smoke.gd' >> /tmp/sargasso_save_load_no_git_changes.log
+printf '%s\n' 'NO_GIT Task 1 RED save_load_service_smoke added and failed for missing service: scripts/validation/save_load_service_smoke.gd' >> /tmp/synapse_sea_save_load_no_git_changes.log
 ```
 
 ---
@@ -500,7 +500,7 @@ func has_save() -> bool:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/save_load_service_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/save_load_service_smoke.gd
 ```
 
 Expected green result:
@@ -514,7 +514,7 @@ Expected green result:
 Run:
 
 ```bash
-printf '%s\n' 'NO_GIT Task 2 GREEN RunSnapshot and SaveLoadService implemented; save_load_service_smoke passes' >> /tmp/sargasso_save_load_no_git_changes.log
+printf '%s\n' 'NO_GIT Task 2 GREEN RunSnapshot and SaveLoadService implemented; save_load_service_smoke passes' >> /tmp/synapse_sea_save_load_no_git_changes.log
 ```
 
 ---
@@ -670,7 +670,7 @@ func _cleanup_and_quit(code: int) -> void:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_save_load_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_save_load_smoke.gd
 ```
 
 Expected red result:
@@ -683,7 +683,7 @@ Expected red result:
 Run:
 
 ```bash
-printf '%s\n' 'NO_GIT Task 3 RED main_playable_slice_save_load_smoke added and failed for missing PlayableGeneratedShip hooks: scripts/validation/main_playable_slice_save_load_smoke.gd' >> /tmp/sargasso_save_load_no_git_changes.log
+printf '%s\n' 'NO_GIT Task 3 RED main_playable_slice_save_load_smoke added and failed for missing PlayableGeneratedShip hooks: scripts/validation/main_playable_slice_save_load_smoke.gd' >> /tmp/synapse_sea_save_load_no_git_changes.log
 ```
 
 ---
@@ -826,7 +826,7 @@ func apply_summary(summary: Dictionary) -> bool:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/save_load_service_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/save_load_service_smoke.gd
 ```
 
 Expected green result:
@@ -838,7 +838,7 @@ Expected green result:
 Run:
 
 ```bash
-printf '%s\n' 'NO_GIT Task 4 GREEN apply_summary() added to ShipSystemState, RouteControlState, OxygenState' >> /tmp/sargasso_save_load_no_git_changes.log
+printf '%s\n' 'NO_GIT Task 4 GREEN apply_summary() added to ShipSystemState, RouteControlState, OxygenState' >> /tmp/synapse_sea_save_load_no_git_changes.log
 ```
 
 ---
@@ -935,7 +935,7 @@ func apply_summary(summary: Dictionary) -> bool:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/save_load_service_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/save_load_service_smoke.gd
 ```
 
 Expected green result.
@@ -945,7 +945,7 @@ Expected green result.
 Run:
 
 ```bash
-printf '%s\n' 'NO_GIT Task 5 GREEN Gate 2 model stubs/contracts added for InventoryState, FireState, ObjectiveProgressState' >> /tmp/sargasso_save_load_no_git_changes.log
+printf '%s\n' 'NO_GIT Task 5 GREEN Gate 2 model stubs/contracts added for InventoryState, FireState, ObjectiveProgressState' >> /tmp/synapse_sea_save_load_no_git_changes.log
 ```
 
 ---
@@ -1158,8 +1158,8 @@ if save_load_service != null:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/save_load_service_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_save_load_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/save_load_service_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_save_load_smoke.gd
 ```
 
 Expected green result:
@@ -1173,7 +1173,7 @@ Expected green result:
 Run:
 
 ```bash
-printf '%s\n' 'NO_GIT Task 6 GREEN PlayableGeneratedShip save/load hooks implemented; both smokes pass' >> /tmp/sargasso_save_load_no_git_changes.log
+printf '%s\n' 'NO_GIT Task 6 GREEN PlayableGeneratedShip save/load hooks implemented; both smokes pass' >> /tmp/synapse_sea_save_load_no_git_changes.log
 ```
 
 ---
@@ -1190,7 +1190,7 @@ Patch `docs/game/06_validation_plan.md`:
 1. Add two `run_clean` lines to the bundle script after the readability smoke:
    - `run_clean 'save/load service smoke' 'SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=6' ...`
    - `run_clean 'main save/load smoke' 'MAIN PLAYABLE SAVE LOAD PASS saved_sequence=2 loaded_sequence=2 position_match=true supplies=true' ...`
-2. Update the final `SARGASSO REGRESSION PASS commands=N` line to count the new smokes.
+2. Update the final `SYNAPSE_SEA REGRESSION PASS commands=N` line to count the new smokes.
 3. Update the evidence-collection loop to include the two new smokes.
 4. Move the four lines under "Future validation additions" for REQ-007/010/011/012 into the active regression bundle as they are implemented; for REQ-012, remove or strike the bullet now that it is in the bundle.
 
@@ -1199,7 +1199,7 @@ Patch `docs/game/06_validation_plan.md`:
 Run:
 
 ```bash
-cd /Users/christopherwilloughby/the-sargasso-of-stars
+cd /Users/christopherwilloughby/the-synapse-sea-of-stars
 bash docs/game/06_validation_plan.md
 ```
 
@@ -1207,14 +1207,14 @@ bash docs/game/06_validation_plan.md
 
 Expected green result:
 
-- `SARGASSO REGRESSION PASS commands=N clean_output=true` where N reflects the new count.
+- `SYNAPSE_SEA REGRESSION PASS commands=N clean_output=true` where N reflects the new count.
 
 - [ ] **Step 3: Record the regression update**
 
 Run:
 
 ```bash
-printf '%s\n' 'NO_GIT Task 7 GREEN docs/game/06_validation_plan.md updated with save/load smokes; full regression bundle passes' >> /tmp/sargasso_save_load_no_git_changes.log
+printf '%s\n' 'NO_GIT Task 7 GREEN docs/game/06_validation_plan.md updated with save/load smokes; full regression bundle passes' >> /tmp/synapse_sea_save_load_no_git_changes.log
 ```
 
 ---
@@ -1239,7 +1239,7 @@ printf '%s\n' 'NO_GIT Task 7 GREEN docs/game/06_validation_plan.md updated with 
 
 ## Stop / Block Conditions
 
-Block and escalate to `sargassoreview` if:
+Block and escalate to `synapse_seareview` if:
 
 - ADR-0007 scope boundary is challenged by implementation needs.
 - Current-run persistence would need to expand into hub/cross-run/meta persistence to satisfy a downstream feature.
@@ -1252,19 +1252,19 @@ Block and escalate to `sargassoreview` if:
 Direct model smoke:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/save_load_service_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/save_load_service_smoke.gd
 ```
 
 Main-scene smoke:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_save_load_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_save_load_smoke.gd
 ```
 
 Regression bundle (after update):
 
 ```bash
-cd /Users/christopherwilloughby/the-sargasso-of-stars
+cd /Users/christopherwilloughby/the-synapse-sea-of-stars
 # Copy the regression bundle block from docs/game/06_validation_plan.md into a temp script and run it.
 ```
 
@@ -1272,7 +1272,7 @@ Expected markers:
 
 - `SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=6`
 - `MAIN PLAYABLE SAVE LOAD PASS saved_sequence=2 loaded_sequence=2 position_match=true supplies=true`
-- `SARGASSO REGRESSION PASS commands=N clean_output=true`
+- `SYNAPSE_SEA REGRESSION PASS commands=N clean_output=true`
 
 ## Allowed Files
 

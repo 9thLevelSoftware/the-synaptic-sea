@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the concrete work required to move the Sargasso of Stars build from Beta exit to Gate 5 (release candidate) entry. This document is the source of truth for RC tasks, owners, effort estimates, and stop conditions.
+Define the concrete work required to move the Synapse Sea build from Beta exit to Gate 5 (release candidate) entry. This document is the source of truth for RC tasks, owners, effort estimates, and stop conditions.
 
 ## Scope boundary
 
@@ -24,10 +24,10 @@ A headless, reproducible Godot export pipeline that produces signed/stamped buil
 
 | ID | Task | Owner | Effort | Stop condition |
 |---|---|---|---|---|
-| RC-001 | Install/configure Windows and macOS export templates for Godot 4.6.2. Verify offline export from CLI. | sargassoworker | 2h | Export fails with official templates on a clean machine. |
-| RC-002 | Create `scripts/export/build_release.sh` (or `.ps1`/`.bat` pair) that exports Windows and macOS executables, names artifacts with version + git-less build stamp, and exits non-zero on Godot export errors. | sargassoworker | 4h | Cannot produce deterministic artifact names without manual rename. |
-| RC-003 | Add export presets (`export_presets.cfg`) checked into the project with classified baseline warnings accepted. | sargassoworker | 1h | Preset file cannot be versioned without leaking local paths. |
-| RC-004 | Smoke-test the export by running the headless regression bundle against the exported executable (not just the editor). | sargassoreview | 2h | Exported build fails a smoke that passes in editor. |
+| RC-001 | Install/configure Windows and macOS export templates for Godot 4.6.2. Verify offline export from CLI. | synapse_seaworker | 2h | Export fails with official templates on a clean machine. |
+| RC-002 | Create `scripts/export/build_release.sh` (or `.ps1`/`.bat` pair) that exports Windows and macOS executables, names artifacts with version + git-less build stamp, and exits non-zero on Godot export errors. | synapse_seaworker | 4h | Cannot produce deterministic artifact names without manual rename. |
+| RC-003 | Add export presets (`export_presets.cfg`) checked into the project with classified baseline warnings accepted. | synapse_seaworker | 1h | Preset file cannot be versioned without leaking local paths. |
+| RC-004 | Smoke-test the export by running the headless regression bundle against the exported executable (not just the editor). | synapse_seareview | 2h | Exported build fails a smoke that passes in editor. |
 
 Platform targets for Gate 5:
 
@@ -39,10 +39,10 @@ Platform targets for Gate 5:
 
 | ID | Task | Owner | Effort | Stop condition |
 |---|---|---|---|---|
-| RC-005 | Create itch.io project page structure (draft title, summary, genre, tags, cover image placeholder, build channels). | sargassodocs | 2h | itch.io project cannot be created or requires paid tier. |
-| RC-006 | Define butler upload workflow: command, API key handling, channel naming (`win-rc`, `mac-rc`), and rollback plan. | sargassoworker | 2h | Butler unavailable or key cannot be stored outside repo. |
-| RC-007 | Verify EULA/privacy notice draft covers save-file location and no third-party telemetry. | sargassodocs | 1h | Legal text cannot be sourced. |
-| RC-008 | Create Steamworks stretch checklist (app ID, depot config, Steam Input, achievements, build upload) but do **not** block Gate 5 on it. | sargassodocs | 2h | Steamworks checklist would require implementation beyond documentation. |
+| RC-005 | Create itch.io project page structure (draft title, summary, genre, tags, cover image placeholder, build channels). | synapse_seadocs | 2h | itch.io project cannot be created or requires paid tier. |
+| RC-006 | Define butler upload workflow: command, API key handling, channel naming (`win-rc`, `mac-rc`), and rollback plan. | synapse_seaworker | 2h | Butler unavailable or key cannot be stored outside repo. |
+| RC-007 | Verify EULA/privacy notice draft covers save-file location and no third-party telemetry. | synapse_seadocs | 1h | Legal text cannot be sourced. |
+| RC-008 | Create Steamworks stretch checklist (app ID, depot config, Steam Input, achievements, build upload) but do **not** block Gate 5 on it. | synapse_seadocs | 2h | Steamworks checklist would require implementation beyond documentation. |
 
 Gate 5 hard requirement: itch.io RC channel is uploadable. Steam is a post-Gate-5 follow-up tracked separately.
 
@@ -52,23 +52,23 @@ A full validation sweep run against the release-exported build, not the editor, 
 
 | ID | Task | Owner | Effort | Stop condition |
 |---|---|---|---|---|
-| RC-009 | Run `docs/game/06_validation_plan.md` regression bundle on the exported Windows build and record results. | sargassoreview | 2h | Exported build fails regression bundle smoke that passes in editor. |
-| RC-010 | Run the same regression bundle on the exported macOS build and record results. | sargassoreview | 2h | macOS export cannot run headless smokes. |
-| RC-011 | Perform a manual fresh-player sanity pass on each platform: start new run, complete one objective, save/load, reach extraction or abort. | sargassoreview | 3h | Manual pass reveals a crash or soft-lock not caught by smokes. |
-| RC-012 | Classify and accept any remaining Godot `ERROR:`/`WARNING:` lines in the RC regression report. | sargassoreview | 1h | New unclassified error or warning appears in RC build. |
-| RC-013 | Verify save-file path (`user://saves/current_run.json`) is created/cleared correctly in installed builds on both platforms. | sargassoworker | 1h | Save path is wrong or permissions fail on installed build. |
+| RC-009 | Run `docs/game/06_validation_plan.md` regression bundle on the exported Windows build and record results. | synapse_seareview | 2h | Exported build fails regression bundle smoke that passes in editor. |
+| RC-010 | Run the same regression bundle on the exported macOS build and record results. | synapse_seareview | 2h | macOS export cannot run headless smokes. |
+| RC-011 | Perform a manual fresh-player sanity pass on each platform: start new run, complete one objective, save/load, reach extraction or abort. | synapse_seareview | 3h | Manual pass reveals a crash or soft-lock not caught by smokes. |
+| RC-012 | Classify and accept any remaining Godot `ERROR:`/`WARNING:` lines in the RC regression report. | synapse_seareview | 1h | New unclassified error or warning appears in RC build. |
+| RC-013 | Verify save-file path (`user://saves/current_run.json`) is created/cleared correctly in installed builds on both platforms. | synapse_seaworker | 1h | Save path is wrong or permissions fail on installed build. |
 
 ### 4. What release notes format?
 
 | ID | Task | Owner | Effort | Stop condition |
 |---|---|---|---|---|
-| RC-014 | Create `docs/game/release_notes/RC_v0.1.0.md` using the release-notes template (see below). | sargassodocs | 1h | Cannot identify which Alpha/Beta changes belong in v0.1.0. |
-| RC-015 | Add a player-facing `CHANGELOG.txt` packaged next to the executable with the same content trimmed to player-relevant items. | sargassodocs | 1h | Build script cannot copy the file into the export. |
+| RC-014 | Create `docs/game/release_notes/RC_v0.1.0.md` using the release-notes template (see below). | synapse_seadocs | 1h | Cannot identify which Alpha/Beta changes belong in v0.1.0. |
+| RC-015 | Add a player-facing `CHANGELOG.txt` packaged next to the executable with the same content trimmed to player-relevant items. | synapse_seadocs | 1h | Build script cannot copy the file into the export. |
 
 Release-notes template:
 
 ```markdown
-# Sargasso of Stars v0.1.0 — Release Candidate
+# Synapse Sea v0.1.0 — Release Candidate
 
 ## Build info
 - Version: v0.1.0
@@ -101,9 +101,9 @@ Release-notes template:
 
 | ID | Task | Owner | Effort | Stop condition |
 |---|---|---|---|---|
-| RC-016 | Create `docs/game/postmortem/postmortem_template.md` covering scope, schedule, quality, process, and actionable improvements. | sargassodocs | 1h | Template is rejected by coordinator. |
+| RC-016 | Create `docs/game/postmortem/postmortem_template.md` covering scope, schedule, quality, process, and actionable improvements. | synapse_seadocs | 1h | Template is rejected by coordinator. |
 | RC-017 | Schedule the Gate 5 exit review meeting and assign note-taker. | default | 0.5h | Cannot schedule within one week of RC build. |
-| RC-018 | Populate the postmortem with preliminary notes during Beta exit so it is not written from memory after release. | sargassodocs | 1h | No Beta exit data available. |
+| RC-018 | Populate the postmortem with preliminary notes during Beta exit so it is not written from memory after release. | synapse_seadocs | 1h | No Beta exit data available. |
 
 Postmortem template sections:
 

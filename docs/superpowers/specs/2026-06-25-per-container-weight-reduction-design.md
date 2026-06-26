@@ -215,7 +215,7 @@ assertion prints no PASS marker.
 Each smoke runs headless via the Godot console binary; trust the PASS marker, not
 the exit code. After implementation, run the full regression bundle (stash
 `project.godot` first, pop after) and confirm
-`SARGASSO REGRESSION PASS commands=120 clean_output=true`.
+`SYNAPSE_SEA REGRESSION PASS commands=120 clean_output=true`.
 
 ## Edge cases & risks
 
@@ -252,5 +252,5 @@ the exit code. After implementation, run the full regression bundle (stash
 - Coordinator pushes `weight_reduction` in `_recompute_player_encumbrance`.
 - Vitals Load line shows `(bags -Nkg)` when reduction is active.
 - All six smokes extended and green; full bundle
-  `SARGASSO REGRESSION PASS commands=120 clean_output=true`.
+  `SYNAPSE_SEA REGRESSION PASS commands=120 clean_output=true`.
 - ADR-0028 + roadmap System 6 row updated.

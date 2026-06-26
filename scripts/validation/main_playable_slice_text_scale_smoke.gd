@@ -88,7 +88,7 @@ func _validate_default_scale(playable: PlayableGeneratedShip) -> void:
 		return
 	# HUD text still sourced from runtime state (not hard-coded).
 	var hud_text: String = tracker.get_hud_text()
-	if not hud_text.contains("Sargasso First Playable"):
+	if not hud_text.contains("Synapse Sea First Playable"):
 		_fail("default: HUD missing runtime title: %s" % hud_text)
 		return
 	if not hud_text.contains("Current:"):

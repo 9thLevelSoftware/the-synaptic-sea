@@ -2,7 +2,7 @@
 
 Date: 2026-06-21
 Status: Approved for implementation
-Parent spec: `docs/superpowers/specs/2026-06-20-sargasso-core-systems-design.md` (System 3)
+Parent spec: `docs/superpowers/specs/2026-06-20-synapse-sea-core-systems-design.md` (System 3)
 Relates to: ADR-0007 (save/load scope — amended by a new ADR), ADR-0008 (ship-systems), ADR-0002/0003 (meta deferral — NOT touched)
 
 ---
@@ -203,7 +203,7 @@ The live game cannot run `repair()` end-to-end until Phase 6 supplies parts/tool
    raises `repair` XP (and the HUD shows `Repair Skill:`); save/load round-trips the progression
    summary (loaded skills/xp equal saved).
 5. Register all four in the regression bundle (`docs/game/06_validation_plan.md`), `commands=50`→`54`.
-   Full bundle must end `SARGASSO REGRESSION PASS ... clean_output=true`; Gate-1 playtest still passes.
+   Full bundle must end `SYNAPSE_SEA REGRESSION PASS ... clean_output=true`; Gate-1 playtest still passes.
 
 ---
 

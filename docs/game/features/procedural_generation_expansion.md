@@ -38,7 +38,7 @@ is a **seed-deterministic** composition of:
    `cargo:refrigerated`) drawn deterministically from a per-role
    variant list seeded by the blueprint.
 3. **Biome profile**: each ship carries a biome id
-   (`abyssal_sargasso`, `breach_field`, `dead_fleet`). Biome
+   (`abyssal_synapse_sea`, `breach_field`, `dead_fleet`). Biome
    modifiers scale hazard density, loot quality, encounter density,
    and lighting ambience. Modifiers are stored as numeric floats in
    `[0.0, 2.0]`; composition with difficulty is multiplicative.
@@ -118,7 +118,7 @@ Each biome JSON declares:
 
 Initial biome set:
 
-- `abyssal_sargasso` — standard; deep-sea baseline.
+- `abyssal_synapse_sea` — standard; deep-sea baseline.
 - `breach_field` — many oxygen breaches; high hazard density; cold
   blue ambient.
 - `dead_fleet` — many derelicts; high loot quality; warm orange

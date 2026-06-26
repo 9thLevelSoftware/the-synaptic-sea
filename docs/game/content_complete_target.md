@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define what "content complete" means for Sargasso Alpha so Gate 3 exit criteria and Gate 4 Beta entry criteria are unambiguous. This document is the source of truth for Alpha scope; any new content category introduced after it is approved must either fit inside these targets or trigger a gate re-decision.
+Define what "content complete" means for Synapse Sea Alpha so Gate 3 exit criteria and Gate 4 Beta entry criteria are unambiguous. This document is the source of truth for Alpha scope; any new content category introduced after it is approved must either fit inside these targets or trigger a gate re-decision.
 
 ## Scope boundary
 

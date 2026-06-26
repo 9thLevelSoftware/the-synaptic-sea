@@ -14,7 +14,7 @@ extends SceneTree
 #
 # Headless:
 #   /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless
-#     --path /Users/christopherwilloughby/the-sargasso-of-stars
+#     --path /Users/christopherwilloughby/the-synapse-sea-of-stars
 #     --script res://scripts/validation/main_playable_slice_arc_smoke.gd
 
 const PlayableShipScript := preload("res://scripts/procgen/playable_generated_ship.gd")

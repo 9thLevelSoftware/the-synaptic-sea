@@ -10,7 +10,7 @@ extends SceneTree
 #      layout JSON output and the same FNV-1a hash.
 #   4. Same input with two different seeds produces different hashes.
 #   5. The recorded golden hash for seed=314 + Medium Cruiser +
-#      abyssal_sargasso + standard matches across runs.
+#      abyssal_synapse_sea + standard matches across runs.
 #
 # Marker:
 #   SEED DETERMINISM PASS fnv_empty=ok fnv_hello=ok match=true golden_match=true seeds_differ=true hash=<hex>
@@ -59,7 +59,7 @@ func _initialize() -> void:
 		"max_duplicates": 2,
 	}
 	var result: Dictionary = SeedDeterminismContractScript.assert_layout_match(
-		blueprint, archetype, "abyssal_sargasso", "standard")
+		blueprint, archetype, "abyssal_synapse_sea", "standard")
 	if not result.get("match", false):
 		push_error("SEED DETERMINISM FAIL pipeline mismatch: byte_equal=%s hash_a=%d hash_b=%d diff=%d" % [
 			str(result.get("byte_equal", false)),
@@ -76,7 +76,7 @@ func _initialize() -> void:
 		ShipBlueprintScript.Condition.PRISTINE,
 		99999)
 	var result_seeded: Dictionary = SeedDeterminismContractScript.assert_layout_match(
-		blueprint_b, archetype, "abyssal_sargasso", "standard")
+		blueprint_b, archetype, "abyssal_synapse_sea", "standard")
 	if int(result.get("hash_a", 0)) == int(result_seeded.get("hash_a", 0)):
 		push_error("SEED DETERMINISM FAIL different seeds produced same hash=%d" % int(result.get("hash_a", 0)))
 		quit(1)
@@ -102,12 +102,12 @@ func _initialize() -> void:
 		"role_weights": {"corridor": 3, "cargo": 4, "crew_quarters": 2},
 	}
 	var golden_record: Dictionary = SeedDeterminismContractScript.record_golden(
-		golden_blueprint, golden_archetype, "abyssal_sargasso", "standard")
+		golden_blueprint, golden_archetype, "abyssal_synapse_sea", "standard")
 	var golden_hash: int = int(golden_record.get("golden_hash", 0))
 
 	# Run the contract again and verify the hash matches.
 	var golden_match: Dictionary = SeedDeterminismContractScript.assert_layout_match(
-		golden_blueprint, golden_archetype, "abyssal_sargasso", "standard")
+		golden_blueprint, golden_archetype, "abyssal_synapse_sea", "standard")
 	if int(golden_match.get("hash_a", 0)) != golden_hash:
 		push_error("SEED DETERMINISM FAIL golden drift: recorded=%d re-derived=%d" % [
 			golden_hash, int(golden_match.get("hash_a", 0))])

@@ -20,7 +20,7 @@
 
 ## Session loop
 
-1. Choose a target derelict or route through the Sargasso.
+1. Choose a target derelict or route through the Synapse Sea.
 2. Prepare based on known risks/resources.
 3. Explore a generated ship slice.
 4. Complete core objectives or abort.

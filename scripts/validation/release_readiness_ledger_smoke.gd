@@ -71,7 +71,7 @@ func _initialize() -> void:
 	if ledger.record_external_evidence(first_check, "pass", ""):
 		_fail("external evidence with empty evidence_path should be rejected")
 		return
-	if not ledger.record_external_evidence(first_check, "pass", "build/release/sargasso-of-stars-v0.1.0-web.zip"):
+	if not ledger.record_external_evidence(first_check, "pass", "build/release/synapse-sea-of-stars-v0.1.0-web.zip"):
 		_fail("external evidence with valid evidence_path should be accepted")
 		return
 

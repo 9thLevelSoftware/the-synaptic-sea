@@ -67,7 +67,7 @@ change. Default text scale (1.0) must leave every pixel identical to today.
   (`ship_inventory_smoke`'s `weight=` is only its own PASS-marker string).
 - **`main_playable_slice_hud_smoke.gd`**: asserts the tracker is parented through
   the `CanvasLayer`, sized correctly, and that `get_hud_text()` contains
-  `Sargasso First Playable`, `Current: 01 Recover Supplies`, the Controls line,
+  `Synapse Sea First Playable`, `Current: 01 Recover Supplies`, the Controls line,
   and `Progress: 0/4`. Marker `MAIN PLAYABLE SLICE HUD PASS …`. **Not** in the
   regression bundle.
 - **`main_playable_slice_text_scale_smoke.gd`**: instantiates the main scene and
@@ -76,7 +76,7 @@ change. Default text scale (1.0) must leave every pixel identical to today.
   asserting the tracker font + `custom_minimum_size` and world-label `pixel_size`.
   Marker `MAIN PLAYABLE TEXT SCALE PASS …`. Already in the bundle.
 - **Regression bundle** (`docs/game/06_validation_plan.md`): tail marker
-  `SARGASSO REGRESSION PASS commands=119 clean_output=true`.
+  `SYNAPSE_SEA REGRESSION PASS commands=119 clean_output=true`.
 
 ## Decisions
 

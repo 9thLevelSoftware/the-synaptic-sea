@@ -942,7 +942,7 @@ Rewrite `travel_to` (1459-1517): keep the `travel_controller.attempt_travel` pre
 
 ```gdscript
 func travel_to(marker) -> Dictionary:
-	if current_ship == null or sargasso_world == null or travel_controller == null or ship_generator == null:
+	if current_ship == null or synapse_sea_world == null or travel_controller == null or ship_generator == null:
 		return {"success": false, "reason": "not_ready", "ship": null}
 	# Precondition: the player must be aboard the piloted ship to travel (the ride
 	# takes them with it). Occupancy is authoritative.
@@ -951,7 +951,7 @@ func travel_to(marker) -> Dictionary:
 		return {"success": false, "reason": "not_aboard_ship", "ship": null}
 	var ops_t: Dictionary = {"propulsion": bool(_current_systems_ops().get("propulsion", false))}
 	var result: Dictionary = travel_controller.attempt_travel(
-		marker, ops_t, sargasso_world, ship_generator, scanner_state.range_radius)
+		marker, ops_t, synapse_sea_world, ship_generator, scanner_state.range_radius)
 	if not bool(result.get("success", false)):
 		return result
 	var new_root: Node3D = result.get("ship", null)
@@ -1426,11 +1426,11 @@ In `docs/game/06_validation_plan.md`: add `run_clean` lines for the 7 new smokes
 GODOT="C:/Users/dasbl/Documents/Godot/Godot_v4.6.2-stable_win64_console.exe"
 ROOT="C:/Users/dasbl/Documents/The Synaptic Sea"
 git stash push -- project.godot
-sed -n '30,160p' "$ROOT/docs/game/06_validation_plan.md" > /tmp/sargasso_bundle.sh
-GODOT="$GODOT" ROOT="$ROOT" bash /tmp/sargasso_bundle.sh
+sed -n '30,160p' "$ROOT/docs/game/06_validation_plan.md" > /tmp/synapse_sea_bundle.sh
+GODOT="$GODOT" ROOT="$ROOT" bash /tmp/synapse_sea_bundle.sh
 git stash pop
 ```
-Expected final line: `SARGASSO REGRESSION PASS commands=88 clean_output=true`. (Adjust the `sed` range if the bundle script block moved after editing the doc.)
+Expected final line: `SYNAPSE_SEA REGRESSION PASS commands=88 clean_output=true`. (Adjust the `sed` range if the bundle script block moved after editing the doc.)
 
 - [ ] **Step 5: Run Gate-1**
 

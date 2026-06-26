@@ -131,13 +131,13 @@ All current objectives are single interactions with identical verb usage. Gate 2
 
 - Direct model smoke:
   ```bash
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/objective_progress_state_smoke.gd
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/objective_progress_state_smoke.gd
   ```
   Expected marker: `OBJECTIVE PROGRESS STATE PASS sequence=2 required=2 completed=2 applied_once=true`
 
 - Main-scene smoke:
   ```bash
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_objective_variation_smoke.gd
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_objective_variation_smoke.gd
   ```
   Expected marker: `MAIN PLAYABLE OBJECTIVE VARIATION PASS sequence=2 steps=2 complete=true power_restored=true gates_opened=true`
 

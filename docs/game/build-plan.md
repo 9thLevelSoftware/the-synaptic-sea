@@ -17,9 +17,9 @@ Generated: 2026-06-25T19:59:51-04:00
 - Subagent coverage reviews for Tasks 1-5, 6-8/12, and 9-15.
 
 ## Assignee/profile map
-- `sargassoworker`: production implementation packages (MiniMax-M3).
-- `sargassoreview`: GPT-5.5 reviewer, integration gate, final systems-map/currency gate.
-- `sargassodocs`: available for documentation support, not assigned by default in this graph.
+- `synapse_seaworker`: production implementation packages (MiniMax-M3).
+- `synapse_seareview`: GPT-5.5 reviewer, integration gate, final systems-map/currency gate.
+- `synapse_seadocs`: available for documentation support, not assigned by default in this graph.
 
 ## Board strategy
 The graph is staged behind a blocked kickoff card `t_0228a857` so implementation does not auto-start while the expanded E2E package plan is reviewed.
@@ -84,7 +84,7 @@ Every package must satisfy its standalone `docs/game/build-plans/<task>-e2e.md` 
 8. Systems map/roadmap/build-plan are updated with real evidence.
 
 ## Verification strategy
-Use explicit Synaptic Sea root for Godot runs because some historical docs still default to `/Users/christopherwilloughby/the-sargasso-of-stars`:
+Use explicit Synaptic Sea root for Godot runs because some historical docs still default to `/Users/christopherwilloughby/the-synapse-sea-of-stars`:
 
 ```bash
 ROOT=/Users/christopherwilloughby/the-synaptic-sea \
@@ -95,7 +95,7 @@ GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2 \
 ## Risks/blockers
 - The graph is intentionally broad; use package boundaries and ADRs to avoid god-object rewrites.
 - Shared workspace edits can collide if too many cards run at once. Keep worker concurrency conservative or switch high-risk packages to worktrees before releasing kickoff.
-- Older validation docs mention the Sargasso path; all cards explicitly override `ROOT`.
+- Older validation docs mention the Synapse Sea path; all cards explicitly override `ROOT`.
 - Workers must not convert package scope into documentation-only deliverables unless the package itself is documentation/currency only (Task 15).
 
 ## Manifest
@@ -108,16 +108,16 @@ GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2 \
 - Task 04: `t_af66b721` — [Loot Ecosystem, Rarity, Containers & Unique Finds](build-plans/04-loot-ecosystem-e2e.md)
 - Task 05: `t_67389b76` — [Consumables, Medicine, Stimulants, Ammo & Utility Items](build-plans/05-consumables-medicine-stimulants-e2e.md)
 - Task 06: `t_cbe56420` — [Combat, Threat AI, Damage, Stealth & Encounters](build-plans/06-combat-threat-ai-e2e.md)
-  - Status (2026-06-25, sargassoworker): implementation complete. Added Task 06 feature/requirements/ADR/balance/evidence docs, corrected the playable shock-probe weapon→ammo mapping in `scripts/procgen/playable_generated_ship.gd`, and registered six focused combat/threat smokes (`damage_pipeline`, `armor_resolver`, `status_effects`, `detection_state`, `threat_ai_state`, `main_playable_slice_combat_encounter`). Main-scene validation now proves `archetypes=5`, `ammo_spent=1`, and `memory_restored=true` after a live save/load encounter. See `docs/game/build-plans/evidence/combat-threat-ai-contract-review.md`.
+  - Status (2026-06-25, synapse_seaworker): implementation complete. Added Task 06 feature/requirements/ADR/balance/evidence docs, corrected the playable shock-probe weapon→ammo mapping in `scripts/procgen/playable_generated_ship.gd`, and registered six focused combat/threat smokes (`damage_pipeline`, `armor_resolver`, `status_effects`, `detection_state`, `threat_ai_state`, `main_playable_slice_combat_encounter`). Main-scene validation now proves `archetypes=5`, `ammo_spent=1`, and `memory_restored=true` after a live save/load encounter. See `docs/game/build-plans/evidence/combat-threat-ai-contract-review.md`.
 - Task 07: `t_290ec958` — [Ship Systems, Power Grid, Hull, Life Support & Sustenance Infrastructure](build-plans/07-ship-systems-sustenance-e2e.md)
-  - Status (2026-06-25, sargassoworker): implementation baseline complete. Added seven pure models (`PowerGridState`, `LifeSupportState`, `HullIntegrityState`, `FireSuppressionState`, `PropulsionState`, `ShieldState`, `SustenanceState`), four ship-system tuning/config JSONs under `data/ship_systems/`, playable-slice integration in `scripts/procgen/playable_generated_ship.gd`, and four focused smokes (`power_grid_state_smoke`, `life_support_state_smoke`, `sustenance_state_smoke`, `main_playable_slice_ship_systems_expanded_smoke`). REQ-SS-001..007 added to `docs/game/05_requirements.md`; ADR-0035 and feature/balance/evidence docs added; regression bundle extended to `commands=146`. See `docs/game/build-plans/evidence/ship-systems-sustenance-contract-review.md`.
+  - Status (2026-06-25, synapse_seaworker): implementation baseline complete. Added seven pure models (`PowerGridState`, `LifeSupportState`, `HullIntegrityState`, `FireSuppressionState`, `PropulsionState`, `ShieldState`, `SustenanceState`), four ship-system tuning/config JSONs under `data/ship_systems/`, playable-slice integration in `scripts/procgen/playable_generated_ship.gd`, and four focused smokes (`power_grid_state_smoke`, `life_support_state_smoke`, `sustenance_state_smoke`, `main_playable_slice_ship_systems_expanded_smoke`). REQ-SS-001..007 added to `docs/game/05_requirements.md`; ADR-0035 and feature/balance/evidence docs added; regression bundle extended to `commands=146`. See `docs/game/build-plans/evidence/ship-systems-sustenance-contract-review.md`.
 - Task 08: `t_02146c59` — [Player Progression, Skills, Classes, Hub & Meta-Progression](build-plans/08-progression-skills-meta-e2e.md)
 - Task 09: `t_7a6849cb` — [UI/UX, HUD, Menus, Tutorials, Controller & Accessibility](build-plans/09-ui-ux-accessibility-e2e.md)
 - Task 10: `t_9e328a9f` — [Audio, Music, Spatial Sound, Voice & Meta Events](build-plans/10-audio-music-spatial-e2e.md)
 - Task 11: `t_2d267b26` — [Save/Load, Persistence, Multi-Slot, Auto-Save & Cloud Readiness](build-plans/11-save-load-persistence-e2e.md)
 - Task 12: `t_4faf58cf` — [Procedural Generation Expansion, Templates, Biomes & Encounter Injection](build-plans/12-procedural-generation-expansion-e2e.md)
 - Task 13: `t_3b217838` — [Distribution, Store, Achievements, Demo, Localization & Post-Launch Ops](build-plans/13-distribution-store-postlaunch-e2e.md)
-  - Status (2026-06-25, sargassoworker): implementation complete. Six pure models (`BuildMetadataState`, `AchievementState`, `LocalizationCatalog`, `DemoScopeGate`, `CrashReportBundle`, `ReleaseReadinessLedger`) under `scripts/systems/`, six JSON catalogs under `data/release/`, four UI seams under `scripts/ui/`, export preset validator at `scripts/release/export_presets_validator.gd`, and five regression smokes under `scripts/validation/`. REQ-RL-001..010 added to `docs/game/05_requirements.md`; ADRs 0029/0030/0031 added under `docs/game/adr/`; risk-register rows RISK-009/010 added. Regression bundle extended to `commands=125`. See `docs/game/build-plans/evidence/distribution-store-postlaunch-contract-review.md` for the package contract review. Achievement trigger wired into `_on_tool_pickup_acquired` (silent no-op when no service is injected — existing inventory/junction-calibrator smokes continue to pass).
+  - Status (2026-06-25, synapse_seaworker): implementation complete. Six pure models (`BuildMetadataState`, `AchievementState`, `LocalizationCatalog`, `DemoScopeGate`, `CrashReportBundle`, `ReleaseReadinessLedger`) under `scripts/systems/`, six JSON catalogs under `data/release/`, four UI seams under `scripts/ui/`, export preset validator at `scripts/release/export_presets_validator.gd`, and five regression smokes under `scripts/validation/`. REQ-RL-001..010 added to `docs/game/05_requirements.md`; ADRs 0029/0030/0031 added under `docs/game/adr/`; risk-register rows RISK-009/010 added. Regression bundle extended to `commands=125`. See `docs/game/build-plans/evidence/distribution-store-postlaunch-contract-review.md` for the package contract review. Achievement trigger wired into `_on_tool_pickup_acquired` (silent no-op when no service is injected — existing inventory/junction-calibrator smokes continue to pass).
 - Task 14: `t_12bf9f4a` — [Cross-System Integration, Balance, Product Audit & Gap Closure](build-plans/14-cross-system-integration-review-e2e.md)
 - Task 15: `t_c7ac4d08` — [Systems Map, Roadmap, Requirements, Manifest & Final Board Currency](build-plans/15-systems-map-task-graph-update-e2e.md)
 

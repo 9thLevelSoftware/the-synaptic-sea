@@ -27,7 +27,7 @@
   },
   "biome_preference": {
     "dead_fleet": 0.9,
-    "abyssal_sargasso": 0.4,
+    "abyssal_synapse_sea": 0.4,
     "breach_field": 0.3
   }
 }

@@ -136,7 +136,7 @@ Requirements must be granular, testable, and linked to feature specs or ADRs.
   - Any hub/meta work in Gate 1 is a scope violation unless the Gate 1 stance is explicitly re-decided via a new ADR.
   - Hub/meta re-decision is required before Gate 2 entry (see `08_milestone_gates.md` Gate 2 entry criteria).
 - Verification:
-  - Documentation review by `sargassoreview` checks that no Gate 1 card introduces hub/meta state, derelict selection, or persistent meta-currency.
+  - Documentation review by `synapse_seareview` checks that no Gate 1 card introduces hub/meta state, derelict selection, or persistent meta-currency.
   - Reviewer confirms `features/hub_progression.md` is not authored during Gate 1.
 
 ## REQ-009: Gate 2 hub/meta re-decision trigger
@@ -148,7 +148,7 @@ Requirements must be granular, testable, and linked to feature specs or ADRs.
 - Rationale: Hub/meta is the largest undecided design surface in the vision. Gate 2 entry review is the formal checkpoint where the deferral is re-affirmed or the scope is escalated into an early Gate 2 implementation card.
 - Resolution: ADR-0003 re-affirms deferral through Gate 2 and anchors the next hub/meta decision to Gate 3 entry planning. Gate 2 focuses on derelict exploration depth: inventory/tools, expanded hazards, objective/procedural variation, and current-run persistence.
 - Acceptance criteria:
-  - Before Gate 2 begins, a hub/meta re-decision card exists on board `sargasso-stage-gate`.
+  - Before Gate 2 begins, a hub/meta re-decision card exists on board `synapse-sea-stage-gate`.
   - The card selects exactly one of: (a) re-affirm deferral with a Gate 3/4 anchor, or (b) escalate into an early Gate 2 implementation card with a `features/hub_progression.md` spec.
   - The chosen path is recorded as a new or patched ADR.
 - Chosen path:
@@ -910,7 +910,7 @@ Requirements must be granular, testable, and linked to feature specs or ADRs.
 - Type: gameplay
 - Priority: must
 - Status: Proposed
-- Rationale: Biomes (`abyssal_sargasso` / `breach_field` / `dead_fleet`) add flavour without changing layout. A biome must scale hazard density, loot quality, and encounter density by deterministic multipliers.
+- Rationale: Biomes (`abyssal_synapse_sea` / `breach_field` / `dead_fleet`) add flavour without changing layout. A biome must scale hazard density, loot quality, and encounter density by deterministic multipliers.
 - Acceptance criteria:
   - `BiomeProfile.from_dict(json)` round-trips a JSON file under `res://data/procgen/biomes/`.
   - `BiomeProfile.modifier()` for `hazard_modifier` / `loot_quality_modifier` / `encounter_density_modifier` returns the value from JSON (default 1.0).
@@ -1581,7 +1581,7 @@ Requirements must be granular, testable, and linked to feature specs or ADRs.
 - Status: Approved
 - Acceptance criteria:
   - `SanityState` is a pure `RefCounted` model with max sanity, drain rate, and recovery rate.
-  - Sanity drains while in the Sargasso field and recovers in safe zones.
+  - Sanity drains while in the Synapse Sea field and recovers in safe zones.
   - Sanity below 40% applies perception/hallucination pressure (cascade).
   - `get_summary()` and `apply_summary()` follow the same contract as VitalsState.
 - Verification: `scripts/validation/sanity_state_smoke.gd` (marker `SANITY STATE PASS`).

@@ -1,6 +1,6 @@
 {
-  "id": "abyssal_sargasso",
-  "description": "Deep-sea baseline. Calm Sargasso with average hazard and encounter density. Default biome for any unknown seed.",
+  "id": "abyssal_synapse_sea",
+  "description": "Deep-sea baseline. Calm Synapse Sea with average hazard and encounter density. Default biome for any unknown seed.",
   "hazard_modifier": 1.0,
   "loot_quality_modifier": 1.0,
   "encounter_density_modifier": 1.0,

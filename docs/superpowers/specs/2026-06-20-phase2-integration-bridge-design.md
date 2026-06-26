@@ -2,7 +2,7 @@
 
 Date: 2026-06-20
 Status: Approved for implementation
-Parent spec: `docs/superpowers/specs/2026-06-20-sargasso-core-systems-design.md` (System 2)
+Parent spec: `docs/superpowers/specs/2026-06-20-synapse-sea-core-systems-design.md` (System 2)
 Phase 2 model spec: `docs/superpowers/specs/2026-06-20-phase2-ship-systems-design.md`
 Handoff: `docs/superpowers/plans/2026-06-20-phase2-integration-handoff.md`
 ADR (to be authored): retires `ShipSystemState`; `ship_systems_summary` carries the manager snapshot.
@@ -17,7 +17,7 @@ Two overlapping tracks exist in the repo:
   scripted objectives (`recover_supplies`, `restore_systems`, `download_logs`,
   `stabilize_reactor`), drives oxygen/fire/arc hazards, and supports current-run save/load. Its
   ship-systems model is `ShipSystemState` — a coarse **objective-flag** model.
-- **Track 2 — master core-systems rebuild:** governed by `sargasso-core-systems-design.md`. Phase 1
+- **Track 2 — master core-systems rebuild:** governed by `synapse-sea-core-systems-design.md`. Phase 1
   (procgen layout pipeline) and Phase 2 (`ShipSystemsManager` model layer, PR #1) are built. The
   master spec is explicit (System 2, "relationship to existing code"): **`ship_system_state.gd`
   becomes `ShipSystemsManager`** and `oxygen_state.gd` eventually becomes a child of
@@ -39,7 +39,7 @@ of its systems role — "Path B"), scoped tightly to the bridge.
 `ShipSystemsManager` is the single source of truth for ship-systems state in the live game.
 `ShipSystemState` is deleted. Every consequence it used to drive (route gates, breach seal, blocked
 affordance clearing, extraction unlock, HUD power/reactor readouts) is re-derived from the manager.
-The full regression bundle ends `SARGASSO REGRESSION PASS` with clean output, and a new main-scene
+The full regression bundle ends `SYNAPSE_SEA REGRESSION PASS` with clean output, and a new main-scene
 smoke proves the live runtime consequences.
 
 ---
@@ -151,7 +151,7 @@ route-control models are untouched.
     assert extraction unlocked → save/load round-trips the manager summary.
   - Check `req012_autosave_sequence_smoke.gd` for any summary-count assertion.
   - Net regression-bundle command count ≈ neutral (one model smoke repurposed, no new model layer).
-  - Done = `SARGASSO REGRESSION PASS commands=<n> clean_output=true`, plus the Gate-1 automated
+  - Done = `SYNAPSE_SEA REGRESSION PASS commands=<n> clean_output=true`, plus the Gate-1 automated
     playtest still passes.
 
 ---

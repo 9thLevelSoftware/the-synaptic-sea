@@ -2,7 +2,7 @@
 
 Date: 2026-06-20
 Status: Approved for implementation
-Parent spec: `docs/superpowers/specs/2026-06-20-sargasso-core-systems-design.md` (System 2 / Build Phase 2)
+Parent spec: `docs/superpowers/specs/2026-06-20-synapse-sea-core-systems-design.md` (System 2 / Build Phase 2)
 ADR: `docs/game/adr/0008-ship-systems-architecture.md`
 
 ---

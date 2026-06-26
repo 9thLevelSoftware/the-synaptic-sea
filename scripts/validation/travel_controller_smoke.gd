@@ -1,6 +1,6 @@
 extends SceneTree
 
-const WorldScript := preload("res://scripts/systems/sargasso_world.gd")
+const WorldScript := preload("res://scripts/systems/synapse_sea_world.gd")
 const TravelScript := preload("res://scripts/systems/travel_controller.gd")
 const GeneratorScript := preload("res://scripts/procgen/ship_generator.gd")
 const MarkerScript := preload("res://scripts/systems/ship_marker.gd")

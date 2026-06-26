@@ -89,7 +89,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	_set_all_operational(mgr)  # restore
 
 	# 3. Pick a real in-range marker id from the world.
-	var world = playable.get_sargasso_world()
+	var world = playable.get_synapse_sea_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
 	if in_range.is_empty():
 		_fail("no markers in range of the starting position")
@@ -175,7 +175,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		_fail("derelict scan returned no markers — derelict travel-cap gate failed (FIX2)")
 		return
 	# 9b. Pick an in-range marker from the derelict world position and travel again.
-	var world2 = playable.get_sargasso_world()
+	var world2 = playable.get_synapse_sea_world()
 	var in_range2: Array = world2.markers_in_range(playable.scanner_state.range_radius)
 	if in_range2.is_empty():
 		_fail("no markers in range of the derelict position (FIX2 derelict→derelict jump)")

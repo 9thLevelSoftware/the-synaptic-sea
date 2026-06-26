@@ -2,7 +2,7 @@
   "metadata": {
     "schema_version": "1.0.0",
     "package_id": "task14_cross_system_integration_review",
-    "generated_by": "sargassoreview/gpt-5.5",
+    "generated_by": "synapse_seareview/gpt-5.5",
     "source_plan": "docs/game/build-plans/14-cross-system-integration-review-e2e.md",
     "required_loop_stages": ["prepare", "derelict", "survive", "loot", "craft", "return", "upgrade"]
   },

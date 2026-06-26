@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Project root is `/Users/christopherwilloughby/the-sargasso-of-stars`.
+- Project root is `/Users/christopherwilloughby/the-synapse-sea-of-stars`.
 - Godot binary is `/Users/christopherwilloughby/.local/bin/godot-4.6.2`.
 - Project main scene remains `run/main_scene="res://scenes/main.tscn"` in `project.godot`.
 - Main scene must continue booting `res://scenes/procgen/playable_coherent_ship.tscn` through `scripts/main.gd`.
@@ -19,7 +19,7 @@
 - Do not replace the structural procgen loader architecture; add only read-only or runtime-playable helper methods to `scripts/procgen/playable_generated_ship.gd` and `scripts/procgen/generated_ship_loader.gd` if needed.
 - All visual proof artifacts in this plan must be real Godot viewport output with `mode=viewport`; do not add HTML, synthetic-map, or diagnostic-map fallback output.
 - If a capture is sparse or visually rough, record it as a prototype staging limitation rather than altering fixture topology in this plan.
-- The workspace is not expected to be a git repository from the shell. Every record step must use the commit-or-record fallback writing to `/tmp/sargasso_main_playable_slice_v1_no_git_changes.log` when `git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree` fails.
+- The workspace is not expected to be a git repository from the shell. Every record step must use the commit-or-record fallback writing to `/tmp/synapse_sea_main_playable_slice_v1_no_git_changes.log` when `git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree` fails.
 - Existing pass markers from prior work must remain green: `MAIN COHERENT BOOT PASS`, `COHERENT PLAYABLE TRAVERSAL PASS`, `COHERENT PROOF SHIP CAPTURE PASS`, `MAIN COHERENT CAPTURE PASS`, and `PLAYABLE SHIP SMOKE PASS`.
 
 ---
@@ -137,7 +137,7 @@ func _validate_hud(playable: PlayableGeneratedShip) -> void:
 		return
 	var hud_text: String = tracker.get_hud_text()
 	var required: Array[String] = [
-		"Sargasso First Playable",
+		"Synapse Sea First Playable",
 		"Current: 01 Recover Supplies",
 		"Controls: WASD move / E interact",
 		"Progress: 0/4",
@@ -177,7 +177,7 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/main_playable_slice_hud_smoke.gd
 ```
 
@@ -309,7 +309,7 @@ func _refresh() -> void:
 
 func _compose_text() -> String:
 	var lines: PackedStringArray = PackedStringArray()
-	lines.append("Sargasso First Playable")
+	lines.append("Synapse Sea First Playable")
 	lines.append("Controls: WASD move / E interact")
 	lines.append("Progress: %d/%d" % [completed_sequences.size(), objectives.size()])
 	if run_complete:
@@ -377,8 +377,8 @@ func _build_runtime_nodes() -> void:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_hud_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_coherent_boot_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_hud_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_coherent_boot_smoke.gd
 ```
 
 Expected pass markers:
@@ -393,11 +393,11 @@ MAIN COHERENT BOOT PASS scene=playable_coherent_ship objectives=4 critical_path=
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/ui/objective_tracker.gd scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_hud_smoke.gd
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "feat: add readable playable slice HUD"
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/ui/objective_tracker.gd scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_hud_smoke.gd
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "feat: add readable playable slice HUD"
 else
-  printf '%s\n' 'NO_GIT Main Playable Slice Task 1 changed: scripts/ui/objective_tracker.gd scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_hud_smoke.gd' >> /tmp/sargasso_main_playable_slice_v1_no_git_changes.log
+  printf '%s\n' 'NO_GIT Main Playable Slice Task 1 changed: scripts/ui/objective_tracker.gd scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_hud_smoke.gd' >> /tmp/synapse_sea_main_playable_slice_v1_no_git_changes.log
 fi
 ```
 
@@ -501,7 +501,7 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/main_playable_slice_completion_smoke.gd
 ```
 
@@ -713,8 +713,8 @@ func _activate_current_objective() -> void:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_completion_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/procgen_playable_ship_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_completion_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/procgen_playable_ship_smoke.gd
 ```
 
 Expected pass markers:
@@ -729,11 +729,11 @@ PLAYABLE SHIP SMOKE PASS
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/interaction/interactable.gd scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_completion_smoke.gd
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "feat: add playable slice objective completion"
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/interaction/interactable.gd scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_completion_smoke.gd
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "feat: add playable slice objective completion"
 else
-  printf '%s\n' 'NO_GIT Main Playable Slice Task 2 changed: scripts/interaction/interactable.gd scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_completion_smoke.gd' >> /tmp/sargasso_main_playable_slice_v1_no_git_changes.log
+  printf '%s\n' 'NO_GIT Main Playable Slice Task 2 changed: scripts/interaction/interactable.gd scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_completion_smoke.gd' >> /tmp/synapse_sea_main_playable_slice_v1_no_git_changes.log
 fi
 ```
 
@@ -835,7 +835,7 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/main_playable_slice_affordance_smoke.gd
 ```
 
@@ -987,10 +987,10 @@ func _title_from_snake(raw: String) -> String:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_playable_slice_affordance_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/coherent_playable_traversal_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_affordance_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/coherent_playable_traversal_smoke.gd
 mkdir -p /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v1
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/main_coherent_capture.gd -- --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v1/affordance_check_main_viewport.png --capture-frame 180
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_coherent_capture.gd -- --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v1/affordance_check_main_viewport.png --capture-frame 180
 ```
 
 Expected pass markers:
@@ -1006,11 +1006,11 @@ MAIN COHERENT CAPTURE PASS output=/Users/christopherwilloughby/off-the-rails-ai-
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_affordance_smoke.gd
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "feat: add playable slice affordance labels"
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_affordance_smoke.gd
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "feat: add playable slice affordance labels"
 else
-  printf '%s\n' 'NO_GIT Main Playable Slice Task 3 changed: scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_affordance_smoke.gd' >> /tmp/sargasso_main_playable_slice_v1_no_git_changes.log
+  printf '%s\n' 'NO_GIT Main Playable Slice Task 3 changed: scripts/procgen/playable_generated_ship.gd scripts/validation/main_playable_slice_affordance_smoke.gd' >> /tmp/synapse_sea_main_playable_slice_v1_no_git_changes.log
 fi
 ```
 
@@ -1143,7 +1143,7 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/main_playable_slice_input_smoke.gd
 ```
 
@@ -1160,9 +1160,9 @@ If it fails because `player_delta` is below `0.75`, inspect whether `CharacterBo
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/player_gravity_floor_snap_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/interactable_distance_fallback_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-sargasso-of-stars --script res://scripts/validation/procgen_playable_ship_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/player_gravity_floor_snap_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/interactable_distance_fallback_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/procgen_playable_ship_smoke.gd
 ```
 
 Expected pass markers:
@@ -1178,11 +1178,11 @@ PLAYABLE SHIP SMOKE PASS
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/validation/main_playable_slice_input_smoke.gd
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "test: verify playable slice input loop"
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/validation/main_playable_slice_input_smoke.gd
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "test: verify playable slice input loop"
 else
-  printf '%s\n' 'NO_GIT Main Playable Slice Task 4 changed: scripts/validation/main_playable_slice_input_smoke.gd' >> /tmp/sargasso_main_playable_slice_v1_no_git_changes.log
+  printf '%s\n' 'NO_GIT Main Playable Slice Task 4 changed: scripts/validation/main_playable_slice_input_smoke.gd' >> /tmp/synapse_sea_main_playable_slice_v1_no_git_changes.log
 fi
 ```
 
@@ -1205,7 +1205,7 @@ Run:
 ```bash
 mkdir -p /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v1
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/main_playable_slice_capture_sequence.gd \
   -- \
   --output-dir /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v1
@@ -1393,7 +1393,7 @@ Run:
 ```bash
 mkdir -p /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v1
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
-  --path /Users/christopherwilloughby/the-sargasso-of-stars \
+  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
   --script res://scripts/validation/main_playable_slice_capture_sequence.gd \
   -- \
   --output-dir /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v1
@@ -1450,11 +1450,11 @@ Expected: both `open` commands exit `0`.
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add scripts/validation/main_playable_slice_capture_sequence.gd
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "test: capture main playable slice sequence"
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/validation/main_playable_slice_capture_sequence.gd
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "test: capture main playable slice sequence"
 else
-  printf '%s\n' 'NO_GIT Main Playable Slice Task 5 changed: scripts/validation/main_playable_slice_capture_sequence.gd' >> /tmp/sargasso_main_playable_slice_v1_no_git_changes.log
+  printf '%s\n' 'NO_GIT Main Playable Slice Task 5 changed: scripts/validation/main_playable_slice_capture_sequence.gd' >> /tmp/synapse_sea_main_playable_slice_v1_no_git_changes.log
 fi
 ```
 
@@ -1475,7 +1475,7 @@ Run:
 
 ```bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
+ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
 GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
 ARTIFACT_DIR=/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v1
 mkdir -p "$ARTIFACT_DIR"
@@ -1536,7 +1536,7 @@ Run this shell block after the final validation bundle passes:
 
 ```bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
+ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
 ARTIFACT_DIR=/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v1
 PROOF=$ROOT/docs/superpowers/proofs/main-playable-slice-v1.md
 mkdir -p "$ROOT/docs/superpowers/proofs"
@@ -1599,7 +1599,7 @@ Run:
 ```bash
 python3 - <<'PY'
 from pathlib import Path
-p = Path('/Users/christopherwilloughby/the-sargasso-of-stars/docs/superpowers/proofs/main-playable-slice-v1.md')
+p = Path('/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/main-playable-slice-v1.md')
 text = p.read_text()
 required = [
     'MAIN PLAYABLE SLICE HUD PASS',
@@ -1630,11 +1630,11 @@ MAIN PLAYABLE SLICE V1 PROOF PASS markers=9
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-sargasso-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars add docs/superpowers/proofs/main-playable-slice-v1.md
-  git -C /Users/christopherwilloughby/the-sargasso-of-stars commit -m "docs: record main playable slice proof"
+if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add docs/superpowers/proofs/main-playable-slice-v1.md
+  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "docs: record main playable slice proof"
 else
-  printf '%s\n' 'NO_GIT Main Playable Slice Task 6 changed: docs/superpowers/proofs/main-playable-slice-v1.md' >> /tmp/sargasso_main_playable_slice_v1_no_git_changes.log
+  printf '%s\n' 'NO_GIT Main Playable Slice Task 6 changed: docs/superpowers/proofs/main-playable-slice-v1.md' >> /tmp/synapse_sea_main_playable_slice_v1_no_git_changes.log
 fi
 ```
 
@@ -1646,7 +1646,7 @@ Run this before claiming the playable slice is complete:
 
 ```bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-sargasso-of-stars
+ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
 GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
 ARTIFACT_DIR=/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v1
 mkdir -p "$ARTIFACT_DIR"
@@ -1680,7 +1680,7 @@ done
 
 python3 - <<'PY'
 from pathlib import Path
-p = Path('/Users/christopherwilloughby/the-sargasso-of-stars/docs/superpowers/proofs/main-playable-slice-v1.md')
+p = Path('/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/main-playable-slice-v1.md')
 text = p.read_text()
 required = [
     'MAIN PLAYABLE SLICE HUD PASS',
@@ -1740,7 +1740,7 @@ sha256: <64 lowercase hex characters>
 - Spec coverage: Tasks 1-6 cover readable HUD, one objective chain, blocker/ramp/landmark affordances, completion state, input-path validation, capture sequence, proof documentation, and seed-17 regression preservation.
 - Placeholder scan: This plan contains no forbidden placeholder tokens, no incomplete sections, and every code-writing step includes concrete code or exact shell commands.
 - Type consistency: `ObjectiveTracker.get_hud_text()`, `PlayableGeneratedShip.get_current_objective_sequence()`, `PlayableGeneratedShip.get_slice_completion_summary()`, `PlayableGeneratedShip.teleport_player_to_objective_for_validation(sequence: int)`, `PlayableGeneratedShip.complete_objective_sequence_for_validation(sequence: int)`, `PlayableGeneratedShip.complete_all_objectives_for_validation()`, and `PlayableGeneratedShip.get_affordance_summary()` are introduced before later validation scripts rely on them.
-- No-git condition: Every record step uses the required commit-or-record fallback and writes to `/tmp/sargasso_main_playable_slice_v1_no_git_changes.log` when the workspace is not a git repo.
+- No-git condition: Every record step uses the required commit-or-record fallback and writes to `/tmp/synapse_sea_main_playable_slice_v1_no_git_changes.log` when the workspace is not a git repo.
 
 ---
 

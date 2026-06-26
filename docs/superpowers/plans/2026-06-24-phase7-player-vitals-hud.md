@@ -17,7 +17,7 @@
 - **Trust the PASS marker, not the exit code** (`--script` can exit 0 on parse/load errors). Always confirm the marker line is present and no unexpected `ERROR:`/`WARNING:` appears.
 - **Allowlisted baseline noise (ignore):** `ERROR: Capture not registered: 'gdaimcp'.` and `WARNING: ObjectDB instances leaked at exit ...`. Any other `ERROR:`/`WARNING:` blocks completion.
 - **Never stage/commit** `project.godot`, `.godot/`, `*.uid`, or `addons/`. Use selective `git add <explicit paths>` only.
-- **Full regression bundle** must end `SARGASSO REGRESSION PASS commands=119 clean_output=true`; stash `project.godot` before the run and pop after (it carries local MCPRuntime-autoload drift that breaks headless).
+- **Full regression bundle** must end `SYNAPSE_SEA REGRESSION PASS commands=119 clean_output=true`; stash `project.godot` before the run and pop after (it carries local MCPRuntime-autoload drift that breaks headless).
 - Godot binary: `C:/Users/dasbl/Documents/Godot/Godot_v4.6.2-stable_win64_console.exe`. Project root: `C:/Users/dasbl/Documents/The Synaptic Sea`. Branch: `phase7-vitals-hud`.
 
 ---
@@ -834,7 +834,7 @@ In `docs/game/06_validation_plan.md`, the current tail is (`:186-188`):
 ```bash
 run_clean 'oxygen+equipment drain' 'OXYGEN EQUIPMENT DRAIN SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/oxygen_equipment_drain_smoke.gd
 run_clean 'suit oxygen slice' 'SUIT OXYGEN SLICE SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_suit_oxygen_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=117 clean_output=true'
+echo 'SYNAPSE_SEA REGRESSION PASS commands=117 clean_output=true'
 ```
 
 Replace it with (add two `run_clean` lines, bump the count to 119):
@@ -844,7 +844,7 @@ run_clean 'oxygen+equipment drain' 'OXYGEN EQUIPMENT DRAIN SMOKE PASS' "$GODOT" 
 run_clean 'suit oxygen slice' 'SUIT OXYGEN SLICE SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_suit_oxygen_smoke.gd
 run_clean 'player vitals model' 'PLAYER VITALS MODEL SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_vitals_model_smoke.gd
 run_clean 'player vitals hud' 'MAIN PLAYABLE VITALS HUD PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_vitals_hud_smoke.gd
-echo 'SARGASSO REGRESSION PASS commands=119 clean_output=true'
+echo 'SYNAPSE_SEA REGRESSION PASS commands=119 clean_output=true'
 ```
 
 Also update any human-readable "expected markers" list / count elsewhere in `06_validation_plan.md` that enumerates the smokes (search the file for `OXYGEN EQUIPMENT DRAIN SMOKE PASS` and for `commands=117`; add the two new markers to any such list and change `117` to `119` wherever it appears as the bundle total).
@@ -871,7 +871,7 @@ status=$?
 git stash pop
 echo "bundle exit=$status"
 ```
-Expected final line: `SARGASSO REGRESSION PASS commands=119 clean_output=true`. If `git stash push` reports "No local changes to save" (the drift may already be stashed/clean), proceed and still run the bundle; ensure the `git stash pop` is skipped if nothing was stashed.
+Expected final line: `SYNAPSE_SEA REGRESSION PASS commands=119 clean_output=true`. If `git stash push` reports "No local changes to save" (the drift may already be stashed/clean), proceed and still run the bundle; ensure the `git stash pop` is skipped if nothing was stashed.
 
 - [ ] **Step 5: Commit**
 
