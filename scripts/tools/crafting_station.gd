@@ -98,16 +98,28 @@ func _try_craft() -> bool:
 	var recipes: Array = crafting_state.get_recipes_for_station(station_kind)
 	# Deterministic order: catalog order is dictionary-key order, so sort by recipe_id.
 	recipes.sort_custom(func(a, b): return str(a.get("recipe_id", "")) < str(b.get("recipe_id", "")))
+	var blocked_by_full: bool = false
 	for recipe in recipes:
 		var rid: String = str(recipe.get("recipe_id", ""))
 		if rid.is_empty():
 			continue
+		# Deconstruction belongs to the dedicated salvage bench (DeconstructionResolver), not
+		# normal stations — some deconstruction recipes share a normal station_kind (e.g.
+		# deconstruct_scrap is station_kind "workbench"), so skip them here.
+		if str(recipe.get("category", "")) == "deconstruction":
+			continue
 		if not crafting_state.can_craft(rid, inventory_state):
+			continue
+		# Don't consume ingredients for an output that won't fit (begin_craft consumes
+		# immediately; add_item silently drops over-stack overflow). Try the next recipe.
+		var produces: Dictionary = crafting_state.get_produces(rid)
+		if not inventory_state.can_accept(str(produces.get("item_id", "")), int(produces.get("quantity", 0))):
+			blocked_by_full = true
 			continue
 		if crafting_state.begin_craft(rid, inventory_state, material_state, _player_skill()):
 			emit_signal("craft_started", station_kind, rid)
 			return true
-	emit_signal("craft_blocked", station_kind, "no_craftable_recipe")
+	emit_signal("craft_blocked", station_kind, "output_full" if blocked_by_full else "no_craftable_recipe")
 	return false
 
 func _try_salvage() -> bool:

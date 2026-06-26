@@ -2579,7 +2579,12 @@ func _on_craft_completed() -> void:
 	if item_id.is_empty() or qty <= 0:
 		return
 	if inventory_state != null:
-		inventory_state.add_item(item_id, qty)
+		# Stations gate on can_accept() before starting, so a full stack here is only the rare
+		# during-craft fill; surface (not silently drop) any overflow rather than emitting a
+		# WARNING (the regression bundle fails on unexpected WARNING lines).
+		var added: int = inventory_state.add_item(item_id, qty)
+		if added < qty:
+			print("CRAFT OVERFLOW item=%s lost=%d reason=stack_full" % [item_id, qty - added])
 	_refresh_inventory_hud()
 	_recompute_player_encumbrance()
 	print("CRAFT COMPLETED item=%s qty=%d quality=%s" % [
@@ -2595,7 +2600,9 @@ func _on_field_craft_completed() -> void:
 	if item_id.is_empty() or qty <= 0:
 		return
 	if inventory_state != null:
-		inventory_state.add_item(item_id, qty)
+		var added: int = inventory_state.add_item(item_id, qty)
+		if added < qty:
+			print("FIELD CRAFT OVERFLOW item=%s lost=%d reason=stack_full" % [item_id, qty - added])
 	_refresh_inventory_hud()
 	_recompute_player_encumbrance()
 	print("FIELD CRAFT COMPLETED item=%s qty=%d quality=%s" % [
@@ -2624,18 +2631,26 @@ func _on_player_field_craft_requested(_player_body) -> void:
 	var skill: int = 0
 	if player_progression != null and player_progression.has_method("get_skill_level"):
 		skill = int(player_progression.get_skill_level("fabrication"))
+	var blocked_by_full: bool = false
 	for recipe in recipes:
 		var rid: String = str(recipe.get("recipe_id", ""))
 		if rid.is_empty():
 			continue
 		if not field_crafting_state.can_craft(rid, inventory_state):
 			continue
+		# Don't consume ingredients for an output the inventory can't store (begin_craft
+		# consumes immediately; add_item drops over-stack overflow on completion).
+		var produces: Variant = recipe.get("produces", {})
+		if produces is Dictionary and not inventory_state.can_accept(
+				str((produces as Dictionary).get("item_id", "")), int((produces as Dictionary).get("quantity", 0))):
+			blocked_by_full = true
+			continue
 		if field_crafting_state.begin_craft(rid, inventory_state, material_state, skill):
 			_refresh_inventory_hud()
 			_recompute_player_encumbrance()
 			print("FIELD CRAFT STARTED recipe=%s" % rid)
 			return
-	print("FIELD CRAFT BLOCKED reason=no_craftable_recipe")
+	print("FIELD CRAFT BLOCKED reason=%s" % ("output_full" if blocked_by_full else "no_craftable_recipe"))
 
 ## Validation seam: start a repair-point channel via the real path, by subcomponent.
 func repair_subcomponent_for_validation(system_id: String, subcomponent_id: String) -> bool:
