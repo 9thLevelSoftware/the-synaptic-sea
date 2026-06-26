@@ -22,6 +22,11 @@ const ElectricalArcStateScript := preload("res://scripts/systems/electrical_arc_
 const AudioManagerScript := preload("res://scripts/audio/audio_manager.gd")
 const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.gd")
 const RunSnapshotScript := preload("res://scripts/systems/run_snapshot.gd")
+# Bucket 3 meta-screen shell deps (constructed here, injected into MenuCoordinator).
+const LocalizationCatalogScript := preload("res://scripts/systems/localization_catalog.gd")
+const BuildMetadataStateScript := preload("res://scripts/systems/build_metadata_state.gd")
+const SaveLoadMenuScript := preload("res://scripts/ui/save_load_menu.gd")
+const AchievementStateScript := preload("res://scripts/systems/achievement_state.gd")
 const WorldSnapshotScript := preload("res://scripts/systems/world_snapshot.gd")
 const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
@@ -359,6 +364,10 @@ var sequence_interactables: Dictionary = {}
 var save_load_service: SaveLoadService
 var last_saved_snapshot: RunSnapshot
 var _is_reloading: bool = false
+# Bucket 3 meta-screen shell deps (injected into MenuCoordinator.bind_meta_screens).
+var localization_catalog          # LocalizationCatalog
+var build_metadata_state          # BuildMetadataState
+var save_load_menu                # SaveLoadMenu (RefCounted slot presenter)
 
 ## NOTE: This scene relies on GeneratedShipLoader.load_from_paths() being
 ## SYNCHRONOUS and emitting `ship_loaded` on the same call stack — the
@@ -1181,10 +1190,27 @@ func _build_runtime_nodes() -> void:
 	crafting_station_root.name = "CraftingStationRoot"
 	add_child(crafting_station_root)
 	_loot_tables = LootRollerScript.load_tables()
-	_build_hud_layer()
 	# REQ-012: current-run save/load service. Single slot at
 	# user://saves/current_run.json; deleted on playable_slice_completed.
+	# Constructed BEFORE _build_hud_layer() because the menu shell's meta-screen
+	# binding (below) consumes save_load_menu / localization_catalog / build_metadata.
 	save_load_service = SaveLoadServiceScript.new()
+	# Bucket 3 meta-screen shell deps: localization catalog + build metadata from the
+	# release data bundle, and the save-slot presenter bound to the live save service.
+	localization_catalog = LocalizationCatalogScript.new()
+	localization_catalog.configure(_load_json_dict("res://data/release/localization_catalog.json"))
+	build_metadata_state = BuildMetadataStateScript.new()
+	build_metadata_state.configure(_load_json_dict("res://data/release/build_metadata.json"))
+	save_load_menu = SaveLoadMenuScript.new()
+	save_load_menu.bind(save_load_service)
+	# Construct the per-run achievement state here (previously only injected by the
+	# external build script, so it was null in the live run — leaving unlock_for_trigger
+	# dormant). Guarded so an external injection still wins. Configured from the same
+	# catalog the AchievementsPanel renders.
+	if achievement_state == null:
+		achievement_state = AchievementStateScript.new()
+		achievement_state.configure(_load_json_dict("res://data/release/achievement_catalog.json"))
+	_build_hud_layer()
 	# Phase 4.5: Synaptic Sea map + scanner + travel. Seed the world from the
 	# starting blueprint's seed so the marker field is deterministic per run.
 	# Player starts at Synaptic Sea map origin (abstract X-Z map space — NOT the
@@ -3072,6 +3098,22 @@ func _build_hud_layer() -> void:
 	)
 	if not configured:
 		push_warning("PlayableGeneratedShip: MenuCoordinator configure returned false")
+	# Bucket 3: make the menu/meta-screen shell player-reachable. Inject the
+	# coordinator-owned states (+ the 3 release-bundle deps) so the Records submenu
+	# can open Achievements / Skill Tree / Hub Upgrades / Class / Audio Log / Audio
+	# Settings / Language / Save-Load / Build Info / Credits from the live pause menu.
+	menu_coordinator.bind_meta_screens(
+		achievement_state,
+		audio_manager,
+		skill_tree_state,
+		player_progression,
+		hub_upgrade_state,
+		meta_progression_state,
+		localization_catalog,
+		build_metadata_state,
+		save_load_menu,
+		accessibility_settings,
+	)
 	menu_coordinator.set_load_available(is_load_available())
 	menu_coordinator.set_inventory_items(_inventory_hotbar_ids())
 	menu_coordinator.set_hotbar_slots(_get_consumable_slot_labels())

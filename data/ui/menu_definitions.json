@@ -18,8 +18,26 @@
         { "id": "resume",     "label": "Resume",            "enabled": true, "kind": "command" },
         { "id": "settings",   "label": "Settings",          "enabled": true, "kind": "command" },
         { "id": "codex",      "label": "Codex",             "enabled": true, "kind": "command" },
+        { "id": "records",    "label": "Records",           "enabled": true, "kind": "command" },
         { "id": "save",       "label": "Save",              "enabled": true, "kind": "command" },
         { "id": "quit_main",  "label": "Quit to Main Menu", "enabled": true, "kind": "command" }
+      ]
+    },
+    {
+      "id": "records_menu",
+      "title": "Records",
+      "items": [
+        { "id": "achievements",   "label": "Achievements",   "enabled": true, "kind": "command" },
+        { "id": "skill_tree",     "label": "Skill Tree",     "enabled": true, "kind": "command" },
+        { "id": "hub_upgrades",   "label": "Hub Upgrades",   "enabled": true, "kind": "command" },
+        { "id": "class",          "label": "Class Roster",   "enabled": true, "kind": "command" },
+        { "id": "audio_log",      "label": "Audio Log",      "enabled": true, "kind": "command" },
+        { "id": "audio_settings", "label": "Audio Settings", "enabled": true, "kind": "command" },
+        { "id": "language",       "label": "Language",       "enabled": true, "kind": "command" },
+        { "id": "save_load",      "label": "Save / Load",    "enabled": true, "kind": "command" },
+        { "id": "release_badge",  "label": "Build Info",     "enabled": true, "kind": "command" },
+        { "id": "credits",        "label": "Credits",        "enabled": true, "kind": "command" },
+        { "id": "back",           "label": "Back",           "enabled": true, "kind": "command" }
       ]
     },
     {
