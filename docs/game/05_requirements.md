@@ -242,3 +242,745 @@ Requirements must be granular, testable, and linked to feature specs or ADRs.
   - `scripts/validation/junction_calibrator_state_smoke.gd`
   - `scripts/validation/main_playable_slice_junction_calibrator_smoke.gd`
   - `scripts/validation/main_playable_slice_junction_calibrator_save_load_smoke.gd`
+
+---
+
+# E2E Systems Wave requirements (Tasks 01-15)
+
+These entries trace the requirements referenced by the cross-system
+integration matrix (`data/integration/cross_system_integration_matrix.json`)
+and the Task 15 documentation-currency deliverable. They are validated by
+`scripts/validation/doc_currency_validators.py requirement-trace`.
+
+## REQ-DOC-001: Systems map cites every completed package task id and evidence
+
+- Source: `features/systems_map_task_graph_currency.md`
+- Type: documentation / process
+- Priority: must
+- Status: Validated
+- Rationale: The complete systems map records each validated package's task id, code/data/smoke files, and smoke markers so 'what is built' is traceable to source.
+- Acceptance criteria:
+  - The currency claim above holds when the validators run with `ROOT` set.
+- Verification:
+  - `doc_currency_validators.py requirement-trace` (`REQUIREMENT TRACE PASS`)
+
+## REQ-DOC-002: ADR currency index lists every package architecture decision
+
+- Source: `features/systems_map_task_graph_currency.md`
+- Type: documentation / process
+- Priority: must
+- Status: Validated
+- Rationale: `docs/game/adr/README.md` and the systems map ADR index reference every package ADR, so each system's architecture decision is discoverable.
+- Acceptance criteria:
+  - The currency claim above holds when the validators run with `ROOT` set.
+- Verification:
+  - `doc_currency_validators.py requirement-trace` (`REQUIREMENT TRACE PASS`)
+
+## REQ-DOC-003: Requirements doc traces every matrix-cited requirement
+
+- Source: `features/systems_map_task_graph_currency.md`
+- Type: documentation / process
+- Priority: must
+- Status: Validated
+- Rationale: Every requirement id referenced by the integration matrix has a heading in this requirements document.
+- Acceptance criteria:
+  - The currency claim above holds when the validators run with `ROOT` set.
+- Verification:
+  - `doc_currency_validators.py requirement-trace` (`REQUIREMENT TRACE PASS`)
+
+## REQ-DOC-004: Kanban manifest matches the live board
+
+- Source: `features/systems_map_task_graph_currency.md`
+- Type: documentation / process
+- Priority: must
+- Status: Validated
+- Rationale: The task-graph manifest's task_count, link_count, and status_counts reconcile against the live Hermes board (when the board DB is available).
+- Acceptance criteria:
+  - The currency claim above holds when the validators run with `ROOT` set.
+- Verification:
+  - `doc_currency_validators.py requirement-trace` (`REQUIREMENT TRACE PASS`)
+
+## REQ-DOC-005: Validation plan registers the doc-currency markers
+
+- Source: `features/systems_map_task_graph_currency.md`
+- Type: documentation / process
+- Priority: must
+- Status: Validated
+- Rationale: `docs/game/06_validation_plan.md` registers the SYSTEMS MAP CURRENCY PASS, REQUIREMENT TRACE PASS, and KANBAN MANIFEST PASS markers.
+- Acceptance criteria:
+  - The currency claim above holds when the validators run with `ROOT` set.
+- Verification:
+  - `doc_currency_validators.py requirement-trace` (`REQUIREMENT TRACE PASS`)
+
+## REQ-DOC-006: No stale in-scope phrases remain in the systems map
+
+- Source: `features/systems_map_task_graph_currency.md`
+- Type: documentation / process
+- Priority: must
+- Status: Validated
+- Rationale: Superseded 'MISSING' / 'SPEC'D' in-scope phrases are removed from the systems map once their package is validated.
+- Acceptance criteria:
+  - The currency claim above holds when the validators run with `ROOT` set.
+- Verification:
+  - `doc_currency_validators.py requirement-trace` (`REQUIREMENT TRACE PASS`)
+
+## REQ-DOC-007: Integration matrix is the source of truth for system traceability
+
+- Source: `features/systems_map_task_graph_currency.md`
+- Type: documentation / process
+- Priority: must
+- Status: Validated
+- Rationale: The cross-system integration matrix links each package to its requirements, code, and smoke evidence and is the input to the currency validators.
+- Acceptance criteria:
+  - The currency claim above holds when the validators run with `ROOT` set.
+- Verification:
+  - `doc_currency_validators.py requirement-trace` (`REQUIREMENT TRACE PASS`)
+
+## REQ-DOC-008: Doc-currency validators are host-side and reproducible
+
+- Source: `features/systems_map_task_graph_currency.md`
+- Type: documentation / process
+- Priority: must
+- Status: Validated
+- Rationale: The currency validators run without booting Godot, auto-detect the repo root (overridable via ROOT), and exit non-zero on failure.
+- Acceptance criteria:
+  - The currency claim above holds when the validators run with `ROOT` set.
+- Verification:
+  - `doc_currency_validators.py requirement-trace` (`REQUIREMENT TRACE PASS`)
+
+## REQ-SV-001: Survival vitals (REQ-SV-001)
+
+- Source: `docs/game/features/survival_vitals.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Survival vitals" E2E package (task t_34d0483b); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Survival vitals" package is implemented and smoke-validated.
+- Verification:
+  - `vitals_state_smoke.gd`
+  - `VITALS STATE PASS`
+
+## REQ-SV-007: Survival vitals (REQ-SV-007)
+
+- Source: `docs/game/features/survival_vitals.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Survival vitals" E2E package (task t_34d0483b); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Survival vitals" package is implemented and smoke-validated.
+- Verification:
+  - `main_playable_slice_vitals_full_smoke.gd`
+  - `MAIN PLAYABLE VITALS FULL PASS`
+
+## REQ-SV-008: Survival vitals (REQ-SV-008)
+
+- Source: `docs/game/features/survival_vitals.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Survival vitals" E2E package (task t_34d0483b); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Survival vitals" package is implemented and smoke-validated.
+- Verification:
+  - `vitals_state_save_load_smoke.gd`
+  - `VITALS SAVE LOAD PASS`
+
+## REQ-FC-001: Food, cooking, spoilage, and sustenance inputs (REQ-FC-001)
+
+- Source: `docs/game/features/food_cooking_spoilage.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Food, cooking, spoilage, and sustenance inputs" E2E package (task t_d569eba2); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Food, cooking, spoilage, and sustenance inputs" package is implemented and smoke-validated.
+- Verification:
+  - `food_state_smoke.gd`
+  - `FOOD STATE PASS`
+
+## REQ-FC-004: Food, cooking, spoilage, and sustenance inputs (REQ-FC-004)
+
+- Source: `docs/game/features/food_cooking_spoilage.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Food, cooking, spoilage, and sustenance inputs" E2E package (task t_d569eba2); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Food, cooking, spoilage, and sustenance inputs" package is implemented and smoke-validated.
+- Verification:
+  - `cooking_state_smoke.gd`
+  - `COOKING STATE PASS`
+
+## REQ-FC-008: Food, cooking, spoilage, and sustenance inputs (REQ-FC-008)
+
+- Source: `docs/game/features/food_cooking_spoilage.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Food, cooking, spoilage, and sustenance inputs" E2E package (task t_d569eba2); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Food, cooking, spoilage, and sustenance inputs" package is implemented and smoke-validated.
+- Verification:
+  - `main_playable_slice_cooking_smoke.gd`
+  - `MAIN PLAYABLE COOKING PASS`
+
+## REQ-CS-001: Crafting, materials, recipes, and stations (REQ-CS-001)
+
+- Source: `docs/game/features/crafting_materials_recipes.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Crafting, materials, recipes, and stations" E2E package (task t_be88f847); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Crafting, materials, recipes, and stations" package is implemented and smoke-validated.
+- Verification:
+  - `material_state_smoke.gd`
+  - `MATERIAL STATE PASS`
+
+## REQ-CS-005: Crafting, materials, recipes, and stations (REQ-CS-005)
+
+- Source: `docs/game/features/crafting_materials_recipes.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Crafting, materials, recipes, and stations" E2E package (task t_be88f847); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Crafting, materials, recipes, and stations" package is implemented and smoke-validated.
+- Verification:
+  - `crafting_state_smoke.gd`
+  - `CRAFTING STATE PASS`
+
+## REQ-CS-014: Crafting, materials, recipes, and stations (REQ-CS-014)
+
+- Source: `docs/game/features/crafting_materials_recipes.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Crafting, materials, recipes, and stations" E2E package (task t_be88f847); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Crafting, materials, recipes, and stations" package is implemented and smoke-validated.
+- Verification:
+  - `main_playable_slice_crafting_smoke.gd`
+  - `MAIN PLAYABLE CRAFTING PASS`
+
+## REQ-LE-001: Loot ecosystem (REQ-LE-001)
+
+- Source: `docs/game/features/loot_ecosystem.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Loot ecosystem" E2E package (task t_af66b721); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Loot ecosystem" package is implemented and smoke-validated.
+- Verification:
+  - `loot_distribution_smoke.gd`
+  - `LOOT DISTRIBUTION PASS`
+
+## REQ-LE-002: Loot ecosystem (REQ-LE-002)
+
+- Source: `docs/game/features/loot_ecosystem.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Loot ecosystem" E2E package (task t_af66b721); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Loot ecosystem" package is implemented and smoke-validated.
+- Verification:
+  - `unique_item_state_smoke.gd`
+  - `UNIQUE ITEM STATE PASS`
+
+## REQ-LE-005: Loot ecosystem (REQ-LE-005)
+
+- Source: `docs/game/features/loot_ecosystem.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Loot ecosystem" E2E package (task t_af66b721); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Loot ecosystem" package is implemented and smoke-validated.
+- Verification:
+  - `main_playable_slice_loot_ecosystem_smoke.gd`
+  - `MAIN PLAYABLE LOOT ECOSYSTEM PASS`
+
+## REQ-CN-001: Consumables, medicine, stimulants, ammo, utility (REQ-CN-001)
+
+- Source: `docs/game/features/consumables_medicine_stimulants.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Consumables, medicine, stimulants, ammo, utility" E2E package (task t_67389b76); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Consumables, medicine, stimulants, ammo, utility" package is implemented and smoke-validated.
+- Verification:
+  - `consumable_state_smoke.gd`
+  - `CONSUMABLE STATE PASS`
+
+## REQ-CN-004: Consumables, medicine, stimulants, ammo, utility (REQ-CN-004)
+
+- Source: `docs/game/features/consumables_medicine_stimulants.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Consumables, medicine, stimulants, ammo, utility" E2E package (task t_67389b76); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Consumables, medicine, stimulants, ammo, utility" package is implemented and smoke-validated.
+- Verification:
+  - `medicine_state_smoke.gd`
+  - `MEDICINE STATE PASS`
+
+## REQ-CN-009: Consumables, medicine, stimulants, ammo, utility (REQ-CN-009)
+
+- Source: `docs/game/features/consumables_medicine_stimulants.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Consumables, medicine, stimulants, ammo, utility" E2E package (task t_67389b76); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Consumables, medicine, stimulants, ammo, utility" package is implemented and smoke-validated.
+- Verification:
+  - `main_playable_consumables_smoke.gd`
+  - `MAIN PLAYABLE CONSUMABLES PASS`
+
+## REQ-D-001: Combat, threat AI, damage, armor, status (REQ-D-001)
+
+- Source: `docs/game/features/combat_threat_ai.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Combat, threat AI, damage, armor, status" E2E package (task t_cbe56420); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Combat, threat AI, damage, armor, status" package is implemented and smoke-validated.
+- Verification:
+  - `damage_pipeline_smoke.gd`
+  - `DAMAGE PIPELINE PASS`
+
+## REQ-D-006: Combat, threat AI, damage, armor, status (REQ-D-006)
+
+- Source: `docs/game/features/combat_threat_ai.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Combat, threat AI, damage, armor, status" E2E package (task t_cbe56420); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Combat, threat AI, damage, armor, status" package is implemented and smoke-validated.
+- Verification:
+  - `threat_ai_state_smoke.gd`
+  - `THREAT AI STATE PASS`
+
+## REQ-D-010: Combat, threat AI, damage, armor, status (REQ-D-010)
+
+- Source: `docs/game/features/combat_threat_ai.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Combat, threat AI, damage, armor, status" E2E package (task t_cbe56420); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Combat, threat AI, damage, armor, status" package is implemented and smoke-validated.
+- Verification:
+  - `main_playable_slice_combat_encounter_smoke.gd`
+  - `MAIN PLAYABLE COMBAT ENCOUNTER PASS`
+
+## REQ-SS-001: Expanded ship systems and sustenance infrastructure (REQ-SS-001)
+
+- Source: `docs/game/features/ship_systems_sustenance_infrastructure.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Expanded ship systems and sustenance infrastructure" E2E package (task t_290ec958); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Expanded ship systems and sustenance infrastructure" package is implemented and smoke-validated.
+- Verification:
+  - `power_grid_state_smoke.gd`
+  - `POWER GRID STATE PASS`
+
+## REQ-SS-002: Expanded ship systems and sustenance infrastructure (REQ-SS-002)
+
+- Source: `docs/game/features/ship_systems_sustenance_infrastructure.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Expanded ship systems and sustenance infrastructure" E2E package (task t_290ec958); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Expanded ship systems and sustenance infrastructure" package is implemented and smoke-validated.
+- Verification:
+  - `sustenance_state_smoke.gd`
+  - `SUSTENANCE STATE PASS`
+
+## REQ-SS-006: Expanded ship systems and sustenance infrastructure (REQ-SS-006)
+
+- Source: `docs/game/features/ship_systems_sustenance_infrastructure.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Expanded ship systems and sustenance infrastructure" E2E package (task t_290ec958); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Expanded ship systems and sustenance infrastructure" package is implemented and smoke-validated.
+- Verification:
+  - `main_playable_slice_ship_systems_expanded_smoke.gd`
+  - `MAIN PLAYABLE SHIP SYSTEMS EXPANDED PASS`
+
+## REQ-PM-001: Player progression and meta progression (REQ-PM-001)
+
+- Source: `docs/game/features/player_progression.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Player progression and meta progression" E2E package (task t_02146c59); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Player progression and meta progression" package is implemented and smoke-validated.
+- Verification:
+  - `player_progression_state_smoke.gd`
+  - `PLAYER PROGRESSION PASS`
+
+## REQ-PM-006: Player progression and meta progression (REQ-PM-006)
+
+- Source: `docs/game/features/player_progression.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Player progression and meta progression" E2E package (task t_02146c59); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Player progression and meta progression" package is implemented and smoke-validated.
+- Verification:
+  - `meta_progression_state_smoke.gd`
+  - `META PROGRESSION STATE PASS`
+
+## REQ-PM-007: Player progression and meta progression (REQ-PM-007)
+
+- Source: `docs/game/features/player_progression.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Player progression and meta progression" E2E package (task t_02146c59); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Player progression and meta progression" package is implemented and smoke-validated.
+- Verification:
+  - `player_progression_full_smoke.gd`
+  - `PLAYER PROGRESSION FULL PASS`
+
+## REQ-UI-001: UI, HUD, tutorial, controller, accessibility (REQ-UI-001)
+
+- Source: `docs/game/features/ui_ux_accessibility.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "UI, HUD, tutorial, controller, accessibility" E2E package (task t_7a6849cb); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "UI, HUD, tutorial, controller, accessibility" package is implemented and smoke-validated.
+- Verification:
+  - `menu_state_smoke.gd`
+  - `MENU STATE PASS`
+
+## REQ-UI-003: UI, HUD, tutorial, controller, accessibility (REQ-UI-003)
+
+- Source: `docs/game/features/ui_ux_accessibility.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "UI, HUD, tutorial, controller, accessibility" E2E package (task t_7a6849cb); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "UI, HUD, tutorial, controller, accessibility" package is implemented and smoke-validated.
+- Verification:
+  - `settings_state_smoke.gd`
+  - `SETTINGS STATE PASS`
+
+## REQ-UI-006: UI, HUD, tutorial, controller, accessibility (REQ-UI-006)
+
+- Source: `docs/game/features/ui_ux_accessibility.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "UI, HUD, tutorial, controller, accessibility" E2E package (task t_7a6849cb); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "UI, HUD, tutorial, controller, accessibility" package is implemented and smoke-validated.
+- Verification:
+  - `main_playable_slice_ui_shell_smoke.gd`
+  - `MAIN PLAYABLE UI SHELL PASS`
+
+## REQ-AU-001: Audio, music, spatial audio, voice, meta events (REQ-AU-001)
+
+- Source: `docs/game/features/audio-music-spatial.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Audio, music, spatial audio, voice, meta events" E2E package (task t_9e328a9f); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Audio, music, spatial audio, voice, meta events" package is implemented and smoke-validated.
+- Verification:
+  - `audio_bus_config_smoke.gd`
+  - `AUDIO BUS CONFIG PASS`
+
+## REQ-AU-004: Audio, music, spatial audio, voice, meta events (REQ-AU-004)
+
+- Source: `docs/game/features/audio-music-spatial.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Audio, music, spatial audio, voice, meta events" E2E package (task t_9e328a9f); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Audio, music, spatial audio, voice, meta events" package is implemented and smoke-validated.
+- Verification:
+  - `dynamic_music_state_smoke.gd`
+  - `DYNAMIC MUSIC STATE PASS`
+
+## REQ-AU-010: Audio, music, spatial audio, voice, meta events (REQ-AU-010)
+
+- Source: `docs/game/features/audio-music-spatial.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Audio, music, spatial audio, voice, meta events" E2E package (task t_9e328a9f); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Audio, music, spatial audio, voice, meta events" package is implemented and smoke-validated.
+- Verification:
+  - `main_playable_slice_audio_smoke.gd`
+  - `MAIN PLAYABLE AUDIO PASS`
+
+## REQ-SL-001: Multi-slot save, autosave, migration, corruption, cloud manifest (REQ-SL-001)
+
+- Source: `docs/game/features/save_load.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Multi-slot save, autosave, migration, corruption, cloud manifest" E2E package (task t_2d267b26); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Multi-slot save, autosave, migration, corruption, cloud manifest" package is implemented and smoke-validated.
+- Verification:
+  - `save_slot_state_smoke.gd`
+  - `SAVE SLOT STATE PASS`
+
+## REQ-SL-007: Multi-slot save, autosave, migration, corruption, cloud manifest (REQ-SL-007)
+
+- Source: `docs/game/features/save_load.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Multi-slot save, autosave, migration, corruption, cloud manifest" E2E package (task t_2d267b26); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Multi-slot save, autosave, migration, corruption, cloud manifest" package is implemented and smoke-validated.
+- Verification:
+  - `save_migration_service_smoke.gd`
+  - `SAVE MIGRATION SERVICE PASS`
+
+## REQ-SL-012: Multi-slot save, autosave, migration, corruption, cloud manifest (REQ-SL-012)
+
+- Source: `docs/game/features/save_load.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Multi-slot save, autosave, migration, corruption, cloud manifest" E2E package (task t_2d267b26); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Multi-slot save, autosave, migration, corruption, cloud manifest" package is implemented and smoke-validated.
+- Verification:
+  - `main_playable_slice_multislot_save_smoke.gd`
+  - `MAIN PLAYABLE MULTISLOT SAVE PASS`
+
+## REQ-PG-001: Procedural generation expansion (REQ-PG-001)
+
+- Source: `docs/game/features/procedural_generation_expansion.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Procedural generation expansion" E2E package (task t_4faf58cf); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Procedural generation expansion" package is implemented and smoke-validated.
+- Verification:
+  - `room_variant_selector_smoke.gd`
+  - `ROOM VARIANT SELECTOR PASS`
+
+## REQ-PG-007: Procedural generation expansion (REQ-PG-007)
+
+- Source: `docs/game/features/procedural_generation_expansion.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Procedural generation expansion" E2E package (task t_4faf58cf); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Procedural generation expansion" package is implemented and smoke-validated.
+- Verification:
+  - `encounter_injector_smoke.gd`
+  - `ENCOUNTER INJECTOR PASS`
+
+## REQ-PG-012: Procedural generation expansion (REQ-PG-012)
+
+- Source: `docs/game/features/procedural_generation_expansion.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Procedural generation expansion" E2E package (task t_4faf58cf); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Procedural generation expansion" package is implemented and smoke-validated.
+- Verification:
+  - `seed_determinism_smoke.gd`
+  - `SEED DETERMINISM PASS`
+
+## REQ-RL-001: Distribution, store, achievements, demo, localization, post-launch ops (REQ-RL-001)
+
+- Source: `docs/game/features/release_distribution.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Distribution, store, achievements, demo, localization, post-launch ops" E2E package (task t_3b217838); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Distribution, store, achievements, demo, localization, post-launch ops" package is implemented and smoke-validated.
+- Verification:
+  - `export_presets_smoke.gd`
+  - `EXPORT PRESETS PASS`
+
+## REQ-RL-003: Distribution, store, achievements, demo, localization, post-launch ops (REQ-RL-003)
+
+- Source: `docs/game/features/release_distribution.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Distribution, store, achievements, demo, localization, post-launch ops" E2E package (task t_3b217838); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Distribution, store, achievements, demo, localization, post-launch ops" package is implemented and smoke-validated.
+- Verification:
+  - `achievement_state_smoke.gd`
+  - `ACHIEVEMENT STATE PASS`
+
+## REQ-RL-008: Distribution, store, achievements, demo, localization, post-launch ops (REQ-RL-008)
+
+- Source: `docs/game/features/release_distribution.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Distribution, store, achievements, demo, localization, post-launch ops" E2E package (task t_3b217838); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Distribution, store, achievements, demo, localization, post-launch ops" package is implemented and smoke-validated.
+- Verification:
+  - `release_readiness_ledger_smoke.gd`
+  - `RELEASE READINESS LEDGER PASS`
+
+## REQ-INT-001: Cross-system integration, balance, product audit, and gap closure (REQ-INT-001)
+
+- Source: `docs/game/features/cross_system_integration_review.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Cross-system integration, balance, product audit, and gap closure" E2E package (task t_12bf9f4a); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Cross-system integration, balance, product audit, and gap closure" package is implemented and smoke-validated.
+- Verification:
+  - `cross_system_dependency_smoke.gd`
+  - `CROSS SYSTEM DEPENDENCY PASS`
+
+## REQ-INT-002: Cross-system integration, balance, product audit, and gap closure (REQ-INT-002)
+
+- Source: `docs/game/features/cross_system_integration_review.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Cross-system integration, balance, product audit, and gap closure" E2E package (task t_12bf9f4a); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Cross-system integration, balance, product audit, and gap closure" package is implemented and smoke-validated.
+- Verification:
+  - `e2e_survival_loop_smoke.gd`
+  - `E2E SURVIVAL LOOP PASS`
+
+## REQ-INT-003: Cross-system integration, balance, product audit, and gap closure (REQ-INT-003)
+
+- Source: `docs/game/features/cross_system_integration_review.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Cross-system integration, balance, product audit, and gap closure" E2E package (task t_12bf9f4a); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Cross-system integration, balance, product audit, and gap closure" package is implemented and smoke-validated.
+- Verification:
+  - `e2e_combat_loot_craft_smoke.gd`
+  - `E2E COMBAT LOOT CRAFT PASS`
+
+## REQ-INT-004: Cross-system integration, balance, product audit, and gap closure (REQ-INT-004)
+
+- Source: `docs/game/features/cross_system_integration_review.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Cross-system integration, balance, product audit, and gap closure" E2E package (task t_12bf9f4a); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Cross-system integration, balance, product audit, and gap closure" package is implemented and smoke-validated.
+- Verification:
+  - `e2e_ship_meta_loop_smoke.gd`
+  - `E2E SHIP META LOOP PASS`
+
+## REQ-INT-005: Cross-system integration, balance, product audit, and gap closure (REQ-INT-005)
+
+- Source: `docs/game/features/cross_system_integration_review.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Cross-system integration, balance, product audit, and gap closure" E2E package (task t_12bf9f4a); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Cross-system integration, balance, product audit, and gap closure" package is implemented and smoke-validated.
+- Verification:
+  - `product_audit_smoke.gd`
+  - `PRODUCT AUDIT PASS`
+
+## REQ-INT-006: Cross-system integration, balance, product audit, and gap closure (REQ-INT-006)
+
+- Source: `docs/game/features/cross_system_integration_review.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Cross-system integration, balance, product audit, and gap closure" E2E package (task t_12bf9f4a); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Cross-system integration, balance, product audit, and gap closure" package is implemented and smoke-validated.
+- Verification:
+  - `cross_system_dependency_smoke.gd`
+  - `CROSS SYSTEM DEPENDENCY PASS`
+
+## REQ-INT-007: Cross-system integration, balance, product audit, and gap closure (REQ-INT-007)
+
+- Source: `docs/game/features/cross_system_integration_review.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Cross-system integration, balance, product audit, and gap closure" E2E package (task t_12bf9f4a); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Cross-system integration, balance, product audit, and gap closure" package is implemented and smoke-validated.
+- Verification:
+  - `cross_system_dependency_smoke.gd`
+  - `CROSS SYSTEM DEPENDENCY PASS`
+
+## REQ-INT-008: Cross-system integration, balance, product audit, and gap closure (REQ-INT-008)
+
+- Source: `docs/game/features/cross_system_integration_review.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Cross-system integration, balance, product audit, and gap closure" E2E package (task t_12bf9f4a); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Cross-system integration, balance, product audit, and gap closure" package is implemented and smoke-validated.
+- Verification:
+  - `cross_system_dependency_smoke.gd`
+  - `CROSS SYSTEM DEPENDENCY PASS`
+
+## REQ-INT-009: Cross-system integration, balance, product audit, and gap closure (REQ-INT-009)
+
+- Source: `docs/game/features/cross_system_integration_review.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Cross-system integration, balance, product audit, and gap closure" E2E package (task t_12bf9f4a); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Cross-system integration, balance, product audit, and gap closure" package is implemented and smoke-validated.
+- Verification:
+  - `cross_system_dependency_smoke.gd`
+  - `CROSS SYSTEM DEPENDENCY PASS`
+
+## REQ-INT-010: Cross-system integration, balance, product audit, and gap closure (REQ-INT-010)
+
+- Source: `docs/game/features/cross_system_integration_review.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Part of the validated "Cross-system integration, balance, product audit, and gap closure" E2E package (task t_12bf9f4a); see the cross-system integration matrix.
+- Acceptance criteria:
+  - The "Cross-system integration, balance, product audit, and gap closure" package is implemented and smoke-validated.
+- Verification:
+  - `cross_system_dependency_smoke.gd`
+  - `CROSS SYSTEM DEPENDENCY PASS`

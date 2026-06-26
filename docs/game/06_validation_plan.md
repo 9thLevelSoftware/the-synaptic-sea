@@ -91,7 +91,15 @@ run_clean 'performance baseline smoke' 'PERFORMANCE BASELINE PASS templates=3' "
 run_clean 'arc hazard model smoke' 'ARC STATE PASS cycles=2 phases=4 passability_switches=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/electrical_arc_state_smoke.gd
 run_clean 'main arc smoke' 'MAIN PLAYABLE ARC PASS state=DISCHARGED cycles=2 blocked_arcing=true blocked_discharged=false' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_arc_smoke.gd
 run_clean 'ADR-0005 hazard contract static smoke' 'HAZARD CONTRACT PASS models=3 phase_timer_owners=2 wrong_kind_rejected=3 configure_dict=3' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_contract_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=30 clean_output=true'
+# --- Task 15 documentation/manifest currency validators (host-side Python; no Godot) ---
+# doc_currency_validators.py auto-detects the repo root (overridable via ROOT) and
+# exits non-zero on failure. The kanban-manifest check needs the live Hermes board
+# SQLite DB; when it is absent it prints "KANBAN MANIFEST SKIP" instead of
+# "KANBAN MANIFEST PASS", and the gate accepts either (marker "KANBAN MANIFEST").
+run_clean 'systems map currency' 'SYSTEMS MAP CURRENCY PASS' python3 "$ROOT/scripts/validation/doc_currency_validators.py" systems-map
+run_clean 'requirement trace' 'REQUIREMENT TRACE PASS' python3 "$ROOT/scripts/validation/doc_currency_validators.py" requirement-trace
+run_clean 'kanban manifest currency' 'KANBAN MANIFEST' python3 "$ROOT/scripts/validation/doc_currency_validators.py" kanban-manifest
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=33 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
