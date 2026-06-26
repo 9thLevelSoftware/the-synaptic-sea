@@ -2,6 +2,7 @@ extends CharacterBody3D
 class_name PlayerController
 
 signal interact_requested(player: PlayerController)
+signal field_craft_requested(player: PlayerController)
 
 const DEFAULT_MOVE_SPEED: float = 6.0
 const DEFAULT_COLLISION_RADIUS: float = 0.35
@@ -40,6 +41,8 @@ func _physics_process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("interact"):
 		request_interact()
+	elif event.is_action_pressed("field_craft"):
+		emit_signal("field_craft_requested", self)
 
 
 func request_interact() -> void:

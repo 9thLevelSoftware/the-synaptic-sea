@@ -39,6 +39,11 @@ const RarityTierScript := preload("res://scripts/systems/rarity_tier.gd")
 const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
 const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
 const RepairPointScript := preload("res://scripts/tools/repair_point.gd")
+const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
+const MaterialStateScript := preload("res://scripts/systems/material_state.gd")
+const FieldCraftingStateScript := preload("res://scripts/systems/field_crafting_state.gd")
+const DeconstructionResolverScript := preload("res://scripts/systems/deconstruction_resolver.gd")
+const CraftingStationScript := preload("res://scripts/tools/crafting_station.gd")
 const ShipOccupancyScript := preload("res://scripts/systems/ship_occupancy.gd")
 const DockPortsScript := preload("res://scripts/systems/dock_ports.gd")
 const DockingManagerScript := preload("res://scripts/systems/docking_manager.gd")
@@ -229,6 +234,15 @@ var loot_containers: Array = []
 # Sub-project #4: timed repair points for damaged subcomponents.
 var repair_point_root: Node3D = null
 var repair_points: Array = []
+# ADR-0038: crafting / salvage economy wired into the live run. These pure models are
+# coordinator-owned and ticked from _process; the station nodes are the player-reachable seam.
+var crafting_state                          # CraftingState
+var material_state                          # MaterialState
+var field_crafting_state                    # FieldCraftingState
+var deconstruction_resolver                 # DeconstructionResolver
+var crafting_station_root: Node3D = null
+var crafting_stations: Array = []
+const CRAFTING_STATION_KINDS: Array[String] = ["fabricator", "medbay", "kitchen", "synthesizer", "workbench", "salvage"]
 var _loot_tables: Dictionary = {}
 var _salvage_loot_tables: Dictionary = {}   # objective_id -> loot_table key
 var unique_item_state
@@ -385,6 +399,8 @@ func ensure_default_input_actions() -> void:
 		_ensure_key_action_set(action_name, DEFAULT_MOVE_BINDINGS[action_name])
 	_ensure_key_action_set("interact", DEFAULT_INTERACT_BINDINGS)
 	_ensure_key_action_set("attack_primary", DEFAULT_ATTACK_BINDINGS)
+	# ADR-0038: emergency field crafting bound to C (previously unbound).
+	_ensure_key_action_set("field_craft", [KEY_C])
 	# REQ-012: manual save/load input actions. F5 saves, F9 loads.
 	_ensure_key_action_set("save_run", DEFAULT_SAVE_RUN_BINDINGS)
 	_ensure_key_action_set("load_run", DEFAULT_LOAD_RUN_BINDINGS)
@@ -1154,6 +1170,16 @@ func _build_runtime_nodes() -> void:
 	repair_point_root = Node3D.new()
 	repair_point_root.name = "RepairPointRoot"
 	add_child(repair_point_root)
+	# ADR-0038: instantiate the crafting / salvage economy models (each auto-loads its JSON
+	# catalog in _init). The station nodes that make them player-reachable are built later
+	# in _build_crafting_stations() once the home ship scene_root exists.
+	crafting_state = CraftingStateScript.new()
+	material_state = MaterialStateScript.new()
+	field_crafting_state = FieldCraftingStateScript.new()
+	deconstruction_resolver = DeconstructionResolverScript.new()
+	crafting_station_root = Node3D.new()
+	crafting_station_root.name = "CraftingStationRoot"
+	add_child(crafting_station_root)
 	_loot_tables = LootRollerScript.load_tables()
 	_build_hud_layer()
 	# REQ-012: current-run save/load service. Single slot at
@@ -1280,6 +1306,20 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 		})
 	if fire_suppression_state != null:
 		fire_suppression_state.tick(delta, {"powered_ratio": power_grid_state.get_allocation_ratio("stations")})
+	# ADR-0038: drive station power from the same "stations" channel, then advance the
+	# single active craft. Field crafting is unpowered, so it ticks regardless (and also in
+	# the _process away-branch for emergency crafts started before travel).
+	if crafting_state != null:
+		var stations_powered: bool = power_grid_state.get_allocation_ratio("stations") > 0.0
+		for kind in CRAFTING_STATION_KINDS:
+			crafting_state.get_or_create_station(kind).set_power(stations_powered)
+		for st in crafting_stations:
+			if is_instance_valid(st):
+				st.set_powered(stations_powered)
+		if crafting_state.tick(delta):
+			_on_craft_completed()
+	if field_crafting_state != null and field_crafting_state.tick(delta):
+		_on_field_craft_completed()
 	if sustenance_state != null:
 		sustenance_state.tick(delta, {
 			"powered_ratio": power_grid_state.get_allocation_ratio("sustenance"),
@@ -2413,6 +2453,71 @@ func _clear_repair_points() -> void:
 	# are freed when scene_root is freed on departure — just clear the array.
 	repair_points.clear()
 
+## ADR-0038: builds one player-reachable CraftingStation per curated kind on the home ship.
+## Stations live on the home ship (not derelicts) and are parented under home_ship.scene_root
+## so they inherit its transform and are freed with it. Idempotent: re-callable on reload.
+func _build_crafting_stations() -> void:
+	_clear_crafting_stations()
+	if away_from_start or home_ship == null or not is_instance_valid(home_ship.scene_root):
+		return
+	if crafting_state == null:
+		return
+	var positions: Array = _home_local_station_positions()
+	if positions.is_empty():
+		# Fallback: spread the stations around the scene_root origin so they always exist
+		# (interactable via range gate / the validation teleport seam) even when the home
+		# structure can't be resolved into floor cells.
+		var y: float = PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR
+		for i in range(CRAFTING_STATION_KINDS.size()):
+			positions.append(Vector3(float(i) * 2.0, y, 0.0))
+	var idx: int = 0
+	for kind in CRAFTING_STATION_KINDS:
+		var pos: Vector3 = positions[idx % positions.size()]
+		idx += 1
+		var st = CraftingStationScript.new()
+		st.configure(kind, crafting_state, material_state, inventory_state,
+			deconstruction_resolver, player_progression, pos, 1.8)
+		if not st.craft_started.is_connected(_on_craft_started):
+			st.craft_started.connect(_on_craft_started)
+		if not st.salvage_completed.is_connected(_on_salvage_completed):
+			st.salvage_completed.connect(_on_salvage_completed)
+		if not st.craft_blocked.is_connected(_on_craft_blocked):
+			st.craft_blocked.connect(_on_craft_blocked)
+		home_ship.scene_root.add_child(st)
+		crafting_stations.append(st)
+
+func _clear_crafting_stations() -> void:
+	for st in crafting_stations:
+		if is_instance_valid(st):
+			var p = st.get_parent()
+			if p != null and is_instance_valid(p):
+				p.remove_child(st)
+			st.queue_free()
+	crafting_stations.clear()
+
+## HOME-LOCAL station positions, derived from the home ship's actual room nodes (the same
+## "ShipStructure"-child approach interior_aabb()/_lifeboat_local_repair_positions() use), so
+## a station parented under home_ship.scene_root lands ON a real floor cell. Returns [] when
+## the structure can't be resolved (caller then falls back to spread anchors).
+func _home_local_station_positions() -> Array:
+	var out: Array = []
+	if home_ship == null or not is_instance_valid(home_ship.scene_root):
+		return out
+	var y: float = PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR
+	var sr: Node3D = home_ship.scene_root
+	var structure: Node = sr.get_node_or_null("ShipStructure")
+	if structure == null:
+		for c in sr.get_children():
+			if c.get_child_count() > 0:
+				structure = c
+				break
+	if structure == null:
+		return out
+	for room_node in structure.get_children():
+		if room_node is Node3D:
+			out.append((room_node as Node3D).position + Vector3(0.0, y, 0.0))
+	return out
+
 ## The systems manager of the ship the player is currently aboard: the derelict's when away,
 ## the lifeboat's when home. (Repair points act on the ship under the player's feet; the
 ## travel gate separately reads the PILOTED ship's systems — see _current_systems_ops.)
@@ -2455,6 +2560,83 @@ func _on_repair_blocked(_system_id: String, _subcomponent_id: String, reason: St
 	if vitals_model != null:
 		vitals_model.notify_repair_blocked(reason)
 
+## ADR-0038: a station began a timed craft (ingredients already consumed by begin_craft).
+## The craft advances in _recompute_expanded_ship_systems and deposits via _on_craft_completed.
+func _on_craft_started(station_kind: String, recipe_id: String) -> void:
+	_refresh_inventory_hud()
+	_recompute_player_encumbrance()
+	print("CRAFT STARTED station=%s recipe=%s" % [station_kind, recipe_id])
+
+## ADR-0038: a global craft (station or field) finished. Collects the product and deposits
+## it into the player inventory, then refreshes HUD + encumbrance. Idempotent: a no-op when
+## finish_craft() returns empty.
+func _on_craft_completed() -> void:
+	if crafting_state == null:
+		return
+	var result: Dictionary = crafting_state.finish_craft()
+	var item_id: String = str(result.get("item_id", ""))
+	var qty: int = int(result.get("quantity", 0))
+	if item_id.is_empty() or qty <= 0:
+		return
+	if inventory_state != null:
+		inventory_state.add_item(item_id, qty)
+	_refresh_inventory_hud()
+	_recompute_player_encumbrance()
+	print("CRAFT COMPLETED item=%s qty=%d quality=%s" % [
+		item_id, qty, str(result.get("quality_tier", "standard"))])
+
+## ADR-0038: an emergency field craft finished. Same deposit path as station crafts.
+func _on_field_craft_completed() -> void:
+	if field_crafting_state == null:
+		return
+	var result: Dictionary = field_crafting_state.finish_craft()
+	var item_id: String = str(result.get("item_id", ""))
+	var qty: int = int(result.get("quantity", 0))
+	if item_id.is_empty() or qty <= 0:
+		return
+	if inventory_state != null:
+		inventory_state.add_item(item_id, qty)
+	_refresh_inventory_hud()
+	_recompute_player_encumbrance()
+	print("FIELD CRAFT COMPLETED item=%s qty=%d quality=%s" % [
+		item_id, qty, str(result.get("quality_tier", "standard"))])
+
+## ADR-0038: a salvage station deconstructed an item (the station already deposited the
+## yield into inventory); just refresh HUD + encumbrance and report.
+func _on_salvage_completed(item_id: String, yields: Dictionary) -> void:
+	_refresh_inventory_hud()
+	_recompute_player_encumbrance()
+	print("SALVAGE COMPLETED item=%s qty=%d" % [item_id, int(yields.get("quantity", 0))])
+
+func _on_craft_blocked(station_kind: String, reason: String) -> void:
+	print("CRAFT BLOCKED station=%s reason=%s" % [station_kind, reason])
+
+## ADR-0038: handles the player's field_craft (KEY_C) press — begins the first craftable
+## portable recipe (station_kind == "field_crafting") via the coordinator-owned model.
+func _on_player_field_craft_requested(_player_body) -> void:
+	if field_crafting_state == null or inventory_state == null:
+		return
+	if field_crafting_state.is_crafting():
+		print("FIELD CRAFT BLOCKED reason=busy")
+		return
+	var recipes: Array = field_crafting_state.get_field_recipes()
+	recipes.sort_custom(func(a, b): return str(a.get("recipe_id", "")) < str(b.get("recipe_id", "")))
+	var skill: int = 0
+	if player_progression != null and player_progression.has_method("get_skill_level"):
+		skill = int(player_progression.get_skill_level("fabrication"))
+	for recipe in recipes:
+		var rid: String = str(recipe.get("recipe_id", ""))
+		if rid.is_empty():
+			continue
+		if not field_crafting_state.can_craft(rid, inventory_state):
+			continue
+		if field_crafting_state.begin_craft(rid, inventory_state, material_state, skill):
+			_refresh_inventory_hud()
+			_recompute_player_encumbrance()
+			print("FIELD CRAFT STARTED recipe=%s" % rid)
+			return
+	print("FIELD CRAFT BLOCKED reason=no_craftable_recipe")
+
 ## Validation seam: start a repair-point channel via the real path, by subcomponent.
 func repair_subcomponent_for_validation(system_id: String, subcomponent_id: String) -> bool:
 	if not is_instance_valid(player):
@@ -2473,6 +2655,38 @@ func advance_repair_channels_for_validation(delta: float) -> void:
 	for rp in repair_points:
 		if is_instance_valid(rp) and rp.channeling:
 			rp.advance_channel(delta)
+
+## ADR-0038 validation seam: start a station craft/salvage via the REAL interaction path,
+## by station kind. Teleports the player onto the station so the range gate (not a
+## candidate bypass) admits the interact — mirrors repair_subcomponent_for_validation.
+func craft_at_station_for_validation(station_kind: String) -> bool:
+	if not is_instance_valid(player):
+		return false
+	for st in crafting_stations:
+		if is_instance_valid(st) and st.station_kind == station_kind:
+			if player.has_method("teleport_to"):
+				player.teleport_to(st.global_position)
+			# Force the station model powered so the deterministic advance below isn't
+			# gated by the live power grid (which may allocate 0 to "stations" on a
+			# damaged boot). Mirrors how the real loop drives set_power each frame.
+			if crafting_state != null:
+				crafting_state.get_or_create_station(station_kind).set_power(true)
+			st.set_powered(true)
+			return st.try_interact(player)
+	return false
+
+## ADR-0038 validation seam: deterministically advance the active station craft (and field
+## craft) by delta, depositing outputs through the real completion handlers when they finish.
+## Keeps the active station powered so the advance never stalls on the live power grid.
+func advance_crafting_for_validation(delta: float) -> void:
+	if crafting_state != null:
+		var active_kind: String = crafting_state.get_active_station_kind()
+		if not active_kind.is_empty():
+			crafting_state.get_or_create_station(active_kind).set_power(true)
+		if crafting_state.tick(delta):
+			_on_craft_completed()
+	if field_crafting_state != null and field_crafting_state.tick(delta):
+		_on_field_craft_completed()
 
 ## LIFEBOAT-LOCAL repair-point positions, derived from the ACTUAL built lifeboat room nodes.
 ## LifeBoatBuilder.build() lays rooms via StructuralPlacer's BFS grid (CELL_SIZE+ROOM_GAP
@@ -2722,6 +2936,7 @@ func travel_home() -> bool:
 	_clear_repair_points()
 	_build_loot_containers()
 	_build_repair_points()
+	_build_crafting_stations()
 	if tracker != null and loader != null and loader.has_method("get_objective_specs_copy"):
 		# set_objectives resets the tracker's completed set; re-apply the home loop's
 		# progress so returning home does not blank a partially-completed home HUD.
@@ -3267,6 +3482,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_refresh_arc_state(true)
 	_build_loot_containers()
 	_build_repair_points()
+	_build_crafting_stations()
 	tracker.set_objectives(loader.get_objective_specs_copy())
 	current_objective_sequence = 1
 	slice_complete = false
@@ -3389,6 +3605,7 @@ func _spawn_player() -> void:
 	add_child(player)
 	player.teleport_to(loader.get_start_transform().origin + Vector3(0.0, PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR, 0.0))
 	player.interact_requested.connect(_on_player_interact_requested)
+	player.field_craft_requested.connect(_on_player_field_craft_requested)
 
 func _spawn_camera() -> void:
 	camera_rig = IsoCameraRigScript.new()
@@ -3494,6 +3711,11 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# Sub-project #4: try lifeboat repair points before pickups/objectives.
 	for rp in repair_points:
 		if is_instance_valid(rp) and rp.try_start(player_body):
+			return
+	# ADR-0038: home-ship crafting / salvage stations. Range-gated; tried after repairs so a
+	# repair point and a station sharing an area resolve to the repair first.
+	for st in crafting_stations:
+		if is_instance_valid(st) and st.try_interact(player_body):
 			return
 	# REQ-007: tool pickup is an interaction like any other. Try it first
 	# (before objective interactables) so the player can pick up the pump
@@ -3858,6 +4080,10 @@ func _process(delta: float) -> void:
 		# away from home, even though the home oxygen/hazard loop is paused here.
 		_tick_threat_runtime(delta)
 		_refresh_player_vitals(delta)
+		# ADR-0038: emergency field crafting completes even away from home (powered-station
+		# crafts pause while away, by design — only field_crafting_state advances here).
+		if field_crafting_state != null and field_crafting_state.tick(delta):
+			_on_field_craft_completed()
 		return
 	if not playable_started or slice_complete:
 		return
@@ -5063,6 +5289,15 @@ func _build_run_snapshot() -> RunSnapshot:
 		snapshot.oxygen_summary = get_oxygen_summary()
 	if inventory_state != null:
 		snapshot.inventory_summary = inventory_state.get_summary()
+	# ADR-0038: persist crafting + material state via the existing additive fields. Field
+	# crafting nests under crafting_summary["field_crafting"] so no new RunSnapshot field is
+	# introduced (apply_summary ignores unknown keys; FieldCraftingState reads the nested key).
+	if crafting_state != null:
+		snapshot.crafting_summary = crafting_state.get_summary()
+		if field_crafting_state != null:
+			snapshot.crafting_summary["field_crafting"] = field_crafting_state.get_summary().get("field_crafting", {})
+	if material_state != null:
+		snapshot.material_summary = material_state.get_summary()
 	if threat_manager != null:
 		snapshot.inventory_summary["combat_hotbar_text"] = _last_weapon_hotbar_text
 		snapshot.inventory_summary["threat_summary"] = threat_manager.get_summary()
@@ -5290,6 +5525,15 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	if oxygen_state != null and not snapshot.oxygen_summary.is_empty():
 		oxygen_state.apply_summary(snapshot.oxygen_summary)
 		_refresh_oxygen_state(true, 0.0)
+	# ADR-0038: restore crafting + material state (and nested field-craft progress). Both
+	# apply_summary calls receive the same crafting_summary dict — CraftingState reads
+	# active_craft/station_summaries, FieldCraftingState reads the nested "field_crafting" key.
+	if crafting_state != null and not snapshot.crafting_summary.is_empty():
+		crafting_state.apply_summary(snapshot.crafting_summary)
+		if field_crafting_state != null:
+			field_crafting_state.apply_summary(snapshot.crafting_summary)
+	if material_state != null and not snapshot.material_summary.is_empty():
+		material_state.apply_summary(snapshot.material_summary)
 	if inventory_state != null and not snapshot.inventory_summary.is_empty():
 		inventory_state.apply_summary(snapshot.inventory_summary)
 		_last_weapon_hotbar_text = str(snapshot.inventory_summary.get("combat_hotbar_text", _last_weapon_hotbar_text))
@@ -5364,6 +5608,7 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	# only truly-damaged subcomponents get markers (Fix 2: stale markers
 	# built before apply_summary healed already-repaired subcomponents).
 	_build_repair_points()
+	_build_crafting_stations()
 	# Restore the saved objective sequence AFTER all model state has
 	# been applied so the subsequent _activate_current_objective() call
 	# sees the right state.
