@@ -88,6 +88,15 @@ func add_item(item_id: String, qty: int) -> int:
 	items[item_id] = current + want
 	return want
 
+## Returns true if at least `qty` of item_id can be added without exceeding max_stack.
+## Weight is a soft-cap (never blocks); only the per-item stack ceiling gates here. Use to
+## guard actions that consume inputs and then deposit an output (e.g. crafting), so the
+## output is never silently dropped after the inputs are spent.
+func can_accept(item_id: String, qty: int) -> bool:
+	if item_id.is_empty() or qty <= 0:
+		return true
+	return (_max_stack(item_id) - get_quantity(item_id)) >= qty
+
 func remove_item(item_id: String, qty: int) -> int:
 	if qty <= 0:
 		return 0

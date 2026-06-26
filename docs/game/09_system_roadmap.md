@@ -27,10 +27,23 @@ A reachability audit of the E2E batch (commit `5445480`) found that **30 of the
 102 new runtime scripts are not reachable from the live main scene** — they have
 passing model/smokes but are never mounted in the actual derelict run. "Validated"
 in the table above therefore means *unit-tested*, not *player-reachable*. The
-crafting/salvage economy (ADR-0038) and the entire menu/settings/meta-screen UI
-shell are validated-but-unreachable. See [integration_debt.md](integration_debt.md) for the
-full classification and the integration actions required before depth/content work
-builds on these foundations.
+entire menu/settings/meta-screen UI shell remains validated-but-unreachable.
+
+> **Update — crafting/salvage now player-reachable (ADR-0038, Bucket 2).** The
+> crafting/salvage economy is wired into the live run: `playable_generated_ship.gd`
+> owns and ticks `CraftingState` / `MaterialState` / `FieldCraftingState` /
+> `DeconstructionResolver`, builds player-reachable `CraftingStation` nodes on the home
+> ship, drives station power from the `stations` power channel, persists via the existing
+> `crafting_summary` / `material_summary` snapshot fields (no new `RunSnapshot` field), and
+> binds emergency field crafting to `C`. Proven coordinator-driven (not just unit-tested) by
+> `scripts/validation/main_playable_slice_station_craft_smoke.gd` →
+> `MAIN PLAYABLE STATION CRAFT PASS crafted=true salvaged=true field=true reachable=true`.
+> MVP limits: one active craft at a time; no recipe-picker UI (auto-selects first craftable);
+> powered-station crafts pause while away from home. See
+> [integration_debt.md](integration_debt.md) for the residual debt.
+
+See [integration_debt.md](integration_debt.md) for the full classification and the
+integration actions required before depth/content work builds on these foundations.
 
 ## Roadmap principles after Task 15
 
