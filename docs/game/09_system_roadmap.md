@@ -27,9 +27,10 @@ A reachability audit of the E2E batch (commit `5445480`) found that **30 of the
 102 new runtime scripts are not reachable from the live main scene** — they have
 passing model/smokes but are never mounted in the actual derelict run. "Validated"
 in the table above therefore means *unit-tested*, not *player-reachable*. As of
-2026-06-26 the crafting/salvage economy (Bucket 2) and the menu/meta-screen UI shell
-(Bucket 3) are both wired into the live run; a fresh reachability audit reports
-**92 reachable / 10 unreachable** (the 10 are Bucket-1 infra tooling + `junk_yield_resolver`).
+2026-06-26 the crafting/salvage economy (Bucket 2), the menu/meta-screen UI shell
+(Bucket 3), and the timed/rotating autosave loop (`autosave_policy`) are all wired into the
+live run; a fresh reachability audit reports **93 reachable / 9 unreachable** (the 9 are
+Bucket-1 infra tooling + `junk_yield_resolver`).
 
 > **Update — crafting/salvage now player-reachable (ADR-0038, Bucket 2).** The
 > crafting/salvage economy is wired into the live run: `playable_generated_ship.gd`
@@ -56,6 +57,18 @@ in the table above therefore means *unit-tested*, not *player-reachable*. As of
 > `MAIN PLAYABLE META SCREENS PASS screens=10 reachable=true`. MVP limits: screens are
 > read-only on open; reached from the in-run pause menu (no separate pre-run main-menu
 > shell yet).
+
+> **Update — timed/rotating autosave now live (`autosave_policy`).** The run previously
+> autosaved only at objective-completion checkpoints; the borderline-unreachable
+> `AutosavePolicy` is now owned + ticked every frame by `playable_generated_ship.gd`
+> (home and away), writing rotating `autosave_a/b/c` slots (surfaced by the Bucket-3
+> `SaveLoadMenu`) on a 90 s / 8-event cadence. Purely additive — the REQ-012
+> `current_run.json` checkpoint path and its resume smokes are untouched (no new
+> `RunSnapshot` field, no new ADR, no new keybind); the policy is reseeded on reload and its
+> rotating slots are cleared on run completion so finished runs leave no resumable rows.
+> Proven by `scripts/validation/main_playable_meta_autosave_smoke.gd` →
+> `MAIN PLAYABLE META AUTOSAVE PASS slot_rotated=true reachable=true`. MVP limit: manual
+> quicksave is not yet wired (no quicksave keybind).
 
 See [integration_debt.md](integration_debt.md) for the full classification and the
 integration actions required before depth/content work builds on these foundations.

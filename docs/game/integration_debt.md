@@ -14,9 +14,10 @@ added by the E2E batch were not reachable from the live main scene
 derelict run. **As of 2026-06-26 the Bucket 2 crafting/salvage economy (6 scripts) is
 wired into the live run (ADR-0038 integration), and the Bucket 3 menu/meta-UI shell
 (10 screens, plus the `localization_catalog` + `build_metadata_state` they consume) is
-now player-reachable. A fresh audit (`/tmp/reach.py`) reports 92 reachable / 10
-unreachable — the 10 remaining are all Bucket-1 infra tooling + `junk_yield_resolver`.**
-See Buckets 2 and 3 below.
+now player-reachable, and the `autosave_policy` timed/rotating autosave loop is wired into
+the live run. A fresh audit (`/tmp/reach.py`) reports 93 reachable / 9 unreachable — the 9
+remaining are all Bucket-1 infra tooling + `junk_yield_resolver`.**
+See Buckets 2, 3, and the autosave note below.
 
 These are **not stubs** — the models are real and smoke-backed. They are
 **un-integrated**. This document tracks that debt so "Validated" is not read as
@@ -35,8 +36,10 @@ After the ADR-0038 crafting integration (2026-06-26): **78 reachable, 24 not rea
 (6 of Bucket 2's 7 scripts wired; `junk_yield_resolver` remains a static helper).
 After the Bucket 3 menu/meta-UI shell integration (2026-06-26): **92 reachable, 10 not
 reachable** (the 10 menu/meta screens + `localization_catalog` + `build_metadata_state`
-graduated to reachable). The 10 remaining unreachable are the Bucket-1 infra/audit
-tooling below plus `junk_yield_resolver` — all expected-unreached.
+graduated to reachable). After wiring the `autosave_policy` timed/rotating autosave loop
+(2026-06-26): **93 reachable, 9 not reachable** (`autosave_policy` graduated). The 9
+remaining unreachable are the Bucket-1 infra/audit tooling below plus `junk_yield_resolver`
+— all expected-unreached.
 
 Re-run the audit script at `/tmp/reach.py` (seed = `scenes/main.tscn`, diff base =
 `5445480`) after any integration change to confirm a script has moved into the
@@ -49,7 +52,8 @@ pipeline. They are correctly **not** in the gameplay scene. They should **not**
 count toward "playable systems."
 
 - `scripts/systems/automated_playtest_rubric.gd`
-- `scripts/systems/autosave_policy.gd`
+- ~~`scripts/systems/autosave_policy.gd`~~ — **graduated to reachable** (timed/rotating
+  autosave loop wired into `playable_generated_ship.gd`; see the autosave note below)
 - `scripts/systems/balance_ledger.gd`
 - ~~`scripts/systems/build_metadata_state.gd`~~ — **graduated to reachable** (Bucket 3:
   drives `ReleaseBadgeOverlay`)
@@ -63,12 +67,12 @@ count toward "playable systems."
 - `scripts/procgen/kit_catalog.gd`
 
 The fresh audit shows `demo_scope_gate` and `release_readiness_ledger` are no longer
-unreachable either; the live unreachable set is now exactly the 9 items above plus
-`junk_yield_resolver` (Bucket 2). The 10-item audit list is the source of truth.
+unreachable either; the live unreachable set is now exactly the 8 non-struck items above
+plus `junk_yield_resolver` (Bucket 2) — 9 in total. The audit list is the source of truth.
 
-Action: none required for playability. `build_metadata_state` and `localization_catalog`
-are now wired (Bucket 3). Re-classify `autosave_policy` and `kit_catalog` if/when their
-consumers (autosave loop, encounter injection) are wired.
+Action: none required for playability. `build_metadata_state`, `localization_catalog`, and
+`autosave_policy` are now wired (Bucket 3 + the autosave loop). Re-classify `kit_catalog`
+if/when its consumer (encounter injection) is wired.
 
 ## Bucket 2 — Crafting / salvage economy. RESOLVED (2026-06-26) — now player-reachable.
 
@@ -142,6 +146,32 @@ pause menu (the game still boots straight into the derelict — no separate pre-
 shell); cross-run achievement reconciliation (Steamworks, ADR-0029/0030) remains deferred —
 `AchievementState` is per-run only.
 
+## Autosave loop — `autosave_policy`. RESOLVED (2026-06-26) — now player-reachable.
+
+> **RESOLVED.** The timed/rotating autosave loop is wired into the live run.
+> `playable_generated_ship.gd` now constructs and owns `AutosavePolicy` in
+> `_build_runtime_nodes()`; ticks it every frame from `_process()` in **both** the home and
+> away (boarded-derelict) branches via `_tick_autosave_policy(delta)`, feeding it the
+> accumulated run-clock seconds and a monotonically-growing event count
+> (`objective_completion_count` + the training-event-bus log size); and on a fire writes a
+> `RunSnapshot` into a rotating `autosave_a`/`b`/`c` slot through
+> `save_load_service.save_to_slot(..., SLOT_KIND_AUTO, ...)` — the same slots the now-reachable
+> `SaveLoadMenu` (Bucket 3) lists. **This is purely additive: the REQ-012 checkpoint path
+> (`_auto_save_current_run` → `save_world` → `current_run.json`) and its resume smokes are
+> untouched** (`REQ012 AUTOSAVE SEQUENCE CHECK PASS` + `AUTOSAVE POLICY PASS` still green;
+> no new `RunSnapshot` field — `summaries=27` unchanged; no new ADR). Lifecycle handling:
+> `_reset_runtime_for_reload()` reseeds the policy (`reset()` + zeroes the run-clock) so a stale
+> event count/clock can't carry across a load, and slice completion deletes the rotating
+> `autosave_a/b/c` slots alongside `delete_current_run()` so a finished run leaves no resumable
+> rows. Proven coordinator-driven by `scripts/validation/main_playable_meta_autosave_smoke.gd`,
+> which forces an autosave through the live coordinator seam and asserts a rotating
+> `SLOT_KIND_AUTO` slot actually hits disk →
+> `MAIN PLAYABLE META AUTOSAVE PASS slot_rotated=true reachable=true`.
+>
+> **Residual MVP limits (follow-ups, not blockers):** manual quicksave (`AutosavePolicy.try_quicksave`)
+> is **not** wired — there is no quicksave keybind yet, so only the autosave loop runs; cadence
+> tunables use the model defaults (90 in-game-second / 8-event cadence, 5 s real-time budget).
+
 ## Deeper audit: are the reachable systems actually *driven*? (2026-06-26)
 
 > Note: the counts in this section predate the ADR-0038 crafting integration; the 6 newly
@@ -178,8 +208,8 @@ negative caused by instance var names differing from file names
 Verified by hand against `audio_manager.gd` — they are ticked every frame.
 
 **Conclusion:** integration debt is confined entirely to the unreachable scripts above
-— **10 after the Bucket 3 menu/meta-UI integration** (was 30 → 24 after Bucket 2 → 10
-after Bucket 3; the 10 menu/meta screens + `localization_catalog` + `build_metadata_state`
-are now reachable + driven). The 10 remaining unreachable are Bucket-1 infra/audit tooling
-plus `junk_yield_resolver` — all expected-unreached. Everything that is reachable is
-genuinely driven.
+— **9 after wiring the autosave loop** (was 30 → 24 after Bucket 2 → 10 after Bucket 3 → 9
+after `autosave_policy`; the 10 menu/meta screens + `localization_catalog` +
+`build_metadata_state` + `autosave_policy` are now reachable + driven). The 9 remaining
+unreachable are Bucket-1 infra/audit tooling plus `junk_yield_resolver` — all
+expected-unreached. Everything that is reachable is genuinely driven.
