@@ -42,8 +42,8 @@ builds on these foundations.
 ## Source-of-truth files
 
 - Systems map: `docs/SYNAPTIC_SEA_COMPLETE_SYSTEMS_MAP.md`
-- Requirements: `docs/game/05_requirements.md` (`REQ-DOC-001..008` added by Task 15)
-- Validation plan: `docs/game/06_validation_plan.md` (Task 15 Python doc-currency smokes registered)
+- Requirements: `docs/game/05_requirements.md` — uses numeric `REQ-001..REQ-014`. NOTE: `REQ-DOC-001..008` is referenced by the Task 15 doc set (this roadmap, ADR-0040, build-plans, systems map, `doc_currency_validators.py`) but was **never added to this requirements file**. See "Documentation-currency caveats" below.
+- Validation plan: `docs/game/06_validation_plan.md` — NOTE: the Task 15 Python doc-currency validators (`scripts/validation/{doc_currency_validators,requirement_trace_smoke,systems_map_currency_smoke,kanban_manifest_smoke}.py`) are **not registered here** and are **not** part of the 30-command regression bundle. See caveats below.
 - ADR index: `docs/game/adr/README.md`
 - Build plan: `docs/game/build-plan.md`
 - Manifest: `.omh/kanban/synaptic-sea-e2e-systems-task-graph.json`
@@ -55,3 +55,32 @@ builds on these foundations.
 - Links: 44
 - Status counts: pre-completion `{"done": 17, "running": 1}`; expected after Task 15 completion `{"done": 18}`
 - Manifest validation marker: `KANBAN MANIFEST PASS`
+
+## Documentation-currency caveats (verified 2026-06-26)
+
+A direct check of the claims above against the working tree found that the M11
+"Documentation Currency — Validated by focused validators" lane does not hold up.
+These are tracked defects, not regressions:
+
+1. **`REQ-DOC-001..008` does not exist in `05_requirements.md`.** The family is
+   referenced in six places (this roadmap, ADR-0040, build-plans, the systems map,
+   and `doc_currency_validators.py`) but was never written into the requirements
+   document, which uses the numeric `REQ-001..REQ-014` scheme. Fix: add the
+   REQ-DOC entries, or remove the dangling references.
+2. **The Python doc-currency validators are not registered in the regression
+   bundle.** `06_validation_plan.md` references them zero times, so they never run
+   as part of the gate.
+3. **Those validators are broken on this machine and fail open.** They hardcode the
+   original macOS paths (`/Users/christopherwilloughby/the-synaptic-sea/...`) and
+   raise `FileNotFoundError` here — yet **exit 0 on failure**, so even if registered
+   they would report false-green. This is why defects (1) went undetected: the
+   "currency validators" do not run, cannot run here, and misreport their status.
+4. **The board snapshot is a frozen point-in-time capture, unverifiable here.**
+   `board_currency.board_db_path` is a macOS path
+   (`/Users/christopherwilloughby/.hermes/...`) not present on this machine, and the
+   snapshot is fixed at `{"done": 17, "running": 1}`. The "`{"done": 18}`" state is
+   aspirational and cannot be confirmed from this checkout.
+
+Real fix (separate from this roadmap edit): repair the validators' paths + non-zero
+exit on failure, register them in `06_validation_plan.md`, then land the REQ-DOC
+entries so the validators pass for the right reason.
