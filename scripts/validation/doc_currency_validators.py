@@ -16,7 +16,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-ROOT_DEFAULT = Path("/Users/christopherwilloughby/the-synaptic-sea")
+# Auto-detect the repo root from this file's location
+# (scripts/validation/doc_currency_validators.py -> repo root is parents[2]).
+# Overridable via the ROOT env var (see root_path()).
+ROOT_DEFAULT = Path(__file__).resolve().parents[2]
 BOARD_DEFAULT = "synaptic-sea-e2e-systems"
 BOARD_DB_DEFAULT = Path.home() / ".hermes" / "kanban" / "boards" / BOARD_DEFAULT / "kanban.db"
 
@@ -266,6 +269,13 @@ def run_requirement_trace(root: Path) -> str:
 
 
 def run_kanban_manifest(root: Path) -> str:
+    # Gate on board-DB availability: the live Hermes SQLite board is not present on
+    # every checkout (e.g. CI / non-origin machines). When it is absent, skip with a
+    # distinct marker rather than failing the gate. Set KANBAN_DB to force a check.
+    manifest = load_json(root, ".omh/kanban/synaptic-sea-e2e-systems-task-graph.json")
+    db_path = board_db_path(manifest)
+    if not db_path.exists():
+        return f"KANBAN MANIFEST SKIP reason=board_db_absent path={db_path}"
     result = KanbanManifestValidator().validate(root)
     result.require_ok()
     details = result.details or {}
