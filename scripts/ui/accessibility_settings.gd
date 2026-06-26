@@ -38,7 +38,27 @@ const DEFAULT_TEXT_SCALE: float = 1.0
 const PROJECT_SETTING_KEY: String = "synaptic-sea/accessibility/text_scale"
 const ENV_VAR_NAME: String = "SYNAPTIC_SEA_TEXT_SCALE"
 
+# REQ-UI-003 / REQ-UI-008 / ADR-0033: AccessibilitySettings is the single
+# runtime sink that SettingsState.apply_to_accessibility() writes to. The
+# fields below mirror the SettingsState schema so the write-back path is a
+# direct, lossless copy. SettingsState validates every value before it gets
+# here, so these setters store as-given; consumers read via the getters.
+const DEFAULT_COLORBLIND_MODE: String = "none"
+const DEFAULT_MOTION_REDUCE: bool = false
+const DEFAULT_CAPTIONS_ENABLED: bool = true
+const DEFAULT_HOLD_TO_TAP: bool = false
+const DEFAULT_DIFFICULTY: String = "standard"
+const DEFAULT_GLYPH_SCHEME: String = "auto"
+const DEFAULT_PRESET_ID: String = "default"
+
 var _text_scale: float = DEFAULT_TEXT_SCALE
+var _colorblind_mode: String = DEFAULT_COLORBLIND_MODE
+var _motion_reduce: bool = DEFAULT_MOTION_REDUCE
+var _captions_enabled: bool = DEFAULT_CAPTIONS_ENABLED
+var _hold_to_tap: bool = DEFAULT_HOLD_TO_TAP
+var _difficulty: String = DEFAULT_DIFFICULTY
+var _glyph_scheme: String = DEFAULT_GLYPH_SCHEME
+var _preset_id: String = DEFAULT_PRESET_ID
 
 func _init() -> void:
 	_text_scale = _resolve_initial_scale()
@@ -55,6 +75,52 @@ func set_text_scale(new_scale: float) -> void:
 	if new_scale <= 0.0:
 		return
 	_text_scale = clampf(new_scale, MIN_TEXT_SCALE, MAX_TEXT_SCALE)
+
+## --- Settings write-back sink (SettingsState.apply_to_accessibility) ---
+## These store the validated settings values so UI/runtime consumers can read
+## a single source of truth. Values are validated upstream by SettingsState.
+
+func set_colorblind_mode(mode: String) -> void:
+	_colorblind_mode = mode
+
+func get_colorblind_mode() -> String:
+	return _colorblind_mode
+
+func set_motion_reduce(value: bool) -> void:
+	_motion_reduce = value
+
+func is_motion_reduce() -> bool:
+	return _motion_reduce
+
+func set_captions_enabled(value: bool) -> void:
+	_captions_enabled = value
+
+func is_captions_enabled() -> bool:
+	return _captions_enabled
+
+func set_hold_to_tap(value: bool) -> void:
+	_hold_to_tap = value
+
+func is_hold_to_tap() -> bool:
+	return _hold_to_tap
+
+func set_difficulty(difficulty: String) -> void:
+	_difficulty = difficulty
+
+func get_difficulty() -> String:
+	return _difficulty
+
+func set_glyph_scheme(scheme: String) -> void:
+	_glyph_scheme = scheme
+
+func get_glyph_scheme() -> String:
+	return _glyph_scheme
+
+func set_preset_id(id: String) -> void:
+	_preset_id = id
+
+func get_preset_id() -> String:
+	return _preset_id
 
 ## HUD font size for a base pixel value at the current scale, rounded to int.
 func scaled_hud_font_size(base_font_size: int) -> int:
