@@ -1,0 +1,42 @@
+{
+  "pistol_ammo_box": {
+    "display_name": "Pistol Ammo Box",
+    "category": "ammo",
+    "weight": 0.6,
+    "max_stack": 10,
+    "ammo_kind": "pistol",
+    "ammo_amount": 12,
+    "effects": ["pistol_rounds_small"],
+    "icon": "res://assets/placeholder/pistol_ammo_box.png"
+  },
+  "shotgun_shell_pack": {
+    "display_name": "Shotgun Shell Pack",
+    "category": "ammo",
+    "weight": 0.8,
+    "max_stack": 10,
+    "ammo_kind": "shell",
+    "ammo_amount": 6,
+    "effects": ["shells_small"],
+    "icon": "res://assets/placeholder/shotgun_shell_pack.png"
+  },
+  "flare_round": {
+    "display_name": "Flare Round",
+    "category": "ammo",
+    "weight": 0.1,
+    "max_stack": 24,
+    "ammo_kind": "flare",
+    "ammo_amount": 1,
+    "effects": ["flare_burn"],
+    "icon": "res://assets/placeholder/flare_round.png"
+  },
+  "shock_probe": {
+    "display_name": "Shock Probe",
+    "category": "ammo",
+    "weight": 0.2,
+    "max_stack": 12,
+    "ammo_kind": "shock",
+    "ammo_amount": 1,
+    "effects": ["shock_jolt"],
+    "icon": "res://assets/placeholder/shock_probe.png"
+  }
+}

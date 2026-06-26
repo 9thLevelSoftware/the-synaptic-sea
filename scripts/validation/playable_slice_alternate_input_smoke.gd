@@ -230,25 +230,25 @@ func _begin_enter_interact_probe() -> void:
 	# layer, not the interaction-completion path (which the WASD/E smoke
 	# already covers end-to-end).
 	_last_phase_key_label = "KEY_ENTER"
-	_send_key(KEY_ENTER, true)
+	_send_key(KEY_ENTER, true, "parse_and_viewport")
 	# Release after one frame so the press isn't held (no double-fire).
-	_send_key(KEY_ENTER, false)
+	_send_key(KEY_ENTER, false, "parse_and_viewport")
 	phase = Phase.ENTER_INTERACT_PROBE
 	phase_frames = 0
 
 
 func _begin_space_interact_probe() -> void:
 	_last_phase_key_label = "KEY_SPACE"
-	_send_key(KEY_SPACE, true)
-	_send_key(KEY_SPACE, false)
+	_send_key(KEY_SPACE, true, "viewport")
+	_send_key(KEY_SPACE, false, "viewport")
 	phase = Phase.SPACE_INTERACT_PROBE
 	phase_frames = 0
 
 
 func _begin_kp_enter_interact_probe() -> void:
 	_last_phase_key_label = "KEY_KP_ENTER"
-	_send_key(KEY_KP_ENTER, true)
-	_send_key(KEY_KP_ENTER, false)
+	_send_key(KEY_KP_ENTER, true, "viewport")
+	_send_key(KEY_KP_ENTER, false, "viewport")
 	phase = Phase.KP_ENTER_INTERACT_PROBE
 	phase_frames = 0
 
@@ -299,16 +299,27 @@ func _tick_settle_then(next: Callable) -> void:
 		next.call()
 
 
-func _send_key(keycode: int, pressed: bool) -> void:
+func _send_key(keycode: int, pressed: bool, dispatch_mode: String = "parse") -> void:
 	var ev := InputEventKey.new()
 	ev.physical_keycode = keycode
 	ev.keycode = keycode
 	ev.pressed = pressed
-	# parse_input_event routes the event through the same input pump the
-	# engine uses for hardware/OS key events, so the action map and
-	# _unhandled_input handlers see exactly what a real keypress would
-	# produce.
-	Input.parse_input_event(ev)
+	if dispatch_mode == "viewport":
+		# In a headless SceneTree smoke, Input.parse_input_event updates the
+		# Input singleton's action state but does not reliably dispatch the
+		# event to Viewport callbacks. Interact is handled by
+		# PlayerController._unhandled_input, so push through the root
+		# viewport exactly once. Do not also call parse_input_event here:
+		# some keycodes (for example Space) can otherwise double-dispatch.
+		get_root().push_input(ev)
+	elif dispatch_mode == "parse_and_viewport":
+		Input.parse_input_event(ev)
+		get_root().push_input(ev)
+	else:
+		# The movement probe intentionally validates the polled action-state
+		# path (`Input.get_action_strength`), so it needs the Input singleton
+		# state updated by parse_input_event while KEY_RIGHT is held.
+		Input.parse_input_event(ev)
 
 
 func _finish() -> void:

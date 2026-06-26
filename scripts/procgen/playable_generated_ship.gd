@@ -7,9 +7,11 @@ const PlayerControllerScript := preload("res://scripts/player/player_controller.
 const IsoCameraRigScript := preload("res://scripts/camera/iso_camera_rig.gd")
 const InteractableScript := preload("res://scripts/interaction/interactable.gd")
 const ObjectiveTrackerScript := preload("res://scripts/ui/objective_tracker.gd")
+const ScannerPanelScript := preload("res://scripts/ui/scanner_panel.gd")
+const InventoryPanelScript := preload("res://scripts/ui/inventory_panel.gd")
 const AccessibilitySettingsScript := preload("res://scripts/ui/accessibility_settings.gd")
+const MenuCoordinatorScript := preload("res://scripts/ui/menu_coordinator.gd")
 const ReadabilityPropFactoryScript := preload("res://scripts/procgen/readability_prop_factory.gd")
-const ShipSystemStateScript := preload("res://scripts/systems/ship_system_state.gd")
 const RouteControlStateScript := preload("res://scripts/systems/route_control_state.gd")
 const OxygenStateScript := preload("res://scripts/systems/oxygen_state.gd")
 const ObjectiveProgressStateScript := preload("res://scripts/systems/objective_progress_state.gd")
@@ -17,8 +19,73 @@ const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd"
 const ToolPickupScript := preload("res://scripts/tools/tool_pickup.gd")
 const FireStateScript := preload("res://scripts/systems/fire_state.gd")
 const ElectricalArcStateScript := preload("res://scripts/systems/electrical_arc_state.gd")
+const AudioManagerScript := preload("res://scripts/audio/audio_manager.gd")
 const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.gd")
 const RunSnapshotScript := preload("res://scripts/systems/run_snapshot.gd")
+const WorldSnapshotScript := preload("res://scripts/systems/world_snapshot.gd")
+const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
+const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
+const PlayerProgressionScript := preload("res://scripts/systems/player_progression_state.gd")
+const ClassDefinitionScript := preload("res://scripts/systems/class_definition.gd")
+const ShipInstanceScript := preload("res://scripts/systems/ship_instance.gd")
+const SynapseSeaWorldScript := preload("res://scripts/systems/synapse_sea_world.gd")
+const ScannerStateScript := preload("res://scripts/systems/scanner_state.gd")
+const TravelControllerScript := preload("res://scripts/systems/travel_controller.gd")
+const LootContainerScript := preload("res://scripts/tools/loot_container.gd")
+const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
+const LootDistributionScript := preload("res://scripts/systems/loot_distribution.gd")
+const UniqueItemStateScript := preload("res://scripts/systems/unique_item_state.gd")
+const RarityTierScript := preload("res://scripts/systems/rarity_tier.gd")
+const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
+const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
+const RepairPointScript := preload("res://scripts/tools/repair_point.gd")
+const ShipOccupancyScript := preload("res://scripts/systems/ship_occupancy.gd")
+const DockPortsScript := preload("res://scripts/systems/dock_ports.gd")
+const DockingManagerScript := preload("res://scripts/systems/docking_manager.gd")
+const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
+const DockPortBarrierScript := preload("res://scripts/tools/dock_port_barrier.gd")
+const BridgeTerminalScript := preload("res://scripts/tools/bridge_terminal.gd")
+const HangarBayControlScript := preload("res://scripts/tools/hangar_bay_control.gd")
+const CargoHoldControlScript := preload("res://scripts/tools/cargo_hold_control.gd")
+const CargoTransferScript := preload("res://scripts/systems/cargo_transfer.gd")
+const CartControlScript := preload("res://scripts/tools/cart_control.gd")
+const CartStateScript := preload("res://scripts/systems/cart_state.gd")
+const EquipmentStateScript := preload("res://scripts/systems/equipment_state.gd")
+const EncumbranceScript := preload("res://scripts/systems/encumbrance.gd")
+const PlayerVitalsModelScript := preload("res://scripts/systems/player_vitals_model.gd")
+const PlayerVitalsPanelScript := preload("res://scripts/ui/player_vitals_panel.gd")
+const HotbarPanelScript := preload("res://scripts/ui/hotbar_panel.gd")
+const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
+const ThreatManagerScript := preload("res://scripts/systems/threat_manager.gd")
+const TrainingEventBusScript := preload("res://scripts/systems/training_event_bus.gd")
+const SkillTreeStateScript := preload("res://scripts/systems/skill_tree_state.gd")
+const HubUpgradeStateScript := preload("res://scripts/systems/hub_upgrade_state.gd")
+const MetaProgressionStateScript := preload("res://scripts/systems/meta_progression_state.gd")
+const UnlockRegistryScript := preload("res://scripts/systems/unlock_registry.gd")
+const VitalsStateScript := preload("res://scripts/systems/vitals_state.gd")
+const SanityStateScript := preload("res://scripts/systems/sanity_state.gd")
+const RadiationStateScript := preload("res://scripts/systems/radiation_state.gd")
+const BodyTemperatureStateScript := preload("res://scripts/systems/body_temperature_state.gd")
+const StatusEffectsStateScript := preload("res://scripts/systems/status_effects_state.gd")
+const SpoilageStateScript := preload("res://scripts/systems/spoilage_state.gd")
+const CookingStateScript := preload("res://scripts/systems/cooking_state.gd")
+const HydroponicsStateScript := preload("res://scripts/systems/hydroponics_state.gd")
+const SynthesizerStateScript := preload("res://scripts/systems/synthesizer_state.gd")
+const WaterRecyclerStateScript := preload("res://scripts/systems/water_recycler_state.gd")
+const PowerGridStateScript := preload("res://scripts/systems/power_grid_state.gd")
+const LifeSupportExpandedStateScript := preload("res://scripts/systems/life_support_state.gd")
+const HullIntegrityStateScript := preload("res://scripts/systems/hull_integrity_state.gd")
+const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
+const PropulsionExpandedStateScript := preload("res://scripts/systems/propulsion_state.gd")
+const ShieldStateScript := preload("res://scripts/systems/shield_state.gd")
+const SustenanceStateScript := preload("res://scripts/systems/sustenance_state.gd")
+const EffectDispatcherScript := preload("res://scripts/systems/effect_dispatcher.gd")
+const ConsumableStateScript := preload("res://scripts/systems/consumable_state.gd")
+const MedicineStateScript := preload("res://scripts/systems/medicine_state.gd")
+const StimulantStateScript := preload("res://scripts/systems/stimulant_state.gd")
+const AddictionStateScript := preload("res://scripts/systems/addiction_state.gd")
+const AmmoStateScript := preload("res://scripts/systems/ammo_state.gd")
+const UtilityItemResolverScript := preload("res://scripts/systems/utility_item_resolver.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -29,6 +96,13 @@ const DEFAULT_LAYOUT_PATH: String = "res://data/procgen/smoke/seed_000017/layout
 const DEFAULT_KIT_PATH: String = "res://data/kits/ship_structural_v0.json"
 const DEFAULT_GAMEPLAY_SLICE_PATH: String = "res://data/procgen/smoke/seed_000017/gameplay_slice.json"
 const PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR: float = 0.55
+# Phase 5a Task 5: co-presence offset. A traveled derelict's scene_root is placed
+# at this world position so the derelict hull sits well clear of the home ship.
+# 100 units ensures a generated layout (max radius ~24 units) does not overlap
+# the home hull (Task 8 will replace this fixed offset with real DockPorts wiring).
+const DERELICT_DOCK_OFFSET := Vector3(100.0, 0.0, 0.0)
+# Phase 5b: the lifeboat no longer parks at a fixed anchor offset — it port-docks to
+# the home ship's airlock via DockingManager at boot (see _build_lifeboat_at_home).
 const ROUTE_GATE_COLLISION_SIZE: Vector3 = Vector3(2.6, 2.2, 0.7)
 const ROUTE_GATE_VISUAL_COLOR_CLOSED: Color = Color(1.0, 0.22, 0.18, 0.82)
 const ROUTE_GATE_VISUAL_COLOR_OPEN: Color = Color(0.18, 0.75, 1.0, 0.18)
@@ -58,15 +132,37 @@ const ARC_ZONE_VISUAL_COLOR_DISCHARGED: Color = Color(0.35, 0.85, 1.0, 0.35)
 const ARC_ZONE_VISUAL_COLOR_ARCING: Color = Color(0.95, 0.32, 1.0, 0.82)
 const ARC_ZONE_LABEL_TEXT_DISCHARGED: String = "ARC GROUNDED — CROSS"
 const ARC_ZONE_LABEL_TEXT_ARCING: String = "ARC LIVE — WAIT"
+const POWER_GRID_CONFIG_PATH: String = "res://data/ship_systems/power_budget_tables.json"
+const HULL_COMPARTMENTS_CONFIG_PATH: String = "res://data/ship_systems/hull_compartments.json"
+const FACILITY_UPGRADES_CONFIG_PATH: String = "res://data/ship_systems/facility_upgrades.json"
+const SHIP_SUBSYSTEM_TUNING_PATH: String = "res://data/ship_systems/subsystem_tuning.json"
+
+# Objective bridge: which manager subcomponents each objective brings operational.
+# restore_systems delivers main power (distribution + battery); stabilize_reactor
+# brings the reactor core to full health (extraction). download_logs/recover_supplies
+# are narrative beats with no system backing.
+const OBJECTIVE_REPAIR_MAP: Dictionary = {
+	"restore_systems": [["power", "power_distribution"], ["power", "battery_cells"]],
+	"download_logs": [["navigation", "nav_computer"]],
+	"stabilize_reactor": [["power", "reactor_core"]],
+}
 
 @export var layout_path: String = DEFAULT_LAYOUT_PATH
 @export var kit_path: String = DEFAULT_KIT_PATH
 @export var gameplay_slice_path: String = DEFAULT_GAMEPLAY_SLICE_PATH
+@export var blueprint_path: String = "res://data/procgen/golden/coherent_ship_001/blueprint.json"
+@export var starting_class_id: String = "engineer"
 var loader
 var player
 var camera_rig
 var hud_layer: CanvasLayer
+var scanner_panel   # ScannerPanel
+var inventory_panel
 var tracker
+var vitals_model            # PlayerVitalsModel
+var vitals_panel            # PlayerVitalsPanel
+var hotbar_panel            # HotbarPanel
+var menu_coordinator
 var interaction_root: Node3D
 var affordance_root: Node3D
 var affordance_labels: Dictionary = {}
@@ -85,7 +181,64 @@ var slice_complete: bool = false
 var ready_summary: Dictionary = {}
 var playable_started: bool = false
 var last_failure_reason: String = ""
-var ship_systems: ShipSystemState
+var ship_systems_manager   # ShipSystemsManager (untyped: class_name globals unreliable under --headless --script)
+var player_progression   # PlayerProgressionState (untyped: class_name unreliable headless)
+var training_event_bus   # TrainingEventBus (REQ-PM-002 / ADR-0033)
+var skill_tree_state     # SkillTreeState (REQ-PM-003)
+var hub_upgrade_state    # HubUpgradeState (REQ-PM-007)
+var meta_progression_state # MetaProgressionState (REQ-PM-006)
+var unlock_registry      # UnlockRegistry (REQ-PM-009)
+var current_ship           # ShipInstance (untyped: class_name globals unreliable headless)
+var current_occupancy      # ShipInstance the player currently occupies (defaults to home_ship)
+var synapse_sea_world         # SynapseSeaWorld
+var scanner_state          # ScannerState
+var travel_controller      # TravelController
+var ship_generator         # ShipGenerator (injected into travel)
+# True while the player is aboard a traveled derelict (not the starting ship).
+# Gates the starting-ship hazard/objective _process so the unoccupied starting
+# ship does not keep simulating in the background.
+var away_from_start: bool = false
+# Sub-project #1 (world persistence): every visited derelict is retained by
+# marker_id so its mutable state survives leaving. Only the ACTIVE ship has a
+# live scene_root; a derelict's geometry is regenerated from seed on revisit
+# while its systems_manager (and later objective/hazard/loot summaries) ride the
+# retained ShipInstance.
+var visited_ships: Dictionary = {}          # marker_id -> ShipInstance
+var home_ship = null                        # the home ShipInstance (marker_id "")
+# Phase 5a Task 7: the physical lifeboat docked to the starting derelict.
+# Port-docked to the home ship's airlock at boot; shares ship_systems_manager with it.
+var lifeboat_ship = null                    # ShipInstance (docked to home_ship)
+var piloted_ship = null                     # the ShipInstance the player currently pilots (lifeboat or any claimed working vessel)
+# Phase 5b Task 5: the active host's closed dock-seam barriers (Array[DockPortBarrier]).
+# Spawned closed when the piloted ship docks to a host; the player breaches one to board.
+var dock_barriers: Array = []
+const PLAYER_LOCAL_ID := "player_local"
+var bridge_terminals: Array = []
+var hangar_controls: Array = []             # Array[HangarBayControl]
+var cargo_hold_controls: Array = []         # Array[CargoHoldControl]
+var cart_controls: Array = []               # Array[CartControl]
+var grabbed_cart = null                     # CartState currently pushed by the player (or null)
+# Sub-project #2: the active derelict's objective interactables live under a
+# dedicated root (empty while on the home ship). Separate from the home gameplay
+# roots so it stays attached when away_from_start.
+var derelict_objective_root: Node3D = null
+var derelict_interactables: Array = []
+# Sub-project #3: scattered loot containers for the active derelict.
+var loot_container_root: Node3D = null
+var loot_containers: Array = []
+# Sub-project #4: timed repair points for damaged subcomponents.
+var repair_point_root: Node3D = null
+var repair_points: Array = []
+var _loot_tables: Dictionary = {}
+var _salvage_loot_tables: Dictionary = {}   # objective_id -> loot_table key
+var unique_item_state
+var _loot_biome_ids_cache: Array[String] = []
+var _last_loot_feedback_line: String = ""
+var _home_player_position: Vector3 = Vector3.ZERO
+const REPAIR_OBJECTIVE_XP: int = 50
+# Narrative objective flags with no manager backing (supplies/logs). Set on
+# completion; persisted in the snapshot; read by _manager_compat_summary().
+var completed_objective_types: Dictionary = {}
 var route_control_state: RouteControlState
 var route_control_root: Node3D
 var route_gate_nodes: Array = []
@@ -110,10 +263,18 @@ var unsafe_room_marker: Label3D
 # removes the calibrator from inventory and hides the pickup marker.
 
 var inventory_state: InventoryState
+var equipment_state                  # EquipmentState (untyped: class_name unreliable headless)
+var _item_defs: Dictionary = {}      # cached merged item-def catalog (lazy; equip/encumbrance reads)
 var tool_pickup: ToolPickup
 var tool_pickup_root: Node3D
 const TOOL_PICKUP_INTERACTION_RADIUS: float = 1.8
 const TOOL_PICKUP_FALLBACK_OFFSET: Vector3 = Vector3(4.0, 0.0, 0.0)
+# REQ-RL-003 / REQ-RL-004: per-run achievement service. Loaded at boot
+# when an `AchievementState` was injected by the build script; emits
+# unlock events when gameplay milestones fire (tool pickup, objective
+# completion, reactor stabilization, run complete). Cross-run state is
+# a deferred Steamworks concern (ADR-0029); this is the per-run hook.
+var achievement_state: AchievementState
 # REQ-014: junction calibrator pickup. Sits in a different side room so
 # the player can pick it up independently of the oxygen pump.
 var junction_calibrator_pickup: ToolPickup
@@ -139,6 +300,41 @@ var fire_zone_resolved_room_id: String = ""
 # StaticBody3D whose collision is toggled; arc_zone_label is the
 # localized Label3D that swaps between DISCHARGED and ARCING text.
 var electrical_arc_state: ElectricalArcState
+# ADR-0034: food / cooking / spoilage / sustenance runtime state.
+# Untyped because class_name globals are unreliable under --headless --script.
+var spoilage_state  # SpoilageState
+var cooking_state   # CookingState
+var hydroponics_state  # HydroponicsState
+var synthesizer_state  # SynthesizerState
+var water_recycler_state  # WaterRecyclerState
+var power_grid_state  # PowerGridState
+var life_support_expanded_state  # LifeSupportState
+var hull_integrity_state  # HullIntegrityState
+var fire_suppression_state  # FireSuppressionState
+var propulsion_expanded_state  # PropulsionState
+var shield_state  # ShieldState
+var sustenance_state  # SustenanceState
+# Task 05 consumables runtime state.
+var effect_dispatcher  # EffectDispatcher
+var consumable_state  # ConsumableState
+var medicine_state  # MedicineState
+var stimulant_state  # StimulantState
+var addiction_state  # AddictionState
+var ammo_state  # AmmoState
+var utility_item_state  # UtilityItemResolver
+var threat_manager  # ThreatManager
+var _last_weapon_hotbar_text: String = ""
+# REQ-SV: survival vitals runtime state.  Untyped for headless reliability.
+var vitals_state  # VitalsState
+var sanity_state  # SanityState
+var radiation_state  # RadiationState
+var body_temperature_state  # BodyTemperatureState
+var status_effects_state  # StatusEffectsState
+# REQ-AU-001..010: audio runtime. audio_manager is owned by the playable
+# (NOT an autoload, per AGENTS.md). audio_root is a Node3D parent for any
+# spatial AudioStreamPlayer3D the manager spawns.
+var audio_manager: Node
+var audio_root: Node3D
 var arc_root: Node3D
 var arc_zone_node: StaticBody3D
 var arc_zone_label: Label3D
@@ -182,14 +378,27 @@ const DEFAULT_MOVE_BINDINGS: Dictionary = {
 const DEFAULT_INTERACT_BINDINGS: Array[Key] = [KEY_E, KEY_ENTER, KEY_SPACE, KEY_KP_ENTER]
 const DEFAULT_SAVE_RUN_BINDINGS: Array[Key] = [KEY_F5]
 const DEFAULT_LOAD_RUN_BINDINGS: Array[Key] = [KEY_F9]
+const DEFAULT_ATTACK_BINDINGS: Array[Key] = [KEY_F]
 
 func ensure_default_input_actions() -> void:
 	for action_name in DEFAULT_MOVE_BINDINGS:
 		_ensure_key_action_set(action_name, DEFAULT_MOVE_BINDINGS[action_name])
 	_ensure_key_action_set("interact", DEFAULT_INTERACT_BINDINGS)
+	_ensure_key_action_set("attack_primary", DEFAULT_ATTACK_BINDINGS)
 	# REQ-012: manual save/load input actions. F5 saves, F9 loads.
 	_ensure_key_action_set("save_run", DEFAULT_SAVE_RUN_BINDINGS)
 	_ensure_key_action_set("load_run", DEFAULT_LOAD_RUN_BINDINGS)
+	_ensure_key_action_set("toggle_scanner", [KEY_TAB])
+	_ensure_key_action_set("toggle_inventory", [KEY_I])
+	_ensure_key_action_set("ui_up", [KEY_UP])
+	_ensure_key_action_set("ui_down", [KEY_DOWN])
+	_ensure_key_action_set("ui_left", [KEY_LEFT])
+	_ensure_key_action_set("ui_right", [KEY_RIGHT])
+	_ensure_key_action_set("ui_accept", [KEY_ENTER, KEY_SPACE, KEY_KP_ENTER])
+	_ensure_key_action_set("ui_cancel", [KEY_ESCAPE])
+	_ensure_key_action_set("ui_pause", [KEY_ESCAPE])
+	_ensure_key_action_set("ui_open_codex", [KEY_F1])
+	_ensure_key_action_set("ui_open_map", [KEY_M])
 
 ## A11Y-P1-001: swap in a new accessibility settings object and re-apply
 ## its scale to the HUD tracker and all existing world Label3D nodes.
@@ -204,6 +413,12 @@ func apply_accessibility_settings(settings: RefCounted) -> void:
 	accessibility_settings = settings
 	if tracker != null and tracker.has_method("apply_accessibility_settings"):
 		tracker.apply_accessibility_settings(settings)
+	if is_instance_valid(vitals_panel) and vitals_panel.has_method("apply_accessibility_settings"):
+		vitals_panel.apply_accessibility_settings(settings)
+	if is_instance_valid(hotbar_panel) and hotbar_panel.has_method("apply_accessibility_settings"):
+		hotbar_panel.apply_accessibility_settings(settings)
+	if is_instance_valid(menu_coordinator) and menu_coordinator.has_method("apply_accessibility_settings"):
+		menu_coordinator.apply_accessibility_settings(settings)
 	_apply_world_label_scale()
 
 func _apply_world_label_scale() -> void:
@@ -282,11 +497,12 @@ func get_playable_summary() -> Dictionary:
 
 ## Blueprint-driven entry point: build a GeneratedShip Node3D tree from a
 ## ShipBlueprint via the ShipGenerator and add it as a direct child of this
-## playable scene. The generator returns a freshly-built root named
-## "GeneratedShip" with the "ShipStructure" Node3D nested inside it; we
-## re-parent that root under self so the existing playable infrastructure
-## (player spawn, camera rig, interactables) can reference it the same way
-## it references the GeneratedShipLoader output.
+## playable scene. The generator returns a freshly-built GeneratedShipLoader
+## root named "GeneratedShip" with "StructuralRoot" (geometry + nav) and
+## "ObjectiveRoot" Node3D children nested inside it; we re-parent that root
+## under self so the existing playable infrastructure (player spawn, camera
+## rig, interactables) can reference it the same way it references the
+## GeneratedShipLoader output.
 ##
 ## This is intentionally orthogonal to loader.load_from_paths(): callers
 ## who already have a ShipBlueprint (e.g. generated procedurally, replayed
@@ -337,9 +553,20 @@ func get_objective_progress_summary() -> Dictionary:
 func get_interactable_by_sequence(sequence: int):
 	var group: Array = sequence_interactables.get(sequence, [])
 	for interactable in group:
-		if int(interactable.get("sequence")) == sequence:
+		if is_instance_valid(interactable) and int(interactable.get("sequence")) == sequence:
 			return interactable
 	return null
+
+## Validation seam: every interactable belonging to a sequence. Multi-step
+## objectives (e.g. the repair_junction at objective 2) expose one
+## interactable per step at distinct positions; drivers that only touch the
+## first (see get_interactable_by_sequence) cannot complete the junction.
+func get_interactables_by_sequence(sequence: int) -> Array:
+	var out: Array = []
+	for interactable in sequence_interactables.get(sequence, []):
+		if is_instance_valid(interactable) and int(interactable.get("sequence")) == sequence:
+			out.append(interactable)
+	return out
 
 func teleport_player_to_objective_for_validation(sequence: int) -> bool:
 	if player == null:
@@ -787,7 +1014,52 @@ func _title_from_snake(raw: String) -> String:
 	return " ".join(words)
 
 func _build_runtime_nodes() -> void:
-	ship_systems = ShipSystemStateScript.new()
+	ship_systems_manager = ShipSystemsManagerScript.new()
+	var bp = _load_blueprint_for_systems()
+	ship_systems_manager.configure(ship_systems_manager.load_definitions(), bp.condition, bp.seed_value)
+	_apply_lifeboat_opening_damage()
+	player_progression = PlayerProgressionScript.new()
+	_configure_player_progression()
+	# REQ-PM-002 / ADR-0033 — training event bus resolves every gameplay
+	# loop (repair / combat / crafting / discovery) into a deterministic
+	# XP grant on player_progression. Configured after player_progression
+	# so the bus can read the player's class multipliers.
+	training_event_bus = TrainingEventBusScript.new()
+	training_event_bus.configure()
+	# REQ-PM-003 / ADR-0033 — skill tree + book prereqs.
+	skill_tree_state = SkillTreeStateScript.new()
+	skill_tree_state.configure(
+		PlayerProgressionScript.load_skills_catalog(),
+		PlayerProgressionScript.load_books_catalog(),
+	)
+	skill_tree_state.load_prerequisites()
+	# REQ-PM-006 / ADR-0033 — meta state (cross-run). Loaded from
+	# user://meta_progression.json; missing file defaults to zeroed.
+	meta_progression_state = MetaProgressionStateScript.new()
+	if not meta_progression_state.load_from_disk():
+		meta_progression_state.reset_all()
+	# REQ-PM-007 / ADR-0033 — hub upgrade catalog.
+	hub_upgrade_state = HubUpgradeStateScript.new()
+	hub_upgrade_state.configure()
+	# REQ-PM-009 / ADR-0033 — cross-run unlock registry (codex / scenes /
+	# classes). Loaded from user://unlock_registry.json.
+	unlock_registry = UnlockRegistryScript.new()
+	var unlock_catalog_path: String = "res://data/player/unlock_tables.json"
+	if FileAccess.file_exists(unlock_catalog_path):
+		var unlock_text: String = FileAccess.get_file_as_string(unlock_catalog_path)
+		var unlock_parsed: Variant = JSON.parse_string(unlock_text)
+		if typeof(unlock_parsed) == TYPE_DICTIONARY:
+			unlock_registry.configure(unlock_parsed)
+		else:
+			unlock_registry.configure()
+	else:
+		unlock_registry.configure()
+	unlock_registry.load_from_disk()
+	unique_item_state = UniqueItemStateScript.new()
+	unique_item_state.configure()
+	# Re-run progression setup after loading cross-run meta + hub state so
+	# persistent starting-skill and XP-multiplier bonuses are actually applied.
+	_configure_player_progression()
 	route_control_state = RouteControlStateScript.new()
 	route_gate_nodes.clear()
 	objective_progress_state = ObjectiveProgressStateScript.new()
@@ -813,6 +1085,7 @@ func _build_runtime_nodes() -> void:
 	# (RefCounted); tool_pickup_root is the parent for any ToolPickup node
 	# the coordinator spawns during ship load.
 	inventory_state = InventoryStateScript.new()
+	equipment_state = EquipmentStateScript.create()
 	tool_pickup_root = Node3D.new()
 	tool_pickup_root.name = "ToolPickupRoot"
 	add_child(tool_pickup_root)
@@ -830,10 +1103,1665 @@ func _build_runtime_nodes() -> void:
 	arc_root = Node3D.new()
 	arc_root.name = "ElectricalArcRoot"
 	add_child(arc_root)
+	# REQ-SV: instantiate survival vitals models.
+	vitals_state = VitalsStateScript.new()
+	sanity_state = SanityStateScript.new()
+	radiation_state = RadiationStateScript.new()
+	body_temperature_state = BodyTemperatureStateScript.new()
+	status_effects_state = StatusEffectsStateScript.new()
+	# ADR-0034: instantiate food / cooking / spoilage / sustenance models.
+	spoilage_state = SpoilageStateScript.new()
+	cooking_state = CookingStateScript.new()
+	hydroponics_state = HydroponicsStateScript.new()
+	synthesizer_state = SynthesizerStateScript.new()
+	water_recycler_state = WaterRecyclerStateScript.new()
+	_configure_expanded_ship_system_models()
+	effect_dispatcher = EffectDispatcherScript.new()
+	effect_dispatcher.configure({})
+	consumable_state = ConsumableStateScript.new()
+	consumable_state.configure({})
+	medicine_state = MedicineStateScript.new()
+	medicine_state.configure({})
+	stimulant_state = StimulantStateScript.new()
+	stimulant_state.configure({})
+	addiction_state = AddictionStateScript.new()
+	addiction_state.configure({})
+	ammo_state = AmmoStateScript.new()
+	ammo_state.configure({})
+	utility_item_state = UtilityItemResolverScript.new()
+	utility_item_state.configure({})
+	threat_manager = ThreatManagerScript.new()
+	threat_manager.name = "ThreatManager"
+	add_child(threat_manager)
+	# REQ-AU-001..010: build the AudioManager service. The manager owns
+	# six pure models (bus_config, ambient, sfx_router, music, spatial,
+	# meta_event) and a per-bus AudioStreamPlayer pool. Constructed after
+	# the hazards so the manager's music-state engine can read engagement /
+	# hazard / vitals signals from the same models the rest of the scene
+	# uses.
+	audio_manager = AudioManagerScript.new()
+	audio_manager.name = "AudioManager"
+	add_child(audio_manager)
+	audio_root = Node3D.new()
+	audio_root.name = "AudioRoot"
+	add_child(audio_root)
+	derelict_objective_root = Node3D.new()
+	derelict_objective_root.name = "DerelictObjectiveRoot"
+	add_child(derelict_objective_root)
+	loot_container_root = Node3D.new()
+	loot_container_root.name = "LootContainerRoot"
+	add_child(loot_container_root)
+	repair_point_root = Node3D.new()
+	repair_point_root.name = "RepairPointRoot"
+	add_child(repair_point_root)
+	_loot_tables = LootRollerScript.load_tables()
 	_build_hud_layer()
 	# REQ-012: current-run save/load service. Single slot at
 	# user://saves/current_run.json; deleted on playable_slice_completed.
 	save_load_service = SaveLoadServiceScript.new()
+	# Phase 4.5: Synapse Sea map + scanner + travel. Seed the world from the
+	# starting blueprint's seed so the marker field is deterministic per run.
+	# Player starts at Synapse Sea map origin (abstract X-Z map space — NOT the
+	# physical scene origin where ship geometry is instantiated).
+	var start_bp = _load_blueprint_for_systems()
+	synapse_sea_world = SynapseSeaWorldScript.new(start_bp.seed_value, Vector3.ZERO)
+	scanner_state = ScannerStateScript.new()
+	travel_controller = TravelControllerScript.new()
+	ship_generator = ShipGeneratorScript.new()
+
+## Configures the progression model from starting_class_id (defaults to engineer
+## when the id is unknown). Idempotent: re-callable on reload.
+func _configure_player_progression() -> void:
+	if player_progression == null:
+		return
+	var classes: Dictionary = ClassDefinitionScript.load_all()
+	var class_def = classes.get(starting_class_id, classes.get("engineer", null))
+	if class_def == null:
+		push_error("PlayableGeneratedShip: no class definition for '%s' or fallback 'engineer' (data/player/classes.json missing or malformed)" % starting_class_id)
+	player_progression.configure(
+		class_def,
+		PlayerProgressionScript.load_skills_catalog(),
+		PlayerProgressionScript.load_books_catalog(),
+	)
+	# REQ-PM-007 / ADR-0033 — apply persistent starting-skill bonuses
+	# purchased as hub upgrades on prior runs.
+	if hub_upgrade_state != null and meta_progression_state != null:
+		var bonuses: Dictionary = hub_upgrade_state.compose_starting_skill_bonuses(meta_progression_state)
+		for sid in bonuses:
+			if player_progression.skills.has(sid):
+				var current: int = int(player_progression.skills[sid])
+				var bonus: int = int(bonuses[sid])
+				player_progression.skills[sid] = clampi(current + bonus, 0, PlayerProgressionScript.MAX_SKILL_LEVEL)
+	# REQ-PM-007 — apply persistent XP multiplier bonuses.
+	if hub_upgrade_state != null and meta_progression_state != null:
+		var mults: Dictionary = hub_upgrade_state.compose_xp_multipliers(meta_progression_state)
+		for cat in mults:
+			var m: float = float(mults[cat])
+			if m > 1.0:
+				# PlayerProgressionState._xp_multipliers is keyed by category;
+				# multiplicative composition means the upgrade bonus layers
+				# on top of the class multiplier already in place.
+				var existing: float = float(player_progression._xp_multipliers.get(cat, 1.0))
+				player_progression._xp_multipliers[cat] = existing * m
+
+## Loads the blueprint sidecar that seeds the ShipSystemsManager's condition
+## damage. Falls back to a DAMAGED/seed=17 default (never crashes the slice)
+## when the sidecar is absent or malformed.
+func _load_blueprint_for_systems():
+	var fallback = ShipBlueprintScript.new(ShipBlueprintScript.Size.MEDIUM, ShipBlueprintScript.Condition.DAMAGED, 17)
+	if blueprint_path.is_empty() or not FileAccess.file_exists(blueprint_path):
+		push_warning("PlayableGeneratedShip: blueprint sidecar missing at %s; using DAMAGED/seed=17 default" % blueprint_path)
+		return fallback
+	var text: String = FileAccess.get_file_as_string(blueprint_path)
+	var parsed: Variant = JSON.parse_string(text)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		push_warning("PlayableGeneratedShip: blueprint sidecar malformed at %s; using default" % blueprint_path)
+		return fallback
+	return ShipBlueprintScript.from_dict(parsed as Dictionary)
+
+func _load_json_dict(path: String) -> Dictionary:
+	if path.is_empty() or not FileAccess.file_exists(path):
+		return {}
+	var text: String = FileAccess.get_file_as_string(path)
+	var parsed: Variant = JSON.parse_string(text)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return {}
+	return parsed as Dictionary
+
+func _configure_expanded_ship_system_models() -> void:
+	power_grid_state = PowerGridStateScript.new()
+	power_grid_state.configure(_load_json_dict(POWER_GRID_CONFIG_PATH))
+	hull_integrity_state = HullIntegrityStateScript.new()
+	hull_integrity_state.configure(_load_json_dict(HULL_COMPARTMENTS_CONFIG_PATH))
+	var tuning: Dictionary = _load_json_dict(SHIP_SUBSYSTEM_TUNING_PATH)
+	life_support_expanded_state = LifeSupportExpandedStateScript.new()
+	life_support_expanded_state.configure(tuning.get("life_support", {}))
+	fire_suppression_state = FireSuppressionStateScript.new()
+	fire_suppression_state.configure(tuning.get("fire_suppression", {}))
+	propulsion_expanded_state = PropulsionExpandedStateScript.new()
+	propulsion_expanded_state.configure(tuning.get("propulsion", {}))
+	shield_state = ShieldStateScript.new()
+	shield_state.configure(tuning.get("shields", {}))
+	sustenance_state = SustenanceStateScript.new()
+	sustenance_state.configure(_load_json_dict(FACILITY_UPGRADES_CONFIG_PATH))
+
+func _manager_broken_systems() -> Array[String]:
+	var broken: Array[String] = []
+	if ship_systems_manager == null:
+		return broken
+	for subsystem_id in ["life_support", "propulsion"]:
+		if not ship_systems_manager.systems.has(subsystem_id) or not ship_systems_manager.is_operational(subsystem_id):
+			broken.append(subsystem_id)
+	return broken
+
+func _recompute_expanded_ship_systems(delta: float) -> void:
+	if power_grid_state == null:
+		return
+	var power_health: float = 0.0
+	if ship_systems_manager != null and ship_systems_manager.get_system("power") != null:
+		power_health = ship_systems_manager.get_system("power").health()
+	power_grid_state.rebalance(power_health, _manager_broken_systems())
+	if propulsion_expanded_state != null and hull_integrity_state != null:
+		propulsion_expanded_state.tick(delta, {
+			"powered_ratio": power_grid_state.get_allocation_ratio("propulsion"),
+			"manager_operational": ship_systems_manager != null and ship_systems_manager.is_operational("propulsion"),
+			"hull_penalty": 1.0 - hull_integrity_state.average_integrity(),
+		})
+	if shield_state != null:
+		shield_state.tick(delta, {"powered_ratio": power_grid_state.get_allocation_ratio("shields")})
+	if life_support_expanded_state != null and hull_integrity_state != null:
+		var recycled_water: float = 0.0
+		if water_recycler_state != null:
+			recycled_water = float(water_recycler_state.output_ready)
+		life_support_expanded_state.tick(delta, {
+			"powered_ratio": power_grid_state.get_allocation_ratio("life_support"),
+			"breach_count": hull_integrity_state.get_breach_count(),
+			"recycled_water": recycled_water,
+		})
+	if fire_suppression_state != null:
+		fire_suppression_state.tick(delta, {"powered_ratio": power_grid_state.get_allocation_ratio("stations")})
+	if sustenance_state != null:
+		sustenance_state.tick(delta, {
+			"powered_ratio": power_grid_state.get_allocation_ratio("sustenance"),
+			"hydroponics_summary": hydroponics_state.get_summary() if hydroponics_state != null else {},
+			"synthesizer_summary": synthesizer_state.get_summary() if synthesizer_state != null else {},
+			"water_recycler_summary": water_recycler_state.get_summary() if water_recycler_state != null else {},
+		})
+
+func _expanded_ship_systems_summary() -> Dictionary:
+	return {
+		"power_grid_summary": power_grid_state.get_summary() if power_grid_state != null else {},
+		"life_support_state_summary": life_support_expanded_state.get_summary() if life_support_expanded_state != null else {},
+		"hull_integrity_summary": hull_integrity_state.get_summary() if hull_integrity_state != null else {},
+		"fire_suppression_summary": fire_suppression_state.get_summary() if fire_suppression_state != null else {},
+		"propulsion_state_summary": propulsion_expanded_state.get_summary() if propulsion_expanded_state != null else {},
+		"shield_state_summary": shield_state.get_summary() if shield_state != null else {},
+		"sustenance_state_summary": sustenance_state.get_summary() if sustenance_state != null else {},
+	}
+
+func get_ship_systems_expanded_summary() -> Dictionary:
+	return _expanded_ship_systems_summary()
+
+func set_manual_power_route_for_validation(subsystem_id: String, units: float) -> bool:
+	if power_grid_state == null:
+		return false
+	var ok: bool = power_grid_state.set_manual_route(subsystem_id, units)
+	_recompute_expanded_ship_systems(0.0)
+	_refresh_tracker_system_status_lines()
+	return ok
+
+func force_hull_breach_for_validation(compartment_id: String, amount: float = 0.6) -> bool:
+	if hull_integrity_state == null:
+		return false
+	var ok: bool = hull_integrity_state.damage_compartment(compartment_id, amount, true)
+	_recompute_expanded_ship_systems(0.0)
+	_refresh_tracker_system_status_lines()
+	return ok
+
+func seal_hull_breach_for_validation(compartment_id: String, amount: float = 1.0) -> bool:
+	if hull_integrity_state == null:
+		return false
+	var ok: bool = hull_integrity_state.seal_compartment(compartment_id, amount)
+	_recompute_expanded_ship_systems(0.0)
+	_refresh_tracker_system_status_lines()
+	return ok
+
+func ignite_compartment_for_validation(compartment_id: String, intensity: float = 1.0) -> bool:
+	if fire_suppression_state == null:
+		return false
+	var ok: bool = fire_suppression_state.ignite(compartment_id, intensity)
+	_recompute_expanded_ship_systems(0.0)
+	_refresh_tracker_system_status_lines()
+	return ok
+
+## Validation seam: the live ShipSystemsManager (null before _build_runtime_nodes()).
+func get_ship_systems_manager():
+	return ship_systems_manager
+
+## Validation seam: the live PlayerProgressionState (null before _build_runtime_nodes()).
+func get_player_progression():
+	return player_progression
+
+## REQ-PM-002 / ADR-0033 validation seam.
+func get_training_event_bus():
+	return training_event_bus
+
+## REQ-PM-003 / ADR-0033 validation seam.
+func get_skill_tree_state():
+	return skill_tree_state
+
+## REQ-PM-007 / ADR-0033 validation seam.
+func get_hub_upgrade_state():
+	return hub_upgrade_state
+
+## REQ-PM-006 / ADR-0033 validation seam.
+func get_meta_progression_state():
+	return meta_progression_state
+
+## REQ-PM-009 / ADR-0033 validation seam.
+func get_unlock_registry():
+	return unlock_registry
+
+## REQ-PM-008 / ADR-0033 — explicit end-of-run trigger (death, extraction,
+## abandon). Applies the meta payout, persists meta + unlock state, then
+## wipes the current-run save file so a fresh run starts clean.
+##
+## Returns the payout amount in meta_currency. Idempotent: a second call
+## after the slice is already complete returns 0 and is a no-op.
+func end_run(reason: String = "extraction") -> int:
+	if slice_complete:
+		return 0
+	slice_complete = true
+	tracker.mark_run_complete()
+	var payout: int = int(_apply_meta_payout_and_persist(reason))
+	if save_load_service != null:
+		save_load_service.delete_current_run()
+	emit_signal("playable_slice_completed", get_slice_completion_summary())
+	return payout
+
+## REQ-PM-002 / ADR-0033 — public seam for gameplay code (repair points,
+## combat, cooking, scanners, etc.) to fire a deterministic training event
+## through the bus. Returns the resolved (skill_id, base_xp) record or
+## null on rejection (unknown event, missing progression, suppressed).
+func emit_training_event(event_id: String, target_id: String = ""):
+	if training_event_bus == null or player_progression == null:
+		return null
+	return training_event_bus.emit(event_id, target_id, player_progression)
+
+## Phase 4.5 validation seam: the current ShipInstance (null before the first
+## ship loads).
+func get_current_ship():
+	return current_ship
+
+## Phase 5a Task 5 validation seam: the home ShipInstance.
+func get_home_ship_for_validation():
+	return home_ship
+
+## Phase 5a Task 7 validation seam: the docked lifeboat ShipInstance.
+func get_lifeboat_ship_for_validation():
+	return lifeboat_ship
+
+## Phase 5a Task 6: build the occupancy-entry list for ShipOccupancy.resolve().
+## Phase 5b Task 5: the PILOTED ship (lifeboat) is listed FIRST — it physically docks
+## flush to its host and its tighter interior sits INSIDE the host's generous per-room
+## AABB, so the player standing in the lifeboat must resolve to the lifeboat, not the
+## host. (Pre-5b ordered home first for dock-seam priority, but with physical docking
+## the ride fully overlaps the host; piloted-first is the correct containment priority.)
+## Home and the active derelict follow as hosts the player can cross into once they
+## breach the dock barrier and step out of the piloted ship's interior.
+func _occupancy_entries() -> Array:
+	var entries: Array = []
+	# Piloted ship (the player's ride) has top priority when its interior contains them.
+	if piloted_ship != null and piloted_ship.scene_root != null and is_instance_valid(piloted_ship.scene_root) and piloted_ship.scene_root.get_parent() == self:
+		entries.append({"inst": piloted_ship, "aabb": piloted_ship.interior_aabb()})
+	# Lifeboat (when not the piloted ship handle) kept for back-compat with the docked
+	# home lifeboat occupancy (Phase 5a Task 7).
+	if lifeboat_ship != null and lifeboat_ship != piloted_ship and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root) and lifeboat_ship.scene_root.get_parent() == self:
+		entries.append({"inst": lifeboat_ship, "aabb": lifeboat_ship.interior_aabb()})
+	# Phase 5b Task 6: a host (home or derelict) is only resolvable as "occupied" once
+	# the player has opened its dock-seam barrier — "you must open the port to board."
+	# The piloted ship and lifeboat are the player's own ride and are never gated.
+	if home_ship != null and home_ship.scene_root != null and is_instance_valid(home_ship.scene_root) and _ship_boardable(home_ship):
+		entries.append({"inst": home_ship, "aabb": home_ship.interior_aabb()})
+	if current_ship != null and current_ship != home_ship and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root) and _ship_boardable(current_ship):
+		entries.append({"inst": current_ship, "aabb": current_ship.interior_aabb()})
+	return entries
+
+## True if `inst` can be boarded: it has no dock barrier, or its dock barrier is open.
+## (The piloted ship and any ship without a seam barrier are always boardable.)
+func _ship_boardable(inst) -> bool:
+	if inst == null:
+		return false
+	if inst == piloted_ship:
+		return true
+	for b in dock_barriers:
+		if is_instance_valid(b) and String(b.marker_id) == String(inst.marker_id):
+			return b.opened
+	return true   # no barrier for this ship -> boardable (defensive)
+
+## Phase 5a Task 6: derive current_occupancy from world position.
+## Also keeps away_from_start consistent so existing hazard/persistence readers
+## keep working unchanged.
+func recompute_occupancy() -> void:
+	if home_ship == null:
+		return
+	var resolved = home_ship
+	if player != null and player is Node3D:
+		var r = ShipOccupancyScript.resolve((player as Node3D).global_position, _occupancy_entries())
+		if r != null:
+			resolved = r
+	current_occupancy = resolved
+	# Phase 5b Task 5: "away" means the player is away from the HOME complex. With
+	# physical docking the player rides the piloted ship; while that ship is docked to
+	# the home ship, occupying it is still "at home" (the ride is parked at home). So
+	# away is false when occupancy is home OR the piloted ship docked to home.
+	var at_home_complex: bool = (current_occupancy == home_ship) \
+		or (piloted_ship != null and current_occupancy == piloted_ship and piloted_ship.parent_ship == home_ship)
+	away_from_start = not at_home_complex
+
+## A bridge terminal fired login_requested. Gate on the ship being a working
+## vessel, then claim it for the local player and take command. Refused logins
+## leave piloted_ship unchanged.
+func _on_login_requested(ship_id: String) -> void:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null:
+		return
+	if not inst.is_working_vessel():
+		return   # silent: refusing a login on an unrepaired vessel is an expected player action
+	inst.get_access().claim(PLAYER_LOCAL_ID)
+	set_piloted_ship(inst)
+
+## Re-points piloted_ship to `inst` (the player's active ride). Gated on the local
+## player having access. Recomputes occupancy. Returns {success, reason}.
+func set_piloted_ship(inst) -> Dictionary:
+	if inst == null:
+		return {"success": false, "reason": "unknown_ship"}
+	if not inst.get_access().has_access(PLAYER_LOCAL_ID):
+		return {"success": false, "reason": "no_access"}
+	piloted_ship = inst
+	recompute_occupancy()
+	return {"success": true, "reason": "ok"}
+
+## Phase 5a Task 6 validation seam: returns current_occupancy.
+func get_current_occupancy_for_validation():
+	return current_occupancy
+
+## Phase 5b Task 5 validation seam: the piloted ship's current host (the derelict
+## or home ship it is docked to). Equals current_ship.
+func get_current_host_for_validation():
+	return current_ship
+
+## 5c seam: calls set_piloted_ship for ship_id without the login/claim path
+## (used to exercise the no_access guard directly).
+func set_piloted_ship_by_id_for_validation(ship_id: String) -> Dictionary:
+	return set_piloted_ship(_find_ship_by_id(ship_id))
+
+## Phase 5b Task 5 validation seam: teleport the player to the piloted ship's
+## interior center so it reads as aboard the ride.
+func board_piloted_ship_for_validation() -> void:
+	if piloted_ship != null and player != null and player is Node3D and player.has_method("teleport_to"):
+		player.teleport_to(piloted_ship.interior_aabb().get_center())
+
+## Phase 5b Task 5 validation seam: true iff some active dock barrier is closed.
+func has_closed_dock_barrier_for_validation() -> bool:
+	for b in dock_barriers:
+		if is_instance_valid(b) and not b.opened:
+			return true
+	return false
+
+## Phase 5b Task 5 validation seam: true iff the piloted ship's lifted airlock port
+## is within 0.5u of the host's lifted dock port (proves a real flush dock).
+func piloted_flush_to_host_for_validation() -> bool:
+	if piloted_ship == null or current_ship == null or not is_instance_valid(current_ship.scene_root):
+		return false
+	var cc := 0 if current_ship == home_ship else _ship_condition_class(current_ship)
+	var host_local: Dictionary = DockPortsScript.for_derelict(current_ship.built_layout, _ship_seed(current_ship), cc)
+	var host_world: Dictionary = DockingManagerScript.host_port_to_world(current_ship, host_local)
+	if host_world.is_empty():
+		return false
+	var lb_local: Dictionary = DockPortsScript.for_lifeboat(piloted_ship.built_layout)
+	if not is_instance_valid(piloted_ship.scene_root) or not (piloted_ship.scene_root as Node3D).is_inside_tree():
+		return false
+	var lb_world: Vector3 = (piloted_ship.scene_root as Node3D).global_transform * (lb_local["position"] as Vector3)
+	return lb_world.distance_to(host_world["position"] as Vector3) <= 0.5
+
+## 5c seams for rigid-pair travel.
+func current_ship_id_for_validation() -> String:
+	return String(current_ship.ship_id) if current_ship != null else ""
+
+func is_marker_current_for_validation(marker_id: String) -> bool:
+	return current_ship != null and String(current_ship.marker_id) == marker_id
+
+func lifeboat_docked_to_piloted_for_validation() -> bool:
+	return lifeboat_ship != null and piloted_ship != null and lifeboat_ship.parent_ship == piloted_ship
+
+## True iff the lifeboat's lifted airlock port is within 0.5u of the piloted ship's
+## lifted dock port — i.e. the lifeboat is flush against the (moved) piloted ship.
+func lifeboat_flush_to_piloted_for_validation() -> bool:
+	if lifeboat_ship == null or piloted_ship == null:
+		return false
+	if not is_instance_valid(lifeboat_ship.scene_root) or not is_instance_valid(piloted_ship.scene_root):
+		return false
+	if not (lifeboat_ship.scene_root as Node3D).is_inside_tree() or not (piloted_ship.scene_root as Node3D).is_inside_tree():
+		return false
+	var piloted_local: Dictionary = _piloted_port_local()
+	var piloted_world: Dictionary = DockingManagerScript.host_port_to_world(piloted_ship, piloted_local)
+	if piloted_world.is_empty():
+		return false
+	var lb_local: Dictionary = DockPortsScript.for_lifeboat(lifeboat_ship.built_layout)
+	var lb_world: Vector3 = (lifeboat_ship.scene_root as Node3D).global_transform * (lb_local["position"] as Vector3)
+	return lb_world.distance_to(piloted_world["position"] as Vector3) <= 0.5
+
+## Phase 5b Task 5 validation seam: force-repair every subcomponent of every system
+## on the piloted ship's shared systems manager, so propulsion (and scanners/nav) read
+## operational and travel is permitted. Mirrors the per-system force_repair loops in
+## travel_integration_smoke / repair_loop_smoke, hoisted into the coordinator.
+func force_repair_all_for_validation() -> void:
+	if ship_systems_manager == null:
+		return
+	for sid in ship_systems_manager.systems.keys():
+		var sys = ship_systems_manager.get_system(sid)
+		if sys == null:
+			continue
+		for sub in sys.subcomponents:
+			ship_systems_manager.force_repair(sid, sub.subcomponent_id)
+
+## Phase 5b Task 5 validation seam: in-range marker ids the player can travel to.
+## Reuses scan()'s gated marker list (the same source travel_integration_smoke reads
+## via markers_in_range), returning just the ids.
+func scannable_marker_ids_for_validation() -> Array:
+	var out: Array = []
+	if synapse_sea_world == null or scanner_state == null:
+		return out
+	for m in synapse_sea_world.markers_in_range(scanner_state.range_radius):
+		out.append(String(m.marker_id))
+	return out
+
+## Validation seam: the subset of in-range markers whose generated layouts actually
+## contain a bridge room and are therefore claimable/pilotable. This makes smokes
+## deterministic when nearby marker geometry changes: bridge presence is weighted,
+## so raw in-range markers are no longer guaranteed to include a claimable host.
+func claimable_marker_ids_for_validation() -> Array:
+	var out: Array = []
+	if synapse_sea_world == null or scanner_state == null or ship_generator == null:
+		return out
+	for marker in synapse_sea_world.markers_in_range(scanner_state.range_radius):
+		if _marker_has_bridge_for_validation(marker):
+			out.append(String(marker.marker_id))
+	return out
+
+func _marker_has_bridge_for_validation(marker) -> bool:
+	if marker == null or ship_generator == null:
+		return false
+	var built = ship_generator.generate_from_seed(int(marker.seed_value), int(marker.size_class), int(marker.condition))
+	if built == null:
+		return false
+	var has_bridge: bool = built.has_method("get_layout_copy") and _layout_has_bridge(built.get_layout_copy())
+	built.queue_free()
+	return has_bridge
+
+## Phase 5a Task 5 validation seam: count of distinct in-tree ship scene_roots
+## currently parented under the coordinator. Returns 1 when only the home ship
+## is present (no lifeboat or derelict), 2 when the home derelict + lifeboat are
+## co-present at home (Task 7 canonical opening), or home + traveled derelict.
+## Returns 3 when home + lifeboat + derelict are all present.
+func active_ship_root_count_for_validation() -> int:
+	var count := 0
+	if home_ship != null and home_ship.scene_root != null and is_instance_valid(home_ship.scene_root) and home_ship.scene_root.get_parent() == self:
+		count += 1
+	# Phase 5a Task 7: lifeboat is a distinct in-tree root co-present at home.
+	if lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root) and lifeboat_ship.scene_root.get_parent() == self:
+		count += 1
+	if current_ship != null and current_ship != home_ship and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root) and current_ship.scene_root.get_parent() == self:
+		count += 1
+	return count
+
+## Phase 4.5 validation seam: the SynapseSeaWorld map model.
+func get_synapse_sea_world():
+	return synapse_sea_world
+
+## Operational status feeding scan/travel. Travel capability always comes from the
+## player's functional ship — the lifeboat (the coordinator-owned starting systems
+## manager) — whether the player is on the lifeboat or boarded on a docked derelict.
+## The lifeboat is the guaranteed ride, so a boarded derelict's broken systems never
+## strand the player; an unrepaired lifeboat simply cannot jump until its propulsion
+## is restored. (Retires ADR-0011 placeholder.)
+func _current_systems_ops() -> Dictionary:
+	# Travel capability comes from the ship the player is PILOTING (5c: that may be a
+	# claimed derelict, not just the lifeboat). Fall back to the coordinator's starting
+	# manager before a piloted ship exists.
+	var mgr = piloted_ship.systems_manager if piloted_ship != null and piloted_ship.systems_manager != null else ship_systems_manager
+	var propulsion_ok: bool = mgr != null and mgr.is_operational("propulsion")
+	if propulsion_expanded_state != null:
+		propulsion_ok = propulsion_ok and propulsion_expanded_state.can_propel()
+	return {
+		"navigation": mgr != null and mgr.is_operational("navigation"),
+		"scanners": mgr != null and mgr.is_operational("scanners"),
+		"propulsion": propulsion_ok,
+	}
+
+## Resolves the visible markers at the gated detail level, deriving operational
+## status from the CURRENT ship's systems and scanner skill from progression.
+func scan() -> Dictionary:
+	if current_ship == null or synapse_sea_world == null or scanner_state == null:
+		return {"detail_level": 0, "markers": []}
+	var ops: Dictionary = _current_systems_ops()
+	var skill: int = 0
+	if player_progression != null and player_progression.has_method("get_skill_level"):
+		skill = int(player_progression.get_skill_level("scanner_operation"))
+	return scanner_state.scan(synapse_sea_world, ops, skill)
+
+## Resolves a marker by id from the in-range set and travels to it. Returns
+## {success:false, reason:"unknown_marker"} if the id is not currently in range.
+func travel_to_marker_id(marker_id: String) -> Dictionary:
+	if synapse_sea_world == null or scanner_state == null:
+		return {"success": false, "reason": "not_ready", "ship": null}
+	for m in synapse_sea_world.markers_in_range(scanner_state.range_radius):
+		if String(m.marker_id) == marker_id:
+			var result: Dictionary = travel_to(m)
+			if bool(result.get("success", false)) and is_instance_valid(menu_coordinator):
+				menu_coordinator.trigger_tutorial("ship_traveled", "any")
+			return result
+	return {"success": false, "reason": "unknown_marker", "ship": null}
+
+## Makes `inst` the active boarded derelict: attaches the freshly built
+## `new_root` at DERELICT_DOCK_OFFSET (so it is co-present with the home
+## ship, which stays in-tree at origin), and flips away_from_start. Shared
+## by travel_to (revisit/first-visit) and world-load (_apply_world_snapshot).
+## Does NOT re-home the player — callers position the player afterwards.
+## Phase 5a Task 5: home ship is NO LONGER detached. Home and derelict are
+## co-present at distinct world positions (origin vs DERELICT_DOCK_OFFSET).
+func _attach_derelict_active(inst, new_root: Node3D) -> void:
+	inst.scene_root = new_root
+	add_child(new_root)
+	new_root.position = DERELICT_DOCK_OFFSET   # initial world anchor; piloted ship docks TO it
+	if inst.built_layout.is_empty() and new_root.has_method("get_layout_copy"):
+		inst.built_layout = new_root.get_layout_copy()
+	current_ship = inst
+	away_from_start = true
+	# Phase 5b Task 5: the piloted ship (lifeboat) PHYSICALLY undocks from its old
+	# host and re-docks to this derelict, so the ride — and the player aboard it —
+	# moves with it. The player is carried by preserving their pose relative to the
+	# piloted ship root across the dock move (the dock changes that root's transform).
+	if piloted_ship != null:
+		var carry := _capture_player_carry()
+		var child_carry := _capture_subtree()
+		_unbay_from_parent(piloted_ship)   # clear a stale bay slot if the piloted ship was bayed (PR#16 P2)
+		DockingManagerScript.undock(piloted_ship)
+		var dock_res: Dictionary = _dock_piloted_to(inst)
+		if not bool(dock_res.get("success", false)):
+			# Belt-and-suspenders: the travel_to precheck already rules out
+			# incompatibility, but if a dock ever fails after undocking, re-dock to home
+			# so the player is never physically stranded undocked.
+			push_error("PlayableGeneratedShip: travel dock failed (%s) — re-docking piloted ship to home" % str(dock_res.get("reason", "?")))
+			_dock_piloted_to(home_ship)
+		_apply_player_carry(carry)
+		_reposition_subtree(child_carry)
+	_spawn_dock_barrier(inst)
+	_spawn_bridge_terminal(inst)
+	_spawn_hangar_control(inst)
+	_spawn_cargo_hold_control(inst)
+	_spawn_cart_controls_for_ship(inst)
+	# Phase 5b Task 5: occupancy is the piloted ship — the player rides it to the host
+	# and stays aboard (no teleport into the derelict). recompute_occupancy() then
+	# tracks the player as they breach the dock seam and walk into the host.
+	current_occupancy = piloted_ship if piloted_ship != null else inst
+	_build_derelict_objectives()
+	_build_loot_containers()
+	_build_repair_points()
+
+## Captures the player's world pose relative to the piloted ship's scene_root so the
+## player can be carried when the piloted ship is repositioned by a dock. Returns
+## {} when there is no player / piloted root to anchor against.
+func _capture_player_carry() -> Dictionary:
+	if piloted_ship == null or not is_instance_valid(piloted_ship.scene_root):
+		return {}
+	var root: Node3D = piloted_ship.scene_root as Node3D
+	if player == null or not (player is Node3D) or not root.is_inside_tree():
+		return {}
+	# Local offset of the player within the piloted ship's frame (inverse * world).
+	var local: Vector3 = root.global_transform.affine_inverse() * (player as Node3D).global_position
+	return {"local": local}
+
+## Re-applies a captured player carry after the piloted ship root moved, so the
+## player ends up at the same spot INSIDE the (repositioned) piloted ship.
+func _apply_player_carry(carry: Dictionary) -> void:
+	if carry.is_empty() or piloted_ship == null or not is_instance_valid(piloted_ship.scene_root):
+		return
+	var root: Node3D = piloted_ship.scene_root as Node3D
+	if player == null or not root.is_inside_tree() or not player.has_method("teleport_to"):
+		return
+	player.teleport_to(root.global_transform * (carry["local"] as Vector3))
+
+## Captures EVERY transitive dock descendant of the piloted ship (airlock children
+## and bayed children, any depth) relative to the piloted ship's root, BEFORE a dock
+## move repositions that root. Returns [{inst, local_xform}, ...]. DFS generalization
+## of the 5c one-level capture; depth-1 is just the first ring of the walk.
+func _capture_subtree() -> Array:
+	var out: Array = []
+	if piloted_ship == null or not is_instance_valid(piloted_ship.scene_root):
+		return out
+	var root_node: Node3D = piloted_ship.scene_root as Node3D
+	if not root_node.is_inside_tree():
+		return out
+	var inv: Transform3D = root_node.global_transform.affine_inverse()
+	var stack: Array = piloted_ship.docked_ships.duplicate()
+	var seen: Dictionary = {}
+	while not stack.is_empty():
+		var child = stack.pop_back()
+		if child == null or seen.has(child):
+			continue
+		seen[child] = true
+		if is_instance_valid(child.scene_root) and (child.scene_root as Node3D).is_inside_tree():
+			out.append({"inst": child, "local_xform": inv * (child.scene_root as Node3D).global_transform})
+		for grandchild in child.docked_ships:
+			if grandchild != null and not seen.has(grandchild):
+				stack.append(grandchild)
+	return out
+
+## Re-applies captured descendant relatives AFTER the piloted root moved, so the
+## whole nested group rides rigidly with it. Every descendant was captured in the
+## piloted root's frame, so a single re-peg per node is depth-agnostic.
+func _reposition_subtree(captured: Array) -> void:
+	if piloted_ship == null or not is_instance_valid(piloted_ship.scene_root):
+		return
+	var root_node: Node3D = piloted_ship.scene_root as Node3D
+	if not root_node.is_inside_tree():
+		return
+	for entry_v in captured:
+		var entry: Dictionary = entry_v
+		var child = entry.get("inst", null)
+		# child is a RefCounted ShipInstance (== null is the correct nil check); guard
+		# is_inside_tree() before writing global_transform (no orphan-node write).
+		if child == null or not is_instance_valid(child.scene_root) or not (child.scene_root as Node3D).is_inside_tree():
+			continue
+		(child.scene_root as Node3D).global_transform = root_node.global_transform * (entry["local_xform"] as Transform3D)
+
+## Spawns the closed dock-seam barrier for `inst` at its dock-port world position,
+## condition from the derelict's seed/condition. Home derelict is always intact.
+func _spawn_dock_barrier(inst) -> void:
+	_clear_dock_barriers()
+	if inst == null or not is_instance_valid(inst.scene_root):
+		return
+	var local: Dictionary = DockPortsScript.for_derelict(inst.built_layout, _ship_seed(inst), _ship_condition_class(inst))
+	if local.is_empty():
+		return
+	var cond: String = "intact" if inst == home_ship else str(local.get("condition", "intact"))
+	var barrier = DockPortBarrierScript.new()
+	# Local position under the derelict's scene_root (the port is ship-local).
+	(inst.scene_root as Node3D).add_child(barrier)
+	barrier.configure(String(inst.marker_id), cond, player_progression, local["position"] as Vector3, 6.0, 1.8)
+	barrier.breach_opened.connect(_on_dock_barrier_opened)
+	dock_barriers.append(barrier)
+
+func _clear_dock_barriers() -> void:
+	for b in dock_barriers:
+		if is_instance_valid(b):
+			if b.get_parent() != null:
+				b.get_parent().remove_child(b)
+			b.queue_free()
+	dock_barriers.clear()
+
+func _on_dock_barrier_opened(_marker_id: String) -> void:
+	# Boarding the derelict is now possible; occupancy flips as the player crosses.
+	recompute_occupancy()
+
+## Ship-local center of `inst`'s bridge room (role == "bridge"), or Vector3.INF if the
+## ship has NO bridge room. Derived from inst.built_layout via DockPorts so it works
+## uniformly for the lifeboat (plain Node3D scene_root), procgen derelicts, and golden
+## ships. Claimability requires a real bridge: a ship without one is not pilotable
+## (just a loot/explore space) — deliberately NO entry-room fallback.
+func _command_room_local_center(inst) -> Vector3:
+	if inst == null or typeof(inst.built_layout) != TYPE_DICTIONARY or (inst.built_layout as Dictionary).is_empty():
+		return Vector3.INF
+	return DockPortsScript.bridge_center(inst.built_layout)
+
+## Spawns the bridge terminal for a pilotable ship at its bridge room (ship-local),
+## parented under the ship's scene_root so it inherits the ship transform and is
+## freed with it. The home ship is never pilotable -> no terminal. A ship with NO
+## bridge room gets NO terminal (it cannot be claimed/piloted — loot space only).
+func _spawn_bridge_terminal(inst) -> void:
+	if inst == null or inst == home_ship or not is_instance_valid(inst.scene_root):
+		return
+	var local_center: Vector3 = _command_room_local_center(inst)
+	if local_center == Vector3.INF:
+		return   # no bridge room -> not claimable
+	# Prune dead entries + any existing terminal for this same ship (idempotent re-spawn).
+	var kept: Array = []
+	for t in bridge_terminals:
+		if not is_instance_valid(t):
+			continue
+		if String(t.ship_id) == String(inst.ship_id):
+			if t.get_parent() != null:
+				t.get_parent().remove_child(t)
+			t.queue_free()
+			continue
+		kept.append(t)
+	bridge_terminals = kept
+	var terminal = BridgeTerminalScript.new()
+	(inst.scene_root as Node3D).add_child(terminal)
+	terminal.configure(String(inst.ship_id), local_center, 1.8)
+	terminal.login_requested.connect(_on_login_requested)
+	bridge_terminals.append(terminal)
+
+func _clear_bridge_terminals() -> void:
+	for t in bridge_terminals:
+		if is_instance_valid(t):
+			if t.get_parent() != null:
+				t.get_parent().remove_child(t)
+			t.queue_free()
+	bridge_terminals.clear()
+
+## Reads inst.built_layout and (re)configures inst's HangarBay slot_count/size from
+## DockPorts.for_hangar. No-op (leaves a 0-slot bay) when the ship has no hangar/cargo
+## room. Returns the for_hangar descriptor (or {}).
+func _configure_bay_from_layout(inst) -> Dictionary:
+	if inst == null or typeof(inst.built_layout) != TYPE_DICTIONARY or (inst.built_layout as Dictionary).is_empty():
+		return {}
+	var desc: Dictionary = DockPortsScript.for_hangar(inst.built_layout, _ship_seed(inst))
+	if desc.is_empty():
+		return {}
+	var bay = inst.get_hangar()
+	# Preserve existing occupancy when re-configuring (e.g. on reload); only (re)size
+	# when the bay is unconfigured, so a restored slot map is never clobbered.
+	if bay.slot_count == 0:
+		bay.slot_count = int(desc.get("slot_count", 0))
+		bay.slot_size_class = int(desc.get("slot_size_class", 0))
+		bay.slots.clear()
+		for _i in range(bay.slot_count):
+			bay.slots.append("")
+	return desc
+
+## Spawns a HangarBayControl for a ship that has a bay (hangar room, or the home
+## ship's cargo fallback), parented under its scene_root. Unlike the bridge terminal,
+## the HOME ship IS allowed a bay. Idempotent: prunes any existing control for the
+## same carrier id. No-op when the ship has no bay.
+func _spawn_hangar_control(inst) -> void:
+	if inst == null or not is_instance_valid(inst.scene_root):
+		return
+	var desc: Dictionary = _configure_bay_from_layout(inst)
+	if desc.is_empty():
+		return
+	var anchors: Array = desc.get("slot_anchors", [])
+	if anchors.is_empty():
+		return
+	# Place the control at the centroid of the slot anchors (bay center).
+	var center := Vector3.ZERO
+	for a in anchors:
+		center += a as Vector3
+	center /= float(anchors.size())
+	# Prune dead entries + any existing control for this same carrier (idempotent).
+	var kept: Array = []
+	for c in hangar_controls:
+		if not is_instance_valid(c):
+			continue
+		if String(c.carrier_id) == String(inst.ship_id):
+			if c.get_parent() != null:
+				c.get_parent().remove_child(c)
+			c.queue_free()
+			continue
+		kept.append(c)
+	hangar_controls = kept
+	var control = HangarBayControlScript.new()
+	(inst.scene_root as Node3D).add_child(control)
+	control.configure(String(inst.ship_id), center, 1.8)
+	control.bay_dock_requested.connect(_on_bay_dock_requested)
+	control.bay_launch_requested.connect(_on_bay_launch_requested)
+	hangar_controls.append(control)
+
+func _clear_hangar_controls() -> void:
+	for c in hangar_controls:
+		if is_instance_valid(c):
+			if c.get_parent() != null:
+				c.get_parent().remove_child(c)
+			c.queue_free()
+	hangar_controls.clear()
+
+func _spawn_cargo_hold_control(inst) -> void:
+	if inst == null or not is_instance_valid(inst.scene_root):
+		return
+	var center: Vector3 = DockPortsScript._room_floor_center(inst.built_layout, "cargo", "cargo")
+	if center == Vector3.INF:
+		return   # no cargo room -> no hold, no lazy ShipInventory
+	# Prune dead entries + any existing control for this same carrier (idempotent).
+	var kept: Array = []
+	for c in cargo_hold_controls:
+		if not is_instance_valid(c):
+			continue
+		if String(c.carrier_id) == String(inst.ship_id):
+			if c.get_parent() != null:
+				c.get_parent().remove_child(c)
+			c.queue_free()
+			continue
+		kept.append(c)
+	cargo_hold_controls = kept
+	var control = CargoHoldControlScript.new()
+	(inst.scene_root as Node3D).add_child(control)
+	control.configure(String(inst.ship_id), center, 1.8)
+	control.cargo_deposit_requested.connect(_on_cargo_deposit_requested)
+	control.cargo_withdraw_requested.connect(_on_cargo_withdraw_requested)
+	cargo_hold_controls.append(control)
+
+func _clear_cargo_hold_controls() -> void:
+	for c in cargo_hold_controls:
+		if is_instance_valid(c):
+			if c.get_parent() != null:
+				c.get_parent().remove_child(c)
+			c.queue_free()
+	cargo_hold_controls.clear()
+
+## Spawn a CartControl node for an existing CartState parked on `inst`.
+## Idempotent per cart_id: prunes any existing control for the same cart_id first.
+func _spawn_cart_control(inst, cart) -> void:
+	if inst == null or cart == null or not is_instance_valid(inst.scene_root):
+		return
+	# Prune dead entries + any existing control for this same cart_id (idempotent).
+	var kept: Array = []
+	for c in cart_controls:
+		if not is_instance_valid(c):
+			continue
+		if String(c.cart_id) == String(cart.cart_id):
+			if c.get_parent() != null:
+				c.get_parent().remove_child(c)
+			c.queue_free()
+			continue
+		kept.append(c)
+	cart_controls = kept
+	var control = CartControlScript.new()
+	(inst.scene_root as Node3D).add_child(control)
+	control.configure(String(cart.cart_id), cart.parked_position, 1.8)
+	control.cart_grab_requested.connect(_on_cart_grab_requested)
+	control.cart_load_requested.connect(_on_cart_load_requested)
+	control.cart_unload_requested.connect(_on_cart_unload_requested)
+	cart_controls.append(control)
+
+func _spawn_cart_controls_for_ship(inst) -> void:
+	if inst == null:
+		return
+	for cart in inst.get_carts():
+		_spawn_cart_control(inst, cart)
+
+func _clear_cart_controls() -> void:
+	for c in cart_controls:
+		if is_instance_valid(c):
+			if c.get_parent() != null:
+				c.get_parent().remove_child(c)
+			c.queue_free()
+	cart_controls.clear()
+
+func _find_cart_by_id(cart_id: String) -> Dictionary:
+	for inst in _all_known_ships():
+		for cart in inst.get_carts():
+			if String(cart.cart_id) == cart_id:
+				return {"cart": cart, "ship": inst}
+	return {}
+
+func _on_cart_grab_requested(cart_id: String) -> void:
+	var hit: Dictionary = _find_cart_by_id(cart_id)
+	if hit.is_empty():
+		return
+	grabbed_cart = hit["cart"]
+	_recompute_player_encumbrance()      # applies the push penalty
+
+func _on_cart_load_requested(cart_id: String) -> void:
+	_open_transfer_panel_for_cart(cart_id)
+
+func _on_cart_unload_requested(cart_id: String, _category: String) -> void:
+	_open_transfer_panel_for_cart(cart_id)
+
+func _on_cargo_deposit_requested(ship_id: String) -> void:
+	_open_transfer_panel_for_ship(ship_id)
+
+func _on_cargo_withdraw_requested(ship_id: String, _category: String) -> void:
+	_open_transfer_panel_for_ship(ship_id)
+
+## Recompute the player's effective carry budget from worn equipment and apply the
+## Heavy Load movement penalty (× any active cart push penalty). Called on every
+## inventory/equipment/cart change.
+func _recompute_player_encumbrance() -> void:
+	if inventory_state == null:
+		return
+	var bonus: float = 0.0
+	var saved: float = 0.0
+	if equipment_state != null:
+		bonus = equipment_state.get_carry_capacity_bonus()   # + future strength bonus
+		saved = EncumbranceScript.weight_reduction_saved(
+			inventory_state.get_total_weight(), equipment_state.get_container_reductions())
+	inventory_state.bonus_capacity = bonus
+	inventory_state.weight_reduction = saved
+	if is_instance_valid(player):
+		var mult: float = EncumbranceScript.move_speed_multiplier(inventory_state.get_load_ratio())
+		player.move_speed = float(player.DEFAULT_MOVE_SPEED) * mult * _cart_push_multiplier()
+
+## Equip item_id from the player inventory into its slot. Honors the both-hands
+## cart block. `auto` (pickup path) only fills EMPTY slots; manual equip displaces
+## the worn item back into inventory. Returns true on success.
+func _equip_from_inventory(item_id: String, auto: bool) -> bool:
+	if equipment_state == null or inventory_state == null:
+		return false
+	if not equipment_state.can_equip(item_id):
+		return false
+	var slot: String = ItemDefsScript.equip_slot(_definitions_for_equip(), item_id)
+	if (slot == "primary_hand" or slot == "secondary_hand") and _is_cart_grabbed():
+		return false   # both hands occupied by a grabbed cart
+	if auto and equipment_state.is_slot_occupied(slot):
+		return false   # auto-equip never swaps a filled slot
+	if inventory_state.get_quantity(item_id) <= 0:
+		return false
+	inventory_state.remove_item(item_id, 1)
+	var res: Dictionary = equipment_state.equip(item_id)
+	if not bool(res.get("ok", false)):
+		inventory_state.add_item(item_id, 1)   # equip failed -> put it back
+		return false
+	var displaced: String = str(res.get("displaced", ""))
+	if displaced != "":
+		inventory_state.add_item(displaced, 1)
+	_recompute_player_encumbrance()
+	return true
+
+## Unequip a slot back into the player inventory. Returns the unequipped id ("" if empty).
+func _unequip_to_inventory(slot: String) -> String:
+	if equipment_state == null or inventory_state == null:
+		return ""
+	var item_id: String = equipment_state.unequip(slot)
+	if item_id != "":
+		inventory_state.add_item(item_id, 1)
+		_recompute_player_encumbrance()
+	return item_id
+
+func _definitions_for_equip() -> Dictionary:
+	# The merged item-def catalog, lazily loaded once and cached. ItemDefs.load_definitions()
+	# does synchronous disk I/O parsing several JSON files; caching avoids repeating that on
+	# every equip / auto-equip during gameplay loops (the defs are static at runtime).
+	if _item_defs.is_empty():
+		_item_defs = ItemDefsScript.load_definitions()
+	return _item_defs
+
+func _is_cart_grabbed() -> bool:
+	return grabbed_cart != null
+
+func _cart_push_multiplier() -> float:
+	return float(grabbed_cart.push_speed_multiplier) if grabbed_cart != null else 1.0
+
+## A ship currently airlock-docked to `carrier` (parent_ship == carrier) that is NOT
+## already bayed there and whose airlock port size_class fits a free slot. null if none.
+func _bay_dock_candidate(carrier):
+	if carrier == null:
+		return null
+	var bay = carrier.get_hangar()
+	for child in carrier.docked_ships:
+		if child == null or not is_instance_valid(child.scene_root):
+			continue
+		if bay.slot_of(String(child.ship_id)) != -1:
+			continue   # already bayed
+		var size_class: int = _ship_dock_size_class(child)
+		if bay.free_slot_for(size_class) != -1:
+			return child
+	return null
+
+## A ship's own dock/airlock port size_class (1 today for every ship). Reads its
+## airlock port when present, else the dock port, else AIRLOCK_SIZE_CLASS.
+func _ship_dock_size_class(inst) -> int:
+	if inst == null or typeof(inst.built_layout) != TYPE_DICTIONARY:
+		return DockPortsScript.AIRLOCK_SIZE_CLASS
+	var p: Dictionary = DockPortsScript.for_lifeboat(inst.built_layout)
+	if p.is_empty():
+		p = DockPortsScript.for_derelict(inst.built_layout)
+	return int(p.get("size_class", DockPortsScript.AIRLOCK_SIZE_CLASS))
+
+func _first_occupied_slot(bay) -> int:
+	for i in range(bay.slots.size()):
+		if String(bay.slots[i]) != "":
+			return i
+	return -1
+
+## Places `mobile` at carrier-local slot anchor `slot_index` (world transform).
+func _place_in_slot(carrier, mobile, slot_index: int) -> void:
+	if carrier == null or mobile == null:
+		return
+	if not is_instance_valid(carrier.scene_root) or not is_instance_valid(mobile.scene_root):
+		return
+	# Both roots must be in-tree before a global_transform write (we write mobile's below).
+	if not (carrier.scene_root as Node3D).is_inside_tree() or not (mobile.scene_root as Node3D).is_inside_tree():
+		return
+	var desc: Dictionary = DockPortsScript.for_hangar(carrier.built_layout, _ship_seed(carrier))
+	var anchors: Array = desc.get("slot_anchors", [])
+	if slot_index < 0 or slot_index >= anchors.size():
+		return
+	var anchor: Vector3 = anchors[slot_index]
+	(mobile.scene_root as Node3D).global_transform = (carrier.scene_root as Node3D).global_transform * Transform3D(Basis(), anchor)
+
+## Docks a co-present airlock-docked ship into a free hangar slot of `carrier_id`.
+## Silent refusal (no candidate / no slot / not co-present). slot_index is advisory
+## (-1 = first free).
+func _on_bay_dock_requested(carrier_id: String, slot_index: int) -> void:
+	var carrier = _find_ship_by_id(carrier_id)
+	if carrier == null:
+		return
+	var bay = carrier.get_hangar()
+	if bay.slot_count <= 0:
+		return
+	var candidate = _bay_dock_candidate(carrier)
+	if candidate == null:
+		return   # silent: not_co_present / no_free_slot / incompatible_size
+	var size_class: int = _ship_dock_size_class(candidate)
+	var idx: int = bay.dock(String(candidate.ship_id), size_class)
+	if idx == -1:
+		return
+	# Transition the candidate from airlock-docked to slot-bayed: drop its airlock
+	# alignment, keep it a dock child of the carrier, and re-peg it to the slot anchor.
+	DockingManagerScript.undock(candidate)
+	candidate.parent_ship = carrier
+	if not carrier.docked_ships.has(candidate):
+		carrier.docked_ships.append(candidate)
+	_place_in_slot(carrier, candidate, idx)
+	recompute_occupancy()
+
+## Launches a bayed ship of `carrier_id` back out to a co-present anchor near the
+## carrier. slot_index -1 = first occupied. Silent refusal when nothing is bayed.
+func _on_bay_launch_requested(carrier_id: String, slot_index: int) -> void:
+	var carrier = _find_ship_by_id(carrier_id)
+	if carrier == null:
+		return
+	var bay = carrier.get_hangar()
+	var idx := slot_index
+	if idx < 0:
+		idx = _first_occupied_slot(bay)
+	if idx < 0:
+		return
+	var ship_id: String = bay.launch(idx)
+	if ship_id == "":
+		return
+	var launched = _find_ship_by_id(ship_id)
+	if launched == null:
+		return
+	launched.parent_ship = null
+	carrier.docked_ships.erase(launched)
+	if is_instance_valid(launched.scene_root) and is_instance_valid(carrier.scene_root) \
+			and (carrier.scene_root as Node3D).is_inside_tree() \
+			and (launched.scene_root as Node3D).is_inside_tree():
+		# Park it just outside the bay (carrier-local -Z), co-present and free.
+		(launched.scene_root as Node3D).global_transform = \
+			(carrier.scene_root as Node3D).global_transform * Transform3D(Basis(), Vector3(0.0, 0.0, -8.0))
+	recompute_occupancy()
+
+## Clears `inst`'s hangar slot in its parent's bay BEFORE the ship leaves via a
+## non-launch path (the travel undock of a bayed piloted ship). Without this, a ship
+## that undocks while still occupying a bay slot leaves a stale slot id: the slot stays
+## unusable and the ship's next airlock re-dock is misclassified as a hangar edge by
+## _current_dock_edges (Codex PR#16 P2). Must run BEFORE DockingManager.undock (which
+## nulls parent_ship). No-op when the ship is not bayed.
+func _unbay_from_parent(inst) -> void:
+	if inst == null or inst.parent_ship == null:
+		return
+	var parent = inst.parent_ship
+	if parent.hangar == null:
+		return
+	var s: int = parent.hangar.slot_of(String(inst.ship_id))
+	if s != -1:
+		parent.hangar.launch(s)
+
+## Builds the active derelict's objective interactables from its loader specs and
+## restores completed/cleared state from its (retained or loaded) controller. Called
+## whenever a derelict becomes active. No-op on the home ship.
+func _build_derelict_objectives() -> void:
+	_clear_derelict_objectives()
+	_salvage_loot_tables.clear()
+	if current_ship == null or String(current_ship.marker_id) == "":
+		return
+	var active_loader = current_ship.scene_root
+	if not is_instance_valid(active_loader) or not active_loader.has_method("get_objective_specs_copy"):
+		return
+	var specs: Array = active_loader.get_objective_specs_copy()
+	var controller = current_ship.get_objective_controller()
+	# First visit registers the set; a retained/restored controller is already
+	# configured, so this is a no-op that preserves progress.
+	controller.configure(specs)
+	for spec_variant in specs:
+		if typeof(spec_variant) != TYPE_DICTIONARY:
+			continue
+		var spec: Dictionary = spec_variant
+		var sequence: int = int(spec.get("sequence", 0))
+		if sequence <= 0:
+			continue
+		var position_variant: Variant = spec.get("position", Vector3.INF)
+		if typeof(position_variant) != TYPE_VECTOR3:
+			continue
+		# Record salvage objective loot tables for grant on completion.
+		if str(spec.get("type", "")) == "salvage":
+			_salvage_loot_tables[str(spec.get("id", ""))] = str(spec.get("loot_table", "salvage_cargo"))
+		var interactable = InteractableScript.new()
+		interactable.configure_from_objective(spec, position_variant, 1.8)
+		interactable.interaction_completed.connect(_on_derelict_interactable_completed)
+		# Restore: a persisted-complete objective reads as done and cannot be re-fired
+		# (try_interact returns false when completed).
+		if controller.is_objective_complete(sequence):
+			interactable.completed = true
+			interactable.set_active(false)
+		# Phase 5a Task 5 (co-presence): parent the interactable under the derelict's
+		# scene_root so it inherits the DERELICT_DOCK_OFFSET transform and is freed
+		# automatically when the derelict scene_root is freed on departure.
+		current_ship.scene_root.add_child(interactable)
+		derelict_interactables.append(interactable)
+	# Show the derelict's objectives in the HUD while aboard, then reflect any
+	# persisted/restored completion (set_objectives resets the tracker's completed
+	# set, so this must run after it).
+	if tracker != null:
+		tracker.set_objectives(specs)
+		_refresh_derelict_tracker()
+
+## Mirrors the active derelict's controller state into the ObjectiveTracker: marks
+## completed sequences, advances the "Current" pointer to the lowest incomplete
+## objective, and flags run-complete once the derelict is cleared. Idempotent
+## (tracker.mark_completed keys a dict), so it serves both restore-on-board and
+## per-completion updates. No-op on the home ship (driven by the singleton loop).
+func _refresh_derelict_tracker() -> void:
+	if tracker == null or current_ship == null or String(current_ship.marker_id) == "":
+		return
+	var controller = current_ship.get_objective_controller()
+	var first_incomplete: int = -1
+	for it in derelict_interactables:
+		if not is_instance_valid(it):
+			continue
+		var seq: int = int(it.sequence)
+		if controller.is_objective_complete(seq):
+			tracker.mark_completed(seq)
+		elif first_incomplete < 0 or seq < first_incomplete:
+			first_incomplete = seq
+	if controller.is_cleared():
+		tracker.mark_run_complete()
+	elif first_incomplete > 0:
+		tracker.set_current_sequence(first_incomplete)
+
+## Frees the active derelict's interactables. The controller (state) lives on the
+## ShipInstance and is untouched.
+## Phase 5a Task 5 (co-presence): interactables are parented under the derelict
+## scene_root (freed with it on departure) rather than derelict_objective_root
+## (which remains empty). derelict_objective_root is kept as an empty placeholder
+## so the coordinator structure is unchanged. Just clear the reference array here;
+## nodes parented under scene_root are freed when scene_root is freed.
+func _clear_derelict_objectives() -> void:
+	if is_instance_valid(derelict_objective_root):
+		for child in derelict_objective_root.get_children():
+			derelict_objective_root.remove_child(child)
+			child.queue_free()
+	derelict_interactables.clear()
+
+## Pushes the current inventory state to the HUD. Reuses _refresh_tracker_system_status_lines
+## so the full combined status (systems + oxygen + inventory) is always consistent.
+func _refresh_inventory_hud() -> void:
+	_refresh_tracker_system_status_lines()
+
+## Builds scattered loot containers for the active ship (derelict or home lifeboat).
+## Containers already in the ship's looted_container_ids read as searched (no respawn).
+## Sub-project #4: the home ship early-return is removed; the home loader is used when home.
+func _build_loot_containers() -> void:
+	_clear_loot_containers()
+	if current_ship == null:
+		return
+	var active_loader = current_ship.scene_root if (away_from_start and current_ship != null) else loader
+	if not is_instance_valid(active_loader) or not active_loader.has_method("get_loot_container_specs_copy"):
+		return
+	var looted: Array = current_ship.looted_container_ids
+	for spec_variant in active_loader.get_loot_container_specs_copy():
+		if typeof(spec_variant) != TYPE_DICTIONARY:
+			continue
+		var spec: Dictionary = spec_variant
+		var cid: String = str(spec.get("id", ""))
+		var pos_variant: Variant = spec.get("position", Vector3.INF)
+		if cid.is_empty() or typeof(pos_variant) != TYPE_VECTOR3:
+			continue
+		var lc = LootContainerScript.new()
+		var seed_source: String = "%s:%s" % [String(current_ship.marker_id), cid]
+		lc.configure(cid, str(spec.get("loot_table", "generic_crate")), seed_source,
+			inventory_state, _loot_tables, pos_variant, 1.8, _build_loot_context(spec))
+		if looted.has(cid):
+			lc.set_searched(true)
+		if not lc.container_searched.is_connected(_on_loot_container_searched):
+			lc.container_searched.connect(_on_loot_container_searched)
+		# Phase 5a Task 5 (co-presence): derelict loot containers parent under the
+		# derelict's scene_root so they inherit DERELICT_DOCK_OFFSET and are freed
+		# automatically with the derelict on departure. Home loot containers continue
+		# to parent under the coordinator-owned loot_container_root at origin.
+		if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
+			current_ship.scene_root.add_child(lc)
+		else:
+			loot_container_root.add_child(lc)
+		loot_containers.append(lc)
+
+func _clear_loot_containers() -> void:
+	if is_instance_valid(loot_container_root):
+		for child in loot_container_root.get_children():
+			loot_container_root.remove_child(child)
+			child.queue_free()
+	# Phase 5a Task 5 (co-presence): derelict loot containers parent under
+	# current_ship.scene_root rather than loot_container_root, so loot_container_root
+	# only holds home-ship containers. The derelict containers are freed when
+	# scene_root is freed on departure — just clear the reference array.
+	loot_containers.clear()
+
+## Builds repair points for every currently-damaged subcomponent of the active ship,
+## distributing them across the ship's rooms. Works for the lifeboat (home) and derelicts.
+func _build_repair_points() -> void:
+	_clear_repair_points()
+	if not is_instance_valid(repair_point_root):
+		return
+	var mgr = _active_systems_manager()
+	if mgr == null:
+		return
+	# Phase 5a fix (Codex P1): HOME repair points parent under lifeboat_ship.scene_root
+	# (now port-docked to the home airlock), so their positions must be LIFEBOAT-LOCAL —
+	# otherwise the derelict-frame _distributed_room_positions() values get the lifeboat
+	# transform added and the (travel-gating) propulsion repair lands OUTSIDE the lifeboat.
+	# The away-derelict branch parents under current_ship.scene_root, whose derelict-frame
+	# positions correctly match its geometry — so it keeps _distributed_room_positions().
+	var use_lifeboat: bool = (not away_from_start) and lifeboat_ship != null \
+		and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root)
+	var positions: Array = _lifeboat_local_repair_positions() if use_lifeboat else _distributed_room_positions()
+	if positions.is_empty():
+		return
+	var idx: int = 0
+	for sid in mgr.system_order:
+		var system = mgr.get_system(sid)
+		if system == null:
+			continue
+		for sub in system.subcomponents:
+			if sub.is_functional():
+				continue
+			var pos: Vector3 = positions[idx % positions.size()]
+			idx += 1
+			var rp = RepairPointScript.new()
+			rp.configure(sid, sub.subcomponent_id, mgr, inventory_state, player_progression,
+				pos, sub.repair_seconds, sub.min_skill, 1.8)
+			if not rp.repair_completed.is_connected(_on_repair_completed):
+				rp.repair_completed.connect(_on_repair_completed)
+			if not rp.repair_blocked.is_connected(_on_repair_blocked):
+				rp.repair_blocked.connect(_on_repair_blocked)
+			# Phase 5a Task 5 (co-presence): derelict repair points parent under the
+			# derelict's scene_root so they inherit DERELICT_DOCK_OFFSET and are freed
+			# automatically with the derelict on departure.
+			# Phase 5a Task 7: HOME repair points (the lifeboat's nav_linkage blocker)
+			# parent under lifeboat_ship.scene_root so the player physically repairs
+			# inside the docked lifeboat. Falls back to repair_point_root if the
+			# lifeboat has not been built yet.
+			if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
+				current_ship.scene_root.add_child(rp)
+			elif lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root):
+				lifeboat_ship.scene_root.add_child(rp)
+			else:
+				repair_point_root.add_child(rp)
+			repair_points.append(rp)
+
+func _clear_repair_points() -> void:
+	if is_instance_valid(repair_point_root):
+		for child in repair_point_root.get_children():
+			repair_point_root.remove_child(child)
+			child.queue_free()
+	# Phase 5a Task 7: home repair points are now parented under lifeboat_ship.scene_root.
+	# Free any that are still parented there (e.g., on a same-ship reload that bypasses the
+	# derelict-departure path). Derelict repair points parent under current_ship.scene_root and
+	# are freed when that root is freed on departure — no action needed for them here.
+	for rp in repair_points:
+		if is_instance_valid(rp) and rp.get_parent() != repair_point_root:
+			var rp_parent = rp.get_parent()
+			if rp_parent != null and is_instance_valid(rp_parent):
+				rp_parent.remove_child(rp)
+			rp.queue_free()
+	# Phase 5a Task 5 (co-presence): derelict repair points parent under
+	# current_ship.scene_root rather than repair_point_root, so repair_point_root
+	# only holds fallback home-ship repair points. The derelict repair points
+	# are freed when scene_root is freed on departure — just clear the array.
+	repair_points.clear()
+
+## The systems manager of the ship the player is currently aboard: the derelict's when away,
+## the lifeboat's when home. (Repair points act on the ship under the player's feet; the
+## travel gate separately reads the PILOTED ship's systems — see _current_systems_ops.)
+func _active_systems_manager():
+	if away_from_start and current_ship != null and current_ship.systems_manager != null:
+		return current_ship.systems_manager
+	return ship_systems_manager
+
+## Floor-cell world positions distributed across the active ship's rooms, for repair-point
+## placement. Reuses the active loader's room/cell resolution where available.
+func _distributed_room_positions() -> Array:
+	var out: Array = []
+	var active_loader = current_ship.scene_root if (away_from_start and current_ship != null) else loader
+	if is_instance_valid(active_loader) and active_loader.has_method("get_objective_specs_copy"):
+		for spec in active_loader.get_objective_specs_copy():
+			if typeof(spec) == TYPE_DICTIONARY and typeof(spec.get("position", null)) == TYPE_VECTOR3:
+				out.append(spec["position"])
+	# Fallback: derive from loot container specs if no objective positions exist.
+	if out.is_empty() and is_instance_valid(active_loader) and active_loader.has_method("get_loot_container_specs_copy"):
+		for spec in active_loader.get_loot_container_specs_copy():
+			if typeof(spec) == TYPE_DICTIONARY and typeof(spec.get("position", null)) == TYPE_VECTOR3:
+				out.append(spec["position"])
+	return out
+
+func _on_repair_completed(system_id: String, subcomponent_id: String) -> void:
+	_refresh_inventory_hud()
+	# Repairs consume parts from the player inventory (RepairPoint is configured
+	# with inventory_state), so carry weight drops here. Recompute encumbrance so
+	# the cached weight_reduction / bonus_capacity (and the Heavy-Load penalty)
+	# reflect the post-consume load instead of going stale until the next
+	# equip/transfer. Restores the ADR-0028 invariant: every inventory-content
+	# change refreshes the reduction cache.
+	_recompute_player_encumbrance()
+	var mgr = _active_systems_manager()
+	var operational: bool = mgr != null and mgr.is_operational(system_id)
+	print("REPAIR COMPLETED system=%s sub=%s operational=%s" % [
+		system_id, subcomponent_id, str(operational).to_lower()])
+
+func _on_repair_blocked(_system_id: String, _subcomponent_id: String, reason: String) -> void:
+	if vitals_model != null:
+		vitals_model.notify_repair_blocked(reason)
+
+## Validation seam: start a repair-point channel via the real path, by subcomponent.
+func repair_subcomponent_for_validation(system_id: String, subcomponent_id: String) -> bool:
+	if not is_instance_valid(player):
+		return false
+	for rp in repair_points:
+		if is_instance_valid(rp) and rp.system_id == system_id and rp.subcomponent_id == subcomponent_id and not rp.repaired:
+			# Put the player at the repair point so the real range gate (not a
+			# candidate_player bypass) admits the channel — mirrors the loot smoke seam.
+			if player.has_method("teleport_to"):
+				player.teleport_to(rp.global_position)
+			return rp.try_start(player)
+	return false
+
+## Validation seam: pump all channeling repair points by delta (deterministic timed advance).
+func advance_repair_channels_for_validation(delta: float) -> void:
+	for rp in repair_points:
+		if is_instance_valid(rp) and rp.channeling:
+			rp.advance_channel(delta)
+
+## LIFEBOAT-LOCAL repair-point positions, derived from the ACTUAL built lifeboat room nodes.
+## LifeBoatBuilder.build() lays rooms via StructuralPlacer's BFS grid (CELL_SIZE+ROOM_GAP
+## spacing + airlock separation) — NOT the fixed ROOM_CELL_X cells — so hardcoding positions
+## places repair points off the real floor. We read each room node's local position from the
+## "ShipStructure" container (which sits at the scene_root origin, so its children's positions
+## are lifeboat-local). A repair point parented under lifeboat_ship.scene_root at one of these
+## therefore lands ON an actual lifeboat room. Returns [] if the structure can't be found
+## (caller then falls through to repair_point_root, never to an off-floor position).
+func _lifeboat_local_repair_positions() -> Array:
+	var out: Array = []
+	if lifeboat_ship == null or not is_instance_valid(lifeboat_ship.scene_root):
+		return out
+	var y: float = PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR
+	var sr: Node3D = lifeboat_ship.scene_root
+	var structure: Node = sr.get_node_or_null("ShipStructure")
+	if structure == null:
+		# Fallback: the first child that contains room nodes.
+		for c in sr.get_children():
+			if c.get_child_count() > 0:
+				structure = c
+				break
+	if structure == null:
+		return out
+	for room_node in structure.get_children():
+		if room_node is Node3D:
+			out.append((room_node as Node3D).position + Vector3(0.0, y, 0.0))
+	return out
+
+## Curates the lifeboat's propulsion so the opening blocker is a single low-skill repair:
+## nav_linkage broken (circuit_board, skill 2, no tool), the other propulsion subs healthy.
+## Propulsion is offline at boot (and stays so until repaired), making "repair the lifeboat to
+## travel" the opening. Other systems keep their deterministic condition damage (the existing
+## objective loop repairs power/navigation; nothing else depends on propulsion's start health).
+func _apply_lifeboat_opening_damage() -> void:
+	if ship_systems_manager == null:
+		return
+	var prop = ship_systems_manager.get_system("propulsion")
+	if prop == null:
+		return
+	for sub in prop.subcomponents:
+		sub.health = 1.0
+	var blocker = prop.get_subcomponent("nav_linkage")
+	if blocker != null:
+		blocker.health = ShipSystemsManagerScript.DAMAGED_HEALTH
+
+## Records a searched scattered container on the per-ship slice + refreshes the HUD.
+func _on_loot_container_searched(container_id: String, granted: Array) -> void:
+	if current_ship != null and not current_ship.looted_container_ids.has(container_id):
+		current_ship.looted_container_ids.append(container_id)
+	_postprocess_loot_grants(granted, container_id)
+	_refresh_inventory_hud()
+	# Auto-equip granted containers into empty slots (Phase-7 deferral: no equip UI yet).
+	for entry in granted:
+		var gid: String = str(entry.get("item_id", ""))
+		if gid != "" and equipment_state != null and equipment_state.can_equip(gid):
+			_equip_from_inventory(gid, true)
+	_recompute_player_encumbrance()
+	print("LOOT CONTAINER SEARCHED marker=%s container=%s granted=%d" % [
+		String(current_ship.marker_id) if current_ship != null else "", container_id, granted.size()])
+
+## Validation seam: search a loot container by id through the real interaction path.
+func search_loot_container_for_validation(container_id: String) -> bool:
+	for lc in loot_containers:
+		if is_instance_valid(lc) and String(lc.container_id) == container_id and not lc.searched:
+			lc.set_validation_player_in_range(player)
+			return lc.try_interact(player)
+	return false
+
+## Routes a derelict interactable completion to the active ship's controller.
+func _on_derelict_interactable_completed(interaction_id: String, objective_id: String, sequence: int, objective_type: String, room_id: String, step_id: String) -> void:
+	if current_ship == null:
+		return
+	var controller = current_ship.get_objective_controller()
+	controller.complete(sequence)
+	# Reflect the completion (and run-complete on clear) in the HUD.
+	_refresh_derelict_tracker()
+	# Sub-project #3: grant salvage-point loot on objective completion (once only —
+	# the interactable cannot re-fire after completed = true).
+	if objective_type == "salvage" and _salvage_loot_tables.has(objective_id):
+		var seed_source: String = "%s:%s" % [String(current_ship.marker_id), objective_id]
+		var rolled: Array = LootDistributionScript.roll(_salvage_loot_tables[objective_id], seed_source, _loot_tables, {
+			"biome_id": _resolve_current_loot_biome_id(),
+			"depth": _resolve_current_loot_depth(),
+			"condition": _resolve_current_loot_condition(),
+			"container_kind": "salvage_objective",
+			"item_definitions": ItemDefsScript.load_definitions(),
+			"unique_state": unique_item_state,
+		})
+		var granted: Array = []
+		for entry in rolled:
+			var added: int = inventory_state.add_item(str(entry.get("item_id", "")), int(entry.get("quantity", 0)))
+			if added > 0:
+				var granted_entry: Dictionary = (entry as Dictionary).duplicate(true)
+				granted_entry["quantity"] = added
+				granted.append(granted_entry)
+		_postprocess_loot_grants(granted, objective_id)
+		_refresh_inventory_hud()
+		_recompute_player_encumbrance()   # salvage rewards change carry weight -> refresh Heavy Load
+	print("DERELICT OBJECTIVE COMPLETE marker=%s sequence=%d type=%s cleared=%s" % [
+		String(current_ship.marker_id), sequence, objective_type, str(controller.is_cleared()).to_lower()])
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("objective_completed", objective_type)
+		if not room_id.is_empty():
+			menu_coordinator.reveal_room(room_id)
+
+## Validation seam: complete a derelict objective by sequence through the real
+## interaction path (bypassing proximity via set_validation_player_in_range).
+func complete_derelict_objective_for_validation(sequence: int) -> bool:
+	for it in derelict_interactables:
+		if is_instance_valid(it) and int(it.sequence) == sequence and not it.completed:
+			it.set_validation_player_in_range(player)
+			return it.try_interact(player)
+	return false
+
+## Validates + executes a jump to a marker, swapping current_ship and re-homing
+## the player on success. Travel is gated by the CURRENT ship's propulsion.
+func travel_to(marker) -> Dictionary:
+	if current_ship == null or synapse_sea_world == null or travel_controller == null or ship_generator == null:
+		return {"success": false, "reason": "not_ready", "ship": null}
+	# Reject travel to the marker of the ship we are currently PILOTING. Selecting it would
+	# regenerate that ship's geometry: because current_ship == piloted_ship here,
+	# _attach_derelict_active would overwrite piloted_ship.scene_root (leaking the old root)
+	# and then dock the ship to itself — a failed/softlocked state. (Codex P2) This is
+	# narrowly scoped to current_ship == piloted_ship; the lifeboat-piloted "revisit in place"
+	# case (current_ship is the host derelict, piloted is the separate lifeboat) still works:
+	# the host is freed and regenerated and the lifeboat re-docks, as in 5b.
+	if piloted_ship != null and current_ship == piloted_ship and String(marker.marker_id) == String(current_ship.marker_id):
+		return {"success": false, "reason": "already_here", "ship": null}
+	# Phase 5b Task 5 precondition: the player must be aboard the piloted ship to
+	# travel — the ride physically takes them with it. Occupancy is authoritative.
+	recompute_occupancy()
+	if piloted_ship != null and current_occupancy != piloted_ship:
+		return {"success": false, "reason": "not_aboard_ship", "ship": null}
+	# Capture the world state attempt_travel mutates on success (scanner position +
+	# generated mark) so the dock-compat check below can roll it back on rejection.
+	var prev_player_pos: Vector3 = synapse_sea_world.player_position
+	var was_generated: bool = synapse_sea_world.is_generated(String(marker.marker_id))
+	var ops_t: Dictionary = {"propulsion": bool(_current_systems_ops().get("propulsion", false))}
+	var result: Dictionary = travel_controller.attempt_travel(
+		marker, ops_t, synapse_sea_world, ship_generator, scanner_state.range_radius)
+	if not bool(result.get("success", false)):
+		return result
+	var new_root: Node3D = result.get("ship", null)
+	if new_root == null:
+		return {"success": false, "reason": "generation_failed", "ship": null}
+
+	# Spec edge case: abort with dock_incompatible BEFORE freeing the current host,
+	# so a port-mismatch never leaves a half-undocked state. ports_compatible needs only
+	# type/size (layout-derived), so the target's LOCAL port suffices here (no placement yet).
+	if piloted_ship != null and new_root.has_method("get_layout_copy"):
+		var target_local: Dictionary = DockPortsScript.for_derelict(new_root.get_layout_copy(), int(marker.seed_value), int(marker.condition))
+		var lb_local: Dictionary = _piloted_port_local()
+		if not DockPortsScript.ports_compatible(target_local, lb_local):
+			new_root.queue_free()
+			# Codex P2: attempt_travel already advanced the scanner position + generated
+			# mark; roll them back so a rejected target leaves no world/scanner state
+			# pointing at a derelict the player never docked to (current_ship is untouched).
+			synapse_sea_world.set_player_position(prev_player_pos)
+			if not was_generated:
+				synapse_sea_world.unmark_generated(String(marker.marker_id))
+			return {"success": false, "reason": "dock_incompatible", "ship": null}
+
+	# Leaving the current ship.
+	# Phase 5a Task 5 (co-presence): the HOME ship is NO LONGER detached — it stays
+	# in-tree at origin while the new derelict is placed at DERELICT_DOCK_OFFSET.
+	# The home gameplay roots (interaction_root, oxygen_root, etc.) also stay
+	# in-tree. A DERELICT (non-empty marker_id) keeps its retained ShipInstance in
+	# visited_ships but frees its scene_root (geometry regenerates from seed on revisit).
+	_sync_current_ship_combat_summary()
+	var leaving = current_ship
+	if String(leaving.marker_id) == "":
+		# Leaving home: record the player's position so travel_home can restore it.
+		_home_player_position = (player as Node3D).global_position if player != null and player is Node3D else _home_player_position
+		# Home hull STAYS in-tree (co-presence — no remove_child).
+	else:
+		if leaving == piloted_ship:
+			# 5c: the player is piloting this ship — it is the ride, not a host to abandon.
+			# It will be re-docked to the new target below; do NOT free it.
+			pass
+		elif leaving.scene_root != null and is_instance_valid(leaving.scene_root):
+			if leaving.scene_root.get_parent() == self:
+				remove_child(leaving.scene_root)
+			leaving.scene_root.queue_free()
+			leaving.scene_root = null  # retained instance, scene dropped
+
+	var mid: String = String(marker.marker_id)
+	var inst
+	if visited_ships.has(mid):
+		# Revisit: reuse the retained instance (its systems state is preserved);
+		# the freshly generated geometry replaces the freed scene.
+		inst = visited_ships[mid]
+	else:
+		# First visit: build the per-ship systems manager seeded by condition so a
+		# wrecked ship boards with mostly-offline systems, and register it.
+		var new_bp = ShipBlueprintScript.new(int(marker.size_class), int(marker.condition), int(marker.seed_value))
+		var new_mgr = ShipSystemsManagerScript.new()
+		new_mgr.configure(new_mgr.load_definitions(), new_bp.condition, new_bp.seed_value)
+		inst = ShipInstanceScript.create("ship_%s" % mid, mid, new_bp, new_mgr, null)
+		visited_ships[mid] = inst
+
+	_attach_derelict_active(inst, new_root)
+	_configure_threat_runtime_for_current_ship()
+	# Phase 5b Task 5: NO player teleport into the derelict. The player rides the
+	# piloted ship, which docked flush to the target; _attach_derelict_active carried
+	# the player along. They cross the (closed) dock barrier themselves to board the
+	# host. recompute_occupancy() confirms the player is still aboard the piloted ship.
+	recompute_occupancy()
+	return result
+
+## Returns the player to the home ship instance: frees the active derelict's
+## scene (its retained instance stays in visited_ships), restores
+## current_ship = home_ship, and re-homes the player at the position they left
+## from. Returns false if not currently away or the home ship is unavailable.
+## Phase 5a Task 5 (co-presence): home hull was NEVER detached, so NO
+## add_child(home_ship.scene_root) and NO _reattach_starting_gameplay_roots().
+## #4 invariants preserved: repair-point/loot rebuild for the home ship.
+func travel_home() -> bool:
+	if not away_from_start or home_ship == null:
+		return false
+	_sync_current_ship_combat_summary()
+	# Phase 5b Task 5: undock the piloted ship from the current derelict so the ride
+	# physically detaches before the host is freed (capture the player carry first so
+	# they ride the piloted ship back home rather than being left in the freed frame).
+	var carry := _capture_player_carry()
+	var child_carry := _capture_subtree()
+	if piloted_ship != null:
+		_unbay_from_parent(piloted_ship)   # clear a stale bay slot if the piloted ship was bayed (PR#16 P2)
+		DockingManagerScript.undock(piloted_ship)
+	var leaving = current_ship
+	if leaving != null and String(leaving.marker_id) != "":
+		if leaving == piloted_ship:
+			# 5c: the player is piloting this ship — it is the ride, not a host to abandon.
+			# It is re-docked to home below; do NOT free it.
+			pass
+		elif leaving.scene_root != null and is_instance_valid(leaving.scene_root):
+			if leaving.scene_root.get_parent() == self:
+				remove_child(leaving.scene_root)
+			leaving.scene_root.queue_free()
+			leaving.scene_root = null
+	# Home hull stays in-tree — no re-add needed (co-presence).
+	current_ship = home_ship
+	away_from_start = false
+	_configure_threat_runtime_for_current_ship()
+	_clear_derelict_objectives()
+	_clear_loot_containers()
+	_clear_repair_points()
+	_build_loot_containers()
+	_build_repair_points()
+	if tracker != null and loader != null and loader.has_method("get_objective_specs_copy"):
+		# set_objectives resets the tracker's completed set; re-apply the home loop's
+		# progress so returning home does not blank a partially-completed home HUD.
+		tracker.set_objectives(loader.get_objective_specs_copy())
+		_refresh_home_tracker_completed()
+	# Phase 5b Task 5: re-dock the piloted ship to home and carry the player aboard it.
+	# The player stays aboard the piloted ship (which re-docked to home) — no teleport
+	# into the home derelict's frame.
+	if piloted_ship != null:
+		_dock_piloted_to(home_ship)
+		_apply_player_carry(carry)
+		_reposition_subtree(child_carry)
+	_spawn_dock_barrier(home_ship)
+	current_occupancy = piloted_ship if piloted_ship != null else home_ship
+	recompute_occupancy()
+	return true
+
+## Re-applies the home objective loop's completion state to the ObjectiveTracker
+## after a set_objectives reset (sequences below current_objective_sequence are
+## complete). Mirrors, for the home ship's singleton loop, what
+## _refresh_derelict_tracker does for a derelict.
+func _refresh_home_tracker_completed() -> void:
+	if tracker == null:
+		return
+	for s in range(1, current_objective_sequence):
+		tracker.mark_completed(s)
+	tracker.set_current_sequence(current_objective_sequence)
+	if slice_complete:
+		tracker.mark_run_complete()
+
+## Validation seam: the marker_ids of every retained visited derelict.
+func get_visited_ship_ids() -> Array:
+	return visited_ships.keys()
+
+## Validation seam: true if any combined status line contains `token`.
+func get_combined_system_status_lines_contains(token: String) -> bool:
+	for line in _combined_system_status_lines():
+		if String(line).contains(token):
+			return true
+	return false
 
 ## Allocates the HUD CanvasLayer and the ObjectiveTracker that lives
 ## inside it. Called from _build_runtime_nodes (initial slice setup)
@@ -864,6 +2792,422 @@ func _build_hud_layer() -> void:
 	if tracker.has_method("apply_accessibility_settings"):
 		tracker.apply_accessibility_settings(accessibility_settings)
 	hud_layer.add_child(tracker)
+	vitals_model = PlayerVitalsModelScript.new()
+	vitals_panel = PlayerVitalsPanelScript.new()
+	vitals_panel.name = "PlayerVitalsPanel"
+	# A11Y parity (ADR-0027): drive the vitals panel font/size from the same
+	# accessibility seam as the tracker, before it is parented (its _ready then
+	# builds at the stored scale).
+	if vitals_panel.has_method("apply_accessibility_settings"):
+		vitals_panel.apply_accessibility_settings(accessibility_settings)
+	hud_layer.add_child(vitals_panel)
+	hotbar_panel = HotbarPanelScript.new()
+	hotbar_panel.name = "WeaponHotbarPanel"
+	if hotbar_panel.has_method("apply_accessibility_settings"):
+		hotbar_panel.apply_accessibility_settings(accessibility_settings)
+	hud_layer.add_child(hotbar_panel)
+	scanner_panel = ScannerPanelScript.new()
+	scanner_panel.name = "ScannerPanel"
+	scanner_panel.visible = false
+	hud_layer.add_child(scanner_panel)
+	scanner_panel.bind(self)
+	# Restore player control on every panel close path via the signal, not just
+	# the two close paths wired into _input.
+	scanner_panel.panel_closed.connect(_on_scanner_panel_closed)
+	inventory_panel = InventoryPanelScript.new()
+	inventory_panel.name = "InventoryPanel"
+	inventory_panel.visible = false
+	hud_layer.add_child(inventory_panel)
+	inventory_panel.panel_closed.connect(_on_inventory_panel_closed)
+	inventory_panel.transfer_completed.connect(_on_inventory_transfer_completed)
+	inventory_panel.use_requested.connect(_on_inventory_use_requested)
+	menu_coordinator = MenuCoordinatorScript.new()
+	menu_coordinator.name = "MenuCoordinator"
+	hud_layer.add_child(menu_coordinator)
+	menu_coordinator.modal_opened.connect(_on_ui_modal_opened)
+	menu_coordinator.modal_closed.connect(_on_ui_modal_closed)
+	menu_coordinator.save_requested.connect(request_save)
+	menu_coordinator.load_requested.connect(request_load)
+	menu_coordinator.quit_requested.connect(_on_ui_quit_requested)
+	menu_coordinator.settings_changed.connect(_on_ui_settings_changed)
+	var configured: bool = menu_coordinator.configure(
+		_load_json_dict("res://data/ui/menu_definitions.json"),
+		_load_json_dict("res://data/ui/tutorial_triggers.json"),
+		_load_json_dict("res://data/ui/codex_entries.json"),
+		_load_json_dict("res://data/ui/input_glyphs.json"),
+		_load_json_dict("res://data/ui/tooltip_catalog.json"),
+		_load_json_dict("res://data/ui/accessibility_presets.json"),
+		_build_ui_bindings_table(),
+		accessibility_settings,
+	)
+	if not configured:
+		push_warning("PlayableGeneratedShip: MenuCoordinator configure returned false")
+	menu_coordinator.set_load_available(is_load_available())
+	menu_coordinator.set_inventory_items(_inventory_hotbar_ids())
+	menu_coordinator.set_hotbar_slots(_get_consumable_slot_labels())
+	menu_coordinator.open_main_menu()
+
+func _on_scanner_panel_closed() -> void:
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process_input(true)
+		player.set_process_unhandled_input(true)
+
+func _freeze_player_for_panel() -> void:
+	if player != null:
+		player.set_physics_process(false)
+		player.set_process_input(false)
+		player.set_process_unhandled_input(false)
+
+func _on_inventory_panel_closed() -> void:
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process_input(true)
+		player.set_process_unhandled_input(true)
+
+## A transfer/equip mutated player state: refresh carry budget (Heavy Load) and oxygen
+## (the O2-pump drain benefit follows the pump in/out of the player inventory).
+func _on_inventory_transfer_completed() -> void:
+	_recompute_player_encumbrance()
+	_ensure_consumable_hotbar_assignments()
+	_refresh_oxygen_state(false, 0.0)
+	_refresh_consumable_ui()
+	_refresh_weapon_hotbar()
+
+func _on_inventory_use_requested(item_id: String, use_all: bool) -> void:
+	_use_consumable_item(item_id, use_all)
+
+func _open_inventory_self() -> void:
+	if not is_instance_valid(inventory_panel) or inventory_state == null:
+		return
+	inventory_panel.open_self(inventory_state, equipment_state)
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("inventory_opened", "any")
+	_freeze_player_for_panel()
+
+func _open_transfer_panel_for_ship(ship_id: String) -> void:
+	if not is_instance_valid(inventory_panel) or inventory_state == null:
+		return
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null:
+		return
+	inventory_panel.open_transfer(inventory_state, inst.get_inventory(), "HOLD", equipment_state)
+	_freeze_player_for_panel()
+
+func _open_transfer_panel_for_cart(cart_id: String) -> void:
+	if not is_instance_valid(inventory_panel) or inventory_state == null:
+		return
+	var hit: Dictionary = _find_cart_by_id(cart_id)
+	if hit.is_empty():
+		return
+	inventory_panel.open_transfer(inventory_state, hit["cart"].get_hold(), "CART", equipment_state)
+	_freeze_player_for_panel()
+
+func _build_ui_bindings_table() -> Dictionary:
+	var table: Dictionary = {
+		"interact": get_input_action_keycodes_for_validation("interact"),
+		"move_up": get_input_action_keycodes_for_validation("move_forward"),
+		"move_down": get_input_action_keycodes_for_validation("move_back"),
+		"move_left": get_input_action_keycodes_for_validation("move_left"),
+		"move_right": get_input_action_keycodes_for_validation("move_right"),
+		"toggle_inventory": get_input_action_keycodes_for_validation("toggle_inventory"),
+		"toggle_scanner": get_input_action_keycodes_for_validation("toggle_scanner"),
+		"ui_pause": get_input_action_keycodes_for_validation("ui_pause"),
+		"ui_cancel": get_input_action_keycodes_for_validation("ui_cancel"),
+		"ui_accept": get_input_action_keycodes_for_validation("ui_accept"),
+		"save_run": get_input_action_keycodes_for_validation("save_run"),
+		"load_run": get_input_action_keycodes_for_validation("load_run"),
+		"ui_open_codex": get_input_action_keycodes_for_validation("ui_open_codex"),
+		"ui_open_map": get_input_action_keycodes_for_validation("ui_open_map"),
+	}
+	for action_name in ["move_forward", "move_back", "move_left", "move_right"]:
+		if not InputMap.has_action(action_name):
+			continue
+	return table
+
+func _inventory_hotbar_ids() -> Array:
+	if inventory_state == null:
+		return []
+	var ids: Array = inventory_state.items.keys()
+	ids.sort()
+	var out: Array = []
+	for id_variant in ids:
+		out.append(String(id_variant))
+	return out
+
+func _weapon_ammo_item_id(weapon_id: String) -> String:
+	match weapon_id:
+		"flare_pistol":
+			return "flare_round"
+		"shock_probe":
+			return "capacitor_cell"
+		"welding_lance":
+			return "fuel_canister"
+		_:
+			return ""
+
+func _equipped_primary_weapon_id() -> String:
+	if equipment_state == null:
+		return ""
+	for slot_id in ["primary_hand", "secondary_hand"]:
+		var item_id: String = str(equipment_state.get_equipped(slot_id))
+		if item_id == "capacitor_cell":
+			return "shock_probe"
+		if item_id in ["crowbar", "flare_pistol", "welding_lance"]:
+			return item_id
+	return ""
+
+func _player_armor_profile() -> Dictionary:
+	var profile: Dictionary = {
+		"flat_reduction": {},
+		"resistance": {},
+		"durability": 0.0,
+		"max_durability": 0.0,
+		"wear_factor": 0.35,
+	}
+	if equipment_state == null:
+		return profile
+	var suit_id: String = str(equipment_state.get_equipped("suit"))
+	if suit_id == "hardsuit":
+		profile["resistance"] = {
+			"physical": 0.20,
+			"bleed": 0.15,
+			"fire": 0.25,
+			"electric": 0.20,
+		}
+		profile["durability"] = 40.0
+		profile["max_durability"] = 40.0
+	return profile
+
+func _combat_anchor_for_current_ship() -> Vector3:
+	if current_ship != null and is_instance_valid(current_ship.scene_root):
+		return (current_ship.scene_root as Node3D).global_position
+	return Vector3.ZERO
+
+func _combat_layout_for_current_ship() -> Dictionary:
+	if current_ship != null and typeof(current_ship.built_layout) == TYPE_DICTIONARY and not current_ship.built_layout.is_empty():
+		return current_ship.built_layout
+	if loader != null and loader.has_method("get_layout_copy"):
+		return loader.get_layout_copy()
+	return {}
+
+func _combat_markers_for_current_ship() -> Array:
+	var layout: Dictionary = _combat_layout_for_current_ship()
+	var raw: Variant = layout.get("encounters", [])
+	if raw is Array and not (raw as Array).is_empty():
+		return (raw as Array).duplicate(true)
+	if loader != null and loader.has_method("get_encounter_markers"):
+		return loader.get_encounter_markers()
+	return []
+
+func _sync_current_ship_combat_summary() -> void:
+	if current_ship == null or threat_manager == null:
+		return
+	current_ship.combat_summary = threat_manager.get_summary()
+
+func _configure_threat_runtime_for_current_ship() -> void:
+	if threat_manager == null:
+		return
+	var anchor: Vector3 = _combat_anchor_for_current_ship()
+	threat_manager.fallback_anchor = anchor
+	if current_ship != null and not current_ship.combat_summary.is_empty():
+		threat_manager.apply_summary(current_ship.combat_summary)
+	else:
+		threat_manager.configure_for_layout(_combat_layout_for_current_ship(), _combat_markers_for_current_ship(), anchor)
+	_refresh_weapon_hotbar()
+
+func _refresh_weapon_hotbar() -> void:
+	if not is_instance_valid(hotbar_panel):
+		return
+	var weapon_id: String = _equipped_primary_weapon_id()
+	if weapon_id.is_empty():
+		_last_weapon_hotbar_text = "Weapon: unarmed | Threat: %.2f | Hostiles: %d" % [
+			threat_manager.awareness_indicator if threat_manager != null else 0.0,
+			threat_manager.get_active_threat_count() if threat_manager != null else 0,
+		]
+		hotbar_panel.set_hotbar_text(_last_weapon_hotbar_text)
+		return
+	var weapon_name: String = ItemDefsScript.display_name(_definitions_for_equip(), weapon_id)
+	var ammo_item_id: String = _weapon_ammo_item_id(weapon_id)
+	var ammo_text: String = "melee"
+	if not ammo_item_id.is_empty() and inventory_state != null:
+		ammo_text = "%s=%d" % [ammo_item_id, inventory_state.get_quantity(ammo_item_id)]
+	var combat_text: String = "idle"
+	if threat_manager != null:
+		combat_text = "combat" if threat_manager.has_combat_engagement() else "stealth"
+	_last_weapon_hotbar_text = "%s | %s | Threat %.2f | %s" % [
+		weapon_name,
+		ammo_text,
+		threat_manager.awareness_indicator if threat_manager != null else 0.0,
+		combat_text,
+	]
+	hotbar_panel.set_hotbar_text(_last_weapon_hotbar_text)
+
+func _attack_with_equipped_weapon() -> Dictionary:
+	if threat_manager == null:
+		return {"ok": false, "reason": "threat_manager_missing"}
+	var weapon_id: String = _equipped_primary_weapon_id()
+	if weapon_id.is_empty():
+		weapon_id = "crowbar"
+	var result: Dictionary = threat_manager.attack_with_weapon(weapon_id, inventory_state, equipment_state)
+	if bool(result.get("ok", false)):
+		_refresh_inventory_hud()
+		_refresh_player_vitals(0.0)
+		_sync_current_ship_combat_summary()
+	_refresh_weapon_hotbar()
+	return result
+
+func _tick_threat_runtime(delta: float) -> void:
+	if threat_manager == null:
+		return
+	var player_pos: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
+	threat_manager.set_player_signals(
+		0.2 if player != null and player.has_method("is_moving") and player.is_moving() else 0.05,
+		0.35,
+		0.55,
+		false,
+		"",
+	)
+	threat_manager.tick_threats(delta, vitals_state, status_effects_state, _player_armor_profile(), player_pos)
+	_sync_current_ship_combat_summary()
+	_refresh_weapon_hotbar()
+
+func _consumable_pipeline_context() -> Dictionary:
+	return {
+		"effect_dispatcher": effect_dispatcher,
+		"consumable_state": consumable_state,
+		"medicine_state": medicine_state,
+		"stimulant_state": stimulant_state,
+		"addiction_state": addiction_state,
+		"ammo_state": ammo_state,
+		"utility_state": utility_item_state,
+		"vitals_state": vitals_state,
+		"sanity_state": sanity_state,
+		"radiation_state": radiation_state,
+		"body_temperature_state": body_temperature_state,
+		"status_effects_state": status_effects_state,
+	}
+
+func _get_consumable_slot_labels() -> Array:
+	var out: Array = []
+	if consumable_state == null:
+		return out
+	for item_id_variant in consumable_state.hotbar_slots:
+		var item_id: String = str(item_id_variant)
+		if item_id.is_empty():
+			out.append("(empty)")
+		else:
+			var qty: int = inventory_state.get_quantity(item_id) if inventory_state != null else 0
+			out.append("%s x%d" % [ItemDefsScript.display_name(_definitions_for_equip(), item_id), qty])
+	return out
+
+func _refresh_consumable_ui(selected_index: int = 0) -> void:
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.set_inventory_items(_inventory_hotbar_ids())
+		menu_coordinator.set_hotbar_slots(_get_consumable_slot_labels(), selected_index)
+
+func _ensure_consumable_hotbar_assignments() -> void:
+	if consumable_state == null or inventory_state == null:
+		return
+	var usable: Array = []
+	for item_id_variant in _inventory_hotbar_ids():
+		var item_id: String = str(item_id_variant)
+		if inventory_state.get_quantity(item_id) > 0 and consumable_state.has_use_action(item_id):
+			usable.append(item_id)
+	for slot_index in range(consumable_state.hotbar_slots.size()):
+		var current: String = str(consumable_state.hotbar_slots[slot_index])
+		if current.is_empty() or inventory_state.get_quantity(current) <= 0 or not consumable_state.has_use_action(current):
+			consumable_state.assign_hotbar_slot(slot_index, usable[slot_index] if slot_index < usable.size() else "")
+
+func _use_consumable_item(item_id: String, use_all: bool = false) -> Dictionary:
+	if consumable_state == null or inventory_state == null:
+		return {"ok": false, "reason": "consumable_pipeline_missing"}
+	var result: Dictionary = consumable_state.use_item(item_id, inventory_state, _consumable_pipeline_context(), use_all)
+	if bool(result.get("ok", false)):
+		_ensure_consumable_hotbar_assignments()
+		_recompute_player_encumbrance()
+		_refresh_oxygen_state(false, 0.0)
+		_refresh_player_vitals(0.0)
+		_refresh_consumable_ui()
+	return result
+
+func _use_consumable_hotbar_slot(slot_index: int) -> Dictionary:
+	if consumable_state == null or inventory_state == null:
+		return {"ok": false, "reason": "consumable_pipeline_missing"}
+	var result: Dictionary = consumable_state.use_hotbar_slot(slot_index, inventory_state, _consumable_pipeline_context())
+	if bool(result.get("ok", false)):
+		_ensure_consumable_hotbar_assignments()
+		_recompute_player_encumbrance()
+		_refresh_oxygen_state(false, 0.0)
+		_refresh_player_vitals(0.0)
+		_refresh_consumable_ui(slot_index)
+	return result
+
+func _build_ui_room_payload() -> Dictionary:
+	var room_set: Dictionary = {}
+	var neighbours: Dictionary = {}
+	if loader != null and loader.has_method("get_room_links"):
+		for link_variant in loader.get_room_links():
+			if typeof(link_variant) != TYPE_DICTIONARY:
+				continue
+			var link: Dictionary = link_variant
+			var from_room: String = str(link.get("from_room", ""))
+			var to_room: String = str(link.get("to_room", ""))
+			if from_room.is_empty() or to_room.is_empty():
+				continue
+			room_set[from_room] = true
+			room_set[to_room] = true
+			if not neighbours.has(from_room):
+				neighbours[from_room] = []
+			if not neighbours.has(to_room):
+				neighbours[to_room] = []
+			if not (neighbours[from_room] as Array).has(to_room):
+				(neighbours[from_room] as Array).append(to_room)
+			if not (neighbours[to_room] as Array).has(from_room):
+				(neighbours[to_room] as Array).append(from_room)
+	for objective in loader.get_objective_specs_copy() if loader != null and loader.has_method("get_objective_specs_copy") else []:
+		if typeof(objective) == TYPE_DICTIONARY:
+			var room_id: String = str((objective as Dictionary).get("room_id", ""))
+			if not room_id.is_empty():
+				room_set[room_id] = true
+	for room_id in [fire_zone_resolved_room_id, arc_zone_resolved_room_id]:
+		if not String(room_id).is_empty():
+			room_set[String(room_id)] = true
+	var rooms: Array = room_set.keys()
+	rooms.sort()
+	for room_id in rooms:
+		if not neighbours.has(room_id):
+			neighbours[room_id] = []
+	return {"rooms": rooms, "neighbours": neighbours}
+
+func _refresh_ui_shell_runtime() -> void:
+	if not is_instance_valid(menu_coordinator):
+		return
+	menu_coordinator.set_load_available(is_load_available())
+	menu_coordinator.set_inventory_items(_inventory_hotbar_ids())
+	menu_coordinator.set_hotbar_slots(_get_consumable_slot_labels())
+	_refresh_weapon_hotbar()
+	menu_coordinator.configure_map(_build_ui_room_payload())
+	if loader != null and loader.has_method("get_critical_path"):
+		var critical: Array[String] = loader.get_critical_path()
+		if not critical.is_empty():
+			menu_coordinator.track_room(critical[0])
+
+func _on_ui_modal_opened(_menu_id: String) -> void:
+	_freeze_player_for_panel()
+
+func _on_ui_modal_closed(_previous_menu_id: String) -> void:
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process_input(true)
+		player.set_process_unhandled_input(true)
+
+func _on_ui_quit_requested() -> void:
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.open_main_menu()
+
+func _on_ui_settings_changed(_summary: Dictionary) -> void:
+	apply_accessibility_settings(accessibility_settings)
 
 func _on_ship_loaded(summary: Dictionary) -> void:
 	if playable_started:
@@ -878,6 +3222,26 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_build_hud_layer()
 	_spawn_player()
 	_spawn_camera()
+	_refresh_ui_shell_runtime()
+	# Phase 4.5: wrap the freshly-loaded starting ship as current_ship. Reuses
+	# the coordinator's existing ship_systems_manager (Approach A: the starting
+	# slice's systems are untouched). marker_id "" marks it as the home ship.
+	if current_ship == null:
+		current_ship = ShipInstanceScript.create("ship_start", "", _load_blueprint_for_systems(), ship_systems_manager, loader)
+		# Sub-project #1: keep a stable reference to the home ship so travel_home
+		# and world-load can restore it.
+		home_ship = current_ship
+		# Store the layout so DockPorts can derive port descriptors for boot docking.
+		home_ship.built_layout = loader.get_layout_copy()
+		_spawn_hangar_control(home_ship)
+		_spawn_cargo_hold_control(home_ship)
+		_spawn_cart_controls_for_ship(home_ship)
+		# Phase 5a Task 6: initialise occupancy to home ship (player starts here).
+		current_occupancy = home_ship
+		# Phase 5a Task 7: build the physical lifeboat docked to the starting derelict.
+		# The lifeboat is now port-aligned via DockingManager (replaces fixed LIFEBOAT_DOCK_OFFSET).
+		_build_lifeboat_at_home()
+	_configure_threat_runtime_for_current_ship()
 	_build_interactables()
 	_build_slice_affordance_labels()
 	_build_route_control_gates()
@@ -888,16 +3252,21 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	# tool_pickup_root and reads its world position from a side room
 	# (tool_storage_01 if defined) with a player-spawn fallback.
 	_build_tool_pickup()
+	_ensure_consumable_hotbar_assignments()
+	_refresh_consumable_ui()
 	# REQ-014: spawn the junction_calibrator pickup in a different side
 	# room (galley_01 with a player-spawn fallback offset on the
 	# opposite side of the spawn). Same parent root as the oxygen pump
 	# so the existing reset/reload teardown covers it.
 	_build_junction_calibrator_pickup()
 	_refresh_oxygen_state(true, 0.0)
+	_refresh_weapon_hotbar()
 	_build_fire_zone()
 	_refresh_fire_state(true)
 	_build_arc_zone()
 	_refresh_arc_state(true)
+	_build_loot_containers()
+	_build_repair_points()
 	tracker.set_objectives(loader.get_objective_specs_copy())
 	current_objective_sequence = 1
 	slice_complete = false
@@ -914,6 +3283,105 @@ func _on_loader_failed(reason: String) -> void:
 	last_failure_reason = reason
 	push_error("PLAYABLE SHIP FAIL reason=%s" % reason)
 	emit_signal("playable_failed", reason)
+
+## Break the home_ship ↔ lifeboat_ship RefCounted cycle before this Node3D is
+## freed. Without this, both ShipInstances keep each other alive (and their
+## preloaded GDScript resources with them), producing the "7 resources still in
+## use at exit" error that breaks the regression bundle's clean_output contract.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_break_ship_instance_cycles()
+
+func _break_ship_instance_cycles() -> void:
+	# Break lifeboat → home cycle.
+	if lifeboat_ship != null:
+		lifeboat_ship.parent_ship = null
+		lifeboat_ship.docked_ships.clear()
+	# Break home → lifeboat cycle.
+	if home_ship != null:
+		home_ship.docked_ships.clear()
+	# Break any visited-derelict parent_ship back-pointers.
+	for mid in visited_ships:
+		var inst = visited_ships[mid]
+		if inst != null:
+			inst.parent_ship = null
+			inst.docked_ships.clear()
+
+## Phase 5a Task 7: build the physical lifeboat and dock it to the home derelict.
+## Called from the home-wrap path in _on_ship_loaded (guarded by `current_ship == null`).
+## Safe to call multiple times — frees any prior lifeboat_ship.scene_root first.
+func _build_lifeboat_at_home() -> void:
+	# Free any prior lifeboat root (reload safety — should not be in-tree here since
+	# _reset_runtime_for_reload tears it down, but guard defensively).
+	if lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root):
+		var old_root: Node3D = lifeboat_ship.scene_root as Node3D
+		if old_root != null and old_root.get_parent() == self:
+			remove_child(old_root)
+		old_root.queue_free()
+		lifeboat_ship = null
+
+	var lb_root: Node3D = LifeBoatBuilderScript.build()
+	if lb_root == null:
+		push_error("PlayableGeneratedShip: LifeBoatBuilder.build() returned null; lifeboat not created")
+		return
+
+	# Create the ShipInstance: shared systems_manager so #4 opening-damage, travel-gate,
+	# and repair semantics stay exactly as they are.
+	lifeboat_ship = ShipInstanceScript.create("lifeboat", "", null, ship_systems_manager, lb_root)
+	lifeboat_ship.built_layout = LifeBoatBuilderScript.build_layout()
+	lifeboat_ship.get_access().claim(PLAYER_LOCAL_ID)
+
+	# Add to the scene tree FIRST so host/mobile global_transforms resolve, then
+	# port-align the lifeboat to the home airlock via DockingManager (the lifeboat now
+	# port-docks to the host instead of parking at a fixed anchor offset).
+	add_child(lb_root)
+	piloted_ship = lifeboat_ship
+	var dock_result: Dictionary = _dock_piloted_to(home_ship)
+	if not bool(dock_result.get("success", false)):
+		push_error("PlayableGeneratedShip: boot dock failed — reason=%s" % str(dock_result.get("reason", "?")))
+	# Phase 5b Task 6: spawn the boot home barrier so boarding home at the canonical
+	# opening is consistent with boarding a travel target (both require seam interaction).
+	_spawn_dock_barrier(home_ship)
+	# 5c: the lifeboat's bridge terminal is spawned AFTER _spawn_dock_barrier(home_ship)
+	# because that call clears bridge_terminals (it shares the dock-transition teardown).
+	# Spawned post-add_child so the terminal is in-tree for the login range gate.
+	_spawn_bridge_terminal(lifeboat_ship)
+	_spawn_hangar_control(lifeboat_ship)
+	_spawn_cargo_hold_control(lifeboat_ship)
+	_spawn_cart_controls_for_ship(lifeboat_ship)
+
+## Port-aligns piloted_ship's airlock to host's dock port and writes the dock
+## relationship. host.scene_root must be in-tree. Returns the dock() result dict.
+## The piloted ship's OWN dock port (ship-local). The lifeboat exposes an airlock
+## port; a claimed derelict exposes its dock-room port. Used both to dock the piloted
+## ship to a target and to pre-check compatibility before committing a travel.
+func _piloted_port_local() -> Dictionary:
+	if piloted_ship == null:
+		return {}
+	if piloted_ship == lifeboat_ship:
+		return DockPortsScript.for_lifeboat(piloted_ship.built_layout)
+	return DockPortsScript.for_derelict(piloted_ship.built_layout, _ship_seed(piloted_ship), _ship_condition_class(piloted_ship))
+
+func _dock_piloted_to(host) -> Dictionary:
+	if piloted_ship == null or host == null or host.scene_root == null:
+		return {"success": false, "reason": "dock_failed"}
+	var cc := 0 if host == home_ship else _ship_condition_class(host)
+	var host_local: Dictionary = DockPortsScript.for_derelict(host.built_layout, _ship_seed(host), cc)
+	var host_world: Dictionary = DockingManagerScript.host_port_to_world(host, host_local)
+	var mobile_local: Dictionary = _piloted_port_local()
+	if not DockPortsScript.ports_compatible(host_world, mobile_local):
+		return {"success": false, "reason": "dock_incompatible"}
+	return DockingManagerScript.dock(host, piloted_ship, host_world, mobile_local)
+
+func _ship_seed(inst) -> int:
+	if inst != null and inst.blueprint != null and ("seed_value" in inst.blueprint):
+		return int(inst.blueprint.seed_value)
+	return 0
+
+func _ship_condition_class(inst) -> int:
+	if inst != null and inst.blueprint != null and ("condition" in inst.blueprint):
+		return int(inst.blueprint.condition)
+	return 0
 
 func _spawn_player() -> void:
 	player = PlayerControllerScript.new()
@@ -990,6 +3458,43 @@ func _add_interactable_to_sequence(sequence: int, interactable: Node) -> void:
 	sequence_interactables[sequence].append(interactable)
 
 func _on_player_interact_requested(player_body: PlayerController) -> void:
+	# Phase 4.5: while aboard a traveled derelict the starting ship's retained
+	# interactables/pickups are detached but still referenced here; gate them so
+	# a derelict cannot complete stale starting-ship objectives.
+	# Phase 5b: barrier pass is unconditional — the home seam also has a barrier at boot,
+	# so opening/breaching the dock seam must work whether the player is at home or away.
+	for b in dock_barriers:
+		if is_instance_valid(b) and not b.opened and b.try_start(player_body):
+			return
+	for t in bridge_terminals:
+		if is_instance_valid(t) and t.try_login(player_body):
+			return
+	if away_from_start:
+		# Sub-project #4: try repair points before loot/objectives.
+		for rp in repair_points:
+			if is_instance_valid(rp) and rp.try_start(player_body):
+				return
+		# Sub-project #3: derelict loot containers are pickup-like interactables.
+		# Try them before objectives, matching the home ship's tool-pickup
+		# precedence when an objective and pickup share the same interaction area.
+		for lc in loot_containers:
+			if is_instance_valid(lc) and lc.try_interact(player_body):
+				return
+		# Sub-project #2: the boarded derelict has its own objective interactables.
+		for it in derelict_interactables:
+			if is_instance_valid(it) and it.try_interact(player_body):
+				return
+		# Sub-project #6 (cargo): deposit is the lowest-priority fallback — only fires
+		# if nothing more specific (repair/loot/objective) claimed the interact here.
+		if _try_cargo_deposit(player_body):
+			return
+		if _try_cart_interact(player_body):
+			return
+		return
+	# Sub-project #4: try lifeboat repair points before pickups/objectives.
+	for rp in repair_points:
+		if is_instance_valid(rp) and rp.try_start(player_body):
+			return
 	# REQ-007: tool pickup is an interaction like any other. Try it first
 	# (before objective interactables) so the player can pick up the pump
 	# when standing in front of it.
@@ -1005,6 +3510,35 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		var interactable = interactable_variant
 		if interactable.try_interact(player_body):
 			return
+	# Sub-project #6 (cargo): deposit-all is the lowest-priority fallback at home too —
+	# walk up to the cargo hold and interact to dump salvage when nothing else claims it.
+	if _try_cargo_deposit(player_body):
+		return
+	if _try_cart_interact(player_body):
+		return
+
+## Walk-up cargo deposit: deposits all haulable salvage into the hold of whichever
+## cargo control the player is standing at (strict in-range gate). Returns true iff a
+## deposit fired. Emit-only control + coordinator-owned transfer (single ownership).
+func _try_cargo_deposit(player_body) -> bool:
+	for ch in cargo_hold_controls:
+		if is_instance_valid(ch) and ch.try_deposit(player_body):
+			return true
+	return false
+
+## Walk-up cart interact: grab if not held, else load salvage into it. Lowest-priority
+## fallback (Phase 7 will add the picker for unload/release; seam-driven for now).
+func _try_cart_interact(player_body) -> bool:
+	for c in cart_controls:
+		if not is_instance_valid(c):
+			continue
+		if grabbed_cart == null:
+			if c.try_grab(player_body):
+				return true
+		else:
+			if c.try_load(player_body):
+				return true
+	return false
 
 func _on_interactable_completed(interaction_id: String, objective_id: String, sequence: int, objective_type: String, room_id: String, step_id: String) -> void:
 	if sequence != current_objective_sequence:
@@ -1047,21 +3581,29 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 		# Fall through to single-step completion path exactly once.
 
 	objective_completion_count += 1
-	if ship_systems != null:
-		ship_systems.apply_objective(sequence, objective_type, objective_id, room_id)
+	if ship_systems_manager != null:
+		completed_objective_types[objective_type] = true
+		for pair in OBJECTIVE_REPAIR_MAP.get(objective_type, []):
+			ship_systems_manager.force_repair(str(pair[0]), str(pair[1]))
+		if player_progression != null and (objective_type == "restore_systems" or objective_type == "stabilize_reactor"):
+			player_progression.grant_xp("repair", REPAIR_OBJECTIVE_XP)
+			# REQ-PM-002 — funnel the objective-completion XP through the
+			# training bus so the log captures the deterministic event.
+			if training_event_bus != null:
+				training_event_bus.emit("repair_full_system", str(sequence), player_progression)
+		var compat: Dictionary = _manager_compat_summary()
 		_apply_ship_systems_consequences(objective_type)
 		_refresh_route_control_from_ship_systems()
 		if oxygen_state != null:
-			oxygen_state.apply_ship_systems_summary(ship_systems.get_summary())
+			oxygen_state.apply_ship_systems_summary(compat)
 			_refresh_oxygen_state(false, 0.0)
-		var ship_summary: Dictionary = ship_systems.get_summary()
 		var route_summary: Dictionary = get_route_control_summary()
 		print("SHIP SYSTEM UPDATED sequence=%d type=%s power=%d reactor=%d extraction=%s route_opened=%d blockers=%d" % [
 			sequence,
 			objective_type,
-			int(ship_summary.get("power_percent", 0)),
-			int(ship_summary.get("reactor_stability_percent", 0)),
-			str(bool(ship_summary.get("extraction_unlocked", false))),
+			int(compat.get("power_percent", 0)),
+			int(compat.get("reactor_stability_percent", 0)),
+			str(bool(compat.get("extraction_unlocked", false))),
 			int(route_summary.get("opened_gate_count", 0)),
 			int(route_summary.get("active_blocker_count", 0)),
 		])
@@ -1079,6 +3621,9 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 		current_objective_sequence = total_sequences + 1
 		tracker.mark_run_complete()
 		print("PLAYABLE SLICE COMPLETE objectives_completed=%d" % objective_completion_count)
+		# REQ-PM-008 / ADR-0033 — apply the meta payout and persist
+		# meta + unlock state before wiping the run snapshot.
+		_apply_meta_payout_and_persist("completion")
 		# REQ-012: drop the current-run save file so a stale snapshot
 		# cannot be resumed into a finished run. A fresh run
 		# automatically starts with no save file (delete returns true
@@ -1121,10 +3666,10 @@ func get_blocked_affordance_visible_count() -> int:
 	return count
 
 func _refresh_route_control_from_ship_systems() -> void:
-	if route_control_state == null or ship_systems == null:
+	if route_control_state == null or ship_systems_manager == null:
 		_refresh_tracker_system_status_lines()
 		return
-	route_control_state.apply_ship_systems_summary(ship_systems.get_summary())
+	route_control_state.apply_ship_systems_summary(_manager_compat_summary())
 	_apply_route_gate_scene_state()
 	_refresh_tracker_system_status_lines()
 
@@ -1162,44 +3707,111 @@ func _refresh_tracker_system_status_lines() -> void:
 
 func _combined_system_status_lines() -> PackedStringArray:
 	var lines: PackedStringArray = PackedStringArray()
-	if ship_systems != null:
-		for line in ship_systems.get_status_lines():
-			var text: String = String(line)
-			if text.begins_with("Routes:") or text.begins_with("Extraction:"):
-				continue
-			lines.append(text)
+	if ship_systems_manager != null:
+		var compat: Dictionary = _manager_compat_summary()
+		lines.append("Power: %d%%" % int(compat.get("power_percent", 0)))
+		lines.append("Reactor: %d%%" % int(compat.get("reactor_stability_percent", 0)))
+		lines.append("Supplies: %s" % ("OK" if bool(compat.get("emergency_supplies_recovered", false)) else "LOW"))
+		lines.append("Main Power: %s" % ("ON" if bool(compat.get("main_power_restored", false)) else "OFF"))
+		lines.append("Logs: %s" % ("DOWNLOADED" if bool(compat.get("navigation_logs_downloaded", false)) else "PENDING"))
+		lines.append("Reactor: %s" % ("STABLE" if bool(compat.get("reactor_stabilized", false)) else "UNSTABLE"))
 	if route_control_state != null:
 		for line in route_control_state.get_status_lines():
 			lines.append(String(line))
-	if oxygen_state != null:
-		for line in oxygen_state.get_status_lines():
-			lines.append(String(line))
-	# REQ-007: surface carried tools on the HUD via inventory status lines.
+	# ADR-0027: player oxygen + breach now live solely in the bottom-left
+	# PlayerVitalsPanel; the tracker no longer mirrors oxygen_state lines.
+	# REQ-007: still surface carried tools/items, but the inventory weight
+	# readout is owned by the vitals panel's Load line, so drop the weight= line.
 	if inventory_state != null:
 		for line in inventory_state.get_status_lines():
+			var inv_text: String = String(line)
+			if inv_text.begins_with("weight="):
+				continue
+			lines.append(inv_text)
+	if not _last_loot_feedback_line.is_empty():
+		lines.append(_last_loot_feedback_line)
+	if unique_item_state != null:
+		for line in unique_item_state.get_status_lines():
 			lines.append(String(line))
+	if power_grid_state != null:
+		for line in power_grid_state.get_status_lines():
+			lines.append(String(line))
+	if life_support_expanded_state != null:
+		for line in life_support_expanded_state.get_status_lines():
+			lines.append(String(line))
+	if hull_integrity_state != null:
+		for line in hull_integrity_state.get_status_lines():
+			lines.append(String(line))
+	if fire_suppression_state != null:
+		for line in fire_suppression_state.get_status_lines():
+			lines.append(String(line))
+	if propulsion_expanded_state != null:
+		for line in propulsion_expanded_state.get_status_lines():
+			lines.append(String(line))
+	if shield_state != null:
+		for line in shield_state.get_status_lines():
+			lines.append(String(line))
+	if sustenance_state != null:
+		for line in sustenance_state.get_status_lines():
+			lines.append(String(line))
+	if player_progression != null:
+		lines.append("Repair Skill: %d" % player_progression.get_skill_level("repair"))
 	return lines
 
 func get_combined_system_status_lines() -> PackedStringArray:
 	return _combined_system_status_lines()
 
+func _sub_health(system_id: String, sub_id: String) -> float:
+	if ship_systems_manager == null:
+		return 0.0
+	var system = ship_systems_manager.get_system(system_id)
+	if system == null:
+		return 0.0
+	var sub = system.get_subcomponent(sub_id)
+	return sub.health if sub != null else 0.0
+
+func _sub_functional(system_id: String, sub_id: String) -> bool:
+	if ship_systems_manager == null:
+		return false
+	var system = ship_systems_manager.get_system(system_id)
+	if system == null:
+		return false
+	var sub = system.get_subcomponent(sub_id)
+	return sub != null and sub.is_functional()
+
+## Flag-shaped summary derived from manager subcomponent state + the narrative
+## record. Feeds the unchanged route_control_state / breach oxygen_state models
+## and the HUD (ShipSystemsManager is the sole source of truth for ship-system state).
+func _manager_compat_summary() -> Dictionary:
+	var power_restored: bool = _sub_functional("power", "power_distribution") and _sub_functional("power", "battery_cells")
+	var reactor_full: bool = _sub_health("power", "reactor_core") >= 1.0
+	var power_health: float = 0.0
+	if ship_systems_manager != null and ship_systems_manager.get_system("power") != null:
+		power_health = ship_systems_manager.get_system("power").health()
+	return {
+		"emergency_supplies_recovered": completed_objective_types.has("recover_supplies"),
+		"main_power_restored": power_restored,
+		"navigation_logs_downloaded": completed_objective_types.has("download_logs"),
+		"reactor_stabilized": reactor_full,
+		"blocked_routes_cleared": power_restored,
+		"extraction_unlocked": reactor_full,
+		"power_percent": int(round(power_health * 100.0)),
+		"reactor_stability_percent": int(round(_sub_health("power", "reactor_core") * 100.0)),
+	}
+
 func get_ship_systems_summary() -> Dictionary:
 	var summary: Dictionary = {}
-	if ship_systems == null:
-		summary["emergency_supplies_recovered"] = false
+	if ship_systems_manager == null:
 		summary["main_power_restored"] = false
-		summary["navigation_logs_downloaded"] = false
-		summary["reactor_stabilized"] = false
-		summary["blocked_routes_cleared"] = false
 		summary["extraction_unlocked"] = false
 		summary["power_percent"] = 0
 		summary["reactor_stability_percent"] = 0
-		summary["completed_sequences"] = []
-		summary["completed_system_count"] = 0
 		summary["blocked_affordance_visible_count"] = 0
 		return summary
-	summary = ship_systems.get_summary()
+	summary = _manager_compat_summary()
 	summary["blocked_affordance_visible_count"] = get_blocked_affordance_visible_count()
+	for key in _expanded_ship_systems_summary().keys():
+		summary[key] = _expanded_ship_systems_summary()[key]
 	return summary
 
 func get_route_control_summary() -> Dictionary:
@@ -1240,10 +3852,21 @@ func get_route_gate_collision_enabled_count() -> int:
 # and is intentionally a no-op before ship load completes.
 
 func _process(delta: float) -> void:
+	if away_from_start:
+		# Keep the vitals panel live on a boarded derelict: Heavy-Load, repair
+		# progress, and the repair_blocked message + its countdown still apply
+		# away from home, even though the home oxygen/hazard loop is paused here.
+		_tick_threat_runtime(delta)
+		_refresh_player_vitals(delta)
+		return
 	if not playable_started or slice_complete:
 		return
 	if oxygen_state == null:
 		return
+	_tick_threat_runtime(delta)
+	if ship_systems_manager != null:
+		ship_systems_manager.advance(delta)
+	_recompute_expanded_ship_systems(delta)
 	_refresh_oxygen_state(false, delta)
 	if fire_state != null:
 		fire_state.tick(delta)
@@ -1255,6 +3878,60 @@ func _process(delta: float) -> void:
 	if electrical_arc_state != null:
 		electrical_arc_state.tick(delta, {})
 		_refresh_arc_state(false)
+	if stimulant_state != null:
+		stimulant_state.tick(delta, addiction_state, _consumable_pipeline_context())
+	if addiction_state != null:
+		addiction_state.tick(delta, status_effects_state)
+	# REQ-SV: tick survival vitals and cascades.
+	if vitals_state != null:
+		var temp_mult: float = 1.0
+		if body_temperature_state != null:
+			temp_mult = body_temperature_state.get_thirst_multiplier()
+		var rad_drain: float = 0.0
+		if radiation_state != null:
+			rad_drain = radiation_state.get_health_drain_per_second()
+		var status_mult: float = 1.0
+		if status_effects_state != null:
+			status_mult = status_effects_state.get_modifier("stamina_recovery")
+		vitals_state.tick(delta, {
+			"temperature_thirst_mult": temp_mult,
+			"radiation_health_drain": rad_drain,
+			"status_stamina_recovery_mult": status_mult,
+			"moving": player != null and player.has_method("is_moving") and player.is_moving(),
+		})
+	if sanity_state != null:
+		# Synapse Sea field = not in a safe zone (away_from_start or breach open)
+		var in_safe: bool = not away_from_start and (oxygen_state == null or not oxygen_state.get_summary().get("breach_open", false))
+		sanity_state.in_safe_zone = in_safe
+		sanity_state.tick(delta)
+	if radiation_state != null:
+		# Radiation zones are active on derelicts or when breach is open.
+		var in_rad: bool = away_from_start or (oxygen_state != null and oxygen_state.get_summary().get("breach_open", false))
+		radiation_state.in_radiation_zone = in_rad
+		radiation_state.tick(delta)
+	if body_temperature_state != null:
+		body_temperature_state.in_extreme_zone = away_from_start
+		body_temperature_state.tick(delta)
+	if status_effects_state != null:
+		status_effects_state.tick(delta)
+	# ADR-0034: tick food / cooking / spoilage / sustenance models.
+	if spoilage_state != null:
+		spoilage_state.tick(delta)
+	if cooking_state != null and cooking_state.state == CookingStateScript.State.COOKING:
+		cooking_state.tick(delta)
+	if hydroponics_state != null and hydroponics_state.state == HydroponicsStateScript.State.PLANTED:
+		hydroponics_state.tick(delta)
+	if synthesizer_state != null and synthesizer_state._cooking.state == CookingStateScript.State.COOKING:
+		synthesizer_state.tick(delta)
+	if water_recycler_state != null and water_recycler_state.state == WaterRecyclerStateScript.State.RECYCLING:
+		water_recycler_state.tick(delta)
+	# REQ-AU-001..010: tick the audio manager. The manager advances the
+	# ambient crossfade, music layer crossfade, sfx cooldowns + captions,
+	# and the meta-event scheduler. Tick before any HUD caption drain so
+	# the audio summary the HUD reads is at most one frame stale.
+	if audio_manager != null and audio_manager.has_method("tick"):
+		audio_manager.tick(delta)
+		_refresh_audio_state(false, delta)
 
 func _build_breach_zone() -> void:
 	if oxygen_root == null:
@@ -1382,16 +4059,58 @@ func _refresh_oxygen_state(force_initial: bool, delta_seconds: float) -> void:
 	# multiplier reflects any tools acquired this frame.
 	if inventory_state != null:
 		oxygen_state.apply_inventory_summary(inventory_state.get_summary())
+	if equipment_state != null:
+		oxygen_state.apply_equipment_summary(
+			{"drain_multiplier": equipment_state.get_oxygen_drain_multiplier()})
 	if force_initial:
 		oxygen_state.apply_ship_systems_summary({})  # no-op; recompute passability
 		_apply_breach_zone_scene_state()
 		_refresh_tracker_system_status_lines()
+		_refresh_player_vitals(delta_seconds)
 		return
 	# Per-tick path: read player position, decide breach presence, tick.
 	var player_in_zone: bool = is_player_in_breach_zone()
 	oxygen_state.tick(delta_seconds, player_in_zone)
 	_apply_breach_zone_scene_state()
 	_refresh_tracker_system_status_lines()
+	_refresh_player_vitals(delta_seconds)
+
+func _refresh_player_vitals(delta_seconds: float) -> void:
+	# A freed Node stays non-null in Godot, so guard the panel with
+	# is_instance_valid (a hud_layer teardown on reload frees it).
+	if vitals_model == null or not is_instance_valid(vitals_panel):
+		return
+	if oxygen_state != null:
+		vitals_model.apply_oxygen_summary(oxygen_state.get_summary())
+	if inventory_state != null:
+		var ratio: float = inventory_state.get_load_ratio()
+		vitals_model.apply_inventory_load(ratio, EncumbranceScript.move_speed_multiplier(ratio), inventory_state.weight_reduction)
+	var channeling: bool = false
+	var progress: float = 0.0
+	for rp in repair_points:
+		if is_instance_valid(rp) and rp.channeling:
+			channeling = true
+			progress = rp.progress
+			break
+	vitals_model.set_repair_progress(channeling, progress)
+	# REQ-SV: feed survival vitals into the HUD model.
+	if vitals_state != null:
+		vitals_model.apply_vitals_summary(vitals_state.get_summary())
+	if sanity_state != null:
+		vitals_model.apply_sanity_summary(sanity_state.get_summary())
+	if radiation_state != null:
+		vitals_model.apply_radiation_summary(radiation_state.get_summary())
+	if body_temperature_state != null:
+		vitals_model.apply_temperature_summary(body_temperature_state.get_summary())
+	if status_effects_state != null:
+		vitals_model.apply_status_effects_summary(status_effects_state.get_summary())
+	vitals_model.tick(delta_seconds)
+	vitals_panel.set_status_lines(vitals_model.get_status_lines())
+
+func get_player_vitals_lines() -> PackedStringArray:
+	if vitals_model == null:
+		return PackedStringArray()
+	return vitals_model.get_status_lines()
 
 func _apply_breach_zone_scene_state() -> void:
 	if oxygen_state == null or breach_zone_node == null:
@@ -1513,6 +4232,19 @@ func get_input_action_keycodes_for_validation(action_name: String) -> Array:
 			var key_event: InputEventKey = event
 			out.append(int(key_event.keycode))
 	return out
+
+func get_menu_coordinator_for_validation():
+	return menu_coordinator
+
+func dismiss_latest_tutorial_for_validation() -> bool:
+	if not is_instance_valid(menu_coordinator):
+		return false
+	return menu_coordinator.dismiss_latest_tutorial()
+
+func apply_ui_settings_summary_for_validation(summary: Dictionary) -> bool:
+	if not is_instance_valid(menu_coordinator):
+		return false
+	return menu_coordinator.apply_settings_summary(summary)
 
 # --- Hazard / FireState integration -----------------------------------------
 # Per the Gate 2 timed fire-zone feature spec, FireState cycles between
@@ -1957,6 +4689,70 @@ func teleport_player_to_arc_zone_for_validation() -> bool:
 	player.teleport_to(arc_zone_node.global_position)
 	return true
 
+# REQ-AU-001..010: audio runtime refresh. Mirrors _refresh_fire_state /
+# _refresh_arc_state: the AudioManager owns the per-bus AudioStreamPlayer
+# pool and pushes volumes from its summaries; this method is the per-frame
+# seam that re-syncs the scene tree with the model's state. `force_initial`
+# is true on first build / save-reload to push the summary even when no
+# delta exists.
+func _refresh_audio_state(force_initial: bool, _delta_seconds: float = 0.0) -> void:
+	if audio_manager == null:
+		return
+	# Update the music-state flags based on the current gameplay signals.
+	# Engagement defaults to false (no hostile AI in the vertical slice);
+	# hazard_active is true when ANY hazard model reports non-safe state.
+	var hazard_active: bool = false
+	if oxygen_state != null and bool(oxygen_state.is_passability_blocked()):
+		hazard_active = true
+	if fire_state != null and bool(fire_state.is_passability_blocked()):
+		hazard_active = true
+	if electrical_arc_state != null and bool(electrical_arc_state.is_passability_blocked()):
+		hazard_active = true
+	# vitals_critical: derived from vitals_model oxygen <= 0 OR hp below
+	# critical. vitals_model is optional in the playable scene; default
+	# to false when missing.
+	var vitals_critical: bool = false
+	if vitals_model != null and vitals_model.has_method("get_summary"):
+		var vs: Dictionary = vitals_model.get_summary()
+		if float(vs.get("oxygen", 1.0)) <= 0.0:
+			vitals_critical = true
+		elif float(vs.get("hp", 1.0)) < 0.25:
+			vitals_critical = true
+	audio_manager.update_music_flags(false, hazard_active, vitals_critical)
+	# Attach the AudioListener to the player when a player anchor exists.
+	if player != null and is_instance_valid(player) and player is Node3D:
+		audio_manager.attach_listener(player as Node3D)
+	audio_manager.update_listener_transform()
+	audio_manager.apply_spatial_attenuation()
+
+## Validation seam: full audio summary from the manager. Used by the
+## main playable slice audio smoke and by the audio_save_load smoke.
+func get_audio_summary() -> Dictionary:
+	if audio_manager == null:
+		return {}
+	return audio_manager.get_summary()
+
+## Validation seam: convenience accessors used by smokes that need to
+## inspect the audio manager's state without poking at its internals.
+func get_audio_manager() -> Node:
+	return audio_manager
+
+func get_audio_bus_player_count() -> int:
+	if audio_manager == null:
+		return 0
+	var count: int = 0
+	for bus_id in ["sfx", "music", "voice", "ui", "ambient", "meta"]:
+		if audio_manager.has_method("get_bus_player") and audio_manager.get_bus_player(StringName(bus_id)) != null:
+			count += 1
+	return count
+
+func get_audio_spatial_player_count() -> int:
+	if audio_manager == null:
+		return 0
+	if not audio_manager.has_method("get_spatial_player_count"):
+		return 0
+	return int(audio_manager.get_spatial_player_count())
+
 # --- Inventory / Tool pickup integration -------------------------------------
 # REQ-007: a single ToolPickup carrying the portable_oxygen_pump lives in a
 # fixed side room (tool_storage_01 if the loader defines it, otherwise a
@@ -1993,6 +4789,16 @@ func _resolve_tool_pickup_world_position() -> Vector3:
 func _on_tool_pickup_acquired(p_tool_id: String) -> void:
 	_refresh_tracker_system_status_lines()
 	print("PLAYABLE TOOL ACQUIRED tool_id=%s" % p_tool_id)
+	_recompute_player_encumbrance()
+	_ensure_consumable_hotbar_assignments()
+	_refresh_consumable_ui()
+	# REQ-RL-003 / REQ-RL-004: route the tool pickup into the achievement
+	# service when one is attached. Silent no-op when no service is
+	# injected (the per-run achievement service is opt-in for tests).
+	if achievement_state != null:
+		var unlocked_id: String = achievement_state.unlock_for_trigger("tool_acquired", p_tool_id)
+		if not unlocked_id.is_empty():
+			print("ACHIEVEMENT UNLOCKED trigger=tool_acquired target=%s id=%s" % [p_tool_id, unlocked_id])
 
 # --- REQ-014: junction_calibrator pickup -------------------------------------
 # A second ToolPickup configured with tool_id = "junction_calibrator".
@@ -2242,47 +5048,150 @@ func _build_run_snapshot() -> RunSnapshot:
 		var pos: Vector3 = (player as Node3D).global_position
 		snapshot.player_position = [pos.x, pos.y, pos.z]
 	snapshot.current_objective_sequence = current_objective_sequence
-	if ship_systems != null:
-		snapshot.ship_systems_summary = ship_systems.get_summary()
+	if ship_systems_manager != null:
+		snapshot.ship_systems_summary = ship_systems_manager.get_summary()
+		# Persist only the authoritative objective record; flag-shaped fields
+		# (main_power_restored, emergency_supplies_recovered, ...) are derived
+		# live from manager health + this record via _manager_compat_summary(),
+		# never stored (ADR-0009).
+		snapshot.ship_systems_summary["completed_objective_types"] = completed_objective_types.keys()
+		for key in _expanded_ship_systems_summary().keys():
+			snapshot.ship_systems_summary[key] = _expanded_ship_systems_summary()[key]
 	if route_control_state != null:
 		snapshot.route_control_summary = get_route_control_summary()
 	if oxygen_state != null:
 		snapshot.oxygen_summary = get_oxygen_summary()
 	if inventory_state != null:
 		snapshot.inventory_summary = inventory_state.get_summary()
+	if threat_manager != null:
+		snapshot.inventory_summary["combat_hotbar_text"] = _last_weapon_hotbar_text
+		snapshot.inventory_summary["threat_summary"] = threat_manager.get_summary()
 	if fire_state != null:
 		snapshot.fire_summary = fire_state.get_summary()
 	if electrical_arc_state != null:
 		snapshot.electrical_arc_summary = electrical_arc_state.get_summary()
 	if objective_progress_state != null:
 		snapshot.objective_progress_summary = objective_progress_state.get_summary()
+	if player_progression != null:
+		snapshot.player_progression_summary = player_progression.get_summary()
+	if is_instance_valid(menu_coordinator):
+		snapshot.settings_summary = menu_coordinator.get_settings_summary()
+	if audio_manager != null:
+		snapshot.audio_summary = audio_manager.get_summary()
+	# REQ-SV: capture survival vitals summaries.
+	if vitals_state != null:
+		snapshot.vitals_summary = vitals_state.get_summary()
+	if sanity_state != null:
+		snapshot.sanity_summary = sanity_state.get_summary()
+	if radiation_state != null:
+		snapshot.radiation_summary = radiation_state.get_summary()
+	if body_temperature_state != null:
+		snapshot.temperature_summary = body_temperature_state.get_summary()
+	if status_effects_state != null:
+		snapshot.status_effects_summary = status_effects_state.get_summary()
+	# ADR-0034: capture food / cooking / spoilage summaries.
+	if spoilage_state != null:
+		snapshot.spoilage_summary = spoilage_state.get_summary()
+	if cooking_state != null:
+		snapshot.cooking_summary = cooking_state.get_summary()
+	if hydroponics_state != null:
+		snapshot.hydroponics_summary = hydroponics_state.get_summary()
+	if synthesizer_state != null:
+		snapshot.synthesizer_summary = synthesizer_state.get_summary()
+	if consumable_state != null:
+		snapshot.consumable_summary = consumable_state.get_summary()
+	if medicine_state != null:
+		snapshot.medicine_summary = medicine_state.get_summary()
+	if stimulant_state != null:
+		snapshot.stimulant_summary = stimulant_state.get_summary()
+	if addiction_state != null:
+		snapshot.addiction_summary = addiction_state.get_summary()
+	if ammo_state != null:
+		snapshot.ammo_summary = ammo_state.get_summary()
+	if utility_item_state != null:
+		snapshot.utility_summary = utility_item_state.get_summary()
 	snapshot.slice_version = SaveLoadServiceScript.CURRENT_SLICE_VERSION
 	snapshot.godot_version = Engine.get_version_info()["string"]
 	snapshot.saved_at = Time.get_datetime_string_from_system(true)
 	return snapshot
 
-## Writes the current snapshot to disk. Returns true on success.
+## Writes the whole world to the single save slot. Routed through the
+## world-save format (ADR-0012) so every write to user://saves/current_run.json
+## — auto-save here AND manual request_save — is a WorldSnapshot. Otherwise an
+## auto-save on objective completion would overwrite a manual F5 world-save with
+## a RunSnapshot and fail the version gate on the next load. The in-memory
+## RunSnapshot seam (last_saved_snapshot / get_last_saved_snapshot) is preserved
+## because the auto-save regression smokes assert its current_objective_sequence.
 func _auto_save_current_run() -> bool:
 	if save_load_service == null or slice_complete:
 		return false
-	var snapshot: RunSnapshot = _build_run_snapshot()
-	if snapshot == null:
+	var ws = _build_world_snapshot()
+	if ws == null:
 		return false
-	if save_load_service.save_current_run(snapshot):
-		last_saved_snapshot = snapshot
+	if save_load_service.save_world(ws):
+		last_saved_snapshot = _build_run_snapshot()  # preserve in-memory RunSnapshot seam (get_last_saved_snapshot)
 		return true
 	return false
 
-## Manual save trigger (F5 / save_run input). Refuses to save if the
-## slice has not started or has already completed.
+## REQ-PM-008 / ADR-0033 — at run-end, fold the run summary into the
+## meta_progression_state (currency + counters), persist the meta + unlock
+## state to disk, and emit the resolved unlock events from the bus log so
+## codex / scene / class unlocks can record themselves on the registry.
+##
+## `reason` is "completion" or "death". The payout is the same either way
+## (per the spec: death still earns currency for what was accomplished).
+func _apply_meta_payout_and_persist(reason: String = "completion") -> int:
+	if meta_progression_state == null:
+		return 0
+	var summary: Dictionary = get_slice_completion_summary() if has_method("get_slice_completion_summary") else {}
+	var completed: int = int(summary.get("completed_objectives", objective_completion_count))
+	var skill_levels: Dictionary = {}
+	if player_progression != null:
+		for sid in player_progression.skills:
+			skill_levels[sid] = int(player_progression.skills[sid])
+	var run_summary: Dictionary = {
+		"completed_objectives": completed,
+		"skill_levels": skill_levels,
+		"discoveries": 0,
+		"reason": reason,
+	}
+	var payout: int = int(meta_progression_state.apply_meta_payout(run_summary))
+	# Persist meta + unlocks to disk so the next run picks them up.
+	meta_progression_state.save_to_disk()
+	if unlock_registry != null:
+		if training_event_bus != null:
+			for entry in training_event_bus.get_log():
+				var evt: String = str(entry.get("event_id", ""))
+				var tgt: String = str(entry.get("target_id", ""))
+				if not evt.is_empty():
+					unlock_registry.unlock_for_trigger(evt, tgt)
+		unlock_registry.save_to_disk()
+	print("META PAYOUT reason=%s payout=%d meta_currency=%d runs_completed=%d" % [
+		reason,
+		payout,
+		int(meta_progression_state.meta_currency),
+		int(meta_progression_state.total_runs_completed),
+	])
+	return payout
+
+## Manual save trigger (F5 / save_run input). Saves the whole world, so saving is
+## allowed anywhere — including aboard a traveled derelict (save-anywhere; ADR-0012
+## supersedes the Phase 4.5 away-save rejection). Refuses only before the slice has
+## started or after it has completed.
 func request_save() -> bool:
 	if not playable_started or slice_complete:
 		return false
 	if save_load_service == null:
 		return false
-	var result: bool = _auto_save_current_run()
+	var ws = _build_world_snapshot()
+	if ws == null:
+		return false
+	var result: bool = save_load_service.save_world(ws)
 	if result:
-		print("PLAYABLE SHIP SAVED sequence=%d" % current_objective_sequence)
+		print("PLAYABLE SHIP SAVED location=%s sequence=%d" % [ws.current_location, current_objective_sequence])
+		if is_instance_valid(menu_coordinator):
+			menu_coordinator.trigger_tutorial("run_saved", "any")
+			menu_coordinator.set_load_available(true)
 	return result
 
 ## Validation / public seam: the SaveLoadService instance. Returns null
@@ -2302,17 +5211,19 @@ func is_load_available() -> bool:
 		return false
 	return save_load_service.has_save()
 
-## Manual load trigger (F9 / load_run input). Reads the snapshot, resets
-## the slice, and applies the saved state before the next _process tick.
-## Returns true on success.
+## Manual load trigger (F9 / load_run input). Loads the whole world and applies it
+## (home ship + visited-ship registry + active location + in-ship position).
 func request_load() -> bool:
 	if save_load_service == null:
 		return false
-	var snapshot: RunSnapshot = save_load_service.load_current_run()
-	if snapshot == null:
-		push_warning("PlayableGeneratedShip: no compatible save to load")
+	var ws = save_load_service.load_world()
+	if ws == null:
+		push_warning("PlayableGeneratedShip: no compatible world save to load")
 		return false
-	return _apply_run_snapshot(snapshot)
+	var loaded: bool = _apply_world_snapshot(ws)
+	if loaded and is_instance_valid(menu_coordinator):
+		menu_coordinator.set_load_available(true)
+	return loaded
 
 ## Reconstructs the slice through the normal load path, then applies
 ## the saved model summaries. Designed to be called from a fully
@@ -2341,17 +5252,38 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		push_error("PlayableGeneratedShip: load failed because slice did not start")
 		return false
 	# Apply the saved model state to the freshly-built slice.
-	if ship_systems != null and not snapshot.ship_systems_summary.is_empty():
-		ship_systems.apply_summary(snapshot.ship_systems_summary)
-		# Re-derive the coordinator-level objective_completion_count from
-		# the restored model so the slice-completion arithmetic stays
-		# consistent with the saved sequence number.
-		var restored_sequences: Array = (ship_systems.get_summary().get("completed_sequences", []) as Array)
-		objective_completion_count = restored_sequences.size()
-		_apply_ship_systems_consequences("")
+	if ship_systems_manager != null and not snapshot.ship_systems_summary.is_empty():
+		ship_systems_manager.apply_summary(snapshot.ship_systems_summary)
+		if power_grid_state != null:
+			power_grid_state.apply_summary(snapshot.ship_systems_summary.get("power_grid_summary", {}))
+		if life_support_expanded_state != null:
+			life_support_expanded_state.apply_summary(snapshot.ship_systems_summary.get("life_support_state_summary", {}))
+		if hull_integrity_state != null:
+			hull_integrity_state.apply_summary(snapshot.ship_systems_summary.get("hull_integrity_summary", {}))
+		if fire_suppression_state != null:
+			fire_suppression_state.apply_summary(snapshot.ship_systems_summary.get("fire_suppression_summary", {}))
+		if propulsion_expanded_state != null:
+			propulsion_expanded_state.apply_summary(snapshot.ship_systems_summary.get("propulsion_state_summary", {}))
+		if shield_state != null:
+			shield_state.apply_summary(snapshot.ship_systems_summary.get("shield_state_summary", {}))
+		if sustenance_state != null:
+			sustenance_state.apply_summary(snapshot.ship_systems_summary.get("sustenance_state_summary", {}))
+		completed_objective_types.clear()
+		for t in snapshot.ship_systems_summary.get("completed_objective_types", []):
+			completed_objective_types[str(t)] = true
+		objective_completion_count = max(0, snapshot.current_objective_sequence - 1)
+		# Re-apply scene consequences for every completed objective. The reload
+		# rebuilds affordances visible (via _build_slice_affordance_labels), so a
+		# completed restore_systems must re-clear the blocked-biomatter props or
+		# they reappear after loading (PR #2 review finding). The handler is a
+		# no-op for objective types without scene consequences, so iterating all
+		# completed types is safe and future-proof.
+		for completed_type in completed_objective_types:
+			_apply_ship_systems_consequences(str(completed_type))
+		_recompute_expanded_ship_systems(0.0)
 		_refresh_route_control_from_ship_systems()
 		if oxygen_state != null:
-			oxygen_state.apply_ship_systems_summary(ship_systems.get_summary())
+			oxygen_state.apply_ship_systems_summary(_manager_compat_summary())
 	if route_control_state != null and not snapshot.route_control_summary.is_empty():
 		route_control_state.apply_summary(snapshot.route_control_summary)
 		_apply_route_gate_scene_state()
@@ -2360,6 +5292,11 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		_refresh_oxygen_state(true, 0.0)
 	if inventory_state != null and not snapshot.inventory_summary.is_empty():
 		inventory_state.apply_summary(snapshot.inventory_summary)
+		_last_weapon_hotbar_text = str(snapshot.inventory_summary.get("combat_hotbar_text", _last_weapon_hotbar_text))
+		var threat_summary: Variant = snapshot.inventory_summary.get("threat_summary", {})
+		if threat_manager != null and threat_summary is Dictionary and not (threat_summary as Dictionary).is_empty():
+			threat_manager.apply_summary(threat_summary as Dictionary)
+			_sync_current_ship_combat_summary()
 	if fire_state != null and not snapshot.fire_summary.is_empty():
 		fire_state.apply_summary(snapshot.fire_summary)
 		_refresh_fire_state(true)
@@ -2372,6 +5309,49 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		_refresh_arc_state(true)
 	if objective_progress_state != null and not snapshot.objective_progress_summary.is_empty():
 		objective_progress_state.apply_summary(snapshot.objective_progress_summary)
+	if player_progression != null and not snapshot.player_progression_summary.is_empty():
+		player_progression.apply_summary(snapshot.player_progression_summary)
+	if is_instance_valid(menu_coordinator) and not snapshot.settings_summary.is_empty():
+		menu_coordinator.apply_settings_summary(snapshot.settings_summary)
+	# REQ-AU-010: re-apply the audio summary to the AudioManager so save/load
+	# restores per-bus volume, ambient role, sfx router cooldowns, music
+	# state, spatial resolver config, and meta-event schedule.
+	if audio_manager != null and not snapshot.audio_summary.is_empty():
+		audio_manager.apply_summary(snapshot.audio_summary)
+	# REQ-SV: restore survival vitals summaries.
+	if vitals_state != null and not snapshot.vitals_summary.is_empty():
+		vitals_state.apply_summary(snapshot.vitals_summary)
+	if sanity_state != null and not snapshot.sanity_summary.is_empty():
+		sanity_state.apply_summary(snapshot.sanity_summary)
+	if radiation_state != null and not snapshot.radiation_summary.is_empty():
+		radiation_state.apply_summary(snapshot.radiation_summary)
+	if body_temperature_state != null and not snapshot.temperature_summary.is_empty():
+		body_temperature_state.apply_summary(snapshot.temperature_summary)
+	if status_effects_state != null and not snapshot.status_effects_summary.is_empty():
+		status_effects_state.apply_summary(snapshot.status_effects_summary)
+	# ADR-0034: restore food / cooking / spoilage summaries.
+	if spoilage_state != null and not snapshot.spoilage_summary.is_empty():
+		spoilage_state.apply_summary(snapshot.spoilage_summary)
+	if cooking_state != null and not snapshot.cooking_summary.is_empty():
+		cooking_state.apply_summary(snapshot.cooking_summary)
+	if hydroponics_state != null and not snapshot.hydroponics_summary.is_empty():
+		hydroponics_state.apply_summary(snapshot.hydroponics_summary)
+	if synthesizer_state != null and not snapshot.synthesizer_summary.is_empty():
+		synthesizer_state.apply_summary(snapshot.synthesizer_summary)
+	if consumable_state != null and not snapshot.consumable_summary.is_empty():
+		consumable_state.apply_summary(snapshot.consumable_summary)
+	if medicine_state != null and not snapshot.medicine_summary.is_empty():
+		medicine_state.apply_summary(snapshot.medicine_summary)
+	if stimulant_state != null and not snapshot.stimulant_summary.is_empty():
+		stimulant_state.apply_summary(snapshot.stimulant_summary)
+	if addiction_state != null and not snapshot.addiction_summary.is_empty():
+		addiction_state.apply_summary(snapshot.addiction_summary)
+	if ammo_state != null and not snapshot.ammo_summary.is_empty():
+		ammo_state.apply_summary(snapshot.ammo_summary)
+	if utility_item_state != null and not snapshot.utility_summary.is_empty():
+		utility_item_state.apply_summary(snapshot.utility_summary)
+	_ensure_consumable_hotbar_assignments()
+	_refresh_consumable_ui()
 	# REQ-014: reconcile the junction_calibrator pickup marker visibility
 	# with the restored inventory + objective_progress summaries. The
 	# marker is rebuilt visible by `_build_junction_calibrator_pickup`,
@@ -2380,11 +5360,16 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	# though the calibrator is in the carried inventory (or already spent),
 	# which lets the reviewer probe re-acquire the calibrator after load.
 	_reconcile_junction_calibrator_marker_after_reload()
+	# Rebuild repair points after all systems summaries have been applied so
+	# only truly-damaged subcomponents get markers (Fix 2: stale markers
+	# built before apply_summary healed already-repaired subcomponents).
+	_build_repair_points()
 	# Restore the saved objective sequence AFTER all model state has
 	# been applied so the subsequent _activate_current_objective() call
 	# sees the right state.
 	current_objective_sequence = max(1, snapshot.current_objective_sequence)
 	_activate_current_objective()
+	_refresh_weapon_hotbar()
 	# Teleport the player to the saved position last so any spawn-side
 	# effects (e.g. hazard proximity) do not overwrite the snapshot.
 	if player != null and player is Node3D and snapshot.player_position.size() >= 3:
@@ -2403,10 +5388,503 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	])
 	return true
 
+## Builds a full WorldSnapshot from live state. The home-ship slice is the
+## existing RunSnapshot; when the player is aboard a derelict the home slice's
+## player_position is overridden with the position they left home from (the live
+## player position belongs to the derelict and is stored separately). Each
+## retained ShipInstance contributes its own slice; current_location names the
+## active ship.
+func _build_world_snapshot():
+	_sync_current_ship_combat_summary()
+	var ws = WorldSnapshotScript.new()
+	if synapse_sea_world != null:
+		ws.world_summary = synapse_sea_world.get_summary()
+	if meta_progression_state != null:
+		ws.meta_progression_summary = meta_progression_state.to_dict()
+	if unique_item_state != null:
+		ws.unique_item_summary = unique_item_state.get_summary()
+	var home_snap = _build_run_snapshot()
+	if home_snap != null:
+		if away_from_start:
+			home_snap.player_position = [_home_player_position.x, _home_player_position.y, _home_player_position.z]
+		ws.home_ship = home_snap.to_dict()
+	# The home ship's loot-search state rides the WorldSnapshot (RunSnapshot does not
+	# carry it). Without this, the #4 home loot-lift would respawn the starting
+	# containers unsearched after a fresh-process load → starter-part duplication.
+	if home_ship != null:
+		ws.home_looted_containers = home_ship.looted_container_ids.duplicate()
+		ws.home_ship_inventory = home_ship.get_inventory().get_summary()
+		var home_cart_dicts: Array = []
+		for c in home_ship.get_carts():
+			home_cart_dicts.append(c.get_summary())
+		ws.home_ship_carts = home_cart_dicts
+	if equipment_state != null:
+		ws.player_equipment = equipment_state.get_summary()
+	ws.visited_ships = {}
+	for mid in visited_ships:
+		ws.visited_ships[String(mid)] = visited_ships[mid].get_summary()
+	ws.current_location = String(current_ship.marker_id) if current_ship != null else ""
+	if player != null and player is Node3D:
+		var p: Vector3 = (player as Node3D).global_position
+		ws.player_position_in_ship = [p.x, p.y, p.z]
+	ws.dock_edges = _current_dock_edges()
+	ws.piloted_ship_id = piloted_ship.ship_id if piloted_ship != null else ""
+	ws.aboard_ship_id = current_occupancy.ship_id if current_occupancy != null else ""
+	ws.opened_ports = _opened_port_marker_ids()
+	ws.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
+	ws.godot_version = Engine.get_version_info()["string"]
+	ws.saved_at = Time.get_datetime_string_from_system(true)
+	return ws
+
+## Returns the current dock-edge set as a serialisable Array.
+## Each entry is {host: String, mobile: String, port_type: String}.
+## Emits an edge for EVERY known ship that has a parent_ship (de-duped), so the
+## lifeboat->claimed-derelict edge persists when the player pilots a derelict.
+func _current_dock_edges() -> Array:
+	var edges: Array = []
+	var seen: Dictionary = {}
+	for inst in _all_known_ships():
+		if inst == null or inst.parent_ship == null:
+			continue
+		var key: String = "%s>%s" % [String(inst.ship_id), String(inst.parent_ship.marker_id)]
+		if seen.has(key):
+			continue
+		seen[key] = true
+		# A child is a HANGAR edge iff its parent's bay holds it in a slot; else airlock.
+		var port_type: String = "airlock"
+		var slot_index: int = -1
+		var parent = inst.parent_ship
+		if parent.hangar != null:
+			var s: int = parent.hangar.slot_of(String(inst.ship_id))
+			if s != -1:
+				port_type = "hangar"
+				slot_index = s
+		edges.append({
+			"host": String(parent.marker_id),
+			"mobile": String(inst.ship_id),
+			"port_type": port_type,
+			"slot_index": slot_index,
+		})
+	return edges
+
+## Every ShipInstance the coordinator currently tracks (home, lifeboat, current,
+## and all visited), de-duplicated.
+func _all_known_ships() -> Array:
+	var out: Array = []
+	var seen: Dictionary = {}
+	for inst in [home_ship, lifeboat_ship, current_ship]:
+		if inst != null and not seen.has(inst):
+			seen[inst] = true
+			out.append(inst)
+	for mid in visited_ships:
+		var inst = visited_ships[mid]
+		if inst != null and not seen.has(inst):
+			seen[inst] = true
+			out.append(inst)
+	return out
+
+## Returns the marker_ids of every dock barrier that is currently opened.
+func _opened_port_marker_ids() -> Array:
+	var out: Array = []
+	for b in dock_barriers:
+		if is_instance_valid(b) and b.opened:
+			out.append(String(b.marker_id))
+	return out
+
+## Task 7 validation seam: the live dock-edge set (same shape _build_world_snapshot saves).
+func current_dock_edges_for_validation() -> Array:
+	return _current_dock_edges()
+
+## Task 7 validation seam: true iff the restored barrier for the given marker_id is opened.
+func restored_port_opened_for_validation(marker_id: String) -> bool:
+	for b in dock_barriers:
+		if is_instance_valid(b) and String(b.marker_id) == marker_id:
+			return b.opened
+	return false
+
+## Task 7 validation seam: calls request_save() (world save) and returns its result.
+func save_world_for_validation() -> bool:
+	return request_save()
+
+## Task 7 validation seam: calls request_load() (world load) and returns its result.
+func load_world_for_validation() -> bool:
+	return request_load()
+
+## Regenerates a derelict's geometry from its retained blueprint, makes it the
+## active ship (re-applying its persisted systems state is implicit — the
+## ShipInstance already holds it), and re-homes the player at pos_in_ship.
+func _activate_derelict_from_instance(inst, pos_in_ship: Array) -> bool:
+	if inst == null or ship_generator == null:
+		return false
+	var new_root: Node3D = ship_generator.generate(inst.blueprint)
+	if new_root == null:
+		return false
+	_attach_derelict_active(inst, new_root)
+	_configure_threat_runtime_for_current_ship()
+	if player != null and player is Node3D and pos_in_ship.size() >= 3:
+		(player as Node3D).global_position = Vector3(float(pos_in_ship[0]), float(pos_in_ship[1]), float(pos_in_ship[2]))
+	return true
+
+## Regenerates geometry (scene_root + bridge terminal) for a derelict ShipInstance
+## that is co-present but NOT the active current_ship — e.g. a claimed derelict the
+## player was PILOTING while docked to a different host (after rigid-pair travel). The
+## current_location-driven rebuild (_activate_derelict_from_instance) only materializes
+## the active host, so without this such a mobile endpoint would reload with
+## scene_root == null and the saved dock edge could not be re-established. (Codex P2)
+## No-op for home/lifeboat (marker_id "") and for ships that already have geometry.
+## Positions at DERELICT_DOCK_OFFSET; _apply_docking_snapshot then re-docks it flush.
+func _ensure_derelict_geometry(inst) -> void:
+	if inst == null or ship_generator == null:
+		return
+	if String(inst.marker_id) == "" or is_instance_valid(inst.scene_root):
+		return
+	var new_root: Node3D = ship_generator.generate(inst.blueprint)
+	if new_root == null:
+		return
+	inst.scene_root = new_root
+	add_child(new_root)
+	(new_root as Node3D).position = DERELICT_DOCK_OFFSET
+	if inst.built_layout.is_empty() and new_root.has_method("get_layout_copy"):
+		inst.built_layout = new_root.get_layout_copy()
+	_spawn_bridge_terminal(inst)
+	_spawn_hangar_control(inst)
+	_spawn_cargo_hold_control(inst)
+	_spawn_cart_controls_for_ship(inst)
+
+## Applies a WorldSnapshot: rebuilds the home ship first (this resets the runtime
+## and returns to home if currently away), restores the SynapseSeaWorld and the
+## visited-ships registry, then re-activates the saved derelict if the snapshot
+## was taken aboard one. Returns false on any hard failure.
+func _apply_world_snapshot(ws) -> bool:
+	if ws == null:
+		return false
+	# 1. Home ship via the existing single-ship reload path. Reconstruct a
+	#    RunSnapshot object from the embedded dict (version-gated like a disk load).
+	var home_snap = RunSnapshotScript.from_dict(ws.home_ship, SaveLoadServiceScript.CURRENT_SLICE_VERSION, Engine.get_version_info()["string"])
+	if home_snap == null:
+		push_warning("PlayableGeneratedShip: world load rejected — embedded home slice incompatible")
+		return false
+	# Restore the home-departure position. On an away-save the home slice's
+	# player_position holds where the player left home from (see _build_world_snapshot);
+	# without copying it back, a later travel_home() after a fresh process would
+	# teleport the player to the origin instead of their saved home position.
+	if home_snap.player_position.size() >= 3:
+		_home_player_position = Vector3(home_snap.player_position[0], home_snap.player_position[1], home_snap.player_position[2])
+	if not _apply_run_snapshot(home_snap):
+		return false
+	# 1b. Restore the home ship's loot-search state and rebuild its containers so
+	#     already-searched starting containers read as searched (prevents starter-part
+	#     re-loot after a fresh-process load). We are home here (the reload reset us),
+	#     so current_ship == home_ship and _build_loot_containers targets the home ship.
+	if home_ship != null:
+		home_ship.looted_container_ids = ws.home_looted_containers.duplicate()
+		if not ws.home_ship_inventory.is_empty():
+			home_ship.get_inventory().apply_summary(ws.home_ship_inventory)
+		# Restore home-ship carts BEFORE spawning their controls so the CartStates
+		# are in place when _spawn_cart_controls_for_ship iterates them.
+		home_ship.get_carts().clear()
+		for cd in ws.home_ship_carts:
+			if typeof(cd) == TYPE_DICTIONARY:
+				var cart = CartStateScript.create()
+				cart.apply_summary(cd as Dictionary)
+				home_ship.get_carts().append(cart)
+		_spawn_cart_controls_for_ship(home_ship)
+		if not away_from_start:
+			_build_loot_containers()
+	# 1c. Restore player equipment (player-global — runs regardless of home_ship branch).
+	#     Loading restores the EXACT saved state: a non-empty snapshot is applied; an EMPTY
+	#     snapshot (older save, or nothing was worn) clears any currently-worn gear so
+	#     pre-load equipment never leaks across a load (_reset_runtime_for_reload does not
+	#     touch equipment_state).
+	if equipment_state != null:
+		if not ws.player_equipment.is_empty():
+			equipment_state.apply_summary(ws.player_equipment)
+		else:
+			equipment_state.slots.clear()
+	_recompute_player_encumbrance()
+	if meta_progression_state != null and not ws.meta_progression_summary.is_empty():
+		meta_progression_state.apply_summary(ws.meta_progression_summary)
+	if unique_item_state != null:
+		unique_item_state.apply_summary(ws.unique_item_summary)
+	# 2. World model. _apply_run_snapshot reset us to the home ship; home_ship is
+	#    re-wrapped by _on_ship_loaded during that reload.
+	if synapse_sea_world != null and not ws.world_summary.is_empty():
+		synapse_sea_world.apply_summary(ws.world_summary)
+	# 3. Rebuild the retained-derelict registry from the slices.
+	visited_ships.clear()
+	for mid in ws.visited_ships:
+		var inst = ShipInstanceScript.create("", "", ShipBlueprintScript.new(), null, null)
+		if inst.apply_summary(ws.visited_ships[mid]):
+			visited_ships[String(mid)] = inst
+	# 4. If saved aboard a derelict, re-activate it.
+	if String(ws.current_location) != "":
+		var active = visited_ships.get(String(ws.current_location), null)
+		if active == null:
+			push_warning("PlayableGeneratedShip: world load — current_location '%s' missing from visited_ships" % String(ws.current_location))
+			return true  # home is already correctly restored; treat as on-home
+		if not _activate_derelict_from_instance(active, ws.player_position_in_ship):
+			push_warning("PlayableGeneratedShip: world load — failed to re-activate derelict '%s'" % String(ws.current_location))
+			return true
+	# 5. Restore opened-port flags (Task 7: dock-edge persistence).
+	# After ships are rebuilt and barriers spawned (step 4 / _attach_derelict_active),
+	# re-open any barriers that were opened at save time. This is not cosmetic: a host
+	# whose barrier is closed is non-boardable (_ship_boardable returns false), so a
+	# previously-breached derelict would become unboardable after load without this.
+	for b in dock_barriers:
+		if is_instance_valid(b) and ws.opened_ports.has(String(b.marker_id)):
+			b.set_opened(true)
+	# 5c. Ensure every derelict that is an endpoint of a saved dock edge has geometry
+	# BEFORE re-docking. Step 4 only materializes current_location; a claimed derelict the
+	# player was PILOTING (docked to a different host after rigid-pair travel) is otherwise
+	# restored data-only (scene_root == null), which would leave piloted_ship geometry-less
+	# and the L->D / D->host edges undockable. (Codex P2) Idempotent: _ensure_derelict_geometry
+	# skips home/lifeboat and ships that already have geometry.
+	for edge_v in ws.dock_edges:
+		if typeof(edge_v) != TYPE_DICTIONARY:
+			continue
+		var edge: Dictionary = edge_v
+		_ensure_derelict_geometry(_find_ship_by_id(String(edge.get("mobile", ""))))
+		_ensure_derelict_geometry(_find_ship_by_id_or_marker(String(edge.get("host", ""))))
+	# 6. Re-apply the persisted docking snapshot (piloted pointer + dock-edge set +
+	# occupancy). This is the general N-ship persistence mechanism: the dock edges are
+	# the source of truth, not the implicit current_location-driven rebuild. Idempotent
+	# (a no-op confirm when step 4 already re-docked 5b's single mobile ship).
+	_apply_docking_snapshot(ws)
+	return true
+
+## Restores the piloted pointer, dock-edge set, and occupancy from the snapshot
+## (the general N-ship persistence mechanism). Idempotent: confirms/re-applies the
+## edge the current_location-driven rebuild already established for 5b's single ship.
+## Consumes ws.piloted_ship_id, ws.dock_edges, ws.aboard_ship_id — every saved
+## docking field is read here so persistence is genuine, not implicit.
+func _apply_docking_snapshot(ws) -> void:
+	# Piloted pointer (today the lifeboat; resolved by ship_id so it generalizes to N ships).
+	if String(ws.piloted_ship_id) != "":
+		var p = _find_ship_by_id(String(ws.piloted_ship_id))
+		if p != null:
+			piloted_ship = p
+	# Dock-edge set: ensure each mobile ship is docked to the host named in the snapshot.
+	# Edge shape (see _current_dock_edges): host = host.marker_id, mobile = mobile.ship_id.
+	for edge_v in ws.dock_edges:
+		if typeof(edge_v) != TYPE_DICTIONARY:
+			continue
+		var edge: Dictionary = edge_v
+		var mobile = _find_ship_by_id(String(edge.get("mobile", "")))
+		var host = _find_ship_by_id_or_marker(String(edge.get("host", "")))
+		if mobile == null or host == null:
+			continue
+		if str(edge.get("port_type", "airlock")) == "hangar":
+			# Hangar edge: re-peg the carrier's bay + place at slot anchor. Do NOT run
+			# the airlock port-alignment (_dock_piloted_to) — bayed ships sit at slots.
+			_redock_bayed(mobile, host, int(edge.get("slot_index", -1)))
+		elif mobile.parent_ship != host:
+			# Re-establish only when the rebuild did not already dock this edge (idempotent).
+			# _dock_piloted_to reads the module-level piloted_ship, so swap it for the move.
+			var saved_piloted = piloted_ship
+			piloted_ship = mobile
+			_dock_piloted_to(host)
+			piloted_ship = saved_piloted
+	# Occupancy: restore the ship the player was aboard (by ship_id). Leave as set by
+	# _attach_derelict_active when the id does not resolve. Do NOT call
+	# recompute_occupancy() here — that breaks world_save_anywhere (player's saved world
+	# position may resolve to a different ship than the one they were logically aboard).
+	if String(ws.aboard_ship_id) != "":
+		var a = _find_ship_by_id(String(ws.aboard_ship_id))
+		if a != null:
+			current_occupancy = a
+
+## Restores a hangar edge: re-pegs the carrier's bay slot, re-establishes the
+## parent/child link, and places the bayed ship at its slot anchor. Configures the
+## carrier's bay from its layout first so slot_count/size exist after a fresh load.
+func _redock_bayed(mobile, host, slot_index: int) -> void:
+	if mobile == null or host == null:
+		return
+	if not is_instance_valid(mobile.scene_root) or not is_instance_valid(host.scene_root):
+		return
+	_configure_bay_from_layout(host)
+	var bay = host.get_hangar()
+	if slot_index >= 0 and slot_index < bay.slots.size():
+		bay.slots[slot_index] = String(mobile.ship_id)
+	else:
+		slot_index = bay.dock(String(mobile.ship_id), _ship_dock_size_class(mobile))
+	mobile.parent_ship = host
+	if not host.docked_ships.has(mobile):
+		host.docked_ships.append(mobile)
+	_place_in_slot(host, mobile, slot_index)
+
+## Resolves a ShipInstance by its ship_id across home/lifeboat/active/visited registries.
+func _find_ship_by_id(id: String):
+	if id == "":
+		return null
+	if home_ship != null and String(home_ship.ship_id) == id: return home_ship
+	if lifeboat_ship != null and String(lifeboat_ship.ship_id) == id: return lifeboat_ship
+	if current_ship != null and String(current_ship.ship_id) == id: return current_ship
+	for mid in visited_ships:
+		if String((visited_ships[mid]).ship_id) == id: return visited_ships[mid]
+	return null
+
+## Resolves a dock host. Edges store the host's marker_id ("" = home), so match on
+## marker_id first, then fall back to ship_id lookup.
+func _find_ship_by_id_or_marker(key: String):
+	if key == "" and home_ship != null: return home_ship
+	if current_ship != null and String(current_ship.marker_id) == key: return current_ship
+	if home_ship != null and String(home_ship.marker_id) == key: return home_ship
+	for mid in visited_ships:
+		if String((visited_ships[mid]).marker_id) == key: return visited_ships[mid]
+	return _find_ship_by_id(key)
+
+func _build_loot_context(spec: Dictionary) -> Dictionary:
+	return {
+		"biome_id": _resolve_current_loot_biome_id(),
+		"depth": _resolve_current_loot_depth(),
+		"condition": _resolve_current_loot_condition(),
+		"container_kind": str(spec.get("kind", spec.get("loot_table", "generic_crate"))),
+		"item_definitions": ItemDefsScript.load_definitions(),
+		"unique_state": unique_item_state,
+	}
+
+func _resolve_current_loot_biome_id() -> String:
+	var biome_ids: Array[String] = _loot_biome_ids()
+	if biome_ids.is_empty():
+		return "abyssal_synapse_sea"
+	var seed_value: int = 0
+	if current_ship != null and current_ship.blueprint != null:
+		seed_value = int(current_ship.blueprint.seed_value)
+	return BiomeProfileScript.select_biome(seed_value, biome_ids)
+
+func _resolve_current_loot_depth() -> int:
+	if current_ship == null or current_ship.blueprint == null:
+		return 0
+	var blueprint = current_ship.blueprint
+	return maxi(0, int(blueprint.size) * 2 + int(blueprint.condition) + (1 if away_from_start else 0))
+
+func _resolve_current_loot_condition() -> String:
+	if current_ship == null or current_ship.blueprint == null:
+		return "damaged"
+	match int(current_ship.blueprint.condition):
+		0:
+			return "pristine"
+		1:
+			return "damaged"
+		_:
+			return "wrecked"
+
+func _loot_biome_ids() -> Array[String]:
+	if not _loot_biome_ids_cache.is_empty():
+		return _loot_biome_ids_cache
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://data/items/biome_definitions.json"))
+	if parsed is Dictionary:
+		var biomes_v: Variant = (parsed as Dictionary).get("biomes", {})
+		if biomes_v is Dictionary:
+			for biome_id in (biomes_v as Dictionary).keys():
+				_loot_biome_ids_cache.append(String(biome_id))
+	_loot_biome_ids_cache.sort()
+	if _loot_biome_ids_cache.is_empty():
+		_loot_biome_ids_cache.append("abyssal_synapse_sea")
+	return _loot_biome_ids_cache
+
+func _postprocess_loot_grants(granted: Array, source_id: String) -> void:
+	if granted.is_empty():
+		_last_loot_feedback_line = "Loot: %s empty" % source_id
+		return
+	for entry in granted:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var item_id: String = str((entry as Dictionary).get("item_id", ""))
+		var unique_id: String = str((entry as Dictionary).get("unique_id", ""))
+		var seed_key: String = str((entry as Dictionary).get("seed_key", ""))
+		var codex_entry_id: String = str((entry as Dictionary).get("codex_entry_id", ""))
+		if unique_item_state != null and not unique_id.is_empty():
+			unique_item_state.claim(unique_id, seed_key, codex_entry_id)
+		elif unique_item_state != null and not codex_entry_id.is_empty():
+			unique_item_state.record_codex_unlock(codex_entry_id)
+		if meta_progression_state != null and not codex_entry_id.is_empty():
+			meta_progression_state.unlock_codex_entry(codex_entry_id)
+		if equipment_state != null and item_id != "" and equipment_state.can_equip(item_id):
+			_equip_from_inventory(item_id, true)
+	var first: Dictionary = granted[0] as Dictionary
+	var rarity_text: String = RarityTierScript.label(str(first.get("rarity", "common")))
+	_last_loot_feedback_line = "Loot: %s x%d [%s]" % [
+		ItemDefsScript.display_name(ItemDefsScript.load_definitions(), str(first.get("item_id", ""))),
+		int(first.get("quantity", 0)),
+		rarity_text,
+	]
+	if audio_manager != null and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
+
 ## Tear down every runtime child so a fresh load can rebuild the slice
 ## cleanly. Mirrors the setup done by _build_runtime_nodes() and the
 ## various _build_*_zone helpers, but in reverse.
 func _reset_runtime_for_reload() -> void:
+	# REQ-012 fix: if the player is aboard a traveled derelict when a reload is
+	# triggered, we must return to the starting ship BEFORE rebuilding the slice.
+	# Without this block:
+	#   - away_from_start stays true → _process returns forever (sim wedged)
+	#   - current_ship still points at the stale derelict → _on_ship_loaded's
+	#     `if current_ship == null` guard is false → the reloaded starting ship
+	#     is never wrapped as current_ship
+	#   - the derelict root remains a child of this coordinator → leaked scene
+	# Phase 5a Task 5 (co-presence) changes: the home hull and its gameplay
+	# roots are NEVER detached, so there is no "loader off-tree" or
+	# "gameplay roots off-tree" to re-attach here. Only the DERELICT root
+	# must be freed. _reattach_starting_gameplay_roots() is removed.
+	if away_from_start:
+		# Free EVERY co-present derelict root, not just current_ship's. 5c: the player may be
+		# piloting a CLAIMED derelict that is docked to a DIFFERENT host, so the piloted
+		# derelict's root is a separate child of this coordinator — freeing only current_ship
+		# would orphan it (leaked scene + "resources still in use at exit"). Home/lifeboat
+		# roots (marker_id "") are intentionally NOT freed here: the home hull stays co-present,
+		# and the lifeboat is rebuilt (and its prior root freed) by _build_lifeboat_at_home.
+		# queue_free defers destruction to end-of-frame so physics/nav resources unregister
+		# cleanly; the reload's slice rebuild replaces the ShipInstances afterward.
+		for inst in _all_known_ships():
+			if inst == null or String(inst.marker_id) == "":
+				continue
+			var droot = inst.scene_root
+			if droot != null and is_instance_valid(droot):
+				if droot.get_parent() == self:
+					remove_child(droot)
+				droot.queue_free()
+			inst.scene_root = null
+		# Break dock-relationship cycles (parent_ship <-> docked_ships) among the old
+		# ShipInstances. RefCounted has no cycle collector, so once the reload's slice
+		# rebuild (visited_ships.clear()) and the lifeboat rebuild drop their dict/var
+		# references, a surviving D<->host cycle would keep the old instances and their
+		# sub-states alive — leaked RefCounted at exit. The reload re-establishes the
+		# dock graph from the snapshot, so severing it here is safe.
+		for inst in _all_known_ships():
+			if inst != null:
+				inst.parent_ship = null
+				inst.docked_ships = []
+				# 5d: clear bay slots too. A stale occupant id left in the home/lifeboat
+				# bay would desync the reload's slot re-peg (and keep a freed ship_id
+				# pinned). The reload re-pegs occupancy from the snapshot edges.
+				if inst.hangar != null:
+					for i in range(inst.hangar.slots.size()):
+						inst.hangar.slots[i] = ""
+		# Co-presence: home hull / loader / gameplay roots were never detached —
+		# no re-attach needed here (contrast with old single-active model).
+		away_from_start = false
+		# Phase 5a Task 6: keep occupancy in lockstep — reload returns to the home
+		# ship (home hull is never detached under co-presence, so home_ship is valid).
+		current_occupancy = home_ship
+		# Sub-project #2 (I1): free the prior derelict's objective interactables on
+		# reload. _build_derelict_objectives (the only other caller of
+		# _clear_derelict_objectives) does not run on a reload-into-home path
+		# (_apply_world_snapshot skips re-activation when current_location == ""),
+		# so without this the Area3D interactables stay orphaned under
+		# derelict_objective_root (or the freed scene_root in the co-presence
+		# model), overlaying the home ship. Harmless on the reload-into-derelict
+		# path (_build_derelict_objectives re-clears anyway).
+		_clear_derelict_objectives()
+		_clear_loot_containers()
+		_clear_repair_points()
+	# Allow _on_ship_loaded to re-wrap the freshly-reloaded starting ship on
+	# every reload (home-save or away-save). Previously this was only inside
+	# `if away_from_start` — but when saving at home current_ship was never
+	# nulled, so _on_ship_loaded's `if current_ship == null` guard stayed false
+	# and _build_lifeboat_at_home() was never called on reload-from-home.
+	current_ship = null
 	# Player first so the camera unfollows before the rig is freed.
 	if player != null and is_instance_valid(player):
 		player.queue_free()
@@ -2442,6 +5920,34 @@ func _reset_runtime_for_reload() -> void:
 		for child in arc_root.get_children():
 			arc_root.remove_child(child)
 			child.queue_free()
+	# Phase 5a Task 7: free the lifeboat scene_root on reload so _build_lifeboat_at_home()
+	# can build a fresh one. The lifeboat is NOT freed during the away-branch above
+	# (it is at home, not a traveled derelict), so it must be freed here unconditionally.
+	if lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root):
+		var lb_root: Node3D = lifeboat_ship.scene_root as Node3D
+		if lb_root != null and lb_root.get_parent() == self:
+			remove_child(lb_root)
+		lb_root.queue_free()
+	# Break the home_ship ↔ lifeboat_ship RefCounted cycle before releasing our
+	# reference. Without this, both ShipInstances keep each other alive via
+	# parent_ship / docked_ships and their preloaded GDScript resources leak.
+	if lifeboat_ship != null:
+		lifeboat_ship.parent_ship = null
+	if home_ship != null:
+		home_ship.docked_ships.erase(lifeboat_ship)
+	lifeboat_ship = null
+	# Drop the stale piloted_ship handle so the reload path does not hold a freed
+	# ShipInstance reference between teardown and the next _build_lifeboat_at_home.
+	piloted_ship = null
+	# Phase 5b Task 5: free any active dock-seam barriers (they are parented under a
+	# host scene_root that may be freed on reload — clear the references to avoid a
+	# stale/leaked Array entry).
+	_clear_dock_barriers()
+	_clear_bridge_terminals()
+	_clear_hangar_controls()
+	_clear_cargo_hold_controls()
+	_clear_cart_controls()
+	grabbed_cart = null
 	if hud_layer != null and is_instance_valid(hud_layer):
 		hud_layer.queue_free()
 	# REQ-014 blocking finding B: null the hud_layer and tracker
@@ -2452,17 +5958,29 @@ func _reset_runtime_for_reload() -> void:
 	# helper's idempotent guard would re-free the same node twice.
 	hud_layer = null
 	tracker = null
+	scanner_panel = null
+	inventory_panel = null
 	interactables.clear()
 	sequence_interactables.clear()
 	affordance_labels.clear()
 	affordance_props.clear()
 	route_gate_nodes.clear()
+	# Sub-project #1: drop retained visited-derelict instances on reload. The
+	# active derelict scene is already freed and current_ship nulled above; a
+	# stale ShipInstance left in visited_ships would make a post-reload revisit
+	# reuse pre-reload systems state instead of building a fresh condition-seeded
+	# instance. home_ship is NOT cleared — _on_ship_loaded reassigns it.
+	visited_ships.clear()
 	objective_completion_count = 0
 	slice_complete = false
 	# Reset pure models so a fresh load starts from a clean state and
 	# then has the snapshot re-applied.
-	if ship_systems != null:
-		ship_systems.reset()
+	if ship_systems_manager != null:
+		var bp_reset = _load_blueprint_for_systems()
+		ship_systems_manager.configure(ship_systems_manager.load_definitions(), bp_reset.condition, bp_reset.seed_value)
+		_apply_lifeboat_opening_damage()
+	_configure_player_progression()
+	completed_objective_types.clear()
 	if route_control_state != null:
 		route_control_state.configure_from_blocked_routes([])
 	if oxygen_state != null:
@@ -2488,6 +6006,17 @@ func _reset_runtime_for_reload() -> void:
 			"arcing_duration": ElectricalArcStateScript.DEFAULT_ARCING_DURATION,
 			"discharged_duration": ElectricalArcStateScript.DEFAULT_DISCHARGED_DURATION,
 		})
+	# REQ-SV: reset survival vitals models on reload.
+	if vitals_state != null:
+		vitals_state.configure({})
+	if sanity_state != null:
+		sanity_state.configure({})
+	if radiation_state != null:
+		radiation_state.configure({})
+	if body_temperature_state != null:
+		body_temperature_state.configure({})
+	if status_effects_state != null:
+		status_effects_state.configure({})
 	if objective_progress_state != null:
 		objective_progress_state.reset()
 	breach_zone_node = null
@@ -2513,7 +6042,68 @@ func _reset_runtime_for_reload() -> void:
 func _input(event: InputEvent) -> void:
 	if not playable_started or slice_complete:
 		return
+	# Phase 4.5: scanner panel toggle + navigation. Opening the panel freezes
+	# player movement/interaction so the shared arrow/Enter keys drive the panel.
+	# Control is restored on close by the panel_closed signal handler, which
+	# covers every close path — not just toggle-close / confirm-success.
+	if scanner_panel != null:
+		if event.is_action_pressed("toggle_scanner") and (not is_instance_valid(inventory_panel) or not inventory_panel.is_open()):
+			scanner_panel.toggle()
+			if player != null and scanner_panel.is_open():
+				player.set_physics_process(false)
+				player.set_process_input(false)
+				player.set_process_unhandled_input(false)
+			get_viewport().set_input_as_handled()
+			return
+		if scanner_panel.is_open():
+			if event.is_action_pressed("ui_down"):
+				scanner_panel.move_selection(1)
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_up"):
+				scanner_panel.move_selection(-1)
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_accept"):
+				scanner_panel.confirm_selection()
+				get_viewport().set_input_as_handled()
+			return  # swallow other input while the scanner is open
+	if is_instance_valid(inventory_panel):
+		if inventory_panel.is_open():
+			if event.is_action_pressed("toggle_inventory") or event.is_action_pressed("ui_cancel"):
+				inventory_panel.close()
+				get_viewport().set_input_as_handled()
+			return  # swallow other keys while the inventory panel is open (mouse drives it)
+		if event.is_action_pressed("toggle_inventory"):
+			_open_inventory_self()
+			get_viewport().set_input_as_handled()
+			return
+	if is_instance_valid(menu_coordinator):
+		if menu_coordinator.handle_ui_input(event):
+			if event.is_action_pressed("ui_open_map"):
+				menu_coordinator.reveal_room(menu_coordinator.map_fog_state.get_tracked_room_id())
+			get_viewport().set_input_as_handled()
+			return
+		for action_name in ["move_forward", "move_back", "move_left", "move_right"]:
+			if event.is_action_pressed(action_name):
+				menu_coordinator.trigger_tutorial("player_moved", "any")
+				break
 	if save_load_service == null:
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_1:
+			_use_consumable_hotbar_slot(0)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.keycode == KEY_2:
+			_use_consumable_hotbar_slot(1)
+			get_viewport().set_input_as_handled()
+			return
+		elif event.keycode == KEY_3:
+			_use_consumable_hotbar_slot(2)
+			get_viewport().set_input_as_handled()
+			return
+	if event.is_action_pressed("attack_primary"):
+		_attack_with_equipped_weapon()
+		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("save_run"):
 		request_save()
@@ -2521,3 +6111,386 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_pressed("load_run"):
 		request_load()
 		get_viewport().set_input_as_handled()
+
+func use_inventory_item_for_validation(item_id: String, use_all: bool = false) -> Dictionary:
+	return _use_consumable_item(item_id, use_all)
+
+func assign_hotbar_slot_for_validation(slot_index: int, item_id: String) -> bool:
+	if consumable_state == null:
+		return false
+	var ok: bool = consumable_state.assign_hotbar_slot(slot_index, item_id)
+	if ok:
+		_refresh_consumable_ui(slot_index)
+	return ok
+
+func use_hotbar_slot_for_validation(slot_index: int) -> Dictionary:
+	return _use_consumable_hotbar_slot(slot_index)
+
+## Phase 5b Task 6 validation seam: opens the first closed dock-seam barrier
+## without requiring player proximity. Returns true if the barrier is now opened.
+func open_active_dock_barrier_for_validation() -> bool:
+	for b in dock_barriers:
+		if is_instance_valid(b) and not b.opened:
+			if b.condition == "broken":
+				b.channeling = true
+				b._scaled_seconds = 0.01
+				b.advance_channel(100.0)
+			else:
+				b.set_opened(true)
+				b.emit_signal("breach_opened", b.marker_id)
+			return b.opened
+	return false
+
+## Phase 5b Task 6 validation seam: teleports the player to a room of current_ship
+## that lies OUTSIDE the piloted ship's interior AABB (so occupancy resolves
+## unambiguously to the host, not the overlapping docked lifeboat). Returns true on a
+## genuine outside-room teleport; returns FALSE (without moving the player) when no such
+## room exists (host entirely inside the lifeboat AABB — unexpected for a multi-room
+## derelict) so the smoke fails honestly rather than asserting against an ambiguous point.
+func board_host_for_validation() -> bool:
+	if current_ship == null or player == null or not (player is Node3D):
+		return false
+	# Find a room of current_ship whose world position is outside the piloted ship's AABB.
+	var lb_aabb: AABB = AABB()
+	if piloted_ship != null and piloted_ship.scene_root != null and is_instance_valid(piloted_ship.scene_root):
+		lb_aabb = piloted_ship.interior_aabb()
+	var sr = current_ship.scene_root
+	if sr != null and is_instance_valid(sr):
+		var st = sr.get_node_or_null("ShipStructure")
+		if st == null:
+			for c in sr.get_children():
+				if c.get_child_count() > 0:
+					st = c
+					break
+		if st != null:
+			for rn in st.get_children():
+				if not (rn is Node3D):
+					continue
+				var gp: Vector3 = (rn as Node3D).global_position
+				if not lb_aabb.grow(0.001).has_point(gp):
+					(player as Node3D).global_position = gp
+					return true
+	# No room outside the piloted AABB — do NOT teleport to an ambiguous center.
+	push_error("board_host_for_validation: no host room found outside piloted AABB; cannot prove a genuine flip")
+	return false
+
+## 5c seam: drives the real login path for ship_id — teleports the player to that
+## ship's bridge terminal and calls try_login (so the real in-range gate admits it).
+## Returns true iff the login was accepted (piloted_ship changed to ship_id's instance).
+func login_at_terminal_for_validation(ship_id: String) -> bool:
+	for t in bridge_terminals:
+		if is_instance_valid(t) and String(t.ship_id) == ship_id:
+			if is_instance_valid(player) and player.has_method("teleport_to") and t.is_inside_tree():
+				player.teleport_to(t.global_position)
+			var before = piloted_ship
+			t.try_login(player)
+			return piloted_ship != before and piloted_ship != null and String(piloted_ship.ship_id) == ship_id
+	return false
+
+## 5c seam: force-repair every subcomponent of ship_id's OWN systems manager so its
+## propulsion reads operational (makes it a working vessel for tests).
+func make_ship_working_for_validation(ship_id: String) -> void:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null or inst.systems_manager == null:
+		return
+	for sid in inst.systems_manager.systems.keys():
+		var sys = inst.systems_manager.get_system(sid)
+		if sys == null:
+			continue
+		for sub in sys.subcomponents:
+			inst.systems_manager.force_repair(sid, sub.subcomponent_id)
+
+## 5c seam: the current piloted ship's id ("" if none).
+func piloted_ship_id_for_validation() -> String:
+	return String(piloted_ship.ship_id) if piloted_ship != null else ""
+
+## 5c seam: true iff the piloted ship exists AND has live geometry (a valid scene_root).
+func piloted_ship_has_geometry_for_validation() -> bool:
+	return piloted_ship != null and is_instance_valid(piloted_ship.scene_root)
+
+## 5c seam: the owner_id recorded on ship_id ("" if unknown/unowned).
+func ship_owner_for_validation(ship_id: String) -> String:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null:
+		return ""
+	return inst.get_access().owner_id
+
+## 5c seam: registers an offline derelict-like ship that HAS a bridge room (so it is
+## claimable), with its own systems manager and a spawned bridge terminal, parented at
+## a distinct world offset, for login tests. Loops candidate seeds until the generated
+## layout contains a bridge room (bridge is weighted, not guaranteed). Returns its id,
+## or "" if no bridge-bearing layout was found in the search budget.
+func register_offline_test_ship_for_validation() -> String:
+	if ship_generator == null:
+		return ""
+	var built = null
+	var chosen_seed := -1
+	for seed_try in range(0, 200):
+		var candidate = ship_generator.generate_from_seed(seed_try, 1, 2)   # size 1, condition 2 (wrecked -> propulsion offline)
+		if candidate == null:
+			continue
+		if candidate.has_method("get_layout_copy") and _layout_has_bridge(candidate.get_layout_copy()):
+			built = candidate
+			chosen_seed = seed_try
+			break
+		# Not claimable -> discard this candidate root so it does not leak.
+		candidate.queue_free()
+	if built == null:
+		return ""
+	var bp = ShipBlueprintScript.new(1, 2, chosen_seed)
+	var mgr = ShipSystemsManagerScript.new()
+	mgr.configure(mgr.load_definitions(), bp.condition, bp.seed_value)
+	var inst = ShipInstanceScript.create("ship_offline_test", "cell:cell:%d" % chosen_seed, bp, mgr, null)
+	inst.scene_root = built
+	add_child(built)
+	(built as Node3D).position = Vector3(0.0, 0.0, 60.0)
+	if inst.built_layout.is_empty() and built.has_method("get_layout_copy"):
+		inst.built_layout = built.get_layout_copy()
+	visited_ships[String(inst.marker_id)] = inst
+	_spawn_bridge_terminal(inst)
+	_spawn_hangar_control(inst)
+	_spawn_cargo_hold_control(inst)
+	_spawn_cart_controls_for_ship(inst)
+	return String(inst.ship_id)
+
+## True iff a layout dict contains a room with room_role == "bridge".
+func _layout_has_bridge(layout: Dictionary) -> bool:
+	var rooms_v: Variant = layout.get("rooms", [])
+	if typeof(rooms_v) != TYPE_ARRAY:
+		return false
+	for room_v in (rooms_v as Array):
+		if typeof(room_v) == TYPE_DICTIONARY and str((room_v as Dictionary).get("room_role", "")) == "bridge":
+			return true
+	return false
+
+## 5c seam: true iff the current active ship has a bridge room (is claimable).
+func current_ship_has_bridge_for_validation() -> bool:
+	return current_ship != null and typeof(current_ship.built_layout) == TYPE_DICTIONARY and _layout_has_bridge(current_ship.built_layout)
+
+## 5d seams: hangar-bay dock/launch validation surface.
+func home_ship_id_for_validation() -> String:
+	return String(home_ship.ship_id) if home_ship != null else ""
+
+func cargo_deposit_for_validation(ship_id: String) -> int:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null or inventory_state == null:
+		return 0
+	var moved: int = int(CargoTransferScript.deposit_all(inventory_state, inst.get_inventory()).get("total_moved", 0))
+	_recompute_player_encumbrance()
+	return moved
+
+func cargo_withdraw_for_validation(ship_id: String, category: String) -> int:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null or inventory_state == null:
+		return 0
+	var moved: int = int(CargoTransferScript.withdraw_category(inst.get_inventory(), inventory_state, category).get("total_moved", 0))
+	_recompute_player_encumbrance()
+	return moved
+
+func inventory_panel_is_open_for_validation() -> bool:
+	return is_instance_valid(inventory_panel) and inventory_panel.is_open()
+
+func inventory_open_self_for_validation() -> bool:
+	_open_inventory_self()
+	return inventory_panel_is_open_for_validation()
+
+func inventory_close_for_validation() -> void:
+	if is_instance_valid(inventory_panel) and inventory_panel.is_open():
+		inventory_panel.close()
+
+func inventory_panel_deposit_all_for_validation() -> int:
+	if not is_instance_valid(inventory_panel) or not inventory_panel.is_open():
+		return 0
+	return int(inventory_panel.deposit_all_to_container())
+
+func inventory_transfer_first_to_container_for_validation(item_id: String) -> int:
+	# Open-transfer must already be active. Selects item_id on the YOU pane and moves the
+	# whole stack into the container; returns moved.
+	if not is_instance_valid(inventory_panel) or not inventory_panel.is_open():
+		return 0
+	var ids: Array = inventory_panel.get_pane_ids("self")
+	var idx: int = ids.find(item_id)
+	if idx < 0:
+		return 0
+	inventory_panel.select_row("self", idx, false, false)
+	return int(inventory_panel.transfer_selected("self"))
+
+func inventory_transfer_first_from_container_for_validation(item_id: String) -> int:
+	if not is_instance_valid(inventory_panel) or not inventory_panel.is_open():
+		return 0
+	var ids: Array = inventory_panel.get_pane_ids("container")
+	var idx: int = ids.find(item_id)
+	if idx < 0:
+		return 0
+	inventory_panel.select_row("container", idx, false, false)
+	return int(inventory_panel.transfer_selected("container"))
+
+func player_frozen_for_validation() -> bool:
+	return is_instance_valid(player) and not player.is_physics_processing()
+
+func ship_hold_quantity_for_validation(ship_id: String, item_id: String) -> int:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null:
+		return 0
+	return inst.get_inventory().get_quantity(item_id)
+
+func ship_has_cargo_hold_for_validation(ship_id: String) -> bool:
+	for c in cargo_hold_controls:
+		if is_instance_valid(c) and String(c.carrier_id) == ship_id:
+			return true
+	return false
+
+## Drives the REAL player-interact dispatch (_on_player_interact_requested), NOT the
+## direct transfer seam: positions the player at the ship's cargo control so the strict
+## in-range gate admits it, fires interact, and returns how many items landed in the
+## hold. A return of 0 means the cargo control is not wired into the interact path.
+func cargo_interact_deposit_for_validation(ship_id: String) -> int:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null or player == null or not (player is Node3D):
+		return 0
+	var control = null
+	for c in cargo_hold_controls:
+		if is_instance_valid(c) and String(c.carrier_id) == ship_id:
+			control = c
+			break
+	if control == null or not control.is_inside_tree() or not (player as Node3D).is_inside_tree():
+		return 0
+	(player as Node3D).global_position = control.global_position
+	var before: int = _hold_item_total(inst)
+	_on_player_interact_requested(player)   # opens the transfer panel for this hold
+	inventory_panel_deposit_all_for_validation()
+	return _hold_item_total(inst) - before
+
+func _hold_item_total(inst) -> int:
+	var total: int = 0
+	var hold = inst.get_inventory()
+	for k in hold.items:
+		total += int(hold.items[k])
+	return total
+
+func lifeboat_ship_id_for_validation() -> String:
+	return String(lifeboat_ship.ship_id) if lifeboat_ship != null else ""
+
+func ship_bay_slot_count_for_validation(ship_id: String) -> int:
+	var inst = _find_ship_by_id(ship_id)
+	return inst.get_hangar().slot_count if inst != null else 0
+
+func ship_is_bayed_in_for_validation(mobile_id: String, carrier_id: String) -> bool:
+	var carrier = _find_ship_by_id(carrier_id)
+	if carrier == null:
+		return false
+	return carrier.get_hangar().slot_of(mobile_id) != -1
+
+func bay_dock_for_validation(carrier_id: String) -> int:
+	var carrier = _find_ship_by_id(carrier_id)
+	if carrier == null:
+		return -1
+	var before: int = _first_occupied_slot(carrier.get_hangar())
+	_on_bay_dock_requested(carrier_id, -1)
+	# Return the slot the candidate landed in (first occupied that was not before, else any occupied).
+	var candidate_slot: int = -1
+	for i in range(carrier.get_hangar().slots.size()):
+		if String(carrier.get_hangar().slots[i]) != "":
+			candidate_slot = i
+			if i != before:
+				break
+	return candidate_slot
+
+func bay_launch_for_validation(carrier_id: String) -> int:
+	var carrier = _find_ship_by_id(carrier_id)
+	if carrier == null:
+		return -1
+	var idx: int = _first_occupied_slot(carrier.get_hangar())
+	_on_bay_launch_requested(carrier_id, -1)
+	return idx
+
+## 5d seam: drive the DFS rigid-pair capture/reposition directly (for a deterministic depth-2 guard).
+func capture_subtree_for_validation() -> Array:
+	return _capture_subtree()
+
+func reposition_subtree_for_validation(captured: Array) -> void:
+	_reposition_subtree(captured)
+
+## 5d seam: true iff `child_id` resolves to a ship whose root's offset to the piloted
+## root is finite (it is positioned in the piloted frame, i.e. it rode the subtree).
+func nested_child_tracks_piloted_for_validation(child_id: String) -> bool:
+	if piloted_ship == null or not is_instance_valid(piloted_ship.scene_root):
+		return false
+	var child = _find_ship_by_id(child_id)
+	if child == null or not is_instance_valid(child.scene_root):
+		return false
+	var root_node: Node3D = piloted_ship.scene_root as Node3D
+	var cn: Node3D = child.scene_root as Node3D
+	if not root_node.is_inside_tree() or not cn.is_inside_tree():
+		return false
+	return root_node.global_position.distance_to(cn.global_position) < 1000.0
+
+## Task 7 equipment seams.
+func equip_for_validation(item_id: String) -> bool:
+	# Seed one into inventory if absent so the seam can drive equip deterministically.
+	if inventory_state != null and inventory_state.get_quantity(item_id) <= 0:
+		inventory_state.add_item(item_id, 1)
+	return _equip_from_inventory(item_id, false)
+
+func unequip_for_validation(slot: String) -> String:
+	return _unequip_to_inventory(slot)
+
+func player_capacity_for_validation() -> float:
+	return inventory_state.get_capacity() if inventory_state != null else 0.0
+
+func player_equipped_for_validation(slot: String) -> String:
+	return equipment_state.get_equipped(slot) if equipment_state != null else ""
+
+func player_move_speed_for_validation() -> float:
+	return float(player.move_speed) if is_instance_valid(player) else 0.0
+
+func overload_player_for_validation(item_id: String, qty: int) -> void:
+	if inventory_state != null:
+		inventory_state.add_item(item_id, qty)
+	_recompute_player_encumbrance()
+
+## Task 11 cart validation seams.
+func spawn_cart_for_validation(ship_id: String) -> String:
+	var inst = _find_ship_by_id(ship_id)
+	if inst == null:
+		return ""
+	var cart = CartStateScript.create("cart_%s" % ship_id, 200.0)
+	cart.parked_ship_id = ship_id
+	inst.get_carts().append(cart)
+	_spawn_cart_control(inst, cart)
+	return cart.cart_id
+
+func cart_grab_for_validation(cart_id: String) -> bool:
+	var hit: Dictionary = _find_cart_by_id(cart_id)
+	if hit.is_empty() or player == null or not (player is Node3D):
+		return false
+	var control = null
+	for c in cart_controls:
+		if is_instance_valid(c) and String(c.cart_id) == cart_id:
+			control = c
+			break
+	if control == null or not control.is_inside_tree() or not (player as Node3D).is_inside_tree():
+		return false
+	(player as Node3D).global_position = control.global_position
+	return control.try_grab(player)
+
+func cart_load_for_validation(cart_id: String) -> int:
+	var hit: Dictionary = _find_cart_by_id(cart_id)
+	if hit.is_empty() or inventory_state == null:
+		return 0
+	return int(CargoTransferScript.deposit_all(inventory_state, hit["cart"].get_hold()).get("total_moved", 0))
+
+func cart_unload_for_validation(cart_id: String, category: String) -> int:
+	var hit: Dictionary = _find_cart_by_id(cart_id)
+	if hit.is_empty() or inventory_state == null:
+		return 0
+	return int(CargoTransferScript.withdraw_category(hit["cart"].get_hold(), inventory_state, category).get("total_moved", 0))
+
+func cart_is_grabbed_for_validation() -> bool:
+	return _is_cart_grabbed()
+
+func cart_hold_quantity_for_validation(cart_id: String, item_id: String) -> int:
+	var hit: Dictionary = _find_cart_by_id(cart_id)
+	if hit.is_empty():
+		return 0
+	return hit["cart"].get_hold().get_quantity(item_id)

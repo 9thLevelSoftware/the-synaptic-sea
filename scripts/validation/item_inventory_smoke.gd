@@ -1,0 +1,100 @@
+extends SceneTree
+
+## Pure-model smoke: quantitied/weighted/categorized inventory + tool-shim
+## backward compatibility. No scene tree.
+
+const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd")
+
+func _initialize() -> void:
+	var ok_add: bool = _test_add_and_categories()
+	var ok_weight: bool = _test_weight_cap()
+	var ok_round: bool = _test_round_trip()
+	var ok_legacy: bool = _test_legacy_compat()
+	var ok_repair: bool = _test_repair_vocabulary()
+	if ok_add and ok_weight and ok_round and ok_legacy and ok_repair:
+		print("ITEM INVENTORY PASS add=true weight_cap=true round_trip=true legacy_compat=true repair_vocab=%s" % str(ok_repair).to_lower())
+	else:
+		push_error("ITEM INVENTORY FAIL add=%s weight_cap=%s round_trip=%s legacy_compat=%s repair_vocab=%s" % [
+			str(ok_add), str(ok_weight), str(ok_round), str(ok_legacy), str(ok_repair)])
+	quit(0 if (ok_add and ok_weight and ok_round and ok_legacy and ok_repair) else 1)
+
+func _test_add_and_categories() -> bool:
+	var inv = InventoryStateScript.new()
+	# power_cell is a 'part' defined in item_definitions.json (weight 1.0, max_stack 10).
+	var added: int = inv.add_item("power_cell", 3)
+	if added != 3 or inv.get_quantity("power_cell") != 3:
+		return false
+	var parts: Array = inv.get_items_by_category("part")
+	if parts.size() != 1 or int(parts[0]["quantity"]) != 3:
+		return false
+	# Tools still resolve through the shims and are category 'tool'.
+	if not inv.add_tool("portable_oxygen_pump"):
+		return false
+	if not inv.has_tool("portable_oxygen_pump"):
+		return false
+	if inv.get_category("portable_oxygen_pump") != "tool":
+		return false
+	if inv.get_drain_multiplier() != 0.5:
+		return false
+	# Derived tool_ids excludes parts.
+	if inv.tool_ids != ["portable_oxygen_pump"]:
+		return false
+	return true
+
+func _test_weight_cap() -> bool:
+	var inv = InventoryStateScript.new()
+	# PZ soft-cap: weight no longer gates add_item; max_stack is the only limit.
+	# scrap_metal has max_stack 20 and weight 5.0; base cap is 50.0 (10 items).
+	# All 20 should be accepted even though 20*5.0=100.0 > base cap of 50.0.
+	var added: int = inv.add_item("scrap_metal", 20)
+	if added != 20:
+		return false
+	if not inv.is_over_capacity():
+		return false
+	if inv.get_load_ratio() <= 1.0:
+		return false
+	# Stack is now full; a further add returns 0 (max_stack exhausted).
+	if inv.add_item("scrap_metal", 1) != 0:
+		return false
+	return true
+
+func _test_round_trip() -> bool:
+	var inv = InventoryStateScript.new()
+	inv.add_item("power_cell", 2)
+	inv.add_item("ration_pack", 4)   # supply
+	inv.add_tool("junction_calibrator")
+	var summary: Dictionary = inv.get_summary()
+	var restored = InventoryStateScript.new()
+	if not restored.apply_summary(summary):
+		return false
+	if restored.get_quantity("power_cell") != 2: return false
+	if restored.get_quantity("ration_pack") != 4: return false
+	if not restored.has_tool("junction_calibrator"): return false
+	if abs(restored.get_total_weight() - inv.get_total_weight()) > 0.0001: return false
+	return true
+
+func _test_legacy_compat() -> bool:
+	# A pre-#3 save carried only {"tool_ids": [...], "drain_multiplier": ...}.
+	var legacy: Dictionary = {"tool_ids": ["portable_oxygen_pump"], "drain_multiplier": 0.5}
+	var inv = InventoryStateScript.new()
+	if not inv.apply_summary(legacy):
+		return false
+	if not inv.has_tool("portable_oxygen_pump"): return false
+	if inv.get_drain_multiplier() != 0.5: return false
+	if inv.tool_ids != ["portable_oxygen_pump"]: return false
+	return true
+
+func _test_repair_vocabulary() -> bool:
+	var inv = InventoryStateScript.new()
+	# Every part required by systems.json must resolve as a 'part'.
+	for part_id in ["reactor_core", "power_cell", "oxygen_filter", "sealant", "plating",
+			"circuit_board", "data_core", "thruster_nozzle", "fuel_line", "sensor_module"]:
+		if inv.get_category(part_id) != "part":
+			return false
+		if inv.get_weight_each(part_id) <= 0.0:
+			return false
+	# The two repair tools must resolve as 'tool'.
+	for tool_id in ["welder", "plasma_cutter"]:
+		if inv.get_category(tool_id) != "tool":
+			return false
+	return true

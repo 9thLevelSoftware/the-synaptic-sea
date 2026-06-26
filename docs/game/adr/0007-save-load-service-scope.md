@@ -42,6 +42,15 @@ Adopt a **current-run-only, single-slot save/load service** scoped to the active
 - Mid-animation or mid-physics state preservation.
 - Scene nodes, props, VFX, audio state, or camera zoom.
 
+> **Note (ADR-0031):** The "single slot per run" wording above is the
+> logical boundary. The Task 11 multi-slot extension is allowed to add
+> sibling slots (manual `slot_01`..`slot_06`, autosave `autosave_a`..`autosave_c`,
+> quicksave `quicksave`, world `world`) without crossing the cut line,
+> because every one of them serializes the same RunSnapshot / WorldSnapshot
+> payload that this ADR scopes. Adding hub-state fields to the snapshot
+> still requires a new ADR; adding new slot *families* (or new slot *paths*)
+> is allowed but every new path inherits the hub/meta exclusion.
+
 ### Architecture contract
 
 - `SaveLoadService` is a `RefCounted` service owned by `PlayableGeneratedShip`, not an autoload.

@@ -72,8 +72,8 @@ func _on_playable_ready(summary: Dictionary) -> void:
 	if collision_shape_count <= 0:
 		_fail("collision shape count is zero")
 		return
-	if objective_count != 4:
-		_fail("expected 4 objectives got %d" % objective_count)
+	if objective_count != 5:
+		_fail("expected 5 objectives got %d" % objective_count)
 		return
 	var player_position: Vector3 = playable_ship.player.global_position
 	var nearest_floor_top_y: float = _nearest_floor_collision_top_y(player_position)
@@ -155,7 +155,7 @@ func _validate_and_pass() -> void:
 	if not interaction_completed or completed_count < 1:
 		_fail("interaction_completed=false")
 		return
-	if objective_count != 4:
+	if objective_count != 5:
 		_fail("objective_count=%d" % objective_count)
 		return
 	finished = true

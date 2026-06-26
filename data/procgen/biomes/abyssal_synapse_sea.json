@@ -1,0 +1,16 @@
+{
+  "id": "abyssal_synapse_sea",
+  "description": "Deep-sea baseline. Calm Synapse Sea with average hazard and encounter density. Default biome for any unknown seed.",
+  "hazard_modifier": 1.0,
+  "loot_quality_modifier": 1.0,
+  "encounter_density_modifier": 1.0,
+  "ambient_color": [0.60, 0.65, 0.75],
+  "ambient_intensity": 1.0,
+  "hazard_overrides": {
+    "fire": 1.0,
+    "oxygen_breach": 1.0,
+    "electrical_arc": 1.0
+  },
+  "encounter_table_id": "biomatter_lurker",
+  "loot_table_overrides": {}
+}

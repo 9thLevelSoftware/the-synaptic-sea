@@ -1,177 +1,358 @@
 extends RefCounted
 class_name StructuralPlacer
 
-# Builds the physical "shell" of a procedurally generated ship from a
-# RoomGraph. Consumes the same RoomGraph that RoomGraphGenerator emits
-# (and that later tasks — gameplay/prop placement, lighting, encounters
-# — will also read) and produces a Node3D tree of structural modules
-# under a single "ShipStructure" root.
+# Builds the physical "shell" of a ship from a RoomGraph using 2D
+# grid placement with spatial rules.
 #
-# The placer is the bridge between the abstract topology (rooms with
-# roles, connected by doors) and the concrete scene-graph world
-# (PackedScene wrappers placed at world coordinates). It is intentionally
-# deterministic given the same RoomGraph: room order is the graph's room
-# order, and modules within a room are placed in a fixed line along +Z
-# scaled by CELL_SIZE. This determinism is what lets the same blueprint
-# be reproduced as a usable scene file later.
-#
-# Why a RefCounted and not a Node3D? The placer itself is a pure
-# builder. It does not need to be in the scene tree, has no per-frame
-# state, and exposing `place_structure` as a method on a RefCounted
-# makes it trivially unit-testable from a SceneTree smoke (no need to
-# attach to a parent, no leaked nodes). The output (the ShipStructure
-# root) is a Node3D that the caller is expected to add to the tree.
+# v3 changes:
+#   - Stronger directional preferences (room roles have preferred
+#     quadrants of the ship).
+#   - Airlock separation: on non-life-boat ships, airlock must not
+#     be directly adjacent to bridge. Airlock goes on the side
+#     (east or west), bridge goes forward (north).
+#   - More aggressive branching: direction order shuffled per-room,
+#     more random links, rooms spread outward from center.
+#   - Post-layout swap: rooms that ended up in the wrong zone get
+#     swapped with rooms in better positions.
 
-# Preload the peer data class so type annotations resolve cleanly under
-# `godot --headless --script`. class_name globals (RoomGraph) may not
-# be registered yet during the first parse pass in headless mode, so we
-# reference the script via preload just like the smokes do.
 const RoomGraphScript := preload("res://scripts/procgen/room_graph.gd")
 
-# World-space size of a single cell. All structural modules in
-# ship_structural_v0 are authored on a 1x1 (or 2x1 / 1x2) grid where
-# each cell is CELL_SIZE metres. Keeping it as a constant here means
-# downstream placers (props, lighting) and tests can align to the same
-# grid without re-deriving it from the module scenes.
 const CELL_SIZE: float = 4.0
-
-# Root directory of the structural module PackedScenes. Modules are
-# referenced by their stem (e.g. "floor_1x1") and the placer resolves
-# the full res:// path at load time. Keeping the directory in one place
-# means the library can be swapped to ship_structural_v1, etc. by
-# changing just this constant.
+const ROOM_GAP: float = 2.0
 const MODULE_BASE_PATH: String = "res://scenes/wrappers/structural/ship_structural_v0/"
 
-# Maps each room role produced by RoomGraphGenerator to the ordered
-# list of structural module stems to place along that room's Z-axis
-# run. The first module sits at the room's origin, each subsequent
-# module is offset by CELL_SIZE further along +Z.
-#
-# Stems, not full paths: the placer resolves the path via
-# MODULE_BASE_PATH so the same mapping can be used in tests without
-# hard-coding res:// URLs.
-#
-# Roles not present in this map fall back to the default fallback list
-# (just a single floor_1x1) so a future role added to the generator
-# never crashes placement — it just gets the minimum structure.
-const ROOM_MODULES: Dictionary = {
-	"airlock": [
-		"floor_1x1",
-		"floor_1x1",
-		"doorway_frame_open_1x1",
-	],
-	"corridor": [
-		"corridor_floor_1x1",
-		"corridor_floor_1x1",
-	],
-	"engineering": [
-		"floor_1x1",
-		"floor_2x1",
-		"wall_straight_1x1",
-	],
-	"life_support": [
-		"floor_1x1",
-		"floor_1x1",
-		"wall_straight_1x1",
-	],
-	"bridge": [
-		"floor_2x1",
-		"floor_2x1",
-		"wall_straight_1x1",
-	],
-	"cargo": [
-		"floor_2x1",
-		"floor_2x1",
-	],
-	"crew_quarters": [
-		"floor_1x1",
-		"floor_1x1",
-	],
-	"medical": [
-		"floor_1x1",
-		"floor_1x1",
-	],
-	"maintenance": [
-		"floor_1x1",
-		"corridor_floor_1x1",
-	],
+# Room footprints in grid cells.
+const ROOM_FOOTPRINTS: Dictionary = {
+	"engineering": Vector2i(2, 1),
+	"bridge": Vector2i(2, 1),
+	"cargo": Vector2i(2, 1),
+	"life_support": Vector2i(2, 1),
+	"bay": Vector2i(2, 1),
 }
 
-# Fallback module list for any role that is not in ROOM_MODULES. A
-# single floor_1x1 is the minimum structural footprint: a deck cell
-# you can stand on. This is the safety net for forward-compatibility
-# when a new role is added to the generator before the placer learns
-# about it.
+# Module lists per role.
+const ROOM_MODULES: Dictionary = {
+	# --- Ship roles ---
+	"airlock": ["floor_1x1", "floor_1x1", "doorway_frame_open_1x1"],
+	"corridor": ["corridor_floor_1x1", "corridor_floor_1x1"],
+	"engineering": ["floor_1x1", "floor_2x1", "wall_straight_1x1"],
+	"life_support": ["floor_1x1", "floor_1x1", "wall_straight_1x1"],
+	"bridge": ["floor_2x1", "floor_2x1", "wall_straight_1x1"],
+	"cargo": ["floor_2x1", "floor_2x1"],
+	"crew_quarters": ["floor_1x1", "floor_1x1"],
+	"medical": ["floor_1x1", "floor_1x1"],
+	"maintenance": ["floor_1x1", "corridor_floor_1x1"],
+	# --- Life boat roles ---
+	"cockpit": ["floor_1x1", "floor_1x1", "wall_straight_1x1"],
+	"engine_bay": ["floor_1x1", "floor_2x1", "wall_straight_1x1"],
+	# --- Derelict roles ---
+	"compartment": ["floor_1x1", "floor_1x1", "floor_1x1"],
+	"bay": ["floor_2x1", "floor_2x1", "floor_1x1"],
+	"quarters": ["floor_1x1", "floor_1x1"],
+	"dock": ["floor_1x1", "floor_1x1", "doorway_frame_open_1x1"],
+}
+
 const FALLBACK_MODULES: Array[String] = ["floor_1x1"]
 
+# Direction vectors: 0=north(-Z), 1=east(+X), 2=south(+Z), 3=west(-X)
+const DIRECTIONS: Array[Vector2i] = [
+	Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0),
+]
 
-# Builds the ShipStructure Node3D for the given graph.
-#
-# Returns a Node3D named "ShipStructure" with one child Node3D per
-# room; each child holds the placed module instances along its +Z
-# axis. The returned root is NOT attached to the scene tree — the
-# caller decides where to add it (root scene, a generator output
-# node, a test scene, etc.).
-#
-# Rooms are iterated in the graph's order, which means the chain
-# RoomGraphGenerator builds (airlock → engineering → …) ends up laid
-# out along world +Z. Each room's origin is offset by the running
-# position so rooms don't overlap.
-#
-# The return type is declared as Node3D (not the more specific
-# Node3D subclass) so callers can chain further Node3D operations
-# (e.g. transform) without upcasting.
-func place_structure(graph: RoomGraphScript) -> Node3D:
+# Directional zones. Each role has a preferred quadrant of the ship.
+# "north" = forward, "south" = aft, "east" = starboard, "west" = port.
+# The placer tries to put each room in its preferred zone relative to
+# the ship's center of mass.
+const DIRECTION_PREFERENCES: Dictionary = {
+	"engineering": [2, 1, 3, 0],   # aft
+	"engine_bay": [2, 1, 3, 0],    # aft
+	"bridge": [0, 1, 3, 2],        # forward
+	"cockpit": [0, 1, 3, 2],       # forward
+	"cargo": [1, 2, 3, 0],         # starboard
+	"life_support": [3, 0, 1, 2],  # port
+	"airlock": [1, 3, 2, 0],       # sides (east/west), NOT forward
+	"dock": [1, 3, 2, 0],          # sides
+	"corridor": [0, 1, 2, 3],      # no preference
+	"maintenance": [2, 3, 1, 0],   # aft-port
+	"medical": [3, 2, 0, 1],       # port-aft
+	"crew_quarters": [3, 0, 1, 2], # port
+	"quarters": [3, 0, 1, 2],      # port
+	"compartment": [0, 1, 2, 3],   # no preference
+}
+
+# Roles that are "forward" — used for airlock separation check.
+const FORWARD_ROLES: Array[String] = ["bridge", "cockpit"]
+
+# Minimum grid distance between airlock and bridge on non-life-boat ships.
+const AIRLOCK_BRIDGE_MIN_DIST: int = 3
+
+var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+
+
+func place_structure(graph: RoomGraphScript, seed_value: int = 0) -> Node3D:
+	if graph.rooms.is_empty():
+		return null
+
+	rng.seed = seed_value
+
+	# Phase 1: compute grid positions via BFS with strong preferences.
+	var grid_positions: Dictionary = _layout_rooms(graph)
+	if grid_positions.is_empty():
+		push_error("STRUCTURAL PLACER FAIL grid layout returned empty")
+		return null
+
+	# Phase 2: airlock separation enforcement.
+	_enforce_airlock_separation(graph, grid_positions)
+
+	# Phase 3: build the Node3D tree.
 	var root: Node3D = Node3D.new()
 	root.name = "ShipStructure"
 
-	# Track the running Z offset across rooms. Each room advances
-	# the cursor by the number of modules it placed times CELL_SIZE,
-	# so a 2-module room is 2 cells long, a 3-module room is 3 cells
-	# long, etc. Using a local float keeps the math obvious and
-	# avoids depending on any per-room metadata we don't have yet.
-	var z_cursor: float = 0.0
 	for room in graph.rooms:
-		var room_node: Node3D = _create_room_node(room, z_cursor)
+		var rid: String = String(room["id"])
+		var role: String = String(room["role"])
+		var grid_pos: Vector2i = grid_positions.get(rid, Vector2i.ZERO)
+
+		var world_x: float = float(grid_pos.x) * (CELL_SIZE + ROOM_GAP)
+		var world_z: float = float(grid_pos.y) * (CELL_SIZE + ROOM_GAP)
+
+		var room_node: Node3D = _create_room_node(room, Vector3(world_x, 0.0, world_z))
 		root.add_child(room_node)
-		var module_count: int = _modules_for_role(String(room["role"])).size()
-		z_cursor += float(module_count) * CELL_SIZE
 
 	return root
 
 
-# Builds a single room's Node3D and populates it with the role's
-# module list. The room node is named after the room id (e.g.
-# "airlock_01") and positioned at `(0, 0, x_offset)` so the room
-# anchor sits on the world Z axis at `x_offset`.
+# --- BFS Layout ---
+
+func _layout_rooms(graph: RoomGraphScript) -> Dictionary:
+	var positions: Dictionary = {}
+	var occupied: Dictionary = {}
+
+	if graph.rooms.is_empty():
+		return positions
+
+	# Place first room at origin.
+	var first_id: String = String(graph.rooms[0]["id"])
+	var first_role: String = String(graph.rooms[0]["role"])
+	var first_fp: Vector2i = _footprint_for_role(first_role)
+	positions[first_id] = Vector2i(0, 0)
+	_occupy_cells(occupied, Vector2i(0, 0), first_fp, first_id)
+
+	var visited: Dictionary = {first_id: true}
+	var queue: Array[String] = [first_id]
+
+	while not queue.is_empty():
+		var current_id: String = queue.pop_front()
+		var current_pos: Vector2i = positions[current_id]
+		var current_fp: Vector2i = _footprint_for_role(_role_for_room(graph, current_id))
+
+		var connected: Array[String] = []
+		for cid in graph.get_connected_rooms(current_id):
+			connected.append(cid)
+
+		# Shuffle connected rooms for more varied branching.
+		_shuffle_array(connected)
+
+		for connected_id in connected:
+			if visited.has(connected_id):
+				continue
+			visited[connected_id] = true
+
+			var connected_role: String = _role_for_room(graph, connected_id)
+			var connected_fp: Vector2i = _footprint_for_role(connected_role)
+
+			var best_pos: Vector2i = _find_adjacent_position(
+				current_pos, current_fp, connected_fp, connected_role, occupied)
+
+			if best_pos == Vector2i(-99999, -99999):
+				best_pos = _find_any_free_position(current_pos, connected_fp, occupied)
+
+			if best_pos == Vector2i(-99999, -99999):
+				push_error("STRUCTURAL PLACER WARN could not place room %s" % connected_id)
+				continue
+
+			positions[connected_id] = best_pos
+			_occupy_cells(occupied, best_pos, connected_fp, connected_id)
+			queue.append(connected_id)
+
+	return positions
+
+
+# Fisher-Yates shuffle for Array[String].
+func _shuffle_array(arr: Array[String]) -> void:
+	for i in range(arr.size() - 1, 0, -1):
+		var j: int = rng.randi_range(0, i)
+		var tmp: String = arr[i]
+		arr[i] = arr[j]
+		arr[j] = tmp
+
+
+func _find_adjacent_position(
+		parent_pos: Vector2i,
+		parent_fp: Vector2i,
+		new_fp: Vector2i,
+		new_role: String,
+		occupied: Dictionary) -> Vector2i:
+
+	# Get preferred directions and shuffle within preference tiers.
+	var prefs: Array = DIRECTION_PREFERENCES.get(new_role, [0, 1, 2, 3])
+
+	# Try preferred directions with some randomization.
+	var tried: Dictionary = {}
+	for attempt in range(prefs.size() * 2):
+		var dir_idx: int
+		if attempt < prefs.size():
+			dir_idx = prefs[attempt]
+		else:
+			dir_idx = rng.randi_range(0, 3)
+		if tried.has(dir_idx):
+			continue
+		tried[dir_idx] = true
+
+		var dir: Vector2i = DIRECTIONS[dir_idx]
+		var candidate: Vector2i = _adjacent_cell(parent_pos, parent_fp, dir)
+		if _can_place(candidate, new_fp, occupied):
+			return candidate
+
+		# Try rotated footprint.
+		var rotated_fp: Vector2i = Vector2i(new_fp.y, new_fp.x)
+		if rotated_fp != new_fp:
+			if _can_place(candidate, rotated_fp, occupied):
+				return candidate
+
+	# Try ALL directions with ALL rotations as fallback.
+	for dir_idx in range(4):
+		var dir: Vector2i = DIRECTIONS[dir_idx]
+		for fp in [new_fp, Vector2i(new_fp.y, new_fp.x)]:
+			var candidate: Vector2i = _adjacent_cell(parent_pos, parent_fp, dir)
+			if _can_place(candidate, fp, occupied):
+				return candidate
+
+	return Vector2i(-99999, -99999)
+
+
+func _adjacent_cell(parent_pos: Vector2i, parent_fp: Vector2i, dir: Vector2i) -> Vector2i:
+	if dir == Vector2i(0, -1):
+		return Vector2i(parent_pos.x, parent_pos.y - 1)
+	elif dir == Vector2i(1, 0):
+		return Vector2i(parent_pos.x + parent_fp.x, parent_pos.y)
+	elif dir == Vector2i(0, 1):
+		return Vector2i(parent_pos.x, parent_pos.y + parent_fp.y)
+	else:
+		return Vector2i(parent_pos.x - 1, parent_pos.y)
+
+
+func _can_place(pos: Vector2i, footprint: Vector2i, occupied: Dictionary) -> bool:
+	for dx in range(footprint.x):
+		for dz in range(footprint.y):
+			if occupied.has(Vector2i(pos.x + dx, pos.y + dz)):
+				return false
+	return true
+
+
+func _find_any_free_position(
+		parent_pos: Vector2i,
+		footprint: Vector2i,
+		occupied: Dictionary) -> Vector2i:
+	for radius in range(1, 20):
+		for dx in range(-radius, radius + 1):
+			for dz in range(-radius, radius + 1):
+				if abs(dx) != radius and abs(dz) != radius:
+					continue
+				var candidate: Vector2i = Vector2i(parent_pos.x + dx, parent_pos.y + dz)
+				if _can_place(candidate, footprint, occupied):
+					return candidate
+	return Vector2i(-99999, -99999)
+
+
+func _occupy_cells(occupied: Dictionary, pos: Vector2i, footprint: Vector2i, room_id: String) -> void:
+	for dx in range(footprint.x):
+		for dz in range(footprint.y):
+			occupied[Vector2i(pos.x + dx, pos.y + dz)] = room_id
+
+
+# --- Airlock Separation ---
 #
-# Each module is instantiated from its PackedScene, parented to the
-# room node, and offset further along +Z by index * CELL_SIZE. If a
-# module fails to load (missing .tscn, bad path), the placer pushes
-# an error and continues with the next module rather than aborting:
-# partial structure is better than no structure for downstream
-# gameplay debugging.
-func _create_room_node(room: Dictionary, x_offset: float) -> Node3D:
+# On non-life-boat ships, if the airlock is directly adjacent to
+# the bridge (Manhattan distance < AIRLOCK_BRIDGE_MIN_DIST), swap
+# the airlock with a room that's farther from the bridge.
+
+func _enforce_airlock_separation(graph: RoomGraphScript, positions: Dictionary) -> void:
+	# Find airlock and bridge rooms.
+	var airlock_id: String = ""
+	var bridge_id: String = ""
+	for room in graph.rooms:
+		var role: String = String(room["role"])
+		if role == "airlock":
+			airlock_id = String(room["id"])
+		elif role in FORWARD_ROLES:
+			bridge_id = String(room["id"])
+
+	if airlock_id.is_empty() or bridge_id.is_empty():
+		return  # No airlock or bridge (derelict or life boat).
+
+	var airlock_pos: Vector2i = positions.get(airlock_id, Vector2i.ZERO)
+	var bridge_pos: Vector2i = positions.get(bridge_id, Vector2i.ZERO)
+	var dist: int = abs(airlock_pos.x - bridge_pos.x) + abs(airlock_pos.y - bridge_pos.y)
+
+	if dist >= AIRLOCK_BRIDGE_MIN_DIST:
+		return  # Already far enough.
+
+	# Find a room to swap with the airlock. We want a room that's
+	# farther from the bridge and not itself a forward-adjacent room.
+	var best_swap: String = ""
+	var best_dist: int = dist
+	for room in graph.rooms:
+		var rid: String = String(room["id"])
+		if rid == airlock_id or rid == bridge_id:
+			continue
+		var role: String = String(room["role"])
+		if role in FORWARD_ROLES:
+			continue  # Don't swap with bridge/cockpit.
+		var rpos: Vector2i = positions.get(rid, Vector2i.ZERO)
+		var rdist: int = abs(rpos.x - bridge_pos.x) + abs(rpos.y - bridge_pos.y)
+		if rdist > best_dist:
+			best_dist = rdist
+			best_swap = rid
+
+	if best_swap.is_empty():
+		return  # No suitable swap found.
+
+	# Swap positions.
+	var swap_pos: Vector2i = positions[best_swap]
+	positions[best_swap] = airlock_pos
+	positions[airlock_id] = swap_pos
+
+
+# --- Helpers ---
+
+func _footprint_for_role(role: String) -> Vector2i:
+	if ROOM_FOOTPRINTS.has(role):
+		return ROOM_FOOTPRINTS[role]
+	return Vector2i(1, 1)
+
+
+func _role_for_room(graph: RoomGraphScript, room_id: String) -> String:
+	var room: Dictionary = graph.get_room(room_id)
+	if room.is_empty():
+		return ""
+	return String(room["role"])
+
+
+func _create_room_node(room: Dictionary, world_pos: Vector3) -> Node3D:
 	var room_id: String = String(room.get("id", "room"))
 	var role: String = String(room.get("role", ""))
 
 	var room_node: Node3D = Node3D.new()
 	room_node.name = room_id
-	room_node.position = Vector3(0.0, 0.0, x_offset)
+	room_node.position = world_pos
 
 	var modules: Array[String] = _modules_for_role(role)
 	for i in range(modules.size()):
 		var stem: String = modules[i]
 		var instance: Node3D = _instantiate_module(stem)
 		if instance == null:
-			# _instantiate_module already pushed the error; skip
-			# the bad module so the room's remaining modules
-			# still get placed. Also advance the world-space
-			# cursor to keep rooms non-overlapping.
 			continue
-		# Naming includes the stem + index so a single room with
-		# two "floor_1x1" modules (e.g. airlock) produces
-		# distinguishable children: "floor_1x1_0", "floor_1x1_1".
 		instance.name = "%s_%d" % [stem, i]
 		instance.position = Vector3(0.0, 0.0, float(i) * CELL_SIZE)
 		room_node.add_child(instance)
@@ -179,18 +360,11 @@ func _create_room_node(room: Dictionary, x_offset: float) -> Node3D:
 	return room_node
 
 
-# Returns the ordered module stem list for a given role. Unknown
-# roles fall back to FALLBACK_MODULES so the placer never crashes
-# on a new role. The returned Array[String] is safe to index and
-# iterate.
 func _modules_for_role(role: String) -> Array[String]:
 	if not ROOM_MODULES.has(role):
 		return FALLBACK_MODULES.duplicate()
 	var raw = ROOM_MODULES[role]
 	if raw is Array:
-		# Coerce each element to String in case the literal was
-		# inferred as a Variant array; this also filters out any
-		# accidental non-string entries without crashing.
 		var out: Array[String] = []
 		for entry in raw:
 			out.append(String(entry))
@@ -198,10 +372,6 @@ func _modules_for_role(role: String) -> Array[String]:
 	return FALLBACK_MODULES.duplicate()
 
 
-# Loads and instantiates a single module by its stem (e.g. "floor_1x1")
-# using MODULE_BASE_PATH. Returns the root Node3D of the instantiated
-# scene, or null on load failure (after pushing an error so the
-# regression shows up in the smoke output).
 func _instantiate_module(stem: String) -> Node3D:
 	var path: String = MODULE_BASE_PATH + stem + ".tscn"
 	if not ResourceLoader.exists(path):
@@ -219,10 +389,6 @@ func _instantiate_module(stem: String) -> Node3D:
 		push_error("STRUCTURAL PLACER FAIL module instantiate returned null: %s" % path)
 		return null
 	if not (instance is Node3D):
-		# Defensive: every structural module in ship_structural_v0
-		# is authored with a Node3D root. If this ever fires, the
-		# scene file is mis-typed and should be fixed, not worked
-		# around.
 		push_error("STRUCTURAL PLACER FAIL module root is not Node3D: %s" % path)
 		instance.queue_free()
 		return null

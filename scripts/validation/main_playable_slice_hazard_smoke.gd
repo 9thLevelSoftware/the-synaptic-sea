@@ -101,26 +101,23 @@ func _validate_initial_state() -> void:
 	if playable.get_breach_zone_collision_enabled_count() != 0:
 		_fail("initial breach zone collision enabled count should be 0 (corridor passable at full oxygen), got %d" % playable.get_breach_zone_collision_enabled_count())
 		return
-	# HUD must already contain an Oxygen: line routed through ObjectiveTracker.
-	var initial_lines: PackedStringArray = playable.get_combined_system_status_lines()
-	var initial_oxygen_line: String = ""
-	for line in initial_lines:
-		var text := String(line)
-		if text.begins_with("Oxygen:"):
-			initial_oxygen_line = text
-			break
+	# ADR-0027: player oxygen + breach now live solely in the bottom-left
+	# PlayerVitalsPanel; the vitals oxygen line embeds the breach state as
+	# (BREACH)/(SEALED). The top-left tracker no longer mirrors them.
+	var initial_oxygen_line: String = _first_status_line_starting_with("Oxygen:")
 	if initial_oxygen_line.is_empty():
-		_fail("initial combined status lines missing Oxygen: line")
+		_fail("initial vitals lines missing Oxygen: line")
 		return
-	# Look for the Breach: OPEN marker separately on a different status line.
-	var found_breach_open: bool = false
-	for line in initial_lines:
-		if String(line).begins_with("Breach:") and String(line).contains("OPEN"):
-			found_breach_open = true
-			break
-	if not found_breach_open:
-		_fail("initial status lines should report Breach: OPEN")
+	if not initial_oxygen_line.contains("(BREACH)"):
+		_fail("initial vitals oxygen line should report (BREACH), got %s" % initial_oxygen_line)
 		return
+	# De-dup guard (ADR-0027): the tracker's combined status block must NOT carry
+	# oxygen/breach/weight any more — those belong to the vitals panel.
+	for line in playable.get_combined_system_status_lines():
+		var dedup_text := String(line)
+		if dedup_text.begins_with("Oxygen:") or dedup_text.begins_with("Breach:") or dedup_text.begins_with("weight="):
+			_fail("tracker combined status must not contain oxygen/breach/weight after ADR-0027 de-dup, got %s" % dedup_text)
+			return
 	phase = "complete_obj1"
 
 func _complete_objective_1() -> void:
@@ -237,10 +234,12 @@ func _drive_to_zero_and_check_collision() -> void:
 	if not breach_meta_open:
 		_fail("after zero-drive breach_zone_passability_blocked meta should be true")
 		return
-	# HUD should now show the blocked marker.
+	# Vitals oxygen line at zero is "Oxygen: 0 (BREACH) LOW" — there is no BLOCKED
+	# token (passability_blocked is already asserted via the model + collision
+	# count above). Prove the HUD reflects zero oxygen.
 	hud_line_after_zero = _first_status_line_starting_with("Oxygen:")
-	if not hud_line_after_zero.contains("BLOCKED"):
-		_fail("after zero-drive HUD oxygen line should contain BLOCKED, got %s" % hud_line_after_zero)
+	if not hud_line_after_zero.begins_with("Oxygen: 0"):
+		_fail("after zero-drive vitals oxygen line should report 0, got %s" % hud_line_after_zero)
 		return
 	phase = "complete_obj2"
 
@@ -272,22 +271,13 @@ func _complete_objective_2() -> void:
 	if bool(route_after_two.get("extraction_unlocked", false)):
 		_fail("hazard must not unlock extraction early")
 		return
-	# HUD status lines should include an oxygen line and a Breach: SEALED marker.
-	var lines: PackedStringArray = playable.get_combined_system_status_lines()
-	var found_oxygen: bool = false
-	var found_seal: bool = false
-	for line in lines:
-		var text := String(line)
-		if text.begins_with("Oxygen:"):
-			found_oxygen = true
-			hud_line_after_seal = text
-		if text.begins_with("Breach:") and text.contains("SEALED"):
-			found_seal = true
-	if not found_oxygen:
-		_fail("combined status lines missing Oxygen: line after seal")
+	# ADR-0027: the vitals oxygen line carries the sealed state as (SEALED).
+	hud_line_after_seal = _first_status_line_starting_with("Oxygen:")
+	if hud_line_after_seal.is_empty():
+		_fail("vitals lines missing Oxygen: line after seal")
 		return
-	if not found_seal:
-		_fail("combined status lines missing Breach: SEALED line after seal")
+	if not hud_line_after_seal.contains("(SEALED)"):
+		_fail("vitals oxygen line should report (SEALED) after seal, got %s" % hud_line_after_seal)
 		return
 	phase = "complete_obj3_4"
 
@@ -330,7 +320,7 @@ func _complete_obj3_and_4() -> void:
 	_cleanup_and_quit(0)
 
 func _first_status_line_starting_with(prefix: String) -> String:
-	var lines: PackedStringArray = playable.get_combined_system_status_lines()
+	var lines: PackedStringArray = playable.get_player_vitals_lines()
 	for line in lines:
 		var text := String(line)
 		if text.begins_with(prefix):

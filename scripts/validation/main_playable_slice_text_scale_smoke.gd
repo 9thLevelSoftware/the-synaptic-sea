@@ -25,6 +25,8 @@ const DEFAULT_BASE_HUD_FONT_SIZE: int = 18
 const DEFAULT_BASE_HUD_SIZE: Vector2 = Vector2(520.0, 250.0)
 const DEFAULT_BASE_AFFORDANCE_PIXEL_SIZE: float = 0.003
 const DEFAULT_BASE_HAZARD_PIXEL_SIZE: float = 0.0035
+const DEFAULT_BASE_VITALS_FONT_SIZE: int = 18
+const DEFAULT_BASE_VITALS_SIZE: Vector2 = Vector2(360.0, 150.0)
 
 var main_node: Node
 var frame_count: int = 0
@@ -105,6 +107,7 @@ func _validate_default_scale(playable: PlayableGeneratedShip) -> void:
 		if not is_equal_approx(fire_pixel, DEFAULT_BASE_HAZARD_PIXEL_SIZE):
 			_fail("default: fire label pixel_size=%.6f expected %.6f" % [fire_pixel, DEFAULT_BASE_HAZARD_PIXEL_SIZE])
 			return
+	if not _check_vitals_scale(playable, 1.0, "default"): return
 	print("A11Y TEXT SCALE DEFAULT PASS font=%d panel=%s marker_pixel=%.4f fire_pixel=%.4f" % [
 		font_size,
 		str(tracker.custom_minimum_size),
@@ -154,6 +157,7 @@ func _validate_15x_scale(playable: PlayableGeneratedShip) -> void:
 		if not is_equal_approx(fire_pixel, expected_hazard_pixel):
 			_fail("1.5x: fire label pixel_size=%.6f expected %.6f" % [fire_pixel, expected_hazard_pixel])
 			return
+	if not _check_vitals_scale(playable, 1.5, "1.5x"): return
 	print("A11Y TEXT SCALE 1.5X PASS font=%d panel=%s marker_pixel=%.6f fire_pixel=%.6f" % [
 		actual_font,
 		str(tracker.custom_minimum_size),
@@ -196,6 +200,7 @@ func _validate_20x_scale(playable: PlayableGeneratedShip) -> void:
 		if not is_equal_approx(fire_pixel, expected_hazard_pixel):
 			_fail("2.0x: fire label pixel_size=%.6f expected %.6f" % [fire_pixel, expected_hazard_pixel])
 			return
+	if not _check_vitals_scale(playable, 2.0, "2.0x"): return
 	print("A11Y TEXT SCALE 2.0X PASS font=%d panel=%s marker_pixel=%.6f fire_pixel=%.6f" % [
 		actual_font,
 		str(tracker.custom_minimum_size),
@@ -214,6 +219,22 @@ func _finalize() -> void:
 	finalized = true
 	print("MAIN PLAYABLE TEXT SCALE PASS scales=3 default=1.0x1.5x2.0 runtime_text=present")
 	_cleanup_and_quit(0)
+
+func _check_vitals_scale(playable: PlayableGeneratedShip, scale: float, tag: String) -> bool:
+	var vitals: PlayerVitalsPanel = playable.vitals_panel as PlayerVitalsPanel
+	if vitals == null:
+		_fail("%s: vitals panel missing" % tag)
+		return false
+	var expected_font: int = int(round(float(DEFAULT_BASE_VITALS_FONT_SIZE) * scale))
+	var actual_font: int = int(vitals.label.get_theme_font_size("font_size"))
+	if actual_font != expected_font:
+		_fail("%s: vitals font_size=%d expected %d" % [tag, actual_font, expected_font])
+		return false
+	var expected_cmin: Vector2 = Vector2(DEFAULT_BASE_VITALS_SIZE.x * scale, DEFAULT_BASE_VITALS_SIZE.y * scale)
+	if vitals.custom_minimum_size != expected_cmin:
+		_fail("%s: vitals cmin=%s expected %s" % [tag, str(vitals.custom_minimum_size), str(expected_cmin)])
+		return false
+	return true
 
 func _find_playable(node: Node) -> PlayableGeneratedShip:
 	if node is PlayableGeneratedShip:

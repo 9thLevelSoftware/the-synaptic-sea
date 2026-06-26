@@ -103,6 +103,28 @@ func _initialize() -> void:
 		_fail("inventory summary drain_multiplier with pump should be 0.5, got %s" % str(summary_multiplier_with_pump))
 		return
 
+	# --- PZ soft-cap (slice 2): weight never refuses; capacity/load queries ---
+	var sc := InventoryState.new()
+	sc.add_item("scrap_metal", 20)        # 20 * 5.0 = 100.0 weight, base cap 50.0
+	assert(sc.get_quantity("scrap_metal") == 20, "soft-cap accepted a full stack over weight")
+	assert(sc.is_over_capacity(), "over capacity after overload")
+	assert(sc.get_load_ratio() > 1.0, "load ratio > 1 when overloaded")
+	sc.bonus_capacity = 60.0              # a worn container raises the budget
+	assert(not sc.is_over_capacity(), "container bonus lifts player back under capacity")
+
+	# --- per-container weight reduction (slice D): effective weight feeds ratio ---
+	var wr := InventoryState.new()
+	wr.add_item("scrap_metal", 20)              # 20 * 5.0 = 100.0 raw weight, base cap 50
+	assert(wr.get_total_weight() == 100.0, "raw weight is 100 before reduction")
+	assert(wr.is_over_capacity(), "over capacity before reduction")
+	wr.weight_reduction = 60.0                   # coordinator pushes saved kg
+	assert(absf(wr.get_effective_weight() - 40.0) < 0.0001, "effective = raw - reduction = 40")
+	assert(wr.get_total_weight() == 100.0, "raw weight unchanged by reduction")
+	assert(not wr.is_over_capacity(), "reduction lifts effective under capacity")
+	assert(absf(wr.get_load_ratio() - 0.8) < 0.0001, "load ratio uses effective: 40/50 = 0.8")
+	wr.weight_reduction = 1000.0                 # over-large reduction never goes negative
+	assert(wr.get_effective_weight() == 0.0, "effective weight clamps at 0")
+
 	print("INVENTORY STATE PASS tools=%d pump=%s drain_multiplier=%s" % [
 		tool_ids.size(),
 		str(pump_carried_at_multiplier).to_lower(),

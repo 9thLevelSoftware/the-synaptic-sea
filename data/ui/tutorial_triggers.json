@@ -1,0 +1,77 @@
+{
+  "version": "tutorial-triggers-1",
+  "tutorials": [
+    {
+      "id": "first_move",
+      "trigger_event": "player_moved",
+      "trigger_target": "any",
+      "title": "Movement",
+      "body": "Use WASD or the left stick to move. Hold SHIFT to walk quietly.",
+      "codex_topic": "Survival",
+      "codex_entry_id": "first_move"
+    },
+    {
+      "id": "first_interact",
+      "trigger_event": "player_interacted",
+      "trigger_target": "any",
+      "title": "Interaction",
+      "body": "Walk up to an interactable and press E (or A on gamepad) to use it.",
+      "codex_topic": "Survival",
+      "codex_entry_id": "first_interact"
+    },
+    {
+      "id": "first_inventory_open",
+      "trigger_event": "inventory_opened",
+      "trigger_target": "any",
+      "title": "Inventory",
+      "body": "Press I (or TAB on gamepad) to open your inventory. Drag to move items.",
+      "codex_topic": "Items",
+      "codex_entry_id": "first_inventory_open"
+    },
+    {
+      "id": "first_save",
+      "trigger_event": "run_saved",
+      "trigger_target": "any",
+      "title": "Saving",
+      "body": "Progress auto-saves every checkpoint. Press F5 to save manually.",
+      "codex_topic": "Survival",
+      "codex_entry_id": "first_save"
+    },
+    {
+      "id": "first_travel",
+      "trigger_event": "ship_traveled",
+      "trigger_target": "any",
+      "title": "Travel",
+      "body": "When the lifeboat's propulsion is online, you can travel to other derelicts in the Synapse Sea.",
+      "codex_topic": "Ship Systems",
+      "codex_entry_id": "first_travel"
+    },
+    {
+      "id": "first_objective_complete",
+      "trigger_event": "objective_completed",
+      "trigger_target": "any",
+      "title": "Objectives",
+      "body": "Each derelict carries a sequence of objectives. The current objective shows in the top-left.",
+      "codex_topic": "Exploration",
+      "codex_entry_id": "first_objective_complete"
+    },
+    {
+      "id": "first_hazard",
+      "trigger_event": "hazard_entered",
+      "trigger_target": "fire",
+      "title": "Fire Hazard",
+      "body": "Fire spreads between adjacent rooms. Find an extinguisher or vent it into space.",
+      "codex_topic": "Combat",
+      "codex_entry_id": "first_hazard_fire"
+    },
+    {
+      "id": "first_low_oxygen",
+      "trigger_event": "vitals_warning",
+      "trigger_target": "oxygen_low",
+      "title": "Low Oxygen",
+      "body": "Your suit is leaking oxygen. Find a refill station or return to the lifeboat.",
+      "codex_topic": "Survival",
+      "codex_entry_id": "first_low_oxygen"
+    }
+  ]
+}

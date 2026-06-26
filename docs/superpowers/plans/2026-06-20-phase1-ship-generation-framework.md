@@ -180,7 +180,7 @@ git commit -m "feat(procgen): add ShipBlueprint data class with size/condition/s
 - Test: `scripts/validation/room_graph_smoke.gd`
 
 **Interfaces:**
-- Produces: `RoomGraph` class with `rooms`, `links`, `add_room()`, `add_link()`, `get_connected_rooms()`, `is_connected()`
+- Produces: `RoomGraph` class with `rooms`, `links`, `add_room()`, `add_link()`, `get_connected_rooms()`, `is_fully_connected()`
 
 - [ ] **Step 1: Write the RoomGraph class**
 
@@ -213,7 +213,7 @@ func get_connected_rooms(room_id: String) -> Array[String]:
             connected.append(link["from_room"])
     return connected
 
-func is_connected() -> bool:
+func is_fully_connected() -> bool:
     if rooms.is_empty():
         return true
     
@@ -268,7 +268,7 @@ func _init() -> void:
     
     assert(graph.rooms.size() == 3)
     assert(graph.links.size() == 2)
-    assert(graph.is_connected())
+    assert(graph.is_fully_connected())
     
     var connected := graph.get_connected_rooms("corridor_01")
     assert(connected.size() == 2)
@@ -285,14 +285,14 @@ func _init() -> void:
     graph2.add_room("b", "corridor")
     graph2.add_room("c", "engineering")  # Not connected
     graph2.add_link("a", "b")
-    assert(not graph2.is_connected())
+    assert(not graph2.is_fully_connected())
     
     # Test serialization
     var dict := graph.to_dict()
     var graph3 := RoomGraph.from_dict(dict)
     assert(graph3.rooms.size() == 3)
     assert(graph3.links.size() == 2)
-    assert(graph3.is_connected())
+    assert(graph3.is_fully_connected())
     
     print("ROOM GRAPH PASS rooms=3 links=2 connected=true disconnected_detected=true serialization=true")
     quit(0)
@@ -377,7 +377,7 @@ func _add_required_rooms(graph: RoomGraph, blueprint: ShipBlueprint) -> void:
     if blueprint.size != ShipBlueprint.Size.LIFE_BOAT:
         graph.add_room("bridge_01", "bridge")
 
-func _fill_optional_rooms: RoomGraph, target_count: int) -> void:
+func _fill_optional_rooms(graph: RoomGraph, target_count: int) -> void:
     var current_count := graph.rooms.size()
     var available_roles := OPTIONAL_ROLES.duplicate()
     
@@ -428,7 +428,7 @@ func _init() -> void:
     var bp_life := ShipBlueprint.new(ShipBlueprint.Size.LIFE_BOAT, ShipBlueprint.Condition.DAMAGED, 42)
     var graph_life := generator.generate(bp_life)
     assert(graph_life.rooms.size() >= 2 and graph_life.rooms.size() <= 4)
-    assert(graph_life.is_connected())
+    assert(graph_life.is_fully_connected())
     assert(graph_life.get_rooms_by_role("airlock").size() == 1)
     assert(graph_life.get_rooms_by_role("engineering").size() == 1)
     
@@ -436,14 +436,14 @@ func _init() -> void:
     var bp_small := ShipBlueprint.new(ShipBlueprint.Size.SMALL, ShipBlueprint.Condition.PRISTINE, 123)
     var graph_small := generator.generate(bp_small)
     assert(graph_small.rooms.size() >= 4 and graph_small.rooms.size() <= 8)
-    assert(graph_small.is_connected())
+    assert(graph_small.is_fully_connected())
     assert(graph_small.get_rooms_by_role("bridge").size() == 1)
     
     # Test medium ship generation
     var bp_medium := ShipBlueprint.new(ShipBlueprint.Size.MEDIUM, ShipBlueprint.Condition.WRECKED, 456)
     var graph_medium := generator.generate(bp_medium)
     assert(graph_medium.rooms.size() >= 8 and graph_medium.rooms.size() <= 12)
-    assert(graph_medium.is_connected())
+    assert(graph_medium.is_fully_connected())
     
     # Test deterministic generation (same seed = same result)
     var bp_same := ShipBlueprint.new(ShipBlueprint.Size.SMALL, ShipBlueprint.Condition.DAMAGED, 42)

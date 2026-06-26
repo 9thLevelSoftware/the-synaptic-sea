@@ -1,0 +1,29 @@
+{
+  "demo_blocked_features": [
+    {
+      "feature_id": "cargo_hold.full_inventory",
+      "reason": "Demo build caps cargo slots to 6kg; full build supports 30kg.",
+      "hint": "Demo: 6 kg cap, full build: 30 kg cap."
+    },
+    {
+      "feature_id": "multi_hazard.run",
+      "reason": "Demo seeds carry a single hazard; full build seeds carry up to three.",
+      "hint": "Demo: 1 hazard, full build: up to 3 hazards."
+    },
+    {
+      "feature_id": "long_run.persistence",
+      "reason": "Demo wipes save state after 20 minutes of active play.",
+      "hint": "Demo: 20 min cap, full build: unlimited."
+    },
+    {
+      "feature_id": "world_persistence.cross_run",
+      "reason": "Demo does not persist cross-run world state (ADR-0012 deferred).",
+      "hint": "Demo: per-run only, full build: cross-run persistence."
+    },
+    {
+      "feature_id": "hub.meta_progression",
+      "reason": "Hub/meta progression is deferred through Gate 2 per ADR-0003.",
+      "hint": "Demo: skip hub, full build: skip hub (Gate 3)."
+    }
+  ]
+}

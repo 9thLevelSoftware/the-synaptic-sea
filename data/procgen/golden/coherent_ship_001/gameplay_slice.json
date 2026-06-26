@@ -76,6 +76,10 @@
       "interactable": true
     }
   ],
+  "loot_containers": [
+    { "id": "start_supply_a", "kind": "generic_crate",  "room_id": "maintenance_01", "approach_cell": [6, 1, 1], "loot_table": "repair_parts_starter" },
+    { "id": "start_supply_b", "kind": "generic_locker", "room_id": "medbay_01",      "approach_cell": [7, -1, 1], "loot_table": "salvage_engineering" }
+  ],
   "summary": {
     "objective_count": 4,
     "role_count": 4,

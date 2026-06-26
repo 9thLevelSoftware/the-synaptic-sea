@@ -6,3 +6,5 @@ build/
 exports/
 *.zip
 *.app/
+.godot/
+*.uid

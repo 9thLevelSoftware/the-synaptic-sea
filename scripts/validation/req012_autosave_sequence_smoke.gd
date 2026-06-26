@@ -14,6 +14,13 @@ extends SceneTree
 ## captured the just-completed sequence while the live state had already
 ## advanced.
 ##
+## Per ADR-0012 the single save slot now holds a WorldSnapshot (the
+## single-ship RunSnapshot on-disk format is superseded), so the on-disk
+## file is read via `service.load_world()`; `file=2` is the
+## current_objective_sequence embedded in the world snapshot's home slice.
+## The in-memory snapshot seam (get_last_saved_snapshot) is still a
+## RunSnapshot, so `snapshot=2` is read from it directly.
+##
 ## Pass marker: REQ012 AUTOSAVE SEQUENCE CHECK PASS live=2 snapshot=2 file=2 has_save=true
 ## Fail marker: REQ012 AUTOSAVE CHECK FAIL reason=...
 
@@ -71,10 +78,11 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	var snapshot_sequence: int = -1
 	if last_snapshot != null:
 		snapshot_sequence = last_snapshot.current_objective_sequence
-	var loaded: RunSnapshot = service.load_current_run()
+	var loaded_world = service.load_world()
 	var file_sequence: int = -1
-	if loaded != null:
-		file_sequence = loaded.current_objective_sequence
+	if loaded_world != null:
+		var home_dict: Dictionary = loaded_world.home_ship
+		file_sequence = int(home_dict.get("current_objective_sequence", -1))
 	var has_save: bool = service.has_save()
 	if live_sequence != 2 or not has_save or snapshot_sequence != 2 or file_sequence != 2:
 		_fail("AUTOSAVE SEQUENCE CHECK actual_live=%d actual_snapshot=%d actual_file=%d has_save=%s expected=2" % [live_sequence, snapshot_sequence, file_sequence, str(has_save)])

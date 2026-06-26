@@ -1,0 +1,271 @@
+<svg width="800" height="720" xmlns="http://www.w3.org/2000/svg">
+<rect width="800" height="720" fill="#0a0f16"/>
+<text x="400.0" y="30" text-anchor="middle" fill="#FFD700" font-size="18" font-family="monospace" font-weight="bold">The Synaptic Sea — Ship Layouts</text>
+<text x="400.0" y="48" text-anchor="middle" fill="#7a8a9a" font-size="11" font-family="monospace">█ = derelict (randomized)   gold border = life boat (fixed)</text>
+<g transform="translate(20,60)">
+<rect width="284" height="258" rx="8" fill="#0f1923" stroke="#2a3a4a" stroke-width="1"/>
+<text x="142.0" y="20" text-anchor="middle" fill="#e0d0b0" font-size="13" font-family="monospace" font-weight="bold">Life Boat Standalone</text>
+<rect x="30" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="40" width="54" height="54" rx="3" fill="#3A7CA5" stroke="#FFD700" stroke-width="2"/>
+<text x="225.0" y="63.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Airlock</text>
+<text x="225.0" y="75.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="30" y="40" width="54" height="54" rx="3" fill="#4A9EA0" stroke="#FFD700" stroke-width="2"/>
+<text x="57.0" y="63.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Cockpit</text>
+<text x="57.0" y="75.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="30" y="152" width="54" height="54" rx="3" fill="#C08040" stroke="#FFD700" stroke-width="2"/>
+<text x="57.0" y="175.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Bay</text>
+<text x="57.0" y="187.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="38.0" y="48.0" width="208.0" height="152.0" rx="4" fill="none" stroke="#FFD700" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="41.0" y="44.0" fill="#FFD700" font-size="8" font-family="monospace">LIFE BOAT</text>
+</g>
+<g transform="translate(400,60)">
+<rect width="452" height="370" rx="8" fill="#0f1923" stroke="#2a3a4a" stroke-width="1"/>
+<text x="226.0" y="20" text-anchor="middle" fill="#e0d0b0" font-size="13" font-family="monospace" font-weight="bold">Start Seed 42</text>
+<rect x="30" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="310" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="310" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="310" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="310" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="310" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="366" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="366" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="366" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="366" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="366" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="208" width="54" height="54" rx="3" fill="#4A9EA0" stroke="#FFD700" stroke-width="2"/>
+<text x="225.0" y="231.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Cockpit</text>
+<text x="225.0" y="243.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="198" y="152" width="54" height="54" rx="3" fill="#C08040" stroke="#3a4a5a" stroke-width="1"/>
+<text x="225.0" y="175.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Bay</text>
+<text x="225.0" y="187.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="198" y="40" width="54" height="54" rx="3" fill="#8B5E3C" stroke="#3a4a5a" stroke-width="1"/>
+<text x="225.0" y="63.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Compartment</text>
+<text x="225.0" y="75.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="254" y="208" width="54" height="54" rx="3" fill="#B8976A" stroke="#3a4a5a" stroke-width="1"/>
+<text x="281.0" y="231.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Corridor</text>
+<text x="281.0" y="243.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">2 mod</text>
+<rect x="366" y="208" width="54" height="54" rx="3" fill="#3A7CA5" stroke="#FFD700" stroke-width="2"/>
+<text x="393.0" y="231.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Airlock</text>
+<text x="393.0" y="243.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="366" y="152" width="54" height="54" rx="3" fill="#8B5E3C" stroke="#3a4a5a" stroke-width="1"/>
+<text x="393.0" y="175.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Compartment</text>
+<text x="393.0" y="187.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="30" y="208" width="54" height="54" rx="3" fill="#C08040" stroke="#3a4a5a" stroke-width="1"/>
+<text x="57.0" y="231.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Bay</text>
+<text x="57.0" y="243.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="30" y="152" width="54" height="54" rx="3" fill="#D4A76A" stroke="#3a4a5a" stroke-width="1"/>
+<text x="57.0" y="175.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Quarters</text>
+<text x="57.0" y="187.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">2 mod</text>
+<rect x="142" y="40" width="54" height="54" rx="3" fill="#B8976A" stroke="#3a4a5a" stroke-width="1"/>
+<text x="169.0" y="63.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Corridor</text>
+<text x="169.0" y="75.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">2 mod</text>
+<rect x="142" y="152" width="54" height="54" rx="3" fill="#D4A76A" stroke="#3a4a5a" stroke-width="1"/>
+<text x="169.0" y="175.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Quarters</text>
+<text x="169.0" y="187.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">2 mod</text>
+<rect x="198" y="264" width="54" height="54" rx="3" fill="#C08040" stroke="#FFD700" stroke-width="2"/>
+<text x="225.0" y="287.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Bay</text>
+<text x="225.0" y="299.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="206.0" y="216.0" width="208.0" height="96.0" rx="4" fill="none" stroke="#FFD700" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="209.0" y="212.0" fill="#FFD700" font-size="8" font-family="monospace">LIFE BOAT</text>
+<rect x="38.0" y="48.0" width="376.0" height="208.0" rx="4" fill="none" stroke="#5a7a5a" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="41.0" y="44.0" fill="#5a7a5a" font-size="8" font-family="monospace">DERELICT</text>
+</g>
+<g transform="translate(20,380)">
+<rect width="340" height="482" rx="8" fill="#0f1923" stroke="#2a3a4a" stroke-width="1"/>
+<text x="170.0" y="20" text-anchor="middle" fill="#e0d0b0" font-size="13" font-family="monospace" font-weight="bold">Start Seed 7777</text>
+<rect x="30" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="320" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="376" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="320" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="376" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="320" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="376" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="320" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="376" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="320" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="376" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="264" width="54" height="54" rx="3" fill="#4A9EA0" stroke="#FFD700" stroke-width="2"/>
+<text x="169.0" y="287.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Cockpit</text>
+<text x="169.0" y="299.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="30" y="264" width="54" height="54" rx="3" fill="#D4A76A" stroke="#3a4a5a" stroke-width="1"/>
+<text x="57.0" y="287.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Quarters</text>
+<text x="57.0" y="299.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">2 mod</text>
+<rect x="30" y="208" width="54" height="54" rx="3" fill="#B8976A" stroke="#3a4a5a" stroke-width="1"/>
+<text x="57.0" y="231.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Corridor</text>
+<text x="57.0" y="243.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">2 mod</text>
+<rect x="254" y="208" width="54" height="54" rx="3" fill="#B8976A" stroke="#3a4a5a" stroke-width="1"/>
+<text x="281.0" y="231.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Corridor</text>
+<text x="281.0" y="243.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">2 mod</text>
+<rect x="142" y="208" width="54" height="54" rx="3" fill="#C08040" stroke="#3a4a5a" stroke-width="1"/>
+<text x="169.0" y="231.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Bay</text>
+<text x="169.0" y="243.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="142" y="152" width="54" height="54" rx="3" fill="#8B5E3C" stroke="#3a4a5a" stroke-width="1"/>
+<text x="169.0" y="175.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Compartment</text>
+<text x="169.0" y="187.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="142" y="40" width="54" height="54" rx="3" fill="#B8976A" stroke="#3a4a5a" stroke-width="1"/>
+<text x="169.0" y="63.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Corridor</text>
+<text x="169.0" y="75.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">2 mod</text>
+<rect x="254" y="264" width="54" height="54" rx="3" fill="#3A7CA5" stroke="#FFD700" stroke-width="2"/>
+<text x="281.0" y="287.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Airlock</text>
+<text x="281.0" y="299.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="142" y="376" width="54" height="54" rx="3" fill="#C08040" stroke="#FFD700" stroke-width="2"/>
+<text x="169.0" y="399.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Bay</text>
+<text x="169.0" y="411.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="150.0" y="272.0" width="152.0" height="152.0" rx="4" fill="none" stroke="#FFD700" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="153.0" y="268.0" fill="#FFD700" font-size="8" font-family="monospace">LIFE BOAT</text>
+<rect x="38.0" y="48.0" width="264.0" height="264.0" rx="4" fill="none" stroke="#5a7a5a" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="41.0" y="44.0" fill="#5a7a5a" font-size="8" font-family="monospace">DERELICT</text>
+</g>
+<g transform="translate(400,380)">
+<rect width="452" height="482" rx="8" fill="#0f1923" stroke="#2a3a4a" stroke-width="1"/>
+<text x="226.0" y="20" text-anchor="middle" fill="#e0d0b0" font-size="13" font-family="monospace" font-weight="bold">Start Seed 999</text>
+<rect x="30" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="320" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="30" y="376" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="320" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="86" y="376" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="320" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="376" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="320" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="198" y="376" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="320" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="254" y="376" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="310" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="310" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="310" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="310" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="310" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="310" y="320" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="310" y="376" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="366" y="40" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="366" y="96" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="366" y="152" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="366" y="208" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="366" y="264" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="366" y="320" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="366" y="376" width="54" height="54" rx="2" fill="#151f2a" stroke="#1e2e3e" stroke-width="0.5"/>
+<rect x="142" y="264" width="54" height="54" rx="3" fill="#4A9EA0" stroke="#FFD700" stroke-width="2"/>
+<text x="169.0" y="287.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Cockpit</text>
+<text x="169.0" y="299.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="142" y="208" width="54" height="54" rx="3" fill="#B8976A" stroke="#3a4a5a" stroke-width="1"/>
+<text x="169.0" y="231.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Corridor</text>
+<text x="169.0" y="243.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">2 mod</text>
+<rect x="142" y="152" width="54" height="54" rx="3" fill="#8B5E3C" stroke="#3a4a5a" stroke-width="1"/>
+<text x="169.0" y="175.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Compartment</text>
+<text x="169.0" y="187.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="198" y="208" width="54" height="54" rx="3" fill="#C08040" stroke="#3a4a5a" stroke-width="1"/>
+<text x="225.0" y="231.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Bay</text>
+<text x="225.0" y="243.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="198" y="264" width="54" height="54" rx="3" fill="#C08040" stroke="#3a4a5a" stroke-width="1"/>
+<text x="225.0" y="287.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Bay</text>
+<text x="225.0" y="299.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="366" y="264" width="54" height="54" rx="3" fill="#8B5E3C" stroke="#3a4a5a" stroke-width="1"/>
+<text x="393.0" y="287.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Compartment</text>
+<text x="393.0" y="299.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="30" y="264" width="54" height="54" rx="3" fill="#D4A76A" stroke="#3a4a5a" stroke-width="1"/>
+<text x="57.0" y="287.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Quarters</text>
+<text x="57.0" y="299.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">2 mod</text>
+<rect x="30" y="208" width="54" height="54" rx="3" fill="#8B5E3C" stroke="#3a4a5a" stroke-width="1"/>
+<text x="57.0" y="231.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Compartment</text>
+<text x="57.0" y="243.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="198" y="152" width="54" height="54" rx="3" fill="#D4A76A" stroke="#3a4a5a" stroke-width="1"/>
+<text x="225.0" y="175.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Quarters</text>
+<text x="225.0" y="187.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">2 mod</text>
+<rect x="198" y="40" width="54" height="54" rx="3" fill="#B8976A" stroke="#3a4a5a" stroke-width="1"/>
+<text x="225.0" y="63.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Corridor</text>
+<text x="225.0" y="75.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">2 mod</text>
+<rect x="254" y="264" width="54" height="54" rx="3" fill="#3A7CA5" stroke="#FFD700" stroke-width="2"/>
+<text x="281.0" y="287.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Airlock</text>
+<text x="281.0" y="299.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="142" y="376" width="54" height="54" rx="3" fill="#C08040" stroke="#FFD700" stroke-width="2"/>
+<text x="169.0" y="399.0" text-anchor="middle" fill="#fff" font-size="9" font-family="monospace" font-weight="bold">Bay</text>
+<text x="169.0" y="411.0" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="8" font-family="monospace">3 mod</text>
+<rect x="150.0" y="272.0" width="152.0" height="152.0" rx="4" fill="none" stroke="#FFD700" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="153.0" y="268.0" fill="#FFD700" font-size="8" font-family="monospace">LIFE BOAT</text>
+<rect x="38.0" y="48.0" width="376.0" height="264.0" rx="4" fill="none" stroke="#5a7a5a" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="41.0" y="44.0" fill="#5a7a5a" font-size="8" font-family="monospace">DERELICT</text>
+</g>
+</svg>

@@ -15,6 +15,7 @@ var layout_doc: Dictionary = {}
 var kit_doc: Dictionary = {}
 var gameplay_doc: Dictionary = {}
 var objective_specs: Array = []
+var loot_container_specs: Array = []
 var objective_volumes: Array = []
 var landmark_nodes: Array[Node3D] = []
 var blocked_route_nodes: Array[Node3D] = []
@@ -39,6 +40,7 @@ func clear_loaded_ship() -> void:
 	kit_doc = {}
 	gameplay_doc = {}
 	objective_specs = []
+	loot_container_specs = []
 	objective_volumes = []
 	landmark_nodes = []
 	blocked_route_nodes = []
@@ -102,6 +104,8 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 	objective_specs = _build_objective_specs(layout_doc, gameplay_doc, gameplay_slice_abs)
 	if objective_specs.is_empty():
 		return _fail_load("gameplay slice contains no valid objectives: %s" % gameplay_slice_abs)
+
+	loot_container_specs = _build_loot_container_specs(layout_doc, gameplay_doc)
 
 	start_position = _room_center(rooms, start_room_id)
 	goal_position = _room_center(rooms, goal_room_id)
@@ -172,6 +176,10 @@ func has_loaded_ship() -> bool:
 	return structural_root != null and not objective_specs.is_empty() and start_position != Vector3.INF and goal_position != Vector3.INF
 
 
+func get_layout_copy() -> Dictionary:
+	return layout_doc.duplicate(true)
+
+
 func get_start_transform() -> Transform3D:
 	var spawn_position: Vector3 = start_position
 	if spawn_position == Vector3.INF:
@@ -185,6 +193,10 @@ func get_goal_position() -> Vector3:
 
 func get_objective_specs_copy() -> Array:
 	return objective_specs.duplicate(true)
+
+
+func get_loot_container_specs_copy() -> Array:
+	return loot_container_specs.duplicate(true)
 
 
 func count_collision_shapes() -> int:
@@ -347,20 +359,57 @@ func _build_objective_specs(layout_doc: Dictionary, gameplay_doc: Dictionary, ga
 					"position": step_position,
 				})
 
-		objective_specs.append(
-			{
-				"id": objective_id,
-				"sequence": sequence,
-				"type": str(objective.get("type", "unknown")),
-				"kind": kind,
-				"room_id": room_id,
-				"position": target_position,
-				"radius": OBJECTIVE_TRIGGER_RADIUS,
-				"steps": step_specs,
-			}
-		)
+		var spec: Dictionary = {
+			"id": objective_id,
+			"sequence": sequence,
+			"type": str(objective.get("type", "unknown")),
+			"kind": kind,
+			"room_id": room_id,
+			"position": target_position,
+			"radius": OBJECTIVE_TRIGGER_RADIUS,
+			"steps": step_specs,
+		}
+		if objective.has("loot_table"):
+			spec["loot_table"] = str(objective.get("loot_table", ""))
+		objective_specs.append(spec)
 
 	return objective_specs
+
+
+func _build_loot_container_specs(layout_doc: Dictionary, gameplay_doc: Dictionary) -> Array:
+	var rooms_variant: Variant = layout_doc.get("rooms", [])
+	if typeof(rooms_variant) != TYPE_ARRAY:
+		return []
+	var rooms: Array = rooms_variant
+	var containers_variant: Variant = gameplay_doc.get("loot_containers", [])
+	if typeof(containers_variant) != TYPE_ARRAY:
+		return []
+	var out: Array = []
+	for c_variant in (containers_variant as Array):
+		if typeof(c_variant) != TYPE_DICTIONARY:
+			continue
+		var c: Dictionary = c_variant
+		var cid: String = str(c.get("id", ""))
+		var room_id: String = str(c.get("room_id", ""))
+		if cid.is_empty() or room_id.is_empty():
+			continue
+		var room: Dictionary = _find_room(rooms, room_id)
+		if room.is_empty():
+			continue
+		var approach_variant: Variant = c.get("approach_cell", [])
+		if typeof(approach_variant) != TYPE_ARRAY or (approach_variant as Array).size() < 3:
+			continue
+		var pos: Vector3 = _room_cell_world(room, approach_variant as Array)
+		if pos == Vector3.INF:
+			continue
+		out.append({
+			"id": cid,
+			"kind": str(c.get("kind", "generic_crate")),
+			"room_id": room_id,
+			"loot_table": str(c.get("loot_table", "generic_crate")),
+			"position": pos,
+		})
+	return out
 
 
 func _find_room(rooms: Array, room_id: String) -> Dictionary:
@@ -723,6 +772,18 @@ func get_room_links() -> Array:
 		if typeof(link) != TYPE_DICTIONARY:
 			continue
 		out.append((link as Dictionary).duplicate(true))
+	return out
+
+
+func get_encounter_markers() -> Array:
+	var out: Array = []
+	var raw: Variant = layout_doc.get("encounters", [])
+	if typeof(raw) != TYPE_ARRAY:
+		return out
+	for entry in (raw as Array):
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		out.append((entry as Dictionary).duplicate(true))
 	return out
 
 
