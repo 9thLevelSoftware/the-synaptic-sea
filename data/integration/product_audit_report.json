@@ -67,7 +67,7 @@
       "evidence": [
         "Kanban card t_cc483347 fixed the original rigid-pair/claim-persistence regression timeout.",
         "Task 14 retry closed the same validation precondition class in `recursive_travel_smoke.gd` and `bay_travel_unbay_smoke.gd`, and isolated `vitals_state_save_load_smoke.gd` from live threat damage.",
-        "The full regression bundle from docs/game/06_validation_plan.md now emits `SYNAPSE_SEA REGRESSION PASS commands=163 clean_output=true` with exit code 0."
+        "The full regression bundle from docs/game/06_validation_plan.md now emits `SYNAPTIC_SEA REGRESSION PASS commands=163 clean_output=true` with exit code 0."
       ]
     },
     {

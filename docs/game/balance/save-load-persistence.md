@@ -1,6 +1,6 @@
 # Save/Load Persistence — Tuning Notes (Task 11)
 
-Authored by synapse_seaworker on 2026-06-25 as part of Task 11
+Authored by synaptic_seaworker on 2026-06-25 as part of Task 11
 (Save/Load, Persistence, Multi-Slot, Auto-Save & Cloud Readiness).
 
 These numbers are picked to keep the persistence layer cheap (no

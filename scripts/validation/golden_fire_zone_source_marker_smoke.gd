@@ -6,7 +6,7 @@ extends SceneTree
 # FIRE_ZONE_FALLBACK_ROOM_ID constant points at the same room id.
 #
 # Headless: /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless
-#   --path /Users/christopherwilloughby/the-synapse-sea-of-stars
+#   --path /Users/christopherwilloughby/the-synaptic-sea-of-stars
 #   --script res://scripts/validation/golden_fire_zone_source_marker_smoke.gd
 #
 # Pass marker: GOLDEN FIRE ZONE SOURCE MARKER PASS marker_room=cargo_01

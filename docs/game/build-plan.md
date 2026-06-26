@@ -1,18 +1,18 @@
-# Synapse Sea Kanban Build Plan
+# Synaptic Sea Kanban Build Plan
 
 ## Board
 
-`synapse-sea-stage-gate`
+`synaptic-sea-stage-gate`
 
 ## Purpose
 
-Convert the Synapse Sea operating model into a durable execution queue for Gate 1 and future milestone work.
+Convert the Synaptic Sea operating model into a durable execution queue for Gate 1 and future milestone work.
 
 ## Profiles
 
-- `synapse_sea_worker` — scoped Godot implementation worker.
-- `synapse_sea_docs` — documentation/planning worker.
-- `synapse_sea_review` — review and gate-check worker.
+- `synaptic_sea_worker` — scoped Godot implementation worker.
+- `synaptic_sea_docs` — documentation/planning worker.
+- `synaptic_sea_review` — review and gate-check worker.
 - `default` — GPT-5.5 coordinator/final integrator.
 
 ## Board strategy
@@ -25,7 +25,7 @@ The repository is currently not a git workspace, so shared-workspace concurrency
 
 - Create docs/game operating model.
 - Create ADR-0001.
-- Create Synapse Sea profiles.
+- Create Synaptic Sea profiles.
 - Create board and task graph.
 - Verify MCP/tooling state.
 
@@ -59,4 +59,4 @@ Every card must include objective, source requirements, scope, out of scope, ste
 
 The task graph manifest lives at:
 
-`.omh/kanban/synapse-sea-stage-gate-task-graph.json`
+`.omh/kanban/synaptic-sea-stage-gate-task-graph.json`

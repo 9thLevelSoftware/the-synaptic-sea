@@ -10,7 +10,7 @@ Task: `t_c7ac4d08`
 - `docs/game/05_requirements.md` — no `REQ-DOC-001..008` rows existed; Task 15 appends them.
 - `docs/game/06_validation_plan.md` — no Task 15 focused validators existed; Task 15 registers three Python smokes.
 - `.omh/kanban/synaptic-sea-e2e-systems-task-graph.json` — task ids and declared package edges were real; board counts needed explicit current capture.
-- `.omh/kanban/synapse-sea-stage-gate-task-graph.json` — historical bootstrap manifest; Task 15 marks the active current manifest instead of treating this as the E2E graph.
+- `.omh/kanban/synaptic-sea-stage-gate-task-graph.json` — historical bootstrap manifest; Task 15 marks the active current manifest instead of treating this as the E2E graph.
 
 ## Chosen extension seams
 

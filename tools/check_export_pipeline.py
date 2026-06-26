@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static validation for the Synapse Sea release export pipeline."""
+"""Static validation for the Synaptic Sea release export pipeline."""
 
 from __future__ import annotations
 
@@ -11,9 +11,9 @@ from pathlib import Path
 
 REQUIRED_PRESETS = {
     "web": ("Web", "build/exports/web/index.html"),
-    "linux": ("Linux", "build/exports/linux/synapse-sea-of-stars.x86_64"),
-    "macos": ("macOS", "build/exports/macos/synapse-sea-of-stars.zip"),
-    "windows": ("Windows Desktop", "build/exports/windows/synapse-sea-of-stars.exe"),
+    "linux": ("Linux", "build/exports/linux/synaptic-sea-of-stars.x86_64"),
+    "macos": ("macOS", "build/exports/macos/synaptic-sea-of-stars.zip"),
+    "windows": ("Windows Desktop", "build/exports/windows/synaptic-sea-of-stars.exe"),
 }
 
 
@@ -63,7 +63,7 @@ def main(argv: list[str]) -> int:
     for preset_name in REQUIRED_PRESETS:
         if preset_name not in script_text:
             fail(f"build script does not mention preset {preset_name!r}")
-    for token in ("SYNAPSE_SEA_VERSION", "BUILD_STAMP", "godot-4.6.2"):
+    for token in ("SYNAPTIC_SEA_VERSION", "BUILD_STAMP", "godot-4.6.2"):
         if token not in script_text:
             fail(f"build script missing {token}")
 

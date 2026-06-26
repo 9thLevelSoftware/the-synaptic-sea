@@ -2,7 +2,7 @@
 
 Date: 2026-06-21
 Status: Approved for implementation
-Parent spec: `docs/superpowers/specs/2026-06-20-synapse-sea-core-systems-design.md` (System 4 + System 8)
+Parent spec: `docs/superpowers/specs/2026-06-20-synaptic-sea-core-systems-design.md` (System 4 + System 8)
 Integrates: Phase 2 ship systems (`ShipSystemsManager`), Phase 3 progression (`scanner_operation` skill), procgen (`ShipGenerator.generate_from_seed`)
 
 ---
@@ -10,7 +10,7 @@ Integrates: Phase 2 ship systems (`ShipSystemsManager`), Phase 3 progression (`s
 ## Goal
 
 Build the deterministic logic for ship discovery and menu travel: a procedurally generated,
-infinite Synapse Sea of ship markers; a scanner whose reach/detail is gated by the ship's
+infinite Synaptic Sea of ship markers; a scanner whose reach/detail is gated by the ship's
 navigation/scanners systems and the player's `scanner_operation` skill; and a travel/docking action
 that materializes a real ship from a marker's seed via the existing procgen pipeline.
 
@@ -21,7 +21,7 @@ that materializes a real ship from a marker's seed via the existing procgen pipe
 - **End-to-end proof:** a headless smoke drives scan → select marker → `generate_from_seed` → a real
   ship `Node3D`.
 - **No `RunSnapshot` integration this phase.** Each model exposes `get_summary`/`apply_summary`
-  (round-trip validated by smokes), but wiring the Synapse Sea world into a save belongs to a later
+  (round-trip validated by smokes), but wiring the Synaptic Sea world into a save belongs to a later
   world↔slice integration: the current `RunSnapshot` is the *single-ship-slice* save, and the
   meta-world that wraps it does not exist yet. No `RunSnapshot`/ADR/`summaries` churn here.
 - **No coordinator (`PlayableGeneratedShip`) changes.** Phase 4 sits above the single-ship slice; it
@@ -40,7 +40,7 @@ ship-in-ship docking (Phase 5).
 ```
 ShipMarker (RefCounted, pure data)        scripts/systems/ship_marker.gd
 MarkerGenerator (RefCounted, deterministic) scripts/systems/marker_generator.gd
-Synapse SeaWorld (RefCounted)                scripts/systems/synapse_sea_world.gd
+Synaptic SeaWorld (RefCounted)                scripts/systems/synaptic_sea_world.gd
 ScannerState (RefCounted)                 scripts/systems/scanner_state.gd
 TravelController (RefCounted)             scripts/systems/travel_controller.gd
 ```
@@ -53,7 +53,7 @@ determinism). Enums mirror `ShipBlueprint` (`Size`: LIFE_BOAT=0/SMALL=1/MEDIUM=2
 
 ```gdscript
 var marker_id: String      # stable: "%d:%d:%d" % [cell.x, cell.y, index]
-var position: Vector3      # in Synapse Sea space
+var position: Vector3      # in Synaptic Sea space
 var size_class: int        # ShipBlueprint.Size
 var condition: int         # ShipBlueprint.Condition
 var ship_type: String      # flavor: "shuttle"/"freighter"/"science_vessel"/"derelict_hauler"
@@ -62,12 +62,12 @@ func to_dict() -> Dictionary
 static func from_dict(d: Dictionary) -> ShipMarker
 ```
 
-`distance` is derived against the player position by `Synapse SeaWorld`, never stored.
+`distance` is derived against the player position by `Synaptic SeaWorld`, never stored.
 
 ### `MarkerGenerator` (deterministic, infinite)
 
 ```gdscript
-const CELL_SIZE := 100.0          # Synapse Sea-space units per grid cell
+const CELL_SIZE := 100.0          # Synaptic Sea-space units per grid cell
 const MARKERS_PER_CELL := 3       # markers placed per cell
 
 ## Markers for one integer grid cell. Same (world_seed, cell) -> identical markers.
@@ -78,11 +78,11 @@ static func cell_seed(world_seed: int, cell: Vector2i) -> int     # stable spati
 
 `cell_seed` uses a fixed spatial hash (not `hash()`): `world_seed ^ (cell.x * 73856093) ^
 (cell.y * 19349663)`. A `RandomNumberGenerator` seeded with `cell_seed` then places each marker:
-position within the cell (x,z in world units; y=0 — Synapse Sea travel is planar), `seed_value` from
+position within the cell (x,z in world units; y=0 — Synaptic Sea travel is planar), `seed_value` from
 `rng.randi()`, and `size_class`/`condition`/`ship_type` from weighted picks. Marker grid is the X–Z
 plane (locked-iso convention); `position.y` is always 0.
 
-### `Synapse SeaWorld`
+### `Synaptic SeaWorld`
 
 ```gdscript
 var world_seed: int
@@ -178,7 +178,7 @@ wiring assembles these from the real systems.
 1. **`marker_generator_smoke.gd`** — `markers_for_cell(seed, cell)` is deterministic (two calls
    equal); different cells yield different marker sets; `MARKERS_PER_CELL` markers per cell with
    in-cell positions and distinct `seed_value`s; `cell_seed` stable.
-2. **`synapse_sea_world_smoke.gd`** — `markers_in_range(radius)` returns markers within radius sorted by
+2. **`synaptic_sea_world_smoke.gd`** — `markers_in_range(radius)` returns markers within radius sorted by
    ascending distance, deduped; a marker beyond radius is excluded; `mark_generated`/`is_generated`;
    `get_summary`/`apply_summary` round-trip (`world_seed`, position, generated ids).
 3. **`scanner_state_smoke.gd`** — navigation offline → empty, detail 0; scanners offline → detail 1,
@@ -189,12 +189,12 @@ wiring assembles these from the real systems.
    ok → `success`, `ship` is a non-null `Node3D`, and the world records the new position + generated
    id. Frees the generated ship to avoid leak warnings.
 5. Register all four in `docs/game/06_validation_plan.md` (`commands=54` → `58`); full bundle must
-   end `SYNAPSE_SEA REGRESSION PASS ... clean_output=true`; Gate-1 playtest still passes.
+   end `SYNAPTIC_SEA REGRESSION PASS ... clean_output=true`; Gate-1 playtest still passes.
 
 ## File structure
 
 - Create: `scripts/systems/ship_marker.gd`, `scripts/systems/marker_generator.gd`,
-  `scripts/systems/synapse_sea_world.gd`, `scripts/systems/scanner_state.gd`,
+  `scripts/systems/synaptic_sea_world.gd`, `scripts/systems/scanner_state.gd`,
   `scripts/systems/travel_controller.gd`
 - Create: the 4 validation smokes above
 - Modify: `docs/game/06_validation_plan.md` (register 4 smokes, bump count)

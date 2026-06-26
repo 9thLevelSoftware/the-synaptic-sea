@@ -4,7 +4,7 @@
 
 - Engine: Godot 4.6.2.
 - Godot binary: `/Users/christopherwilloughby/.local/bin/godot-4.6.2`.
-- Project root: `/Users/christopherwilloughby/the-synapse-sea-of-stars`.
+- Project root: `/Users/christopherwilloughby/the-synaptic-sea-of-stars`.
 - Current workspace is not a git repository; use no-git ledgers until that changes.
 
 ## Architecture principles
@@ -44,8 +44,8 @@ Enabled and useful:
 - `gdai` MCP for live Godot editor state, screenshots, scene/script manipulation, errors, and simulated input.
 
 GDAI notes:
-- Synapse Sea-local addon path: `res://addons/gdai-mcp-plugin-godot/`.
-- Hermes config runs `/Users/christopherwilloughby/.local/bin/uv run /Users/christopherwilloughby/the-synapse-sea-of-stars/addons/gdai-mcp-plugin-godot/gdai_mcp_server.py`.
+- Synaptic Sea-local addon path: `res://addons/gdai-mcp-plugin-godot/`.
+- Hermes config runs `/Users/christopherwilloughby/.local/bin/uv run /Users/christopherwilloughby/the-synaptic-sea-of-stars/addons/gdai-mcp-plugin-godot/gdai_mcp_server.py`.
 - Godot editor must be running with the plugin active; otherwise `hermes mcp test gdai` can time out or show no tools.
 - GDAI listens on `127.0.0.1:3571` by default.
 - The addon is paid/local tooling and is ignored by `.gitignore`; do not publish it in a public repository.

@@ -193,7 +193,7 @@ func _compose_text() -> String:
 	# alternate-binding expansion.
 	const CONTROLS_LINE: String = "Controls: WASD or Arrows move / E or Enter or Space interact / F5 save / F9 load"
 	var lines: PackedStringArray = PackedStringArray()
-	lines.append("Synapse Sea First Playable")
+	lines.append("Synaptic Sea First Playable")
 	lines.append(CONTROLS_LINE)
 	lines.append("Progress: %d/%d" % [completed_sequences.size(), objectives.size()])
 	if system_status_lines.size() > 0:

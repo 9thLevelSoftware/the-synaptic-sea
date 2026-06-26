@@ -7,7 +7,7 @@ const DEFAULT_PLAYABLE_SHIP_SCENE: PackedScene = preload("res://scenes/procgen/p
 var playable_instance: PlayableGeneratedShip
 
 func _ready() -> void:
-	print("The Synapse Sea coherent proof ship bootstrap loaded.")
+	print("The Synaptic Sea coherent proof ship bootstrap loaded.")
 	if playable_ship_scene == null:
 		push_error("MAIN BOOT FAIL reason=missing playable_ship_scene")
 		return

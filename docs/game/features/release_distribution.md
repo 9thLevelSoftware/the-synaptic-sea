@@ -26,11 +26,11 @@ Approved for Gate 3 implementation (Task 13)
 
 ## Player fantasy
 
-The player launches a fully-tested build of **The Synapse Sea** on whichever storefront they chose (itch.io Web demo, Steam Windows/Linux/macOS), in their preferred language (English at launch), sees consistent credits and achievements across platforms, and gets a working demo that gates non-story content without crashing. After launch, every shipping concern (saves, achievements, demo, localization, crash bundle, release ledger) has a runtime seam rather than a hand-coded checklist.
+The player launches a fully-tested build of **The Synaptic Sea** on whichever storefront they chose (itch.io Web demo, Steam Windows/Linux/macOS), in their preferred language (English at launch), sees consistent credits and achievements across platforms, and gets a working demo that gates non-story content without crashing. After launch, every shipping concern (saves, achievements, demo, localization, crash bundle, release ledger) has a runtime seam rather than a hand-coded checklist.
 
 ## Gameplay problem
 
-The Synapse Sea shipped its Gate 2 vertical slice without:
+The Synaptic Sea shipped its Gate 2 vertical slice without:
 
 - A real export-pipeline validation (the existing `export_presets.cfg` is unvalidated; a bad preset path would only surface at release time).
 - Achievements at all — Steam achievements require a real, data-driven catalog and unlock events triggered by gameplay milestones.

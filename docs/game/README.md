@@ -1,11 +1,11 @@
-# Synapse Sea Game Development Operating System
+# Synaptic Sea Game Development Operating System
 
-This folder is the canonical source of truth for The Synapse Sea design, technical structure, gates, requirements, and validation.
+This folder is the canonical source of truth for The Synaptic Sea design, technical structure, gates, requirements, and validation.
 
 The operating model is:
 
 - Stage-Gate governance for milestone decisions.
-- Kanban execution on the `synapse-sea-stage-gate` board.
+- Kanban execution on the `synaptic-sea-stage-gate` board.
 - Living GDD/TDD/requirements documents.
 - ADRs for architecture decisions.
 - Godot validation gates for every completion claim.

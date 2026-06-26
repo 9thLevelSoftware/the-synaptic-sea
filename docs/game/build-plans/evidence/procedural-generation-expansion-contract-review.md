@@ -44,7 +44,7 @@ reuses so the pipeline remains backward-compatible.
 - `data/procgen/templates/dispersed.json`
 - `data/procgen/templates/derelict_a.json`
 - `data/procgen/templates/derelict_b.json`
-- `data/procgen/biomes/abyssal_synapse_sea.json`
+- `data/procgen/biomes/abyssal_synaptic_sea.json`
 - `data/procgen/biomes/breach_field.json`
 - `data/procgen/biomes/dead_fleet.json`
 - `data/procgen/difficulty/standard.json`

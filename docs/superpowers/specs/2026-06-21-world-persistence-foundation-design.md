@@ -3,7 +3,7 @@
 Date: 2026-06-21
 Status: Approved (pre-implementation)
 Phase: Sub-project #1 of the "target session loop" decomposition (precedes Phase 5 docking)
-Related: ADR-0007 (save/load scope), ADR-0011 (ShipInstance & travel integration), `docs/superpowers/specs/2026-06-20-synapse-sea-core-systems-design.md` (System 5/8)
+Related: ADR-0007 (save/load scope), ADR-0011 (ShipInstance & travel integration), `docs/superpowers/specs/2026-06-20-synaptic-sea-core-systems-design.md` (System 5/8)
 
 ## Why this sub-project exists
 
@@ -37,7 +37,7 @@ structure defined here.
 
 ## Starting point (current code)
 
-- `scripts/systems/synapse_sea_world.gd` — `Synapse SeaWorld`: `world_seed`, map-space
+- `scripts/systems/synaptic_sea_world.gd` — `Synaptic SeaWorld`: `world_seed`, map-space
   `player_position`, `generated_marker_ids` (set of materialized markers), with
   `get_summary()`/`apply_summary()`. Holds no per-ship state. Markers are regenerated
   deterministically from `world_seed`.
@@ -83,7 +83,7 @@ State survives; memory does not bloat.
 
 ```
 WorldSnapshot
-├── world_summary             # Synapse SeaWorld.get_summary()
+├── world_summary             # Synaptic SeaWorld.get_summary()
 ├── home_ship                 # a RunSnapshot dict (home-ship slice — RunSnapshot unchanged)
 ├── visited_ships             # { marker_id -> per-ship slice dict }   (NEW)
 ├── current_location          # "" = home, else marker_id
@@ -111,7 +111,7 @@ the **active** ship holds a live `scene_root` in the tree.
 ### Travel becomes persist-and-restore
 
 - **First visit to a marker:** generate from seed, build a `ShipInstance`, register it in
-  `visited_ships`, make it the active ship. (`Synapse SeaWorld.mark_generated` still records the
+  `visited_ships`, make it the active ship. (`Synaptic SeaWorld.mark_generated` still records the
   marker.)
 - **Leaving a derelict:** capture any live-node state back into the `ShipInstance` summaries,
   free its `scene_root` (geometry is regenerable), keep the `ShipInstance` (state) in the
@@ -135,7 +135,7 @@ sub-project, the full `RunSnapshot` capture for the home ship), `current_locatio
 player's scene-space position. `SaveLoadService` serializes the `WorldSnapshot` to the
 single slot.
 
-Load rebuilds: apply `world_summary` to `Synapse SeaWorld`, restore the `visited_ships`
+Load rebuilds: apply `world_summary` to `Synaptic SeaWorld`, restore the `visited_ships`
 registry from the slices, rebuild the home ship from its `RunSnapshot`, then — based on
 `current_location` — make the home ship or the named derelict active (rebuilding that
 derelict's scene from its slice) and re-home the player at `player_position_in_ship`.
@@ -145,7 +145,7 @@ slots remain out of scope.
 
 ### Coordinate spaces (unchanged separation, both persisted)
 
-Map space (`Synapse SeaWorld.player_position`, in `world_summary`) and scene space
+Map space (`Synaptic SeaWorld.player_position`, in `world_summary`) and scene space
 (`player_position_in_ship`) are separate and both serialized. Each ship is instantiated at
 the coordinator's local origin; `player_position_in_ship` is relative to the active ship.
 

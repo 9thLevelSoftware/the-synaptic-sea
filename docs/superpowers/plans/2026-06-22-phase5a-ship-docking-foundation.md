@@ -589,7 +589,7 @@ func _on_frame() -> void:
 
 func _validate(p) -> void:
 	# Pick any in-range marker and travel.
-	var world = p.get_synapse_sea_world()
+	var world = p.get_synaptic_sea_world()
 	var in_range: Array = world.markers_in_range(p.scanner_state.range_radius)
 	if in_range.is_empty(): _fail("no markers in range"); return
 	# Force propulsion operational so travel is allowed (foundation test, not gate test).
@@ -743,7 +743,7 @@ func _run(p) -> void:
 		var sys = mgr.get_system(sid)
 		if sys != null:
 			for sub in sys.subcomponents: mgr.force_repair(sid, sub.subcomponent_id)
-	var world = p.get_synapse_sea_world()
+	var world = p.get_synaptic_sea_world()
 	var ir: Array = world.markers_in_range(p.scanner_state.range_radius)
 	if ir.is_empty(): _fail("no markers"); return
 	if not bool(p.travel_to_marker_id(String(ir[0].marker_id)).get("success", false)):
@@ -999,7 +999,7 @@ Add to the regression bundle in `docs/game/06_validation_plan.md` (follow the ex
 
 - [ ] **Step 2: Run the full bundle**
 
-Run the bundle block from `docs/game/06_validation_plan.md` with `GODOT`/`ROOT` set to the Windows values. Expected final line: `SYNAPSE_SEA REGRESSION PASS commands=81 clean_output=true`. Then Gate-1: `--script res://scripts/validation/gate1_automated_playtest.gd` → `GATE 1 AUTOMATED PLAYTEST PASS`, `pass_decision=GO`. Fix any unallowlisted `ERROR:`/`WARNING:` before proceeding.
+Run the bundle block from `docs/game/06_validation_plan.md` with `GODOT`/`ROOT` set to the Windows values. Expected final line: `SYNAPTIC_SEA REGRESSION PASS commands=81 clean_output=true`. Then Gate-1: `--script res://scripts/validation/gate1_automated_playtest.gd` → `GATE 1 AUTOMATED PLAYTEST PASS`, `pass_decision=GO`. Fix any unallowlisted `ERROR:`/`WARNING:` before proceeding.
 
 - [ ] **Step 3: Write ADR-0016**
 

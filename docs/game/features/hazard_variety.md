@@ -116,13 +116,13 @@ REQ-006 solved "one depleting resource" pressure. Gate 2 needs a second hazard p
 
 - Direct model smoke:
   ```bash
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/fire_state_smoke.gd
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/fire_state_smoke.gd
   ```
   Expected marker: `FIRE STATE PASS cycles=2 phases=4 passability_switches=4`
 
 - Main-scene smoke:
   ```bash
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_fire_smoke.gd
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_fire_smoke.gd
   ```
   Expected marker: `MAIN PLAYABLE FIRE PASS state=CLEARED cycles=2 blocked_burning=true blocked_cleared=false`
 

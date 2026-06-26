@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the first player-controllable generated-ship prototype slice for The Synapse Sea.
+**Goal:** Build the first player-controllable generated-ship prototype slice for The Synaptic Sea.
 
 **Architecture:** Keep the existing procgen loader and debug runner intact, then wrap them with a new playable scene that owns player spawn, locked-isometric camera, input, interactables, and playability validation. Existing deterministic seed-17 runtime/gameplay/walkthrough smokes remain regression gates while a new playable smoke proves the player-facing path independently.
 
@@ -10,13 +10,13 @@
 
 ## Global Constraints
 
-- Godot project root: `/Users/christopherwilloughby/the-synapse-sea-of-stars`.
+- Godot project root: `/Users/christopherwilloughby/the-synaptic-sea-of-stars`.
 - Procgen infra root: `/Users/christopherwilloughby/off-the-rails-ai-infra`.
 - Godot binary: `/Users/christopherwilloughby/.local/bin/godot-4.6.2`.
 - Deterministic first fixture: `res://data/procgen/smoke/seed_000017/layout.json`, `res://data/procgen/smoke/seed_000017/gameplay_slice.json`, `res://data/kits/ship_structural_v0.json`.
 - Preserve existing debug route validation: `procgen_runtime_demo_smoke.gd`, `procgen_ship_gameplay_smoke.gd`, and `procgen_ship_walkthrough_smoke.gd` must continue to pass.
 - No combat, inventory, economy, save/load, hub-ship state machine, production art, broad topology rewrite, or random-seed gameplay claim in this plan.
-- The workspaces are not git repositories at plan time. Each task includes a commit-or-log step that commits when git exists and otherwise appends exact changed paths to `/tmp/synapse_sea_playable_no_git_changes.log`.
+- The workspaces are not git repositories at plan time. Each task includes a commit-or-log step that commits when git exists and otherwise appends exact changed paths to `/tmp/synaptic_sea_playable_no_git_changes.log`.
 
 ---
 
@@ -24,30 +24,30 @@
 
 ### New Godot files
 
-- `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/player/player_controller.gd`
+- `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/player/player_controller.gd`
   - Owns placeholder player movement, interact input, collision body setup, and a test helper for scripted movement.
-- `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/camera/iso_camera_rig.gd`
+- `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/camera/iso_camera_rig.gd`
   - Owns the locked-isometric follow camera. Does not parse procgen data.
-- `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/interaction/interactable.gd`
+- `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/interaction/interactable.gd`
   - Owns player-in-range detection and interact completion signals for objective/portal targets.
-- `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/playable_generated_ship.gd`
+- `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/playable_generated_ship.gd`
   - Coordinates loader, player, camera, objective tracker, and interactable nodes for the playable generated-ship slice.
-- `/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/procgen/playable_generated_ship.tscn`
+- `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/procgen/playable_generated_ship.tscn`
   - Minimal scene resource that attaches `PlayableGeneratedShip`.
-- `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/playable_component_smoke.gd`
+- `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/playable_component_smoke.gd`
   - Headless component smoke for player, camera, and interactable scripts.
-- `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_playable_ship_smoke.gd`
+- `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_playable_ship_smoke.gd`
   - Headless playable generated-ship smoke.
-- `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_playable_ship_capture.gd`
+- `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_playable_ship_capture.gd`
   - Headless-or-windowed capture proof for the playable scene.
 
 ### Modified Godot files
 
-- `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/generated_ship_loader.gd`
+- `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/generated_ship_loader.gd`
   - Add read-only helper methods for loaded state, spawn transform, objective copies, goal position, and collision shape counting.
-- `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/ui/objective_tracker.gd`
+- `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/ui/objective_tracker.gd`
   - Add completion query helpers used by playable validation.
-- `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/main.gd`
+- `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/main.gd`
   - Load the playable generated-ship scene from the main scene while leaving `GeneratedShipDemo` available for regression scripts.
 
 ### New infra files
@@ -61,7 +61,7 @@
 
 **Files:**
 - Create: `/Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_playable_ship.py`
-- Expected missing for RED: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_playable_ship_smoke.gd`
+- Expected missing for RED: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_playable_ship_smoke.gd`
 
 **Interfaces:**
 - Consumes: Godot binary path `/Users/christopherwilloughby/.local/bin/godot-4.6.2`.
@@ -80,7 +80,7 @@ from pathlib import Path
 import pytest
 
 GODOT = Path("/Users/christopherwilloughby/.local/bin/godot-4.6.2")
-GODOT_PROJECT = Path("/Users/christopherwilloughby/the-synapse-sea-of-stars")
+GODOT_PROJECT = Path("/Users/christopherwilloughby/the-synaptic-sea-of-stars")
 SCRIPT = GODOT_PROJECT / "scripts" / "validation" / "procgen_playable_ship_smoke.gd"
 
 
@@ -150,21 +150,21 @@ if git -C /Users/christopherwilloughby/off-the-rails-ai-infra rev-parse --is-ins
   git -C /Users/christopherwilloughby/off-the-rails-ai-infra add tests/test_godot_procgen_playable_ship.py
   git -C /Users/christopherwilloughby/off-the-rails-ai-infra commit -m "test: define playable generated ship smoke contract"
 else
-  printf '%s\n' 'NO_GIT Task 1 changed: /Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_playable_ship.py' >> /tmp/synapse_sea_playable_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 1 changed: /Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_playable_ship.py' >> /tmp/synaptic_sea_playable_no_git_changes.log
 fi
 ```
 
-Expected when no git repo is present: command exits 0 and appends the path to `/tmp/synapse_sea_playable_no_git_changes.log`.
+Expected when no git repo is present: command exits 0 and appends the path to `/tmp/synaptic_sea_playable_no_git_changes.log`.
 
 ---
 
 ### Task 2: Add focused player, camera, and interactable components
 
 **Files:**
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/player/player_controller.gd`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/camera/iso_camera_rig.gd`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/interaction/interactable.gd`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/playable_component_smoke.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/player/player_controller.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/camera/iso_camera_rig.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/interaction/interactable.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/playable_component_smoke.gd`
 
 **Interfaces:**
 - Produces: `PlayerController.request_interact() -> void`, `PlayerController.teleport_to(world_position: Vector3) -> void`, `IsoCameraRig.follow_target: Node3D`, `Interactable.configure_from_objective(objective: Dictionary, world_position: Vector3, radius: float) -> void`, `Interactable.set_validation_player_in_range(player_body: Node) -> void`, `Interactable.try_interact(player_body: Node) -> bool`.
@@ -176,7 +176,7 @@ Run:
 
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/playable_component_smoke.gd
 ```
 
@@ -184,7 +184,7 @@ Expected: FAIL with an error that `res://scripts/validation/playable_component_s
 
 - [ ] **Step 2: Create `player_controller.gd`**
 
-Write this complete file to `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/player/player_controller.gd`:
+Write this complete file to `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/player/player_controller.gd`:
 
 ```gdscript
 extends CharacterBody3D
@@ -282,7 +282,7 @@ func _ensure_support_nodes() -> void:
 
 - [ ] **Step 3: Create `iso_camera_rig.gd`**
 
-Write this complete file to `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/camera/iso_camera_rig.gd`:
+Write this complete file to `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/camera/iso_camera_rig.gd`:
 
 ```gdscript
 extends Node3D
@@ -336,7 +336,7 @@ func _ensure_camera() -> void:
 
 - [ ] **Step 4: Create `interactable.gd`**
 
-Write this complete file to `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/interaction/interactable.gd`:
+Write this complete file to `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/interaction/interactable.gd`:
 
 ```gdscript
 extends Area3D
@@ -442,7 +442,7 @@ func _on_body_exited(body: Node3D) -> void:
 
 - [ ] **Step 5: Create `playable_component_smoke.gd`**
 
-Write this complete file to `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/playable_component_smoke.gd`:
+Write this complete file to `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/playable_component_smoke.gd`:
 
 ```gdscript
 extends SceneTree
@@ -518,7 +518,7 @@ Run:
 
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/playable_component_smoke.gd
 ```
 
@@ -533,24 +533,24 @@ PLAYABLE COMPONENT SMOKE PASS player=true camera=true interaction=true
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/player/player_controller.gd scripts/camera/iso_camera_rig.gd scripts/interaction/interactable.gd scripts/validation/playable_component_smoke.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "feat: add playable prototype components"
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/player/player_controller.gd scripts/camera/iso_camera_rig.gd scripts/interaction/interactable.gd scripts/validation/playable_component_smoke.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m "feat: add playable prototype components"
 else
-  printf '%s\n' 'NO_GIT Task 2 changed: /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/player/player_controller.gd /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/camera/iso_camera_rig.gd /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/interaction/interactable.gd /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/playable_component_smoke.gd' >> /tmp/synapse_sea_playable_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 2 changed: /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/player/player_controller.gd /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/camera/iso_camera_rig.gd /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/interaction/interactable.gd /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/playable_component_smoke.gd' >> /tmp/synaptic_sea_playable_no_git_changes.log
 fi
 ```
 
-Expected when no git repo is present: command exits 0 and appends the paths to `/tmp/synapse_sea_playable_no_git_changes.log`.
+Expected when no git repo is present: command exits 0 and appends the paths to `/tmp/synaptic_sea_playable_no_git_changes.log`.
 
 ---
 
 ### Task 3: Add loader and tracker query helpers
 
 **Files:**
-- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/generated_ship_loader.gd`
-- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/ui/objective_tracker.gd`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_loader_playable_contract_smoke.gd`
+- Modify: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/generated_ship_loader.gd`
+- Modify: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/ui/objective_tracker.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_loader_playable_contract_smoke.gd`
 
 **Interfaces:**
 - Produces on `GeneratedShipLoader`: `has_loaded_ship() -> bool`, `get_start_transform() -> Transform3D`, `get_goal_position() -> Vector3`, `get_objective_specs_copy() -> Array`, `count_collision_shapes() -> int`.
@@ -563,7 +563,7 @@ Run:
 
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
 ```
 
@@ -571,7 +571,7 @@ Expected: FAIL with an error that `res://scripts/validation/procgen_loader_playa
 
 - [ ] **Step 2: Add helper methods to `generated_ship_loader.gd`**
 
-Append this exact block to the end of `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/generated_ship_loader.gd`:
+Append this exact block to the end of `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/generated_ship_loader.gd`:
 
 ```gdscript
 
@@ -613,7 +613,7 @@ func _count_collision_shapes_recursive(node: Node) -> int:
 
 - [ ] **Step 3: Add helper methods to `objective_tracker.gd`**
 
-Append this exact block to the end of `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/ui/objective_tracker.gd`:
+Append this exact block to the end of `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/ui/objective_tracker.gd`:
 
 ```gdscript
 
@@ -627,7 +627,7 @@ func is_sequence_completed(sequence: int) -> bool:
 
 - [ ] **Step 4: Create loader contract smoke**
 
-Write this complete file to `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_loader_playable_contract_smoke.gd`:
+Write this complete file to `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_loader_playable_contract_smoke.gd`:
 
 ```gdscript
 extends SceneTree
@@ -707,7 +707,7 @@ Run:
 
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
 ```
 
@@ -723,7 +723,7 @@ Run:
 
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_runtime_demo_smoke.gd -- \
   --timeout-frames 9000
 ```
@@ -739,23 +739,23 @@ RUNTIME GAMEPLAY DEMO PASS objectives=4 interactions=4
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/procgen/generated_ship_loader.gd scripts/ui/objective_tracker.gd scripts/validation/procgen_loader_playable_contract_smoke.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "feat: expose generated ship playable contract"
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/procgen/generated_ship_loader.gd scripts/ui/objective_tracker.gd scripts/validation/procgen_loader_playable_contract_smoke.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m "feat: expose generated ship playable contract"
 else
-  printf '%s\n' 'NO_GIT Task 3 changed: /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/generated_ship_loader.gd /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/ui/objective_tracker.gd /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_loader_playable_contract_smoke.gd' >> /tmp/synapse_sea_playable_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 3 changed: /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/generated_ship_loader.gd /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/ui/objective_tracker.gd /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_loader_playable_contract_smoke.gd' >> /tmp/synaptic_sea_playable_no_git_changes.log
 fi
 ```
 
-Expected when no git repo is present: command exits 0 and appends the paths to `/tmp/synapse_sea_playable_no_git_changes.log`.
+Expected when no git repo is present: command exits 0 and appends the paths to `/tmp/synaptic_sea_playable_no_git_changes.log`.
 
 ---
 
 ### Task 4: Add the playable generated-ship scene
 
 **Files:**
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/playable_generated_ship.gd`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/procgen/playable_generated_ship.tscn`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/playable_generated_ship.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/procgen/playable_generated_ship.tscn`
 
 **Interfaces:**
 - Consumes: `GeneratedShipLoader.has_loaded_ship()`, `GeneratedShipLoader.get_start_transform()`, `GeneratedShipLoader.get_goal_position()`, `GeneratedShipLoader.get_objective_specs_copy()`, `GeneratedShipLoader.count_collision_shapes()` from Task 3.
@@ -775,7 +775,7 @@ Expected: FAIL because `procgen_playable_ship_smoke.gd` is still missing. This c
 
 - [ ] **Step 2: Create `playable_generated_ship.gd`**
 
-Write this complete file to `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/playable_generated_ship.gd`:
+Write this complete file to `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/playable_generated_ship.gd`:
 
 ```gdscript
 extends Node3D
@@ -966,10 +966,10 @@ func _ensure_key_action(action_name: String, keycode: Key) -> void:
 
 - [ ] **Step 3: Create `playable_generated_ship.tscn`**
 
-Write this complete file to `/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/procgen/playable_generated_ship.tscn`:
+Write this complete file to `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/procgen/playable_generated_ship.tscn`:
 
 ```text
-[gd_scene load_steps=2 format=3 uid="uid://synapse_sea_playable_generated_ship"]
+[gd_scene load_steps=2 format=3 uid="uid://synaptic_sea_playable_generated_ship"]
 
 [ext_resource type="Script" path="res://scripts/procgen/playable_generated_ship.gd" id="1_playable_generated_ship"]
 
@@ -983,7 +983,7 @@ Run:
 
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --scene res://scenes/procgen/playable_generated_ship.tscn \
   --quit-after 2
 ```
@@ -1000,11 +1000,11 @@ Run:
 
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/playable_component_smoke.gd
 
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
 ```
 
@@ -1020,23 +1020,23 @@ PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/procgen/playable_generated_ship.gd scenes/procgen/playable_generated_ship.tscn
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "feat: add playable generated ship scene"
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/procgen/playable_generated_ship.gd scenes/procgen/playable_generated_ship.tscn
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m "feat: add playable generated ship scene"
 else
-  printf '%s\n' 'NO_GIT Task 4 changed: /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/playable_generated_ship.gd /Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/procgen/playable_generated_ship.tscn' >> /tmp/synapse_sea_playable_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 4 changed: /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/playable_generated_ship.gd /Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/procgen/playable_generated_ship.tscn' >> /tmp/synaptic_sea_playable_no_git_changes.log
 fi
 ```
 
-Expected when no git repo is present: command exits 0 and appends the paths to `/tmp/synapse_sea_playable_no_git_changes.log`.
+Expected when no git repo is present: command exits 0 and appends the paths to `/tmp/synaptic_sea_playable_no_git_changes.log`.
 
 ---
 
 ### Task 5: Add playable smoke and capture validation
 
 **Files:**
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_playable_ship_smoke.gd`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_playable_ship_capture.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_playable_ship_smoke.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_playable_ship_capture.gd`
 
 **Interfaces:**
 - Consumes: `PlayableGeneratedShip.complete_first_interaction_for_validation() -> bool` and `PlayableGeneratedShip.get_playable_summary() -> Dictionary`.
@@ -1051,11 +1051,11 @@ cd /Users/christopherwilloughby/off-the-rails-ai-infra
 env PYTHONPATH=. uv run pytest tests/test_godot_procgen_playable_ship.py -q
 ```
 
-Expected: FAIL because `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_playable_ship_smoke.gd` is missing.
+Expected: FAIL because `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_playable_ship_smoke.gd` is missing.
 
 - [ ] **Step 2: Create `procgen_playable_ship_smoke.gd`**
 
-Write this complete file to `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_playable_ship_smoke.gd`:
+Write this complete file to `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_playable_ship_smoke.gd`:
 
 ```gdscript
 extends SceneTree
@@ -1181,7 +1181,7 @@ func _fail(reason: String) -> void:
 
 - [ ] **Step 3: Create `procgen_playable_ship_capture.gd`**
 
-Write this complete file to `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_playable_ship_capture.gd`:
+Write this complete file to `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_playable_ship_capture.gd`:
 
 ```gdscript
 extends SceneTree
@@ -1293,7 +1293,7 @@ Run:
 
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_playable_ship_smoke.gd -- \
   --timeout-frames 9000
 ```
@@ -1324,15 +1324,15 @@ Expected: exit code 0 and output containing:
 Run:
 
 ```bash
-mkdir -p /tmp/synapse_sea_playable_ship
+mkdir -p /tmp/synaptic_sea_playable_ship
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_playable_ship_capture.gd -- \
-  --output /tmp/synapse_sea_playable_ship/playable-ship-capture.png \
+  --output /tmp/synaptic_sea_playable_ship/playable-ship-capture.png \
   --capture-frame 240
 python3 - <<'PY'
 from pathlib import Path
-p = Path('/tmp/synapse_sea_playable_ship/playable-ship-capture.png')
+p = Path('/tmp/synaptic_sea_playable_ship/playable-ship-capture.png')
 print(f'capture_exists={p.exists()} size_bytes={p.stat().st_size if p.exists() else 0} path={p}')
 raise SystemExit(0 if p.exists() and p.stat().st_size > 0 else 1)
 PY
@@ -1341,7 +1341,7 @@ PY
 Expected: exit code 0 and output containing:
 
 ```text
-PLAYABLE SHIP CAPTURE PASS output=/tmp/synapse_sea_playable_ship/playable-ship-capture.png
+PLAYABLE SHIP CAPTURE PASS output=/tmp/synaptic_sea_playable_ship/playable-ship-capture.png
 capture_exists=True size_bytes=
 ```
 
@@ -1350,22 +1350,22 @@ capture_exists=True size_bytes=
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/validation/procgen_playable_ship_smoke.gd scripts/validation/procgen_playable_ship_capture.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "test: add playable generated ship smoke"
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/validation/procgen_playable_ship_smoke.gd scripts/validation/procgen_playable_ship_capture.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m "test: add playable generated ship smoke"
 else
-  printf '%s\n' 'NO_GIT Task 5 changed: /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_playable_ship_smoke.gd /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_playable_ship_capture.gd' >> /tmp/synapse_sea_playable_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 5 changed: /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_playable_ship_smoke.gd /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_playable_ship_capture.gd' >> /tmp/synaptic_sea_playable_no_git_changes.log
 fi
 ```
 
-Expected when no git repo is present: command exits 0 and appends the paths to `/tmp/synapse_sea_playable_no_git_changes.log`.
+Expected when no git repo is present: command exits 0 and appends the paths to `/tmp/synaptic_sea_playable_no_git_changes.log`.
 
 ---
 
 ### Task 6: Wire the playable scene into main and run final gates
 
 **Files:**
-- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/main.gd`
+- Modify: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/main.gd`
 
 **Interfaces:**
 - Consumes: `scenes/procgen/playable_generated_ship.tscn` from Task 4.
@@ -1377,16 +1377,16 @@ Run:
 
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --scene res://scenes/main.tscn \
   --quit-after 2
 ```
 
-Expected before this task: output contains `The Synapse Sea project bootstrap loaded.` and may reference `GeneratedShipDemo` through runtime demo load output. This confirms the main scene is runnable before changing it.
+Expected before this task: output contains `The Synaptic Sea project bootstrap loaded.` and may reference `GeneratedShipDemo` through runtime demo load output. This confirms the main scene is runnable before changing it.
 
 - [ ] **Step 2: Replace `scripts/main.gd` with playable-scene launcher**
 
-Write this complete file to `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/main.gd`:
+Write this complete file to `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/main.gd`:
 
 ```gdscript
 extends Node3D
@@ -1397,7 +1397,7 @@ var playable_scene: Node
 
 
 func _ready() -> void:
-	print("The Synapse Sea playable prototype bootstrap loaded.")
+	print("The Synaptic Sea playable prototype bootstrap loaded.")
 	playable_scene = PLAYABLE_GENERATED_SHIP_SCENE.instantiate()
 	playable_scene.name = "PlayableGeneratedShip"
 	add_child(playable_scene)
@@ -1409,7 +1409,7 @@ Run:
 
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --scene res://scenes/main.tscn \
   --quit-after 2
 ```
@@ -1417,7 +1417,7 @@ Run:
 Expected: exit code 0 and output containing:
 
 ```text
-The Synapse Sea playable prototype bootstrap loaded.
+The Synaptic Sea playable prototype bootstrap loaded.
 PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=4
 ```
 
@@ -1427,15 +1427,15 @@ Run:
 
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/playable_component_smoke.gd
 
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
 
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_playable_ship_smoke.gd -- \
   --timeout-frames 9000
 ```
@@ -1454,23 +1454,23 @@ Run:
 
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_runtime_demo_smoke.gd -- \
   --timeout-frames 9000
 
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_ship_gameplay_smoke.gd -- \
-  --layout /Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017/layout.json \
-  --kit /Users/christopherwilloughby/the-synapse-sea-of-stars/data/kits/ship_structural_v0.json \
-  --gameplay-slice /Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017/gameplay_slice.json \
+  --layout /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017/layout.json \
+  --kit /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/kits/ship_structural_v0.json \
+  --gameplay-slice /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017/gameplay_slice.json \
   --timeout-frames 9000
 
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_ship_walkthrough_smoke.gd -- \
-  --layout /Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017/layout.json \
-  --kit /Users/christopherwilloughby/the-synapse-sea-of-stars/data/kits/ship_structural_v0.json \
+  --layout /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017/layout.json \
+  --kit /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/kits/ship_structural_v0.json \
   --timeout-frames 9000
 ```
 
@@ -1504,15 +1504,15 @@ Expected: exit code 0. The exact total may increase after Task 1 adds tests; out
 Run:
 
 ```bash
-mkdir -p /tmp/synapse_sea_playable_ship
+mkdir -p /tmp/synaptic_sea_playable_ship
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_playable_ship_capture.gd -- \
-  --output /tmp/synapse_sea_playable_ship/final-playable-ship-capture.png \
+  --output /tmp/synaptic_sea_playable_ship/final-playable-ship-capture.png \
   --capture-frame 240
 python3 - <<'PY'
 from pathlib import Path
-p = Path('/tmp/synapse_sea_playable_ship/final-playable-ship-capture.png')
+p = Path('/tmp/synaptic_sea_playable_ship/final-playable-ship-capture.png')
 print(f'capture_exists={p.exists()} size_bytes={p.stat().st_size if p.exists() else 0} path={p}')
 raise SystemExit(0 if p.exists() and p.stat().st_size > 0 else 1)
 PY
@@ -1521,7 +1521,7 @@ PY
 Expected: exit code 0 and output containing:
 
 ```text
-PLAYABLE SHIP CAPTURE PASS output=/tmp/synapse_sea_playable_ship/final-playable-ship-capture.png
+PLAYABLE SHIP CAPTURE PASS output=/tmp/synaptic_sea_playable_ship/final-playable-ship-capture.png
 capture_exists=True size_bytes=
 ```
 
@@ -1530,15 +1530,15 @@ capture_exists=True size_bytes=
 Run:
 
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/main.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "feat: launch playable generated ship prototype"
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/main.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m "feat: launch playable generated ship prototype"
 else
-  printf '%s\n' 'NO_GIT Task 6 changed: /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/main.gd' >> /tmp/synapse_sea_playable_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 6 changed: /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/main.gd' >> /tmp/synaptic_sea_playable_no_git_changes.log
 fi
 ```
 
-Expected when no git repo is present: command exits 0 and appends the path to `/tmp/synapse_sea_playable_no_git_changes.log`.
+Expected when no git repo is present: command exits 0 and appends the path to `/tmp/synaptic_sea_playable_no_git_changes.log`.
 
 ---
 
@@ -1550,36 +1550,36 @@ Run all commands below before reporting the implementation complete:
 set -euo pipefail
 
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/playable_component_smoke.gd
 
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
 
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_playable_ship_smoke.gd -- \
   --timeout-frames 9000
 
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_runtime_demo_smoke.gd -- \
   --timeout-frames 9000
 
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_ship_gameplay_smoke.gd -- \
-  --layout /Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017/layout.json \
-  --kit /Users/christopherwilloughby/the-synapse-sea-of-stars/data/kits/ship_structural_v0.json \
-  --gameplay-slice /Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017/gameplay_slice.json \
+  --layout /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017/layout.json \
+  --kit /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/kits/ship_structural_v0.json \
+  --gameplay-slice /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017/gameplay_slice.json \
   --timeout-frames 9000
 
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_ship_walkthrough_smoke.gd -- \
-  --layout /Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017/layout.json \
-  --kit /Users/christopherwilloughby/the-synapse-sea-of-stars/data/kits/ship_structural_v0.json \
+  --layout /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017/layout.json \
+  --kit /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/kits/ship_structural_v0.json \
   --timeout-frames 9000
 
 cd /Users/christopherwilloughby/off-the-rails-ai-infra

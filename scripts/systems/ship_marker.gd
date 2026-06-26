@@ -1,11 +1,11 @@
 extends RefCounted
 class_name ShipMarker
 
-## Lightweight pre-generation descriptor of a ship in Synapse Sea space. Pure data;
+## Lightweight pre-generation descriptor of a ship in Synaptic Sea space. Pure data;
 ## the actual ship is materialized on demand from seed_value via ShipGenerator.
 
 var marker_id: String = ""
-var position: Vector3 = Vector3.ZERO   # y is always 0 (planar SynapseSea grid)
+var position: Vector3 = Vector3.ZERO   # y is always 0 (planar SynapticSea grid)
 var size_class: int = 0                # ShipBlueprint.Size
 var condition: int = 1                 # ShipBlueprint.Condition
 var ship_type: String = ""

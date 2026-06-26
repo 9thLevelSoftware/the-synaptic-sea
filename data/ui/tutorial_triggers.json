@@ -42,7 +42,7 @@
       "trigger_event": "ship_traveled",
       "trigger_target": "any",
       "title": "Travel",
-      "body": "When the lifeboat's propulsion is online, you can travel to other derelicts in the Synapse Sea.",
+      "body": "When the lifeboat's propulsion is online, you can travel to other derelicts in the Synaptic Sea.",
       "codex_topic": "Ship Systems",
       "codex_entry_id": "first_travel"
     },

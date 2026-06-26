@@ -8,7 +8,7 @@ Requirement range: REQ-PM-001..010
 
 Project Zomboid-influenced learn-by-doing progression translated to a
 locked-isometric 3D space-horror survival aboard derelict ships trapped
-in a biomatter Synapse Sea field. The player picks a class (engineer, medic,
+in a biomatter Synaptic Sea field. The player picks a class (engineer, medic,
 pilot, …) on a fresh run, gains XP from repair / combat / crafting /
 discovery actions, levels skills, reads skill books/schematics to gain
 bonus XP and unlock prerequisites in the skill tree, and unlocks

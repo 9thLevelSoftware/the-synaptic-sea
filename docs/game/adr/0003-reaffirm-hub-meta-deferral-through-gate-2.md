@@ -23,7 +23,7 @@ Choose **Option A: re-affirm deferral**.
 
 Hub/meta progression remains **deferred through Gate 2**. Gate 2 production focuses on deepening the derelict exploration loop: inventory/tools, expanded hazards, objective/procedural variation, and current-run persistence. Gate 2 implementation cards must not include hub ship scene/UI, derelict selection or queueing, persistent meta-currency, persistent unlocks, faction/narrative progression, or hub save state.
 
-The next anchor is **Gate 3 entry planning**. Before Gate 3 Alpha work is accepted as scoped, `synapse-sea-stage-gate` must schedule a hub/meta feature-spec decision that either:
+The next anchor is **Gate 3 entry planning**. Before Gate 3 Alpha work is accepted as scoped, `synaptic-sea-stage-gate` must schedule a hub/meta feature-spec decision that either:
 
 1. authors `docs/game/features/hub_progression.md` and implementation/review cards for the hub/meta loop, or
 2. records a Gate 3/4 cut/hold decision explaining why Alpha can proceed without hub/meta implementation.

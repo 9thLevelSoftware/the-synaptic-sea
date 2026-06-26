@@ -1,7 +1,7 @@
 extends RefCounted
-class_name SynapseSeaWorld
+class_name SynapticSeaWorld
 
-## The infinite Synapse Sea: a world_seed, the player's position, and the set of
+## The infinite Synaptic Sea: a world_seed, the player's position, and the set of
 ## markers already materialized into ships. Markers themselves are not stored —
 ## they are regenerated deterministically from world_seed on each query.
 
@@ -20,7 +20,7 @@ func _init(p_world_seed: int = 0, p_player_position: Vector3 = Vector3.ZERO) -> 
 ## Distinct markers within `radius` of player_position, sorted ascending by
 ## distance. Regenerates every cell overlapping the radius bounding box.
 func markers_in_range(radius: float) -> Array:
-	assert(radius >= 0.0, "SynapseSeaWorld.markers_in_range: radius must be non-negative")
+	assert(radius >= 0.0, "SynapticSeaWorld.markers_in_range: radius must be non-negative")
 	var out: Array = []
 	var seen: Dictionary = {}
 	var cs: float = MarkerGeneratorScript.CELL_SIZE

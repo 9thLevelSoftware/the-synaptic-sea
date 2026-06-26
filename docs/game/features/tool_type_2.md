@@ -148,19 +148,19 @@ REQ-007 added the first tool that modifies an environmental pressure. REQ-014 re
 
 - Direct model smoke:
   ```bash
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/junction_calibrator_state_smoke.gd
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/junction_calibrator_state_smoke.gd
   ```
   Expected marker: `JUNCTION CALIBRATOR STATE PASS required_steps=2 consumed=true`
 
 - Main-scene smoke:
   ```bash
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_junction_calibrator_smoke.gd
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_junction_calibrator_smoke.gd
   ```
   Expected marker: `MAIN PLAYABLE JUNCTION CALIBRATOR PASS acquired=true required_steps=2 consumed=true`
 
 - Save/load smoke (REQ-014 review-t_80dcea4b follow-up):
   ```bash
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_junction_calibrator_save_load_smoke.gd
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_junction_calibrator_save_load_smoke.gd
   ```
   Expected marker: `MAIN PLAYABLE JUNCTION CALIBRATOR SAVE LOAD PASS carried_load=true consumed_load=true next_frame_interaction=true`
 

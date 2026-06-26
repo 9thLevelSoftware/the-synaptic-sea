@@ -18,7 +18,7 @@ but offers:
 
 - no per-room role variation (every `corridor` is identical
   regardless of seed),
-- no biome flavour (no concept of `abyssal_synapse_sea` vs
+- no biome flavour (no concept of `abyssal_synaptic_sea` vs
   `breach_field` vs `dead_fleet`),
 - no difficulty curve (every run is the same `Condition` scalar),
 - no encounter markers for combat (combat has nowhere to spawn
@@ -146,10 +146,10 @@ func generate(blueprint: RefCounted, archetype: Dictionary = {}, biome_id: Strin
 After Stage 5, it instantiates a BiomeProfile + DifficultyProfile
 from the supplied ids, calls `EncounterInjector.inject(...)` on the
 serialised layout, and returns the augmented dict. Default empty
-ids fall back to `abyssal_synapse_sea` + `standard` so existing
+ids fall back to `abyssal_synaptic_sea` + `standard` so existing
 callers see no behavioural change in their JSON output (the
 `encounters` array is empty for `standard` biome+difficulty
-combinations in `abyssal_synapse_sea`).
+combinations in `abyssal_synaptic_sea`).
 
 ### 9. Template JSON files
 

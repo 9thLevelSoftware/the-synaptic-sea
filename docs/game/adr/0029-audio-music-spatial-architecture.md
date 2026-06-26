@@ -8,7 +8,7 @@ Feature spec: `docs/game/features/audio-music-spatial.md`
 
 ## Context
 
-The Synapse Sea playable slice has shipped pure-model gameplay systems (oxygen, fire, arc hazards, inventory, ship systems, route control, vitals) but no audio layer. Headless Godot validation does not need real audio playback, but the runtime architecture and player-facing feedback must be production-grade: every gameplay event must route through a named audio event, ambient layers must respond to room role and threat, dynamic music must respond to vitals and combat, spatialization must be deterministic, voice / audio log entries must replay, and meta-events (Project Zomboid's helicopter/gunshot palette, translated in-character as distress beacons / biomatter pulses / hull groans) must fire deterministically.
+The Synaptic Sea playable slice has shipped pure-model gameplay systems (oxygen, fire, arc hazards, inventory, ship systems, route control, vitals) but no audio layer. Headless Godot validation does not need real audio playback, but the runtime architecture and player-facing feedback must be production-grade: every gameplay event must route through a named audio event, ambient layers must respond to room role and threat, dynamic music must respond to vitals and combat, spatialization must be deterministic, voice / audio log entries must replay, and meta-events (Project Zomboid's helicopter/gunshot palette, translated in-character as distress beacons / biomatter pulses / hull groans) must fire deterministically.
 
 Headless `AudioServer` boots without a device and stream players load silence, so the runtime path is fully exercisable in CI. The architecture must therefore validate end-to-end without requiring a sound card.
 
@@ -32,7 +32,7 @@ All buses are children of `master`. The `AudioBusConfig` Resource validates ever
 
 ### Pure-model-first architecture (parallels ADR-0005)
 
-Six pure RefCounted models under `scripts/systems/`, plus the AudioBusConfig Resource. Each follows the standard Synapse Sea model contract (configure / tick / get_summary / apply_summary / get_status_lines) — the same shape as `FireState` and `ElectricalArcState`, adapted for non-passability audio state:
+Six pure RefCounted models under `scripts/systems/`, plus the AudioBusConfig Resource. Each follows the standard Synaptic Sea model contract (configure / tick / get_summary / apply_summary / get_status_lines) — the same shape as `FireState` and `ElectricalArcState`, adapted for non-passability audio state:
 
 1. **`AudioBusConfig`** (`Resource`, not RefCounted — it is data) — bus layout and per-bus volumes. `apply_bus_volumes(audio_server: AudioServer)` pushes dB values to the runtime buses.
 2. **`AmbientZoneState`** (`RefCounted`) — current room role, transition state, threat meter. `set_room_role(role_id)` starts a crossfade; `set_threat_level(intensity)` adjusts the threat-driven gain.

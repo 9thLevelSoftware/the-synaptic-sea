@@ -8,7 +8,7 @@ Related: Phase 4 scanner/travel design; System 4/5 in the core-systems master sp
 ## Context
 
 Phases 1–3 are integrated into the live coordinator `PlayableGeneratedShip`, but
-Phase 4 (scanner/travel/Synapse Sea) was built as pure logic with no in-game wiring,
+Phase 4 (scanner/travel/Synaptic Sea) was built as pure logic with no in-game wiring,
 and there was no first-class "ship" object: `TravelController.attempt_travel()`
 returned a `Node3D` nobody held, and the coordinator owned exactly one hardcoded
 ship with a single `ShipSystemsManager`. Phase 5 docking ("attach ship B to ship
@@ -20,7 +20,7 @@ Introduce `ShipInstance` (RefCounted): a per-ship handle bundling `ship_id`,
 `marker_id`, `blueprint`, its own `ShipSystemsManager`, the generated `scene_root`,
 and declared-but-unused Phase-5 docking stubs (`parent_ship`, `docked_ships`,
 `docking_ports`). The coordinator wraps its starting ship as `current_ship`, owns a
-`Synapse SeaWorld`/`ScannerState`/`TravelController`/`ShipGenerator`, and exposes
+`Synaptic SeaWorld`/`ScannerState`/`TravelController`/`ShipGenerator`, and exposes
 `scan()` / `travel_to()` that swap `current_ship` and re-home the player on success.
 
 Boundary (Approach A): only state that MUST be per-ship for travel to be real moves

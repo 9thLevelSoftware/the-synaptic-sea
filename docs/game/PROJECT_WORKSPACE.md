@@ -1,12 +1,12 @@
-# The Synapse Sea Project Workspace
+# The Synaptic Sea Project Workspace
 
 Canonical Godot project root:
 
-`/Users/christopherwilloughby/the-synapse-sea-of-stars`
+`/Users/christopherwilloughby/the-synaptic-sea-of-stars`
 
 Godot project file:
 
-`/Users/christopherwilloughby/the-synapse-sea-of-stars/project.godot`
+`/Users/christopherwilloughby/the-synaptic-sea-of-stars/project.godot`
 
 Locked premise:
 

@@ -1,10 +1,10 @@
-# Synapse Sea Agent Instructions
+# Synaptic Sea Agent Instructions
 
 These instructions apply to all work in this repository.
 
 ## Operating model
 
-The Synapse Sea uses a rigid, source-backed game-development operating system:
+The Synaptic Sea uses a rigid, source-backed game-development operating system:
 
 1. Stage-Gate governance for milestone decisions.
 2. Kanban for execution cards and multi-agent coordination.
@@ -30,7 +30,7 @@ Do not make ad-hoc implementation decisions when a feature spec, requirement, AD
 1. Update or create a feature spec under `docs/game/features/`.
 2. Add or update requirement rows in `docs/game/05_requirements.md`.
 3. Add ADRs for architecture decisions.
-4. Create or update Kanban cards on board `synapse-sea-stage-gate`.
+4. Create or update Kanban cards on board `synaptic-sea-stage-gate`.
 5. Implement with scoped files only.
 6. Run the feature smoke plus the regression bundle in `docs/game/06_validation_plan.md`.
 7. Update docs and the no-git ledger if the workspace is not a git repository.
@@ -47,18 +47,18 @@ Do not make ad-hoc implementation decisions when a feature spec, requirement, AD
 
 ## Current board, agents, and live tooling
 
-- Board: `synapse-sea-stage-gate`.
-- Default assignee: `synapse_sea_worker` (bulk execution).
-- Implementation worker: `synapse_sea_worker` on `MiniMax-M3`.
-- Documentation/planning worker: `synapse_sea_docs` on `kimi-k2.7-code` (OpenCode Go).
-- Review/gate worker: `synapse_sea_review` on `gpt-5.5` (OpenAI Codex).
+- Board: `synaptic-sea-stage-gate`.
+- Default assignee: `synaptic_sea_worker` (bulk execution).
+- Implementation worker: `synaptic_sea_worker` on `MiniMax-M3`.
+- Documentation/planning worker: `synaptic_sea_docs` on `kimi-k2.7-code` (OpenCode Go).
+- Review/gate worker: `synaptic_sea_review` on `gpt-5.5` (OpenAI Codex).
 
 Primary conversation/architecture model is `mimo-v2.5-pro` (Xiaomi token plan). Senior review, validation, and auxiliary vision/default assistant second-opinion use `gpt-5.5`. Complex but scoped implementation delegation uses `kimi-k2.7-code`. Routine worker, documentation, and compression work uses `MiniMax-M3`.
 
-Use explicit `--board synapse-sea-stage-gate` in CLI scripts. Do not rely on whatever board is currently active.
+Use explicit `--board synaptic-sea-stage-gate` in CLI scripts. Do not rely on whatever board is currently active.
 
 Godot automation:
 - `godot_coding_solo` is available for editor-free Godot automation.
-- `gdai` is available for live editor state when the Synapse Sea Godot editor is running with the GDAI plugin active on port `3571`.
+- `gdai` is available for live editor state when the Synaptic Sea Godot editor is running with the GDAI plugin active on port `3571`.
 - `blender_mcp` is available for Blender asset tooling.
 - Do not commit/publish `addons/gdai-mcp-plugin-godot/`; it is paid/local tooling and is ignored by `.gitignore`.

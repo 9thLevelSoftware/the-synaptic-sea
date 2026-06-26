@@ -25,7 +25,7 @@ const WORLD_SLOT_ID: String = "world"
 var slot_id: String = ""
 var slot_kind: String = ""
 var display_name: String = ""
-var synapse_sea_seed: int = 0
+var synaptic_sea_seed: int = 0
 var player_class: String = ""
 var current_location: String = ""
 var objective_sequence: int = 1
@@ -55,7 +55,7 @@ func to_dict() -> Dictionary:
 		"slot_id": slot_id,
 		"slot_kind": slot_kind,
 		"display_name": display_name,
-		"synapse_sea_seed": synapse_sea_seed,
+		"synaptic_sea_seed": synaptic_sea_seed,
 		"player_class": player_class,
 		"current_location": current_location,
 		"objective_sequence": objective_sequence,
@@ -78,7 +78,7 @@ static func from_dict(data: Variant) -> SaveSlotState:
 	row.slot_id = str(dict.get("slot_id", ""))
 	row.slot_kind = str(dict.get("slot_kind", ""))
 	row.display_name = str(dict.get("display_name", ""))
-	row.synapse_sea_seed = int(dict.get("synapse_sea_seed", 0))
+	row.synaptic_sea_seed = int(dict.get("synaptic_sea_seed", 0))
 	row.player_class = str(dict.get("player_class", ""))
 	row.current_location = str(dict.get("current_location", ""))
 	row.objective_sequence = int(dict.get("objective_sequence", 1))

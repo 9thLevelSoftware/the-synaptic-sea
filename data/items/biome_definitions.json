@@ -1,7 +1,7 @@
 {
   "version": "loot-biomes-1",
   "biomes": {
-    "abyssal_synapse_sea": {
+    "abyssal_synaptic_sea": {
       "loot_quality_bonus": 0.0,
       "junk_bias": 1.0,
       "container_quality_bonus": {

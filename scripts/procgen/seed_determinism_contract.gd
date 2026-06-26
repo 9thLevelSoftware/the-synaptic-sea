@@ -247,8 +247,8 @@ static func _compare_layouts(
 # doesn't depend on the catalog being on disk.
 static func _default_biome(biome_id: String) -> Dictionary:
 	if biome_id.is_empty():
-		biome_id = "abyssal_synapse_sea"
-	# Tuned values match data/procgen/biomes/abyssal_synapse_sea.json.
+		biome_id = "abyssal_synaptic_sea"
+	# Tuned values match data/procgen/biomes/abyssal_synaptic_sea.json.
 	match biome_id:
 		"breach_field":
 			return {
@@ -270,7 +270,7 @@ static func _default_biome(biome_id: String) -> Dictionary:
 			}
 		_:
 			return {
-				"id": "abyssal_synapse_sea",
+				"id": "abyssal_synaptic_sea",
 				"hazard_modifier": 1.0,
 				"loot_quality_modifier": 1.0,
 				"encounter_density_modifier": 1.0,

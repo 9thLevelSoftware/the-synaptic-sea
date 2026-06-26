@@ -1,9 +1,9 @@
-# The Synapse Sea
+# The Synaptic Sea
 
 > **Locked-isometric 3D space-horror survival sim.**
 > Godot 4.6.2 · GDScript · Stage-Gate driven development
 
-Your hub ship is trapped in a vast biomatter web — a cosmic Synapse Sea. From a
+Your hub ship is trapped in a vast biomatter web — a cosmic Synaptic Sea. From a
 readable locked-isometric view, you pilot your lifeboat to procedurally
 generated derelict spacecraft, dock, board, loot, repair, survive hazards,
 and ship out again. The end-game is wiring a fleet of physically-docked,
@@ -33,7 +33,7 @@ Current state:
 | 5 | Ship Docking & Ship-in-Ship           | Complete (5a–5d)  |
 | 6 | Inventory & Equipment                 | ~88% (Phase 6)    |
 | 7 | Procedural Generation Details         | Complete (folded into 1) |
-| 8 | Synapse Sea World & Scanner Display      | Complete (folded into 4) |
+| 8 | Synaptic Sea World & Scanner Display      | Complete (folded into 4) |
 | – | Phase 7 — Integration & Polish        | In progress (slice A: inventory/transfer UI built; slices B/C/D pending) |
 
 **Two phases remain:** finish System 6 (carry containers, EquipmentSlots,
@@ -136,7 +136,7 @@ into the scene tree. Scene nodes apply scene consequences.
 **Persistence & world**
 - `world_snapshot` + `save_load_service` + `run_snapshot` — disk save/load
   of world + per-ship slices; geometry regenerates from seed (ADR-0012).
-- `synapse_sea_world` + `world_snapshot` — Synapse Sea spatial registry.
+- `synaptic_sea_world` + `world_snapshot` — Synaptic Sea spatial registry.
 - `derelict_objective_controller` — boarded derelicts run the same
   objective/hazard/loot loop as the home ship (ADR-0013).
 
@@ -146,7 +146,7 @@ into the scene tree. Scene nodes apply scene consequences.
 - `scripts/ui/objective_tracker.gd` — live HUD from real runtime state.
 - `scripts/ui/inventory_panel.gd` + `inventory_row.gd` +
   `inventory_drop_zone.gd` — interactive inventory/transfer UI.
-- `scripts/ui/scanner_panel.gd` — Synapse Sea scanner.
+- `scripts/ui/scanner_panel.gd` — Synaptic Sea scanner.
 - `scripts/ui/accessibility_settings.gd` — accessibility toggles.
 
 ### Validation
@@ -200,7 +200,7 @@ the-synaptic-sea/
 ├── project.godot                # Godot project (config_version=5)
 ├── export_presets.cfg           # Release export presets
 ├── icon.svg                     # Project icon
-├── AGENTS.md                    # Synapse Sea operating model (read first)
+├── AGENTS.md                    # Synaptic Sea operating model (read first)
 ├── scenes/                      # .tscn scenes
 │   ├── main.tscn                # Entry point
 │   ├── procgen/                 # Playable generated ship scenes

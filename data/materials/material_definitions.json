@@ -52,7 +52,7 @@
       "weight": 0.3,
       "max_stack": 40,
       "base_quality": 0.2,
-      "description": "Dried slurry from the Synapse Sea web. Potentially reactive.",
+      "description": "Dried slurry from the Synaptic Sea web. Potentially reactive.",
       "icon": "res://assets/icons/materials/biomatter_residue.png"
     },
     "reactive_gel": {

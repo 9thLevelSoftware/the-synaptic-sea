@@ -1,8 +1,8 @@
-# The Synapse Sea — Planning & Design Synthesis
+# The Synaptic Sea — Planning & Design Synthesis
 
 **Source:** `~/the-synaptic-sea/docs/`
-**Project root:** `/Users/christopherwilloughby/the-synapse-sea-of-stars` (Godot 4.6.2)
-**Working title:** *The Synapse Sea* — locked-isometric 3D ship survival/exploration
+**Project root:** `/Users/christopherwilloughby/the-synaptic-sea-of-stars` (Godot 4.6.2)
+**Working title:** *The Synaptic Sea* — locked-isometric 3D ship survival/exploration
 **Stage:** Gate 5 (post-RC); open-world build tracked in `09_system_roadmap.md`
 **Generated:** 2026-06-25 (synthesis date)
 
@@ -14,8 +14,8 @@ This document is the comprehensive cross-reference of every planning artifact un
 
 ### 1.1 Working title & premise (`docs/game/00_vision.md`, 4,991 chars)
 
-- **Working title:** *The Synapse Sea* (placeholder kept; main scene prints "The Synapse Sea coherent proof ship bootstrap loaded.").
-- **Locked premise:** The player's hub ship is trapped in a vast biomatter/cosmic Synapse Sea. They explore procedurally generated derelicts (each one a self-contained "building") to loot, repair, occupy/fortify, defend, and ultimately fly them out. Derelicts are the buildings; ships are the explorers. Modeled in the spirit of *Project Zomboid* — open-world, persistent-location, deep systems.
+- **Working title:** *The Synaptic Sea* (placeholder kept; main scene prints "The Synaptic Sea coherent proof ship bootstrap loaded.").
+- **Locked premise:** The player's hub ship is trapped in a vast biomatter/cosmic Synaptic Sea. They explore procedurally generated derelicts (each one a self-contained "building") to loot, repair, occupy/fortify, defend, and ultimately fly them out. Derelicts are the buildings; ships are the explorers. Modeled in the spirit of *Project Zomboid* — open-world, persistent-location, deep systems.
 - **Genre slot:** Open-world ship survival (locked-isometric 3D, Godot 4.6).
 - **North Star fantasy:** Loot → Repair → Occupy/Fortify → Defend → Fly.
 - **Explicit non-goals:** No monsters (yet), no fortification (yet), no faction/survivor simulation (yet); those are deferred to later gates. Hub/meta progression is deferred through Gate 2.
@@ -136,7 +136,7 @@ SPAWN → ORIENT → TRAVERSE → RESTORE → EXTRACT
 
 ### 5.3 Validation gates
 - **Per-smoke:** Expected marker line + strict `^(ERROR|WARNING):` filter (allowing baseline).
-- **Per-bundle:** `SYNAPSE_SEA REGRESSION PASS commands=<N> clean_output=true` marker.
+- **Per-bundle:** `SYNAPTIC_SEA REGRESSION PASS commands=<N> clean_output=true` marker.
 - **Per-playtest:** `GATE <N> AUTOMATED PLAYTEST PASS` (current 2.00 average across 5 dimensions, Go decision).
 - **Per-build:** `gate-1-regression-<YYYY-MM-DD>.md` artifact under `docs/game/playtests/`.
 
@@ -246,7 +246,7 @@ Every feature spec has explicit Given/When/Then acceptance criteria tied to mark
 ### 10.1 Current state (snapshot)
 - **Active gate:** Gate 5 (post-RC).
 - **Godot:** 4.6.2 at `/Users/christopherwilloughby/.local/bin/godot-4.6.2`.
-- **Project:** `/Users/christopherwilloughby/the-synapse-sea-of-stars`.
+- **Project:** `/Users/christopherwilloughby/the-synaptic-sea-of-stars`.
 - **Workspace model:** No git repository; ledger via `docs/` artifacts (per `AGENTS.md §Operating model`).
 - **Smoke count:** 120 commands in regression bundle (per ADR-0028).
 
@@ -326,7 +326,7 @@ None blocking Gate 5. Procedural variation and monster pillars are deferred and 
 ## 13. Playtest Reports (`docs/game/playtests/`)
 
 ### 13.1 Gate 1 Regression Bundle — 2026-06-19 (`gate-1-regression-2026-06-19.md`)
-- **Result:** PASS — `SYNAPSE_SEA REGRESSION PASS commands=8 clean_output=true`.
+- **Result:** PASS — `SYNAPTIC_SEA REGRESSION PASS commands=8 clean_output=true`.
 - **8/8 smokes passed:** route_control_state, main_route_control, oxygen_state, main_hazard, main_ship_systems, main_completion, main_input, main_readability.
 - **No unexpected `ERROR:`/`WARNING:`** outside baseline Godot teardown lines.
 - **Workspace:** No-git per `AGENTS.md §Operating model`; ledger via docs artifacts.

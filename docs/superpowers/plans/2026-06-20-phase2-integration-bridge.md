@@ -865,7 +865,7 @@ In `docs/game/06_validation_plan.md`, find the expected marker line for `main_pl
 ```
 MAIN PLAYABLE SHIP SYSTEMS PASS power=true breach_sealed=true gates_open=true logs=true reactor=true extraction=true power_pct=100
 ```
-Add the two new smokes to the bundle (grep list + command count): `ship_systems_manager_force_repair_smoke.gd` (marker `SHIP SYSTEMS MANAGER FORCE REPAIR PASS health=1.0 unknown_rejected=true`) and `playable_manager_built_smoke.gd` (marker `PLAYABLE MANAGER BUILT PASS systems=6`). Increment the `commands=` count in the final `SYNAPSE_SEA REGRESSION PASS` line accordingly (was 47; +2 new = 49 — confirm against the actual bundle when you run it).
+Add the two new smokes to the bundle (grep list + command count): `ship_systems_manager_force_repair_smoke.gd` (marker `SHIP SYSTEMS MANAGER FORCE REPAIR PASS health=1.0 unknown_rejected=true`) and `playable_manager_built_smoke.gd` (marker `PLAYABLE MANAGER BUILT PASS systems=6`). Increment the `commands=` count in the final `SYNAPTIC_SEA REGRESSION PASS` line accordingly (was 47; +2 new = 49 — confirm against the actual bundle when you run it).
 
 - [ ] **Step 3: Run the full regression bundle**
 
@@ -873,7 +873,7 @@ Extract the bundle block from `docs/game/06_validation_plan.md` and run it with 
 ```bash
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gate1_automated_playtest.gd
 ```
-Expected: bundle ends `SYNAPSE_SEA REGRESSION PASS commands=<n> clean_output=true`; Gate-1 playtest passes. Resolve any unexpected `ERROR:`/`WARNING:` before proceeding (only the allowlisted teardown/REQ-012 lines are permitted).
+Expected: bundle ends `SYNAPTIC_SEA REGRESSION PASS commands=<n> clean_output=true`; Gate-1 playtest passes. Resolve any unexpected `ERROR:`/`WARNING:` before proceeding (only the allowlisted teardown/REQ-012 lines are permitted).
 
 - [ ] **Step 4: Commit**
 

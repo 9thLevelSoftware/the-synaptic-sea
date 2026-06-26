@@ -1,4 +1,4 @@
-# The Synapse Sea — Core Systems Design
+# The Synaptic Sea — Core Systems Design
 
 Date: 2026-06-20
 Status: Approved for implementation
@@ -8,7 +8,7 @@ Architecture: System-first (each system built in isolation with clean interfaces
 
 ## Vision Summary
 
-Sandbox survival in a biomatter web that traps ships. Players start on a broken life raft with randomized system states, repair what they can, then explore an infinite Synapse Sea of procedurally generated derelicts. Progression comes from finding and claiming better ships, each with more complex systems, better equipment, and more space. Large ships can dock smaller ships in hangars, preserving player investment.
+Sandbox survival in a biomatter web that traps ships. Players start on a broken life raft with randomized system states, repair what they can, then explore an infinite Synaptic Sea of procedurally generated derelicts. Progression comes from finding and claiming better ships, each with more complex systems, better equipment, and more space. Large ships can dock smaller ships in hangars, preserving player investment.
 
 **Core loop:** Repair → Travel → Explore → Loot → Repair → Repeat
 
@@ -45,8 +45,8 @@ SYSTEM 6: Inventory & Equipment
 SYSTEM 7: Procedural Generation Details
   Room roles, graph rules, structural placement, gameplay content
 
-SYSTEM 8: Synapse Sea World & Scanner Display
-  Synapse SeaWorld → ShipRegistry, spatial grid
+SYSTEM 8: Synaptic Sea World & Scanner Display
+  Synaptic SeaWorld → ShipRegistry, spatial grid
   ScannerDisplay → UI for ship discovery + travel
 ```
 
@@ -297,7 +297,7 @@ Docking animation (generation happens) → Board ship
 ```gdscript
 class_name ShipMarker
 var marker_id: String
-var position: Vector3        # in Synapse Sea space
+var position: Vector3        # in Synaptic Sea space
 var size_class: String       # life_boat, small, medium
 var seed: int                # for deterministic generation
 var distance: float          # from player
@@ -470,16 +470,16 @@ GameplayContentPlacer (systems, hazards, loot)
 
 ---
 
-## System 8: Synapse Sea World & Scanner Display
+## System 8: Synaptic Sea World & Scanner Display
 
 **Purpose:** The infinite biomatter web, how ships exist in it, and the scanner UI for navigation.
 
 **Architecture:**
 
 ```
-Synapse SeaWorld
+Synaptic SeaWorld
     ├── ShipRegistry (all discovered/generated ships)
-    ├── Synapse SeaGrid (spatial partitioning for ships)
+    ├── Synaptic SeaGrid (spatial partitioning for ships)
     └── BiomatterField (the web itself, hazards)
 
 ScannerDisplay
@@ -488,8 +488,8 @@ ScannerDisplay
     └── DetailPanel (shows selected ship info)
 ```
 
-**Synapse Sea World:**
-- Ships exist at positions in Synapse Sea space (3D coordinates, but travel is menu-based)
+**Synaptic Sea World:**
+- Ships exist at positions in Synaptic Sea space (3D coordinates, but travel is menu-based)
 - Ships are "trapped" in biomatter web (visual context)
 - Biomatter has properties (may damage ships over time, hazards)
 - Grid-based spatial partitioning for efficient ship lookup
@@ -503,7 +503,7 @@ var player_ship: ShipInstance     # current primary ship
 ```
 
 **Scanner Display UI:**
-- Top-down or 3D view of local Synapse Sea space
+- Top-down or 3D view of local Synaptic Sea space
 - Player ship at center
 - Discovered ships shown as icons/markers
 - Color coding by size, condition, or distance

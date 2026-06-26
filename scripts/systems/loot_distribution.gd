@@ -17,7 +17,7 @@ static func roll(table_key: String, seed_source: String, tables: Dictionary, con
 	rng.seed = LootRollerScript._stable_seed("%s|%s|%s|%s|%s" % [
 		table_key,
 		seed_source,
-		str(context.get("biome_id", "abyssal_synapse_sea")),
+		str(context.get("biome_id", "abyssal_synaptic_sea")),
 		str(context.get("depth", 0)),
 		str(context.get("container_kind", str(table.get("container_kind", table_key)))),
 	])
@@ -46,7 +46,7 @@ static func roll(table_key: String, seed_source: String, tables: Dictionary, con
 			"quantity": quantity,
 			"rarity": rarity,
 			"container_kind": str(context.get("container_kind", str(table.get("container_kind", table_key)))),
-			"biome_id": str(context.get("biome_id", "abyssal_synapse_sea")),
+			"biome_id": str(context.get("biome_id", "abyssal_synaptic_sea")),
 			"depth": int(context.get("depth", 0)),
 			"condition": str(context.get("condition", "damaged")),
 			"seed_key": "%s|%d|%s" % [seed_source, roll_index, item_id],
@@ -61,7 +61,7 @@ static func roll(table_key: String, seed_source: String, tables: Dictionary, con
 
 static func _weighted_entries(entries: Array, context: Dictionary, unique_state, seed_source: String, item_defs: Dictionary) -> Array:
 	var out: Array = []
-	var biome_id: String = str(context.get("biome_id", "abyssal_synapse_sea"))
+	var biome_id: String = str(context.get("biome_id", "abyssal_synaptic_sea"))
 	var depth: int = int(context.get("depth", 0))
 	var condition: String = str(context.get("condition", "damaged"))
 	var container_kind: String = str(context.get("container_kind", "generic_crate"))

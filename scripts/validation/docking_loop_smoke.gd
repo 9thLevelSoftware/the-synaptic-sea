@@ -76,7 +76,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		_fail("LOOP: propulsion not operational after repair"); return
 
 	# Travel to an in-range marker.
-	var world = playable.get_synapse_sea_world()
+	var world = playable.get_synaptic_sea_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
 	if in_range.is_empty():
 		_fail("LOOP: no markers in range after propulsion repair"); return

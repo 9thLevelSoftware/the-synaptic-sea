@@ -51,7 +51,7 @@ round-trip stays green.
 
 `SaveIndexState` is the on-disk index at `user://saves/index.json`. It carries
 `version`, `godot_version`, `updated_at`, and `slots: Array`. Each row is a
-`SaveSlotState` summary (`slot_id`, `slot_kind`, `display_name`, `synapse_sea_seed`,
+`SaveSlotState` summary (`slot_id`, `slot_kind`, `display_name`, `synaptic_sea_seed`,
 `player_class`, `current_location`, `objective_sequence`, `play_time_seconds`,
 `saved_at`, `world_slot_id`, `corrupt`). `SaveLoadService.list_slots()` reads
 this file and returns rows sorted by `saved_at` desc. The index is rewritten

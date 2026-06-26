@@ -7,7 +7,7 @@ Accepted
 ## Context
 
 Build Phase 2 of the core-systems rebuild
-(`docs/superpowers/specs/2026-06-20-synapse-sea-core-systems-design.md`, System 2) introduces
+(`docs/superpowers/specs/2026-06-20-synaptic-sea-core-systems-design.md`, System 2) introduces
 the six core ship systems — Power, Life Support, Gravity, Propulsion, Navigation, Scanners —
 each with subcomponents, inter-system dependencies, dependency-cascade failure, and a repair
 flow. The design is detailed in

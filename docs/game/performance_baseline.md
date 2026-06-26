@@ -1,6 +1,6 @@
 # Performance Baseline
 
-This document captures the **first measured performance baseline** for The Synapse Sea, recorded 2026-06-19 against the local Mac mini M4 dev box. It exists to anchor the Gate 4 Beta exit criterion "Performance pass — frame time, memory, load times acceptable" against hard numbers, and to make any future regression against those numbers immediately visible.
+This document captures the **first measured performance baseline** for The Synaptic Sea, recorded 2026-06-19 against the local Mac mini M4 dev box. It exists to anchor the Gate 4 Beta exit criterion "Performance pass — frame time, memory, load times acceptable" against hard numbers, and to make any future regression against those numbers immediately visible.
 
 The baseline is produced by two reusable harness scripts under `scripts/validation/`:
 
@@ -46,7 +46,7 @@ Stop conditions did not trip during baseline capture.
 
 ## Headless profiler results (3 runs)
 
-`/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/performance_profiler.gd`
+`/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/performance_profiler.gd`
 
 The full `summary_json` is printed inline on stdout as part of the `PERFORMANCE BASELINE PASS` line. Numbers below are extracted from 3 consecutive runs.
 
@@ -92,9 +92,9 @@ Includes full Godot engine + GDAI MCP plugin capture registration + all 3 profil
 
 ## Windowed FPS results (3 runs)
 
-`/Users/christopherwilloughby/.local/bin/godot-4.6.2 --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/windowed_fps_capture.gd`
+`/Users/christopherwilloughby/.local/bin/godot-4.6.2 --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/windowed_fps_capture.gd`
 
-Capture window: 240 frames after `playable_ready` fires. JSON dump at `~/Library/Application Support/Godot/app_userdata/The Synapse Sea/perf_windowed_fps.json`.
+Capture window: 240 frames after `playable_ready` fires. JSON dump at `~/Library/Application Support/Godot/app_userdata/The Synaptic Sea/perf_windowed_fps.json`.
 
 | Run | frames | median_ms | p95_ms | observed_fps | peak_static_mb | peak_rss_mb |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -131,12 +131,12 @@ No follow-up cards are required against the card's "metric exceeding target" acc
 ```bash
 # Headless baseline (templates + main scene, no display required)
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/performance_profiler.gd
 
 # Windowed FPS capture (requires display server; writes user://perf_windowed_fps.json)
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/windowed_fps_capture.gd
 ```
 

@@ -693,7 +693,7 @@ bash <(awk '/^## Regression bundle/{f=1} f && /^```bash$/ {c=1; next} f && c && 
 git stash pop
 ```
 
-Expected final line: `SYNAPSE_SEA REGRESSION PASS commands=120 clean_output=true`.
+Expected final line: `SYNAPTIC_SEA REGRESSION PASS commands=120 clean_output=true`.
 If the bundle fails, fix the offending smoke before committing; do NOT commit `project.godot` or any `.godot/` file. If `git stash pop` reports the working tree already has `project.godot` changes, that is the pre-existing local drift — resolve by keeping the stashed (pre-run) version.
 
 - [ ] **Step 4: Commit the docs.**

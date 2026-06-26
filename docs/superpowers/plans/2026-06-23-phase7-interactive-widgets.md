@@ -702,7 +702,7 @@ run_clean 'inventory widget layer' 'INVENTORY WIDGET SMOKE PASS' "$GODOT" --head
 ```
 
 ```bash
-echo 'SYNAPSE_SEA REGRESSION PASS commands=115 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=115 clean_output=true'
 ```
 
 > Sanity: `grep -c '^run_clean' docs/game/06_validation_plan.md` will report **116** (the `run_clean() {` definition line + 115 invocations). The echo says `commands=115`.
@@ -716,7 +716,7 @@ git stash push -- project.godot
 bash <(awk '/^## Regression bundle/{f=1} f && /^```bash$/ {c=1; next} f && c && /^```$/ {exit} f && c {print}' docs/game/06_validation_plan.md)   # GODOT/ROOT exported
 git stash pop
 ```
-Expected tail: `SYNAPSE_SEA REGRESSION PASS commands=115 clean_output=true`. Do not commit or revert the `project.godot` drift.
+Expected tail: `SYNAPTIC_SEA REGRESSION PASS commands=115 clean_output=true`. Do not commit or revert the `project.godot` drift.
 
 - [ ] **Step 5: Commit:**
 

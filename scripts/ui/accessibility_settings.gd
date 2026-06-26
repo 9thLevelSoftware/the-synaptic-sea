@@ -2,7 +2,7 @@ extends RefCounted
 class_name AccessibilitySettings
 ## A11Y-P1-001: single runtime seam for scalable HUD and world text.
 ##
-## The Synapse Sea playable slice keeps pure gameplay state in RefCounted / Resource
+## The Synaptic Sea playable slice keeps pure gameplay state in RefCounted / Resource
 ## classes where practical. This settings object is a pure model — it owns a
 ## text scale multiplier and exposes helpers that turn that multiplier into the
 ## two different kinds of "larger text" we need:
@@ -15,8 +15,8 @@ class_name AccessibilitySettings
 ##   renders a larger label on screen for the same world position.
 ##
 ## The scale multiplier is read from three sources, in order:
-## 1. The `SYNAPSE_SEA_TEXT_SCALE` environment variable (CI /).
-## 2. The headless overrides `synapse-sea/accessibility/text_scale` project setting.
+## 1. The `SYNAPTIC_SEA_TEXT_SCALE` environment variable (CI /).
+## 2. The headless overrides `synaptic-sea/accessibility/text_scale` project setting.
 ## 3. A hard-coded default of 1.0.
 ##
 ## The value is clamped to [MIN_TEXT_SCALE, MAX_TEXT_SCALE] so a malformed env
@@ -35,8 +35,8 @@ class_name AccessibilitySettings
 const MIN_TEXT_SCALE: float = 1.0
 const MAX_TEXT_SCALE: float = 2.0
 const DEFAULT_TEXT_SCALE: float = 1.0
-const PROJECT_SETTING_KEY: String = "synapse-sea/accessibility/text_scale"
-const ENV_VAR_NAME: String = "SYNAPSE_SEA_TEXT_SCALE"
+const PROJECT_SETTING_KEY: String = "synaptic-sea/accessibility/text_scale"
+const ENV_VAR_NAME: String = "SYNAPTIC_SEA_TEXT_SCALE"
 
 var _text_scale: float = DEFAULT_TEXT_SCALE
 

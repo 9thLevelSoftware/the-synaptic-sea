@@ -3,7 +3,7 @@ extends SceneTree
 # biome_profile_smoke — REQ-PG-005 verification.
 #
 # Asserts:
-#   1. BiomeProfile.from_dict() round-trips the abyssal_synapse_sea
+#   1. BiomeProfile.from_dict() round-trips the abyssal_synaptic_sea
 #      JSON to a RefCounted with the expected modifier values.
 #   2. modifier(dial) returns the value from JSON for every dial.
 #   3. hazard_override("oxygen_breach") returns the per-hazard
@@ -19,9 +19,9 @@ const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
 
 
 func _initialize() -> void:
-	# --- Case 1: Round-trip abyssal_synapse_sea ---
+	# --- Case 1: Round-trip abyssal_synaptic_sea ---
 	var abyssal_data: Dictionary = {
-		"id": "abyssal_synapse_sea",
+		"id": "abyssal_synaptic_sea",
 		"description": "Deep-sea baseline",
 		"hazard_modifier": 1.0,
 		"loot_quality_modifier": 1.0,
@@ -34,7 +34,7 @@ func _initialize() -> void:
 		push_error("BIOME PROFILE FAIL from_dict returned null")
 		quit(1)
 		return
-	if str(abyssal.id) != "abyssal_synapse_sea":
+	if str(abyssal.id) != "abyssal_synaptic_sea":
 		push_error("BIOME PROFILE FAIL abyssal.id=%s" % str(abyssal.id))
 		quit(1)
 		return
@@ -103,7 +103,7 @@ func _initialize() -> void:
 		return
 
 	# --- Case 5: select_biome is deterministic ---
-	var biome_pool: Array[String] = ["abyssal_synapse_sea", "breach_field", "dead_fleet"]
+	var biome_pool: Array[String] = ["abyssal_synaptic_sea", "breach_field", "dead_fleet"]
 	var seed_a: String = BiomeProfileScript.select_biome(314, biome_pool)
 	var seed_b: String = BiomeProfileScript.select_biome(314, biome_pool)
 	if seed_a != seed_b:
@@ -117,7 +117,7 @@ func _initialize() -> void:
 
 	# --- Case 6: to_dict round-trip ---
 	var roundtrip: Dictionary = abyssal.to_dict()
-	if str(roundtrip.get("id", "")) != "abyssal_synapse_sea":
+	if str(roundtrip.get("id", "")) != "abyssal_synaptic_sea":
 		push_error("BIOME PROFILE FAIL to_dict lost id")
 		quit(1)
 		return

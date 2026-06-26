@@ -1,7 +1,7 @@
 # Distribution / Store / Achievements / Demo / Localization / Post-Launch Ops Package — Contract and Gap Review
 
 Package: `docs/game/build-plans/13-distribution-store-postlaunch-e2e.md`
-Author: synapse_seaworker (Task 13, board `synapse-sea-stage-gate`, card `t_3b217838`)
+Author: synaptic_seaworker (Task 13, board `synaptic-sea-stage-gate`, card `t_3b217838`)
 Date: 2026-06-25
 
 ## Existing seams to extend (not replace)

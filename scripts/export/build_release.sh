@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 GODOT=${GODOT:-/Users/christopherwilloughby/.local/bin/godot-4.6.2}
-SYNAPSE_SEA_VERSION=${SYNAPSE_SEA_VERSION:-v0.1.0}
-BUILD_STAMP=${SYNAPSE_SEA_BUILD_STAMP:-$(date -u +%Y%m%dT%H%M%SZ)}
+SYNAPTIC_SEA_VERSION=${SYNAPTIC_SEA_VERSION:-v0.1.0}
+BUILD_STAMP=${SYNAPTIC_SEA_BUILD_STAMP:-$(date -u +%Y%m%dT%H%M%SZ)}
 EXPORT_DIR="$ROOT/build/exports"
 RELEASE_DIR="$ROOT/build/release"
 LOG_DIR="$ROOT/build/logs"
@@ -17,7 +17,7 @@ Usage: scripts/export/build_release.sh [web] [linux] [macos] [windows]
 
 Builds release exports with Godot 4.6.2. If no targets are supplied, all four
 configured presets are exported. Artifacts are written under build/release/ and
-named synapse-sea-of-stars-<version>-<stamp>-<target>.*.
+named synaptic-sea-of-stars-<version>-<stamp>-<target>.*.
 USAGE
 }
 
@@ -37,7 +37,7 @@ restore_project() {
 }
 
 prepare_release_project() {
-  PROJECT_BACKUP=$(mktemp "${TMPDIR:-/tmp}/synapse_sea_project_godot.XXXXXX")
+  PROJECT_BACKUP=$(mktemp "${TMPDIR:-/tmp}/synaptic_sea_project_godot.XXXXXX")
   cp "$ROOT/project.godot" "$PROJECT_BACKUP"
   python3 - "$ROOT/project.godot" <<'PY'
 from pathlib import Path
@@ -127,16 +127,16 @@ main() {
   for target in "${targets[@]}"; do
     case "$target" in
       web)
-        export_one web "$EXPORT_DIR/web/index.html" "$RELEASE_DIR/synapse-sea-of-stars-${SYNAPSE_SEA_VERSION}-${BUILD_STAMP}-web.zip"
+        export_one web "$EXPORT_DIR/web/index.html" "$RELEASE_DIR/synaptic-sea-of-stars-${SYNAPTIC_SEA_VERSION}-${BUILD_STAMP}-web.zip"
         ;;
       linux)
-        export_one linux "$EXPORT_DIR/linux/synapse-sea-of-stars.x86_64" "$RELEASE_DIR/synapse-sea-of-stars-${SYNAPSE_SEA_VERSION}-${BUILD_STAMP}-linux-x86_64.zip"
+        export_one linux "$EXPORT_DIR/linux/synaptic-sea-of-stars.x86_64" "$RELEASE_DIR/synaptic-sea-of-stars-${SYNAPTIC_SEA_VERSION}-${BUILD_STAMP}-linux-x86_64.zip"
         ;;
       macos)
-        export_one macos "$EXPORT_DIR/macos/synapse-sea-of-stars.zip" "$RELEASE_DIR/synapse-sea-of-stars-${SYNAPSE_SEA_VERSION}-${BUILD_STAMP}-macos.zip"
+        export_one macos "$EXPORT_DIR/macos/synaptic-sea-of-stars.zip" "$RELEASE_DIR/synaptic-sea-of-stars-${SYNAPTIC_SEA_VERSION}-${BUILD_STAMP}-macos.zip"
         ;;
       windows)
-        export_one windows "$EXPORT_DIR/windows/synapse-sea-of-stars.exe" "$RELEASE_DIR/synapse-sea-of-stars-${SYNAPSE_SEA_VERSION}-${BUILD_STAMP}-windows-x86_64.zip"
+        export_one windows "$EXPORT_DIR/windows/synaptic-sea-of-stars.exe" "$RELEASE_DIR/synaptic-sea-of-stars-${SYNAPTIC_SEA_VERSION}-${BUILD_STAMP}-windows-x86_64.zip"
         ;;
       *)
         echo "unknown target '$target'" >&2
@@ -150,7 +150,7 @@ main() {
     cd "$RELEASE_DIR"
     shasum -a 256 * > artifacts.sha256
   )
-  echo "SYNAPSE_SEA EXPORT PASS version=$SYNAPSE_SEA_VERSION stamp=$BUILD_STAMP targets=${targets[*]} release_dir=$RELEASE_DIR"
+  echo "SYNAPTIC_SEA EXPORT PASS version=$SYNAPTIC_SEA_VERSION stamp=$BUILD_STAMP targets=${targets[*]} release_dir=$RELEASE_DIR"
 }
 
 main "$@"

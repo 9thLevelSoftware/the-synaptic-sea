@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Project root: `/Users/christopherwilloughby/the-synapse-sea-of-stars`.
+- Project root: `/Users/christopherwilloughby/the-synaptic-sea-of-stars`.
 - Godot binary: `/Users/christopherwilloughby/.local/bin/godot-4.6.2`.
 - Workspace state checked on 2026-06-19: `GIT_INSIDE=false`.
 - Cite REQ-011 (`docs/game/05_requirements.md` lines 176-191) and `docs/game/features/objective_variation.md` as the authoritative feature spec.
@@ -23,7 +23,7 @@
 - Do not implement a full procedural objective generator, objective graph, branching paths, optional alternate sequences, failure/timer/wrong-order penalty, new ship-system flags, audio/VFX polish, or hub/meta progression.
 - Do not create HTML, PNG, contact sheets, screenshot galleries, or proof documents for this milestone.
 - Output from validation commands must be clean of unexpected lines beginning with `ERROR:` or `WARNING:`.
-- Because this is not a git repository, every task uses the no-git ledger fallback at `/tmp/synapse_sea_repair_junction_no_git_changes.log` instead of assuming `git commit` works.
+- Because this is not a git repository, every task uses the no-git ledger fallback at `/tmp/synaptic_sea_repair_junction_no_git_changes.log` instead of assuming `git commit` works.
 - Existing validation seams (`complete_objective_sequence_for_validation`, `complete_all_objectives_for_validation`, `complete_first_interaction_for_validation`) must keep working, and all pre-existing smokes in `docs/game/06_validation_plan.md` must continue to pass.
 
 ---
@@ -214,7 +214,7 @@ func _fail(reason: String) -> void:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/objective_progress_state_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/objective_progress_state_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'OBJECTIVE PROGRESS STATE PASS' || true
 ```
@@ -228,11 +228,11 @@ Expected (RED) result:
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/validation/objective_progress_state_smoke.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'test(objective): RED objective progress state smoke'
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/validation/objective_progress_state_smoke.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'test(objective): RED objective progress state smoke'
 else
-  printf '%s\n' 'NO_GIT Task 1 RED: scripts/validation/objective_progress_state_smoke.gd added and failed for missing ObjectiveProgressState implementation' >> /tmp/synapse_sea_repair_junction_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 1 RED: scripts/validation/objective_progress_state_smoke.gd added and failed for missing ObjectiveProgressState implementation' >> /tmp/synaptic_sea_repair_junction_no_git_changes.log
 fi
 ```
 
@@ -340,7 +340,7 @@ func reset() -> void:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/objective_progress_state_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/objective_progress_state_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'OBJECTIVE PROGRESS STATE PASS'
 if printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' >/dev/null; then
@@ -357,11 +357,11 @@ Expected (GREEN) result:
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/systems/objective_progress_state.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'feat(objective): ObjectiveProgressState model for multi-step repair junction'
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/systems/objective_progress_state.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'feat(objective): ObjectiveProgressState model for multi-step repair junction'
 else
-  printf '%s\n' 'NO_GIT Task 2 GREEN: scripts/systems/objective_progress_state.gd added; objective_progress_state_smoke passes' >> /tmp/synapse_sea_repair_junction_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 2 GREEN: scripts/systems/objective_progress_state.gd added; objective_progress_state_smoke passes' >> /tmp/synaptic_sea_repair_junction_no_git_changes.log
 fi
 ```
 
@@ -419,7 +419,7 @@ Replace the `emit_signal` line inside `try_interact` with:
 
 Run:
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/interaction/interactable.gd 2>&1 | head -n 20
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/interaction/interactable.gd 2>&1 | head -n 20
 ```
 
 Expected: script loads without parse errors (exit code may be 0 with baseline teardown noise only).
@@ -428,11 +428,11 @@ Expected: script loads without parse errors (exit code may be 0 with baseline te
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/interaction/interactable.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'feat(objective): Interactable step support for repair junction'
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/interaction/interactable.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'feat(objective): Interactable step support for repair junction'
 else
-  printf '%s\n' 'NO_GIT Task 3: scripts/interaction/interactable.gd extended with step_id and configure_from_step' >> /tmp/synapse_sea_repair_junction_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 3: scripts/interaction/interactable.gd extended with step_id and configure_from_step' >> /tmp/synaptic_sea_repair_junction_no_git_changes.log
 fi
 ```
 
@@ -512,7 +512,7 @@ Locate the block in `scripts/procgen/generated_ship_loader.gd` that appends to `
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'LOADER PLAYABLE CONTRACT PASS'
 ```
@@ -523,11 +523,11 @@ Expected: loader contract smoke still passes (marker present, no new errors).
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/procgen/generated_ship_loader.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'feat(objective): loader parses repair_junction kind and steps'
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/procgen/generated_ship_loader.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'feat(objective): loader parses repair_junction kind and steps'
 else
-  printf '%s\n' 'NO_GIT Task 4: scripts/procgen/generated_ship_loader.gd extended with kind/steps parsing' >> /tmp/synapse_sea_repair_junction_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 4: scripts/procgen/generated_ship_loader.gd extended with kind/steps parsing' >> /tmp/synaptic_sea_repair_junction_no_git_changes.log
 fi
 ```
 
@@ -732,10 +732,10 @@ func get_objective_progress_summary() -> Dictionary:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/objective_progress_state_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/objective_progress_state_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'OBJECTIVE PROGRESS STATE PASS'
-OUT2=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/route_control_state_smoke.gd 2>&1)
+OUT2=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/route_control_state_smoke.gd 2>&1)
 printf '%s\n' "$OUT2"
 printf '%s\n' "$OUT2" | grep -q 'ROUTE CONTROL STATE PASS'
 ```
@@ -746,11 +746,11 @@ Expected: both pass markers present; no new `ERROR:`/`WARNING:` lines.
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/procgen/playable_generated_ship.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'feat(objective): wire multi-step repair junction completion'
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/procgen/playable_generated_ship.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'feat(objective): wire multi-step repair junction completion'
 else
-  printf '%s\n' 'NO_GIT Task 5: scripts/procgen/playable_generated_ship.gd wired for multi-step objectives' >> /tmp/synapse_sea_repair_junction_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 5: scripts/procgen/playable_generated_ship.gd wired for multi-step objectives' >> /tmp/synaptic_sea_repair_junction_no_git_changes.log
 fi
 ```
 
@@ -809,7 +809,7 @@ func _current_objective_display() -> String:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_hud_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_hud_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'MAIN PLAYABLE HUD PASS'
 ```
@@ -820,11 +820,11 @@ Expected: HUD smoke still passes.
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/ui/objective_tracker.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'feat(objective): tracker shows repair junction step progress'
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/ui/objective_tracker.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'feat(objective): tracker shows repair junction step progress'
 else
-  printf '%s\n' 'NO_GIT Task 6: scripts/ui/objective_tracker.gd shows multi-step progress text' >> /tmp/synapse_sea_repair_junction_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 6: scripts/ui/objective_tracker.gd shows multi-step progress text' >> /tmp/synaptic_sea_repair_junction_no_git_changes.log
 fi
 ```
 
@@ -979,7 +979,7 @@ func _cleanup_and_quit(code: int) -> void:
 At this point the smoke will likely fail because the gameplay slice still uses a single-step sequence 2. Run it once to confirm the failure is due to missing `repair_junction` data, not code errors:
 
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_objective_variation_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_objective_variation_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 ```
 
@@ -989,11 +989,11 @@ Expected: marker `MAIN PLAYABLE OBJECTIVE VARIATION PASS` is absent; failure rea
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/validation/main_playable_slice_objective_variation_smoke.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'test(objective): RED main-scene objective variation smoke'
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/validation/main_playable_slice_objective_variation_smoke.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'test(objective): RED main-scene objective variation smoke'
 else
-  printf '%s\n' 'NO_GIT Task 7 RED: scripts/validation/main_playable_slice_objective_variation_smoke.gd added; fails until gameplay_slice data updated' >> /tmp/synapse_sea_repair_junction_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 7 RED: scripts/validation/main_playable_slice_objective_variation_smoke.gd added; fails until gameplay_slice data updated' >> /tmp/synaptic_sea_repair_junction_no_git_changes.log
 fi
 ```
 
@@ -1010,7 +1010,7 @@ fi
 
 - [ ] **Step 1: Find valid floor cells in `maintenance_01`**
 
-Read `/Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017/layout.json` and locate the `maintenance_01` room. Identify at least two distinct floor cell placements (e.g., `floor_cell_x14_z0` and `floor_cell_x13_z0`) that are inside the room and navigable.
+Read `/Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017/layout.json` and locate the `maintenance_01` room. Identify at least two distinct floor cell placements (e.g., `floor_cell_x14_z0` and `floor_cell_x13_z0`) that are inside the room and navigable.
 
 If the existing single-step sequence-2 objective uses `approach_cell [14, 0, 1]`, choose adjacent floor cells in the same room for the two steps, such as:
 - primary_coupling: `[14, 0, 1]`
@@ -1076,7 +1076,7 @@ Replace the second objective entry (sequence 2) in `data/procgen/smoke/seed_0000
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'LOADER PLAYABLE CONTRACT PASS'
 ```
@@ -1087,7 +1087,7 @@ Expected: loader contract smoke passes and the new objective spec includes `kind
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_objective_variation_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_objective_variation_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'MAIN PLAYABLE OBJECTIVE VARIATION PASS'
 if printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' >/dev/null; then
@@ -1102,11 +1102,11 @@ Expected: output contains `MAIN PLAYABLE OBJECTIVE VARIATION PASS sequence=2 ste
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add data/procgen/smoke/seed_000017/gameplay_slice.json
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'data(objective): replace sequence 2 with repair_junction'
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add data/procgen/smoke/seed_000017/gameplay_slice.json
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'data(objective): replace sequence 2 with repair_junction'
 else
-  printf '%s\n' 'NO_GIT Task 8: data/procgen/smoke/seed_000017/gameplay_slice.json updated with repair_junction at sequence 2' >> /tmp/synapse_sea_repair_junction_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 8: data/procgen/smoke/seed_000017/gameplay_slice.json updated with repair_junction at sequence 2' >> /tmp/synaptic_sea_repair_junction_no_git_changes.log
 fi
 ```
 
@@ -1132,7 +1132,7 @@ run_clean 'main objective variation smoke' 'MAIN PLAYABLE OBJECTIVE VARIATION PA
 
 Also update the final echo line from `commands=8` to `commands=10`:
 ```bash
-echo 'SYNAPSE_SEA REGRESSION PASS commands=10 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=10 clean_output=true'
 ```
 
 - [ ] **Step 2: Update "Future validation additions"**
@@ -1151,17 +1151,17 @@ with:
 
 Run the complete regression bundle script from `docs/game/06_validation_plan.md`.
 
-Expected: all 10 smokes pass and the final line prints `SYNAPSE_SEA REGRESSION PASS commands=10 clean_output=true`.
+Expected: all 10 smokes pass and the final line prints `SYNAPTIC_SEA REGRESSION PASS commands=10 clean_output=true`.
 
 - [ ] **Step 4: Record Task 9**
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add docs/game/06_validation_plan.md
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'docs(validation): add REQ-011 smokes to regression bundle'
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add docs/game/06_validation_plan.md
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'docs(validation): add REQ-011 smokes to regression bundle'
 else
-  printf '%s\n' 'NO_GIT Task 9: docs/game/06_validation_plan.md updated with REQ-011 smokes' >> /tmp/synapse_sea_repair_junction_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 9: docs/game/06_validation_plan.md updated with REQ-011 smokes' >> /tmp/synaptic_sea_repair_junction_no_git_changes.log
 fi
 ```
 
@@ -1173,8 +1173,8 @@ fi
 
 Run:
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/objective_progress_state_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_objective_variation_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/objective_progress_state_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_objective_variation_smoke.gd
 ```
 
 Expected markers:
@@ -1185,13 +1185,13 @@ Expected markers:
 
 Use the updated bundle in `docs/game/06_validation_plan.md`.
 
-Expected: `SYNAPSE_SEA REGRESSION PASS commands=10 clean_output=true`.
+Expected: `SYNAPTIC_SEA REGRESSION PASS commands=10 clean_output=true`.
 
 - [ ] **Step 3: Inspect the no-git ledger**
 
 Run:
 ```bash
-cat /tmp/synapse_sea_repair_junction_no_git_changes.log 2>/dev/null || echo 'no no-git ledger'
+cat /tmp/synaptic_sea_repair_junction_no_git_changes.log 2>/dev/null || echo 'no no-git ledger'
 ```
 
 - [ ] **Step 4: Record completion and unblock the implement card**
@@ -1209,7 +1209,7 @@ Then mark this plan card complete.
 
 ## Stop / Block Conditions
 
-Block and escalate to `synapse_sea_review` if any of the following occur:
+Block and escalate to `synaptic_sea_review` if any of the following occur:
 
 - The implementation would alter route/extraction rules, advance ship systems before all steps complete, or call `ShipSystemState.apply_objective()` more than once for a sequence.
 - A change breaks an existing smoke in `docs/game/06_validation_plan.md` and the breakage is not a straightforward regression in the new feature itself.

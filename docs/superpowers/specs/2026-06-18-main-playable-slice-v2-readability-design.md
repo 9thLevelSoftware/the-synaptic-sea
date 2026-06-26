@@ -1,8 +1,8 @@
 # Main Playable Slice v2 — Readable Ship, Real Props Design
 
 Date: 2026-06-18
-Project: The Synapse Sea
-Godot project: `/Users/christopherwilloughby/the-synapse-sea-of-stars`
+Project: The Synaptic Sea
+Godot project: `/Users/christopherwilloughby/the-synaptic-sea-of-stars`
 Godot version target: `4.6.2.stable.official.71f334935`
 Workspace state: no git repository; use the no-git record ledger instead of commits.
 
@@ -222,7 +222,7 @@ The milestone is accepted when:
 This workspace is not inside a git repository. The implementation plan should use the established fallback ledger pattern and append changed-file records to:
 
 ```text
-/tmp/synapse_sea_main_playable_slice_v2_readability_no_git_changes.log
+/tmp/synaptic_sea_main_playable_slice_v2_readability_no_git_changes.log
 ```
 
 The design document itself should be recorded with:

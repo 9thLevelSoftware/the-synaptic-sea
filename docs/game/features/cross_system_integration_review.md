@@ -46,7 +46,7 @@ Task 14 introduces five pure models:
 - `E2E SHIP META LOOP PASS`
 - `PRODUCT AUDIT PASS`
 - Explicit Kanban follow-up for the live main-scene/controller-path e2e probe (`t_4e47145d`, now complete).
-- Full-bundle marker `SYNAPSE_SEA REGRESSION PASS commands=163 clean_output=true` after resolving the tracked rigid-pair/adjacent validation preconditions.
+- Full-bundle marker `SYNAPTIC_SEA REGRESSION PASS commands=163 clean_output=true` after resolving the tracked rigid-pair/adjacent validation preconditions.
 
 ## Rules
 
@@ -84,7 +84,7 @@ Affected files:
 - Given combat, loot, inventory, material, and crafting models, when `e2e_combat_loot_craft_smoke.gd` runs, then a damage event, deterministic loot roll, and `power_cell` craft all compose in one smoke.
 - Given power routing, meta payout, and hub upgrade models, when `e2e_ship_meta_loop_smoke.gd` runs, then a repaired/returned run can buy `hub_storage_basic`.
 - Given the product audit report, when `product_audit_smoke.gd` runs, then all contradictions have linked fix cards and no untracked blockers remain.
-- Given the full regression bundle in `docs/game/06_validation_plan.md`, when it runs against the Task 14 retry workspace, then it emits `SYNAPSE_SEA REGRESSION PASS commands=163 clean_output=true` with no unallowlisted `ERROR:`/`WARNING:` lines.
+- Given the full regression bundle in `docs/game/06_validation_plan.md`, when it runs against the Task 14 retry workspace, then it emits `SYNAPTIC_SEA REGRESSION PASS commands=163 clean_output=true` with no unallowlisted `ERROR:`/`WARNING:` lines.
 
 ## Validation
 

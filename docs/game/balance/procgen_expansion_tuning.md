@@ -12,7 +12,7 @@ The three shipped biomes (defined under `data/procgen/biomes/`):
 
 | id | hazard | loot quality | encounter density | ambient intensity |
 |---|---|---|---|---|
-| abyssal_synapse_sea | 1.0 | 1.0 | 1.0 | 1.0 |
+| abyssal_synaptic_sea | 1.0 | 1.0 | 1.0 | 1.0 |
 | breach_field | 1.4 | 1.1 | 1.3 | 0.85 |
 | dead_fleet | 1.1 | 1.4 | 0.8 | 1.1 |
 
@@ -43,9 +43,9 @@ to the upper end of the safe range.
 
 Final hazard multiplier = `biome.hazard_modifier × difficulty.hazard_modifier`.
 
-- abyssal_synapse_sea × standard = **1.0**
-- abyssal_synapse_sea × hardened = **1.4**
-- abyssal_synapse_sea × deep_dive = **1.7**
+- abyssal_synaptic_sea × standard = **1.0**
+- abyssal_synaptic_sea × hardened = **1.4**
+- abyssal_synaptic_sea × deep_dive = **1.7**
 - breach_field × standard = **1.4**
 - breach_field × hardened = **1.96** (safe, under 3.0)
 - breach_field × deep_dive = **2.38** (safe, under 3.0; upper edge)
@@ -78,7 +78,7 @@ p_final = clamp(base_probability[role] × combined_density, 0.0, 1.0)
 
 For a `breach_field × deep_dive` ship (combined_density clamped to 1.0),
 cargo rooms fire 25%, engineering 30%, maintenance 35%, reactor 40%.
-For a `standard × abyssal_synapse_sea` ship (combined_density 1.0), the
+For a `standard × abyssal_synaptic_sea` ship (combined_density 1.0), the
 same numbers apply — but in practice the encounter_injector_smoke
 verifies that a 10-room layout with all-cargo roles fires >= 1
 marker in the deep_dive+breach_field combination.
@@ -101,14 +101,14 @@ delta even when the layout and biome are identical.
 `KitCatalog.kits_for_role(role, biome)` consults the biome_preference
 map in each kit JSON. The shipped kits declare:
 
-| kit | abyssal_synapse_sea | breach_field | dead_fleet |
+| kit | abyssal_synaptic_sea | breach_field | dead_fleet |
 |---|---|---|---|
 | ship_structural_v0 | default | default | default |
 | ship_structural_hazard | 0.4 | 0.9 | 0.3 |
 | ship_structural_industrial | 0.4 | 0.3 | 0.9 |
 
 `breach_field` selects the hazard kit by 0.9 affinity; `dead_fleet`
-selects the industrial kit by 0.9 affinity. `abyssal_synapse_sea`
+selects the industrial kit by 0.9 affinity. `abyssal_synaptic_sea`
 defaults to the legacy kit (no kit exceeds 0.4).
 
 ## Determinism contract

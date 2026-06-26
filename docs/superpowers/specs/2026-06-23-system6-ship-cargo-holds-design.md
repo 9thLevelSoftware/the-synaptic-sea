@@ -286,7 +286,7 @@ smoke must pass unchanged (the `ItemDefs` extract regression guard).
 
 Bundle count: **101 → 104**. Register all three markers in
 `docs/game/06_validation_plan.md`; the run must end
-`SYNAPSE_SEA REGRESSION PASS commands=104 clean_output=true`, and Gate-1 must still
+`SYNAPTIC_SEA REGRESSION PASS commands=104 clean_output=true`, and Gate-1 must still
 return GO 2.00.
 
 ## Documentation

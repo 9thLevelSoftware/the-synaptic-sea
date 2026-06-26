@@ -22,9 +22,9 @@
       "notes": "Visual-only tendrils; must never affect pathfinding."
     },
     "source_asset_path": "assets/_source/organic/web_tendril_strip.glb",
-    "wrapper_scene": "/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-05-dependent-biomatter-tendril-ast-dress-web-tendrils.tscn",
-    "contract_path": "/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-05-dependent-biomatter-tendril-ast-dress-web-tendrils.contract.tres",
-    "inspection_path": "/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-05-dependent-biomatter-tendril-ast-dress-web-tendrils.inspection.json",
+    "wrapper_scene": "/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-05-dependent-biomatter-tendril-ast-dress-web-tendrils.tscn",
+    "contract_path": "/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-05-dependent-biomatter-tendril-ast-dress-web-tendrils.contract.tres",
+    "inspection_path": "/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-05-dependent-biomatter-tendril-ast-dress-web-tendrils.inspection.json",
     "support": {
       "required_surfaces": [
         "wall",

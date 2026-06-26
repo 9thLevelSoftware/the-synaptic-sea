@@ -1349,7 +1349,7 @@ git commit -m "feat(docking): world-4 hangar-edge persistence + bay restore (5d)
 
 **Interfaces:**
 - Consumes: all prior tasks.
-- Produces: ADR-0019; updated roadmap marking 5d built (System 5 complete); the regression bundle runs the 6 new smokes and ends `SYNAPSE_SEA REGRESSION PASS commands=100 clean_output=true`.
+- Produces: ADR-0019; updated roadmap marking 5d built (System 5 complete); the regression bundle runs the 6 new smokes and ends `SYNAPTIC_SEA REGRESSION PASS commands=100 clean_output=true`.
 
 - [ ] **Step 1: Write ADR-0019** — `docs/game/adr/0019-hangar-nesting.md`. Mirror the structure of `docs/game/adr/0018-claim-and-pilot-switch.md` (Status / Context / Decision / Consequences / Validation). Record: hangar as an asymmetric port type on the existing dock forest; `HangarBay` fixed-slot model (slot_count from footprint, size-class gate); `HangarBayControl` physical walk-up dock/launch (no HUD); the cargo-room fallback for the home bay (no golden-fixture churn); arbitrary-depth DFS rigid-pair travel replacing the one-level reposition; world-4 edge fields (`port_type`, `slot_index`). Cross-reference ADR-0016/0017/0018. Note the deferred items: screen-space hangar UI (Phase 7), cross-ship inventory transfer (System 6), recursion of bays-within-bays beyond a single carrier chain is supported by the forest but a bay cannot itself be stored in another bay.
 
@@ -1366,7 +1366,7 @@ git commit -m "feat(docking): world-4 hangar-edge persistence + bay restore (5d)
   - `recursive_travel_smoke` → `RECURSIVE TRAVEL SMOKE PASS`
   - `hangar_persistence_smoke` → `HANGAR PERSISTENCE SMOKE PASS`
 
-  Bump the command count in the final echo from `commands=94` to `commands=100` and update any header count comment. (Confirm the actual prior count by reading the file's final `SYNAPSE_SEA REGRESSION PASS commands=N` line; if it is not 94, use `N` and `N+6`.)
+  Bump the command count in the final echo from `commands=94` to `commands=100` and update any header count comment. (Confirm the actual prior count by reading the file's final `SYNAPTIC_SEA REGRESSION PASS commands=N` line; if it is not 94, use `N` and `N+6`.)
 
 - [ ] **Step 4: Run the full regression bundle (drift stashed)**
 
@@ -1378,7 +1378,7 @@ sed -n '30,171p' docs/game/06_validation_plan.md > /tmp/bundle.sh
 GODOT="C:/Users/dasbl/Documents/Godot/Godot_v4.6.2-stable_win64_console.exe" ROOT="$ROOT" bash /tmp/bundle.sh
 git stash pop
 ```
-Expected final line: `SYNAPSE_SEA REGRESSION PASS commands=100 clean_output=true`. If any smoke fails, fix it before proceeding (do NOT edit the marker to pass).
+Expected final line: `SYNAPTIC_SEA REGRESSION PASS commands=100 clean_output=true`. If any smoke fails, fix it before proceeding (do NOT edit the marker to pass).
 
 - [ ] **Step 5: Run the Gate-1 automated playtest (drift stashed)**
 

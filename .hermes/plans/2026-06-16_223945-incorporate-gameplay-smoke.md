@@ -13,7 +13,7 @@
 The current state is real validation, not real playable game UI:
 
 - Real today:
-  - `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_ship_gameplay_smoke.gd` loads `layout.json`, kit JSON, and `gameplay_slice.json`.
+  - `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_ship_gameplay_smoke.gd` loads `layout.json`, kit JSON, and `gameplay_slice.json`.
   - It instantiates structural wrappers in Godot.
   - It bakes a navmesh from generated floor/corridor cells.
   - It adds vertical `NavigationLink3D` records.
@@ -21,8 +21,8 @@ The current state is real validation, not real playable game UI:
   - It drives a scripted `NavigationAgent3D` through all objectives and goal.
   - Fresh evidence: `GAMEPLAY SMOKE PASS objectives=4 interactions=4 frames=4318 final_distance=0.766`.
 - Not real in the playable game yet:
-  - `/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/main.tscn` only has a root, camera, and light.
-  - `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/main.gd` only prints a bootstrap message.
+  - `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/main.tscn` only has a root, camera, and light.
+  - `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/main.gd` only prints a bootstrap message.
   - No runtime ship loader is used by `main.tscn`.
   - No visible player/debug actor exists in the normal game scene.
   - No in-game objective tracker exists.
@@ -60,7 +60,7 @@ Do not do these in this implementation pass:
 
 Primary Godot project:
 
-- `/Users/christopherwilloughby/the-synapse-sea-of-stars`
+- `/Users/christopherwilloughby/the-synaptic-sea-of-stars`
 
 Procgen / tests / bundle project:
 
@@ -112,19 +112,19 @@ Runtime validation script proves same path headlessly
 
 Godot project:
 
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/generated_ship_loader.gd`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/gameplay_objective_volume.gd`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/procgen_debug_runner.gd`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/generated_ship_demo.gd`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/ui/objective_tracker.gd`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/procgen/generated_ship_demo.tscn`
-- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/main.gd`
-- Optional modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/main.tscn`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_runtime_demo_smoke.gd`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_runtime_demo_capture.gd`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/data/kits/ship_structural_v0.json`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017/layout.json`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017/gameplay_slice.json`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/generated_ship_loader.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/gameplay_objective_volume.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/procgen_debug_runner.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/generated_ship_demo.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/ui/objective_tracker.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/procgen/generated_ship_demo.tscn`
+- Modify: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/main.gd`
+- Optional modify: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/main.tscn`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_runtime_demo_smoke.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_runtime_demo_capture.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/data/kits/ship_structural_v0.json`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017/layout.json`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017/gameplay_slice.json`
 
 Infra project:
 
@@ -143,7 +143,7 @@ Infra project:
 **Files:**
 
 - Create: `/Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py`
-- Expected missing for RED: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_runtime_demo_smoke.gd`
+- Expected missing for RED: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_runtime_demo_smoke.gd`
 
 **Step 1: Write failing test**
 
@@ -158,7 +158,7 @@ from pathlib import Path
 import pytest
 
 GODOT = Path("/Users/christopherwilloughby/.local/bin/godot-4.6.2")
-GODOT_PROJECT = Path("/Users/christopherwilloughby/the-synapse-sea-of-stars")
+GODOT_PROJECT = Path("/Users/christopherwilloughby/the-synaptic-sea-of-stars")
 SCRIPT = GODOT_PROJECT / "scripts" / "validation" / "procgen_runtime_demo_smoke.gd"
 
 
@@ -233,9 +233,9 @@ If not a git repository, record the diff path in the implementation notes and co
 
 **Files:**
 
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/data/kits/ship_structural_v0.json`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017/layout.json`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017/gameplay_slice.json`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/data/kits/ship_structural_v0.json`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017/layout.json`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017/gameplay_slice.json`
 
 **Step 1: Write failing fixture existence test**
 
@@ -264,24 +264,24 @@ Use the already proven bundle command as the source of truth:
 
 ```bash
 cd /Users/christopherwilloughby/off-the-rails-ai-infra
-rm -rf /tmp/synapse_sea_runtime_demo_fixture
+rm -rf /tmp/synaptic_sea_runtime_demo_fixture
 python3 tools/build_ship_prototype_bundle.py \
   --seed 17 \
   --room-count 8 \
   --deck-count 2 \
   --vertical-transition-count 1 \
-  --output-root /tmp/synapse_sea_runtime_demo_fixture \
+  --output-root /tmp/synaptic_sea_runtime_demo_fixture \
   --skip-render \
   --gameplay-smoke
 
-mkdir -p /Users/christopherwilloughby/the-synapse-sea-of-stars/data/kits
-mkdir -p /Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017
+mkdir -p /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/kits
+mkdir -p /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017
 cp data/kits/ship_structural_v0.json \
-  /Users/christopherwilloughby/the-synapse-sea-of-stars/data/kits/ship_structural_v0.json
-cp /tmp/synapse_sea_runtime_demo_fixture/seed_000017/layout.json \
-  /Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017/layout.json
-cp /tmp/synapse_sea_runtime_demo_fixture/seed_000017/gameplay_slice.json \
-  /Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017/gameplay_slice.json
+  /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/kits/ship_structural_v0.json
+cp /tmp/synaptic_sea_runtime_demo_fixture/seed_000017/layout.json \
+  /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017/layout.json
+cp /tmp/synaptic_sea_runtime_demo_fixture/seed_000017/gameplay_slice.json \
+  /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017/gameplay_slice.json
 ```
 
 Expected: bundle exit 0 and three fixture files copied.
@@ -299,9 +299,9 @@ Expected: PASS.
 
 ```bash
 git add \
-  /Users/christopherwilloughby/the-synapse-sea-of-stars/data/kits/ship_structural_v0.json \
-  /Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017/layout.json \
-  /Users/christopherwilloughby/the-synapse-sea-of-stars/data/procgen/smoke/seed_000017/gameplay_slice.json \
+  /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/kits/ship_structural_v0.json \
+  /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017/layout.json \
+  /Users/christopherwilloughby/the-synaptic-sea-of-stars/data/procgen/smoke/seed_000017/gameplay_slice.json \
   /Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py
 git commit -m "test: add runtime procgen demo fixture"
 ```
@@ -314,7 +314,7 @@ git commit -m "test: add runtime procgen demo fixture"
 
 **Files:**
 
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/gameplay_objective_volume.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/gameplay_objective_volume.gd`
 - Test: `/Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py`
 
 **Step 1: Add failing text-level test**
@@ -346,7 +346,7 @@ Expected: FAIL because the script does not exist.
 
 **Step 3: Implement script**
 
-Create `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/gameplay_objective_volume.gd`:
+Create `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/gameplay_objective_volume.gd`:
 
 ```gdscript
 extends Area3D
@@ -417,7 +417,7 @@ Expected: PASS.
 
 ```bash
 git add \
-  /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/gameplay_objective_volume.gd \
+  /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/gameplay_objective_volume.gd \
   /Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py
 git commit -m "feat: add runtime gameplay objective volume"
 ```
@@ -430,8 +430,8 @@ git commit -m "feat: add runtime gameplay objective volume"
 
 **Files:**
 
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/generated_ship_loader.gd`
-- Use as source reference only: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_ship_gameplay_smoke.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/generated_ship_loader.gd`
+- Use as source reference only: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_ship_gameplay_smoke.gd`
 - Test: `/Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py`
 
 **Step 1: Add failing text-level test**
@@ -465,7 +465,7 @@ Expected: FAIL.
 
 **Step 3: Implement minimal runtime loader**
 
-Create `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/generated_ship_loader.gd`.
+Create `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/generated_ship_loader.gd`.
 
 Use this structure and copy the proven helper bodies from `procgen_ship_gameplay_smoke.gd` rather than inventing new behavior:
 
@@ -593,7 +593,7 @@ Expected: PASS.
 
 ```bash
 git add \
-  /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/generated_ship_loader.gd \
+  /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/generated_ship_loader.gd \
   /Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py
 git commit -m "feat: add generated ship runtime loader"
 ```
@@ -606,7 +606,7 @@ git commit -m "feat: add generated ship runtime loader"
 
 **Files:**
 
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/procgen_debug_runner.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/procgen_debug_runner.gd`
 - Test: `/Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py`
 
 **Step 1: Add failing text-level test**
@@ -639,7 +639,7 @@ Expected: FAIL.
 
 **Step 3: Implement debug runner**
 
-Create `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/procgen_debug_runner.gd`:
+Create `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/procgen_debug_runner.gd`:
 
 ```gdscript
 extends Node3D
@@ -778,7 +778,7 @@ Expected: PASS.
 
 ```bash
 git add \
-  /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/procgen_debug_runner.gd \
+  /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/procgen_debug_runner.gd \
   /Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py
 git commit -m "feat: add visible procgen debug runner"
 ```
@@ -791,7 +791,7 @@ git commit -m "feat: add visible procgen debug runner"
 
 **Files:**
 
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/ui/objective_tracker.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/ui/objective_tracker.gd`
 - Test: `/Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py`
 
 **Step 1: Add failing text-level test**
@@ -822,7 +822,7 @@ Expected: FAIL.
 
 **Step 3: Implement UI script**
 
-Create `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/ui/objective_tracker.gd`:
+Create `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/ui/objective_tracker.gd`:
 
 ```gdscript
 extends Control
@@ -889,7 +889,7 @@ Expected: PASS.
 
 ```bash
 git add \
-  /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/ui/objective_tracker.gd \
+  /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/ui/objective_tracker.gd \
   /Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py
 git commit -m "feat: add procgen objective tracker UI"
 ```
@@ -902,8 +902,8 @@ git commit -m "feat: add procgen objective tracker UI"
 
 **Files:**
 
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/generated_ship_demo.gd`
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/procgen/generated_ship_demo.tscn`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/generated_ship_demo.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/procgen/generated_ship_demo.tscn`
 - Test: `/Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py`
 
 **Step 1: Add failing text-level test**
@@ -940,7 +940,7 @@ Expected: FAIL.
 
 **Step 3: Implement demo controller**
 
-Create `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/generated_ship_demo.gd`:
+Create `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/generated_ship_demo.gd`:
 
 ```gdscript
 extends Node3D
@@ -1030,7 +1030,7 @@ func _on_run_failed(reason: String, frame_count: int, interaction_count: int) ->
 
 **Step 4: Create demo scene**
 
-Create `/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/procgen/generated_ship_demo.tscn`:
+Create `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/procgen/generated_ship_demo.tscn`:
 
 ```ini
 [gd_scene load_steps=2 format=3]
@@ -1054,8 +1054,8 @@ Expected: PASS.
 
 ```bash
 git add \
-  /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/procgen/generated_ship_demo.gd \
-  /Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/procgen/generated_ship_demo.tscn \
+  /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/procgen/generated_ship_demo.gd \
+  /Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/procgen/generated_ship_demo.tscn \
   /Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py
 git commit -m "feat: add generated ship gameplay demo scene"
 ```
@@ -1068,8 +1068,8 @@ git commit -m "feat: add generated ship gameplay demo scene"
 
 **Files:**
 
-- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/main.gd`
-- Optional modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/main.tscn`
+- Modify: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/main.gd`
+- Optional modify: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/main.tscn`
 - Test: `/Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py`
 
 **Step 1: Add failing text-level test**
@@ -1095,7 +1095,7 @@ Expected: FAIL.
 
 **Step 3: Replace minimal bootstrap with demo loader**
 
-Modify `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/main.gd`:
+Modify `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/main.gd`:
 
 ```gdscript
 extends Node3D
@@ -1103,7 +1103,7 @@ extends Node3D
 const GENERATED_SHIP_DEMO_SCENE := preload("res://scenes/procgen/generated_ship_demo.tscn")
 
 func _ready() -> void:
-    print("The Synapse Sea project bootstrap loaded.")
+    print("The Synaptic Sea project bootstrap loaded.")
     var demo := GENERATED_SHIP_DEMO_SCENE.instantiate()
     demo.name = "GeneratedShipDemo"
     add_child(demo)
@@ -1122,7 +1122,7 @@ Expected: PASS.
 
 ```bash
 git add \
-  /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/main.gd \
+  /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/main.gd \
   /Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py
 git commit -m "feat: launch procgen gameplay demo from main scene"
 ```
@@ -1135,7 +1135,7 @@ git commit -m "feat: launch procgen gameplay demo from main scene"
 
 **Files:**
 
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_runtime_demo_smoke.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_runtime_demo_smoke.gd`
 - Test: `/Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py`
 
 **Step 1: Confirm RED still fails**
@@ -1151,7 +1151,7 @@ Expected: FAIL until this script exists and runtime code works.
 
 **Step 2: Implement runtime smoke script**
 
-Create `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_runtime_demo_smoke.gd`:
+Create `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_runtime_demo_smoke.gd`:
 
 ```gdscript
 extends SceneTree
@@ -1218,7 +1218,7 @@ Expected: PASS and output contains `RUNTIME GAMEPLAY DEMO PASS objectives=4 inte
 
 ```bash
 git add \
-  /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_runtime_demo_smoke.gd \
+  /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_runtime_demo_smoke.gd \
   /Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py
 git commit -m "test: add runtime gameplay demo smoke"
 ```
@@ -1231,7 +1231,7 @@ git commit -m "test: add runtime gameplay demo smoke"
 
 **Files:**
 
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_runtime_demo_capture.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_runtime_demo_capture.gd`
 - Test: `/Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py`
 
 **Step 1: Add failing test**
@@ -1283,7 +1283,7 @@ Expected: FAIL because capture script does not exist.
 
 **Step 3: Implement capture script**
 
-Create `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_runtime_demo_capture.gd`:
+Create `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_runtime_demo_capture.gd`:
 
 ```gdscript
 extends SceneTree
@@ -1353,11 +1353,11 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_runtime_demo_capture.gd -- \
-  --output /tmp/synapse_sea_runtime_gameplay_demo.png \
+  --output /tmp/synaptic_sea_runtime_gameplay_demo.png \
   --capture-frame 240
-open /tmp/synapse_sea_runtime_gameplay_demo.png
+open /tmp/synaptic_sea_runtime_gameplay_demo.png
 ```
 
 Expected: PNG opens and shows the generated ship scene from the Godot viewport.
@@ -1366,7 +1366,7 @@ Expected: PNG opens and shows the generated ship scene from the Godot viewport.
 
 ```bash
 git add \
-  /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/procgen_runtime_demo_capture.gd \
+  /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/procgen_runtime_demo_capture.gd \
   /Users/christopherwilloughby/off-the-rails-ai-infra/tests/test_godot_procgen_runtime_demo.py
 git commit -m "test: add runtime gameplay demo viewport capture"
 ```
@@ -1434,7 +1434,7 @@ def test_export_runtime_demo_fixture_helper_has_expected_paths() -> None:
     text = helper.read_text(encoding="utf-8")
 
     assert "build_ship_prototype_bundle.py" in text
-    assert "the-synapse-sea-of-stars" in text
+    assert "the-synaptic-sea-of-stars" in text
     assert "data/procgen/smoke/seed_000017" in text
     assert "ship_structural_v0.json" in text
 ```
@@ -1469,7 +1469,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_GODOT_PROJECT = Path("/Users/christopherwilloughby/the-synapse-sea-of-stars")
+DEFAULT_GODOT_PROJECT = Path("/Users/christopherwilloughby/the-synaptic-sea-of-stars")
 
 
 def parse_args() -> argparse.Namespace:
@@ -1479,7 +1479,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--room-count", type=int, default=8)
     parser.add_argument("--deck-count", type=int, default=2)
     parser.add_argument("--vertical-transition-count", type=int, default=1)
-    parser.add_argument("--work-root", type=Path, default=Path("/tmp/synapse_sea_runtime_demo_fixture"))
+    parser.add_argument("--work-root", type=Path, default=Path("/tmp/synaptic_sea_runtime_demo_fixture"))
     return parser.parse_args()
 
 
@@ -1608,7 +1608,7 @@ Expected: `Summary: passed=5 failed=0 scenes=5`.
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_runtime_demo_smoke.gd -- \
   --timeout-frames 9000
 ```
@@ -1624,11 +1624,11 @@ RUNTIME GAMEPLAY DEMO PASS objectives=4 interactions=4 frames=<n> final_distance
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/procgen_runtime_demo_capture.gd -- \
-  --output /tmp/synapse_sea_runtime_gameplay_demo.png \
+  --output /tmp/synaptic_sea_runtime_gameplay_demo.png \
   --capture-frame 240
-open /tmp/synapse_sea_runtime_gameplay_demo.png
+open /tmp/synaptic_sea_runtime_gameplay_demo.png
 ```
 
 Expected:
@@ -1641,7 +1641,7 @@ Expected:
 
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars
 ```
 
 Expected:

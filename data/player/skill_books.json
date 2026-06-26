@@ -47,7 +47,7 @@
       "target_skill": "pharmacology",
       "book_xp": 200,
       "unlocks_skill": "",
-      "description": "Stimulant and stabilizer recipes for Synapse Sea exposure."
+      "description": "Stimulant and stabilizer recipes for Synaptic Sea exposure."
     },
     {
       "book_id": "astrogation_almanac",
@@ -55,7 +55,7 @@
       "target_skill": "astrogation",
       "book_xp": 200,
       "unlocks_skill": "",
-      "description": "Charts of every drift pattern observed in the Synapse Sea."
+      "description": "Charts of every drift pattern observed in the Synaptic Sea."
     },
     {
       "book_id": "biomatter_signal_analysis",

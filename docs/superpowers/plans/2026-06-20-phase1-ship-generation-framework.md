@@ -8,7 +8,7 @@
 
 **Tech Stack:** Godot 4.6.2, GDScript, existing structural module kit (ship_structural_v0)
 
-**Spec:** `docs/superpowers/specs/2026-06-20-synapse-sea-core-systems-design.md` — System 1 + System 7
+**Spec:** `docs/superpowers/specs/2026-06-20-synaptic-sea-core-systems-design.md` — System 1 + System 7
 
 ---
 
@@ -161,7 +161,7 @@ func _init() -> void:
 
 - [ ] **Step 3: Run smoke to verify it passes**
 
-Run: `/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/ship_blueprint_smoke.gd`
+Run: `/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/ship_blueprint_smoke.gd`
 Expected: `SHIP BLUEPRINT PASS sizes=3 conditions=3 serialization=true`
 
 - [ ] **Step 4: Commit**
@@ -300,7 +300,7 @@ func _init() -> void:
 
 - [ ] **Step 3: Run smoke to verify it passes**
 
-Run: `/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/room_graph_smoke.gd`
+Run: `/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/room_graph_smoke.gd`
 Expected: `ROOM GRAPH PASS rooms=3 links=2 connected=true disconnected_detected=true serialization=true`
 
 - [ ] **Step 4: Commit**
@@ -463,7 +463,7 @@ func _init() -> void:
 
 - [ ] **Step 3: Run smoke to verify it passes**
 
-Run: `/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/room_graph_generator_smoke.gd`
+Run: `/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/room_graph_generator_smoke.gd`
 Expected: `ROOM GRAPH GENERATOR PASS life_boat=2-4 small=4-8 medium=8-12 deterministic=true`
 
 - [ ] **Step 4: Commit**
@@ -575,7 +575,7 @@ func _init() -> void:
 
 - [ ] **Step 3: Run smoke to verify it passes**
 
-Run: `/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/structural_placer_smoke.gd`
+Run: `/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/structural_placer_smoke.gd`
 Expected: `STRUCTURAL PLACER PASS rooms=2-4 modules=N`
 
 - [ ] **Step 4: Commit**
@@ -651,7 +651,7 @@ func _init() -> void:
 
 - [ ] **Step 3: Run smoke to verify it passes**
 
-Run: `/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/ship_generator_smoke.gd`
+Run: `/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/ship_generator_smoke.gd`
 Expected: `SHIP GENERATOR PASS life_boat=true small=true deterministic=true`
 
 - [ ] **Step 4: Commit**
@@ -691,7 +691,7 @@ func load_from_blueprint(blueprint: ShipBlueprint) -> void:
 
 - [ ] **Step 2: Run existing validation smokes to verify no regressions**
 
-Run: `/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_completion_smoke.gd`
+Run: `/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_completion_smoke.gd`
 Expected: `MAIN PLAYABLE SLICE COMPLETE PASS`
 
 - [ ] **Step 3: Commit**

@@ -55,7 +55,7 @@ func _validate_hud(playable: PlayableGeneratedShip) -> void:
 		return
 	var hud_text: String = tracker.get_hud_text()
 	var required: Array[String] = [
-		"Synapse Sea First Playable",
+		"Synaptic Sea First Playable",
 		"Current: 01 Recover Supplies",
 		"Controls: WASD or Arrows move / E or Enter or Space interact",
 		"Progress: 0/4",

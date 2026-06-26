@@ -2,7 +2,7 @@
 
 Source plan: `docs/game/build-plans/04-loot-ecosystem-e2e.md`
 Package range: REQ-LE-001..009
-Author: synapse_seaworker (Task 04)
+Author: synaptic_seaworker (Task 04)
 
 ## Existing seams extended, not replaced
 

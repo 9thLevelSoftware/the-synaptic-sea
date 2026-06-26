@@ -1,8 +1,8 @@
 # Coherent Proof Ship Design
 
 Date: 2026-06-17
-Project: The Synapse Sea
-Godot project: `/Users/christopherwilloughby/the-synapse-sea-of-stars`
+Project: The Synaptic Sea
+Godot project: `/Users/christopherwilloughby/the-synaptic-sea-of-stars`
 Godot version: `4.6.2.stable.official.71f334935`
 
 ## Purpose
@@ -291,4 +291,4 @@ After this proof is accepted, next candidates are:
 
 ## Repository Note
 
-At design-writing time, `/Users/christopherwilloughby/the-synapse-sea-of-stars` and `/Users/christopherwilloughby/off-the-rails-ai-infra` did not contain a `.git` repository from the shell. The design document can be written to disk, but a normal `git add` / `git commit` cannot succeed until the workspace is placed under git or a repository target is chosen.
+At design-writing time, `/Users/christopherwilloughby/the-synaptic-sea-of-stars` and `/Users/christopherwilloughby/off-the-rails-ai-infra` did not contain a `.git` repository from the shell. The design document can be written to disk, but a normal `git add` / `git commit` cannot succeed until the workspace is placed under git or a repository target is chosen.

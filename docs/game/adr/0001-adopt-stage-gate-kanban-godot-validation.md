@@ -1,4 +1,4 @@
-# ADR-0001: Adopt Stage-Gate + Kanban + Godot Validation as the Synapse Sea Operating Model
+# ADR-0001: Adopt Stage-Gate + Kanban + Godot Validation as the Synaptic Sea Operating Model
 
 ## Status
 
@@ -18,10 +18,10 @@ Web research found:
 
 ## Decision
 
-Use this operating model for Synapse Sea:
+Use this operating model for Synaptic Sea:
 
 1. Stage-Gate governance for milestone decisions.
-2. Kanban board `synapse-sea-stage-gate` for execution.
+2. Kanban board `synaptic-sea-stage-gate` for execution.
 3. Living docs under `docs/game/`.
 4. ADRs under `docs/game/adr/` for architecture/process decisions.
 5. Feature specs under `docs/game/features/` before implementation.
@@ -45,5 +45,5 @@ Negative/tradeoffs:
 
 - `docs/game/` scaffold exists.
 - `AGENTS.md` points future agents to the operating model.
-- Kanban board and Synapse Sea profiles exist.
+- Kanban board and Synaptic Sea profiles exist.
 - Future cards reference requirements/specs/validation.

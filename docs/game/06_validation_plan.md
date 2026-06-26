@@ -10,13 +10,13 @@ No completion claim without fresh validation evidence.
 
 ## Project root
 
-`/Users/christopherwilloughby/the-synapse-sea-of-stars`
+`/Users/christopherwilloughby/the-synaptic-sea-of-stars`
 
 ## Focused route-control validation
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/route_control_state_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/route_control_state_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
 ```
 
 Expected markers:
@@ -28,11 +28,11 @@ Expected markers:
 
 ```bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
+ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
 GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
 # Known baseline Godot shutdown lines that appear identically in every
 # unchanged smoke (route-control, completion, input, readability, oxygen,
-# hazard, ship-systems) and are NOT introduced by the Synapse Sea hazard code
+# hazard, ship-systems) and are NOT introduced by the Synaptic Sea hazard code
 # or any other Gate 1 runtime system. They are filtered out of the strict
 # ERROR/WARNING check below; any other ERROR:/WARNING: line (parse errors,
 # GDScript runtime errors, validation markers pushed via push_error) still
@@ -87,7 +87,7 @@ run_clean 'performance baseline smoke' 'PERFORMANCE BASELINE PASS templates=3' "
 run_clean 'arc hazard model smoke' 'ARC STATE PASS cycles=2 phases=4 passability_switches=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/electrical_arc_state_smoke.gd
 run_clean 'main arc smoke' 'MAIN PLAYABLE ARC PASS state=DISCHARGED cycles=2 blocked_arcing=true blocked_discharged=false' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_arc_smoke.gd
 run_clean 'ADR-0005 hazard contract static smoke' 'HAZARD CONTRACT PASS models=3 phase_timer_owners=2 wrong_kind_rejected=3 configure_dict=3' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_contract_smoke.gd
-echo 'SYNAPSE_SEA REGRESSION PASS commands=30 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=30 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
@@ -99,7 +99,7 @@ baseline engine noise and filtered by the script above:
 
 - `ERROR: Capture not registered: 'gdaimcp'.` — emitted by Godot's
   `engine_debugger.cpp:62` when a registered message capture (the GDAI MCP
-  capture, registered when the Synapse Sea Godot editor session is live) is
+  capture, registered when the Synaptic Sea Godot editor session is live) is
   not active during a `--headless --script` run. Present in every smoke.
 - `WARNING: ObjectDB instances leaked at exit (run with --verbose for details).`
   — generic Godot cleanup-time warning from `object.cpp:2641`. The ObjectDB
@@ -126,7 +126,7 @@ bundle; any unexpected `ERROR:`/`WARNING:` line that is not on the allowlist
 must block the change):
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
+ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
 for s in route_control_state_smoke main_playable_slice_route_control_smoke oxygen_state_smoke main_playable_slice_hazard_smoke fire_state_smoke main_playable_slice_fire_smoke main_playable_slice_ship_systems_smoke main_playable_slice_completion_smoke main_playable_slice_input_smoke main_playable_slice_readability_smoke save_load_service_smoke main_playable_slice_save_load_smoke objective_progress_state_smoke objective_progress_hud_label_smoke main_playable_slice_objective_variation_smoke req012_autosave_sequence_smoke main_playable_slice_text_scale_smoke electrical_arc_state_smoke main_playable_slice_arc_smoke main_playable_slice_junction_calibrator_save_load_smoke; do
   echo "=== $s ==="
   /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path "$ROOT" --script res://scripts/validation/$s.gd 2>&1 | grep -E '^(ERROR|WARNING):'
@@ -142,7 +142,7 @@ section (and update the allowlist) before re-running.
 Use after gameplay-system milestones where the user asked to avoid proof churn:
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
+ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
 find "$ROOT/docs/superpowers/proofs" -maxdepth 1 -type f -newer "$ROOT/docs/game/00_vision.md" -print 2>/dev/null || true
 find "$ROOT/.superpowers" -type f \( -name '*.html' -o -name '*.png' \) -newer "$ROOT/docs/game/00_vision.md" -print 2>/dev/null || true
 ```
@@ -165,7 +165,7 @@ Gate 1 accepts two evidence paths:
 Automated Gate 1 command:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/gate1_automated_playtest.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/gate1_automated_playtest.gd
 ```
 
 A Gate 1 Go decision requires the regression bundle plus either the automated protocol acceptance checklist or the human playtest protocol acceptance checklist to pass.

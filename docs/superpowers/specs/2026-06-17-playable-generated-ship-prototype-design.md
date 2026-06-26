@@ -1,8 +1,8 @@
 # Playable Generated Ship Prototype Design
 
 Date: 2026-06-17
-Project: The Synapse Sea
-Godot project: `/Users/christopherwilloughby/the-synapse-sea-of-stars`
+Project: The Synaptic Sea
+Godot project: `/Users/christopherwilloughby/the-synaptic-sea-of-stars`
 Procgen infra project: `/Users/christopherwilloughby/off-the-rails-ai-infra`
 
 ## Purpose
@@ -15,7 +15,7 @@ This design targets the next accepted claim boundary from `docs/game/ship_struct
 
 The structural/procgen foundation is real and currently green enough to build on:
 
-- Canonical Godot project root: `/Users/christopherwilloughby/the-synapse-sea-of-stars`
+- Canonical Godot project root: `/Users/christopherwilloughby/the-synaptic-sea-of-stars`
 - Godot version verified: `4.6.2.stable.official.71f334935`
 - Seed-17 runtime fixture currently loads:
   - `data/procgen/smoke/seed_000017/layout.json`
@@ -268,4 +268,4 @@ After this gate passes, strong next candidates are:
 
 ## Repository Note
 
-At spec-writing time, `/Users/christopherwilloughby/the-synapse-sea-of-stars` and `/Users/christopherwilloughby/off-the-rails-ai-infra` did not contain a `.git` repository from the shell. The design document can be written to disk, but a normal `git add` / `git commit` cannot succeed until the workspace is placed under git or the user chooses a repository target.
+At spec-writing time, `/Users/christopherwilloughby/the-synaptic-sea-of-stars` and `/Users/christopherwilloughby/off-the-rails-ai-infra` did not contain a `.git` repository from the shell. The design document can be written to disk, but a normal `git add` / `git commit` cannot succeed until the workspace is placed under git or the user chooses a repository target.

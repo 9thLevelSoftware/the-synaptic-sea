@@ -909,7 +909,7 @@ inventory while travelling between derelicts; death/restart is undefined).
 
 - [ ] **Step 2: Register the four smokes in the regression bundle**
 
-In `docs/game/06_validation_plan.md`, inside the `run_clean` block (the bash fence ending in `SYNAPSE_SEA REGRESSION PASS`), add these four lines (place the model/data ones near the other ship-systems model smokes, the main-scene one near the other `main_playable_slice_*` smokes):
+In `docs/game/06_validation_plan.md`, inside the `run_clean` block (the bash fence ending in `SYNAPTIC_SEA REGRESSION PASS`), add these four lines (place the model/data ones near the other ship-systems model smokes, the main-scene one near the other `main_playable_slice_*` smokes):
 
 ```bash
 run_clean 'class definitions smoke' 'CLASS DEFINITIONS PASS classes=8 engineer_repair=3 technical=1.5 default=1.0' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/class_definitions_smoke.gd
@@ -918,7 +918,7 @@ run_clean 'progression repair integration smoke' 'PROGRESSION REPAIR INTEGRATION
 run_clean 'main progression smoke' 'MAIN PLAYABLE PROGRESSION PASS class=engineer repair_xp_gained=true hud=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_progression_smoke.gd
 ```
 
-Then change the final line `echo 'SYNAPSE_SEA REGRESSION PASS commands=50 clean_output=true'` to `commands=54`.
+Then change the final line `echo 'SYNAPTIC_SEA REGRESSION PASS commands=50 clean_output=true'` to `commands=54`.
 
 - [ ] **Step 3: Run the full regression bundle + Gate-1 playtest**
 
@@ -931,7 +931,7 @@ sed -n '30,115p' docs/game/06_validation_plan.md \
 bash /tmp/reg.sh 2>&1 | tail -2
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gate1_automated_playtest.gd 2>&1 | grep -E "GATE 1 AUTOMATED PLAYTEST PASS|FAIL"
 ```
-Expected: bundle ends `SYNAPSE_SEA REGRESSION PASS commands=54 clean_output=true`; Gate-1 prints `GATE 1 AUTOMATED PLAYTEST PASS`. If the bundle reports a count mismatch or an unexpected ERROR/WARNING, fix the registration/marker (or the real regression) and re-run — do not adjust the count to paper over a missing smoke.
+Expected: bundle ends `SYNAPTIC_SEA REGRESSION PASS commands=54 clean_output=true`; Gate-1 prints `GATE 1 AUTOMATED PLAYTEST PASS`. If the bundle reports a count mismatch or an unexpected ERROR/WARNING, fix the registration/marker (or the real regression) and re-run — do not adjust the count to paper over a missing smoke.
 
 - [ ] **Step 4: Commit**
 

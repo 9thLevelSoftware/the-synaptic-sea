@@ -1,7 +1,7 @@
 # Route Control System Design
 
 Date: 2026-06-19
-Project: The Synapse Sea
+Project: The Synaptic Sea
 Milestone: Main Playable Slice — Route Control System
 
 ## Summary
@@ -66,7 +66,7 @@ Objective completed
 
 New file:
 
-`/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/systems/route_control_state.gd`
+`/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/systems/route_control_state.gd`
 
 Responsibilities:
 
@@ -173,7 +173,7 @@ Systems:
 
 Existing HUD strings must remain intact for regression smokes:
 
-- `Synapse Sea First Playable`
+- `Synaptic Sea First Playable`
 - `Controls: WASD move / E interact`
 - `Progress:`
 - `Current:`
@@ -187,7 +187,7 @@ Testing is Godot-headless and runtime-focused. The milestone does not depend on 
 
 New file:
 
-`/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/main_playable_slice_route_control_smoke.gd`
+`/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/main_playable_slice_route_control_smoke.gd`
 
 The smoke should instantiate `res://scenes/main.tscn`, wait for `PlayableGeneratedShip`, and assert the route-control lifecycle.
 
@@ -239,11 +239,11 @@ If the gate count is greater than one, the marker may report the actual count, b
 Run these after the new route-control smoke:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_ship_systems_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_completion_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_input_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_readability_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_ship_systems_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_completion_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_input_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_readability_smoke.gd
 ```
 
 Output should be clean of unexpected `ERROR:` or `WARNING:` lines.
@@ -289,4 +289,4 @@ The implementation plan should be TDD-first:
 
 This workspace is not currently a git repository. Instead of a commit, design and implementation changes should be recorded in a no-git ledger. For this design phase, use:
 
-`/tmp/synapse_sea_route_control_no_git_changes.log`
+`/tmp/synaptic_sea_route_control_no_git_changes.log`

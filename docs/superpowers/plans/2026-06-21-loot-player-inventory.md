@@ -912,7 +912,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		if sys != null:
 			for sub in sys.subcomponents:
 				playable.get_ship_systems_manager().force_repair(sid, sub.subcomponent_id)
-	var world = playable.get_synapse_sea_world()
+	var world = playable.get_synaptic_sea_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
 	if in_range.is_empty():
 		_fail("no markers in range"); return
@@ -1296,12 +1296,12 @@ Also update the two extended markers in the doc if they are listed there:
 - `ship_instance_smoke.gd` now ends `... looted_round_trip=true`
 - `gameplay_slice_builder_smoke.gd` marker extended in Task 4.
 
-Bump the final success line count: `SYNAPSE_SEA REGRESSION PASS commands=67` → `commands=70`. Grep the doc for `commands=67` to find every occurrence (header counts + the final assertion) and update all.
+Bump the final success line count: `SYNAPTIC_SEA REGRESSION PASS commands=67` → `commands=70`. Grep the doc for `commands=67` to find every occurrence (header counts + the final assertion) and update all.
 
 - [ ] **Step 2: Run the FULL regression bundle**
 
 Run the bash block in `docs/game/06_validation_plan.md` with `GODOT`/`ROOT` set to the Windows values. Run it to completion (it runs smokes sequentially — never concurrently with any other smoke).
-Expected final line: `SYNAPSE_SEA REGRESSION PASS commands=70 clean_output=true`. If any smoke is missing its marker or emits an un-allowlisted ERROR/WARNING, fix before proceeding.
+Expected final line: `SYNAPTIC_SEA REGRESSION PASS commands=70 clean_output=true`. If any smoke is missing its marker or emits an un-allowlisted ERROR/WARNING, fix before proceeding.
 
 - [ ] **Step 3: Write ADR-0014** `docs/game/adr/0014-loot-player-inventory.md`
 

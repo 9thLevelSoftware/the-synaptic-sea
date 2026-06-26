@@ -11,8 +11,8 @@
 ## Global Constraints
 
 - Godot binary: `/Users/christopherwilloughby/.local/bin/godot-4.6.2`.
-- Project root: `/Users/christopherwilloughby/the-synapse-sea-of-stars`.
-- Workspace state: no git repository; use `/tmp/synapse_sea_main_playable_slice_v2_readability_no_git_changes.log` for record steps instead of assuming commits.
+- Project root: `/Users/christopherwilloughby/the-synaptic-sea-of-stars`.
+- Workspace state: no git repository; use `/tmp/synaptic_sea_main_playable_slice_v2_readability_no_git_changes.log` for record steps instead of assuming commits.
 - Main scene path must remain `res://scenes/main.tscn`.
 - Do not move player input, HUD, camera, or gameplay-prop behavior into `GeneratedShipLoader`.
 - Preserve the interaction chain: `Player.request_interact()` -> `interact_requested` signal -> `PlayableGeneratedShip._on_player_interact_requested` -> `Interactable.try_interact(player_body)` -> objective advance.
@@ -129,7 +129,7 @@ func _fail(reason: String) -> void:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/readability_prop_factory_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/readability_prop_factory_smoke.gd
 ```
 
 Expected: exit `1` with a preload/parse failure because `res://scripts/procgen/readability_prop_factory.gd` does not exist yet.
@@ -275,7 +275,7 @@ static func _material(color: Color, emissive: bool) -> StandardMaterial3D:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/readability_prop_factory_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/readability_prop_factory_smoke.gd
 ```
 
 Expected marker:
@@ -289,12 +289,12 @@ READABILITY PROP FACTORY PASS props=9
 Run:
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
+ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
 if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git -C "$ROOT" add scripts/procgen/readability_prop_factory.gd scripts/validation/readability_prop_factory_smoke.gd
   git -C "$ROOT" commit -m "feat: add readability prop factory"
 else
-  printf '%s\n' 'NO_GIT Main Playable Slice v2 Task 1 changed: scripts/procgen/readability_prop_factory.gd scripts/validation/readability_prop_factory_smoke.gd' >> /tmp/synapse_sea_main_playable_slice_v2_readability_no_git_changes.log
+  printf '%s\n' 'NO_GIT Main Playable Slice v2 Task 1 changed: scripts/procgen/readability_prop_factory.gd scripts/validation/readability_prop_factory_smoke.gd' >> /tmp/synaptic_sea_main_playable_slice_v2_readability_no_git_changes.log
 fi
 ```
 
@@ -420,7 +420,7 @@ func _fail(reason: String) -> void:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_readability_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_readability_smoke.gd
 ```
 
 Expected: exit `1` with `MAIN PLAYABLE SLICE READABILITY FAIL reason=get_readability_summary missing`.
@@ -668,7 +668,7 @@ func get_affordance_summary() -> Dictionary:
 Run:
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
+ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
 GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_readability_smoke.gd
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_affordance_smoke.gd
@@ -690,12 +690,12 @@ MAIN PLAYABLE SLICE COMPLETE PASS completed=4 current_sequence=5 run_complete=tr
 Run:
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
+ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
 if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git -C "$ROOT" add scripts/procgen/playable_generated_ship.gd scripts/interaction/interactable.gd scripts/validation/main_playable_slice_readability_smoke.gd
   git -C "$ROOT" commit -m "feat: add playable readability props"
 else
-  printf '%s\n' 'NO_GIT Main Playable Slice v2 Task 2 changed: scripts/procgen/playable_generated_ship.gd scripts/interaction/interactable.gd scripts/validation/main_playable_slice_readability_smoke.gd' >> /tmp/synapse_sea_main_playable_slice_v2_readability_no_git_changes.log
+  printf '%s\n' 'NO_GIT Main Playable Slice v2 Task 2 changed: scripts/procgen/playable_generated_ship.gd scripts/interaction/interactable.gd scripts/validation/main_playable_slice_readability_smoke.gd' >> /tmp/synaptic_sea_main_playable_slice_v2_readability_no_git_changes.log
 fi
 ```
 
@@ -733,7 +733,7 @@ Update the pass marker line to include route cues:
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_readability_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_readability_smoke.gd
 ```
 
 Expected marker starts with this text and reports a positive route cue count:
@@ -820,7 +820,7 @@ Run:
 
 ```bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
+ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
 GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
 ARTIFACT_DIR=/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v2_readability
 mkdir -p "$ARTIFACT_DIR"
@@ -846,12 +846,12 @@ Expected metadata for every PNG: `pixelWidth: 1280`, `pixelHeight: 720`, `format
 Run:
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
+ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
 if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git -C "$ROOT" add scripts/validation/main_playable_slice_capture_sequence.gd scripts/validation/main_playable_slice_readability_smoke.gd
   git -C "$ROOT" commit -m "test: verify readable viewport captures"
 else
-  printf '%s\n' 'NO_GIT Main Playable Slice v2 Task 3 changed: scripts/validation/main_playable_slice_capture_sequence.gd scripts/validation/main_playable_slice_readability_smoke.gd' >> /tmp/synapse_sea_main_playable_slice_v2_readability_no_git_changes.log
+  printf '%s\n' 'NO_GIT Main Playable Slice v2 Task 3 changed: scripts/validation/main_playable_slice_capture_sequence.gd scripts/validation/main_playable_slice_readability_smoke.gd' >> /tmp/synaptic_sea_main_playable_slice_v2_readability_no_git_changes.log
 fi
 ```
 
@@ -950,7 +950,7 @@ if __name__ == "__main__":
 Run:
 
 ```bash
-python3 /Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/main_playable_slice_v2_contact_sheet.py /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v2_readability
+python3 /Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/main_playable_slice_v2_contact_sheet.py /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v2_readability
 ```
 
 Expected output begins with:
@@ -987,7 +987,7 @@ import hashlib
 import os
 
 artifact_dir = Path('/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v2_readability')
-proof = Path('/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/main-playable-slice-v2-readability.md')
+proof = Path('/Users/christopherwilloughby/the-synaptic-sea-of-stars/docs/superpowers/proofs/main-playable-slice-v2-readability.md')
 frames = [
     '01_spawn_airlock.png',
     '02_objective_01_prompt.png',
@@ -1050,7 +1050,7 @@ Run:
 python3 - <<'PY'
 from pathlib import Path
 import hashlib
-proof = Path('/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/main-playable-slice-v2-readability.md')
+proof = Path('/Users/christopherwilloughby/the-synaptic-sea-of-stars/docs/superpowers/proofs/main-playable-slice-v2-readability.md')
 artifact_dir = Path('/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v2_readability')
 text = proof.read_text()
 required = [
@@ -1090,12 +1090,12 @@ MAIN PLAYABLE SLICE V2 READABILITY PROOF PASS markers=10 hashes=6
 Run:
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
+ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
 if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git -C "$ROOT" add scripts/validation/main_playable_slice_v2_contact_sheet.py docs/superpowers/proofs/main-playable-slice-v2-readability.md
   git -C "$ROOT" commit -m "docs: prove main playable slice v2 readability"
 else
-  printf '%s\n' 'NO_GIT Main Playable Slice v2 Task 4 changed: scripts/validation/main_playable_slice_v2_contact_sheet.py docs/superpowers/proofs/main-playable-slice-v2-readability.md' >> /tmp/synapse_sea_main_playable_slice_v2_readability_no_git_changes.log
+  printf '%s\n' 'NO_GIT Main Playable Slice v2 Task 4 changed: scripts/validation/main_playable_slice_v2_contact_sheet.py docs/superpowers/proofs/main-playable-slice-v2-readability.md' >> /tmp/synaptic_sea_main_playable_slice_v2_readability_no_git_changes.log
 fi
 ```
 
@@ -1117,7 +1117,7 @@ Run:
 
 ```bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
+ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
 GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
 ARTIFACT_DIR=/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v2_readability
 mkdir -p "$ARTIFACT_DIR"
@@ -1155,7 +1155,7 @@ echo '--- proof check ---'
 python3 - <<'PY'
 from pathlib import Path
 import hashlib
-proof = Path('/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/main-playable-slice-v2-readability.md')
+proof = Path('/Users/christopherwilloughby/the-synaptic-sea-of-stars/docs/superpowers/proofs/main-playable-slice-v2-readability.md')
 artifact_dir = Path('/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/main_playable_slice_v2_readability')
 text = proof.read_text()
 required = [
@@ -1213,13 +1213,13 @@ Expected: exit `0`. The implementer must visually inspect it before claiming com
 Run:
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
+ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
 if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git -C "$ROOT" status --short
   git -C "$ROOT" add scripts/procgen/readability_prop_factory.gd scripts/procgen/playable_generated_ship.gd scripts/interaction/interactable.gd scripts/validation/readability_prop_factory_smoke.gd scripts/validation/main_playable_slice_readability_smoke.gd scripts/validation/main_playable_slice_capture_sequence.gd scripts/validation/main_playable_slice_v2_contact_sheet.py docs/superpowers/proofs/main-playable-slice-v2-readability.md
   git -C "$ROOT" commit -m "feat: make main playable slice readable"
 else
-  printf '%s\n' 'NO_GIT Main Playable Slice v2 Task 5 final verification complete' >> /tmp/synapse_sea_main_playable_slice_v2_readability_no_git_changes.log
+  printf '%s\n' 'NO_GIT Main Playable Slice v2 Task 5 final verification complete' >> /tmp/synaptic_sea_main_playable_slice_v2_readability_no_git_changes.log
 fi
 ```
 

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Godot 4.6.2, GDScript, RefCounted classes for pipeline stages, existing structural module kit (`data/ship_structural_v0_kit.json`)
 
-**Spec:** `docs/superpowers/specs/2026-06-20-synapse-sea-core-systems-design.md` — System 1: "Generate life raft + one derelict type. Validate: rooms connect, geometry loads, player can walk through."
+**Spec:** `docs/superpowers/specs/2026-06-20-synaptic-sea-core-systems-design.md` — System 1: "Generate life raft + one derelict type. Validate: rooms connect, geometry loads, player can walk through."
 
 ## Global Constraints
 

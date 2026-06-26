@@ -5,7 +5,7 @@ extends SceneTree
 ## sidecar):
 ##
 ##   /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless \
-##       --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+##       --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
 ##       --script res://scripts/validation/gridmap_meshlibrary_smoke.gd -- \
 ##       /abs/path/to/ship_structural_v0.tres /abs/path/to/ship_structural_v0.sidecar.json
 ##

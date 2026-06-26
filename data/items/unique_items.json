@@ -7,11 +7,11 @@
       "display_name": "Captain's Black Box",
       "icon": "res://assets/icons/loot/captains_black_box.png"
     },
-    "synapse_sea_reliquary": {
-      "item_id": "synapse_sea_reliquary",
-      "codex_entry_id": "synapse_sea_reliquary",
-      "display_name": "Synapse Sea Reliquary",
-      "icon": "res://assets/icons/loot/synapse_sea_reliquary.png"
+    "synaptic_sea_reliquary": {
+      "item_id": "synaptic_sea_reliquary",
+      "codex_entry_id": "synaptic_sea_reliquary",
+      "display_name": "Synaptic Sea Reliquary",
+      "icon": "res://assets/icons/loot/synaptic_sea_reliquary.png"
     }
   }
 }

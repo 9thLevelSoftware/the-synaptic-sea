@@ -2,7 +2,7 @@
 
 Source plan: `docs/game/build-plans/10-audio-music-spatial-e2e.md`
 Package range: REQ-AU-001..010
-Author: synapse_seaworker (Task 10, run 6)
+Author: synaptic_seaworker (Task 10, run 6)
 
 ## Existing assets that must be extended, not replaced
 

@@ -20,7 +20,7 @@
 - **Typed GDScript** for new systems. **Headless class-cache portability:** new `RefCounted`/`Resource` classes that get reconstructed from data use a `static func create(...)` / `load()` self-reference factory, never `ClassName.new()` from another class under `--script` (mirrors `ShipInstance.create` / `WorldSnapshot.from_dict`). A `RefCounted` nil check is `== null` (not `is_instance_valid`).
 - **No ship↔ship transfer.** Deposit-all moves only `part` + `supply`; **tools are never auto-deposited.**
 - **No save-version bump** (`WORLD_SLICE_VERSION` stays `"world-4"`): the hold is additive/tolerant.
-- **Validation is the definition of done.** Final state: `SYNAPSE_SEA REGRESSION PASS commands=104 clean_output=true` and Gate-1 `GO 2.00`.
+- **Validation is the definition of done.** Final state: `SYNAPTIC_SEA REGRESSION PASS commands=104 clean_output=true` and Gate-1 `GO 2.00`.
 
 ---
 
@@ -1177,7 +1177,7 @@ physical player↔ship load/unload mechanism.
   - `cargo_transfer_smoke.gd` → `CARGO TRANSFER SMOKE PASS`
   - `cargo_hold_smoke.gd` → `CARGO HOLD SMOKE PASS`
 
-  Update every place the count appears (the bundle loop list, the count header, and the final `SYNAPSE_SEA REGRESSION PASS commands=104` expectation). The `ship_instance_smoke` and `world_snapshot_smoke` markers are unchanged (already registered) — do not double-register.
+  Update every place the count appears (the bundle loop list, the count header, and the final `SYNAPTIC_SEA REGRESSION PASS commands=104` expectation). The `ship_instance_smoke` and `world_snapshot_smoke` markers are unchanged (already registered) — do not double-register.
 
 - [ ] **Step 3: Update the System 6 roadmap row.**
 
@@ -1194,7 +1194,7 @@ git stash push -- project.godot
 # <run the bundle block from docs/game/06_validation_plan.md>
 git stash pop
 ```
-Expected final line: `SYNAPSE_SEA REGRESSION PASS commands=104 clean_output=true`. If any smoke's marker is missing or an unexpected `ERROR:`/`WARNING:` appears, fix it before proceeding. (Remember to `git stash pop` even if the bundle fails.)
+Expected final line: `SYNAPTIC_SEA REGRESSION PASS commands=104 clean_output=true`. If any smoke's marker is missing or an unexpected `ERROR:`/`WARNING:` appears, fix it before proceeding. (Remember to `git stash pop` even if the bundle fails.)
 
 - [ ] **Step 5: Run the automated Gate-1 playtest (drift still stashed or re-stash).**
 

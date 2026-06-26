@@ -50,7 +50,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		_fail("propulsion should be offline after breaking nav_linkage"); return
 
 	# A marker must be in range to attempt travel.
-	var world = playable.get_synapse_sea_world()
+	var world = playable.get_synaptic_sea_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
 	if in_range.is_empty():
 		_fail("no markers in range"); return

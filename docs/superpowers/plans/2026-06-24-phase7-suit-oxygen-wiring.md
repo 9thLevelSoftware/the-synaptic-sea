@@ -495,7 +495,7 @@ value (sub-project D); suit air-supply depletion (future system).
 
 ```bash
 run_clean 'inventory widget layer' 'INVENTORY WIDGET SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_widget_smoke.gd
-echo 'SYNAPSE_SEA REGRESSION PASS commands=115 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=115 clean_output=true'
 ```
 
 and replace it with:
@@ -504,7 +504,7 @@ and replace it with:
 run_clean 'inventory widget layer' 'INVENTORY WIDGET SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_widget_smoke.gd
 run_clean 'oxygen+equipment drain' 'OXYGEN EQUIPMENT DRAIN SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/oxygen_equipment_drain_smoke.gd
 run_clean 'suit oxygen slice' 'SUIT OXYGEN SLICE SMOKE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_suit_oxygen_smoke.gd
-echo 'SYNAPSE_SEA REGRESSION PASS commands=117 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=117 clean_output=true'
 ```
 
 Also update any prose line in that file that states the command count (search for `commands=115` / "115" smoke-count references) to `117`.
@@ -521,7 +521,7 @@ export ROOT="C:/Users/dasbl/Documents/The Synaptic Sea"
 bash <(awk '/^## Regression bundle/{f=1} f && /^```bash$/ {c=1; next} f && c && /^```$/ {exit} f && c {print}' docs/game/06_validation_plan.md) 2>&1 | tail -6
 git stash pop
 ```
-Expected final line: `SYNAPSE_SEA REGRESSION PASS commands=117 clean_output=true`.
+Expected final line: `SYNAPTIC_SEA REGRESSION PASS commands=117 clean_output=true`.
 
 - [ ] **Step 5: Commit**
 

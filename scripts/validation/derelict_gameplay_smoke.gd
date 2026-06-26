@@ -47,7 +47,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	_all_operational(playable.get_ship_systems_manager())
 
 	# Board a derelict.
-	var world = playable.get_synapse_sea_world()
+	var world = playable.get_synaptic_sea_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
 	if in_range.is_empty():
 		_fail("no markers in range")

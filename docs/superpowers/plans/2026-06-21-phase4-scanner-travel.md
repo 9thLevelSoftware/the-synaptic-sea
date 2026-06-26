@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the deterministic scanner/travel logic — an infinite procgen Synapse Sea of ship markers, a system/skill-gated scanner, and a propulsion-gated travel action that materializes a real ship via `generate_from_seed`.
+**Goal:** Build the deterministic scanner/travel logic — an infinite procgen Synaptic Sea of ship markers, a system/skill-gated scanner, and a propulsion-gated travel action that materializes a real ship via `generate_from_seed`.
 
 **Architecture:** Five pure `RefCounted` models in `scripts/systems/*` (Resources are data, Nodes are behavior). Deterministic via seeded `RandomNumberGenerator` and a fixed spatial hash; no `Time`/`Math.random`. Models are decoupled from `ShipSystemsManager`/`PlayerProgressionState` — callers pass plain dicts/ints. No `RunSnapshot`/coordinator changes.
 
@@ -24,7 +24,7 @@
 - Typed GDScript for new code. Conventional Commits. Branch: `phase4-scanner-travel`.
 - Determinism: no `Time.*`, no `Math.random`, no argless `Date`. Use `RandomNumberGenerator` with an explicit `.seed`. Spatial hash uses fixed constants, NOT `hash()`.
 - Enums mirror `ShipBlueprint`: `Size` LIFE_BOAT=0 / SMALL=1 / MEDIUM=2; `Condition` PRISTINE=0 / DAMAGED=1 / WRECKED=2.
-- The Synapse Sea grid is the X–Z plane; `position.y` is always `0.0`. Grid cell = `Vector2i(cell_x, cell_y)` where `cell_y` indexes the Z axis.
+- The Synaptic Sea grid is the X–Z plane; `position.y` is always `0.0`. Grid cell = `Vector2i(cell_x, cell_y)` where `cell_y` indexes the Z axis.
 - `ShipGenerator` API (existing, do not change): `ShipGenerator.new()`; `generate_from_seed(seed_value: int, size := 0, condition := 1) -> Node3D` (returns null on failure).
 
 ---
@@ -33,10 +33,10 @@
 
 - **Create** `scripts/systems/ship_marker.gd` — `ShipMarker` pure data + `to_dict`/`from_dict`.
 - **Create** `scripts/systems/marker_generator.gd` — `MarkerGenerator` deterministic per-cell markers.
-- **Create** `scripts/systems/synapse_sea_world.gd` — `Synapse SeaWorld` range query + generated set + summary.
+- **Create** `scripts/systems/synaptic_sea_world.gd` — `Synaptic SeaWorld` range query + generated set + summary.
 - **Create** `scripts/systems/scanner_state.gd` — `ScannerState` gated scan + detail-reveal views.
 - **Create** `scripts/systems/travel_controller.gd` — `TravelController` validated jump → generation.
-- **Create** 4 smokes: `marker_generator_smoke.gd`, `synapse_sea_world_smoke.gd`, `scanner_state_smoke.gd`, `travel_controller_smoke.gd`.
+- **Create** 4 smokes: `marker_generator_smoke.gd`, `synaptic_sea_world_smoke.gd`, `scanner_state_smoke.gd`, `travel_controller_smoke.gd`.
 - **Modify** `docs/game/06_validation_plan.md` — register 4 smokes, `commands=54` → `58`.
 
 ---
@@ -133,11 +133,11 @@ Create `scripts/systems/ship_marker.gd`:
 extends RefCounted
 class_name ShipMarker
 
-## Lightweight pre-generation descriptor of a ship in Synapse Sea space. Pure data;
+## Lightweight pre-generation descriptor of a ship in Synaptic Sea space. Pure data;
 ## the actual ship is materialized on demand from seed_value via ShipGenerator.
 
 var marker_id: String = ""
-var position: Vector3 = Vector3.ZERO   # y is always 0 (planar Synapse Sea grid)
+var position: Vector3 = Vector3.ZERO   # y is always 0 (planar Synaptic Sea grid)
 var size_class: int = 0                # ShipBlueprint.Size
 var condition: int = 1                 # ShipBlueprint.Condition
 var ship_type: String = ""
@@ -241,24 +241,24 @@ git commit -m "feat(scanner): add ShipMarker + deterministic MarkerGenerator"
 
 ---
 
-## Task 2: Synapse SeaWorld
+## Task 2: Synaptic SeaWorld
 
 **Files:**
-- Create: `scripts/systems/synapse_sea_world.gd`
-- Test: `scripts/validation/synapse_sea_world_smoke.gd`
+- Create: `scripts/systems/synaptic_sea_world.gd`
+- Test: `scripts/validation/synaptic_sea_world_smoke.gd`
 
 **Interfaces:**
 - Consumes: `MarkerGenerator` (`CELL_SIZE`, `markers_for_cell`); `ShipMarker`.
-- Produces: `Synapse SeaWorld` `_init(world_seed:int=0, player_position:Vector3=Vector3.ZERO)`; `world_seed:int`, `player_position:Vector3`, `generated_marker_ids:Dictionary`; `markers_in_range(radius:float)->Array`; `mark_generated(id:String)->void`; `is_generated(id:String)->bool`; `set_player_position(pos:Vector3)->void`; `get_summary()->Dictionary`; `apply_summary(summary)->bool`.
+- Produces: `Synaptic SeaWorld` `_init(world_seed:int=0, player_position:Vector3=Vector3.ZERO)`; `world_seed:int`, `player_position:Vector3`, `generated_marker_ids:Dictionary`; `markers_in_range(radius:float)->Array`; `mark_generated(id:String)->void`; `is_generated(id:String)->bool`; `set_player_position(pos:Vector3)->void`; `get_summary()->Dictionary`; `apply_summary(summary)->bool`.
 
 - [ ] **Step 1: Write the failing smoke**
 
-Create `scripts/validation/synapse_sea_world_smoke.gd`:
+Create `scripts/validation/synaptic_sea_world_smoke.gd`:
 
 ```gdscript
 extends SceneTree
 
-const WorldScript := preload("res://scripts/systems/synapse_sea_world.gd")
+const WorldScript := preload("res://scripts/systems/synaptic_sea_world.gd")
 
 func _initialize() -> void:
 	var world = WorldScript.new(42, Vector3.ZERO)
@@ -323,30 +323,30 @@ func _initialize() -> void:
 		_fail("generated set not restored")
 		return
 
-	print("SYNAPSE_SEA WORLD PASS in_range_sorted=true generated=true round_trip=true")
+	print("SYNAPTIC_SEA WORLD PASS in_range_sorted=true generated=true round_trip=true")
 	quit(0)
 
 func _fail(reason: String) -> void:
-	push_error("SYNAPSE_SEA WORLD FAIL reason=%s" % reason)
+	push_error("SYNAPTIC_SEA WORLD FAIL reason=%s" % reason)
 	quit(1)
 ```
 
 - [ ] **Step 2: Run it to verify it fails**
 
 ```bash
-"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/synapse_sea_world_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/synaptic_sea_world_smoke.gd
 ```
-Expected: FAIL — `synapse_sea_world.gd` does not exist.
+Expected: FAIL — `synaptic_sea_world.gd` does not exist.
 
-- [ ] **Step 3: Implement Synapse SeaWorld**
+- [ ] **Step 3: Implement Synaptic SeaWorld**
 
-Create `scripts/systems/synapse_sea_world.gd`:
+Create `scripts/systems/synaptic_sea_world.gd`:
 
 ```gdscript
 extends RefCounted
-class_name Synapse SeaWorld
+class_name Synaptic SeaWorld
 
-## The infinite Synapse Sea: a world_seed, the player's position, and the set of
+## The infinite Synaptic Sea: a world_seed, the player's position, and the set of
 ## markers already materialized into ships. Markers themselves are not stored —
 ## they are regenerated deterministically from world_seed on each query.
 
@@ -420,15 +420,15 @@ func apply_summary(summary) -> bool:
 - [ ] **Step 4: Run it to verify it passes**
 
 ```bash
-"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/synapse_sea_world_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/synaptic_sea_world_smoke.gd
 ```
-Expected: PASS — `SYNAPSE_SEA WORLD PASS in_range_sorted=true generated=true round_trip=true`.
+Expected: PASS — `SYNAPTIC_SEA WORLD PASS in_range_sorted=true generated=true round_trip=true`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/systems/synapse_sea_world.gd scripts/validation/synapse_sea_world_smoke.gd
-git commit -m "feat(scanner): add Synapse SeaWorld range query + generated set + summary"
+git add scripts/systems/synaptic_sea_world.gd scripts/validation/synaptic_sea_world_smoke.gd
+git commit -m "feat(scanner): add Synaptic SeaWorld range query + generated set + summary"
 ```
 
 ---
@@ -440,7 +440,7 @@ git commit -m "feat(scanner): add Synapse SeaWorld range query + generated set +
 - Test: `scripts/validation/scanner_state_smoke.gd`
 
 **Interfaces:**
-- Consumes: `Synapse SeaWorld` (`markers_in_range`, `player_position`).
+- Consumes: `Synaptic SeaWorld` (`markers_in_range`, `player_position`).
 - Produces: `ScannerState` `const MAX_DETAIL := 6`; `range_radius:float=250.0`, `hardware_detail:int=1`; `scan(world, systems_ops:Dictionary, scanner_skill:int)->Dictionary` returning `{detail_level:int, markers:Array}`; `get_summary()->Dictionary`; `apply_summary(summary)->bool`.
 
 - [ ] **Step 1: Write the failing smoke**
@@ -450,7 +450,7 @@ Create `scripts/validation/scanner_state_smoke.gd`:
 ```gdscript
 extends SceneTree
 
-const WorldScript := preload("res://scripts/systems/synapse_sea_world.gd")
+const WorldScript := preload("res://scripts/systems/synaptic_sea_world.gd")
 const ScannerScript := preload("res://scripts/systems/scanner_state.gd")
 
 func _initialize() -> void:
@@ -622,7 +622,7 @@ git commit -m "feat(scanner): add ScannerState gated scan with detail-reveal vie
 - Test: `scripts/validation/travel_controller_smoke.gd`
 
 **Interfaces:**
-- Consumes: `Synapse SeaWorld` (`markers_in_range`, `set_player_position`, `mark_generated`, `is_generated`, `player_position`); `ShipMarker`; `ShipGenerator` (`new()`, `generate_from_seed`).
+- Consumes: `Synaptic SeaWorld` (`markers_in_range`, `set_player_position`, `mark_generated`, `is_generated`, `player_position`); `ShipMarker`; `ShipGenerator` (`new()`, `generate_from_seed`).
 - Produces: `TravelController` `attempt_travel(marker, systems_ops:Dictionary, world, generator, radius:float)->Dictionary` returning `{success:bool, reason:String, ship}`. Rejection order: `null_marker` → `out_of_range` → `propulsion_offline`; then `generation_failed` if generator returns null; else success with the ship `Node3D`. Mutates the world ONLY on success.
 
 - [ ] **Step 1: Write the failing smoke**
@@ -632,7 +632,7 @@ Create `scripts/validation/travel_controller_smoke.gd`:
 ```gdscript
 extends SceneTree
 
-const WorldScript := preload("res://scripts/systems/synapse_sea_world.gd")
+const WorldScript := preload("res://scripts/systems/synaptic_sea_world.gd")
 const TravelScript := preload("res://scripts/systems/travel_controller.gd")
 const GeneratorScript := preload("res://scripts/procgen/ship_generator.gd")
 const MarkerScript := preload("res://scripts/systems/ship_marker.gd")
@@ -758,11 +758,11 @@ git commit -m "feat(scanner): add TravelController — propulsion/range-gated ju
 
 - [ ] **Step 1: Register the four smokes in the regression bundle**
 
-In `docs/game/06_validation_plan.md`, inside the `run_clean` block (the bash fence that ends with the `SYNAPSE_SEA REGRESSION PASS` echo at line ~118), add these four lines just before that echo:
+In `docs/game/06_validation_plan.md`, inside the `run_clean` block (the bash fence that ends with the `SYNAPTIC_SEA REGRESSION PASS` echo at line ~118), add these four lines just before that echo:
 
 ```bash
 run_clean 'marker generator smoke' 'MARKER GENERATOR PASS deterministic=true per_cell=3 round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/marker_generator_smoke.gd
-run_clean 'synapse_sea world smoke' 'SYNAPSE_SEA WORLD PASS in_range_sorted=true generated=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/synapse_sea_world_smoke.gd
+run_clean 'synaptic_sea world smoke' 'SYNAPTIC_SEA WORLD PASS in_range_sorted=true generated=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/synaptic_sea_world_smoke.gd
 run_clean 'scanner state smoke' 'SCANNER STATE PASS nav_off_empty=true scanners_off_detail1=true full_detail=6 round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_state_smoke.gd
 run_clean 'travel controller smoke' 'TRAVEL CONTROLLER PASS propulsion_gate=true range_gate=true generated_node=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_controller_smoke.gd
 ```
@@ -771,18 +771,18 @@ Then change the final echo `commands=54` → `commands=58`.
 
 - [ ] **Step 2: Run the full regression bundle + Gate-1 playtest**
 
-Extract the bundle bash fence and run with the Windows paths substituted (do NOT edit the doc's hardcoded macOS paths). The fence content currently spans lines ~30–118; after adding 4 lines it ends ~122 — capture through the `SYNAPSE_SEA REGRESSION PASS` echo:
+Extract the bundle bash fence and run with the Windows paths substituted (do NOT edit the doc's hardcoded macOS paths). The fence content currently spans lines ~30–118; after adding 4 lines it ends ~122 — capture through the `SYNAPTIC_SEA REGRESSION PASS` echo:
 ```bash
 GODOT="C:/Users/dasbl/Documents/Godot/Godot_v4.6.2-stable_win64_console.exe"
 ROOT="C:/Users/dasbl/Documents/The Synaptic Sea"
 START=$(grep -n '^```bash$' docs/game/06_validation_plan.md | sed -n '2p' | cut -d: -f1)
-END=$(grep -n "SYNAPSE_SEA REGRESSION PASS commands=" docs/game/06_validation_plan.md | head -1 | cut -d: -f1)
+END=$(grep -n "SYNAPTIC_SEA REGRESSION PASS commands=" docs/game/06_validation_plan.md | head -1 | cut -d: -f1)
 sed -n "$((START+1)),${END}p" docs/game/06_validation_plan.md \
   | sed "s#^ROOT=.*#ROOT=\"$ROOT\"#; s#^GODOT=.*#GODOT=\"$GODOT\"#" > /tmp/reg.sh
 bash /tmp/reg.sh 2>&1 | tail -2
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gate1_automated_playtest.gd 2>&1 | grep -E "GATE 1 AUTOMATED PLAYTEST PASS|FAIL"
 ```
-Expected: bundle ends `SYNAPSE_SEA REGRESSION PASS commands=58 clean_output=true`; Gate-1 prints `GATE 1 AUTOMATED PLAYTEST PASS`. If the count mismatches or an unexpected ERROR/WARNING appears, fix the registration/marker (or the real regression) and re-run — do not adjust the count to mask a missing smoke.
+Expected: bundle ends `SYNAPTIC_SEA REGRESSION PASS commands=58 clean_output=true`; Gate-1 prints `GATE 1 AUTOMATED PLAYTEST PASS`. If the count mismatches or an unexpected ERROR/WARNING appears, fix the registration/marker (or the real regression) and re-run — do not adjust the count to mask a missing smoke.
 
 - [ ] **Step 3: Commit**
 
@@ -798,7 +798,7 @@ git commit -m "docs(validation): register Phase 4 scanner/travel smokes (command
 **Spec coverage:**
 - `ShipMarker` data + round-trip → Task 1 ✓
 - `MarkerGenerator` deterministic cell markers + spatial hash → Task 1 ✓
-- `Synapse SeaWorld` range query + generated set + summary → Task 2 ✓
+- `Synaptic SeaWorld` range query + generated set + summary → Task 2 ✓
 - `ScannerState` gating (nav off → empty; scanners off → detail 1; operational + skill → detail 1..6) + detail-reveal field table + round-trip → Task 3 ✓
 - `TravelController` null/range/propulsion rejections + generate_from_seed proof + world mutation on success only → Task 4 ✓
 - 4 smokes registered, commands 54→58, regression + Gate-1 → Task 5 ✓

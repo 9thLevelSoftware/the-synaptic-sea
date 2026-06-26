@@ -12,9 +12,9 @@
     "AGENTS.md"
   ],
   "profile_map": {
-    "synapse_seaworker": "MiniMax-M3 implementation worker for production-grade package implementation",
-    "synapse_seadocs": "Kimi docs/planning support profile (available, not primary assignee for this board)",
-    "synapse_seareview": "GPT-5.5 reviewer/final approver and integration gate executor"
+    "synaptic_seaworker": "MiniMax-M3 implementation worker for production-grade package implementation",
+    "synaptic_seadocs": "Kimi docs/planning support profile (available, not primary assignee for this board)",
+    "synaptic_seareview": "GPT-5.5 reviewer/final approver and integration gate executor"
   },
   "kickoff_task_id": "t_0228a857",
   "kickoff_status": "blocked_until_user_says_begin_implementation",
@@ -108,7 +108,7 @@
       "title": "Survival Vitals",
       "package_plan": "docs/game/build-plans/01-survival-vitals-e2e.md",
       "milestone": "M1 Survival Foundation",
-      "assignee": "synapse_seaworker",
+      "assignee": "synaptic_seaworker",
       "parents": [
         "t_0228a857"
       ],
@@ -127,7 +127,7 @@
       "title": "Food, Cooking, Spoilage & Sustenance Inputs",
       "package_plan": "docs/game/build-plans/02-food-cooking-spoilage-e2e.md",
       "milestone": "M1 Survival Foundation",
-      "assignee": "synapse_seaworker",
+      "assignee": "synaptic_seaworker",
       "parents": [
         "t_0228a857"
       ],
@@ -146,7 +146,7 @@
       "title": "Crafting, Materials, Recipes & Stations",
       "package_plan": "docs/game/build-plans/03-crafting-materials-recipes-e2e.md",
       "milestone": "M2 Production Economy",
-      "assignee": "synapse_seaworker",
+      "assignee": "synaptic_seaworker",
       "parents": [
         "t_0228a857"
       ],
@@ -165,7 +165,7 @@
       "title": "Loot Ecosystem, Rarity, Containers & Unique Finds",
       "package_plan": "docs/game/build-plans/04-loot-ecosystem-e2e.md",
       "milestone": "M2 Production Economy",
-      "assignee": "synapse_seaworker",
+      "assignee": "synaptic_seaworker",
       "parents": [
         "t_0228a857"
       ],
@@ -184,7 +184,7 @@
       "title": "Consumables, Medicine, Stimulants, Ammo & Utility Items",
       "package_plan": "docs/game/build-plans/05-consumables-medicine-stimulants-e2e.md",
       "milestone": "M2 Production Economy",
-      "assignee": "synapse_seaworker",
+      "assignee": "synaptic_seaworker",
       "parents": [
         "t_0228a857"
       ],
@@ -203,7 +203,7 @@
       "title": "Combat, Threat AI, Damage, Stealth & Encounters",
       "package_plan": "docs/game/build-plans/06-combat-threat-ai-e2e.md",
       "milestone": "M3 Hostile Derelicts",
-      "assignee": "synapse_seaworker",
+      "assignee": "synaptic_seaworker",
       "parents": [
         "t_0228a857"
       ],
@@ -222,7 +222,7 @@
       "title": "Ship Systems, Power Grid, Hull, Life Support & Sustenance Infrastructure",
       "package_plan": "docs/game/build-plans/07-ship-systems-sustenance-e2e.md",
       "milestone": "M4 Ship Survival Infrastructure",
-      "assignee": "synapse_seaworker",
+      "assignee": "synaptic_seaworker",
       "parents": [
         "t_0228a857"
       ],
@@ -241,7 +241,7 @@
       "title": "Player Progression, Skills, Classes, Hub & Meta-Progression",
       "package_plan": "docs/game/build-plans/08-progression-skills-meta-e2e.md",
       "milestone": "M5 Long-Arc Progression",
-      "assignee": "synapse_seaworker",
+      "assignee": "synaptic_seaworker",
       "parents": [
         "t_0228a857"
       ],
@@ -260,7 +260,7 @@
       "title": "UI/UX, HUD, Menus, Tutorials, Controller & Accessibility",
       "package_plan": "docs/game/build-plans/09-ui-ux-accessibility-e2e.md",
       "milestone": "M6 Presentation & Operability",
-      "assignee": "synapse_seaworker",
+      "assignee": "synaptic_seaworker",
       "parents": [
         "t_0228a857"
       ],
@@ -279,7 +279,7 @@
       "title": "Audio, Music, Spatial Sound, Voice & Meta Events",
       "package_plan": "docs/game/build-plans/10-audio-music-spatial-e2e.md",
       "milestone": "M6 Presentation & Operability",
-      "assignee": "synapse_seaworker",
+      "assignee": "synaptic_seaworker",
       "parents": [
         "t_0228a857"
       ],
@@ -298,7 +298,7 @@
       "title": "Save/Load, Persistence, Multi-Slot, Auto-Save & Cloud Readiness",
       "package_plan": "docs/game/build-plans/11-save-load-persistence-e2e.md",
       "milestone": "M7 Persistence & Platform Reliability",
-      "assignee": "synapse_seaworker",
+      "assignee": "synaptic_seaworker",
       "parents": [
         "t_0228a857"
       ],
@@ -317,7 +317,7 @@
       "title": "Procedural Generation Expansion, Templates, Biomes & Encounter Injection",
       "package_plan": "docs/game/build-plans/12-procedural-generation-expansion-e2e.md",
       "milestone": "M8 World Variety",
-      "assignee": "synapse_seaworker",
+      "assignee": "synaptic_seaworker",
       "parents": [
         "t_0228a857"
       ],
@@ -336,7 +336,7 @@
       "title": "Distribution, Store, Achievements, Demo, Localization & Post-Launch Ops",
       "package_plan": "docs/game/build-plans/13-distribution-store-postlaunch-e2e.md",
       "milestone": "M9 Release Readiness",
-      "assignee": "synapse_seaworker",
+      "assignee": "synaptic_seaworker",
       "parents": [
         "t_0228a857"
       ],
@@ -355,7 +355,7 @@
       "title": "Cross-System Integration, Balance, Product Audit & Gap Closure",
       "package_plan": "docs/game/build-plans/14-cross-system-integration-review-e2e.md",
       "milestone": "M10 Integration Gate",
-      "assignee": "synapse_seareview",
+      "assignee": "synaptic_seareview",
       "parents": [
         "t_0228a857",
         "t_34d0483b",
@@ -387,7 +387,7 @@
       "title": "Systems Map, Roadmap, Requirements, Manifest & Final Board Currency",
       "package_plan": "docs/game/build-plans/15-systems-map-task-graph-update-e2e.md",
       "milestone": "M11 Documentation Currency",
-      "assignee": "synapse_seareview",
+      "assignee": "synaptic_seareview",
       "parents": [
         "t_0228a857",
         "t_34d0483b",
@@ -418,7 +418,7 @@
   "policy": {
     "no_stubs": true,
     "no_generic_human_review_blocks": true,
-    "reviewer_profile": "synapse_seareview",
+    "reviewer_profile": "synaptic_seareview",
     "validation_root": "/Users/christopherwilloughby/the-synaptic-sea"
   },
   "recovery_notes": [

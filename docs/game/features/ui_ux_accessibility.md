@@ -19,7 +19,7 @@ codex entries.
 Project Zomboid-style moodle / status readability, health panel,
 inventory, map/FOW, and contextual survival feedback — adapted to
 locked-isometric 3D space-horror survival aboard derelict ships trapped
-in a biomatter Synapse Sea field.
+in a biomatter Synaptic Sea field.
 
 Every mechanic must read as locked-isometric, in-character, and
 production-grade. Placeholder art is acceptable so long as readability

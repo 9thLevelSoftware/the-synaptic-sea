@@ -3,7 +3,7 @@
 ## Build / workspace state
 
 - Godot binary: `/Users/christopherwilloughby/.local/bin/godot-4.6.2` (Godot Engine v4.6.2.stable.official.71f334935)
-- Project root: `/Users/christopherwilloughby/the-synapse-sea-of-stars`
+- Project root: `/Users/christopherwilloughby/the-synaptic-sea-of-stars`
 - Workspace: no-git (per `docs/game/06_validation_plan.md` ledger guidance)
 - Protocol: `docs/game/playtests/automated-playtest-protocol.md`
 - Script: `res://scripts/validation/gate1_automated_playtest.gd`
@@ -16,7 +16,7 @@ Run before the automated playtest; must pass cleanly under the strict allowlist
 (`BASELINE_ERROR` and `BASELINE_WARNING` filter only the two accepted Godot
 teardown lines; any other `ERROR:`/`WARNING:` blocks the bundle).
 
-Result: **PASS** — `SYNAPSE_SEA REGRESSION PASS commands=8 clean_output=true`.
+Result: **PASS** — `SYNAPTIC_SEA REGRESSION PASS commands=8 clean_output=true`.
 
 All eight smokes emitted only the two baseline Godot teardown lines
 (`ERROR: Capture not registered: 'gdaimcp'.` and
@@ -41,7 +41,7 @@ Smoke pass markers observed:
 ```
 Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
 
-The Synapse Sea coherent proof ship bootstrap loaded.
+The Synaptic Sea coherent proof ship bootstrap loaded.
 PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=4 collision_shapes=31
 SHIP SYSTEM UPDATED sequence=1 type=recover_supplies power=18 reactor=22 extraction=false route_opened=0 blockers=1
 PLAYABLE INTERACTION interaction=objective:01:cargo_01:cargo_supply_cache objective=cargo_01:cargo_supply_cache sequence=1 type=recover_supplies room=cargo_01

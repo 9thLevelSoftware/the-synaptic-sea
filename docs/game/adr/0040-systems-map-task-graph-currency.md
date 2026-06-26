@@ -23,7 +23,7 @@ These validators live in `scripts/validation/doc_currency_validators.py` and are
 
 - Task 15 can validate docs and board state without booting the Godot scene tree.
 - Future docs/manifest drift becomes a failing smoke instead of a prose caveat.
-- The active execution board for this package is recorded as `synaptic-sea-e2e-systems`, while the older `synapse-sea-stage-gate` manifest remains historical.
+- The active execution board for this package is recorded as `synaptic-sea-e2e-systems`, while the older `synaptic-sea-stage-gate` manifest remains historical.
 - External release evidence and the live controller-path e2e probe remain explicit follow-up surfaces, not hidden blockers.
 
 ## Validation

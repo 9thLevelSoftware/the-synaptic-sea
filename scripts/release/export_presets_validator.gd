@@ -8,7 +8,7 @@ class_name ExportPresetsValidator
 ## contains, with type coercion (`runnable` -> bool, `dedicated_server`
 ## -> bool).
 ##
-## Used by `export_presets_smoke.gd` to validate the SynapseSea export
+## Used by `export_presets_smoke.gd` to validate the SynapticSea export
 ## pipeline config before invoking `godot --export-release`.
 
 const REQUIRED_KEYS: Array = [

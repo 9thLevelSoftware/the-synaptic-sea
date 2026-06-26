@@ -14,8 +14,8 @@
 
 | Target | Artifact | SHA-256 | Size / notes |
 |---|---|---|---|
-| Web / HTML5 | `build/release/synapse-sea-of-stars-v0.1.0-20260620T000000Z-web.zip` | `e1e59ea8c094f7cfade3c9e448a25aa485cf402f31a9e8342815a92fc91df7e6` | 9 entries; excludes `addons/gdai-mcp-plugin-godot`. |
-| macOS | `build/release/synapse-sea-of-stars-v0.1.0-20260620T000000Z-macos.zip` | `a6b7136a6934fe5e39f6a26e37771401e528409c2e60b43a44166c140b55e997` | 6 entries; excludes `addons/gdai-mcp-plugin-godot`. |
+| Web / HTML5 | `build/release/synaptic-sea-of-stars-v0.1.0-20260620T000000Z-web.zip` | `e1e59ea8c094f7cfade3c9e448a25aa485cf402f31a9e8342815a92fc91df7e6` | 9 entries; excludes `addons/gdai-mcp-plugin-godot`. |
+| macOS | `build/release/synaptic-sea-of-stars-v0.1.0-20260620T000000Z-macos.zip` | `a6b7136a6934fe5e39f6a26e37771401e528409c2e60b43a44166c140b55e997` | 6 entries; excludes `addons/gdai-mcp-plugin-godot`. |
 
 Hash manifest: `build/release/artifacts.sha256`.
 
@@ -24,13 +24,13 @@ Hash manifest: `build/release/artifacts.sha256`.
 Command:
 
 ```bash
-SYNAPSE_SEA_BUILD_STAMP=20260620T000000Z scripts/export/build_release.sh web macos
+SYNAPTIC_SEA_BUILD_STAMP=20260620T000000Z scripts/export/build_release.sh web macos
 ```
 
 Result:
 
 ```text
-SYNAPSE_SEA EXPORT PASS version=v0.1.0 stamp=20260620T000000Z targets=web macos release_dir=/Users/christopherwilloughby/the-synapse-sea-of-stars/build/release
+SYNAPTIC_SEA EXPORT PASS version=v0.1.0 stamp=20260620T000000Z targets=web macos release_dir=/Users/christopherwilloughby/the-synaptic-sea-of-stars/build/release
 ```
 
 Logs:
@@ -54,14 +54,14 @@ The full validation bundle was run against both exported packs.
 | Target | Exported pack | Commands | Result | Log |
 |---|---|---:|---|---|
 | Web / HTML5 | `build/exports/web/index.pck` | 31 | PASS / clean output | `build/logs/export_regression_web.log` |
-| macOS | `build/run/macos/The Synapse Sea.app/Contents/Resources/The Synapse Sea.pck` | 31 | PASS / clean output | `build/logs/export_regression_macos.log` |
+| macOS | `build/run/macos/The Synaptic Sea.app/Contents/Resources/The Synaptic Sea.pck` | 31 | PASS / clean output | `build/logs/export_regression_macos.log` |
 
 Summary output:
 
 ```text
-SYNAPSE_SEA EXPORT REGRESSION PASS target=web commands=31 clean_output=true log=/Users/christopherwilloughby/the-synapse-sea-of-stars/build/logs/export_regression_web.log
-SYNAPSE_SEA EXPORT REGRESSION PASS target=macos commands=31 clean_output=true log=/Users/christopherwilloughby/the-synapse-sea-of-stars/build/logs/export_regression_macos.log
-export_regression_results=/Users/christopherwilloughby/the-synapse-sea-of-stars/build/logs/export_regression_results.tsv rows=62
+SYNAPTIC_SEA EXPORT REGRESSION PASS target=web commands=31 clean_output=true log=/Users/christopherwilloughby/the-synaptic-sea-of-stars/build/logs/export_regression_web.log
+SYNAPTIC_SEA EXPORT REGRESSION PASS target=macos commands=31 clean_output=true log=/Users/christopherwilloughby/the-synaptic-sea-of-stars/build/logs/export_regression_macos.log
+export_regression_results=/Users/christopherwilloughby/the-synaptic-sea-of-stars/build/logs/export_regression_results.tsv rows=62
 ```
 
 Result table: `build/logs/export_regression_results.tsv`.

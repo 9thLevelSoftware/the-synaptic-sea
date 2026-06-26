@@ -16,7 +16,7 @@
 
 ## Global Constraints
 
-- Project root: `/Users/christopherwilloughby/the-synapse-sea-of-stars`.
+- Project root: `/Users/christopherwilloughby/the-synaptic-sea-of-stars`.
 - Godot binary: `/Users/christopherwilloughby/.local/bin/godot-4.6.2`.
 - Workspace state checked on 2026-06-19: `GIT_INSIDE=false`.
 - Do not create HTML, PNG, contact sheets, screenshot galleries, or proof documents for this milestone.
@@ -26,7 +26,7 @@
 - The inventory/tool milestone has no proof artifacts as deliverables; validation is command-output smokes only.
 - Preserve existing validation seams and smokes: `complete_objective_sequence_for_validation()`, `complete_all_objectives_for_validation()`, `main_playable_slice_hazard_smoke.gd`, `main_playable_slice_route_control_smoke.gd`, ship_systems/completion/input/readability smokes must keep passing.
 - Output from validation commands must be clean of unexpected lines beginning with `ERROR:` or `WARNING:`.
-- Because this is not a git repository, every task uses the no-git ledger fallback at `/tmp/synapse_sea_inventory_tool_no_git_changes.log` instead of assuming `git commit` works.
+- Because this is not a git repository, every task uses the no-git ledger fallback at `/tmp/synaptic_sea_inventory_tool_no_git_changes.log` instead of assuming `git commit` works.
 - Do not collapse `InventoryState` into `ShipSystemState` or `OxygenState`; keep separate responsibility.
 - Do not delete the pickup node on acquisition — hide it and mark it acquired so state remains inspectable.
 - Do not introduce equipment UI/grid, crafting, durability, charges, dropping, trading, hub-stored tools, route-gate keys, audio cues, particle VFX, or animation polish in this slice (non-goals in `features/inventory_tools.md`).
@@ -293,7 +293,7 @@ func _fail(reason: String) -> void:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/inventory_state_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/inventory_state_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'INVENTORY STATE PASS' || true
 ```
@@ -307,11 +307,11 @@ Expected (RED) result:
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/validation/inventory_state_smoke.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'test(inventory): RED inventory/tool model smoke (REQ-007)'
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/validation/inventory_state_smoke.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'test(inventory): RED inventory/tool model smoke (REQ-007)'
 else
-  printf '%s\n' 'NO_GIT Task 1 RED: scripts/validation/inventory_state_smoke.gd added and failed for missing InventoryState implementation' >> /tmp/synapse_sea_inventory_tool_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 1 RED: scripts/validation/inventory_state_smoke.gd added and failed for missing InventoryState implementation' >> /tmp/synaptic_sea_inventory_tool_no_git_changes.log
 fi
 ```
 
@@ -487,7 +487,7 @@ In `scripts/systems/oxygen_state.gd`:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/inventory_state_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/inventory_state_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'INVENTORY STATE PASS'
 if printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' >/dev/null; then
@@ -504,11 +504,11 @@ Expected (GREEN) result:
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/systems/inventory_state.gd data/tools/tool_definitions.json scripts/systems/oxygen_state.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'feat(inventory): InventoryState model, tool definition, OxygenState drain multiplier (REQ-007)'
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/systems/inventory_state.gd data/tools/tool_definitions.json scripts/systems/oxygen_state.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'feat(inventory): InventoryState model, tool definition, OxygenState drain multiplier (REQ-007)'
 else
-  printf '%s\n' 'NO_GIT Task 2 GREEN: scripts/systems/inventory_state.gd, data/tools/tool_definitions.json, scripts/systems/oxygen_state.gd added' >> /tmp/synapse_sea_inventory_tool_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 2 GREEN: scripts/systems/inventory_state.gd, data/tools/tool_definitions.json, scripts/systems/oxygen_state.gd added' >> /tmp/synaptic_sea_inventory_tool_no_git_changes.log
 fi
 ```
 
@@ -799,7 +799,7 @@ In `scripts/procgen/playable_generated_ship.gd`:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/inventory_state_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/inventory_state_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'INVENTORY STATE PASS'
 ```
@@ -810,11 +810,11 @@ Expected: still green.
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/tools/tool_pickup.gd scripts/procgen/playable_generated_ship.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'feat(inventory): ToolPickup node and PlayableGeneratedShip integration (REQ-007)'
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/tools/tool_pickup.gd scripts/procgen/playable_generated_ship.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'feat(inventory): ToolPickup node and PlayableGeneratedShip integration (REQ-007)'
 else
-  printf '%s\n' 'NO_GIT Task 3: scripts/tools/tool_pickup.gd, scripts/procgen/playable_generated_ship.gd modified' >> /tmp/synapse_sea_inventory_tool_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 3: scripts/tools/tool_pickup.gd, scripts/procgen/playable_generated_ship.gd modified' >> /tmp/synaptic_sea_inventory_tool_no_git_changes.log
 fi
 ```
 
@@ -1014,7 +1014,7 @@ func _cleanup_and_quit(code: int) -> void:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_inventory_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_inventory_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'MAIN PLAYABLE INVENTORY PASS' || true
 ```
@@ -1027,11 +1027,11 @@ Expected (RED) result:
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/validation/main_playable_slice_inventory_smoke.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'test(inventory): RED main-scene inventory smoke (REQ-007)'
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/validation/main_playable_slice_inventory_smoke.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'test(inventory): RED main-scene inventory smoke (REQ-007)'
 else
-  printf '%s\n' 'NO_GIT Task 4 RED: scripts/validation/main_playable_slice_inventory_smoke.gd added and failed for missing scene integration' >> /tmp/synapse_sea_inventory_tool_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 4 RED: scripts/validation/main_playable_slice_inventory_smoke.gd added and failed for missing scene integration' >> /tmp/synaptic_sea_inventory_tool_no_git_changes.log
 fi
 ```
 
@@ -1060,7 +1060,7 @@ Confirm `PlayableGeneratedShip` exposes:
 
 Run:
 ```bash
-OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_inventory_smoke.gd 2>&1)
+OUT=$(/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_inventory_smoke.gd 2>&1)
 printf '%s\n' "$OUT"
 printf '%s\n' "$OUT" | grep -q 'MAIN PLAYABLE INVENTORY PASS'
 if printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' >/dev/null; then
@@ -1077,11 +1077,11 @@ Expected (GREEN) result:
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/procgen/playable_generated_ship.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'feat(inventory): green main-scene inventory smoke (REQ-007)'
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/procgen/playable_generated_ship.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'feat(inventory): green main-scene inventory smoke (REQ-007)'
 else
-  printf '%s\n' 'NO_GIT Task 5 GREEN: PlayableGeneratedShip helpers verified' >> /tmp/synapse_sea_inventory_tool_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 5 GREEN: PlayableGeneratedShip helpers verified' >> /tmp/synaptic_sea_inventory_tool_no_git_changes.log
 fi
 ```
 
@@ -1094,7 +1094,7 @@ fi
 
 - [ ] **Step 1: Add inventory smokes to the regression bundle**
 
-Insert two `run_clean` calls into the bundle in `docs/game/06_validation_plan.md` before the final `echo 'SYNAPSE_SEA REGRESSION PASS ...'` line:
+Insert two `run_clean` calls into the bundle in `docs/game/06_validation_plan.md` before the final `echo 'SYNAPTIC_SEA REGRESSION PASS ...'` line:
 
 ```bash
 run_clean 'inventory model smoke' 'INVENTORY STATE PASS tools=1 pump=true drain_multiplier=0.5' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_state_smoke.gd
@@ -1118,11 +1118,11 @@ to:
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add docs/game/06_validation_plan.md
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'docs(validation): add REQ-007 inventory smokes to regression bundle'
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add docs/game/06_validation_plan.md
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'docs(validation): add REQ-007 inventory smokes to regression bundle'
 else
-  printf '%s\n' 'NO_GIT Task 6: docs/game/06_validation_plan.md updated with REQ-007 smokes' >> /tmp/synapse_sea_inventory_tool_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 6: docs/game/06_validation_plan.md updated with REQ-007 smokes' >> /tmp/synaptic_sea_inventory_tool_no_git_changes.log
 fi
 ```
 
@@ -1138,7 +1138,7 @@ fi
 Run the bundle script from `docs/game/06_validation_plan.md` (lines 29-66, after the Task 6 edits):
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-synapse-sea-of-stars
+ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
 GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
 BASELINE_ERROR="^ERROR: Capture not registered: 'gdaimcp'\\.$"
 BASELINE_WARNING="^WARNING: ObjectDB instances leaked at exit \\(run with --verbose for details\\)\\.$"
@@ -1167,12 +1167,12 @@ run_clean 'ship systems smoke' 'MAIN PLAYABLE SHIP SYSTEMS PASS supplies=true po
 run_clean 'completion smoke' 'MAIN PLAYABLE SLICE COMPLETE PASS completed=4 current_sequence=5 run_complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_completion_smoke.gd
 run_clean 'input smoke' 'MAIN PLAYABLE INPUT LOOP PASS moved=true camera_followed=true interaction_input_path=true current_sequence=2' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_input_smoke.gd
 run_clean 'readability smoke' 'MAIN PLAYABLE SLICE READABILITY PASS objective_props=4 blocked=1 ramp=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_readability_smoke.gd
-echo 'SYNAPSE_SEA REGRESSION PASS commands=10 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=10 clean_output=true'
 ```
 
 Expected:
 - All 10 smokes pass with their markers.
-- Final line: `SYNAPSE_SEA REGRESSION PASS commands=10 clean_output=true`.
+- Final line: `SYNAPTIC_SEA REGRESSION PASS commands=10 clean_output=true`.
 - No unexpected `ERROR:` or `WARNING:` lines.
 
 - [ ] **Step 2: If any existing smoke regresses**
@@ -1182,16 +1182,16 @@ If an existing smoke (route control, oxygen, hazard, ship systems, completion, i
 2. Inspect the failure output.
 3. Fix the regression in the inventory/tool code; do not alter the existing feature semantics.
 4. Re-run the failing smoke plus the full bundle.
-5. If the regression is caused by an intentional design conflict, block and escalate to `synapse_sea_review` for ADR-level decision before proceeding.
+5. If the regression is caused by an intentional design conflict, block and escalate to `synaptic_sea_review` for ADR-level decision before proceeding.
 
 - [ ] **Step 3: Record Task 7**
 
 Run:
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m 'test(regression): REQ-007 bundle passes with 10 smokes' --allow-empty
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m 'test(regression): REQ-007 bundle passes with 10 smokes' --allow-empty
 else
-  printf '%s\n' 'NO_GIT Task 7: regression bundle passed with 10 smokes' >> /tmp/synapse_sea_inventory_tool_no_git_changes.log
+  printf '%s\n' 'NO_GIT Task 7: regression bundle passed with 10 smokes' >> /tmp/synaptic_sea_inventory_tool_no_git_changes.log
 fi
 ```
 
@@ -1201,13 +1201,13 @@ fi
 
 Direct model smoke:
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/inventory_state_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/inventory_state_smoke.gd
 ```
 Expected marker: `INVENTORY STATE PASS tools=1 pump=true drain_multiplier=0.5`
 
 Main-scene smoke:
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_playable_slice_inventory_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_inventory_smoke.gd
 ```
 Expected marker: `MAIN PLAYABLE INVENTORY PASS tool=portable_oxygen_pump acquired=true drain_multiplier=0.5`
 
@@ -1215,7 +1215,7 @@ Regression bundle:
 ```bash
 # Run the script from docs/game/06_validation_plan.md after Task 6 edits.
 ```
-Expected marker: `SYNAPSE_SEA REGRESSION PASS commands=10 clean_output=true`
+Expected marker: `SYNAPTIC_SEA REGRESSION PASS commands=10 clean_output=true`
 
 ---
 
@@ -1255,7 +1255,7 @@ Expected marker: `SYNAPSE_SEA REGRESSION PASS commands=10 clean_output=true`
 
 ## Stop / Block Conditions
 
-Block the implementation and escalate to `synapse_sea_review` if:
+Block the implementation and escalate to `synaptic_sea_review` if:
 - The plan would add hub/meta state, broaden into a generic equipment system, alter route/extraction semantics, or require an unapproved architecture decision beyond the one-tool scope.
 - Implementing the tool pickup requires changes to `GeneratedShipLoader` that affect layout/gameplay_slice parsing for other features.
 - The `OxygenState` multiplier change causes any existing Gate 1 smoke to fail and the failure cannot be fixed without changing existing feature semantics.

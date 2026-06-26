@@ -9,7 +9,7 @@ ADR-0030 (achievement catalog and triggers),
 
 ## Context
 
-Every player-facing string in the Synapse Sea is hard-coded English:
+Every player-facing string in the Synaptic Sea is hard-coded English:
 
 - HUD lines ("Oxygen:", "Breach:", "Load:") in `oxygen_state.gd`,
   `player_vitals_model.gd`, `inventory_state.gd`.

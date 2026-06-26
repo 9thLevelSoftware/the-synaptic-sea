@@ -1688,7 +1688,7 @@ Create `docs/game/adr/0021-equipment-carts.md` capturing the decisions from the 
 
 - [ ] **Step 2: Register the new smokes in the regression bundle.**
 
-In `docs/game/06_validation_plan.md`, read the bundle block (the flat list of `run_clean '<desc>' '<marker-substring>' ... --script <gd>` lines) and the trailing `echo 'SYNAPSE_SEA REGRESSION PASS commands=104 clean_output=true'`. Add one `run_clean` line per NEW smoke, each grepping its exact marker substring:
+In `docs/game/06_validation_plan.md`, read the bundle block (the flat list of `run_clean '<desc>' '<marker-substring>' ... --script <gd>` lines) and the trailing `echo 'SYNAPTIC_SEA REGRESSION PASS commands=104 clean_output=true'`. Add one `run_clean` line per NEW smoke, each grepping its exact marker substring:
 - `equipment_defs_smoke.gd` → `EQUIPMENT DEFS SMOKE PASS`
 - `equipment_state_smoke.gd` → `EQUIPMENT STATE SMOKE PASS`
 - `encumbrance_smoke.gd` → `EQUIPMENT ENCUMBRANCE SMOKE PASS`
@@ -1696,7 +1696,7 @@ In `docs/game/06_validation_plan.md`, read the bundle block (the flat list of `r
 - `cart_control_smoke.gd` → `CART CONTROL SMOKE PASS`
 - `equipment_carts_smoke.gd` → `EQUIPMENT CARTS SMOKE PASS`
 
-(`equipment_defs_smoke` is folded into Task 1 but registered here.) That is 6 new commands: update the final count `104` → `110` in the `echo 'SYNAPSE_SEA REGRESSION PASS commands=110 clean_output=true'` line AND any header/comment that states the command count. Verify the arithmetic against the actual number of `run_clean` lines after editing (the existing pre-slice count is 104; confirm by counting before adding).
+(`equipment_defs_smoke` is folded into Task 1 but registered here.) That is 6 new commands: update the final count `104` → `110` in the `echo 'SYNAPTIC_SEA REGRESSION PASS commands=110 clean_output=true'` line AND any header/comment that states the command count. Verify the arithmetic against the actual number of `run_clean` lines after editing (the existing pre-slice count is 104; confirm by counting before adding).
 
 - [ ] **Step 3: Update the system roadmap.**
 
@@ -1713,7 +1713,7 @@ ROOT="C:/Users/dasbl/Documents/The Synaptic Sea" \
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gate1_automated_playtest.gd 2>&1
 git stash pop
 ```
-Expected: `SYNAPSE_SEA REGRESSION PASS commands=110 clean_output=true` and Gate-1 `pass_decision=GO` / `overall_average=2.00`. If the bundle reports an unexpected `ERROR:`/`WARNING:`, classify it in `06_validation_plan.md` before completing. **Always `git stash pop`** even on failure.
+Expected: `SYNAPTIC_SEA REGRESSION PASS commands=110 clean_output=true` and Gate-1 `pass_decision=GO` / `overall_average=2.00`. If the bundle reports an unexpected `ERROR:`/`WARNING:`, classify it in `06_validation_plan.md` before completing. **Always `git stash pop`** even on failure.
 
 - [ ] **Step 5: Commit.**
 

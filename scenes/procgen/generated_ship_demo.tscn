@@ -1,4 +1,4 @@
-[gd_scene load_steps=2 format=3 uid="uid://synapse_sea_generated_ship_demo"]
+[gd_scene load_steps=2 format=3 uid="uid://synaptic_sea_generated_ship_demo"]
 
 [ext_resource type="Script" path="res://scripts/procgen/generated_ship_demo.gd" id="1_generated_ship_demo"]
 

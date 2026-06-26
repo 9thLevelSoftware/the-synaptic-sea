@@ -16,7 +16,7 @@ repair) and saving to work anywhere (Project-Zomboid style).
 
 ## Decision
 
-Introduce `WorldSnapshot` (RefCounted, pure data): wraps the `Synapse SeaWorld`
+Introduce `WorldSnapshot` (RefCounted, pure data): wraps the `Synaptic SeaWorld`
 summary, the home ship's unchanged `RunSnapshot`, a `visited_ships` registry of
 per-derelict slices keyed by `marker_id`, the `current_location`, and the in-ship
 player position. The coordinator keeps a live `visited_ships: Dictionary` of

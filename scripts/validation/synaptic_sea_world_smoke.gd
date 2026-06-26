@@ -1,6 +1,6 @@
 extends SceneTree
 
-const WorldScript := preload("res://scripts/systems/synapse_sea_world.gd")
+const WorldScript := preload("res://scripts/systems/synaptic_sea_world.gd")
 
 func _initialize() -> void:
 	var world = WorldScript.new(42, Vector3.ZERO)
@@ -65,9 +65,9 @@ func _initialize() -> void:
 		_fail("generated set not restored")
 		return
 
-	print("SYNAPSE_SEA WORLD PASS in_range_sorted=true generated=true round_trip=true")
+	print("SYNAPTIC_SEA WORLD PASS in_range_sorted=true generated=true round_trip=true")
 	quit(0)
 
 func _fail(reason: String) -> void:
-	push_error("SYNAPSE_SEA WORLD FAIL reason=%s" % reason)
+	push_error("SYNAPTIC_SEA WORLD FAIL reason=%s" % reason)
 	quit(1)

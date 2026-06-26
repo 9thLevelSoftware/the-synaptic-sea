@@ -1,7 +1,7 @@
 # Food, Cooking, Spoilage & Sustenance Inputs
 
 ## Overview
-Complete food economy for The Synapse Sea. Players must manage hunger, thirst, and sanity through rations, scavenged food, alien flora, cooked meals, and hydroponics. Food spoils over time, affecting restoration values and sickness risk.
+Complete food economy for The Synaptic Sea. Players must manage hunger, thirst, and sanity through rations, scavenged food, alien flora, cooked meals, and hydroponics. Food spoils over time, affecting restoration values and sickness risk.
 
 ## Source requirements
 - REQ-FC-001..010

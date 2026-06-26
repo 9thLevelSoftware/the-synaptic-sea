@@ -1,4 +1,4 @@
-# The Synapse Sea — Architectural Reference
+# The Synaptic Sea — Architectural Reference
 
 A complete architectural map of the Godot 4.6.2 project at `~/the-synaptic-sea`.
 Generated 2026-06-25. Read this end-to-end for onboarding, refactoring, or planning.
@@ -78,7 +78,7 @@ Full contents (30 lines, 785 bytes):
 config_version=5
 
 [application]
-config/name="The Synapse Sea"
+config/name="The Synaptic Sea"
 config/description="Locked-isometric 3D space-horror survival sim: ..."
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
@@ -148,7 +148,7 @@ object and UI panel. Key responsibilities:
 - Loads the home-ship layout, builds the home ship via `GeneratedShipLoader`.
 - Constructs and persists: `InventoryState`, `EquipmentState`,
   `ShipSystemsManager`, `PlayerProgressionState`, `RouteControlState`,
-  `OxygenState`, `ObjectiveProgressState`, `Synapse SeaWorld`, `ScannerState`,
+  `OxygenState`, `ObjectiveProgressState`, `Synaptic SeaWorld`, `ScannerState`,
   `TravelController`, `PlayerVitalsModel`, `SaveLoadService`, `RunSnapshot`,
   `WorldSnapshot`.
 - Manages `current_ship`, `home_ship`, `lifeboat_ship`, `piloted_ship`,
@@ -179,7 +179,7 @@ PlayableGeneratedShip
   ├── FireState                   (scripts/systems/fire_state.gd)
   ├── ElectricalArcState          (scripts/systems/electrical_arc_state.gd)
   ├── ObjectiveProgressState      (scripts/systems/objective_progress_state.gd)
-  ├── Synapse SeaWorld               (scripts/systems/synapse_sea_world.gd)
+  ├── Synaptic SeaWorld               (scripts/systems/synaptic_sea_world.gd)
   ├── ScannerState                (scripts/systems/scanner_state.gd)
   ├── TravelController            (scripts/systems/travel_controller.gd)
   ├── PlayerProgressionState      (scripts/systems/player_progression_state.gd)
@@ -374,7 +374,7 @@ the runtime placer reads the JSON kit instead.
 
 - `RunSnapshot`: player inventory, equipment, progression, current objective
   sequence, oxygen, vitals, fire/arc/breach state.
-- `WorldSnapshot`: `Synapse SeaWorld` (world_seed + player_position + generated
+- `WorldSnapshot`: `Synaptic SeaWorld` (world_seed + player_position + generated
   marker ids), `visited_ships` dict (per-`ShipInstance` summary),
   `lifeboat_ship` summary, `dock_barriers`.
 
@@ -697,7 +697,7 @@ coordinator.
 
 - `extends RefCounted`
 - Pure model. `_text_scale` ∈ [1.0, 2.0]. Sources: env
-  `SYNAPSE_SEA_TEXT_SCALE` → project setting `synapse_sea/accessibility/text_scale`
+  `SYNAPTIC_SEA_TEXT_SCALE` → project setting `synaptic_sea/accessibility/text_scale`
   → default 1.0.
 - Helpers: `scaled_hud_font_size(base)`, `scaled_hud_minimum_size(base)`,
   `scaled_hud_panel_size(base)`, `scaled_world_pixel_size(base)` (divides
@@ -896,8 +896,8 @@ is a Python helper that orchestrates capture screenshots.
   6. Generate `build/release/artifacts.sha256` (shasum -a 256).
 - **Trap `restore_project` on EXIT** to restore the original project.godot
   even on failure.
-- Defaults: `SYNAPSE_SEA_VERSION=v0.1.0`, `BUILD_STAMP=$(date -u +...)`.
-- Output: `build/release/synapse-sea-of-stars-<version>-<stamp>-<target>.<ext>`.
+- Defaults: `SYNAPTIC_SEA_VERSION=v0.1.0`, `BUILD_STAMP=$(date -u +...)`.
+- Output: `build/release/synaptic-sea-of-stars-<version>-<stamp>-<target>.<ext>`.
 
 ### `export_presets.cfg` (6K)
 
@@ -918,7 +918,7 @@ is a Python helper that orchestrates capture screenshots.
 | **Ship systems** | `scripts/systems/ship_systems_manager.gd`, `ship_system.gd`, `ship_subcomponent.gd` |
 | **Hazards** | `oxygen_state.gd`, `fire_state.gd`, `electrical_arc_state.gd` |
 | **Docking** | `docking_manager.gd`, `dock_ports.gd`, `ship_occupancy.gd`, `dock_port_barrier.gd` |
-| **World / travel** | `synapse_sea_world.gd`, `marker_generator.gd`, `travel_controller.gd`, `scanner_state.gd` |
+| **World / travel** | `synaptic_sea_world.gd`, `marker_generator.gd`, `travel_controller.gd`, `scanner_state.gd` |
 | **Procgen** | `scripts/procgen/ship_generator.gd` + `room_graph*.gd` + `cell_layout_engine.gd` + `structural_placer.gd` |
 | **UI** | `scripts/ui/{objective_tracker,scanner_panel,inventory_panel,player_vitals_panel,accessibility_settings}.gd` |
 | **Interaction** | `scripts/interaction/interactable.gd` |

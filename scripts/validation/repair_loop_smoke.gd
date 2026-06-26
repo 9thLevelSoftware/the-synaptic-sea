@@ -78,7 +78,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 	# Propulsion now operational; a jump that was blocked now succeeds.
 	if not mgr.is_operational("propulsion"):
 		_fail("propulsion not operational after repair"); return
-	var world = playable.get_synapse_sea_world()
+	var world = playable.get_synaptic_sea_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
 	if in_range.is_empty():
 		_fail("no markers in range"); return

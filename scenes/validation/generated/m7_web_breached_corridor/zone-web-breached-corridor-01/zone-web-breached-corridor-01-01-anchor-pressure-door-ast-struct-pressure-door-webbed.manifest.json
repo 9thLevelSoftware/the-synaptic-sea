@@ -32,9 +32,9 @@
       "notes": "Intended as the sealed door anchor on the left side of the corridor."
     },
     "source_asset_path": "assets/_source/derelict/pressure_door_webbed.glb",
-    "wrapper_scene": "/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.tscn",
-    "contract_path": "/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.contract.tres",
-    "inspection_path": "/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.inspection.json",
+    "wrapper_scene": "/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.tscn",
+    "contract_path": "/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.contract.tres",
+    "inspection_path": "/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/validation/generated/m7_web_breached_corridor/zone-web-breached-corridor-01/zone-web-breached-corridor-01-01-anchor-pressure-door-ast-struct-pressure-door-webbed.inspection.json",
     "support": {
       "required_surfaces": [
         "floor",

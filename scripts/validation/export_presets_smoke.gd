@@ -50,7 +50,7 @@ func _initialize() -> void:
 		if not export_path.begins_with(expected_prefix):
 			all_paths_under_build = false
 
-	# Known-good preset set for the Synapse Sea: web/linux/macos/windows.
+	# Known-good preset set for the Synaptic Sea: web/linux/macos/windows.
 	var expected_preset_names: Array = ["web", "linux", "macos", "windows"]
 	var found_names: Array = []
 	for preset in presets:

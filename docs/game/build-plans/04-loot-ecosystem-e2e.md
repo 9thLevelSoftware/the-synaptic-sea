@@ -19,7 +19,7 @@ Finite location-aware loot system with rarity tiers, container subtypes, depth/b
 ## Project Zomboid influence, translated in-character
 PZ location loot, finite world scavenging, containers with distinct pools, hidden stashes, weight/space triage.
 
-This is influence, not copying: every mechanic must read as locked-isometric 3D space-horror survival aboard derelict ships trapped in a biomatter Synapse Sea field.
+This is influence, not copying: every mechanic must read as locked-isometric 3D space-horror survival aboard derelict ships trapped in a biomatter Synaptic Sea field.
 
 
 ## Non-negotiable package contract
@@ -49,11 +49,11 @@ This is influence, not copying: every mechanic must read as locked-isometric 3D 
 6. Persistence: prove save/load, travel, reload, and mid-action persistence for any state that can survive a frame.
 7. Main-scene smoke: exercise the system through `res://scenes/main.tscn` or the package-specific scene, not only through pure models.
 8. Regression bundle: register all smokes in `docs/game/06_validation_plan.md` and run the focused smoke(s) plus the appropriate bundle.
-9. Product audit: describe what a player actually sees/does and why it is in-character for the Synapse Sea/biomatter web fantasy.
+9. Product audit: describe what a player actually sees/does and why it is in-character for the Synaptic Sea/biomatter web fantasy.
 10. Commit hygiene: provide changed files, commands, output markers, and if executed by Kanban worker, complete with evidence; do not block for vague human review.
 
 ## Standard verification command shape
-Use the Synaptic Sea checkout explicitly even if older docs default to the Synapse Sea path:
+Use the Synaptic Sea checkout explicitly even if older docs default to the Synaptic Sea path:
 
 ```bash
 ROOT=/Users/christopherwilloughby/the-synaptic-sea GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2 /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea --script res://scripts/validation/<smoke>.gd
@@ -172,7 +172,7 @@ Then run the relevant focused bundle from `docs/game/06_validation_plan.md` with
 ### 9. Production-grade closeout
 - Update systems map, roadmap, requirements, ADR index, validation plan, and risk register with actual file evidence.
 - Provide changed files, commands run, PASS markers, and any accepted caveats.
-- If a Kanban worker executes this package, complete the card only after evidence is fresh; do not block for generic human review because `synapse_seareview`/GPT-5.5 is the designated reviewer.
+- If a Kanban worker executes this package, complete the card only after evidence is fresh; do not block for generic human review because `synaptic_seareview`/GPT-5.5 is the designated reviewer.
 
 ## Stop/block conditions
 - Missing source assets or credentials that cannot be replaced with a runtime placeholder.

@@ -9,13 +9,13 @@ This protocol is a behavioral, in-engine playtest. The primary evidence is **dir
 ## Scope and target
 
 - **Target build**: the running Godot main playable slice (`scenes/main_playable_slice.tscn` via `scripts/procgen/playable_generated_ship.gd`) at the most recent commit / workspace state. The slice must already pass the regression bundle in `docs/game/06_validation_plan.md` before a playtest session starts.
-- **Target player profile**: someone who has **never** played Synapse Sea, has **not** read the GDD or feature specs, and has **not** watched a prior playtest recording. This is the "stranger" the Gate 1 exit criteria reference.
+- **Target player profile**: someone who has **never** played Synaptic Sea, has **not** read the GDD or feature specs, and has **not** watched a prior playtest recording. This is the "stranger" the Gate 1 exit criteria reference.
 - **Target session length**: 10–15 minutes per player. Two players per round is the minimum sample; one player is acceptable for an early directional pass but cannot by itself certify Gate 1.
 
 ## Pre-session setup
 
 1. Confirm the regression bundle is green by re-running `docs/game/06_validation_plan.md`. If any smoke fails, **stop** and create a Kanban card to fix the regression before continuing.
-2. Confirm the build being tested matches the workspace state recorded in this session's log (Godot 4.6.2 at `/Users/christopherwilloughby/.local/bin/godot-4.6.2`, project at `/Users/christopherwilloughby/the-synapse-sea-of-stars`).
+2. Confirm the build being tested matches the workspace state recorded in this session's log (Godot 4.6.2 at `/Users/christopherwilloughby/.local/bin/godot-4.6.2`, project at `/Users/christopherwilloughby/the-synaptic-sea-of-stars`).
 3. Reset the player's save / objective state so the run starts at objective 1 with the reactor and route gate closed.
 4. Brief the player with only what the in-game UI tells them. Do **not** explain the loop, hazards, or system order before the run.
 5. Create a per-session log using `docs/game/playtests/playtest_template.md`. Filename: `playtests/gate-1-<YYYY-MM-DD>-<player-pseudonym>.md`.

@@ -10,7 +10,7 @@
 
 ## Current Context / Assumptions
 
-- Project root: `/Users/christopherwilloughby/the-synapse-sea-of-stars`
+- Project root: `/Users/christopherwilloughby/the-synaptic-sea-of-stars`
 - Godot binary: `/Users/christopherwilloughby/.local/bin/godot-4.6.2`
 - `project.godot` currently sets `run/main_scene="res://scenes/main.tscn"`.
 - `scripts/main.gd` currently hardcodes `res://scenes/procgen/playable_generated_ship.tscn`, which uses the older seed-17 fixture by default.
@@ -25,7 +25,7 @@
   - 2 landmarks
   - 4 objectives
   - real non-headless viewport capture at `/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/coherent_proof_ship_viewport.png`
-- The repo is not currently a git repository from the shell. Use `/tmp/synapse_sea_coherent_incorporation_no_git_changes.log` as the fallback change ledger if `git rev-parse --is-inside-work-tree` fails.
+- The repo is not currently a git repository from the shell. Use `/tmp/synaptic_sea_coherent_incorporation_no_git_changes.log` as the fallback change ledger if `git rev-parse --is-inside-work-tree` fails.
 - Do **not** regenerate the golden fixture, rewrite the loader, or modify seed-17 data in this plan. The goal is incorporation into the main runnable path, not another proof-fixture build.
 
 ---
@@ -48,7 +48,7 @@
 - Create: `scripts/validation/main_coherent_capture.gd`
 - Modify: `docs/superpowers/proofs/coherent-proof-ship.md`
 - Artifact output, outside repo: `/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png`
-- Fallback no-git ledger: `/tmp/synapse_sea_coherent_incorporation_no_git_changes.log`
+- Fallback no-git ledger: `/tmp/synaptic_sea_coherent_incorporation_no_git_changes.log`
 
 Files that must **not** change:
 
@@ -67,7 +67,7 @@ Files that must **not** change:
 **Objective:** Create a failing validation script that proves the actual `res://scenes/main.tscn` boots the coherent proof ship, not the older seed-17 scene.
 
 **Files:**
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/main_coherent_boot_smoke.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/main_coherent_boot_smoke.gd`
 
 ### Step 1: Write the failing validation script
 
@@ -162,7 +162,7 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/main_coherent_boot_smoke.gd
 ```
 
@@ -177,11 +177,11 @@ MAIN COHERENT BOOT FAIL reason=expected coherent layout res://data/procgen/golde
 ### Step 3: Record Task 1
 
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/validation/main_coherent_boot_smoke.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "test: add main coherent boot smoke"
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/validation/main_coherent_boot_smoke.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m "test: add main coherent boot smoke"
 else
-  printf '%s\n' 'NO_GIT Incorporation Task 1 changed: scripts/validation/main_coherent_boot_smoke.gd' >> /tmp/synapse_sea_coherent_incorporation_no_git_changes.log
+  printf '%s\n' 'NO_GIT Incorporation Task 1 changed: scripts/validation/main_coherent_boot_smoke.gd' >> /tmp/synaptic_sea_coherent_incorporation_no_git_changes.log
 fi
 ```
 
@@ -192,8 +192,8 @@ fi
 **Objective:** Make `scenes/main.tscn` boot the coherent proof ship by default and remove the stale static camera from main.
 
 **Files:**
-- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/main.gd`
-- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scenes/main.tscn`
+- Modify: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/main.gd`
+- Modify: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scenes/main.tscn`
 
 ### Step 1: Replace `scripts/main.gd`
 
@@ -210,7 +210,7 @@ var playable_instance: PlayableGeneratedShip
 
 
 func _ready() -> void:
-	print("The Synapse Sea coherent proof ship bootstrap loaded.")
+	print("The Synaptic Sea coherent proof ship bootstrap loaded.")
 	if playable_ship_scene == null:
 		push_error("MAIN BOOT FAIL reason=missing playable_ship_scene")
 		return
@@ -229,7 +229,7 @@ Remove the old `LockedIsoCamera` node. The playable coherent scene creates its o
 Replace the file with:
 
 ```text
-[gd_scene load_steps=2 format=3 uid="uid://synapse_sea_main"]
+[gd_scene load_steps=2 format=3 uid="uid://synaptic_sea_main"]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 
@@ -248,7 +248,7 @@ Run:
 ```bash
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
   --headless \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/main_coherent_boot_smoke.gd
 ```
 
@@ -263,8 +263,8 @@ MAIN COHERENT BOOT PASS scene=playable_coherent_ship objectives=4 critical_path=
 Run:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/coherent_playable_scene_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/procgen_playable_ship_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/coherent_playable_scene_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/procgen_playable_ship_smoke.gd
 ```
 
 Expected pass markers:
@@ -277,11 +277,11 @@ PLAYABLE SHIP SMOKE PASS
 ### Step 5: Record Task 2
 
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/main.gd scenes/main.tscn
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "feat: boot coherent proof ship from main scene"
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/main.gd scenes/main.tscn
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m "feat: boot coherent proof ship from main scene"
 else
-  printf '%s\n' 'NO_GIT Incorporation Task 2 changed: scripts/main.gd scenes/main.tscn' >> /tmp/synapse_sea_coherent_incorporation_no_git_changes.log
+  printf '%s\n' 'NO_GIT Incorporation Task 2 changed: scripts/main.gd scenes/main.tscn' >> /tmp/synaptic_sea_coherent_incorporation_no_git_changes.log
 fi
 ```
 
@@ -292,7 +292,7 @@ fi
 **Objective:** Capture a fresh viewport through `res://scenes/main.tscn`, proving the project’s main scene path renders the coherent ship in-engine.
 
 **Files:**
-- Create: `/Users/christopherwilloughby/the-synapse-sea-of-stars/scripts/validation/main_coherent_capture.gd`
+- Create: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/scripts/validation/main_coherent_capture.gd`
 
 ### Step 1: Run the capture command before the script exists to verify RED
 
@@ -301,7 +301,7 @@ Run:
 ```bash
 mkdir -p /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/main_coherent_capture.gd \
   -- \
   --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png \
@@ -464,7 +464,7 @@ Run without `--headless`:
 ```bash
 mkdir -p /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/main_coherent_capture.gd \
   -- \
   --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png \
@@ -509,11 +509,11 @@ Expected: exit 0. If visual review shows the scene is too sparse or poorly frame
 ### Step 6: Record Task 3
 
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add scripts/validation/main_coherent_capture.gd
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "test: capture coherent ship through main scene"
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add scripts/validation/main_coherent_capture.gd
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m "test: capture coherent ship through main scene"
 else
-  printf '%s\n' 'NO_GIT Incorporation Task 3 changed: scripts/validation/main_coherent_capture.gd' >> /tmp/synapse_sea_coherent_incorporation_no_git_changes.log
+  printf '%s\n' 'NO_GIT Incorporation Task 3 changed: scripts/validation/main_coherent_capture.gd' >> /tmp/synaptic_sea_coherent_incorporation_no_git_changes.log
 fi
 ```
 
@@ -524,7 +524,7 @@ fi
 **Objective:** Update the existing proof log with the main-scene boot proof and main-scene viewport capture proof.
 
 **Files:**
-- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
+- Modify: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
 
 ### Step 1: Append a new proof section
 
@@ -567,7 +567,7 @@ Run:
 ```bash
 python3 - <<'PY'
 from pathlib import Path
-p = Path('/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md')
+p = Path('/Users/christopherwilloughby/the-synaptic-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md')
 text = p.read_text()
 required = [
     '## Main-Scene Incorporation',
@@ -592,11 +592,11 @@ MAIN INCORPORATION PROOF LOG PASS markers=5
 ### Step 3: Record Task 4
 
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add docs/superpowers/proofs/coherent-proof-ship.md
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "docs: record coherent ship main-scene incorporation"
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add docs/superpowers/proofs/coherent-proof-ship.md
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m "docs: record coherent ship main-scene incorporation"
 else
-  printf '%s\n' 'NO_GIT Incorporation Task 4 changed: docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/synapse_sea_coherent_incorporation_no_git_changes.log
+  printf '%s\n' 'NO_GIT Incorporation Task 4 changed: docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/synaptic_sea_coherent_incorporation_no_git_changes.log
 fi
 ```
 
@@ -607,7 +607,7 @@ fi
 **Objective:** Prove the coherent ship remains validated through both the direct coherent scene path and the actual main scene path, while seed-17 regression remains intact.
 
 **Files:**
-- Modify: `/Users/christopherwilloughby/the-synapse-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
+- Modify: `/Users/christopherwilloughby/the-synaptic-sea-of-stars/docs/superpowers/proofs/coherent-proof-ship.md`
 
 ### Step 1: Run the coherent + main validation bundle
 
@@ -625,7 +625,7 @@ for script in \
   echo "=== $script ==="
   /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
     --headless \
-    --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+    --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
     --script "$script"
 done
 ```
@@ -655,7 +655,7 @@ for script in \
   echo "=== $script ==="
   /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
     --headless \
-    --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+    --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
     --script "$script"
 done
 ```
@@ -676,13 +676,13 @@ Run:
 ```bash
 mkdir -p /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/coherent_proof_ship_capture.gd \
   -- \
   --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/coherent_proof_ship_viewport.png \
   --capture-frame 180
 /Users/christopherwilloughby/.local/bin/godot-4.6.2 \
-  --path /Users/christopherwilloughby/the-synapse-sea-of-stars \
+  --path /Users/christopherwilloughby/the-synaptic-sea-of-stars \
   --script res://scripts/validation/main_coherent_capture.gd \
   -- \
   --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png \
@@ -718,11 +718,11 @@ Append this checklist to `docs/superpowers/proofs/coherent-proof-ship.md` and fi
 ### Step 5: Record final incorporation task
 
 ```bash
-if git -C /Users/christopherwilloughby/the-synapse-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars add docs/superpowers/proofs/coherent-proof-ship.md
-  git -C /Users/christopherwilloughby/the-synapse-sea-of-stars commit -m "docs: record coherent ship main-path acceptance"
+if git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars add docs/superpowers/proofs/coherent-proof-ship.md
+  git -C /Users/christopherwilloughby/the-synaptic-sea-of-stars commit -m "docs: record coherent ship main-path acceptance"
 else
-  printf '%s\n' 'NO_GIT Incorporation Task 5 changed: docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/synapse_sea_coherent_incorporation_no_git_changes.log
+  printf '%s\n' 'NO_GIT Incorporation Task 5 changed: docs/superpowers/proofs/coherent-proof-ship.md' >> /tmp/synaptic_sea_coherent_incorporation_no_git_changes.log
 fi
 ```
 
@@ -734,7 +734,7 @@ Run these before claiming completion:
 
 ```bash
 # Main path smoke
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_coherent_boot_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_coherent_boot_smoke.gd
 
 # Coherent validation bundle
 for script in \
@@ -743,7 +743,7 @@ for script in \
   res://scripts/validation/coherent_runtime_loader_smoke.gd \
   res://scripts/validation/coherent_playable_scene_smoke.gd \
   res://scripts/validation/coherent_playable_traversal_smoke.gd; do
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script "$script"
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script "$script"
 done
 
 # Existing regression bundle
@@ -752,11 +752,11 @@ for script in \
   res://scripts/validation/player_gravity_floor_snap_smoke.gd \
   res://scripts/validation/interactable_distance_fallback_smoke.gd \
   res://scripts/validation/procgen_playable_ship_smoke.gd; do
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script "$script"
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script "$script"
 done
 
 # Main path non-headless capture
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_coherent_capture.gd -- --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png --capture-frame 180
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_coherent_capture.gd -- --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png --capture-frame 180
 ```
 
 Required pass markers:
@@ -782,7 +782,7 @@ MAIN COHERENT CAPTURE PASS
 - **Main scene becomes coherent proof ship by default.** This is intentional for incorporation, but if the desired default should remain seed-17, add a menu/launcher or `@export` scene override instead of changing the default.
 - **Visual quality is still proof-level.** This plan proves main-path in-engine incorporation. It does not add art dressing, hull silhouettes, lighting passes, or a prettier hero camera beyond the current runtime camera. If the capture is still visually sparse, treat that as the next staging/art pass.
 - **Synchronous loader assumption remains.** `PlayableGeneratedShip` currently relies on synchronous `GeneratedShipLoader.load_from_paths()`. This plan does not change that; validation should fail if it breaks.
-- **No-git fallback.** The project is not a git repo in the shell. Subagents must not invent repo-local audit logs; use `/tmp/synapse_sea_coherent_incorporation_no_git_changes.log` exactly.
+- **No-git fallback.** The project is not a git repo in the shell. Subagents must not invent repo-local audit logs; use `/tmp/synaptic_sea_coherent_incorporation_no_git_changes.log` exactly.
 - **No fixture edits.** If a validation fails because of the existing blocked-link fallback or sparse camera framing, do not “fix” fixture geometry as part of this incorporation plan. File a follow-up plan for staging/fixture polish.
 
 ---

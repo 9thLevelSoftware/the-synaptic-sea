@@ -55,7 +55,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		(playable.player as Node3D).global_position = known_home_pos
 
 	# Travel to a derelict and mutate its systems to a recognisable state.
-	var world = playable.get_synapse_sea_world()
+	var world = playable.get_synaptic_sea_world()
 	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
 	if in_range.is_empty():
 		_fail("no markers in range")

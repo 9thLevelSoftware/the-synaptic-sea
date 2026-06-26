@@ -13,7 +13,7 @@ In progress for Alpha content-complete target.
 
 ## Design intent
 
-Template C is the third hand-authored ship layout for Synapse Sea Alpha. It is visually and topologically distinct from Template A (horizontal spine with side rooms, single ramp) and Template B (bifurcated branch-and-merge). Template C is a **stacked two-deck ship**:
+Template C is the third hand-authored ship layout for Synaptic Sea Alpha. It is visually and topologically distinct from Template A (horizontal spine with side rooms, single ramp) and Template B (bifurcated branch-and-merge). Template C is a **stacked two-deck ship**:
 
 - Lower deck contains the airlock, entry corridor, a central hub, optional side rooms, and the reactor.
 - Upper deck contains a second hub and the maintenance / medbay side rooms.
@@ -96,7 +96,7 @@ The exact randomization rules are owned by the procedural generator and validate
 Run the main-scene smoke:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/template_c_main_scenario_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/template_c_main_scenario_smoke.gd
 ```
 
 Expected marker:

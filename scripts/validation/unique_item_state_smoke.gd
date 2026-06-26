@@ -19,10 +19,10 @@ func _initialize() -> void:
 	if state.claim("captains_black_box", "seed:a", "captains_black_box"):
 		_fail("duplicate claim should fail")
 		return
-	if not state.record_codex_unlock("synapse_sea_reliquary"):
+	if not state.record_codex_unlock("synaptic_sea_reliquary"):
 		_fail("new codex unlock should record")
 		return
-	if state.record_codex_unlock("synapse_sea_reliquary"):
+	if state.record_codex_unlock("synaptic_sea_reliquary"):
 		_fail("duplicate codex unlock should fail")
 		return
 	var summary: Dictionary = state.get_summary()
@@ -37,7 +37,7 @@ func _initialize() -> void:
 	if not clone.unlocked_codex_entry_ids.has("captains_black_box"):
 		_fail("claim should persist codex unlock")
 		return
-	if not clone.unlocked_codex_entry_ids.has("synapse_sea_reliquary"):
+	if not clone.unlocked_codex_entry_ids.has("synaptic_sea_reliquary"):
 		_fail("recorded codex unlock missing after round-trip")
 		return
 	print("UNIQUE ITEM STATE PASS claimed=%d codex=%d" % [clone.claimed_unique_ids.size(), clone.unlocked_codex_entry_ids.size()])

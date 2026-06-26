@@ -16,7 +16,7 @@
 - **Allowlisted baseline noise (ignore):** `ERROR: Capture not registered: 'gdaimcp'.` and `WARNING: ObjectDB instances leaked at exit …`. Any other `ERROR:`/`WARNING:` line blocks completion.
 - **Never stage/commit** `project.godot`, `.godot/`, `*.uid`, or `addons/`. Use selective `git add <explicit paths>` only. Before the full regression bundle: `git stash push -- project.godot`, run, then `git stash pop` (the local MCPRuntime-autoload drift breaks headless).
 - **Conventional Commits**, each ending with a trailer line: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
-- **Bundle marker after this slice:** `SYNAPSE_SEA REGRESSION PASS commands=120 clean_output=true` (was 119; Task 2 adds one smoke).
+- **Bundle marker after this slice:** `SYNAPTIC_SEA REGRESSION PASS commands=120 clean_output=true` (was 119; Task 2 adds one smoke).
 - **Vitals oxygen line format (sole home):** `Oxygen: N (BREACH)` / `Oxygen: N (SEALED)` / trailing ` LOW` when `N ≤ recovery_threshold`; no breach suffix when closed. There is **no `BLOCKED` token** in the vitals line (that token only existed in the retired tracker oxygen line).
 - **Tracker keeps:** ship systems (Power/Reactor/Supplies/Main Power/Logs), Routes/Extraction, carried `Tool:`/`tool=`/`item=` lines (REQ-007), `Repair Skill:`. Tracker **drops:** `Oxygen:`, `Breach:`, `weight=`.
 
@@ -200,7 +200,7 @@ run_clean 'main playable slice hud' 'MAIN PLAYABLE SLICE HUD PASS' "$GODOT" --he
 Then bump the tail marker on the next line:
 
 ```bash
-echo 'SYNAPSE_SEA REGRESSION PASS commands=120 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=120 clean_output=true'
 ```
 (was `commands=119`).
 
@@ -522,7 +522,7 @@ git -C "$ROOT" stash push -- project.godot
 bash <(awk '/^## Regression bundle/{f=1} f && /^```bash$/ {c=1; next} f && c && /^```$/ {exit} f && c {print}' "$ROOT/docs/game/06_validation_plan.md")
 git -C "$ROOT" stash pop
 ```
-Expected final line: `SYNAPSE_SEA REGRESSION PASS commands=120 clean_output=true`. (If the stash pop is skipped on a bundle failure, re-run `git stash pop` manually — never commit `project.godot`.)
+Expected final line: `SYNAPTIC_SEA REGRESSION PASS commands=120 clean_output=true`. (If the stash pop is skipped on a bundle failure, re-run `git stash pop` manually — never commit `project.godot`.)
 
 - [ ] **Step 4: Commit**
 

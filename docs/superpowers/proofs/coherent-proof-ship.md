@@ -106,7 +106,7 @@ Capture command:
 
 ```sh
 mkdir -p /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/coherent_proof_ship_capture.gd -- --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/coherent_proof_ship_viewport.png --capture-frame 180
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/coherent_proof_ship_capture.gd -- --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/coherent_proof_ship_viewport.png --capture-frame 180
 ```
 
 Pass marker (note `mode=viewport` confirms a real rendered capture rather than a synthetic map):
@@ -204,7 +204,7 @@ The coherent proof ship is now the default playable scene instantiated by `res:/
 Main boot smoke command (headless, run from the project root with the spec'd Godot binary):
 
 ```sh
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_coherent_boot_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_coherent_boot_smoke.gd
 ```
 
 Main boot smoke output:
@@ -212,7 +212,7 @@ Main boot smoke output:
 ```text
 Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
 
-The Synapse Sea coherent proof ship bootstrap loaded.
+The Synaptic Sea coherent proof ship bootstrap loaded.
 PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=4 collision_shapes=31
 MAIN COHERENT BOOT PASS scene=playable_coherent_ship objectives=4 critical_path=5 landmarks=2 frames=1
 ```
@@ -221,7 +221,7 @@ Main-scene capture command (non-headless, run from the project root with the spe
 
 ```sh
 mkdir -p /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_coherent_capture.gd -- --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png --capture-frame 180
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_coherent_capture.gd -- --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png --capture-frame 180
 ```
 
 Main-scene capture output (note `mode=viewport` confirms a real rendered capture through `scenes/main.tscn` rather than a synthetic map):
@@ -230,7 +230,7 @@ Main-scene capture output (note `mode=viewport` confirms a real rendered capture
 Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
 Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 (Apple9)
 
-The Synapse Sea coherent proof ship bootstrap loaded.
+The Synaptic Sea coherent proof ship bootstrap loaded.
 PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=4 collision_shapes=31
 MAIN COHERENT CAPTURE PASS output=/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png frame=180 mode=viewport
 ```
@@ -271,7 +271,7 @@ PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=4 collisi
 PLAYABLE INTERACTION interaction=objective:01:cargo_01:cargo_supply_cache objective=cargo_01:cargo_supply_cache sequence=1 type=recover_supplies room=cargo_01
 COHERENT PLAYABLE TRAVERSAL PASS rooms_traversed=5 side_rooms=3 blocked_route_blocked=true objective_completed=true
 === res://scripts/validation/main_coherent_boot_smoke.gd ===
-The Synapse Sea coherent proof ship bootstrap loaded.
+The Synaptic Sea coherent proof ship bootstrap loaded.
 PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=4 collision_shapes=31
 MAIN COHERENT BOOT PASS scene=playable_coherent_ship objectives=4 critical_path=5 landmarks=2 frames=1
 ```
@@ -294,18 +294,18 @@ PLAYABLE SHIP SMOKE PASS player_spawned=true collision_checked=true interaction_
 ### Non-headless viewport captures (final re-run)
 
 ```text
-$ /Users/christopherwilloughby/.local/bin/godot-4.6.2 --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/coherent_proof_ship_capture.gd -- --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/coherent_proof_ship_viewport.png --capture-frame 180
+$ /Users/christopherwilloughby/.local/bin/godot-4.6.2 --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/coherent_proof_ship_capture.gd -- --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/coherent_proof_ship_viewport.png --capture-frame 180
 Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
 Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 (Apple9)
 
 PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=4 collision_shapes=31
 COHERENT PROOF SHIP CAPTURE PASS output=/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/coherent_proof_ship_viewport.png frame=180 mode=viewport
 
-$ /Users/christopherwilloughby/.local/bin/godot-4.6.2 --path /Users/christopherwilloughby/the-synapse-sea-of-stars --script res://scripts/validation/main_coherent_capture.gd -- --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png --capture-frame 180
+$ /Users/christopherwilloughby/.local/bin/godot-4.6.2 --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_coherent_capture.gd -- --output /Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png --capture-frame 180
 Godot Engine v4.6.2.stable.official.71f334935 - https://godotengine.org
 Metal 4.0 - Forward+ - Using Device #0: Apple - Apple M4 (Apple9)
 
-The Synapse Sea coherent proof ship bootstrap loaded.
+The Synaptic Sea coherent proof ship bootstrap loaded.
 PLAYABLE SHIP READY player_spawned=true camera_spawned=true objectives=4 collision_shapes=31
 MAIN COHERENT CAPTURE PASS output=/Users/christopherwilloughby/off-the-rails-ai-infra/artifacts/in_engine_show/coherent_proof_ship/main_coherent_viewport.png frame=180 mode=viewport
 ```

@@ -1391,7 +1391,7 @@ In `docs/game/06_validation_plan.md`, add `run_clean` lines (matching the existi
 - `rigid_pair_travel_smoke` → `RIGID PAIR TRAVEL SMOKE PASS`
 - `claim_persistence_smoke` → `CLAIM PERSISTENCE SMOKE PASS`
 
-Change the closing line from `commands=88` to `commands=94` (`echo 'SYNAPSE_SEA REGRESSION PASS commands=94 clean_output=true'`).
+Change the closing line from `commands=88` to `commands=94` (`echo 'SYNAPTIC_SEA REGRESSION PASS commands=94 clean_output=true'`).
 
 - [ ] **Step 4: Reconcile the spec testing count**
 
@@ -1402,13 +1402,13 @@ In `docs/superpowers/specs/2026-06-22-phase5c-claim-and-pilot-switch-design.md`,
 ```bash
 git stash push -- project.godot
 # Extract and run the bundle from 06_validation_plan.md with GODOT/ROOT set to the Windows values.
-# Expected tail: SYNAPSE_SEA REGRESSION PASS commands=94 clean_output=true
+# Expected tail: SYNAPTIC_SEA REGRESSION PASS commands=94 clean_output=true
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gate1_automated_playtest.gd
 # Expected: GATE 1 AUTOMATED PLAYTEST PASS, pass_decision=GO, overall_average=2.00
 git stash pop
 ```
 
-Expected: bundle ends `SYNAPSE_SEA REGRESSION PASS commands=94 clean_output=true`; Gate-1 prints GO. If any smoke fails, fix the root cause before continuing — do not loosen an assertion to make it pass.
+Expected: bundle ends `SYNAPTIC_SEA REGRESSION PASS commands=94 clean_output=true`; Gate-1 prints GO. If any smoke fails, fix the root cause before continuing — do not loosen an assertion to make it pass.
 
 - [ ] **Step 6: Commit**
 
