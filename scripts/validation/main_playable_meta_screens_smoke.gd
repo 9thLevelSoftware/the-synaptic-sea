@@ -77,6 +77,12 @@ func _validate(playable) -> void:
 		if not ui.meta_screen_is_populated(str(screen_id)):
 			_fail("screen not populated by a live dependency: %s" % str(screen_id))
 			return
+		# The catalog-backed panels must actually RENDER their label after binding, not
+		# just hold the data model (regression guard for the explicit render() calls).
+		if str(screen_id) in ["achievements", "skill_tree", "hub_upgrades", "class"]:
+			if _rendered_text(panel).strip_edges().is_empty():
+				_fail("catalog panel rendered blank: %s" % str(screen_id))
+				return
 		visited += 1
 
 	if visited != 10:
@@ -100,6 +106,15 @@ func _validate(playable) -> void:
 	if is_instance_valid(main_node):
 		main_node.queue_free()
 	quit(0)
+
+## Returns the text of the panel's first RichTextLabel child (the catalog panels render
+## their content into a RichTextLabel). Empty string when none is found.
+func _rendered_text(panel) -> String:
+	if not is_instance_valid(panel):
+		return ""
+	for child in panel.find_children("", "RichTextLabel", true, false):
+		return str((child as RichTextLabel).text)
+	return ""
 
 func _find_playable(node: Node):
 	if not is_instance_valid(node):

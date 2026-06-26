@@ -155,12 +155,20 @@ func handle_ui_input(event: InputEvent) -> bool:
 		return true
 	if menu_state.is_in_play():
 		return false
-	# While a meta screen is displayed, it owns the input: cancel returns to the
-	# records list, everything else is swallowed so the list behind it doesn't move.
+	# While a meta screen is displayed it owns the input: cancel returns to the records
+	# list. Swallow ONLY the menu-list navigation/accept actions so the list behind the
+	# screen doesn't move — but let every other event (mouse clicks, slider drags, key
+	# typing) fall through (return false) so the visible screen's own Controls (the
+	# Language OptionButton, Audio Settings sliders, Audio Log ItemList) stay operable.
 	if not _active_meta_screen.is_empty():
 		if event.is_action_pressed("ui_cancel"):
 			_close_meta_screen()
-		return true
+			return true
+		if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down") \
+				or event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right") \
+				or event.is_action_pressed("ui_accept"):
+			return true
+		return false
 	if event.is_action_pressed("ui_down"):
 		menu_state.navigate(0, 1)
 		_refresh_menu_panel()
@@ -417,43 +425,64 @@ func _build_meta_screens() -> void:
 	}
 	for sid in _meta_panels:
 		var node = _meta_panels[sid]
-		if node != null:
+		if is_instance_valid(node):
 			node.visible = false
 
-## Inject each meta screen's coordinator-owned data dependency. Idempotent; every
-## argument is null-guarded so this is safe headless and before models exist.
+## Inject each meta screen's coordinator-owned data dependency. Idempotent; re-callable
+## on a HUD rebuild. The coordinator constructs/owns every required dependency before
+## calling this, so a null is a wiring bug — asserted in debug. The catalog-backed panels
+## need an explicit render() after binding (their setters assign data but don't redraw).
 func bind_meta_screens(p_achievement_state, p_audio_manager, p_skill_tree_state, p_player_progression, p_hub_upgrade_state, p_meta_progression_state, p_localization_catalog, p_build_metadata_state, p_save_load_menu, p_a11y) -> void:
+	assert(p_achievement_state != null, "p_achievement_state dependency is missing")
+	assert(p_audio_manager != null, "p_audio_manager dependency is missing")
+	assert(p_skill_tree_state != null, "p_skill_tree_state dependency is missing")
+	assert(p_player_progression != null, "p_player_progression dependency is missing")
+	assert(p_hub_upgrade_state != null, "p_hub_upgrade_state dependency is missing")
+	assert(p_meta_progression_state != null, "p_meta_progression_state dependency is missing")
+	assert(p_localization_catalog != null, "p_localization_catalog dependency is missing")
+	assert(p_build_metadata_state != null, "p_build_metadata_state dependency is missing")
+	assert(p_save_load_menu != null, "p_save_load_menu dependency is missing")
+	# p_a11y stays optional (its body use is null-guarded), matching the rest of the
+	# coordinator, which tolerates a null accessibility_settings.
 	save_load_menu = p_save_load_menu
-	if achievements_panel != null:
+	# Catalog-backed panels: set data, then render() (the setters do not auto-redraw, so
+	# without this the panel is visible but its RichTextLabel stays blank).
+	if is_instance_valid(achievements_panel):
 		achievements_panel.load_catalog()
 		achievements_panel.set_state(p_achievement_state)
-	if skill_tree_panel != null:
+		achievements_panel.render()
+	if is_instance_valid(skill_tree_panel):
 		skill_tree_panel.set_tree(p_skill_tree_state)
 		skill_tree_panel.set_progression(p_player_progression)
-	if hub_upgrade_panel != null:
+		skill_tree_panel.render()
+	if is_instance_valid(hub_upgrade_panel):
 		hub_upgrade_panel.set_catalog(p_hub_upgrade_state)
 		hub_upgrade_panel.set_meta_state(p_meta_progression_state)
-	if class_panel != null:
+		hub_upgrade_panel.render()
+	if is_instance_valid(class_panel):
 		class_panel.load_catalog()
 		if p_player_progression != null and p_player_progression.has_method("get_class_id"):
 			class_panel.set_selected_class(str(p_player_progression.get_class_id()))
-	if audio_log_panel != null:
+		class_panel.render()
+	# These panels self-render in their setters (set_audio_manager / set_catalog /
+	# set_metadata) or in load_catalog (credits) — no explicit render() needed.
+	if is_instance_valid(audio_log_panel):
 		audio_log_panel.set_audio_manager(p_audio_manager)
-	if audio_settings_panel != null:
+	if is_instance_valid(audio_settings_panel):
 		audio_settings_panel.set_audio_manager(p_audio_manager)
 		if p_a11y != null:
 			audio_settings_panel.set_accessibility_settings(p_a11y)
-	if language_selector != null:
+	if is_instance_valid(language_selector):
 		language_selector.set_catalog(p_localization_catalog)
-	if release_badge_overlay != null:
+	if is_instance_valid(release_badge_overlay):
 		release_badge_overlay.set_metadata(p_build_metadata_state)
-	if credits_screen != null:
+	if is_instance_valid(credits_screen):
 		credits_screen.load_catalog()
 	_refresh_save_load_panel()
 	_meta_bound = true
 
 func _refresh_save_load_panel() -> void:
-	if _save_load_panel == null:
+	if not is_instance_valid(_save_load_panel):
 		return
 	var lines := PackedStringArray()
 	lines.append("SAVE / LOAD")
@@ -465,12 +494,19 @@ func _refresh_save_load_panel() -> void:
 	if rows.is_empty():
 		lines.append("(no save slots)")
 	else:
+		# list_slots() returns SaveSlotState objects (RefCounted, with to_dict()), not
+		# dictionaries — normalize both shapes so the rows show real slot metadata
+		# instead of an object identity string.
 		for row in rows:
+			var d: Dictionary = {}
 			if typeof(row) == TYPE_DICTIONARY:
-				var d: Dictionary = row
-				lines.append("- %s | %s" % [str(d.get("slot_id", "?")), str(d.get("display_name", ""))])
-			else:
+				d = row
+			elif row != null and (row as Object).has_method("to_dict"):
+				d = (row as Object).to_dict()
+			if d.is_empty():
 				lines.append("- %s" % str(row))
+			else:
+				lines.append("- %s | %s" % [str(d.get("slot_id", "?")), str(d.get("display_name", ""))])
 	_save_load_panel.text = "\n".join(lines)
 
 func _open_meta_screen(screen_id: String) -> void:
@@ -488,7 +524,7 @@ func _close_meta_screen() -> void:
 func _refresh_meta_screens() -> void:
 	for sid in _meta_panels:
 		var node = _meta_panels[sid]
-		if node != null:
+		if is_instance_valid(node):
 			node.visible = (sid == _active_meta_screen)
 
 ## Validation/host seam: open the records list directly.
@@ -519,25 +555,26 @@ func get_save_load_menu():
 func meta_screen_is_populated(screen_id: String) -> bool:
 	match screen_id:
 		"achievements":
-			return achievements_panel != null and achievements_panel.get_total_count() > 0
+			return is_instance_valid(achievements_panel) and achievements_panel.get_total_count() > 0
 		"skill_tree":
-			return skill_tree_panel != null and skill_tree_panel.get_status_lines().size() >= 1
+			return is_instance_valid(skill_tree_panel) and skill_tree_panel.get_status_lines().size() >= 1
 		"hub_upgrades":
-			return hub_upgrade_panel != null and hub_upgrade_panel.get_upgrade_count() > 0
+			return is_instance_valid(hub_upgrade_panel) and hub_upgrade_panel.get_upgrade_count() > 0
 		"class":
-			return class_panel != null and class_panel.get_class_count() > 0
+			return is_instance_valid(class_panel) and class_panel.get_class_count() > 0
 		"audio_log":
-			return audio_log_panel != null and audio_log_panel.audio_manager != null
+			return is_instance_valid(audio_log_panel) and audio_log_panel.audio_manager != null
 		"audio_settings":
-			return audio_settings_panel != null and audio_settings_panel.audio_manager != null
+			return is_instance_valid(audio_settings_panel) and audio_settings_panel.audio_manager != null
 		"language":
-			return language_selector != null and language_selector.get_known_languages().size() > 0
+			return is_instance_valid(language_selector) and language_selector.get_known_languages().size() > 0
 		"save_load":
+			# save_load_menu is a RefCounted model, not a node — keep the null check.
 			return save_load_menu != null and typeof(save_load_menu.refresh()) == TYPE_ARRAY
 		"release_badge":
-			return release_badge_overlay != null and not release_badge_overlay.get_badge_text().is_empty()
+			return is_instance_valid(release_badge_overlay) and not release_badge_overlay.get_badge_text().is_empty()
 		"credits":
-			return credits_screen != null and credits_screen.get_entry_count() > 0
+			return is_instance_valid(credits_screen) and credits_screen.get_entry_count() > 0
 	return false
 
 func _apply_accessibility_to_children() -> void:
