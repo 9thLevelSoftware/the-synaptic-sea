@@ -34,7 +34,7 @@ builds on these foundations.
 
 ## Roadmap principles after Task 15
 
-1. Treat Tasks 01-15 as the source-backed baseline; do not re-open “missing system” language unless a validator or smoke proves a regression. **Exception:** integration debt proven by the reachability audit (`integration_debt.md`) is a documented gap, not a regression — un-integrated systems may be wired into the live scene without a new ADR re-opening the system itself.
+1. Treat Tasks 01-15 as the source-backed baseline; do not re-open “missing system” language unless a validator or smoke proves a regression. **Exception:** integration debt proven by the reachability audit ([integration_debt.md](integration_debt.md)) is a documented gap, not a regression — un-integrated systems may be wired into the live scene without a new ADR re-opening the system itself.
 2. `t_4e47145d` completed the live main-scene/controller-path e2e strengthening probe with marker `LIVE MAIN PREPARE UPGRADE PROBE PASS stages=7`; it complements, rather than replaces, Task 14's model/composite integration gate.
 3. External release evidence remains intentionally separate from local release scaffolding. Task 13 validates export/readiness models; release ops must still provide real signed/platform/store evidence.
 4. Future content should expand depth (art/audio/content/bosses/hub/vendor/faction/store assets) rather than rebuild the validated system foundations.
