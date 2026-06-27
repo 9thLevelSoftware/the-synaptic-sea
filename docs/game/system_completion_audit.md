@@ -136,7 +136,9 @@ inventory. Remaining: the biome's `loot_quality_modifier` isn't yet applied to r
 per-derelict biome is now resolved (PR #38, same seam as combat), so the hook exists; wiring it
 into the loot roll is a fast-follow. Content: loot/unique/junk definitions exist.
 
-### M7 · Ship systems & sustenance infrastructure — 🔴 **the most hollow lane** (highest-priority gap)
+### M7 · Ship systems & sustenance infrastructure — 🟡 partial progress (M7-A: life-support closed; hull source partly wired; shields cut)
+
+*Resolved by M7-A: `shield_state` removed; `life_support_expanded_state` closed-loop (hull breach_count → atmosphere drain → vitals health while aboard); `hull_integrity_state` sink-side now 🟢 (player seals via `BreachSealPoint`), live damage source is config-only #4, sources #1–3 deferred.*
 
 | System | Coupled | Live input → output | Conf |
 | --- | --- | --- | --- |
@@ -144,34 +146,25 @@ into the loot roll is a fast-follow. Content: loot/unique/junk definitions exist
 | `propulsion_expanded_state` | 🟢 | ← power + hull penalty + manager (1331) → **gates travel via `can_propel()`** (1716) | [V] |
 | `crafting_state` / `station_state` | 🟢 | ← stations power channel (1353) → `_on_craft_completed` (materials/inventory) | [V] |
 | `fire_suppression_state` | 🔴 | ← power (1348) + `ignite()` only from `ignite_compartment_for_validation` (1412, test seam) → `get_status_lines()` only (4055); a HUD shadow of the real `fire_state` Alpha hazard | [V] |
-| `shield_state` | 🔴 | ← power (1337) → **only `get_status_lines()` HUD (4061); nothing damages or reads shields for gameplay** | [V] |
-| `life_support_expanded_state` | 🔴 | ← power + breach + recycled water (1342) → **only `get_status_lines()` (4049); does NOT gate the player's actual breathable oxygen** (that's the separate `oxygen_state` Alpha hazard) | [V] |
-| `hull_integrity_state` | 🔴 | **input-starved:** only caller of `damage_compartment` is `force_hull_breach_for_validation()` (1393, a test seam) → feeds life-support breach count + propulsion hull penalty | [V] |
+| ~~`shield_state`~~ | cut | **Removed by M7-A** — model and tuning deleted; orphaned power channel (`power → shield allocation slot`) flagged as follow-up cleanup. | [V] |
+| `life_support_expanded_state` | 🟢 | ← power + hull `breach_count` (1342) → `get_health_drain_per_second()` → drains `vitals_state.health` while aboard (coordinator M7-A wiring); drain is zero while away on a derelict. **Closed-loop by M7-A.** | [V] |
+| `hull_integrity_state` | 🟡 | **sink** 🟢 breach_count → life-support drain → vitals; player can seal via `BreachSealPoint` + hull_sealant. **source** 🟡 live damage source is config-only `#4` (initial breach set at load via `hull_compartments.json`); sources `#1–3` (combat / hazard / pressure) deferred. | [V] |
 | `sustenance_state` | 🔴 | ← power + hydroponics/synth/water summaries (1364) → **only `get_status_lines()` (4064); does not feed player hunger/thirst** | [P] |
 
-**Gap (the big one):** power + propulsion + crafting form a real coupled core, but **half
-this lane is decoration.** Specifically:
-1. **No live source breaches the hull** — the entire hull→life-support/propulsion damage
-   cascade can only fire from a validation function. Needs a real source (combat hits,
-   hazards, deep-dive pressure, derelict events).
-2. **Shields charge from power but nothing ever depletes them** — there's no
-   ship-directed-damage channel that reads `shield_state`. Either wire shields as a damage
-   buffer or cut them.
-3. **Expanded life-support and sustenance produce HUD text only** — `life_support_expanded`
-   runs *parallel to* the real `oxygen_state` the player breathes, instead of gating it; and
-   `sustenance_state` consumes the whole farm/cook chain but its output feeds no player vital.
-   These are the two longest "hollow output" chains in the project.
-4. **Fire-suppression is a HUD shadow of the real fire hazard** — ignites only from a
+**Gap (remaining after M7-A):** power + propulsion + crafting form a real coupled core.
+Life-support is now a real atmospheric-vitals source. Remaining hollow systems:
+1. **Hull damage sources #1–3 deferred** — config-injected breach (source #4) is live; player
+   can seal via `BreachSealPoint`. But combat hits, hazard cascades, and deep-dive pressure do
+   not yet call `damage_compartment()`. The seam exists; it needs live callers.
+2. **Fire-suppression is a HUD shadow of the real fire hazard** — ignites only from a
    validation seam, outputs status text, runs parallel to the actual `fire_state` Alpha hazard.
+3. **Sustenance produces HUD text only** — `sustenance_state` consumes the farm/cook chain
+   but its output feeds no player vital. The `water_recycler_state` output feeds life-support,
+   but life-support now actually gates vitals, so this chain is closer to live.
 
-**Pattern (the root cause):** the entire "expanded ship systems" tier (`shield`,
-`hull_integrity`, `life_support_expanded`, `fire_suppression`, `sustenance`) is a parallel set
-of **HUD-only models shadowing the real hazards** the player actually faces (`oxygen_state`,
-`fire_state`). Only `power → propulsion → crafting` earns its place in the live loop. **The
-decision isn't five small fixes — it's one architectural call:** either promote these expanded
-models to be the *authoritative* hazard sources (feed/replace the Alpha hazards, with live
-damage sources) or treat the tier as cut. This lane is where "the game functions as a whole"
-most visibly fails. **Recommend first deep-fix target.**
+**Pattern (partially resolved):** of the original "expanded ship systems" tier, `life_support_expanded`
+is now authoritative (drives real vitals). `shield_state` is cut. `hull_integrity` has a real
+sink but still needs live damage callers. `fire_suppression` and `sustenance` remain HUD-only.
 
 ### M5 · Consumables / medicine / stimulants / ammo — 🟢 closed-loop
 
@@ -260,11 +253,14 @@ to close a loop." Ordered by how much each breaks *the game functioning as a who
    (`deep_dive`/`breach_field` could only *lower* the rate). Now floored at 0 with no upper cap
    (per-room probability is still capped at 1.0 downstream), so high-density biomes/difficulties
    actually raise spawn rate (encounter_injector_smoke `deep_markers` 1→2). *(M8/M12)*
-2. **🔴 Hull has no live damage source.** The hull→life-support→propulsion cascade only fires
-   from `force_hull_breach_for_validation()`. Without a real breach source (combat / hazard /
-   deep-dive pressure / derelict events), an entire ship-damage subsystem is inert. *(M7)*
-3. **🔴 Shields are pure decoration.** Charged by power, depleted by nothing — no ship-directed
-   damage channel reads them. Wire as a damage buffer or cut. *(M7)*
+2. **🟡 Hull source partly addressed (M7-A).** Source #4 (config-injected breach via
+   `hull_compartments.json`) is now live — initial hull damage is set at load time. The
+   breach→life-support→vitals drain loop is **closed** (see M7 table). Player can seal via
+   `BreachSealPoint` + `hull_sealant`. Sources #1–3 (combat hits, hazard cascades, deep-dive
+   pressure) remain deferred — `damage_compartment()` seam is future-proof but not wired to live
+   events. *(M7, Resolved by M7-A)*
+3. **✅ RESOLVED (M7-A) — `shield_state` cut.** Model, tuning, and power-channel allocation
+   removed. The orphaned power slot is flagged for cleanup but does not block gameplay. *(M7)*
 4. **✅ RESOLVED — food eat→vitals loop closed (+ dead duplicate removed).** *Corrected framing:*
    production already worked (the kitchen crafting station makes `cooked_meal`); the real break was
    that **eating food was a no-op** (food items have `hunger_restore` but no `effects` array, so the
