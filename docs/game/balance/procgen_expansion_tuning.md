@@ -76,12 +76,13 @@ p_final = clamp(base_probability[role] × combined_density, 0.0, 1.0)
 | hub / dock | 0.10 | | compartment | 0.30 |
 | bay / hangar | 0.20-0.25 | | storage | 0.20 |
 
-For a `breach_field × deep_dive` ship (combined_density clamped to 1.0),
-cargo rooms fire 25%, engineering 30%, maintenance 35%, reactor 40%.
-For a `standard × abyssal_synaptic_sea` ship (combined_density 1.0), the
-same numbers apply — but in practice the encounter_injector_smoke
-verifies that a 10-room layout with all-cargo roles fires >= 1
-marker in the deep_dive+breach_field combination.
+For a `breach_field × deep_dive` ship the combined encounter-density multiplier is
+`1.3 × 1.6 = 2.08` (bounded only by `combined_modifier`'s `[0, 3.0]` range — no longer
+clamped to 1.0), so per-room chances scale up (each still capped at 1.0): cargo
+25%→52%, engineering 30%→62%, maintenance 35%→73%, reactor 40%→83%. For a
+`standard × abyssal_synaptic_sea` ship (combined density 1.0) the base numbers apply
+unchanged. The encounter_injector_smoke verifies a 10-room all-cargo layout fires >= 1
+marker in the deep_dive+breach_field combination (now ~2 vs ~1 under the old clamp).
 
 ## Room variant count targets
 

@@ -202,8 +202,8 @@ stamping were all skipped. PR #38 threads a deterministic per-derelict biome+dif
 call, so all four now drive live derelicts (proven by
 `main_playable_derelict_encounter_injection_smoke.gd`). `seed_determinism_contract` stays a test
 contract, not a runtime system. Remaining known-future: full derelict *structural*-template
-variety (layout.json template expansion) and the EncounterInjector density-clamp balance bug
-(see the rollup).
+variety (layout.json template expansion). (The EncounterInjector density-clamp balance bug is
+now fixed — see the rollup.)
 
 ### M9 · Audio / music / spatial — 🟡 driven, source-coupling [?]
 
@@ -253,10 +253,11 @@ to close a loop." Ordered by how much each breaks *the game functioning as a who
    biome/difficulty ids**, so `EncounterInjector` + `room_variant_selector` + biome/difficulty
    stamping were skipped and combat fell back to the fixed 5. PR #38 threads a deterministic
    per-derelict biome+difficulty into that call → live derelicts now spawn injected,
-   biome/difficulty-tuned encounters. **Follow-up (not yet done):** `encounter_injector.gd:130`
-   clamps combined encounter density to `[0,1]`, neutering biome/difficulty density > 1.0
-   (`deep_dive`/`breach_field` can only *lower* the rate) — a balance fix deferred to its own
-   review. *(M8/M12)*
+   biome/difficulty-tuned encounters. **Follow-up (DONE):** `encounter_injector.gd` previously
+   clamped combined encounter density to `[0,1]`, neutering biome/difficulty density > 1.0
+   (`deep_dive`/`breach_field` could only *lower* the rate). Now floored at 0 with no upper cap
+   (per-room probability is still capped at 1.0 downstream), so high-density biomes/difficulties
+   actually raise spawn rate (encounter_injector_smoke `deep_markers` 1→2). *(M8/M12)*
 2. **🔴 Hull has no live damage source.** The hull→life-support→propulsion cascade only fires
    from `force_hull_breach_for_validation()`. Without a real breach source (combat / hazard /
    deep-dive pressure / derelict events), an entire ship-damage subsystem is inert. *(M7)*
