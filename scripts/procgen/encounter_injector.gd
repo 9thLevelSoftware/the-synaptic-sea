@@ -123,13 +123,15 @@ func inject(
 		for rid in path:
 			critical_set[str(rid)] = true
 
-	# Combined density multiplier for the encounter dial.
-	var density: float = 1.0
-	if biome != null and difficulty != null:
-		density = _safe_combined(biome, difficulty, DIAL_ENCOUNTER)
-		density = clamp(density, 0.0, 1.0)
-	elif difficulty != null:
-		density = clamp(_safe_modifier(difficulty, DIAL_ENCOUNTER), 0.0, 1.0)
+	# Combined density multiplier for the encounter dial. _safe_combined handles every
+	# null combination (both / biome-only / difficulty-only / neither), so a non-null
+	# biome with a null difficulty still applies its own density modifier. Floor at 0 but
+	# DO NOT cap at 1.0 — biome/difficulty density > 1.0 (breach_field 1.3, deep_dive 1.6,
+	# their 2.08 combination) must be able to RAISE the spawn rate, not just lower it. The
+	# per-room probability is still clamped to [0,1] below (clamp(p_base * density, ...)),
+	# so a high multiplier saturates each room's chance rather than being silently
+	# neutered. (A prior clamp(density, 0, 1) here made all density > 1.0 a no-op.)
+	var density: float = maxf(_safe_combined(biome, difficulty, DIAL_ENCOUNTER), 0.0)
 
 	var difficulty_id: String = _safe_difficulty_id(difficulty)
 	var encounter_table_id: String = _safe_encounter_table_id(biome)

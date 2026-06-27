@@ -97,8 +97,9 @@ tooling + `junk_yield_resolver` — no borderline player-facing systems remain).
 > retained combat summary). Proven by
 > `scripts/validation/main_playable_derelict_encounter_injection_smoke.gd` →
 > `MAIN PLAYABLE DERELICT ENCOUNTER INJECTION PASS injected_threats=true reachable=true`. Known
-> follow-ups: room-accurate threat placement; the `encounter_injector.gd` density clamp that
-> neuters biome/difficulty density > 1.0 (a balance fix, deferred).
+> follow-up: room-accurate threat placement. (The `encounter_injector.gd` density-clamp balance
+> bug — which neutered biome/difficulty density > 1.0 — has since been fixed so `deep_dive` /
+> `breach_field` actually raise the spawn rate.)
 
 See [integration_debt.md](integration_debt.md) for the full classification and the
 integration actions required before depth/content work builds on these foundations.
