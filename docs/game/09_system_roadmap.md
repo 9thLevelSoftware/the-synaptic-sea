@@ -83,6 +83,23 @@ tooling + `junk_yield_resolver` — no borderline player-facing systems remain).
 > (the `layout.json` pipeline) is out of scope. **This closes the last borderline player-facing
 > integration-debt item.**
 
+> **Update — live derelicts now run the procgen encounter/biome/difficulty pipeline.** The
+> system-completion audit ([system_completion_audit.md](system_completion_audit.md)) found that
+> while traveled-to derelicts are procgen (`ShipGenerator` → `ShipLayoutGenerator`), they were
+> generated with **empty biome/difficulty ids**, so the Task-12 Stage-6 `EncounterInjector`,
+> `room_variant_selector`, and biome/difficulty stamping were all skipped — derelict combat fell
+> back to a hardcoded 5-archetype set. The coordinator now resolves a deterministic per-derelict
+> biome (`BiomeProfileScript.select_biome` on the marker seed) + difficulty (depth-banded) and
+> hands them to `ShipGenerator.configure_run_context()` before travel, lighting up all four
+> dormant systems. Threat spawning consumes the injected `layout.encounters`
+> (`threat_manager._normalize_encounter_kind` already maps injector kinds → real archetypes).
+> Determinism/saves unchanged (encounters derive from the marker seed; revisits restore the
+> retained combat summary). Proven by
+> `scripts/validation/main_playable_derelict_encounter_injection_smoke.gd` →
+> `MAIN PLAYABLE DERELICT ENCOUNTER INJECTION PASS injected_threats=true reachable=true`. Known
+> follow-ups: room-accurate threat placement; the `encounter_injector.gd` density clamp that
+> neuters biome/difficulty density > 1.0 (a balance fix, deferred).
+
 See [integration_debt.md](integration_debt.md) for the full classification and the
 integration actions required before depth/content work builds on these foundations.
 

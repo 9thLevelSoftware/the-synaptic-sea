@@ -14,6 +14,22 @@ const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slic
 
 var layout_generator: RefCounted = ShipLayoutGeneratorScript.new()
 
+# Per-derelict run context. When non-empty, generate() forwards these to
+# ShipLayoutGenerator.generate_with_options(), which turns on room-variant
+# selection + Stage-6 EncounterInjector and stamps biome_id/difficulty_id on
+# the layout. Empty (the default) preserves the legacy bare-geometry behaviour
+# exactly, so existing callers/smokes are unaffected.
+var biome_id: String = ""
+var difficulty_id: String = ""
+
+
+# Sets the biome / difficulty applied to the NEXT generate()/generate_from_seed()
+# call. The coordinator resolves these deterministically from the target marker's
+# seed before each travel/preview so encounters + variants are seed-stable.
+func configure_run_context(p_biome_id: String, p_difficulty_id: String) -> void:
+	biome_id = p_biome_id
+	difficulty_id = p_difficulty_id
+
 
 # Builds the full Node3D tree for the given blueprint.
 # `archetype` is forwarded to the layout generator for template
@@ -21,7 +37,7 @@ var layout_generator: RefCounted = ShipLayoutGeneratorScript.new()
 func generate(blueprint, archetype: Dictionary = {}) -> Node3D:
 	assert(blueprint != null, "ShipGenerator: blueprint must not be null")
 
-	var layout: Dictionary = layout_generator.generate(blueprint, archetype)
+	var layout: Dictionary = layout_generator.generate_with_options(blueprint, archetype, biome_id, difficulty_id, false)
 	if layout.is_empty():
 		push_error("SHIP GENERATOR FAIL layout generation returned empty")
 		return null
