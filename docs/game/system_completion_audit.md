@@ -268,10 +268,11 @@ to close a loop." Ordered by how much each breaks *the game functioning as a who
    `FoodState`. The superseded standalone `cooking_state` (galley) duplicate was deleted. **Follow-up
    (option 3, not done):** live start/harvest for hydroponics/synthesizer/water-recycler as a passive
    production source; per-item spoilage-stage scaling on eat. *(M2)*
-5. **🔴 Expanded life-support, fire-suppression, sustenance output to HUD only** and run
-   *parallel* to the real `oxygen_state` / `fire_state` hazards instead of being the
-   authoritative source. The whole "expanded ship systems" tier is a HUD shadow — see M7
-   pattern; this is items 2–5 collapsed into one architectural call. *(M7)*
+5. **🔴 Fire-suppression and sustenance still output to HUD only** and run *parallel* to the
+   real `oxygen_state` / `fire_state` hazards instead of being the authoritative source.
+   (**Life-support is no longer in this list — RESOLVED by M7-A:** it now drives a real vitals
+   drain while aboard; see the M7 table.) These two remain HUD shadows — the same architectural
+   pattern, now narrowed to the systems M7-A did not touch. *(M7)*
 6. **🔴 Sanity is cosmetic** — live source (safe-zone) but output is HUD warning text only; no
    damage / hallucination / control effect consumes low sanity. Give it teeth or accept it as a
    meter. *(M1)*
