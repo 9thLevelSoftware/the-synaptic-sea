@@ -1673,6 +1673,10 @@ func claimable_marker_ids_for_validation() -> Array:
 func _marker_has_bridge_for_validation(marker) -> bool:
 	if marker == null or ship_generator == null:
 		return false
+	# Match the live travel path's run context so bridge-presence previews stay
+	# consistent with the actual built derelict (the variant selector is biome-driven).
+	var ctx: Dictionary = _resolve_derelict_run_context(marker)
+	ship_generator.configure_run_context(str(ctx.get("biome", "")), str(ctx.get("difficulty", "")))
 	var built = ship_generator.generate_from_seed(int(marker.seed_value), int(marker.size_class), int(marker.condition))
 	if built == null:
 		return false
@@ -2881,6 +2885,12 @@ func travel_to(marker) -> Dictionary:
 	var prev_player_pos: Vector3 = synaptic_sea_world.player_position
 	var was_generated: bool = synaptic_sea_world.is_generated(String(marker.marker_id))
 	var ops_t: Dictionary = {"propulsion": bool(_current_systems_ops().get("propulsion", false))}
+	# Light up the procgen expansion lane for this derelict: resolve a deterministic
+	# biome + difficulty from the target marker and hand them to the generator so
+	# ShipLayoutGenerator runs EncounterInjector + room-variant selection and stamps
+	# biome_id/difficulty_id on the layout (consumed by threat spawning + scanner/HUD).
+	var run_ctx: Dictionary = _resolve_derelict_run_context(marker)
+	ship_generator.configure_run_context(str(run_ctx.get("biome", "")), str(run_ctx.get("difficulty", "")))
 	var result: Dictionary = travel_controller.attempt_travel(
 		marker, ops_t, synaptic_sea_world, ship_generator, scanner_state.range_radius)
 	if not bool(result.get("success", false)):
@@ -6138,6 +6148,32 @@ func _resolve_current_loot_biome_id() -> String:
 	if current_ship != null and current_ship.blueprint != null:
 		seed_value = int(current_ship.blueprint.seed_value)
 	return BiomeProfileScript.select_biome(seed_value, biome_ids)
+
+## Resolves the deterministic {biome, difficulty} a derelict marker should be
+## generated with. Biome reuses the same seed->biome selector as the loot path;
+## difficulty is depth-banded from the marker's size/condition. Both feed
+## ShipGenerator.configure_run_context() before generation.
+func _resolve_derelict_run_context(marker) -> Dictionary:
+	var biome: String = "abyssal_synaptic_sea"
+	if marker != null:
+		var biome_ids: Array[String] = _loot_biome_ids()
+		if not biome_ids.is_empty():
+			biome = BiomeProfileScript.select_biome(int(marker.seed_value), biome_ids)
+	return {"biome": biome, "difficulty": _resolve_derelict_difficulty_id(marker)}
+
+## Deterministic difficulty band from the target derelict's size/condition.
+## depth = size_class * 2 + condition: 0-2 standard, 3-4 hardened, 5+ deep_dive.
+## Ids match data/procgen/difficulty/*.json (ShipLayoutGenerator falls back to
+## built-in defaults for these three ids even if a file is absent). Tunable.
+func _resolve_derelict_difficulty_id(marker) -> String:
+	if marker == null:
+		return "standard"
+	var depth: int = int(marker.size_class) * 2 + int(marker.condition)
+	if depth >= 5:
+		return "deep_dive"
+	if depth >= 3:
+		return "hardened"
+	return "standard"
 
 func _resolve_current_loot_depth() -> int:
 	if current_ship == null or current_ship.blueprint == null:
