@@ -5913,6 +5913,9 @@ func load_world_for_validation() -> bool:
 func _activate_derelict_from_instance(inst, pos_in_ship: Array) -> bool:
 	if inst == null or ship_generator == null:
 		return false
+	# Rebuild from this derelict's OWN seed/size/condition so a save-reload reproduces
+	# its injected encounters + biome/difficulty stamps (not empty / a stale marker's).
+	_apply_run_context_from_blueprint(inst.blueprint)
 	var new_root: Node3D = ship_generator.generate(inst.blueprint)
 	if new_root == null:
 		return false
@@ -5935,6 +5938,8 @@ func _ensure_derelict_geometry(inst) -> void:
 		return
 	if String(inst.marker_id) == "" or is_instance_valid(inst.scene_root):
 		return
+	# Regenerate from this derelict's OWN context (see _apply_run_context_from_blueprint).
+	_apply_run_context_from_blueprint(inst.blueprint)
 	var new_root: Node3D = ship_generator.generate(inst.blueprint)
 	if new_root == null:
 		return
@@ -6149,31 +6154,48 @@ func _resolve_current_loot_biome_id() -> String:
 		seed_value = int(current_ship.blueprint.seed_value)
 	return BiomeProfileScript.select_biome(seed_value, biome_ids)
 
-## Resolves the deterministic {biome, difficulty} a derelict marker should be
-## generated with. Biome reuses the same seed->biome selector as the loot path;
-## difficulty is depth-banded from the marker's size/condition. Both feed
-## ShipGenerator.configure_run_context() before generation.
-func _resolve_derelict_run_context(marker) -> Dictionary:
+## Resolves the deterministic {biome, difficulty} a derelict should be generated
+## with from its seed/size/condition. Biome reuses the same seed->biome selector as
+## the loot path; difficulty is depth-banded. Shared by the marker-driven travel
+## path and the blueprint-driven rebuild paths so a derelict ALWAYS regenerates from
+## its OWN context — never a stale last-traveled one.
+func _resolve_run_context(seed_value: int, size: int, condition: int) -> Dictionary:
 	var biome: String = "abyssal_synaptic_sea"
-	if marker != null:
-		var biome_ids: Array[String] = _loot_biome_ids()
-		if not biome_ids.is_empty():
-			biome = BiomeProfileScript.select_biome(int(marker.seed_value), biome_ids)
-	return {"biome": biome, "difficulty": _resolve_derelict_difficulty_id(marker)}
+	var biome_ids: Array[String] = _loot_biome_ids()
+	if not biome_ids.is_empty():
+		biome = BiomeProfileScript.select_biome(seed_value, biome_ids)
+	return {"biome": biome, "difficulty": _difficulty_id_for_depth(size * 2 + condition)}
 
-## Deterministic difficulty band from the target derelict's size/condition.
-## depth = size_class * 2 + condition: 0-2 standard, 3-4 hardened, 5+ deep_dive.
-## Ids match data/procgen/difficulty/*.json (ShipLayoutGenerator falls back to
-## built-in defaults for these three ids even if a file is absent). Tunable.
-func _resolve_derelict_difficulty_id(marker) -> String:
-	if marker == null:
-		return "standard"
-	var depth: int = int(marker.size_class) * 2 + int(marker.condition)
+## Deterministic difficulty band. depth = size * 2 + condition: 0-2 standard,
+## 3-4 hardened, 5+ deep_dive. Ids match data/procgen/difficulty/*.json
+## (ShipLayoutGenerator falls back to built-in defaults for these three ids even if
+## a file is absent). Tunable.
+func _difficulty_id_for_depth(depth: int) -> String:
 	if depth >= 5:
 		return "deep_dive"
 	if depth >= 3:
 		return "hardened"
 	return "standard"
+
+## Marker wrapper — the travel + scanner-preview paths address derelicts by marker.
+func _resolve_derelict_run_context(marker) -> Dictionary:
+	if marker == null:
+		return {"biome": "abyssal_synaptic_sea", "difficulty": "standard"}
+	return _resolve_run_context(int(marker.seed_value), int(marker.size_class), int(marker.condition))
+
+## Applies a derelict's OWN run context to the generator before a blueprint-driven
+## rebuild (save-reload via _activate_derelict_from_instance, geometry regen via
+## _ensure_derelict_geometry). Without this the generator's mutable biome/difficulty
+## fields are empty on a fresh load (losing encounter injection + stamps) or stale
+## from the last traveled marker (wrong biome/difficulty) — see the rebuild sites.
+func _apply_run_context_from_blueprint(blueprint) -> void:
+	if ship_generator == null:
+		return
+	if blueprint == null:
+		ship_generator.configure_run_context("", "")
+		return
+	var ctx: Dictionary = _resolve_run_context(int(blueprint.seed_value), int(blueprint.size), int(blueprint.condition))
+	ship_generator.configure_run_context(str(ctx.get("biome", "")), str(ctx.get("difficulty", "")))
 
 func _resolve_current_loot_depth() -> int:
 	if current_ship == null or current_ship.blueprint == null:
@@ -6655,6 +6677,9 @@ func ship_owner_for_validation(ship_id: String) -> String:
 func register_offline_test_ship_for_validation() -> String:
 	if ship_generator == null:
 		return ""
+	# Bare-geometry test ship (bridge-presence probe only) — reset any stale run context
+	# so it does not inherit a previously-traveled marker's biome/difficulty.
+	ship_generator.configure_run_context("", "")
 	var built = null
 	var chosen_seed := -1
 	for seed_try in range(0, 200):

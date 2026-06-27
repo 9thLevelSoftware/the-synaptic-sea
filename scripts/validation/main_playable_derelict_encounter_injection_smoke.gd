@@ -69,31 +69,34 @@ func _set_all_operational(mgr) -> void:
 func _validate(playable: PlayableGeneratedShip) -> void:
 	var mgr = playable.get_ship_systems_manager()
 	_set_all_operational(mgr)
-
-	# Populate the scanner and collect in-range derelict markers.
-	playable.scan()
 	var world = playable.get_synaptic_sea_world()
-	var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
-	if in_range.is_empty():
-		_fail("no markers in range of the starting position")
-		return
-
-	# Travel to the largest derelicts first (more rooms -> more reliable encounter
-	# rolls) and accept the first whose layout carries injected encounters. The
-	# density clamp in EncounterInjector makes any single small derelict potentially
-	# empty, so we iterate rather than gamble on one marker.
-	var ordered: Array = in_range.duplicate()
-	ordered.sort_custom(func(a, b): return int(a.size_class) > int(b.size_class))
 
 	var stamped_biome: String = ""
 	var stamped_difficulty: String = ""
 	var encounter_count: int = 0
 	var injected_threats: bool = false
 	var any_travel: bool = false
+	var visited: Dictionary = {}
 
-	var attempts: int = mini(MAX_TRAVEL_ATTEMPTS, ordered.size())
-	for i in range(attempts):
-		var marker = ordered[i]
+	# Travel to derelicts and accept the first whose layout carries injected encounters.
+	# The density clamp in EncounterInjector makes any single small derelict potentially
+	# empty, so we iterate. IMPORTANT: re-scan from the CURRENT world position each
+	# attempt — travel_to_marker_id moves the player, so the previous scan's markers may
+	# no longer be in range (Codex). Pick the largest unvisited in-range marker (more
+	# rooms -> more reliable encounter rolls).
+	for attempt in range(MAX_TRAVEL_ATTEMPTS):
+		playable.scan()
+		var in_range: Array = world.markers_in_range(playable.scanner_state.range_radius)
+		var marker = null
+		for m in in_range:
+			if visited.has(String(m.marker_id)):
+				continue
+			if marker == null or int(m.size_class) > int(marker.size_class):
+				marker = m
+		if marker == null:
+			break  # nothing new in range from the current position
+		visited[String(marker.marker_id)] = true
+
 		var res: Dictionary = playable.travel_to_marker_id(String(marker.marker_id))
 		if not bool(res.get("success", false)):
 			continue
@@ -119,7 +122,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 
 		var encs: Array = layout.get("encounters", [])
 		if encs.is_empty():
-			continue  # this derelict rolled zero encounters; try the next marker
+			continue  # this derelict rolled zero encounters; re-scan and try another
 		encounter_count = encs.size()
 
 		# Encounters drive combat: the threat manager spawned from the injected markers
@@ -139,10 +142,10 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		break
 
 	if not any_travel:
-		_fail("no in-range marker accepted travel after %d attempts" % attempts)
+		_fail("no in-range marker accepted travel in %d attempts" % MAX_TRAVEL_ATTEMPTS)
 		return
 	if encounter_count <= 0:
-		_fail("no in-range derelict produced injected encounters in %d attempts (clamp/density too low?)" % attempts)
+		_fail("no in-range derelict produced injected encounters in %d attempts (clamp/density too low?)" % MAX_TRAVEL_ATTEMPTS)
 		return
 
 	finished = true
