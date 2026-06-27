@@ -72,7 +72,13 @@ func _run_validation(playable: PlayableGeneratedShip) -> void:
 	if not playable.seal_hull_breach_for_validation("engineering", 1.0):
 		_fail("failed to seal engineering")
 		return
-	if playable.hull_integrity_state.get_breach_count() != 0:
+	# Verify engineering specifically is sealed (cargo starts pre-breached per hull_compartments.json,
+	# so a total breach_count check would give a false failure).
+	expanded = playable.get_ship_systems_expanded_summary()
+	hull_summary = expanded.get("hull_integrity_summary", {}) as Dictionary
+	hull_compartments = hull_summary.get("compartments", {}) as Dictionary
+	engineering_row = hull_compartments.get("engineering", {}) as Dictionary
+	if bool(engineering_row.get("breach_open", false)):
 		_fail("engineering breach should be sealed")
 		return
 	playable.ignite_compartment_for_validation("cargo", 1.0)
@@ -115,6 +121,9 @@ func _run_validation(playable: PlayableGeneratedShip) -> void:
 	if int(sustenance.get("harvest_ready", 0)) != 1 or int(sustenance.get("meals_ready", 0)) != 1 or int(sustenance.get("purified_water_ready", 0)) != 4:
 		_fail("sustenance outputs missing")
 		return
+	# Seal the pre-breached cargo before snapshotting so the snapshot baseline
+	# has cargo closed; the mutation test below then reopens it and verifies restore.
+	playable.seal_hull_breach_for_validation("cargo", 1.0)
 	var snapshot = playable._build_run_snapshot()
 	if snapshot == null:
 		_fail("snapshot null")

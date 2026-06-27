@@ -48,6 +48,7 @@ const RarityTierScript := preload("res://scripts/systems/rarity_tier.gd")
 const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
 const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
 const RepairPointScript := preload("res://scripts/tools/repair_point.gd")
+const BreachSealPointScript := preload("res://scripts/tools/breach_seal_point.gd")
 const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
 const MaterialStateScript := preload("res://scripts/systems/material_state.gd")
 const FieldCraftingStateScript := preload("res://scripts/systems/field_crafting_state.gd")
@@ -91,7 +92,6 @@ const LifeSupportExpandedStateScript := preload("res://scripts/systems/life_supp
 const HullIntegrityStateScript := preload("res://scripts/systems/hull_integrity_state.gd")
 const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
 const PropulsionExpandedStateScript := preload("res://scripts/systems/propulsion_state.gd")
-const ShieldStateScript := preload("res://scripts/systems/shield_state.gd")
 const SustenanceStateScript := preload("res://scripts/systems/sustenance_state.gd")
 const EffectDispatcherScript := preload("res://scripts/systems/effect_dispatcher.gd")
 const ConsumableStateScript := preload("res://scripts/systems/consumable_state.gd")
@@ -243,6 +243,8 @@ var loot_containers: Array = []
 # Sub-project #4: timed repair points for damaged subcomponents.
 var repair_point_root: Node3D = null
 var repair_points: Array = []
+# M7-A Task 5: breach seal points for breached hull compartments.
+var breach_seal_points: Array = []
 # ADR-0038: crafting / salvage economy wired into the live run. These pure models are
 # coordinator-owned and ticked from _process; the station nodes are the player-reachable seam.
 var crafting_state                          # CraftingState
@@ -334,7 +336,6 @@ var life_support_expanded_state  # LifeSupportState
 var hull_integrity_state  # HullIntegrityState
 var fire_suppression_state  # FireSuppressionState
 var propulsion_expanded_state  # PropulsionState
-var shield_state  # ShieldState
 var sustenance_state  # SustenanceState
 # Task 05 consumables runtime state.
 var effect_dispatcher  # EffectDispatcher
@@ -1304,8 +1305,6 @@ func _configure_expanded_ship_system_models() -> void:
 	fire_suppression_state.configure(tuning.get("fire_suppression", {}))
 	propulsion_expanded_state = PropulsionExpandedStateScript.new()
 	propulsion_expanded_state.configure(tuning.get("propulsion", {}))
-	shield_state = ShieldStateScript.new()
-	shield_state.configure(tuning.get("shields", {}))
 	sustenance_state = SustenanceStateScript.new()
 	sustenance_state.configure(_load_json_dict(FACILITY_UPGRADES_CONFIG_PATH))
 
@@ -1331,8 +1330,6 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 			"manager_operational": ship_systems_manager != null and ship_systems_manager.is_operational("propulsion"),
 			"hull_penalty": 1.0 - hull_integrity_state.average_integrity(),
 		})
-	if shield_state != null:
-		shield_state.tick(delta, {"powered_ratio": power_grid_state.get_allocation_ratio("shields")})
 	if life_support_expanded_state != null and hull_integrity_state != null:
 		var recycled_water: float = 0.0
 		if water_recycler_state != null:
@@ -1373,7 +1370,6 @@ func _expanded_ship_systems_summary() -> Dictionary:
 		"hull_integrity_summary": hull_integrity_state.get_summary() if hull_integrity_state != null else {},
 		"fire_suppression_summary": fire_suppression_state.get_summary() if fire_suppression_state != null else {},
 		"propulsion_state_summary": propulsion_expanded_state.get_summary() if propulsion_expanded_state != null else {},
-		"shield_state_summary": shield_state.get_summary() if shield_state != null else {},
 		"sustenance_state_summary": sustenance_state.get_summary() if sustenance_state != null else {},
 	}
 
@@ -1403,6 +1399,17 @@ func seal_hull_breach_for_validation(compartment_id: String, amount: float = 1.0
 	_recompute_expanded_ship_systems(0.0)
 	_refresh_tracker_system_status_lines()
 	return ok
+
+func get_breach_seal_points_for_validation() -> Array:
+	return breach_seal_points.duplicate()
+
+func teleport_player_to_breach_seal_point_for_validation(seal_point) -> bool:
+	if player == null or seal_point == null or not is_instance_valid(seal_point):
+		return false
+	if player is Node3D and seal_point is Node3D:
+		(player as Node3D).global_position = (seal_point as Node3D).global_position
+		return true
+	return false
 
 func ignite_compartment_for_validation(compartment_id: String, intensity: float = 1.0) -> bool:
 	if fire_suppression_state == null:
@@ -1791,6 +1798,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	_build_derelict_objectives()
 	_build_loot_containers()
 	_build_repair_points()
+	_build_breach_seal_points()
 
 ## Captures the player's world pose relative to the piloted ship's scene_root so the
 ## player can be carried when the piloted ship is repositioned by a dock. Returns
@@ -2495,6 +2503,53 @@ func _clear_repair_points() -> void:
 	# are freed when scene_root is freed on departure — just clear the array.
 	repair_points.clear()
 
+func _build_breach_seal_points() -> void:
+	_clear_breach_seal_points()
+	if hull_integrity_state == null:
+		return
+	# Only seal breached compartments; healthy hull needs no seal node.
+	var breached: Array = []
+	for cid in hull_integrity_state.compartments:
+		if bool((hull_integrity_state.compartments[cid] as Dictionary).get("breach_open", false)):
+			breached.append(str(cid))
+	if breached.is_empty():
+		return
+	var use_lifeboat: bool = (not away_from_start) and lifeboat_ship != null \
+		and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root)
+	var positions: Array = _lifeboat_local_repair_positions() if use_lifeboat else _distributed_room_positions()
+	if positions.is_empty():
+		return
+	var idx: int = 0
+	for cid in breached:
+		var pos: Vector3 = positions[idx % positions.size()]
+		idx += 1
+		var sp = BreachSealPointScript.new()
+		sp.configure(cid, hull_integrity_state, inventory_state, player_progression, pos, 4.0, "hull_sealant", 1.0, 1.8)
+		if not sp.breach_sealed.is_connected(_on_breach_sealed):
+			sp.breach_sealed.connect(_on_breach_sealed)
+		if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
+			current_ship.scene_root.add_child(sp)
+		elif lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root):
+			lifeboat_ship.scene_root.add_child(sp)
+		else:
+			repair_point_root.add_child(sp)
+		breach_seal_points.append(sp)
+
+func _clear_breach_seal_points() -> void:
+	for sp in breach_seal_points:
+		if is_instance_valid(sp):
+			var parent = sp.get_parent()
+			if parent != null and is_instance_valid(parent):
+				parent.remove_child(sp)
+			sp.queue_free()
+	breach_seal_points.clear()
+
+func _on_breach_sealed(_compartment_id: String) -> void:
+	# HullIntegrityState already mutated by the seal node; nothing else needed here
+	# beyond letting the next _recompute_expanded_ship_systems pick up the lower
+	# breach_count. Hook for HUD/audio later.
+	pass
+
 ## ADR-0038: builds one player-reachable CraftingStation per curated kind on the home ship.
 ## Stations live on the home ship (not derelicts) and are parented under home_ship.scene_root
 ## so they inherit its transform and are freed with it. Idempotent: re-callable on reload.
@@ -2997,8 +3052,10 @@ func travel_home() -> bool:
 	_clear_derelict_objectives()
 	_clear_loot_containers()
 	_clear_repair_points()
+	_clear_breach_seal_points()
 	_build_loot_containers()
 	_build_repair_points()
+	_build_breach_seal_points()
 	_build_crafting_stations()
 	if tracker != null and loader != null and loader.has_method("get_objective_specs_copy"):
 		# set_objectives resets the tracker's completed set; re-apply the home loop's
@@ -3561,6 +3618,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_refresh_arc_state(true)
 	_build_loot_containers()
 	_build_repair_points()
+	_build_breach_seal_points()
 	_build_crafting_stations()
 	tracker.set_objectives(loader.get_objective_specs_copy())
 	current_objective_sequence = 1
@@ -3774,6 +3832,10 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		for rp in repair_points:
 			if is_instance_valid(rp) and rp.try_start(player_body):
 				return
+		# M7-A: hull breach seal points share the repair-point precedence (survival-critical).
+		for sp in breach_seal_points:
+			if is_instance_valid(sp) and sp.try_start(player_body):
+				return
 		# Sub-project #3: derelict loot containers are pickup-like interactables.
 		# Try them before objectives, matching the home ship's tool-pickup
 		# precedence when an objective and pickup share the same interaction area.
@@ -3794,6 +3856,10 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# Sub-project #4: try lifeboat repair points before pickups/objectives.
 	for rp in repair_points:
 		if is_instance_valid(rp) and rp.try_start(player_body):
+			return
+	# M7-A: hull breach seal points share the repair-point precedence (survival-critical).
+	for sp in breach_seal_points:
+		if is_instance_valid(sp) and sp.try_start(player_body):
 			return
 	# ADR-0038: home-ship crafting / salvage stations. Range-gated; tried after repairs so a
 	# repair point and a station sharing an area resolve to the repair first.
@@ -4065,9 +4131,6 @@ func _combined_system_status_lines() -> PackedStringArray:
 	if propulsion_expanded_state != null:
 		for line in propulsion_expanded_state.get_status_lines():
 			lines.append(String(line))
-	if shield_state != null:
-		for line in shield_state.get_status_lines():
-			lines.append(String(line))
 	if sustenance_state != null:
 		for line in sustenance_state.get_status_lines():
 			lines.append(String(line))
@@ -4218,9 +4281,16 @@ func _process(delta: float) -> void:
 		var status_mult: float = 1.0
 		if status_effects_state != null:
 			status_mult = status_effects_state.get_modifier("stamina_recovery")
+		# M7-A: the hub's failing ambient atmosphere bites only while ABOARD the hub
+		# (away on a derelict, the personal oxygen / radiation / body-temp hazards own it).
+		var atmo_drain: float = 0.0
+		if life_support_expanded_state != null and not away_from_start:
+			atmo_drain = life_support_expanded_state.get_health_drain_per_second()
+			temp_mult *= life_support_expanded_state.get_thirst_multiplier()
 		vitals_state.tick(delta, {
 			"temperature_thirst_mult": temp_mult,
 			"radiation_health_drain": rad_drain,
+			"atmosphere_health_drain": atmo_drain,
 			"status_stamina_recovery_mult": status_mult,
 			"moving": player != null and player.has_method("is_moving") and player.is_moving(),
 		})
@@ -5645,8 +5715,6 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 			fire_suppression_state.apply_summary(snapshot.ship_systems_summary.get("fire_suppression_summary", {}))
 		if propulsion_expanded_state != null:
 			propulsion_expanded_state.apply_summary(snapshot.ship_systems_summary.get("propulsion_state_summary", {}))
-		if shield_state != null:
-			shield_state.apply_summary(snapshot.ship_systems_summary.get("shield_state_summary", {}))
 		if sustenance_state != null:
 			sustenance_state.apply_summary(snapshot.ship_systems_summary.get("sustenance_state_summary", {}))
 		completed_objective_types.clear()
@@ -5752,6 +5820,7 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	# only truly-damaged subcomponents get markers (Fix 2: stale markers
 	# built before apply_summary healed already-repaired subcomponents).
 	_build_repair_points()
+	_build_breach_seal_points()
 	_build_crafting_stations()
 	# Restore the saved objective sequence AFTER all model state has
 	# been applied so the subsequent _activate_current_objective() call
@@ -6316,6 +6385,7 @@ func _reset_runtime_for_reload() -> void:
 		_clear_derelict_objectives()
 		_clear_loot_containers()
 		_clear_repair_points()
+		_clear_breach_seal_points()
 	# Allow _on_ship_loaded to re-wrap the freshly-reloaded starting ship on
 	# every reload (home-save or away-save). Previously this was only inside
 	# `if away_from_start` — but when saving at home current_ship was never
