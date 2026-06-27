@@ -28,9 +28,10 @@ A reachability audit of the E2E batch (commit `5445480`) found that **30 of the
 passing model/smokes but are never mounted in the actual derelict run. "Validated"
 in the table above therefore means *unit-tested*, not *player-reachable*. As of
 2026-06-26 the crafting/salvage economy (Bucket 2), the menu/meta-screen UI shell
-(Bucket 3), and the timed/rotating autosave loop (`autosave_policy`) are all wired into the
-live run; a fresh reachability audit reports **93 reachable / 9 unreachable** (the 9 are
-Bucket-1 infra tooling + `junk_yield_resolver`).
+(Bucket 3), the timed/rotating autosave loop (`autosave_policy`), and the lifeboat's
+biome-skinned structural kits (`kit_catalog`) are all wired into the live run; a fresh
+reachability audit reports **94 reachable / 8 unreachable** (the 8 are genuine infra/audit
+tooling + `junk_yield_resolver` — no borderline player-facing systems remain).
 
 > **Update — crafting/salvage now player-reachable (ADR-0038, Bucket 2).** The
 > crafting/salvage economy is wired into the live run: `playable_generated_ship.gd`
@@ -69,6 +70,18 @@ Bucket-1 infra tooling + `junk_yield_resolver`).
 > Proven by `scripts/validation/main_playable_meta_autosave_smoke.gd` →
 > `MAIN PLAYABLE META AUTOSAVE PASS slot_rotated=true reachable=true`. MVP limit: manual
 > quicksave is not yet wired (no quicksave keybind).
+
+> **Update — lifeboat structure now biome-skinned via `kit_catalog`.** The previously-orphaned
+> `KitCatalog` (role → structural-module registry, `data/kits/*.json`) now drives the lifeboat's
+> modules: `StructuralPlacer` consults it (with a `biome` param) instead of a hardcoded const,
+> `LifeBoatBuilder.build(biome)` threads it through, and the coordinator passes the run's
+> deterministic biome. The floorplan stays fixed; only the per-role module kit changes
+> (`breach_field` → hazard, `dead_fleet` → industrial, `abyssal_synaptic_sea` → v0). Determinism
+> preserved (v0 `role_modules` mirror the old const), plus a latent KitCatalog parse bug fixed.
+> Proven by `scripts/validation/main_playable_lifeboat_biome_skin_smoke.gd` →
+> `MAIN PLAYABLE LIFEBOAT BIOME SKIN PASS biomes=3 reachable=true`. Derelict structural variety
+> (the `layout.json` pipeline) is out of scope. **This closes the last borderline player-facing
+> integration-debt item.**
 
 See [integration_debt.md](integration_debt.md) for the full classification and the
 integration actions required before depth/content work builds on these foundations.

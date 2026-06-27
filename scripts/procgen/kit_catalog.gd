@@ -195,14 +195,30 @@ func _load_kit_file(abs_path: String) -> Dictionary:
 	# existing ship_structural_v0.json), populate role_modules for
 	# the well-known role set from that list. The default module
 	# is the first entry.
+	#
+	# `modules` may be either a flat list of module-id strings (legacy
+	# kits) OR an array of module-catalog objects (the asset-manifest
+	# schema used by ship_structural_v0.json). For the object form we
+	# read each entry's `module_id`; stringifying the whole Dictionary
+	# (the old behaviour) produced unusable stems.
 	var raw_modules: Variant = data.get("modules", [])
 	var legacy_modules: Array[String] = []
 	if raw_modules is Array:
 		for entry in raw_modules:
-			legacy_modules.append(str(entry))
-	var default_module: String = "floor_1x1"
-	if not legacy_modules.is_empty():
-		default_module = str(legacy_modules[0])
+			if entry is Dictionary:
+				var mid: String = str((entry as Dictionary).get("module_id", ""))
+				if not mid.is_empty():
+					legacy_modules.append(mid)
+			else:
+				legacy_modules.append(str(entry))
+	# Honour an explicit `default_role_module` from the kit JSON; only
+	# fall back to the first module in the list when the field is absent.
+	var default_module: String = str(data.get("default_role_module", ""))
+	if default_module.is_empty():
+		if not legacy_modules.is_empty():
+			default_module = str(legacy_modules[0])
+		else:
+			default_module = "floor_1x1"
 
 	# Legacy fall-back: if no role_modules field, build a uniform
 	# map from the legacy module list for the standard role set so
