@@ -126,6 +126,26 @@ func kits_for_role(role: String, biome: String = "") -> Array[String]:
 	return FALLBACK_MODULES.duplicate()
 
 
+# True iff the kit selected for `biome` (default kit when biome is empty)
+# defines `role` explicitly in its role_modules map. Lets callers distinguish
+# a deliberate kit mapping — including a single-module one like ["floor_1x1"] —
+# from kits_for_role()'s value-based default/fallback, so they don't wrongly
+# override a kit's intentional choice.
+func has_role_for(role: String, biome: String = "") -> bool:
+	if _kits.is_empty():
+		return false
+	var kit_id: String = _default_kit_id
+	if not biome.is_empty():
+		var candidate: String = _best_kit_for_biome(biome)
+		if not candidate.is_empty():
+			kit_id = candidate
+	if not _kits.has(kit_id):
+		return false
+	var kit: Dictionary = _kits[kit_id]
+	var role_modules: Dictionary = kit.get("role_modules", {})
+	return role_modules.has(role)
+
+
 # Returns a single module id for `role` from `kit_id`. Returns the
 # catalog default for unknown roles or missing kits.
 func module_id_for_role(kit_id: String, role: String) -> String:

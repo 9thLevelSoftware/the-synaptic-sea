@@ -89,11 +89,14 @@ const AIRLOCK_BRIDGE_MIN_DIST: int = 3
 
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
-# Role -> module-list source. Lazily configured from res://data/kits/ on first
-# use. When the catalog is unavailable (missing dir) or has no mapping for a
-# role, _modules_for_role falls back to the built-in ROOM_MODULES const so the
-# default/no-biome output is byte-identical to the pre-KitCatalog behaviour.
-var kit_catalog
+# Role -> module-list source. Configured once from res://data/kits/ and shared
+# across all placers (read-only after configure(), so a process-wide static
+# cache avoids re-reading/parsing the kit JSONs on every placer). When the
+# catalog has no explicit mapping for a role, _modules_for_role falls back to
+# the built-in ROOM_MODULES const so the default/no-biome output is
+# byte-identical to the pre-KitCatalog behaviour.
+static var _shared_kit_catalog: KitCatalog = null
+var kit_catalog: KitCatalog = null
 # Biome id used to pick a biome-biased kit (e.g. breach_field -> hazard kit).
 # Empty selects the default kit (ship_structural_v0 == ROOM_MODULES).
 var biome: String = ""
@@ -373,23 +376,25 @@ func _create_room_node(room: Dictionary, world_pos: Vector3) -> Node3D:
 
 
 func _ensure_kit_catalog() -> void:
-	if kit_catalog != null:
-		return
-	kit_catalog = KitCatalogScript.new()
-	# configure() is idempotent and never raises; a missing kits dir just
-	# leaves the catalog empty so _modules_for_role uses the const fallback.
-	kit_catalog.configure("res://data/kits/")
+	if _shared_kit_catalog == null:
+		_shared_kit_catalog = KitCatalogScript.new()
+		# configure() is idempotent and never raises; a missing kits dir just
+		# leaves the catalog empty so _modules_for_role uses the const fallback.
+		_shared_kit_catalog.configure("res://data/kits/")
+	kit_catalog = _shared_kit_catalog
 
 
 func _modules_for_role(role: String) -> Array[String]:
-	# Prefer the data-driven KitCatalog (role -> module list, biome-biased).
-	# kits_for_role() returns FALLBACK_MODULES (["floor_1x1"]) when a kit is
-	# loaded but the role is unknown to it; treat that as "no catalog answer"
-	# and fall through to the built-in ROOM_MODULES so known roles keep their
-	# richer module lists. The const is also the safety net when no kit loaded.
-	if kit_catalog != null:
+	# Prefer the data-driven KitCatalog (role -> module list, biome-biased), but
+	# only when the selected kit defines the role EXPLICITLY. has_role_for()
+	# distinguishes a deliberate kit mapping (even a single-module one like
+	# ["floor_1x1"]) from kits_for_role()'s default/fallback, so a kit's
+	# intentional choice is never overridden by the const below. When the kit
+	# has no mapping (or no catalog loaded), fall through to ROOM_MODULES so
+	# known roles keep their richer lists and the no-biome output is unchanged.
+	if kit_catalog != null and kit_catalog.has_role_for(role, biome):
 		var from_kit: Array[String] = kit_catalog.kits_for_role(role, biome)
-		if not from_kit.is_empty() and not _is_bare_fallback(from_kit):
+		if not from_kit.is_empty():
 			return from_kit
 	if not ROOM_MODULES.has(role):
 		return FALLBACK_MODULES.duplicate()
@@ -400,12 +405,6 @@ func _modules_for_role(role: String) -> Array[String]:
 			out.append(String(entry))
 		return out
 	return FALLBACK_MODULES.duplicate()
-
-
-# True when the catalog returned only the generic single-cell fallback, which
-# means it had no real mapping for the role (vs. a deliberate kit list).
-func _is_bare_fallback(mods: Array[String]) -> bool:
-	return mods.size() == 1 and mods[0] == FALLBACK_MODULES[0]
 
 
 func _instantiate_module(stem: String) -> Node3D:

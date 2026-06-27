@@ -79,7 +79,7 @@ tooling + `junk_yield_resolver` — no borderline player-facing systems remain).
 > (`breach_field` → hazard, `dead_fleet` → industrial, `abyssal_synaptic_sea` → v0). Determinism
 > preserved (v0 `role_modules` mirror the old const), plus a latent KitCatalog parse bug fixed.
 > Proven by `scripts/validation/main_playable_lifeboat_biome_skin_smoke.gd` →
-> `MAIN PLAYABLE LIFEBOAT BIOME SKIN PASS biomes=3 reachable=true`. Derelict structural variety
+> `MAIN PLAYABLE LIFEBOAT BIOME SKIN PASS biomes=3 live_match=true reachable=true`. Derelict structural variety
 > (the `layout.json` pipeline) is out of scope. **This closes the last borderline player-facing
 > integration-debt item.**
 

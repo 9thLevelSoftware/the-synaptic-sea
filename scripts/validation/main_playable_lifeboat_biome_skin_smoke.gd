@@ -14,6 +14,7 @@ extends SceneTree
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const KitCatalogScript := preload("res://scripts/procgen/kit_catalog.gd")
 const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
+const StructuralPlacerScript := preload("res://scripts/procgen/structural_placer.gd")
 const TIMEOUT_FRAMES: int = 600
 const BIOMES: Array[String] = ["abyssal_synaptic_sea", "breach_field", "dead_fleet"]
 
@@ -88,14 +89,31 @@ func _validate(playable) -> void:
 		_fail("no lifeboat roles matched against the kit catalog")
 		return
 
-	# 5) Biome selection actually VARIES (the feature has teeth): for at least one
+	# 5) Verify the wiring for ALL THREE biomes through the REAL StructuralPlacer
+	#    path (the exact _modules_for_role() that LifeBoatBuilder.build(biome)
+	#    drives), not just KitCatalog data. Leak-free: _modules_for_role returns
+	#    stems without instantiating any Node3D, so we cover breach_field/
+	#    dead_fleet without building extra (RID-leaking) lifeboats.
+	for b in BIOMES:
+		var placer = StructuralPlacerScript.new()
+		placer.biome = b
+		placer._ensure_kit_catalog()
+		for entry2 in LifeBoatBuilderScript.ROOMS:
+			var role2: String = str(entry2.get("role", ""))
+			var placed: Array = placer._modules_for_role(role2)
+			var expected2: Array = catalog.kits_for_role(role2, b)
+			if not _arrays_equal(placed, expected2):
+				_fail("biome=%s role=%s placer=%s != kit=%s" % [b, role2, str(placed), str(expected2)])
+				return
+
+	# 6) Biome selection actually VARIES (the feature has teeth): for at least one
 	#    lifeboat role, breach_field/dead_fleet differ from the abyssal default.
 	var varied: bool = false
-	for entry2 in LifeBoatBuilderScript.ROOMS:
-		var role2: String = str(entry2.get("role", ""))
-		var base: Array = catalog.kits_for_role(role2, "abyssal_synaptic_sea")
+	for entry3 in LifeBoatBuilderScript.ROOMS:
+		var role3: String = str(entry3.get("role", ""))
+		var base: Array = catalog.kits_for_role(role3, "abyssal_synaptic_sea")
 		for other in ["breach_field", "dead_fleet"]:
-			if not _arrays_equal(catalog.kits_for_role(role2, other), base):
+			if not _arrays_equal(catalog.kits_for_role(role3, other), base):
 				varied = true
 				break
 		if varied:
@@ -105,7 +123,7 @@ func _validate(playable) -> void:
 		return
 
 	finished = true
-	print("MAIN PLAYABLE LIFEBOAT BIOME SKIN PASS biomes=%d reachable=true" % BIOMES.size())
+	print("MAIN PLAYABLE LIFEBOAT BIOME SKIN PASS biomes=%d live_match=true reachable=true" % BIOMES.size())
 	if is_instance_valid(main_node):
 		main_node.queue_free()
 	quit(0)
@@ -154,7 +172,7 @@ func _arrays_equal(a: Array, b: Array) -> bool:
 func _find_playable(node: Node):
 	if not is_instance_valid(node):
 		return null
-	if node.get_script() == load("res://scripts/procgen/playable_generated_ship.gd"):
+	if node is PlayableGeneratedShip:
 		return node
 	for child in node.get_children():
 		var found = _find_playable(child)

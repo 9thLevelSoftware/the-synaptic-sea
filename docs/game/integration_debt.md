@@ -198,7 +198,7 @@ shell); cross-run achievement reconciliation (Steamworks, ADR-0029/0030) remains
 > `kit_catalog_smoke` strengthened to assert real `.tscn` stems. Proven coordinator-driven by
 > `scripts/validation/main_playable_lifeboat_biome_skin_smoke.gd`, which reads the live
 > lifeboat's instantiated modules and asserts they match the kit for the run's biome →
-> `MAIN PLAYABLE LIFEBOAT BIOME SKIN PASS biomes=3 reachable=true`.
+> `MAIN PLAYABLE LIFEBOAT BIOME SKIN PASS biomes=3 live_match=true reachable=true`.
 >
 > **Out of scope:** derelict structural variety — derelicts use the `layout.json` pipeline
 > (module ids baked per placement by `LayoutSerializer`), not `StructuralPlacer`. Kits are wired
