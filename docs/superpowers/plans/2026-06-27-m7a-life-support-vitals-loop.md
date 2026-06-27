@@ -18,6 +18,9 @@
 - Typed GDScript for new code. Resources/RefCounted are data; Nodes are behavior (Model/Node separation).
 - Conventional Commits. Branch: `feat/m7a-life-support-vitals` (already created).
 - Validation is the definition of done: no completion claim without fresh PASS-marker output.
+- **NEVER stage/commit `project.godot`, `.godot/`, `*.uid`, or `addons/`.** Use selective `git add <explicit paths>` only — never `git add -A`/`git add .`. (`.uid` files for *new* scripts are auto-generated and gitignored; do not add them.)
+- Commit messages end with the trailer: `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
+- The full regression bundle touches `project.godot`; **stash it before the bundle and pop after** so it is never committed: `git stash push -- project.godot` … run bundle … `git stash pop`. The bundle's command count is whatever the doc currently states — read it, add the number of new smokes; do not assume a literal value.
 
 ## File Structure
 
@@ -190,7 +193,7 @@ git commit -m "feat(survival): give life-support atmosphere teeth (vitals drain 
 **Interfaces:**
 - Consumes: nothing. Produces: nothing. Pure removal. The `"shields"` **power-allocation channel** in `power_grid_state.gd` / `power_budget_tables.json` / `power_grid_state_smoke.gd` is **intentionally left intact** (removing it would re-balance the working power grid — out of scope). No HUD consumer reads `shield_state_summary` (verified).
 
-- [ ] **Step 1: Delete the model files**
+- [ ] **Step 1: Delete the model files** (this stages the two deletions)
 
 ```bash
 git rm scripts/systems/shield_state.gd scripts/systems/shield_state.gd.uid
@@ -245,10 +248,10 @@ Expected: **no matches** (the remaining `shield` hits in `power_grid_state.gd`, 
 ```
 Expected: both print their PASS markers, no parse error referencing `shield_state`, only allowlisted noise.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 10: Commit** (deletions already staged in Step 1; add only the two edited files — never `-A`)
 
 ```bash
-git add -A
+git add scripts/procgen/playable_generated_ship.gd data/ship_systems/subsystem_tuning.json
 git commit -m "refactor(ship-systems): cut dead shield_state model (no on-foot role)"
 ```
 
@@ -915,8 +918,14 @@ git commit -m "feat(ship-systems): spawn + wire hull breach seal points (M7-A lo
   - `hull_integrity_state` → 🟡→🟢 on the sink side (breach_count now drives life-support; live source still config-only #4, sources #1–3 deferred); player can seal via `BreachSealPoint`.
   Update the rollup items (#2 hull source partly addressed via #4; #3 shields resolved by cut) and add a short "Resolved by M7-A" note.
 
-- [ ] **Step 3: Run the FULL regression bundle** — run the bash block from `docs/game/06_validation_plan.md` with the Windows `GODOT`/`ROOT` values.
-Expected: ends with `SARGASSO REGRESSION PASS commands=<N+2> clean_output=true`. If any smoke fails or an unexpected `ERROR:`/`WARNING:` appears, fix it before proceeding (do not edit the doc to hide it).
+- [ ] **Step 3: Run the FULL regression bundle** — stash `project.godot` first so it is never committed, run the bash block from `docs/game/06_validation_plan.md` with the Windows `GODOT`/`ROOT` values, then pop:
+
+```bash
+git stash push -- project.godot
+# ... run the bundle bash block from 06_validation_plan.md ...
+git stash pop
+```
+Expected: ends with `SARGASSO REGRESSION PASS commands=<N+2> clean_output=true` (N = the count the doc had before this task). If any smoke fails or an unexpected `ERROR:`/`WARNING:` appears, fix it before proceeding (do not edit the doc to hide it).
 
 - [ ] **Step 4: Commit**
 
