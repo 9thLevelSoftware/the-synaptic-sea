@@ -4208,9 +4208,16 @@ func _process(delta: float) -> void:
 		var status_mult: float = 1.0
 		if status_effects_state != null:
 			status_mult = status_effects_state.get_modifier("stamina_recovery")
+		# M7-A: the hub's failing ambient atmosphere bites only while ABOARD the hub
+		# (away on a derelict, the personal oxygen / radiation / body-temp hazards own it).
+		var atmo_drain: float = 0.0
+		if life_support_expanded_state != null and not away_from_start:
+			atmo_drain = life_support_expanded_state.get_health_drain_per_second()
+			temp_mult *= life_support_expanded_state.get_thirst_multiplier()
 		vitals_state.tick(delta, {
 			"temperature_thirst_mult": temp_mult,
 			"radiation_health_drain": rad_drain,
+			"atmosphere_health_drain": atmo_drain,
 			"status_stamina_recovery_mult": status_mult,
 			"moving": player != null and player.has_method("is_moving") and player.is_moving(),
 		})
