@@ -3832,6 +3832,10 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		for rp in repair_points:
 			if is_instance_valid(rp) and rp.try_start(player_body):
 				return
+		# M7-A: hull breach seal points share the repair-point precedence (survival-critical).
+		for sp in breach_seal_points:
+			if is_instance_valid(sp) and sp.try_start(player_body):
+				return
 		# Sub-project #3: derelict loot containers are pickup-like interactables.
 		# Try them before objectives, matching the home ship's tool-pickup
 		# precedence when an objective and pickup share the same interaction area.
@@ -3852,6 +3856,10 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# Sub-project #4: try lifeboat repair points before pickups/objectives.
 	for rp in repair_points:
 		if is_instance_valid(rp) and rp.try_start(player_body):
+			return
+	# M7-A: hull breach seal points share the repair-point precedence (survival-critical).
+	for sp in breach_seal_points:
+		if is_instance_valid(sp) and sp.try_start(player_body):
 			return
 	# ADR-0038: home-ship crafting / salvage stations. Range-gated; tried after repairs so a
 	# repair point and a station sharing an area resolve to the repair first.

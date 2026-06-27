@@ -88,7 +88,9 @@ func _validate() -> void:
 		_fail("health should not drop with restored power + clean atmosphere (%.2f -> %.2f)" % [recover_before, recover_after])
 		return
 
-	# Seal the pre-damaged cargo breach through a live BreachSealPoint -> breach clears.
+	# Seal the pre-damaged cargo breach through the REAL interact dispatcher
+	# (_on_player_interact_requested), NOT a direct sp.try_start — this proves the seal loop
+	# is reachable in actual play (the dispatcher routes interact to breach_seal_points).
 	playable.away_from_start = false
 	if int(playable.inventory_state.get_quantity("hull_sealant")) < 1:
 		playable.inventory_state.add_item("hull_sealant", 1)
@@ -98,9 +100,10 @@ func _validate() -> void:
 		return
 	var sp = seal_points[0]
 	playable.teleport_player_to_breach_seal_point_for_validation(sp)
-	sp.set_validation_player_in_range(playable.player)
-	if not sp.try_start(playable.player):
-		_fail("breach seal channel should start")
+	# Drive the real player-interact path; the dispatcher MUST start the seal channel.
+	playable._on_player_interact_requested(playable.player)
+	if not (sp.channeling or sp.sealed):
+		_fail("interact dispatch did not start the breach seal channel (loop unreachable in real play)")
 		return
 	sp.advance_channel(10.0)
 	if playable.hull_integrity_state.get_breach_count() != 0:
