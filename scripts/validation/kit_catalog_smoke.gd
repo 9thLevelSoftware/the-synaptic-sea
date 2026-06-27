@@ -105,7 +105,32 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	print("KIT CATALOG PASS loaded=%d default=%s airlock=%d eng=%d breach_select=ok fallback=ok ids_sorted=true" % [
-		loaded, default_kit, airlock_modules.size(), eng_modules.size(),
+	# --- Case 10: default-kit modules are REAL module stems, not stringified ---
+	# Regression guard: ship_structural_v0.json uses the asset-catalog schema
+	# (modules: [{module_id,...}]). Before the parse fix, kits_for_role on the
+	# default kit returned str(Dictionary) garbage that still passed the weak
+	# "non-empty string" checks above. Assert every default-kit module resolves
+	# to a real .tscn so a regression to garbage stems is caught.
+	var MODULE_BASE_PATH: String = "res://scenes/wrappers/structural/ship_structural_v0/"
+	for role in ["airlock", "engineering", "bridge"]:
+		for stem in catalog.kits_for_role(role):
+			var path: String = MODULE_BASE_PATH + str(stem) + ".tscn"
+			if not ResourceLoader.exists(path):
+				push_error("KIT CATALOG FAIL default-kit role=%s stem=%s not a real module (.tscn missing: %s)" % [role, str(stem), path])
+				quit(1)
+				return
+
+	# --- Case 11: explicit default_role_module from JSON is honored ---
+	# The parse fix reads the kit's "default_role_module" field (v0 = floor_1x1)
+	# instead of deriving it from str(modules[0]). An unknown role must resolve
+	# to that real stem, not a stringified catalog object.
+	var default_role_mod: String = catalog.module_id_for_role(default_kit, "totally_unknown_role")
+	if not ResourceLoader.exists(MODULE_BASE_PATH + default_role_mod + ".tscn"):
+		push_error("KIT CATALOG FAIL default_role_module not honored: got '%s'" % default_role_mod)
+		quit(1)
+		return
+
+	print("KIT CATALOG PASS loaded=%d default=%s airlock=%d eng=%d breach_select=ok fallback=ok real_stems=true default_role_module=%s ids_sorted=true" % [
+		loaded, default_kit, airlock_modules.size(), eng_modules.size(), default_role_mod,
 	])
 	quit(0)

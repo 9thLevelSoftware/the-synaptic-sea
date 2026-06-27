@@ -16,6 +16,7 @@ class_name StructuralPlacer
 #     swapped with rooms in better positions.
 
 const RoomGraphScript := preload("res://scripts/procgen/room_graph.gd")
+const KitCatalogScript := preload("res://scripts/procgen/kit_catalog.gd")
 
 const CELL_SIZE: float = 4.0
 const ROOM_GAP: float = 2.0
@@ -88,12 +89,26 @@ const AIRLOCK_BRIDGE_MIN_DIST: int = 3
 
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
+# Role -> module-list source. Configured once from res://data/kits/ and shared
+# across all placers (read-only after configure(), so a process-wide static
+# cache avoids re-reading/parsing the kit JSONs on every placer). When the
+# catalog has no explicit mapping for a role, _modules_for_role falls back to
+# the built-in ROOM_MODULES const so the default/no-biome output is
+# byte-identical to the pre-KitCatalog behaviour.
+static var _shared_kit_catalog: KitCatalog = null
+var kit_catalog: KitCatalog = null
+# Biome id used to pick a biome-biased kit (e.g. breach_field -> hazard kit).
+# Empty selects the default kit (ship_structural_v0 == ROOM_MODULES).
+var biome: String = ""
 
-func place_structure(graph: RoomGraphScript, seed_value: int = 0) -> Node3D:
+
+func place_structure(graph: RoomGraphScript, seed_value: int = 0, p_biome: String = "") -> Node3D:
 	if graph.rooms.is_empty():
 		return null
 
 	rng.seed = seed_value
+	biome = p_biome
+	_ensure_kit_catalog()
 
 	# Phase 1: compute grid positions via BFS with strong preferences.
 	var grid_positions: Dictionary = _layout_rooms(graph)
@@ -360,7 +375,27 @@ func _create_room_node(room: Dictionary, world_pos: Vector3) -> Node3D:
 	return room_node
 
 
+func _ensure_kit_catalog() -> void:
+	if _shared_kit_catalog == null:
+		_shared_kit_catalog = KitCatalogScript.new()
+		# configure() is idempotent and never raises; a missing kits dir just
+		# leaves the catalog empty so _modules_for_role uses the const fallback.
+		_shared_kit_catalog.configure("res://data/kits/")
+	kit_catalog = _shared_kit_catalog
+
+
 func _modules_for_role(role: String) -> Array[String]:
+	# Prefer the data-driven KitCatalog (role -> module list, biome-biased), but
+	# only when the selected kit defines the role EXPLICITLY. has_role_for()
+	# distinguishes a deliberate kit mapping (even a single-module one like
+	# ["floor_1x1"]) from kits_for_role()'s default/fallback, so a kit's
+	# intentional choice is never overridden by the const below. When the kit
+	# has no mapping (or no catalog loaded), fall through to ROOM_MODULES so
+	# known roles keep their richer lists and the no-biome output is unchanged.
+	if kit_catalog != null and kit_catalog.has_role_for(role, biome):
+		var from_kit: Array[String] = kit_catalog.kits_for_role(role, biome)
+		if not from_kit.is_empty():
+			return from_kit
 	if not ROOM_MODULES.has(role):
 		return FALLBACK_MODULES.duplicate()
 	var raw = ROOM_MODULES[role]

@@ -6,6 +6,27 @@
   "source_workspace_root": "/Users/christopherwilloughby/off-the-rails-ai-infra/assets/_source/self_authored/ship_structural_v0/",
   "catalog_path": "data/kits/ship_structural_v0.json",
   "module_count": 15,
+  "default_role_module": "floor_1x1",
+  "biome_preference": {
+    "abyssal_synaptic_sea": 0.9
+  },
+  "role_modules": {
+    "airlock": ["floor_1x1", "floor_1x1", "doorway_frame_open_1x1"],
+    "corridor": ["corridor_floor_1x1", "corridor_floor_1x1"],
+    "engineering": ["floor_1x1", "floor_2x1", "wall_straight_1x1"],
+    "life_support": ["floor_1x1", "floor_1x1", "wall_straight_1x1"],
+    "bridge": ["floor_2x1", "floor_2x1", "wall_straight_1x1"],
+    "cargo": ["floor_2x1", "floor_2x1"],
+    "crew_quarters": ["floor_1x1", "floor_1x1"],
+    "medical": ["floor_1x1", "floor_1x1"],
+    "maintenance": ["floor_1x1", "corridor_floor_1x1"],
+    "cockpit": ["floor_1x1", "floor_1x1", "wall_straight_1x1"],
+    "engine_bay": ["floor_1x1", "floor_2x1", "wall_straight_1x1"],
+    "compartment": ["floor_1x1", "floor_1x1", "floor_1x1"],
+    "bay": ["floor_2x1", "floor_2x1", "floor_1x1"],
+    "quarters": ["floor_1x1", "floor_1x1"],
+    "dock": ["floor_1x1", "floor_1x1", "doorway_frame_open_1x1"]
+  },
   "modules": [
     {
       "module_id": "floor_1x1",

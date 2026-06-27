@@ -14,10 +14,11 @@ added by the E2E batch were not reachable from the live main scene
 derelict run. **As of 2026-06-26 the Bucket 2 crafting/salvage economy (6 scripts) is
 wired into the live run (ADR-0038 integration), and the Bucket 3 menu/meta-UI shell
 (10 screens, plus the `localization_catalog` + `build_metadata_state` they consume) is
-now player-reachable, and the `autosave_policy` timed/rotating autosave loop is wired into
-the live run. A fresh audit (`/tmp/reach.py`) reports 93 reachable / 9 unreachable — the 9
-remaining are all Bucket-1 infra tooling + `junk_yield_resolver`.**
-See Buckets 2, 3, and the autosave note below.
+now player-reachable, the `autosave_policy` timed/rotating autosave loop is wired into the
+live run, and `kit_catalog` now drives the lifeboat's biome-skinned structure. A fresh audit
+(`/tmp/reach.py`) reports 94 reachable / 8 unreachable — the 8 remaining are all genuine
+Bucket-1 infra/audit tooling + `junk_yield_resolver`.**
+See Buckets 2, 3, and the autosave + kit-catalog notes below.
 
 These are **not stubs** — the models are real and smoke-backed. They are
 **un-integrated**. This document tracks that debt so "Validated" is not read as
@@ -37,7 +38,9 @@ After the ADR-0038 crafting integration (2026-06-26): **78 reachable, 24 not rea
 After the Bucket 3 menu/meta-UI shell integration (2026-06-26): **92 reachable, 10 not
 reachable** (the 10 menu/meta screens + `localization_catalog` + `build_metadata_state`
 graduated to reachable). After wiring the `autosave_policy` timed/rotating autosave loop
-(2026-06-26): **93 reachable, 9 not reachable** (`autosave_policy` graduated). The 9
+(2026-06-26): **93 reachable, 9 not reachable** (`autosave_policy` graduated). After wiring
+`kit_catalog` into the lifeboat's structural placer (2026-06-26): **94 reachable, 8 not
+reachable** (`kit_catalog` graduated). The 8
 remaining unreachable are the Bucket-1 infra/audit tooling below plus `junk_yield_resolver`
 — all expected-unreached.
 
@@ -64,15 +67,18 @@ count toward "playable systems."
   drives `LanguageSelector`)
 - `scripts/systems/product_audit_report.gd`
 - `scripts/procgen/seed_determinism_contract.gd`
-- `scripts/procgen/kit_catalog.gd`
+- ~~`scripts/procgen/kit_catalog.gd`~~ — **graduated to reachable** (drives the lifeboat's
+  biome-skinned structural modules via `StructuralPlacer`; see the kit-catalog note below)
 
 The fresh audit shows `demo_scope_gate` and `release_readiness_ledger` are no longer
-unreachable either; the live unreachable set is now exactly the 8 non-struck items above
-plus `junk_yield_resolver` (Bucket 2) — 9 in total. The audit list is the source of truth.
+unreachable either; the live unreachable set is now exactly the 7 non-struck items above
+plus `junk_yield_resolver` (Bucket 2) — 8 in total. The audit list is the source of truth.
 
-Action: none required for playability. `build_metadata_state`, `localization_catalog`, and
-`autosave_policy` are now wired (Bucket 3 + the autosave loop). Re-classify `kit_catalog`
-if/when its consumer (encounter injection) is wired.
+Action: none required for playability. `build_metadata_state`, `localization_catalog`,
+`autosave_policy`, and `kit_catalog` are now wired. The remaining unreached scripts are all
+genuine release/audit/dev tooling (correctly **not** in the gameplay scene) plus
+`junk_yield_resolver` (a static salvage helper superseded by the deconstruction path) — no
+borderline player-facing systems remain.
 
 ## Bucket 2 — Crafting / salvage economy. RESOLVED (2026-06-26) — now player-reachable.
 
@@ -172,6 +178,32 @@ shell); cross-run achievement reconciliation (Steamworks, ADR-0029/0030) remains
 > is **not** wired — there is no quicksave keybind yet, so only the autosave loop runs; cadence
 > tunables use the model defaults (90 in-game-second / 8-event cadence, 5 s real-time budget).
 
+## Kit catalog — `kit_catalog`. RESOLVED (2026-06-26) — now player-reachable.
+
+> **RESOLVED.** `KitCatalog` (role → structural-module registry, loaded from `data/kits/*.json`
+> with biome-biased kit selection) now drives the **lifeboat's** structural modules.
+> `StructuralPlacer` (`scripts/procgen/structural_placer.gd`) constructs and consults a
+> `KitCatalog` in `_modules_for_role()` instead of its hardcoded `ROOM_MODULES` const, and
+> accepts a `biome` param; `LifeBoatBuilder.build(biome)` threads it through, and
+> `playable_generated_ship.gd:_build_lifeboat_at_home()` passes the run's deterministic biome
+> (`_resolve_current_loot_biome_id()`). The lifeboat's room graph/cell positions stay fixed —
+> only the per-role module *kit* changes, so each run's home craft gets a biome skin
+> (`abyssal_synaptic_sea` → `ship_structural_v0`, `breach_field` → hazard kit, `dead_fleet` →
+> industrial kit) without altering the floorplan the player learns. **Determinism preserved:**
+> `ship_structural_v0.json` gained a `role_modules` map that mirrors `ROOM_MODULES` exactly plus
+> a high `abyssal_synaptic_sea` affinity, so the default/abyssal lifeboat is byte-identical to
+> before (`STRUCTURAL PLACER PASS … modules=24` unchanged). **Latent bug fixed:** `KitCatalog`
+> previously mangled v0's asset-catalog `modules` (array of objects) into stringified-dict stems
+> and ignored the JSON `default_role_module` field — both fixed in `_load_kit_file`, and
+> `kit_catalog_smoke` strengthened to assert real `.tscn` stems. Proven coordinator-driven by
+> `scripts/validation/main_playable_lifeboat_biome_skin_smoke.gd`, which reads the live
+> lifeboat's instantiated modules and asserts they match the kit for the run's biome →
+> `MAIN PLAYABLE LIFEBOAT BIOME SKIN PASS biomes=3 live_match=true reachable=true`.
+>
+> **Out of scope:** derelict structural variety — derelicts use the `layout.json` pipeline
+> (module ids baked per placement by `LayoutSerializer`), not `StructuralPlacer`. Kits are wired
+> only into the lifeboat path here.
+
 ## Deeper audit: are the reachable systems actually *driven*? (2026-06-26)
 
 > Note: the counts in this section predate the ADR-0038 crafting integration; the 6 newly
@@ -208,8 +240,7 @@ negative caused by instance var names differing from file names
 Verified by hand against `audio_manager.gd` — they are ticked every frame.
 
 **Conclusion:** integration debt is confined entirely to the unreachable scripts above
-— **9 after wiring the autosave loop** (was 30 → 24 after Bucket 2 → 10 after Bucket 3 → 9
-after `autosave_policy`; the 10 menu/meta screens + `localization_catalog` +
-`build_metadata_state` + `autosave_policy` are now reachable + driven). The 9 remaining
-unreachable are Bucket-1 infra/audit tooling plus `junk_yield_resolver` — all
-expected-unreached. Everything that is reachable is genuinely driven.
+— **8 after wiring `kit_catalog`** (was 30 → 24 after Bucket 2 → 10 after Bucket 3 → 9
+after `autosave_policy` → 8 after `kit_catalog`). The 8 remaining unreachable are Bucket-1
+infra/audit/dev tooling plus `junk_yield_resolver` — all expected-unreached, with **no
+borderline player-facing systems left**. Everything that is reachable is genuinely driven.

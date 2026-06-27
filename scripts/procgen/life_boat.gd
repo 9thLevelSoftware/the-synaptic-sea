@@ -47,7 +47,7 @@ const ROOM_CELL_Z: Dictionary = {
 # "LifeBoat" with one child per room, each containing structural
 # modules. The caller is responsible for adding it to the scene tree
 # and positioning it adjacent to the derelict dock.
-static func build() -> Node3D:
+static func build(biome: String = "") -> Node3D:
 	var graph: RoomGraphScript = RoomGraphScript.new()
 	for room_def in ROOMS:
 		graph.add_room(room_def["id"], room_def["role"], room_def["deck"])
@@ -56,8 +56,12 @@ static func build() -> Node3D:
 	graph.add_link("airlock_01", "cockpit_01", "door")
 	graph.add_link("cockpit_01", "engine_bay_01", "door")
 
+	# The room graph / cell positions stay fixed (the player learns one
+	# floorplan); `biome` only selects which structural kit dresses each role,
+	# so the lifeboat gets a per-run visual skin. Empty biome = default kit
+	# (ship_structural_v0), i.e. the original modules.
 	var placer: StructuralPlacerScript = StructuralPlacerScript.new()
-	var structure: Node3D = placer.place_structure(graph)
+	var structure: Node3D = placer.place_structure(graph, 0, biome)
 	if structure == null:
 		push_error("LifeBoatBuilder: StructuralPlacer returned null")
 		return null
