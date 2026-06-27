@@ -32,7 +32,6 @@ var player_progression_summary: Dictionary = {}
 var settings_summary: Dictionary = {}
 var audio_summary: Dictionary = {}
 var spoilage_summary: Dictionary = {}
-var cooking_summary: Dictionary = {}
 var hydroponics_summary: Dictionary = {}
 var synthesizer_summary: Dictionary = {}
 var crafting_summary: Dictionary = {}
@@ -75,7 +74,6 @@ const SUMMARY_FIELDS: Array = [
 	"settings_summary",
 	"audio_summary",
 	"spoilage_summary",
-	"cooking_summary",
 	"hydroponics_summary",
 	"synthesizer_summary",
 	"consumable_summary",
@@ -114,7 +112,6 @@ func to_dict() -> Dictionary:
 		"settings_summary": settings_summary.duplicate(true),
 		"audio_summary": audio_summary.duplicate(true),
 		"spoilage_summary": spoilage_summary.duplicate(true),
-		"cooking_summary": cooking_summary.duplicate(true),
 		"hydroponics_summary": hydroponics_summary.duplicate(true),
 		"synthesizer_summary": synthesizer_summary.duplicate(true),
 		"crafting_summary": crafting_summary.duplicate(true),
@@ -175,7 +172,6 @@ static func from_dict(data: Variant, expected_slice_version: String, expected_go
 	snapshot.settings_summary = _deep_copy_dict(dict.get("settings_summary", {}))
 	snapshot.audio_summary = _deep_copy_dict(dict.get("audio_summary", {}))
 	snapshot.spoilage_summary = _deep_copy_dict(dict.get("spoilage_summary", {}))
-	snapshot.cooking_summary = _deep_copy_dict(dict.get("cooking_summary", {}))
 	snapshot.hydroponics_summary = _deep_copy_dict(dict.get("hydroponics_summary", {}))
 	snapshot.synthesizer_summary = _deep_copy_dict(dict.get("synthesizer_summary", {}))
 	snapshot.crafting_summary = _deep_copy_dict(dict.get("crafting_summary", {}))

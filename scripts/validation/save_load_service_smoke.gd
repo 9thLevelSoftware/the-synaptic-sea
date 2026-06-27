@@ -95,7 +95,6 @@ func _initialize() -> void:
 	original.player_progression_summary = progression.get_summary()
 	# ADR-0034: add food summaries
 	original.spoilage_summary = _make_spoilage_summary_for_smoke()
-	original.cooking_summary = _make_cooking_summary_for_smoke()
 	original.hydroponics_summary = _make_hydroponics_summary_for_smoke()
 	original.synthesizer_summary = _make_synthesizer_summary_for_smoke()
 	original.consumable_summary = {"hotbar_slots": ["bandage_kit", "focus_ampoule", "pistol_ammo_box"], "last_item_id": "flare", "total_uses": 4}
@@ -148,8 +147,8 @@ func _initialize() -> void:
 	if loaded.current_objective_sequence != original.current_objective_sequence:
 		_fail("current_objective_sequence mismatch")
 		return
-	if loaded.get_summary_count() != 27:
-		_fail("summary_count=%d expected 27" % loaded.get_summary_count())
+	if loaded.get_summary_count() != 26:
+		_fail("summary_count=%d expected 26" % loaded.get_summary_count())
 		return
 	if not loaded.ship_systems_summary.has("systems") or not loaded.ship_systems_summary.has("system_order"):
 		_fail("ship_systems_summary missing manager keys after round-trip")
@@ -229,7 +228,6 @@ func _initialize() -> void:
 	bad.audio_summary = original.audio_summary
 	# ADR-0034: add food summaries
 	bad.spoilage_summary = original.spoilage_summary
-	bad.cooking_summary = original.cooking_summary
 	bad.hydroponics_summary = original.hydroponics_summary
 	bad.synthesizer_summary = original.synthesizer_summary
 	bad.consumable_summary = original.consumable_summary
@@ -256,7 +254,7 @@ func _initialize() -> void:
 		_fail("delete_current_run did not remove the file")
 		return
 
-	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=27")
+	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=26")
 	quit(0)
 
 func _make_spoilage_summary_for_smoke() -> Dictionary:
@@ -274,22 +272,6 @@ func _make_spoilage_summary_for_smoke() -> Dictionary:
 	})
 	ss.tick(1200.0)
 	return ss.get_summary()
-
-func _make_cooking_summary_for_smoke() -> Dictionary:
-	var cs = load("res://scripts/systems/cooking_state.gd").new()
-	cs.configure({
-		"recipe_id": "cooked_meal_basic",
-		"display_name": "Basic Cooked Meal",
-		"ingredients": {"ration_pack": 1, "purified_water": 1},
-		"produces": {"item_id": "cooked_meal", "quantity": 1},
-		"power_cost": 5.0,
-		"cook_time_seconds": 10.0,
-		"required_skill_level": 0,
-		"station_kind": "galley",
-	})
-	cs.start_cooking({"items": {"ration_pack": 2, "purified_water": 2}}, 0, 10.0)
-	cs.tick(4.0)
-	return cs.get_summary()
 
 func _make_hydroponics_summary_for_smoke() -> Dictionary:
 	var hs = load("res://scripts/systems/hydroponics_state.gd").new()

@@ -4,6 +4,11 @@ class_name CookingState
 ## Pure model for cooking station state machine.
 ## Consumes ingredients and power, ticks a timer, produces food items.
 ## Never touches the scene tree.
+##
+## NOTE: The standalone cooking path (galley `cooking_recipes.json`) was superseded by the
+## ADR-0038 kitchen crafting station (recipe_definitions.json), which is the live food
+## producer. This class is retained as the internal state machine wrapped by
+## `SynthesizerState._cooking` — that is now its only consumer.
 
 enum State { IDLE, COOKING, COMPLETE }
 

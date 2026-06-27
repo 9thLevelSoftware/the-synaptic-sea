@@ -7,6 +7,7 @@ class_name ConsumableState
 
 const HOTBAR_SLOT_COUNT: int = 3
 const ItemDefsScript := preload("res://scripts/systems/item_defs.gd")
+const FoodStateScript := preload("res://scripts/systems/food_state.gd")
 
 var definitions: Dictionary = {}
 var hotbar_slots: Array[String] = []
@@ -143,10 +144,39 @@ func _use_once(item_id: String, category: String, definition: Dictionary, invent
 		"food", "drink":
 			if dispatcher == null:
 				return {"ok": false, "reason": "effect_dispatcher_missing"}
+			# Legacy/explicit effects path — kept for any food that declares an effects array.
 			var effects: Variant = definition.get("effects", [])
 			if effects is Array:
 				for effect_id_variant in effects:
 					dispatcher.dispatch_effect(str(effect_id_variant), pipeline_context)
+			# REQ-FC: apply the food/drink's hunger/thirst/sanity restores to live vitals.
+			# Food items carry hunger_restore/thirst_restore/sanity_restore (not an effects
+			# array), so without this, eating food was a no-op. Routed through FoodState so the
+			# spoilage multiplier is honoured (FRESH baseline until per-stack stage is threaded).
+			var restored: Dictionary = _apply_food_restores(definition, pipeline_context)
 			inventory_state.remove_item(item_id, 1)
-			return {"ok": true, "item_id": item_id, "category": category}
+			return {
+				"ok": true, "item_id": item_id, "category": category,
+				"hunger_restored": float(restored.get("hunger", 0.0)),
+				"thirst_restored": float(restored.get("thirst", 0.0)),
+				"sanity_restored": float(restored.get("sanity", 0.0)),
+			}
 	return {"ok": false, "reason": "unsupported_category", "category": category}
+
+## REQ-FC: applies a food/drink definition's spoilage-scaled restores to the live
+## vitals_state / sanity_state in the pipeline context. Reuses FoodState so the food
+## pillar runs through one model. Returns the applied {hunger, thirst, sanity} amounts.
+func _apply_food_restores(definition: Dictionary, pipeline_context: Dictionary) -> Dictionary:
+	var food = FoodStateScript.new()
+	food.configure(definition)
+	var r: Dictionary = food.get_effective_restores()
+	var hunger: float = float(r.get("hunger", 0.0))
+	var thirst: float = float(r.get("thirst", 0.0))
+	var sanity: float = float(r.get("sanity", 0.0))
+	var vitals = pipeline_context.get("vitals_state", null)
+	if vitals != null and vitals.has_method("apply_delta") and (hunger != 0.0 or thirst != 0.0):
+		vitals.apply_delta({"hunger": hunger, "thirst": thirst})
+	var sanity_state = pipeline_context.get("sanity_state", null)
+	if sanity != 0.0 and sanity_state != null and sanity_state.has_method("adjust_sanity"):
+		sanity_state.adjust_sanity(sanity)
+	return {"hunger": hunger, "thirst": thirst, "sanity": sanity}

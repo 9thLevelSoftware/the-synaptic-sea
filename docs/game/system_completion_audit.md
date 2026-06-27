@@ -76,27 +76,29 @@ warning text — low sanity causes no traced damage / hallucination / control ef
 it within the vitals model. **Give sanity teeth (or accept it as a cosmetic meter).** Content:
 vitals tuning exists.
 
-### M2 · Food / cooking / spoilage / sustenance inputs — 🔴 production chain inert in live play
+### M2 · Food / cooking / spoilage — 🟡 eat→vitals loop CLOSED; production via crafting; standalone duplicates removed
+
+*Corrected framing (like the procgen lane): production already worked and the real break was
+consumption, not production.*
 
 | System | Coupled | Live input → output | Conf |
 | --- | --- | --- | --- |
-| `cooking_state` | 🔴 | coordinator only **ticks** it when already `COOKING` (4237); **no live caller starts a cook or collects the result** → cooked output never reaches vitals | [V] |
-| `hydroponics_state` | 🔴 | ticked only when already `PLANTED` (4239); no live plant/harvest interaction → grown food → sustenance summary (HUD) | [V] |
-| `synthesizer_state` | 🔴 | ticked only when already `COOKING` (4241); no live start/collect → sustenance summary (HUD) | [V] |
-| `water_recycler_state` | 🟡 | ticked only when already `RECYCLING` (4243); no live start. `recycled_water` IS read by life-support (1340), but life-support's own output is HUD-only, so the chain dead-ends (sink cosmetic) | [V] |
-| `spoilage_state` | 🟡 | ← ticked unconditionally (4236); **does spoilage degrade live inventory food? not traced** | [P] |
+| food eat path (`consumable_state` food/drink) | 🟢 | ← eat a food/drink item → **applies hunger/thirst/sanity to `vitals_state` via `FoodState`** (was a no-op; fixed). Production: the **kitchen crafting station** (ADR-0038, `recipe_definitions.json`) makes `cooked_meal` into inventory. | [V] |
+| `hydroponics_state` / `synthesizer_state` | 🔴 | ticked only when already active; no live plant/synth start → `sustenance_state` summary (HUD only). Orphaned passive growers (option 3). | [V] |
+| `water_recycler_state` | 🟡 | ticked only when `RECYCLING`; `recycled_water` read by life-support (1340), but life-support output is HUD-only → dead-ends. | [V] |
+| `spoilage_state` | 🟡 | ticked unconditionally; per-item spoilage stage not yet threaded into the live eat (eat uses the FRESH baseline). | [P] |
 
-**Gap (CONFIRMED, two-fold):** (1) **the production chain never starts in live play** — the
-coordinator only advances cook/plant/synth/recycle models that are *already* in their active
-state, and no wired interaction starts a cook/plant/recycle or harvests/collects the output
-(`rg 'start_cooking|start_synthesis|\.plant\(|harvest\(|collect_output'` finds only validation
-seams — Codex). (2) Even when forced active, output terminates at a HUD readout:
-cook/hydroponics/synth → `sustenance_state` → `get_status_lines()` (coord 4064), never feeding
-hunger/thirst (that runs via the **M5 consumable pipeline**: eat item → `effect_dispatcher` →
-vitals). `water_recycler` → life-support `recycled_water` (1340) is the one real consumer, but
-life-support's own output is HUD-only, so even that dead-ends. **Fix needs both: wire the live
-start/harvest/collect interactions AND route grown/cooked output into the inventory/consumable
-path.**
+**RESOLVED (eat→vitals) + cleanup:** the survival food loop now closes. The kitchen crafting
+station already produced `cooked_meal` into inventory, and **eating it now restores
+hunger/thirst/sanity** on the live `vitals_state` — the consumable food/drink branch was a no-op
+because food items carry `hunger_restore`/etc. but no `effects` array; it now routes through
+`FoodState`. The superseded standalone `cooking_state` (galley `cooking_recipes.json`) duplicate
+of the kitchen station was **removed** (`CookingState` retained only as `SynthesizerState`'s
+internal machine; its `RunSnapshot` field dropped, `summaries` 27→26). Proven by
+`scripts/validation/main_playable_food_consumption_smoke.gd`. **Remaining (out of scope here):**
+live start/harvest for hydroponics/synthesizer/water-recycler (a second, *passive* production
+source — option 3); per-item spoilage-stage scaling on eat (FoodState supports it; the live stage
+isn't threaded yet); the HUD-only `sustenance_state` output (M7).
 
 ### M3 · Combat / threat AI / damage — 🟢 closed-loop both directions (designed injection now wired, PR #38)
 
@@ -263,12 +265,13 @@ to close a loop." Ordered by how much each breaks *the game functioning as a who
    deep-dive pressure / derelict events), an entire ship-damage subsystem is inert. *(M7)*
 3. **🔴 Shields are pure decoration.** Charged by power, depleted by nothing — no ship-directed
    damage channel reads them. Wire as a damage buffer or cut. *(M7)*
-4. **🔴 Food production chain is inert in live play.** Two-fold (Codex): nothing live starts a
-   cook/plant/recycle or harvests/collects output (the coordinator only ticks already-active
-   models), **and** even when active the output dead-ends at the HUD instead of feeding
-   hunger/thirst (that runs via the M5 consumable pipeline). Fix needs both: wire the
-   start/harvest/collect interactions and route grown/cooked output into the inventory/consumable
-   path. *(M2)*
+4. **✅ RESOLVED — food eat→vitals loop closed (+ dead duplicate removed).** *Corrected framing:*
+   production already worked (the kitchen crafting station makes `cooked_meal`); the real break was
+   that **eating food was a no-op** (food items have `hunger_restore` but no `effects` array, so the
+   consumable pipeline dispatched nothing). Now the food/drink branch applies restores to vitals via
+   `FoodState`. The superseded standalone `cooking_state` (galley) duplicate was deleted. **Follow-up
+   (option 3, not done):** live start/harvest for hydroponics/synthesizer/water-recycler as a passive
+   production source; per-item spoilage-stage scaling on eat. *(M2)*
 5. **🔴 Expanded life-support, fire-suppression, sustenance output to HUD only** and run
    *parallel* to the real `oxygen_state` / `fire_state` hazards instead of being the
    authoritative source. The whole "expanded ship systems" tier is a HUD shadow — see M7

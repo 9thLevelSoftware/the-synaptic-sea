@@ -44,11 +44,11 @@
       "status": "validated",
       "loop_stages": ["survive", "craft"],
       "requirements": ["REQ-FC-001", "REQ-FC-004", "REQ-FC-008"],
-      "code_files": ["scripts/systems/food_state.gd", "scripts/systems/cooking_state.gd", "scripts/systems/hydroponics_state.gd", "scripts/systems/synthesizer_state.gd", "scripts/systems/water_recycler_state.gd"],
+      "code_files": ["scripts/systems/food_state.gd", "scripts/systems/hydroponics_state.gd", "scripts/systems/synthesizer_state.gd", "scripts/systems/water_recycler_state.gd"],
       "docs_files": ["docs/game/features/food_cooking_spoilage.md", "docs/game/adr/0034-food-cooking-spoilage-architecture.md", "docs/game/balance/food_cooking_spoilage_tuning.md"],
       "data_files": ["data/items/food_definitions.json"],
-      "smoke_files": ["scripts/validation/food_state_smoke.gd", "scripts/validation/cooking_state_smoke.gd", "scripts/validation/main_playable_slice_cooking_smoke.gd"],
-      "smoke_markers": ["FOOD STATE PASS", "COOKING STATE PASS", "MAIN PLAYABLE COOKING PASS"],
+      "smoke_files": ["scripts/validation/food_state_smoke.gd", "scripts/validation/food_save_load_smoke.gd", "scripts/validation/main_playable_food_consumption_smoke.gd"],
+      "smoke_markers": ["FOOD STATE PASS", "FOOD SAVE LOAD PASS", "MAIN PLAYABLE FOOD CONSUMPTION PASS"],
       "dependencies": ["task01_survival_vitals"]
     },
     {

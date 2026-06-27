@@ -326,7 +326,6 @@ var electrical_arc_state: ElectricalArcState
 # ADR-0034: food / cooking / spoilage / sustenance runtime state.
 # Untyped because class_name globals are unreliable under --headless --script.
 var spoilage_state  # SpoilageState
-var cooking_state   # CookingState
 var hydroponics_state  # HydroponicsState
 var synthesizer_state  # SynthesizerState
 var water_recycler_state  # WaterRecyclerState
@@ -1146,7 +1145,6 @@ func _build_runtime_nodes() -> void:
 	status_effects_state = StatusEffectsStateScript.new()
 	# ADR-0034: instantiate food / cooking / spoilage / sustenance models.
 	spoilage_state = SpoilageStateScript.new()
-	cooking_state = CookingStateScript.new()
 	hydroponics_state = HydroponicsStateScript.new()
 	synthesizer_state = SynthesizerStateScript.new()
 	water_recycler_state = WaterRecyclerStateScript.new()
@@ -4244,8 +4242,6 @@ func _process(delta: float) -> void:
 	# ADR-0034: tick food / cooking / spoilage / sustenance models.
 	if spoilage_state != null:
 		spoilage_state.tick(delta)
-	if cooking_state != null and cooking_state.state == CookingStateScript.State.COOKING:
-		cooking_state.tick(delta)
 	if hydroponics_state != null and hydroponics_state.state == HydroponicsStateScript.State.PLANTED:
 		hydroponics_state.tick(delta)
 	if synthesizer_state != null and synthesizer_state._cooking.state == CookingStateScript.State.COOKING:
@@ -5428,8 +5424,6 @@ func _build_run_snapshot() -> RunSnapshot:
 	# ADR-0034: capture food / cooking / spoilage summaries.
 	if spoilage_state != null:
 		snapshot.spoilage_summary = spoilage_state.get_summary()
-	if cooking_state != null:
-		snapshot.cooking_summary = cooking_state.get_summary()
 	if hydroponics_state != null:
 		snapshot.hydroponics_summary = hydroponics_state.get_summary()
 	if synthesizer_state != null:
@@ -5728,8 +5722,6 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	# ADR-0034: restore food / cooking / spoilage summaries.
 	if spoilage_state != null and not snapshot.spoilage_summary.is_empty():
 		spoilage_state.apply_summary(snapshot.spoilage_summary)
-	if cooking_state != null and not snapshot.cooking_summary.is_empty():
-		cooking_state.apply_summary(snapshot.cooking_summary)
 	if hydroponics_state != null and not snapshot.hydroponics_summary.is_empty():
 		hydroponics_state.apply_summary(snapshot.hydroponics_summary)
 	if synthesizer_state != null and not snapshot.synthesizer_summary.is_empty():

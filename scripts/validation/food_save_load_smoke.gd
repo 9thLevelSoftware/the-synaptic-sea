@@ -45,21 +45,6 @@ func _initialize() -> void:
 	ss.tick(1200.0)  # ration_pack fresh (1200/3600=0.33 < 0.5), cooked_meal stale (1200/1800=0.67 > 0.5)
 	original.spoilage_summary = ss.get_summary()
 
-	var cs = load("res://scripts/systems/cooking_state.gd").new()
-	cs.configure({
-		"recipe_id": "cooked_meal_basic",
-		"display_name": "Basic Cooked Meal",
-		"ingredients": {"ration_pack": 1, "purified_water": 1},
-		"produces": {"item_id": "cooked_meal", "quantity": 1},
-		"power_cost": 5.0,
-		"cook_time_seconds": 10.0,
-		"required_skill_level": 0,
-		"station_kind": "galley",
-	})
-	cs.start_cooking({"items": {"ration_pack": 2, "purified_water": 2}}, 0, 10.0)
-	cs.tick(4.0)
-	original.cooking_summary = cs.get_summary()
-
 	var hs = load("res://scripts/systems/hydroponics_state.gd").new()
 	hs.plant({
 		"crop_id": "hydroponic_greens",
@@ -102,9 +87,6 @@ func _initialize() -> void:
 	if loaded.spoilage_summary.is_empty():
 		_fail("spoilage_summary empty after round-trip")
 		return
-	if loaded.cooking_summary.is_empty():
-		_fail("cooking_summary empty after round-trip")
-		return
 	if loaded.hydroponics_summary.is_empty():
 		_fail("hydroponics_summary empty after round-trip")
 		return
@@ -135,13 +117,6 @@ func _initialize() -> void:
 		_fail("cooked_meal stage mismatch after round-trip")
 		return
 
-	# Assert cooking progress preserved
-	if float(loaded.cooking_summary.get("progress_seconds", 0.0)) != 4.0:
-		_fail("cooking progress mismatch")
-		return
-	if str(loaded.cooking_summary.get("recipe_id", "")) != "cooked_meal_basic":
-		_fail("cooking recipe_id mismatch")
-		return
 
 	# Assert hydroponics progress preserved
 	if float(loaded.hydroponics_summary.get("progress_seconds", 0.0)) != 30.0:
@@ -160,7 +135,7 @@ func _initialize() -> void:
 		return
 
 	service.delete_current_run()
-	print("FOOD SAVE LOAD PASS spoilage=2 cooking=1 hydroponics=1 synthesizer=1")
+	print("FOOD SAVE LOAD PASS spoilage=2 hydroponics=1 synthesizer=1")
 	quit(0)
 
 func _fail(reason: String) -> void:
