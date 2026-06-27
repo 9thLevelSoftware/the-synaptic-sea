@@ -91,7 +91,6 @@ const LifeSupportExpandedStateScript := preload("res://scripts/systems/life_supp
 const HullIntegrityStateScript := preload("res://scripts/systems/hull_integrity_state.gd")
 const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
 const PropulsionExpandedStateScript := preload("res://scripts/systems/propulsion_state.gd")
-const ShieldStateScript := preload("res://scripts/systems/shield_state.gd")
 const SustenanceStateScript := preload("res://scripts/systems/sustenance_state.gd")
 const EffectDispatcherScript := preload("res://scripts/systems/effect_dispatcher.gd")
 const ConsumableStateScript := preload("res://scripts/systems/consumable_state.gd")
@@ -334,7 +333,6 @@ var life_support_expanded_state  # LifeSupportState
 var hull_integrity_state  # HullIntegrityState
 var fire_suppression_state  # FireSuppressionState
 var propulsion_expanded_state  # PropulsionState
-var shield_state  # ShieldState
 var sustenance_state  # SustenanceState
 # Task 05 consumables runtime state.
 var effect_dispatcher  # EffectDispatcher
@@ -1304,8 +1302,6 @@ func _configure_expanded_ship_system_models() -> void:
 	fire_suppression_state.configure(tuning.get("fire_suppression", {}))
 	propulsion_expanded_state = PropulsionExpandedStateScript.new()
 	propulsion_expanded_state.configure(tuning.get("propulsion", {}))
-	shield_state = ShieldStateScript.new()
-	shield_state.configure(tuning.get("shields", {}))
 	sustenance_state = SustenanceStateScript.new()
 	sustenance_state.configure(_load_json_dict(FACILITY_UPGRADES_CONFIG_PATH))
 
@@ -1331,8 +1327,6 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 			"manager_operational": ship_systems_manager != null and ship_systems_manager.is_operational("propulsion"),
 			"hull_penalty": 1.0 - hull_integrity_state.average_integrity(),
 		})
-	if shield_state != null:
-		shield_state.tick(delta, {"powered_ratio": power_grid_state.get_allocation_ratio("shields")})
 	if life_support_expanded_state != null and hull_integrity_state != null:
 		var recycled_water: float = 0.0
 		if water_recycler_state != null:
@@ -1373,7 +1367,6 @@ func _expanded_ship_systems_summary() -> Dictionary:
 		"hull_integrity_summary": hull_integrity_state.get_summary() if hull_integrity_state != null else {},
 		"fire_suppression_summary": fire_suppression_state.get_summary() if fire_suppression_state != null else {},
 		"propulsion_state_summary": propulsion_expanded_state.get_summary() if propulsion_expanded_state != null else {},
-		"shield_state_summary": shield_state.get_summary() if shield_state != null else {},
 		"sustenance_state_summary": sustenance_state.get_summary() if sustenance_state != null else {},
 	}
 
@@ -4065,9 +4058,6 @@ func _combined_system_status_lines() -> PackedStringArray:
 	if propulsion_expanded_state != null:
 		for line in propulsion_expanded_state.get_status_lines():
 			lines.append(String(line))
-	if shield_state != null:
-		for line in shield_state.get_status_lines():
-			lines.append(String(line))
 	if sustenance_state != null:
 		for line in sustenance_state.get_status_lines():
 			lines.append(String(line))
@@ -5645,8 +5635,6 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 			fire_suppression_state.apply_summary(snapshot.ship_systems_summary.get("fire_suppression_summary", {}))
 		if propulsion_expanded_state != null:
 			propulsion_expanded_state.apply_summary(snapshot.ship_systems_summary.get("propulsion_state_summary", {}))
-		if shield_state != null:
-			shield_state.apply_summary(snapshot.ship_systems_summary.get("shield_state_summary", {}))
 		if sustenance_state != null:
 			sustenance_state.apply_summary(snapshot.ship_systems_summary.get("sustenance_state_summary", {}))
 		completed_objective_types.clear()

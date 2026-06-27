@@ -25,12 +25,5 @@
     "fuel_efficiency": 1.0,
     "power_threshold": 0.5,
     "operational": true
-  },
-  "shields": {
-    "charge_percent": 100.0,
-    "recharge_per_second": 8.0,
-    "drain_per_second": 15.0,
-    "power_threshold": 0.5,
-    "active": true
   }
 }
