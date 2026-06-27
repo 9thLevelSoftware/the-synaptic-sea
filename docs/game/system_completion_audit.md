@@ -138,7 +138,7 @@ into the loot roll is a fast-follow. Content: loot/unique/junk definitions exist
 
 ### M7 · Ship systems & sustenance infrastructure — 🟡 partial progress (M7-A: life-support closed; hull source partly wired; shields cut)
 
-*Resolved by M7-A: `shield_state` removed; `life_support_expanded_state` closed-loop (hull breach_count → atmosphere drain → vitals health while aboard); `hull_integrity_state` sink-side now 🟢 (player seals via `BreachSealPoint`), live damage source is config-only #4, sources #1–3 deferred.*
+*Resolved by M7-A: `shield_state` removed; `life_support_expanded_state` closed-loop (hull breach_count → atmosphere drain → vitals health while aboard); `hull_integrity_state` sink-side mechanically 🟢 (BreachSealPoint channel + `hull_sealant` consumption proven by smoke); `hull_sealant` is not yet a defined or obtainable item (no loot/craft/starting-inventory path), so player-facing loop completion is deferred. Live damage source is config-only #4, sources #1–3 deferred.*
 
 | System | Coupled | Live input → output | Conf |
 | --- | --- | --- | --- |
@@ -148,7 +148,7 @@ into the loot roll is a fast-follow. Content: loot/unique/junk definitions exist
 | `fire_suppression_state` | 🔴 | ← power (1348) + `ignite()` only from `ignite_compartment_for_validation` (1412, test seam) → `get_status_lines()` only (4055); a HUD shadow of the real `fire_state` Alpha hazard | [V] |
 | ~~`shield_state`~~ | cut | **Removed by M7-A** — model and tuning deleted; orphaned power channel (`power → shield allocation slot`) flagged as follow-up cleanup. | [V] |
 | `life_support_expanded_state` | 🟢 | ← power + hull `breach_count` (1342) → `get_health_drain_per_second()` → drains `vitals_state.health` while aboard (coordinator M7-A wiring); drain is zero while away on a derelict. **Closed-loop by M7-A.** | [V] |
-| `hull_integrity_state` | 🟡 | **sink** 🟢 breach_count → life-support drain → vitals; player can seal via `BreachSealPoint` + hull_sealant. **source** 🟡 live damage source is config-only `#4` (initial breach set at load via `hull_compartments.json`); sources `#1–3` (combat / hazard / pressure) deferred. | [V] |
+| `hull_integrity_state` | 🟡 | **sink** 🟢 breach_count → life-support drain → vitals; sealing mechanism mechanically proven (BreachSealPoint channel + `hull_sealant` consumption); `hull_sealant` is not yet a defined or obtainable item (no loot/craft/starting-inventory path) — player-facing loop completion deferred. **source** 🟡 live damage source is config-only `#4` (initial breach set at load via `hull_compartments.json`); sources `#1–3` (combat / hazard / pressure) deferred. | [V] |
 | `sustenance_state` | 🔴 | ← power + hydroponics/synth/water summaries (1364) → **only `get_status_lines()` (4064); does not feed player hunger/thirst** | [P] |
 
 **Gap (remaining after M7-A):** power + propulsion + crafting form a real coupled core.
@@ -255,8 +255,10 @@ to close a loop." Ordered by how much each breaks *the game functioning as a who
    actually raise spawn rate (encounter_injector_smoke `deep_markers` 1→2). *(M8/M12)*
 2. **🟡 Hull source partly addressed (M7-A).** Source #4 (config-injected breach via
    `hull_compartments.json`) is now live — initial hull damage is set at load time. The
-   breach→life-support→vitals drain loop is **closed** (see M7 table). Player can seal via
-   `BreachSealPoint` + `hull_sealant`. Sources #1–3 (combat hits, hazard cascades, deep-dive
+   breach→life-support→vitals drain loop is **closed** (see M7 table). Sealing mechanism is
+   mechanically proven (`BreachSealPoint` channel + `hull_sealant` consumption) but `hull_sealant`
+   is not yet a defined or obtainable item (no loot/craft/starting-inventory path) — player-facing
+   loop completion is deferred. Sources #1–3 (combat hits, hazard cascades, deep-dive
    pressure) remain deferred — `damage_compartment()` seam is future-proof but not wired to live
    events. *(M7, Resolved by M7-A)*
 3. **✅ RESOLVED (M7-A) — `shield_state` cut.** Model, tuning, and power-channel allocation

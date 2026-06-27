@@ -70,6 +70,7 @@ run_clean 'fire model smoke' 'FIRE STATE PASS cycles=2 phases=4 passability_swit
 run_clean 'main fire smoke' 'MAIN PLAYABLE FIRE PASS state=CLEARED cycles=2 blocked_burning=true blocked_cleared=false' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_fire_smoke.gd
 run_clean 'golden fire zone source marker smoke' 'GOLDEN FIRE ZONE SOURCE MARKER PASS marker_room=cargo_01' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/golden_fire_zone_source_marker_smoke.gd
 run_clean 'ship systems smoke' 'MAIN PLAYABLE SHIP SYSTEMS PASS power=true breach_sealed=true gates_open=true logs=true reactor=true extraction=true power_pct=100' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_ship_systems_smoke.gd
+run_clean 'M7-A ship systems expanded smoke' 'MAIN PLAYABLE SHIP SYSTEMS EXPANDED PASS propulsion=true hull=true fire=true sustenance=true persistence=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_ship_systems_expanded_smoke.gd
 run_clean 'completion smoke' 'MAIN PLAYABLE SLICE COMPLETE PASS completed=4 current_sequence=5 run_complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_completion_smoke.gd
 run_clean 'template b completion smoke' 'MAIN PLAYABLE TEMPLATE B COMPLETE PASS completed=5 current_sequence=6 run_complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_template_b_completion_smoke.gd
 run_clean 'input smoke' 'MAIN PLAYABLE INPUT LOOP PASS moved=true camera_followed=true interaction_input_path=true current_sequence=2' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_input_smoke.gd
@@ -107,7 +108,7 @@ run_clean 'M7-A life support vitals loop smoke' 'MAIN PLAYABLE LIFE SUPPORT VITA
 run_clean 'systems map currency' 'SYSTEMS MAP CURRENCY PASS' python3 "$ROOT/scripts/validation/doc_currency_validators.py" systems-map
 run_clean 'requirement trace' 'REQUIREMENT TRACE PASS' python3 "$ROOT/scripts/validation/doc_currency_validators.py" requirement-trace
 run_clean 'kanban manifest currency' 'KANBAN MANIFEST' python3 "$ROOT/scripts/validation/doc_currency_validators.py" kanban-manifest
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=42 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=43 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

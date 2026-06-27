@@ -120,6 +120,9 @@ func apply_summary(summary: Dictionary) -> bool:
 		"online_oxygen_recovery_per_second", "offline_co2_gain_per_second",
 		"online_co2_scrub_per_second", "offline_temp_drift_per_second",
 		"water_use_per_second", "life_support_power_threshold",
+		"atmosphere_safe_oxygen", "atmosphere_safe_co2", "max_atmosphere_health_drain",
+		"atmosphere_temp_comfort_band", "max_atmosphere_thirst_mult",
+		"breach_oxygen_leak_per_second",
 	]:
 		var new_value: float = float(summary.get(key, get(key)))
 		if absf(new_value - float(get(key))) > 0.001:
