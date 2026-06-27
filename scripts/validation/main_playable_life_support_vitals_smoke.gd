@@ -88,8 +88,27 @@ func _validate() -> void:
 		_fail("health should not drop with restored power + clean atmosphere (%.2f -> %.2f)" % [recover_before, recover_after])
 		return
 
+	# Seal the pre-damaged cargo breach through a live BreachSealPoint -> breach clears.
+	playable.away_from_start = false
+	if int(playable.inventory_state.get_quantity("hull_sealant")) < 1:
+		playable.inventory_state.add_item("hull_sealant", 1)
+	var seal_points: Array = playable.get_breach_seal_points_for_validation()
+	if seal_points.is_empty():
+		_fail("expected at least one breach seal point for the pre-damaged hull")
+		return
+	var sp = seal_points[0]
+	playable.teleport_player_to_breach_seal_point_for_validation(sp)
+	sp.set_validation_player_in_range(playable.player)
+	if not sp.try_start(playable.player):
+		_fail("breach seal channel should start")
+		return
+	sp.advance_channel(10.0)
+	if playable.hull_integrity_state.get_breach_count() != 0:
+		_fail("hull breach should be sealed (count=%d)" % playable.hull_integrity_state.get_breach_count())
+		return
+
 	finished = true
-	print("MAIN PLAYABLE LIFE SUPPORT VITALS PASS aboard_drain=true away_safe=true recover=true reachable=true aboard=%.2f->%.2f" % [aboard_before, aboard_after])
+	print("MAIN PLAYABLE LIFE SUPPORT VITALS PASS aboard_drain=true away_safe=true recover=true seal_loop=true reachable=true aboard=%.2f->%.2f" % [aboard_before, aboard_after])
 	_cleanup_and_quit(0)
 
 # Pumps the coordinator's own _process for `seconds` of simulated time at a fixed step,

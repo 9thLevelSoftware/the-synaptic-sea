@@ -48,6 +48,7 @@ const RarityTierScript := preload("res://scripts/systems/rarity_tier.gd")
 const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
 const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
 const RepairPointScript := preload("res://scripts/tools/repair_point.gd")
+const BreachSealPointScript := preload("res://scripts/tools/breach_seal_point.gd")
 const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
 const MaterialStateScript := preload("res://scripts/systems/material_state.gd")
 const FieldCraftingStateScript := preload("res://scripts/systems/field_crafting_state.gd")
@@ -242,6 +243,8 @@ var loot_containers: Array = []
 # Sub-project #4: timed repair points for damaged subcomponents.
 var repair_point_root: Node3D = null
 var repair_points: Array = []
+# M7-A Task 5: breach seal points for breached hull compartments.
+var breach_seal_points: Array = []
 # ADR-0038: crafting / salvage economy wired into the live run. These pure models are
 # coordinator-owned and ticked from _process; the station nodes are the player-reachable seam.
 var crafting_state                          # CraftingState
@@ -1397,6 +1400,17 @@ func seal_hull_breach_for_validation(compartment_id: String, amount: float = 1.0
 	_refresh_tracker_system_status_lines()
 	return ok
 
+func get_breach_seal_points_for_validation() -> Array:
+	return breach_seal_points.duplicate()
+
+func teleport_player_to_breach_seal_point_for_validation(seal_point) -> bool:
+	if player == null or seal_point == null or not is_instance_valid(seal_point):
+		return false
+	if player is Node3D and seal_point is Node3D:
+		(player as Node3D).global_position = (seal_point as Node3D).global_position
+		return true
+	return false
+
 func ignite_compartment_for_validation(compartment_id: String, intensity: float = 1.0) -> bool:
 	if fire_suppression_state == null:
 		return false
@@ -1784,6 +1798,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	_build_derelict_objectives()
 	_build_loot_containers()
 	_build_repair_points()
+	_build_breach_seal_points()
 
 ## Captures the player's world pose relative to the piloted ship's scene_root so the
 ## player can be carried when the piloted ship is repositioned by a dock. Returns
@@ -2488,6 +2503,53 @@ func _clear_repair_points() -> void:
 	# are freed when scene_root is freed on departure — just clear the array.
 	repair_points.clear()
 
+func _build_breach_seal_points() -> void:
+	_clear_breach_seal_points()
+	if hull_integrity_state == null:
+		return
+	# Only seal breached compartments; healthy hull needs no seal node.
+	var breached: Array = []
+	for cid in hull_integrity_state.compartments:
+		if bool((hull_integrity_state.compartments[cid] as Dictionary).get("breach_open", false)):
+			breached.append(str(cid))
+	if breached.is_empty():
+		return
+	var use_lifeboat: bool = (not away_from_start) and lifeboat_ship != null \
+		and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root)
+	var positions: Array = _lifeboat_local_repair_positions() if use_lifeboat else _distributed_room_positions()
+	if positions.is_empty():
+		return
+	var idx: int = 0
+	for cid in breached:
+		var pos: Vector3 = positions[idx % positions.size()]
+		idx += 1
+		var sp = BreachSealPointScript.new()
+		sp.configure(cid, hull_integrity_state, inventory_state, player_progression, pos, 4.0, "hull_sealant", 1.0, 1.8)
+		if not sp.breach_sealed.is_connected(_on_breach_sealed):
+			sp.breach_sealed.connect(_on_breach_sealed)
+		if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
+			current_ship.scene_root.add_child(sp)
+		elif lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root):
+			lifeboat_ship.scene_root.add_child(sp)
+		else:
+			repair_point_root.add_child(sp)
+		breach_seal_points.append(sp)
+
+func _clear_breach_seal_points() -> void:
+	for sp in breach_seal_points:
+		if is_instance_valid(sp):
+			var parent = sp.get_parent()
+			if parent != null and is_instance_valid(parent):
+				parent.remove_child(sp)
+			sp.queue_free()
+	breach_seal_points.clear()
+
+func _on_breach_sealed(_compartment_id: String) -> void:
+	# HullIntegrityState already mutated by the seal node; nothing else needed here
+	# beyond letting the next _recompute_expanded_ship_systems pick up the lower
+	# breach_count. Hook for HUD/audio later.
+	pass
+
 ## ADR-0038: builds one player-reachable CraftingStation per curated kind on the home ship.
 ## Stations live on the home ship (not derelicts) and are parented under home_ship.scene_root
 ## so they inherit its transform and are freed with it. Idempotent: re-callable on reload.
@@ -2990,8 +3052,10 @@ func travel_home() -> bool:
 	_clear_derelict_objectives()
 	_clear_loot_containers()
 	_clear_repair_points()
+	_clear_breach_seal_points()
 	_build_loot_containers()
 	_build_repair_points()
+	_build_breach_seal_points()
 	_build_crafting_stations()
 	if tracker != null and loader != null and loader.has_method("get_objective_specs_copy"):
 		# set_objectives resets the tracker's completed set; re-apply the home loop's
@@ -3554,6 +3618,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_refresh_arc_state(true)
 	_build_loot_containers()
 	_build_repair_points()
+	_build_breach_seal_points()
 	_build_crafting_stations()
 	tracker.set_objectives(loader.get_objective_specs_copy())
 	current_objective_sequence = 1
@@ -5747,6 +5812,7 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	# only truly-damaged subcomponents get markers (Fix 2: stale markers
 	# built before apply_summary healed already-repaired subcomponents).
 	_build_repair_points()
+	_build_breach_seal_points()
 	_build_crafting_stations()
 	# Restore the saved objective sequence AFTER all model state has
 	# been applied so the subsequent _activate_current_objective() call
@@ -6311,6 +6377,7 @@ func _reset_runtime_for_reload() -> void:
 		_clear_derelict_objectives()
 		_clear_loot_containers()
 		_clear_repair_points()
+		_clear_breach_seal_points()
 	# Allow _on_ship_loaded to re-wrap the freshly-reloaded starting ship on
 	# every reload (home-save or away-save). Previously this was only inside
 	# `if away_from_start` — but when saving at home current_ship was never
