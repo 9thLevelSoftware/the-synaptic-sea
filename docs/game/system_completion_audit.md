@@ -76,46 +76,50 @@ warning text — low sanity causes no traced damage / hallucination / control ef
 it within the vitals model. **Give sanity teeth (or accept it as a cosmetic meter).** Content:
 vitals tuning exists.
 
-### M2 · Food / cooking / spoilage / sustenance inputs — 🟡 production runs, consumption loop incomplete
+### M2 · Food / cooking / spoilage / sustenance inputs — 🔴 production chain inert in live play
 
 | System | Coupled | Live input → output | Conf |
 | --- | --- | --- | --- |
-| `cooking_state` | 🟡 | ← player action sets COOKING (only ticks when active, 4237) → cooked food item; **does cooked output re-enter vitals hunger? not traced** | [P] |
-| `hydroponics_state` | 🟡 | ← PLANTED state (4239) → grown food → sustenance summary | [P] |
-| `synthesizer_state` | 🟡 | ← COOKING state (4241) → synth food → sustenance summary | [P] |
-| `water_recycler_state` | 🟢 | ← RECYCLING state (4243) → `recycled_water` consumed by life-support (1340) | [V] |
-| `spoilage_state` | 🟡 | ← ticked unconditionally (4236); **does spoilage actually degrade live inventory food? not traced** | [P] |
+| `cooking_state` | 🔴 | coordinator only **ticks** it when already `COOKING` (4237); **no live caller starts a cook or collects the result** → cooked output never reaches vitals | [V] |
+| `hydroponics_state` | 🔴 | ticked only when already `PLANTED` (4239); no live plant/harvest interaction → grown food → sustenance summary (HUD) | [V] |
+| `synthesizer_state` | 🔴 | ticked only when already `COOKING` (4241); no live start/collect → sustenance summary (HUD) | [V] |
+| `water_recycler_state` | 🟡 | ticked only when already `RECYCLING` (4243); no live start. `recycled_water` IS read by life-support (1340), but life-support's own output is HUD-only, so the chain dead-ends (sink cosmetic) | [V] |
+| `spoilage_state` | 🟡 | ← ticked unconditionally (4236); **does spoilage degrade live inventory food? not traced** | [P] |
 
-**Gap (CONFIRMED orphan):** the food-*production* chain runs but terminates at a HUD
-readout. Cook/hydroponics/synth → `sustenance_state` → `get_status_lines()` only (coord
-4064); **none of it feeds the player's hunger/thirst.** Actual hunger/thirst restoration
-runs through the **M5 consumable pipeline** (eat item → `effect_dispatcher` → vitals). So you
-can grow and cook food, but the cooked output never re-enters the survival loop. The one
-exception is `water_recycler` → life-support `recycled_water` (1340) — but life-support's own
-output is itself HUD-only (see ship-systems), so even that chain dead-ends. **Fix: route
-cooked/grown food into the consumable/inventory path so the production chain closes.**
+**Gap (CONFIRMED, two-fold):** (1) **the production chain never starts in live play** — the
+coordinator only advances cook/plant/synth/recycle models that are *already* in their active
+state, and no wired interaction starts a cook/plant/recycle or harvests/collects the output
+(`rg 'start_cooking|start_synthesis|\.plant\(|harvest\(|collect_output'` finds only validation
+seams — Codex). (2) Even when forced active, output terminates at a HUD readout:
+cook/hydroponics/synth → `sustenance_state` → `get_status_lines()` (coord 4064), never feeding
+hunger/thirst (that runs via the **M5 consumable pipeline**: eat item → `effect_dispatcher` →
+vitals). `water_recycler` → life-support `recycled_water` (1340) is the one real consumer, but
+life-support's own output is HUD-only, so even that dead-ends. **Fix needs both: wire the live
+start/harvest/collect interactions AND route grown/cooked output into the inventory/consumable
+path.**
 
-### M3 · Combat / threat AI / damage — 🟢 closed-loop both directions (but designed injection bypassed)
+### M3 · Combat / threat AI / damage — 🟢 closed-loop both directions (designed injection now wired, PR #38)
 
 | System | Coupled | Live input → output | Conf |
 | --- | --- | --- | --- |
 | `threat_manager` / `threat_ai_state` | 🟢 | ← player signals + `tick_threats(vitals, status, armor, pos)` (3357) → drains player vitals | [V] |
 | `detection_state` | 🟢 | ← player move/noise signals (3350) → threat awareness | [V] |
-| `damage_pipeline` / `armor_resolver` | 🟢 | ← player `attack_with_weapon(weapon, inventory, equipment)` (3338) → damages threats; armor profile mediates incoming | [V] |
+| `damage_pipeline` / `armor_resolver` | 🟢 | ← player `attack_with_weapon(weapon, inventory, equipment)` (3338) → damages threats; the player armor profile mediates incoming threat damage to the player | [V] |
 
-**Threats DO spawn in live golden runs:** `configure_for_layout` falls back to
-`_fallback_markers_from_layout` (threat_manager 221) when the layout has no `encounters` —
-spawning a fixed 5-archetype set (`biomatter_swarm, puppet_corpse, stalker, mimic,
-hull_tendril`). So combat has a live source and sink.
+**Threats DO spawn:** `configure_for_layout` falls back to `_fallback_markers_from_layout`
+(threat_manager 221) when the layout has no `encounters`, spawning a fixed 5-archetype set
+(`biomatter_swarm, puppet_corpse, stalker, mimic, hull_tendril`). So combat has a live source
+and sink even with no injected encounters.
 
-**Gap (NEW finding):** the **designed encounter system is bypassed in the live path.**
-`EncounterInjector` (biome/difficulty-tuned spawn tables) only runs inside the procgen
-`ship_layout_generator` (line 104). The live run loads **golden** layouts
-(`blueprint_path` default = `coherent_ship_001`), which carry **no `encounters` key**, so
-every golden derelict gets the *same* hardcoded 5-enemy fallback — no biome/difficulty
-variation, no injector. So combat *functions* but is not *driven by its own tuning system*.
-Fix: either populate golden layouts' `encounters` arrays, or run `EncounterInjector` over
-golden layouts at load. Content: 5 archetypes exist; bespoke behaviors/bosses are future.
+**Gap (corrected — RESOLVED by PR #38):** the designed encounter system was *defaulted off*,
+not bypassed (a deeper trace by Codex corrected my first-pass framing). Traveled-to derelicts
+**are** procgen — `travel_to` → `ShipGenerator` → `ShipLayoutGenerator` already runs the
+pipeline; golden layouts are only the *home/start* ship (intentionally a safe hub). But
+`ShipGenerator` called the layout generator with **empty biome/difficulty ids**, so the Stage-6
+`EncounterInjector` was skipped and `layout.encounters` stayed empty → threats fell back to the
+fixed 5. **PR #38 threads a deterministic per-derelict biome+difficulty into that call**, so
+live derelicts now spawn injected, biome/difficulty-tuned encounters (`enc_*` threat ids).
+Content: 5 archetypes exist; bespoke behaviors/bosses are future.
 
 ### M4 · Loot ecosystem — 🟢 closed-loop (source→sink wired)
 
@@ -125,10 +129,10 @@ golden layouts at load. Content: 5 archetypes exist; bespoke behaviors/bosses ar
 | `loot_roller` / `loot_distribution` / `rarity_tier` | 🟢 | ← search roll context → rolled items into the grant | [V] |
 | `unique_item_state` | 🟡 | unique-find path wired to rolls; **uniqueness-dedup-across-runs not traced** | [P] |
 
-**Gap:** the loot loop closes — golden layouts define container specs, searching grants real
-items into inventory. Same caveat as combat: loot *tables* are biome/depth-tuned in the
-matrix, but the live golden path uses whatever specs the golden layout hardcodes rather than
-injector-driven tables. Content: loot/unique/junk definitions exist.
+**Gap:** the loot loop closes — layouts define container specs, searching grants real items into
+inventory. Remaining: the biome's `loot_quality_modifier` isn't yet applied to rolls. The
+per-derelict biome is now resolved (PR #38, same seam as combat), so the hook exists; wiring it
+into the loot roll is a fast-follow. Content: loot/unique/junk definitions exist.
 
 ### M7 · Ship systems & sustenance infrastructure — 🔴 **the most hollow lane** (highest-priority gap)
 
@@ -184,20 +188,22 @@ item→player-effect loop. Content: medicine/stimulant/ammo definitions exist.
 `tooltip_presenter`, hotbar/panels — all driven by `menu_coordinator`. UI is inherently an
 *output sink*; "hollow output" doesn't apply. **Gap:** the **inputs feeding the HUD are only
 as real as the systems behind them** — e.g. the ship-systems panel faithfully renders the
-hollow shield/sustenance numbers from M4/M7. Fixing M4/M7 makes the HUD meaningful. [?]
+hollow shield/sustenance numbers from M7. Fixing M7 makes the HUD meaningful. [?]
 
-### M8 / M12 · Procgen expansion & world variety — 🟡 lifeboat wired, derelict variety pending
+### M8 / M12 · Procgen expansion & world variety — 🟢 wired (lifeboat PR #36, derelicts PR #38)
 
-`kit_catalog` now skins the **lifeboat** (PR #36). **`encounter_injector` RESOLVED:** it runs
-only in the procgen `ship_layout_generator` (line 104), which the **live golden run does not
-invoke** — so the injector and its biome/difficulty-tuned tables are dormant in the default
-game (combat/loot fall back to fixed golden specs + a hardcoded enemy set; see M3/M4). This is
-the single biggest "designed system not driving the live game" gap. `room_variant_selector`,
-`biome_profile`, `difficulty_profile`, `seed_determinism_contract` are all on that same
-procgen path and therefore equally bypassed by the golden run — graded 🔴 *live-bypassed*
-[V for encounter_injector, P for the rest]. Derelict structural variety (layout.json pipeline)
-is the known-future vehicle that would also carry these. **Decision needed: is the live game
-meant to run procgen derelicts (lighting up this whole lane) or curated golden ones?**
+`kit_catalog` skins the **lifeboat** (PR #36). **`encounter_injector` / `room_variant_selector`
+/ `biome_profile` / `difficulty_profile` — RESOLVED (PR #38).** My first-pass framing here was
+wrong (corrected by a deeper trace): traveled-to derelicts are **not** bypassed — `travel_to` →
+`ShipGenerator` → `ShipLayoutGenerator` already runs the procgen pipeline; golden layouts are
+only the *home* ship. The dormant part was that `ShipGenerator` called the generator with
+**empty biome/difficulty ids**, so Stage-6 injection + room-variant selection + biome/difficulty
+stamping were all skipped. PR #38 threads a deterministic per-derelict biome+difficulty into that
+call, so all four now drive live derelicts (proven by
+`main_playable_derelict_encounter_injection_smoke.gd`). `seed_determinism_contract` stays a test
+contract, not a runtime system. Remaining known-future: full derelict *structural*-template
+variety (layout.json template expansion) and the EncounterInjector density-clamp balance bug
+(see the rollup).
 
 ### M9 · Audio / music / spatial — 🟡 driven, source-coupling [?]
 
@@ -241,21 +247,27 @@ The pre-alpha question isn't "what's missing a model" — it's "where does the s
 to close a loop." Ordered by how much each breaks *the game functioning as a whole*.
 **Verified hollows (fix or cut):**
 
-1. **🔴 The whole procgen/encounter lane is bypassed in the live game.** The default run loads
-   **golden** layouts, which never invoke `ship_layout_generator` — so `EncounterInjector`,
-   `room_variant_selector`, `biome_profile`, `difficulty_profile` are all dormant. Combat and
-   loot work, but off a *fixed* fallback (same 5 enemies, golden-hardcoded loot specs) with no
-   biome/difficulty tuning. **This is the highest-leverage decision, not just a fix:** does the
-   live game run procgen derelicts (lighting up an entire built-but-dark lane) or curated golden
-   ones? Everything below is smaller. *(M8/M12)*
+1. **✅ RESOLVED (PR #38) — procgen biome/difficulty/encounter injection.** *Corrected framing
+   (Codex):* the lane was **not** bypassed — traveled-to derelicts run `ShipGenerator` →
+   `ShipLayoutGenerator` (golden is only the *home* ship). It was simply called with **empty
+   biome/difficulty ids**, so `EncounterInjector` + `room_variant_selector` + biome/difficulty
+   stamping were skipped and combat fell back to the fixed 5. PR #38 threads a deterministic
+   per-derelict biome+difficulty into that call → live derelicts now spawn injected,
+   biome/difficulty-tuned encounters. **Follow-up (not yet done):** `encounter_injector.gd:130`
+   clamps combined encounter density to `[0,1]`, neutering biome/difficulty density > 1.0
+   (`deep_dive`/`breach_field` can only *lower* the rate) — a balance fix deferred to its own
+   review. *(M8/M12)*
 2. **🔴 Hull has no live damage source.** The hull→life-support→propulsion cascade only fires
    from `force_hull_breach_for_validation()`. Without a real breach source (combat / hazard /
    deep-dive pressure / derelict events), an entire ship-damage subsystem is inert. *(M7)*
 3. **🔴 Shields are pure decoration.** Charged by power, depleted by nothing — no ship-directed
    damage channel reads them. Wire as a damage buffer or cut. *(M7)*
-4. **🔴 Food production chain dead-ends at the HUD.** Cook/hydroponics/synth → `sustenance_state`
-   → status lines; cooked food never re-enters hunger/thirst (that runs via the M5 consumable
-   pipeline). Route grown/cooked output into the inventory/consumable path. *(M2)*
+4. **🔴 Food production chain is inert in live play.** Two-fold (Codex): nothing live starts a
+   cook/plant/recycle or harvests/collects output (the coordinator only ticks already-active
+   models), **and** even when active the output dead-ends at the HUD instead of feeding
+   hunger/thirst (that runs via the M5 consumable pipeline). Fix needs both: wire the
+   start/harvest/collect interactions and route grown/cooked output into the inventory/consumable
+   path. *(M2)*
 5. **🔴 Expanded life-support, fire-suppression, sustenance output to HUD only** and run
    *parallel* to the real `oxygen_state` / `fire_state` hazards instead of being the
    authoritative source. The whole "expanded ship systems" tier is a HUD shadow — see M7
@@ -273,6 +285,10 @@ to close a loop." Ordered by how much each breaks *the game functioning as a who
 **Resolved this pass (were unknowns, now confirmed live):** combat both directions (threats
 spawn via fallback + `attack_with_weapon`), loot source→inventory, progression **both** sides
 (earn *and* hub-upgrade spend→effect at run setup).
+
+**Resolved after this audit:** procgen biome/difficulty/encounter injection for live derelicts
+(PR #38 — see rollup item 1; the audit's original "lane bypassed" framing was corrected to
+"extended generator options defaulted off", then wired).
 
 ## How to extend this audit (next pass)
 
