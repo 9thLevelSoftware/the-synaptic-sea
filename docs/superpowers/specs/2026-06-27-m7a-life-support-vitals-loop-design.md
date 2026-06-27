@@ -78,16 +78,42 @@ the lane was missing.
   `seal_compartment()`, `get_breach_count()`, `average_integrity()`. Its only live caller today
   is `force_hull_breach_for_validation()` (test seam). It is configured from a JSON config path
   at run start.
-- **Save/load:** the expanded-systems summaries live in `_expanded_ship_systems_summary()`
-  (~1369) for the HUD; they are **NOT** in `RunSnapshot.SUMMARY_FIELDS` (currently 26 fields).
-  So hull-breach and ambient-atmosphere state does **not** survive save/load today. Because A
-  makes them gameplay-affecting, A adds `hull_integrity_summary` and `life_support_summary` to
-  the snapshot so a loaded save preserves the threat (count 26 → 28). `shield` is cut, so it is
-  never added.
+- **Save/load (CORRECTED after tracing the code):** the expanded-systems summaries are NOT
+  top-level `RunSnapshot.SUMMARY_FIELDS` (which stays 26), **but they already round-trip** —
+  the snapshot builder merges every key of `_expanded_ship_systems_summary()` *into*
+  `snapshot.ship_systems_summary` (~5381–5382), and the loader restores them via
+  `life_support_expanded_state.apply_summary(...)` (~5641) and
+  `hull_integrity_state.apply_summary(...)` (~5643). So hull-breach + ambient-atmosphere state
+  **survive save/load today, nested under `ship_systems_summary`**. → A needs **no** new
+  `SUMMARY_FIELDS` and the count stays 26. Cutting `shield_state` removes `shield_state_summary`
+  from `_expanded_ship_systems_summary()`, which automatically drops it from the nested persist;
+  there is no shield restore call to remove.
+
+## Planning-stage refinements (decided during plan authoring, approved)
+
+Two decisions made the loop actually playable; both extend (do not contradict) the approved design:
+
+1. **Breaches leak atmosphere even while powered.** The existing `LifeSupportState.tick` only
+   lets `breach_count` amplify drain in the *unpowered* branch — so a pre-damaged hull (source #4)
+   would be inert while power is on, and there would be no "race to seal." A adds a per-breach
+   atmosphere leak that applies in the **powered** branch too (reduces/overcomes online recovery),
+   so unsealed breaches degrade O2/CO2 until sealed. Existing `life_support_state_smoke` assertions
+   use `breach_count == 0` (recover-online case), so they stay green; the new behavior is additive
+   and gated on `breach_count > 0`.
+
+2. **A player-facing breach-seal interaction (`BreachSealPoint`).** Verified there is **no** live
+   caller of `HullIntegrityState.seal_compartment()` except a test seam, and no per-compartment
+   repair interaction exists. A adds a `BreachSealPoint` interactable **modeled on the existing
+   `RepairPoint`** (`scripts/interaction/repair_point.gd`): the player approaches a breached
+   compartment, interacts (consuming a sealant/repair material via `inventory_state`, optionally
+   skill-gated like RepairPoint), and on completion the coordinator calls
+   `hull_integrity_state.seal_compartment(compartment_id, amount)` → breach closes (`health ≥ 0.75`)
+   → `breach_count` drops → atmosphere recovers. This realizes source #4's "racing to seal."
 
 ## Architecture / data flow (sub-project A)
 
-No new model classes. Wire existing ones via read-only accessors + a ~3-line coordinator change.
+No new *model* classes (one new *interaction* node — `BreachSealPoint`). Wire the existing models
+via read-only accessors + the breach-leak refinement + a small coordinator change.
 
 ```
 HullIntegrityState
@@ -151,29 +177,45 @@ balance step of implementation, asserted by the smokes below.
 
 ## Cutting `shield_state`
 
-Remove every reference (no on-foot role):
+Remove the **model and its direct wiring** (no on-foot role):
 - `scripts/systems/shield_state.gd` (+ `.uid`).
 - Coordinator: `ShieldStateScript` preload (~94), `shield_state` field (~337), instantiation +
   `configure` (~1307–1308), `tick` (~1334–1335), and the `shield_state_summary` line in
-  `_expanded_ship_systems_summary()` (~1376).
-- Its config block (`tuning.get("shields", …)`) in the ship-systems tuning data.
-- Its validation smoke (and its entry in `06_validation_plan.md` + the regression bundle).
-- Any HUD/status consumer that renders the shield line.
-- `shield_state` is **not** in `RunSnapshot`, so the snapshot count is unaffected by the cut.
+  `_expanded_ship_systems_summary()` (~1376). Removing that line auto-drops shields from the
+  nested save persist; there is no shield restore call to remove.
+- The `"shields"` block in `data/ship_systems/subsystem_tuning.json` (dead config once the model
+  is gone).
+- No HUD consumer reads `shield_state_summary` (verified — grep found none outside the model and
+  coordinator), so no HUD change is needed.
+- **There is no dedicated shield validation smoke.** `shield` appears only inside
+  `power_grid_state_smoke.gd` as a power-allocation channel (see below).
 
-Grep `shield` across the repo as the completeness check; remove all live references, leaving no
-dangling reads.
+**Deliberately LEFT in place (flagged follow-up, not silently ignored):** `"shields"` is also a
+**power-grid allocation channel** — hardcoded in `power_grid_state.gd` (`DEFAULT_SUBSYSTEM_ORDER`),
+present in `data/ship_systems/power_budget_tables.json`, and asserted by `power_grid_state_smoke.gd`.
+Removing it would re-balance the power-allocation ratios across **all** subsystems and ripple into
+the working 🟢 power grid + its smoke + propulsion/life-support thresholds — out of scope for a
+life-support→vitals loop and a real regression risk. A leaves the orphaned `"shields"` power
+channel intact (it allocates power to nothing now) and records it as an explicit follow-up: a
+later card can either repurpose the channel or remove it together with a deliberate power
+re-balance. Grep `shield` after the cut to confirm the only remaining references are the power
+channel (`power_grid_state.gd`, `power_budget_tables.json`, `power_grid_state_smoke.gd`) plus the
+incidental `material_definitions.json` / `recipe_definitions.json` item data (a craftable shield
+item, unrelated to the cut model).
 
 ## Save/load
 
-Add to `RunSnapshot.SUMMARY_FIELDS` (and `to_dict` / `from_dict`):
-- `hull_integrity_summary` (from `hull_integrity_state.get_summary()`)
-- `life_support_summary` (from `life_support_expanded_state.get_summary()`)
+**No change required — hull + life-support already persist.** Tracing the coordinator confirmed
+the snapshot builder merges `_expanded_ship_systems_summary()` into `snapshot.ship_systems_summary`
+(~5381–5382) and the loader restores `hull_integrity_state` / `life_support_expanded_state` via
+their `apply_summary()` (~5641, ~5643). Because A only adds **read-only accessors** to those
+models (no new persisted fields), the existing nested round-trip already preserves breach state
+and ambient atmosphere across save/load. `RunSnapshot.SUMMARY_FIELDS` stays at **26**; the
+save-load-service smoke's `summary_count == 26` assertion is unchanged.
 
-So a loaded save preserves breach state and ambient atmosphere — without this, loading silently
-heals the ship and erases the threat. Count 26 → 28. The coordinator must apply these on load
-via the models' existing `apply_summary()`. The save-load service smoke and run-snapshot model
-smoke that assert the summary count must be updated to 28.
+Cutting `shield_state` removes `shield_state_summary` from `_expanded_ship_systems_summary()`,
+which automatically removes it from the nested persist. No shield restore call exists, so nothing
+on the load path needs changing.
 
 ## Testing (the definition of done)
 
@@ -189,23 +231,30 @@ smoke that assert the summary count must be updated to 28.
    - player health measurably drops over N ticks **while aboard** (`away_from_start == false`);
    - restoring power to life support (+ sealing breaches) halts the health drain;
    - **no atmosphere health drain while `away_from_start == true`** (away on a derelict).
-3. **Regression bundle (`docs/game/06_validation_plan.md`):** add both new smokes with their
-   PASS markers; **remove** the shield smoke entry and its expected marker; update the command
-   count. Update the save-load / run-snapshot summary-count assertions to 28. Run the full
-   bundle to `SARGASSO REGRESSION PASS` with clean output (only the allowlisted baseline noise).
+3. **Regression bundle (`docs/game/06_validation_plan.md`):** add the new main-scene smoke with
+   its PASS marker (the life-support model teeth are folded into the existing
+   `life_support_state_smoke.gd`, already in the bundle); update the command count for the added
+   main-scene smoke. There is no dedicated shield smoke to remove (shields is only exercised
+   inside `power_grid_state_smoke.gd`, which is left intact — see the shield-cut section). The
+   save-load summary count stays **26** (unchanged). Run the full bundle to
+   `SARGASSO REGRESSION PASS` with clean output (only the allowlisted baseline noise).
 
 ## Files touched (anticipated)
 
 - `scripts/systems/life_support_state.gd` — add two read-only accessors + tunable fields.
 - `scripts/systems/hull_integrity_state.gd` — no code change expected; verify config-driven
-  pre-damage. Config data file gains pre-damaged compartment entries.
-- `scripts/systems/shield_state.gd` — **deleted.**
-- `scripts/systems/run_snapshot.gd` — add two summary fields (26 → 28).
+  pre-damage works.
+- `data/ship_systems/hull_compartments.json` — pre-damage some compartments (source #4).
+- `data/ship_systems/subsystem_tuning.json` — add `life_support` threshold tunables for the new
+  accessors if not derivable from existing fields; remove the dead `"shields"` block.
+- `scripts/systems/shield_state.gd` — **deleted** (+ `.uid`).
 - `scripts/procgen/playable_generated_ship.gd` — vitals-context wiring (~4221); remove shield
-  wiring; persist/restore hull + life-support summaries.
-- `scripts/validation/` — new life-support model smoke + `main_playable_life_support_vitals_smoke.gd`;
-  delete the shield smoke.
-- `docs/game/06_validation_plan.md` — markers/bundle/count updates.
+  model wiring. **No save/load change** (hull + life-support already round-trip nested in
+  `ship_systems_summary`).
+- `scripts/validation/life_support_state_smoke.gd` — extend with the new-accessor assertions.
+- `scripts/validation/main_playable_life_support_vitals_smoke.gd` — **new** main-scene smoke.
+- `docs/game/06_validation_plan.md` — add the new main-scene smoke marker + command count (no
+  shield smoke exists to remove; save-load count stays 26).
 - `docs/game/system_completion_audit.md` — re-grade M7 life-support/hull/shield rows after A lands.
 
 ## Open questions for written-spec review
