@@ -34,6 +34,7 @@ var audio_summary: Dictionary = {}
 var spoilage_summary: Dictionary = {}
 var hydroponics_summary: Dictionary = {}
 var synthesizer_summary: Dictionary = {}
+var water_recycler_summary: Dictionary = {}
 var crafting_summary: Dictionary = {}
 var material_summary: Dictionary = {}
 var consumable_summary: Dictionary = {}
@@ -76,6 +77,7 @@ const SUMMARY_FIELDS: Array = [
 	"spoilage_summary",
 	"hydroponics_summary",
 	"synthesizer_summary",
+	"water_recycler_summary",
 	"consumable_summary",
 	"medicine_summary",
 	"stimulant_summary",
@@ -114,6 +116,7 @@ func to_dict() -> Dictionary:
 		"spoilage_summary": spoilage_summary.duplicate(true),
 		"hydroponics_summary": hydroponics_summary.duplicate(true),
 		"synthesizer_summary": synthesizer_summary.duplicate(true),
+		"water_recycler_summary": water_recycler_summary.duplicate(true),
 		"crafting_summary": crafting_summary.duplicate(true),
 		"material_summary": material_summary.duplicate(true),
 		"consumable_summary": consumable_summary.duplicate(true),
@@ -174,6 +177,7 @@ static func from_dict(data: Variant, expected_slice_version: String, expected_go
 	snapshot.spoilage_summary = _deep_copy_dict(dict.get("spoilage_summary", {}))
 	snapshot.hydroponics_summary = _deep_copy_dict(dict.get("hydroponics_summary", {}))
 	snapshot.synthesizer_summary = _deep_copy_dict(dict.get("synthesizer_summary", {}))
+	snapshot.water_recycler_summary = _deep_copy_dict(dict.get("water_recycler_summary", {}))
 	snapshot.crafting_summary = _deep_copy_dict(dict.get("crafting_summary", {}))
 	snapshot.material_summary = _deep_copy_dict(dict.get("material_summary", {}))
 	snapshot.consumable_summary = _deep_copy_dict(dict.get("consumable_summary", {}))

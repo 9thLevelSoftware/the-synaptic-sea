@@ -5605,6 +5605,8 @@ func _build_run_snapshot() -> RunSnapshot:
 		snapshot.hydroponics_summary = hydroponics_state.get_summary()
 	if synthesizer_state != null:
 		snapshot.synthesizer_summary = synthesizer_state.get_summary()
+	if water_recycler_state != null:
+		snapshot.water_recycler_summary = water_recycler_state.get_summary()
 	if consumable_state != null:
 		snapshot.consumable_summary = consumable_state.get_summary()
 	if medicine_state != null:
@@ -5904,6 +5906,8 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		hydroponics_state.apply_summary(snapshot.hydroponics_summary)
 	if synthesizer_state != null and not snapshot.synthesizer_summary.is_empty():
 		synthesizer_state.apply_summary(snapshot.synthesizer_summary)
+	if water_recycler_state != null and not snapshot.water_recycler_summary.is_empty():
+		water_recycler_state.apply_summary(snapshot.water_recycler_summary)
 	if consumable_state != null and not snapshot.consumable_summary.is_empty():
 		consumable_state.apply_summary(snapshot.consumable_summary)
 	if medicine_state != null and not snapshot.medicine_summary.is_empty():
