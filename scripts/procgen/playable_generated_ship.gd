@@ -1798,6 +1798,9 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 			# so the player is never physically stranded undocked.
 			push_error("PlayableGeneratedShip: travel dock failed (%s) — re-docking piloted ship to home" % str(dock_res.get("reason", "?")))
 			_dock_piloted_to(home_ship)
+		else:
+			if audio_manager != null and audio_manager.has_method("play_sfx"):
+				audio_manager.play_sfx(AudioEventSeamScript.SFX_DOCK_LAND)
 		_apply_player_carry(carry)
 		_reposition_subtree(child_carry)
 	_spawn_dock_barrier(inst)
@@ -3515,6 +3518,8 @@ func _freeze_player_for_panel() -> void:
 		player.set_process_unhandled_input(false)
 
 func _on_inventory_panel_closed() -> void:
+	if audio_manager != null and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_INVENTORY_CLOSE)
 	if player != null:
 		player.set_physics_process(true)
 		player.set_process_input(true)
@@ -3536,6 +3541,8 @@ func _open_inventory_self() -> void:
 	if not is_instance_valid(inventory_panel) or inventory_state == null:
 		return
 	inventory_panel.open_self(inventory_state, equipment_state)
+	if audio_manager != null and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_INVENTORY_OPEN)
 	if is_instance_valid(menu_coordinator):
 		menu_coordinator.trigger_tutorial("inventory_opened", "any")
 	_freeze_player_for_panel()
@@ -3780,6 +3787,8 @@ func _use_consumable_item(item_id: String, use_all: bool = false) -> Dictionary:
 		return {"ok": false, "reason": "consumable_pipeline_missing"}
 	var result: Dictionary = consumable_state.use_item(item_id, inventory_state, _consumable_pipeline_context(), use_all)
 	if bool(result.get("ok", false)):
+		if audio_manager != null and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 		_ensure_consumable_hotbar_assignments()
 		_recompute_player_encumbrance()
 		_refresh_oxygen_state(false, 0.0)
@@ -4336,6 +4345,8 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 	# persist the just-completed sequence and a load would put the
 	# player back on the same objective they just finished.
 	current_objective_sequence += 1
+	if audio_manager != null and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_OBJECTIVE_ADVANCE)
 	_auto_save_current_run()
 	# NOTE: we deliberately do NOT force a rotating autosave here. The checkpoint
 	# is already persisted to current_run.json above (the REQ-012 resume point), and
@@ -5774,6 +5785,8 @@ func request_save() -> bool:
 		return false
 	var result: bool = save_load_service.save_world(ws)
 	if result:
+		if audio_manager != null and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_SAVE)
 		print("PLAYABLE SHIP SAVED location=%s sequence=%d" % [ws.current_location, current_objective_sequence])
 		if is_instance_valid(menu_coordinator):
 			menu_coordinator.trigger_tutorial("run_saved", "any")
@@ -5807,8 +5820,11 @@ func request_load() -> bool:
 		push_warning("PlayableGeneratedShip: no compatible world save to load")
 		return false
 	var loaded: bool = _apply_world_snapshot(ws)
-	if loaded and is_instance_valid(menu_coordinator):
-		menu_coordinator.set_load_available(true)
+	if loaded:
+		if audio_manager != null and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_LOAD)
+		if is_instance_valid(menu_coordinator):
+			menu_coordinator.set_load_available(true)
 	return loaded
 
 ## Reconstructs the slice through the normal load path, then applies
