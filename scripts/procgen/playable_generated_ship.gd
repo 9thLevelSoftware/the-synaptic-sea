@@ -2669,7 +2669,12 @@ func _refresh_fire_zones() -> void:
 	var rendered := {}
 	for cid in fire_zone_nodes:
 		rendered[str(cid)] = true
-	if JSON.stringify(burning.keys()) != JSON.stringify(rendered.keys()):
+	# Compare as sorted sets so a different key order does not force a needless rebuild.
+	var burning_keys: Array = burning.keys()
+	burning_keys.sort()
+	var rendered_keys: Array = rendered.keys()
+	rendered_keys.sort()
+	if burning_keys != rendered_keys:
 		_build_fire_zones()
 
 # --- validation seams ---
