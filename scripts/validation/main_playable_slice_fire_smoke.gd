@@ -51,8 +51,36 @@ func _validate() -> void:
 	playable.fire_suppression_state.tick(0.5, playable._build_fire_context())
 	if playable.fire_suppression_state.is_burning("engineering"):
 		_fail("breached compartment should vent-extinguish the fire"); return
+	# Teeth: a burning compartment drains vitals and damages its housed system.
+	# Clear threats so nothing else perturbs the player's vitals during the pump.
+	if playable.threat_manager != null:
+		playable.threat_manager.threats.clear()
+	# The vent block above left engineering breached; seal it so the re-ignited
+	# fire persists (an open breach would vent-extinguish it again).
+	playable.seal_hull_breach_for_validation("engineering", 1.0)
+	playable.force_ignite_compartment_for_validation("engineering", 1.0)
+	playable.vitals_state.health = 90.0
+	var sys_before: float = playable.ship_systems_manager.get_system("power").health()
+	# Place the player inside the engineering fire zone.
+	var ez = null
+	for zn in playable.get_fire_zone_nodes_for_validation():
+		if str(zn.get_meta("fire_compartment_id", "")) == "engineering":
+			ez = zn
+	if ez == null:
+		_fail("no engineering fire zone to stand in"); return
+	if playable.player != null and ez is Node3D:
+		playable.player.global_position = (ez as Node3D).global_position
+	var step: float = 1.0 / 30.0
+	var elapsed: float = 0.0
+	while elapsed < 2.0:
+		playable._process(step)
+		elapsed += step
+	if playable.vitals_state.health >= 90.0:
+		_fail("standing in fire should drain vitals"); return
+	if playable.ship_systems_manager.get_system("power").health() >= sys_before:
+		_fail("burning compartment should damage its system"); return
 	finished = true
-	print("MAIN PLAYABLE FIRE PASS passable=true present=true vent=true")
+	print("MAIN PLAYABLE FIRE PASS passable=true present=true vent=true vitals_drain=true system_damage=true")
 	_cleanup_and_quit(0)
 
 func _find_playable(node: Node) -> PlayableGeneratedShip:

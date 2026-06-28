@@ -1333,6 +1333,8 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 	if fire_suppression_state != null:
 		if fire_suppression_state.tick(delta, _build_fire_context()):
 			_refresh_fire_zones()
+		# M7-B Task 8: a burning compartment degrades the ship system housed there.
+		_apply_fire_system_damage(delta)
 	# ADR-0038: drive station power from the same "stations" channel, then advance the
 	# single active craft. Field crafting is unpowered, so it ticks regardless (and also in
 	# the _process away-branch for emergency crafts started before travel).
@@ -2598,6 +2600,32 @@ func _seed_fires_from_damage() -> void:
 	for cid in ctx.get("damaged_compartments", []):
 		if not breached.has(str(cid)):
 			fire_suppression_state.ignite(str(cid), 1.0)
+
+## M7-B Task 8: returns the intensity of the fire the player is currently standing
+## in (0.0 if none). The player overlaps a fire when within the fire zone's radius
+## (~2.0) of its world position.
+func _player_fire_intensity() -> float:
+	if player == null or fire_suppression_state == null:
+		return 0.0
+	for cid in fire_zone_nodes:
+		var z = fire_zone_nodes[cid]
+		if not is_instance_valid(z) or not (z is Node3D):
+			continue
+		if (z as Node3D).global_position.distance_to(player.global_position) <= 2.0:
+			return fire_suppression_state.get_intensity(str(cid))
+	return 0.0
+
+## M7-B Task 8: applies fire degradation to the ship system housed in each burning
+## compartment, scaled by fire intensity. Compartments with no mapped system are skipped.
+func _apply_fire_system_damage(delta: float) -> void:
+	if fire_suppression_state == null or ship_systems_manager == null:
+		return
+	for cid in fire_suppression_state.get_burning_compartments():
+		var sid: String = str(FIRE_COMPARTMENT_SYSTEM.get(str(cid), ""))
+		if sid.is_empty():
+			continue
+		var intensity: float = fire_suppression_state.get_intensity(str(cid))
+		ship_systems_manager.damage_system(sid, FIRE_SYSTEM_DAMAGE_PER_SECOND * intensity * delta)
 
 func _build_fire_zones() -> void:
 	_clear_fire_zones()
@@ -4437,6 +4465,8 @@ func _process(delta: float) -> void:
 			"temperature_thirst_mult": temp_mult,
 			"radiation_health_drain": rad_drain,
 			"atmosphere_health_drain": atmo_drain,
+			# M7-B Task 8: standing in a burning compartment drains player health.
+			"fire_health_drain": FIRE_HEALTH_DRAIN_PER_SECOND * _player_fire_intensity(),
 			"status_stamina_recovery_mult": status_mult,
 			"moving": player != null and player.has_method("is_moving") and player.is_moving(),
 		})
