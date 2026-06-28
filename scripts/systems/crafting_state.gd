@@ -153,6 +153,12 @@ func begin_craft(recipe_id: String, inventory, material_state, player_skill_leve
 		return false
 	if not can_craft(recipe_id, inventory):
 		return false
+	# Enforce the recipe's skill gate (previously required_skill_level only affected quality,
+	# leaving the "mid/late-game" progression gate decorative — Codex PR #45). Station crafting
+	# now rejects under-skilled players; emergency field crafting (FieldCraftingState) stays
+	# ungated by design.
+	if player_skill_level < get_required_skill_level(recipe_id):
+		return false
 	var station_kind: String = str(recipe.get("station_kind", ""))
 	if station_kind.is_empty():
 		return false

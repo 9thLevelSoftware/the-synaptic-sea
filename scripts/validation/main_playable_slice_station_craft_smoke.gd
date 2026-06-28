@@ -75,6 +75,10 @@ func _validate(playable) -> void:
 	playable.material_state.set_quality("wiring_bundle", 0.7)
 	playable.material_state.set_quality("reactive_gel", 0.9)
 	playable.material_state.set_quality("circuit_board", 0.75)
+	# Station crafting now enforces required_skill_level (PR #45). Grant fabrication skill so
+	# the fabricator auto-craft can select a mid-tier recipe (boot skill is 0).
+	if playable.player_progression != null:
+		playable.player_progression.skills["fabrication"] = 6
 
 	# --- 1) Station craft through the real interaction path -------------------------------
 	if not playable.craft_at_station_for_validation("fabricator"):

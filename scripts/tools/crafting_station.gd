@@ -110,6 +110,10 @@ func _try_craft() -> bool:
 			continue
 		if not crafting_state.can_craft(rid, inventory_state):
 			continue
+		# Skip recipes the player lacks the skill for, so selection falls through to a
+		# craftable one rather than picking a too-high-skill recipe that begin_craft rejects.
+		if crafting_state.get_required_skill_level(rid) > _player_skill():
+			continue
 		# Don't consume ingredients for an output that won't fit (begin_craft consumes
 		# immediately; add_item silently drops over-stack overflow). Try the next recipe.
 		var produces: Dictionary = crafting_state.get_produces(rid)

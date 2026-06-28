@@ -138,7 +138,7 @@ into the loot roll is a fast-follow. Content: loot/unique/junk definitions exist
 
 ### M7 · Ship systems & sustenance infrastructure — 🟡 partial progress (M7-A: life-support closed; hull source partly wired; shields cut)
 
-*Resolved by M7-A: `shield_state` removed; `life_support_expanded_state` closed-loop (hull breach_count → atmosphere drain → vitals health while aboard); `hull_integrity_state` sink-side mechanically 🟢 (BreachSealPoint channel + `hull_sealant` consumption proven by smoke); `hull_sealant` is not yet a defined or obtainable item (no loot/craft/starting-inventory path), so player-facing loop completion is deferred. Live damage source is config-only #4, sources #1–3 deferred.*
+*Resolved by M7-A: `shield_state` removed; `life_support_expanded_state` closed-loop (hull breach_count → atmosphere drain → vitals health while aboard); `hull_integrity_state` sink-side 🟢 (BreachSealPoint channel + `hull_sealant` consumption). `hull_sealant` is now a defined, obtainable item (uncommon loot + `craft_hull_sealant`, skill 2), so the breach-seal player loop is reachable in real play (`main_playable_item_economy_smoke.gd`). Live damage source is config-only #4, sources #1–3 deferred.*
 
 | System | Coupled | Live input → output | Conf |
 | --- | --- | --- | --- |
@@ -148,7 +148,7 @@ into the loot roll is a fast-follow. Content: loot/unique/junk definitions exist
 | `fire_suppression_state` | 🟢 | **Authoritative fire hazard (M7-B / ADR-0041).** ← live ignition as a *symptom of damage*: a damaged mapped ship system + oxygen re-ignites a compartment each tick; plus electrical-arc cascade and deterministic spread to adjacent compartments. → real teeth: drains `vitals_state.health` while the player stands in a burning zone (`fire_health_drain`) AND degrades the burning compartment's ship system via `ship_systems_manager.damage_system()`. Three extinguish paths: manual `FireSuppressionPoint` (consumes `ExtinguisherState` charge, refilled at a powered `ExtinguisherRechargePort`), powered auto-suppression, and breach/vacuum vent. `fire_state` (the old timer hazard) is **deleted**. | [V] |
 | ~~`shield_state`~~ | cut | **Removed by M7-A** — model and tuning deleted; orphaned power channel (`power → shield allocation slot`) **cleaned up** (removed from `DEFAULT_SUBSYSTEM_ORDER`, `power_budget_tables.json`, and smoke). 18-unit budget slot reclaimed. | [V] |
 | `life_support_expanded_state` | 🟢 | ← power + hull `breach_count` (1342) → `get_health_drain_per_second()` → drains `vitals_state.health` while aboard (coordinator M7-A wiring); drain is zero while away on a derelict. **Closed-loop by M7-A.** | [V] |
-| `hull_integrity_state` | 🟡 | **sink** 🟢 breach_count → life-support drain → vitals; sealing mechanism mechanically proven (BreachSealPoint channel + `hull_sealant` consumption); `hull_sealant` is not yet a defined or obtainable item (no loot/craft/starting-inventory path) — player-facing loop completion deferred. **source** 🟡 live damage source is config-only `#4` (initial breach set at load via `hull_compartments.json`); sources `#1–3` (combat / hazard / pressure) deferred. | [V] |
+| `hull_integrity_state` | 🟡 | **sink** 🟢 breach_count → life-support drain → vitals; full breach-seal player loop now reachable in real play — `hull_sealant` is a defined, obtainable item (uncommon loot in `salvage_cargo`/`repair_parts_common` + `craft_hull_sealant` @ workbench skill 2), consumed by the BreachSealPoint channel (`main_playable_item_economy_smoke.gd`). **source** 🟡 live damage source is config-only `#4` (initial breach set at load via `hull_compartments.json`); sources `#1–3` (combat / hazard / pressure) deferred. | [V] |
 | `sustenance_state` | 🔴 | ← power + hydroponics/synth/water summaries (1364) → **only `get_status_lines()` (4064); does not feed player hunger/thirst** | [P] |
 
 **Gap (remaining after M7-A):** power + propulsion + crafting form a real coupled core.
@@ -256,14 +256,14 @@ to close a loop." Ordered by how much each breaks *the game functioning as a who
    (`deep_dive`/`breach_field` could only *lower* the rate). Now floored at 0 with no upper cap
    (per-room probability is still capped at 1.0 downstream), so high-density biomes/difficulties
    actually raise spawn rate (encounter_injector_smoke `deep_markers` 1→2). *(M8/M12)*
-2. **🟡 Hull source partly addressed (M7-A).** Source #4 (config-injected breach via
-   `hull_compartments.json`) is now live — initial hull damage is set at load time. The
-   breach→life-support→vitals drain loop is **closed** (see M7 table). Sealing mechanism is
-   mechanically proven (`BreachSealPoint` channel + `hull_sealant` consumption) but `hull_sealant`
-   is not yet a defined or obtainable item (no loot/craft/starting-inventory path) — player-facing
-   loop completion is deferred. Sources #1–3 (combat hits, hazard cascades, deep-dive
-   pressure) remain deferred — `damage_compartment()` seam is future-proof but not wired to live
-   events. *(M7, Resolved by M7-A)*
+2. **🟡 Hull: sink closed + seal loop reachable; live damage sources #1–3 deferred.** Source #4
+   (config-injected breach via `hull_compartments.json`) is live, and the
+   breach→life-support→vitals drain loop is **closed** (see M7 table). The breach-seal player
+   loop is now **reachable in real play**: `hull_sealant` is a defined, obtainable item (uncommon
+   loot + `craft_hull_sealant` @ workbench skill 2), consumed by the `BreachSealPoint` channel —
+   proven by `main_playable_item_economy_smoke.gd` (craft → seal via the real dispatcher, no
+   injection). Sources #1–3 (combat hits, hazard cascades, deep-dive pressure) remain deferred —
+   `damage_compartment()` seam is future-proof but not wired to live events. *(M7)*
 3. **✅ RESOLVED (M7-A + cleanup) — `shield_state` cut and orphaned power slot removed.** Model, tuning, and power-channel allocation all removed. `shields` channel deleted from `DEFAULT_SUBSYSTEM_ORDER`, `power_budget_tables.json`, and the power-grid smoke; 18-unit budget slot reclaimed. *(M7)*
 4. **✅ RESOLVED — food eat→vitals loop closed (+ dead duplicate removed).** *Corrected framing:*
    production already worked (the kitchen crafting station makes `cooked_meal`); the real break was
@@ -277,11 +277,14 @@ to close a loop." Ordered by how much each breaks *the game functioning as a who
    `fire_state` timer hazard, which is deleted): ignition is a live symptom of unrepaired
    system damage (+ arc cascade + spread), it has real teeth (player vitals drain + ship-
    system degradation), and a full player loop (manual extinguisher with charge/recharge
-   port, powered auto-suppression, breach vent). **Deferred follow-ups:** B2 deliberate-vent
-   control, fire-consumes-oxygen, `fire_extinguisher`/`hull_sealant` acquisition paths,
-   derelict-side fire points/recharge ports, and door-gated spread. **Sustenance** remains a
-   HUD shadow — it consumes the farm/cook chain but feeds no player vital. (**Life-support is
-   no longer in this list — RESOLVED by M7-A.**) *(M7)*
+   port, powered auto-suppression, breach vent). **`fire_extinguisher`/`hull_sealant` acquisition
+   — RESOLVED:** both are now uncommon loot + mid-tier recipes (`craft_fire_extinguisher` @
+   fabricator skill 3, `craft_hull_sealant` @ workbench skill 2), so the manual extinguish and
+   breach-seal loops are reachable in real play (`main_playable_item_economy_smoke.gd`).
+   **Deferred follow-ups:** B2 deliberate-vent control, fire-consumes-oxygen, **derelict-side
+   fire points/recharge ports** (now unblocked by the item economy — next M7 lane), and
+   door-gated spread. **Sustenance** remains a HUD shadow — it consumes the farm/cook chain but
+   feeds no player vital. *(M7)*
 6. **✅ RESOLVED (ADR-0042) — Sanity hallucinations closed the loop.** Sanity now drives a
    deterministic `HallucinationDirector` (seeded integer hash, no RNG) across three tiers
    (< 40 / < 25 / < 15): tier-1 ambient SFX cues; tier-2 phantom threats (via `HallucinationManager`,
