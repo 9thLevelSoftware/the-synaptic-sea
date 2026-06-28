@@ -116,8 +116,7 @@ static func _resolve_rarity(entry: Dictionary, context: Dictionary, rng: RandomN
 		return RarityTierScript.normalize(explicit)
 	var base_roll: float = rng.randf()
 	base_roll += 0.04 * float(context.get("depth", 0))
-	if str(context.get("biome_id", "")) == "dead_fleet":
-		base_roll += 0.06
+	base_roll += (float(context.get("loot_quality_modifier", 1.0)) - 1.0) * 0.15
 	if str(context.get("condition", "damaged")) == "wrecked":
 		base_roll += 0.04
 	var from_roll: String = RarityTierScript.from_roll(base_roll)

@@ -142,11 +142,11 @@ into the loot roll is a fast-follow. Content: loot/unique/junk definitions exist
 
 | System | Coupled | Live input → output | Conf |
 | --- | --- | --- | --- |
-| `power_grid_state` | 🟢 | ← `ship_systems_manager.power.health()` + broken systems (1327) → allocation ratios feeding 6 subsystems | [V] |
+| `power_grid_state` | 🟢 | ← `ship_systems_manager.power.health()` + broken systems (1327) → allocation ratios feeding 5 subsystems (shields channel removed) | [V] |
 | `propulsion_expanded_state` | 🟢 | ← power + hull penalty + manager (1331) → **gates travel via `can_propel()`** (1716) | [V] |
 | `crafting_state` / `station_state` | 🟢 | ← stations power channel (1353) → `_on_craft_completed` (materials/inventory) | [V] |
 | `fire_suppression_state` | 🟢 | **Authoritative fire hazard (M7-B / ADR-0041).** ← live ignition as a *symptom of damage*: a damaged mapped ship system + oxygen re-ignites a compartment each tick; plus electrical-arc cascade and deterministic spread to adjacent compartments. → real teeth: drains `vitals_state.health` while the player stands in a burning zone (`fire_health_drain`) AND degrades the burning compartment's ship system via `ship_systems_manager.damage_system()`. Three extinguish paths: manual `FireSuppressionPoint` (consumes `ExtinguisherState` charge, refilled at a powered `ExtinguisherRechargePort`), powered auto-suppression, and breach/vacuum vent. `fire_state` (the old timer hazard) is **deleted**. | [V] |
-| ~~`shield_state`~~ | cut | **Removed by M7-A** — model and tuning deleted; orphaned power channel (`power → shield allocation slot`) flagged as follow-up cleanup. | [V] |
+| ~~`shield_state`~~ | cut | **Removed by M7-A** — model and tuning deleted; orphaned power channel (`power → shield allocation slot`) **cleaned up** (removed from `DEFAULT_SUBSYSTEM_ORDER`, `power_budget_tables.json`, and smoke). 18-unit budget slot reclaimed. | [V] |
 | `life_support_expanded_state` | 🟢 | ← power + hull `breach_count` (1342) → `get_health_drain_per_second()` → drains `vitals_state.health` while aboard (coordinator M7-A wiring); drain is zero while away on a derelict. **Closed-loop by M7-A.** | [V] |
 | `hull_integrity_state` | 🟡 | **sink** 🟢 breach_count → life-support drain → vitals; sealing mechanism mechanically proven (BreachSealPoint channel + `hull_sealant` consumption); `hull_sealant` is not yet a defined or obtainable item (no loot/craft/starting-inventory path) — player-facing loop completion deferred. **source** 🟡 live damage source is config-only `#4` (initial breach set at load via `hull_compartments.json`); sources `#1–3` (combat / hazard / pressure) deferred. | [V] |
 | `sustenance_state` | 🔴 | ← power + hydroponics/synth/water summaries (1364) → **only `get_status_lines()` (4064); does not feed player hunger/thirst** | [P] |
@@ -186,7 +186,7 @@ item→player-effect loop. Content: medicine/stimulant/ammo definitions exist.
 `tooltip_presenter`, hotbar/panels — all driven by `menu_coordinator`. UI is inherently an
 *output sink*; "hollow output" doesn't apply. **Gap:** the **inputs feeding the HUD are only
 as real as the systems behind them** — e.g. the ship-systems panel faithfully renders the
-hollow shield/sustenance numbers from M7. Fixing M7 makes the HUD meaningful. [?]
+hollow sustenance numbers from M7. Fixing M7 makes the HUD meaningful. [?]
 
 ### M8 / M12 · Procgen expansion & world variety — 🟢 wired (lifeboat PR #36, derelicts PR #38)
 
@@ -264,8 +264,7 @@ to close a loop." Ordered by how much each breaks *the game functioning as a who
    loop completion is deferred. Sources #1–3 (combat hits, hazard cascades, deep-dive
    pressure) remain deferred — `damage_compartment()` seam is future-proof but not wired to live
    events. *(M7, Resolved by M7-A)*
-3. **✅ RESOLVED (M7-A) — `shield_state` cut.** Model, tuning, and power-channel allocation
-   removed. The orphaned power slot is flagged for cleanup but does not block gameplay. *(M7)*
+3. **✅ RESOLVED (M7-A + cleanup) — `shield_state` cut and orphaned power slot removed.** Model, tuning, and power-channel allocation all removed. `shields` channel deleted from `DEFAULT_SUBSYSTEM_ORDER`, `power_budget_tables.json`, and the power-grid smoke; 18-unit budget slot reclaimed. *(M7)*
 4. **✅ RESOLVED — food eat→vitals loop closed (+ dead duplicate removed).** *Corrected framing:*
    production already worked (the kitchen crafting station makes `cooked_meal`); the real break was
    that **eating food was a no-op** (food items have `hunger_restore` but no `effects` array, so the

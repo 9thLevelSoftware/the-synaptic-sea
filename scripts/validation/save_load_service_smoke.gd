@@ -93,6 +93,7 @@ func _initialize() -> void:
 	original.spoilage_summary = _make_spoilage_summary_for_smoke()
 	original.hydroponics_summary = _make_hydroponics_summary_for_smoke()
 	original.synthesizer_summary = _make_synthesizer_summary_for_smoke()
+	original.water_recycler_summary = _make_water_recycler_summary_for_smoke()
 	original.consumable_summary = {"hotbar_slots": ["bandage_kit", "focus_ampoule", "pistol_ammo_box"], "last_item_id": "flare", "total_uses": 4}
 	original.medicine_summary = {"last_item_id": "bandage_kit", "last_cured_statuses": ["radiation_sickness"], "last_results": []}
 	original.stimulant_summary = {"active_stims": [{"item_id": "focus_ampoule", "remaining": 12.0, "base_duration": 20.0, "effects": ["stim_focus"], "withdrawal_effects": ["withdrawal_shakes"]}], "last_used_item": "focus_ampoule"}
@@ -143,8 +144,8 @@ func _initialize() -> void:
 	if loaded.current_objective_sequence != original.current_objective_sequence:
 		_fail("current_objective_sequence mismatch")
 		return
-	if loaded.get_summary_count() != 26:
-		_fail("summary_count=%d expected 26" % loaded.get_summary_count())
+	if loaded.get_summary_count() != 27:
+		_fail("summary_count=%d expected 27" % loaded.get_summary_count())
 		return
 	if not loaded.ship_systems_summary.has("systems") or not loaded.ship_systems_summary.has("system_order"):
 		_fail("ship_systems_summary missing manager keys after round-trip")
@@ -206,6 +207,9 @@ func _initialize() -> void:
 	if not _dicts_equal(loaded.material_summary, original.material_summary):
 		_fail("material_summary mismatch")
 		return
+	if not _dicts_equal(loaded.water_recycler_summary, original.water_recycler_summary):
+		_fail("water_recycler_summary mismatch")
+		return
 
 	# Version mismatch rejection: write a snapshot with the wrong slice_version
 	# and confirm load returns null instead of accepting it.
@@ -226,6 +230,7 @@ func _initialize() -> void:
 	bad.spoilage_summary = original.spoilage_summary
 	bad.hydroponics_summary = original.hydroponics_summary
 	bad.synthesizer_summary = original.synthesizer_summary
+	bad.water_recycler_summary = original.water_recycler_summary
 	bad.consumable_summary = original.consumable_summary
 	bad.medicine_summary = original.medicine_summary
 	bad.stimulant_summary = original.stimulant_summary
@@ -250,7 +255,7 @@ func _initialize() -> void:
 		_fail("delete_current_run did not remove the file")
 		return
 
-	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=26")
+	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=27")
 	quit(0)
 
 func _make_spoilage_summary_for_smoke() -> Dictionary:
@@ -299,6 +304,19 @@ func _make_synthesizer_summary_for_smoke() -> Dictionary:
 	ss.start_synthesis({"items": {"hydroponic_greens": 4, "purified_water": 2}}, 1, 10.0)
 	ss.tick(7.5)
 	return ss.get_summary()
+
+func _make_water_recycler_summary_for_smoke() -> Dictionary:
+	var wr = load("res://scripts/systems/water_recycler_state.gd").new()
+	wr.configure({
+		"input_item_id": "contaminated_water",
+		"output_item_id": "purified_water",
+		"conversion_ratio": 1.0,
+		"recycle_time_seconds": 30.0,
+		"power_cost": 5.0,
+	})
+	wr.load_input("contaminated_water", 3, 10.0)
+	wr.tick(12.0)
+	return wr.get_summary()
 
 func _make_audio_summary_for_smoke() -> Dictionary:
 	# REQ-AU-010: smoke-only round-trip dict that exercises every

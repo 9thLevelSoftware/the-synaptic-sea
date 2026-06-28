@@ -153,7 +153,7 @@ func _use_once(item_id: String, category: String, definition: Dictionary, invent
 			# Food items carry hunger_restore/thirst_restore/sanity_restore (not an effects
 			# array), so without this, eating food was a no-op. Routed through FoodState so the
 			# spoilage multiplier is honoured (FRESH baseline until per-stack stage is threaded).
-			var restored: Dictionary = _apply_food_restores(definition, pipeline_context)
+			var restored: Dictionary = _apply_food_restores(item_id, definition, pipeline_context)
 			inventory_state.remove_item(item_id, 1)
 			return {
 				"ok": true, "item_id": item_id, "category": category,
@@ -164,11 +164,23 @@ func _use_once(item_id: String, category: String, definition: Dictionary, invent
 	return {"ok": false, "reason": "unsupported_category", "category": category}
 
 ## REQ-FC: applies a food/drink definition's spoilage-scaled restores to the live
-## vitals_state / sanity_state in the pipeline context. Reuses FoodState so the food
-## pillar runs through one model. Returns the applied {hunger, thirst, sanity} amounts.
-func _apply_food_restores(definition: Dictionary, pipeline_context: Dictionary) -> Dictionary:
+## vitals_state / sanity_state in the pipeline context. Uses per-item tracked spoilage
+## stage from spoilage_state when available (threads the stale/rotten multiplier into
+## the live eat path). Falls back to FRESH stage when the item has no tracked entry or
+## spoilage_state is absent in the context.
+## Returns the applied {hunger, thirst, sanity} amounts.
+func _apply_food_restores(item_id: String, definition: Dictionary, pipeline_context: Dictionary) -> Dictionary:
+	# Always configure from the item definition so base restore values are correct.
 	var food = FoodStateScript.new()
 	food.configure(definition)
+	# Override the stage from the per-item tracked spoilage entry if available.
+	# This threads stale/rotten multipliers into the eat path without losing the
+	# definition's base hunger/thirst/sanity values.
+	var spoilage_state = pipeline_context.get("spoilage_state", null)
+	if spoilage_state != null and spoilage_state.has_method("get_food"):
+		var tracked = spoilage_state.get_food(item_id)
+		if tracked != null:
+			food.stage = tracked.stage
 	var r: Dictionary = food.get_effective_restores()
 	var hunger: float = float(r.get("hunger", 0.0))
 	var thirst: float = float(r.get("thirst", 0.0))

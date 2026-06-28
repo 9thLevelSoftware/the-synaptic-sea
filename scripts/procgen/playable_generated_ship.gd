@@ -364,6 +364,10 @@ var status_effects_state  # StatusEffectsState
 # spatial AudioStreamPlayer3D the manager spawns.
 var audio_manager: Node
 var audio_root: Node3D
+# REQ-AU-001: edge-detection flag for the vitals_critical -> UI_VITALS_LOW
+# one-shot emit. Set to false so the first transition into critical fires
+# the alert; reset to false when vitals recover.
+var _prev_vitals_critical: bool = false
 var arc_root: Node3D
 var arc_zone_node: StaticBody3D
 var arc_zone_label: Label3D
@@ -1794,6 +1798,9 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 			# so the player is never physically stranded undocked.
 			push_error("PlayableGeneratedShip: travel dock failed (%s) — re-docking piloted ship to home" % str(dock_res.get("reason", "?")))
 			_dock_piloted_to(home_ship)
+		else:
+			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+				audio_manager.play_sfx(AudioEventSeamScript.SFX_DOCK_LAND)
 		_apply_player_carry(carry)
 		_reposition_subtree(child_carry)
 	_spawn_dock_barrier(inst)
@@ -2957,6 +2964,21 @@ func _on_craft_started(station_kind: String, recipe_id: String) -> void:
 ## ADR-0038: a global craft (station or field) finished. Collects the product and deposits
 ## it into the player inventory, then refreshes HUD + encumbrance. Idempotent: a no-op when
 ## finish_craft() returns empty.
+## REQ-FC (Codex PR #43): register a newly acquired food/drink item with the spoilage
+## tracker so it ages from acquisition. Crafted/looted food previously only hit
+## inventory_state and was never tracked, so the eat-time spoilage multiplier always fell
+## back to FRESH in real play. Idempotent: skips items already tracked or not food/drink.
+func _register_food_for_spoilage(item_id: String) -> void:
+	if spoilage_state == null or item_id.is_empty() or spoilage_state.has_food(item_id):
+		return
+	var defs: Dictionary = ItemDefsScript.load_definitions()
+	var definition: Variant = defs.get(item_id, null)
+	if not (definition is Dictionary):
+		return
+	var category: String = str((definition as Dictionary).get("category", ""))
+	if category == "food" or category == "drink":
+		spoilage_state.add_food(item_id, definition as Dictionary)
+
 func _on_craft_completed() -> void:
 	if crafting_state == null:
 		return
@@ -2972,6 +2994,7 @@ func _on_craft_completed() -> void:
 		var added: int = inventory_state.add_item(item_id, qty)
 		if added < qty:
 			print("CRAFT OVERFLOW item=%s lost=%d reason=stack_full" % [item_id, qty - added])
+		_register_food_for_spoilage(item_id)
 	_refresh_inventory_hud()
 	_recompute_player_encumbrance()
 	print("CRAFT COMPLETED item=%s qty=%d quality=%s" % [
@@ -2990,6 +3013,7 @@ func _on_field_craft_completed() -> void:
 		var added: int = inventory_state.add_item(item_id, qty)
 		if added < qty:
 			print("FIELD CRAFT OVERFLOW item=%s lost=%d reason=stack_full" % [item_id, qty - added])
+		_register_food_for_spoilage(item_id)
 	_refresh_inventory_hud()
 	_recompute_player_encumbrance()
 	print("FIELD CRAFT COMPLETED item=%s qty=%d quality=%s" % [
@@ -3144,7 +3168,10 @@ func _on_loot_container_searched(container_id: String, granted: Array) -> void:
 	# Auto-equip granted containers into empty slots (Phase-7 deferral: no equip UI yet).
 	for entry in granted:
 		var gid: String = str(entry.get("item_id", ""))
-		if gid != "" and equipment_state != null and equipment_state.can_equip(gid):
+		if gid == "":
+			continue
+		_register_food_for_spoilage(gid)
+		if equipment_state != null and equipment_state.can_equip(gid):
 			_equip_from_inventory(gid, true)
 	_recompute_player_encumbrance()
 	print("LOOT CONTAINER SEARCHED marker=%s container=%s granted=%d" % [
@@ -3172,6 +3199,7 @@ func _on_derelict_interactable_completed(interaction_id: String, objective_id: S
 		var seed_source: String = "%s:%s" % [String(current_ship.marker_id), objective_id]
 		var rolled: Array = LootDistributionScript.roll(_salvage_loot_tables[objective_id], seed_source, _loot_tables, {
 			"biome_id": _resolve_current_loot_biome_id(),
+			"loot_quality_modifier": _resolve_current_loot_quality_modifier(),
 			"depth": _resolve_current_loot_depth(),
 			"condition": _resolve_current_loot_condition(),
 			"container_kind": "salvage_objective",
@@ -3510,6 +3538,8 @@ func _freeze_player_for_panel() -> void:
 		player.set_process_unhandled_input(false)
 
 func _on_inventory_panel_closed() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_INVENTORY_CLOSE)
 	if player != null:
 		player.set_physics_process(true)
 		player.set_process_input(true)
@@ -3531,6 +3561,8 @@ func _open_inventory_self() -> void:
 	if not is_instance_valid(inventory_panel) or inventory_state == null:
 		return
 	inventory_panel.open_self(inventory_state, equipment_state)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_INVENTORY_OPEN)
 	if is_instance_valid(menu_coordinator):
 		menu_coordinator.trigger_tutorial("inventory_opened", "any")
 	_freeze_player_for_panel()
@@ -3672,8 +3704,8 @@ func _refresh_weapon_hotbar() -> void:
 	var weapon_id: String = _equipped_primary_weapon_id()
 	if weapon_id.is_empty():
 		_last_weapon_hotbar_text = "Weapon: unarmed | Threat: %.2f | Hostiles: %d" % [
-			threat_manager.awareness_indicator if threat_manager != null else 0.0,
-			threat_manager.get_active_threat_count() if threat_manager != null else 0,
+			threat_manager.awareness_indicator if is_instance_valid(threat_manager) else 0.0,
+			threat_manager.get_active_threat_count() if is_instance_valid(threat_manager) else 0,
 		]
 		hotbar_panel.set_hotbar_text(_last_weapon_hotbar_text)
 		return
@@ -3683,12 +3715,12 @@ func _refresh_weapon_hotbar() -> void:
 	if not ammo_item_id.is_empty() and inventory_state != null:
 		ammo_text = "%s=%d" % [ammo_item_id, inventory_state.get_quantity(ammo_item_id)]
 	var combat_text: String = "idle"
-	if threat_manager != null:
+	if is_instance_valid(threat_manager):
 		combat_text = "combat" if threat_manager.has_combat_engagement() else "stealth"
 	_last_weapon_hotbar_text = "%s | %s | Threat %.2f | %s" % [
 		weapon_name,
 		ammo_text,
-		threat_manager.awareness_indicator if threat_manager != null else 0.0,
+		threat_manager.awareness_indicator if is_instance_valid(threat_manager) else 0.0,
 		combat_text,
 	]
 	hotbar_panel.set_hotbar_text(_last_weapon_hotbar_text)
@@ -3736,6 +3768,7 @@ func _consumable_pipeline_context() -> Dictionary:
 		"radiation_state": radiation_state,
 		"body_temperature_state": body_temperature_state,
 		"status_effects_state": status_effects_state,
+		"spoilage_state": spoilage_state,
 	}
 
 func _get_consumable_slot_labels() -> Array:
@@ -3774,6 +3807,8 @@ func _use_consumable_item(item_id: String, use_all: bool = false) -> Dictionary:
 		return {"ok": false, "reason": "consumable_pipeline_missing"}
 	var result: Dictionary = consumable_state.use_item(item_id, inventory_state, _consumable_pipeline_context(), use_all)
 	if bool(result.get("ok", false)):
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 		_ensure_consumable_hotbar_assignments()
 		_recompute_player_encumbrance()
 		_refresh_oxygen_state(false, 0.0)
@@ -4330,6 +4365,8 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 	# persist the just-completed sequence and a load would put the
 	# player back on the same objective they just finished.
 	current_objective_sequence += 1
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_OBJECTIVE_ADVANCE)
 	_auto_save_current_run()
 	# NOTE: we deliberately do NOT force a rotating autosave here. The checkpoint
 	# is already persisted to current_run.json above (the REQ-012 resume point), and
@@ -4556,6 +4593,12 @@ func _process(delta: float) -> void:
 		# Timed autosave still advances on a derelict — a long boarding run is
 		# exactly the data-loss case it protects (the checkpoint save also runs away).
 		_tick_autosave_policy(delta)
+		# REQ-AU-001 (Codex PR #43): refresh + tick audio on the derelict path too, else
+		# COMBAT music / engagement flags go stale during actual away-from-start combat
+		# (this branch returns before the home-path audio tick below).
+		if is_instance_valid(audio_manager) and audio_manager.has_method("tick"):
+			audio_manager.tick(delta)
+			_refresh_audio_state(false, delta)
 		return
 	if not playable_started or slice_complete:
 		return
@@ -4635,7 +4678,7 @@ func _process(delta: float) -> void:
 	# ambient crossfade, music layer crossfade, sfx cooldowns + captions,
 	# and the meta-event scheduler. Tick before any HUD caption drain so
 	# the audio summary the HUD reads is at most one frame stale.
-	if audio_manager != null and audio_manager.has_method("tick"):
+	if is_instance_valid(audio_manager) and audio_manager.has_method("tick"):
 		audio_manager.tick(delta)
 		_refresh_audio_state(false, delta)
 
@@ -5204,17 +5247,39 @@ func _refresh_audio_state(force_initial: bool, _delta_seconds: float = 0.0) -> v
 		hazard_active = true
 	if electrical_arc_state != null and bool(electrical_arc_state.is_passability_blocked()):
 		hazard_active = true
-	# vitals_critical: derived from vitals_model oxygen <= 0 OR hp below
-	# critical. vitals_model is optional in the playable scene; default
-	# to false when missing.
+	# vitals_critical: derived from vitals_model oxygen <= 0 OR health below 25%.
+	# vitals_model is optional in the playable scene; default to false when missing.
+	# NOTE: PlayerVitalsModel exposes get_vitals_summary() (not get_summary()); the
+	# health key is "health" (0-100) and the HP threshold is 25 out of 100.
 	var vitals_critical: bool = false
-	if vitals_model != null and vitals_model.has_method("get_summary"):
-		var vs: Dictionary = vitals_model.get_summary()
+	if vitals_model != null and vitals_model.has_method("get_vitals_summary"):
+		var vs: Dictionary = vitals_model.get_vitals_summary()
 		if float(vs.get("oxygen", 1.0)) <= 0.0:
 			vitals_critical = true
-		elif float(vs.get("hp", 1.0)) < 0.25:
+		elif float(vs.get("health", 100.0)) < 25.0:
 			vitals_critical = true
-	audio_manager.update_music_flags(false, hazard_active, vitals_critical)
+	# REQ-AU-001: pass the live combat engagement flag so COMBAT music is
+	# reachable when a threat is in an engaged/aware state.
+	var engagement: bool = false
+	if is_instance_valid(threat_manager) and threat_manager.has_method("has_combat_engagement"):
+		engagement = bool(threat_manager.has_combat_engagement())
+	audio_manager.update_music_flags(engagement, hazard_active, vitals_critical)
+	# REQ-AU-001: emit hazard-coupled SFX through the router (cooldown-gated
+	# so a burning / arcing state does not flood the bus every frame).
+	if audio_manager.has_method("play_sfx"):
+		# Fire crackle — any burning compartment present.
+		if fire_suppression_state != null and not fire_suppression_state.get_burning_compartments().is_empty():
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_FIRE_CRACKLE)
+		# Arc zap — arcing phase active.
+		if electrical_arc_state != null and electrical_arc_state.phase == ElectricalArcState.Phase.ARCING:
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_ARC_ZAP)
+		# Suit breath — audible when oxygen is critically low or HP is critical.
+		if vitals_critical:
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_SUIT_BREATH)
+		# Vitals-low UI alert — emit exactly once per rising edge into critical.
+		if vitals_critical and not _prev_vitals_critical:
+			audio_manager.play_sfx(AudioEventSeamScript.UI_VITALS_LOW)
+	_prev_vitals_critical = vitals_critical
 	# Attach the AudioListener to the player when a player anchor exists.
 	if player != null and is_instance_valid(player) and player is Node3D:
 		audio_manager.attach_listener(player as Node3D)
@@ -5568,7 +5633,7 @@ func _build_run_snapshot() -> RunSnapshot:
 			snapshot.crafting_summary["field_crafting"] = field_crafting_state.get_summary().get("field_crafting", {})
 	if material_state != null:
 		snapshot.material_summary = material_state.get_summary()
-	if threat_manager != null:
+	if is_instance_valid(threat_manager):
 		snapshot.inventory_summary["combat_hotbar_text"] = _last_weapon_hotbar_text
 		snapshot.inventory_summary["threat_summary"] = threat_manager.get_summary()
 	# M7-B Task 7: the old timer FireState is retired. Authoritative fire state
@@ -5583,7 +5648,7 @@ func _build_run_snapshot() -> RunSnapshot:
 		snapshot.player_progression_summary = player_progression.get_summary()
 	if is_instance_valid(menu_coordinator):
 		snapshot.settings_summary = menu_coordinator.get_settings_summary()
-	if audio_manager != null:
+	if is_instance_valid(audio_manager):
 		snapshot.audio_summary = audio_manager.get_summary()
 	# REQ-SV: capture survival vitals summaries.
 	if vitals_state != null:
@@ -5603,6 +5668,8 @@ func _build_run_snapshot() -> RunSnapshot:
 		snapshot.hydroponics_summary = hydroponics_state.get_summary()
 	if synthesizer_state != null:
 		snapshot.synthesizer_summary = synthesizer_state.get_summary()
+	if water_recycler_state != null:
+		snapshot.water_recycler_summary = water_recycler_state.get_summary()
 	if consumable_state != null:
 		snapshot.consumable_summary = consumable_state.get_summary()
 	if medicine_state != null:
@@ -5744,6 +5811,8 @@ func request_save() -> bool:
 		return false
 	var result: bool = save_load_service.save_world(ws)
 	if result:
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_SAVE)
 		print("PLAYABLE SHIP SAVED location=%s sequence=%d" % [ws.current_location, current_objective_sequence])
 		if is_instance_valid(menu_coordinator):
 			menu_coordinator.trigger_tutorial("run_saved", "any")
@@ -5777,8 +5846,11 @@ func request_load() -> bool:
 		push_warning("PlayableGeneratedShip: no compatible world save to load")
 		return false
 	var loaded: bool = _apply_world_snapshot(ws)
-	if loaded and is_instance_valid(menu_coordinator):
-		menu_coordinator.set_load_available(true)
+	if loaded:
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_LOAD)
+		if is_instance_valid(menu_coordinator):
+			menu_coordinator.set_load_available(true)
 	return loaded
 
 ## Reconstructs the slice through the normal load path, then applies
@@ -5859,7 +5931,7 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		inventory_state.apply_summary(snapshot.inventory_summary)
 		_last_weapon_hotbar_text = str(snapshot.inventory_summary.get("combat_hotbar_text", _last_weapon_hotbar_text))
 		var threat_summary: Variant = snapshot.inventory_summary.get("threat_summary", {})
-		if threat_manager != null and threat_summary is Dictionary and not (threat_summary as Dictionary).is_empty():
+		if is_instance_valid(threat_manager) and threat_summary is Dictionary and not (threat_summary as Dictionary).is_empty():
 			threat_manager.apply_summary(threat_summary as Dictionary)
 			_sync_current_ship_combat_summary()
 	# M7-B Task 7: authoritative fire is restored via the ship_systems_summary
@@ -5882,7 +5954,7 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	# REQ-AU-010: re-apply the audio summary to the AudioManager so save/load
 	# restores per-bus volume, ambient role, sfx router cooldowns, music
 	# state, spatial resolver config, and meta-event schedule.
-	if audio_manager != null and not snapshot.audio_summary.is_empty():
+	if is_instance_valid(audio_manager) and not snapshot.audio_summary.is_empty():
 		audio_manager.apply_summary(snapshot.audio_summary)
 	# REQ-SV: restore survival vitals summaries.
 	if vitals_state != null and not snapshot.vitals_summary.is_empty():
@@ -5902,6 +5974,8 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		hydroponics_state.apply_summary(snapshot.hydroponics_summary)
 	if synthesizer_state != null and not snapshot.synthesizer_summary.is_empty():
 		synthesizer_state.apply_summary(snapshot.synthesizer_summary)
+	if water_recycler_state != null and not snapshot.water_recycler_summary.is_empty():
+		water_recycler_state.apply_summary(snapshot.water_recycler_summary)
 	if consumable_state != null and not snapshot.consumable_summary.is_empty():
 		consumable_state.apply_summary(snapshot.consumable_summary)
 	if medicine_state != null and not snapshot.medicine_summary.is_empty():
@@ -6313,12 +6387,35 @@ func _find_ship_by_id_or_marker(key: String):
 func _build_loot_context(spec: Dictionary) -> Dictionary:
 	return {
 		"biome_id": _resolve_current_loot_biome_id(),
+		"loot_quality_modifier": _resolve_current_loot_quality_modifier(),
 		"depth": _resolve_current_loot_depth(),
 		"condition": _resolve_current_loot_condition(),
 		"container_kind": str(spec.get("kind", spec.get("loot_table", "generic_crate"))),
 		"item_definitions": ItemDefsScript.load_definitions(),
 		"unique_state": unique_item_state,
 	}
+
+func _resolve_current_loot_quality_modifier() -> float:
+	var biome_id: String = _resolve_current_loot_biome_id()
+	if biome_id.is_empty():
+		return 1.0
+	var rel_path: String = "res://data/procgen/biomes/" + biome_id + ".json"
+	if FileAccess.file_exists(rel_path):
+		var text: String = FileAccess.get_file_as_string(rel_path)
+		var parsed: Variant = JSON.parse_string(text)
+		if parsed is Dictionary:
+			var biome_obj = BiomeProfileScript.from_dict(parsed as Dictionary)
+			if biome_obj != null:
+				return float(biome_obj.loot_quality_modifier)
+	# Fall back to the same built-in dict table used by ShipLayoutGenerator._resolve_biome()
+	match biome_id:
+		"breach_field":
+			return 1.1
+		"dead_fleet":
+			return 1.4
+		_:
+			return 1.0
+
 
 func _resolve_current_loot_biome_id() -> String:
 	var biome_ids: Array[String] = _loot_biome_ids()
@@ -6429,7 +6526,7 @@ func _postprocess_loot_grants(granted: Array, source_id: String) -> void:
 		int(first.get("quantity", 0)),
 		rarity_text,
 	]
-	if audio_manager != null and audio_manager.has_method("play_sfx"):
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
 
 ## Tear down every runtime child so a fresh load can rebuild the slice
