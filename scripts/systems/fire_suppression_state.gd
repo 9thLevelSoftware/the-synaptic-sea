@@ -225,25 +225,42 @@ func apply_summary(summary: Dictionary) -> bool:
 			changed = true
 	var adj: Variant = summary.get("adjacency", null)
 	if typeof(adj) == TYPE_DICTIONARY:
-		adjacency.clear()
+		var new_adj: Dictionary = {}
 		for cid in (adj as Dictionary):
 			var neighbours: Array[String] = []
 			var lst: Variant = (adj as Dictionary)[cid]
 			if typeof(lst) == TYPE_ARRAY:
 				for n in (lst as Array):
 					neighbours.append(str(n))
-			adjacency[str(cid)] = neighbours
-		changed = true
+			new_adj[str(cid)] = neighbours
+		if new_adj != adjacency:
+			adjacency = new_adj
+			changed = true
 	if summary.has("suppression_rate_per_second"):
-		suppression_rate_per_second = maxf(0.1, float(summary["suppression_rate_per_second"]))
+		var new_supp_rate: float = maxf(0.1, float(summary["suppression_rate_per_second"]))
+		if absf(new_supp_rate - suppression_rate_per_second) > 0.001:
+			suppression_rate_per_second = new_supp_rate
+			changed = true
 	if summary.has("power_threshold"):
-		power_threshold = clampf(float(summary["power_threshold"]), 0.05, 1.0)
+		var new_threshold: float = clampf(float(summary["power_threshold"]), 0.05, 1.0)
+		if absf(new_threshold - power_threshold) > 0.001:
+			power_threshold = new_threshold
+			changed = true
 	if summary.has("spread_rate_per_second"):
-		spread_rate_per_second = maxf(0.0, float(summary["spread_rate_per_second"]))
+		var new_spread_rate: float = maxf(0.0, float(summary["spread_rate_per_second"]))
+		if absf(new_spread_rate - spread_rate_per_second) > 0.001:
+			spread_rate_per_second = new_spread_rate
+			changed = true
 	if summary.has("ignition_rate_per_second"):
-		ignition_rate_per_second = maxf(0.0, float(summary["ignition_rate_per_second"]))
+		var new_ignition_rate: float = maxf(0.0, float(summary["ignition_rate_per_second"]))
+		if absf(new_ignition_rate - ignition_rate_per_second) > 0.001:
+			ignition_rate_per_second = new_ignition_rate
+			changed = true
 	if summary.has("cascade_rate_per_second"):
-		cascade_rate_per_second = maxf(0.0, float(summary["cascade_rate_per_second"]))
+		var new_cascade_rate: float = maxf(0.0, float(summary["cascade_rate_per_second"]))
+		if absf(new_cascade_rate - cascade_rate_per_second) > 0.001:
+			cascade_rate_per_second = new_cascade_rate
+			changed = true
 	return changed
 
 func get_status_lines() -> PackedStringArray:
