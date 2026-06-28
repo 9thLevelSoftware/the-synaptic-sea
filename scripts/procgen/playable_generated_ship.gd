@@ -17,7 +17,6 @@ const OxygenStateScript := preload("res://scripts/systems/oxygen_state.gd")
 const ObjectiveProgressStateScript := preload("res://scripts/systems/objective_progress_state.gd")
 const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd")
 const ToolPickupScript := preload("res://scripts/tools/tool_pickup.gd")
-const FireStateScript := preload("res://scripts/systems/fire_state.gd")
 const ElectricalArcStateScript := preload("res://scripts/systems/electrical_arc_state.gd")
 const AudioManagerScript := preload("res://scripts/audio/audio_manager.gd")
 const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.gd")
@@ -127,16 +126,11 @@ const BREACH_ZONE_VISUAL_COLOR_SEALED: Color = Color(0.18, 0.55, 1.0, 0.55)
 const BREACH_ZONE_FALLBACK_ID: String = "corridor_to_reactor"
 const BREACH_ZONE_PROXIMITY_RADIUS: float = 2.4
 const BREACH_ZONE_UNSAFE_LABEL_TEXT: String = "OXYGEN LOW"
-const FIRE_ZONE_FALLBACK_ID: String = "side_corridor_fire"
-# REQ-010: fire zone must live on a non-critical side room so it never
-# blocks the objective 3 -> 4 breach corridor or any other main objective
-# (objective 1 cargo loot is the only thing the fire can lock out).
+# Retained for the golden_fire_zone_source_marker_smoke source-of-truth check:
+# the golden layout's fire_zones marker `to_room` must equal this constant.
+# The authoritative M7-B fire model (FireSuppressionState) renders passable
+# per-compartment zones; this constant no longer drives runtime placement.
 const FIRE_ZONE_FALLBACK_ROOM_ID: String = "cargo_01"
-const FIRE_ZONE_COLLISION_SIZE: Vector3 = Vector3(2.6, 2.2, 1.6)
-const FIRE_ZONE_VISUAL_COLOR_CLEARED: Color = Color(0.18, 0.75, 1.0, 0.35)
-const FIRE_ZONE_VISUAL_COLOR_BURNING: Color = Color(1.0, 0.22, 0.18, 0.82)
-const FIRE_ZONE_LABEL_TEXT_CLEARED: String = "FIRE CLEARED"
-const FIRE_ZONE_LABEL_TEXT_BURNING: String = "FIRE BURNING — WAIT"
 # REQ-013: electrical-arc zone. Mirrors the fire-zone visual sizing so the
 # third hazard reads the same scale on screen; placement is template-
 # specific (no fallback room is injected per hazard_type_3.md).
@@ -245,6 +239,18 @@ var repair_point_root: Node3D = null
 var repair_points: Array = []
 # M7-A Task 5: breach seal points for breached hull compartments.
 var breach_seal_points: Array = []
+# M7-B Task 7: authoritative fire renders as PASSABLE per-compartment Area3D
+# zones (visual + lookup only; never a collision blocker). compartment_id -> Area3D.
+var fire_zone_nodes: Dictionary = {}
+const FIRE_COMPARTMENT_SYSTEM := {
+	"bridge": "navigation",
+	"engineering": "power",
+	"hydroponics": "life_support",
+	"cargo": "",
+}
+const OXYGEN_MIN_FOR_FIRE: float = 5.0
+const FIRE_HEALTH_DRAIN_PER_SECOND: float = 2.0
+const FIRE_SYSTEM_DAMAGE_PER_SECOND: float = 0.05
 # ADR-0038: crafting / salvage economy wired into the live run. These pure models are
 # coordinator-owned and ticked from _process; the station nodes are the player-reachable seam.
 var crafting_state                          # CraftingState
@@ -311,15 +317,6 @@ const JUNCTION_CALIBRATOR_FALLBACK_ROOM_ID: String = "galley_01"
 # completion handler can apply the calibrator to the right sequences
 # without re-walking the loader's objective specs.
 var sequence_kinds: Dictionary = {}
-var fire_state: FireState
-var fire_root: Node3D
-var fire_zone_node: StaticBody3D
-var fire_zone_label: Label3D
-# Resolved room id for the fire zone: the `to_room` of the fire_zones
-# marker when one is present in the layout, otherwise the
-# FIRE_ZONE_FALLBACK_ROOM_ID constant. Empty when neither source supplied
-# a room id (the last-ditch player-spawn offset path).
-var fire_zone_resolved_room_id: String = ""
 # REQ-013: electrical-arc hazard runtime state. electrical_arc_state is
 # the pure model; arc_root owns the scene node; arc_zone_node is the
 # StaticBody3D whose collision is toggled; arc_zone_label is the
@@ -468,8 +465,6 @@ func _apply_world_label_scale() -> void:
 				_apply_pixel_size_to_label(child, 0.003)
 	if unsafe_room_marker != null:
 		_apply_pixel_size_to_label(unsafe_room_marker, 0.0035)
-	if fire_zone_label != null:
-		_apply_pixel_size_to_label(fire_zone_label, 0.0035)
 	if arc_zone_label != null:
 		_apply_pixel_size_to_label(arc_zone_label, 0.0035)
 
@@ -1124,10 +1119,6 @@ func _build_runtime_nodes() -> void:
 	tool_pickup_root = Node3D.new()
 	tool_pickup_root.name = "ToolPickupRoot"
 	add_child(tool_pickup_root)
-	fire_state = FireStateScript.new()
-	fire_root = Node3D.new()
-	fire_root.name = "FireRoot"
-	add_child(fire_root)
 	# REQ-013: electrical-arc runtime nodes. The model + scene root are
 	# always allocated so _process and _refresh_arc_state can be called
 	# unconditionally; the per-template `_build_arc_zone()` decides
@@ -1340,7 +1331,8 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 			"recycled_water": recycled_water,
 		})
 	if fire_suppression_state != null:
-		fire_suppression_state.tick(delta, {"powered_ratio": power_grid_state.get_allocation_ratio("stations")})
+		if fire_suppression_state.tick(delta, _build_fire_context()):
+			_refresh_fire_zones()
 	# ADR-0038: drive station power from the same "stations" channel, then advance the
 	# single active craft. Field crafting is unpowered, so it ticks regardless (and also in
 	# the _process away-branch for emergency crafts started before travel).
@@ -1799,6 +1791,9 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	_build_loot_containers()
 	_build_repair_points()
 	_build_breach_seal_points()
+	# M7-B Task 7: fresh derelict build — seed fires from damaged systems, render zones.
+	_seed_fires_from_damage()
+	_build_fire_zones()
 
 ## Captures the player's world pose relative to the piloted ship's scene_root so the
 ## player can be carried when the piloted ship is repositioned by a dock. Returns
@@ -2550,6 +2545,147 @@ func _on_breach_sealed(_compartment_id: String) -> void:
 	# breach_count. Hook for HUD/audio later.
 	pass
 
+# --- M7-B Task 7: authoritative compartment fire ----------------------------
+# The old timer-based FireState is retired. FireSuppressionState is the single
+# source of truth; the coordinator ticks it against a per-frame context and
+# renders the burning set as PASSABLE Area3D zones (the player can walk into a
+# fire). Tasks 8/9 add vitals/system teeth and recharge wiring on top of the
+# same context + lifecycle built here.
+
+## Builds the per-frame context the authoritative fire model ticks against.
+func _build_fire_context() -> Dictionary:
+	var breached: Array = []
+	if hull_integrity_state != null:
+		for cid in hull_integrity_state.compartments:
+			if bool((hull_integrity_state.compartments[cid] as Dictionary).get("breach_open", false)):
+				breached.append(str(cid))
+	var damaged: Array = []
+	if ship_systems_manager != null:
+		for cid in FIRE_COMPARTMENT_SYSTEM:
+			var sid: String = str(FIRE_COMPARTMENT_SYSTEM[cid])
+			if sid.is_empty():
+				continue
+			var sys = ship_systems_manager.get_system(sid)
+			if sys != null and not sys.is_self_functional():
+				damaged.append(cid)
+	var oxygen_present: bool = true
+	if life_support_expanded_state != null:
+		oxygen_present = life_support_expanded_state.oxygen_percent > OXYGEN_MIN_FOR_FIRE
+	var arc_arcing: bool = false
+	if electrical_arc_state != null:
+		arc_arcing = electrical_arc_state.phase == ElectricalArcState.Phase.ARCING
+	return {
+		"powered_ratio": power_grid_state.get_allocation_ratio("stations") if power_grid_state != null else 0.0,
+		"ship_oxygen_present": oxygen_present,
+		"breached_compartments": breached,
+		"damaged_compartments": damaged,
+		"arc_arcing": arc_arcing,
+	}
+
+## Seeds fires in compartments whose mapped system is already damaged at build
+## time, so a damaged ship presents fire immediately rather than only after the
+## ignition accumulator fills. Only called on a genuine fresh build, never on the
+## save-restore path (restored fires come from the applied summary).
+func _seed_fires_from_damage() -> void:
+	if fire_suppression_state == null:
+		return
+	var ctx := _build_fire_context()
+	var breached := {}
+	for c in ctx.get("breached_compartments", []):
+		breached[str(c)] = true
+	if not bool(ctx.get("ship_oxygen_present", true)):
+		return
+	for cid in ctx.get("damaged_compartments", []):
+		if not breached.has(str(cid)):
+			fire_suppression_state.ignite(str(cid), 1.0)
+
+func _build_fire_zones() -> void:
+	_clear_fire_zones()
+	if fire_suppression_state == null:
+		return
+	var burning: Array = fire_suppression_state.get_burning_compartments()
+	if burning.is_empty():
+		return
+	var positions: Array = _distributed_room_positions()
+	if positions.is_empty():
+		return
+	var idx: int = 0
+	for cid in burning:
+		var pos: Vector3 = positions[idx % positions.size()]
+		idx += 1
+		var zone := Area3D.new()
+		zone.name = "FireZone_%s" % str(cid)
+		# Passable: monitoring/monitorable off — these are visual + lookup nodes,
+		# NOT collision blockers. The player must be able to walk into a fire.
+		zone.monitoring = false
+		zone.monitorable = false
+		zone.set_meta("fire_compartment_id", str(cid))
+		zone.position = pos
+		var shape := CollisionShape3D.new()
+		var sphere := SphereShape3D.new()
+		sphere.radius = 2.0
+		shape.shape = sphere
+		zone.add_child(shape)
+		var visual := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(1.2, 1.2, 1.2)
+		visual.mesh = box
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.95, 0.3, 0.05, 0.65)
+		mat.emission_enabled = true
+		mat.emission = Color(1.0, 0.4, 0.1)
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		visual.material_override = mat
+		visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		zone.add_child(visual)
+		_attach_zone_to_active_ship(zone)
+		fire_zone_nodes[str(cid)] = zone
+
+func _attach_zone_to_active_ship(node: Node) -> void:
+	if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
+		current_ship.scene_root.add_child(node)
+	elif lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root):
+		lifeboat_ship.scene_root.add_child(node)
+	else:
+		repair_point_root.add_child(node)
+
+func _clear_fire_zones() -> void:
+	for cid in fire_zone_nodes:
+		var z = fire_zone_nodes[cid]
+		if is_instance_valid(z):
+			var parent = z.get_parent()
+			if parent != null and is_instance_valid(parent):
+				parent.remove_child(z)
+			z.queue_free()
+	fire_zone_nodes.clear()
+
+func _refresh_fire_zones() -> void:
+	# Rebuild only when the burning set differs from the rendered set.
+	var burning := {}
+	if fire_suppression_state != null:
+		for cid in fire_suppression_state.get_burning_compartments():
+			burning[str(cid)] = true
+	var rendered := {}
+	for cid in fire_zone_nodes:
+		rendered[str(cid)] = true
+	if JSON.stringify(burning.keys()) != JSON.stringify(rendered.keys()):
+		_build_fire_zones()
+
+# --- validation seams ---
+func get_burning_compartments_for_validation() -> Array:
+	return fire_suppression_state.get_burning_compartments() if fire_suppression_state != null else []
+
+func get_fire_zone_nodes_for_validation() -> Array:
+	return fire_zone_nodes.values()
+
+func force_ignite_compartment_for_validation(compartment_id: String, intensity: float = 1.0) -> bool:
+	if fire_suppression_state == null:
+		return false
+	var ok: bool = fire_suppression_state.ignite(compartment_id, intensity)
+	_refresh_fire_zones()
+	return ok
+
 ## ADR-0038: builds one player-reachable CraftingStation per curated kind on the home ship.
 ## Stations live on the home ship (not derelicts) and are parented under home_ship.scene_root
 ## so they inherit its transform and are freed with it. Idempotent: re-callable on reload.
@@ -3053,9 +3189,13 @@ func travel_home() -> bool:
 	_clear_loot_containers()
 	_clear_repair_points()
 	_clear_breach_seal_points()
+	_clear_fire_zones()
 	_build_loot_containers()
 	_build_repair_points()
 	_build_breach_seal_points()
+	# M7-B Task 7: returning home rebuilds interactables — re-seed/render fire.
+	_seed_fires_from_damage()
+	_build_fire_zones()
 	_build_crafting_stations()
 	if tracker != null and loader != null and loader.has_method("get_objective_specs_copy"):
 		# set_objectives resets the tracker's completed set; re-apply the home loop's
@@ -3521,9 +3661,8 @@ func _build_ui_room_payload() -> Dictionary:
 			var room_id: String = str((objective as Dictionary).get("room_id", ""))
 			if not room_id.is_empty():
 				room_set[room_id] = true
-	for room_id in [fire_zone_resolved_room_id, arc_zone_resolved_room_id]:
-		if not String(room_id).is_empty():
-			room_set[String(room_id)] = true
+	if not arc_zone_resolved_room_id.is_empty():
+		room_set[arc_zone_resolved_room_id] = true
 	var rooms: Array = room_set.keys()
 	rooms.sort()
 	for room_id in rooms:
@@ -3612,13 +3751,15 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_build_junction_calibrator_pickup()
 	_refresh_oxygen_state(true, 0.0)
 	_refresh_weapon_hotbar()
-	_build_fire_zone()
-	_refresh_fire_state(true)
 	_build_arc_zone()
 	_refresh_arc_state(true)
 	_build_loot_containers()
 	_build_repair_points()
 	_build_breach_seal_points()
+	# M7-B Task 7: genuine fresh build — seed fires from already-damaged systems,
+	# then render the burning set as passable zones.
+	_seed_fires_from_damage()
+	_build_fire_zones()
 	_build_crafting_stations()
 	tracker.set_objectives(loader.get_objective_specs_copy())
 	current_objective_sequence = 1
@@ -4256,9 +4397,9 @@ func _process(delta: float) -> void:
 		ship_systems_manager.advance(delta)
 	_recompute_expanded_ship_systems(delta)
 	_refresh_oxygen_state(false, delta)
-	if fire_state != null:
-		fire_state.tick(delta)
-		_refresh_fire_state(false)
+	# M7-B Task 7: the authoritative fire model is ticked inside
+	# _recompute_expanded_ship_systems(delta) above (with _build_fire_context()),
+	# which also refreshes the passable fire zones when the burning set changes.
 	# REQ-013: tick the electrical-arc model with the same per-frame
 	# delta so its phase / passability advance in lock-step with fire.
 	# electrical_arc_state.tick ignores the second arg (no per-frame
@@ -4639,218 +4780,8 @@ func apply_ui_settings_summary_for_validation(summary: Dictionary) -> bool:
 		return false
 	return menu_coordinator.apply_settings_summary(summary)
 
-# --- Hazard / FireState integration -----------------------------------------
-# Per the Gate 2 timed fire-zone feature spec, FireState cycles between
-# CLEARED and BURNING on fixed durations, toggles the fire-zone collision
-# segment, and updates a localized Label3D. The model is parallel to
-# OxygenState and never reaches into the scene tree. The fire zone is on a
-# side corridor (cargo_01 fallback, non-critical side room off the spine) and does NOT overlap the objective
-# 3 -> 4 breach corridor. Fire is independent of oxygen, route control,
-# objectives, and extraction; it does not deplete oxygen or any other
-# resource and cannot be disabled by the player in Gate 2.
-
-func _build_fire_zone() -> void:
-	if fire_root == null:
-		return
-	for child in fire_root.get_children():
-		fire_root.remove_child(child)
-		child.queue_free()
-	fire_zone_node = null
-	fire_zone_label = null
-	fire_zone_resolved_room_id = ""
-	var resolution: Dictionary = _resolve_fire_zone_world_position()
-	var world_position: Vector3 = resolution.get("position", Vector3.INF)
-	fire_zone_resolved_room_id = str(resolution.get("room_id", ""))
-	if fire_state == null:
-		fire_state = FireStateScript.new()
-	# Per ADR-0005 HazardStateContract: configure() takes a Dictionary so
-	# each hazard model unpacks the fields it cares about. FireState reads
-	# burn_duration / clear_duration plus the zone_ids array.
-	fire_state.configure({
-		"zone_ids": [FIRE_ZONE_FALLBACK_ID],
-		"burn_duration": FireStateScript.DEFAULT_BURN_DURATION,
-		"clear_duration": FireStateScript.DEFAULT_CLEAR_DURATION,
-	})
-	fire_zone_node = _create_fire_zone_node(world_position)
-	fire_root.add_child(fire_zone_node)
-	fire_zone_label = _create_fire_zone_label(world_position)
-	fire_root.add_child(fire_zone_label)
-
-func _resolve_fire_zone_world_position() -> Dictionary:
-	if loader != null and loader.has_method("get_fire_zone_markers"):
-		var markers: Array = loader.get_fire_zone_markers()
-		if markers.size() > 0 and markers[0] is Vector3:
-			var candidate: Vector3 = markers[0]
-			if candidate != Vector3.INF:
-				return {
-					"position": candidate,
-					"room_id": _resolved_marker_room_id(),
-				}
-	# Fallback: side corridor room center (must not be the objective 3 -> 4 corridor).
-	if loader != null and loader.has_method("get_room_center"):
-		var room_center: Vector3 = loader.get_room_center(FIRE_ZONE_FALLBACK_ROOM_ID)
-		if room_center != Vector3.INF:
-			return {
-				"position": room_center,
-				"room_id": FIRE_ZONE_FALLBACK_ROOM_ID,
-			}
-	# Last-ditch: player spawn + offset. No room id is known in this branch.
-	if player != null:
-		return {
-			"position": player.global_position + Vector3(6.0, 0.0, 0.0),
-			"room_id": "",
-		}
-	return {
-		"position": Vector3.ZERO,
-		"room_id": "",
-	}
-
-# Returns the `to_room` of the first fire_zones marker the loader exposes, or
-# "" if no marker is present. Used to attach a stable room id to the resolved
-# fire zone world position so validation can confirm marker-to-resolved-room
-# agreement without re-walking the loader's internal arrays.
-func _resolved_marker_room_id() -> String:
-	if loader == null or not (loader is Node):
-		return ""
-	var loader_node: Node = loader as Node
-	if not loader_node.has_method("get_fire_zone_specs"):
-		return ""
-	var specs_variant: Variant = loader_node.call("get_fire_zone_specs")
-	if typeof(specs_variant) != TYPE_ARRAY:
-		return ""
-	for spec_variant in (specs_variant as Array):
-		if typeof(spec_variant) != TYPE_DICTIONARY:
-			continue
-		var to_room: String = str((spec_variant as Dictionary).get("to_room", ""))
-		if not to_room.is_empty():
-			return to_room
-	return ""
-
-func _create_fire_zone_node(world_position: Vector3) -> StaticBody3D:
-	var zone: StaticBody3D = StaticBody3D.new()
-	zone.name = "FireZone_SideCorridor"
-	zone.position = world_position
-	zone.collision_layer = 1
-	zone.collision_mask = 1
-	zone.set_meta("fire_zone_id", FIRE_ZONE_FALLBACK_ID)
-	zone.set_meta("fire_zone_kind", "timed_fire")
-	zone.set_meta("fire_zone_phase", "CLEARED")
-	zone.set_meta("fire_zone_passability_blocked", false)
-	zone.set_meta("fire_zone_resolved_room_id", fire_zone_resolved_room_id)
-
-	var collision_shape: CollisionShape3D = CollisionShape3D.new()
-	collision_shape.name = "FireZoneCollisionShape3D"
-	var box_shape: BoxShape3D = BoxShape3D.new()
-	box_shape.size = FIRE_ZONE_COLLISION_SIZE
-	collision_shape.shape = box_shape
-	collision_shape.position = Vector3(0.0, FIRE_ZONE_COLLISION_SIZE.y * 0.5, 0.0)
-	zone.add_child(collision_shape)
-
-	var visual: MeshInstance3D = MeshInstance3D.new()
-	visual.name = "FireZoneVisual"
-	var box_mesh: BoxMesh = BoxMesh.new()
-	box_mesh.size = FIRE_ZONE_COLLISION_SIZE
-	visual.mesh = box_mesh
-	visual.position = collision_shape.position
-	visual.material_override = _make_fire_zone_material(false)
-	visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	zone.add_child(visual)
-	return zone
-
-func _make_fire_zone_material(is_burning: bool) -> StandardMaterial3D:
-	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.albedo_color = FIRE_ZONE_VISUAL_COLOR_BURNING if is_burning else FIRE_ZONE_VISUAL_COLOR_CLEARED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	return material
-
-func _create_fire_zone_label(world_position: Vector3) -> Label3D:
-	var label: Label3D = Label3D.new()
-	label.name = "FireZoneLabel"
-	label.text = FIRE_ZONE_LABEL_TEXT_CLEARED
-	label.position = world_position + Vector3(0.0, FIRE_ZONE_COLLISION_SIZE.y + 0.4, 0.0)
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.no_depth_test = true
-	label.fixed_size = true
-	# A11Y-P1-001: world label pixel_size flows through the single
-	# accessibility_settings seam. Default scale=1.0 keeps the prior
-	# 0.0035 value exactly; larger scales divide the pixel_size so the
-	# label renders larger on screen for the same world position.
-	label.pixel_size = accessibility_settings.scaled_world_pixel_size(0.0035)
-	label.modulate = FIRE_ZONE_VISUAL_COLOR_CLEARED
-	label.outline_size = 3
-	label.outline_modulate = Color.BLACK
-	return label
-
-func _refresh_fire_state(force_initial: bool) -> void:
-	if fire_state == null or fire_zone_node == null:
-		return
-	_apply_fire_zone_scene_state()
-
-func _apply_fire_zone_scene_state() -> void:
-	if fire_state == null or fire_zone_node == null:
-		return
-	var summary: Dictionary = fire_state.get_summary()
-	var burning: bool = bool(summary.get("burning", false))
-	var state_text: String = str(summary.get("state", "CLEARED"))
-	fire_zone_node.set_meta("fire_zone_phase", state_text)
-	fire_zone_node.set_meta("fire_zone_passability_blocked", burning)
-	_set_fire_zone_collision_enabled(fire_zone_node, burning)
-	_update_fire_zone_visual(fire_zone_node, burning)
-	if fire_zone_label != null:
-		fire_zone_label.text = FIRE_ZONE_LABEL_TEXT_BURNING if burning else FIRE_ZONE_LABEL_TEXT_CLEARED
-		fire_zone_label.modulate = FIRE_ZONE_VISUAL_COLOR_BURNING if burning else FIRE_ZONE_VISUAL_COLOR_CLEARED
-
-func _set_fire_zone_collision_enabled(zone: Node, enabled: bool) -> void:
-	for child in zone.get_children():
-		if child is CollisionShape3D:
-			(child as CollisionShape3D).disabled = not enabled
-
-func _update_fire_zone_visual(zone: Node, is_burning: bool) -> void:
-	for child in zone.get_children():
-		if child is MeshInstance3D and child.name == "FireZoneVisual":
-			var visual: MeshInstance3D = child as MeshInstance3D
-			visual.material_override = _make_fire_zone_material(is_burning)
-
-func get_fire_summary() -> Dictionary:
-	var summary: Dictionary = {}
-	if fire_state == null:
-		summary["state"] = "CLEARED"
-		summary["phase"] = 0
-		summary["time_in_state"] = 0.0
-		summary["cycle_duration"] = 0.0
-		summary["burning"] = false
-		summary["passability_blocked"] = false
-		summary["burn_duration"] = 0.0
-		summary["clear_duration"] = 0.0
-		summary["zone_ids"] = []
-		return summary
-	return fire_state.get_summary()
-
-func get_fire_zone_node() -> Node:
-	return fire_zone_node
-
-func get_fire_zone_resolved_room_id() -> String:
-	return fire_zone_resolved_room_id
-
-func get_fire_zone_collision_enabled_count() -> int:
-	if fire_zone_node == null:
-		return 0
-	for child in fire_zone_node.get_children():
-		if child is CollisionShape3D and not (child as CollisionShape3D).disabled:
-			return 1
-	return 0
-
-func teleport_player_to_fire_zone_for_validation() -> bool:
-	if player == null or fire_zone_node == null:
-		return false
-	player.teleport_to(fire_zone_node.global_position)
-	return true
-
 # --- Hazard / ElectricalArcState integration ----------------------------------
-# REQ-013: electrical-arc zone scene integration. Mirrors the
-# FireState integration above; the third hazard's pure model
+# REQ-013: electrical-arc zone scene integration. The third hazard's pure model
 # (ElectricalArcState) ticks from _process and toggles a localized
 # StaticBody3D / CollisionShape3D collision segment and a Label3D.
 # Placement is template-specific (no fallback room id is injected), so
@@ -5082,8 +5013,8 @@ func teleport_player_to_arc_zone_for_validation() -> bool:
 	player.teleport_to(arc_zone_node.global_position)
 	return true
 
-# REQ-AU-001..010: audio runtime refresh. Mirrors _refresh_fire_state /
-# _refresh_arc_state: the AudioManager owns the per-bus AudioStreamPlayer
+# REQ-AU-001..010: audio runtime refresh. Mirrors _refresh_arc_state:
+# the AudioManager owns the per-bus AudioStreamPlayer
 # pool and pushes volumes from its summaries; this method is the per-frame
 # seam that re-syncs the scene tree with the model's state. `force_initial`
 # is true on first build / save-reload to push the summary even when no
@@ -5097,7 +5028,7 @@ func _refresh_audio_state(force_initial: bool, _delta_seconds: float = 0.0) -> v
 	var hazard_active: bool = false
 	if oxygen_state != null and bool(oxygen_state.is_passability_blocked()):
 		hazard_active = true
-	if fire_state != null and bool(fire_state.is_passability_blocked()):
+	if fire_suppression_state != null and not fire_suppression_state.get_burning_compartments().is_empty():
 		hazard_active = true
 	if electrical_arc_state != null and bool(electrical_arc_state.is_passability_blocked()):
 		hazard_active = true
@@ -5468,8 +5399,10 @@ func _build_run_snapshot() -> RunSnapshot:
 	if threat_manager != null:
 		snapshot.inventory_summary["combat_hotbar_text"] = _last_weapon_hotbar_text
 		snapshot.inventory_summary["threat_summary"] = threat_manager.get_summary()
-	if fire_state != null:
-		snapshot.fire_summary = fire_state.get_summary()
+	# M7-B Task 7: the old timer FireState is retired. Authoritative fire state
+	# round-trips via fire_suppression_summary (see _expanded_ship_systems_summary
+	# / the ship_systems_summary restore path). The legacy snapshot.fire_summary
+	# field is left at its default for save-format back-compat.
 	if electrical_arc_state != null:
 		snapshot.electrical_arc_summary = electrical_arc_state.get_summary()
 	if objective_progress_state != null:
@@ -5755,9 +5688,10 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		if threat_manager != null and threat_summary is Dictionary and not (threat_summary as Dictionary).is_empty():
 			threat_manager.apply_summary(threat_summary as Dictionary)
 			_sync_current_ship_combat_summary()
-	if fire_state != null and not snapshot.fire_summary.is_empty():
-		fire_state.apply_summary(snapshot.fire_summary)
-		_refresh_fire_state(true)
+	# M7-B Task 7: authoritative fire is restored via the ship_systems_summary
+	# (fire_suppression_summary) applied above; the burning set is re-rendered by
+	# the _build_fire_zones() call on the restore build path. The legacy
+	# snapshot.fire_summary field is intentionally not read here.
 	# REQ-013: restore the electrical-arc summary alongside fire. The
 	# model's apply_summary rejects summaries whose hazard_kind does
 	# not match, so an older snapshot written before REQ-013 lands is
@@ -5821,6 +5755,9 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	# built before apply_summary healed already-repaired subcomponents).
 	_build_repair_points()
 	_build_breach_seal_points()
+	# M7-B Task 7: save-restore path — render the burning set from the applied
+	# fire_suppression_summary. Do NOT seed here (restored fires are authoritative).
+	_build_fire_zones()
 	_build_crafting_stations()
 	# Restore the saved objective sequence AFTER all model state has
 	# been applied so the subsequent _activate_current_objective() call
@@ -6419,10 +6356,7 @@ func _reset_runtime_for_reload() -> void:
 		for child in tool_pickup_root.get_children():
 			tool_pickup_root.remove_child(child)
 			child.queue_free()
-	if fire_root != null and is_instance_valid(fire_root):
-		for child in fire_root.get_children():
-			fire_root.remove_child(child)
-			child.queue_free()
+	_clear_fire_zones()
 	if arc_root != null and is_instance_valid(arc_root):
 		for child in arc_root.get_children():
 			arc_root.remove_child(child)
@@ -6501,12 +6435,11 @@ func _reset_runtime_for_reload() -> void:
 		})
 	if inventory_state != null:
 		inventory_state.reset()
-	if fire_state != null:
-		fire_state.configure({
-			"zone_ids": [],
-			"burn_duration": FireStateScript.DEFAULT_BURN_DURATION,
-			"clear_duration": FireStateScript.DEFAULT_CLEAR_DURATION,
-		})
+	# M7-B Task 7: reconfigure the authoritative fire model from tuning so a
+	# reload starts with no burning compartments (configure() clears active_fires).
+	# A reload-from-save then re-applies fire_suppression_summary over this.
+	if fire_suppression_state != null:
+		fire_suppression_state.configure(_load_json_dict(SHIP_SUBSYSTEM_TUNING_PATH).get("fire_suppression", {}))
 	if electrical_arc_state != null:
 		electrical_arc_state.configure({
 			"zone_ids": [],
@@ -6528,12 +6461,9 @@ func _reset_runtime_for_reload() -> void:
 		objective_progress_state.reset()
 	breach_zone_node = null
 	unsafe_room_marker = null
-	fire_zone_node = null
-	fire_zone_label = null
 	arc_zone_node = null
 	arc_zone_label = null
 	tool_pickup = null
-	fire_zone_resolved_room_id = ""
 	arc_zone_resolved_room_id = ""
 	# REQ-014: drop the second ToolPickup reference so a fresh load
 	# rebuilds it cleanly. The node itself is freed by the
