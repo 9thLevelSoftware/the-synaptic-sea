@@ -1359,8 +1359,9 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 			"breach_count": hull_integrity_state.get_breach_count(),
 			"recycled_water": recycled_water,
 		})
-	if fire_suppression_state != null:
-		if fire_suppression_state.tick(delta, _build_fire_context()):
+	var _afs_home = _active_fire_state()
+	if _afs_home != null:
+		if _afs_home.tick(delta, _build_fire_context()):
 			_refresh_fire_zones()
 		# M7-B Task 8: a burning compartment degrades the ship system housed there.
 		_apply_fire_system_damage(delta)
@@ -2649,37 +2650,35 @@ func _seed_fires_from_damage() -> void:
 ## in (0.0 if none). The player overlaps a fire when within the fire zone's radius
 ## (~2.0) of its world position.
 func _player_fire_intensity() -> float:
-	if player == null or fire_suppression_state == null:
+	if player == null or _active_fire_state() == null:
 		return 0.0
 	for cid in fire_zone_nodes:
 		var z = fire_zone_nodes[cid]
 		if not is_instance_valid(z) or not (z is Node3D):
 			continue
 		if (z as Node3D).global_position.distance_to(player.global_position) <= 2.0:
-			return fire_suppression_state.get_intensity(str(cid))
+			return _active_fire_state().get_intensity(str(cid))
 	return 0.0
 
 ## M7-B Task 8: applies fire degradation to the ship system housed in each burning
 ## compartment, scaled by fire intensity. Compartments with no mapped system are skipped.
 func _apply_fire_system_damage(delta: float) -> void:
-	if fire_suppression_state == null or ship_systems_manager == null:
+	var afs = _active_fire_state()
+	if afs == null or _active_systems_manager() == null:
 		return
-	for cid in fire_suppression_state.get_burning_compartments():
+	for cid in afs.get_burning_compartments():
 		var sid: String = str(FIRE_COMPARTMENT_SYSTEM.get(str(cid), ""))
 		if sid.is_empty():
 			continue
-		var intensity: float = fire_suppression_state.get_intensity(str(cid))
-		ship_systems_manager.damage_system(sid, FIRE_SYSTEM_DAMAGE_PER_SECOND * intensity * delta)
+		var intensity: float = afs.get_intensity(str(cid))
+		_active_systems_manager().damage_system(sid, FIRE_SYSTEM_DAMAGE_PER_SECOND * intensity * delta)
 
 func _build_fire_zones() -> void:
 	_clear_fire_zones()
-	# M7-B: fire is home/lifeboat-only for now. Still clear stale away-side nodes
-	# above, then skip building on a derelict (away-ship parity is a follow-up).
-	if away_from_start:
+	var afs = _active_fire_state()
+	if afs == null:
 		return
-	if fire_suppression_state == null:
-		return
-	var burning: Array = fire_suppression_state.get_burning_compartments()
+	var burning: Array = afs.get_burning_compartments()
 	if burning.is_empty():
 		return
 	# Codex P1: home fire zones parent under lifeboat_ship.scene_root (port-docked),
@@ -2777,8 +2776,9 @@ func _clear_fire_zones() -> void:
 func _refresh_fire_zones() -> void:
 	# Rebuild only when the burning set differs from the rendered set.
 	var burning := {}
-	if fire_suppression_state != null:
-		for cid in fire_suppression_state.get_burning_compartments():
+	var _afs_rfz = _active_fire_state()
+	if _afs_rfz != null:
+		for cid in _afs_rfz.get_burning_compartments():
 			burning[str(cid)] = true
 	var rendered := {}
 	for cid in fire_zone_nodes:
@@ -2799,13 +2799,10 @@ func _refresh_fire_zones() -> void:
 
 func _build_fire_suppression_points() -> void:
 	_clear_fire_suppression_points()
-	# M7-B: fire is home/lifeboat-only for now. Still clear stale away-side nodes
-	# above, then skip building on a derelict (away-ship parity is a follow-up).
-	if away_from_start:
+	var afs = _active_fire_state()
+	if afs == null:
 		return
-	if fire_suppression_state == null:
-		return
-	var burning: Array = fire_suppression_state.get_burning_compartments()
+	var burning: Array = afs.get_burning_compartments()
 	if burning.is_empty():
 		return
 	# Codex P1: home suppression points parent under lifeboat_ship.scene_root, so positions
@@ -2820,7 +2817,7 @@ func _build_fire_suppression_points() -> void:
 		var pos: Vector3 = positions[idx % positions.size()]
 		idx += 1
 		var fp = FireSuppressionPointScript.new()
-		fp.configure(str(cid), fire_suppression_state, extinguisher_state, inventory_state, player_progression, pos, 4.0, "fire_extinguisher", 1.8)
+		fp.configure(str(cid), afs, extinguisher_state, inventory_state, player_progression, pos, 4.0, "fire_extinguisher", 1.8)
 		if not fp.fire_extinguished.is_connected(_on_fire_extinguished):
 			fp.fire_extinguished.connect(_on_fire_extinguished)
 		_attach_zone_to_active_ship(fp)
@@ -2842,7 +2839,7 @@ func _on_fire_extinguished(_compartment_id: String) -> void:
 
 func _build_extinguisher_recharge_port() -> void:
 	_clear_extinguisher_recharge_port()
-	if extinguisher_state == null or away_from_start:
+	if extinguisher_state == null:
 		return
 	# Codex P1: the recharge port parents under lifeboat_ship.scene_root, so its position
 	# must be LIFEBOAT-LOCAL — matching repair/breach/fire builders.
@@ -2966,6 +2963,15 @@ func _active_systems_manager():
 	if away_from_start and current_ship != null and current_ship.systems_manager != null:
 		return current_ship.systems_manager
 	return ship_systems_manager
+
+## The fire model of the ship the player is currently aboard: the derelict's per-ship
+## FireSuppressionState when away, the coordinator's home model otherwise. Mirrors
+## _active_systems_manager(). The derelict instance is configured from tuning by
+## _seed_derelict_fire() / the restore path before use.
+func _active_fire_state():
+	if away_from_start and current_ship != null:
+		return current_ship.get_fire()
+	return fire_suppression_state
 
 ## Floor-cell world positions distributed across the active ship's rooms, for repair-point
 ## placement. Reuses the active loader's room/cell resolution where available.
