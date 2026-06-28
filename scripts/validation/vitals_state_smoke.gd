@@ -96,6 +96,14 @@ func _initialize() -> void:
 		_fail("missing thirst vision warning")
 		return
 
+	# M7-B: fire_health_drain channel adds to health drain.
+	var vf := VitalsStateScript.new()
+	vf.configure({"health": 50.0, "max_health": 100.0})
+	vf.tick(1.0, {"moving": false, "fire_health_drain": 4.0})
+	if absf(vf.health - 46.0) > 0.001:
+		_fail("fire_health_drain not applied (expected 46.0, got %.3f)" % vf.health)
+		return
+
 	print("VITALS STATE PASS health=%.1f stamina=%.1f hunger=%.1f thirst=%.1f" % [v.health, v.stamina, v.hunger, v.thirst])
 	quit(0)
 
