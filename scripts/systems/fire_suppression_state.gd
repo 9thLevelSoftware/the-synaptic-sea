@@ -5,6 +5,9 @@ class_name FireSuppressionState
 ## Fire is a SYMPTOM of unrepaired system damage: a compartment ignites only when its
 ## mapped system is damaged AND it has oxygen, and re-ignites until repaired or vented.
 ## Pure RefCounted; the coordinator renders passable fire-zone nodes from active_fires.
+## apply_summary() restores dynamic state (active_fires, spread/ignition/cascade progress,
+## suppressant) and arc_compartment; it assumes configure() has already established the
+## structural tunables (compartments, adjacency, rates).
 
 const DEFAULT_SUPPRESSANT_UNITS: float = 100.0
 const DEFAULT_SUPPRESSION_RATE: float = 25.0
@@ -16,6 +19,8 @@ const DEFAULT_ARC_COMPARTMENT: String = "engineering"
 const MIN_INTENSITY: float = 0.1
 const MAX_INTENSITY: float = 10.0
 # Powered suppression removes this fraction of intensity per second (rate * factor).
+# Effective powered-suppression rate is suppression_rate_per_second * SUPPRESSION_INTENSITY_FACTOR
+# intensity/sec (~1.0/s at defaults: 25.0 * 0.04), so the scaling is explicit, not a silent surprise.
 const SUPPRESSION_INTENSITY_FACTOR: float = 0.04
 const SUPPRESSANT_DRAIN_PER_SECOND: float = 0.5
 
@@ -71,6 +76,8 @@ func extinguish(compartment_id: String) -> bool:
 		return false
 	active_fires.erase(compartment_id)
 	spread_progress.erase(compartment_id)
+	for adj in _adjacent(compartment_id):
+		spread_progress.erase(adj)
 	return true
 
 func is_burning(compartment_id: String) -> bool:
@@ -100,6 +107,8 @@ func tick(delta: float, context: Dictionary) -> bool:
 		if not _has_oxygen(cid, ship_oxygen, breached):
 			active_fires.erase(cid)
 			spread_progress.erase(cid)
+			for adj in _adjacent(cid):
+				spread_progress.erase(adj)
 			changed = true
 
 	# 2. Powered auto-suppression.
@@ -109,6 +118,9 @@ func tick(delta: float, context: Dictionary) -> bool:
 			suppressant_units = maxf(0.0, suppressant_units - SUPPRESSANT_DRAIN_PER_SECOND * delta)
 			if reduced <= 0.0:
 				active_fires.erase(cid)
+				spread_progress.erase(cid)
+				for adj in _adjacent(cid):
+					spread_progress.erase(adj)
 			else:
 				active_fires[cid] = reduced
 			changed = true
@@ -129,7 +141,7 @@ func tick(delta: float, context: Dictionary) -> bool:
 				spread_progress[adj] = p
 	for adj in spread_ignites:
 		if not active_fires.has(adj):
-			active_fires[adj] = MIN_INTENSITY if MIN_INTENSITY > 1.0 else 1.0
+			active_fires[adj] = 1.0
 			changed = true
 
 	# 4. Ignition from unrepaired damage (re-ignites until repaired/vented).
@@ -180,15 +192,15 @@ func apply_summary(summary: Dictionary) -> bool:
 		return false
 	var changed: bool = false
 	var fires: Variant = summary.get("active_fires", null)
-	if typeof(fires) == TYPE_DICTIONARY and JSON.stringify(fires) != JSON.stringify(active_fires):
+	if typeof(fires) == TYPE_DICTIONARY and (fires as Dictionary) != active_fires:
 		active_fires = (fires as Dictionary).duplicate(true)
 		changed = true
 	var sp: Variant = summary.get("spread_progress", null)
-	if typeof(sp) == TYPE_DICTIONARY and JSON.stringify(sp) != JSON.stringify(spread_progress):
+	if typeof(sp) == TYPE_DICTIONARY and (sp as Dictionary) != spread_progress:
 		spread_progress = (sp as Dictionary).duplicate(true)
 		changed = true
 	var ip: Variant = summary.get("ignition_progress", null)
-	if typeof(ip) == TYPE_DICTIONARY and JSON.stringify(ip) != JSON.stringify(ignition_progress):
+	if typeof(ip) == TYPE_DICTIONARY and (ip as Dictionary) != ignition_progress:
 		ignition_progress = (ip as Dictionary).duplicate(true)
 		changed = true
 	var new_suppressant: float = float(summary.get("suppressant_units", suppressant_units))

@@ -69,6 +69,20 @@ func _initialize() -> void:
 	if spr.is_burning("cargo"):
 		_fail("fire spread into a vented compartment (cargo) — must not"); return
 
+	# stale spread guard (fix #1): extinguishing a source must clear the spread progress it built toward neighbors.
+	var stale := FireSuppressionState.new(); stale.configure(cfg)
+	stale.ignite("engineering", 1.0)
+	var ctx_stale := {"powered_ratio": 0.0, "ship_oxygen_present": true, "breached_compartments": [], "damaged_compartments": [], "arc_arcing": false}
+	for i in range(3):
+		stale.tick(0.5, ctx_stale)
+	if float(stale.spread_progress.get("bridge", 0.0)) <= 0.0:
+		_fail("spread progress toward bridge never accumulated — cannot test stale guard"); return
+	if stale.is_burning("bridge"):
+		_fail("bridge ignited too early — accumulate partial progress only"); return
+	stale.extinguish("engineering")
+	if float(stale.spread_progress.get("bridge", 0.0)) != 0.0:
+		_fail("stale spread_progress toward bridge survived extinguishing the source"); return
+
 	# re-ignition: damaged + oxygen re-ignites after extinguish; clearing the damage stops it.
 	var rei := FireSuppressionState.new(); rei.configure(cfg)
 	var ctx_dmg := {"powered_ratio": 0.0, "ship_oxygen_present": true, "breached_compartments": [], "damaged_compartments": ["engineering"], "arc_arcing": false}
