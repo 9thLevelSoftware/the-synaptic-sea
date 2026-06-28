@@ -73,6 +73,11 @@ var combat_summary: Dictionary = {}
 # persisted under "fire" only when a compartment is actually burning. Home fire stays
 # on the coordinator (fire_suppression_state); this is for boarded derelicts.
 var fire = null                          # FireSuppressionState | null
+# True once the coordinator has run its one-time environmental fire pre-seed for this
+# derelict. Persisted so a revisit/reload does NOT re-roll the presence gate or re-ignite
+# compartments the player already extinguished. Set even when the presence gate yields no
+# fire — "seeded to empty" must survive reload too.
+var fire_seeded: bool = false
 
 # Static factory via load() self-reference (class_name globals unreliable under
 # --headless --script).
@@ -118,6 +123,8 @@ func get_summary() -> Dictionary:
 		result["carts"] = cart_dicts
 	if has_fire():
 		result["fire"] = fire.get_summary()
+	if fire_seeded:
+		result["fire_seeded"] = true
 	return result
 
 func apply_summary(summary) -> bool:
@@ -167,6 +174,7 @@ func apply_summary(summary) -> bool:
 	var fire_summary: Variant = summary.get("fire", null)
 	if typeof(fire_summary) == TYPE_DICTIONARY and not (fire_summary as Dictionary).is_empty():
 		get_fire().apply_summary(fire_summary as Dictionary)
+	fire_seeded = bool(summary.get("fire_seeded", fire_seeded))
 	return true
 
 ## Returns this ship's DerelictObjectiveController, creating it on first access.

@@ -2616,10 +2616,15 @@ func _configure_derelict_fire(fs) -> void:
 func _seed_derelict_fire() -> void:
 	if not away_from_start or current_ship == null:
 		return
+	if current_ship.fire_seeded:
+		return  # already seeded (revisit) or restored from save — preserve the player's burning set
 	var fs = current_ship.get_fire()
 	if fs == null:
 		return
 	_configure_derelict_fire(fs)
+	# Mark seeded on the first build regardless of whether the presence gate lit anything,
+	# so a fire-free derelict is not re-rolled on revisit/reload.
+	current_ship.fire_seeded = true
 	var seed_int: int = _ship_seed(current_ship)
 	# Presence gate — most derelicts board fire-free.
 	if (abs(hash("%d:fire_presence" % seed_int)) % 100) >= FIRE_PRESENCE_PERCENT:
