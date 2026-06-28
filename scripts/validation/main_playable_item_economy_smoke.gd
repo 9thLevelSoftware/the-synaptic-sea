@@ -38,7 +38,7 @@ func _validate() -> void:
 	if inv == null or playable.crafting_state == null or playable.material_state == null:
 		_fail("inventory/crafting models missing"); return
 	playable.away_from_start = false
-	if playable.threat_manager != null:
+	if is_instance_valid(playable.threat_manager):
 		playable.threat_manager.threats.clear()
 
 	# --- 1) Craft hull_sealant via the REAL craft path (no add_item of hull_sealant) ---------
@@ -120,7 +120,7 @@ func _find_playable(node: Node) -> PlayableGeneratedShip:
 		return node as PlayableGeneratedShip
 	for child in node.get_children():
 		var f = _find_playable(child)
-		if f != null:
+		if is_instance_valid(f):
 			return f
 	return null
 
@@ -132,6 +132,6 @@ func _fail(reason: String) -> void:
 	_cleanup_and_quit(1)
 
 func _cleanup_and_quit(code: int) -> void:
-	if main_node != null and is_instance_valid(main_node):
+	if is_instance_valid(main_node):
 		main_node.queue_free()
 	quit(code)
