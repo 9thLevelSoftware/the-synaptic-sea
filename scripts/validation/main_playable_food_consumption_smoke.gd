@@ -76,8 +76,22 @@ func _validate() -> void:
 		_fail("thirst did not rise (before=%.1f after=%.1f)" % [thirst_before, thirst_after])
 		return
 
+	# Codex PR #43: acquiring food via a live acquisition path (here the loot-grant
+	# handler) must register it with the spoilage tracker, so the eat-time stale/rotten
+	# multiplier actually applies in real play (not just in pre-seeded saves/tests).
+	if playable.spoilage_state == null:
+		_fail("spoilage_state missing")
+		return
+	if playable.spoilage_state.has_food("cooked_meal"):
+		# Ensure we're proving the acquisition path, not a pre-existing entry.
+		playable.spoilage_state.remove_food("cooked_meal")
+	playable._on_loot_container_searched("smoke_food_container", [{"item_id": "cooked_meal", "quantity": 1}])
+	if not playable.spoilage_state.has_food("cooked_meal"):
+		_fail("acquired food was not registered with spoilage_state (eat-time spoilage inert)")
+		return
+
 	finished = true
-	print("MAIN PLAYABLE FOOD CONSUMPTION PASS hunger_restored=true thirst_restored=true reachable=true hunger=%.1f->%.1f thirst=%.1f->%.1f" % [
+	print("MAIN PLAYABLE FOOD CONSUMPTION PASS hunger_restored=true thirst_restored=true spoilage_tracked=true reachable=true hunger=%.1f->%.1f thirst=%.1f->%.1f" % [
 		hunger_before, hunger_after, thirst_before, thirst_after])
 	_cleanup_and_quit(0)
 
