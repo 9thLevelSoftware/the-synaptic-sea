@@ -364,6 +364,10 @@ var status_effects_state  # StatusEffectsState
 # spatial AudioStreamPlayer3D the manager spawns.
 var audio_manager: Node
 var audio_root: Node3D
+# REQ-AU-001: edge-detection flag for the vitals_critical -> UI_VITALS_LOW
+# one-shot emit. Set to false so the first transition into critical fires
+# the alert; reset to false when vitals recover.
+var _prev_vitals_critical: bool = false
 var arc_root: Node3D
 var arc_zone_node: StaticBody3D
 var arc_zone_label: Label3D
@@ -5206,17 +5210,39 @@ func _refresh_audio_state(force_initial: bool, _delta_seconds: float = 0.0) -> v
 		hazard_active = true
 	if electrical_arc_state != null and bool(electrical_arc_state.is_passability_blocked()):
 		hazard_active = true
-	# vitals_critical: derived from vitals_model oxygen <= 0 OR hp below
-	# critical. vitals_model is optional in the playable scene; default
-	# to false when missing.
+	# vitals_critical: derived from vitals_model oxygen <= 0 OR health below 25%.
+	# vitals_model is optional in the playable scene; default to false when missing.
+	# NOTE: PlayerVitalsModel exposes get_vitals_summary() (not get_summary()); the
+	# health key is "health" (0-100) and the HP threshold is 25 out of 100.
 	var vitals_critical: bool = false
-	if vitals_model != null and vitals_model.has_method("get_summary"):
-		var vs: Dictionary = vitals_model.get_summary()
+	if vitals_model != null and vitals_model.has_method("get_vitals_summary"):
+		var vs: Dictionary = vitals_model.get_vitals_summary()
 		if float(vs.get("oxygen", 1.0)) <= 0.0:
 			vitals_critical = true
-		elif float(vs.get("hp", 1.0)) < 0.25:
+		elif float(vs.get("health", 100.0)) < 25.0:
 			vitals_critical = true
-	audio_manager.update_music_flags(false, hazard_active, vitals_critical)
+	# REQ-AU-001: pass the live combat engagement flag so COMBAT music is
+	# reachable when a threat is in an engaged/aware state.
+	var engagement: bool = false
+	if threat_manager != null and threat_manager.has_method("has_combat_engagement"):
+		engagement = bool(threat_manager.has_combat_engagement())
+	audio_manager.update_music_flags(engagement, hazard_active, vitals_critical)
+	# REQ-AU-001: emit hazard-coupled SFX through the router (cooldown-gated
+	# so a burning / arcing state does not flood the bus every frame).
+	if audio_manager.has_method("play_sfx"):
+		# Fire crackle — any burning compartment present.
+		if fire_suppression_state != null and not fire_suppression_state.get_burning_compartments().is_empty():
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_FIRE_CRACKLE)
+		# Arc zap — arcing phase active.
+		if electrical_arc_state != null and electrical_arc_state.phase == ElectricalArcState.Phase.ARCING:
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_ARC_ZAP)
+		# Suit breath — audible when oxygen is critically low or HP is critical.
+		if vitals_critical:
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_SUIT_BREATH)
+		# Vitals-low UI alert — emit exactly once per rising edge into critical.
+		if vitals_critical and not _prev_vitals_critical:
+			audio_manager.play_sfx(AudioEventSeamScript.UI_VITALS_LOW)
+	_prev_vitals_critical = vitals_critical
 	# Attach the AudioListener to the player when a player anchor exists.
 	if player != null and is_instance_valid(player) and player is Node3D:
 		audio_manager.attach_listener(player as Node3D)
