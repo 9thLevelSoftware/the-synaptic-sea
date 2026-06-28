@@ -3172,6 +3172,7 @@ func _on_derelict_interactable_completed(interaction_id: String, objective_id: S
 		var seed_source: String = "%s:%s" % [String(current_ship.marker_id), objective_id]
 		var rolled: Array = LootDistributionScript.roll(_salvage_loot_tables[objective_id], seed_source, _loot_tables, {
 			"biome_id": _resolve_current_loot_biome_id(),
+			"loot_quality_modifier": _resolve_current_loot_quality_modifier(),
 			"depth": _resolve_current_loot_depth(),
 			"condition": _resolve_current_loot_condition(),
 			"container_kind": "salvage_objective",
@@ -6313,12 +6314,34 @@ func _find_ship_by_id_or_marker(key: String):
 func _build_loot_context(spec: Dictionary) -> Dictionary:
 	return {
 		"biome_id": _resolve_current_loot_biome_id(),
+		"loot_quality_modifier": _resolve_current_loot_quality_modifier(),
 		"depth": _resolve_current_loot_depth(),
 		"condition": _resolve_current_loot_condition(),
 		"container_kind": str(spec.get("kind", spec.get("loot_table", "generic_crate"))),
 		"item_definitions": ItemDefsScript.load_definitions(),
 		"unique_state": unique_item_state,
 	}
+
+func _resolve_current_loot_quality_modifier() -> float:
+	var biome_id: String = _resolve_current_loot_biome_id()
+	if biome_id.is_empty():
+		return 1.0
+	var rel_path: String = "res://data/procgen/biomes/" + biome_id + ".json"
+	if FileAccess.file_exists(rel_path):
+		var text: String = FileAccess.get_file_as_string(rel_path)
+		var parsed: Variant = JSON.parse_string(text)
+		if parsed is Dictionary:
+			var biome_obj = BiomeProfileScript.from_dict(parsed as Dictionary)
+			return float(biome_obj.loot_quality_modifier)
+	# Fall back to the same built-in dict table used by ShipLayoutGenerator._resolve_biome()
+	match biome_id:
+		"breach_field":
+			return 1.1
+		"dead_fleet":
+			return 1.4
+		_:
+			return 1.0
+
 
 func _resolve_current_loot_biome_id() -> String:
 	var biome_ids: Array[String] = _loot_biome_ids()
