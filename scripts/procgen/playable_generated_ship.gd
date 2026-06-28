@@ -2665,6 +2665,7 @@ func _build_fire_context() -> Dictionary:
 	var damaged: Array = []
 	var oxygen_present: bool = true
 	var powered: float = 0.0
+	var arc_arcing: bool = false
 	if not away_from_start:
 		# Home path: derive damaged compartments from the home systems manager,
 		# oxygen from the life-support expanded model, and powered_ratio from the
@@ -2681,9 +2682,12 @@ func _build_fire_context() -> Dictionary:
 		if life_support_expanded_state != null:
 			oxygen_present = life_support_expanded_state.oxygen_percent > OXYGEN_MIN_FOR_FIRE
 		powered = power_grid_state.get_allocation_ratio("stations") if power_grid_state != null else 0.0
-	var arc_arcing: bool = false
-	if electrical_arc_state != null:
-		arc_arcing = electrical_arc_state.phase == ElectricalArcState.Phase.ARCING
+		# arc_arcing is home-only: electrical_arc_state is coordinator/home-owned and is
+		# NOT ticked or reset when away, so reading it on the derelict path would leak a
+		# frozen phase into the derelict fire's arc-cascade step (re-igniting "engineering"
+		# nondeterministically based on travel timing). Stays false when away.
+		if electrical_arc_state != null:
+			arc_arcing = electrical_arc_state.phase == ElectricalArcState.Phase.ARCING
 	return {
 		"powered_ratio": powered,
 		"ship_oxygen_present": oxygen_present,
@@ -5458,10 +5462,15 @@ func _refresh_audio_state(force_initial: bool, _delta_seconds: float = 0.0) -> v
 	# Update the music-state flags based on the current gameplay signals.
 	# Engagement defaults to false (no hostile AI in the vertical slice);
 	# hazard_active is true when ANY hazard model reports non-safe state.
+	# Fire audio must follow the ACTIVE fire model: on the away branch this is the
+	# derelict's per-ship FireSuppressionState, so a burning derelict gets crackle/
+	# hazard music and a home fire does not leak phantom crackle while away. At home
+	# _active_fire_state() returns fire_suppression_state, so the home path is unchanged.
+	var afs = _active_fire_state()
 	var hazard_active: bool = false
 	if oxygen_state != null and bool(oxygen_state.is_passability_blocked()):
 		hazard_active = true
-	if fire_suppression_state != null and not fire_suppression_state.get_burning_compartments().is_empty():
+	if afs != null and not afs.get_burning_compartments().is_empty():
 		hazard_active = true
 	if electrical_arc_state != null and bool(electrical_arc_state.is_passability_blocked()):
 		hazard_active = true
@@ -5485,8 +5494,8 @@ func _refresh_audio_state(force_initial: bool, _delta_seconds: float = 0.0) -> v
 	# REQ-AU-001: emit hazard-coupled SFX through the router (cooldown-gated
 	# so a burning / arcing state does not flood the bus every frame).
 	if audio_manager.has_method("play_sfx"):
-		# Fire crackle — any burning compartment present.
-		if fire_suppression_state != null and not fire_suppression_state.get_burning_compartments().is_empty():
+		# Fire crackle — any burning compartment present in the ACTIVE fire model.
+		if afs != null and not afs.get_burning_compartments().is_empty():
 			audio_manager.play_sfx(AudioEventSeamScript.SFX_FIRE_CRACKLE)
 		# Arc zap — arcing phase active.
 		if electrical_arc_state != null and electrical_arc_state.phase == ElectricalArcState.Phase.ARCING:
