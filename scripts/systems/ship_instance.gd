@@ -15,6 +15,7 @@ const ShipAccessStateScript := preload("res://scripts/systems/ship_access_state.
 const HangarBayScript := preload("res://scripts/systems/hangar_bay.gd")
 const ShipInventoryScript := preload("res://scripts/systems/ship_inventory.gd")
 const CartStateScript := preload("res://scripts/systems/cart_state.gd")
+const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
 
 const ROOM_HALF_EXTENT: float = 4.0   # generous per-room half-box in X/Z (covers 2x1 rooms + module chains)
 const ROOM_HALF_HEIGHT: float = 3.0   # half deck height + headroom
@@ -68,6 +69,16 @@ var looted_container_ids: Array = []
 # losing threat positions, detection memory, or the last combat result.
 var combat_summary: Dictionary = {}
 
+# Derelict-side fire: per-ship authoritative FireSuppressionState. Lazily created;
+# persisted under "fire" only when a compartment is actually burning. Home fire stays
+# on the coordinator (fire_suppression_state); this is for boarded derelicts.
+var fire = null                          # FireSuppressionState | null
+# True once the coordinator has run its one-time environmental fire pre-seed for this
+# derelict. Persisted so a revisit/reload does NOT re-roll the presence gate or re-ignite
+# compartments the player already extinguished. Set even when the presence gate yields no
+# fire — "seeded to empty" must survive reload too.
+var fire_seeded: bool = false
+
 # Static factory via load() self-reference (class_name globals unreliable under
 # --headless --script).
 static func create(p_ship_id: String, p_marker_id: String, p_blueprint, p_systems_manager, p_scene_root) -> ShipInstance:
@@ -110,6 +121,10 @@ func get_summary() -> Dictionary:
 		for c in carts:
 			cart_dicts.append(c.get_summary())
 		result["carts"] = cart_dicts
+	if has_fire():
+		result["fire"] = fire.get_summary()
+	if fire_seeded:
+		result["fire_seeded"] = true
 	return result
 
 func apply_summary(summary) -> bool:
@@ -156,6 +171,10 @@ func apply_summary(summary) -> bool:
 				var cart = CartStateScript.create()
 				cart.apply_summary(cd as Dictionary)
 				carts.append(cart)
+	var fire_summary: Variant = summary.get("fire", null)
+	if typeof(fire_summary) == TYPE_DICTIONARY and not (fire_summary as Dictionary).is_empty():
+		get_fire().apply_summary(fire_summary as Dictionary)
+	fire_seeded = bool(summary.get("fire_seeded", fire_seeded))
 	return true
 
 ## Returns this ship's DerelictObjectiveController, creating it on first access.
@@ -189,6 +208,17 @@ func get_inventory():
 ## True iff this ship's hold exists and holds at least one item.
 func has_cargo() -> bool:
 	return inventory != null and not inventory.items.is_empty()
+
+## Returns this ship's FireSuppressionState, creating a bare one on first access.
+## The coordinator configures it from tuning before seeding/use.
+func get_fire():
+	if fire == null:
+		fire = FireSuppressionStateScript.new()
+	return fire
+
+## True iff this ship has at least one burning compartment.
+func has_fire() -> bool:
+	return fire != null and not fire.get_burning_compartments().is_empty()
 
 ## Returns this ship's live carts array (parked carts).
 func get_carts() -> Array:

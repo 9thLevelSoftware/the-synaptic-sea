@@ -262,6 +262,9 @@ const FIRE_COMPARTMENT_SYSTEM := {
 const OXYGEN_MIN_FOR_FIRE: float = 5.0
 const FIRE_HEALTH_DRAIN_PER_SECOND: float = 2.0
 const FIRE_SYSTEM_DAMAGE_PER_SECOND: float = 0.05
+# Derelict-side fire: only ~1 in 7 boarded derelicts present any fire (deterministic per
+# seed). Fire is one of several possible derelict conditions, not a default.
+const FIRE_PRESENCE_PERCENT: int = 15
 # ADR-0038: crafting / salvage economy wired into the live run. These pure models are
 # coordinator-owned and ticked from _process; the station nodes are the player-reachable seam.
 var crafting_state                          # CraftingState
@@ -1359,8 +1362,9 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 			"breach_count": hull_integrity_state.get_breach_count(),
 			"recycled_water": recycled_water,
 		})
-	if fire_suppression_state != null:
-		if fire_suppression_state.tick(delta, _build_fire_context()):
+	var _afs_home = _active_fire_state()
+	if _afs_home != null:
+		if _afs_home.tick(delta, _build_fire_context()):
 			_refresh_fire_zones()
 		# M7-B Task 8: a burning compartment degrades the ship system housed there.
 		_apply_fire_system_damage(delta)
@@ -1830,8 +1834,8 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	_build_loot_containers()
 	_build_repair_points()
 	_build_breach_seal_points()
-	# M7-B Task 7: fresh derelict build — seed fires from damaged systems, render zones.
-	_seed_fires_from_damage()
+	# Derelict-side fire: per-ship pre-seeded environmental fire (presence-gated, capped).
+	_seed_derelict_fire()
 	_build_fire_zones()
 	# M7-B Task 9: manual extinguish nodes + recharge port share the fire lifecycle.
 	_build_fire_suppression_points()
@@ -2594,6 +2598,63 @@ func _on_breach_sealed(_compartment_id: String) -> void:
 # fire). Tasks 8/9 add vitals/system teeth and recharge wiring on top of the
 # same context + lifecycle built here.
 
+func _fire_tuning() -> Dictionary:
+	return _load_json_dict(SHIP_SUBSYSTEM_TUNING_PATH).get("fire_suppression", {})
+
+## Configures a per-ship derelict FireSuppressionState from shared tuning (compartments,
+## adjacency, rates). Required before seeding or after restoring from a summary so spread
+## topology exists.
+func _configure_derelict_fire(fs) -> void:
+	if fs != null:
+		fs.configure(_fire_tuning())
+
+## Pre-seeds environmental fire on a freshly built derelict. Deterministic, RNG-free:
+## a per-seed presence gate (FIRE_PRESENCE_PERCENT) decides whether THIS derelict burns at
+## all; when it does, ignites up to a condition-scaled cap of compartments whose mapped
+## system is damaged (and not breached). Never called on the home/lifeboat ship or on the
+## save-restore path (restored fire comes from the applied ShipInstance "fire" summary).
+func _seed_derelict_fire() -> void:
+	if not away_from_start or current_ship == null:
+		return
+	if current_ship.fire_seeded:
+		return  # already seeded (revisit) or restored from save — preserve the player's burning set
+	var fs = current_ship.get_fire()
+	if fs == null:
+		return
+	_configure_derelict_fire(fs)
+	# Mark seeded on the first build regardless of whether the presence gate lit anything,
+	# so a fire-free derelict is not re-rolled on revisit/reload.
+	current_ship.fire_seeded = true
+	var seed_int: int = _ship_seed(current_ship)
+	# Presence gate — most derelicts board fire-free.
+	if (abs(hash("%d:fire_presence" % seed_int)) % 100) >= FIRE_PRESENCE_PERCENT:
+		return
+	var mgr = _active_systems_manager()
+	if mgr == null:
+		return
+	# Candidate compartments: mapped system damaged, not breached. Deterministic order.
+	var breached := {}
+	if hull_integrity_state != null:
+		for cid in hull_integrity_state.compartments:
+			if bool((hull_integrity_state.compartments[cid] as Dictionary).get("breach_open", false)):
+				breached[str(cid)] = true
+	var candidates: Array = []
+	for cid in FIRE_COMPARTMENT_SYSTEM:
+		var sid: String = str(FIRE_COMPARTMENT_SYSTEM[cid])
+		if sid.is_empty() or breached.has(str(cid)):
+			continue
+		var sys = mgr.get_system(sid)
+		if sys != null and not sys.is_self_functional():
+			candidates.append(str(cid))
+	candidates.sort()
+	var cap: int = 2 + (1 if _ship_condition_class(current_ship) == ShipBlueprint.Condition.WRECKED else 0)
+	var lit: int = 0
+	for cid in candidates:
+		if lit >= cap:
+			break
+		fs.ignite(cid, 1.0)
+		lit += 1
+
 ## Builds the per-frame context the authoritative fire model ticks against.
 func _build_fire_context() -> Dictionary:
 	var breached: Array = []
@@ -2602,22 +2663,33 @@ func _build_fire_context() -> Dictionary:
 			if bool((hull_integrity_state.compartments[cid] as Dictionary).get("breach_open", false)):
 				breached.append(str(cid))
 	var damaged: Array = []
-	if ship_systems_manager != null:
-		for cid in FIRE_COMPARTMENT_SYSTEM:
-			var sid: String = str(FIRE_COMPARTMENT_SYSTEM[cid])
-			if sid.is_empty():
-				continue
-			var sys = ship_systems_manager.get_system(sid)
-			if sys != null and not sys.is_self_functional():
-				damaged.append(cid)
 	var oxygen_present: bool = true
-	if life_support_expanded_state != null:
-		oxygen_present = life_support_expanded_state.oxygen_percent > OXYGEN_MIN_FOR_FIRE
+	var powered: float = 0.0
 	var arc_arcing: bool = false
-	if electrical_arc_state != null:
-		arc_arcing = electrical_arc_state.phase == ElectricalArcState.Phase.ARCING
+	if not away_from_start:
+		# Home path: derive damaged compartments from the home systems manager,
+		# oxygen from the life-support expanded model, and powered_ratio from the
+		# home power grid. On a derelict: no re-ignition chain (pre-seeded only),
+		# breathable pockets exist, and there is no auto-suppression grid.
+		if ship_systems_manager != null:
+			for cid in FIRE_COMPARTMENT_SYSTEM:
+				var sid: String = str(FIRE_COMPARTMENT_SYSTEM[cid])
+				if sid.is_empty():
+					continue
+				var sys = ship_systems_manager.get_system(sid)
+				if sys != null and not sys.is_self_functional():
+					damaged.append(cid)
+		if life_support_expanded_state != null:
+			oxygen_present = life_support_expanded_state.oxygen_percent > OXYGEN_MIN_FOR_FIRE
+		powered = power_grid_state.get_allocation_ratio("stations") if power_grid_state != null else 0.0
+		# arc_arcing is home-only: electrical_arc_state is coordinator/home-owned and is
+		# NOT ticked or reset when away, so reading it on the derelict path would leak a
+		# frozen phase into the derelict fire's arc-cascade step (re-igniting "engineering"
+		# nondeterministically based on travel timing). Stays false when away.
+		if electrical_arc_state != null:
+			arc_arcing = electrical_arc_state.phase == ElectricalArcState.Phase.ARCING
 	return {
-		"powered_ratio": power_grid_state.get_allocation_ratio("stations") if power_grid_state != null else 0.0,
+		"powered_ratio": powered,
 		"ship_oxygen_present": oxygen_present,
 		"breached_compartments": breached,
 		"damaged_compartments": damaged,
@@ -2649,37 +2721,35 @@ func _seed_fires_from_damage() -> void:
 ## in (0.0 if none). The player overlaps a fire when within the fire zone's radius
 ## (~2.0) of its world position.
 func _player_fire_intensity() -> float:
-	if player == null or fire_suppression_state == null:
+	if player == null or _active_fire_state() == null:
 		return 0.0
 	for cid in fire_zone_nodes:
 		var z = fire_zone_nodes[cid]
 		if not is_instance_valid(z) or not (z is Node3D):
 			continue
 		if (z as Node3D).global_position.distance_to(player.global_position) <= 2.0:
-			return fire_suppression_state.get_intensity(str(cid))
+			return _active_fire_state().get_intensity(str(cid))
 	return 0.0
 
 ## M7-B Task 8: applies fire degradation to the ship system housed in each burning
 ## compartment, scaled by fire intensity. Compartments with no mapped system are skipped.
 func _apply_fire_system_damage(delta: float) -> void:
-	if fire_suppression_state == null or ship_systems_manager == null:
+	var afs = _active_fire_state()
+	if afs == null or _active_systems_manager() == null:
 		return
-	for cid in fire_suppression_state.get_burning_compartments():
+	for cid in afs.get_burning_compartments():
 		var sid: String = str(FIRE_COMPARTMENT_SYSTEM.get(str(cid), ""))
 		if sid.is_empty():
 			continue
-		var intensity: float = fire_suppression_state.get_intensity(str(cid))
-		ship_systems_manager.damage_system(sid, FIRE_SYSTEM_DAMAGE_PER_SECOND * intensity * delta)
+		var intensity: float = afs.get_intensity(str(cid))
+		_active_systems_manager().damage_system(sid, FIRE_SYSTEM_DAMAGE_PER_SECOND * intensity * delta)
 
 func _build_fire_zones() -> void:
 	_clear_fire_zones()
-	# M7-B: fire is home/lifeboat-only for now. Still clear stale away-side nodes
-	# above, then skip building on a derelict (away-ship parity is a follow-up).
-	if away_from_start:
+	var afs = _active_fire_state()
+	if afs == null:
 		return
-	if fire_suppression_state == null:
-		return
-	var burning: Array = fire_suppression_state.get_burning_compartments()
+	var burning: Array = afs.get_burning_compartments()
 	if burning.is_empty():
 		return
 	# Codex P1: home fire zones parent under lifeboat_ship.scene_root (port-docked),
@@ -2777,8 +2847,9 @@ func _clear_fire_zones() -> void:
 func _refresh_fire_zones() -> void:
 	# Rebuild only when the burning set differs from the rendered set.
 	var burning := {}
-	if fire_suppression_state != null:
-		for cid in fire_suppression_state.get_burning_compartments():
+	var _afs_rfz = _active_fire_state()
+	if _afs_rfz != null:
+		for cid in _afs_rfz.get_burning_compartments():
 			burning[str(cid)] = true
 	var rendered := {}
 	for cid in fire_zone_nodes:
@@ -2799,13 +2870,10 @@ func _refresh_fire_zones() -> void:
 
 func _build_fire_suppression_points() -> void:
 	_clear_fire_suppression_points()
-	# M7-B: fire is home/lifeboat-only for now. Still clear stale away-side nodes
-	# above, then skip building on a derelict (away-ship parity is a follow-up).
-	if away_from_start:
+	var afs = _active_fire_state()
+	if afs == null:
 		return
-	if fire_suppression_state == null:
-		return
-	var burning: Array = fire_suppression_state.get_burning_compartments()
+	var burning: Array = afs.get_burning_compartments()
 	if burning.is_empty():
 		return
 	# Codex P1: home suppression points parent under lifeboat_ship.scene_root, so positions
@@ -2820,7 +2888,7 @@ func _build_fire_suppression_points() -> void:
 		var pos: Vector3 = positions[idx % positions.size()]
 		idx += 1
 		var fp = FireSuppressionPointScript.new()
-		fp.configure(str(cid), fire_suppression_state, extinguisher_state, inventory_state, player_progression, pos, 4.0, "fire_extinguisher", 1.8)
+		fp.configure(str(cid), afs, extinguisher_state, inventory_state, player_progression, pos, 4.0, "fire_extinguisher", 1.8)
 		if not fp.fire_extinguished.is_connected(_on_fire_extinguished):
 			fp.fire_extinguished.connect(_on_fire_extinguished)
 		_attach_zone_to_active_ship(fp)
@@ -2842,7 +2910,7 @@ func _on_fire_extinguished(_compartment_id: String) -> void:
 
 func _build_extinguisher_recharge_port() -> void:
 	_clear_extinguisher_recharge_port()
-	if extinguisher_state == null or away_from_start:
+	if extinguisher_state == null:
 		return
 	# Codex P1: the recharge port parents under lifeboat_ship.scene_root, so its position
 	# must be LIFEBOAT-LOCAL — matching repair/breach/fire builders.
@@ -2893,6 +2961,22 @@ func force_ignite_compartment_for_validation(compartment_id: String, intensity: 
 	var ok: bool = fire_suppression_state.ignite(compartment_id, intensity)
 	_refresh_fire_zones()
 	return ok
+
+## Ignites a compartment in the ACTIVE fire state (derelict's when away, home model
+## otherwise). Use this in away-branch smokes where force_ignite_compartment_for_validation
+## acts on the home model and cannot reach the derelict's per-ship FireSuppressionState.
+func force_ignite_active_compartment_for_validation(cid: String, intensity: float = 1.0) -> bool:
+	var afs = _active_fire_state()
+	if afs == null:
+		return false
+	var ok: bool = afs.ignite(cid, intensity)
+	_refresh_fire_zones()
+	return ok
+
+## Validation seam: the active fire state (derelict's when away, home model otherwise).
+## Use when a smoke needs direct access to the fire model for inspection or setup.
+func get_active_fire_state_for_validation():
+	return _active_fire_state()
 
 ## ADR-0038: builds one player-reachable CraftingStation per curated kind on the home ship.
 ## Stations live on the home ship (not derelicts) and are parented under home_ship.scene_root
@@ -2966,6 +3050,15 @@ func _active_systems_manager():
 	if away_from_start and current_ship != null and current_ship.systems_manager != null:
 		return current_ship.systems_manager
 	return ship_systems_manager
+
+## The fire model of the ship the player is currently aboard: the derelict's per-ship
+## FireSuppressionState when away, the coordinator's home model otherwise. Mirrors
+## _active_systems_manager(). The derelict instance is configured from tuning by
+## _seed_derelict_fire() / the restore path before use.
+func _active_fire_state():
+	if away_from_start and current_ship != null:
+		return current_ship.get_fire()
+	return fire_suppression_state
 
 ## Floor-cell world positions distributed across the active ship's rooms, for repair-point
 ## placement. Reuses the active loader's room/cell resolution where available.
@@ -4679,6 +4772,25 @@ func _process(delta: float) -> void:
 					var away_drain: float = float(hallucination_director.get_direct_teeth()["health_drain_per_second"]) * delta
 					if away_drain > 0.0:
 						vitals_state.apply_delta({"health": -away_drain})
+		# Derelict-side fire (wire BOTH branches): tick the active (derelict) fire model so
+		# it spreads, degrades derelict systems, and feeds the player-vitals teeth below.
+		# The home branch ticks fire inside _recompute_expanded_ship_systems, which this
+		# branch never calls. This closes the "away path early-return" gap for fire — the
+		# same pattern used by the sanity/hallucination and audio fixes (Codex PRs #43-44).
+		var _afs_away = _active_fire_state()
+		if _afs_away != null:
+			if _afs_away.tick(delta, _build_fire_context()):
+				_refresh_fire_zones()
+			_apply_fire_system_damage(delta)
+			if vitals_state != null:
+				var fire_drain: float = FIRE_HEALTH_DRAIN_PER_SECOND * _player_fire_intensity() * delta
+				if fire_drain > 0.0:
+					vitals_state.apply_delta({"health": -fire_drain})
+		# Recharge port is power-gated on the DERELICT's own power system (engineering gate):
+		# present but dead until the player restores derelict power.
+		if is_instance_valid(extinguisher_recharge_port):
+			var _dmgr = _active_systems_manager()
+			extinguisher_recharge_port.set_powered(_dmgr != null and _dmgr.is_operational("power"))
 		_refresh_player_vitals(delta)
 		# ADR-0038: emergency field crafting completes even away from home (powered-station
 		# crafts pause while away, by design — only field_crafting_state advances here).
@@ -5350,10 +5462,15 @@ func _refresh_audio_state(force_initial: bool, _delta_seconds: float = 0.0) -> v
 	# Update the music-state flags based on the current gameplay signals.
 	# Engagement defaults to false (no hostile AI in the vertical slice);
 	# hazard_active is true when ANY hazard model reports non-safe state.
+	# Fire audio must follow the ACTIVE fire model: on the away branch this is the
+	# derelict's per-ship FireSuppressionState, so a burning derelict gets crackle/
+	# hazard music and a home fire does not leak phantom crackle while away. At home
+	# _active_fire_state() returns fire_suppression_state, so the home path is unchanged.
+	var afs = _active_fire_state()
 	var hazard_active: bool = false
 	if oxygen_state != null and bool(oxygen_state.is_passability_blocked()):
 		hazard_active = true
-	if fire_suppression_state != null and not fire_suppression_state.get_burning_compartments().is_empty():
+	if afs != null and not afs.get_burning_compartments().is_empty():
 		hazard_active = true
 	if electrical_arc_state != null and bool(electrical_arc_state.is_passability_blocked()):
 		hazard_active = true
@@ -5377,8 +5494,8 @@ func _refresh_audio_state(force_initial: bool, _delta_seconds: float = 0.0) -> v
 	# REQ-AU-001: emit hazard-coupled SFX through the router (cooldown-gated
 	# so a burning / arcing state does not flood the bus every frame).
 	if audio_manager.has_method("play_sfx"):
-		# Fire crackle — any burning compartment present.
-		if fire_suppression_state != null and not fire_suppression_state.get_burning_compartments().is_empty():
+		# Fire crackle — any burning compartment present in the ACTIVE fire model.
+		if afs != null and not afs.get_burning_compartments().is_empty():
 			audio_manager.play_sfx(AudioEventSeamScript.SFX_FIRE_CRACKLE)
 		# Arc zap — arcing phase active.
 		if electrical_arc_state != null and electrical_arc_state.phase == ElectricalArcState.Phase.ARCING:

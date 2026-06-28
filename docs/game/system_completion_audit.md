@@ -272,7 +272,7 @@ to close a loop." Ordered by how much each breaks *the game functioning as a who
    `FoodState`. The superseded standalone `cooking_state` (galley) duplicate was deleted. **Follow-up
    (option 3, not done):** live start/harvest for hydroponics/synthesizer/water-recycler as a passive
    production source; per-item spoilage-stage scaling on eat. *(M2)*
-5. **🟢 Fire-suppression — RESOLVED (M7-B / ADR-0041); 🔴 sustenance still HUD-only.**
+5. **🟢 Fire-suppression — RESOLVED (M7-B / ADR-0041 + derelict-side fire; this branch `feat/derelict-fire`); 🔴 sustenance still HUD-only.**
    Fire-suppression is now the **authoritative** fire hazard (it *replaced* the old
    `fire_state` timer hazard, which is deleted): ignition is a live symptom of unrepaired
    system damage (+ arc cascade + spread), it has real teeth (player vitals drain + ship-
@@ -281,10 +281,19 @@ to close a loop." Ordered by how much each breaks *the game functioning as a who
    — RESOLVED:** both are now uncommon loot + mid-tier recipes (`craft_fire_extinguisher` @
    fabricator skill 3, `craft_hull_sealant` @ workbench skill 2), so the manual extinguish and
    breach-seal loops are reachable in real play (`main_playable_item_economy_smoke.gd`).
-   **Deferred follow-ups:** B2 deliberate-vent control, fire-consumes-oxygen, **derelict-side
-   fire points/recharge ports** (now unblocked by the item economy — next M7 lane), and
-   door-gated spread. **Sustenance** remains a HUD shadow — it consumes the farm/cook chain but
-   feeds no player vital. *(M7)*
+   **Derelict-side fire points/recharge ports — RESOLVED (`feat/derelict-fire`):**
+   derelicts now carry live per-ship `FireSuppressionState` (deterministic seeding per
+   `_seed_derelict_fire()`, ~15% presence gate, condition-scaled cap), fire ticks on the away
+   branch (`main_playable_derelict_fire_smoke.gd` proves `away_ticks>0`, `seeded=true`,
+   `ticked=true`, `hurt=true`), `FireSuppressionPoint` nodes are built on the derelict for each
+   burning compartment, and a single `ExtinguisherRechargePort` is present but power-gated by
+   the derelict's own power system (`port_gated=true`). Per-ship fire is preserved across
+   leave-and-revisit — the `fire_seeded` flag on `ShipInstance` prevents re-seeding and
+   `visited_ships` retains the `FireSuppressionState` intact (proven by
+   `derelict_fire_sequential_persistence_smoke.gd`: `remembered=true`).
+   **Remaining deferred follow-ups:** B2 deliberate-vent control, fire-consumes-oxygen,
+   and door-gated spread. **Sustenance** remains a HUD shadow — it consumes the farm/cook chain
+   but feeds no player vital. *(M7)*
 6. **✅ RESOLVED (ADR-0042) — Sanity hallucinations closed the loop.** Sanity now drives a
    deterministic `HallucinationDirector` (seeded integer hash, no RNG) across three tiers
    (< 40 / < 25 / < 15): tier-1 ambient SFX cues; tier-2 phantom threats (via `HallucinationManager`,
