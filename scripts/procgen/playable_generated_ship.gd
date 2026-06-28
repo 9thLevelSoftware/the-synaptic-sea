@@ -80,6 +80,7 @@ const VitalsStateScript := preload("res://scripts/systems/vitals_state.gd")
 const SanityStateScript := preload("res://scripts/systems/sanity_state.gd")
 const HallucinationDirectorScript := preload("res://scripts/systems/hallucination_director.gd")
 const HallucinationManagerScript := preload("res://scripts/systems/hallucination_manager.gd")
+const HallucinationFXOverlayScript := preload("res://scripts/ui/hallucination_fx_overlay.gd")
 const RadiationStateScript := preload("res://scripts/systems/radiation_state.gd")
 const BodyTemperatureStateScript := preload("res://scripts/systems/body_temperature_state.gd")
 const StatusEffectsStateScript := preload("res://scripts/systems/status_effects_state.gd")
@@ -361,6 +362,7 @@ var sanity_state  # SanityState
 # ADR-0042: sanity-driven hallucinations (pure director + scene manager).
 var hallucination_director  # HallucinationDirector
 var hallucination_manager   # HallucinationManager
+var _hallucination_fx_overlay: CanvasLayer  # screen-FX overlay (alpha = hallucination_intensity)
 var radiation_state  # RadiationState
 var body_temperature_state  # BodyTemperatureState
 var status_effects_state  # StatusEffectsState
@@ -2744,6 +2746,23 @@ func _build_hallucination_runtime() -> void:
 	hallucination_manager.name = "HallucinationManager"
 	hallucination_manager.configure(hallucination_director)
 	_attach_zone_to_active_ship(hallucination_manager)
+	# ADR-0042 Task 5: wire the false-HUD/ambient/screen-FX channels. Ambient cues go
+	# through the live AudioManager; the screen-FX overlay is a lightweight CanvasLayer
+	# whose ColorRect alpha tracks hallucination_intensity.
+	hallucination_manager.set_channels(audio_manager, _ensure_hallucination_fx_overlay())
+
+# ADR-0042 Task 5: lazily build the screen-FX overlay. A HallucinationFXOverlay
+# (CanvasLayer) holds a full-rect red ColorRect whose alpha tracks the
+# `hallucination_intensity` meta the HallucinationManager writes each frame. Kept
+# intentionally minimal — richer shader work is a non-goal for v1.
+func _ensure_hallucination_fx_overlay() -> CanvasLayer:
+	if _hallucination_fx_overlay != null and is_instance_valid(_hallucination_fx_overlay):
+		return _hallucination_fx_overlay
+	var layer = HallucinationFXOverlayScript.new()
+	layer.name = "HallucinationFXOverlay"
+	add_child(layer)
+	_hallucination_fx_overlay = layer
+	return layer
 
 func _clear_fire_zones() -> void:
 	for cid in fire_zone_nodes:
@@ -4528,6 +4547,12 @@ func _combined_system_status_lines() -> PackedStringArray:
 			lines.append(String(line))
 	if player_progression != null:
 		lines.append("Repair Skill: %d" % player_progression.get_skill_level("repair"))
+	# ADR-0042 Task 5: merge false-HUD hallucination readouts (phantom blips / wrong
+	# bearings) so the tracker shows lies when sanity is low. These are derived from the
+	# director's hud events and clear automatically when sanity recovers.
+	if hallucination_manager != null and is_instance_valid(hallucination_manager):
+		for line in hallucination_manager.get_hallucinated_status_lines():
+			lines.append(String(line))
 	return lines
 
 func get_combined_system_status_lines() -> PackedStringArray:

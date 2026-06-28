@@ -25,6 +25,7 @@ const SFX_ARC_ZAP: StringName = &"sfx.arc.zap"
 const SFX_FOOTSTEP: StringName = &"sfx.footstep"
 const SFX_DROP_ITEM: StringName = &"sfx.drop.item"
 const SFX_DOCK_LAND: StringName = &"sfx.dock.land"
+const SFX_HALLUCINATION_WHISPER: StringName = &"sfx.hallucination.whisper"
 
 const UI_INVENTORY_OPEN: StringName = &"ui.inventory.open"
 const UI_INVENTORY_CLOSE: StringName = &"ui.inventory.close"

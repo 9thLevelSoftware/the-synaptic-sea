@@ -1,7 +1,7 @@
 extends SceneTree
 
 ## Live-scene proof of the sanity hallucination loop (phantom channel + teeth).
-## Marker: MAIN PLAYABLE HALLUCINATION PASS manifest=true phantom_no_damage=true attack_dissipates=true teeth=true clears=true reachable=true
+## Marker: MAIN PLAYABLE HALLUCINATION PASS manifest=true phantom_no_damage=true attack_dissipates=true teeth=true clears=true hud=true fx=true reachable=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const TIMEOUT_FRAMES: int = 360
@@ -92,6 +92,22 @@ func _validate() -> void:
 		playable._process(1.0 / 30.0)
 	var teeth: bool = playable.vitals_state.health < teeth_before
 
+	# Channels: at tier 3, false-HUD lines are present and FX intensity is maxed.
+	# Keep the home-path field live (breach open, away_from_start false) so the
+	# coordinator's sanity block keeps ticking the director.
+	playable.away_from_start = false
+	if playable.oxygen_state != null:
+		playable.oxygen_state.breach_open = true
+		playable.oxygen_state.breach_sealed = false
+	playable.sanity_state.sanity = 8.0
+	var hud_ok: bool = false
+	for i in range(240):
+		playable._process(1.0 / 30.0)
+		if manager.get_hallucinated_status_lines().size() > 0:
+			hud_ok = true
+			break
+	var fx_ok: bool = director.get_fx_intensity() >= 0.99
+
 	# Clears: restore sanity (tier 0) and seal the breach (safe zone) => everything cleared.
 	playable.away_from_start = false
 	if playable.oxygen_state != null:
@@ -101,12 +117,12 @@ func _validate() -> void:
 		playable._process(1.0 / 30.0)
 	var clears: bool = manager.phantom_count() == 0
 
-	if manifested and phantom_no_damage and attack_dissipates and teeth and clears:
-		print("MAIN PLAYABLE HALLUCINATION PASS manifest=true phantom_no_damage=true attack_dissipates=true teeth=true clears=true reachable=true")
+	if manifested and phantom_no_damage and attack_dissipates and teeth and hud_ok and fx_ok and clears:
+		print("MAIN PLAYABLE HALLUCINATION PASS manifest=true phantom_no_damage=true attack_dissipates=true teeth=true clears=true hud=true fx=true reachable=true")
 		finished = true
 		_cleanup_and_quit(0)
 	else:
-		_fail("manifest=%s no_damage=%s attack=%s teeth=%s clears=%s" % [manifested, phantom_no_damage, attack_dissipates, teeth, clears])
+		_fail("manifest=%s no_damage=%s attack=%s teeth=%s hud=%s fx=%s clears=%s" % [manifested, phantom_no_damage, attack_dissipates, teeth, hud_ok, fx_ok, clears])
 
 func _ammo_id() -> String:
 	return "flare_round"
