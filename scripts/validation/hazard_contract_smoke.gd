@@ -4,13 +4,18 @@ extends SceneTree
 # it instantiates each Alpha hazard model and asserts the contract
 # properties called out in docs/game/adr/0005-multi-hazard-architecture.md
 # without ever driving a tick. A future regression that drops the
-# PhaseTimer from FireState, removes hazard_kind from a summary,
+# PhaseTimer from ElectricalArcState, removes hazard_kind from a summary,
 # silently accepts a wrong-kind apply_summary, or switches any model's
 # configure() away from the ADR-0005 Dictionary contract will fail this
 # smoke BEFORE the focused runtime smokes even get a chance to run.
 #
-# Pass marker: HAZARD CONTRACT PASS models=3 phase_timer_owners=2
-#              wrong_kind_rejected=3 configure_dict=3
+# M7-B Task 7: the old timer-based FireState is retired (replaced by the
+# authoritative FireSuppressionState compartment model, which is not a
+# PhaseTimer hazard). Only ElectricalArc and Oxygen remain in this contract;
+# ElectricalArc is now the sole PhaseTimer owner.
+#
+# Pass marker: HAZARD CONTRACT PASS models=2 phase_timer_owners=1
+#              wrong_kind_rejected=2 configure_dict=2
 #
 # Headless:
 #   /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless
@@ -21,38 +26,6 @@ func _initialize() -> void:
 	var phase_timer_owners: int = 0
 	var wrong_kind_rejected: int = 0
 	var configure_dict: int = 0
-
-	# --- FireState ----------------------------------------------------------
-	var fire := FireState.new()
-	# Per ADR-0005: configure() takes a Dictionary.
-	# Probe by trying a known Dictionary shape and a known positional
-	# shape. The Dictionary form MUST be accepted; the positional form
-	# MUST be rejected (or ignored) so a future regression that drops
-	# the contract fails here, not in the runtime smokes.
-	fire.configure({
-		"zone_ids": ["static_check"],
-		"burn_duration": 4.0,
-		"clear_duration": 3.0,
-	})
-	configure_dict += 1
-	# FireState MUST own a PhaseTimer instance per ADR-0005.
-	if not _has_phase_timer(fire):
-		_fail("FireState does not own a PhaseTimer instance (ADR-0005 requires the shared helper for timer hazards)")
-		return
-	phase_timer_owners += 1
-	# get_summary() MUST include hazard_kind = "fire".
-	var fire_summary: Dictionary = fire.get_summary()
-	if str(fire_summary.get("hazard_kind", "")) != "fire":
-		_fail("FireState.get_summary() missing hazard_kind='fire' (got '%s')" % str(fire_summary.get("hazard_kind", "")))
-		return
-	# apply_summary() MUST reject a wrong-kind summary (oxygen, electrical_arc).
-	if fire.apply_summary({"hazard_kind": "oxygen"}):
-		_fail("FireState.apply_summary() accepted a wrong-kind summary (must reject hazard_kind='oxygen')")
-		return
-	if fire.apply_summary({"hazard_kind": "electrical_arc"}):
-		_fail("FireState.apply_summary() accepted a wrong-kind summary (must reject hazard_kind='electrical_arc')")
-		return
-	wrong_kind_rejected += 1
 
 	# --- ElectricalArcState ------------------------------------------------
 	var arc := ElectricalArcState.new()
@@ -141,7 +114,7 @@ func _initialize() -> void:
 			_fail("PhaseTimer instance reports HAZARD_KIND='%s'; the helper must not own per-hazard discriminators (ADR-0005 says each owner owns its own enum)" % kind)
 			return
 
-	print("HAZARD CONTRACT PASS models=3 phase_timer_owners=%d wrong_kind_rejected=%d configure_dict=%d" % [
+	print("HAZARD CONTRACT PASS models=2 phase_timer_owners=%d wrong_kind_rejected=%d configure_dict=%d" % [
 		phase_timer_owners,
 		wrong_kind_rejected,
 		configure_dict,
@@ -150,7 +123,7 @@ func _initialize() -> void:
 
 # Inspects a model instance for an underscore-prefixed PhaseTimer
 # property. This is the structural contract the ADR-0005 review
-# flagged: FireState and ElectricalArcState MUST own a PhaseTimer
+# flagged: ElectricalArcState MUST own a PhaseTimer
 # instance; OxygenState MUST NOT. We probe by name so the smoke
 # catches a regression that renames the property (the names are
 # stable across all three model files for exactly this reason).

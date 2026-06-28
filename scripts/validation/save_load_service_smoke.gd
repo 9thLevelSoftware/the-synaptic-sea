@@ -6,7 +6,6 @@ const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_ma
 const RouteControlStateScript := preload("res://scripts/systems/route_control_state.gd")
 const OxygenStateScript := preload("res://scripts/systems/oxygen_state.gd")
 const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd")
-const FireStateScript := preload("res://scripts/systems/fire_state.gd")
 const ElectricalArcStateScript := preload("res://scripts/systems/electrical_arc_state.gd")
 const ObjectiveProgressStateScript := preload("res://scripts/systems/objective_progress_state.gd")
 const PlayerProgressionStateScript := preload("res://scripts/systems/player_progression_state.gd")
@@ -50,13 +49,10 @@ func _initialize() -> void:
 	var inventory := InventoryStateScript.new()
 	inventory.add_tool("portable_oxygen_pump")
 
-	var fire := FireStateScript.new()
-	# Per ADR-0005 HazardStateContract: configure() takes a Dictionary.
-	fire.configure({
-		"zone_ids": ["side_corridor_fire"],
-		"burn_duration": FireStateScript.DEFAULT_BURN_DURATION,
-		"clear_duration": FireStateScript.DEFAULT_CLEAR_DURATION,
-	})
+	# M7-B Task 7: the old timer FireState is retired. The RunSnapshot still
+	# carries a legacy `fire_summary` field for save-format back-compat, so this
+	# smoke seeds it with a representative literal dict and proves it round-trips.
+	var fire_summary: Dictionary = {"state": "CLEARED", "hazard_kind": "fire"}
 
 	# REQ-013: include the electrical-arc summary in the round-trip so the
 	# smoke proves all seven SUMMARY_FIELDS survive a save / load cycle.
@@ -85,7 +81,7 @@ func _initialize() -> void:
 	original.route_control_summary = route.get_summary()
 	original.oxygen_summary = oxygen.get_summary()
 	original.inventory_summary = inventory.get_summary()
-	original.fire_summary = fire.get_summary()
+	original.fire_summary = fire_summary
 	original.electrical_arc_summary = arc.get_summary()
 	original.objective_progress_summary = progress.get_summary()
 	original.audio_summary = _make_audio_summary_for_smoke()
@@ -222,7 +218,7 @@ func _initialize() -> void:
 	bad.route_control_summary = route.get_summary()
 	bad.oxygen_summary = oxygen.get_summary()
 	bad.inventory_summary = inventory.get_summary()
-	bad.fire_summary = fire.get_summary()
+	bad.fire_summary = fire_summary
 	bad.electrical_arc_summary = arc.get_summary()
 	bad.objective_progress_summary = progress.get_summary()
 	bad.audio_summary = original.audio_summary
