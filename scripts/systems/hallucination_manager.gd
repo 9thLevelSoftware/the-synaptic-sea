@@ -7,6 +7,7 @@ class_name HallucinationManager
 ## untouched. Phantoms deal no damage; they dissipate on attack or melee proximity.
 
 const ThreatPlaceholderRendererScript := preload("res://scripts/tools/threat_placeholder_renderer.gd")
+const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
 
 var director  # HallucinationDirector
 var melee_range: float = 1.2
@@ -107,16 +108,21 @@ func clear_all() -> void:
 
 ## Resolve the ambient hallucination SFX id from the audio seam (single source of
 ## truth for audio ids). Falls back to a literal only if the constant is absent.
-func _ambient_sfx_id():
-	var SeamScript = preload("res://scripts/audio/audio_event_seam.gd")
-	if "SFX_HALLUCINATION_WHISPER" in SeamScript:
-		return SeamScript.SFX_HALLUCINATION_WHISPER
-	return "hallucination_whisper"
+func _ambient_sfx_id() -> StringName:
+	# Single source of truth for the audio id. The constant is defined on the seam and the
+	# sfx_event_router has a matching catalog entry, so reference it directly — the previous
+	# `"X" in SeamScript` check always returned false (script constants are not properties),
+	# which silently used a wrong id the router could not resolve.
+	return AudioEventSeamScript.SFX_HALLUCINATION_WHISPER
 
 func _free_phantom(id: int) -> void:
 	var n = _phantom_nodes.get(id, null)
-	if n != null and is_instance_valid(n):
-		if n.get_parent() != null:
+	if is_instance_valid(n):
+		if is_instance_valid(n.get_parent()):
 			n.get_parent().remove_child(n)
 		n.queue_free()
 	_phantom_nodes.erase(id)
+	# Remove the director event too, else render() rebuilds the phantom next frame and the
+	# commit-to-reveal counterplay is defeated (the phantom reappears until its TTL).
+	if is_instance_valid(director) and director.has_method("remove_event"):
+		director.remove_event(id)

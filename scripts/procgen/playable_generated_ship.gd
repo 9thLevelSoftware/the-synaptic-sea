@@ -4658,6 +4658,27 @@ func _process(delta: float) -> void:
 		# progress, and the repair_blocked message + its countdown still apply
 		# away from home, even though the home oxygen/hazard loop is paused here.
 		_tick_threat_runtime(delta)
+		# ADR-0042 (Codex PR #44): the derelict field run is the PRIMARY low-sanity context,
+		# but this branch returns before the home-path sanity/hallucination tick. Drive it here
+		# too: away is never a safe zone, so sanity drains, the director advances, phantoms /
+		# false-HUD / FX render, and the tier-3 health teeth apply. The away path does not run
+		# the full survival vitals tick, so apply just the sanity health drain via apply_delta.
+		if sanity_state != null:
+			sanity_state.in_safe_zone = false
+			sanity_state.tick(delta)
+			if hallucination_director != null:
+				hallucination_director.tick(delta, {
+					"sanity": sanity_state.sanity,
+					"in_safe_zone": false,
+					"anchor_positions": _distributed_room_positions(),
+				})
+				if hallucination_manager != null and is_instance_valid(hallucination_manager):
+					var ppos_away: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
+					hallucination_manager.render(delta, ppos_away)
+				if vitals_state != null:
+					var away_drain: float = float(hallucination_director.get_direct_teeth()["health_drain_per_second"]) * delta
+					if away_drain > 0.0:
+						vitals_state.apply_delta({"health": -away_drain})
 		_refresh_player_vitals(delta)
 		# ADR-0038: emergency field crafting completes even away from home (powered-station
 		# crafts pause while away, by design — only field_crafting_state advances here).

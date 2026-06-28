@@ -113,6 +113,14 @@ func get_active_events(kind: String = "") -> Array:
 			out.append(e.duplicate(true))
 	return out
 
+## Remove a single active event by id (called when a phantom is dissipated, so it is not
+## immediately re-rendered from active_events on the next frame).
+func remove_event(id: int) -> void:
+	for i in range(active_events.size()):
+		if int(active_events[i]["id"]) == id:
+			active_events.remove_at(i)
+			return
+
 func get_direct_teeth() -> Dictionary:
 	if _current_tier >= 3:
 		return {"health_drain_per_second": health_drain_per_second, "stamina_recovery_mult": stamina_recovery_mult}

@@ -85,6 +85,14 @@ func _validate() -> void:
 	var attack_dissipates: bool = manager.phantom_count() < before_phantoms and bool(result.get("phantom_dissipated", false))
 	attack_dissipates = attack_dissipates and int(playable.inventory_state.get_quantity(_ammo_id())) < ammo_before
 
+	# No-respawn (commit-to-reveal): a dissipated phantom must NOT reappear next frame.
+	# Regression guard for the director-event-not-removed bug — without remove_event the
+	# manager rebuilds the same phantom from active_events on the very next render().
+	var post_attack_count: int = manager.phantom_count()
+	for i in range(5):
+		playable._process(1.0 / 30.0)
+	var no_respawn: bool = manager.phantom_count() <= post_attack_count
+
 	# Teeth: tier 3 drains health over time (sanity_health_drain).
 	playable.vitals_state.health = 90.0
 	var teeth_before: float = playable.vitals_state.health
@@ -108,6 +116,27 @@ func _validate() -> void:
 			break
 	var fx_ok: bool = director.get_fx_intensity() >= 0.99
 
+	# Derelict path (Codex PR #44): hallucinations + teeth must run on the away/boarded
+	# path too — it is the primary field-run context, and that _process branch returns
+	# before the home-path sanity block. Away is never a safe zone, so sanity drains and
+	# tier-3 health teeth apply even though the away path skips the full survival vitals tick.
+	if playable.threat_manager != null:
+		playable.threat_manager.threats.clear()
+	playable.away_from_start = true
+	playable.sanity_state.sanity = 50.0
+	var away_sanity_before: float = playable.sanity_state.sanity
+	for i in range(30):
+		playable._process(1.0 / 30.0)
+	var away_sanity_drains: bool = playable.sanity_state.sanity < away_sanity_before
+	if playable.threat_manager != null:
+		playable.threat_manager.threats.clear()
+	playable.sanity_state.sanity = 8.0
+	playable.vitals_state.health = 90.0
+	for i in range(30):
+		playable._process(1.0 / 30.0)
+	var away_teeth: bool = playable.vitals_state.health < 90.0
+	var away_ticks: bool = away_sanity_drains and away_teeth
+
 	# Clears: restore sanity (tier 0) and seal the breach (safe zone) => everything cleared.
 	playable.away_from_start = false
 	if playable.oxygen_state != null:
@@ -117,12 +146,12 @@ func _validate() -> void:
 		playable._process(1.0 / 30.0)
 	var clears: bool = manager.phantom_count() == 0
 
-	if manifested and phantom_no_damage and attack_dissipates and teeth and hud_ok and fx_ok and clears:
-		print("MAIN PLAYABLE HALLUCINATION PASS manifest=true phantom_no_damage=true attack_dissipates=true teeth=true clears=true hud=true fx=true reachable=true")
+	if manifested and phantom_no_damage and attack_dissipates and no_respawn and teeth and away_ticks and hud_ok and fx_ok and clears:
+		print("MAIN PLAYABLE HALLUCINATION PASS manifest=true phantom_no_damage=true attack_dissipates=true no_respawn=true teeth=true away_ticks=true clears=true hud=true fx=true reachable=true")
 		finished = true
 		_cleanup_and_quit(0)
 	else:
-		_fail("manifest=%s no_damage=%s attack=%s teeth=%s hud=%s fx=%s clears=%s" % [manifested, phantom_no_damage, attack_dissipates, teeth, hud_ok, fx_ok, clears])
+		_fail("manifest=%s no_damage=%s attack=%s no_respawn=%s teeth=%s away_ticks=%s hud=%s fx=%s clears=%s" % [manifested, phantom_no_damage, attack_dissipates, no_respawn, teeth, away_ticks, hud_ok, fx_ok, clears])
 
 func _ammo_id() -> String:
 	return "flare_round"
