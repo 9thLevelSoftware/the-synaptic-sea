@@ -4,6 +4,15 @@
 
 Accepted
 
+> **Amended by ADR-0041 (2026-06-27):** `FireState` has been **retired** and fire
+> migrated to `FireSuppressionState` as a persistent, compartment-keyed,
+> resource/repair-coupled hazard — it no longer cycles on a `PhaseTimer` and is no
+> longer part of the timer-hazard set. The timer-hazard set is now `ElectricalArcState`
+> **only**; oxygen and fire are both non-timer hazards. The `HazardStateContract`,
+> `PhaseTimer` helper, loader zone arrays, and save/load shape below remain in force for
+> oxygen and electrical arc. `hazard_contract_smoke.gd` accordingly asserts
+> `models=2 phase_timer_owners=1`. See ADR-0041 for fire's new model.
+
 ## Context
 
 REQ-013 (`docs/game/features/hazard_type_3.md`) adds `ElectricalArcState` as the third Alpha hazard type. The electrical-arc spec notes that `ElectricalArcState` shares the same timer/passability code shape as `FireState`: both cycle between two phases on fixed durations and toggle a collision segment. REQ-013 requires an ADR before implementation if the third hazard shares code with `FireState` or `OxygenState`.
