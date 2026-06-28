@@ -262,6 +262,9 @@ const FIRE_COMPARTMENT_SYSTEM := {
 const OXYGEN_MIN_FOR_FIRE: float = 5.0
 const FIRE_HEALTH_DRAIN_PER_SECOND: float = 2.0
 const FIRE_SYSTEM_DAMAGE_PER_SECOND: float = 0.05
+# Derelict-side fire: only ~1 in 7 boarded derelicts present any fire (deterministic per
+# seed). Fire is one of several possible derelict conditions, not a default.
+const FIRE_PRESENCE_PERCENT: int = 15
 # ADR-0038: crafting / salvage economy wired into the live run. These pure models are
 # coordinator-owned and ticked from _process; the station nodes are the player-reachable seam.
 var crafting_state                          # CraftingState
@@ -1831,8 +1834,8 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	_build_loot_containers()
 	_build_repair_points()
 	_build_breach_seal_points()
-	# M7-B Task 7: fresh derelict build — seed fires from damaged systems, render zones.
-	_seed_fires_from_damage()
+	# Derelict-side fire: per-ship pre-seeded environmental fire (presence-gated, capped).
+	_seed_derelict_fire()
 	_build_fire_zones()
 	# M7-B Task 9: manual extinguish nodes + recharge port share the fire lifecycle.
 	_build_fire_suppression_points()
@@ -2594,6 +2597,58 @@ func _on_breach_sealed(_compartment_id: String) -> void:
 # renders the burning set as PASSABLE Area3D zones (the player can walk into a
 # fire). Tasks 8/9 add vitals/system teeth and recharge wiring on top of the
 # same context + lifecycle built here.
+
+func _fire_tuning() -> Dictionary:
+	return _load_json_dict(SHIP_SUBSYSTEM_TUNING_PATH).get("fire_suppression", {})
+
+## Configures a per-ship derelict FireSuppressionState from shared tuning (compartments,
+## adjacency, rates). Required before seeding or after restoring from a summary so spread
+## topology exists.
+func _configure_derelict_fire(fs) -> void:
+	if fs != null:
+		fs.configure(_fire_tuning())
+
+## Pre-seeds environmental fire on a freshly built derelict. Deterministic, RNG-free:
+## a per-seed presence gate (FIRE_PRESENCE_PERCENT) decides whether THIS derelict burns at
+## all; when it does, ignites up to a condition-scaled cap of compartments whose mapped
+## system is damaged (and not breached). Never called on the home/lifeboat ship or on the
+## save-restore path (restored fire comes from the applied ShipInstance "fire" summary).
+func _seed_derelict_fire() -> void:
+	if not away_from_start or current_ship == null:
+		return
+	var fs = current_ship.get_fire()
+	if fs == null:
+		return
+	_configure_derelict_fire(fs)
+	var seed_int: int = _ship_seed(current_ship)
+	# Presence gate — most derelicts board fire-free.
+	if (abs(hash("%d:fire_presence" % seed_int)) % 100) >= FIRE_PRESENCE_PERCENT:
+		return
+	var mgr = _active_systems_manager()
+	if mgr == null:
+		return
+	# Candidate compartments: mapped system damaged, not breached. Deterministic order.
+	var breached := {}
+	if hull_integrity_state != null:
+		for cid in hull_integrity_state.compartments:
+			if bool((hull_integrity_state.compartments[cid] as Dictionary).get("breach_open", false)):
+				breached[str(cid)] = true
+	var candidates: Array = []
+	for cid in FIRE_COMPARTMENT_SYSTEM:
+		var sid: String = str(FIRE_COMPARTMENT_SYSTEM[cid])
+		if sid.is_empty() or breached.has(str(cid)):
+			continue
+		var sys = mgr.get_system(sid)
+		if sys != null and not sys.is_self_functional():
+			candidates.append(str(cid))
+	candidates.sort()
+	var cap: int = 2 + (1 if _ship_condition_class(current_ship) == ShipBlueprint.Condition.WRECKED else 0)
+	var lit: int = 0
+	for cid in candidates:
+		if lit >= cap:
+			break
+		fs.ignite(cid, 1.0)
+		lit += 1
 
 ## Builds the per-frame context the authoritative fire model ticks against.
 func _build_fire_context() -> Dictionary:
