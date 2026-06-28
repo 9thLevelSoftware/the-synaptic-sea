@@ -25,6 +25,19 @@ func _initialize() -> void:
 	e2.configure({"charge": 0.0, "max_charge": 100.0})
 	if not e2.apply_summary(s) or absf(e2.charge - e.charge) > 0.001:
 		_fail("round-trip failed"); return
+	# guard: empty summary is rejected.
+	if e2.apply_summary({}):
+		_fail("apply_summary({}) should return false"); return
+	# guard: negative recharge delta is a no-op.
+	var before := e2.charge
+	e2.recharge(-1.0)
+	if absf(e2.charge - before) > 0.001:
+		_fail("recharge(-1.0) should not change charge"); return
+	# guard: max_charge is floored to 1.0.
+	var e3 := ExtinguisherState.new()
+	e3.configure({"max_charge": 0.5, "charge": 0.5})
+	if absf(e3.max_charge - 1.0) > 0.001:
+		_fail("configure max_charge floor should be 1.0, got %.3f" % e3.max_charge); return
 	print("EXTINGUISHER STATE PASS consume=true recharge=true round_trip=true")
 	quit(0)
 

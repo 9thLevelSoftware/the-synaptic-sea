@@ -51,5 +51,8 @@ func apply_summary(summary: Dictionary) -> bool:
 			if absf(new_val - float(get(key))) > 0.001:
 				set(key, new_val)
 				changed = true
+	max_charge = maxf(1.0, max_charge)
+	charge_cost_per_use = maxf(0.0, charge_cost_per_use)
+	recharge_per_second = maxf(0.0, recharge_per_second)
 	charge = clampf(charge, 0.0, max_charge)
 	return changed
