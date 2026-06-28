@@ -4,7 +4,6 @@ class_name PowerGridState
 const DEFAULT_SUBSYSTEM_ORDER: Array[String] = [
 	"life_support",
 	"propulsion",
-	"shields",
 	"stations",
 	"lights",
 	"sustenance",

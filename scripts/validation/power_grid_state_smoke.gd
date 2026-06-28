@@ -7,11 +7,10 @@ func _initialize() -> void:
 	grid.configure({
 		"total_supply_units": 100.0,
 		"min_operational_ratio": 0.5,
-		"subsystem_order": ["life_support", "propulsion", "shields", "stations", "lights", "sustenance"],
+		"subsystem_order": ["life_support", "propulsion", "stations", "lights", "sustenance"],
 		"baseline_demand_units": {
 			"life_support": 22.0,
 			"propulsion": 30.0,
-			"shields": 18.0,
 			"stations": 12.0,
 			"lights": 8.0,
 			"sustenance": 10.0
@@ -36,11 +35,10 @@ func _initialize() -> void:
 	restored.configure({
 		"total_supply_units": 100.0,
 		"min_operational_ratio": 0.5,
-		"subsystem_order": ["life_support", "propulsion", "shields", "stations", "lights", "sustenance"],
+		"subsystem_order": ["life_support", "propulsion", "stations", "lights", "sustenance"],
 		"baseline_demand_units": {
 			"life_support": 22.0,
 			"propulsion": 30.0,
-			"shields": 18.0,
 			"stations": 12.0,
 			"lights": 8.0,
 			"sustenance": 10.0
