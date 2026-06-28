@@ -3737,6 +3737,7 @@ func _consumable_pipeline_context() -> Dictionary:
 		"radiation_state": radiation_state,
 		"body_temperature_state": body_temperature_state,
 		"status_effects_state": status_effects_state,
+		"spoilage_state": spoilage_state,
 	}
 
 func _get_consumable_slot_labels() -> Array:
