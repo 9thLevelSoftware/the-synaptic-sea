@@ -90,6 +90,9 @@ const PowerGridStateScript := preload("res://scripts/systems/power_grid_state.gd
 const LifeSupportExpandedStateScript := preload("res://scripts/systems/life_support_state.gd")
 const HullIntegrityStateScript := preload("res://scripts/systems/hull_integrity_state.gd")
 const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
+const ExtinguisherStateScript := preload("res://scripts/systems/extinguisher_state.gd")
+const FireSuppressionPointScript := preload("res://scripts/tools/fire_suppression_point.gd")
+const ExtinguisherRechargePortScript := preload("res://scripts/tools/extinguisher_recharge_port.gd")
 const PropulsionExpandedStateScript := preload("res://scripts/systems/propulsion_state.gd")
 const SustenanceStateScript := preload("res://scripts/systems/sustenance_state.gd")
 const EffectDispatcherScript := preload("res://scripts/systems/effect_dispatcher.gd")
@@ -242,6 +245,11 @@ var breach_seal_points: Array = []
 # M7-B Task 7: authoritative fire renders as PASSABLE per-compartment Area3D
 # zones (visual + lookup only; never a collision blocker). compartment_id -> Area3D.
 var fire_zone_nodes: Dictionary = {}
+# M7-B Task 9: manual extinguish nodes (one per burning compartment) + the single
+# home/lifeboat extinguisher recharge port. Tracked here so they share the fire
+# zone build/clear lifecycle and the interact dispatcher precedence.
+var fire_suppression_points: Array = []
+var extinguisher_recharge_port  # ExtinguisherRechargePort
 const FIRE_COMPARTMENT_SYSTEM := {
 	"bridge": "navigation",
 	"engineering": "power",
@@ -332,6 +340,7 @@ var power_grid_state  # PowerGridState
 var life_support_expanded_state  # LifeSupportState
 var hull_integrity_state  # HullIntegrityState
 var fire_suppression_state  # FireSuppressionState
+var extinguisher_state  # ExtinguisherState
 var propulsion_expanded_state  # PropulsionState
 var sustenance_state  # SustenanceState
 # Task 05 consumables runtime state.
@@ -1294,6 +1303,8 @@ func _configure_expanded_ship_system_models() -> void:
 	life_support_expanded_state.configure(tuning.get("life_support", {}))
 	fire_suppression_state = FireSuppressionStateScript.new()
 	fire_suppression_state.configure(tuning.get("fire_suppression", {}))
+	extinguisher_state = ExtinguisherStateScript.new()
+	extinguisher_state.configure(tuning.get("extinguisher", {}))
 	propulsion_expanded_state = PropulsionExpandedStateScript.new()
 	propulsion_expanded_state.configure(tuning.get("propulsion", {}))
 	sustenance_state = SustenanceStateScript.new()
@@ -1345,6 +1356,10 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 		for st in crafting_stations:
 			if is_instance_valid(st):
 				st.set_powered(stations_powered)
+		# M7-B Task 9: the extinguisher recharge port draws from the same "stations"
+		# channel as the crafting stations.
+		if is_instance_valid(extinguisher_recharge_port):
+			extinguisher_recharge_port.set_powered(power_grid_state.get_allocation_ratio("stations") > 0.0)
 		if crafting_state.tick(delta):
 			_on_craft_completed()
 	if field_crafting_state != null and field_crafting_state.tick(delta):
@@ -1363,6 +1378,7 @@ func _expanded_ship_systems_summary() -> Dictionary:
 		"life_support_state_summary": life_support_expanded_state.get_summary() if life_support_expanded_state != null else {},
 		"hull_integrity_summary": hull_integrity_state.get_summary() if hull_integrity_state != null else {},
 		"fire_suppression_summary": fire_suppression_state.get_summary() if fire_suppression_state != null else {},
+		"extinguisher_summary": extinguisher_state.get_summary() if extinguisher_state != null else {},
 		"propulsion_state_summary": propulsion_expanded_state.get_summary() if propulsion_expanded_state != null else {},
 		"sustenance_state_summary": sustenance_state.get_summary() if sustenance_state != null else {},
 	}
@@ -1796,6 +1812,9 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	# M7-B Task 7: fresh derelict build — seed fires from damaged systems, render zones.
 	_seed_fires_from_damage()
 	_build_fire_zones()
+	# M7-B Task 9: manual extinguish nodes + recharge port share the fire lifecycle.
+	_build_fire_suppression_points()
+	_build_extinguisher_recharge_port()
 
 ## Captures the player's world pose relative to the piloted ship's scene_root so the
 ## player can be carried when the piloted ship is repositioned by a dock. Returns
@@ -2704,8 +2723,84 @@ func _refresh_fire_zones() -> void:
 	rendered_keys.sort()
 	if burning_keys != rendered_keys:
 		_build_fire_zones()
+		# M7-B Task 9: keep the manual extinguish nodes tracking the burning set.
+		_build_fire_suppression_points()
+
+# --- M7-B Task 9: manual extinguish loop -------------------------------------
+# One FireSuppressionPoint per burning compartment, rebuilt from model truth on
+# every change. The single recharge port lives on the home/lifeboat ship only.
+
+func _build_fire_suppression_points() -> void:
+	_clear_fire_suppression_points()
+	if fire_suppression_state == null:
+		return
+	var burning: Array = fire_suppression_state.get_burning_compartments()
+	if burning.is_empty():
+		return
+	var positions: Array = _distributed_room_positions()
+	if positions.is_empty():
+		return
+	var idx: int = 0
+	for cid in burning:
+		var pos: Vector3 = positions[idx % positions.size()]
+		idx += 1
+		var fp = FireSuppressionPointScript.new()
+		fp.configure(str(cid), fire_suppression_state, extinguisher_state, inventory_state, player_progression, pos, 4.0, "fire_extinguisher", 1.8)
+		if not fp.fire_extinguished.is_connected(_on_fire_extinguished):
+			fp.fire_extinguished.connect(_on_fire_extinguished)
+		_attach_zone_to_active_ship(fp)
+		fire_suppression_points.append(fp)
+
+func _clear_fire_suppression_points() -> void:
+	for fp in fire_suppression_points:
+		if is_instance_valid(fp):
+			var parent = fp.get_parent()
+			if parent != null and is_instance_valid(parent):
+				parent.remove_child(fp)
+			fp.queue_free()
+	fire_suppression_points.clear()
+
+func _on_fire_extinguished(_compartment_id: String) -> void:
+	_refresh_fire_zones()
+	_build_fire_suppression_points()
+
+func _build_extinguisher_recharge_port() -> void:
+	_clear_extinguisher_recharge_port()
+	if extinguisher_state == null or away_from_start:
+		return
+	var positions: Array = _distributed_room_positions()
+	var pos: Vector3 = positions[0] if not positions.is_empty() else Vector3(0.0, PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR, 0.0)
+	var port = ExtinguisherRechargePortScript.new()
+	port.configure(extinguisher_state, pos, 1.8)
+	_attach_zone_to_active_ship(port)
+	extinguisher_recharge_port = port
+
+func _clear_extinguisher_recharge_port() -> void:
+	if is_instance_valid(extinguisher_recharge_port):
+		var parent = extinguisher_recharge_port.get_parent()
+		if parent != null and is_instance_valid(parent):
+			parent.remove_child(extinguisher_recharge_port)
+		extinguisher_recharge_port.queue_free()
+	extinguisher_recharge_port = null
 
 # --- validation seams ---
+func get_extinguisher_state():
+	return extinguisher_state
+
+func get_fire_suppression_points_for_validation() -> Array:
+	return fire_suppression_points.duplicate()
+
+func get_extinguisher_recharge_port_for_validation():
+	return extinguisher_recharge_port
+
+func teleport_player_to_fire_suppression_point_for_validation(point) -> bool:
+	if player == null or point == null or not is_instance_valid(point):
+		return false
+	if player is Node3D and point is Node3D:
+		(player as Node3D).global_position = (point as Node3D).global_position
+		return true
+	return false
+
 func get_burning_compartments_for_validation() -> Array:
 	return fire_suppression_state.get_burning_compartments() if fire_suppression_state != null else []
 
@@ -3223,12 +3318,17 @@ func travel_home() -> bool:
 	_clear_repair_points()
 	_clear_breach_seal_points()
 	_clear_fire_zones()
+	_clear_fire_suppression_points()
+	_clear_extinguisher_recharge_port()
 	_build_loot_containers()
 	_build_repair_points()
 	_build_breach_seal_points()
 	# M7-B Task 7: returning home rebuilds interactables — re-seed/render fire.
 	_seed_fires_from_damage()
 	_build_fire_zones()
+	# M7-B Task 9: manual extinguish nodes + recharge port share the fire lifecycle.
+	_build_fire_suppression_points()
+	_build_extinguisher_recharge_port()
 	_build_crafting_stations()
 	if tracker != null and loader != null and loader.has_method("get_objective_specs_copy"):
 		# set_objectives resets the tracker's completed set; re-apply the home loop's
@@ -3793,6 +3893,9 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	# then render the burning set as passable zones.
 	_seed_fires_from_damage()
 	_build_fire_zones()
+	# M7-B Task 9: manual extinguish nodes + recharge port share the fire lifecycle.
+	_build_fire_suppression_points()
+	_build_extinguisher_recharge_port()
 	_build_crafting_stations()
 	tracker.set_objectives(loader.get_objective_specs_copy())
 	current_objective_sequence = 1
@@ -4010,6 +4113,10 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		for sp in breach_seal_points:
 			if is_instance_valid(sp) and sp.try_start(player_body):
 				return
+		# M7-B: fire suppression points share the survival-critical precedence.
+		for fp in fire_suppression_points:
+			if is_instance_valid(fp) and fp.try_start(player_body):
+				return
 		# Sub-project #3: derelict loot containers are pickup-like interactables.
 		# Try them before objectives, matching the home ship's tool-pickup
 		# precedence when an objective and pickup share the same interaction area.
@@ -4034,6 +4141,10 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# M7-A: hull breach seal points share the repair-point precedence (survival-critical).
 	for sp in breach_seal_points:
 		if is_instance_valid(sp) and sp.try_start(player_body):
+			return
+	# M7-B: fire suppression points share the survival-critical precedence.
+	for fp in fire_suppression_points:
+		if is_instance_valid(fp) and fp.try_start(player_body):
 			return
 	# ADR-0038: home-ship crafting / salvage stations. Range-gated; tried after repairs so a
 	# repair point and a station sharing an area resolve to the repair first.
@@ -5681,6 +5792,8 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 			hull_integrity_state.apply_summary(snapshot.ship_systems_summary.get("hull_integrity_summary", {}))
 		if fire_suppression_state != null:
 			fire_suppression_state.apply_summary(snapshot.ship_systems_summary.get("fire_suppression_summary", {}))
+		if extinguisher_state != null:
+			extinguisher_state.apply_summary(snapshot.ship_systems_summary.get("extinguisher_summary", {}))
 		if propulsion_expanded_state != null:
 			propulsion_expanded_state.apply_summary(snapshot.ship_systems_summary.get("propulsion_state_summary", {}))
 		if sustenance_state != null:
@@ -5793,6 +5906,9 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	# M7-B Task 7: save-restore path — render the burning set from the applied
 	# fire_suppression_summary. Do NOT seed here (restored fires are authoritative).
 	_build_fire_zones()
+	# M7-B Task 9: rebuild manual extinguish nodes + recharge port for restored fires.
+	_build_fire_suppression_points()
+	_build_extinguisher_recharge_port()
 	_build_crafting_stations()
 	# Restore the saved objective sequence AFTER all model state has
 	# been applied so the subsequent _activate_current_objective() call
@@ -6392,6 +6508,9 @@ func _reset_runtime_for_reload() -> void:
 			tool_pickup_root.remove_child(child)
 			child.queue_free()
 	_clear_fire_zones()
+	# M7-B Task 9: manual extinguish nodes + recharge port share the fire teardown.
+	_clear_fire_suppression_points()
+	_clear_extinguisher_recharge_port()
 	if arc_root != null and is_instance_valid(arc_root):
 		for child in arc_root.get_children():
 			arc_root.remove_child(child)
