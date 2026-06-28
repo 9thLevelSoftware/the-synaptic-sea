@@ -104,7 +104,31 @@ func _initialize() -> void:
 		_fail("fire_health_drain not applied (expected 46.0, got %.3f)" % vf.health)
 		return
 
-	print("VITALS STATE PASS health=%.1f stamina=%.1f hunger=%.1f thirst=%.1f" % [v.health, v.stamina, v.hunger, v.thirst])
+	# Sanity teeth: sanity_health_drain adds to health drain at sanity tier 3.
+	var vs := VitalsStateScript.new()
+	vs.configure({})
+	vs.health = 90.0
+	vs.tick(1.0, {"sanity_health_drain": 5.0, "moving": false})
+	var drain_ok := vs.health < 90.0
+	if not drain_ok:
+		_fail("sanity_health_drain not applied (health should be < 90.0, got %.3f)" % vs.health)
+		return
+
+	# Sanity teeth: sanity_stamina_recovery_mult reduces stamina recovery vs baseline.
+	var va := VitalsStateScript.new()
+	va.stamina = 10.0
+	va.tick(1.0, {"moving": false})
+	var base_recover: float = va.stamina - 10.0
+	var vb := VitalsStateScript.new()
+	vb.stamina = 10.0
+	vb.tick(1.0, {"moving": false, "sanity_stamina_recovery_mult": 0.5})
+	var pen_recover: float = vb.stamina - 10.0
+	var stamina_ok := base_recover > 0.0 and pen_recover < base_recover
+	if not stamina_ok:
+		_fail("sanity_stamina_recovery_mult not applied (base=%.3f pen=%.3f)" % [base_recover, pen_recover])
+		return
+
+	print("VITALS STATE PASS health=%.1f stamina=%.1f hunger=%.1f thirst=%.1f sanity_drain=true sanity_stamina=true" % [v.health, v.stamina, v.hunger, v.thirst])
 	quit(0)
 
 func _fail(reason: String) -> void:

@@ -33,6 +33,7 @@ const EVENT_CATALOG: Dictionary = {
 	String(AudioEventSeam.SFX_FOOTSTEP): {"bus": AudioEventSeam.BUS_SFX, "volume_db": -10.0, "cooldown": 0.30, "caption": ""},
 	String(AudioEventSeam.SFX_DROP_ITEM): {"bus": AudioEventSeam.BUS_SFX, "volume_db": -6.0, "cooldown": 0.05, "caption": ""},
 	String(AudioEventSeam.SFX_DOCK_LAND): {"bus": AudioEventSeam.BUS_SFX, "volume_db": -3.0, "cooldown": 0.50, "caption": "Docked"},
+	String(AudioEventSeam.SFX_HALLUCINATION_WHISPER): {"bus": AudioEventSeam.BUS_SFX, "volume_db": -14.0, "cooldown": 1.5, "caption": ""},
 
 	String(AudioEventSeam.UI_INVENTORY_OPEN): {"bus": AudioEventSeam.BUS_UI, "volume_db": -6.0, "cooldown": 0.10, "caption": ""},
 	String(AudioEventSeam.UI_INVENTORY_CLOSE): {"bus": AudioEventSeam.BUS_UI, "volume_db": -6.0, "cooldown": 0.10, "caption": ""},

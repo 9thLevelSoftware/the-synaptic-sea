@@ -25,13 +25,16 @@ A Project-Zomboid-style moodle/vitals stack adapted to space horror: oxygen, hea
 ## Cascade rules
 1. Hunger below 30% reduces stamina recovery by 50%.
 2. Thirst below 20% reduces vision/readability (communicated to HUD as a warning).
-3. Sanity below 40% applies perception/hallucination pressure (communicated to HUD).
+3. Sanity below 40% activates tiered hallucinations (ADR-0042): tier-1 (< 40) ambient cues;
+   tier-2 (< 25) phantom threats + false HUD contact blips; tier-3 (< 15) direct vitals drain
+   (health drain per second, stamina recovery penalty) and wasted-ammo counterplay via
+   commit-to-reveal phantom dissipation. Sanity is now mechanically coupled, not cosmetic.
 4. Radiation above 50% causes passive health drain.
 5. Body temperature outside safe range [18, 32] increases thirst drain.
 
 ## Acceptance criteria
 - All vitals drain/recover under deterministic tuning.
-- At least three cascade interactions are live: hunger->stamina, thirst->vision, sanity->perception.
+- At least three cascade interactions are live: hunger->stamina, thirst->vision, sanity->tiered hallucinations (phantom threats + false HUD + vitals teeth at tier 3, ADR-0042).
 - Save/load preserves non-default vitals and active status effects.
 - HUD communicates every critical state without opening a menu.
 

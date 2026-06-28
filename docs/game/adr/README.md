@@ -26,6 +26,8 @@ Validated by: Task 15 (`t_c7ac4d08`) / `REQUIREMENT TRACE PASS`
 | 0038 | docs/game/adr/0038-crafting-materials-stations-architecture.md | materials/crafting/stations/quality/field crafting |
 | 0039 | docs/game/adr/0039-cross-system-integration-audit-architecture.md | Task 14 integration audit models and e2e smokes |
 | 0040 | docs/game/adr/0040-systems-map-task-graph-currency.md | Task 15 doc-currency validators and board manifest checks |
+| 0041 | docs/game/adr/0041-fire-as-persistent-compartment-hazard.md | fire as authoritative compartment hazard; FireState retired; three extinguish paths |
+| 0042 | docs/game/adr/0042-sanity-hallucinations.md | sanity hallucination director (4 channels, deterministic, tier-3 teeth); closes M1 sanity cosmetic gap |
 
 ## Notes
 

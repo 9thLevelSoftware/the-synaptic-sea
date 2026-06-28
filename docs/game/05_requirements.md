@@ -373,6 +373,36 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - `vitals_state_smoke.gd`
   - `VITALS STATE PASS`
 
+## REQ-SV-002: Sanity hallucinations (REQ-SV-002)
+
+- Source: `docs/game/features/survival_vitals.md`, ADR-0042
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Sanity below 40% was previously cosmetic (HUD text only). ADR-0042 replaces the
+  cosmetic output with a tiered hallucination system: tier-1 ambient cues, tier-2 phantom threats
+  and false HUD readouts, tier-3 direct health drain and stamina recovery penalty plus wasted-ammo
+  counterplay. This closes the M1 simulation loop gap identified in the system-completion audit.
+- Acceptance criteria:
+  - Sanity below 40 activates tier-1 ambient hallucination cues (no HUD or phantom events).
+  - Sanity below 25 activates tier-2 phantom threats and false HUD contact blips.
+  - Sanity below 15 activates tier-3 direct vitals teeth: health drain per second and reduced
+    stamina recovery multiplier fed into the vitals tick via `sanity_health_drain` and
+    `sanity_stamina_recovery_mult` context keys.
+  - Phantoms are rendered by `HallucinationManager`, never registered in `ThreatManager`; real
+    combat math is untouched.
+  - Swinging at a phantom in melee range dissipates it and spends the attack action (wasted ammo
+    if an ammo weapon is equipped); the attack result carries `phantom_dissipated: true`.
+  - Entering a safe zone or returning sanity to tier 0 clears all active hallucination events.
+  - The hallucination schedule is deterministic from seed and sanity history (no `randi()`/`randf()`).
+  - Hallucination events are not persisted; they re-derive from the already-saved sanity value on load.
+  - A pure-model smoke and a main-scene live-loop smoke both pass.
+- Verification:
+  - `scripts/validation/hallucination_director_smoke.gd`
+  - `HALLUCINATION DIRECTOR PASS tiers=true gated=true deterministic=true ttl=true teeth=true fx=true round_trip=true`
+  - `scripts/validation/main_playable_hallucination_smoke.gd`
+  - `MAIN PLAYABLE HALLUCINATION PASS manifest=true phantom_no_damage=true attack_dissipates=true teeth=true clears=true hud=true fx=true reachable=true`
+
 ## REQ-SV-007: Survival vitals (REQ-SV-007)
 
 - Source: `docs/game/features/survival_vitals.md`

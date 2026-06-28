@@ -60,7 +60,7 @@ its cause-and-effect loops.
 
 ## Lane-by-lane grades
 
-### M1 · Survival vitals — 🟢 mostly closed-loop (the best-wired lane)
+### M1 · Survival vitals — 🟢 fully closed-loop (all five systems coupled)
 
 | System | Coupled | Live input → output | Conf |
 | --- | --- | --- | --- |
@@ -68,13 +68,13 @@ its cause-and-effect loops.
 | `radiation_state` | 🟢 | ← in-radiation zone (away/breach, 4227) → vitals health drain (4209) | [V] |
 | `body_temperature_state` | 🟢 | ← extreme zone (away, 4230) → vitals thirst mult (4206) | [V] |
 | `status_effects_state` | 🟢 | ← stimulant/addiction/consumables → vitals stamina-recovery mult (4212) | [V] |
-| `sanity_state` | 🟡 | ← safe-zone flag (4222) → `vitals_model.apply_sanity_summary` (4417) renders **HUD warnings only** (`_sanity_lines`: a "<40" warning + a `perception_pressure_active` text line); no mechanical consumer traced | [V] |
+| `sanity_state` | 🟢 | ← safe-zone flag → `hallucination_director.tick(delta, hctx)` (sanity block, after `sanity_state.tick`) → **HallucinationManager** renders phantoms/HUD lies/FX; `get_direct_teeth()` feeds `sanity_health_drain` + `sanity_stamina_recovery_mult` into vitals tick; phantom dissipate in `_attack_with_equipped_weapon` (wasted ammo teeth). Three tiers (< 40 / < 25 / < 15). Closed by ADR-0042. | [V] |
 
-**Gap (CONFIRMED cosmetic):** sanity has a live *source* (safe-zone) but its *output* is HUD
-warning text — low sanity causes no traced damage / hallucination / control effect. A
-`perception_pressure_active` flag is published in the summary but nothing mechanical consumes
-it within the vitals model. **Give sanity teeth (or accept it as a cosmetic meter).** Content:
-vitals tuning exists.
+**RESOLVED (ADR-0042):** sanity now has a live *source* (safe-zone flag) **and** live mechanical
+*outputs*: tier-1 ambient SFX cues, tier-2 phantom threats + false HUD contact blips, tier-3
+direct vitals drain (health + stamina recovery penalty) and wasted-ammo "commit-to-reveal"
+counterplay. `perception_pressure_active` is still published but sanity's gameplay output is no
+longer HUD-text-only. Proven by `main_playable_hallucination_smoke.gd`. Content: vitals tuning exists.
 
 ### M2 · Food / cooking / spoilage — 🟡 eat→vitals loop CLOSED; production via crafting; standalone duplicates removed
 
@@ -282,9 +282,13 @@ to close a loop." Ordered by how much each breaks *the game functioning as a who
    derelict-side fire points/recharge ports, and door-gated spread. **Sustenance** remains a
    HUD shadow — it consumes the farm/cook chain but feeds no player vital. (**Life-support is
    no longer in this list — RESOLVED by M7-A.**) *(M7)*
-6. **🔴 Sanity is cosmetic** — live source (safe-zone) but output is HUD warning text only; no
-   damage / hallucination / control effect consumes low sanity. Give it teeth or accept it as a
-   meter. *(M1)*
+6. **✅ RESOLVED (ADR-0042) — Sanity hallucinations closed the loop.** Sanity now drives a
+   deterministic `HallucinationDirector` (seeded integer hash, no RNG) across three tiers
+   (< 40 / < 25 / < 15): tier-1 ambient SFX cues; tier-2 phantom threats (via `HallucinationManager`,
+   shared `ThreatPlaceholderRenderer`) + false HUD contact blips; tier-3 direct vitals teeth
+   (`sanity_health_drain` → `vitals_state.tick` + `sanity_stamina_recovery_mult`) plus wasted-ammo
+   "commit-to-reveal" dissipation. Real combat is untouched; phantoms re-derive from sanity on load
+   (no RunSnapshot change). Proven by `main_playable_hallucination_smoke.gd`. *(M1)*
 
 **Unverified couplings the next pass must trace:**
 

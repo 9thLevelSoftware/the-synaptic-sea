@@ -53,8 +53,10 @@ func configure(config: Dictionary) -> void:
 ##   "radiation_health_drain" -> float (added to health drain when radiation high)
 ##   "atmosphere_health_drain" -> float (added to health drain when the hub atmosphere is fouled)
 ##   "fire_health_drain" -> float (added to health drain while standing in a burning compartment)
+##   "sanity_health_drain" -> float (added to health drain at sanity tier 3)
 ##   "temperature_thirst_mult" -> float (multiplies thirst drain when temp unsafe)
 ##   "status_stamina_recovery_mult" -> float (multiplier from active effects)
+##   "sanity_stamina_recovery_mult" -> float (multiplies stamina recovery at sanity tier 3)
 ##   "moving" -> bool (when false stamina recovers instead of draining)
 func tick(delta_seconds: float, context: Dictionary = {}) -> bool:
 	if delta_seconds <= 0.0:
@@ -66,6 +68,8 @@ func tick(delta_seconds: float, context: Dictionary = {}) -> bool:
 		stamina_recovery_mult = 0.5
 	if context.has("status_stamina_recovery_mult"):
 		stamina_recovery_mult *= float(context.get("status_stamina_recovery_mult", 1.0))
+	if context.has("sanity_stamina_recovery_mult"):
+		stamina_recovery_mult *= float(context.get("sanity_stamina_recovery_mult", 1.0))
 	# Stamina
 	var moving: bool = bool(context.get("moving", true))
 	if moving:
@@ -86,6 +90,8 @@ func tick(delta_seconds: float, context: Dictionary = {}) -> bool:
 		h_drain += float(context.get("atmosphere_health_drain", 0.0)) * delta_seconds
 	if context.has("fire_health_drain"):
 		h_drain += float(context.get("fire_health_drain", 0.0)) * delta_seconds
+	if context.has("sanity_health_drain"):
+		h_drain += float(context.get("sanity_health_drain", 0.0)) * delta_seconds
 	if h_drain > 0.0 and health > 0.0:
 		health = maxf(0.0, health - h_drain)
 		changed = true
