@@ -1,8 +1,15 @@
 # Feature: Hazard Variety — Timed Fire Zone
 
+> **Superseded (M7-B).** The cyclic, timer-driven `FireState` fire hazard described
+> below was retired and replaced by the persistent compartment-fire model introduced
+> in M7-B. See **ADR-0041 (Fire as a persistent compartment hazard)** and **REQ-010**
+> for the current design (ignite/spread on accumulated damage, manual extinguishing
+> via fire-suppression points, recharge ports, no automatic SAFE/BURNING cycle). The
+> Gate-2 content below is retained as history only and no longer reflects runtime behavior.
+
 ## Status
 
-Approved for Gate 2 implementation
+Approved for Gate 2 implementation (superseded by M7-B persistent fire — see ADR-0041)
 
 ## Requirement cross-reference
 

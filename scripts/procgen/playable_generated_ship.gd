@@ -1356,12 +1356,12 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 		for st in crafting_stations:
 			if is_instance_valid(st):
 				st.set_powered(stations_powered)
-		# M7-B Task 9: the extinguisher recharge port draws from the same "stations"
-		# channel as the crafting stations.
-		if is_instance_valid(extinguisher_recharge_port):
-			extinguisher_recharge_port.set_powered(power_grid_state.get_allocation_ratio("stations") > 0.0)
 		if crafting_state.tick(delta):
 			_on_craft_completed()
+	# M7-B Task 9: the extinguisher recharge port draws from the same "stations"
+	# channel as the crafting stations, but its power is independent of crafting_state.
+	if is_instance_valid(extinguisher_recharge_port):
+		extinguisher_recharge_port.set_powered(power_grid_state.get_allocation_ratio("stations") > 0.0)
 	if field_crafting_state != null and field_crafting_state.tick(delta):
 		_on_field_craft_completed()
 	if sustenance_state != null:
@@ -2608,6 +2608,10 @@ func _build_fire_context() -> Dictionary:
 ## ignition accumulator fills. Only called on a genuine fresh build, never on the
 ## save-restore path (restored fires come from the applied summary).
 func _seed_fires_from_damage() -> void:
+	# M7-B: fire is home/lifeboat-only for now; derelict-side fire is deferred
+	# (away-ship parity is a follow-up per the fire-suppression spec).
+	if away_from_start:
+		return
 	if fire_suppression_state == null:
 		return
 	var ctx := _build_fire_context()
@@ -2648,6 +2652,10 @@ func _apply_fire_system_damage(delta: float) -> void:
 
 func _build_fire_zones() -> void:
 	_clear_fire_zones()
+	# M7-B: fire is home/lifeboat-only for now. Still clear stale away-side nodes
+	# above, then skip building on a derelict (away-ship parity is a follow-up).
+	if away_from_start:
+		return
 	if fire_suppression_state == null:
 		return
 	var burning: Array = fire_suppression_state.get_burning_compartments()
@@ -2732,6 +2740,10 @@ func _refresh_fire_zones() -> void:
 
 func _build_fire_suppression_points() -> void:
 	_clear_fire_suppression_points()
+	# M7-B: fire is home/lifeboat-only for now. Still clear stale away-side nodes
+	# above, then skip building on a derelict (away-ship parity is a follow-up).
+	if away_from_start:
+		return
 	if fire_suppression_state == null:
 		return
 	var burning: Array = fire_suppression_state.get_burning_compartments()
@@ -2761,8 +2773,9 @@ func _clear_fire_suppression_points() -> void:
 	fire_suppression_points.clear()
 
 func _on_fire_extinguished(_compartment_id: String) -> void:
+	# _refresh_fire_zones() already rebuilds suppression points when the burning
+	# set changes (Task 9), so no second explicit _build_fire_suppression_points().
 	_refresh_fire_zones()
-	_build_fire_suppression_points()
 
 func _build_extinguisher_recharge_port() -> void:
 	_clear_extinguisher_recharge_port()
