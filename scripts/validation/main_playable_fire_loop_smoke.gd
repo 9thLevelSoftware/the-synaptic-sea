@@ -58,6 +58,15 @@ func _validate() -> void:
 	# test asserts. Zeroing the cascade rate leaves damage- and spread-driven fire intact.
 	playable.fire_suppression_state.cascade_rate_per_second = 0.0
 
+	# Keep suppression UNPOWERED for the manual-fight portion: powered auto-suppression
+	# (stations >= power_threshold) would otherwise extinguish engineering before the manual
+	# extinguish step, making this test non-deterministic. This also models the real scenario
+	# the manual loop exists for — a power failure where the crew must fight fire by hand.
+	# (Reclaiming the dead shield power budget gives the grid surplus, so stations now stays
+	# pinned at full power unless explicitly routed to 0 here. The recharge sub-test below
+	# powers its port directly via set_powered(true), so it is unaffected by this route.)
+	playable.set_manual_power_route_for_validation("stations", 0.0)
+
 	# Damage power (engineering's system) so engineering becomes ignitable; ensure oxygen.
 	playable.life_support_expanded_state.oxygen_percent = 100.0
 	for sub in playable.ship_systems_manager.get_system("power").subcomponents:
