@@ -261,20 +261,10 @@ func _pick_target(target_id: String = ""):
 	return null
 
 func _spawn_placeholder(threat, index: int, anchor: Vector3) -> void:
-	var node := Node3D.new()
+	var ThreatPlaceholderRendererScript := preload("res://scripts/tools/threat_placeholder_renderer.gd")
+	var pos := Vector3(float(threat.world_position[0]), float(threat.world_position[1]), float(threat.world_position[2]))
+	var node := ThreatPlaceholderRendererScript.build_placeholder(threat.archetype_id, threat.tags, pos)
 	node.name = "Threat_%s" % threat.instance_id
-	node.position = Vector3(float(threat.world_position[0]), float(threat.world_position[1]), float(threat.world_position[2]))
-	var mesh_instance := MeshInstance3D.new()
-	if threat.tags.has("swarm"):
-		mesh_instance.mesh = SphereMesh.new()
-	elif threat.tags.has("anchored"):
-		mesh_instance.mesh = CylinderMesh.new()
-	else:
-		mesh_instance.mesh = CapsuleMesh.new()
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = _color_for_archetype(threat.archetype_id)
-	mesh_instance.material_override = mat
-	node.add_child(mesh_instance)
 	add_child(node)
 	placeholder_nodes[threat.instance_id] = node
 
@@ -307,19 +297,8 @@ func _unique_archetype_count() -> int:
 	return seen.size()
 
 func _color_for_archetype(archetype_id: String) -> Color:
-	match archetype_id:
-		"biomatter_swarm":
-			return Color(0.55, 1.0, 0.45)
-		"puppet_corpse":
-			return Color(0.85, 0.82, 0.7)
-		"stalker":
-			return Color(0.7, 0.7, 1.0)
-		"mimic":
-			return Color(1.0, 0.55, 0.25)
-		"hull_tendril":
-			return Color(0.55, 0.9, 1.0)
-		_:
-			return Color(1.0, 0.35, 0.35)
+	var ThreatPlaceholderRendererScript := preload("res://scripts/tools/threat_placeholder_renderer.gd")
+	return ThreatPlaceholderRendererScript.color_for_archetype(archetype_id)
 
 func _load_json_dict(path: String) -> Dictionary:
 	if path.is_empty() or not FileAccess.file_exists(path):
