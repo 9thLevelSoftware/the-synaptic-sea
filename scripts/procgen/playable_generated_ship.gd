@@ -78,6 +78,8 @@ const MetaProgressionStateScript := preload("res://scripts/systems/meta_progress
 const UnlockRegistryScript := preload("res://scripts/systems/unlock_registry.gd")
 const VitalsStateScript := preload("res://scripts/systems/vitals_state.gd")
 const SanityStateScript := preload("res://scripts/systems/sanity_state.gd")
+const HallucinationDirectorScript := preload("res://scripts/systems/hallucination_director.gd")
+const HallucinationManagerScript := preload("res://scripts/systems/hallucination_manager.gd")
 const RadiationStateScript := preload("res://scripts/systems/radiation_state.gd")
 const BodyTemperatureStateScript := preload("res://scripts/systems/body_temperature_state.gd")
 const StatusEffectsStateScript := preload("res://scripts/systems/status_effects_state.gd")
@@ -356,6 +358,9 @@ var _last_weapon_hotbar_text: String = ""
 # REQ-SV: survival vitals runtime state.  Untyped for headless reliability.
 var vitals_state  # VitalsState
 var sanity_state  # SanityState
+# ADR-0042: sanity-driven hallucinations (pure director + scene manager).
+var hallucination_director  # HallucinationDirector
+var hallucination_manager   # HallucinationManager
 var radiation_state  # RadiationState
 var body_temperature_state  # BodyTemperatureState
 var status_effects_state  # StatusEffectsState
@@ -641,6 +646,13 @@ func is_player_in_breach_zone_for_validation() -> bool:
 ## passability_blocked to true. This is a runtime consequence, not a direct
 ## model mutation: OxygenState.tick(...) still runs from the scene tree on
 ## the next frame. Returns true when passability_blocked is now true.
+# ADR-0042: validation seams for the sanity hallucination loop.
+func get_hallucination_director_for_validation():
+	return hallucination_director
+
+func get_hallucination_manager_for_validation():
+	return hallucination_manager
+
 func force_runtime_oxygen_to_zero_for_validation() -> bool:
 	if oxygen_state == null:
 		return false
@@ -2717,6 +2729,22 @@ func _attach_zone_to_active_ship(node: Node) -> void:
 	else:
 		repair_point_root.add_child(node)
 
+# ADR-0042: construct + configure the deterministic hallucination director and its
+# scene manager, then attach the manager to the active ship (same helper the fire zones
+# use). Called from _on_ship_loaded so it runs on every fresh build and post-reload load.
+func _build_hallucination_runtime() -> void:
+	if hallucination_manager != null and is_instance_valid(hallucination_manager):
+		hallucination_manager.clear_all()
+		if hallucination_manager.get_parent() != null:
+			hallucination_manager.get_parent().remove_child(hallucination_manager)
+		hallucination_manager.queue_free()
+	hallucination_director = HallucinationDirectorScript.new()
+	hallucination_director.configure({"seed": _ship_seed(current_ship)})
+	hallucination_manager = HallucinationManagerScript.new()
+	hallucination_manager.name = "HallucinationManager"
+	hallucination_manager.configure(hallucination_director)
+	_attach_zone_to_active_ship(hallucination_manager)
+
 func _clear_fire_zones() -> void:
 	for cid in fire_zone_nodes:
 		var z = fire_zone_nodes[cid]
@@ -3371,6 +3399,9 @@ func travel_home() -> bool:
 	_clear_loot_containers()
 	_clear_repair_points()
 	_clear_breach_seal_points()
+	# ADR-0042: drop phantoms so they do not leak across the ship transition.
+	if hallucination_manager != null and is_instance_valid(hallucination_manager):
+		hallucination_manager.clear_all()
 	_clear_fire_zones()
 	_clear_fire_suppression_points()
 	_clear_extinguisher_recharge_port()
@@ -3736,6 +3767,14 @@ func _attack_with_equipped_weapon() -> Dictionary:
 		_refresh_inventory_hud()
 		_refresh_player_vitals(0.0)
 		_sync_current_ship_combat_summary()
+	# ADR-0042: a swing also dissipates a phantom within reach. Ammo was already spent by
+	# attack_with_weapon (even on a no_target result) — that is the wasted-action teeth.
+	if hallucination_manager != null and is_instance_valid(hallucination_manager):
+		var ppos: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
+		if hallucination_manager.dissipate_phantom_in_range(ppos):
+			result["phantom_dissipated"] = true
+			result["ok"] = true
+			_refresh_inventory_hud()
 	_refresh_weapon_hotbar()
 	return result
 
@@ -3954,6 +3993,11 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	# then render the burning set as passable zones.
 	_seed_fires_from_damage()
 	_build_fire_zones()
+	# ADR-0042: (re)build the sanity hallucination director + manager for the active
+	# ship. Attaches like fire zones so phantom world positions are valid in-frame; runs
+	# on every ship load (fresh build + post-reload), so it lives here rather than in the
+	# reload-only reset path. clear_all() on the prior manager runs in the teardown sites.
+	_build_hallucination_runtime()
 	# M7-B Task 9: manual extinguish nodes + recharge port share the fire lifecycle.
 	_build_fire_suppression_points()
 	_build_extinguisher_recharge_port()
@@ -4641,6 +4685,9 @@ func _process(delta: float) -> void:
 		if life_support_expanded_state != null and not away_from_start:
 			atmo_drain = life_support_expanded_state.get_health_drain_per_second()
 			temp_mult *= life_support_expanded_state.get_thirst_multiplier()
+		# ADR-0042: tier-3 sanity teeth (one-frame lag is acceptable; the director was
+		# ticked in the prior frame's sanity block, below this one in _process order).
+		var hteeth: Dictionary = hallucination_director.get_direct_teeth() if hallucination_director != null else {"health_drain_per_second": 0.0, "stamina_recovery_mult": 1.0}
 		vitals_state.tick(delta, {
 			"temperature_thirst_mult": temp_mult,
 			"radiation_health_drain": rad_drain,
@@ -4648,6 +4695,8 @@ func _process(delta: float) -> void:
 			# M7-B Task 8: standing in a burning compartment drains player health.
 			"fire_health_drain": FIRE_HEALTH_DRAIN_PER_SECOND * _player_fire_intensity(),
 			"status_stamina_recovery_mult": status_mult,
+			"sanity_health_drain": float(hteeth["health_drain_per_second"]),
+			"sanity_stamina_recovery_mult": float(hteeth["stamina_recovery_mult"]),
 			"moving": player != null and player.has_method("is_moving") and player.is_moving(),
 		})
 	if sanity_state != null:
@@ -4655,6 +4704,17 @@ func _process(delta: float) -> void:
 		var in_safe: bool = not away_from_start and (oxygen_state == null or not oxygen_state.get_summary().get("breach_open", false))
 		sanity_state.in_safe_zone = in_safe
 		sanity_state.tick(delta)
+		# ADR-0042: drive sanity hallucinations from the post-tick sanity value.
+		if hallucination_director != null:
+			var hctx := {
+				"sanity": sanity_state.sanity,
+				"in_safe_zone": in_safe,
+				"anchor_positions": _distributed_room_positions(),
+			}
+			hallucination_director.tick(delta, hctx)
+			if hallucination_manager != null and is_instance_valid(hallucination_manager):
+				var ppos: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
+				hallucination_manager.render(delta, ppos)
 	if radiation_state != null:
 		# Radiation zones are active on derelicts or when breach is open.
 		var in_rad: bool = away_from_start or (oxygen_state != null and oxygen_state.get_summary().get("breach_open", false))
@@ -6630,6 +6690,10 @@ func _reset_runtime_for_reload() -> void:
 		for child in tool_pickup_root.get_children():
 			tool_pickup_root.remove_child(child)
 			child.queue_free()
+	# ADR-0042: clear phantoms on reload teardown (a fresh manager is rebuilt in
+	# _on_ship_loaded once the reloaded ship is active).
+	if hallucination_manager != null and is_instance_valid(hallucination_manager):
+		hallucination_manager.clear_all()
 	_clear_fire_zones()
 	# M7-B Task 9: manual extinguish nodes + recharge port share the fire teardown.
 	_clear_fire_suppression_points()
