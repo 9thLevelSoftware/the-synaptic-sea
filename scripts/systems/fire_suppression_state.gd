@@ -212,6 +212,38 @@ func apply_summary(summary: Dictionary) -> bool:
 	# Tunables (round-trip but rarely change at runtime).
 	if summary.has("arc_compartment") and str(summary["arc_compartment"]) != arc_compartment:
 		arc_compartment = str(summary["arc_compartment"]); changed = true
+	# Round-trip spread topology + rate tunables (previously dropped — a restored-from-
+	# scratch model could not spread). Home reconfigures from tuning before applying, but
+	# per-ship derelict fire restores straight from its ShipInstance summary.
+	var comps: Variant = summary.get("compartments", null)
+	if typeof(comps) == TYPE_ARRAY:
+		var new_comps: Array[String] = []
+		for c in (comps as Array):
+			new_comps.append(str(c))
+		if new_comps != compartments:
+			compartments = new_comps
+			changed = true
+	var adj: Variant = summary.get("adjacency", null)
+	if typeof(adj) == TYPE_DICTIONARY:
+		adjacency.clear()
+		for cid in (adj as Dictionary):
+			var neighbours: Array[String] = []
+			var lst: Variant = (adj as Dictionary)[cid]
+			if typeof(lst) == TYPE_ARRAY:
+				for n in (lst as Array):
+					neighbours.append(str(n))
+			adjacency[str(cid)] = neighbours
+		changed = true
+	if summary.has("suppression_rate_per_second"):
+		suppression_rate_per_second = maxf(0.1, float(summary["suppression_rate_per_second"]))
+	if summary.has("power_threshold"):
+		power_threshold = clampf(float(summary["power_threshold"]), 0.05, 1.0)
+	if summary.has("spread_rate_per_second"):
+		spread_rate_per_second = maxf(0.0, float(summary["spread_rate_per_second"]))
+	if summary.has("ignition_rate_per_second"):
+		ignition_rate_per_second = maxf(0.0, float(summary["ignition_rate_per_second"]))
+	if summary.has("cascade_rate_per_second"):
+		cascade_rate_per_second = maxf(0.0, float(summary["cascade_rate_per_second"]))
 	return changed
 
 func get_status_lines() -> PackedStringArray:
