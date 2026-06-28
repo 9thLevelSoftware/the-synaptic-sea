@@ -1,3 +1,10 @@
+> ⚠️ **ARCHIVED — INACCURATE. DO NOT TRUST.** Quarantined 2026-06-28.
+> Points at a macOS-only project root (`/Users/christopherwilloughby/...`) that does not
+> exist on this machine. The real project root is `C:/Users/dasbl/Documents/The Synaptic Sea`
+> and the real Godot binary path is in `/CLAUDE.md`. See **`/STATUS.md`**.
+
+---
+
 # The Synaptic Sea Project Workspace
 
 Canonical Godot project root:

@@ -1,3 +1,11 @@
+> ⚠️ **ARCHIVED — INACCURATE. DO NOT TRUST.** Quarantined 2026-06-28.
+> Describes a `synaptic-sea-stage-gate` Kanban board and asserts "the repository is
+> currently not a git workspace" — both false on this machine (this **is** a git repo).
+> Uses a Gate/M0–M3 scheme that conflicts with the real milestone naming. Real,
+> code-anchored status: **`docs/game/system_completion_audit.md`** (canonical). See **`/STATUS.md`**.
+
+---
+
 # Synaptic Sea Kanban Build Plan
 
 ## Board
