@@ -13,6 +13,8 @@
   "reactor_core":    { "display_name": "Reactor Core",    "category": "part",   "weight": 12.0, "max_stack": 2, "rarity": "epic" },
   "oxygen_filter":   { "display_name": "Oxygen Filter",   "category": "part",   "weight": 1.5, "max_stack": 10, "rarity": "common" },
   "sealant":         { "display_name": "Sealant",         "category": "part",   "weight": 1.0, "max_stack": 20, "rarity": "common" },
+  "hull_sealant":      { "display_name": "Hull Sealant",      "category": "part", "weight": 1.0, "max_stack": 10, "rarity": "uncommon" },
+  "fire_extinguisher": { "display_name": "Fire Extinguisher", "category": "tool", "weight": 3.0, "max_stack": 1,  "rarity": "uncommon" },
   "plating":         { "display_name": "Hull Plating",    "category": "part",   "weight": 8.0, "max_stack": 10, "rarity": "common" },
   "circuit_board":   { "display_name": "Circuit Board",   "category": "part",   "weight": 1.0, "max_stack": 15, "rarity": "common",   "codex_entry_id": "circuit_board" },
   "data_core":       { "display_name": "Data Core",       "category": "part",   "weight": 2.0, "max_stack": 10, "rarity": "uncommon" },

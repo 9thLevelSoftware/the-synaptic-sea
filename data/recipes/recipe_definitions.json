@@ -704,6 +704,30 @@
       "station_kind": "workbench",
       "power_cost": 0.0,
       "batch_size": 1
+    },
+    {
+      "recipe_id": "craft_hull_sealant",
+      "display_name": "Mix Hull Sealant",
+      "category": "repair",
+      "ingredients": { "sealant": 2, "adhesive_paste": 1 },
+      "produces": { "item_id": "hull_sealant", "quantity": 1 },
+      "craft_time_seconds": 12.0,
+      "required_skill_level": 2,
+      "station_kind": "workbench",
+      "power_cost": 2.0,
+      "batch_size": 1
+    },
+    {
+      "recipe_id": "craft_fire_extinguisher",
+      "display_name": "Assemble Fire Extinguisher",
+      "category": "fabrication",
+      "ingredients": { "scrap_metal": 2, "power_cell": 1, "reactive_gel": 1 },
+      "produces": { "item_id": "fire_extinguisher", "quantity": 1 },
+      "craft_time_seconds": 20.0,
+      "required_skill_level": 3,
+      "station_kind": "fabricator",
+      "power_cost": 3.0,
+      "batch_size": 1
     }
   ]
 }
