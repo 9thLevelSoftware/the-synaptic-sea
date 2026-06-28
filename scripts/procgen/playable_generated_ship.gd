@@ -2661,7 +2661,12 @@ func _build_fire_zones() -> void:
 	var burning: Array = fire_suppression_state.get_burning_compartments()
 	if burning.is_empty():
 		return
-	var positions: Array = _distributed_room_positions()
+	# Codex P1: home fire zones parent under lifeboat_ship.scene_root (port-docked),
+	# so positions must be LIFEBOAT-LOCAL — matching _build_repair_points/_build_breach_seal_points.
+	# Raw _distributed_room_positions() are derelict-frame and land off the lifeboat floor.
+	var use_lifeboat: bool = (not away_from_start) and lifeboat_ship != null \
+		and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root)
+	var positions: Array = _lifeboat_local_repair_positions() if use_lifeboat else _distributed_room_positions()
 	if positions.is_empty():
 		return
 	var idx: int = 0
@@ -2749,7 +2754,11 @@ func _build_fire_suppression_points() -> void:
 	var burning: Array = fire_suppression_state.get_burning_compartments()
 	if burning.is_empty():
 		return
-	var positions: Array = _distributed_room_positions()
+	# Codex P1: home suppression points parent under lifeboat_ship.scene_root, so positions
+	# must be LIFEBOAT-LOCAL — otherwise extinguish range checks land off the lifeboat floor.
+	var use_lifeboat: bool = (not away_from_start) and lifeboat_ship != null \
+		and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root)
+	var positions: Array = _lifeboat_local_repair_positions() if use_lifeboat else _distributed_room_positions()
 	if positions.is_empty():
 		return
 	var idx: int = 0
@@ -2781,7 +2790,11 @@ func _build_extinguisher_recharge_port() -> void:
 	_clear_extinguisher_recharge_port()
 	if extinguisher_state == null or away_from_start:
 		return
-	var positions: Array = _distributed_room_positions()
+	# Codex P1: the recharge port parents under lifeboat_ship.scene_root, so its position
+	# must be LIFEBOAT-LOCAL — matching repair/breach/fire builders.
+	var use_lifeboat: bool = lifeboat_ship != null \
+		and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root)
+	var positions: Array = _lifeboat_local_repair_positions() if use_lifeboat else _distributed_room_positions()
 	var pos: Vector3 = positions[0] if not positions.is_empty() else Vector3(0.0, PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR, 0.0)
 	var port = ExtinguisherRechargePortScript.new()
 	port.configure(extinguisher_state, pos, 1.8)

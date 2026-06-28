@@ -76,8 +76,12 @@ func extinguish(compartment_id: String) -> bool:
 		return false
 	active_fires.erase(compartment_id)
 	spread_progress.erase(compartment_id)
+	# Clear stale spread accumulators around the now-extinguished fire, but only for
+	# neighbours that no longer have ANY burning adjacent source — otherwise we would
+	# wrongly reset progress still being fed by another active fire (Gemini PR #42).
 	for adj in _adjacent(compartment_id):
-		spread_progress.erase(adj)
+		if not _has_burning_neighbour(adj):
+			spread_progress.erase(adj)
 	return true
 
 func is_burning(compartment_id: String) -> bool:
@@ -105,10 +109,7 @@ func tick(delta: float, context: Dictionary) -> bool:
 	# 1. Vent / oxygen-loss extinguish.
 	for cid in active_fires.keys():
 		if not _has_oxygen(cid, ship_oxygen, breached):
-			active_fires.erase(cid)
-			spread_progress.erase(cid)
-			for adj in _adjacent(cid):
-				spread_progress.erase(adj)
+			extinguish(cid)
 			changed = true
 
 	# 2. Powered auto-suppression.
@@ -117,10 +118,7 @@ func tick(delta: float, context: Dictionary) -> bool:
 			var reduced: float = float(active_fires[cid]) - suppression_rate_per_second * SUPPRESSION_INTENSITY_FACTOR * delta
 			suppressant_units = maxf(0.0, suppressant_units - SUPPRESSANT_DRAIN_PER_SECOND * delta)
 			if reduced <= 0.0:
-				active_fires.erase(cid)
-				spread_progress.erase(cid)
-				for adj in _adjacent(cid):
-					spread_progress.erase(adj)
+				extinguish(cid)
 			else:
 				active_fires[cid] = reduced
 			changed = true
@@ -226,6 +224,14 @@ func get_status_lines() -> PackedStringArray:
 func _adjacent(compartment_id: String) -> Array:
 	var v: Variant = adjacency.get(compartment_id, [])
 	return v if typeof(v) == TYPE_ARRAY else []
+
+## True if any compartment adjacent to `compartment_id` is currently burning. Used to
+## decide whether a spread accumulator toward `compartment_id` still has a live source.
+func _has_burning_neighbour(compartment_id: String) -> bool:
+	for other in _adjacent(compartment_id):
+		if active_fires.has(other):
+			return true
+	return false
 
 func _has_oxygen(compartment_id: String, ship_oxygen: bool, breached: Dictionary) -> bool:
 	return ship_oxygen and not breached.has(compartment_id)
