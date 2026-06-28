@@ -2663,22 +2663,29 @@ func _build_fire_context() -> Dictionary:
 			if bool((hull_integrity_state.compartments[cid] as Dictionary).get("breach_open", false)):
 				breached.append(str(cid))
 	var damaged: Array = []
-	if ship_systems_manager != null:
-		for cid in FIRE_COMPARTMENT_SYSTEM:
-			var sid: String = str(FIRE_COMPARTMENT_SYSTEM[cid])
-			if sid.is_empty():
-				continue
-			var sys = ship_systems_manager.get_system(sid)
-			if sys != null and not sys.is_self_functional():
-				damaged.append(cid)
 	var oxygen_present: bool = true
-	if life_support_expanded_state != null:
-		oxygen_present = life_support_expanded_state.oxygen_percent > OXYGEN_MIN_FOR_FIRE
+	var powered: float = 0.0
+	if not away_from_start:
+		# Home path: derive damaged compartments from the home systems manager,
+		# oxygen from the life-support expanded model, and powered_ratio from the
+		# home power grid. On a derelict: no re-ignition chain (pre-seeded only),
+		# breathable pockets exist, and there is no auto-suppression grid.
+		if ship_systems_manager != null:
+			for cid in FIRE_COMPARTMENT_SYSTEM:
+				var sid: String = str(FIRE_COMPARTMENT_SYSTEM[cid])
+				if sid.is_empty():
+					continue
+				var sys = ship_systems_manager.get_system(sid)
+				if sys != null and not sys.is_self_functional():
+					damaged.append(cid)
+		if life_support_expanded_state != null:
+			oxygen_present = life_support_expanded_state.oxygen_percent > OXYGEN_MIN_FOR_FIRE
+		powered = power_grid_state.get_allocation_ratio("stations") if power_grid_state != null else 0.0
 	var arc_arcing: bool = false
 	if electrical_arc_state != null:
 		arc_arcing = electrical_arc_state.phase == ElectricalArcState.Phase.ARCING
 	return {
-		"powered_ratio": power_grid_state.get_allocation_ratio("stations") if power_grid_state != null else 0.0,
+		"powered_ratio": powered,
 		"ship_oxygen_present": oxygen_present,
 		"breached_compartments": breached,
 		"damaged_compartments": damaged,
@@ -2950,6 +2957,22 @@ func force_ignite_compartment_for_validation(compartment_id: String, intensity: 
 	var ok: bool = fire_suppression_state.ignite(compartment_id, intensity)
 	_refresh_fire_zones()
 	return ok
+
+## Ignites a compartment in the ACTIVE fire state (derelict's when away, home model
+## otherwise). Use this in away-branch smokes where force_ignite_compartment_for_validation
+## acts on the home model and cannot reach the derelict's per-ship FireSuppressionState.
+func force_ignite_active_compartment_for_validation(cid: String, intensity: float = 1.0) -> bool:
+	var afs = _active_fire_state()
+	if afs == null:
+		return false
+	var ok: bool = afs.ignite(cid, intensity)
+	_refresh_fire_zones()
+	return ok
+
+## Validation seam: the active fire state (derelict's when away, home model otherwise).
+## Use when a smoke needs direct access to the fire model for inspection or setup.
+func get_active_fire_state_for_validation():
+	return _active_fire_state()
 
 ## ADR-0038: builds one player-reachable CraftingStation per curated kind on the home ship.
 ## Stations live on the home ship (not derelicts) and are parented under home_ship.scene_root
@@ -4745,6 +4768,25 @@ func _process(delta: float) -> void:
 					var away_drain: float = float(hallucination_director.get_direct_teeth()["health_drain_per_second"]) * delta
 					if away_drain > 0.0:
 						vitals_state.apply_delta({"health": -away_drain})
+		# Derelict-side fire (wire BOTH branches): tick the active (derelict) fire model so
+		# it spreads, degrades derelict systems, and feeds the player-vitals teeth below.
+		# The home branch ticks fire inside _recompute_expanded_ship_systems, which this
+		# branch never calls. This closes the "away path early-return" gap for fire — the
+		# same pattern used by the sanity/hallucination and audio fixes (Codex PRs #43-44).
+		var _afs_away = _active_fire_state()
+		if _afs_away != null:
+			if _afs_away.tick(delta, _build_fire_context()):
+				_refresh_fire_zones()
+			_apply_fire_system_damage(delta)
+			if vitals_state != null:
+				var fire_drain: float = FIRE_HEALTH_DRAIN_PER_SECOND * _player_fire_intensity() * delta
+				if fire_drain > 0.0:
+					vitals_state.apply_delta({"health": -fire_drain})
+		# Recharge port is power-gated on the DERELICT's own power system (engineering gate):
+		# present but dead until the player restores derelict power.
+		if is_instance_valid(extinguisher_recharge_port):
+			var _dmgr = _active_systems_manager()
+			extinguisher_recharge_port.set_powered(_dmgr != null and _dmgr.is_operational("power"))
 		_refresh_player_vitals(delta)
 		# ADR-0038: emergency field crafting completes even away from home (powered-station
 		# crafts pause while away, by design — only field_crafting_state advances here).
