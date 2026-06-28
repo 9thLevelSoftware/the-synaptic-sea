@@ -2,7 +2,11 @@ extends SceneTree
 
 ## Data-validation proof: hull_sealant + fire_extinguisher are defined, lootable, and
 ## craftable at the intended mid-tier — closing the breach-seal / fire-extinguish loops.
-## Marker: ITEM ECONOMY PASS sealant_def=true ext_def=true sealant_loot=true ext_loot=true sealant_recipe=true ext_recipe=true skill_gated=true
+## Marker: ITEM ECONOMY PASS sealant_def=true ext_def=true sealant_loot=true ext_loot=true sealant_recipe=true ext_recipe=true skill_enforced=true
+
+const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
+const InventoryStateScript := preload("res://scripts/systems/inventory_state.gd")
+const MaterialStateScript := preload("res://scripts/systems/material_state.gd")
 
 func _initialize() -> void:
 	var items: Dictionary = _read_json("res://data/items/item_definitions.json")
@@ -28,15 +32,29 @@ func _initialize() -> void:
 	var r_ext: Dictionary = _recipe_producing(recipes, "fire_extinguisher")
 	var sealant_recipe: bool = not r_sealant.is_empty() and str(r_sealant.get("station_kind", "")) == "workbench"
 	var ext_recipe: bool = not r_ext.is_empty() and str(r_ext.get("station_kind", "")) == "fabricator"
-	var skill_gated: bool = int(r_sealant.get("required_skill_level", -1)) == 2 \
+	var skill_meta: bool = int(r_sealant.get("required_skill_level", -1)) == 2 \
 		and int(r_ext.get("required_skill_level", -1)) == 3
 
-	if sealant_def and ext_def and sealant_loot and ext_loot and sealant_recipe and ext_recipe and skill_gated:
-		print("ITEM ECONOMY PASS sealant_def=true ext_def=true sealant_loot=true ext_loot=true sealant_recipe=true ext_recipe=true skill_gated=true")
+	# Behavioral proof the gate is ENFORCED (not just metadata): CraftingState.begin_craft
+	# must reject an under-skilled player and accept a skilled one for craft_hull_sealant
+	# (skill 2). Refutes the false validation pass where required_skill_level only affected
+	# crafting quality.
+	var craft = CraftingStateScript.new()
+	var mat = MaterialStateScript.new()
+	var inv_low = InventoryStateScript.new()
+	inv_low.add_item("sealant", 2); inv_low.add_item("adhesive_paste", 1)
+	var rejected_low: bool = not craft.begin_craft("craft_hull_sealant", inv_low, mat, 1)  # 1 < 2
+	var inv_ok = InventoryStateScript.new()
+	inv_ok.add_item("sealant", 2); inv_ok.add_item("adhesive_paste", 1)
+	var accepted_ok: bool = craft.begin_craft("craft_hull_sealant", inv_ok, mat, 2)        # 2 >= 2
+	var skill_enforced: bool = skill_meta and rejected_low and accepted_ok
+
+	if sealant_def and ext_def and sealant_loot and ext_loot and sealant_recipe and ext_recipe and skill_enforced:
+		print("ITEM ECONOMY PASS sealant_def=true ext_def=true sealant_loot=true ext_loot=true sealant_recipe=true ext_recipe=true skill_enforced=true")
 		quit(0)
 	else:
-		push_error("ITEM ECONOMY FAIL sealant_def=%s ext_def=%s sealant_loot=%s ext_loot=%s sealant_recipe=%s ext_recipe=%s skill_gated=%s" % [
-			sealant_def, ext_def, sealant_loot, ext_loot, sealant_recipe, ext_recipe, skill_gated])
+		push_error("ITEM ECONOMY FAIL sealant_def=%s ext_def=%s sealant_loot=%s ext_loot=%s sealant_recipe=%s ext_recipe=%s skill_meta=%s rejected_low=%s accepted_ok=%s" % [
+			sealant_def, ext_def, sealant_loot, ext_loot, sealant_recipe, ext_recipe, skill_meta, rejected_low, accepted_ok])
 		quit(1)
 
 func _read_json(path: String) -> Dictionary:
