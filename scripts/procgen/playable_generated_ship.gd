@@ -3430,6 +3430,10 @@ func travel_home() -> bool:
 	# M7-B Task 7: returning home rebuilds interactables — re-seed/render fire.
 	_seed_fires_from_damage()
 	_build_fire_zones()
+	# ADR-0042: the hallucination manager was attached to the (now-freed) derelict root,
+	# so rebuild it on the home ship — otherwise home-side hallucinations never render
+	# after a round trip while the director still feeds tier-3 teeth into vitals.
+	_build_hallucination_runtime()
 	# M7-B Task 9: manual extinguish nodes + recharge port share the fire lifecycle.
 	_build_fire_suppression_points()
 	_build_extinguisher_recharge_port()

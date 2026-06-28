@@ -22,7 +22,7 @@ const KIND_CONFIG := {
 	"phantom": {"min_tier": 2, "interval": 8.0, "interval_t3": 3.5, "max": 1, "max_t3": 3, "ttl": 12.0},
 }
 
-var seed: int = 0
+var rng_seed: int = 0  # not "seed": avoid shadowing GDScript's global seed() utility
 var step: int = 0
 var health_drain_per_second: float = DEFAULT_HEALTH_DRAIN
 var stamina_recovery_mult: float = DEFAULT_STAMINA_RECOVERY_MULT
@@ -33,7 +33,7 @@ var _spawn_timers: Dictionary = {}  # kind -> float
 var _current_tier: int = 0
 
 func configure(config: Dictionary) -> void:
-	seed = int(config.get("seed", 0))
+	rng_seed = int(config.get("seed", 0))
 	step = 0
 	health_drain_per_second = maxf(0.0, float(config.get("health_drain_per_second", DEFAULT_HEALTH_DRAIN)))
 	stamina_recovery_mult = clampf(float(config.get("stamina_recovery_mult", DEFAULT_STAMINA_RECOVERY_MULT)), 0.0, 1.0)
@@ -51,7 +51,12 @@ func tick(delta: float, context: Dictionary) -> bool:
 	var anchors: Array = context.get("anchor_positions", []) if context.get("anchor_positions", []) is Array else []
 	_current_tier = _tier_for(sanity)
 
-	if _current_tier == 0 or in_safe_zone or anchors.is_empty():
+	# A safe zone is a refuge: force tier 0 so NO manifestations OR teeth/FX apply while
+	# recovering in the hub/lifeboat, regardless of sanity (design contract). Tier 0 (sanity
+	# >= 40) likewise produces nothing. In both cases clear discrete events and return.
+	if in_safe_zone:
+		_current_tier = 0
+	if _current_tier == 0:
 		if not active_events.is_empty():
 			active_events.clear()
 			changed = true
@@ -65,6 +70,13 @@ func tick(delta: float, context: Dictionary) -> bool:
 		if float(active_events[i]["ttl"]) <= 0.0:
 			active_events.remove_at(i)
 			changed = true
+
+	# Schedule discrete events only when anchor positions are available. Direct teeth and
+	# FX intensity are tier-driven (get_direct_teeth / get_fx_intensity) and remain active
+	# in the field even without anchors — only event PLACEMENT needs anchors.
+	if anchors.is_empty():
+		step += 1
+		return changed
 
 	# Schedule per enabled kind.
 	for kind in KIND_CONFIG.keys():
@@ -111,7 +123,7 @@ func get_fx_intensity() -> float:
 
 func get_summary() -> Dictionary:
 	return {
-		"seed": seed,
+		"seed": rng_seed,
 		"step": step,
 		"health_drain_per_second": health_drain_per_second,
 		"stamina_recovery_mult": stamina_recovery_mult,
@@ -122,7 +134,7 @@ func get_summary() -> Dictionary:
 func apply_summary(summary: Dictionary) -> bool:
 	if summary == null or summary.is_empty():
 		return false
-	seed = int(summary.get("seed", seed))
+	rng_seed = int(summary.get("seed", rng_seed))
 	step = int(summary.get("step", step))
 	health_drain_per_second = maxf(0.0, float(summary.get("health_drain_per_second", health_drain_per_second)))
 	stamina_recovery_mult = clampf(float(summary.get("stamina_recovery_mult", stamina_recovery_mult)), 0.0, 1.0)
@@ -151,6 +163,6 @@ func _count_kind(kind: String) -> int:
 func _pick_index(kind: String, count: int) -> int:
 	if count <= 0:
 		return 0
-	var h: int = seed * 1103515245 + step * 12345 + hash(kind)
+	var h: int = rng_seed * 1103515245 + step * 12345 + hash(kind)
 	h = (h ^ (h >> 16)) & 0x7fffffff
 	return h % count

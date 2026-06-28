@@ -22,9 +22,19 @@ func _initialize() -> void:
 		g.tick(0.5, {"sanity": 35.0, "in_safe_zone": false, "anchor_positions": anchors})
 	var gated_ok := g.get_active_events("hud").is_empty() and g.get_active_events("phantom").is_empty()
 	gated_ok = gated_ok and not g.get_active_events("ambient").is_empty()
-	# safe zone clears
+	# safe zone is a refuge: clears events AND forces tier 0 so teeth/FX do not leak
+	# (regression guard for the whole-branch review finding — recovering in the hub at
+	# sanity<15 must not keep draining health or show the red FX overlay).
 	g.tick(0.5, {"sanity": 10.0, "in_safe_zone": true, "anchor_positions": anchors})
 	gated_ok = gated_ok and g.get_active_events().is_empty()
+	gated_ok = gated_ok and g.get_tier() == 0
+	gated_ok = gated_ok and float(g.get_direct_teeth()["health_drain_per_second"]) == 0.0
+	gated_ok = gated_ok and float(g.get_direct_teeth()["stamina_recovery_mult"]) == 1.0
+	gated_ok = gated_ok and g.get_fx_intensity() == 0.0
+	# but teeth/FX still apply in the FIELD with no anchors (only event PLACEMENT needs anchors)
+	var ga = Director.new(); ga.configure({"seed": 3})
+	ga.tick(0.5, {"sanity": 10.0, "in_safe_zone": false, "anchor_positions": []})
+	gated_ok = gated_ok and ga.get_tier() == 3 and float(ga.get_direct_teeth()["health_drain_per_second"]) > 0.0 and ga.get_fx_intensity() >= 0.99
 	# tier 2 enables hud + phantom
 	var g2 = Director.new(); g2.configure({"seed": 3})
 	for i in range(400):
