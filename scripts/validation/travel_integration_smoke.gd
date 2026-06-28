@@ -301,7 +301,6 @@ func _teardown_and_quit(code: int) -> void:
 			playable.route_control_root,
 			playable.oxygen_root,
 			playable.tool_pickup_root,
-			playable.fire_root,
 			playable.arc_root,
 		]:
 			_free_detached_node(root)

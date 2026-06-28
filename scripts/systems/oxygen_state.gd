@@ -14,7 +14,7 @@ class_name OxygenState
 ##   apply_summary / is_passability_blocked / get_status_lines).
 ## - Does NOT use PhaseTimer: oxygen is a resource-drain model with no
 ##   discrete phase cycle, so it intentionally does not inherit timer
-##   concepts from FireState / ElectricalArcState.
+##   concepts from ElectricalArcState (the lone timer hazard).
 ## - The HazardStateContract's `tick(delta_seconds, context)` uniform
 ##   boundary is preserved by reading `player_in_breach_zone` from the
 ##   `context` dictionary (per ADR-0005 the `context` argument is loose-

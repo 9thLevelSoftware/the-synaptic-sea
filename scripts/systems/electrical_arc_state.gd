@@ -8,16 +8,16 @@ class_name ElectricalArcState
 ## Per ADR-0005 this model:
 ## - Implements the HazardStateContract (configure / tick / get_summary /
 ##   apply_summary / is_passability_blocked / get_status_lines).
-## - Owns a PhaseTimer instance shared with FireState; the helper removes
-##   timer-math duplication while this class owns the per-hazard enum,
-##   passability mapping, label text, and the `hazard_kind` discriminator
-##   required by the contract.
+## - Owns a PhaseTimer instance (it is now the only timer-based hazard; the
+##   old FireState was retired in M7-B). The helper removes timer-math
+##   duplication while this class owns the per-hazard enum, passability
+##   mapping, label text, and the `hazard_kind` discriminator required by
+##   the contract.
 ## - Remains an independent RefCounted; OxygenState does not inherit any
 ##   timer concepts from this class (and vice versa).
 ##
 ## The hazard cycle is short-safe (1.5s DISCHARGED) then short-danger
-## (2.5s ARCING). The total 4.0s cycle is intentionally de-synchronized
-## from the fire cycle so the two hazards de-correlate on a run.
+## (2.5s ARCING) on a 4.0s loop.
 
 const PhaseTimerScript := preload("res://scripts/systems/phase_timer.gd")
 
@@ -35,8 +35,8 @@ var phase: int = Phase.DISCHARGED
 var time_in_phase: float = 0.0
 var passability_blocked: bool = false
 # PhaseTimer maps its internal Phase.A -> DISCHARGED and Phase.B -> ARCING
-# so FireState and ElectricalArcState can share the helper with a stable
-# A/B vocabulary while each owns a typed Phase enum above.
+# so this hazard uses the helper with a stable A/B vocabulary while owning
+# the typed Phase enum above.
 var _phase_timer: PhaseTimer = PhaseTimerScript.new()
 
 # configure(config: Dictionary) -> void
@@ -103,8 +103,8 @@ func is_passability_blocked() -> bool:
 # get_summary() -> Dictionary
 # - Required by the ADR-0005 contract: must include `hazard_kind`
 #   ("electrical_arc") and `passability_blocked` (bool). The remaining
-#   keys mirror FireState so SaveLoadService consumers can apply both
-#   timer-hazard summaries through a uniform shape.
+#   keys follow the uniform timer-hazard shape SaveLoadService consumers
+#   expect.
 func get_summary() -> Dictionary:
 	var current_duration: float = arcing_duration if phase == Phase.ARCING else discharged_duration
 	return {

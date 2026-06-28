@@ -3,7 +3,7 @@ class_name PhaseTimer
 
 ## ADR-0005 shared phase-timer helper for Alpha timer hazards.
 ## PhaseTimer is intentionally a helper, not a base class: each owner
-## (FireState, ElectricalArcState) composes a PhaseTimer instance and
+## (currently only ElectricalArcState) composes a PhaseTimer instance and
 ## translates its Phase.A / Phase.B output into its own typed enum,
 ## passability mapping, and labels. The helper removes the timer math
 ## but keeps each hazard model responsible for its own semantics, so
@@ -26,7 +26,7 @@ class_name PhaseTimer
 const MINIMUM_PHASE_DURATION: float = 0.1
 
 # Generic two-phase enum used by every timer hazard owner. Owners map
-# these into their own typed enum (FireState.Phase, ElectricalArcState.Phase)
+# these into their own typed enum (ElectricalArcState.Phase)
 # via `current_phase()`. The helper does not own per-hazard enums so a
 # single PhaseTimer instance can serve multiple owners without leaking
 # the helper's enum into a model that wants to keep its own types.

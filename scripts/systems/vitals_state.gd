@@ -52,6 +52,7 @@ func configure(config: Dictionary) -> void:
 ## tick updates all four vitals.  context keys used by downstream systems:
 ##   "radiation_health_drain" -> float (added to health drain when radiation high)
 ##   "atmosphere_health_drain" -> float (added to health drain when the hub atmosphere is fouled)
+##   "fire_health_drain" -> float (added to health drain while standing in a burning compartment)
 ##   "temperature_thirst_mult" -> float (multiplies thirst drain when temp unsafe)
 ##   "status_stamina_recovery_mult" -> float (multiplier from active effects)
 ##   "moving" -> bool (when false stamina recovers instead of draining)
@@ -83,6 +84,8 @@ func tick(delta_seconds: float, context: Dictionary = {}) -> bool:
 		h_drain += float(context.get("radiation_health_drain", 0.0)) * delta_seconds
 	if context.has("atmosphere_health_drain"):
 		h_drain += float(context.get("atmosphere_health_drain", 0.0)) * delta_seconds
+	if context.has("fire_health_drain"):
+		h_drain += float(context.get("fire_health_drain", 0.0)) * delta_seconds
 	if h_drain > 0.0 and health > 0.0:
 		health = maxf(0.0, health - h_drain)
 		changed = true

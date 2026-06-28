@@ -145,7 +145,7 @@ into the loot roll is a fast-follow. Content: loot/unique/junk definitions exist
 | `power_grid_state` | 🟢 | ← `ship_systems_manager.power.health()` + broken systems (1327) → allocation ratios feeding 6 subsystems | [V] |
 | `propulsion_expanded_state` | 🟢 | ← power + hull penalty + manager (1331) → **gates travel via `can_propel()`** (1716) | [V] |
 | `crafting_state` / `station_state` | 🟢 | ← stations power channel (1353) → `_on_craft_completed` (materials/inventory) | [V] |
-| `fire_suppression_state` | 🔴 | ← power (1348) + `ignite()` only from `ignite_compartment_for_validation` (1412, test seam) → `get_status_lines()` only (4055); a HUD shadow of the real `fire_state` Alpha hazard | [V] |
+| `fire_suppression_state` | 🟢 | **Authoritative fire hazard (M7-B / ADR-0041).** ← live ignition as a *symptom of damage*: a damaged mapped ship system + oxygen re-ignites a compartment each tick; plus electrical-arc cascade and deterministic spread to adjacent compartments. → real teeth: drains `vitals_state.health` while the player stands in a burning zone (`fire_health_drain`) AND degrades the burning compartment's ship system via `ship_systems_manager.damage_system()`. Three extinguish paths: manual `FireSuppressionPoint` (consumes `ExtinguisherState` charge, refilled at a powered `ExtinguisherRechargePort`), powered auto-suppression, and breach/vacuum vent. `fire_state` (the old timer hazard) is **deleted**. | [V] |
 | ~~`shield_state`~~ | cut | **Removed by M7-A** — model and tuning deleted; orphaned power channel (`power → shield allocation slot`) flagged as follow-up cleanup. | [V] |
 | `life_support_expanded_state` | 🟢 | ← power + hull `breach_count` (1342) → `get_health_drain_per_second()` → drains `vitals_state.health` while aboard (coordinator M7-A wiring); drain is zero while away on a derelict. **Closed-loop by M7-A.** | [V] |
 | `hull_integrity_state` | 🟡 | **sink** 🟢 breach_count → life-support drain → vitals; sealing mechanism mechanically proven (BreachSealPoint channel + `hull_sealant` consumption); `hull_sealant` is not yet a defined or obtainable item (no loot/craft/starting-inventory path) — player-facing loop completion deferred. **source** 🟡 live damage source is config-only `#4` (initial breach set at load via `hull_compartments.json`); sources `#1–3` (combat / hazard / pressure) deferred. | [V] |
@@ -156,15 +156,18 @@ Life-support is now a real atmospheric-vitals source. Remaining hollow systems:
 1. **Hull damage sources #1–3 deferred** — config-injected breach (source #4) is live; player
    can seal via `BreachSealPoint`. But combat hits, hazard cascades, and deep-dive pressure do
    not yet call `damage_compartment()`. The seam exists; it needs live callers.
-2. **Fire-suppression is a HUD shadow of the real fire hazard** — ignites only from a
-   validation seam, outputs status text, runs parallel to the actual `fire_state` Alpha hazard.
+2. **Fire-suppression — RESOLVED (M7-B / ADR-0041).** Now the authoritative fire
+   hazard: live symptom-of-damage ignition, vitals + ship-system teeth, and three
+   extinguish paths; `fire_state` deleted. (Was: a HUD shadow of the real hazard.)
 3. **Sustenance produces HUD text only** — `sustenance_state` consumes the farm/cook chain
    but its output feeds no player vital. The `water_recycler_state` output feeds life-support,
    but life-support now actually gates vitals, so this chain is closer to live.
 
 **Pattern (partially resolved):** of the original "expanded ship systems" tier, `life_support_expanded`
 is now authoritative (drives real vitals). `shield_state` is cut. `hull_integrity` has a real
-sink but still needs live damage callers. `fire_suppression` and `sustenance` remain HUD-only.
+sink but still needs live damage callers. `fire_suppression` is now authoritative (M7-B /
+ADR-0041 — real fire hazard with vitals + system teeth and a full extinguish loop); only
+`sustenance` remains HUD-only.
 
 ### M5 · Consumables / medicine / stimulants / ammo — 🟢 closed-loop
 
@@ -270,11 +273,16 @@ to close a loop." Ordered by how much each breaks *the game functioning as a who
    `FoodState`. The superseded standalone `cooking_state` (galley) duplicate was deleted. **Follow-up
    (option 3, not done):** live start/harvest for hydroponics/synthesizer/water-recycler as a passive
    production source; per-item spoilage-stage scaling on eat. *(M2)*
-5. **🔴 Fire-suppression and sustenance still output to HUD only** and run *parallel* to the
-   real `oxygen_state` / `fire_state` hazards instead of being the authoritative source.
-   (**Life-support is no longer in this list — RESOLVED by M7-A:** it now drives a real vitals
-   drain while aboard; see the M7 table.) These two remain HUD shadows — the same architectural
-   pattern, now narrowed to the systems M7-A did not touch. *(M7)*
+5. **🟢 Fire-suppression — RESOLVED (M7-B / ADR-0041); 🔴 sustenance still HUD-only.**
+   Fire-suppression is now the **authoritative** fire hazard (it *replaced* the old
+   `fire_state` timer hazard, which is deleted): ignition is a live symptom of unrepaired
+   system damage (+ arc cascade + spread), it has real teeth (player vitals drain + ship-
+   system degradation), and a full player loop (manual extinguisher with charge/recharge
+   port, powered auto-suppression, breach vent). **Deferred follow-ups:** B2 deliberate-vent
+   control, fire-consumes-oxygen, `fire_extinguisher`/`hull_sealant` acquisition paths,
+   derelict-side fire points/recharge ports, and door-gated spread. **Sustenance** remains a
+   HUD shadow — it consumes the farm/cook chain but feeds no player vital. (**Life-support is
+   no longer in this list — RESOLVED by M7-A.**) *(M7)*
 6. **🔴 Sanity is cosmetic** — live source (safe-zone) but output is HUD warning text only; no
    damage / hallucination / control effect consumes low sanity. Give it teeth or accept it as a
    meter. *(M1)*

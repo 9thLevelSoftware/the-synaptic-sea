@@ -4,9 +4,9 @@ extends SceneTree
 # This smoke proves that the new AccessibilitySettings seam drives:
 # - HUD font_size (Control Label font theme override)
 # - HUD panel + label minimum sizes
-# - World Label3D pixel_size values for the breach unsafe marker and the
-#   fire zone label (and, when debug_affordance_labels_enabled is set, the
-#   affordance/landmark labels too).
+# - World Label3D pixel_size values for the breach unsafe marker (and, when
+#   debug_affordance_labels_enabled is set, the affordance/landmark labels too).
+#   (M7-B Task 7 retired the timed fire-zone Label3D.)
 #
 # It is structured as three sequential passes against the SAME live main
 # scene instance so it exercises apply_accessibility_settings() in place
@@ -95,24 +95,19 @@ func _validate_default_scale(playable: PlayableGeneratedShip) -> void:
 		_fail("default: HUD missing runtime 'Current:' line: %s" % hud_text)
 		return
 	# Default scale must reproduce the pre-A11Y-P1-001 world label sizes.
+	# M7-B Task 7: the timed fire-zone Label3D was retired; only the breach
+	# unsafe marker remains as a scalable world hazard label.
 	var marker_pixel: float = -1.0
-	var fire_pixel: float = -1.0
 	if playable.unsafe_room_marker != null:
 		marker_pixel = float(playable.unsafe_room_marker.pixel_size)
 		if not is_equal_approx(marker_pixel, DEFAULT_BASE_HAZARD_PIXEL_SIZE):
 			_fail("default: unsafe marker pixel_size=%.6f expected %.6f" % [marker_pixel, DEFAULT_BASE_HAZARD_PIXEL_SIZE])
 			return
-	if playable.fire_zone_label != null:
-		fire_pixel = float(playable.fire_zone_label.pixel_size)
-		if not is_equal_approx(fire_pixel, DEFAULT_BASE_HAZARD_PIXEL_SIZE):
-			_fail("default: fire label pixel_size=%.6f expected %.6f" % [fire_pixel, DEFAULT_BASE_HAZARD_PIXEL_SIZE])
-			return
 	if not _check_vitals_scale(playable, 1.0, "default"): return
-	print("A11Y TEXT SCALE DEFAULT PASS font=%d panel=%s marker_pixel=%.4f fire_pixel=%.4f" % [
+	print("A11Y TEXT SCALE DEFAULT PASS font=%d panel=%s marker_pixel=%.4f" % [
 		font_size,
 		str(tracker.custom_minimum_size),
 		marker_pixel,
-		fire_pixel,
 	])
 	_apply_scale(playable, 1.5)
 	phase = 2
@@ -146,23 +141,16 @@ func _validate_15x_scale(playable: PlayableGeneratedShip) -> void:
 	# divided by 1.5 land at ~0.002333, well above the floor.
 	var expected_hazard_pixel: float = DEFAULT_BASE_HAZARD_PIXEL_SIZE / 1.5
 	var marker_pixel: float = -1.0
-	var fire_pixel: float = -1.0
 	if playable.unsafe_room_marker != null:
 		marker_pixel = float(playable.unsafe_room_marker.pixel_size)
 		if not is_equal_approx(marker_pixel, expected_hazard_pixel):
 			_fail("1.5x: unsafe marker pixel_size=%.6f expected %.6f" % [marker_pixel, expected_hazard_pixel])
 			return
-	if playable.fire_zone_label != null:
-		fire_pixel = float(playable.fire_zone_label.pixel_size)
-		if not is_equal_approx(fire_pixel, expected_hazard_pixel):
-			_fail("1.5x: fire label pixel_size=%.6f expected %.6f" % [fire_pixel, expected_hazard_pixel])
-			return
 	if not _check_vitals_scale(playable, 1.5, "1.5x"): return
-	print("A11Y TEXT SCALE 1.5X PASS font=%d panel=%s marker_pixel=%.6f fire_pixel=%.6f" % [
+	print("A11Y TEXT SCALE 1.5X PASS font=%d panel=%s marker_pixel=%.6f" % [
 		actual_font,
 		str(tracker.custom_minimum_size),
 		marker_pixel,
-		fire_pixel,
 	])
 	_apply_scale(playable, 2.0)
 	phase = 4
@@ -189,23 +177,16 @@ func _validate_20x_scale(playable: PlayableGeneratedShip) -> void:
 	# World labels: at 2.0x, pixel_size is base/2.0.
 	var expected_hazard_pixel: float = DEFAULT_BASE_HAZARD_PIXEL_SIZE / 2.0
 	var marker_pixel: float = -1.0
-	var fire_pixel: float = -1.0
 	if playable.unsafe_room_marker != null:
 		marker_pixel = float(playable.unsafe_room_marker.pixel_size)
 		if not is_equal_approx(marker_pixel, expected_hazard_pixel):
 			_fail("2.0x: unsafe marker pixel_size=%.6f expected %.6f" % [marker_pixel, expected_hazard_pixel])
 			return
-	if playable.fire_zone_label != null:
-		fire_pixel = float(playable.fire_zone_label.pixel_size)
-		if not is_equal_approx(fire_pixel, expected_hazard_pixel):
-			_fail("2.0x: fire label pixel_size=%.6f expected %.6f" % [fire_pixel, expected_hazard_pixel])
-			return
 	if not _check_vitals_scale(playable, 2.0, "2.0x"): return
-	print("A11Y TEXT SCALE 2.0X PASS font=%d panel=%s marker_pixel=%.6f fire_pixel=%.6f" % [
+	print("A11Y TEXT SCALE 2.0X PASS font=%d panel=%s marker_pixel=%.6f" % [
 		actual_font,
 		str(tracker.custom_minimum_size),
 		marker_pixel,
-		fire_pixel,
 	])
 	phase = 6
 

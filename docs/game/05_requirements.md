@@ -162,16 +162,28 @@ Requirements must be granular, testable, and linked to feature specs or ADRs.
 - Source: `features/hazard_variety.md`
 - Type: gameplay
 - Priority: should
-- Status: Approved
+- Status: Approved (Gate 2 form **superseded by ADR-0041**; see note below)
 - Rationale: Gate 2 needs a second hazard pattern to prove the ship can host multiple environmental pressures without every hazard being an oxygen-drain variant.
-- Acceptance criteria:
+- Acceptance criteria (Gate 2 — historical):
   - At least one additional hazard type exists in the generated ship scene (the timed fire zone in a side corridor for Gate 2).
-  - The new hazard toggles real passability via its own pure state model (`FireState`).
+  - ~~The new hazard toggles real passability via its own pure state model (`FireState`).~~ **Superseded by ADR-0041** (see note).
   - The new hazard does not alter oxygen, route-gate, or extraction semantics.
   - Both a direct model smoke and a main-scene smoke pass.
-- Verification:
-  - `scripts/validation/fire_state_smoke.gd`
-  - `scripts/validation/main_playable_slice_fire_smoke.gd`
+- **Superseded note (M7-B / ADR-0041, 2026-06-27):** Fire was reworked from the cyclic
+  phase-timer zone into the authoritative persistent compartment hazard owned by
+  `FireSuppressionState`; `FireState` is deleted. **Fire no longer blocks passability**
+  (burning fire zones are deliberately passable so the player can walk in to fight the
+  fire), so the "timed fire zone in a non-critical side corridor / toggles real
+  passability" placement constraint above is obsolete — it applied only to the old
+  impassable timed zone. Fire now ignites as a symptom of unrepaired system damage and
+  has vitals + ship-system teeth (REQ-010's "second hazard pattern" intent is satisfied,
+  more strongly, by the new model). The Gate 2 criteria are kept for history.
+- Verification (current — REQ-010 / ADR-0041):
+  - `scripts/validation/fire_suppression_state_smoke.gd` (pure model)
+  - `scripts/validation/main_playable_slice_fire_smoke.gd` (passable zones + teeth)
+  - `scripts/validation/main_playable_fire_loop_smoke.gd` (full end-to-end loop)
+  - Supporting: `extinguisher_state_smoke.gd`, `ship_systems_damage_smoke.gd`,
+    `fire_suppression_point_smoke.gd`, `extinguisher_recharge_port_smoke.gd`
 
 ## REQ-011: Objective variation
 

@@ -180,6 +180,16 @@ func force_repair(system_id: String, subcomponent_id: String) -> bool:
 	sub.health = 1.0
 	return true
 
+## Reduces every subcomponent's health in a system by `amount` (clamp >= 0).
+## Used by the coordinator to apply fire -> system degradation. Returns false
+## for an unknown system.
+func damage_system(system_id: String, amount: float) -> bool:
+	if not systems.has(system_id) or amount <= 0.0:
+		return systems.has(system_id)
+	for sub in systems[system_id].subcomponents:
+		sub.health = maxf(0.0, sub.health - amount)
+	return true
+
 ## Returns a lightweight {system_id: {operational, health}} dict for HUD/diagnostics.
 func get_status_summary() -> Dictionary:
 	var out: Dictionary = {}

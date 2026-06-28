@@ -17,7 +17,17 @@
     "compartments": ["bridge", "engineering", "hydroponics", "cargo"],
     "suppressant_units": 100.0,
     "suppression_rate_per_second": 25.0,
-    "power_threshold": 0.5
+    "power_threshold": 0.5,
+    "adjacency": {
+      "bridge": ["engineering"],
+      "engineering": ["bridge", "hydroponics", "cargo"],
+      "hydroponics": ["engineering"],
+      "cargo": ["engineering"]
+    },
+    "spread_rate_per_second": 0.15,
+    "ignition_rate_per_second": 0.2,
+    "cascade_rate_per_second": 0.5,
+    "arc_compartment": "engineering"
   },
   "propulsion": {
     "thrust_percent": 100.0,
