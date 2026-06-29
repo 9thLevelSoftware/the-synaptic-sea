@@ -2574,21 +2574,21 @@
       "domain": "progression",
       "kind": "simulation",
       "model_exists": true,
-      "smoke": null,
+      "smoke": "scripts/validation/player_progression_full_smoke.gd",
       "reachable": true,
       "driven": true,
       "driven_at": "playable_generated_ship.gd:6017",
       "input": {
         "live": true,
-        "desc": "OMITTED BY PROPOSAL. configure+load_from_disk at run start (1106-1117); driven at run-end -- coordinator folds every training_event_bus log entry into unlock_for_trigger(evt, tgt) then save_to_disk (6011-6018)",
-        "at": "playable_generated_ship.gd:6017"
+        "desc": "Constructed + configured from data/player/unlock_tables.json and load_from_disk() at run start (playable_generated_ship.gd:1106-1117, verified); driven at run-end in _apply_meta_payout_and_persist -- coordinator folds every training_event_bus.get_log() entry into unlock_for_trigger(evt,tgt) then save_to_disk (6011-6018, verified). Real live input.",
+        "at": "playable_generated_ship.gd:1106-1117,6011-6018"
       },
       "output": {
         "live": false,
-        "desc": "docstring claims 'the codex panel reads from this model', but no UI or gameplay node reads get_unlocked_ids()/is_unlocked() -- only the coordinator (writer) and validation smokes reference it. Output is write-to-disk only; no live consumer.",
+        "desc": "VERIFIED hollow. Output is write-to-disk only. get_unlocked_ids()/is_unlocked()/get_entries_for_category() are referenced ONLY by validation smokes (meta_progression_state_smoke.gd:140, player_progression_full_smoke.gd:314). Grep confirms codex_panel.gd has ZERO references to unlock_registry/UnlockRegistry, contradicting the unlock_registry.gd:12 docstring. The only non-smoke references to the registry are in the coordinator (writer side, 1106-1117 + 6011-6018). No UI or gameplay node reads unlock state. (Note: meta_snapshot_smoke.gd also references the registry but does not call its getters -- still a smoke.)",
         "at": null
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [
         "progression"
       ],
@@ -2596,21 +2596,28 @@
         {
           "to": "training_event_bus",
           "via": "run-end consumes bus log to fire unlock triggers",
-          "at": "playable_generated_ship.gd:6017",
+          "at": "playable_generated_ship.gd:6011-6018",
           "health": "healthy"
         },
         {
           "to": "meta_progression_state",
-          "via": "intentionally separate persistence (unlock-registry-1) from meta currency; no direct call coupling",
-          "at": null,
+          "via": "co-persisted at run-end (intentionally separate user://unlock_registry.json vs meta_progression.json); no direct call coupling",
+          "at": "playable_generated_ship.gd:6009-6018",
           "health": "weak"
+        },
+        {
+          "to": "codex_panel",
+          "via": "docstring claims codex panel reads the registry, but codex_panel.gd never references unlock_registry (grep-verified) -- documented-but-unwired output edge",
+          "at": null,
+          "health": "broken"
         }
       ],
       "content": "sufficient",
-      "content_note": "REQ-PM-009/ADR-0033. Catalog from data/player/unlock_tables.json; persists to user://unlock_registry.json independently of meta_progression.json. unlock_for_trigger at unlock_registry.gd:101.",
+      "content_note": "REQ-PM-009/ADR-0033. Catalog of 23 entries (codex/hub_scene/class) authored in data/player/unlock_tables.json; persists to user://unlock_registry.json independently of meta_progression.json. unlock_for_trigger resolves exact + 'event|*' wildcard (unlock_registry.gd:101). Data authoring is complete; what is missing is the in-game reader, not the data. All citations re-verified read-only; confidence held at V.",
       "functional": null,
       "gaps": [
-        "no live output consumer: get_unlocked_ids()/is_unlocked() are read only by smokes; the referenced codex panel is not wired -- registry accrues unlocks to disk that nothing in-game reads"
+        "Hollow output: get_unlocked_ids()/is_unlocked() are read only by validation smokes; the codex panel the docstring names is not wired (grep-confirmed), so the registry accrues unlocks to disk that nothing in-game reads.",
+        "The 23 catalog triggers (repair_subcomponent, diagnose_fault, scan_derelict, etc.) depend on events emitted into training_event_bus; coverage of those emitters was not traced in this pass."
       ],
       "subsystems": []
     },
@@ -3197,31 +3204,38 @@
       "driven_at": "ship_layout_generator.gd:74",
       "input": {
         "live": true,
-        "desc": "biome_id + template/room plan during assign_with_selector",
-        "at": "ship_layout_generator.gd:74"
+        "desc": "role + room_index + blueprint seed + biome_id during assign_with_selector (selector constructed at slgen:72 only when biome_id non-empty; live travel resolves a real biome)",
+        "at": "ship_layout_generator.gd:71-75"
       },
       "output": {
         "live": false,
-        "desc": "intended per-room variant choices; data/procgen/room_variants/ does not exist so it produces no live variation",
-        "at": "ship_layout_generator.gd:74"
+        "desc": "pick() variant string written to room dict (room_assigner.gd:90) and serialized into layout.json (layout_serializer.gd:40,59) but NO live gameplay consumer reads room['variant'] — produced and stored, never used",
+        "at": "room_assigner.gd:90"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [
         "travel"
       ],
       "integrations": [
         {
           "to": "room_assigner",
-          "via": "assign_with_selector",
+          "via": "assign_with_selector -> pick() -> room['variant']",
           "at": "ship_layout_generator.gd:74",
+          "health": "weak"
+        },
+        {
+          "to": "layout_serializer",
+          "via": "variant serialized into layout rooms (then unread)",
+          "at": "layout_serializer.gd:40",
           "health": "weak"
         }
       ],
-      "content": "none",
-      "content_note": "CORRECTED: data/procgen/room_variants/ directory is ABSENT (does not exist), not merely empty. Selector IS constructed on the live path (biome_id non-empty triggers RoomVariantSelectorScript.new() at lines 71-72) and assign_with_selector IS invoked (:74), but with no variant data the output is a no-op. Constructed/driven but inert. Selector file itself not opened (P).",
+      "content": "partial",
+      "content_note": "RE-VERIFIED V. Independently opened all cited lines: room_assigner.gd:85 _pick_variant -> :90 writes room['variant']; layout_serializer.gd:40 reads room.get('variant') and :59 emits 'variant' into the serialized room_dict; ship_layout_generator.gd:71-75 constructs RoomVariantSelectorScript.new() only when biome non-empty (:72) and drives via assign_with_selector (:74). VARIANTS_BY_ROLE is an in-code table (room_variant_selector.gd:29-103, ~24 roles), NOT data-driven from data/procgen/room_variants/. Output confirmed DEAD: grep of generated_ship_loader/gameplay_slice_builder/readability_prop_factory/playable_generated_ship for 'variant' returns only local *_variant Variant-typed loop variables (e.g. rooms_variant, room_variant, module_variant) — none read the serialized room['variant'] field. Inert despite full upstream wiring.",
       "functional": null,
       "gaps": [
-        "no room-variant data authored; data/procgen/room_variants/ directory absent; output is a no-op despite being wired"
+        "no live gameplay consumer reads the serialized room['variant'] field — selector output is dead despite being constructed, driven, and serialized",
+        "no per-biome variant lists yet (biome param accepted but every biome uses the same default table)"
       ],
       "subsystems": []
     },
@@ -3274,37 +3288,43 @@
       "smoke": "scripts/validation/topology_template_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "ship_layout_generator.gd:64",
+      "driven_at": "template_selector.gd:99",
       "input": {
         "live": true,
-        "desc": "template JSON (spine/bifurcated/stacked...) loaded during selection",
-        "at": "ship_layout_generator.gd:64"
+        "desc": "template JSON (spine/bifurcated/stacked/compact/dispersed/derelict_a/derelict_b/stacked_v2) parsed via from_dict during template selection",
+        "at": "template_selector.gd:99"
       },
       "output": {
         "live": true,
-        "desc": "zone/spine structure consumed by RoomAssigner+CellLayoutEngine",
+        "desc": "zones/connections/deck_config consumed by RoomAssigner and CellLayoutEngine to shape the live derelict geometry on the travel path",
         "at": "ship_layout_generator.gd:77"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [
         "travel"
       ],
       "integrations": [
         {
           "to": "template_selector",
-          "via": "loaded/selected",
-          "at": "ship_layout_generator.gd:64",
+          "via": "TopologyTemplate.from_dict(parsed) returned by select()",
+          "at": "template_selector.gd:99",
           "health": "healthy"
         },
         {
           "to": "room_assigner",
-          "via": "zones read",
+          "via": "template zones read during assign/assign_with_selector",
           "at": "ship_layout_generator.gd:77",
+          "health": "healthy"
+        },
+        {
+          "to": "cell_layout_engine",
+          "via": "template passed to layout() for grid placement",
+          "at": "ship_layout_generator.gd:83",
           "health": "healthy"
         }
       ],
       "content": "sufficient",
-      "content_note": "8 template JSONs in data/procgen/templates/ (confirmed by dir listing). template.id consumed at serialize (:95); template passed to assign/layout. File not opened directly (P) but usage traced via selector/assigner.",
+      "content_note": "RE-VERIFIED V. template_selector.gd:99 confirmed `return TopologyTemplateScript.from_dict(parsed)`. ship_layout_generator.gd drives the pipeline: :64 select(), :74-77 room_assigner.assign_with_selector/assign reads template zones, :83 cell_layout_engine.layout(room_plan, template, seed). Template parsed live and consumed both into room assignment and grid placement on the travel path. V holds.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -3358,46 +3378,46 @@
       "smoke": "scripts/validation/structural_placer_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:4178",
+      "driven_at": "life_boat.gd:64",
       "input": {
         "live": true,
-        "desc": "room_graph + kit via LifeBoatBuilder.build()",
-        "at": "playable_generated_ship.gd:4178"
+        "desc": "RoomGraph + seed + biome via place_structure(graph, 0, biome)",
+        "at": "life_boat.gd:64"
       },
       "output": {
         "live": true,
-        "desc": "BFS-grid structural placements -> lifeboat scene geometry",
+        "desc": "BFS-grid Node3D 'ShipStructure' tree (real walkable lifeboat geometry) returned to LifeBoatBuilder and parented under lifeboat_ship.scene_root (the player's actual ride)",
         "at": "playable_generated_ship.gd:4178"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [
         "travel"
       ],
       "integrations": [
         {
           "to": "room_graph",
-          "via": "BFS grid placement",
-          "at": "life_boat.gd:16",
+          "via": "place_structure(graph) reads rooms/links + get_connected_rooms for BFS layout",
+          "at": "structural_placer.gd:142-193",
           "health": "healthy"
         },
         {
           "to": "kit_catalog",
-          "via": "module skinning",
-          "at": "structural_placer.gd",
+          "via": "_ensure_kit_catalog -> kits_for_role/has_role_for for per-role module lists",
+          "at": "structural_placer.gd:378-396",
           "health": "healthy"
         },
         {
           "to": "life_boat",
-          "via": "LifeBoatBuilder.build",
-          "at": "playable_generated_ship.gd:4178",
+          "via": "LifeBoatBuilder.build -> StructuralPlacer.new().place_structure",
+          "at": "life_boat.gd:63-64",
           "health": "healthy"
         }
       ],
       "content": "partial",
-      "content_note": "Verified: life_boat.gd preloads StructuralPlacerScript (:17) and RoomGraphScript (:16); LifeBoatBuilder.build invoked live at coord 4178. Used by lifeboat path only (main derelict loader uses kit JSON directly). File not opened (P).",
+      "content_note": "RE-VERIFIED V. life_boat.gd:63-64 confirmed StructuralPlacerScript.new().place_structure(graph, 0, biome). Live path confirmed: playable_generated_ship.gd:4082 _build_lifeboat_at_home() (called during home-ship build) -> :4178 LifeBoatBuilderScript.build(_resolve_current_loot_biome_id()) -> life_boat.gd:64. structural_placer.gd:378-384 _ensure_kit_catalog/configure and :395-396 has_role_for/kits_for_role confirmed. Output is real walkable lifeboat geometry parented as the player's ride. Main derelict path bypasses StructuralPlacer (uses CellLayoutEngine + generated_ship_loader). V holds.",
       "functional": null,
       "gaps": [
-        "main derelict loader bypasses StructuralPlacer; only the lifeboat builder exercises it"
+        "main derelict loader bypasses StructuralPlacer entirely; only the fixed 3-room lifeboat exercises it at runtime"
       ],
       "subsystems": []
     },
@@ -3411,33 +3431,36 @@
       "smoke": "scripts/validation/kit_catalog_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:4178",
+      "driven_at": "structural_placer.gd:383",
       "input": {
         "live": true,
-        "desc": "kit JSON id (biome-skinned lifeboat, PR #36)",
-        "at": "playable_generated_ship.gd:4178"
+        "desc": "configure('res://data/kits/') walks + parses kit JSONs (ship_structural_v0/hazard/industrial); biome id selects kit via biome_preference",
+        "at": "structural_placer.gd:383"
       },
       "output": {
         "live": true,
-        "desc": "module wrapper scene refs -> structural geometry skinning",
-        "at": "structural_placer.gd"
+        "desc": "per-role module-id lists (kits_for_role/has_role_for) consumed by StructuralPlacer._modules_for_role to skin lifeboat geometry",
+        "at": "structural_placer.gd:395-396"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [
         "travel"
       ],
       "integrations": [
         {
           "to": "structural_placer",
-          "via": "module lookup",
-          "at": "structural_placer.gd",
+          "via": "has_role_for + kits_for_role drive module selection",
+          "at": "structural_placer.gd:395-396",
           "health": "healthy"
         }
       ],
       "content": "partial",
-      "content_note": "3 kit JSONs in data/kits/ (v0/industrial/hazard, confirmed by dir listing). Reached via StructuralPlacer on the lifeboat path (LifeBoatBuilder.build at coord 4178). File not opened (P).",
+      "content_note": "RE-VERIFIED V. structural_placer.gd:378-384 _ensure_kit_catalog: KitCatalogScript.new() + configure('res://data/kits/') (process-wide static cache _shared_kit_catalog). :387-398 _modules_for_role prefers kit_catalog.kits_for_role(role, biome) when has_role_for(role, biome) is true (:395-396), else falls through to ROOM_MODULES const. Live only on the lifeboat path (via StructuralPlacer at playable_generated_ship.gd:4178). For default v0 kit has_role_for returns true so the kit list is used. V holds.",
       "functional": null,
-      "gaps": [],
+      "gaps": [
+        "only 3 kits and a single biome_preference entry (abyssal 0.9) authored; biome-biased skinning barely populated",
+        "exercised only via the lifeboat StructuralPlacer; main derelict loader reads the kit JSON directly without KitCatalog"
+      ],
       "subsystems": []
     },
     {
@@ -3450,39 +3473,41 @@
       "smoke": "scripts/validation/room_graph_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:4178",
+      "driven_at": "life_boat.gd:51",
       "input": {
         "live": true,
-        "desc": "rooms/adjacency from lifeboat builder + structural placer",
-        "at": "life_boat.gd:51"
+        "desc": "3 rooms + 2 links added in LifeBoatBuilder.build (airlock->cockpit->engine_bay)",
+        "at": "life_boat.gd:51-57"
       },
       "output": {
         "live": true,
-        "desc": "graph nodes/edges -> StructuralPlacer BFS layout (lifeboat)",
-        "at": "structural_placer.gd"
+        "desc": "rooms[]/links[] + get_connected_rooms() consumed by StructuralPlacer.place_structure(graph) -> real lifeboat geometry",
+        "at": "life_boat.gd:64"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [
         "travel"
       ],
       "integrations": [
         {
           "to": "structural_placer",
-          "via": "graph -> placement",
-          "at": "structural_placer.gd",
+          "via": "graph passed to place_structure; get_connected_rooms drives BFS",
+          "at": "life_boat.gd:64",
           "health": "healthy"
         },
         {
           "to": "life_boat",
-          "via": "build()",
-          "at": "playable_generated_ship.gd:4178",
+          "via": "RoomGraph.new() + add_room/add_link in build()",
+          "at": "life_boat.gd:51-57",
           "health": "healthy"
         }
       ],
       "content": "partial",
-      "content_note": "Verified: life_boat.gd preloads RoomGraphScript (:16), constructs graph and add_room/add_link in build() (:51-57). Used by lifeboat path + room_graph_generator; main pipeline uses CellLayoutEngine instead. File not opened (P).",
+      "content_note": "RE-VERIFIED V. life_boat.gd:51 RoomGraphScript.new(); :52-53 add_room over ROOMS const; :56-57 add_link airlock_01->cockpit_01->engine_bay_01; :64 graph consumed by place_structure. Live via playable_generated_ship.gd:4082 _build_lifeboat_at_home -> :4178. Pure RefCounted adjacency model, no external data file (rooms hardcoded in life_boat.ROOMS). Main pipeline uses CellLayoutEngine instead. V holds.",
       "functional": null,
-      "gaps": [],
+      "gaps": [
+        "main procgen pipeline uses CellLayoutEngine, not RoomGraph; RoomGraph is live only via the fixed lifeboat (and room_graph_generator)"
+      ],
       "subsystems": []
     },
     {
@@ -3543,31 +3568,32 @@
       "driven_at": "generated_ship_loader.gd:148",
       "input": {
         "live": true,
-        "desc": "objective specs from gameplay_slice (built by loader)",
-        "at": "generated_ship_loader.gd:148"
+        "desc": "objective spec dict (id/sequence/type/room_id) + world_position from objective_specs; configured per ship load",
+        "at": "generated_ship_loader.gd:148-149"
       },
       "output": {
-        "live": true,
-        "desc": "Area3D trigger volumes -> objective approach/interact detection",
-        "at": "generated_ship_loader.gd:148"
+        "live": false,
+        "desc": "Area3D trigger + objective_completed signal. complete()/objective_completed are wired ONLY in procgen_debug_runner.gd:143 and generated_ship_demo.gd:74 (demo/validation). Live coordinator never connects them — it tracks objectives via get_objective_specs_copy() + the objective tracker. Only live scene effect is a translucent marker mesh (readability/HUD, does not count).",
+        "at": "procgen_debug_runner.gd:82"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [
         "travel"
       ],
       "integrations": [
         {
           "to": "generated_ship_loader",
-          "via": "instantiated by loader",
-          "at": "generated_ship_loader.gd:148",
-          "health": "healthy"
+          "via": "GameplayObjectiveVolume.new() + configure() + add_child(objective_root)",
+          "at": "generated_ship_loader.gd:148-151",
+          "health": "weak"
         }
       ],
       "content": "partial",
-      "content_note": "CORRECTED driven_at to instantiation site: preloaded at generated_ship_loader.gd:4, instantiated GameplayObjectiveVolumeScript.new() at :148. Scene node built by loader for objective volumes; no dedicated smoke (covered by loader/objective smokes). Own file not opened (P).",
+      "content_note": "RE-VERIFIED V, output.live=false confirmed. generated_ship_loader.gd:148-151 builds the volume live (GameplayObjectiveVolumeScript.new, configure, add_child(objective_root), objective_volumes.append) so it IS in-tree. gameplay_objective_volume.gd:57-61 complete() (zero-arg) emits objective_completed; :41-54 builds a green translucent SphereMesh marker. Grep confirms the zero-arg complete() is invoked only at procgen_debug_runner.gd:82, objective_completed connected only at procgen_debug_runner.gd:143, and loader.objective_volumes read only at generated_ship_demo.gd:74. The coordinator's complete() calls (playable_generated_ship.gd:3333) are controller.complete(sequence) on DerelictObjectiveController (different arity), NOT the volume. Live gameplay drives objectives off get_objective_specs_copy() + objective tracker. Trigger output dead in real gameplay.",
       "functional": null,
       "gaps": [
-        "no dedicated smoke"
+        "Area3D objective trigger + objective_completed signal consumed only by procgen_debug_runner/generated_ship_demo (demo/validation); live gameplay drives objectives off objective_specs, leaving the volume's collision output inert",
+        "no dedicated smoke (exercised indirectly via procgen_runtime_demo_smoke)"
       ],
       "subsystems": []
     },
@@ -5400,28 +5426,28 @@
       "driven_at": "inventory_panel.gd:524",
       "input": {
         "live": true,
-        "desc": "created per item id with defs by inventory_panel",
-        "at": "inventory_panel.gd:524"
+        "desc": "constructed per pane item id via InventoryRowScript.create(self,pane,i,id,_defs); _ready reads panel.pane_quantity + ItemDefs/RarityTier for swatch/label",
+        "at": "inventory_panel.gd:524; inventory_row.gd:24-46"
       },
       "output": {
         "live": true,
-        "desc": "row selection drives transfer_selected",
-        "at": "inventory_panel.gd:37"
+        "desc": "left-click -> panel.row_clicked (select_row); _get_drag_data -> panel.row_drag_payload; _drop_data -> panel.zone_drop which performs a real item transfer/equip on inventory_state (NOT HUD-only)",
+        "at": "inventory_row.gd:70,77,92 -> inventory_panel.gd:255,258,296"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [
         "ui_shell"
       ],
       "integrations": [
         {
           "to": "inventory_panel",
-          "via": "selection callback",
+          "via": "row_clicked / row_drag_payload / zone_drop callbacks",
           "at": "inventory_panel.gd:524",
           "health": "healthy"
         }
       ],
       "content": "partial",
-      "content_note": "NOT re-opened inventory_panel.gd:524/37 directly this pass; reachability inherited from inventory_panel (which IS verified live). Widget subcomponent — confidence downgraded V->P pending direct line check",
+      "content_note": "RE-VERIFIED this pass: opened inventory_row.gd (full) + inventory_panel.gd lines 248-337,490-530. Constructed at inventory_panel.gd:524 inside _make_pane_section (rebuilt each _render). Output genuinely live: _gui_input left-click forwards to panel.row_clicked (inventory_row.gd:70 -> inventory_panel.gd:255 -> select_row); _drop_data (inventory_row.gd:92) -> panel.zone_drop (inventory_panel.gd:296) which on a real drop calls equip_from_container (307) / equip_selected (310) / transfer_selected (314) -- genuine inventory_state+equipment mutation, NOT HUD-only. row_drag_payload at inventory_panel.gd:258. Confidence V holds.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -5439,28 +5465,28 @@
       "driven_at": "inventory_panel.gd:518",
       "input": {
         "live": true,
-        "desc": "created per pane/slot target by inventory_panel; receives drag payload",
-        "at": "inventory_panel.gd:500, 518"
+        "desc": "constructed per equipment slot (target 'slot:<id>') and per pane via InventoryDropZoneScript.create; receives Godot drag payload through _can_drop_data/_drop_data",
+        "at": "inventory_panel.gd:500,518; inventory_drop_zone.gd:11-21"
       },
       "output": {
         "live": true,
-        "desc": "drop triggers transfer into target pane/equipment slot",
-        "at": "inventory_panel.gd:38"
+        "desc": "_drop_data -> panel.zone_drop performs real transfer/equip-from-container on inventory_state/equipment_state; slot right-click -> panel.slot_context -> unequip (NOT HUD-only)",
+        "at": "inventory_drop_zone.gd:26,34 -> inventory_panel.gd:296,331"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [
         "ui_shell"
       ],
       "integrations": [
         {
           "to": "inventory_panel",
-          "via": "drop callback",
+          "via": "zone_drop / slot_context callbacks",
           "at": "inventory_panel.gd:518",
           "health": "healthy"
         }
       ],
       "content": "partial",
-      "content_note": "NOT re-opened inventory_panel.gd:518/500/38 directly this pass; reachability inherited from inventory_panel (verified live). Widget subcomponent — confidence downgraded V->P pending direct line check",
+      "content_note": "RE-VERIFIED this pass: opened inventory_drop_zone.gd (full) + inventory_panel.gd. Slot zones built at inventory_panel.gd:500 (_make_equipment_section), pane zones at :518 (_make_pane_section). _drop_data (inventory_drop_zone.gd:26) forwards to panel.zone_drop (inventory_panel.gd:296) -> equip_from_container/equip_selected/transfer_selected (real inventory+equipment mutation, lines 307/310/314); slot right-click (inventory_drop_zone.gd:34) -> panel.slot_context (inventory_panel.gd:331 -> Unequip popup). Real gameplay consumer, not HUD. Confidence V holds.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -5865,28 +5891,28 @@
       "driven_at": "player_controller.gd:28",
       "input": {
         "live": true,
-        "desc": "reads move_left/right/forward/back + interact/field_craft actions",
-        "at": "player_controller.gd:41-82"
+        "desc": "self-driven each physics frame: _read_move_direction reads InputMap move_left/right/forward/back action strengths; _unhandled_input reads interact/field_craft actions (or scripted_move_direction for smokes)",
+        "at": "player_controller.gd:28-38,41-45,70-82"
       },
       "output": {
         "live": true,
-        "desc": "CharacterBody3D movement (move_and_slide) + interact_requested/field_craft_requested signals",
-        "at": "player_controller.gd:38, 42-44"
+        "desc": "CharacterBody3D move_and_slide drives world position; interact_requested signal -> coordinator._on_player_interact_requested dispatches to dock barriers/terminals/repair/breach/fire/loot/interactables (real gameplay); field_craft_requested -> field-craft pipeline",
+        "at": "player_controller.gd:38,49 -> playable_generated_ship.gd:4246-4247,4316"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [
         "hud_feedback"
       ],
       "integrations": [
         {
           "to": "interactable",
-          "via": "interact_requested -> try_interact",
+          "via": "interact_requested -> _on_player_interact_requested -> try_interact dispatch",
           "at": "playable_generated_ship.gd:4246",
           "health": "healthy"
         }
       ],
       "content": "partial",
-      "content_note": "Cited lines not re-opened directly this pass (focus was on UI-coordinator coupling); player is clearly live (vitals/camera smokes drive it). Confidence V->P pending direct player_controller.gd line check",
+      "content_note": "RE-VERIFIED this pass: opened player_controller.gd (full) + coordinator 4240-4329. Constructed in _spawn_player (playable_generated_ship.gd:4242); interact_requested connected at 4246, field_craft_requested at 4247. Self-drives via _physics_process (player_controller.gd:28) every physics frame -- not coordinator-ticked. Input from InputMap actions (74-82); output via move_and_slide (38) + interact_requested emit (49) consumed at coordinator _on_player_interact_requested (4316) which dispatches to dock_barriers (4322)/bridge_terminals (4325)/away repair-loot-objectives (4328+). Tuning is in-script constants, no external data file. Confidence V holds.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -5904,31 +5930,31 @@
       "driven_at": "iso_camera_rig.gd:17",
       "input": {
         "live": true,
-        "desc": "follow_target (player) position each _process",
-        "at": "iso_camera_rig.gd:17-18, playable_generated_ship.gd:4253"
+        "desc": "self-driven each frame: _process -> _sync_camera_to_target reads follow_target (the spawned player) global_position + offset",
+        "at": "iso_camera_rig.gd:17-18,27-34; playable_generated_ship.gd:4253"
       },
       "output": {
         "live": true,
-        "desc": "orthographic Camera3D transform, make_current()",
-        "at": "playable_generated_ship.gd:4254"
+        "desc": "positions an orthographic Camera3D (look_at player) and make_current() sets it as the active viewport camera -- the real rendered game view, a live engine consumer",
+        "at": "iso_camera_rig.gd:32-34,37-39 -> playable_generated_ship.gd:4254"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [
         "hud_feedback"
       ],
       "integrations": [
         {
           "to": "player_controller",
-          "via": "set_follow_target",
+          "via": "set_follow_target(player)",
           "at": "playable_generated_ship.gd:4253",
           "health": "healthy"
         }
       ],
       "content": "partial",
-      "content_note": "Cited lines not re-opened directly this pass. Confidence V->P pending direct line check; no dedicated smoke (reachability via slice smokes)",
+      "content_note": "RE-VERIFIED this pass: opened iso_camera_rig.gd (full) + coordinator. Constructed in _spawn_camera (playable_generated_ship.gd:4250); set_follow_target(player) at 4253, make_current() at 4254. Self-drives via own _process (iso_camera_rig.gd:17 -> _sync_camera_to_target 27-34). Output = active orthographic viewport camera (_ensure_camera sets PROJECTION_ORTHOGONAL :47; make_current camera.current=true :39); offset/size are in-script constants, no data file. No dedicated smoke (reachability via slice smokes that spawn the playable ship). Confidence V holds.",
       "functional": null,
       "gaps": [
-        "no dedicated smoke; reachability proven via slice smokes"
+        "no dedicated camera smoke; reachability proven via playable-ship slice smokes"
       ],
       "subsystems": []
     },
@@ -5984,22 +6010,23 @@
       "driven_at": null,
       "input": {
         "live": false,
-        "desc": "authoring-time Resource schema for placement wrapper assets",
+        "desc": "authoring-time Resource schema (document_kind 'modular_asset_spec') for placement wrapper assets; no live scene constructs it",
         "at": null
       },
       "output": {
         "live": false,
-        "desc": "data consumed by placement/validation tooling, not live scene",
+        "desc": "schema for placement-contract data files; consumed by offline placement/validation tooling, never the runtime scene",
         "at": null
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
       "integrations": [],
-      "content": "partial",
-      "content_note": "VERIFIED not live: grep of scripts/procgen + main.gd finds no reference. NOTE domain mis-bucketed — this is placement/asset tooling, not 'ui'; flagged for the orchestrator",
+      "content": "sufficient",
+      "content_note": "RE-VERIFIED not live: grep for ModularAssetSpec/modular_asset_spec across scripts/ returns ONLY scripts/placement/modular_asset_spec.gd itself (no preload/new in scripts/procgen or main.gd). Backing data IS populated -- data/placement/contracts/structural/ship_structural_v0/ holds a real library of *_contract.json/.tres (corridor_floor_1x1, bulkhead_portal_2x1, ceiling_cap_1x1, doorway_frame_open/blocked, floor/pillar/ramp ...). Content real (sufficient) though schema is runtime-dead. NOTE domain mis-bucketed: placement/asset tooling, not 'ui' -- kept 'ui' to match the pass bucket but flagged. Confidence V holds.",
       "functional": true,
       "gaps": [
-        "domain likely should be placement/tooling, not ui"
+        "domain should be placement/tooling, not ui",
+        "runtime-dead schema: only offline placement tooling consumes it"
       ],
       "subsystems": []
     },
@@ -6391,22 +6418,59 @@
       "smoke": "scripts/validation/inventory_state_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:1147",
       "input": {
         "live": true,
-        "desc": "add_item/remove_item from loot grants, crafting output, consumable use, and inventory-panel transfers",
-        "at": "playable_generated_ship.gd"
+        "desc": "add_item/remove_item from loot grants, crafting output, consumable use, equip/unequip swaps, and inventory-panel transfers",
+        "at": "playable_generated_ship.gd:3351 (salvage loot grant), 3134 (craft output add), 2182/2199 (equip/unequip swap), 3314-3315 (auto-equip on loot)"
       },
       "output": {
         "live": true,
-        "desc": "stack contents read by HUD hotbar, crafting ingredient checks, consumable use, ammo consumption, and save snapshot",
-        "at": "playable_generated_ship.gd"
+        "desc": "summary drives OxygenState drain; load_ratio drives Encumbrance -> player.move_speed; quantities gate ammo (threat_manager), crafting can_craft, consumable use; persisted to save",
+        "at": "playable_generated_ship.gd:5032 (oxygen apply_inventory_summary), 2165 (encumbrance->move_speed), 5058 (vitals HUD load), 3881->threat_manager.gd:107-109 (ammo gate)"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "oxygen_state",
+          "via": "apply_inventory_summary(get_summary)",
+          "at": "playable_generated_ship.gd:5032",
+          "health": "healthy"
+        },
+        {
+          "to": "encumbrance",
+          "via": "get_load_ratio/get_total_weight",
+          "at": "playable_generated_ship.gd:2159-2164",
+          "health": "healthy"
+        },
+        {
+          "to": "equipment_state",
+          "via": "equip/unequip remove+add",
+          "at": "playable_generated_ship.gd:2182-2189",
+          "health": "healthy"
+        },
+        {
+          "to": "threat_manager",
+          "via": "attack_with_weapon ammo consume",
+          "at": "playable_generated_ship.gd:3881",
+          "health": "healthy"
+        },
+        {
+          "to": "consumable_state",
+          "via": "use_item(inventory_state)",
+          "at": "playable_generated_ship.gd:3963",
+          "health": "healthy"
+        },
+        {
+          "to": "cargo_transfer",
+          "via": "move_items/deposit_all/withdraw_category src",
+          "at": "inventory_panel.gd:429",
+          "health": "healthy"
+        }
+      ],
       "content": "sufficient",
-      "content_note": "Backed by item_defs aggregate catalog; the live item store consumed across loot/crafting/consumables/combat (ammo) and the inventory UI. Added on coverage sweep (integration target of consumable_state/threat_manager/loot_container/hotbar_panel/inventory_panel).",
+      "content_note": "VERIFIED. Live coordinator-owned store, constructed once at playable_generated_ship.gd:1147 and shared everywhere. Confirmed exact lines: oxygen apply_inventory_summary at 5032; salvage loot add_item at 3351; craft add at 3134; consumable use_item(inventory_state) at 3963; weapon gate threat_manager.attack_with_weapon(weapon_id, inventory_state, equipment_state) at 3881 with ammo consume at threat_manager.gd:107-109 and equipped-check at 100-104. move_speed coupling is at 2165 (the original note's '5057-5058 -> move_speed 2165' conflated the vitals-HUD load line 5058 with the real move_speed write at 2165; both confirmed). Output read by real gameplay consumers, not just HUD.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -6421,22 +6485,53 @@
       "smoke": "scripts/validation/equipment_state_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:2183",
       "input": {
         "live": true,
-        "desc": "equip from inventory (auto-equip on loot grant + manual equip via inventory panel)",
-        "at": "playable_generated_ship.gd"
+        "desc": "equip from inventory (auto-equip on loot grant 3314-3315; manual equip via inventory panel) and unequip 2197; save restore",
+        "at": "playable_generated_ship.gd:2170-2191"
       },
       "output": {
         "live": true,
-        "desc": "equipped suit drives armor_resolver player profile; equipped weapon gates threat_manager.attack_with_weapon",
-        "at": "threat_manager.gd:100"
+        "desc": "worn-container carry capacity bonus + weight_reduction feed Encumbrance; suit oxygen_drain multiplier feeds OxygenState; equipped suit drives armor profile; equipped weapon gates threat_manager.attack_with_weapon",
+        "at": "playable_generated_ship.gd:2158 (capacity), 5034-5035 (oxygen drain), 3799 (suit armor profile), 3881->threat_manager.gd:100-104 (weapon equipped gate)"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
-      "content": "partial",
-      "content_note": "Equipment slots backed by equipment_definitions.json. Integration target of threat_manager/armor_resolver/loot_container. Added on coverage sweep.",
+      "integrations": [
+        {
+          "to": "encumbrance",
+          "via": "get_carry_capacity_bonus/get_container_reductions",
+          "at": "playable_generated_ship.gd:2158-2160",
+          "health": "healthy"
+        },
+        {
+          "to": "oxygen_state",
+          "via": "get_oxygen_drain_multiplier -> apply_equipment_summary",
+          "at": "playable_generated_ship.gd:5034-5035",
+          "health": "healthy"
+        },
+        {
+          "to": "armor_resolver",
+          "via": "get_equipped('suit') -> player armor profile",
+          "at": "playable_generated_ship.gd:3799",
+          "health": "healthy"
+        },
+        {
+          "to": "threat_manager",
+          "via": "attack_with_weapon(weapon, inventory, equipment) equipped gate",
+          "at": "playable_generated_ship.gd:3881",
+          "health": "healthy"
+        },
+        {
+          "to": "inventory_state",
+          "via": "equip removes / unequip adds item",
+          "at": "playable_generated_ship.gd:2182-2199",
+          "health": "healthy"
+        }
+      ],
+      "content": "sufficient",
+      "content_note": "VERIFIED. Constructed via EquipmentState.create() at playable_generated_ship.gd:1148. Confirmed: oxygen drain apply_equipment_summary({'drain_multiplier': get_oxygen_drain_multiplier()}) at 5034-5035; suit armor get_equipped('suit')=='hardsuit' -> resistance/durability profile at 3799-3808; weapon gate threat_manager.gd:100-104 rejects attack if neither primary_hand nor secondary_hand == weapon_id. Outputs read by real consumers (encumbrance capacity, oxygen drain, suit armor, weapon gate).",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -6451,22 +6546,35 @@
       "smoke": "scripts/validation/inventory_selection_model_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "inventory_panel.gd",
+      "driven_at": "inventory_panel.gd:130-138",
       "input": {
         "live": true,
-        "desc": "pane/row selection + drag source state driven by inventory_panel interactions",
-        "at": "inventory_panel.gd"
+        "desc": "select_single/toggle/select_range_to driven by inventory_panel.select_row row-click handling; set_ids on _rebuild_models refresh",
+        "at": "inventory_panel.gd:130-138 (select_row), 126-128 (set_ids)"
       },
       "output": {
         "live": true,
-        "desc": "selected slot/quantity consumed by inventory_panel transfer/use dispatch",
-        "at": "inventory_panel.gd"
+        "desc": "get_selected_ids consumed by transfer_selected -> CargoTransfer.move_items mutates the live player InventoryState <-> hold/cart",
+        "at": "inventory_panel.gd:427-429 (selected ids -> move_items)"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "cargo_transfer",
+          "via": "get_selected_ids -> move_items",
+          "at": "inventory_panel.gd:427-429",
+          "health": "healthy"
+        },
+        {
+          "to": "inventory_state",
+          "via": "selection -> transfer mutates live store",
+          "at": "inventory_panel.gd:429",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "UI-side selection state for the inventory panel (not referenced by the coordinator directly). Added on coverage sweep.",
+      "content_note": "VERIFIED. Pure per-list UI selection state; inventory_panel.gd owns two instances (_sel_self/_sel_container at lines 31-32). select_row (130-138) routes to select_range_to/toggle/select_single. transfer_selected (419-432) reads get_selected_ids at line 427 and feeds CargoTransferScript.move_items at 429 -> real container mutation. Reachable in the field (transfer panel opened via _open_transfer_panel_for_ship/_for_cart 3717/3726). Data backing is only item_defs categories (context_actions). Output is UI-mediated but ends in real state mutation.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -6481,24 +6589,45 @@
       "smoke": "scripts/validation/encumbrance_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:2164",
       "input": {
         "live": true,
-        "desc": "total carried weight recomputed from inventory contents",
-        "at": "playable_generated_ship.gd"
+        "desc": "inventory_state.get_load_ratio()/get_total_weight() and equipment_state.get_container_reductions() recomputed on every inventory/equipment/cart change via _recompute_player_encumbrance",
+        "at": "playable_generated_ship.gd:2152-2165"
       },
       "output": {
         "live": true,
-        "desc": "encumbrance ratio surfaced to HUD / movement weighting",
-        "at": "playable_generated_ship.gd"
+        "desc": "move_speed_multiplier sets player.move_speed (real movement, x cart push penalty); weight_reduction_saved writes inventory_state.weight_reduction (feeds load_ratio); ratio also fed to vitals_model HUD",
+        "at": "playable_generated_ship.gd:2165 (player.move_speed), 2162 (weight_reduction), 5058 (vitals load)"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "inventory_state",
+          "via": "get_load_ratio + sets weight_reduction/bonus_capacity",
+          "at": "playable_generated_ship.gd:2161-2164",
+          "health": "healthy"
+        },
+        {
+          "to": "equipment_state",
+          "via": "get_container_reductions -> weight_reduction_saved",
+          "at": "playable_generated_ship.gd:2159-2160",
+          "health": "healthy"
+        },
+        {
+          "to": "cart_state",
+          "via": "_cart_push_multiplier folds into move_speed",
+          "at": "playable_generated_ship.gd:2165",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Weight model over inventory_state contents (weights from item_defs). Added on coverage sweep.",
+      "content_note": "VERIFIED. Confirmed _recompute_player_encumbrance (2152-2165): bonus_capacity=get_carry_capacity_bonus() at 2161, weight_reduction=weight_reduction_saved(...) at 2162, and the real player.move_speed = DEFAULT_MOVE_SPEED * move_speed_multiplier(get_load_ratio()) * _cart_push_multiplier() at 2165. Output is genuinely live (sets player.move_speed, not just HUD). Tuning constants hardcoded in encumbrance.gd (FLOOR_MULTIPLIER, MULT_AT_125), item weights from item_defs. PZ endurance/health effects deferred.",
       "functional": null,
-      "gaps": [],
+      "gaps": [
+        "Endurance/health consequences of overload deferred -- only a movement multiplier is applied (encumbrance.gd:6-8)."
+      ],
       "subsystems": []
     },
     {
@@ -6511,22 +6640,41 @@
       "smoke": "scripts/validation/ship_inventory_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "ship_instance.gd",
+      "driven_at": "inventory_panel.gd:429",
       "input": {
         "live": true,
-        "desc": "per-ship cargo store populated by transfers + ship loot",
-        "at": "ship_instance.gd"
+        "desc": "lazily constructed per ship via ship_instance.get_inventory(); filled organically by the transfer panel (move_items/deposit_all) opened from the cargo hold, plus the cargo_deposit_for_validation seam and save restore",
+        "at": "inventory_panel.gd:429 (organic move_items via open_transfer 3723), playable_generated_ship.gd:7235 (validation seam deposit_all), 6460 (save restore)"
       },
       "output": {
         "live": true,
-        "desc": "cargo contents read on docking transfer / cargo-hold UI",
-        "at": "ship_instance.gd"
+        "desc": "hold contents read back into the live player InventoryState via the transfer panel (withdraw direction of move_items / withdraw_category) and persisted to the world save",
+        "at": "inventory_panel.gd:429 (organic withdraw), playable_generated_ship.gd:7243 (seam withdraw_category), 6289 (save get_summary)"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "cargo_transfer",
+          "via": "move_items/deposit_all/withdraw_category as src or dst container",
+          "at": "inventory_panel.gd:429",
+          "health": "healthy"
+        },
+        {
+          "to": "inventory_state",
+          "via": "transfer counterpart container",
+          "at": "inventory_panel.gd:429",
+          "health": "healthy"
+        },
+        {
+          "to": "cart_state",
+          "via": "CartState._hold IS a ShipInventory",
+          "at": "cart_state.gd:22/28",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Per-ship cargo container owned by ship_instance; used by cargo transfer/cargo-hold control. Added on coverage sweep.",
+      "content_note": "VERIFIED + citation refined. Per-ship weight-capped container (default 500kg) owned by ship_instance, created on first access. The original driven_at=7235 is the cargo_deposit_for_validation SEAM; the ORGANIC path is confirmed: cargo_hold_control signal -> _on_cargo_deposit_requested (2143) -> _open_transfer_panel_for_ship (3717-3723) passes inst.get_inventory() into inventory_panel.open_transfer, whose transfer_selected runs CargoTransferScript.move_items at inventory_panel.gd:429 against the live ShipInventory. Both directions (deposit/withdraw) reachable in normal play. Also the backing store for CartState holds. No data-seeded starting cargo -- holds begin empty.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -6541,22 +6689,41 @@
       "smoke": "scripts/validation/cargo_transfer_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "inventory_panel.gd:429",
       "input": {
         "live": true,
-        "desc": "transfer request between player inventory and ship/cargo holds",
-        "at": "playable_generated_ship.gd"
+        "desc": "static move_items/move_item (organic transfer panel) and deposit_all/withdraw_category (validation seams + cart load) invoked with the live player InventoryState and a ShipInventory/cart hold",
+        "at": "inventory_panel.gd:429 (move_items) / 442 (move_item), playable_generated_ship.gd:7235/7243 (seam deposit/withdraw), 7438/7444 (cart load/unload seam)"
       },
       "output": {
         "live": true,
-        "desc": "moves stacks across inventory_state <-> ship_inventory",
-        "at": "playable_generated_ship.gd"
+        "desc": "conservation-preserving moves that mutate both live containers (player InventoryState <-> ship/cart ShipInventory); callers then recompute encumbrance",
+        "at": "inventory_panel.gd:431 (_after_mutation -> encumbrance), playable_generated_ship.gd:7236 (_recompute_player_encumbrance after seam move)"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "inventory_state",
+          "via": "move_items/deposit/withdraw src+dst",
+          "at": "inventory_panel.gd:429",
+          "health": "healthy"
+        },
+        {
+          "to": "ship_inventory",
+          "via": "move_items/deposit/withdraw counterpart",
+          "at": "inventory_panel.gd:429",
+          "health": "healthy"
+        },
+        {
+          "to": "cart_state",
+          "via": "deposit into cart get_hold()",
+          "at": "playable_generated_ship.gd:7438",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Resolves cross-container moves (player<->cargo hold). Added on coverage sweep.",
+      "content_note": "VERIFIED + citation refined. Pure-static transfer logic (no data file): HAULABLE_CATEGORIES = part+supply (tools excluded), conservation contract. Confirmed organic exercise: inventory_panel.transfer_selected calls CargoTransferScript.move_items(src, dst, id_to_qty) at line 429 (and move_item at 442 for splits) against the live player/ship containers; this is reached via the cargo-hold interact wired into BOTH the away branch (_try_cargo_deposit at 4353) and home branch (4392). The deposit_all/withdraw_category statics at 7235/7243 are validation seams; 7438/7444 are cart-hold transfers. Depends on item_defs categories. Logic-only so content graded partial.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -6571,24 +6738,45 @@
       "smoke": "scripts/validation/cart_state_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:7414",
       "input": {
         "live": true,
-        "desc": "cart load/push state driven by CartControl interactions",
-        "at": "playable_generated_ship.gd"
+        "desc": "grab sets grabbed_cart; CartControl load/unload opens a transfer panel; CargoTransfer.deposit_all/withdraw_category mutate the cart's ShipInventory hold. BUT carts are only created by spawn_cart_for_validation (7414) or save restore (6466) -- no organic gameplay spawn",
+        "at": "playable_generated_ship.gd:2134 (grab sets grabbed_cart), 7414 (validation spawn), 6466 (save restore)"
       },
       "output": {
         "live": true,
-        "desc": "carried cargo contents transferable to ship/home cargo",
-        "at": "playable_generated_ship.gd"
+        "desc": "push_speed_multiplier folds into player.move_speed via _cart_push_multiplier; hold contents transferable to ship/home cargo; persisted under ship 'carts'",
+        "at": "playable_generated_ship.gd:2215 -> 2165 (move_speed), 7438 (deposit into hold), 6291 (save)"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "ship_inventory",
+          "via": "CartState._hold IS a ShipInventory",
+          "at": "cart_state.gd:22/28",
+          "health": "healthy"
+        },
+        {
+          "to": "cargo_transfer",
+          "via": "deposit_all into get_hold()",
+          "at": "playable_generated_ship.gd:7438",
+          "health": "healthy"
+        },
+        {
+          "to": "cart_control",
+          "via": "grabbed/loaded via CartControl signals",
+          "at": "playable_generated_ship.gd:2104-2106",
+          "health": "weak"
+        }
+      ],
       "content": "partial",
-      "content_note": "Pushable salvage cart capacity/contents model. Added on coverage sweep.",
+      "content_note": "VERIFIED. Pushable cart = a ShipInventory hold (default 200kg) + push_speed_multiplier 0.7. Confirmed grab path: _on_cart_grab_requested sets grabbed_cart at 2134 then _recompute_player_encumbrance applies _cart_push_multiplier()=push_speed_multiplier into player.move_speed at 2165. Confirmed the ONLY CartState creators in the coordinator are spawn_cart_for_validation (7414, '200.0' cap) and save restore (6466); grep across scripts confirms no organic spawn (also ship_instance.gd:171 is summary-restore). In normal play inst.get_carts() is empty, so the loot->cart->haul loop is seam-only/dormant.",
       "functional": null,
-      "gaps": [],
+      "gaps": [
+        "No organic gameplay cart spawn: carts only created via spawn_cart_for_validation (playable_generated_ship.gd:7414) or save restore (6466 / ship_instance.gd:171). The salvage-cart loop is not reachable by a player in normal play."
+      ],
       "subsystems": []
     },
     {
@@ -6601,24 +6789,40 @@
       "smoke": "scripts/validation/achievement_state_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:1244",
+      "driven_at": "playable_generated_ship.gd:5587",
       "input": {
         "live": true,
-        "desc": "progress events folded in from run summary; constructed live at coordinator 1244",
-        "at": "playable_generated_ship.gd:1244"
+        "desc": "Constructed + configured from data/release/achievement_catalog.json at coordinator (1244-1246, verified null-guarded so it always exists at runtime). Live driver: tool pickup handler calls achievement_state.unlock_for_trigger('tool_acquired', p_tool_id) at 5586-5589 (verified). Input is PARTIALLY wired -- grep confirms 5587 is the ONLY unlock_for_trigger emitter on achievement_state in the coordinator; 'tool_acquired' is the sole trigger event reaching the model.",
+        "at": "playable_generated_ship.gd:5586-5589"
       },
       "output": {
-        "live": true,
-        "desc": "achievement unlock list rendered by achievements_panel",
-        "at": "menu_coordinator.gd:452"
+        "live": false,
+        "desc": "VERIFIED display-only. achievement_state is passed to menu_coordinator.bind_meta_screens at playable_generated_ship.gd:3659, which calls achievements_panel.set_state/render (menu_coordinator.gd:450-453). achievements_panel.render() reads _state.get_unlocked() (achievements_panel.gd:72) to draw a RichTextLabel. No gameplay system reads unlock state to alter the simulation -- this is a cosmetic menu panel, excluded like HUD/get_status_lines.",
+        "at": null
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "tool_pickup",
+          "via": "tool_acquired pickup drives unlock_for_trigger('tool_acquired', tool_id)",
+          "at": "playable_generated_ship.gd:5587",
+          "health": "healthy"
+        },
+        {
+          "to": "achievements_panel",
+          "via": "panel.render() reads get_unlocked() for menu display only; bound via menu_coordinator.bind_meta_screens (coordinator:3659 -> menu_coordinator.gd:450-453)",
+          "at": "menu_coordinator.gd:452",
+          "health": "weak"
+        }
+      ],
       "content": "partial",
-      "content_note": "Integration target of achievements_panel. Constructed live at coordinator 1244. Added on coverage sweep.",
+      "content_note": "REQ-RL-003/REQ-RL-004/ADR-0030. Catalog of 8 fully-authored entries (id/display_name/description/trigger) in data/release/achievement_catalog.json. Data is authored but the system barely closes: only the 2 'tool_acquired' achievements can ever fire in play. Per-run only (start_new_run wipes set); cross-run is deferred Steamworks (ADR-0029/0030). All citations re-verified read-only; confidence held at V.",
       "functional": null,
-      "gaps": [],
+      "gaps": [
+        "6 of 8 catalog triggers have NO in-game emitter -- repair_consumed, loot_searched, objective_completed, reactor_stabilized, run_complete are never routed to achievement_state.unlock_for_trigger (grep confirms only 'tool_acquired' at 5587 is wired). Most achievements are unreachable in actual play.",
+        "Output is hollow for simulation purposes: the only sink is the cosmetic achievements_panel; no gameplay loop consumes unlock state."
+      ],
       "subsystems": []
     },
     {
@@ -6631,22 +6835,65 @@
       "smoke": "scripts/validation/objective_progress_state_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:4444",
       "input": {
         "live": true,
-        "desc": "interaction_completed signals from interactable + objective volumes advance step/sequence progress",
-        "at": "interactable.gd:4"
+        "desc": "register_objective() seeds multi-step repair_junction sequences from loader objective specs; interaction_completed signals advance steps via complete_step()",
+        "at": "playable_generated_ship.gd:4286,4444"
       },
       "output": {
         "live": true,
-        "desc": "current sequence/step progress drives objective_tracker HUD, map reveal, training XP and meta payout",
-        "at": "playable_generated_ship.gd:4449"
+        "desc": "is_sequence_complete() gates the completion block that force_repairs ship systems, grants repair XP, fires the training bus, and refreshes route control — real gameplay consumers, not just HUD",
+        "at": "playable_generated_ship.gd:4456"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "ship_systems_manager",
+          "via": "sequence complete -> force_repair(system,subcomponent)",
+          "at": "playable_generated_ship.gd:4456-4464",
+          "health": "healthy"
+        },
+        {
+          "to": "player_progression_state",
+          "via": "repair-objective XP grant on completion",
+          "at": "playable_generated_ship.gd:4466",
+          "health": "healthy"
+        },
+        {
+          "to": "training_event_bus",
+          "via": "emit repair_full_system on completion",
+          "at": "playable_generated_ship.gd:4470",
+          "health": "healthy"
+        },
+        {
+          "to": "route_control_state",
+          "via": "_refresh_route_control_from_ship_systems on completion",
+          "at": "playable_generated_ship.gd:4473",
+          "health": "healthy"
+        },
+        {
+          "to": "oxygen_state",
+          "via": "apply_ship_systems_summary after repair",
+          "at": "playable_generated_ship.gd:4475",
+          "health": "healthy"
+        },
+        {
+          "to": "objective_tracker",
+          "via": "set_step_progress / mark_completed HUD reflection",
+          "at": "playable_generated_ship.gd:4449,4487",
+          "health": "healthy"
+        },
+        {
+          "to": "inventory_state",
+          "via": "junction_calibrator consume reduces required_steps (apply_junction_calibrator)",
+          "at": "playable_generated_ship.gd:5666-5706",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Integration target of objective_tracker/interactable. Drives objective HUD + completion XP. Added on coverage sweep.",
+      "content_note": "Re-verified V (all citations open and hold): model owns multi-step repair_junction sequence progress on the home/main slice (register at coordinator 4286, complete_step at 4444, completion gate at 4456). Output is a genuine gameplay sink — fall-through completion path at 4460+ force_repairs systems (4464), grants repair XP (4466), fires training bus (4470), refreshes route (4473) and oxygen (4475). Step/objective data is procgen-derived from loader specs; no dedicated authored objective data files beyond golden gameplay_slice.json, so content is partial (formulaic objective set, REQ-014 calibrator path exists at 4441).",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -6661,22 +6908,53 @@
       "smoke": "scripts/validation/derelict_objective_controller_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "generated_ship_loader.gd",
+      "driven_at": "playable_generated_ship.gd:3333",
       "input": {
         "live": true,
-        "desc": "objective specs from the gameplay slice / loader wire interaction volumes per derelict",
-        "at": "generated_ship_loader.gd"
+        "desc": "configure() registers the derelict's objective set from the loader's objective specs on first board; complete() is fired by _on_derelict_interactable_completed on each in-world objective interaction",
+        "at": "playable_generated_ship.gd:2350,3333"
       },
       "output": {
         "live": true,
-        "desc": "objective completion + reactor-goal state feeds objective_progress_state",
-        "at": "objective_progress_state.gd"
+        "desc": "is_objective_complete() gates each interactable's completed/active state on (re)board so a finished objective cannot be re-fired and is restored from save; controller.is_cleared() drives run-complete HUD flag; salvage loot grant is gated by the same completion signal path",
+        "at": "playable_generated_ship.gd:2369"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "objective_progress_state",
+          "via": "composes ObjectiveProgressState; complete()/is_objective_complete() delegate to progress.complete_step/is_sequence_complete",
+          "at": "derelict_objective_controller.gd:14,51,57",
+          "health": "healthy"
+        },
+        {
+          "to": "generated_ship_loader",
+          "via": "get_objective_specs_copy() feeds configure()",
+          "at": "playable_generated_ship.gd:2346-2350",
+          "health": "healthy"
+        },
+        {
+          "to": "ship_instance",
+          "via": "owned/created by ShipInstance, retrieved via get_objective_controller()",
+          "at": "ship_instance.gd:147,181-184",
+          "health": "healthy"
+        },
+        {
+          "to": "inventory_state",
+          "via": "salvage objective completion grants rolled loot into inventory",
+          "at": "playable_generated_ship.gd:3338-3358",
+          "health": "healthy"
+        },
+        {
+          "to": "objective_tracker",
+          "via": "_refresh_derelict_tracker mark_completed / mark_run_complete on clear",
+          "at": "playable_generated_ship.gd:2399,2403",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Per-derelict objective sequencer built on the loaded ship (not constructed in the coordinator directly). Added on coverage sweep.",
+      "content_note": "Re-verified V (all citations open and hold): pure-logic per-derelict objective sequencer owned by ShipInstance (created/restored ship_instance.gd:147 on apply_summary, 183 on first access via get_objective_controller). Configured from loader specs at coordinator 2350, driven by complete() at 3333, output consumed by interactable re-fire gating at 2369 and salvage loot at 3338-3358, cleared() drives tracker run-complete at 2403. Objective set is procgen (salvage objectives + reach_goal/interact). Content partial: real but formulaic objective variety.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -6691,24 +6969,40 @@
       "smoke": "scripts/validation/oxygen_state_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:290",
+      "driven_at": "playable_generated_ship.gd:5044",
       "input": {
         "live": true,
-        "desc": "personal suit O2 drains while away on a derelict / during a hull breach; refilled at recharge points",
-        "at": "playable_generated_ship.gd:4848"
+        "desc": "per-frame breach-zone presence (is_player_in_breach_zone) drives drain/regen; inventory + worn-equipment drain multipliers applied before each tick (REQ-007). Only the HOME/hub _process branch ticks it.",
+        "at": "playable_generated_ship.gd:5032-5044"
       },
       "output": {
         "live": true,
-        "desc": "depletion feeds vitals health drain + breach_open flag into sanity/radiation safe-zone gating",
-        "at": "vitals_state.gd"
+        "desc": "oxygen<=recovery_threshold flips passability_blocked -> breach-zone CollisionShape3D enabled, blocking traversal (_apply_breach_zone_scene_state); breach_open gates sanity safe-zone (4866) and radiation zone (4882); is_passability_blocked drives hazard music (5471). NOT a vitals-health drain.",
+        "at": "playable_generated_ship.gd:5100-5101"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "sanity_state",
+          "via": "breach_open gates sanity in_safe_zone (in_safe = not away_from_start AND not breach_open, so open breach -> unsafe -> sanity drains)",
+          "at": "playable_generated_ship.gd:4866",
+          "health": "healthy"
+        },
+        {
+          "to": "radiation_state",
+          "via": "breach_open gates radiation in_radiation_zone (in_rad = away_from_start OR breach_open, so open breach -> irradiated)",
+          "at": "playable_generated_ship.gd:4882",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Non-timer resource-drain hazard (ADR-0005). The live personal-oxygen model (distinct from the life_support_system subclass oxygen). Added on coverage sweep.",
+      "content_note": "ADR-0005 non-timer resource-drain hazard (Gate 1 hub breach loop). Tuning is hardcoded DEFAULT_* constants (max=100, drain=6, regen=3.5, recovery=30, safe=35) in oxygen_state.gd:23-28 / configured at 4922; no data/ file backs it. This is the HUB breach hazard, NOT an away-from-start suit model (despite the inventory name 'Personal Oxygen'). RE-VERIFIED: constructed 1140 (re-instantiated if null at 4917), configured 4922 with all DEFAULT_* constants, ticked 5044 via _refresh_oxygen_state called at 4818 (home branch). All cited lines confirmed.",
       "functional": null,
-      "gaps": [],
+      "gaps": [
+        "Ticks ONLY on the home/hub _process branch (4818 -> _refresh_oxygen_state -> tick 5044). RE-VERIFIED: the away/derelict branch (4748-4808) never calls _refresh_oxygen_state; at 4794 it calls _refresh_player_vitals, which only READS oxygen_state.get_summary() at 5055 for the HUD. So personal O2 does not drain in the field, which is the primary gameplay context per CLAUDE.md — same away-branch early-return class as PR #42-44 regressions.",
+        "No content/data backing; tuning is constants only."
+      ],
       "subsystems": []
     },
     {
@@ -6721,24 +7015,34 @@
       "smoke": "scripts/validation/electrical_arc_state_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:4827",
       "input": {
         "live": true,
-        "desc": "arc zones seeded from layout / unpowered damaged systems; owns a PhaseTimer (A/B)",
-        "at": "playable_generated_ship.gd"
+        "desc": "configured from layout arc-zone markers/specs via _build_arc_zone (loader.get_arc_zone_markers); owns a PhaseTimer (DISCHARGED 1.5s / ARCING 2.5s)",
+        "at": "playable_generated_ship.gd:5243-5266"
       },
       "output": {
         "live": true,
-        "desc": "arc zap drains vitals health when player in zone + arc SFX; can cascade into fire ignition",
-        "at": "vitals_state.gd"
+        "desc": "during ARCING phase, _apply_arc_zone_scene_state toggles the arc-zone StaticBody3D collision ON (blocks player passability) and swaps visual/label; audio reads is_passability_blocked() for arc SFX (5475). NO vitals/health drain exists.",
+        "at": "playable_generated_ship.gd:5400"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "phase_timer",
+          "via": "composes a PhaseTimer; maps A->DISCHARGED / B->ARCING",
+          "at": "electrical_arc_state.gd:40",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Phase-based hazard (ADR-0005) using PhaseTimer. Ticked on both _process branches with the other hazards. Added on coverage sweep.",
+      "content_note": "Verified at source: arc zones are data-driven from the layout (arc_zone_specs/markers, _resolve_arc_zone_world_position 5268), but the A/B phase durations are hardcoded constants (DEFAULT_ARCING_DURATION/DEFAULT_DISCHARGED_DURATION) passed verbatim by _build_arc_zone configure at 5245-5246 and 5260-5261 with no data/ tuning file. Output confirmed: _set_arc_zone_collision_enabled (5406) only disables a CollisionShape3D = blocks passability; grep-confirmed there is NO arc->health/vitals code anywhere in the coordinator.",
       "functional": null,
-      "gaps": [],
+      "gaps": [
+        "Home-only: electrical_arc_state.tick is called only in the home _process branch (line 4827); the away/derelict branch returns at line 4808 before reaching it (verified — the away block ends with `return` at 4808), so the arc hazard is dead on derelicts. This violates the coordinator both-branch rule (CLAUDE.md). The comment at line 2685 ('arc_arcing is home-only') treats this as intentional, but it is the same away-path early-return class that caused PR #42-44 regressions.",
+        "The model smoke (electrical_arc_state_smoke.gd) is a pure-model test with no away_ticks/scene assertion, so the home-only gap is not caught by validation."
+      ],
       "subsystems": []
     },
     {
@@ -6751,22 +7055,29 @@
       "smoke": "scripts/validation/hazard_contract_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "electrical_arc_state.gd",
+      "driven_at": "electrical_arc_state.gd:93",
       "input": {
         "live": false,
-        "desc": "shared A/B phase clock instantiated by phase-based hazards (electrical_arc/fire/etc.)",
-        "at": "electrical_arc_state.gd"
+        "desc": "shared two-phase A/B clock; configured with phase durations by its owner (electrical_arc_state.configure -> _phase_timer.configure at electrical_arc_state.gd:75)",
+        "at": "electrical_arc_state.gd:75"
       },
       "output": {
         "live": false,
-        "desc": "Phase.A/B enum + elapsed feeding each hazard's own state translation",
+        "desc": "current_phase()/get_time_in_phase()/normalized_progress() consumed only by its owner ElectricalArcState (_sync_phase_from_timer, electrical_arc_state.gd:94) to drive that hazard's own enum",
         "at": null
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
-      "content": "partial",
-      "content_note": "Hazard-contract primitive (ADR-0005): each phase-based hazard owns a PhaseTimer. Reusable infra, no standalone driver. Added on coverage sweep.",
+      "integrations": [
+        {
+          "to": "electrical_arc_state",
+          "via": "composed as the arc hazard's phase clock; tick()/current_phase() consumed",
+          "at": "electrical_arc_state.gd:40",
+          "health": "healthy"
+        }
+      ],
+      "content": "none",
+      "content_note": "Pure ADR-0005 helper primitive (MINIMUM_PHASE_DURATION constant, no data/ content). infra kind -> excluded from completion. Verified ElectricalArcState is its sole owner (composed at electrical_arc_state.gd:40, configure at 75, tick at 93, _sync at 94). Driven transitively whenever the arc is ticked, therefore home-only in practice along with the arc.",
       "functional": true,
       "gaps": [],
       "subsystems": []
@@ -6781,24 +7092,27 @@
       "smoke": "scripts/validation/player_vitals_model_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:5069",
+      "driven_at": "playable_generated_ship.gd:5078",
       "input": {
         "live": true,
-        "desc": "apply_*_summary from vitals/sanity/radiation/temperature/status each frame",
-        "at": "playable_generated_ship.gd:5054"
+        "desc": "apply_oxygen/inventory_load/repair_progress + apply_vitals/sanity/radiation/temperature/status_effects summaries fed each frame from the live models before tick()",
+        "at": "playable_generated_ship.gd:5055-5078"
       },
       "output": {
-        "live": true,
-        "desc": "aggregated status lines + critical flags consumed by player_vitals_panel + audio music flags",
+        "live": false,
+        "desc": "Pure presentation aggregator. get_status_lines() -> vitals_panel.set_status_lines() (5079) is HUD-only (excluded). get_vitals_summary() is read only at 5483 to derive the vitals_critical music flag (audio feedback). No gameplay mechanic consumes it — actual health drain/death lives upstream in vitals_state.",
         "at": "player_vitals_panel.gd"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
       "integrations": [],
       "content": "partial",
-      "content_note": "Aggregator DTO assembling per-frame vitals summaries for the HUD/audio (read at 5482 for vitals_critical). Added on coverage sweep.",
+      "content_note": "Logic-complete ASCII status-line composer (oxygen/suit/load/repair + REQ-SV vitals/sanity/radiation/temp/status lines); no data/ assets back it. It is a downstream DTO of vitals_state/sanity_state/etc., not a simulation source. RE-VERIFIED: constructed 3604, fed+ticked in _refresh_player_vitals 5055-5078, ticked on BOTH _process branches (away via 4794, home via 5040 force_initial / 5047 per-tick). Output confirmed half-coupled: get_status_lines -> set_status_lines 5079 (HUD) and get_vitals_summary -> vitals_critical music flag 5483 (audio feedback); neither is a gameplay consumer. Hollow-output capped at 50%.",
       "functional": null,
-      "gaps": [],
+      "gaps": [
+        "Output is HUD lines + one audio music flag (vitals_critical at 5483, derived from oxygen<=0 OR health<25); no live gameplay consumer, so coupling is half / hollow-output capped at 50%.",
+        "kind is 'simulation' but it is effectively a UI/presentation aggregator; could be reclassified."
+      ],
       "subsystems": []
     },
     {
@@ -6811,22 +7125,29 @@
       "smoke": "scripts/validation/route_control_state_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:4563",
       "input": {
         "live": true,
-        "desc": "route/branch selection + blocked-link state from layout and player choices",
-        "at": "playable_generated_ship.gd"
+        "desc": "configure_from_blocked_routes seeds powered route gates from layout gate markers; apply_ship_systems_summary reads main_power_restored + blocked_routes_cleared + extraction_unlocked from the ship-systems compat summary each refresh",
+        "at": "playable_generated_ship.gd:4563"
       },
       "output": {
         "live": true,
-        "desc": "active route gates traversal / readability cues + travel readiness",
-        "at": "playable_generated_ship.gd"
+        "desc": "_apply_route_gate_scene_state reads is_gate_open() (4575) and toggles each route-gate CollisionShape3D via _set_route_gate_collision_enabled (4579) — opening a powered gate physically unblocks traversal of the home slice; verified live by main_playable_slice_route_control_smoke.gd checking get_route_gate_collision_enabled_count",
+        "at": "playable_generated_ship.gd:4579"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "ship_systems_manager",
+          "via": "apply_ship_systems_summary consumes _manager_compat_summary (main_power_restored/blocked_routes_cleared/extraction_unlocked)",
+          "at": "playable_generated_ship.gd:4563",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Route/branch control model for the derelict run. Added on coverage sweep.",
+      "content_note": "Verified: gate ids come from the layout route markers; the per-gate required_system is hardcoded 'main_power_restored' with no data/ tuning. Event-driven (not per-frame): _refresh_route_control_from_ship_systems (4559) refreshed at build, on objective/ship-system change, and load. Home-slice scoped by design (route gates belong to the home playable ship; derelict away-path has no route gates), so the home-only refresh is NOT a both-branch violation.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -6841,22 +7162,37 @@
       "smoke": "scripts/validation/scanner_state_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:1773",
       "input": {
         "live": true,
-        "desc": "scan() builds marker view dicts gated by scanner_operation skill level",
-        "at": "playable_generated_ship.gd:1771"
+        "desc": "scan() fed live: ops from current ship's systems_manager (navigation/scanners is_operational) + scanner_operation skill from progression; world from SynapticSeaWorld",
+        "at": "playable_generated_ship.gd:1769-1773"
       },
       "output": {
         "live": true,
-        "desc": "scan results feed scanner_panel -> travel target selection",
-        "at": "scanner_panel.gd"
+        "desc": "scan view-dicts consumed by ScannerPanel.refresh() (scanner_panel.gd:72) -> confirm_selection (scanner_panel.gd:93-103) -> coordinator.travel_to_marker_id (real travel target selection, not passive HUD)",
+        "at": "scanner_panel.gd:72"
       },
-      "confidence": "P",
-      "loops": [],
-      "integrations": [],
+      "confidence": "V",
+      "loops": [
+        "travel"
+      ],
+      "integrations": [
+        {
+          "to": "synaptic_sea_world",
+          "via": "scan() iterates world.markers_in_range(range_radius)",
+          "at": "scanner_state.gd:24",
+          "health": "healthy"
+        },
+        {
+          "to": "ship_marker",
+          "via": "_marker_view reads marker_id/position/size_class/ship_type/condition",
+          "at": "scanner_state.gd:31-47",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Backs the scanner panel/travel selection; skill-gated. Added on coverage sweep.",
+      "content_note": "Functional skill/hardware-gated detail tiers (MAX_DETAIL=6, +1 detail/2 skill) but all thresholds hardcoded in-script; no data/ tuning file. Verified construction at playable_generated_ship.gd:1254 and live scan path 1766-1773. Verified consumer chain: scanner_panel.refresh:72 -> confirm_selection:93-103 -> travel_to_marker_id.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -6874,19 +7210,34 @@
       "driven_at": "playable_generated_ship.gd:3405",
       "input": {
         "live": true,
-        "desc": "attempt_travel(marker, generator, systems_ops) gated by propulsion can_propel + manager operational",
-        "at": "playable_generated_ship.gd:1757"
+        "desc": "attempt_travel(marker, {propulsion:bool from _current_systems_ops}, world, ship_generator, range) — propulsion gate is live from ship systems; marker from scanner selection",
+        "at": "playable_generated_ship.gd:3398-3406"
       },
       "output": {
         "live": true,
-        "desc": "resolves travel to a marker -> ship generation + attach derelict / dock",
-        "at": "playable_generated_ship.gd:3405"
+        "desc": "on success returns ship Node3D consumed at 3409 (new_root) -> _attach_derelict_active boards the derelict (3467); also mutates world (set_player_position + mark_generated at travel_controller.gd:27-28)",
+        "at": "playable_generated_ship.gd:3409"
       },
-      "confidence": "P",
-      "loops": [],
-      "integrations": [],
+      "confidence": "V",
+      "loops": [
+        "travel"
+      ],
+      "integrations": [
+        {
+          "to": "synaptic_sea_world",
+          "via": "range-checks markers_in_range then mutates set_player_position + mark_generated",
+          "at": "travel_controller.gd:16-28",
+          "health": "healthy"
+        },
+        {
+          "to": "ship_instance",
+          "via": "travel_to builds/reuses ShipInstance for the materialized ship",
+          "at": "playable_generated_ship.gd:3464",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Integration target of propulsion_expanded_state (travel-ready gate). Drives the travel/generation hop. Added on coverage sweep.",
+      "content_note": "Pure validate-and-execute coordinator; no data/ tuning. Range/propulsion/generation-failure branches all live (travel_controller.gd:13-29). Constructed at playable_generated_ship.gd:1255, called in travel_to at 3405; result.ship consumed at 3409 and 3467. Generation delegated to ship_generator (out of this domain set).",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -6901,22 +7252,37 @@
       "smoke": "scripts/validation/marker_generator_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "synaptic_sea_world.gd",
+      "driven_at": "synaptic_sea_world.gd:33",
       "input": {
         "live": true,
-        "desc": "world seed -> deterministic ship markers (size/condition/biome band)",
-        "at": "synaptic_sea_world.gd"
+        "desc": "world_seed + grid cell -> deterministic ShipMarkers; seed flows from SynapticSeaWorld (start blueprint seed) on every markers_in_range query",
+        "at": "synaptic_sea_world.gd:33"
       },
       "output": {
         "live": true,
-        "desc": "ship_marker set consumed by scanner/travel + ship_instance creation",
-        "at": "ship_instance.gd"
+        "desc": "ShipMarker set returned to SynapticSeaWorld.markers_in_range (synaptic_sea_world.gd:33-40), consumed live by scanner_state.scan + travel_to_marker_id",
+        "at": "synaptic_sea_world.gd:33-40"
       },
-      "confidence": "P",
-      "loops": [],
-      "integrations": [],
+      "confidence": "V",
+      "loops": [
+        "travel"
+      ],
+      "integrations": [
+        {
+          "to": "ship_marker",
+          "via": "markers_for_cell instantiates ShipMarker per cell slot (MARKERS_PER_CELL=3)",
+          "at": "marker_generator.gd:30",
+          "health": "healthy"
+        },
+        {
+          "to": "synaptic_sea_world",
+          "via": "owned + queried by SynapticSeaWorld (_generator), cell_seed from world_seed",
+          "at": "synaptic_sea_world.gd:18",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Generates the field of derelict markers for the world (used by world setup, not the coordinator directly). Added on coverage sweep.",
+      "content_note": "Deterministic infinite field but variety is hardcoded in-script: 4 SHIP_TYPES (marker_generator.gd:11), 3-way weighted size (0.4/0.4/0.2, lines 43-49), 3-way weighted condition (0.15/0.45/0.40, lines 51-57) — verified against source. No data/ file backs the marker variety. Owned by SynapticSeaWorld._init at synaptic_sea_world.gd:18; world itself constructed at playable_generated_ship.gd:1253.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -6931,22 +7297,37 @@
       "smoke": "scripts/validation/ship_instance_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:4069",
       "input": {
         "live": true,
-        "desc": "instantiated per visited ship from a marker/blueprint; holds systems manager + cargo + access state",
-        "at": "playable_generated_ship.gd"
+        "desc": "constructed per ship: home at boot (4069), lifeboat (4185), each visited derelict (3464). Aggregates blueprint + per-ship ShipSystemsManager + scene_root + access/hangar/cargo/fire",
+        "at": "playable_generated_ship.gd:4069"
       },
       "output": {
         "live": true,
-        "desc": "ship instance state persisted in world snapshot visited-ship registry",
-        "at": "world_snapshot.gd"
+        "desc": "current_ship.systems_manager / scene_root / built_layout read all over live gameplay; get_summary persisted per-ship in world snapshot save slice",
+        "at": "playable_generated_ship.gd:4074"
       },
-      "confidence": "P",
-      "loops": [],
-      "integrations": [],
+      "confidence": "V",
+      "loops": [
+        "travel"
+      ],
+      "integrations": [
+        {
+          "to": "ship_access_state",
+          "via": "get_access() lazily creates/holds per-ship ShipAccessState",
+          "at": "ship_instance.gd:187-190",
+          "health": "healthy"
+        },
+        {
+          "to": "hangar_bay",
+          "via": "get_hangar() lazily creates/holds per-ship HangarBay",
+          "at": "ship_instance.gd:193-196",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Per-ship runtime aggregate (systems/cargo/access). Added on coverage sweep.",
+      "content_note": "Per-ship runtime aggregate (systems/cargo/access/hangar/fire/objective). No data/ backing — structure only. get_summary/apply_summary round-trip complete. Verified live construction sites 3464/4069/4185 and heavy live reads of current_ship.* throughout coordinator (e.g. built_layout at 4074, get_access at 1588).",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -6961,22 +7342,24 @@
       "smoke": "scripts/validation/marker_generator_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "marker_generator.gd",
+      "driven_at": "marker_generator.gd:30",
       "input": {
         "live": false,
-        "desc": "marker data record (seed/size/condition/biome/position) produced by marker_generator",
-        "at": "marker_generator.gd"
+        "desc": "pure DTO populated by MarkerGenerator.markers_for_cell (marker_id/position/size_class/condition/ship_type/seed_value); to_dict/from_dict round-trip",
+        "at": "marker_generator.gd:30-40"
       },
       "output": {
         "live": false,
-        "desc": "consumed by scanner/travel + ship_instance creation",
-        "at": "scanner_state.gd"
+        "desc": "read by scanner_state._marker_view (scanner_state.gd:31-47) and travel (marker.seed_value/size_class/condition for generation, travel_controller.gd:24)",
+        "at": "scanner_state.gd:31"
       },
-      "confidence": "P",
-      "loops": [],
+      "confidence": "V",
+      "loops": [
+        "travel"
+      ],
       "integrations": [],
       "content": "partial",
-      "content_note": "Pure marker DTO (Resource). Added on coverage sweep.",
+      "content_note": "Pure data Resource/DTO (6 fields, ship_marker.gd:7-12) with to_dict/from_dict. infra-kind so coupling is na (input/output booleans don't score). Instantiated at marker_generator.gd:30; consumed by scanner_state.gd:31-47 and travel_controller.gd:24. Verified no behavior of its own.",
       "functional": true,
       "gaps": [],
       "subsystems": []
@@ -6991,22 +7374,31 @@
       "smoke": "scripts/validation/ship_occupancy_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:1567",
       "input": {
         "live": true,
-        "desc": "tracks which ship/room the player currently occupies (home vs away vs visited)",
-        "at": "playable_generated_ship.gd"
+        "desc": "ShipOccupancy.resolve(player.global_position, _occupancy_entries()) — fed live player world position + per-ship interior AABBs. Event-driven via recompute_occupancy, NOT per-frame",
+        "at": "playable_generated_ship.gd:1567"
       },
       "output": {
         "live": true,
-        "desc": "occupancy drives away_from_start branch selection + save location",
-        "at": "playable_generated_ship.gd"
+        "desc": "resolved instance sets current_occupancy (1570) and derives away_from_start (1577), which gates the entire _process home-vs-away branch and hazard/persistence readers",
+        "at": "playable_generated_ship.gd:1570-1577"
       },
-      "confidence": "P",
-      "loops": [],
-      "integrations": [],
+      "confidence": "V",
+      "loops": [
+        "travel"
+      ],
+      "integrations": [
+        {
+          "to": "ship_instance",
+          "via": "resolve returns the ShipInstance whose interior AABB contains the player",
+          "at": "playable_generated_ship.gd:1567",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Player location/occupancy model feeding the home/away coordinator branch. Added on coverage sweep.",
+      "content_note": "Pure spatial-containment resolver (entry order = priority; AABB grown 0.001 for seam, ship_occupancy.gd:17). No data/ backing. Driven by recompute_occupancy (1562-1577) at live call sites incl. 1599/1938/3391/3473. away_from_start set at 1577 and consumed to branch _process.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -7018,25 +7410,27 @@
       "domain": "travel",
       "kind": "simulation",
       "model_exists": true,
-      "smoke": null,
+      "smoke": "scripts/validation/ship_access_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "ship_instance.gd",
+      "driven_at": "playable_generated_ship.gd:1588",
       "input": {
         "live": true,
-        "desc": "per-ship access/lock state (opened ports, unlocked sections) mutated by docking/bridge login",
-        "at": "ship_instance.gd"
+        "desc": "claim(PLAYER_LOCAL_ID) on bridge login (_on_login_requested:1588) and lifeboat boot claim (4187); grant/revoke generalize to N players",
+        "at": "playable_generated_ship.gd:1588"
       },
       "output": {
         "live": true,
-        "desc": "access flags gate dock barriers + opened-port persistence",
-        "at": "world_snapshot.gd"
+        "desc": "has_access(PLAYER_LOCAL_ID) gates set_piloted_ship (taking command of a vessel, 1596); owner_id read for ownership; persisted under ship-summary 'access'",
+        "at": "playable_generated_ship.gd:1596"
       },
-      "confidence": "P",
-      "loops": [],
+      "confidence": "V",
+      "loops": [
+        "travel"
+      ],
       "integrations": [],
       "content": "partial",
-      "content_note": "Access/lock state owned by ship_instance; no dedicated smoke (covered via ship_instance). Added on coverage sweep.",
+      "content_note": "Pure owner_id + access_ids data (ship_access_state.gd); multiplayer-forward seam (one local player this cycle). CORRECTION: a dedicated pure-model smoke EXISTS — scripts/validation/ship_access_smoke.gd (claim/grant/revoke/has_access + owner-cannot-be-revoked + summary round-trip). Owned by ShipInstance.get_access (ship_instance.gd:187). claim at 1588/4187, has_access gate at set_piloted_ship:1596.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -7051,22 +7445,31 @@
       "smoke": "scripts/validation/synaptic_sea_world_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:1253",
       "input": {
         "live": true,
-        "desc": "top-level world model: seed, marker field, visited-ship registry, dock graph",
-        "at": "playable_generated_ship.gd"
+        "desc": "constructed with start blueprint seed (1253); player_position mutated on travel via attempt_travel.set_player_position; mark_generated/unmark on travel/rollback (3424-3426); apply_summary on load",
+        "at": "playable_generated_ship.gd:1253"
       },
       "output": {
         "live": true,
-        "desc": "world state drives marker generation + travel graph + world snapshot persistence",
-        "at": "world_snapshot.gd"
+        "desc": "markers_in_range feeds scanner_state.scan + travel_to_marker_id live (1780); get_summary persisted into world snapshot; apply_summary restored on load",
+        "at": "playable_generated_ship.gd:1780"
       },
-      "confidence": "P",
-      "loops": [],
-      "integrations": [],
+      "confidence": "V",
+      "loops": [
+        "travel"
+      ],
+      "integrations": [
+        {
+          "to": "marker_generator",
+          "via": "owns _generator and queries markers_for_cell per overlapping cell",
+          "at": "synaptic_sea_world.gd:18",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Top-level overworld model owning markers + visited ships. Added on coverage sweep.",
+      "content_note": "Top-level overworld: world_seed + player_position + generated_marker_ids; markers regenerated deterministically (not stored, synaptic_sea_world.gd:22-40). No data/ backing beyond seed. Constructed at 1253, mutated through travel_controller.attempt_travel (3405) and rollback at 3424-3426, queried for markers at 1780.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -7081,22 +7484,31 @@
       "smoke": "scripts/validation/dock_ports_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:4224",
       "input": {
         "live": true,
-        "desc": "dock port adjacency/edges between ships set up at world/dock time",
-        "at": "playable_generated_ship.gd"
+        "desc": "static derivers (for_lifeboat/for_derelict/for_hangar) read live ship built_layout dicts at boot docking (4224), barrier spawn (1917), hangar config (2000), and travel dock-compat (3417). NB: line 1635 is a validation seam, not live",
+        "at": "playable_generated_ship.gd:4224"
       },
       "output": {
         "live": true,
-        "desc": "open/closed port edges gate docking_manager transitions + persisted as dock_edges",
-        "at": "docking_manager.gd"
+        "desc": "port descriptors drive DockingManager.host_port_to_world (4225) and ports_compatible gate that accepts/rejects docking (4227 boot, 3419 travel)",
+        "at": "playable_generated_ship.gd:4227"
       },
-      "confidence": "P",
-      "loops": [],
-      "integrations": [],
+      "confidence": "V",
+      "loops": [
+        "travel"
+      ],
+      "integrations": [
+        {
+          "to": "docking_manager",
+          "via": "for_*/host descriptors feed host_port_to_world + ports_compatible gating",
+          "at": "playable_generated_ship.gd:4225-4227",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Dock-port adjacency model between ships. Added on coverage sweep.",
+      "content_note": "Layout-derived port/hangar descriptors; geometric constants hardcoded. condition_from_seed adds deterministic intact/broken split. No external data/ file. Verified live at boot dock _dock_piloted_to (for_derelict:4224, ports_compatible:4227), barrier spawn for_derelict:1917, and travel compat for_derelict:3417/ports_compatible:3419. One desc citation (1635) is a *_for_validation seam, not live — but live boot/travel paths confirm output.live.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -7111,22 +7523,37 @@
       "smoke": "scripts/validation/docking_manager_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:4229",
       "input": {
         "live": true,
-        "desc": "dock/undock requests from dock barriers / travel resolved against dock_ports",
-        "at": "playable_generated_ship.gd"
+        "desc": "host_port_to_world (4225) + dock(host, piloted, host_world, mobile_local) (4229) called live at boot lifeboat->home dock via _dock_piloted_to; undock on travel/launch paths",
+        "at": "playable_generated_ship.gd:4225-4229"
       },
       "output": {
         "live": true,
-        "desc": "performs ship-to-ship dock transitions + opens ports",
-        "at": "playable_generated_ship.gd"
+        "desc": "sets mobile scene_root transform + writes parent_ship/docked_ships relationship -> physical co-presence consumed by ship_occupancy AABB resolve",
+        "at": "docking_manager.gd:65-68"
       },
-      "confidence": "P",
-      "loops": [],
-      "integrations": [],
+      "confidence": "V",
+      "loops": [
+        "travel"
+      ],
+      "integrations": [
+        {
+          "to": "dock_ports",
+          "via": "consumes DockPorts descriptors (lifts ship-local ports to world)",
+          "at": "playable_generated_ship.gd:4225",
+          "health": "healthy"
+        },
+        {
+          "to": "ship_instance",
+          "via": "writes parent_ship + docked_ships on the ShipInstances",
+          "at": "docking_manager.gd:66-68",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Coordinates dock/undock transitions. Added on coverage sweep.",
+      "content_note": "Pure yaw-only docking math + parent/child bookkeeping; no scene ownership, no data/ backing. Verified live boot dock _dock_piloted_to: host_port_to_world:4225, dock:4229 (called from _build_lifeboat_at_home:4194). undock used on launch (2284) and travel/launch paths. NB desc line 1636 is a validation seam; the load-bearing boot path 4225/4229 is live.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -7141,24 +7568,41 @@
       "smoke": "scripts/validation/hangar_bay_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "hangar_bay_control.gd",
+      "driven_at": "playable_generated_ship.gd:2013",
       "input": {
         "live": true,
-        "desc": "hangar door/launch state driven by HangarBayControl interactions",
-        "at": "hangar_bay_control.gd"
+        "desc": "slot_count/slot_size_class configured live from layout via _configure_bay_from_layout (1995-2003) on every _spawn_hangar_control (home/lifeboat/derelict, 2013)",
+        "at": "playable_generated_ship.gd:2013"
       },
       "output": {
-        "live": true,
-        "desc": "launch readiness gates lifeboat / small-craft departure",
-        "at": "playable_generated_ship.gd"
+        "live": false,
+        "desc": "slot occupancy (dock/launch) is mutated ONLY by _on_bay_dock_requested/_on_bay_launch_requested (2279 bay.dock / 2303 bay.launch); in live play those handlers are unreachable — the interact chain (4316-4395) has NO hangar_controls loop; only validation seams bay_dock_for_validation:7346 / bay_launch_for_validation:7361 drive them, so slots stay empty during real play",
+        "at": "playable_generated_ship.gd:2279"
       },
-      "confidence": "P",
-      "loops": [],
-      "integrations": [],
+      "confidence": "V",
+      "loops": [
+        "travel"
+      ],
+      "integrations": [
+        {
+          "to": "dock_ports",
+          "via": "slot_count/size + anchors configured from DockPorts.for_hangar",
+          "at": "playable_generated_ship.gd:2013",
+          "health": "healthy"
+        },
+        {
+          "to": "ship_instance",
+          "via": "owned per-ship via get_hangar(); slots store bayed ship_ids, persisted under 'hangar'",
+          "at": "ship_instance.gd:193",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Hangar door/launch model (driven via the hangar control tool node). Added on coverage sweep.",
+      "content_note": "Pure fixed-slot store; configured live from layout but the dock/launch loop is unreachable by the player. CONFIRMED via grep: bay.dock/bay.launch reached only through _on_bay_dock_requested:2279 / _on_bay_launch_requested:2303, which are invoked only from validation seams 7346/7361 (plus signal connections from HangarBayControl, never fired live). Coupling is half (config in, occupancy out dead) -> completion capped at 50%.",
       "functional": null,
-      "gaps": [],
+      "gaps": [
+        "bay dock/launch only reachable via validation seams (7346/7361); no live player path mutates slot occupancy because HangarBayControl is not wired into _on_player_interact_requested (verified interact chain 4316-4395 has no hangar loop)"
+      ],
       "subsystems": []
     },
     {
@@ -7170,25 +7614,40 @@
       "model_exists": true,
       "smoke": "scripts/validation/tooltip_presenter_smoke.gd",
       "reachable": true,
-      "driven": true,
-      "driven_at": "tooltip_presenter.gd",
+      "driven": false,
+      "driven_at": null,
       "input": {
         "live": false,
-        "desc": "payload DTO (title/body/footer) produced by tooltip_presenter.resolve",
-        "at": "tooltip_presenter.gd"
+        "desc": "pure RefCounted DTO (title/body/footer + split glyph/label) produced by TooltipPresenter.resolve(); but resolve() is only reachable via MenuCoordinator.set_tooltip_query, whose ONLY callers are two validation smokes (no live gameplay source feeds it)",
+        "at": "menu_coordinator.gd:233-234 (set_tooltip_query -> tooltip_presenter.resolve); tooltip_payload.gd:20"
       },
       "output": {
         "live": false,
-        "desc": "rendered by tooltip_panel.set_payload",
-        "at": "tooltip_panel.gd"
+        "desc": "rendered by tooltip_panel.set_payload via presenter.payload_changed -> _on_payload_changed; this fires only when resolve() runs, which never happens in live gameplay -> output is pure presentation and never exercised in the field",
+        "at": "menu_coordinator.gd:108,723 (payload_changed -> tooltip_panel.set_payload)"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "tooltip_presenter",
+          "via": "produced by tooltip_presenter.resolve()",
+          "at": "menu_coordinator.gd:234",
+          "health": "weak"
+        },
+        {
+          "to": "tooltip_panel",
+          "via": "payload_changed -> tooltip_panel.set_payload",
+          "at": "menu_coordinator.gd:723",
+          "health": "weak"
+        }
+      ],
       "content": "partial",
-      "content_note": "Pure tooltip data record. Added on coverage sweep.",
+      "content_note": "RE-VERIFIED this pass: opened tooltip_payload.gd (full) + menu_coordinator.gd. tooltip_presenter live-constructed (menu_coordinator.gd:45, configured :125) inside reachable MenuCoordinator; payload_changed wired to _on_payload_changed (:108) -> tooltip_panel.set_payload (:723). HOWEVER grep confirms the only payload producer, MenuCoordinator.set_tooltip_query (:233 -> presenter.resolve), has NO live caller -- only main_playable_ui_shell_smoke.gd:109 and main_playable_slice_ui_shell_smoke.gd:105 (both validation smokes). So payloads are never created in live gameplay; input.live=false and output.live=false confirmed. Pure DTO (to_dict/from_dict/_split_footer). kind=infra; functional=true. Confidence V holds.",
       "functional": true,
-      "gaps": [],
+      "gaps": [
+        "tooltip presenter/panel are wired but never triggered in gameplay: no live caller of MenuCoordinator.set_tooltip_query outside validation smokes"
+      ],
       "subsystems": []
     },
     {
@@ -7201,22 +7660,41 @@
       "smoke": "scripts/validation/breach_seal_point_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:4363",
       "input": {
         "live": true,
-        "desc": "player interacts with hull_sealant to seal a breach (Area3D + try_interact)",
-        "at": "playable_generated_ship.gd"
+        "desc": "player interact dispatched in _on_player_interact_requested -> try_start (home 4363, away 4334, both branches wired); requires breach_open compartment + hull_sealant in inventory; channel then advances in the node's OWN _process (breach_seal_point.gd:98 -> advance_channel)",
+        "at": "playable_generated_ship.gd:4363"
       },
       "output": {
         "live": true,
-        "desc": "seals a hull_integrity_state compartment breach + grants repair XP (breach_seal_point.gd:125)",
-        "at": "playable_generated_ship.gd"
+        "desc": "on channel complete (_complete) consumes required_item via inventory_state.remove_item (121) and calls hull_state.seal_compartment (122) to close the breach -> stops oxygen loss, and grants repair XP (124-125)",
+        "at": "breach_seal_point.gd:122"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "hull_integrity_state",
+          "via": "seal_compartment closes the breach",
+          "at": "breach_seal_point.gd:122",
+          "health": "healthy"
+        },
+        {
+          "to": "inventory_state",
+          "via": "remove_item('hull_sealant')",
+          "at": "breach_seal_point.gd:121",
+          "health": "healthy"
+        },
+        {
+          "to": "player_progression_state",
+          "via": "grant_xp('repair', 15)",
+          "at": "breach_seal_point.gd:125",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Scene tool node configured at coordinator 2568. Added on coverage sweep.",
+      "content_note": "Verified scene tool node: interaction wired in BOTH _process interact branches (away 4334 / home 4363 confirmed at source). Compartment data from hull-compartments config; seal_seconds/required_item are configure() args (hardcoded 4.0s/'hull_sealant') with no dedicated data/ file.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -7231,22 +7709,41 @@
       "smoke": "scripts/validation/bridge_terminal_login_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:4326",
       "input": {
         "live": true,
-        "desc": "player login/interact at a bridge terminal",
-        "at": "playable_generated_ship.gd"
+        "desc": "player interaction loop calls try_login(player_body) on each bridge terminal; the in-range gate admits or refuses before objective/pickup handlers run",
+        "at": "playable_generated_ship.gd:4325-4326"
       },
       "output": {
         "live": true,
-        "desc": "unlocks ship access / advances objective on successful login",
-        "at": "playable_generated_ship.gd"
+        "desc": "login_requested signal -> _on_login_requested gates on inst.is_working_vessel() then claims ship access for the local player and set_piloted_ship (takes command) — real gameplay state change, not HUD",
+        "at": "playable_generated_ship.gd:1586-1589"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "ship_access_state",
+          "via": "successful login calls inst.get_access().claim(PLAYER_LOCAL_ID)",
+          "at": "playable_generated_ship.gd:1588",
+          "health": "healthy"
+        },
+        {
+          "to": "ship_instance",
+          "via": "login gated on inst.is_working_vessel(); set_piloted_ship(inst) on success",
+          "at": "playable_generated_ship.gd:1586-1589",
+          "health": "healthy"
+        },
+        {
+          "to": "playable_generated_ship",
+          "via": "login_requested connected to coordinator _on_login_requested in bridge-terminal spawn",
+          "at": "playable_generated_ship.gd:1975",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Scene interaction node (login gate). Added on coverage sweep.",
+      "content_note": "Re-verified V (all citations open and hold): scene node (BridgeTerminalScript.new()) constructed/configured per pilotable ship at coordinator 1972-1976 (parented to inst.scene_root at 1973, configured 1974, signal wired 1975), driven by the interaction loop try_login at 4326, output claims access (1588) + pilots ship (1589) gated by is_working_vessel (1586). Pure interaction logic with no backing data files — content partial reflects the meaningful working-vessel/access gating rather than authored content.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -7261,22 +7758,35 @@
       "smoke": null,
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:2069",
       "input": {
         "live": true,
-        "desc": "player interacts to open a cargo-hold transfer UI",
-        "at": "playable_generated_ship.gd"
+        "desc": "player walk-up interact -> try_deposit/try_withdraw (strict in-range gate); wired into BOTH the away-derelict (4353) and home (4392) interact handlers via _try_cargo_deposit; spawned per ship that has a cargo room",
+        "at": "playable_generated_ship.gd:4353 (away) / 4392 (home) -> _try_cargo_deposit 4400-4404 -> ch.try_deposit"
       },
       "output": {
         "live": true,
-        "desc": "opens cargo_transfer between player inventory and ship_inventory",
-        "at": "playable_generated_ship.gd"
+        "desc": "emits cargo_deposit_requested/cargo_withdraw_requested -> _on_cargo_deposit_requested opens the transfer panel which runs CargoTransfer.move_items against the live containers",
+        "at": "playable_generated_ship.gd:2072-2073 -> 2143-2147 -> _open_transfer_panel_for_ship 3717-3723"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "cargo_transfer",
+          "via": "deposit/withdraw signal -> transfer panel move_items",
+          "at": "inventory_panel.gd:429",
+          "health": "healthy"
+        },
+        {
+          "to": "ship_inventory",
+          "via": "operates on inst.get_inventory()",
+          "at": "playable_generated_ship.gd:3723",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Scene interaction node (cargo UI opener). No dedicated smoke. Added on coverage sweep.",
+      "content_note": "VERIFIED. Area3D sensor + signal opener (emit-only; coordinator owns the transfer for single ownership). Spawned at playable_generated_ship.gd:2069 for ships with a cargo room, signals connected at 2072-2073. Confirmed interact wired into both away (4353) and home (4392) branches via _try_cargo_deposit (4400-4404, iterates cargo_hold_controls -> ch.try_deposit). Signal -> _on_cargo_deposit_requested (2143) -> _open_transfer_panel_for_ship (3717-3723) -> inventory_panel.open_transfer -> CargoTransfer.move_items (inventory_panel.gd:429). No dedicated smoke. Output drives real CargoTransfer, not just HUD.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -7291,24 +7801,39 @@
       "smoke": "scripts/validation/cart_control_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:2101",
       "input": {
         "live": true,
-        "desc": "player grabs/pushes/loads a salvage cart",
-        "at": "playable_generated_ship.gd"
+        "desc": "player walk-up interact -> try_grab/try_load (strict in-range gate), wired into both away (4355) and home (4394) branches via _try_cart_interact. Spawned by _spawn_cart_controls_for_ship which iterates inst.get_carts() -- only non-empty when a cart was seam-spawned",
+        "at": "playable_generated_ship.gd:4413 (try_grab) / 4416 (try_load) inside _try_cart_interact 4408-4418"
       },
       "output": {
         "live": true,
-        "desc": "drives cart_state load/move + cargo transfer",
-        "at": "playable_generated_ship.gd"
+        "desc": "emits cart_grab_requested -> _on_cart_grab_requested sets grabbed_cart and applies the push penalty to move_speed; cart_load/unload -> _open_transfer_panel_for_cart (CargoTransfer)",
+        "at": "playable_generated_ship.gd:2104-2106 -> 2130-2141 -> _open_transfer_panel_for_cart 3726-3733"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "cart_state",
+          "via": "grab/load drives CartState + push penalty",
+          "at": "playable_generated_ship.gd:2130-2135",
+          "health": "weak"
+        },
+        {
+          "to": "cargo_transfer",
+          "via": "load/unload -> transfer panel move_items",
+          "at": "inventory_panel.gd:429",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Scene interaction node for the salvage cart. Added on coverage sweep.",
+      "content_note": "VERIFIED. Area3D sensor + signal opener for a parked salvage cart, spawned at playable_generated_ship.gd:2101 by _spawn_cart_controls_for_ship, signals connected 2104-2106. Confirmed interact wired both branches: away at 4355 and home at 4394 both call _try_cart_interact (4408-4418, grab via try_grab 4413 / load via try_load 4416). HAS a smoke. BUT _spawn_cart_controls_for_ship iterates inst.get_carts(), which is only non-empty via spawn_cart_for_validation (7414) or save restore (6466) -- so like cart_state it is dormant in organic play.",
       "functional": null,
-      "gaps": [],
+      "gaps": [
+        "Only spawned for ships that have a CartState, and carts have no organic spawn (validation seam 7414 / save restore 6466 only) -- the cart_control is unreachable in normal gameplay."
+      ],
       "subsystems": []
     },
     {
@@ -7318,25 +7843,50 @@
       "domain": "ship_systems",
       "kind": "ui",
       "model_exists": true,
-      "smoke": null,
+      "smoke": "scripts/validation/main_playable_slice_station_craft_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:4372",
       "input": {
         "live": true,
-        "desc": "player begins a craft (begin_craft, skill-gated, station_node.gd:123) or salvage (_try_salvage:139)",
-        "at": "playable_generated_ship.gd"
+        "desc": "player interact -> try_interact (home only, 4372 — inside the home branch after the away path returns at 4357); range+power gated; selects first craftable recipe for the station_kind (fabrication-skill gated) or, for 'salvage', runs DeconstructionResolver. Station power driven each home frame at 1380.",
+        "at": "playable_generated_ship.gd:4372"
       },
       "output": {
         "live": true,
-        "desc": "drives crafting_state.begin_craft / deconstruction_resolver -> items into inventory",
-        "at": "playable_generated_ship.gd"
+        "desc": "begin_craft consumes ingredients via crafting_state (123; output later deposited by coordinator _on_craft_completed) OR _try_salvage deconstructs (139) and adds yields straight into inventory_state (144)",
+        "at": "crafting_station.gd:123"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "crafting_state",
+          "via": "begin_craft / is_crafting / get_recipes_for_station",
+          "at": "crafting_station.gd:123",
+          "health": "healthy"
+        },
+        {
+          "to": "deconstruction_resolver",
+          "via": "deconstruct on salvage station",
+          "at": "crafting_station.gd:139",
+          "health": "healthy"
+        },
+        {
+          "to": "inventory_state",
+          "via": "add_item (salvage yields) / ingredient checks",
+          "at": "crafting_station.gd:144",
+          "health": "healthy"
+        },
+        {
+          "to": "material_state",
+          "via": "begin_craft / deconstruct material accounting",
+          "at": "crafting_station.gd:123",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Live station node for crafting/deconstruction (covered by station-craft slice smokes). Added on coverage sweep.",
+      "content_note": "Verified: main_playable_slice_station_craft_smoke.gd drives it via craft_at_station_for_validation('fabricator'/'salvage'). Recipes are data-driven through crafting_state's recipe catalog. Home-ship only by design (interact dispatched only in the home branch at 4372, after the away branch returns at 4357); away-path field crafting is handled separately by field_crafting_state (both home 1387 and away 4797), so the home-only interact is not a both-branch violation.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -7348,25 +7898,34 @@
       "domain": "travel",
       "kind": "ui",
       "model_exists": true,
-      "smoke": null,
+      "smoke": "scripts/validation/dock_breach_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:4323",
       "input": {
         "live": true,
-        "desc": "player welds open a dock-port barrier (welding skill-gated, dock_port_barrier.gd:55)",
-        "at": "playable_generated_ship.gd"
+        "desc": "spawned per dock seam (1921, signal connected 1925); player interact calls try_start in the interact precedence chain (4322-4324, gated on not b.opened); _process advances the welding-speeded breach channel (skill-gated, dock_port_barrier.gd:79-92)",
+        "at": "playable_generated_ship.gd:4323"
       },
       "output": {
         "live": true,
-        "desc": "opens a dock port (docking_manager) + grants welding XP (dock_port_barrier.gd:98)",
-        "at": "playable_generated_ship.gd"
+        "desc": "breach_opened -> _on_dock_barrier_opened (1936) -> recompute_occupancy (1938, enables boarding) + set_opened disables blocking collider (dock_port_barrier.gd:112); _complete grants welding XP 25 (dock_port_barrier.gd:98)",
+        "at": "playable_generated_ship.gd:1936-1938"
       },
-      "confidence": "P",
-      "loops": [],
-      "integrations": [],
+      "confidence": "V",
+      "loops": [
+        "travel"
+      ],
+      "integrations": [
+        {
+          "to": "ship_occupancy",
+          "via": "breach_opened signal triggers recompute_occupancy so boarding flips away_from_start",
+          "at": "playable_generated_ship.gd:1938",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Welding-gated dock barrier node. No dedicated smoke. Added on coverage sweep.",
+      "content_note": "Area3D interaction node (closed seam; intact opens in one interact:67-69, broken needs timed welding channel:70-77). Breach tuning hardcoded (breach_seconds=6.0 passed at 1924, factor 1+0.1*skill at :75, XP=25 at :98). CORRECTION: a dedicated smoke EXISTS — scripts/validation/dock_breach_smoke.gd (DockPortBarrier breach interactable test). Fully live: try_start in interact chain at 4323, breach_opened wired at 1925/1936-1938.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -7381,22 +7940,35 @@
       "smoke": "scripts/validation/extinguisher_recharge_port_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:1386",
+      "driven_at": "playable_generated_ship.gd:4793",
       "input": {
         "live": true,
-        "desc": "player stands at a powered port to recharge(delta) the extinguisher (port.gd:49)",
-        "at": "playable_generated_ship.gd:1386"
+        "desc": "powered flag driven each frame on BOTH branches (home 1386 from power_grid 'stations' allocation ratio; away 4793 from the derelict's own power system being operational) AND player in range; while both hold, the node's OWN _process calls recharge(delta) (49)",
+        "at": "playable_generated_ship.gd:4793"
       },
       "output": {
         "live": true,
-        "desc": "refills extinguisher_state charge (power-gated on both branches)",
-        "at": "playable_generated_ship.gd"
+        "desc": "extinguisher_state.recharge(delta) refills the shared ExtinguisherState charge, which FireSuppressionPoint then consumes per extinguish (consume_use)",
+        "at": "extinguisher_recharge_port.gd:49"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "extinguisher_state",
+          "via": "recharge(delta) refills charge",
+          "at": "extinguisher_recharge_port.gd:49",
+          "health": "healthy"
+        },
+        {
+          "to": "power_grid_state",
+          "via": "set_powered from 'stations' allocation ratio (home)",
+          "at": "playable_generated_ship.gd:1386",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Power-gated recharge node feeding extinguisher_state. Added on coverage sweep.",
+      "content_note": "Verified ADR-0041 node: power gated on both _process branches (home 1386 / away 4793 confirmed at source — correctly satisfies the both-branch rule). _process (44) early-returns unless powered + extinguisher_state set + player in range, then recharge at 49. Tuning (interaction_radius, ExtinguisherState recharge rate) are configure() args / extinguisher tuning data; no dedicated port data file.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -7411,22 +7983,41 @@
       "smoke": "scripts/validation/fire_suppression_point_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:4367",
       "input": {
         "live": true,
-        "desc": "player manual extinguish at a suppression point (consume_use, point.gd:114)",
-        "at": "playable_generated_ship.gd"
+        "desc": "player interact -> try_start (home 4367, away 4338, both branches wired); requires burning compartment + fire_extinguisher tool + extinguisher charge; channel advances in the node's OWN _process (fire_suppression_point.gd:89 -> advance_channel)",
+        "at": "playable_generated_ship.gd:4367"
       },
       "output": {
         "live": true,
-        "desc": "consumes extinguisher charge then fire_state.extinguish (point.gd:115) puts out fire + repair XP (119)",
-        "at": "playable_generated_ship.gd"
+        "desc": "on complete (_complete): extinguisher_state.consume_use (114) then fire_state.extinguish(compartment) (115) puts the fire out, plus grants repair XP (118-119)",
+        "at": "fire_suppression_point.gd:115"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "fire_suppression_state",
+          "via": "extinguish(compartment_id)",
+          "at": "fire_suppression_point.gd:115",
+          "health": "healthy"
+        },
+        {
+          "to": "extinguisher_state",
+          "via": "has_charge_for_use / consume_use",
+          "at": "fire_suppression_point.gd:114",
+          "health": "healthy"
+        },
+        {
+          "to": "player_progression_state",
+          "via": "grant_xp('repair', 10)",
+          "at": "fire_suppression_point.gd:119",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Manual extinguish node feeding fire_suppression_state. Added on coverage sweep.",
+      "content_note": "Verified: interaction wired in BOTH interact branches (away 4338 / home 4367 confirmed at source). extinguish_seconds/required_tool are configure() args (4.0s/'fire_extinguisher'); fire model is data-driven via fire tuning.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -7438,27 +8029,38 @@
       "domain": "travel",
       "kind": "ui",
       "model_exists": true,
-      "smoke": null,
+      "smoke": "scripts/validation/hangar_control_smoke.gd",
       "reachable": true,
-      "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven": false,
+      "driven_at": null,
       "input": {
-        "live": true,
-        "desc": "player interacts to operate the hangar bay door/launch",
-        "at": "playable_generated_ship.gd"
+        "live": false,
+        "desc": "Spawned per bay-carrying ship and signals connected (2036-2041), tracks candidate_player on body_entered, but try_dock/try_launch (hangar_bay_control.gd:41/48) are NEVER called from _on_player_interact_requested (4316-4395 has no hangar_controls loop). CONFIRMED via grep: try_dock/try_launch callers are only hangar_control_smoke.gd",
+        "at": "playable_generated_ship.gd:2037"
       },
       "output": {
-        "live": true,
-        "desc": "drives hangar_bay launch state",
-        "at": "playable_generated_ship.gd"
+        "live": false,
+        "desc": "bay_dock_requested/bay_launch_requested are wired to real handlers (_on_bay_dock_requested:2268, _on_bay_launch_requested:2293 via connect at 2039-2040) but those signals are only emitted by try_dock/try_launch (hangar_bay_control.gd:44/51), which live play never calls, so no live consumer is reached",
+        "at": "playable_generated_ship.gd:2039-2040"
       },
-      "confidence": "P",
-      "loops": [],
-      "integrations": [],
+      "confidence": "V",
+      "loops": [
+        "travel"
+      ],
+      "integrations": [
+        {
+          "to": "hangar_bay",
+          "via": "bay_dock_requested -> _on_bay_dock_requested -> HangarBay.dock; signal path intact but never fired in live play",
+          "at": "playable_generated_ship.gd:2039",
+          "health": "broken"
+        }
+      ],
       "content": "partial",
-      "content_note": "Hangar bay control node. No dedicated smoke. Added on coverage sweep.",
+      "content_note": "Area3D sensor node: spawned, configured (radius 1.8 at 2038), connects both signals (2039-2040). STRUCTURALLY wired but functionally dead in live play — confirmed try_dock/try_launch absent from interact precedence chain (4316-4395); grep shows the only callers are scripts/validation/hangar_control_smoke.gd. CORRECTION: a dedicated node-level smoke EXISTS (hangar_control_smoke.gd) verifying in-range fires the signals; smoke is no longer null. Hollow live coupling stands.",
       "functional": null,
-      "gaps": [],
+      "gaps": [
+        "player cannot dock/launch hangar craft in live play: HangarBayControl.try_dock/try_launch are not invoked by _on_player_interact_requested; only hangar_control_smoke.gd (node test) and the coordinator validation seams 7346/7361 drive the bay flow"
+      ],
       "subsystems": []
     },
     {
@@ -7468,25 +8070,44 @@
       "domain": "ship_systems",
       "kind": "ui",
       "model_exists": true,
-      "smoke": null,
+      "smoke": "scripts/validation/repair_loop_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:4359",
       "input": {
         "live": true,
-        "desc": "player repairs a ship system at a repair point (repair-skill read, repair_point.gd:79)",
-        "at": "playable_generated_ship.gd"
+        "desc": "player interact -> try_start (home 4359, away 4330, both branches wired); dry-run gate on required parts/tools (from inventory) + repair skill; channel advances in the node's OWN _process with a skill-scaled duration (repair_point.gd:130 -> advance_channel)",
+        "at": "playable_generated_ship.gd:4359"
       },
       "output": {
         "live": true,
-        "desc": "calls repair_with_inventory on ship_systems_manager + grants repair XP (repair_point.gd:159)",
-        "at": "playable_generated_ship.gd"
+        "desc": "on complete (_complete) calls target_manager.repair_with_inventory (155; consumes parts, restores the subcomponent on ShipSystemsManager) and grants repair XP (158-159)",
+        "at": "repair_point.gd:155"
       },
-      "confidence": "P",
+      "confidence": "V",
       "loops": [],
-      "integrations": [],
+      "integrations": [
+        {
+          "to": "ship_systems_manager",
+          "via": "repair_with_inventory restores subcomponent",
+          "at": "repair_point.gd:155",
+          "health": "healthy"
+        },
+        {
+          "to": "inventory_state",
+          "via": "parts/tools precheck + consumption",
+          "at": "repair_point.gd:155",
+          "health": "healthy"
+        },
+        {
+          "to": "player_progression_state",
+          "via": "grant_xp('repair', 25)",
+          "at": "repair_point.gd:159",
+          "health": "healthy"
+        }
+      ],
       "content": "partial",
-      "content_note": "Primary repair interaction node (35 coordinator refs). Covered by ship-systems slice smokes. Added on coverage sweep.",
+      "content_note": "Verified: repair_loop_smoke.gd drives it (iterates playable.repair_points + repair_subcomponent_for_validation). Interaction wired in BOTH interact branches (away 4330 / home 4359 confirmed at source). required_parts/required_tools/min_skill come from ship-systems definitions data; repair_seconds is a configure() arg.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -7498,27 +8119,58 @@
       "domain": "loot",
       "kind": "ui",
       "model_exists": true,
-      "smoke": null,
+      "smoke": "scripts/validation/main_playable_slice_junction_calibrator_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd",
+      "driven_at": "playable_generated_ship.gd:4378",
       "input": {
         "live": true,
-        "desc": "player picks up a placed tool/item node (Area3D + interact)",
-        "at": "playable_generated_ship.gd"
+        "desc": "player interact ray dispatches to tool_pickup.try_interact(player_body) (playable_generated_ship.gd:4378); body_entered also tracks the candidate player (tool_pickup.gd:118-120)",
+        "at": "playable_generated_ship.gd:4378"
       },
       "output": {
         "live": true,
-        "desc": "grants the item into inventory_state + pickup SFX",
-        "at": "playable_generated_ship.gd"
+        "desc": "try_interact calls inventory_state.add_tool (tool_pickup.gd:68); the acquired tool is read by REAL gameplay, not just HUD: inventory_state.get_summary() emits drain_multiplier=0.5 when portable_oxygen_pump is carried (inventory_state.gd:154,172), fed via playable:5032 into oxygen_state._compute_drain_multiplier (oxygen_state.gd:158-161) and consumed by the per-tick oxygen_state.tick (playable:5044); junction_calibrator is consumed by _consume_junction_calibrator_if_eligible -> objective_progress_state.apply_junction_calibrator to reduce repair_junction required steps (playable:5663-5677)",
+        "at": "playable_generated_ship.gd:5032"
       },
-      "confidence": "P",
-      "loops": [],
-      "integrations": [],
+      "confidence": "V",
+      "loops": [
+        "loot",
+        "survival_vitals"
+      ],
+      "integrations": [
+        {
+          "to": "inventory_state",
+          "via": "add_tool(tool_id) grants the carried tool into the single inventory source of truth",
+          "at": "scripts/tools/tool_pickup.gd:68",
+          "health": "healthy"
+        },
+        {
+          "to": "oxygen_state",
+          "via": "carried portable_oxygen_pump -> inventory summary drain_multiplier 0.5 inside an open/unsealed breach (gated to 1.0 when sealed/closed)",
+          "at": "playable_generated_ship.gd:5032",
+          "health": "healthy"
+        },
+        {
+          "to": "objective_progress_state",
+          "via": "carried junction_calibrator consumed against a repair_junction sequence (_consume_junction_calibrator_if_eligible)",
+          "at": "playable_generated_ship.gd:5663",
+          "health": "healthy"
+        },
+        {
+          "to": "achievement_state",
+          "via": "tool_acquired -> _on_tool_pickup_acquired routes to unlock_for_trigger('tool_acquired') only when an opt-in service is attached (achievement_state != null guard)",
+          "at": "playable_generated_ship.gd:5587",
+          "health": "weak"
+        }
+      ],
       "content": "partial",
-      "content_note": "Placed tool/item pickup node (49 coordinator refs). Covered by loot/interaction smokes. Added on coverage sweep.",
+      "content_note": "All citations independently re-verified and hold; confidence V stands. ToolPickup is a generic Area3D carrier (configure() takes any tool_id). Only two pickups are instantiated, both fixed REQ placements: portable_oxygen_pump (REQ-007, _build_tool_pickup at playable:5551-5563) and junction_calibrator (REQ-014, _build_junction_calibrator_pickup at playable:5599-5615). data/tools/tool_definitions.json defines exactly those two ids with real effects (oxygen_drain_multiplier 0.5; junction_step_reduction 1); no loot-distribution / procgen-driven tool spawning feeds this node, so coverage is limited to the two hand-placed tools. Verified: interact dispatch playable:4378, signal handler playable:5577-5589, oxygen consumer wiring playable:5024-5044 + inventory_state.gd:153-175 + oxygen_state.gd:158-169, junction consumer playable:5663-5677.",
       "functional": null,
-      "gaps": [],
+      "gaps": [
+        "Only 2 hardcoded REQ pickups; no procgen/loot-driven tool placement uses ToolPickup",
+        "achievement_state integration is opt-in (no per-run service attached by default), so that edge is dormant in the base run"
+      ],
       "subsystems": []
     }
   ],
