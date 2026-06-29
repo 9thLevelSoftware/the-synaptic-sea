@@ -1493,6 +1493,14 @@ func end_run(reason: String = "extraction") -> int:
 	var payout: int = int(_apply_meta_payout_and_persist(reason))
 	if save_load_service != null:
 		save_load_service.delete_current_run()
+		# A terminal run (death OR extraction) must also drop the rotating
+		# autosave_a/b/c slots. delete_current_run() only clears the current_run/world
+		# rows; without this, a finished run's timed-autosave snapshots survive and
+		# stay resumable through SaveLoadMenu.list_slots() — so a fatal run could be
+		# loaded back, defeating the new death terminal-state. Mirrors the
+		# objective-completion path (Codex review on PR #35 / #50).
+		for slot_id in SaveSlotStateScript.AUTOSAVE_SLOT_IDS:
+			save_load_service.delete_slot(slot_id)
 	emit_signal("playable_slice_completed", get_slice_completion_summary())
 	return payout
 
@@ -4904,7 +4912,7 @@ func _tick_survival_attrition(delta: float) -> void:
 		"status_stamina_recovery_mult": status_mult,
 		"sanity_health_drain": float(hteeth["health_drain_per_second"]),
 		"sanity_stamina_recovery_mult": float(hteeth["stamina_recovery_mult"]),
-		"moving": player != null and player.has_method("is_moving") and player.is_moving(),
+		"moving": is_instance_valid(player) and player.has_method("is_moving") and player.is_moving(),
 	})
 	# Stakes: penalize movement from low vitals, then end the run on incapacitation.
 	_apply_vitals_action_gating()
@@ -4921,7 +4929,7 @@ func _tick_survival_attrition(delta: float) -> void:
 
 ## Domain 1: push the vitals movement gate onto the player every frame.
 func _apply_vitals_action_gating() -> void:
-	if player == null or vitals_state == null:
+	if not is_instance_valid(player) or vitals_state == null:
 		return
 	if not player.has_method("set_movement_speed_multiplier"):
 		return
