@@ -128,6 +128,33 @@ func _initialize() -> void:
 		_fail("sanity_stamina_recovery_mult not applied (base=%.3f pen=%.3f)" % [base_recover, pen_recover])
 		return
 
+	# Domain 1: incapacitation predicate (health<=0)
+	var vi := VitalsStateScript.new()
+	vi.configure({})
+	if vi.is_incapacitated():
+		_fail("full-health vitals should not be incapacitated")
+		return
+	vi.health = 0.0
+	if not vi.is_incapacitated():
+		_fail("health=0 should be incapacitated")
+		return
+
+	# Domain 1: movement-speed multiplier gating
+	var vm := VitalsStateScript.new()
+	vm.configure({})
+	if absf(vm.get_movement_speed_multiplier() - 1.0) > 0.001:
+		_fail("healthy vitals should give full movement multiplier")
+		return
+	vm.stamina = VitalsStateScript.EXHAUSTION_STAMINA_THRESHOLD - 1.0
+	if absf(vm.get_movement_speed_multiplier() - 0.5) > 0.001:
+		_fail("exhausted vitals should halve movement multiplier")
+		return
+	vm.stamina = 100.0
+	vm.health = 0.0
+	if absf(vm.get_movement_speed_multiplier() - 0.0) > 0.001:
+		_fail("incapacitated vitals should zero movement multiplier")
+		return
+
 	print("VITALS STATE PASS health=%.1f stamina=%.1f hunger=%.1f thirst=%.1f sanity_drain=true sanity_stamina=true" % [v.health, v.stamina, v.hunger, v.thirst])
 	quit(0)
 

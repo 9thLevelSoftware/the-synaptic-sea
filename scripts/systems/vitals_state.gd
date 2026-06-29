@@ -16,6 +16,7 @@ const DEFAULT_STAMINA_RECOVERY: float = 5.0
 const DEFAULT_HEALTH_RECOVERY: float = 0.0
 const HUNGER_STAMINA_CASCADE_THRESHOLD: float = 30.0
 const THIRST_VISION_WARNING_THRESHOLD: float = 20.0
+const EXHAUSTION_STAMINA_THRESHOLD: float = 15.0
 
 var max_health: float = DEFAULT_MAX_HEALTH
 var max_stamina: float = DEFAULT_MAX_STAMINA
@@ -118,6 +119,21 @@ func apply_delta(delta: Dictionary) -> Dictionary:
 	hunger = clampf(hunger + float(delta.get("hunger", 0.0)), 0.0, max_hunger)
 	thirst = clampf(thirst + float(delta.get("thirst", 0.0)), 0.0, max_thirst)
 	return get_summary()
+
+## Domain 1 (survival_vitals stakes): true when the player has bled out.
+## Pure predicate; the coordinator turns this into end_run("death").
+func is_incapacitated() -> bool:
+	return health <= 0.0
+
+## Domain 1: low-vitals action-gating expressed as a movement-speed multiplier.
+## 0.0 when incapacitated (movement locked at death), 0.5 when stamina is
+## exhausted (attrition slows the player BEFORE death), else 1.0.
+func get_movement_speed_multiplier() -> float:
+	if is_incapacitated():
+		return 0.0
+	if stamina <= EXHAUSTION_STAMINA_THRESHOLD:
+		return 0.5
+	return 1.0
 
 func get_summary() -> Dictionary:
 	return {
