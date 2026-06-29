@@ -8,3 +8,6 @@ exports/
 *.app/
 .godot/
 *.uid
+
+# Brainstorming / visual-companion scratch sessions
+.superpowers/
