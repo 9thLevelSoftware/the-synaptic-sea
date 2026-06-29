@@ -1,3 +1,14 @@
+> ⚠️ **ARCHIVED — SUPERSEDED & MISLEADING. Quarantined 2026-06-28.**
+> This roadmap marks all system lanes "Validated," but "Validated" here means *unit-tested
+> in isolation* — not reachable, driven, or functionally closed-loop. It also uses an
+> M1–M11 lane numbering that conflicts with the real milestone scheme in the codebase
+> (its "M7 = Persistence & Platform Reliability" vs. the actual "M7 = Ship systems &
+> sustenance infrastructure" used by the 2026-06-27+ specs and git PRs #41–#46). It was
+> explicitly written to be re-graded by **`docs/game/system_completion_audit.md`**, which
+> is now the canonical roadmap. See **`/STATUS.md`**.
+
+---
+
 # 09 System Roadmap — Final E2E Currency Ledger
 
 Date: 2026-06-26

@@ -1,3 +1,11 @@
+> ⚠️ **ARCHIVED — INACCURATE. DO NOT TRUST.** Quarantined 2026-06-28.
+> A synthesis of the fictional "Gate 0–5 / RC-shipped" narrative. Cites macOS-only paths
+> (`/Users/christopherwilloughby/...`) and a stage that never shipped. Real, code-anchored
+> status: **`docs/game/system_completion_audit.md`** (canonical) +
+> **`docs/game/integration_debt.md`**. See **`/STATUS.md`**.
+
+---
+
 # The Synaptic Sea — Planning & Design Synthesis
 
 **Source:** `~/the-synaptic-sea/docs/`

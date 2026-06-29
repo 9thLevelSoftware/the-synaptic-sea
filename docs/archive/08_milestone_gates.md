@@ -1,3 +1,14 @@
+> ⚠️ **ARCHIVED — INACCURATE. DO NOT TRUST.** Quarantined 2026-06-28.
+> This document describes a fictional "Gate 0–5 / RC-shipped" narrative that never
+> happened: it claims a shipped v0.1.0 release candidate (2026-06-19/20) while core
+> gameplay systems were still being built *after* those dates (see git history through
+> 2026-06-28). The real, code-anchored status lives in
+> **`docs/game/system_completion_audit.md`** (canonical) and
+> **`docs/game/integration_debt.md`**. Kept only for historical audit trail.
+> See **`/STATUS.md`** for the current source of truth.
+
+---
+
 # 08 Milestone Gates
 
 ## Gate decision vocabulary

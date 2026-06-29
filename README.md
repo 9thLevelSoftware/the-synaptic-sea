@@ -9,41 +9,28 @@ generated derelict spacecraft, dock, board, loot, repair, survive hazards,
 and ship out again. The end-game is wiring a fleet of physically-docked,
 nested ships that can carry each other.
 
-This repository is the canonical engine project. The full design system,
-requirements, ADRs, validation plan, milestone gates, and live system
-roadmap live under [`docs/game/`](docs/game/README.md).
+This repository is the canonical engine project.
+
+> ⚠️ **For current project status, read [`/STATUS.md`](STATUS.md).** Several older
+> roadmap docs (a "Gate 0–5 / shipped RC" narrative and conflicting milestone tables)
+> were found to be inaccurate and moved to [`docs/archive/`](docs/archive/README.md) on
+> 2026-06-28. The authoritative, code-anchored status lives in
+> [`docs/game/system_completion_audit.md`](docs/game/system_completion_audit.md). Treat
+> any "released / all-complete" claim elsewhere with suspicion until reconciled.
 
 ---
 
 ## Project state
 
-**Stage-gate pipeline (Gates 0 → 5) is closed.** v0.1.0 release candidate
-exited Gate 5 on 2026-06-20. The gate ladder is now historical.
+**Mid-development / pre-alpha.** This is an actively-built deep survival sim, not a
+shipped release. The "Stage-Gate pipeline closed / v0.1.0 RC" language in older docs was
+fictional — feature work (fire, sanity, item economy) is landing as of 2026-06-28.
 
-The live build plan is the **8-system roadmap** in
-[`docs/game/09_system_roadmap.md`](docs/game/09_system_roadmap.md).
-Current state:
-
-| # | System                                | Status            |
-|---|---------------------------------------|-------------------|
-| 1 | Ship Generation Framework             | Complete          |
-| 2 | Ship Systems (6 + repair)             | Complete          |
-| 3 | Player Progression (class + skills)   | Slice built       |
-| 4 | Scanner & Travel                      | Slice built       |
-| 5 | Ship Docking & Ship-in-Ship           | Complete (5a–5d)  |
-| 6 | Inventory & Equipment                 | ~88% (Phase 6)    |
-| 7 | Procedural Generation Details         | Complete (folded into 1) |
-| 8 | Synaptic Sea World & Scanner Display      | Complete (folded into 4) |
-| – | Phase 7 — Integration & Polish        | In progress (slice A: inventory/transfer UI built; slices B/C/D pending) |
-
-**Two phases remain:** finish System 6 (carry containers, EquipmentSlots,
-transfer UI polish) and Phase 7 (wire it all together, full UI/HUD, balance).
-
-### Explicitly out of scope (future expansions)
-
-Per the core-systems design, deferred beyond the core build: fortify/defend
-mechanics, alien ships, NPC encounters, crafting expansion, multiplayer,
-narrative/story, music and audio. Each gets its own spec when it comes up.
+See **[`/STATUS.md`](STATUS.md)** for the authoritative "what's built / what's left"
+summary, and **[`docs/game/system_completion_audit.md`](docs/game/system_completion_audit.md)**
+for the per-system, code-traced grades. The real milestone scheme is the M-lane /
+sub-project naming (e.g. M7 = Ship systems & sustenance) used in `docs/superpowers/specs/`
+and the git history — **not** the archived Gate 0–5 or M1–M11 schemes.
 
 ---
 
@@ -232,12 +219,14 @@ the-synaptic-sea/
         ├── 05_requirements.md
         ├── 06_validation_plan.md
         ├── 07_risk_register.md
-        ├── 08_milestone_gates.md         # Stage-gate pipeline (now historical)
-        ├── 09_system_roadmap.md          # Live build-state roadmap
-        ├── adr/                          # Architecture Decision Records (24)
+        ├── system_completion_audit.md    # CANONICAL roadmap (code-anchored loop grades)
+        ├── integration_debt.md           # Reachability ledger
+        ├── adr/                          # Architecture Decision Records
         ├── features/                     # One spec per feature
         └── playtests/                    # Playtest protocols + logs
-    └── superpowers/             # Recent sub-project specs + plans
+    ├── archive/                 # Quarantined inaccurate docs (Gate 0–5, old roadmaps)
+    └── superpowers/             # Recent sub-project specs + plans (trustworthy)
+└── STATUS.md                    # Source-of-truth entry point
 ```
 
 ---

@@ -1,3 +1,13 @@
+> ✅ **CANONICAL ROADMAP / STATUS (as of 2026-06-28).** This is the authoritative,
+> code-anchored picture of what is actually built and working. It grades each system on
+> whether the simulation *closes its cause→effect loop* in the live coordinator
+> (`scripts/procgen/playable_generated_ship.gd`), traced to real line numbers — not on
+> whether a unit test passes. Each PR re-grades the relevant lane here. Pair with
+> **`integration_debt.md`** (reachability) and **`/STATUS.md`** (entry point). The old
+> Gate 0–5 / "all-validated" roadmaps are archived under `docs/archive/` as inaccurate.
+
+---
+
 # System Completion Audit — "Does the simulation close its loops?"
 
 Date: 2026-06-26
