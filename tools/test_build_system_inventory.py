@@ -64,4 +64,10 @@ t("md lists alpha", "Alpha" in md and "100%" in md)
 t("md shows beta cap", "Beta" in md and "50%" in md)        # half-in capped
 t("md matrix has edge", "alpha" in md and "beta" in md)
 
+html = b.render_html(clean)
+t("html self-contained", "<!DOCTYPE html" in html and "http://" not in html.replace("http://www.w3.org",""))
+t("html embeds data", '"alpha"' in html or "alpha" in html)
+t("html has card view", "card" in html.lower())
+t("html has matrix tab", "matrix" in html.lower())
+
 print("BUILD INVENTORY SELFTEST PASS")

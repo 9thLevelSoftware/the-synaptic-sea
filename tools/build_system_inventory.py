@@ -100,3 +100,89 @@ def render_markdown(data):
                  for c in ids]
         out.append(f"| {r} | " + " | ".join(cells) + " |")
     return "\n".join(out) + "\n"
+
+def _enriched(data):
+    rows = []
+    for s in data.get("systems", []):
+        rows.append({**s, "_pct": system_completion(s), "_coupling": derive_coupling(s)})
+    return {"systems": rows, "loops": data.get("loops", []),
+            "edges": [{"from": s["id"], **e}
+                      for s in iter_systems(data) for e in (s.get("integrations") or [])]}
+
+def render_html(data):
+    payload = json.dumps(_enriched(data))
+    # NOTE: no CDN. All CSS/JS inline. Card grid default; matrix tab; click -> detail.
+    return """<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Synaptic Sea — System Map</title><style>
+body{background:#0f1420;color:#d7dee8;font-family:system-ui,sans-serif;margin:0;padding:16px}
+.tab{cursor:pointer;padding:6px 12px;border:1px solid #2a3340;border-radius:6px;display:inline-block;margin-right:6px}
+.tab.on{background:#1f2937}
+.domain{font-size:12px;letter-spacing:.6px;color:#8fb;margin:14px 0 6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.card{background:#1a212e;border:1px solid #2a3340;border-radius:8px;padding:9px;cursor:pointer}
+.bar{height:5px;background:#222c38;border-radius:3px;margin:7px 0 4px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;float:right}
+table{border-collapse:collapse;font-size:10px}td{width:16px;height:16px;border:1px solid #0f1420}
+#detail{position:fixed;right:0;top:0;width:300px;height:100%;background:#141a24;border-left:1px solid #2a3340;padding:14px;overflow:auto;display:none}
+</style></head><body>
+<h2>Synaptic Sea — System Map</h2>
+<span class="tab on" onclick="show('cards')">Systems</span>
+<span class="tab" onclick="show('matrix')">Integrations</span>
+<div id="cards"></div><div id="matrix" style="display:none"></div>
+<div id="detail"></div>
+<script>const DATA=""" + payload + """;
+const C={closed:'#3fb27f',half:'#e0a93b',hollow:'#d8584e',na:'#55606e'};
+function show(w){for(const id of ['cards','matrix'])document.getElementById(id).style.display=id==w?'block':'none';
+ document.querySelectorAll('.tab').forEach((t,i)=>t.className='tab'+((i==0)==(w=='cards')?' on':''));}
+function detail(s){const d=document.getElementById('detail');d.style.display='block';
+ d.innerHTML=`<b>${s.name||s.id}</b> <span style="color:${C[s._coupling]}">${s._coupling} ${s._pct==null?'—':s._pct+'%'}</span>
+ <div style="opacity:.6;font-size:11px">${s.file}</div>
+ <div style="font-size:11px;margin-top:8px">model ${s.model_exists?'✓':'✗'} · reachable ${s.reachable?'✓':'✗'} · driven ${s.driven?'✓':'✗'}
+ <br>in ${s.input&&s.input.live?'✓':'✗'} out ${s.output&&s.output.live?'✓':'✗'} · content ${s.content}
+ <br>driven_at ${s.driven_at||'—'} · conf [${s.confidence}]</div>`;}
+function cards(){const by={};DATA.systems.forEach(s=>(by[s.domain]=by[s.domain]||[]).push(s));
+ let h='';for(const dom of Object.keys(by).sort()){h+=`<div class="domain">${dom.toUpperCase()}</div><div class="grid">`;
+ for(const s of by[dom]){h+=`<div class="card" onclick='detail(${JSON.stringify(s)})'>
+ <b style="font-size:12px">${s.name||s.id}</b><span class="dot" style="background:${C[s._coupling]}"></span>
+ <div class="bar"><div style="width:${s._pct||0}%;height:5px;background:${C[s._coupling]};border-radius:3px"></div></div>
+ <div style="font-size:10px;opacity:.6">${s._pct==null?'infra':s._pct+'%'}</div></div>`;}h+='</div>';}
+ document.getElementById('cards').innerHTML=h;}
+function matrix(){const ids=DATA.systems.map(s=>s.id);const e={};DATA.edges.forEach(x=>e[x.from+'|'+x.to]=x.health);
+ let h='<table><tr><td></td>'+ids.map(i=>`<td style="writing-mode:vertical-rl;height:auto">${i}</td>`).join('')+'</tr>';
+ for(const r of ids){h+=`<tr><td style="width:auto">${r}</td>`+ids.map(c=>{const v=e[r+'|'+c];
+ return `<td style="background:${v=='healthy'?C.closed:v=='weak'?C.half:v=='broken'?C.hollow:'#1a212e'}"></td>`;}).join('')+'</tr>';}
+ document.getElementById('matrix').innerHTML=h+'</table>';}
+cards();matrix();
+</script></body></html>"""
+
+def main(argv):
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    src = os.path.join(root, "docs/game/inventory/system_inventory.json")
+    with open(src, encoding="utf-8") as f:
+        data = json.load(f)
+    errs = validate(data, root)
+    n = sum(1 for _ in iter_systems(data))
+    verified = sum(1 for s in iter_systems(data) if s.get("confidence") == "V")
+    md = render_markdown(data)
+    html = render_html(data)
+    md_path = os.path.join(root, "docs/game/inventory/SYSTEM_INVENTORY.md")
+    html_path = os.path.join(root, "docs/game/inventory/system_map.html")
+    if "--check" in argv:
+        stale = []
+        for p, content in ((md_path, md), (html_path, html)):
+            cur = open(p, encoding="utf-8").read() if os.path.isfile(p) else None
+            if cur != content:
+                stale.append(os.path.basename(p))
+        if errs or stale:
+            for e in errs: print("ERROR:", e)
+            if stale: print("ERROR: stale generated files:", ", ".join(stale))
+            return 1
+        print(f"SYSTEM INVENTORY CHECK PASS systems={n} verified={verified}")
+        return 0
+    open(md_path, "w", encoding="utf-8").write(md)
+    open(html_path, "w", encoding="utf-8").write(html)
+    print(f"SYSTEM INVENTORY BUILD PASS systems={n} verified={verified}")
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
