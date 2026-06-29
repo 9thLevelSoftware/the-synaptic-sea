@@ -11,6 +11,7 @@ const DEFAULT_FLOOR_SNAP_LENGTH: float = 0.5
 const DEFAULT_FLOOR_MAX_ANGLE_DEGREES: float = 60.0
 
 var move_speed: float = DEFAULT_MOVE_SPEED
+var _speed_multiplier: float = 1.0
 var gravity: float = float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8))
 var scripted_move_direction: Vector3 = Vector3.ZERO
 var use_scripted_movement: bool = false
@@ -25,12 +26,22 @@ func _ready() -> void:
 	set_physics_process(true)
 
 
+## Domain 1: vitals-driven action-gating seam. The coordinator pushes a
+## multiplier each frame from VitalsState.get_movement_speed_multiplier().
+func set_movement_speed_multiplier(m: float) -> void:
+	_speed_multiplier = clampf(m, 0.0, 1.0)
+
+## Effective per-frame move speed after the vitals gate is applied.
+func get_effective_move_speed() -> float:
+	return move_speed * _speed_multiplier
+
+
 func _physics_process(delta: float) -> void:
 	var move_direction: Vector3 = _read_move_direction()
 	if move_direction.length_squared() > 1.0:
 		move_direction = move_direction.normalized()
-	velocity.x = move_direction.x * move_speed
-	velocity.z = move_direction.z * move_speed
+	velocity.x = move_direction.x * get_effective_move_speed()
+	velocity.z = move_direction.z * get_effective_move_speed()
 	if is_on_floor() and velocity.y < 0.0:
 		velocity.y = 0.0
 	else:

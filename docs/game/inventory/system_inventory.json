@@ -18,8 +18,8 @@
       },
       "output": {
         "live": true,
-        "desc": "CORRECTED (was false/HUD-only): health propagates via vitals_model (apply_vitals_summary 5069); vitals_model.get_vitals_summary() is read at 5482-5487 (health<25.0) to derive vitals_critical, which is a LIVE consumer: audio_manager.update_music_flags(5493) drives the CRITICAL music FSM (dynamic_music_state.gd:100), plus SFX_SUIT_BREATH(5504) and UI_VITALS_LOW rising-edge(5507). This is an audio consequence, NOT death/incapacitation/gating.",
-        "at": "playable_generated_ship.gd:5482-5493"
+        "desc": "Death/incapacitation is now a LIVE terminal consumer: _check_vitals_death() calls end_run('death') on health<=0 from BOTH _process branches; _apply_vitals_action_gating() pushes get_movement_speed_multiplier() onto PlayerController each frame (exhaustion at stamina<=15 halves speed, incapacitation locks it). Plus the prior audio consequence (vitals_critical -> CRITICAL music + SFX_SUIT_BREATH + UI_VITALS_LOW).",
+        "at": "playable_generated_ship.gd:_tick_survival_attrition (_check_vitals_death / _apply_vitals_action_gating)"
       },
       "confidence": "V",
       "loops": [
@@ -31,16 +31,13 @@
           "to": "audio_manager",
           "via": "health<25 -> vitals_critical -> update_music_flags CRITICAL + SFX_SUIT_BREATH + UI_VITALS_LOW",
           "at": "playable_generated_ship.gd:5493",
-          "health": "weak"
+          "health": "healthy"
         }
       ],
       "content": "partial",
       "content_note": "In-code DEFAULT constants only (DEFAULT_HEALTH_DRAIN=0.0; passive health drain is zero, only context drains bite). vitals_state.configure is called once at 6959 with an empty dict (reload-reset path); line 1163 is the .new() instantiation, NOT a configure call as the original entry implied. No authored vitals/balance data file. Hunger cascade (threshold 30) + thirst-vision warning (threshold 20) baked in.",
       "functional": null,
-      "gaps": [
-        "No terminal failure consequence: end_run('death') (line 1488) is DEFINED but never invoked (grep confirms zero callers); no health<=0 -> death/incapacitation check exists; no sprint/action gating reads vitals. health<25 only drives CRITICAL music + suit-breath SFX + a UI low-warning, so the attrition has an audio cue but no gameplay stake.",
-        "Away-branch (derelict) runs only sanity/fire teeth via apply_delta (4774,4788) - the full vitals.tick at 4853 is gated behind the home branch after the 4808 early-return"
-      ],
+      "gaps": [],
       "subsystems": []
     },
     {
@@ -298,7 +295,7 @@
       "content_note": "Phantom archetype, melee/attack ranges, ambient cooldown (2.0s) hardcoded; reuses ThreatPlaceholderRenderer + AudioEventSeam ids. No data file.",
       "functional": null,
       "gaps": [
-        "Phantom dissipation counterplay (3890) wastes ammo but tier-3 health teeth ultimately drain vitals, whose own terminal death consumer is unwired (see vitals_state)"
+        "Phantom dissipation counterplay (3890) wastes ammo; tier-3 health teeth ultimately drain vitals, which now feed the live survival_vitals death consumer (end_run('death') via _check_vitals_death, closed Domain 1)"
       ],
       "subsystems": []
     },
@@ -8178,7 +8175,7 @@
     {
       "id": "survival_vitals",
       "name": "Survival vitals attrition",
-      "closes": "broken",
+      "closes": "closed",
       "steps": [
         {
           "system": "radiation_state",
@@ -8202,9 +8199,8 @@
         }
       ],
       "break_points": [
-        "CORRECTED: the vitals sink is NOT purely HUD - health<25 derives vitals_critical (5482-5487) which drives the CRITICAL music FSM (5493), SFX_SUIT_BREATH (5504) and a UI_VITALS_LOW edge alert (5507), so there is a live audio consequence. BUT there is still no terminal stake: end_run('death') (1488) is defined and never called (grep confirms zero callers), no health<=0 death/incapacitation check exists, and no sprint/action gating reads vitals - so attrition never produces a gameplay failure/consequence. Loop grade stays broken.",
-        "radiation_state.tick (4884), body_temperature_state.tick (4887) and status_effects_state.tick (4889) all run only in the home branch after the away-branch early-return at line 4808, so on a boarded derelict (the primary context) they never advance",
-        "body_temperature_state.in_extreme_zone=away_from_start is assigned at 4886 inside the home branch where away_from_start is always false, so the extreme-zone source never activates (temperature->thirst coupling permanently neutral 1.0)"
+        "CLOSED (Domain 1): end_run('death') now fires from _check_vitals_death() on health<=0, wired into BOTH _process branches via _tick_survival_attrition(); low-vitals movement gating applies through VitalsState.get_movement_speed_multiplier() -> PlayerController.set_movement_speed_multiplier(); radiation/body-temperature/status now tick on the away (derelict) branch; body_temperature in_extreme_zone is driven by the real in_hazard_env signal (away_from_start OR breach_open), not the always-false literal. Verified by main_playable_survival_stakes_smoke.gd + main_playable_survival_away_smoke.gd.",
+        "Deferred (by design): no death animation / respawn UX yet; incapacitation == instant run-end."
       ]
     },
     {
@@ -8230,7 +8226,7 @@
         }
       ],
       "break_points": [
-        "Closes as a cause/effect chain (sanity drains -> director schedules -> manager renders phantoms -> player wastes ammo to dissipate via attack path 3890 + tier-3 drains health), wired into BOTH _process branches (away 4760-4774, home 4864-4879); verified accurate. Caveat: the terminal vitals health drain feeds a sink with an audio consequence but no death/incapacitation consumer (see survival_vitals)"
+        "Closes as a cause/effect chain (sanity drains -> director schedules -> manager renders phantoms -> player wastes ammo to dissipate via attack path 3890 + tier-3 drains health), wired into BOTH _process branches (away 4760-4774, home 4864-4879); verified accurate. The terminal vitals health drain now also feeds the survival_vitals death consumer (end_run('death') via _check_vitals_death), closed in Domain 1."
       ]
     },
     {
