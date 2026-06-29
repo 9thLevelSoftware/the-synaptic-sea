@@ -1,0 +1,85 @@
+{
+  "systems": [
+    {
+      "id": "vitals_state",
+      "file": "scripts/systems/vitals_state.gd",
+      "name": "Player Vitals",
+      "domain": "survival",
+      "kind": "simulation",
+      "model_exists": true,
+      "smoke": "scripts/validation/vitals_state_smoke.gd",
+      "reachable": true,
+      "driven": true,
+      "driven_at": "playable_generated_ship.gd:4853",
+      "input": {
+        "live": true,
+        "desc": "temperature/radiation/atmosphere/fire/status/sanity drains + moving flag assembled each frame",
+        "at": "playable_generated_ship.gd:4839-4862"
+      },
+      "output": {
+        "live": true,
+        "desc": "drives player death + HUD vitals + sanity health teeth feedback",
+        "at": "playable_generated_ship.gd:4853-4863"
+      },
+      "confidence": "V",
+      "loops": ["survival_vitals"],
+      "integrations": [],
+      "content": "partial",
+      "content_note": "drain/recovery tuning lives in-script (DEFAULT_* constants); no external balance data file yet",
+      "functional": null,
+      "gaps": [],
+      "subsystems": []
+    },
+    {
+      "id": "radiation_state",
+      "file": "scripts/systems/radiation_state.gd",
+      "name": "Radiation Exposure",
+      "domain": "survival",
+      "kind": "simulation",
+      "model_exists": true,
+      "smoke": "scripts/validation/radiation_state_smoke.gd",
+      "reachable": true,
+      "driven": true,
+      "driven_at": "playable_generated_ship.gd:4884",
+      "input": {
+        "live": true,
+        "desc": "in_radiation_zone set true when away on a derelict or hub breach is open",
+        "at": "playable_generated_ship.gd:4882-4883"
+      },
+      "output": {
+        "live": true,
+        "desc": "get_health_drain_per_second() consumed live by the vitals tick as radiation_health_drain",
+        "at": "playable_generated_ship.gd:4840"
+      },
+      "confidence": "V",
+      "loops": ["survival_vitals"],
+      "integrations": [
+        {
+          "to": "vitals_state",
+          "via": "radiation health drain",
+          "at": "playable_generated_ship.gd:4855",
+          "health": "healthy"
+        }
+      ],
+      "content": "partial",
+      "content_note": "exposure ramp/decay tuning in-script; no external radiation data file yet",
+      "functional": null,
+      "gaps": [],
+      "subsystems": []
+    }
+  ],
+  "loops": [
+    {
+      "id": "survival_vitals",
+      "name": "Survival / Vitals",
+      "closes": "partial",
+      "steps": [
+        { "system": "radiation_state", "role": "source" },
+        { "system": "vitals_state", "role": "core" }
+      ],
+      "break_points": [
+        "seed scope: only radiation + vitals traced; temp/status/sanity sources land in the survival domain pass"
+      ]
+    }
+  ]
+}

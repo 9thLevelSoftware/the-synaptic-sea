@@ -1,0 +1,42 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Synaptic Sea — System Map</title><style>
+body{background:#0f1420;color:#d7dee8;font-family:system-ui,sans-serif;margin:0;padding:16px}
+.tab{cursor:pointer;padding:6px 12px;border:1px solid #2a3340;border-radius:6px;display:inline-block;margin-right:6px}
+.tab.on{background:#1f2937}
+.domain{font-size:12px;letter-spacing:.6px;color:#8fb;margin:14px 0 6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.card{background:#1a212e;border:1px solid #2a3340;border-radius:8px;padding:9px;cursor:pointer}
+.bar{height:5px;background:#222c38;border-radius:3px;margin:7px 0 4px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;float:right}
+table{border-collapse:collapse;font-size:10px}td{width:16px;height:16px;border:1px solid #0f1420}
+#detail{position:fixed;right:0;top:0;width:300px;height:100%;background:#141a24;border-left:1px solid #2a3340;padding:14px;overflow:auto;display:none}
+</style></head><body>
+<h2>Synaptic Sea — System Map</h2>
+<span class="tab on" onclick="show('cards')">Systems</span>
+<span class="tab" onclick="show('matrix')">Integrations</span>
+<div id="cards"></div><div id="matrix" style="display:none"></div>
+<div id="detail"></div>
+<script>const DATA={"systems": [{"id": "vitals_state", "file": "scripts/systems/vitals_state.gd", "name": "Player Vitals", "domain": "survival", "kind": "simulation", "model_exists": true, "smoke": "scripts/validation/vitals_state_smoke.gd", "reachable": true, "driven": true, "driven_at": "playable_generated_ship.gd:4853", "input": {"live": true, "desc": "temperature/radiation/atmosphere/fire/status/sanity drains + moving flag assembled each frame", "at": "playable_generated_ship.gd:4839-4862"}, "output": {"live": true, "desc": "drives player death + HUD vitals + sanity health teeth feedback", "at": "playable_generated_ship.gd:4853-4863"}, "confidence": "V", "loops": ["survival_vitals"], "integrations": [], "content": "partial", "content_note": "drain/recovery tuning lives in-script (DEFAULT_* constants); no external balance data file yet", "functional": null, "gaps": [], "subsystems": [], "_pct": 90, "_coupling": "closed"}, {"id": "radiation_state", "file": "scripts/systems/radiation_state.gd", "name": "Radiation Exposure", "domain": "survival", "kind": "simulation", "model_exists": true, "smoke": "scripts/validation/radiation_state_smoke.gd", "reachable": true, "driven": true, "driven_at": "playable_generated_ship.gd:4884", "input": {"live": true, "desc": "in_radiation_zone set true when away on a derelict or hub breach is open", "at": "playable_generated_ship.gd:4882-4883"}, "output": {"live": true, "desc": "get_health_drain_per_second() consumed live by the vitals tick as radiation_health_drain", "at": "playable_generated_ship.gd:4840"}, "confidence": "V", "loops": ["survival_vitals"], "integrations": [{"to": "vitals_state", "via": "radiation health drain", "at": "playable_generated_ship.gd:4855", "health": "healthy"}], "content": "partial", "content_note": "exposure ramp/decay tuning in-script; no external radiation data file yet", "functional": null, "gaps": [], "subsystems": [], "_pct": 90, "_coupling": "closed"}], "loops": [{"id": "survival_vitals", "name": "Survival / Vitals", "closes": "partial", "steps": [{"system": "radiation_state", "role": "source"}, {"system": "vitals_state", "role": "core"}], "break_points": ["seed scope: only radiation + vitals traced; temp/status/sanity sources land in the survival domain pass"]}], "edges": [{"from": "radiation_state", "to": "vitals_state", "via": "radiation health drain", "at": "playable_generated_ship.gd:4855", "health": "healthy"}]};
+const C={closed:'#3fb27f',half:'#e0a93b',hollow:'#d8584e',na:'#55606e'};
+function show(w){for(const id of ['cards','matrix'])document.getElementById(id).style.display=id==w?'block':'none';
+ document.querySelectorAll('.tab').forEach((t,i)=>t.className='tab'+((i==0)==(w=='cards')?' on':''));}
+function detail(s){const d=document.getElementById('detail');d.style.display='block';
+ d.innerHTML=`<b>${s.name||s.id}</b> <span style="color:${C[s._coupling]}">${s._coupling} ${s._pct==null?'—':s._pct+'%'}</span>
+ <div style="opacity:.6;font-size:11px">${s.file}</div>
+ <div style="font-size:11px;margin-top:8px">model ${s.model_exists?'✓':'✗'} · reachable ${s.reachable?'✓':'✗'} · driven ${s.driven?'✓':'✗'}
+ <br>in ${s.input&&s.input.live?'✓':'✗'} out ${s.output&&s.output.live?'✓':'✗'} · content ${s.content}
+ <br>driven_at ${s.driven_at||'—'} · conf [${s.confidence}]</div>`;}
+function cards(){const by={};DATA.systems.forEach(s=>(by[s.domain]=by[s.domain]||[]).push(s));
+ let h='';for(const dom of Object.keys(by).sort()){h+=`<div class="domain">${dom.toUpperCase()}</div><div class="grid">`;
+ for(const s of by[dom]){h+=`<div class="card" onclick='detail(${JSON.stringify(s)})'>
+ <b style="font-size:12px">${s.name||s.id}</b><span class="dot" style="background:${C[s._coupling]}"></span>
+ <div class="bar"><div style="width:${s._pct||0}%;height:5px;background:${C[s._coupling]};border-radius:3px"></div></div>
+ <div style="font-size:10px;opacity:.6">${s._pct==null?'infra':s._pct+'%'}</div></div>`;}h+='</div>';}
+ document.getElementById('cards').innerHTML=h;}
+function matrix(){const ids=DATA.systems.map(s=>s.id);const e={};DATA.edges.forEach(x=>e[x.from+'|'+x.to]=x.health);
+ let h='<table><tr><td></td>'+ids.map(i=>`<td style="writing-mode:vertical-rl;height:auto">${i}</td>`).join('')+'</tr>';
+ for(const r of ids){h+=`<tr><td style="width:auto">${r}</td>`+ids.map(c=>{const v=e[r+'|'+c];
+ return `<td style="background:${v=='healthy'?C.closed:v=='weak'?C.half:v=='broken'?C.hollow:'#1a212e'}"></td>`;}).join('')+'</tr>';}
+ document.getElementById('matrix').innerHTML=h+'</table>';}
+cards();matrix();
+</script></body></html>

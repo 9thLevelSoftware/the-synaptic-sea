@@ -123,12 +123,19 @@ run_clean 'REQ-AU-001 callsite audio event coupling smoke' 'AUDIO CALLSITE EVENT
 run_clean 'systems map currency' 'SYSTEMS MAP CURRENCY PASS' python3 "$ROOT/scripts/validation/doc_currency_validators.py" systems-map
 run_clean 'requirement trace' 'REQUIREMENT TRACE PASS' python3 "$ROOT/scripts/validation/doc_currency_validators.py" requirement-trace
 run_clean 'kanban manifest currency' 'KANBAN MANIFEST' python3 "$ROOT/scripts/validation/doc_currency_validators.py" kanban-manifest
+# --- System inventory anti-drift check (host-side Python; no Godot) ---
+# build_system_inventory.py auto-detects the repo root from its own path. --check
+# re-renders SYSTEM_INVENTORY.md + system_map.html from system_inventory.json and
+# fails on missing cited files, untraced simulation systems (confidence '?'),
+# dangling integration/loop refs, or stale committed output. Marker carries a
+# systems=/verified= count suffix; the bundle matches the leading marker string.
+run_clean 'system inventory anti-drift check' 'SYSTEM INVENTORY CHECK PASS' python3 "$ROOT/tools/build_system_inventory.py" --check
 run_clean 'fire suppression round-trip smoke' 'FIRE SUPPRESSION ROUND TRIP PASS topo=true fires=true spreads=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/fire_suppression_round_trip_smoke.gd
 run_clean 'ship instance fire persistence smoke' 'SHIP INSTANCE FIRE PERSISTENCE PASS omitted=true restored=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_instance_fire_persistence_smoke.gd
 run_clean 'derelict fire seed smoke' 'DERELICT FIRE SEED PASS deterministic=true rate_ok=true cap_ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_fire_seed_smoke.gd
 run_clean 'main playable derelict fire smoke' 'MAIN PLAYABLE DERELICT FIRE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_derelict_fire_smoke.gd
 run_clean 'derelict fire sequential persistence smoke' 'DERELICT FIRE SEQUENTIAL PERSISTENCE PASS remembered=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_fire_sequential_persistence_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=63 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=64 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
