@@ -20,7 +20,8 @@ despite what the archived "Gate 5 RC" docs claim.
 
 | Doc | What it tells you |
 | --- | --- |
-| **`docs/game/system_completion_audit.md`** | **Canonical roadmap.** Per-system "does the simulation close its loop" grades, traced to live coordinator lines. Re-graded by every PR. |
+| **`docs/game/inventory/SYSTEM_INVENTORY.md`** + **`docs/game/inventory/system_map.html`** | **Canonical status doc.** Code-verified inventory of every runtime system/subsystem — model/reachable/driven/coupling grades with a derived completion %, plus a loop-closure + integration matrix. Generated from `system_inventory.json` by `tools/build_system_inventory.py`; the `--check` smoke fails if data/docs drift. Open `system_map.html` for the interactive card-grid + matrix view. |
+| `docs/game/system_completion_audit.md` | **Superseded — see inventory.** The earlier narrative loop-closure pass; kept for history but no longer the canonical grade source. |
 | `docs/game/integration_debt.md` | Reachability ledger — which scripts are actually mounted in the live run. |
 | `docs/game/06_validation_plan.md` | The live validation/smoke contract (PASS markers, regression bundle). |
 | `docs/game/adr/` | Architecture decisions (current: ADR-0041 fire-as-persistent-hazard, ADR-0042 sanity). |
@@ -33,7 +34,9 @@ sustenance infrastructure**, sub-projects A = life-support→vitals, B = fire su
 This is the scheme in the dated specs and git PRs #41–#46 — **not** the "Gate 0–5" or
 "M1–M11 Persistence" numbering in the archived docs.
 
-## What's left (from the canonical audit, 2026-06-28)
+## What's left (from the canonical inventory, 2026-06-28)
+
+> Source of truth for grades and completion %: **`docs/game/inventory/SYSTEM_INVENTORY.md`** (+ `system_map.html`). The rollup below is a human-readable summary; the inventory is authoritative.
 
 **Recently closed (verified closed-loop):** sanity hallucinations (ADR-0042),
 food eat→vitals, shields cut, procgen biome/encounter injection (PR #38), authoritative
