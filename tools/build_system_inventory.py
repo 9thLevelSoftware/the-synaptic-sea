@@ -42,3 +42,29 @@ def system_completion(s):
         vals = [v for v in vals if v is not None]
         return _round(sum(vals) / len(vals)) if vals else None
     return leaf_completion(s)
+
+def iter_systems(data):
+    def walk(s):
+        yield s
+        for sub in (s.get("subsystems") or []):
+            yield from walk(sub)
+    for top in data.get("systems", []):
+        yield from walk(top)
+
+def validate(data, root):
+    errs = []
+    ids = {s["id"] for s in iter_systems(data)}
+    for s in iter_systems(data):
+        path = s.get("file")
+        if path and not os.path.isfile(os.path.join(root, path)):
+            errs.append(f"missing file for '{s['id']}': {path}")
+        if s.get("kind") == "simulation" and s.get("confidence") == "?":
+            errs.append(f"simulation system '{s['id']}' still confidence '?'")
+        for edge in (s.get("integrations") or []):
+            if edge.get("to") not in ids:
+                errs.append(f"'{s['id']}' integration -> unknown id '{edge.get('to')}'")
+    for loop in data.get("loops", []):
+        for step in loop.get("steps", []):
+            if step.get("system") not in ids:
+                errs.append(f"loop '{loop['id']}' step -> unknown id '{step.get('system')}'")
+    return errs

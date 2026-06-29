@@ -36,4 +36,26 @@ t("infra coupling na", b.derive_coupling(infra) == "na")
 parent = {"kind":"simulation","subsystems":[closed, half_out]}  # mean(100,63)=81.5 -> 82
 t("parent rollup", b.system_completion(parent) == 82)
 
+# validate: dangling integration target
+bad_ref = {"systems":[{"id":"a","file":"tools/build_system_inventory.py","kind":"simulation",
+  "confidence":"V","input":{"live":True},"output":{"live":True},
+  "integrations":[{"to":"ghost"}],"subsystems":[]}], "loops":[]}
+errs = b.validate(bad_ref, ".")
+t("dangling ref caught", any("ghost" in e for e in errs))
+
+# validate: simulation system with confidence '?'
+unsure = {"systems":[{"id":"a","file":"tools/build_system_inventory.py","kind":"simulation",
+  "confidence":"?","input":{"live":True},"output":{"live":True},"integrations":[],"subsystems":[]}], "loops":[]}
+t("confidence ? caught", any("confidence" in e for e in b.validate(unsure, ".")))
+
+# validate: missing file
+missing = {"systems":[{"id":"a","file":"scripts/systems/DOES_NOT_EXIST.gd","kind":"simulation",
+  "confidence":"V","input":{"live":True},"output":{"live":True},"integrations":[],"subsystems":[]}], "loops":[]}
+t("missing file caught", any("DOES_NOT_EXIST" in e for e in b.validate(missing, ".")))
+
+# validate: clean fixture passes
+with open("tools/fixtures/inventory_min.json") as f:
+    clean = json.load(f)
+t("clean fixture valid", b.validate(clean, ".") == [])
+
 print("BUILD INVENTORY SELFTEST PASS")
