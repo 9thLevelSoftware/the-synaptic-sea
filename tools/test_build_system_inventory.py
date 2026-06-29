@@ -58,4 +58,10 @@ with open("tools/fixtures/inventory_min.json") as f:
     clean = json.load(f)
 t("clean fixture valid", b.validate(clean, ".") == [])
 
+md = b.render_markdown(clean)
+t("md has banner", "GENERATED" in md.upper())
+t("md lists alpha", "Alpha" in md and "100%" in md)
+t("md shows beta cap", "Beta" in md and "50%" in md)        # half-in capped
+t("md matrix has edge", "alpha" in md and "beta" in md)
+
 print("BUILD INVENTORY SELFTEST PASS")
