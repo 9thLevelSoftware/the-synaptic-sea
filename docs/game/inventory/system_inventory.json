@@ -295,7 +295,7 @@
       "content_note": "Phantom archetype, melee/attack ranges, ambient cooldown (2.0s) hardcoded; reuses ThreatPlaceholderRenderer + AudioEventSeam ids. No data file.",
       "functional": null,
       "gaps": [
-        "Phantom dissipation counterplay (3890) wastes ammo but tier-3 health teeth ultimately drain vitals, whose own terminal death consumer is unwired (see vitals_state)"
+        "Phantom dissipation counterplay (3890) wastes ammo; tier-3 health teeth ultimately drain vitals, which now feed the live survival_vitals death consumer (end_run('death') via _check_vitals_death, closed Domain 1)"
       ],
       "subsystems": []
     },
