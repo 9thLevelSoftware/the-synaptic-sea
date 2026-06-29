@@ -31,7 +31,7 @@ ROOT="C:/Users/dasbl/Documents/The Synaptic Sea"
 ```
 
 - **Run one smoke:** the command above. Each smoke prints a single `... PASS ...` marker line; that marker is the contract (see expected markers in `06_validation_plan.md`).
-- **Full regression bundle (38 smokes):** run the bash block in `docs/game/06_validation_plan.md` with `GODOT`/`ROOT` set to the Windows values above. It greps for each PASS marker and fails on any unexpected `ERROR:`/`WARNING:` line. Success ends with `SARGASSO REGRESSION PASS commands=38 clean_output=true`.
+- **Full regression bundle (38 smokes):** run the bash block in `docs/game/06_validation_plan.md` with `GODOT`/`ROOT` set to the Windows values above. It greps for each PASS marker and fails on any unexpected `ERROR:`/`WARNING:` line. Success ends with `SYNAPTIC_SEA REGRESSION PASS commands=63 clean_output=true`.
 - **Automated Gate 1 playtest:** `--script res://scripts/validation/gate1_automated_playtest.gd` (run on top of, not instead of, the regression bundle).
 - **Run the game (windowed):** `"$GODOT" --path "$ROOT"` — main scene is `res://scenes/main.tscn`.
 - **Release export:** `scripts/export/build_release.sh [web|linux|macos|windows]` — note this script also hardcodes macOS paths/templates; set `GODOT=` and provide export templates before relying on it.
