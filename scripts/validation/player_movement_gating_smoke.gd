@@ -9,7 +9,7 @@ extends SceneTree
 const PlayerControllerScript := preload("res://scripts/player/player_controller.gd")
 
 func _initialize() -> void:
-	var p = PlayerControllerScript.new()
+	var p := PlayerControllerScript.new()
 	var base: float = p.get_effective_move_speed()
 	if base <= 0.0:
 		_fail("base effective move speed should be > 0 (got %.3f)" % base)
