@@ -9,5 +9,9 @@ exports/
 .godot/
 *.uid
 
+# Python bytecode cache
+__pycache__/
+*.pyc
+
 # Brainstorming / visual-companion scratch sessions
 .superpowers/
