@@ -4754,8 +4754,8 @@ func _process(delta: float) -> void:
 		# ADR-0042 (Codex PR #44): the derelict field run is the PRIMARY low-sanity context,
 		# but this branch returns before the home-path sanity/hallucination tick. Drive it here
 		# too: away is never a safe zone, so sanity drains, the director advances, phantoms /
-		# false-HUD / FX render, and the tier-3 health teeth apply. The away path does not run
-		# the full survival vitals tick, so apply just the sanity health drain via apply_delta.
+		# false-HUD / FX render, and the tier-3 health teeth feed into _tick_survival_attrition
+		# below (Domain 1 Task 6: shared helper now covers the full vitals + death cascade).
 		if sanity_state != null:
 			sanity_state.in_safe_zone = false
 			sanity_state.tick(delta)
@@ -4768,10 +4768,6 @@ func _process(delta: float) -> void:
 				if hallucination_manager != null and is_instance_valid(hallucination_manager):
 					var ppos_away: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
 					hallucination_manager.render(delta, ppos_away)
-				if vitals_state != null:
-					var away_drain: float = float(hallucination_director.get_direct_teeth()["health_drain_per_second"]) * delta
-					if away_drain > 0.0:
-						vitals_state.apply_delta({"health": -away_drain})
 		# Derelict-side fire (wire BOTH branches): tick the active (derelict) fire model so
 		# it spreads, degrades derelict systems, and feeds the player-vitals teeth below.
 		# The home branch ticks fire inside _recompute_expanded_ship_systems, which this
@@ -4782,15 +4778,15 @@ func _process(delta: float) -> void:
 			if _afs_away.tick(delta, _build_fire_context()):
 				_refresh_fire_zones()
 			_apply_fire_system_damage(delta)
-			if vitals_state != null:
-				var fire_drain: float = FIRE_HEALTH_DRAIN_PER_SECOND * _player_fire_intensity() * delta
-				if fire_drain > 0.0:
-					vitals_state.apply_delta({"health": -fire_drain})
 		# Recharge port is power-gated on the DERELICT's own power system (engineering gate):
 		# present but dead until the player restores derelict power.
 		if is_instance_valid(extinguisher_recharge_port):
 			var _dmgr = _active_systems_manager()
 			extinguisher_recharge_port.set_powered(_dmgr != null and _dmgr.is_operational("power"))
+		# Domain 1: survival attrition + stakes on the derelict branch (shared
+		# helper). Runs radiation/body-temp/status + the vitals cascade + death,
+		# so the away path is no longer starved past the 4808 early-return.
+		_tick_survival_attrition(delta)
 		_refresh_player_vitals(delta)
 		# ADR-0038: emergency field crafting completes even away from home (powered-station
 		# crafts pause while away, by design — only field_crafting_state advances here).
