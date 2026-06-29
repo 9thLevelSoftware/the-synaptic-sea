@@ -70,4 +70,8 @@ t("html embeds data", '"alpha"' in html or "alpha" in html)
 t("html has card view", "card" in html.lower())
 t("html has matrix tab", "matrix" in html.lower())
 
+cov = b.coverage({"systems":[{"id":"x","file":"tools/build_system_inventory.py","subsystems":[]}],"loops":[]},
+                 ".", ["tools"])
+t("coverage finds gap", any("test_build_system_inventory.py" in c for c in cov))
+
 print("BUILD INVENTORY SELFTEST PASS")

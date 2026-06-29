@@ -155,6 +155,23 @@ function matrix(){const ids=DATA.systems.map(s=>s.id);const e={};DATA.edges.forE
 cards();matrix();
 </script></body></html>"""
 
+_COVERAGE_EXTS = (".gd", ".py")
+
+def coverage(data, root, dirs):
+    # Find source files on disk not present in the inventory. Matches .gd (the
+    # runtime scripts being inventoried) and .py (so the tool's own dir is covered
+    # — the unit test asserts a missing .py is reported).
+    have = {s.get("file") for s in iter_systems(data)}
+    missing = []
+    for d in dirs:
+        for dirpath, _, files in os.walk(os.path.join(root, d)):
+            for fn in files:
+                if fn.endswith(_COVERAGE_EXTS):
+                    rel = os.path.relpath(os.path.join(dirpath, fn), root).replace("\\", "/")
+                    if rel not in have:
+                        missing.append(rel)
+    return sorted(missing)
+
 def main(argv):
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     src = os.path.join(root, "docs/game/inventory/system_inventory.json")
@@ -167,6 +184,15 @@ def main(argv):
     html = render_html(data)
     md_path = os.path.join(root, "docs/game/inventory/SYSTEM_INVENTORY.md")
     html_path = os.path.join(root, "docs/game/inventory/system_map.html")
+    RUNTIME_DIRS = ["scripts/systems", "scripts/procgen", "scripts/tools", "scripts/ui",
+                    "scripts/player", "scripts/camera", "scripts/interaction", "scripts/placement"]
+    if "--coverage" in argv:
+        missing = coverage(data, root, RUNTIME_DIRS)
+        if missing:
+            for m in missing: print("ERROR: not in inventory:", m)
+            return 1
+        print(f"SYSTEM INVENTORY COVERAGE PASS scripts={n}")
+        return 0
     if "--check" in argv:
         stale = []
         for p, content in ((md_path, md), (html_path, html)):
