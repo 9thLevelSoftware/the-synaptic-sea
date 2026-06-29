@@ -4830,37 +4830,8 @@ func _process(delta: float) -> void:
 		stimulant_state.tick(delta, addiction_state, _consumable_pipeline_context())
 	if addiction_state != null:
 		addiction_state.tick(delta, status_effects_state)
-	# REQ-SV: tick survival vitals and cascades.
-	if vitals_state != null:
-		var temp_mult: float = 1.0
-		if body_temperature_state != null:
-			temp_mult = body_temperature_state.get_thirst_multiplier()
-		var rad_drain: float = 0.0
-		if radiation_state != null:
-			rad_drain = radiation_state.get_health_drain_per_second()
-		var status_mult: float = 1.0
-		if status_effects_state != null:
-			status_mult = status_effects_state.get_modifier("stamina_recovery")
-		# M7-A: the hub's failing ambient atmosphere bites only while ABOARD the hub
-		# (away on a derelict, the personal oxygen / radiation / body-temp hazards own it).
-		var atmo_drain: float = 0.0
-		if life_support_expanded_state != null and not away_from_start:
-			atmo_drain = life_support_expanded_state.get_health_drain_per_second()
-			temp_mult *= life_support_expanded_state.get_thirst_multiplier()
-		# ADR-0042: tier-3 sanity teeth (one-frame lag is acceptable; the director was
-		# ticked in the prior frame's sanity block, below this one in _process order).
-		var hteeth: Dictionary = hallucination_director.get_direct_teeth() if hallucination_director != null else {"health_drain_per_second": 0.0, "stamina_recovery_mult": 1.0}
-		vitals_state.tick(delta, {
-			"temperature_thirst_mult": temp_mult,
-			"radiation_health_drain": rad_drain,
-			"atmosphere_health_drain": atmo_drain,
-			# M7-B Task 8: standing in a burning compartment drains player health.
-			"fire_health_drain": FIRE_HEALTH_DRAIN_PER_SECOND * _player_fire_intensity(),
-			"status_stamina_recovery_mult": status_mult,
-			"sanity_health_drain": float(hteeth["health_drain_per_second"]),
-			"sanity_stamina_recovery_mult": float(hteeth["stamina_recovery_mult"]),
-			"moving": player != null and player.has_method("is_moving") and player.is_moving(),
-		})
+	# REQ-SV / Domain 1: survival attrition + stakes (shared by both branches).
+	_tick_survival_attrition(delta)
 	if sanity_state != null:
 		# Synaptic Sea field = not in a safe zone (away_from_start or breach open)
 		var in_safe: bool = not away_from_start and (oxygen_state == null or not oxygen_state.get_summary().get("breach_open", false))
@@ -4877,16 +4848,6 @@ func _process(delta: float) -> void:
 			if hallucination_manager != null and is_instance_valid(hallucination_manager):
 				var ppos: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
 				hallucination_manager.render(delta, ppos)
-	if radiation_state != null:
-		# Radiation zones are active on derelicts or when breach is open.
-		var in_rad: bool = away_from_start or (oxygen_state != null and oxygen_state.get_summary().get("breach_open", false))
-		radiation_state.in_radiation_zone = in_rad
-		radiation_state.tick(delta)
-	if body_temperature_state != null:
-		body_temperature_state.in_extreme_zone = away_from_start
-		body_temperature_state.tick(delta)
-	if status_effects_state != null:
-		status_effects_state.tick(delta)
 	# ADR-0034: tick food / cooking / spoilage / sustenance models.
 	if spoilage_state != null:
 		spoilage_state.tick(delta)
@@ -4903,6 +4864,81 @@ func _process(delta: float) -> void:
 	if is_instance_valid(audio_manager) and audio_manager.has_method("tick"):
 		audio_manager.tick(delta)
 		_refresh_audio_state(false, delta)
+
+## Domain 1 (survival_vitals): the single survival-attrition tick, called from
+## BOTH _process branches so radiation / body-temperature / status / the vitals
+## cascade — and the terminal stakes (movement gating + death) — are live on a
+## boarded derelict (the PRIMARY context), not home-only. The away early-return
+## at line 4808 previously starved this entire loop in the field.
+##
+## Order preserves the prior home semantics: the vitals context reads the
+## CURRENT (pre-tick) source values, vitals ticks, then the environmental
+## sources advance. The hallucination teeth are read with the same one-frame
+## lag the home path already tolerated (the sanity block ticks the director
+## separately on each branch).
+func _tick_survival_attrition(delta: float) -> void:
+	if vitals_state == null:
+		return
+	# Real environmental hazard signal (replaces the always-false away_from_start
+	# literal at the old line 4886): you are in a thermal/radiation hazard zone on
+	# a derelict OR when the hub hull is breached. Mirrors radiation's prior in_rad.
+	var breach_open: bool = oxygen_state != null and oxygen_state.get_summary().get("breach_open", false)
+	var in_hazard_env: bool = away_from_start or breach_open
+	# Assemble the vitals context from current source state (pre-tick).
+	var temp_mult: float = 1.0
+	if body_temperature_state != null:
+		temp_mult = body_temperature_state.get_thirst_multiplier()
+	var rad_drain: float = 0.0
+	if radiation_state != null:
+		rad_drain = radiation_state.get_health_drain_per_second()
+	var status_mult: float = 1.0
+	if status_effects_state != null:
+		status_mult = status_effects_state.get_modifier("stamina_recovery")
+	# Hub ambient atmosphere bites only while ABOARD (away, the personal hazards own it).
+	var atmo_drain: float = 0.0
+	if life_support_expanded_state != null and not away_from_start:
+		atmo_drain = life_support_expanded_state.get_health_drain_per_second()
+		temp_mult *= life_support_expanded_state.get_thirst_multiplier()
+	var hteeth: Dictionary = hallucination_director.get_direct_teeth() if hallucination_director != null else {"health_drain_per_second": 0.0, "stamina_recovery_mult": 1.0}
+	vitals_state.tick(delta, {
+		"temperature_thirst_mult": temp_mult,
+		"radiation_health_drain": rad_drain,
+		"atmosphere_health_drain": atmo_drain,
+		"fire_health_drain": FIRE_HEALTH_DRAIN_PER_SECOND * _player_fire_intensity(),
+		"status_stamina_recovery_mult": status_mult,
+		"sanity_health_drain": float(hteeth["health_drain_per_second"]),
+		"sanity_stamina_recovery_mult": float(hteeth["stamina_recovery_mult"]),
+		"moving": player != null and player.has_method("is_moving") and player.is_moving(),
+	})
+	# Stakes: penalize movement from low vitals, then end the run on incapacitation.
+	_apply_vitals_action_gating()
+	_check_vitals_death()
+	# Advance the environmental sources AFTER the vitals read (preserves prior order).
+	if radiation_state != null:
+		radiation_state.in_radiation_zone = in_hazard_env
+		radiation_state.tick(delta)
+	if body_temperature_state != null:
+		body_temperature_state.in_extreme_zone = in_hazard_env
+		body_temperature_state.tick(delta)
+	if status_effects_state != null:
+		status_effects_state.tick(delta)
+
+## Domain 1: push the vitals movement gate onto the player every frame.
+func _apply_vitals_action_gating() -> void:
+	if player == null or vitals_state == null:
+		return
+	if not player.has_method("set_movement_speed_multiplier"):
+		return
+	player.set_movement_speed_multiplier(vitals_state.get_movement_speed_multiplier())
+
+## Domain 1: terminal stake. When the player is incapacitated (health<=0) end the
+## run as a death. end_run is idempotent (guards slice_complete), so this is safe
+## to call every frame and from both branches.
+func _check_vitals_death() -> void:
+	if vitals_state == null or slice_complete:
+		return
+	if vitals_state.is_incapacitated():
+		end_run("death")
 
 func _build_breach_zone() -> void:
 	if oxygen_root == null:
