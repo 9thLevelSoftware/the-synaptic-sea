@@ -54,9 +54,37 @@ missing = {"systems":[{"id":"a","file":"scripts/systems/DOES_NOT_EXIST.gd","kind
 t("missing file caught", any("DOES_NOT_EXIST" in e for e in b.validate(missing, ".")))
 
 # validate: clean fixture passes
-with open("tools/fixtures/inventory_min.json") as f:
+with open("tools/fixtures/inventory_min.json", encoding="utf-8") as f:
     clean = json.load(f)
 t("clean fixture valid", b.validate(clean, ".") == [])
+
+# null-safe: input/output explicitly null must not raise
+nullio = {"kind":"simulation","model_exists":True,"reachable":True,"driven":True,
+          "input":None,"output":None,"content":"none","subsystems":[]}
+t("null io coupling hollow", b.derive_coupling(nullio) == "hollow")
+t("null io completion capped", b.leaf_completion(nullio) == 45)  # 15+15+15, output dead -> <=50
+
+# validate: system missing 'id' is reported, not crashed on
+noid = {"systems":[{"file":"tools/build_system_inventory.py","kind":"simulation","confidence":"V",
+  "input":{"live":True},"output":{"live":True},"integrations":[],"subsystems":[]}], "loops":[]}
+t("missing id caught", any("missing 'id'" in e for e in b.validate(noid, ".")))
+
+# subsystems appear as flattened rows in the map payload (not just top-level)
+nested = {"systems":[{"id":"parent","file":"tools/build_system_inventory.py","name":"Parent","domain":"d",
+  "kind":"simulation","confidence":"V","input":{"live":True},"output":{"live":True},"integrations":[],
+  "subsystems":[{"id":"child","file":"tools/build_system_inventory.py","name":"Child","kind":"simulation",
+   "confidence":"V","input":{"live":True},"output":{"live":True},"integrations":[],"subsystems":[]}]}], "loops":[]}
+enr = b._enriched(nested)
+t("subsystem flattened into rows", any(r["id"] == "child" for r in enr["systems"]))
+t("subsystem carries parent", any(r.get("_parent") == "parent" for r in enr["systems"] if r["id"] == "child"))
+t("subsystem inherits domain", any(r.get("domain") == "d" for r in enr["systems"] if r["id"] == "child"))
+
+# apostrophe-safe HTML: no inline JSON-in-onclick (data with an apostrophe must not break the handler)
+apos = {"systems":[{"id":"a","file":"tools/build_system_inventory.py","name":"end_run('death')","domain":"d",
+  "kind":"simulation","confidence":"V","input":{"live":True},"output":{"live":True},"integrations":[],"subsystems":[]}], "loops":[]}
+ahtml = b.render_html(apos)
+t("no inline JSON onclick", "onclick='detail(" not in ahtml)
+t("uses data-index handler", 'data-i="' in ahtml)
 
 md = b.render_markdown(clean)
 t("md has banner", "GENERATED" in md.upper())

@@ -6,6 +6,13 @@
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
 | Audio Manager | 🟡 | 73% | [V] | playable_generated_ship.gd:4904 |
+| ↳ Dynamic Music State Machine | 🟢 | 90% | [V] | playable_generated_ship.gd:5493 |
+| ↳ SFX Event Router | 🟢 | 90% | [V] | playable_generated_ship.gd:3966 |
+| ↳ Meta-Event Scheduler | 🟢 | 90% | [V] | audio_manager.gd:182 |
+| ↳ Ambient Zone State | 🔴 | 50% | [V] | audio_manager.gd:178 |
+| ↳ Spatial Audio Resolver | 🔴 | 45% | [V] | playable_generated_ship.gd:5514 |
+| ↳ Audio Bus Config | ⚪ | — | [V] | — |
+| ↳ Audio Log Registry | ⚪ | — | [V] | — |
 | Audio Event Seam (id catalog) | ⚪ | — | [V] | — |
 
 ## combat
@@ -13,6 +20,10 @@
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
 | Threat Manager | 🟢 | 80% | [V] | playable_generated_ship.gd:3908 |
+| ↳ Detection / Stealth State | 🟡 | 50% | [V] | threat_manager.gd:67 |
+| ↳ Damage Pipeline | 🟢 | 90% | [V] | threat_manager.gd:85 |
+| ↳ Armor Resolver | 🟢 | 90% | [V] | damage_pipeline.gd:23 |
+| ↳ Threat AI State | 🟢 | 90% | [V] | threat_manager.gd:74 |
 | Threat Placeholder Renderer | 🟢 | 75% | [V] | threat_manager.gd:266 |
 
 ## consumables
@@ -36,6 +47,7 @@
 | Sustenance Facility Rollup | 🟡 | 50% | [V] | playable_generated_ship.gd:1390 |
 | Hydroponics Tray | 🔴 | 40% | [V] | — |
 | Nutrient Synthesizer | 🔴 | 30% | [V] | — |
+| ↳ Cooking State Machine | 🔴 | 30% | [V] | — |
 | Water Recycler | 🟡 | 48% | [V] | — |
 
 ## infra
@@ -153,6 +165,9 @@
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
 | Ship Systems Manager | 🟢 | 83% | [V] | playable_generated_ship.gd:4816 |
+| ↳ Ship System (group) | 🟢 | 100% | [V] | ship_systems_manager.gd:135 |
+| ↳ Ship Subcomponent | 🟢 | 100% | [V] | ship_systems_manager.gd:146 |
+| ↳ Life Support System (manager subclass) | 🟡 | 50% | [V] | ship_systems_manager.gd:135 |
 | Power Grid | 🟢 | 90% | [V] | playable_generated_ship.gd:1349 |
 | Propulsion (expanded) | 🟢 | 90% | [V] | playable_generated_ship.gd:1351 |
 | Life Support (expanded atmosphere) | 🟢 | 90% | [V] | playable_generated_ship.gd:1360 |
