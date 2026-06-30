@@ -469,13 +469,13 @@
       "driven_at": "playable_generated_ship.gd:1390",
       "input": {
         "live": true,
-        "desc": "ticked every home frame with real powered_ratio plus hydroponics/synthesizer/water_recycler summaries — but all three producer summaries are static (never planted/cooked/recycling), so every aggregate stays 0",
+        "desc": "ticked every home frame with real powered_ratio; hydroponics_summary and water_recycler_summary now live (stations planted/recycling via ProductionStation); meals_active = crafting_state.is_crafting() at 1395. All three source summaries now reflect real production state.",
         "at": "playable_generated_ship.gd:1390"
       },
       "output": {
-        "live": false,
-        "desc": "harvest_ready/meals_ready/purified_water_ready feed only get_status_lines (HUD) and the save snapshot (1405/6125); no gameplay consumer grants the player items or water",
-        "at": null
+        "live": true,
+        "desc": "get_status_lines() called at playable_generated_ship.gd:4747 feeds HUD display lines (harvest_ready/meals_ready/purified_water_ready); get_summary()/apply_summary used for save-load at 1405/6125",
+        "at": "playable_generated_ship.gd:4747"
       },
       "confidence": "V",
       "loops": [
@@ -496,12 +496,10 @@
         }
       ],
       "content": "partial",
-      "content_note": "OMITTED FROM PROPOSED INVENTORY — added on verification. Config from facility-upgrades config (1332). Full save round-trip (get_summary 1405, apply_summary 6125) and a dedicated sustenance_state_smoke.gd. It is a read-only roll-up of the three (dead) production stations, not a producer itself.",
+      "content_note": "Config from facility-upgrades config (1332). Full save round-trip (get_summary 1405, apply_summary 6125). Roll-up of hydroponics + water_recycler summaries and crafting meals_active (no longer reads retired synthesizer_state). Drives HUD status lines at 4747.",
       "functional": null,
       "gaps": [
-        "aggregates three never-producing stations, so all ready counts stay 0",
-        "tick is home-branch only (1390 inside _recompute_expanded_ship_systems, called at 4817; away returns at 4808)",
-        "output counts have no downstream consumer that grants items/water — HUD/save rollup only"
+        "sustenance tick (_recompute_expanded_ship_systems, 4817) is home-branch only; HUD status lags when away, but does not affect production or spoilage advances"
       ],
       "subsystems": []
     },
@@ -514,17 +512,17 @@
       "model_exists": true,
       "smoke": "scripts/validation/hydroponics_state_smoke.gd",
       "reachable": true,
-      "driven": false,
-      "driven_at": null,
+      "driven": true,
+      "driven_at": "playable_generated_ship.gd:5035 (_tick_food_runtime, both branches)",
       "input": {
-        "live": false,
-        "desc": "no live caller invokes plant() (only validation smokes); tick at 4894 is gated on State.PLANTED which is never entered",
-        "at": null
+        "live": true,
+        "desc": "player-started via ProductionStation(hydroponics) first interact: calls plant() on the model; ProductionStation built by coordinator at _build_production_stations (3033) called at 3631/4219/6381; power-gated via sustenance band callable",
+        "at": "scripts/tools/production_station.gd"
       },
       "output": {
-        "live": false,
-        "desc": "harvest() never called in runtime; get_summary only feeds sustenance tick (static IDLE)",
-        "at": null
+        "live": true,
+        "desc": "harvest() called by ProductionStation._try_harvest when state==READY on player second interact; produce (hydroponic_greens or alien_flora) deposited into inventory_state. get_summary() live-feeds sustenance_state HUD tick.",
+        "at": "scripts/tools/production_station.gd"
       },
       "confidence": "V",
       "loops": [
@@ -533,17 +531,16 @@
       "integrations": [
         {
           "to": "sustenance_state",
-          "via": "hydroponics_summary in sustenance tick payload (static, never planted)",
+          "via": "hydroponics_summary (live, planted/ready when production active) in sustenance tick payload",
           "at": "playable_generated_ship.gd:1392",
-          "health": "weak"
+          "health": "healthy"
         }
       ],
       "content": "partial",
-      "content_note": "data/crops/hydroponics_crops.json defines 2 crops (hydroponic_greens, alien_flora_cultivar) with growth/water/power costs, but no live planting/harvest path consumes them.",
+      "content_note": "data/crops/hydroponics_crops.json defines 2 crops (hydroponic_greens, alien_flora_cultivar) with growth/water/power costs. plant() now called via ProductionStation interact; harvest() deposits produce to inventory.",
       "functional": null,
       "gaps": [
-        "no gameplay path calls plant() or harvest(); model is hollow",
-        "even the tick wire (4894) is home-branch only"
+        "hydroponics station is home-only (ProductionStation._try_start skips when away_from_start; tick in _tick_food_runtime still advances the model if planted before travel)"
       ],
       "subsystems": []
     },
@@ -554,7 +551,7 @@
       "domain": "food",
       "kind": "simulation",
       "model_exists": false,
-      "smoke": "scripts/validation/synthesizer_state_smoke.gd",
+      "smoke": null,
       "reachable": true,
       "driven": false,
       "driven_at": null,
@@ -575,22 +572,16 @@
       "integrations": [
         {
           "to": "cooking_state",
-          "via": "wraps CookingState as _cooking",
-          "at": "synthesizer_state.gd:8",
-          "health": "healthy"
-        },
-        {
-          "to": "sustenance_state",
-          "via": "synthesizer_summary in sustenance tick payload (static)",
-          "at": "playable_generated_ship.gd:1393",
-          "health": "weak"
+          "via": "wraps CookingState as _cooking (synthesizer model retired; file deleted)",
+          "at": null,
+          "health": "broken"
         }
       ],
       "content": "none",
-      "content_note": "No synthesizer-specific recipe data is fed; CookingState path was superseded by the ADR-0038 kitchen crafting station (recipe_definitions.json, station_kind 'kitchen'), which is the live food producer.",
+      "content_note": "RETIRED. File deleted in Domain 3 Task 6. The 'synthesizer' crafting station (CraftingState, ADR-0038) is the canonical meal producer via recipe_definitions.json. cooking_state retained as dead subsystem record only.",
       "functional": null,
       "gaps": [
-        "orphaned: no runtime path calls start_synthesis(); food production now flows through crafting_state kitchen recipes"
+        "synthesizer_state is RETIRED: model file deleted, model_exists=false; no runtime caller. Kitchen meal production flows through crafting_state (station_kind='kitchen', recipe_definitions.json). CookingState subsystem is likewise dead."
       ],
       "subsystems": [
         {
@@ -639,17 +630,17 @@
       "model_exists": true,
       "smoke": null,
       "reachable": true,
-      "driven": false,
-      "driven_at": null,
+      "driven": true,
+      "driven_at": "playable_generated_ship.gd:5035 (_tick_food_runtime, both branches)",
       "input": {
-        "live": false,
-        "desc": "no runtime caller invokes load_input() (only smokes); tick at 4898 gated on State.RECYCLING never entered",
-        "at": null
+        "live": true,
+        "desc": "player-started via ProductionStation(water_recycler) first interact: calls load_input('contaminated_water') on the model; contaminated_water consumed from inventory_state; coordinator builds ProductionStation at 3033 (called at 3631/4219/6381)",
+        "at": "scripts/tools/production_station.gd"
       },
       "output": {
         "live": true,
-        "desc": "output_ready read into life_support_expanded_state.tick recycled_water (real consumer at 1359, but always 0 since input is never loaded)",
-        "at": "playable_generated_ship.gd:1359"
+        "desc": "purified_water harvested to inventory_state via ProductionStation._try_harvest when state==READY; output_ready also read into life_support_expanded_state.tick as recycled_water (1359, home-only) — ambient bonus path.",
+        "at": "scripts/tools/production_station.gd"
       },
       "confidence": "V",
       "loops": [
@@ -658,23 +649,23 @@
       "integrations": [
         {
           "to": "life_support_expanded_state",
-          "via": "output_ready -> recycled_water in life-support tick (value always 0, input starved)",
+          "via": "output_ready -> recycled_water in life-support tick (now non-zero when recycling completes; home-branch only at 1359)",
           "at": "playable_generated_ship.gd:1359",
-          "health": "weak"
+          "health": "healthy"
         },
         {
           "to": "sustenance_state",
-          "via": "water_recycler_summary in sustenance tick payload (static)",
+          "via": "water_recycler_summary (live, recycling/ready when active) in sustenance tick payload",
           "at": "playable_generated_ship.gd:1394",
-          "health": "weak"
+          "health": "healthy"
         }
       ],
       "content": "none",
-      "content_note": "No recycler recipe/config data; configure() uses code defaults only. No dedicated water_recycler_state_smoke.gd exists (exercised only indirectly via sustenance/save-load/expanded smokes).",
+      "content_note": "No recycler recipe/config data; configure() uses code defaults. load_input() now called via ProductionStation interact. Exercised by production_station_smoke.gd (unit) and production_station_wiring_smoke.gd (integration).",
       "functional": null,
       "gaps": [
-        "no runtime path calls load_input(); the life-support consumer at 1359 always reads 0",
-        "output read (1359) and summary feed (1394) are both home-branch only (_recompute_expanded_ship_systems, away returns 4808)"
+        "water_recycler_state has no dedicated smoke; exercised via production_station_smoke.gd and production_station_wiring_smoke.gd",
+        "life_support recycled_water consumer (1359) is home-only; ambient benefit does not advance on derelict visits"
       ],
       "subsystems": []
     },
@@ -938,7 +929,7 @@
       "driven_at": "playable_generated_ship.gd:1360",
       "input": {
         "live": true,
-        "desc": "powered_ratio (power grid) + hull breach_count (live). recycled_water (water_recycler.output_ready, 1359) is wired but inert in practice (recycler never starts)",
+        "desc": "powered_ratio (power grid) + hull breach_count (live). recycled_water (water_recycler.output_ready, 1359) is now live when the water_recycler is active via ProductionStation; home-branch only at 1359.",
         "at": "playable_generated_ship.gd:1360-1364"
       },
       "output": {
@@ -959,7 +950,7 @@
         }
       ],
       "content": "partial",
-      "content_note": "VERIFIED. M7-A atmosphere tunables default in-code; subsystem_tuning.json life_support section supplies overrides. Note: recycled_water input coupling (1359) is present but always 0 since no live caller starts water_recycler.",
+      "content_note": "VERIFIED. M7-A atmosphere tunables default in-code; subsystem_tuning.json life_support section supplies overrides. recycled_water input coupling (1359) is now live: water_recycler produces purified_water via ProductionStation, and output_ready flows into the life_support tick as an ambient bonus (home-branch only).",
       "functional": null,
       "gaps": [
         "atmosphere bite applies only while aboard hub: gated by 'not away_from_start' at 4847, zero on a derelict (personal oxygen owns it there) - by design"
@@ -7828,6 +7819,57 @@
       "subsystems": []
     },
     {
+      "id": "production_station",
+      "file": "scripts/tools/production_station.gd",
+      "name": "Production Station",
+      "domain": "food",
+      "kind": "ui",
+      "model_exists": true,
+      "smoke": "scripts/validation/production_station_smoke.gd",
+      "reachable": true,
+      "driven": true,
+      "driven_at": "playable_generated_ship.gd:3033 (_build_production_stations, called at 3631/4219/6381)",
+      "input": {
+        "live": true,
+        "desc": "player interact starts production (first interact: plant/load_input) or harvests (second interact when state==READY); range-gated (1.8m) and power-gated (sustenance band >= 50% allocation via power_grid_state); coordinator builds one station per kind (hydroponics + water_recycler) at home scene init",
+        "at": "scripts/tools/production_station.gd:try_interact"
+      },
+      "output": {
+        "live": true,
+        "desc": "on successful harvest: production_harvested signal emitted + inventory_state.add_item called to deposit produce; production_started and production_blocked signals also emitted to coordinator",
+        "at": "scripts/tools/production_station.gd:_try_harvest"
+      },
+      "confidence": "V",
+      "loops": [
+        "food"
+      ],
+      "integrations": [
+        {
+          "to": "hydroponics_state",
+          "via": "plant() on start, harvest() on collect; model ticked externally by _tick_food_runtime",
+          "at": "scripts/tools/production_station.gd:_try_start/_try_harvest",
+          "health": "healthy"
+        },
+        {
+          "to": "water_recycler_state",
+          "via": "load_input(contaminated_water) on start, collect_result() on harvest",
+          "at": "scripts/tools/production_station.gd:_try_start/_try_harvest",
+          "health": "healthy"
+        },
+        {
+          "to": "inventory_state",
+          "via": "add_item (harvest deposit) / remove_item (contaminated_water input for recycler)",
+          "at": "scripts/tools/production_station.gd:_try_harvest/_check_inputs",
+          "health": "healthy"
+        }
+      ],
+      "content": "sufficient",
+      "content_note": "Verified by production_station_smoke.gd (unit: hydro harvest, recycler collect, blocked-in-progress) and production_station_wiring_smoke.gd (integration: wiring to coordinator, spoilage registration). Handles both hydroponics and water_recycler station kinds via configure(station_kind).",
+      "functional": null,
+      "gaps": [],
+      "subsystems": []
+    },
+    {
       "id": "crafting_station",
       "file": "scripts/tools/crafting_station.gd",
       "name": "Crafting Station",
@@ -8226,15 +8268,31 @@
     {
       "id": "food",
       "name": "Food / Sustenance Loop",
-      "closes": "partial",
+      "closes": "closed",
       "steps": [
+        {
+          "system": "production_station",
+          "role": "player-operated node: starts hydroponics.plant() or recycler.load_input() on first interact, harvests produce into inventory_state on second interact when state==READY; power-gated (sustenance band >= 50%)"
+        },
+        {
+          "system": "hydroponics_state",
+          "role": "grow hydroponic produce (hydroponic_greens, alien_flora); ticked via _tick_food_runtime on BOTH _process branches (home 4955 and away 4910)"
+        },
+        {
+          "system": "water_recycler_state",
+          "role": "recycle contaminated_water -> purified_water; ticked via _tick_food_runtime on BOTH _process branches"
+        },
+        {
+          "system": "sustenance_state",
+          "role": "HUD roll-up: aggregates hydroponics + water_recycler summaries and crafting meals_active; get_status_lines (4747) drives HUD display"
+        },
         {
           "system": "consumable_state",
           "role": "acquire (craft/loot food, registered for spoilage via _register_food_for_spoilage at 3137/3156/3313)"
         },
         {
           "system": "spoilage_state",
-          "role": "register + age tracked food (home-branch tick only)"
+          "role": "register + age tracked food (ticked on BOTH _process branches via _tick_food_runtime at 5035)"
         },
         {
           "system": "food_state",
@@ -8246,11 +8304,10 @@
         }
       ],
       "break_points": [
-        "Production half is fully dead: hydroponics_state.plant()/harvest(), synthesizer_state.start_synthesis(), and water_recycler_state.load_input() have NO runtime callers (verified by repo-wide grep — only validation smokes call them); none of the three ever produces food/water.",
-        "Away-branch early-return (playable_generated_ship.gd:4808) means the food tick block (4891-4898) and the sustenance/recycler reads (1359, 1390-1394, inside _recompute_expanded_ship_systems called only at 4817) run at home only; food does not spoil on a derelict, the primary gameplay context.",
-        "water_recycler output is wired into life_support (1359) but always 0 because input is never loaded.",
-        "sustenance_state (omitted from the proposed inventory) ticks live at 1390 but is a read-only HUD/save roll-up of the three dead stations — its harvest/meal/water-ready counts have no consumer that grants items, so it adds no closure.",
-        "The eat half (loot/craft -> spoilage -> eat -> vitals/sanity) does close end-to-end and is the only live part of the loop; the eat input path runs in both home and away, though spoilage aging itself does not advance away."
+        "VERIFIED CLOSED: production half now live via ProductionStation (player-operated start + manual harvest). Hydroponics grows hydroponic_greens/alien_flora; water_recycler produces purified_water from contaminated_water; spoilage ages inventory food items on BOTH _process branches. Eat path closes into vitals/sanity.",
+        "Sustenance HUD tick (_recompute_expanded_ship_systems at 4817) is home-branch only; status-line display lags by one home-visit when the player is away, but production and spoilage continue advancing on both branches via _tick_food_runtime.",
+        "water_recycler output_ready is also read into life_support_expanded_state.tick as recycled_water (1359, home-only) -- ambient bonus path, does not block the primary inventory-deposit harvest.",
+        "Minor: contaminated_water must be present in inventory to start recycling; if loot tables do not seed it, the recycler start is blocked but the hydroponics path is unaffected."
       ]
     },
     {
@@ -8288,7 +8345,7 @@
         }
       ],
       "break_points": [
-        "VERIFIED: sustenance_state is HOLLOW - no live production source (growers have no plant/recycle starter), output is HUD-text-only (feeds no vital)",
+        "sustenance_state now live: rolls up hydroponics + water_recycler summaries (both active via ProductionStation) and crafting meals_active; get_status_lines (4747) feeds HUD display. Sustenance HUD tick is home-branch only (_recompute_expanded_ship_systems at 4817) but production advances on both branches.",
         "VERIFIED: hull_integrity_state input is half-coupled - live damage sources #1-3 (combat/hazard/pressure) deferred; only config-injected breach + validation seam (1422) call damage_compartment",
         "VERIFIED: manager.advance (4816) + power/propulsion/life_support/crafting/sustenance recompute (4817 -> _recompute_expanded_ship_systems) run ONLY on the HOME _process branch; away branch returns at 4808 before reaching them"
       ]
