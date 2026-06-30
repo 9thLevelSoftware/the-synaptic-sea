@@ -722,12 +722,65 @@ Also update that system's `gaps` array — replace the single deferred-damage ga
       ]
 ```
 
-- [ ] **Step 5: Regenerate the inventory views**
+- [ ] **Step 4b: Add the `web_infestation_state` system entry to the inventory**
+
+A new `scripts/systems/web_infestation_state.gd` exists (Task 1). The inventory `--coverage` gate flags any `scripts/systems/*.gd` not catalogued, so add an entry (mirroring the Domain 3 `production_station` addition). Insert this object immediately AFTER the `hull_integrity_state` system object's closing `},` in `docs/game/inventory/system_inventory.json`:
+
+```json
+    {
+      "id": "web_infestation_state",
+      "file": "scripts/systems/web_infestation_state.gd",
+      "name": "Web Infestation",
+      "domain": "ship_systems",
+      "kind": "simulation",
+      "model_exists": true,
+      "smoke": "scripts/validation/web_infestation_state_smoke.gd",
+      "reachable": true,
+      "driven": true,
+      "driven_at": "playable_generated_ship.gd:_apply_web_hull_damage",
+      "input": {
+        "live": true,
+        "desc": "configured from data/ship_systems/web_infestation.json (growth/recession/damage/contact rates); hub attached_to_web=true by default; contact boost from a docked still-attached derelict via _active_derelict_web_attached",
+        "at": "playable_generated_ship.gd:_configure_expanded_ship_system_models"
+      },
+      "output": {
+        "live": true,
+        "desc": "tick() returns per-tick hull damage applied across hull_integrity_state.compartments by _apply_web_hull_damage on BOTH _process branches (home + away) — the live source closing the ship_systems loop",
+        "at": "playable_generated_ship.gd:_apply_web_hull_damage"
+      },
+      "confidence": "V",
+      "loops": [
+        "ship_systems"
+      ],
+      "integrations": [
+        {
+          "to": "hull_integrity_state",
+          "via": "coverage -> damage_compartment on every compartment each tick",
+          "at": "playable_generated_ship.gd:_apply_web_hull_damage",
+          "health": "healthy"
+        }
+      ],
+      "content": "partial",
+      "content_note": "Domain 4 foundation: hub trapped in the Sargasso web (attached by default), coverage grows -> hull damage on both branches; ShipInstance.web_attached is the per-derelict contagion-seed flag. Full dock-graph spread / cut-free action / per-derelict hull deferred to the follow-on web spec.",
+      "functional": null,
+      "gaps": [
+        "Foundation only: dock-graph contagion spread, the cut-a-ship-free action + reaching/re-contact, and per-derelict hull are deferred to the follow-on web spec (gated on the Phase-5 docking graph)."
+      ],
+      "subsystems": []
+    },
+```
+
+If `system_inventory.json` has a top-level systems-count or metadata field, update it for +1 entry (the `--check` staleness gate will catch any mismatch).
+
+- [ ] **Step 5: Regenerate the inventory views + verify check AND coverage**
 
 ```bash
-cd "C:/Users/dasbl/Documents/The Synaptic Sea" && python tools/build_system_inventory.py
+cd "C:/Users/dasbl/Documents/The Synaptic Sea"
+python tools/build_system_inventory.py            # regenerate MD + HTML from JSON
+python tools/build_system_inventory.py --check     # expect: SYSTEM INVENTORY CHECK PASS systems=189 verified=189
+python tools/build_system_inventory.py --coverage  # expect: SYSTEM INVENTORY COVERAGE PASS scripts=... (no "ERROR: not in inventory")
 ```
-Expected: regenerates `SYSTEM_INVENTORY.md` + `system_map.html` from the JSON with no error.
+Expected: regenerates `SYSTEM_INVENTORY.md` + `system_map.html` with no error; `--check` and `--coverage` both PASS with the new `web_infestation_state` entry present. If `--coverage` prints `ERROR: not in inventory: scripts/systems/web_infestation_state.gd`, the entry was malformed or misplaced — fix it.
 
 - [ ] **Step 6: Update the `:4948` comment + ADR-0038**
 
