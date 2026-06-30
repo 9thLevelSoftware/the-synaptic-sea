@@ -16,6 +16,8 @@ const HangarBayScript := preload("res://scripts/systems/hangar_bay.gd")
 const ShipInventoryScript := preload("res://scripts/systems/ship_inventory.gd")
 const CartStateScript := preload("res://scripts/systems/cart_state.gd")
 const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
+const HullIntegrityStateScript := preload("res://scripts/systems/hull_integrity_state.gd")
+const WebInfestationStateScript := preload("res://scripts/systems/web_infestation_state.gd")
 
 const ROOM_HALF_EXTENT: float = 4.0   # generous per-room half-box in X/Z (covers 2x1 rooms + module chains)
 const ROOM_HALF_HEIGHT: float = 3.0   # half deck height + headroom
@@ -79,11 +81,11 @@ var fire = null                          # FireSuppressionState | null
 # fire — "seeded to empty" must survive reload too.
 var fire_seeded: bool = false
 
-# Domain 4: is this ship still in contact with the biomatter web? Derelicts
-# generate attached (floating in the Sargasso). The foundation reads this to
-# decide whether docking to this ship accelerates the hub's web growth; the
-# follow-on cut-free action will flip it. Persisted only when false (additive).
-var web_attached: bool = true
+# Live Persistent Ships Phase 2a: per-ship structural state, mirroring `fire`. The
+# coordinator configures these from tuning before seeding/use. hull holds breach/health
+# per compartment; web holds biomatter-web coverage that damages the hull over time.
+var hull = null                          # HullIntegrityState | null
+var web = null                           # WebInfestationState | null
 
 # Live Persistent Ships Phase 1: world_time at which this ship's sim was last
 # advanced. Catch-up on revisit (Phase 4) advances the ship by
@@ -136,8 +138,10 @@ func get_summary() -> Dictionary:
 		result["fire"] = fire.get_summary()
 	if fire_seeded:
 		result["fire_seeded"] = true
-	if not web_attached:
-		result["web_attached"] = false
+	if has_hull():
+		result["hull"] = hull.get_summary()
+	if web != null and (not web.attached_to_web or web.coverage > 0.0):
+		result["web"] = web.get_summary()
 	if last_sim_time != 0.0:
 		result["last_sim_time"] = last_sim_time
 	return result
@@ -190,7 +194,14 @@ func apply_summary(summary) -> bool:
 	if typeof(fire_summary) == TYPE_DICTIONARY and not (fire_summary as Dictionary).is_empty():
 		get_fire().apply_summary(fire_summary as Dictionary)
 	fire_seeded = bool(summary.get("fire_seeded", fire_seeded))
-	web_attached = bool(summary.get("web_attached", web_attached))
+	var hull_summary: Variant = summary.get("hull", null)
+	if typeof(hull_summary) == TYPE_DICTIONARY and not (hull_summary as Dictionary).is_empty():
+		get_hull().apply_summary(hull_summary as Dictionary)
+	var web_summary: Variant = summary.get("web", null)
+	if typeof(web_summary) == TYPE_DICTIONARY and not (web_summary as Dictionary).is_empty():
+		get_web().apply_summary(web_summary as Dictionary)
+	elif summary.has("web_attached"):
+		get_web().attached_to_web = bool(summary.get("web_attached", true))
 	last_sim_time = float(summary.get("last_sim_time", last_sim_time))
 	return true
 
@@ -237,9 +248,27 @@ func get_fire():
 func has_fire() -> bool:
 	return fire != null and not fire.get_burning_compartments().is_empty()
 
-## True iff this ship is still in contact with the biomatter web.
+## Returns this ship's HullIntegrityState, creating a bare one on first access.
+## The coordinator configures it from tuning before seeding/use.
+func get_hull():
+	if hull == null:
+		hull = HullIntegrityStateScript.new()
+	return hull
+
+## True iff this ship has a configured hull (at least one compartment).
+func has_hull() -> bool:
+	return hull != null and not hull.compartments.is_empty()
+
+## Returns this ship's WebInfestationState, creating a bare one on first access.
+## The coordinator configures it from tuning before seeding/use.
+func get_web():
+	if web == null:
+		web = WebInfestationStateScript.new()
+	return web
+
+## True iff this ship is still in contact with the biomatter web (web model is authoritative).
 func is_web_attached() -> bool:
-	return web_attached
+	return get_web().attached_to_web
 
 ## Returns this ship's live carts array (parked carts).
 func get_carts() -> Array:
