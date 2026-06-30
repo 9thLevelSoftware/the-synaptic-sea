@@ -85,6 +85,11 @@ var fire_seeded: bool = false
 # follow-on cut-free action will flip it. Persisted only when false (additive).
 var web_attached: bool = true
 
+# Live Persistent Ships Phase 1: world_time at which this ship's sim was last
+# advanced. Catch-up on revisit (Phase 4) advances the ship by
+# (world_time - last_sim_time). Persisted only when nonzero (additive).
+var last_sim_time: float = 0.0
+
 # Static factory via load() self-reference (class_name globals unreliable under
 # --headless --script).
 static func create(p_ship_id: String, p_marker_id: String, p_blueprint, p_systems_manager, p_scene_root) -> ShipInstance:
@@ -133,6 +138,8 @@ func get_summary() -> Dictionary:
 		result["fire_seeded"] = true
 	if not web_attached:
 		result["web_attached"] = false
+	if last_sim_time != 0.0:
+		result["last_sim_time"] = last_sim_time
 	return result
 
 func apply_summary(summary) -> bool:
@@ -184,6 +191,7 @@ func apply_summary(summary) -> bool:
 		get_fire().apply_summary(fire_summary as Dictionary)
 	fire_seeded = bool(summary.get("fire_seeded", fire_seeded))
 	web_attached = bool(summary.get("web_attached", web_attached))
+	last_sim_time = float(summary.get("last_sim_time", last_sim_time))
 	return true
 
 ## Returns this ship's DerelictObjectiveController, creating it on first access.

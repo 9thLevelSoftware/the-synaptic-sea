@@ -222,6 +222,11 @@ var away_from_start: bool = false
 # retained ShipInstance.
 var visited_ships: Dictionary = {}          # marker_id -> ShipInstance
 var home_ship = null                        # the home ShipInstance (marker_id "")
+# Live Persistent Ships Phase 1: monotonic in-run simulation clock (seconds).
+# Accumulates every _process frame (before branching) so ships can stamp
+# last_sim_time against it and be fast-forwarded by elapsed world_time on
+# revisit (Phase 4 catch-up). Persisted in WorldSnapshot (additive).
+var world_time: float = 0.0
 # Phase 5a Task 7: the physical lifeboat docked to the starting derelict.
 # Port-docked to the home ship's airlock at boot; shares ship_systems_manager with it.
 var lifeboat_ship = null                    # ShipInstance (docked to home_ship)
@@ -4931,6 +4936,7 @@ func get_route_gate_collision_enabled_count() -> int:
 # and is intentionally a no-op before ship load completes.
 
 func _process(delta: float) -> void:
+	world_time += delta  # Live Persistent Ships Phase 1: advance before any branch/return
 	if away_from_start:
 		# Keep the vitals panel live on a boarded derelict: Heavy-Load, repair
 		# progress, and the repair_blocked message + its countdown still apply
@@ -6535,6 +6541,7 @@ func _build_world_snapshot():
 	for mid in visited_ships:
 		ws.visited_ships[String(mid)] = visited_ships[mid].get_summary()
 	ws.current_location = String(current_ship.marker_id) if current_ship != null else ""
+	ws.world_time = world_time
 	if player != null and player is Node3D:
 		var p: Vector3 = (player as Node3D).global_position
 		ws.player_position_in_ship = [p.x, p.y, p.z]
@@ -6732,6 +6739,7 @@ func _apply_world_snapshot(ws) -> bool:
 		var inst = ShipInstanceScript.create("", "", ShipBlueprintScript.new(), null, null)
 		if inst.apply_summary(ws.visited_ships[mid]):
 			visited_ships[String(mid)] = inst
+	world_time = float(ws.world_time)  # Live Persistent Ships Phase 1 (additive; 0.0 default for older saves)
 	# 4. If saved aboard a derelict, re-activate it.
 	if String(ws.current_location) != "":
 		var active = visited_ships.get(String(ws.current_location), null)
