@@ -51,7 +51,7 @@ func is_crouching() -> bool:
 ## emitted noise (Domain 2 stealth). Previously unimplemented, so both consumers'
 ## `has_method("is_moving")` guards were always false and the signal was inert.
 func is_moving() -> bool:
-	return Vector2(velocity.x, velocity.z).length() > 0.1
+	return Vector2(velocity.x, velocity.z).length_squared() > 0.01
 
 
 func _physics_process(delta: float) -> void:

@@ -3341,18 +3341,28 @@ func _on_threat_killed(record: Dictionary) -> void:
 		return
 	var pos: Vector3 = record.get("position", Vector3.ZERO)
 	var cid: String = "corpse_%s" % str(record.get("instance_id", ""))
+	# Decide the parent FIRST so the position can be framed correctly. Derelict corpses
+	# parent under the derelict's scene_root (freed with the derelict on departure); home
+	# corpses parent under loot_container_root at origin.
+	var parent_node: Node = loot_container_root
+	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
+		parent_node = current_ship.scene_root
+		# The kill record position is GLOBAL world-space (threat world_position bakes in the
+		# derelict's global anchor, _combat_anchor_for_current_ship = scene_root.global_position).
+		# LootContainer stores the configured position as the node's LOCAL position, so under the
+		# offset scene_root (DERELICT_DOCK_OFFSET) we must convert global -> local; otherwise the
+		# corpse double-offsets ~100u away and the range interaction can never reach it.
+		pos = (current_ship.scene_root as Node3D).to_local(pos)
+	if parent_node == null or not is_instance_valid(parent_node):
+		return
 	var lc: LootContainer = LootContainerScript.new()
 	var seed_source: String = "kill:%s" % cid
 	lc.configure(cid, str(record.get("loot_table", "combat_drop_common")), seed_source,
 		inventory_state, _loot_tables, pos, 1.8, {})
 	if not lc.container_searched.is_connected(_on_loot_container_searched):
 		lc.container_searched.connect(_on_loot_container_searched)
-	var parent_node: Node = loot_container_root
-	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
-		parent_node = current_ship.scene_root
-	if parent_node != null and is_instance_valid(parent_node):
-		parent_node.add_child(lc)
-		loot_containers.append(lc)
+	parent_node.add_child(lc)
+	loot_containers.append(lc)
 
 ## Validation seam: search a loot container by id through the real interaction path.
 func search_loot_container_for_validation(container_id: String) -> bool:
@@ -3942,8 +3952,8 @@ func _tick_threat_runtime(delta: float) -> void:
 	if threat_manager == null:
 		return
 	var player_pos: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
-	var moving: bool = player != null and player.has_method("is_moving") and player.is_moving()
-	var crouching: bool = player != null and player.has_method("is_crouching") and player.is_crouching()
+	var moving: bool = is_instance_valid(player) and player.has_method("is_moving") and player.is_moving()
+	var crouching: bool = is_instance_valid(player) and player.has_method("is_crouching") and player.is_crouching()
 	threat_manager.set_player_signals(
 		0.3 if moving else 0.05,          # noise from movement
 		0.6 if _player_room_lit() else 0.15,  # light from room power

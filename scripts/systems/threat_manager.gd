@@ -281,7 +281,7 @@ func _spawn_placeholder(threat, index: int, anchor: Vector3) -> void:
 func _sweep_dead_threats() -> void:
 	var dead: Array = []
 	for threat in threats:
-		if threat != null and threat.health <= 0.0 and not _rewarded_kills.has(threat.instance_id):
+		if is_instance_valid(threat) and threat.health <= 0.0 and not _rewarded_kills.has(threat.instance_id):
 			_rewarded_kills[threat.instance_id] = true
 			dead.append(threat)
 	for threat in dead:
@@ -298,7 +298,7 @@ func _remove_threat(threat) -> void:
 	if node != null and is_instance_valid(node):
 		if node.get_parent() == self:
 			remove_child(node)
-		node.free()
+		node.queue_free()
 	placeholder_nodes.erase(threat.instance_id)
 	threats.erase(threat)
 

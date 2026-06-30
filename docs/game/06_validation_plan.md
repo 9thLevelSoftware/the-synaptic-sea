@@ -146,7 +146,8 @@ run_clean 'crouch action smoke' 'CROUCH ACTION PASS registered=true' "$GODOT" --
 run_clean 'threat kill removal smoke' 'THREAT KILL REMOVAL PASS emitted_once=true removed=true loot_table=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_kill_removal_smoke.gd
 run_clean 'combat reward data smoke' 'COMBAT REWARD DATA PASS archetypes=true table=true training=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_reward_data_smoke.gd
 run_clean 'combat closure smoke' 'COMBAT CLOSURE PASS away_kill=true noise=true crouch=true reward=true removed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_closure_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=75 clean_output=true'
+run_clean 'combat corpse position smoke' 'MAIN PLAYABLE COMBAT CORPSE POSITION PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_corpse_position_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=76 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
