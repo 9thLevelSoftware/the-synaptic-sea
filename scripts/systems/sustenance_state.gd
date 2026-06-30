@@ -19,14 +19,13 @@ func configure(config: Dictionary) -> void:
 func tick(_delta: float, context: Dictionary) -> void:
 	var powered_ratio: float = clampf(float(context.get("powered_ratio", 0.0)), 0.0, 1.0)
 	var hydro: Dictionary = (context.get("hydroponics_summary", {}) as Dictionary).duplicate(true)
-	var synth: Dictionary = (context.get("synthesizer_summary", {}) as Dictionary).duplicate(true)
 	var water: Dictionary = (context.get("water_recycler_summary", {}) as Dictionary).duplicate(true)
-	total_power_consumed = float(hydro.get("power_cost", 0.0)) + float(synth.get("power_cost", 0.0)) + float(water.get("power_cost", 0.0))
+	total_power_consumed = float(hydro.get("power_cost", 0.0)) + float(water.get("power_cost", 0.0))
 	if powered_ratio < 0.5:
 		total_power_consumed = 0.0
-	total_materials_consumed = float(hydro.get("water_cost", 0.0)) + float(water.get("input_quantity", 0)) + maxf(0.0, float((synth.get("ingredients", {}) as Dictionary).size()))
-	harvest_ready = 1 if int(hydro.get("state", 0)) == 2 else 0
-	meals_ready = 1 if int(synth.get("state", 0)) == 2 else 0
+	total_materials_consumed = float(hydro.get("water_cost", 0.0)) + float(water.get("input_quantity", 0))
+	harvest_ready = 1 if int(hydro.get("state", 0)) == 2 else 0  # 2 == HydroponicsState.State.HARVESTABLE
+	meals_ready = 1 if bool(context.get("meals_active", false)) else 0
 	purified_water_ready = int(water.get("output_ready", 0))
 
 func get_summary() -> Dictionary:

@@ -59,20 +59,7 @@ func _initialize() -> void:
 	hs.tick(30.0)
 	original.hydroponics_summary = hs.get_summary()
 
-	var syn = load("res://scripts/systems/synthesizer_state.gd").new()
-	syn.configure({
-		"recipe_id": "nutrient_paste",
-		"display_name": "Nutrient Paste",
-		"ingredients": {"hydroponic_greens": 2, "purified_water": 1},
-		"produces": {"item_id": "nutrient_paste", "quantity": 2},
-		"power_cost": 8.0,
-		"cook_time_seconds": 15.0,
-		"required_skill_level": 1,
-		"station_kind": "synthesizer",
-	})
-	syn.start_synthesis({"items": {"hydroponic_greens": 4, "purified_water": 2}}, 1, 10.0)
-	syn.tick(7.5)
-	original.synthesizer_summary = syn.get_summary()
+	# synthesizer_state retired in Domain 3 Task 3; synthesizer_summary removed from RunSnapshot.
 
 	if not service.save_current_run(original):
 		_fail("save_current_run returned false")
@@ -90,10 +77,6 @@ func _initialize() -> void:
 	if loaded.hydroponics_summary.is_empty():
 		_fail("hydroponics_summary empty after round-trip")
 		return
-	if loaded.synthesizer_summary.is_empty():
-		_fail("synthesizer_summary empty after round-trip")
-		return
-
 	# Assert spoilage contains the two foods with correct stages
 	# ration_pack: 1200/3600 = 0.33 < 0.5 -> FRESH (0)
 	# cooked_meal: 1200/1800 = 0.67 > 0.5 -> STALE (1)
@@ -126,16 +109,10 @@ func _initialize() -> void:
 		_fail("hydroponics crop_id mismatch")
 		return
 
-	# Assert synthesizer power tracking preserved
-	if float(loaded.synthesizer_summary.get("total_power_consumed", 0.0)) != 8.0:
-		_fail("synthesizer power mismatch")
-		return
-	if str(loaded.synthesizer_summary.get("station_type", "")) != "synthesizer":
-		_fail("synthesizer station_type mismatch")
-		return
+	# synthesizer_state retired; no synthesizer_summary field to assert.
 
 	service.delete_current_run()
-	print("FOOD SAVE LOAD PASS spoilage=2 hydroponics=1 synthesizer=1")
+	print("FOOD SAVE LOAD PASS spoilage=2 hydroponics=1")
 	quit(0)
 
 func _fail(reason: String) -> void:

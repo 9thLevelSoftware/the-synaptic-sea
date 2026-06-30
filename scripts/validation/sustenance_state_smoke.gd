@@ -2,7 +2,6 @@ extends SceneTree
 
 const SustenanceStateScript := preload("res://scripts/systems/sustenance_state.gd")
 const HydroponicsStateScript := preload("res://scripts/systems/hydroponics_state.gd")
-const SynthesizerStateScript := preload("res://scripts/systems/synthesizer_state.gd")
 const WaterRecyclerStateScript := preload("res://scripts/systems/water_recycler_state.gd")
 
 func _initialize() -> void:
@@ -18,19 +17,6 @@ func _initialize() -> void:
 		"required_skill_level": 0
 	}, 0, 5.0, 5.0)
 	hydro.tick(10.0)
-	var synth := SynthesizerStateScript.new()
-	synth.configure({
-		"recipe_id": "nutrient_paste",
-		"display_name": "Nutrient Paste",
-		"ingredients": {"hydroponic_greens": 2, "purified_water": 1},
-		"produces": {"item_id": "nutrient_paste", "quantity": 2},
-		"power_cost": 8.0,
-		"cook_time_seconds": 5.0,
-		"required_skill_level": 0,
-		"station_kind": "synthesizer"
-	})
-	synth.start_synthesis({"items": {"hydroponic_greens": 2, "purified_water": 1}}, 0, 10.0)
-	synth.tick(5.0)
 	var recycler := WaterRecyclerStateScript.new()
 	recycler.configure({"input_item_id": "contaminated_water", "output_item_id": "purified_water", "conversion_ratio": 1.0, "recycle_time_seconds": 5.0, "power_cost": 2.0})
 	recycler.load_input("contaminated_water", 4, 10.0)
@@ -40,8 +26,8 @@ func _initialize() -> void:
 	state.tick(1.0, {
 		"powered_ratio": 1.0,
 		"hydroponics_summary": hydro.get_summary(),
-		"synthesizer_summary": synth.get_summary(),
 		"water_recycler_summary": recycler.get_summary(),
+		"meals_active": true,
 	})
 	if state.harvest_ready != 1 or state.meals_ready != 1 or state.purified_water_ready != 4:
 		_fail("expected real facility outputs")

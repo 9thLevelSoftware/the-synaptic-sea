@@ -87,7 +87,6 @@ const StatusEffectsStateScript := preload("res://scripts/systems/status_effects_
 const SpoilageStateScript := preload("res://scripts/systems/spoilage_state.gd")
 const CookingStateScript := preload("res://scripts/systems/cooking_state.gd")
 const HydroponicsStateScript := preload("res://scripts/systems/hydroponics_state.gd")
-const SynthesizerStateScript := preload("res://scripts/systems/synthesizer_state.gd")
 const WaterRecyclerStateScript := preload("res://scripts/systems/water_recycler_state.gd")
 const PowerGridStateScript := preload("res://scripts/systems/power_grid_state.gd")
 const LifeSupportExpandedStateScript := preload("res://scripts/systems/life_support_state.gd")
@@ -340,7 +339,6 @@ var electrical_arc_state: ElectricalArcState
 # Untyped because class_name globals are unreliable under --headless --script.
 var spoilage_state  # SpoilageState
 var hydroponics_state  # HydroponicsState
-var synthesizer_state  # SynthesizerState
 var water_recycler_state  # WaterRecyclerState
 var power_grid_state  # PowerGridState
 var life_support_expanded_state  # LifeSupportState
@@ -1168,7 +1166,6 @@ func _build_runtime_nodes() -> void:
 	# ADR-0034: instantiate food / cooking / spoilage / sustenance models.
 	spoilage_state = SpoilageStateScript.new()
 	hydroponics_state = HydroponicsStateScript.new()
-	synthesizer_state = SynthesizerStateScript.new()
 	water_recycler_state = WaterRecyclerStateScript.new()
 	_configure_expanded_ship_system_models()
 	effect_dispatcher = EffectDispatcherScript.new()
@@ -1390,8 +1387,8 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 		sustenance_state.tick(delta, {
 			"powered_ratio": power_grid_state.get_allocation_ratio("sustenance"),
 			"hydroponics_summary": hydroponics_state.get_summary() if hydroponics_state != null else {},
-			"synthesizer_summary": synthesizer_state.get_summary() if synthesizer_state != null else {},
 			"water_recycler_summary": water_recycler_state.get_summary() if water_recycler_state != null else {},
+			"meals_active": crafting_state != null and crafting_state.is_crafting(),
 		})
 
 func _expanded_ship_systems_summary() -> Dictionary:
@@ -4857,8 +4854,6 @@ func _process(delta: float) -> void:
 		spoilage_state.tick(delta)
 	if hydroponics_state != null and hydroponics_state.state == HydroponicsStateScript.State.PLANTED:
 		hydroponics_state.tick(delta)
-	if synthesizer_state != null and synthesizer_state._cooking.state == CookingStateScript.State.COOKING:
-		synthesizer_state.tick(delta)
 	if water_recycler_state != null and water_recycler_state.state == WaterRecyclerStateScript.State.RECYCLING:
 		water_recycler_state.tick(delta)
 	# REQ-AU-001..010: tick the audio manager. The manager advances the
@@ -5933,8 +5928,6 @@ func _build_run_snapshot() -> RunSnapshot:
 		snapshot.spoilage_summary = spoilage_state.get_summary()
 	if hydroponics_state != null:
 		snapshot.hydroponics_summary = hydroponics_state.get_summary()
-	if synthesizer_state != null:
-		snapshot.synthesizer_summary = synthesizer_state.get_summary()
 	if water_recycler_state != null:
 		snapshot.water_recycler_summary = water_recycler_state.get_summary()
 	if consumable_state != null:
@@ -6239,8 +6232,6 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		spoilage_state.apply_summary(snapshot.spoilage_summary)
 	if hydroponics_state != null and not snapshot.hydroponics_summary.is_empty():
 		hydroponics_state.apply_summary(snapshot.hydroponics_summary)
-	if synthesizer_state != null and not snapshot.synthesizer_summary.is_empty():
-		synthesizer_state.apply_summary(snapshot.synthesizer_summary)
 	if water_recycler_state != null and not snapshot.water_recycler_summary.is_empty():
 		water_recycler_state.apply_summary(snapshot.water_recycler_summary)
 	if consumable_state != null and not snapshot.consumable_summary.is_empty():
