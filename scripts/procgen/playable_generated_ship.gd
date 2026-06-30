@@ -432,12 +432,14 @@ const DEFAULT_INTERACT_BINDINGS: Array[Key] = [KEY_E, KEY_ENTER, KEY_SPACE, KEY_
 const DEFAULT_SAVE_RUN_BINDINGS: Array[Key] = [KEY_F5]
 const DEFAULT_LOAD_RUN_BINDINGS: Array[Key] = [KEY_F9]
 const DEFAULT_ATTACK_BINDINGS: Array[Key] = [KEY_F]
+const DEFAULT_CROUCH_BINDINGS: Array[Key] = [KEY_CTRL]
 
 func ensure_default_input_actions() -> void:
 	for action_name in DEFAULT_MOVE_BINDINGS:
 		_ensure_key_action_set(action_name, DEFAULT_MOVE_BINDINGS[action_name])
 	_ensure_key_action_set("interact", DEFAULT_INTERACT_BINDINGS)
 	_ensure_key_action_set("attack_primary", DEFAULT_ATTACK_BINDINGS)
+	_ensure_key_action_set("crouch", DEFAULT_CROUCH_BINDINGS)
 	# ADR-0038: emergency field crafting bound to C (previously unbound).
 	_ensure_key_action_set("field_craft", [KEY_C])
 	# REQ-012: manual save/load input actions. F5 saves, F9 loads.
