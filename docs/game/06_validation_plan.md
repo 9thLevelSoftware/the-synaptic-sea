@@ -139,7 +139,8 @@ run_clean 'ship instance fire persistence smoke' 'SHIP INSTANCE FIRE PERSISTENCE
 run_clean 'derelict fire seed smoke' 'DERELICT FIRE SEED PASS deterministic=true rate_ok=true cap_ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_fire_seed_smoke.gd
 run_clean 'main playable derelict fire smoke' 'MAIN PLAYABLE DERELICT FIRE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_derelict_fire_smoke.gd
 run_clean 'derelict fire sequential persistence smoke' 'DERELICT FIRE SEQUENTIAL PERSISTENCE PASS remembered=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_fire_sequential_persistence_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=68 clean_output=true'
+run_clean 'Domain 3 Task 4 production station wiring smoke' 'PRODUCTION WIRING PASS hydro=true recycler=true spoilage_registered=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_station_wiring_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=69 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
