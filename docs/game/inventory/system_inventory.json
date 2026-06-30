@@ -1425,8 +1425,8 @@
       "driven_at": "playable_generated_ship.gd:3908",
       "input": {
         "live": true,
-        "desc": "vitals/status/armor profile + player_position fed live each frame; player noise/light/sight/crouch/room are near-hardcoded literals in _tick_threat_runtime (only noise has a tiny live is_moving component)",
-        "at": "playable_generated_ship.gd:3901-3908"
+        "desc": "vitals/status/armor profile + player_position fed live each frame; player noise/light/sight/crouch are now REAL runtime signals in _tick_threat_runtime (Domain 2): noise from movement, light from _player_room_lit (room power), base visibility proximity-scaled per threat, crouch from the 'crouch' input action via player.is_crouching()",
+        "at": "playable_generated_ship.gd:_tick_threat_runtime"
       },
       "output": {
         "live": true,
@@ -1442,8 +1442,8 @@
         "combat"
       ],
       "gaps": [
-        "VERIFIED: Dead threats (STATE_DEAD) are not removed from the threats[] array and yield no loot/XP on kill (threat_ai_state.gd:131 sets STATE_DEAD; threat_manager.gd:257 _pick_target merely skips health<=0; no removal/reward logic anywhere).",
-        "VERIFIED: Player stealth signals are near-hardcoded literals in _tick_threat_runtime (playable_generated_ship.gd:3901-3907: noise 0.05/0.2, light 0.35, sight 0.55, crouch false, room \"\"), not derived from real light/stealth systems."
+        "CLOSED (Domain 2): killing a threat now removes it AND rewards. Threat death emits threat_killed; _sweep_dead_threats removes the corpse from threats[] (despawns its placeholder) exactly once; the coordinator _on_threat_killed spawns a lootable LootContainer at the corpse + grants XP via emit_training_event('threat_killed').",
+        "CLOSED (Domain 2): player stealth signals in _tick_threat_runtime are real runtime values (movement noise, _player_room_lit light, proximity-scaled visibility, crouch action), not literals; consumed via DetectionState.get_emitted_profile() as the single AI signal source."
       ],
       "integrations": [
         {
@@ -8366,7 +8366,7 @@
       "steps": [
         {
           "system": "detection_state",
-          "role": "sense (player signals -> awareness; HUD-only output, decorative)"
+          "role": "sense (player emitted-signal profile via get_emitted_profile() — the single source the AI consumes; Domain 2)"
         },
         {
           "system": "threat_ai_state",
