@@ -25,6 +25,7 @@
     {"event_id": "transmit_relay",             "target_skill": "comms",        "base_xp": 50,  "category": "social"},
     {"event_id": "defeat_enemy",               "target_skill": "intimidation", "base_xp": 100, "category": "social"},
     {"event_id": "extract_data",               "target_skill": "diagnostics",  "base_xp": 70,  "category": "technical"},
-    {"event_id": "discover_room",              "target_skill": "astrogation",  "base_xp": 30,  "category": "navigation"}
+    {"event_id": "discover_room",              "target_skill": "astrogation",  "base_xp": 30,  "category": "navigation"},
+    {"event_id": "threat_killed",              "target_skill": "scavenging",   "base_xp": 10,  "category": "combat"}
   ]
 }
