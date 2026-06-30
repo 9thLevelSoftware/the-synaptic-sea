@@ -40,6 +40,18 @@ func update_inputs(noise: float, light: float, sight: float, is_crouching: bool,
 	crouching = is_crouching
 	room_id = current_room_id
 
+## Domain 2: the player's emitted detectability profile — the SINGLE signal the
+## threat AI consumes. Crouch is applied here once (the global stealth modifier),
+## matching the crouch multiplier tick() applies to the HUD awareness, so the AI
+## must NOT re-apply crouch.
+func get_emitted_profile() -> Dictionary:
+	var crouch_mult: float = 0.65 if crouching else 1.0
+	return {
+		"noise": noise_level * crouch_mult,
+		"light": light_level * crouch_mult,
+		"visibility": sight_level * crouch_mult,
+	}
+
 func tick(delta: float, weights: Dictionary = {}) -> bool:
 	if delta < 0.0:
 		return false
