@@ -1190,6 +1190,8 @@ func _build_runtime_nodes() -> void:
 	threat_manager = ThreatManagerScript.new()
 	threat_manager.name = "ThreatManager"
 	add_child(threat_manager)
+	if not threat_manager.threat_killed.is_connected(_on_threat_killed):
+		threat_manager.threat_killed.connect(_on_threat_killed)
 	# REQ-AU-001..010: build the AudioManager service. The manager owns
 	# six pure models (bus_config, ambient, sfx_router, music, spatial,
 	# meta_event) and a per-bus AudioStreamPlayer pool. Constructed after
@@ -3326,6 +3328,31 @@ func _on_loot_container_searched(container_id: String, granted: Array) -> void:
 	_recompute_player_encumbrance()
 	print("LOOT CONTAINER SEARCHED marker=%s container=%s granted=%d" % [
 		String(current_ship.marker_id) if current_ship != null else "", container_id, granted.size()])
+
+## Domain 2 (BP3): a threat died — grant XP through the progression bus and spawn a
+## lootable corpse container at its position (reusing the closed loot/interact path).
+## Runs on BOTH _process branches (the signal fires from tick_threats, called on the
+## away branch too), so derelict kills reward identically.
+func _on_threat_killed(record: Dictionary) -> void:
+	# XP (data-driven interim skill via training_actions.json).
+	emit_training_event("threat_killed", str(record.get("archetype_id", "")))
+	# Lootable corpse container.
+	if inventory_state == null:
+		return
+	var pos: Vector3 = record.get("position", Vector3.ZERO)
+	var cid: String = "corpse_%s" % str(record.get("instance_id", ""))
+	var lc = LootContainerScript.new()
+	var seed_source: String = "kill:%s" % cid
+	lc.configure(cid, str(record.get("loot_table", "combat_drop_common")), seed_source,
+		inventory_state, _loot_tables, pos, 1.8, {})
+	if not lc.container_searched.is_connected(_on_loot_container_searched):
+		lc.container_searched.connect(_on_loot_container_searched)
+	var parent_node: Node = loot_container_root
+	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
+		parent_node = current_ship.scene_root
+	if parent_node != null and is_instance_valid(parent_node):
+		parent_node.add_child(lc)
+		loot_containers.append(lc)
 
 ## Validation seam: search a loot container by id through the real interaction path.
 func search_loot_container_for_validation(container_id: String) -> bool:
