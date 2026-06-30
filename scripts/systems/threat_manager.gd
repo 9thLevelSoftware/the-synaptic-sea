@@ -68,11 +68,13 @@ func tick_threats(delta: float, vitals_state = null, status_effects_state = null
 	detection_state.tick(delta)
 	awareness_indicator = 0.0
 	combat_engaged = false
+	# The emitted profile is constant for the whole tick (detection ticked above) —
+	# fetch once, not per threat.
+	var profile: Dictionary = detection_state.get_emitted_profile()
 	for threat in threats:
 		if threat == null:
 			continue
 		var same_room: bool = player_room_id.is_empty() or threat.room_id == player_room_id
-		var profile: Dictionary = detection_state.get_emitted_profile()
 		var prox: float = _proximity_factor(threat, player_position)
 		threat.tick(delta, {
 			"noise_level": float(profile["noise"]),

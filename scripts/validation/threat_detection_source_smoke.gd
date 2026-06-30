@@ -21,24 +21,29 @@ func _initialize() -> void:
 	if tm.threats.size() < 2:
 		_fail("expected 2 injected threats")
 		return
-	# Place threat 0 near the player, threat 1 far.
+	# Both at the SAME distance so the per-archetype check below isolates sensitivity
+	# differences (proximity is tested separately in tm2). Near enough that proximity > 0.
 	tm.threats[0].world_position = [1.0, 0.0, 0.0]
-	tm.threats[1].world_position = [50.0, 0.0, 0.0]
+	tm.threats[1].world_position = [1.0, 0.0, 0.0]
 	# Low emitted signal -> low awareness for both.
 	tm.set_player_signals(0.05, 0.1, 0.1, false, "")
 	tm.tick_threats(0.1, null, null, {}, Vector3.ZERO)
 	var low0: float = float(tm.threats[0].awareness_score)
 	# Raise the emitted signal -> awareness must rise (single source drives the AI).
-	tm.set_player_signals(1.5, 1.5, 1.5, false, "")
+	# Use a MODERATE signal so awareness stays below the 3.0 clamp; otherwise both
+	# archetypes saturate to 3.0 and the per-archetype check below cannot see their
+	# differing sensitivities (stalker 1.3/1.0/1.2 vs swarm 1.1/0.7/0.8).
+	tm.set_player_signals(0.5, 0.5, 0.5, false, "")
 	tm.tick_threats(0.1, null, null, {}, Vector3.ZERO)
 	var hi0: float = float(tm.threats[0].awareness_score)
 	var hi1: float = float(tm.threats[1].awareness_score)
 	if not (hi0 > low0):
 		_fail("raising the emitted profile must raise threat awareness (single source)")
 		return
-	# Per-archetype: the two threats perceive the same profile differently.
+	# Per-archetype: at the SAME distance, the two archetypes perceive the same
+	# profile differently (their sensitivities differ — not a distance artifact).
 	if absf(hi0 - hi1) < 0.0001:
-		_fail("different archetypes should perceive the same profile differently")
+		_fail("different archetypes at the same distance should perceive the same profile differently")
 		return
 	# Proximity: the NEAR threat perceives more visibility-driven awareness than the FAR one
 	# (same archetype comparison via two stalkers, near vs far).
