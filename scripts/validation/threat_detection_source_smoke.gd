@@ -10,8 +10,11 @@ extends SceneTree
 
 const ThreatManagerScript := preload("res://scripts/systems/threat_manager.gd")
 
+var tm: Node3D
+var tm2: Node3D
+
 func _initialize() -> void:
-	var tm = ThreatManagerScript.new()
+	tm = ThreatManagerScript.new()
 	tm._ready()  # loads archetypes (no scene tree needed for the model path)
 	# Two archetypes with different sensitivities, one near, one far.
 	tm.inject_validation_encounter(["stalker", "biomatter_swarm"], Vector3.ZERO)
@@ -39,7 +42,7 @@ func _initialize() -> void:
 		return
 	# Proximity: the NEAR threat perceives more visibility-driven awareness than the FAR one
 	# (same archetype comparison via two stalkers, near vs far).
-	var tm2 = ThreatManagerScript.new()
+	tm2 = ThreatManagerScript.new()
 	tm2._ready()
 	tm2.inject_validation_encounter(["stalker", "stalker"], Vector3.ZERO)
 	tm2.threats[0].world_position = [1.0, 0.0, 0.0]
@@ -50,8 +53,20 @@ func _initialize() -> void:
 		_fail("near threat should perceive more visibility than far threat")
 		return
 	print("THREAT DETECTION SOURCE PASS single_source=true per_archetype=true proximity=true")
+	_cleanup()
 	quit(0)
+
+## Free the bare ThreatManager nodes (and their spawned MeshInstance3D placeholders)
+## so headless teardown does not leak renderer RIDs into the regression bundle.
+func _cleanup() -> void:
+	if tm != null and is_instance_valid(tm):
+		tm.free()
+		tm = null
+	if tm2 != null and is_instance_valid(tm2):
+		tm2.free()
+		tm2 = null
 
 func _fail(reason: String) -> void:
 	push_error("THREAT DETECTION SOURCE FAIL reason=%s" % reason)
+	_cleanup()
 	quit(1)
