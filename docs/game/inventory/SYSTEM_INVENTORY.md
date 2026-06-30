@@ -42,7 +42,7 @@
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
 | Food Item Freshness | 🟢 | 100% | [V] | spoilage_state.gd:38 |
-| Food Spoilage Tracker | 🟢 | 100% | [V] | playable_generated_ship.gd:4892 |
+| Food Spoilage Tracker | 🟢 | 100% | [V] | playable_generated_ship.gd:5035 |
 | Consumable Eat Pipeline (food/drink branch) | 🟢 | 100% | [V] | playable_generated_ship.gd:3963 |
 | Sustenance Facility Rollup | 🟢 | 90% | [V] | playable_generated_ship.gd:1390 |
 | Hydroponics Tray | 🟢 | 90% | [V] | playable_generated_ship.gd:5035 (_tick_food_runtime, both branches) |

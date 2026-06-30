@@ -313,7 +313,7 @@
       "input": {
         "live": true,
         "desc": "items registered via SpoilageState.add_food on craft/loot",
-        "at": "playable_generated_ship.gd:3120"
+        "at": "playable_generated_ship.gd:3165"
       },
       "output": {
         "live": true,
@@ -348,7 +348,7 @@
       "content_note": "VERIFIED: 7 food/drink defs in data/items/food_definitions.json (ration_pack, scavenged_protein, alien_flora, cooked_meal, purified_water, synthesized_paste, hydroponic_greens) with full spoilage params.",
       "functional": null,
       "gaps": [
-        "per-item tick runs via SpoilageState which only ticks in the home _process branch (4892); food does not age on a derelict (away branch returns at 4808)"
+        "Spoilage ages on BOTH _process branches via _tick_food_runtime (Domain 3); food ages on the derelict/away run too (food_away_tick_smoke)."
       ],
       "subsystems": []
     },
@@ -362,11 +362,11 @@
       "smoke": "scripts/validation/spoilage_state_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:4892",
+      "driven_at": "playable_generated_ship.gd:5035",
       "input": {
         "live": true,
         "desc": "add_food on crafted/looted food via _register_food_for_spoilage (callers at 3137/3156/3313)",
-        "at": "playable_generated_ship.gd:3120"
+        "at": "playable_generated_ship.gd:3165"
       },
       "output": {
         "live": true,
@@ -392,10 +392,10 @@
         }
       ],
       "content": "sufficient",
-      "content_note": "Backed by the same 7 food/drink defs; eat-time stale/rotten scaling proven by spoilage_eat_scaling_smoke.gd. CORRECTION: the proposed spoilage_state -> sustenance_state integration (claimed at 1389) does NOT exist — the sustenance tick payload (1390-1394) carries only hydroponics/synthesizer/water_recycler summaries, never a spoilage summary; bogus integration removed.",
+      "content_note": "Backed by the same 7 food/drink defs; eat-time stale/rotten scaling proven by spoilage_eat_scaling_smoke.gd. CORRECTION: the proposed spoilage_state -> sustenance_state integration (claimed at 1389) does NOT exist — the sustenance tick payload (1390-1394) carries only hydroponics/water_recycler summaries, never a spoilage summary; bogus integration removed.",
       "functional": null,
       "gaps": [
-        "tick is wired only in the home _process branch (4892); derelict (away) run returns at 4808 so food never spoils in the primary gameplay context"
+        "Spoilage ticks on BOTH _process branches via _tick_food_runtime (Domain 3 fix); food ages on the derelict/away run too (food_away_tick_smoke)."
       ],
       "subsystems": []
     },
@@ -521,7 +521,7 @@
       },
       "output": {
         "live": true,
-        "desc": "harvest() called by ProductionStation._try_harvest when state==READY on player second interact; produce (hydroponic_greens or alien_flora) deposited into inventory_state. get_summary() live-feeds sustenance_state HUD tick.",
+        "desc": "harvest() called by ProductionStation._interact_hydro when state==READY on player second interact; produce (hydroponic_greens or alien_flora) deposited into inventory_state. get_summary() live-feeds sustenance_state HUD tick.",
         "at": "scripts/tools/production_station.gd"
       },
       "confidence": "V",
@@ -540,7 +540,7 @@
       "content_note": "data/crops/hydroponics_crops.json defines 2 crops (hydroponic_greens, alien_flora_cultivar) with growth/water/power costs. plant() now called via ProductionStation interact; harvest() deposits produce to inventory.",
       "functional": null,
       "gaps": [
-        "hydroponics station is home-only (ProductionStation._try_start skips when away_from_start; tick in _tick_food_runtime still advances the model if planted before travel)"
+        "hydroponics station is home-only (ProductionStation.try_interact skips when away_from_start; tick in _tick_food_runtime still advances the model if planted before travel)"
       ],
       "subsystems": []
     },
@@ -639,7 +639,7 @@
       },
       "output": {
         "live": true,
-        "desc": "purified_water harvested to inventory_state via ProductionStation._try_harvest when state==READY; output_ready also read into life_support_expanded_state.tick as recycled_water (1359, home-only) — ambient bonus path.",
+        "desc": "purified_water harvested to inventory_state via ProductionStation._interact_recycler when state==READY; output_ready also read into life_support_expanded_state.tick as recycled_water (1359, home-only) — ambient bonus path.",
         "at": "scripts/tools/production_station.gd"
       },
       "confidence": "V",
@@ -7837,7 +7837,7 @@
       "output": {
         "live": true,
         "desc": "on successful harvest: production_harvested signal emitted + inventory_state.add_item called to deposit produce; production_started and production_blocked signals also emitted to coordinator",
-        "at": "scripts/tools/production_station.gd:_try_harvest"
+        "at": "scripts/tools/production_station.gd:_deposit"
       },
       "confidence": "V",
       "loops": [
@@ -7847,19 +7847,19 @@
         {
           "to": "hydroponics_state",
           "via": "plant() on start, harvest() on collect; model ticked externally by _tick_food_runtime",
-          "at": "scripts/tools/production_station.gd:_try_start/_try_harvest",
+          "at": "scripts/tools/production_station.gd:_interact_hydro",
           "health": "healthy"
         },
         {
           "to": "water_recycler_state",
           "via": "load_input(contaminated_water) on start, collect_result() on harvest",
-          "at": "scripts/tools/production_station.gd:_try_start/_try_harvest",
+          "at": "scripts/tools/production_station.gd:_interact_recycler",
           "health": "healthy"
         },
         {
           "to": "inventory_state",
           "via": "add_item (harvest deposit) / remove_item (contaminated_water input for recycler)",
-          "at": "scripts/tools/production_station.gd:_try_harvest/_check_inputs",
+          "at": "scripts/tools/production_station.gd:_interact_recycler/_deposit",
           "health": "healthy"
         }
       ],
