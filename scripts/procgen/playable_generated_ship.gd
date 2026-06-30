@@ -3904,15 +3904,24 @@ func _attack_with_equipped_weapon() -> Dictionary:
 	_refresh_weapon_hotbar()
 	return result
 
+## Domain 2 (BP2): a derived "is the player in a lit area" signal. A powered ship is
+## lit (player more visible); an unpowered/derelict ship is dark (stealthier). Uses
+## the active ship's power system (no per-room lighting model exists).
+func _player_room_lit() -> bool:
+	var mgr = _active_systems_manager()
+	return mgr != null and mgr.is_operational("power")
+
 func _tick_threat_runtime(delta: float) -> void:
 	if threat_manager == null:
 		return
 	var player_pos: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
+	var moving: bool = player != null and player.has_method("is_moving") and player.is_moving()
+	var crouching: bool = player != null and player.has_method("is_crouching") and player.is_crouching()
 	threat_manager.set_player_signals(
-		0.2 if player != null and player.has_method("is_moving") and player.is_moving() else 0.05,
-		0.35,
-		0.55,
-		false,
+		0.3 if moving else 0.05,          # noise from movement
+		0.6 if _player_room_lit() else 0.15,  # light from room power
+		0.8,                               # base visibility (proximity-scaled per threat in the manager)
+		crouching,                          # crouch reduces emitted noise + visibility in DetectionState
 		"",
 	)
 	threat_manager.tick_threats(delta, vitals_state, status_effects_state, _player_armor_profile(), player_pos)
