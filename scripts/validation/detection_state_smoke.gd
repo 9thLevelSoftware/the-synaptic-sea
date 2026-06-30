@@ -26,7 +26,7 @@ func _initialize() -> void:
 		_fail("expected detection to expire")
 		return
 	# Domain 2: emitted profile is the post-crouch signal the AI consumes.
-	var de = DetectionStateScript.new()
+	var de: DetectionState = DetectionStateScript.new()
 	de.configure({})
 	de.update_inputs(1.0, 0.5, 0.8, false, "")
 	var prof: Dictionary = de.get_emitted_profile()
@@ -35,8 +35,9 @@ func _initialize() -> void:
 		return
 	de.update_inputs(1.0, 0.5, 0.8, true, "")  # crouching
 	var profc: Dictionary = de.get_emitted_profile()
-	if not (float(profc["noise"]) < 1.0 and float(profc["visibility"]) < 0.8):
-		_fail("crouch should reduce emitted noise + visibility")
+	# Pin the exact 0.65 crouch multiplier (part of the contract): 1.0*0.65=0.65, 0.8*0.65=0.52.
+	if absf(float(profc["noise"]) - 0.65) > 0.001 or absf(float(profc["visibility"]) - 0.52) > 0.001:
+		_fail("crouch should apply the 0.65 multiplier to emitted noise + visibility")
 		return
 	print("DETECTION STATE PASS score=%.2f memory=%.1f reason=%s" % [
 		float(detection.awareness_score),
