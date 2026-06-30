@@ -12,6 +12,9 @@ signal production_started(station_kind: String, input_id: String)
 signal production_harvested(station_kind: String, item_id: String, qty: int)
 signal production_blocked(station_kind: String, reason: String)
 
+const HydroStateScript := preload("res://scripts/systems/hydroponics_state.gd")
+const RecyclerStateScript := preload("res://scripts/systems/water_recycler_state.gd")
+
 var station_kind: String = ""
 var model                                  # HydroponicsState | WaterRecyclerState
 var inventory_state                        # InventoryState
@@ -76,11 +79,10 @@ func try_interact(player_body: Object) -> bool:
 	return false
 
 func _interact_hydro() -> bool:
-	var HydroState = load("res://scripts/systems/hydroponics_state.gd")
-	if model.state == HydroState.State.HARVESTABLE:
+	if model.state == HydroStateScript.State.HARVESTABLE:
 		var out: Dictionary = model.harvest()
 		return _deposit(str(out.get("item_id", "")), int(out.get("quantity", 0)))
-	if model.state == HydroState.State.PLANTED:
+	if model.state == HydroStateScript.State.PLANTED:
 		emit_signal("production_blocked", station_kind, "in_progress")
 		return false
 	# IDLE -> plant the first affordable crop.
@@ -105,11 +107,10 @@ func _interact_hydro() -> bool:
 	return false
 
 func _interact_recycler() -> bool:
-	var RecyclerState = load("res://scripts/systems/water_recycler_state.gd")
 	if model.output_ready > 0:
 		var out: Dictionary = model.collect_output()
 		return _deposit(str(out.get("item_id", "")), int(out.get("quantity", 0)))
-	if model.state == RecyclerState.State.RECYCLING:
+	if model.state == RecyclerStateScript.State.RECYCLING:
 		emit_signal("production_blocked", station_kind, "in_progress")
 		return false
 	# IDLE -> load contaminated_water.
@@ -117,10 +118,11 @@ func _interact_recycler() -> bool:
 	if qty <= 0:
 		emit_signal("production_blocked", station_kind, "no_input")
 		return false
-	if _avail_power() < model.power_cost:
+	var power := _avail_power()
+	if power < model.power_cost:
 		emit_signal("production_blocked", station_kind, "insufficient_power")
 		return false
-	var res: Dictionary = model.load_input("contaminated_water", qty, _avail_power())
+	var res: Dictionary = model.load_input("contaminated_water", qty, power)
 	if res.get("ok", false):
 		inventory_state.remove_item("contaminated_water", qty)
 		emit_signal("production_started", station_kind, "contaminated_water")
@@ -134,7 +136,7 @@ func _deposit(item_id: String, qty: int) -> bool:
 	var added: int = inventory_state.add_item(item_id, qty)
 	if added < qty:
 		print("PRODUCTION OVERFLOW item=%s lost=%d reason=stack_full" % [item_id, qty - added])
-	emit_signal("production_harvested", station_kind, item_id, qty)
+	emit_signal("production_harvested", station_kind, item_id, added)
 	return true
 
 func _interaction_radius() -> float:
