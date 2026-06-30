@@ -7,6 +7,7 @@ const DamagePipelineScript := preload("res://scripts/systems/damage_pipeline.gd"
 const THREAT_ARCHETYPE_PATH: String = "res://data/combat/threat_archetypes.json"
 const WEAPON_DEFINITIONS_PATH: String = "res://data/combat/weapon_definitions.json"
 const AMMO_DEFINITIONS_PATH: String = "res://data/combat/ammo_definitions.json"
+const SIGHT_RANGE: float = 12.0
 
 var threat_archetypes: Dictionary = {}
 var weapon_definitions: Dictionary = {}
@@ -71,11 +72,13 @@ func tick_threats(delta: float, vitals_state = null, status_effects_state = null
 		if threat == null:
 			continue
 		var same_room: bool = player_room_id.is_empty() or threat.room_id == player_room_id
+		var profile: Dictionary = detection_state.get_emitted_profile()
+		var prox: float = _proximity_factor(threat, player_position)
 		threat.tick(delta, {
-			"noise_level": player_noise,
-			"light_level": player_light,
-			"sight_level": player_sight,
-			"crouching": player_crouching,
+			"noise_level": float(profile["noise"]),
+			"light_level": float(profile["light"]),
+			"sight_level": float(profile["visibility"]) * prox,
+			"crouching": false,  # crouch already applied in the emitted profile (no double-count)
 			"room_id": player_room_id,
 			"same_room": same_room,
 			"detect_threshold": detection_state.detect_threshold,
@@ -267,6 +270,12 @@ func _spawn_placeholder(threat, index: int, anchor: Vector3) -> void:
 	node.name = "Threat_%s" % threat.instance_id
 	add_child(node)
 	placeholder_nodes[threat.instance_id] = node
+
+## Domain 2 (BP1): visibility falls off with world distance, so a closer threat
+## perceives more of the player's emitted visibility than a far one.
+func _proximity_factor(threat, player_position: Vector3) -> float:
+	var tp: Vector3 = Vector3(float(threat.world_position[0]), float(threat.world_position[1]), float(threat.world_position[2]))
+	return clampf(1.0 - tp.distance_to(player_position) / SIGHT_RANGE, 0.0, 1.0)
 
 func _update_placeholder(threat, player_position: Vector3) -> void:
 	var node = placeholder_nodes.get(threat.instance_id, null)
