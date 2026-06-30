@@ -80,6 +80,12 @@ func try_interact(player_body: Object) -> bool:
 
 func _interact_hydro() -> bool:
 	if model.state == HydroStateScript.State.HARVESTABLE:
+		# Guard BEFORE harvest(): harvest() resets the model to IDLE, so if the produce
+		# can't fit we'd silently lose both the crop and the produce. Check capacity first
+		# and leave the crop HARVESTABLE so the player can free space and retry.
+		if not inventory_state.can_accept(model.produce_item_id, model.produce_quantity):
+			emit_signal("production_blocked", station_kind, "output_full")
+			return false
 		var out: Dictionary = model.harvest()
 		return _deposit(str(out.get("item_id", "")), int(out.get("quantity", 0)))
 	if model.state == HydroStateScript.State.PLANTED:
@@ -108,6 +114,11 @@ func _interact_hydro() -> bool:
 
 func _interact_recycler() -> bool:
 	if model.output_ready > 0:
+		# Guard BEFORE collect_output(): it clears output_ready, so a full inventory would
+		# lose the purified water. Check capacity first and leave the output ready for a retry.
+		if not inventory_state.can_accept(model.output_item_id, model.output_ready):
+			emit_signal("production_blocked", station_kind, "output_full")
+			return false
 		var out: Dictionary = model.collect_output()
 		return _deposit(str(out.get("item_id", "")), int(out.get("quantity", 0)))
 	if model.state == RecyclerStateScript.State.RECYCLING:

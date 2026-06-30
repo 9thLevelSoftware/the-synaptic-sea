@@ -18,20 +18,24 @@ var blocked_in_progress: bool = false
 # server-side RIDs at creation; free() is required before quit()).
 var _st_hydro    # ProductionStation
 var _st_recycler # ProductionStation
+var _st_full     # ProductionStation (output-full guard test)
 
 func _initialize() -> void:
 	var ok_hydro: bool = _test_hydro()
 	var ok_recycler: bool = _test_recycler()
+	var ok_full: bool = _test_output_full()
 	# Free stations unconditionally to avoid leaked RID warnings at headless teardown.
 	if is_instance_valid(_st_hydro):
 		_st_hydro.free()
 	if is_instance_valid(_st_recycler):
 		_st_recycler.free()
-	if ok_hydro and ok_recycler and blocked_in_progress:
-		print("PRODUCTION STATION PASS hydro_harvest=true recycler_collect=true blocked_in_progress=true")
+	if is_instance_valid(_st_full):
+		_st_full.free()
+	if ok_hydro and ok_recycler and blocked_in_progress and ok_full:
+		print("PRODUCTION STATION PASS hydro_harvest=true recycler_collect=true blocked_in_progress=true output_full_guarded=true")
 		quit(0)
 	else:
-		push_error("PRODUCTION STATION FAIL hydro=%s recycler=%s blocked=%s" % [str(ok_hydro), str(ok_recycler), str(blocked_in_progress)])
+		push_error("PRODUCTION STATION FAIL hydro=%s recycler=%s blocked=%s output_full=%s" % [str(ok_hydro), str(ok_recycler), str(blocked_in_progress), str(ok_full)])
 		quit(1)
 
 func _test_hydro() -> bool:
@@ -94,3 +98,37 @@ func _test_recycler() -> bool:
 	if inv.get_quantity("purified_water") != 4:
 		return false
 	return true
+
+## Regression for the Codex/Devin item-loss finding: harvesting into a FULL inventory must
+## NOT mutate the model or lose produce — it must emit production_blocked("output_full") and
+## leave the crop HARVESTABLE so the player can free space and retry.
+func _test_output_full() -> bool:
+	var inv = InventoryStateScript.new()
+	inv.add_item("purified_water", 5)
+	inv.add_item("hydroponic_greens", 15)  # fill hydroponic_greens to its max_stack (15)
+	var model = HydroStateScript.new()
+	var crops := {"crops": [{
+		"crop_id": "hydroponic_greens", "display_name": "Hydroponic Greens",
+		"produce_item_id": "hydroponic_greens", "produce_quantity": 3,
+		"growth_seconds": 1.0, "water_cost": 2.0, "power_cost": 3.0, "required_skill_level": 0,
+	}]}
+	_st_full = ProductionStationScript.new()
+	_st_full.configure("hydroponics", model, inv, func(): return 999.0, func(): return 5, crops, Vector3.ZERO, 1.8)
+	var got_block := {"v": false}
+	_st_full.production_blocked.connect(func(_k, reason):
+		if reason == "output_full":
+			got_block["v"] = true)
+	_st_full.set_validation_player_in_range(self)
+	if not _st_full.try_interact(self):  # IDLE -> plant
+		return false
+	model.tick(2.0)
+	if model.state != HydroStateScript.State.HARVESTABLE:
+		return false
+	# Harvest attempt with a full stack: must be refused, model preserved, nothing lost.
+	if _st_full.try_interact(self):
+		return false  # try_interact must return false (blocked)
+	if model.state != HydroStateScript.State.HARVESTABLE:
+		return false  # model must NOT have been reset by harvest()
+	if inv.get_quantity("hydroponic_greens") != 15:
+		return false  # no produce silently added or lost
+	return got_block["v"]
