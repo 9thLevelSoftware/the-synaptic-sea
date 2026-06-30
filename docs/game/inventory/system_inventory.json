@@ -1443,7 +1443,8 @@
       ],
       "gaps": [
         "CLOSED (Domain 2): killing a threat now removes it AND rewards. Threat death emits threat_killed; _sweep_dead_threats removes the corpse from threats[] (despawns its placeholder) exactly once; the coordinator _on_threat_killed spawns a lootable LootContainer at the corpse + grants XP via emit_training_event('threat_killed').",
-        "CLOSED (Domain 2): player stealth signals in _tick_threat_runtime are real runtime values (movement noise, _player_room_lit light, proximity-scaled visibility, crouch action), not literals; consumed via DetectionState.get_emitted_profile() as the single AI signal source."
+        "CLOSED (Domain 2): player stealth signals in _tick_threat_runtime are real runtime values (movement noise, _player_room_lit light, proximity-scaled visibility, crouch action), not literals; consumed via DetectionState.get_emitted_profile() as the single AI signal source.",
+        "Known limitation (deferred, PR #51 Codex P2): spawned corpse LootContainers live only in the transient loot_containers array, not in the persisted save/revisit state — an unsearched corpse left before save/reload or derelict departure loses its drop. In-session kill reward + removal is fully wired; persisting unlooted kill-drops is a follow-up."
       ],
       "integrations": [
         {
@@ -8397,7 +8398,8 @@
         "CLOSED (Domain 2): DetectionState.get_emitted_profile() is now the single signal source the threat AI consumes (threat_manager.tick_threats builds each threat's context noise/light/sight from the emitted profile, scaling visibility per-threat by world distance via _proximity_factor); archetype sensitivities preserve per-enemy perception. Verified by threat_detection_source_smoke.gd + combat_closure_smoke.gd.",
         "CLOSED (Domain 2): stealth inputs are real runtime signals in _tick_threat_runtime (noise from movement, light from _player_room_lit room power, base visibility proximity-scaled, crouch from the new 'crouch' input action reducing emitted noise+visibility and move speed). No literal placeholders remain.",
         "CLOSED (Domain 2): killing a threat emits threat_killed (ThreatManager) -> coordinator spawns a lootable LootContainer at the corpse (archetype loot_table) collected through the closed loot/interact path AND grants XP via emit_training_event('threat_killed') (data-driven interim skill 'scavenging'); the dead threat is removed from threats[] and its placeholder despawned, exactly once. Runs on both _process branches.",
-        "Deferred (by design): the verbose Project-Zomboid/Barotrauma skill overhaul (Domain 6) re-points the threat_killed XP target with no Domain 2 code change; player room-id resolution is out of scope (proximity uses world distance)."
+        "Deferred (by design): the verbose Project-Zomboid/Barotrauma skill overhaul (Domain 6) re-points the threat_killed XP target with no Domain 2 code change; player room-id resolution is out of scope (proximity uses world distance).",
+        "Known limitation (deferred, PR #51 Codex P2): a spawned corpse LootContainer is only tracked in the transient loot_containers array — it is NOT persisted to the save / ship-revisit state (which records only authored container specs + searched ids). A kill whose corpse is left unsearched before a save/reload or leaving the derelict loses that drop. The in-session kill->reward->removal loop is fully closed; persisting in-flight unlooted kill-drops is a follow-up."
       ]
     },
     {
