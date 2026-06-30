@@ -140,7 +140,12 @@ run_clean 'derelict fire seed smoke' 'DERELICT FIRE SEED PASS deterministic=true
 run_clean 'main playable derelict fire smoke' 'MAIN PLAYABLE DERELICT FIRE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_derelict_fire_smoke.gd
 run_clean 'derelict fire sequential persistence smoke' 'DERELICT FIRE SEQUENTIAL PERSISTENCE PASS remembered=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_fire_sequential_persistence_smoke.gd
 run_clean 'Domain 3 Task 4 production station wiring smoke' 'PRODUCTION WIRING PASS hydro=true recycler=true spoilage_registered=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_station_wiring_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=69 clean_output=true'
+run_clean 'Domain3 contaminated_water item smoke' 'CONTAMINATED WATER ITEM PASS defined=true supply=true lootable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/contaminated_water_item_smoke.gd
+run_clean 'Domain3 production station unit smoke' 'PRODUCTION STATION PASS hydro_harvest=true recycler_collect=true blocked_in_progress=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_station_smoke.gd
+run_clean 'Domain3 synthesizer retirement smoke' 'FOOD SYNTHESIZER RETIREMENT PASS orphan_removed=true crafting_synth_ok=true legacy_load_ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/food_synthesizer_retirement_smoke.gd
+run_clean 'Domain3 food away tick smoke' 'FOOD AWAY TICK PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/food_away_tick_smoke.gd
+run_clean 'Domain3 main playable food production smoke' 'MAIN PLAYABLE FOOD PRODUCTION PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_food_production_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=74 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

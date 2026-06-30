@@ -484,21 +484,15 @@
       "integrations": [
         {
           "to": "hydroponics_state",
-          "via": "hydroponics_summary in tick payload (static IDLE)",
+          "via": "hydroponics_summary in tick payload",
           "at": "playable_generated_ship.gd:1392",
-          "health": "weak"
-        },
-        {
-          "to": "synthesizer_state",
-          "via": "synthesizer_summary in tick payload (static)",
-          "at": "playable_generated_ship.gd:1393",
-          "health": "weak"
+          "health": "healthy"
         },
         {
           "to": "water_recycler_state",
-          "via": "water_recycler_summary in tick payload (static)",
+          "via": "water_recycler_summary in tick payload",
           "at": "playable_generated_ship.gd:1394",
-          "health": "weak"
+          "health": "healthy"
         }
       ],
       "content": "partial",
@@ -555,11 +549,11 @@
     },
     {
       "id": "synthesizer_state",
-      "file": "scripts/systems/synthesizer_state.gd",
-      "name": "Nutrient Synthesizer",
+      "file": null,
+      "name": "Nutrient Synthesizer (RETIRED)",
       "domain": "food",
       "kind": "simulation",
-      "model_exists": true,
+      "model_exists": false,
       "smoke": "scripts/validation/synthesizer_state_smoke.gd",
       "reachable": true,
       "driven": false,
