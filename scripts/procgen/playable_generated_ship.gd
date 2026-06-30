@@ -1344,6 +1344,19 @@ func _manager_broken_systems() -> Array[String]:
 			broken.append(subsystem_id)
 	return broken
 
+## Tick the active ship's fire model (home: hub; away: derelict) once and apply
+## its per-compartment system damage. Extracted from _recompute_expanded_ship_systems
+## so the recompute can run on BOTH _process branches (Domain 4) without double-
+## ticking the fire the away branch already owns. Call exactly once per branch.
+func _tick_active_fire(delta: float) -> void:
+	var afs = _active_fire_state()
+	if afs == null:
+		return
+	if afs.tick(delta, _build_fire_context()):
+		_refresh_fire_zones()
+	# A burning compartment degrades the ship system housed there (M7-B Task 8).
+	_apply_fire_system_damage(delta)
+
 func _recompute_expanded_ship_systems(delta: float) -> void:
 	if power_grid_state == null:
 		return
@@ -1366,12 +1379,6 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 			"breach_count": hull_integrity_state.get_breach_count(),
 			"recycled_water": recycled_water,
 		})
-	var _afs_home = _active_fire_state()
-	if _afs_home != null:
-		if _afs_home.tick(delta, _build_fire_context()):
-			_refresh_fire_zones()
-		# M7-B Task 8: a burning compartment degrades the ship system housed there.
-		_apply_fire_system_damage(delta)
 	# ADR-0038: drive station power from the same "stations" channel, then advance the
 	# single active craft. Field crafting is unpowered, so it ticks regardless (and also in
 	# the _process away-branch for emergency crafts started before travel).
@@ -1388,8 +1395,6 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 	# channel as the crafting stations, but its power is independent of crafting_state.
 	if is_instance_valid(extinguisher_recharge_port):
 		extinguisher_recharge_port.set_powered(power_grid_state.get_allocation_ratio("stations") > 0.0)
-	if field_crafting_state != null and field_crafting_state.tick(delta):
-		_on_field_craft_completed()
 	if sustenance_state != null:
 		sustenance_state.tick(delta, {
 			"powered_ratio": power_grid_state.get_allocation_ratio("sustenance"),
@@ -4930,11 +4935,7 @@ func _process(delta: float) -> void:
 		# The home branch ticks fire inside _recompute_expanded_ship_systems, which this
 		# branch never calls. This closes the "away path early-return" gap for fire — the
 		# same pattern used by the sanity/hallucination and audio fixes (Codex PRs #43-44).
-		var _afs_away = _active_fire_state()
-		if _afs_away != null:
-			if _afs_away.tick(delta, _build_fire_context()):
-				_refresh_fire_zones()
-			_apply_fire_system_damage(delta)
+		_tick_active_fire(delta)
 		# Recharge port is power-gated on the DERELICT's own power system (engineering gate):
 		# present but dead until the player restores derelict power.
 		if is_instance_valid(extinguisher_recharge_port):
@@ -4971,6 +4972,9 @@ func _process(delta: float) -> void:
 	if ship_systems_manager != null:
 		ship_systems_manager.advance(delta)
 	_recompute_expanded_ship_systems(delta)
+	_tick_active_fire(delta)
+	if field_crafting_state != null and field_crafting_state.tick(delta):
+		_on_field_craft_completed()
 	_refresh_oxygen_state(false, delta)
 	# M7-B Task 7: the authoritative fire model is ticked inside
 	# _recompute_expanded_ship_systems(delta) above (with _build_fire_context()),
