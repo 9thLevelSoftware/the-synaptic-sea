@@ -1345,6 +1345,16 @@ func _configure_expanded_ship_system_models() -> void:
 	sustenance_state = SustenanceStateScript.new()
 	sustenance_state.configure(_load_json_dict(FACILITY_UPGRADES_CONFIG_PATH))
 
+## Seed a freshly-generated derelict's per-ship structural models from tuning and stamp
+## its sim clock. Called ONCE on first visit (not on revisit — a retained instance already
+## carries its caught-up state). The hub never uses this (it has the coordinator singletons).
+func _seed_ship_models(inst) -> void:
+	if inst == null:
+		return
+	inst.get_hull().configure(_load_json_dict(HULL_COMPARTMENTS_CONFIG_PATH))
+	inst.get_web().configure(_load_json_dict(WEB_INFESTATION_CONFIG_PATH))   # attached_to_web=true by default
+	inst.last_sim_time = world_time
+
 func _manager_broken_systems() -> Array[String]:
 	var broken: Array[String] = []
 	if ship_systems_manager == null:
@@ -3151,6 +3161,30 @@ func _active_fire_state():
 		return current_ship.get_fire()
 	return fire_suppression_state
 
+## The hull/web of the ship the player is currently aboard: the derelict's per-ship
+## model when away, the hub's coordinator singleton otherwise. Mirrors _active_fire_state().
+func _active_hull():
+	if away_from_start and current_ship != null and current_ship != home_ship:
+		return current_ship.get_hull()
+	return hull_integrity_state
+
+func _active_web():
+	if away_from_start and current_ship != null and current_ship != home_ship:
+		return current_ship.get_web()
+	return hull_web_state
+
+## Resolve a SPECIFIC ship's hull/web (hub -> singleton, any other ship -> its own model).
+## Used by the unified per-ship tick (_advance_ship) in Phase 3.
+func _hull_for(ship):
+	if ship == null or ship == home_ship:
+		return hull_integrity_state
+	return ship.get_hull()
+
+func _web_for(ship):
+	if ship == null or ship == home_ship:
+		return hull_web_state
+	return ship.get_web()
+
 ## Floor-cell world positions distributed across the active ship's rooms, for repair-point
 ## placement. Reuses the active loader's room/cell resolution where available.
 func _distributed_room_positions() -> Array:
@@ -3637,6 +3671,7 @@ func travel_to(marker) -> Dictionary:
 		new_mgr.configure(new_mgr.load_definitions(), new_bp.condition, new_bp.seed_value)
 		inst = ShipInstanceScript.create("ship_%s" % mid, mid, new_bp, new_mgr, null)
 		visited_ships[mid] = inst
+		_seed_ship_models(inst)
 
 	_attach_derelict_active(inst, new_root)
 	_configure_threat_runtime_for_current_ship()
