@@ -40,25 +40,33 @@ func _validate() -> void:
 	if playable.threat_manager == null or playable.player == null:
 		_fail("threat_manager / player missing")
 		return
-	var tm = playable.threat_manager
+	var tm: ThreatManager = playable.threat_manager
 	# Board a derelict so the whole loop is exercised on the away branch.
 	playable.away_from_start = true
 	# Ensure at least one threat exists to kill.
 	if tm.threats.is_empty():
 		tm.inject_validation_encounter(["stalker"], Vector3.ZERO)
-	# --- BP2: noise rises with movement. Drive the emitted profile via the manager. ---
-	tm.set_player_signals(0.05, 0.15, 0.8, false, "")
+	# --- BP2 (model contract): the emitted profile responds to raw noise. ---
 	tm.detection_state.update_inputs(0.05, 0.15, 0.8, false, "")
 	var idle_noise: float = float(tm.detection_state.get_emitted_profile()["noise"])
 	tm.detection_state.update_inputs(0.3, 0.15, 0.8, false, "")
 	var move_noise: float = float(tm.detection_state.get_emitted_profile()["noise"])
 	var noise_ok: bool = move_noise > idle_noise
-	# --- BP2: crouch lowers emitted visibility. ---
-	tm.detection_state.update_inputs(0.3, 0.15, 0.8, false, "")
+	# --- BP2 (coordinator feed): crouch flows through the LIVE _process tick —
+	# player.is_crouching() -> _tick_threat_runtime -> set_player_signals -> detection.
+	# Disable the player's _physics_process so its per-tick input read of the crouch
+	# action does not clobber the scripted crouch state mid-test.
+	playable.player.set_physics_process(false)
+	playable.player.set_crouching(false)
+	playable._process(1.0 / 30.0)
 	var stand_vis: float = float(tm.detection_state.get_emitted_profile()["visibility"])
-	tm.detection_state.update_inputs(0.3, 0.15, 0.8, true, "")
+	var stand_flag: bool = tm.detection_state.crouching
+	playable.player.set_crouching(true)
+	playable._process(1.0 / 30.0)
 	var crouch_vis: float = float(tm.detection_state.get_emitted_profile()["visibility"])
-	var crouch_ok: bool = crouch_vis < stand_vis
+	# Coordinator feed proven: detection.crouching went false->true via _process AND
+	# the emitted visibility dropped — not a direct model write.
+	var crouch_ok: bool = crouch_vis < stand_vis and tm.detection_state.crouching and not stand_flag
 	# --- BP3: kill a threat through the live coordinator tick (away branch). ---
 	var before_containers: int = playable.loot_containers.size()
 	var before_threats: int = tm.threats.size()
@@ -80,7 +88,7 @@ func _validate() -> void:
 		_fail("kill should remove the threat from the active array")
 		return
 	finished = true
-	print("COMBAT CLOSURE PASS away_kill=true noise=true crouch=true reward=true removed=true")
+	print("COMBAT CLOSURE PASS away_kill=true noise=true crouch=true reward=true removed=true coord_feed=true")
 	_cleanup_and_quit(0)
 
 func _find_playable(node: Node) -> PlayableGeneratedShip:
