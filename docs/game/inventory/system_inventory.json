@@ -969,9 +969,9 @@
       "driven": true,
       "driven_at": "playable_generated_ship.gd:2568",
       "input": {
-        "live": false,
-        "desc": "live damage sources #1-3 (combat/hazard/pressure) deferred; only config-injected breach (hull_compartments.json at 1321) + validation seam force_hull_breach_for_validation (1422) call damage_compartment",
-        "at": "playable_generated_ship.gd:1422"
+        "live": true,
+        "desc": "live web-infestation damage: hull_web_state (WebInfestationState) coverage -> _apply_web_hull_damage degrades every compartment each tick on both _process branches; config seed + force_hull_breach_for_validation remain as the static/test paths",
+        "at": "playable_generated_ship.gd:_apply_web_hull_damage"
       },
       "output": {
         "live": true,
@@ -1000,7 +1000,48 @@
       "content_note": "VERIFIED. data/ship_systems/hull_compartments.json: thin compartment set; functional but minimal. damage_compartment confirmed to have only config(1321) + validation-seam(1422) callers, no live in-game damage source.",
       "functional": null,
       "gaps": [
-        "VERIFIED: damage_compartment() has no live in-game caller (only config seed + force_hull_breach_for_validation); combat/hazard/pressure damage sources #1-3 deferred per ADR M7-A"
+        "Live in-game damage source landed (Domain 4): hull_web_state web infestation. Per-derelict hull (so the web damages each ship's own hull, not just the hub's) is deferred to the follow-on web spec."
+      ],
+      "subsystems": []
+    },
+    {
+      "id": "web_infestation_state",
+      "file": "scripts/systems/web_infestation_state.gd",
+      "name": "Web Infestation",
+      "domain": "ship_systems",
+      "kind": "simulation",
+      "model_exists": true,
+      "smoke": "scripts/validation/web_infestation_state_smoke.gd",
+      "reachable": true,
+      "driven": true,
+      "driven_at": "playable_generated_ship.gd:_apply_web_hull_damage",
+      "input": {
+        "live": true,
+        "desc": "configured from data/ship_systems/web_infestation.json (growth/recession/damage/contact rates); hub attached_to_web=true by default; contact boost from a docked still-attached derelict via _active_derelict_web_attached",
+        "at": "playable_generated_ship.gd:_configure_expanded_ship_system_models"
+      },
+      "output": {
+        "live": true,
+        "desc": "tick() returns per-tick hull damage applied across hull_integrity_state.compartments by _apply_web_hull_damage on BOTH _process branches (home + away) — the live source closing the ship_systems loop",
+        "at": "playable_generated_ship.gd:_apply_web_hull_damage"
+      },
+      "confidence": "V",
+      "loops": [
+        "ship_systems"
+      ],
+      "integrations": [
+        {
+          "to": "hull_integrity_state",
+          "via": "coverage -> damage_compartment on every compartment each tick",
+          "at": "playable_generated_ship.gd:_apply_web_hull_damage",
+          "health": "healthy"
+        }
+      ],
+      "content": "partial",
+      "content_note": "Domain 4 foundation: hub trapped in the Sargasso web (attached by default), coverage grows -> hull damage on both branches; ShipInstance.web_attached is the per-derelict contagion-seed flag. Full dock-graph spread / cut-free action / per-derelict hull deferred to the follow-on web spec.",
+      "functional": null,
+      "gaps": [
+        "Foundation only: dock-graph contagion spread, the cut-a-ship-free action + reaching/re-contact, and per-derelict hull are deferred to the follow-on web spec (gated on the Phase-5 docking graph)."
       ],
       "subsystems": []
     },
@@ -8311,7 +8352,7 @@
     {
       "id": "ship_systems",
       "name": "Ship power / repair / atmosphere core",
-      "closes": "partial",
+      "closes": "closed",
       "steps": [
         {
           "system": "ship_systems_manager",
@@ -8343,9 +8384,9 @@
         }
       ],
       "break_points": [
-        "sustenance_state now live: rolls up hydroponics + water_recycler summaries (both active via ProductionStation) and crafting meals_active; get_status_lines (4747) feeds HUD display. Sustenance HUD tick is home-branch only (_recompute_expanded_ship_systems at 4817) but production advances on both branches.",
-        "VERIFIED: hull_integrity_state input is half-coupled - live damage sources #1-3 (combat/hazard/pressure) deferred; only config-injected breach + validation seam (1422) call damage_compartment",
-        "VERIFIED: manager.advance (4816) + power/propulsion/life_support/crafting/sustenance recompute (4817 -> _recompute_expanded_ship_systems) run ONLY on the HOME _process branch; away branch returns at 4808 before reaching them"
+        "hull_integrity_state now takes live damage from hull_web_state (WebInfestationState): the hub is trapped in the biomatter web, coverage grows and _apply_web_hull_damage degrades every compartment each tick on BOTH _process branches (playable_generated_ship.gd home + away).",
+        "ship_systems_manager.advance + _recompute_expanded_ship_systems now run on the away (derelict) branch too (live sim, no pausing); fire + field-crafting were extracted to _tick_active_fire to avoid double-ticking. Powered stations are live on both branches (supersedes the former away-pause convention).",
+        "DEFERRED to the follow-on web spec (gated on Phase-5 docking graph): dock-graph contagion spread across multiple persistent derelicts, the cut-a-ship-free action + reaching/re-contact, and per-derelict hull integrity."
       ]
     },
     {

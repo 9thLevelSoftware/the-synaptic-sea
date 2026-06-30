@@ -4960,18 +4960,14 @@ func _process(delta: float) -> void:
 		# _recompute_expanded_ship_systems in the Domain 4 block below (same pattern as
 		# the sanity/hallucination and audio fixes in Codex PRs #43-44).
 		_tick_active_fire(delta)
-		# Recharge port is power-gated on the DERELICT's own power system (engineering gate):
-		# present but dead until the player restores derelict power.
-		if is_instance_valid(extinguisher_recharge_port):
-			var _dmgr = _active_systems_manager()
-			extinguisher_recharge_port.set_powered(_dmgr != null and _dmgr.is_operational("power"))
 		# Domain 1: survival attrition + stakes on the derelict branch (shared
 		# helper). Runs radiation/body-temp/status + the vitals cascade + death,
 		# so the away path is no longer starved past the 4808 early-return.
 		_tick_survival_attrition(delta)
 		_refresh_player_vitals(delta)
-		# ADR-0038: emergency field crafting completes even away from home (powered-station
-		# crafts pause while away, by design — only field_crafting_state advances here).
+		# ADR-0038 (superseded by Domain 4): field crafting completes away from home.
+		# Powered-station crafting is NO LONGER paused away — the hub recompute runs on
+		# both branches now (live sim), so powered stations stay live on a derelict too.
 		if field_crafting_state != null and field_crafting_state.tick(delta):
 			_on_field_craft_completed()
 		# Timed autosave still advances on a derelict — a long boarding run is
@@ -4992,6 +4988,13 @@ func _process(delta: float) -> void:
 			ship_systems_manager.advance(delta)
 		_apply_web_hull_damage(delta)
 		_recompute_expanded_ship_systems(delta)
+		# Recharge port is power-gated on the DERELICT's own power system (engineering gate):
+		# present but dead until the player restores derelict power. This MUST run AFTER
+		# _recompute_expanded_ship_systems (which sets the port to hub power_grid state),
+		# so the derelict-based gate takes final precedence on the away branch.
+		if is_instance_valid(extinguisher_recharge_port):
+			var _dmgr = _active_systems_manager()
+			extinguisher_recharge_port.set_powered(_dmgr != null and _dmgr.is_operational("power"))
 		# Domain 3: food spoilage + production advance on the derelict branch too (see
 		# _tick_food_runtime — deliberate divergence from crafting, which pauses away).
 		_tick_food_runtime(delta)
