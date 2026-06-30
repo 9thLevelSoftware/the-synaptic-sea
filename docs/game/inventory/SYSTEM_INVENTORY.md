@@ -173,7 +173,7 @@
 | Propulsion (expanded) | 🟢 | 90% | [V] | playable_generated_ship.gd:1351 |
 | Life Support (expanded atmosphere) | 🟢 | 90% | [V] | playable_generated_ship.gd:1360 |
 | Hull Integrity | 🟢 | 90% | [V] | playable_generated_ship.gd:2568 |
-| Web Infestation | 🟢 | 90% | [V] | playable_generated_ship.gd:_apply_web_hull_damage |
+| Web Infestation | 🟢 | 90% | [V] | playable_generated_ship.gd:_advance_ship |
 | Fire Suppression (authoritative fire hazard) | 🟢 | 90% | [V] | playable_generated_ship.gd:1367 |
 | Extinguisher Charge | 🟢 | 90% | [V] | playable_generated_ship.gd:1386 |
 | Crafting (station) | 🟢 | 100% | [V] | playable_generated_ship.gd:1381 |

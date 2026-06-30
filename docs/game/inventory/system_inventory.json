@@ -77,7 +77,7 @@
       "content_note": "In-code defaults (accumulation/decay/threshold); reduce_radiation_minor medicine + radiation_suit recipes exist as content but no radiation-zone tuning data.",
       "functional": null,
       "gaps": [
-        "radiation_state.tick (4884) is after the away-branch early-return (4808), so on a boarded derelict in_radiation_zone=away_from_start never actually accumulates - the primary derelict radiation hazard is dead; only a home oxygen breach drives it"
+        "radiation_state.tick runs on BOTH _process branches via _tick_survival_attrition; in_radiation_zone is driven by a real hazard signal (away_from_start OR hull breach), so the derelict radiation hazard is LIVE (Domain 1)."
       ],
       "subsystems": []
     },
@@ -118,7 +118,7 @@
       "content_note": "In-code safe-range/drain constants; no extreme-zone source content and no temp-delta consumable items, so the authored content cannot exercise it.",
       "functional": null,
       "gaps": [
-        "Extreme-zone source is structurally dead: in_extreme_zone=away_from_start (4886) set only in the home branch (away always false), and tick (4887) is gated behind the 4808 away-return so it never runs on the derelict where away IS true. The temperature->thirst coupling is wired but permanently neutral."
+        "body_temperature_state.in_extreme_zone is driven by in_hazard_env (away_from_start OR breach) inside _tick_survival_attrition, which ticks on both branches — the temperature->thirst coupling engages in hazardous derelict zones (Domain 1)."
       ],
       "subsystems": []
     },
@@ -159,7 +159,7 @@
       "content_note": "data/combat/status_effect_definitions.json + status_effect_icons.json exist, but the get_modifier() multiplier table is HARDCODED in status_effects_state.gd, so the JSON is largely unused by the live modifier path. Sources stimulant_state.gd/addiction_state.gd are not catalogued as their own survival systems (arguably consumables/drug domain).",
       "functional": null,
       "gaps": [
-        "Ticked only in the home branch (4889, after the 4808 away-return); on a derelict status effects and their stimulant/addiction sources (4830-4832) freeze - durations do not decay away from start"
+        "status_effects_state.tick runs on both _process branches via _tick_survival_attrition, so status durations decay on a derelict (Domain 1). Its stimulant/addiction SOURCES remain home-only pending Domain 5."
       ],
       "subsystems": []
     },
@@ -970,8 +970,8 @@
       "driven_at": "playable_generated_ship.gd:2568",
       "input": {
         "live": true,
-        "desc": "live web-infestation damage: hull_web_state (WebInfestationState) coverage -> _apply_web_hull_damage degrades every compartment each tick on both _process branches; config seed + force_hull_breach_for_validation remain as the static/test paths",
-        "at": "playable_generated_ship.gd:_apply_web_hull_damage"
+        "desc": "live web-infestation damage: hull_web_state (WebInfestationState) coverage -> _advance_ship degrades every compartment each tick on both _process branches; config seed + force_hull_breach_for_validation remain as the static/test paths",
+        "at": "playable_generated_ship.gd:_advance_ship"
       },
       "output": {
         "live": true,
@@ -997,7 +997,7 @@
         }
       ],
       "content": "partial",
-      "content_note": "VERIFIED. data/ship_systems/hull_compartments.json: thin compartment set; functional but minimal. hull is now a per-ship model on ShipInstance (every derelict owns one, seeded on generation); damage_compartment is driven live by _advance_ship/_apply_web on both _process branches. Config seed and force_hull_breach_for_validation remain as the static/test-only paths.",
+      "content_note": "VERIFIED. data/ship_systems/hull_compartments.json: thin compartment set; functional but minimal. hull is now a per-ship model on ShipInstance (every derelict owns one, seeded on generation); damage_compartment is driven live by _advance_ship on both _process branches. Config seed and force_hull_breach_for_validation remain as the static/test-only paths.",
       "functional": null,
       "gaps": [
         "Per-ship hull is now live (Phase 2): each ShipInstance owns its own hull; web damages every ship's own hull via _advance_ship on both branches and _catch_up_ship on revisit. Dock-graph contagion spread across multiple derelicts and the cut-a-ship-free action remain deferred to the follow-on web spec."
@@ -1014,16 +1014,16 @@
       "smoke": "scripts/validation/web_infestation_state_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:_apply_web_hull_damage",
+      "driven_at": "playable_generated_ship.gd:_advance_ship",
       "input": {
         "live": true,
         "desc": "per-ship model on every ShipInstance (hub + each derelict); configured from data/ship_systems/web_infestation.json (growth/recession/damage/contact rates); hub attached by default; each derelict seeded web_attached=true on generation; advanced by _advance_ship on both _process branches and by _catch_up_ship on revisit",
-        "at": "playable_generated_ship.gd:_configure_expanded_ship_system_models"
+        "at": "playable_generated_ship.gd:_seed_ship_models"
       },
       "output": {
         "live": true,
-        "desc": "tick() returns per-tick hull damage applied across hull_integrity_state.compartments by _apply_web_hull_damage on BOTH _process branches (home + away) — the live source closing the ship_systems loop",
-        "at": "playable_generated_ship.gd:_apply_web_hull_damage"
+        "desc": "tick() returns per-tick hull damage applied across hull_integrity_state.compartments by _advance_ship on BOTH _process branches (home + away) — the live source closing the ship_systems loop",
+        "at": "playable_generated_ship.gd:_advance_ship"
       },
       "confidence": "V",
       "loops": [
@@ -1033,7 +1033,7 @@
         {
           "to": "hull_integrity_state",
           "via": "coverage -> damage_compartment on every compartment each tick",
-          "at": "playable_generated_ship.gd:_apply_web_hull_damage",
+          "at": "playable_generated_ship.gd:_advance_ship",
           "health": "healthy"
         }
       ],
@@ -8385,7 +8385,7 @@
       ],
       "break_points": [
         "Loop closed (Phase 2-4): hull is now a per-ship model on every ShipInstance; web→hull live damage is advanced by the unified _advance_ship on both _process branches, so every present ship's hull degrades continuously. The hub always co-advances; the boarded derelict's own _advance_ship call also runs on the away branch.",
-        "ship_systems_manager.advance, _recompute_expanded_ship_systems, and _apply_web run on both branches via _advance_ship and _recompute_expanded_ship_systems — no home-only framing remains. Fire and field-crafting were extracted to _tick_active_fire to avoid double-ticking. Powered stations are live on both branches. Absent derelicts catch up on revisit via _catch_up_ship (elapsed world_time in capped sub-steps).",
+        "ship_systems_manager.advance and _recompute_expanded_ship_systems run on both branches via _advance_ship and _recompute_expanded_ship_systems — no home-only framing remains. Fire and field-crafting were extracted to _tick_active_fire to avoid double-ticking. Powered stations are live on both branches. Absent derelicts catch up on revisit via _catch_up_ship (elapsed world_time in capped sub-steps).",
         "DEFERRED to the follow-on web spec: dock-graph contagion spread across multiple persistent derelicts and the cut-a-ship-free action + reaching/re-contact."
       ]
     },

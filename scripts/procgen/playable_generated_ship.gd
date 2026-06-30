@@ -1391,6 +1391,7 @@ func _active_derelict_web_attached() -> bool:
 func _advance_ship(ship, delta: float) -> void:
 	if ship == null:
 		return
+	ship.last_sim_time = world_time   # FIX C1: stamp present ship's clock so catch-up on revisit covers absence only (not presence+absence)
 	if ship.systems_manager != null:
 		ship.systems_manager.advance(delta)
 	var web = _web_for(ship)
