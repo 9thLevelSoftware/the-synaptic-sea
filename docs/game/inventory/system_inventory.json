@@ -1425,8 +1425,8 @@
       "driven_at": "playable_generated_ship.gd:3908",
       "input": {
         "live": true,
-        "desc": "vitals/status/armor profile + player_position fed live each frame; player noise/light/sight/crouch/room are near-hardcoded literals in _tick_threat_runtime (only noise has a tiny live is_moving component)",
-        "at": "playable_generated_ship.gd:3901-3908"
+        "desc": "vitals/status/armor profile + player_position fed live each frame; player noise/light/sight/crouch are now REAL runtime signals in _tick_threat_runtime (Domain 2): noise from movement, light from _player_room_lit (room power), base visibility proximity-scaled per threat, crouch from the 'crouch' input action via player.is_crouching()",
+        "at": "playable_generated_ship.gd:_tick_threat_runtime"
       },
       "output": {
         "live": true,
@@ -1442,8 +1442,9 @@
         "combat"
       ],
       "gaps": [
-        "VERIFIED: Dead threats (STATE_DEAD) are not removed from the threats[] array and yield no loot/XP on kill (threat_ai_state.gd:131 sets STATE_DEAD; threat_manager.gd:257 _pick_target merely skips health<=0; no removal/reward logic anywhere).",
-        "VERIFIED: Player stealth signals are near-hardcoded literals in _tick_threat_runtime (playable_generated_ship.gd:3901-3907: noise 0.05/0.2, light 0.35, sight 0.55, crouch false, room \"\"), not derived from real light/stealth systems."
+        "CLOSED (Domain 2): killing a threat now removes it AND rewards. Threat death emits threat_killed; _sweep_dead_threats removes the corpse from threats[] (despawns its placeholder) exactly once; the coordinator _on_threat_killed spawns a lootable LootContainer at the corpse + grants XP via emit_training_event('threat_killed').",
+        "CLOSED (Domain 2): player stealth signals in _tick_threat_runtime are real runtime values (movement noise, _player_room_lit light, proximity-scaled visibility, crouch action), not literals; consumed via DetectionState.get_emitted_profile() as the single AI signal source.",
+        "Known limitation (deferred, PR #51 Codex P2): spawned corpse LootContainers live only in the transient loot_containers array, not in the persisted save/revisit state — an unsearched corpse left before save/reload or derelict departure loses its drop. In-session kill reward + removal is fully wired; persisting unlooted kill-drops is a follow-up."
       ],
       "integrations": [
         {
@@ -1507,9 +1508,9 @@
             "at": "threat_manager.gd:66"
           },
           "output": {
-            "live": false,
-            "desc": "VERIFIED decorative: computed detected/awareness_score/heard/seen reach only get_status_lines() HUD (threat_manager.gd:181); threat AI computes its own parallel awareness (threat_ai_state.gd:88-94) and only borrows the static detect_threshold constant",
-            "at": null
+            "live": true,
+            "desc": "get_emitted_profile() is now the single emitted-signal source the AI consumes; threat_manager.tick_threats builds each threat's context (noise/light/sight) from the emitted profile, scaling visibility per-threat by world distance via _proximity_factor",
+            "at": "detection_state.gd:get_emitted_profile"
           },
           "confidence": "V",
           "content": "partial",
@@ -1518,10 +1519,7 @@
           "loops": [
             "combat"
           ],
-          "gaps": [
-            "VERIFIED: Live computed output (detected/awareness_score/heard/seen) consumed only by HUD (threat_manager.gd:181); threats compute a parallel awareness from raw signals (threat_ai_state.gd:88-94), so this model is decorative.",
-            "VERIFIED: Only the static detect_threshold (a config constant from configure, never recomputed by tick) is fed forward at threat_manager.gd:81."
-          ],
+          "gaps": [],
           "integrations": [],
           "subsystems": []
         },
@@ -1627,7 +1625,7 @@
           },
           "output": {
             "live": true,
-            "desc": "can_attack() gates real damage (threat_manager.gd:84); attack_damage/type/status_on_hit feed damage_pipeline; health/state drive targeting + placeholder motion",
+            "desc": "can_attack() gates real damage (threat_manager.gd:84); attack_damage/type/status_on_hit feed damage_pipeline; health/state drive targeting + placeholder motion; threat death emits threat_killed (ThreatManager) -> coordinator _on_threat_killed spawns a lootable LootContainer + grants XP via emit_training_event('threat_killed'); dead threat removed from threats[] via _sweep_dead_threats, exactly once",
             "at": "threat_manager.gd:84"
           },
           "confidence": "V",
@@ -1638,7 +1636,7 @@
             "combat"
           ],
           "gaps": [
-            "VERIFIED: State machine has STATE_FLEE/STATE_INVESTIGATE/STATE_HUNT but movement is a crude lerp toward player in the manager (threat_manager.gd:278-282); no pathing."
+            "VERIFIED (still open, Domain 2 non-goal): state machine has STATE_FLEE/STATE_INVESTIGATE/STATE_HUNT but movement is a crude lerp toward the player in the manager (threat_manager.gd:278-282); no pathfinding. Deferred (the combat loop closure does not depend on it)."
           ],
           "integrations": [
             {
@@ -1649,9 +1647,9 @@
             },
             {
               "to": "detection_state",
-              "via": "consumes only the static detect_threshold constant as its tick threshold",
-              "at": "threat_manager.gd:81",
-              "health": "weak"
+              "via": "get_emitted_profile() -> threat_manager.tick_threats builds per-threat context (noise/light/sight); _proximity_factor scales visibility by world distance; detect_threshold gates detection",
+              "at": "detection_state.gd:get_emitted_profile",
+              "health": "healthy"
             }
           ],
           "subsystems": []
@@ -8365,11 +8363,11 @@
     {
       "id": "combat",
       "name": "Threat Detection & Combat",
-      "closes": "partial",
+      "closes": "closed",
       "steps": [
         {
           "system": "detection_state",
-          "role": "sense (player signals -> awareness; HUD-only output, decorative)"
+          "role": "sense (player emitted-signal profile via get_emitted_profile() — the single source the AI consumes; Domain 2)"
         },
         {
           "system": "threat_ai_state",
@@ -8397,9 +8395,11 @@
         }
       ],
       "break_points": [
-        "VERIFIED: detection_state computed output (detected/awareness_score/heard/seen) is HUD-only (threat_manager.gd:181); the threat AI computes a parallel awareness from raw player signals (threat_ai_state.gd:88-94) and only borrows detection's static detect_threshold (threat_manager.gd:81), making the detection model decorative.",
-        "VERIFIED: Player stealth inputs feeding detection/AI are near-hardcoded literals in _tick_threat_runtime (playable_generated_ship.gd:3901-3907), so the stealth dimension is shallow (only noise has a tiny live is_moving component).",
-        "VERIFIED: Killing a threat does not remove it or yield loot/XP: STATE_DEAD threats linger in threats[] and are merely skipped by _pick_target (threat_manager.gd:257); no reward closes the player->kill incentive."
+        "CLOSED (Domain 2): DetectionState.get_emitted_profile() is now the single signal source the threat AI consumes (threat_manager.tick_threats builds each threat's context noise/light/sight from the emitted profile, scaling visibility per-threat by world distance via _proximity_factor); archetype sensitivities preserve per-enemy perception. Verified by threat_detection_source_smoke.gd + combat_closure_smoke.gd.",
+        "CLOSED (Domain 2): stealth inputs are real runtime signals in _tick_threat_runtime (noise from movement, light from _player_room_lit room power, base visibility proximity-scaled, crouch from the new 'crouch' input action reducing emitted noise+visibility and move speed). No literal placeholders remain.",
+        "CLOSED (Domain 2): killing a threat emits threat_killed (ThreatManager) -> coordinator spawns a lootable LootContainer at the corpse (archetype loot_table) collected through the closed loot/interact path AND grants XP via emit_training_event('threat_killed') (data-driven interim skill 'scavenging'); the dead threat is removed from threats[] and its placeholder despawned, exactly once. Runs on both _process branches.",
+        "Deferred (by design): the verbose Project-Zomboid/Barotrauma skill overhaul (Domain 6) re-points the threat_killed XP target with no Domain 2 code change; player room-id resolution is out of scope (proximity uses world distance).",
+        "Known limitation (deferred, PR #51 Codex P2): a spawned corpse LootContainer is only tracked in the transient loot_containers array — it is NOT persisted to the save / ship-revisit state (which records only authored container specs + searched ids). A kill whose corpse is left unsearched before a save/reload or leaving the derelict loses that drop. The in-session kill->reward->removal loop is fully closed; persisting in-flight unlooted kill-drops is a follow-up."
       ]
     },
     {

@@ -432,12 +432,14 @@ const DEFAULT_INTERACT_BINDINGS: Array[Key] = [KEY_E, KEY_ENTER, KEY_SPACE, KEY_
 const DEFAULT_SAVE_RUN_BINDINGS: Array[Key] = [KEY_F5]
 const DEFAULT_LOAD_RUN_BINDINGS: Array[Key] = [KEY_F9]
 const DEFAULT_ATTACK_BINDINGS: Array[Key] = [KEY_F]
+const DEFAULT_CROUCH_BINDINGS: Array[Key] = [KEY_CTRL]
 
 func ensure_default_input_actions() -> void:
 	for action_name in DEFAULT_MOVE_BINDINGS:
 		_ensure_key_action_set(action_name, DEFAULT_MOVE_BINDINGS[action_name])
 	_ensure_key_action_set("interact", DEFAULT_INTERACT_BINDINGS)
 	_ensure_key_action_set("attack_primary", DEFAULT_ATTACK_BINDINGS)
+	_ensure_key_action_set("crouch", DEFAULT_CROUCH_BINDINGS)
 	# ADR-0038: emergency field crafting bound to C (previously unbound).
 	_ensure_key_action_set("field_craft", [KEY_C])
 	# REQ-012: manual save/load input actions. F5 saves, F9 loads.
@@ -1188,6 +1190,8 @@ func _build_runtime_nodes() -> void:
 	threat_manager = ThreatManagerScript.new()
 	threat_manager.name = "ThreatManager"
 	add_child(threat_manager)
+	if not threat_manager.threat_killed.is_connected(_on_threat_killed):
+		threat_manager.threat_killed.connect(_on_threat_killed)
 	# REQ-AU-001..010: build the AudioManager service. The manager owns
 	# six pure models (bus_config, ambient, sfx_router, music, spatial,
 	# meta_event) and a per-bus AudioStreamPlayer pool. Constructed after
@@ -3325,6 +3329,41 @@ func _on_loot_container_searched(container_id: String, granted: Array) -> void:
 	print("LOOT CONTAINER SEARCHED marker=%s container=%s granted=%d" % [
 		String(current_ship.marker_id) if current_ship != null else "", container_id, granted.size()])
 
+## Domain 2 (BP3): a threat died — grant XP through the progression bus and spawn a
+## lootable corpse container at its position (reusing the closed loot/interact path).
+## Runs on BOTH _process branches (the signal fires from tick_threats, called on the
+## away branch too), so derelict kills reward identically.
+func _on_threat_killed(record: Dictionary) -> void:
+	# XP (data-driven interim skill via training_actions.json).
+	emit_training_event("threat_killed", str(record.get("archetype_id", "")))
+	# Lootable corpse container.
+	if inventory_state == null:
+		return
+	var pos: Vector3 = record.get("position", Vector3.ZERO)
+	var cid: String = "corpse_%s" % str(record.get("instance_id", ""))
+	# Decide the parent FIRST so the position can be framed correctly. Derelict corpses
+	# parent under the derelict's scene_root (freed with the derelict on departure); home
+	# corpses parent under loot_container_root at origin.
+	var parent_node: Node = loot_container_root
+	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
+		parent_node = current_ship.scene_root
+		# The kill record position is GLOBAL world-space (threat world_position bakes in the
+		# derelict's global anchor, _combat_anchor_for_current_ship = scene_root.global_position).
+		# LootContainer stores the configured position as the node's LOCAL position, so under the
+		# offset scene_root (DERELICT_DOCK_OFFSET) we must convert global -> local; otherwise the
+		# corpse double-offsets ~100u away and the range interaction can never reach it.
+		pos = (current_ship.scene_root as Node3D).to_local(pos)
+	if parent_node == null or not is_instance_valid(parent_node):
+		return
+	var lc: LootContainer = LootContainerScript.new()
+	var seed_source: String = "kill:%s" % cid
+	lc.configure(cid, str(record.get("loot_table", "combat_drop_common")), seed_source,
+		inventory_state, _loot_tables, pos, 1.8, {})
+	if not lc.container_searched.is_connected(_on_loot_container_searched):
+		lc.container_searched.connect(_on_loot_container_searched)
+	parent_node.add_child(lc)
+	loot_containers.append(lc)
+
 ## Validation seam: search a loot container by id through the real interaction path.
 func search_loot_container_for_validation(container_id: String) -> bool:
 	for lc in loot_containers:
@@ -3902,15 +3941,24 @@ func _attack_with_equipped_weapon() -> Dictionary:
 	_refresh_weapon_hotbar()
 	return result
 
+## Domain 2 (BP2): a derived "is the player in a lit area" signal. A powered ship is
+## lit (player more visible); an unpowered/derelict ship is dark (stealthier). Uses
+## the active ship's power system (no per-room lighting model exists).
+func _player_room_lit() -> bool:
+	var mgr = _active_systems_manager()
+	return mgr != null and mgr.is_operational("power")
+
 func _tick_threat_runtime(delta: float) -> void:
 	if threat_manager == null:
 		return
 	var player_pos: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
+	var moving: bool = is_instance_valid(player) and player.has_method("is_moving") and player.is_moving()
+	var crouching: bool = is_instance_valid(player) and player.has_method("is_crouching") and player.is_crouching()
 	threat_manager.set_player_signals(
-		0.2 if player != null and player.has_method("is_moving") and player.is_moving() else 0.05,
-		0.35,
-		0.55,
-		false,
+		0.3 if moving else 0.05,          # noise from movement
+		0.6 if _player_room_lit() else 0.15,  # light from room power
+		0.8,                               # base visibility (proximity-scaled per threat in the manager)
+		crouching,                          # crouch reduces emitted noise + visibility in DetectionState
 		"",
 	)
 	threat_manager.tick_threats(delta, vitals_state, status_effects_state, _player_armor_profile(), player_pos)

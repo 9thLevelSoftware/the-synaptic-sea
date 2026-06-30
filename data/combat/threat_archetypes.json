@@ -13,7 +13,8 @@
     "flee_threshold": 0.10,
     "armor": {"flat_reduction": {"physical": 1.0}, "resistance": {"biomatter": 0.10, "fire": 0.0}, "durability": 18.0},
     "status_on_hit": "infected",
-    "tags": ["swarm", "biomatter"]
+    "tags": ["swarm", "biomatter"],
+    "loot_table": "combat_drop_common"
   },
   "puppet_corpse": {
     "display_name": "Puppet Corpse",
@@ -29,7 +30,8 @@
     "flee_threshold": 0.18,
     "armor": {"flat_reduction": {"physical": 2.0}, "resistance": {"physical": 0.15, "fire": -0.15}, "durability": 28.0},
     "status_on_hit": "bleed",
-    "tags": ["melee", "corpse"]
+    "tags": ["melee", "corpse"],
+    "loot_table": "combat_drop_common"
   },
   "stalker": {
     "display_name": "Stalker",
@@ -45,7 +47,8 @@
     "flee_threshold": 0.12,
     "armor": {"flat_reduction": {"physical": 1.0}, "resistance": {"electric": -0.20, "fire": -0.10}, "durability": 16.0},
     "status_on_hit": "bleed",
-    "tags": ["stealth", "hunter"]
+    "tags": ["stealth", "hunter"],
+    "loot_table": "combat_drop_common"
   },
   "mimic": {
     "display_name": "Mimic",
@@ -61,7 +64,8 @@
     "flee_threshold": 0.15,
     "armor": {"flat_reduction": {"acid": 2.0}, "resistance": {"acid": 0.30, "fire": -0.25}, "durability": 20.0},
     "status_on_hit": "exposed",
-    "tags": ["ambush", "acid"]
+    "tags": ["ambush", "acid"],
+    "loot_table": "combat_drop_common"
   },
   "hull_tendril": {
     "display_name": "Hull Tendril",
@@ -77,7 +81,8 @@
     "flee_threshold": 0.08,
     "armor": {"flat_reduction": {"electric": 3.0}, "resistance": {"electric": 0.45, "fire": -0.10}, "durability": 32.0},
     "status_on_hit": "stun",
-    "tags": ["anchored", "electric"]
+    "tags": ["anchored", "electric"],
+    "loot_table": "combat_drop_common"
   },
   "drone_swarm": {
     "display_name": "Drone Swarm",
@@ -93,6 +98,7 @@
     "flee_threshold": 0.20,
     "armor": {"flat_reduction": {"physical": 1.0, "electric": 1.0}, "resistance": {"electric": 0.25, "biomatter": -0.15}, "durability": 24.0},
     "status_on_hit": "stun",
-    "tags": ["drone", "ranged"]
+    "tags": ["drone", "ranged"],
+    "loot_table": "combat_drop_common"
   }
 }

@@ -7,6 +7,9 @@ const DamagePipelineScript := preload("res://scripts/systems/damage_pipeline.gd"
 const THREAT_ARCHETYPE_PATH: String = "res://data/combat/threat_archetypes.json"
 const WEAPON_DEFINITIONS_PATH: String = "res://data/combat/weapon_definitions.json"
 const AMMO_DEFINITIONS_PATH: String = "res://data/combat/ammo_definitions.json"
+const SIGHT_RANGE: float = 12.0
+
+signal threat_killed(record: Dictionary)
 
 var threat_archetypes: Dictionary = {}
 var weapon_definitions: Dictionary = {}
@@ -25,6 +28,7 @@ var awareness_indicator: float = 0.0
 var combat_engaged: bool = false
 var last_attack_result: Dictionary = {}
 var placeholder_nodes: Dictionary = {}
+var _rewarded_kills: Dictionary = {}  # instance_id -> true (reward/remove once)
 
 func _ready() -> void:
 	threat_archetypes = _load_json_dict(THREAT_ARCHETYPE_PATH)
@@ -67,15 +71,19 @@ func tick_threats(delta: float, vitals_state = null, status_effects_state = null
 	detection_state.tick(delta)
 	awareness_indicator = 0.0
 	combat_engaged = false
+	# The emitted profile is constant for the whole tick (detection ticked above) —
+	# fetch once, not per threat.
+	var profile: Dictionary = detection_state.get_emitted_profile()
 	for threat in threats:
 		if threat == null:
 			continue
 		var same_room: bool = player_room_id.is_empty() or threat.room_id == player_room_id
+		var prox: float = _proximity_factor(threat, player_position)
 		threat.tick(delta, {
-			"noise_level": player_noise,
-			"light_level": player_light,
-			"sight_level": player_sight,
-			"crouching": player_crouching,
+			"noise_level": float(profile["noise"]),
+			"light_level": float(profile["light"]),
+			"sight_level": float(profile["visibility"]) * prox,
+			"crouching": false,  # crouch already applied in the emitted profile (no double-count)
 			"room_id": player_room_id,
 			"same_room": same_room,
 			"detect_threshold": detection_state.detect_threshold,
@@ -92,6 +100,7 @@ func tick_threats(delta: float, vitals_state = null, status_effects_state = null
 			threat.consume_attack()
 			combat_engaged = true
 		_update_placeholder(threat, player_position)
+	_sweep_dead_threats()
 
 func attack_with_weapon(weapon_id: String, inventory_state, equipment_state, target_id: String = "") -> Dictionary:
 	var weapon: Dictionary = weapon_definitions.get(weapon_id, {}) if weapon_definitions.get(weapon_id, {}) is Dictionary else {}
@@ -268,6 +277,37 @@ func _spawn_placeholder(threat, index: int, anchor: Vector3) -> void:
 	add_child(node)
 	placeholder_nodes[threat.instance_id] = node
 
+## Domain 2 (BP3): reward + remove threats that died this frame, exactly once.
+func _sweep_dead_threats() -> void:
+	var dead: Array = []
+	for threat in threats:
+		if is_instance_valid(threat) and threat.health <= 0.0 and not _rewarded_kills.has(threat.instance_id):
+			_rewarded_kills[threat.instance_id] = true
+			dead.append(threat)
+	for threat in dead:
+		emit_signal("threat_killed", {
+			"instance_id": threat.instance_id,
+			"archetype_id": threat.archetype_id,
+			"position": Vector3(float(threat.world_position[0]), float(threat.world_position[1]), float(threat.world_position[2])),
+			"loot_table": str((threat_archetypes.get(threat.archetype_id, {}) as Dictionary).get("loot_table", "combat_drop_common")),
+		})
+		_remove_threat(threat)
+
+func _remove_threat(threat) -> void:
+	var node = placeholder_nodes.get(threat.instance_id, null)
+	if node != null and is_instance_valid(node):
+		if node.get_parent() == self:
+			remove_child(node)
+		node.queue_free()
+	placeholder_nodes.erase(threat.instance_id)
+	threats.erase(threat)
+
+## Domain 2 (BP1): visibility falls off with world distance, so a closer threat
+## perceives more of the player's emitted visibility than a far one.
+func _proximity_factor(threat, player_position: Vector3) -> float:
+	var tp: Vector3 = Vector3(float(threat.world_position[0]), float(threat.world_position[1]), float(threat.world_position[2]))
+	return clampf(1.0 - tp.distance_to(player_position) / SIGHT_RANGE, 0.0, 1.0)
+
 func _update_placeholder(threat, player_position: Vector3) -> void:
 	var node = placeholder_nodes.get(threat.instance_id, null)
 	if node == null or not is_instance_valid(node):
@@ -286,6 +326,7 @@ func _clear_runtime_nodes() -> void:
 		remove_child(child)
 		child.queue_free()
 	placeholder_nodes.clear()
+	_rewarded_kills.clear()
 	threats.clear()
 	combat_engaged = false
 	awareness_indicator = 0.0

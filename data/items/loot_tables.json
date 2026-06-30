@@ -82,5 +82,13 @@
       { "item_id": "captains_black_box", "qty_min": 1, "qty_max": 1, "weight": 0.15, "rarity": "legendary", "unique_id": "captains_black_box", "codex_entry_id": "captains_black_box" },
       { "item_id": "synaptic_sea_reliquary", "qty_min": 1, "qty_max": 1, "weight": 0.20, "rarity": "epic", "unique_id": "synaptic_sea_reliquary", "codex_entry_id": "synaptic_sea_reliquary" }
     ]
+  },
+  "combat_drop_common": {
+    "rolls": 1,
+    "entries": [
+      { "item_id": "scrap_metal",      "qty_min": 1, "qty_max": 2, "weight": 5, "rarity": "common" },
+      { "item_id": "biomatter_tangle", "qty_min": 1, "qty_max": 1, "weight": 3, "rarity": "common" },
+      { "item_id": "power_cell",       "qty_min": 1, "qty_max": 1, "weight": 2, "rarity": "uncommon" }
+    ]
   }
 }
