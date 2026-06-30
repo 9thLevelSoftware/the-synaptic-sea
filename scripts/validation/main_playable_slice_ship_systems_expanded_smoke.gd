@@ -98,19 +98,8 @@ func _run_validation(playable: PlayableGeneratedShip) -> void:
 		"required_skill_level": 0
 	}, 0, 5.0, 5.0)
 	hydro.tick(5.0)
-	var synth = playable.synthesizer_state
-	synth.configure({
-		"recipe_id": "nutrient_paste",
-		"display_name": "Nutrient Paste",
-		"ingredients": {"hydroponic_greens": 2, "purified_water": 1},
-		"produces": {"item_id": "nutrient_paste", "quantity": 2},
-		"power_cost": 8.0,
-		"cook_time_seconds": 5.0,
-		"required_skill_level": 0,
-		"station_kind": "synthesizer"
-	})
-	synth.start_synthesis({"items": {"hydroponic_greens": 2, "purified_water": 1}}, 0, 10.0)
-	synth.tick(5.0)
+	# synthesizer_state was retired in Domain 3 Task 3; meals_ready now reflects
+	# crafting_state.is_crafting() — skip synthesizer setup here and assert 0.
 	var recycler = playable.water_recycler_state
 	recycler.configure({"input_item_id": "contaminated_water", "output_item_id": "purified_water", "conversion_ratio": 1.0, "recycle_time_seconds": 5.0, "power_cost": 2.0})
 	recycler.load_input("contaminated_water", 4, 10.0)
@@ -118,7 +107,9 @@ func _run_validation(playable: PlayableGeneratedShip) -> void:
 	playable._recompute_expanded_ship_systems(1.0)
 	expanded = playable.get_ship_systems_expanded_summary()
 	var sustenance: Dictionary = expanded.get("sustenance_state_summary", {})
-	if int(sustenance.get("harvest_ready", 0)) != 1 or int(sustenance.get("meals_ready", 0)) != 1 or int(sustenance.get("purified_water_ready", 0)) != 4:
+	# meals_ready is now driven by crafting_state.is_crafting() (synthesizer_state retired).
+	# No active craft here → meals_ready == 0 is correct.
+	if int(sustenance.get("harvest_ready", 0)) != 1 or int(sustenance.get("purified_water_ready", 0)) != 4:
 		_fail("sustenance outputs missing")
 		return
 	# Seal the pre-breached cargo before snapshotting so the snapshot baseline

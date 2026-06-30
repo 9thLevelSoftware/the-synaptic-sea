@@ -8,7 +8,8 @@
       { "item_id": "wiring_spool", "qty_min": 1, "qty_max": 2, "weight": 3, "rarity": "common" },
       { "item_id": "power_cell",   "qty_min": 1, "qty_max": 1, "weight": 2, "rarity": "uncommon", "biome_weights": { "dead_fleet": 1.3 } },
       { "item_id": "frayed_cable_coil", "qty_min": 1, "qty_max": 2, "weight": 4, "rarity": "common" },
-      { "item_id": "cracked_pressure_valve", "qty_min": 1, "qty_max": 1, "weight": 2, "rarity": "uncommon", "condition_weights": { "wrecked": 1.5 } }
+      { "item_id": "cracked_pressure_valve", "qty_min": 1, "qty_max": 1, "weight": 2, "rarity": "uncommon", "condition_weights": { "wrecked": 1.5 } },
+      { "item_id": "contaminated_water", "qty_min": 1, "qty_max": 3, "weight": 4, "rarity": "common" }
     ]
   },
   "generic_locker": {

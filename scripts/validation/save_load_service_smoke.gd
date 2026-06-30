@@ -55,7 +55,7 @@ func _initialize() -> void:
 	var fire_summary: Dictionary = {"state": "CLEARED", "hazard_kind": "fire"}
 
 	# REQ-013: include the electrical-arc summary in the round-trip so the
-	# smoke proves all seven SUMMARY_FIELDS survive a save / load cycle.
+	# smoke proves all 26 SUMMARY_FIELDS survive a save / load cycle.
 	# Force a non-default state by ticking halfway through the arcing
 	# phase, so the round-trip proves we captured the runtime number.
 	var arc := ElectricalArcStateScript.new()
@@ -92,7 +92,6 @@ func _initialize() -> void:
 	# ADR-0034: add food summaries
 	original.spoilage_summary = _make_spoilage_summary_for_smoke()
 	original.hydroponics_summary = _make_hydroponics_summary_for_smoke()
-	original.synthesizer_summary = _make_synthesizer_summary_for_smoke()
 	original.water_recycler_summary = _make_water_recycler_summary_for_smoke()
 	original.consumable_summary = {"hotbar_slots": ["bandage_kit", "focus_ampoule", "pistol_ammo_box"], "last_item_id": "flare", "total_uses": 4}
 	original.medicine_summary = {"last_item_id": "bandage_kit", "last_cured_statuses": ["radiation_sickness"], "last_results": []}
@@ -144,8 +143,8 @@ func _initialize() -> void:
 	if loaded.current_objective_sequence != original.current_objective_sequence:
 		_fail("current_objective_sequence mismatch")
 		return
-	if loaded.get_summary_count() != 27:
-		_fail("summary_count=%d expected 27" % loaded.get_summary_count())
+	if loaded.get_summary_count() != 26:
+		_fail("summary_count=%d expected 26" % loaded.get_summary_count())
 		return
 	if not loaded.ship_systems_summary.has("systems") or not loaded.ship_systems_summary.has("system_order"):
 		_fail("ship_systems_summary missing manager keys after round-trip")
@@ -229,7 +228,6 @@ func _initialize() -> void:
 	# ADR-0034: add food summaries
 	bad.spoilage_summary = original.spoilage_summary
 	bad.hydroponics_summary = original.hydroponics_summary
-	bad.synthesizer_summary = original.synthesizer_summary
 	bad.water_recycler_summary = original.water_recycler_summary
 	bad.consumable_summary = original.consumable_summary
 	bad.medicine_summary = original.medicine_summary
@@ -255,7 +253,7 @@ func _initialize() -> void:
 		_fail("delete_current_run did not remove the file")
 		return
 
-	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=27")
+	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=26")
 	quit(0)
 
 func _make_spoilage_summary_for_smoke() -> Dictionary:
@@ -288,22 +286,6 @@ func _make_hydroponics_summary_for_smoke() -> Dictionary:
 	}, 0, 5.0, 5.0)
 	hs.tick(30.0)
 	return hs.get_summary()
-
-func _make_synthesizer_summary_for_smoke() -> Dictionary:
-	var ss = load("res://scripts/systems/synthesizer_state.gd").new()
-	ss.configure({
-		"recipe_id": "nutrient_paste",
-		"display_name": "Nutrient Paste",
-		"ingredients": {"hydroponic_greens": 2, "purified_water": 1},
-		"produces": {"item_id": "nutrient_paste", "quantity": 2},
-		"power_cost": 8.0,
-		"cook_time_seconds": 15.0,
-		"required_skill_level": 1,
-		"station_kind": "synthesizer",
-	})
-	ss.start_synthesis({"items": {"hydroponic_greens": 4, "purified_water": 2}}, 1, 10.0)
-	ss.tick(7.5)
-	return ss.get_summary()
 
 func _make_water_recycler_summary_for_smoke() -> Dictionary:
 	var wr = load("res://scripts/systems/water_recycler_state.gd").new()

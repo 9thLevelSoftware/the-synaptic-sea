@@ -53,6 +53,7 @@ const MaterialStateScript := preload("res://scripts/systems/material_state.gd")
 const FieldCraftingStateScript := preload("res://scripts/systems/field_crafting_state.gd")
 const DeconstructionResolverScript := preload("res://scripts/systems/deconstruction_resolver.gd")
 const CraftingStationScript := preload("res://scripts/tools/crafting_station.gd")
+const ProductionStationScript := preload("res://scripts/tools/production_station.gd")
 const ShipOccupancyScript := preload("res://scripts/systems/ship_occupancy.gd")
 const DockPortsScript := preload("res://scripts/systems/dock_ports.gd")
 const DockingManagerScript := preload("res://scripts/systems/docking_manager.gd")
@@ -87,7 +88,6 @@ const StatusEffectsStateScript := preload("res://scripts/systems/status_effects_
 const SpoilageStateScript := preload("res://scripts/systems/spoilage_state.gd")
 const CookingStateScript := preload("res://scripts/systems/cooking_state.gd")
 const HydroponicsStateScript := preload("res://scripts/systems/hydroponics_state.gd")
-const SynthesizerStateScript := preload("res://scripts/systems/synthesizer_state.gd")
 const WaterRecyclerStateScript := preload("res://scripts/systems/water_recycler_state.gd")
 const PowerGridStateScript := preload("res://scripts/systems/power_grid_state.gd")
 const LifeSupportExpandedStateScript := preload("res://scripts/systems/life_support_state.gd")
@@ -149,6 +149,7 @@ const ARC_ZONE_LABEL_TEXT_ARCING: String = "ARC LIVE — WAIT"
 const POWER_GRID_CONFIG_PATH: String = "res://data/ship_systems/power_budget_tables.json"
 const HULL_COMPARTMENTS_CONFIG_PATH: String = "res://data/ship_systems/hull_compartments.json"
 const FACILITY_UPGRADES_CONFIG_PATH: String = "res://data/ship_systems/facility_upgrades.json"
+const HYDROPONICS_CROPS_CONFIG_PATH: String = "res://data/crops/hydroponics_crops.json"
 const SHIP_SUBSYSTEM_TUNING_PATH: String = "res://data/ship_systems/subsystem_tuning.json"
 
 # Objective bridge: which manager subcomponents each objective brings operational.
@@ -274,6 +275,7 @@ var deconstruction_resolver                 # DeconstructionResolver
 var crafting_station_root: Node3D = null
 var crafting_stations: Array = []
 const CRAFTING_STATION_KINDS: Array[String] = ["fabricator", "medbay", "kitchen", "synthesizer", "workbench", "salvage"]
+var production_stations: Array = []
 var _loot_tables: Dictionary = {}
 var _salvage_loot_tables: Dictionary = {}   # objective_id -> loot_table key
 var unique_item_state
@@ -340,7 +342,6 @@ var electrical_arc_state: ElectricalArcState
 # Untyped because class_name globals are unreliable under --headless --script.
 var spoilage_state  # SpoilageState
 var hydroponics_state  # HydroponicsState
-var synthesizer_state  # SynthesizerState
 var water_recycler_state  # WaterRecyclerState
 var power_grid_state  # PowerGridState
 var life_support_expanded_state  # LifeSupportState
@@ -1170,7 +1171,6 @@ func _build_runtime_nodes() -> void:
 	# ADR-0034: instantiate food / cooking / spoilage / sustenance models.
 	spoilage_state = SpoilageStateScript.new()
 	hydroponics_state = HydroponicsStateScript.new()
-	synthesizer_state = SynthesizerStateScript.new()
 	water_recycler_state = WaterRecyclerStateScript.new()
 	_configure_expanded_ship_system_models()
 	effect_dispatcher = EffectDispatcherScript.new()
@@ -1394,8 +1394,8 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 		sustenance_state.tick(delta, {
 			"powered_ratio": power_grid_state.get_allocation_ratio("sustenance"),
 			"hydroponics_summary": hydroponics_state.get_summary() if hydroponics_state != null else {},
-			"synthesizer_summary": synthesizer_state.get_summary() if synthesizer_state != null else {},
 			"water_recycler_summary": water_recycler_state.get_summary() if water_recycler_state != null else {},
+			"meals_active": crafting_state != null and crafting_state.is_crafting() and crafting_state.get_active_station_kind() in ["kitchen", "synthesizer"],
 		})
 
 func _expanded_ship_systems_summary() -> Dictionary:
@@ -2995,7 +2995,7 @@ func get_active_fire_state_for_validation():
 ## so they inherit its transform and are freed with it. Idempotent: re-callable on reload.
 func _build_crafting_stations() -> void:
 	_clear_crafting_stations()
-	if away_from_start or home_ship == null or not is_instance_valid(home_ship.scene_root):
+	if away_from_start or not is_instance_valid(home_ship) or not is_instance_valid(home_ship.scene_root):
 		return
 	if crafting_state == null:
 		return
@@ -3031,6 +3031,52 @@ func _clear_crafting_stations() -> void:
 				p.remove_child(st)
 			st.queue_free()
 	crafting_stations.clear()
+
+## Domain 3: builds one PlayerReachable ProductionStation per persistent food-production
+## model (hydroponics + water_recycler) on the home ship. Mirrors _build_crafting_stations.
+func _build_production_stations() -> void:
+	_clear_production_stations()
+	if away_from_start or not is_instance_valid(home_ship) or not is_instance_valid(home_ship.scene_root):
+		return
+	if hydroponics_state == null or water_recycler_state == null or inventory_state == null:
+		return
+	var crops_cfg: Dictionary = _load_json_dict(HYDROPONICS_CROPS_CONFIG_PATH)
+	var positions: Array = _home_local_station_positions()
+	var y: float = PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR
+	var specs: Array = [
+		{"kind": "hydroponics", "model": hydroponics_state, "config": crops_cfg},
+		{"kind": "water_recycler", "model": water_recycler_state, "config": {}},
+	]
+	var power_cb: Callable = func() -> float:
+		# Boolean power gate as large float: sustenance band either powers the station
+		# (>= half allocation) or it does not. Mirrors how crafting treats station power.
+		var ratio: float = power_grid_state.get_allocation_ratio("sustenance") if power_grid_state != null else 0.0
+		return 999.0 if ratio >= 0.5 else 0.0
+	var skill_cb: Callable = func() -> int:
+		return int(player_progression.get_skill_level("fabrication")) if player_progression != null and player_progression.has_method("get_skill_level") else 0
+	var idx: int = 0
+	for spec in specs:
+		var pos: Vector3 = positions[idx % positions.size()] if not positions.is_empty() else Vector3(float(idx) * 2.0, y, 0.0)
+		idx += 1
+		var st = ProductionStationScript.new()
+		st.configure(str(spec["kind"]), spec["model"], inventory_state, power_cb, skill_cb, spec["config"] as Dictionary, pos, 1.8)
+		if not st.production_started.is_connected(_on_production_started):
+			st.production_started.connect(_on_production_started)
+		if not st.production_harvested.is_connected(_on_production_harvested):
+			st.production_harvested.connect(_on_production_harvested)
+		if not st.production_blocked.is_connected(_on_production_blocked):
+			st.production_blocked.connect(_on_production_blocked)
+		home_ship.scene_root.add_child(st)
+		production_stations.append(st)
+
+func _clear_production_stations() -> void:
+	for st in production_stations:
+		if is_instance_valid(st):
+			var p = st.get_parent()
+			if is_instance_valid(p):
+				p.remove_child(st)
+			st.queue_free()
+	production_stations.clear()
 
 ## HOME-LOCAL station positions, derived from the home ship's actual room nodes (the same
 ## "ShipStructure"-child approach interior_aabb()/_lifeboat_local_repair_positions() use), so
@@ -3181,6 +3227,28 @@ func _on_salvage_completed(item_id: String, yields: Dictionary) -> void:
 func _on_craft_blocked(station_kind: String, reason: String) -> void:
 	print("CRAFT BLOCKED station=%s reason=%s" % [station_kind, reason])
 
+## Domain 3: signal handlers for persistent production stations (hydroponics/water_recycler).
+func _on_production_started(station_kind: String, input_id: String) -> void:
+	_refresh_inventory_hud()
+	_recompute_player_encumbrance()
+	print("PRODUCTION STARTED station=%s input=%s" % [station_kind, input_id])
+
+func _on_production_harvested(station_kind: String, item_id: String, qty: int) -> void:
+	# qty is the count actually deposited; a 0 means nothing landed (e.g. a full stack), so
+	# do NOT register existing inventory of the same id for spoilage. With the output-full
+	# guard in ProductionStation this should not fire at 0, but guard defensively.
+	if qty <= 0:
+		return
+	# The station already deposited into inventory; register produce for spoilage
+	# (mirrors _on_craft_completed) and refresh HUD/encumbrance.
+	_register_food_for_spoilage(item_id)
+	_refresh_inventory_hud()
+	_recompute_player_encumbrance()
+	print("PRODUCTION HARVESTED station=%s item=%s qty=%d" % [station_kind, item_id, qty])
+
+func _on_production_blocked(station_kind: String, reason: String) -> void:
+	print("PRODUCTION BLOCKED station=%s reason=%s" % [station_kind, reason])
+
 ## ADR-0038: handles the player's field_craft (KEY_C) press — begins the first craftable
 ## portable recipe (station_kind == "field_crafting") via the coordinator-owned model.
 func _on_player_field_craft_requested(_player_body) -> void:
@@ -3252,6 +3320,32 @@ func craft_at_station_for_validation(station_kind: String) -> bool:
 			st.set_powered(true)
 			return st.try_interact(player)
 	return false
+
+## Domain 3 validation seam (mirrors craft_at_station_for_validation): teleport the player
+## onto a production station and interact. The station infers start-vs-harvest from its own
+## model state, so a first call starts production and a later call harvests. `_harvest` is an
+## intentionally-unused call-site readability label (false=start, true=collect); the
+## underscore marks it as accepted-but-not-branched-on.
+func produce_at_station_for_validation(station_kind: String, _harvest: bool) -> bool:
+	if not is_instance_valid(player):
+		return false
+	for st in production_stations:
+		if is_instance_valid(st) and st.station_kind == station_kind:
+			if player.has_method("teleport_to"):
+				player.teleport_to(st.global_position)
+			st.set_validation_player_in_range(player)
+			return st.try_interact(player)
+	return false
+
+## Domain 3 validation seam: deterministically advance the production models (hydroponics +
+## water_recycler) by delta, bypassing the _process guard that blocks after slice_complete.
+## Mirrors advance_crafting_for_validation. Call once per simulated second in smoke loops
+## instead of _process(1.0) to avoid the slice_complete early-return after player death.
+func advance_production_for_validation(delta: float) -> void:
+	if hydroponics_state != null and hydroponics_state.state == HydroponicsStateScript.State.PLANTED:
+		hydroponics_state.tick(delta)
+	if water_recycler_state != null and water_recycler_state.state == WaterRecyclerStateScript.State.RECYCLING:
+		water_recycler_state.tick(delta)
 
 ## ADR-0038 validation seam: deterministically advance the active station craft (and field
 ## craft) by delta, depositing outputs through the real completion handlers when they finish.
@@ -3578,6 +3672,7 @@ func travel_home() -> bool:
 	_build_fire_suppression_points()
 	_build_extinguisher_recharge_port()
 	_build_crafting_stations()
+	_build_production_stations()
 	if tracker != null and loader != null and loader.has_method("get_objective_specs_copy"):
 		# set_objectives resets the tracker's completed set; re-apply the home loop's
 		# progress so returning home does not blank a partially-completed home HUD.
@@ -4174,6 +4269,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_build_fire_suppression_points()
 	_build_extinguisher_recharge_port()
 	_build_crafting_stations()
+	_build_production_stations()
 	tracker.set_objectives(loader.get_objective_specs_copy())
 	current_objective_sequence = 1
 	slice_complete = false
@@ -4426,6 +4522,11 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# ADR-0038: home-ship crafting / salvage stations. Range-gated; tried after repairs so a
 	# repair point and a station sharing an area resolve to the repair first.
 	for st in crafting_stations:
+		if is_instance_valid(st) and st.try_interact(player_body):
+			return
+	# Domain 3: persistent production stations (hydroponics + water_recycler). Same
+	# priority tier as crafting stations; tried right after them.
+	for st in production_stations:
 		if is_instance_valid(st) and st.try_interact(player_body):
 			return
 	# REQ-007: tool pickup is an interaction like any other. Try it first
@@ -4857,6 +4958,9 @@ func _process(delta: float) -> void:
 		if is_instance_valid(audio_manager) and audio_manager.has_method("tick"):
 			audio_manager.tick(delta)
 			_refresh_audio_state(false, delta)
+		# Domain 3: food spoilage + production advance on the derelict branch too (see
+		# _tick_food_runtime — deliberate divergence from crafting, which pauses away).
+		_tick_food_runtime(delta)
 		return
 	if not playable_started or slice_complete:
 		return
@@ -4900,15 +5004,8 @@ func _process(delta: float) -> void:
 			if hallucination_manager != null and is_instance_valid(hallucination_manager):
 				var ppos: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
 				hallucination_manager.render(delta, ppos)
-	# ADR-0034: tick food / cooking / spoilage / sustenance models.
-	if spoilage_state != null:
-		spoilage_state.tick(delta)
-	if hydroponics_state != null and hydroponics_state.state == HydroponicsStateScript.State.PLANTED:
-		hydroponics_state.tick(delta)
-	if synthesizer_state != null and synthesizer_state._cooking.state == CookingStateScript.State.COOKING:
-		synthesizer_state.tick(delta)
-	if water_recycler_state != null and water_recycler_state.state == WaterRecyclerStateScript.State.RECYCLING:
-		water_recycler_state.tick(delta)
+	# ADR-0034 / Domain 3: tick food spoilage + production (shared by BOTH _process branches).
+	_tick_food_runtime(delta)
 	# REQ-AU-001..010: tick the audio manager. The manager advances the
 	# ambient crossfade, music layer crossfade, sfx cooldowns + captions,
 	# and the meta-event scheduler. Tick before any HUD caption drain so
@@ -4982,6 +5079,19 @@ func _apply_vitals_action_gating() -> void:
 	if not player.has_method("set_movement_speed_multiplier"):
 		return
 	player.set_movement_speed_multiplier(vitals_state.get_movement_speed_multiplier())
+
+## Domain 3: advance food spoilage and in-progress production. Called from BOTH _process
+## branches. DELIBERATE divergence from crafting (powered crafting stations PAUSE while away):
+## growth/recycling are time-based biological/chemical processes that do not require the
+## player aboard, so a crop planted before boarding keeps growing on the derelict run and is
+## HARVESTABLE on return. Spoilage is likewise time-based and must not freeze on a derelict.
+func _tick_food_runtime(delta: float) -> void:
+	if spoilage_state != null:
+		spoilage_state.tick(delta)
+	if hydroponics_state != null and hydroponics_state.state == HydroponicsStateScript.State.PLANTED:
+		hydroponics_state.tick(delta)
+	if water_recycler_state != null and water_recycler_state.state == WaterRecyclerStateScript.State.RECYCLING:
+		water_recycler_state.tick(delta)
 
 ## Domain 1: terminal stake. When the player is incapacitated (health<=0) end the
 ## run as a death. end_run is idempotent (guards slice_complete), so this is safe
@@ -5981,8 +6091,6 @@ func _build_run_snapshot() -> RunSnapshot:
 		snapshot.spoilage_summary = spoilage_state.get_summary()
 	if hydroponics_state != null:
 		snapshot.hydroponics_summary = hydroponics_state.get_summary()
-	if synthesizer_state != null:
-		snapshot.synthesizer_summary = synthesizer_state.get_summary()
 	if water_recycler_state != null:
 		snapshot.water_recycler_summary = water_recycler_state.get_summary()
 	if consumable_state != null:
@@ -6287,8 +6395,6 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		spoilage_state.apply_summary(snapshot.spoilage_summary)
 	if hydroponics_state != null and not snapshot.hydroponics_summary.is_empty():
 		hydroponics_state.apply_summary(snapshot.hydroponics_summary)
-	if synthesizer_state != null and not snapshot.synthesizer_summary.is_empty():
-		synthesizer_state.apply_summary(snapshot.synthesizer_summary)
 	if water_recycler_state != null and not snapshot.water_recycler_summary.is_empty():
 		water_recycler_state.apply_summary(snapshot.water_recycler_summary)
 	if consumable_state != null and not snapshot.consumable_summary.is_empty():
@@ -6325,6 +6431,7 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	_build_fire_suppression_points()
 	_build_extinguisher_recharge_port()
 	_build_crafting_stations()
+	_build_production_stations()
 	# Restore the saved objective sequence AFTER all model state has
 	# been applied so the subsequent _activate_current_objective() call
 	# sees the right state.
