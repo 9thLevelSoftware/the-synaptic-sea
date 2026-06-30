@@ -5067,8 +5067,9 @@ func _process(delta: float) -> void:
 		if is_instance_valid(extinguisher_recharge_port):
 			var _dmgr = _active_systems_manager()
 			extinguisher_recharge_port.set_powered(_dmgr != null and _dmgr.is_operational("power"))
-		# Domain 3: food spoilage + production advance on the derelict branch too (see
-		# _tick_food_runtime — deliberate divergence from crafting, which pauses away).
+		# Domain 3 + Phase 3: food spoilage + production advance on the derelict branch too (see
+		# _tick_food_runtime). Powered station crafting also advances on both branches
+		# via _recompute_expanded_ship_systems called above (ADR-0038 superseded).
 		_tick_food_runtime(delta)
 		return
 	if not playable_started or slice_complete:

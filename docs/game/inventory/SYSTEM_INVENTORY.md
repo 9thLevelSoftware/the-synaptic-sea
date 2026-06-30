@@ -165,7 +165,7 @@
 
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
-| Ship Systems Manager | 🟢 | 83% | [V] | playable_generated_ship.gd:4816 |
+| Ship Systems Manager | 🟢 | 83% | [V] | playable_generated_ship.gd:_advance_ship (hub always; boarded derelict on away branch; absent derelicts via _catch_up_ship on revisit) |
 | ↳ Ship System (group) | 🟢 | 100% | [V] | ship_systems_manager.gd:135 |
 | ↳ Ship Subcomponent | 🟢 | 100% | [V] | ship_systems_manager.gd:146 |
 | ↳ Life Support System (manager subclass) | 🟡 | 50% | [V] | ship_systems_manager.gd:135 |
