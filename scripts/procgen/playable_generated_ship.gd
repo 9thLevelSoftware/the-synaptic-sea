@@ -1383,16 +1383,28 @@ func _tick_active_fire(delta: float) -> void:
 func _active_derelict_web_attached() -> bool:
 	return away_from_start and current_ship != null and current_ship.is_web_attached()
 
-## Advance the hub web infestation by one tick and apply its hull damage across
-## every hub compartment. The live damage source closing the ship_systems loop.
-func _apply_web_hull_damage(delta: float) -> void:
-	if hull_web_state == null or hull_integrity_state == null:
+## Live Persistent Ships Phase 3: the unified per-ship sim tick. Advances ONE ship's
+## systems manager and applies its biomatter-web hull damage, resolving the ship's own
+## models via _web_for/_hull_for. Works for any ship (hub or derelict); used continuously
+## for present ships and (Phase 4) for catch-up over a large dt. Does NOT tick fire (that
+## stays on the active-ship scene path) or the hub expanded recompute.
+func _advance_ship(ship, delta: float) -> void:
+	if ship == null:
 		return
-	var dmg: float = hull_web_state.tick(delta, _active_derelict_web_attached())
+	if ship.systems_manager != null:
+		ship.systems_manager.advance(delta)
+	var web = _web_for(ship)
+	var hull = _hull_for(ship)
+	if web == null or hull == null:
+		return
+	# Contact boost is the hub's only (an attached derelict docked to the hub). A derelict's
+	# own attachment drives its base web growth; cross-ship spread is a follow-on.
+	var contact: bool = _active_derelict_web_attached() if ship == home_ship else false
+	var dmg: float = web.tick(delta, contact)
 	if dmg <= 0.0:
 		return
-	for cid in hull_integrity_state.compartments.keys():
-		hull_integrity_state.damage_compartment(str(cid), dmg)
+	for cid in hull.compartments.keys():
+		hull.damage_compartment(str(cid), dmg)
 
 func _recompute_expanded_ship_systems(delta: float) -> void:
 	if power_grid_state == null:
@@ -4997,9 +5009,8 @@ func _process(delta: float) -> void:
 		# Derelict-side fire (wire BOTH branches): tick the active (derelict) fire model so
 		# it spreads, degrades derelict systems, and feeds the player-vitals teeth below.
 		# Fire is ticked here via _tick_active_fire on BOTH branches (home and away).
-		# This away branch now also runs ship_systems_manager.advance + web hull damage +
-		# _recompute_expanded_ship_systems in the Domain 4 block below (same pattern as
-		# the sanity/hallucination and audio fixes in Codex PRs #43-44).
+		# Live Persistent Ships Phase 3: _advance_ship (hub + boarded derelict) +
+		# _recompute_expanded_ship_systems run in the block below.
 		_tick_active_fire(delta)
 		# Domain 1: survival attrition + stakes on the derelict branch (shared
 		# helper). Runs radiation/body-temp/status + the vitals cascade + death,
@@ -5020,14 +5031,13 @@ func _process(delta: float) -> void:
 		if is_instance_valid(audio_manager) and audio_manager.has_method("tick"):
 			audio_manager.tick(delta)
 			_refresh_audio_state(false, delta)
-		# Domain 4: the hub ship sim is LIVE on the derelict branch (no pausing).
-		# advance + web hull damage + recompute run here so the trapped hub keeps
-		# degrading (web devours the hull) and powered stations stay live while the
-		# player is aboard a derelict. _tick_active_fire already ran above; recompute
-		# no longer ticks fire/field-crafting (see Task 2), so no double-tick.
-		if ship_systems_manager != null:
-			ship_systems_manager.advance(delta)
-		_apply_web_hull_damage(delta)
+		# Live Persistent Ships Phase 3: _advance_ship ticks BOTH present ships on the
+		# away branch — the hub (always co-present) and the boarded derelict (guarded so
+		# the hub is never advanced twice if current_ship == home_ship). Fire stays on
+		# _tick_active_fire above; _recompute_expanded_ship_systems follows for hub power.
+		_advance_ship(home_ship, delta)
+		if current_ship != null and current_ship != home_ship:
+			_advance_ship(current_ship, delta)
 		_recompute_expanded_ship_systems(delta)
 		# Recharge port is power-gated on the DERELICT's own power system (engineering gate):
 		# present but dead until the player restores derelict power. This MUST run AFTER
@@ -5046,9 +5056,7 @@ func _process(delta: float) -> void:
 		return
 	_tick_autosave_policy(delta)
 	_tick_threat_runtime(delta)
-	if ship_systems_manager != null:
-		ship_systems_manager.advance(delta)
-	_apply_web_hull_damage(delta)
+	_advance_ship(home_ship, delta)
 	_recompute_expanded_ship_systems(delta)
 	_tick_active_fire(delta)
 	if field_crafting_state != null and field_crafting_state.tick(delta):
