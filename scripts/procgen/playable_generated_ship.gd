@@ -3341,7 +3341,7 @@ func _on_threat_killed(record: Dictionary) -> void:
 		return
 	var pos: Vector3 = record.get("position", Vector3.ZERO)
 	var cid: String = "corpse_%s" % str(record.get("instance_id", ""))
-	var lc = LootContainerScript.new()
+	var lc: LootContainer = LootContainerScript.new()
 	var seed_source: String = "kill:%s" % cid
 	lc.configure(cid, str(record.get("loot_table", "combat_drop_common")), seed_source,
 		inventory_state, _loot_tables, pos, 1.8, {})
