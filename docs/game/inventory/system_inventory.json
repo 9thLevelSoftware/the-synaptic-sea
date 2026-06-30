@@ -552,17 +552,17 @@
       "kind": "simulation",
       "model_exists": false,
       "smoke": null,
-      "reachable": true,
+      "reachable": false,
       "driven": false,
       "driven_at": null,
       "input": {
         "live": false,
-        "desc": "no runtime caller invokes start_synthesis() (only smokes); tick at 4896 gated on _cooking COOKING never entered",
+        "desc": "Retired: no runtime caller; .gd file deleted (Task 6).",
         "at": null
       },
       "output": {
         "live": false,
-        "desc": "collect_result() never called in runtime; get_summary feeds sustenance tick (static)",
+        "desc": "Retired: collect_result() and get_summary() no longer called; synthesizer removed from the sustenance tick payload and its .gd file deleted (Task 6). Synthesis closes via CraftingState 'synthesizer' station.",
         "at": null
       },
       "confidence": "V",
@@ -597,7 +597,7 @@
           "driven_at": null,
           "input": {
             "live": false,
-            "desc": "only invoked via SynthesizerState (synthesizer_state.gd:17 start_cooking) which is itself never started; no other caller of start_cooking exists",
+            "desc": "driven by CraftingState (kitchen cook recipes); the former synthesizer_state.gd caller was retired/deleted in Task 6",
             "at": null
           },
           "output": {
@@ -8341,7 +8341,7 @@
         },
         {
           "system": "sustenance_state",
-          "role": "dead-end (HUD-only)"
+          "role": "sink: HUD status display (not a power-loop consumer)"
         }
       ],
       "break_points": [
