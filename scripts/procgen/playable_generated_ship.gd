@@ -1395,7 +1395,7 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 			"powered_ratio": power_grid_state.get_allocation_ratio("sustenance"),
 			"hydroponics_summary": hydroponics_state.get_summary() if hydroponics_state != null else {},
 			"water_recycler_summary": water_recycler_state.get_summary() if water_recycler_state != null else {},
-			"meals_active": crafting_state != null and crafting_state.is_crafting(),
+			"meals_active": crafting_state != null and crafting_state.is_crafting() and crafting_state.get_active_station_kind() in ["kitchen", "synthesizer"],
 		})
 
 func _expanded_ship_systems_summary() -> Dictionary:
@@ -2995,7 +2995,7 @@ func get_active_fire_state_for_validation():
 ## so they inherit its transform and are freed with it. Idempotent: re-callable on reload.
 func _build_crafting_stations() -> void:
 	_clear_crafting_stations()
-	if away_from_start or home_ship == null or not is_instance_valid(home_ship.scene_root):
+	if away_from_start or not is_instance_valid(home_ship) or not is_instance_valid(home_ship.scene_root):
 		return
 	if crafting_state == null:
 		return
@@ -3036,7 +3036,7 @@ func _clear_crafting_stations() -> void:
 ## model (hydroponics + water_recycler) on the home ship. Mirrors _build_crafting_stations.
 func _build_production_stations() -> void:
 	_clear_production_stations()
-	if away_from_start or home_ship == null or not is_instance_valid(home_ship.scene_root):
+	if away_from_start or not is_instance_valid(home_ship) or not is_instance_valid(home_ship.scene_root):
 		return
 	if hydroponics_state == null or water_recycler_state == null or inventory_state == null:
 		return
@@ -3234,6 +3234,11 @@ func _on_production_started(station_kind: String, input_id: String) -> void:
 	print("PRODUCTION STARTED station=%s input=%s" % [station_kind, input_id])
 
 func _on_production_harvested(station_kind: String, item_id: String, qty: int) -> void:
+	# qty is the count actually deposited; a 0 means nothing landed (e.g. a full stack), so
+	# do NOT register existing inventory of the same id for spoilage. With the output-full
+	# guard in ProductionStation this should not fire at 0, but guard defensively.
+	if qty <= 0:
+		return
 	# The station already deposited into inventory; register produce for spoilage
 	# (mirrors _on_craft_completed) and refresh HUD/encumbrance.
 	_register_food_for_spoilage(item_id)
@@ -3317,11 +3322,11 @@ func craft_at_station_for_validation(station_kind: String) -> bool:
 	return false
 
 ## Domain 3 validation seam (mirrors craft_at_station_for_validation): teleport the player
-## onto a production station and interact. harvest=false starts production; harvest=true
-## collects. The node infers start-vs-harvest from model state; the param exists for
-## call-site clarity and is accepted but not branched on here.
-func produce_at_station_for_validation(station_kind: String, harvest: bool) -> bool:
-	var _unused_harvest: bool = harvest
+## onto a production station and interact. The station infers start-vs-harvest from its own
+## model state, so a first call starts production and a later call harvests. `_harvest` is an
+## intentionally-unused call-site readability label (false=start, true=collect); the
+## underscore marks it as accepted-but-not-branched-on.
+func produce_at_station_for_validation(station_kind: String, _harvest: bool) -> bool:
 	if not is_instance_valid(player):
 		return false
 	for st in production_stations:
