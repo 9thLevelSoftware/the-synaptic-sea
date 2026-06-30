@@ -409,21 +409,21 @@ func _on_frame() -> void:
 func _validate() -> void:
 	finished = true  # prevent re-entry across frames
 
-	# Keep the player alive through the away loop so Domain 1 attrition does not
-	# kill them before the ship-systems assertions (mirrors food_away_tick_smoke).
-	if playable.vitals_state != null:
-		playable.vitals_state.hunger = playable.vitals_state.max_hunger
-		playable.vitals_state.thirst = playable.vitals_state.max_thirst
-		playable.vitals_state.health = playable.vitals_state.max_health
-
 	var coverage_before: float = playable.hull_web_state.coverage
 	var integrity_before: float = playable.hull_integrity_state.average_integrity()
 
 	# Force the AWAY branch and drive enough simulated seconds for the web to
 	# breach a compartment (growth 0.05/s with contact, damage_rate 0.03/s).
+	# Re-boost vitals each iteration so Domain 1 attrition / Domain 2 combat on the
+	# away branch cannot kill the player mid-loop (which would reset the slice and
+	# void the ship-systems assertion). This test isolates ship systems, not survival.
 	playable.away_from_start = true
 	var n: int = 0
 	for i: int in range(60):
+		if playable.vitals_state != null:
+			playable.vitals_state.hunger = playable.vitals_state.max_hunger
+			playable.vitals_state.thirst = playable.vitals_state.max_thirst
+			playable.vitals_state.health = playable.vitals_state.max_health
 		playable._process(1.0)
 		n += 1
 
@@ -549,9 +549,9 @@ In the load-path restore block, immediately after the `hull_integrity_state.appl
 				hull_web_state.apply_summary(snapshot.ship_systems_summary.get("web_infestation_summary", {}))
 ```
 
-- [ ] **Step 6: Add the web-damage + contact helpers and the validation seam**
+- [ ] **Step 6: Add the web-damage + contact helpers**
 
-Add these three functions near `_recompute_expanded_ship_systems` (e.g., directly below `_tick_active_fire`):
+Add these two functions near `_recompute_expanded_ship_systems` (e.g., directly below `_tick_active_fire`):
 
 ```gdscript
 ## Foundation contagion seed: while away and docked to a still-web-attached
@@ -570,15 +570,6 @@ func _apply_web_hull_damage(delta: float) -> void:
 		return
 	for cid in hull_integrity_state.compartments.keys():
 		hull_integrity_state.damage_compartment(str(cid), dmg)
-
-## Validation seam: advance hub systems + web damage + recompute by `delta`
-## without the _process death/slice gates. (Reserved for smokes that need to drive
-## the sim directly; the closure smoke drives the real _process away branch.)
-func advance_ship_systems_for_validation(delta: float) -> void:
-	if ship_systems_manager != null:
-		ship_systems_manager.advance(delta)
-	_apply_web_hull_damage(delta)
-	_recompute_expanded_ship_systems(delta)
 ```
 
 - [ ] **Step 7: Apply web damage on the HOME branch**
@@ -811,7 +802,7 @@ EOF
 - Inventory delta (loop closed, hull input live, break-points) + `--check` → Task 4. ✓
 - Non-goals (dock-graph spread, cut-free action, per-derelict hull) → left out; recorded as deferred in the Task 4 break-points. ✓
 
-**Placeholder scan:** no TBD/TODO; every code step shows complete code; rate values are concrete (`web_infestation.json`); the only "reserved" item (`advance_ship_systems_for_validation`) is fully implemented, just not consumed by the smoke (the smoke drives the real `_process` away branch — stronger coverage). ✓
+**Placeholder scan:** no TBD/TODO; every code step shows complete code; rate values are concrete (`web_infestation.json`); no dead/unused functions (the closure smoke drives the real `_process` away branch directly). ✓
 
 **Type consistency:** `hull_web_state` / `WebInfestationStateScript` / `WEB_INFESTATION_CONFIG_PATH` / `_apply_web_hull_damage` / `_active_derelict_web_attached` / `_tick_active_fire` / `ShipInstance.web_attached` / `is_web_attached()` used identically across tasks. `tick(delta, contact) -> float`, `get_summary`/`apply_summary`, `damage_compartment`, `average_integrity`, `get_breach_count`, `get_health_drain_per_second` match their source files. ✓
 
