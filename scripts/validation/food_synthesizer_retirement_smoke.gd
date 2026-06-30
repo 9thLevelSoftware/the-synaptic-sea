@@ -57,9 +57,17 @@ func _on_frame() -> void:
 	# crafting synthesizer still works.
 	if not playable.craft_at_station_for_validation("synthesizer"):
 		_fail("crafting synthesizer produced nothing"); return
+	# meals_ready pipeline: is_crafting() → meals_active context key → sustenance_state.meals_ready.
+	# A 0.1-delta recompute is too short to complete a 15–20s recipe, so is_crafting() stays true.
+	playable._recompute_expanded_ship_systems(0.1)
+	var sus_summary: Dictionary = playable.sustenance_state.get_summary()
+	var meals_ready_got: int = sus_summary.get("meals_ready", -1)
+	if meals_ready_got != 1:
+		_fail("meals_ready pipeline broken: is_crafting->meals_active->meals_ready, got %d" % meals_ready_got)
+		return
 	playable.advance_crafting_for_validation(60.0)
 	finished = true
-	print("FOOD SYNTHESIZER RETIREMENT PASS orphan_removed=true crafting_synth_ok=true legacy_load_ok=true")
+	print("FOOD SYNTHESIZER RETIREMENT PASS orphan_removed=true crafting_synth_ok=true legacy_load_ok=true meals_pipeline=true")
 	_cleanup_and_quit(0)
 
 func _find_playable(node: Node) -> PlayableGeneratedShip:
