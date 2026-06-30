@@ -92,6 +92,7 @@ const WaterRecyclerStateScript := preload("res://scripts/systems/water_recycler_
 const PowerGridStateScript := preload("res://scripts/systems/power_grid_state.gd")
 const LifeSupportExpandedStateScript := preload("res://scripts/systems/life_support_state.gd")
 const HullIntegrityStateScript := preload("res://scripts/systems/hull_integrity_state.gd")
+const WebInfestationStateScript := preload("res://scripts/systems/web_infestation_state.gd")
 const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
 const ExtinguisherStateScript := preload("res://scripts/systems/extinguisher_state.gd")
 const FireSuppressionPointScript := preload("res://scripts/tools/fire_suppression_point.gd")
@@ -148,6 +149,7 @@ const ARC_ZONE_LABEL_TEXT_DISCHARGED: String = "ARC GROUNDED — CROSS"
 const ARC_ZONE_LABEL_TEXT_ARCING: String = "ARC LIVE — WAIT"
 const POWER_GRID_CONFIG_PATH: String = "res://data/ship_systems/power_budget_tables.json"
 const HULL_COMPARTMENTS_CONFIG_PATH: String = "res://data/ship_systems/hull_compartments.json"
+const WEB_INFESTATION_CONFIG_PATH: String = "res://data/ship_systems/web_infestation.json"
 const FACILITY_UPGRADES_CONFIG_PATH: String = "res://data/ship_systems/facility_upgrades.json"
 const HYDROPONICS_CROPS_CONFIG_PATH: String = "res://data/crops/hydroponics_crops.json"
 const SHIP_SUBSYSTEM_TUNING_PATH: String = "res://data/ship_systems/subsystem_tuning.json"
@@ -346,6 +348,7 @@ var water_recycler_state  # WaterRecyclerState
 var power_grid_state  # PowerGridState
 var life_support_expanded_state  # LifeSupportState
 var hull_integrity_state  # HullIntegrityState
+var hull_web_state  # WebInfestationState (hub hull's live web damage source)
 var fire_suppression_state  # FireSuppressionState
 var extinguisher_state  # ExtinguisherState
 var propulsion_expanded_state  # PropulsionState
@@ -1323,6 +1326,8 @@ func _configure_expanded_ship_system_models() -> void:
 	power_grid_state.configure(_load_json_dict(POWER_GRID_CONFIG_PATH))
 	hull_integrity_state = HullIntegrityStateScript.new()
 	hull_integrity_state.configure(_load_json_dict(HULL_COMPARTMENTS_CONFIG_PATH))
+	hull_web_state = WebInfestationStateScript.new()
+	hull_web_state.configure(_load_json_dict(WEB_INFESTATION_CONFIG_PATH))
 	var tuning: Dictionary = _load_json_dict(SHIP_SUBSYSTEM_TUNING_PATH)
 	life_support_expanded_state = LifeSupportExpandedStateScript.new()
 	life_support_expanded_state.configure(tuning.get("life_support", {}))
@@ -1356,6 +1361,23 @@ func _tick_active_fire(delta: float) -> void:
 		_refresh_fire_zones()
 	# A burning compartment degrades the ship system housed there (M7-B Task 8).
 	_apply_fire_system_damage(delta)
+
+## Foundation contagion seed: while away and docked to a still-web-attached
+## derelict, the web creeps onto the hub faster (contact boost). Full dock-graph
+## spread is the follow-on web spec.
+func _active_derelict_web_attached() -> bool:
+	return away_from_start and current_ship != null and current_ship.is_web_attached()
+
+## Advance the hub web infestation by one tick and apply its hull damage across
+## every hub compartment. The live damage source closing the ship_systems loop.
+func _apply_web_hull_damage(delta: float) -> void:
+	if hull_web_state == null or hull_integrity_state == null:
+		return
+	var dmg: float = hull_web_state.tick(delta, _active_derelict_web_attached())
+	if dmg <= 0.0:
+		return
+	for cid in hull_integrity_state.compartments.keys():
+		hull_integrity_state.damage_compartment(str(cid), dmg)
 
 func _recompute_expanded_ship_systems(delta: float) -> void:
 	if power_grid_state == null:
@@ -1408,6 +1430,7 @@ func _expanded_ship_systems_summary() -> Dictionary:
 		"power_grid_summary": power_grid_state.get_summary() if power_grid_state != null else {},
 		"life_support_state_summary": life_support_expanded_state.get_summary() if life_support_expanded_state != null else {},
 		"hull_integrity_summary": hull_integrity_state.get_summary() if hull_integrity_state != null else {},
+		"web_infestation_summary": hull_web_state.get_summary() if hull_web_state != null else {},
 		"fire_suppression_summary": fire_suppression_state.get_summary() if fire_suppression_state != null else {},
 		"extinguisher_summary": extinguisher_state.get_summary() if extinguisher_state != null else {},
 		"propulsion_state_summary": propulsion_expanded_state.get_summary() if propulsion_expanded_state != null else {},
@@ -4932,9 +4955,10 @@ func _process(delta: float) -> void:
 					hallucination_manager.render(delta, ppos_away)
 		# Derelict-side fire (wire BOTH branches): tick the active (derelict) fire model so
 		# it spreads, degrades derelict systems, and feeds the player-vitals teeth below.
-		# The home branch ticks fire inside _recompute_expanded_ship_systems, which this
-		# branch never calls. This closes the "away path early-return" gap for fire — the
-		# same pattern used by the sanity/hallucination and audio fixes (Codex PRs #43-44).
+		# Fire is ticked here via _tick_active_fire on BOTH branches (home and away).
+		# This away branch now also runs ship_systems_manager.advance + web hull damage +
+		# _recompute_expanded_ship_systems in the Domain 4 block below (same pattern as
+		# the sanity/hallucination and audio fixes in Codex PRs #43-44).
 		_tick_active_fire(delta)
 		# Recharge port is power-gated on the DERELICT's own power system (engineering gate):
 		# present but dead until the player restores derelict power.
@@ -4959,6 +4983,15 @@ func _process(delta: float) -> void:
 		if is_instance_valid(audio_manager) and audio_manager.has_method("tick"):
 			audio_manager.tick(delta)
 			_refresh_audio_state(false, delta)
+		# Domain 4: the hub ship sim is LIVE on the derelict branch (no pausing).
+		# advance + web hull damage + recompute run here so the trapped hub keeps
+		# degrading (web devours the hull) and powered stations stay live while the
+		# player is aboard a derelict. _tick_active_fire already ran above; recompute
+		# no longer ticks fire/field-crafting (see Task 2), so no double-tick.
+		if ship_systems_manager != null:
+			ship_systems_manager.advance(delta)
+		_apply_web_hull_damage(delta)
+		_recompute_expanded_ship_systems(delta)
 		# Domain 3: food spoilage + production advance on the derelict branch too (see
 		# _tick_food_runtime — deliberate divergence from crafting, which pauses away).
 		_tick_food_runtime(delta)
@@ -4971,14 +5004,15 @@ func _process(delta: float) -> void:
 	_tick_threat_runtime(delta)
 	if ship_systems_manager != null:
 		ship_systems_manager.advance(delta)
+	_apply_web_hull_damage(delta)
 	_recompute_expanded_ship_systems(delta)
 	_tick_active_fire(delta)
 	if field_crafting_state != null and field_crafting_state.tick(delta):
 		_on_field_craft_completed()
 	_refresh_oxygen_state(false, delta)
-	# M7-B Task 7: the authoritative fire model is ticked inside
-	# _recompute_expanded_ship_systems(delta) above (with _build_fire_context()),
-	# which also refreshes the passable fire zones when the burning set changes.
+	# M7-B Task 7: the authoritative fire model is ticked via _tick_active_fire(delta)
+	# (called directly on BOTH branches, NOT inside _recompute_expanded_ship_systems).
+	# Passable fire zones are refreshed when the burning set changes.
 	# REQ-013: tick the electrical-arc model with the same per-frame
 	# delta so its phase / passability advance in lock-step with fire.
 	# electrical_arc_state.tick ignores the second arg (no per-frame
@@ -6315,6 +6349,8 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 			life_support_expanded_state.apply_summary(snapshot.ship_systems_summary.get("life_support_state_summary", {}))
 		if hull_integrity_state != null:
 			hull_integrity_state.apply_summary(snapshot.ship_systems_summary.get("hull_integrity_summary", {}))
+		if hull_web_state != null:
+			hull_web_state.apply_summary(snapshot.ship_systems_summary.get("web_infestation_summary", {}))
 		if fire_suppression_state != null:
 			fire_suppression_state.apply_summary(snapshot.ship_systems_summary.get("fire_suppression_summary", {}))
 		if extinguisher_state != null:

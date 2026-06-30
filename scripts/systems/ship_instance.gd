@@ -79,6 +79,12 @@ var fire = null                          # FireSuppressionState | null
 # fire — "seeded to empty" must survive reload too.
 var fire_seeded: bool = false
 
+# Domain 4: is this ship still in contact with the biomatter web? Derelicts
+# generate attached (floating in the Sargasso). The foundation reads this to
+# decide whether docking to this ship accelerates the hub's web growth; the
+# follow-on cut-free action will flip it. Persisted only when false (additive).
+var web_attached: bool = true
+
 # Static factory via load() self-reference (class_name globals unreliable under
 # --headless --script).
 static func create(p_ship_id: String, p_marker_id: String, p_blueprint, p_systems_manager, p_scene_root) -> ShipInstance:
@@ -125,6 +131,8 @@ func get_summary() -> Dictionary:
 		result["fire"] = fire.get_summary()
 	if fire_seeded:
 		result["fire_seeded"] = true
+	if not web_attached:
+		result["web_attached"] = false
 	return result
 
 func apply_summary(summary) -> bool:
@@ -175,6 +183,7 @@ func apply_summary(summary) -> bool:
 	if typeof(fire_summary) == TYPE_DICTIONARY and not (fire_summary as Dictionary).is_empty():
 		get_fire().apply_summary(fire_summary as Dictionary)
 	fire_seeded = bool(summary.get("fire_seeded", fire_seeded))
+	web_attached = bool(summary.get("web_attached", web_attached))
 	return true
 
 ## Returns this ship's DerelictObjectiveController, creating it on first access.
@@ -219,6 +228,10 @@ func get_fire():
 ## True iff this ship has at least one burning compartment.
 func has_fire() -> bool:
 	return fire != null and not fire.get_burning_compartments().is_empty()
+
+## True iff this ship is still in contact with the biomatter web.
+func is_web_attached() -> bool:
+	return web_attached
 
 ## Returns this ship's live carts array (parked carts).
 func get_carts() -> Array:
