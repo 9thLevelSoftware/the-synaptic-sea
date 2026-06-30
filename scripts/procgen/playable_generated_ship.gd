@@ -4905,6 +4905,9 @@ func _process(delta: float) -> void:
 		if is_instance_valid(audio_manager) and audio_manager.has_method("tick"):
 			audio_manager.tick(delta)
 			_refresh_audio_state(false, delta)
+		# Domain 3: food spoilage + production advance on the derelict branch too (see
+		# _tick_food_runtime — deliberate divergence from crafting, which pauses away).
+		_tick_food_runtime(delta)
 		return
 	if not playable_started or slice_complete:
 		return
@@ -4948,13 +4951,8 @@ func _process(delta: float) -> void:
 			if hallucination_manager != null and is_instance_valid(hallucination_manager):
 				var ppos: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
 				hallucination_manager.render(delta, ppos)
-	# ADR-0034: tick food / cooking / spoilage / sustenance models.
-	if spoilage_state != null:
-		spoilage_state.tick(delta)
-	if hydroponics_state != null and hydroponics_state.state == HydroponicsStateScript.State.PLANTED:
-		hydroponics_state.tick(delta)
-	if water_recycler_state != null and water_recycler_state.state == WaterRecyclerStateScript.State.RECYCLING:
-		water_recycler_state.tick(delta)
+	# ADR-0034 / Domain 3: tick food spoilage + production (shared by BOTH _process branches).
+	_tick_food_runtime(delta)
 	# REQ-AU-001..010: tick the audio manager. The manager advances the
 	# ambient crossfade, music layer crossfade, sfx cooldowns + captions,
 	# and the meta-event scheduler. Tick before any HUD caption drain so
@@ -5028,6 +5026,19 @@ func _apply_vitals_action_gating() -> void:
 	if not player.has_method("set_movement_speed_multiplier"):
 		return
 	player.set_movement_speed_multiplier(vitals_state.get_movement_speed_multiplier())
+
+## Domain 3: advance food spoilage and in-progress production. Called from BOTH _process
+## branches. DELIBERATE divergence from crafting (powered crafting stations PAUSE while away):
+## growth/recycling are time-based biological/chemical processes that do not require the
+## player aboard, so a crop planted before boarding keeps growing on the derelict run and is
+## HARVESTABLE on return. Spoilage is likewise time-based and must not freeze on a derelict.
+func _tick_food_runtime(delta: float) -> void:
+	if spoilage_state != null:
+		spoilage_state.tick(delta)
+	if hydroponics_state != null and hydroponics_state.state == HydroponicsStateScript.State.PLANTED:
+		hydroponics_state.tick(delta)
+	if water_recycler_state != null and water_recycler_state.state == WaterRecyclerStateScript.State.RECYCLING:
+		water_recycler_state.tick(delta)
 
 ## Domain 1: terminal stake. When the player is incapacitated (health<=0) end the
 ## run as a death. end_run is idempotent (guards slice_complete), so this is safe
