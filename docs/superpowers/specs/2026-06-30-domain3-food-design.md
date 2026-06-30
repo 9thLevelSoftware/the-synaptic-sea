@@ -169,9 +169,17 @@ the roll-up self-corrects on return. (No away-branch sustenance tick required.)
   `snapshot.synthesizer_summary` (lines ~5984–5985, ~6290–6291).
 - Delete `scripts/systems/synthesizer_state.gd` and its smoke if present, OR keep the file
   unreferenced — **delete** it to avoid a dead orphan (the whole point of the decision).
-- **Save migration:** add a step in `save_migration_service.gd` that drops the legacy
-  `synthesizer_summary` key from an older snapshot and bumps the save schema version, so old
-  saves load clean with no error/warning.
+- **Save handling (no version bump — revised after tracing the save code):** remove the
+  `synthesizer_summary` field from `RunSnapshot` (the `var` declaration, the `SUMMARY_FIELDS`
+  array, `to_dict`, and `from_dict`). `RunSnapshot.from_dict` reads every field with
+  `.get(key, {})` and rejects neither unknown nor missing keys, so this is backward-compatible
+  **without** a schema-version bump or migration step: old saves keep an ignored
+  `synthesizer_summary` key; new saves omit it; both load clean. A version bump was rejected as
+  unnecessary and more invasive (it would touch `CURRENT_SLICE_VERSION` plus 4 smokes, one with
+  a hardcoded `"gate2-current-run-3"` string), and the migration table (ADR-0032) exists for
+  load-breaking changes — the prior v1→v2/v2→v3 steps all *added required fields*, the opposite
+  of removing an ignored optional key. Update `save_load_service_smoke.gd`, which asserts
+  `get_summary_count() == 27` and prints `summaries=27` (lines 147, 258), to `26`.
 - **`sustenance_state.tick`** re-sourced: it currently reads `synthesizer_summary`. Change it
   to roll up `hydroponics` (`harvest_ready` from HARVESTABLE) + `water_recycler`
   (`purified_water_ready` from `output_ready`) only. `meals_ready` is read from the live
@@ -253,10 +261,10 @@ count.
 
 3. **`food_synthesizer_retirement_smoke.gd`**: assert `playable.synthesizer_state` is gone
    (null/absent) and that the crafting `"synthesizer"` station still produces
-   `synthesized_paste` via `craft_at_station_for_validation`; build a snapshot dict containing
-   a legacy `synthesizer_summary`, run it through `save_migration_service`, and assert it loads
-   clean (key dropped, no error). Marker:
-   `FOOD SYNTHESIZER RETIREMENT PASS orphan_removed=true crafting_synth_ok=true migrated=true`.
+   `synthesized_paste` via `craft_at_station_for_validation`; build a `RunSnapshot` dict that
+   still carries a legacy `synthesizer_summary` key, run it through `RunSnapshot.from_dict`, and
+   assert it loads clean (extra key ignored, no error, snapshot valid). Marker:
+   `FOOD SYNTHESIZER RETIREMENT PASS orphan_removed=true crafting_synth_ok=true legacy_load_ok=true`.
 
 Existing food smokes (`spoilage_eat_scaling_smoke`, `main_playable_food_consumption_smoke`,
 `food_save_load_smoke`, `food_state_smoke`, `spoilage_state_smoke`, `sustenance_state_smoke`)
