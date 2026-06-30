@@ -5,6 +5,7 @@ signal interact_requested(player: PlayerController)
 signal field_craft_requested(player: PlayerController)
 
 const DEFAULT_MOVE_SPEED: float = 6.0
+const CROUCH_SPEED_FACTOR: float = 0.5
 const DEFAULT_COLLISION_RADIUS: float = 0.35
 const DEFAULT_COLLISION_HEIGHT: float = 1.6
 const DEFAULT_FLOOR_SNAP_LENGTH: float = 0.5
@@ -12,6 +13,7 @@ const DEFAULT_FLOOR_MAX_ANGLE_DEGREES: float = 60.0
 
 var move_speed: float = DEFAULT_MOVE_SPEED
 var _speed_multiplier: float = 1.0
+var _crouching: bool = false
 var gravity: float = float(ProjectSettings.get_setting("physics/3d/default_gravity", 9.8))
 var scripted_move_direction: Vector3 = Vector3.ZERO
 var use_scripted_movement: bool = false
@@ -31,15 +33,26 @@ func _ready() -> void:
 func set_movement_speed_multiplier(m: float) -> void:
 	_speed_multiplier = clampf(m, 0.0, 1.0)
 
-## Effective per-frame move speed after the vitals gate is applied.
+## Effective per-frame move speed after the vitals gate and crouch are applied.
 func get_effective_move_speed() -> float:
-	return move_speed * _speed_multiplier
+	return move_speed * _speed_multiplier * (CROUCH_SPEED_FACTOR if _crouching else 1.0)
+
+## Domain 2: crouch state. Driven by the "crouch" input in _physics_process and
+## settable for validation. Crouch lowers move speed and the player's emitted
+## stealth signals (the coordinator reads is_crouching() for the detection feed).
+func set_crouching(c: bool) -> void:
+	_crouching = c
+
+func is_crouching() -> bool:
+	return _crouching
 
 
 func _physics_process(delta: float) -> void:
 	var move_direction: Vector3 = _read_move_direction()
 	if move_direction.length_squared() > 1.0:
 		move_direction = move_direction.normalized()
+	if InputMap.has_action("crouch"):
+		_crouching = Input.is_action_pressed("crouch")
 	velocity.x = move_direction.x * get_effective_move_speed()
 	velocity.z = move_direction.z * get_effective_move_speed()
 	if is_on_floor() and velocity.y < 0.0:
