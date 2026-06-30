@@ -1406,6 +1406,24 @@ func _advance_ship(ship, delta: float) -> void:
 	for cid in hull.compartments.keys():
 		hull.damage_compartment(str(cid), dmg)
 
+const CATCHUP_SUBSTEP_SECONDS: float = 5.0     # cap per advance step so fire/system models stay stable over big gaps
+const MAX_CATCHUP_SECONDS: float = 1800.0      # bound total absence catch-up to 30 min of sim (no infinite decay)
+
+## Live Persistent Ships Phase 4: fast-forward an absent ship's sim by the world_time elapsed
+## since it was last advanced, in capped sub-steps. The hub is never absent (ticked every
+## frame) so it is excluded. New derelicts have last_sim_time == world_time (seeded), so a
+## first visit is a no-op. Idempotent: stamps last_sim_time = world_time so a re-entry without
+## further world_time advance does nothing.
+func _catch_up_ship(inst) -> void:
+	if inst == null or inst == home_ship:
+		return
+	var dt: float = minf(world_time - inst.last_sim_time, MAX_CATCHUP_SECONDS)
+	inst.last_sim_time = world_time
+	while dt > 0.0:
+		var step: float = minf(CATCHUP_SUBSTEP_SECONDS, dt)
+		_advance_ship(inst, step)
+		dt -= step
+
 func _recompute_expanded_ship_systems(delta: float) -> void:
 	if power_grid_state == null:
 		return
@@ -1860,6 +1878,9 @@ func travel_to_marker_id(marker_id: String) -> Dictionary:
 ## Phase 5a Task 5: home ship is NO LONGER detached. Home and derelict are
 ## co-present at distinct world positions (origin vs DERELICT_DOCK_OFFSET).
 func _attach_derelict_active(inst, new_root: Node3D) -> void:
+	# Live Persistent Ships Phase 4: fast-forward the absent ship's sim by elapsed world_time
+	# before activating it. First visit: dt=0 (seeded), no-op. Revisit: applies the absence.
+	_catch_up_ship(inst)
 	inst.scene_root = new_root
 	add_child(new_root)
 	new_root.position = DERELICT_DOCK_OFFSET   # initial world anchor; piloted ship docks TO it
