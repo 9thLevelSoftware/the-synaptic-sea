@@ -46,17 +46,24 @@ func _validate() -> void:
 	# Ensure at least one threat exists to kill.
 	if tm.threats.is_empty():
 		tm.inject_validation_encounter(["stalker"], Vector3.ZERO)
-	# --- BP2 (model contract): the emitted profile responds to raw noise. ---
-	tm.detection_state.update_inputs(0.05, 0.15, 0.8, false, "")
-	var idle_noise: float = float(tm.detection_state.get_emitted_profile()["noise"])
-	tm.detection_state.update_inputs(0.3, 0.15, 0.8, false, "")
-	var move_noise: float = float(tm.detection_state.get_emitted_profile()["noise"])
-	var noise_ok: bool = move_noise > idle_noise
-	# --- BP2 (coordinator feed): crouch flows through the LIVE _process tick —
-	# player.is_crouching() -> _tick_threat_runtime -> set_player_signals -> detection.
-	# Disable the player's _physics_process so its per-tick input read of the crouch
-	# action does not clobber the scripted crouch state mid-test.
+	# --- BP2 (coordinator feed): drive the stealth signals through the LIVE _process
+	# tick so the assertions exercise _tick_threat_runtime -> set_player_signals ->
+	# detection (not a direct model write). Disable the player's _physics_process so its
+	# per-tick velocity/input reads do not clobber the scripted state mid-test. ---
 	playable.player.set_physics_process(false)
+	# Noise from movement: is_moving() (planar velocity) feeds set_player_signals' noise arg.
+	playable.player.set_crouching(false)
+	playable.player.velocity = Vector3.ZERO
+	playable._process(1.0 / 30.0)
+	var idle_noise: float = float(tm.detection_state.get_emitted_profile()["noise"])
+	playable.player.velocity = Vector3(5.0, 0.0, 0.0)
+	playable._process(1.0 / 30.0)
+	var move_noise: float = float(tm.detection_state.get_emitted_profile()["noise"])
+	# Proves is_moving() is wired through the coordinator: a still player and a moving
+	# player must emit different noise (catches an inert/literal noise feed).
+	var noise_ok: bool = move_noise > idle_noise
+	# Crouch lowers emitted visibility, fed through the coordinator (detection.crouching flips).
+	playable.player.velocity = Vector3.ZERO
 	playable.player.set_crouching(false)
 	playable._process(1.0 / 30.0)
 	var stand_vis: float = float(tm.detection_state.get_emitted_profile()["visibility"])

@@ -46,6 +46,13 @@ func set_crouching(c: bool) -> void:
 func is_crouching() -> bool:
 	return _crouching
 
+## True when the player has meaningful planar velocity. Consumed by the coordinator
+## as a live runtime signal: it drives stamina drain (Domain 1 vitals `moving`) and
+## emitted noise (Domain 2 stealth). Previously unimplemented, so both consumers'
+## `has_method("is_moving")` guards were always false and the signal was inert.
+func is_moving() -> bool:
+	return Vector2(velocity.x, velocity.z).length() > 0.1
+
 
 func _physics_process(delta: float) -> void:
 	var move_direction: Vector3 = _read_move_direction()
