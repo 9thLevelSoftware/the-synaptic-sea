@@ -52,9 +52,10 @@ func _physics_process(delta: float) -> void:
 	if move_direction.length_squared() > 1.0:
 		move_direction = move_direction.normalized()
 	if InputMap.has_action("crouch"):
-		_crouching = Input.is_action_pressed("crouch")
-	velocity.x = move_direction.x * get_effective_move_speed()
-	velocity.z = move_direction.z * get_effective_move_speed()
+		set_crouching(Input.is_action_pressed("crouch"))
+	var speed: float = get_effective_move_speed()
+	velocity.x = move_direction.x * speed
+	velocity.z = move_direction.z * speed
 	if is_on_floor() and velocity.y < 0.0:
 		velocity.y = 0.0
 	else:
