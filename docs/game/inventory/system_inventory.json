@@ -1634,7 +1634,9 @@
           "loops": [
             "combat"
           ],
-          "gaps": [],
+          "gaps": [
+            "VERIFIED (still open, Domain 2 non-goal): state machine has STATE_FLEE/STATE_INVESTIGATE/STATE_HUNT but movement is a crude lerp toward the player in the manager (threat_manager.gd:278-282); no pathfinding. Deferred (the combat loop closure does not depend on it)."
+          ],
           "integrations": [
             {
               "to": "damage_pipeline",
