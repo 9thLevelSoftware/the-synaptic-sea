@@ -160,7 +160,13 @@ run_clean 'Phase 2 ship instance models smoke' 'SHIP INSTANCE MODELS PASS hull_r
 run_clean 'Phase 2 ship models seed smoke' 'SHIP MODELS SEED PASS hull_seeded=true web_attached=true timestamp_set=true active_resolves=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_models_seed_smoke.gd
 run_clean 'Phase 4 ship catch-up smoke' 'SHIP CATCHUP PASS web_grew=true hull_degraded=true timestamp_stamped=true bounded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_catchup_smoke.gd
 run_clean 'Domain 5 sealed hatch seed + bypass smoke' 'SEALED HATCH PASS away_ticks=3 seeded=true mechanical_open=true flag_consumed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sealed_hatch_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=89 clean_output=true'
+run_clean 'Domain 5 thermal consumable smoke' 'THERMAL CONSUMABLE PASS temp_before=12.000 temp_after=20.000 temp_shifted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/thermal_consumable_smoke.gd
+run_clean 'Domain 5 ammo magazine state model smoke' 'AMMO MAGAZINE STATE PASS spent=true empty=true reloaded=true roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ammo_magazine_state_smoke.gd
+run_clean 'Domain 5 ammo magazine away-branch smoke' 'AMMO MAGAZINE PASS away_ticks=30 spent=true dry_fire=true reloaded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ammo_magazine_smoke.gd
+run_clean 'Domain 5 consumables away tick smoke' 'CONSUMABLES AWAY TICK PASS away_ticks=20 stim_decayed=true addiction_ticked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/consumables_away_tick_smoke.gd
+run_clean 'Domain 5 sealed hatch node smoke' 'SEALED HATCH NODE PASS locked=true opened=true collision_off=true signalled=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sealed_hatch_node_smoke.gd
+run_clean 'Domain 5 flare steady sanity smoke' 'FLARE STEADY PASS drain_no_flare=15.000 drain_flare=7.500 steadier=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/flare_steady_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=95 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
