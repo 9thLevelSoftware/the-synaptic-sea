@@ -59,8 +59,23 @@ reshapes the domain and is recorded here so the roadmap can be corrected.
 ## Decisions locked (from brainstorming)
 
 1. **Variant depth: tiered (sim + dressing).** Each variant may carry a small gameplay payload
-   (`loot_bias`, `hazard {kind, weight}`) consumed by `gameplay_slice_builder`, AND a `dressing`
-   hint consumed by `generated_ship_loader`.
+   (`loot_bias`, `hazard {kind, weight}`) AND a `dressing` hint. `loot_bias` is consumed by
+   `gameplay_slice_builder`; `dressing` by `generated_ship_loader`; **`hazard` is wired at the
+   STATE level** (decision #6), not the slice/marker level.
+
+6. **Hazard tier: state-level wiring (deepest option, chosen in brainstorming 2026-07-01).**
+   A room's fire/breach-kind variant drives the *live* hazard state on a boarded derelict, not a
+   cosmetic marker. This is because — traced during plan-writing — the loader reads zone arrays
+   from `layout_doc` and only builds *visual markers*, while live derelict fire is seeded by
+   `_seed_derelict_fire()` (`playable_generated_ship.gd:2770`) from compartment-system damage, and
+   breaches by `hull_integrity_state.damage_compartment(id, amount, force_breach)`. So variant
+   hazards are wired directly into those seams. **Constraint (honest):** the compartment universe
+   is fixed and small — `{bridge, engineering, hydroponics, cargo}` (both `FIRE_COMPARTMENT_SYSTEM`
+   and `data/ship_systems/hull_compartments.json` agree). Variant hazards therefore only bite on
+   rooms whose role maps to one of those compartments; fire/breach variants on other roles (e.g.
+   corridors) remain loot/dressing-only. The plan ensures the compartment-mapped roles carry the
+   hazard variants so the wiring is exercised. Fire seeding is away-branch only (mirrors the
+   existing derelict-fire path) and guarded against restore double-seeding.
 2. **Catalog form: code selector.** The variant→effect mapping lives in code
    (`VARIANT_EFFECTS` in `room_variant_selector.gd`), **not** a JSON catalog. This overrides the
    project's data-driven-procgen convention deliberately, for speed. Consequence: the roadmap's
@@ -111,21 +126,35 @@ Exact variant→effect values are tuned in the plan; the *shape* is fixed here. 
 (most cosmetic ones) resolve to `{}` = neutral, so the table stays sparse and only "dramatic"
 variants carry a payload. `loot_bias` and `hazard` are each independently optional within `sim`.
 
-**A2. Sim consumer (`gameplay_slice_builder.gd`).**
-For each room, read its `variant`, call `selector.effects_for(variant)`, and apply the `sim` payload:
+**A2a. loot_bias consumer (`gameplay_slice_builder.gd`).**
+For each room, read its `variant`, call `selector.effects_for(variant)`, and when `sim.loot_bias`
+is present, override the role-derived `loot_table` for that room's salvage objective and loot
+container (today set purely by `_salvage_loot_table_for_role(role)` and container-index parity).
+`loot_bias` must reference a key in `data/items/loot_tables.json` — valid keys:
+`generic_crate`, `generic_locker`, `salvage_engineering`, `salvage_cargo`, `repair_parts_common`,
+`repair_parts_starter`, `repair_tools`, `hidden_cache`, `combat_drop_common`. The builder is given
+the selector (or an effect-lookup callable) via injection, mirroring how `RoomAssigner` receives it,
+keeping the builder pure/testable.
 
-- **loot_bias:** when present, it overrides the role-derived `loot_table` for that room's salvage
-  objective and/or loot container (today set purely by `_salvage_loot_table_for_role(role)` and
-  container-index parity). Bias must reference a `loot_table` key that exists in
-  `loot_tables.json` — the plan validates every referenced key.
-- **hazard:** when present, a per-room RNG (seeded from `room_id` + blueprint seed) rolls against
-  `weight`; on success, append one entry to the matching zone array (`fire_zones` for
-  `kind:"fire"`, `breach_zones` for `kind:"breach"`, `arc_zones` for `kind:"arc"`), targeting that
-  room, in the same schema the loader already consumes. This fills the arrays the builder currently
-  returns empty. Seeding is deterministic → same seed produces identical zones.
+**A2b. hazard consumer — STATE level (`playable_generated_ship.gd`).**
+A fire/breach-kind variant on a compartment-mapped room drives live hazard state on the boarded
+derelict (away branch):
 
-The builder must be given the selector instance (or effect lookup) — inject it the same way
-`RoomAssigner` receives the selector, keeping the builder pure/testable.
+- **fire** (`kind:"fire"`): in `_seed_derelict_fire()` (`:2770`), after the existing damaged-system
+  candidate loop, additionally ignite the compartments of rooms carrying a fire-kind variant
+  (role→compartment via `FIRE_COMPARTMENT_SYSTEM` keys + a small alias map, e.g. `reactor →
+  engineering`). Presence: a fire-variant present **forces** the presence gate open for that
+  compartment (a `burned_out` engineering room means that derelict burns there), overriding the
+  85%-fire-free `FIRE_PRESENCE_PERCENT` roll for the variant compartments only. Deterministic per
+  seed. Guarded by the existing `current_ship.fire_seeded` flag so revisits/restores don't re-seed.
+- **breach** (`kind:"breach"`): a new `_seed_derelict_breaches()` force-breaches the compartments of
+  rooms carrying a breach-kind variant via `hull_integrity_state.damage_compartment(cid, 1.0,
+  true)`. Called in the derelict build path next to `_seed_derelict_fire()` (`:1952`), away-only,
+  guarded by a new `current_ship.breach_seeded` flag mirroring `fire_seeded`, never on the restore
+  path (restored breaches come from the applied hull summary).
+
+The coordinator reads the derelict's room variants via `loader.get_layout_copy()` /
+`current_ship.built_layout` (rooms carry the `variant` key from A/`room_assigner`).
 
 **A3. Dressing consumer (`generated_ship_loader.gd`).**
 When materializing a room, read `variant`, look up `dressing`. If an existing structural-placement
@@ -167,23 +196,31 @@ no live path imports it before labeling.
 
 ## Validation
 
-New smoke `procgen_variation_smoke.gd` (pure-data; register marker in `06_validation_plan.md`):
+Two smokes (register markers in `06_validation_plan.md`):
 
+**`procgen_variation_smoke.gd`** (pure-data, generation layer):
 1. **Variant variation:** two different seeds produce distinct room-variant sets; at `deep_dive`,
    distinct structural templates.
-2. **Hazard seeding:** a room whose variant carries a `hazard` payload seeds the matching zone
-   array in the slice (e.g. a `burned_out` room → a `fire_zones` entry); assert **determinism**
-   (same seed → identical zones).
-3. **Loot bias:** a room whose variant carries `loot_bias` yields a `loot_table` differing from the
-   role-only baseline.
-4. **Template gating:** extended templates engage at `deep_dive`/`hardened` and **stay off** at
+2. **Loot bias:** a room whose variant carries `loot_bias` yields a `loot_table` differing from the
+   role-only baseline, and the biased key resolves to a real table in `loot_tables.json`.
+3. **Template gating:** extended templates engage at `deep_dive`/`hardened` and **stay off** at
    `standard`.
-5. **Determinism:** same seed generated twice → byte-identical variant + template + zone output.
+4. **Determinism:** same seed generated twice → byte-identical variant + template output.
 
-**Away-branch note:** generation is pre-run (not per-frame), so there is no `_process`
-away-branch to wire. The domain's equivalent anti-regression guard is the **seed-determinism**
-assertion (#2, #5) — the roadmap's `away_ticks=` requirement is satisfied in spirit by proving
-generation output is stable per seed.
+**`procgen_variant_hazard_smoke.gd`** (main-scene, state layer, with `away_ticks=` driving
+`away_from_start = true`):
+5. **Fire:** board a derelict built from a seed whose engineering room carries the fire variant →
+   assert that compartment is ignited in the live fire state on the **away branch**; a seed with no
+   fire variant leaves the presence gate governing (no forced ignite).
+6. **Breach:** a derelict whose cargo/engineering room carries the breach variant →
+   assert `hull_integrity_state.compartments[cid].breach_open == true` after seed, on the away
+   branch; assert restore path does **not** double-seed (`breach_seeded` guard).
+7. **Determinism:** same seed → identical ignited/breached compartment set.
+
+**Away-branch note:** the hazard tier *does* add a per-build seeding step on the derelict path, so
+`_seed_derelict_fire` (extended) and `_seed_derelict_breaches` (new) run on the boarded-derelict
+build (the away context), guarded against restore. The state smoke's `away_ticks=` assertion is the
+mandatory away-branch guard the roadmap requires.
 
 Full regression: run the bundle in `06_validation_plan.md`; must end `SYNAPTIC_SEA REGRESSION PASS`
 with clean output. Then `tools/build_system_inventory.py --check` must pass.
@@ -205,9 +242,10 @@ Because of decision #2 (code selector, no directory), update:
 
 ## Definition of CLOSED (this domain)
 
-1. Room variants produce **real** variation the player experiences: `loot_bias` changes loot and
-   `hazard` seeds live zones (fire/breach/arc) consumed by the loader; dressing is observable via
-   existing props or a scanner/HUD descriptor.
+1. Room variants produce **real** variation the player experiences: `loot_bias` changes loot;
+   fire/breach variants on compartment-mapped rooms drive **live** hazard state on the boarded
+   derelict (ignition via `_seed_derelict_fire`, breach via `hull_integrity_state`); dressing is
+   observable via existing props or a scanner/HUD descriptor.
 2. Extended structural templates are **enabled** at `deep_dive`/`hardened`, all five files validated
    to generate cleanly; determinism per seed preserved.
 3. Legacy `room_graph_generator` is documented deprecated/test-only and excluded from completion %.
