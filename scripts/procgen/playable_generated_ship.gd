@@ -294,7 +294,6 @@ var unique_item_state
 var _loot_biome_ids_cache: Array[String] = []
 var _last_loot_feedback_line: String = ""
 var _home_player_position: Vector3 = Vector3.ZERO
-const REPAIR_OBJECTIVE_XP: int = 50
 # Narrative objective flags with no manager backing (supplies/logs). Set on
 # completion; persisted in the snapshot; read by _manager_compat_summary().
 var completed_objective_types: Dictionary = {}
@@ -4850,9 +4849,9 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 		for pair in OBJECTIVE_REPAIR_MAP.get(objective_type, []):
 			ship_systems_manager.force_repair(str(pair[0]), str(pair[1]))
 		if player_progression != null and (objective_type == "restore_systems" or objective_type == "stabilize_reactor"):
-			player_progression.grant_xp("repair", REPAIR_OBJECTIVE_XP)
-			# REQ-PM-002 — funnel the objective-completion XP through the
-			# training bus so the log captures the deterministic event.
+			# Domain 6 (WI-5): single ingest path -- the bus is the sole grant
+			# (repair_full_system = 120). The prior direct grant_xp (50) plus
+			# the bus (120) double-granted 170 XP; removed.
 			if training_event_bus != null:
 				training_event_bus.emit("repair_full_system", str(sequence), player_progression)
 		var compat: Dictionary = _manager_compat_summary()
