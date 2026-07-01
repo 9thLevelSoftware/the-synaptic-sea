@@ -5629,9 +5629,7 @@
       "content": "partial",
       "content_note": "Domain 6 (WI-2): interactive selection surface, NOT display-only. Panel adds move_selection (skill_tree_panel.gd:41) + get_selected_id (:50) + cursor-aware render; MenuCoordinator.meta_screen_confirm reads get_selected_id() and calls SkillTreeState.unlock() on ui_accept (menu_coordinator.gd:613). Advanced-skill unlocks are driven through this panel's cursor.",
       "functional": null,
-      "gaps": [
-        "panel shows tree but cannot spend points (no mutate signal)"
-      ],
+      "gaps": [],
       "subsystems": []
     },
     {
@@ -5670,9 +5668,7 @@
       "content": "partial",
       "content_note": "Domain 6 (WI-1): interactive selection surface, NOT display-only. Panel adds move_selection (hub_upgrade_panel.gd:89) + get_selected_id (:98) + cursor-aware render; the panel holds no Button/signal of its own, but MenuCoordinator.meta_screen_confirm reads get_selected_id() and calls HubUpgradeState.purchase() on ui_accept (menu_coordinator.gd:601), spending meta_currency and persisting via save_to_disk.",
       "functional": null,
-      "gaps": [
-        "no purchase output wired from panel"
-      ],
+      "gaps": [],
       "subsystems": []
     },
     {

@@ -28,8 +28,8 @@ Expected markers:
 
 ```bash
 set -euo pipefail
-ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
-GODOT=/Users/christopherwilloughby/.local/bin/godot-4.6.2
+ROOT="${ROOT:-/Users/christopherwilloughby/the-synaptic-sea-of-stars}"
+GODOT="${GODOT:-/Users/christopherwilloughby/.local/bin/godot-4.6.2}"
 # Known baseline Godot shutdown lines that appear identically in every
 # unchanged smoke (route-control, completion, input, readability, oxygen,
 # hazard, ship-systems) and are NOT introduced by the Synaptic Sea hazard code
