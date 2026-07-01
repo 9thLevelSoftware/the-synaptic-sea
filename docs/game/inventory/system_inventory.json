@@ -99,7 +99,7 @@
       },
       "output": {
         "live": true,
-        "desc": "get_thirst_multiplier() (4837) fed as temperature_thirst_mult into vitals.tick (4854); consumer is real but value is permanently 1.0 because input is dead",
+        "desc": "get_thirst_multiplier() (4837) fed as temperature_thirst_mult into vitals.tick (4854); multiplier is non-neutral when temperature is elevated (heatpack raises temperature by 8.0; in_extreme_zone on derelict branches further drives temperature above safe range)",
         "at": "playable_generated_ship.gd:4837"
       },
       "confidence": "V",
@@ -109,9 +109,9 @@
       "integrations": [
         {
           "to": "vitals_state",
-          "via": "temperature_thirst_mult into vitals.tick (always neutral 1.0)",
+          "via": "temperature_thirst_mult into vitals.tick; multiplier varies with body temperature (live on home and away branches via _tick_survival_attrition)",
           "at": "playable_generated_ship.gd:4854",
-          "health": "weak"
+          "health": "healthy"
         }
       ],
       "content": "partial",

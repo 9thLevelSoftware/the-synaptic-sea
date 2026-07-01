@@ -244,6 +244,7 @@
         "scripts/validation/consumables_away_tick_smoke.gd",
         "scripts/validation/thermal_consumable_smoke.gd",
         "scripts/validation/sealed_hatch_node_smoke.gd",
+        "scripts/validation/sealed_hatch_smoke.gd",
         "scripts/validation/flare_steady_smoke.gd"
       ],
       "smoke_markers": [
@@ -255,6 +256,7 @@
         "CONSUMABLES AWAY TICK PASS",
         "THERMAL CONSUMABLE PASS",
         "SEALED HATCH NODE PASS",
+        "SEALED HATCH PASS away_ticks=3 seeded=true mechanical_open=true flag_consumed=true",
         "FLARE STEADY PASS"
       ],
       "dependencies": [
