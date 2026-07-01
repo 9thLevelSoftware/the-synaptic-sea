@@ -2314,16 +2314,16 @@
       "smoke": "scripts/validation/player_progression_state_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:4466",
+      "driven_at": "playable_generated_ship.gd:4856",
       "input": {
         "live": true,
-        "desc": "XP granted from real gameplay. Tool nodes call grant_xp() DIRECTLY (not via the bus): repair_point.gd:159 (repair+25), breach_seal_point.gd:125 (repair+15), fire_suppression_point.gd:119 (repair+10), dock_port_barrier.gd:98 (welding+25). Plus objective-repair XP at coordinator 4466, plus the single bus emit at 4470.",
-        "at": "playable_generated_ship.gd:4466"
+        "desc": "XP granted from real gameplay. Tool nodes call grant_xp() DIRECTLY (not via the bus): repair_point.gd:159 (repair+25), breach_seal_point.gd:125 (repair+15), fire_suppression_point.gd:119 (repair+10), dock_port_barrier.gd:98 (welding+25). Objective-repair XP flows exactly once through the bus at playable_generated_ship.gd:4856 (func:_on_interactable_completed, emits repair_full_system=120); the redundant direct grant_xp(50) at this same call site was removed as part of the Domain 6 double-grant fix (see comment at :4852-4854).",
+        "at": "playable_generated_ship.gd:4856"
       },
       "output": {
         "live": true,
-        "desc": "skill levels gate live gameplay: scanner_operation feeds scan() (1771-1773), fabrication passed into field_crafting_state.begin_craft (3184->3199), repair level read by repair_point.gd:79-80 and passed into repair_with_inventory (155); welding read by dock_port_barrier.gd:55-56",
-        "at": "playable_generated_ship.gd:3199"
+        "desc": "skill levels gate live gameplay: scanner_operation feeds scan() (playable_generated_ship.gd:1881-1882, func:scan), fabrication passed into field_crafting_state.begin_craft (playable_generated_ship.gd:3450, func:_on_player_field_craft_requested) and gated by the skill_gate Callable before its training XP lands, repair level read by repair_point.gd:79-80 and passed into repair_with_inventory (155); welding read by dock_port_barrier.gd:55-56",
+        "at": "playable_generated_ship.gd:3450"
       },
       "confidence": "V",
       "loops": [
@@ -2333,18 +2333,18 @@
         {
           "to": "class_definition",
           "via": "configure() applies class xp_multipliers + starting_skills (player_progression_state.gd:96/104)",
-          "at": "playable_generated_ship.gd:1267",
+          "at": "playable_generated_ship.gd:1301-1305",
           "health": "healthy"
         },
         {
           "to": "training_event_bus",
-          "via": "bus.emit() -> grant_xp() (single source: objective completion 4470)",
+          "via": "bus.emit() -> grant_xp(), gated by skill_gate; single ingest path for objective XP (repair_full_system) plus fabricate_part training",
           "at": "training_event_bus.gd:99",
           "health": "healthy"
         }
       ],
       "content": "sufficient",
-      "content_note": "data/player/skills.json (22 skills), skill_books.json (12 books); XP curve hardcoded (level+1)*100. Primary XP path is direct grant_xp() calls from tool nodes, not the training bus.",
+      "content_note": "data/player/skills.json (22 skills), skill_books.json (12 books); XP curve hardcoded (level+1)*100. Primary XP path remains direct grant_xp() calls from tool nodes for their own actions; the training bus is the single path for objective-completion XP and for tree-gated skills like fabrication.",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -2359,16 +2359,16 @@
       "smoke": "scripts/validation/cross_training_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:4470",
+      "driven_at": "playable_generated_ship.gd:4856",
       "input": {
         "live": true,
-        "desc": "CORRECTED: the bus has exactly ONE live emit() caller in gameplay -- objective completion at 4470 (emit 'repair_full_system'). The proposal's claim that emit_training_event is a seam 'used by repair/fire/breach/dock tool nodes' is FALSE: emit_training_event (defined at coordinator 1503) is never called anywhere, and the tool nodes bypass the bus entirely, calling progression.grant_xp() directly.",
-        "at": "playable_generated_ship.gd:4470"
+        "desc": "Domain 6 (WI-5): single ingest path -- the objective-completion handler `_on_interactable_completed` (def playable_generated_ship.gd:4806) is the sole in-run emit() caller, firing `repair_full_system` at :4856 for restore_systems/stabilize_reactor objectives. The prior direct grant_xp(50) double-grant alongside the bus's 120 was removed (see comment at :4852-4854); repair_point/breach_seal_point/fire_suppression_point/dock_port_barrier tool nodes still call progression.grant_xp() directly for their own actions (unrelated events, not a double-grant). Also live: `emit_training_event('fabricate_part', item_id)` from `_on_field_craft_completed` at :3389, gated by `skill_gate`.",
+        "at": "playable_generated_ship.gd:4856"
       },
       "output": {
         "live": true,
-        "desc": "resolves to progression.grant_xp (bus.gd:99) when 4470 fires; the ordered log is also consumed at run-end to drive unlock_registry.unlock_for_trigger (6011-6017)",
-        "at": "playable_generated_ship.gd:6017"
+        "desc": "resolves to progression.grant_xp (training_event_bus.gd:99) when emit() fires, gated per-skill by the `skill_gate` Callable (bus.gd:31/101) that the coordinator wires to skill_tree_state.is_unlocked at playable_generated_ship.gd:1115-1120 (func:_build_runtime_nodes); the ordered log is also consumed at run-end in `_apply_meta_payout_and_persist` to drive unlock_registry.unlock_for_trigger (playable_generated_ship.gd:6465-6473).",
+        "at": "playable_generated_ship.gd:6465"
       },
       "confidence": "V",
       "loops": [
@@ -2377,7 +2377,7 @@
       "integrations": [
         {
           "to": "player_progression_state",
-          "via": "emit() -> progression.grant_xp(skill_id, base_xp, is_cross) on objective completion only",
+          "via": "emit() -> progression.grant_xp(skill_id, base_xp, is_cross), gated by skill_gate; single ingest path for objective XP (repair_full_system) plus fabricate_part training",
           "at": "training_event_bus.gd:99",
           "health": "healthy"
         },
@@ -2390,16 +2390,20 @@
         {
           "to": "unlock_registry",
           "via": "run-end folds bus log into unlock_for_trigger",
-          "at": "playable_generated_ship.gd:6017",
+          "at": "playable_generated_ship.gd:6465-6473 (func:_apply_meta_payout_and_persist)",
+          "health": "healthy"
+        },
+        {
+          "to": "skill_tree_state",
+          "via": "skill_gate Callable wired to skill_tree_state.is_unlocked; gated skills drop XP silently until their tree node is unlocked",
+          "at": "playable_generated_ship.gd:1115-1120 (func:_build_runtime_nodes)",
           "health": "healthy"
         }
       ],
       "content": "sufficient",
-      "content_note": "data/player/training_actions.json (25 actions). CORRECTION: emit_training_event (coordinator:1503) is dead code -- zero callers across the repo; tool-node XP does not flow through the bus.",
+      "content_note": "data/player/training_actions.json (25 actions). Domain 6 closed the double-grant gap: the objective handler's direct grant_xp(50) call was removed so repair_full_system (120) is granted exactly once via the bus (see comment at playable_generated_ship.gd:4852-4854). Field-crafting also now trains the tree-gated `fabrication` skill through the bus (fabricate_part at :3389).",
       "functional": null,
-      "gaps": [
-        "emit_training_event (coordinator:1503) is defined but never invoked anywhere; tool nodes bypass the bus and grant XP directly, so the bus log captures only objective-completion events, not repair/fire/breach/dock actions"
-      ],
+      "gaps": [],
       "subsystems": []
     },
     {
@@ -2412,16 +2416,16 @@
       "smoke": "scripts/validation/meta_progression_state_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:6008",
+      "driven_at": "playable_generated_ship.gd:6460",
       "input": {
         "live": true,
-        "desc": "apply_meta_payout() folds end-of-run summary (completed objectives + skill levels) into currency/counters at run end (6000-6008); load_from_disk at 1099; codex unlocks on loot discovery (6745-6746)",
-        "at": "playable_generated_ship.gd:6008"
+        "desc": "apply_meta_payout() folds end-of-run summary (completed objectives + skill levels) into currency/counters at run end, func:_apply_meta_payout_and_persist (playable_generated_ship.gd:6460); load_from_disk at :1124 (func:_build_runtime_nodes); set_selected_class() written live from the class-picker arm of meta_screen_confirm (menu_coordinator.gd:621, `_meta_progression_state.set_selected_class(sel_c)` + save_to_disk at :622).",
+        "at": "playable_generated_ship.gd:6460"
       },
       "output": {
         "live": true,
-        "desc": "unlock set read at run-start by hub_upgrade compose_*() to mutate player_progression skills/multipliers (1275/1283); currency/counters feed HUD status panel. NOTE: hub-upgrade currency has no live sink (purchase unwired) so unlocked_hub_upgrade_ids never populates; codex set DOES populate at 6746 but its only would-be reader (skill_tree.can_unlock) is never called",
-        "at": "playable_generated_ship.gd:1275"
+        "desc": "Domain 6 closed the meta economy: hub_upgrade purchases (menu_coordinator.gd:601, func:meta_screen_confirm) spend meta_currency and populate unlocked_hub_upgrade_ids, which hub_upgrade_state.compose_*() reads at run-start to mutate player_progression skills/multipliers (playable_generated_ship.gd:1308-1325, func:_configure_player_progression); unlock_registry class-category unlocks bridge into unlocked_class_ids via meta_progression_state.unlock_class (playable_generated_ship.gd:6473, func:_apply_meta_payout_and_persist); `selected_class_id` gates which class the next run's _configure_player_progression resolves (playable_generated_ship.gd:1290-1297) -- base classes are always selectable, unlockable classes require is_class_unlocked(sel) to be true or the pick falls back to starting_class_id.",
+        "at": "playable_generated_ship.gd:1290"
       },
       "confidence": "V",
       "loops": [
@@ -2430,24 +2434,27 @@
       "integrations": [
         {
           "to": "hub_upgrade_state",
-          "via": "purchase()/can_purchase read meta currency+unlock set; but coordinator/UI never calls purchase()",
-          "at": "hub_upgrade_state.gd:122",
-          "health": "broken"
+          "via": "purchase()/can_purchase read+spend meta currency and mutate the owned-upgrade set; called live from meta_screen_confirm's hub_upgrades arm",
+          "at": "menu_coordinator.gd:601",
+          "health": "healthy"
         },
         {
           "to": "player_progression_state",
-          "via": "compose_starting_skill_bonuses(meta) applied to skills (always empty: no hub upgrades owned)",
-          "at": "playable_generated_ship.gd:1275",
-          "health": "weak"
+          "via": "compose_starting_skill_bonuses(meta)/compose_xp_multipliers(meta) applied to skills/_xp_multipliers at run-config using the now-populated owned-upgrade set",
+          "at": "playable_generated_ship.gd:1308-1325",
+          "health": "healthy"
+        },
+        {
+          "to": "unlock_registry",
+          "via": "run-end bridge: class-category unlocks resolved from the training bus log call meta_progression_state.unlock_class so the class picker can offer them next run",
+          "at": "playable_generated_ship.gd:6463-6474 (func:_apply_meta_payout_and_persist)",
+          "health": "healthy"
         }
       ],
-      "content": "partial",
-      "content_note": "payout formula hardcoded in apply_meta_payout (objectives*10, skill tiers +5/+15, discoveries*2); no dedicated meta-tuning data file beyond hub_upgrades.json",
+      "content": "sufficient",
+      "content_note": "payout formula hardcoded in apply_meta_payout (objectives*10, skill tiers +5/+15, discoveries*2); no dedicated meta-tuning data file beyond hub_upgrades.json. Domain 6 added `selected_class_id` (meta_progression_state.gd:24, get/set at :49-53) as the persisted class-selection gate, resolved each run in _configure_player_progression.",
       "functional": null,
-      "gaps": [
-        "meta_currency hub-upgrade sink is dead: hub_upgrade purchase never wired to gameplay",
-        "unlocked_hub_upgrade_ids/unlocked_class_ids never populate at runtime (only codex set populates, via 6746)"
-      ],
+      "gaps": [],
       "subsystems": []
     },
     {
@@ -2460,16 +2467,16 @@
       "smoke": null,
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:1283",
+      "driven_at": "menu_coordinator.gd:601",
       "input": {
         "live": true,
-        "desc": "catalog loaded from hub_upgrades.json (configure 1103); compose_*() read meta_state unlock set each run-config (1275/1283)",
-        "at": "playable_generated_ship.gd:1283"
+        "desc": "catalog loaded from hub_upgrades.json (configure at playable_generated_ship.gd:1128, func:_build_runtime_nodes); Domain 6 wired the purchase seam -- `purchase(sel, _meta_progression_state)` is called live from the hub_upgrades arm of meta_screen_confirm (menu_coordinator.gd:601), spending meta_currency and populating the owned-upgrade set, then meta state is persisted (menu_coordinator.gd:603).",
+        "at": "menu_coordinator.gd:601"
       },
       "output": {
         "live": true,
-        "desc": "compose_xp_multipliers result applied to player_progression._xp_multipliers (1290) and compose_starting_skill_bonuses to skills (1280) -- but purchase() is never called, so the owned set is always empty and compose always returns base 1.0 / {} (no real effect)",
-        "at": "playable_generated_ship.gd:1290"
+        "desc": "compose_xp_multipliers/compose_starting_skill_bonuses now read a non-empty owned-upgrade set (once purchase() has run on a prior visit) and are applied to player_progression at run-config: compose_xp_multipliers -> _xp_multipliers (playable_generated_ship.gd:1317-1325) and compose_starting_skill_bonuses -> skills (playable_generated_ship.gd:1309-1314), both inside func:_configure_player_progression.",
+        "at": "playable_generated_ship.gd:1309"
       },
       "confidence": "V",
       "loops": [
@@ -2478,23 +2485,21 @@
       "integrations": [
         {
           "to": "meta_progression_state",
-          "via": "compose_*() and can_purchase read is_hub_upgrade_unlocked / get_meta_currency",
-          "at": "playable_generated_ship.gd:1283",
-          "health": "weak"
+          "via": "purchase()/can_purchase read+spend get_meta_currency and mutate the unlocked_hub_upgrade_ids set; compose_*() reads that set every run-config",
+          "at": "menu_coordinator.gd:601",
+          "health": "healthy"
         },
         {
           "to": "player_progression_state",
-          "via": "composed multipliers/bonuses written into progression at run config",
-          "at": "playable_generated_ship.gd:1290",
-          "health": "weak"
+          "via": "composed multipliers/bonuses written into progression at run config, now reflecting real owned upgrades",
+          "at": "playable_generated_ship.gd:1309-1325",
+          "health": "healthy"
         }
       ],
       "content": "sufficient",
-      "content_note": "data/player/hub_upgrades.json (12 upgrades with cost/requires/effects incl xp_multiplier_bonus, starting_skill_bonus). CONFIRMED: hub_upgrade_panel.gd is render-only (set_catalog + get_status_lines/render); its docstring lines 8-11 falsely claim the coordinator calls purchase().",
+      "content_note": "data/player/hub_upgrades.json (12 upgrades with cost/requires/effects incl xp_multiplier_bonus, starting_skill_bonus). Domain 6 closed the purchase seam: hub_upgrade_panel.gd's selection feeds meta_screen_confirm's hub_upgrades arm (menu_coordinator.gd:597-606, func:meta_screen_confirm), which calls purchase() directly -- the panel itself remains render-only (set_catalog + get_status_lines/render) by design; the coordinator is the caller.",
       "functional": null,
-      "gaps": [
-        "purchase()/can_purchase never invoked outside validation smokes/probe; hub_upgrade_panel render-only (docstring misleading) so no upgrade is ever owned and compose_*() always returns base values"
-      ],
+      "gaps": [],
       "subsystems": []
     },
     {
@@ -2506,17 +2511,17 @@
       "model_exists": true,
       "smoke": "scripts/validation/skill_tree_panel_smoke.gd",
       "reachable": true,
-      "driven": false,
-      "driven_at": null,
+      "driven": true,
+      "driven_at": "menu_coordinator.gd:613",
       "input": {
-        "live": false,
-        "desc": "configured once (configure + load_prerequisites at 1090-1095) but unlock()/can_unlock() are never called from gameplay (only validation smokes) -- no live unlock events feed it",
-        "at": null
+        "live": true,
+        "desc": "configured once (configure + load_prerequisites, playable_generated_ship.gd:1108-1112, func:_build_runtime_nodes). Domain 6 wired the unlock seam -- the skill_tree arm of meta_screen_confirm calls can_unlock() then unlock(sel_s) live (menu_coordinator.gd:610-613).",
+        "at": "menu_coordinator.gd:613"
       },
       "output": {
-        "live": false,
-        "desc": "get_skill_entries()/get_unlocked() consumed only by skill_tree_panel for display (skill_tree_panel.gd:44); no gameplay system reads the _unlocked set",
-        "at": null
+        "live": true,
+        "desc": "is_unlocked()/is_gated() now gate real gameplay XP: the coordinator wires training_event_bus.skill_gate to a Callable that calls skill_tree_state.is_unlocked() for any skill this tree gates (playable_generated_ship.gd:1115-1120, func:_build_runtime_nodes) -- an advanced skill (e.g. `fabrication`) trains via the bus only once its tree node is unlocked; get_skill_entries()/get_unlocked() are also still consumed by skill_tree_panel for display (skill_tree_panel.gd:44).",
+        "at": "playable_generated_ship.gd:1115"
       },
       "confidence": "V",
       "loops": [
@@ -2525,18 +2530,21 @@
       "integrations": [
         {
           "to": "player_progression_state",
-          "via": "can_unlock() reads get_skill_level for prereq gating, but can_unlock is never invoked at runtime",
-          "at": "skill_tree_state.gd:127",
-          "health": "broken"
+          "via": "can_unlock() reads get_skill_level for prereq gating; called live from meta_screen_confirm's skill_tree arm before unlock()",
+          "at": "menu_coordinator.gd:611",
+          "health": "healthy"
+        },
+        {
+          "to": "training_event_bus",
+          "via": "is_unlocked()/is_gated() back the skill_gate Callable that drops XP for gated, still-locked skills (field-crafting's fabricate_part event is the live subject)",
+          "at": "playable_generated_ship.gd:1115-1120",
+          "health": "healthy"
         }
       ],
       "content": "sufficient",
-      "content_note": "data/player/skill_tree.json (prereq entries) + skills.json (22) + skill_books.json (12); data is rich but unused at runtime",
+      "content_note": "data/player/skill_tree.json (prereq entries) + skills.json (22) + skill_books.json (12). Domain 6 closed both ends: the panel selection feeds a live unlock() call, and the unlocked set gates a real gameplay XP path (fabrication training via field-crafting) rather than sitting inert.",
       "functional": null,
-      "gaps": [
-        "unlock()/can_unlock() never called from gameplay; skill tree is display-only scaffolding",
-        "_unlocked set is not persisted (no to_dict/apply_summary call in coordinator) and gates no gameplay"
-      ],
+      "gaps": [],
       "subsystems": []
     },
     {
@@ -2549,16 +2557,16 @@
       "smoke": "scripts/validation/class_definitions_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:1263",
+      "driven_at": "playable_generated_ship.gd:1289",
       "input": {
         "live": true,
-        "desc": "load_all() reads data/player/classes.json each _configure_player_progression() (1263); selected by starting_class_id falling back to engineer (1264)",
-        "at": "playable_generated_ship.gd:1263"
+        "desc": "load_all() reads data/player/classes.json each func:_configure_player_progression (playable_generated_ship.gd:1289); Domain 6 added a live class-selection consumer -- `chosen_class` resolves meta_progression_state.get_selected_class() (:1292) and falls back to starting_class_id (engineer) unless the selection is a base class or is_class_unlocked(sel) is true (:1290-1297).",
+        "at": "playable_generated_ship.gd:1290"
       },
       "output": {
         "live": true,
-        "desc": "class xp_multipliers + starting_skills consumed by player_progression.configure() (1267), setting real per-category XP rates and starting skill levels; also read by training_event_bus._is_cross_training (bus.gd:159)",
-        "at": "playable_generated_ship.gd:1267"
+        "desc": "class xp_multipliers + starting_skills consumed by player_progression.configure() (playable_generated_ship.gd:1301-1305), setting real per-category XP rates and starting skill levels; also read by training_event_bus._is_cross_training (bus.gd:159)",
+        "at": "playable_generated_ship.gd:1301"
       },
       "confidence": "V",
       "loops": [
@@ -2568,16 +2576,20 @@
         {
           "to": "player_progression_state",
           "via": "configure(class_def) seeds starting_skills + _xp_multipliers",
-          "at": "playable_generated_ship.gd:1267",
+          "at": "playable_generated_ship.gd:1301-1305",
+          "health": "healthy"
+        },
+        {
+          "to": "meta_progression_state",
+          "via": "chosen_class resolution reads get_selected_class()/is_class_unlocked() -- the class-selection gate closed in Domain 6 (criterion 3b)",
+          "at": "playable_generated_ship.gd:1290-1297",
           "health": "healthy"
         }
       ],
       "content": "sufficient",
-      "content_note": "data/player/classes.json (classes with starting_skills + xp_multipliers)",
+      "content_note": "data/player/classes.json (classes with starting_skills + xp_multipliers). Domain 6 closed the prior gap: class_panel's selection (menu_coordinator.gd:617-628) writes meta_progression_state.selected_class_id, which func:_configure_player_progression now reads live every run.",
       "functional": null,
-      "gaps": [
-        "starting_class_id is fixed (defaults to engineer); no live class-selection consumer of meta unlocked_class_ids found"
-      ],
+      "gaps": [],
       "subsystems": []
     },
     {
@@ -2590,16 +2602,16 @@
       "smoke": "scripts/validation/player_progression_full_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:6017",
+      "driven_at": "playable_generated_ship.gd:6473",
       "input": {
         "live": true,
-        "desc": "Constructed + configured from data/player/unlock_tables.json and load_from_disk() at run start (playable_generated_ship.gd:1106-1117, verified); driven at run-end in _apply_meta_payout_and_persist -- coordinator folds every training_event_bus.get_log() entry into unlock_for_trigger(evt,tgt) then save_to_disk (6011-6018, verified). Real live input.",
-        "at": "playable_generated_ship.gd:1106-1117,6011-6018"
+        "desc": "Constructed + configured from data/player/unlock_tables.json and load_from_disk() at run start (playable_generated_ship.gd:1131-1142, func:_build_runtime_nodes); driven at run-end in func:_apply_meta_payout_and_persist -- coordinator folds every training_event_bus.get_log() entry into unlock_for_trigger(evt,tgt) then save_to_disk (playable_generated_ship.gd:6463-6474).",
+        "at": "playable_generated_ship.gd:6463"
       },
       "output": {
-        "live": false,
-        "desc": "VERIFIED hollow. Output is write-to-disk only. get_unlocked_ids()/is_unlocked()/get_entries_for_category() are referenced ONLY by validation smokes (meta_progression_state_smoke.gd:140, player_progression_full_smoke.gd:314). Grep confirms codex_panel.gd has ZERO references to unlock_registry/UnlockRegistry, contradicting the unlock_registry.gd:12 docstring. The only non-smoke references to the registry are in the coordinator (writer side, 1106-1117 + 6011-6018). No UI or gameplay node reads unlock state. (Note: meta_snapshot_smoke.gd also references the registry but does not call its getters -- still a smoke.)",
-        "at": null
+        "live": true,
+        "desc": "Domain 6 (WI-6) closed the reader gap: menu_coordinator.get_registry_unlock_lines() (menu_coordinator.gd:509, func:get_registry_unlock_lines) calls get_unlocked_ids()/get_category()/get_display_name() and is folded into the codex screen's line list at menu_coordinator.gd:735-739 (func:_refresh_codex), which codex_panel.set_entries() then renders -- the earlier docstring claim that codex_panel.gd itself reads the registry was wrong (the reader lives in menu_coordinator, not the panel node); class-category unlocks additionally bridge into meta_progression_state.unlock_class at playable_generated_ship.gd:6473 (func:_apply_meta_payout_and_persist) so the class picker can offer them next run.",
+        "at": "menu_coordinator.gd:509"
       },
       "confidence": "V",
       "loops": [
@@ -2609,28 +2621,27 @@
         {
           "to": "training_event_bus",
           "via": "run-end consumes bus log to fire unlock triggers",
-          "at": "playable_generated_ship.gd:6011-6018",
+          "at": "playable_generated_ship.gd:6465-6469",
           "health": "healthy"
         },
         {
           "to": "meta_progression_state",
-          "via": "co-persisted at run-end (intentionally separate user://unlock_registry.json vs meta_progression.json); no direct call coupling",
-          "at": "playable_generated_ship.gd:6009-6018",
-          "health": "weak"
+          "via": "class-category unlocks bridge live via meta_progression_state.unlock_class; also co-persisted at run-end (separate user://unlock_registry.json vs meta_progression.json)",
+          "at": "playable_generated_ship.gd:6473",
+          "health": "healthy"
         },
         {
-          "to": "codex_panel",
-          "via": "docstring claims codex panel reads the registry, but codex_panel.gd never references unlock_registry (grep-verified) -- documented-but-unwired output edge",
-          "at": null,
-          "health": "broken"
+          "to": "menu_coordinator",
+          "via": "get_registry_unlock_lines() reads get_unlocked_ids()/get_category()/get_display_name() and folds them into the codex/records screen",
+          "at": "menu_coordinator.gd:509,735",
+          "health": "healthy"
         }
       ],
       "content": "sufficient",
-      "content_note": "REQ-PM-009/ADR-0033. Catalog of 23 entries (codex/hub_scene/class) authored in data/player/unlock_tables.json; persists to user://unlock_registry.json independently of meta_progression.json. unlock_for_trigger resolves exact + 'event|*' wildcard (unlock_registry.gd:101). Data authoring is complete; what is missing is the in-game reader, not the data. All citations re-verified read-only; confidence held at V.",
+      "content_note": "REQ-PM-009/ADR-0033. Catalog of 23 entries (codex/hub_scene/class) authored in data/player/unlock_tables.json; persists to user://unlock_registry.json independently of meta_progression.json. unlock_for_trigger resolves exact + 'event|*' wildcard (unlock_registry.gd:106). Domain 6 added the in-game reader (menu_coordinator.get_registry_unlock_lines, folded into the codex screen) and the class-selection bridge (meta_progression_state.unlock_class) -- the registry is no longer write-only.",
       "functional": null,
       "gaps": [
-        "Hollow output: get_unlocked_ids()/is_unlocked() are read only by validation smokes; the codex panel the docstring names is not wired (grep-confirmed), so the registry accrues unlocks to disk that nothing in-game reads.",
-        "The 23 catalog triggers (repair_subcomponent, diagnose_fault, scan_derelict, etc.) depend on events emitted into training_event_bus; coverage of those emitters was not traced in this pass."
+        "The 23 catalog triggers (repair_subcomponent, diagnose_fault, scan_derelict, etc.) depend on events emitted into training_event_bus; full coverage of those emitters beyond repair_full_system/fabricate_part was not re-traced in this pass."
       ],
       "subsystems": []
     },
@@ -8592,43 +8603,42 @@
     {
       "id": "progression",
       "name": "Player progression & meta economy",
-      "closes": "partial",
+      "closes": "closed",
       "break_points": [
-        "INNER LOOP IS LIVE/CLOSED: earn XP (direct grant_xp from tool nodes + objective 4470) -> level skills -> gate scan()/begin_craft()/repair_with_inventory. This in-run loop works.",
-        "OUTER META LOOP IS BROKEN: hub_upgrade_state.purchase() is never called from gameplay (hub_upgrade_panel is render-only; its docstring falsely claims the coordinator purchases) -- meta_currency accrues with no sink",
-        "unlocked_hub_upgrade_ids never populates, so hub_upgrade compose_*() applied at run-start (1275/1290) always returns base values -- the cross-run upgrade-bonus loop is dead",
-        "skill_tree_state.unlock()/can_unlock() never called -- the skill tree is display-only and gates no gameplay",
-        "unlock_registry accrues codex/scene/class unlocks to disk at run-end (6017) but has no live reader -- write-only",
-        "emit_training_event seam (coordinator:1503) is dead code; tool nodes bypass the bus"
+        "Domain 6 closed the outer meta loop: hub_upgrade_state.purchase() is called live from meta_screen_confirm's hub_upgrades arm (menu_coordinator.gd:601), spending meta_currency and populating unlocked_hub_upgrade_ids, which compose_*() reads at the next run's func:_configure_player_progression (playable_generated_ship.gd:1308-1325).",
+        "skill_tree_state.unlock() is called live from meta_screen_confirm's skill_tree arm (menu_coordinator.gd:610-613) after can_unlock() gating; the unlocked set backs training_event_bus.skill_gate (playable_generated_ship.gd:1115-1120, func:_build_runtime_nodes), which gates real XP for the fabrication skill via field-crafting's fabricate_part event (:3389) -- the gate now controls a live subject, not an inert display.",
+        "unlock_registry has a live reader: menu_coordinator.get_registry_unlock_lines() (menu_coordinator.gd:509) folds unlocked codex/scene/class entries into the codex/records screen (:735-739); class-category unlocks additionally bridge into meta_progression_state.unlock_class (playable_generated_ship.gd:6473, func:_apply_meta_payout_and_persist), closing criterion 3b (class-selection gate).",
+        "The repair-XP double-grant is fixed: the objective handler's direct grant_xp(50) call was removed so repair_full_system XP (120) is granted exactly once via training_event_bus.emit at playable_generated_ship.gd:4856 (func:_on_interactable_completed; see removal comment at :4852-4854).",
+        "Deliberate deferral (not a defect): full emitter coverage for all 23 unlock_tables.json triggers (e.g. diagnose_fault, scan_derelict) was not re-traced this pass -- repair_full_system and fabricate_part are confirmed live; other trigger emitters are assumed present from prior domains but unverified in this citation pass."
       ],
       "steps": [
         {
           "system": "class_definition",
-          "role": "config: seeds class multipliers + starting skills into progression (1267)"
+          "role": "config: seeds class multipliers + starting skills into progression (playable_generated_ship.gd:1301-1305); chosen_class itself is now gated by meta_progression_state.selected_class_id (:1290-1297)"
         },
         {
           "system": "training_event_bus",
-          "role": "ingest (LIMITED): only objective completion (4470) flows through the bus; tool-node XP bypasses it"
+          "role": "ingest (LIVE, single-source): objective completion (repair_full_system, :4856) and field-crafting (fabricate_part, :3389) flow through the bus, gated per-skill by skill_gate; tool-node XP for repair/breach/fire/dock actions still grants directly (unrelated events, not a double-grant)"
         },
         {
           "system": "player_progression_state",
-          "role": "core (LIVE): direct grant_xp banks/levels skills; levels gate scanner/crafting/repair/welding (live sink)"
+          "role": "core (LIVE): direct grant_xp + gated bus grants bank/level skills; levels gate scanner/crafting/repair/welding (live sink)"
         },
         {
           "system": "meta_progression_state",
-          "role": "meta accrual: apply_meta_payout folds run summary into currency/counters at run end (6008); codex unlock at 6746"
+          "role": "meta accrual + spend: apply_meta_payout folds run summary into currency/counters at run end (:6460); selected_class_id persists the class-selection gate; hub-upgrade/class unlock sets are now populated by live purchase/unlock/bridge calls"
         },
         {
           "system": "unlock_registry",
-          "role": "meta unlock sink (write-only): run-end folds bus log into unlock_for_trigger (6017) + persists; no live reader"
+          "role": "meta unlock sink (LIVE reader): run-end folds bus log into unlock_for_trigger (:6465-6469) + persists; menu_coordinator.get_registry_unlock_lines() reads it into the codex screen, and class-category unlocks bridge into meta_progression_state"
         },
         {
           "system": "hub_upgrade_state",
-          "role": "spend (BROKEN): purchase unwired; compose_*() reads owned set (always empty) and re-feeds progression next run"
+          "role": "spend (LIVE): purchase() called from meta_screen_confirm's hub_upgrades arm; compose_*() reads the now-real owned set and re-feeds progression next run"
         },
         {
           "system": "skill_tree_state",
-          "role": "unlock (BROKEN): unlock()/can_unlock() never called; display-only"
+          "role": "unlock (LIVE): unlock()/can_unlock() called from meta_screen_confirm's skill_tree arm; is_unlocked() backs the skill_gate Callable that gates fabrication XP"
         }
       ]
     },
