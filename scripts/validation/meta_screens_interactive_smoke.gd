@@ -22,7 +22,16 @@ const LocalizationCatalogScript := preload("res://scripts/systems/localization_c
 var _coord: Node = null
 var _audio: Node = null
 
+## The class-select confirm seam drives the real coordinator arm, which calls
+## MetaProgressionState.save_to_disk() on the REAL default path
+## (user://meta_progression.json) — not a test-scoped path. Wipe it before and
+## after this smoke runs so it never pollutes the real meta file that other
+## main-scene smokes boot from (e.g. main_playable_slice_progression_smoke.gd's
+## class=engineer assertion).
+const REAL_META_PATH := "user://meta_progression.json"
+
 func _initialize() -> void:
+	_wipe_real_meta_file()
 	_coord = MenuCoordinatorScript.new()
 	get_root().add_child(_coord)
 	# _ready() (which builds the meta-screen panels into _meta_panels) is deferred to the
@@ -160,6 +169,7 @@ func _initialize() -> void:
 
 	print("META SCREENS INTERACTIVE PASS hub_purchase=true skill_unlock=true registry_reader=true class_select=true")
 	_cleanup()
+	_wipe_real_meta_file()
 	quit(0)
 
 func _load_json(path: String) -> Dictionary:
@@ -172,7 +182,12 @@ func _cleanup() -> void:
 	if is_instance_valid(_coord):
 		_coord.queue_free()
 
+func _wipe_real_meta_file() -> void:
+	if FileAccess.file_exists(REAL_META_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(REAL_META_PATH))
+
 func _fail(reason: String) -> void:
 	push_error("META SCREENS INTERACTIVE FAIL reason=%s" % reason)
 	_cleanup()
+	_wipe_real_meta_file()
 	quit(1)
