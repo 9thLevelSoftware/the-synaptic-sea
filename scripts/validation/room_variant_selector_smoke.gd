@@ -143,9 +143,49 @@ func _initialize() -> void:
 		quit(1)
 		return
 
+	# --- Case 10: effects_for returns a hazard payload for a fire variant ---
+	var burned: Dictionary = selector.effects_for("burned_out")
+	var burned_hazard: Dictionary = (burned.get("sim", {}) as Dictionary).get("hazard", {})
+	if str(burned_hazard.get("kind", "")) != "fire":
+		push_error("ROOM VARIANT SELECTOR FAIL burned_out hazard kind != fire: %s" % str(burned_hazard))
+		quit(1)
+		return
+
+	# --- Case 11: effects_for returns a breach payload for the breach variant ---
+	var breached: Dictionary = selector.effects_for("breached")
+	var breached_hazard: Dictionary = (breached.get("sim", {}) as Dictionary).get("hazard", {})
+	if str(breached_hazard.get("kind", "")) != "breach":
+		push_error("ROOM VARIANT SELECTOR FAIL breached hazard kind != breach: %s" % str(breached_hazard))
+		quit(1)
+		return
+
+	# --- Case 12: unmapped variant returns empty effects ---
+	if not selector.effects_for("standard").is_empty():
+		push_error("ROOM VARIANT SELECTOR FAIL standard should have empty effects")
+		quit(1)
+		return
+
+	# --- Case 13: loot_bias keys are real loot tables ---
+	var loot_doc: Dictionary = _load_loot_tables()
+	for v: String in ["burned_out", "breached", "refrigerated", "secure", "triage"]:
+		var bias: String = str((selector.effects_for(v).get("sim", {}) as Dictionary).get("loot_bias", ""))
+		if not bias.is_empty() and not loot_doc.has(bias):
+			push_error("ROOM VARIANT SELECTOR FAIL loot_bias '%s' for variant '%s' not in loot_tables.json" % [bias, v])
+			quit(1)
+			return
+
 	print("ROOM VARIANT SELECTOR PASS distinct_per_index=%d distinct_per_seed=%d airlock_variants=%d corridor_variants=%d extended=%d legacy=3 deterministic=true" % [
 		seen_variants.size(), seen_seeds.size(),
 		airlock_variants.size(), corridor_variants.size(),
 		extended_set.size(),
 	])
 	quit(0)
+
+
+func _load_loot_tables() -> Dictionary:
+	var f: FileAccess = FileAccess.open("res://data/items/loot_tables.json", FileAccess.READ)
+	if f == null:
+		return {}
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	f.close()
+	return parsed if parsed is Dictionary else {}
