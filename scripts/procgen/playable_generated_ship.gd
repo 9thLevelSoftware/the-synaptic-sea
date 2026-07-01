@@ -252,7 +252,6 @@ var loot_container_root: Node3D = null
 var loot_containers: Array = []
 # Domain 5: sealed hatches on the active derelict (locked passages the player bypasses
 # with utility flags: lockpick for mechanical, hack_chip for electronic).
-var sealed_hatch_root: Node3D = null
 var sealed_hatches: Array = []
 # Sub-project #4: timed repair points for damaged subcomponents.
 var repair_point_root: Node3D = null
@@ -1226,9 +1225,6 @@ func _build_runtime_nodes() -> void:
 	loot_container_root = Node3D.new()
 	loot_container_root.name = "LootContainerRoot"
 	add_child(loot_container_root)
-	sealed_hatch_root = Node3D.new()
-	sealed_hatch_root.name = "SealedHatchRoot"
-	add_child(sealed_hatch_root)
 	repair_point_root = Node3D.new()
 	repair_point_root.name = "RepairPointRoot"
 	add_child(repair_point_root)
@@ -2603,10 +2599,8 @@ func _build_sealed_hatches() -> void:
 			hatch.set_bypassed(true)
 		if not hatch.hatch_bypassed.is_connected(_on_hatch_bypassed):
 			hatch.hatch_bypassed.connect(_on_hatch_bypassed)
-		if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
+		if current_ship != null and is_instance_valid(current_ship.scene_root):
 			current_ship.scene_root.add_child(hatch)
-		else:
-			sealed_hatch_root.add_child(hatch)
 		sealed_hatches.append(hatch)
 
 func _clear_sealed_hatches() -> void:
@@ -7262,6 +7256,7 @@ func _reset_runtime_for_reload() -> void:
 		_clear_loot_containers()
 		_clear_repair_points()
 		_clear_breach_seal_points()
+		_clear_sealed_hatches()
 	# Allow _on_ship_loaded to re-wrap the freshly-reloaded starting ship on
 	# every reload (home-save or away-save). Previously this was only inside
 	# `if away_from_start` — but when saving at home current_ship was never

@@ -46,7 +46,7 @@ func try_bypass(player_body: Node, active_flags: Dictionary) -> Dictionary:
 	if not _is_player_in_range(player_body):
 		return {"ok": false, "reason": "out_of_range", "hatch_id": hatch_id}
 	var flag: String = required_flag()
-	if active_flags == null or not active_flags.has(flag):
+	if not active_flags.has(flag):
 		return {"ok": false, "reason": "locked", "hatch_id": hatch_id, "needs": flag, "lock_kind": lock_kind}
 	set_bypassed(true)
 	hatch_bypassed.emit(hatch_id, lock_kind)
@@ -55,7 +55,7 @@ func try_bypass(player_body: Node, active_flags: Dictionary) -> Dictionary:
 func _is_player_in_range(player_body: Node) -> bool:
 	if _player_in_range:
 		return true
-	if player_body is Node3D and self != null:
+	if player_body is Node3D:
 		return global_position.distance_to((player_body as Node3D).global_position) <= _radius
 	return false
 
