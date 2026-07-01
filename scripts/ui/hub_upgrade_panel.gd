@@ -15,6 +15,7 @@ const HubUpgradeStateScript := preload("res://scripts/systems/hub_upgrade_state.
 var _catalog = null
 var _meta_state = null
 var _list_label: RichTextLabel = null
+var _selected_index: int = 0
 
 func _ready() -> void:
 	_list_label = RichTextLabel.new()
@@ -59,6 +60,7 @@ func get_status_lines() -> PackedStringArray:
 	if _meta_state != null and _meta_state.has_method("get_meta_currency"):
 		currency = int(_meta_state.get_meta_currency())
 	lines.append("Hub Upgrades: %d / %d owned  Currency: %d" % [owned, _catalog.get_upgrade_count(), currency])
+	var idx: int = 0
 	for entry in _catalog.get_upgrade_entries(_meta_state):
 		var uid: String = str(entry.get("upgrade_id", ""))
 		var display: String = str(entry.get("display_name", uid))
@@ -67,8 +69,10 @@ func get_status_lines() -> PackedStringArray:
 		var owned_e: bool = bool(entry.get("owned", false))
 		var affordable: bool = bool(entry.get("affordable", false))
 		var marker: String = "[X]" if owned_e else ("[$]" if affordable else "[ ]")
+		var cursor: String = ">" if idx == _selected_index else " "
 		var prereq_str: String = "  req=%s" % ",".join(prereqs) if not prereqs.is_empty() else ""
-		lines.append("%s %s cost=%d%s" % [marker, display, cost, prereq_str])
+		lines.append("%s%s %s cost=%d%s" % [cursor, marker, display, cost, prereq_str])
+		idx += 1
 	return lines
 
 func render() -> void:
@@ -79,6 +83,25 @@ func render() -> void:
 	for line in lines:
 		bb += String(line) + "\n"
 	_list_label.text = bb
+
+## Domain 6 host/input seam: moves the selection cursor by `direction` rows
+## (typically -1/+1), clamped to the current upgrade-entry list bounds.
+func move_selection(direction: int) -> void:
+	var n: int = _catalog.get_upgrade_entries(_meta_state).size() if _catalog != null else 0
+	if n <= 0:
+		_selected_index = 0
+		return
+	_selected_index = clampi(_selected_index + direction, 0, n - 1)
+
+## Returns the upgrade_id at the cursor (in `get_upgrade_entries()` order),
+## or "" when the catalog is uninitialized or the cursor is out of bounds.
+func get_selected_id() -> String:
+	if _catalog == null:
+		return ""
+	var entries: Array = _catalog.get_upgrade_entries(_meta_state)
+	if _selected_index < 0 or _selected_index >= entries.size():
+		return ""
+	return str((entries[_selected_index] as Dictionary).get("upgrade_id", ""))
 
 ## Static factory used by the smoke: loads the catalog from disk and
 ## wires the supplied meta state (which the caller is expected to load).
