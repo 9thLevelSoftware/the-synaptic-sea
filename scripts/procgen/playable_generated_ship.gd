@@ -1419,6 +1419,8 @@ func _catch_up_ship(inst) -> void:
 	if inst == null or inst == home_ship:
 		return
 	var dt: float = minf(world_time - inst.last_sim_time, MAX_CATCHUP_SECONDS)
+	if dt <= 0.0:
+		return
 	inst.last_sim_time = world_time
 	while dt > 0.0:
 		var step: float = minf(CATCHUP_SUBSTEP_SECONDS, dt)
@@ -2635,12 +2637,13 @@ func _clear_repair_points() -> void:
 
 func _build_breach_seal_points() -> void:
 	_clear_breach_seal_points()
-	if hull_integrity_state == null:
+	var hull = _active_hull()
+	if hull == null:
 		return
 	# Only seal breached compartments; healthy hull needs no seal node.
 	var breached: Array = []
-	for cid in hull_integrity_state.compartments:
-		if bool((hull_integrity_state.compartments[cid] as Dictionary).get("breach_open", false)):
+	for cid in hull.compartments:
+		if bool((hull.compartments[cid] as Dictionary).get("breach_open", false)):
 			breached.append(str(cid))
 	if breached.is_empty():
 		return
@@ -2654,7 +2657,7 @@ func _build_breach_seal_points() -> void:
 		var pos: Vector3 = positions[idx % positions.size()]
 		idx += 1
 		var sp = BreachSealPointScript.new()
-		sp.configure(cid, hull_integrity_state, inventory_state, player_progression, pos, 4.0, "hull_sealant", 1.0, 1.8)
+		sp.configure(cid, hull, inventory_state, player_progression, pos, 4.0, "hull_sealant", 1.0, 1.8)
 		if not sp.breach_sealed.is_connected(_on_breach_sealed):
 			sp.breach_sealed.connect(_on_breach_sealed)
 		if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
@@ -4889,8 +4892,9 @@ func _combined_system_status_lines() -> PackedStringArray:
 	if life_support_expanded_state != null:
 		for line in life_support_expanded_state.get_status_lines():
 			lines.append(String(line))
-	if hull_integrity_state != null:
-		for line in hull_integrity_state.get_status_lines():
+	var hull = _active_hull()
+	if hull != null:
+		for line in hull.get_status_lines():
 			lines.append(String(line))
 	if fire_suppression_state != null:
 		for line in fire_suppression_state.get_status_lines():

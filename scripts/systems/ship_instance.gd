@@ -202,7 +202,7 @@ func apply_summary(summary) -> bool:
 		get_web().apply_summary(web_summary as Dictionary)
 	elif summary.has("web_attached"):
 		get_web().attached_to_web = bool(summary.get("web_attached", true))
-	last_sim_time = float(summary.get("last_sim_time", last_sim_time))
+	last_sim_time = float(summary.get("last_sim_time", 0.0))
 	return true
 
 ## Returns this ship's DerelictObjectiveController, creating it on first access.
