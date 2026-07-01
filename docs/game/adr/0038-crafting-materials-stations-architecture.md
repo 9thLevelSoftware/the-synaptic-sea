@@ -32,3 +32,12 @@ Task 03 needs a complete crafting economy, but the repository already has strong
 - Put per-recipe behavior directly on interactable station nodes. Rejected: too scene-bound, hard to test headlessly, and poor for save/load.
 - Keep crafting persistence outside `RunSnapshot` as ad-hoc smoke data. Rejected: not production-grade and does not satisfy the package acceptance criteria.
 - Split field crafting into a wholly separate recipe catalog. Rejected: same schema with a `station_kind == field_crafting` subset is simpler and deterministic.
+
+## Superseded in part (Domain 4, 2026-06-30)
+
+The "powered-station crafts pause while the player is away on a derelict" behavior
+was an emergent side-effect of `_recompute_expanded_ship_systems` running only on the
+home `_process` branch — not a deliberate architectural rule. Domain 4 makes the ship
+sim live on both branches (`docs/superpowers/specs/2026-06-30-domain4-ship-systems-design.md`),
+so powered stations now advance while away as well. Field crafting remains the
+unpowered/portable path and is unchanged.

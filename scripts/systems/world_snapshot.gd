@@ -20,6 +20,9 @@ var home_ship_carts: Array = []                  # home ship's [CartState.get_su
 var player_equipment: Dictionary = {}           # EquipmentState.get_summary()
 var visited_ships: Dictionary = {}              # marker_id -> ShipInstance.get_summary()
 var current_location: String = ""               # "" = home ship, else marker_id
+# Live Persistent Ships Phase 1: monotonic in-run simulation clock (seconds).
+# Persisted additively; older saves default to 0.0 via .get("world_time", 0.0).
+var world_time: float = 0.0
 var player_position_in_ship: Array = [0.0, 0.0, 0.0]
 var dock_edges: Array = []          # [{host, mobile, port_type:"airlock"|"hangar", slot_index:int}]
 var piloted_ship_id: String = ""
@@ -41,6 +44,7 @@ func to_dict() -> Dictionary:
 		"player_equipment": player_equipment.duplicate(true),
 		"visited_ships": visited_ships.duplicate(true),
 		"current_location": current_location,
+		"world_time": world_time,
 		"player_position_in_ship": player_position_in_ship.duplicate(),
 		"dock_edges": dock_edges.duplicate(true),
 		"piloted_ship_id": piloted_ship_id,
@@ -85,6 +89,7 @@ static func from_dict(data: Variant, expected_world_version: String, expected_go
 	ws.player_equipment = _deep_copy_dict(dict.get("player_equipment", {}))
 	ws.visited_ships = _deep_copy_dict(dict.get("visited_ships", {}))
 	ws.current_location = str(dict.get("current_location", ""))
+	ws.world_time = float(dict.get("world_time", 0.0))
 	var edges_v: Variant = dict.get("dock_edges", [])
 	if typeof(edges_v) == TYPE_ARRAY:
 		ws.dock_edges = (edges_v as Array).duplicate(true)

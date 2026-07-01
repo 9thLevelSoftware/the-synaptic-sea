@@ -92,6 +92,7 @@ const WaterRecyclerStateScript := preload("res://scripts/systems/water_recycler_
 const PowerGridStateScript := preload("res://scripts/systems/power_grid_state.gd")
 const LifeSupportExpandedStateScript := preload("res://scripts/systems/life_support_state.gd")
 const HullIntegrityStateScript := preload("res://scripts/systems/hull_integrity_state.gd")
+const WebInfestationStateScript := preload("res://scripts/systems/web_infestation_state.gd")
 const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
 const ExtinguisherStateScript := preload("res://scripts/systems/extinguisher_state.gd")
 const FireSuppressionPointScript := preload("res://scripts/tools/fire_suppression_point.gd")
@@ -148,6 +149,7 @@ const ARC_ZONE_LABEL_TEXT_DISCHARGED: String = "ARC GROUNDED — CROSS"
 const ARC_ZONE_LABEL_TEXT_ARCING: String = "ARC LIVE — WAIT"
 const POWER_GRID_CONFIG_PATH: String = "res://data/ship_systems/power_budget_tables.json"
 const HULL_COMPARTMENTS_CONFIG_PATH: String = "res://data/ship_systems/hull_compartments.json"
+const WEB_INFESTATION_CONFIG_PATH: String = "res://data/ship_systems/web_infestation.json"
 const FACILITY_UPGRADES_CONFIG_PATH: String = "res://data/ship_systems/facility_upgrades.json"
 const HYDROPONICS_CROPS_CONFIG_PATH: String = "res://data/crops/hydroponics_crops.json"
 const SHIP_SUBSYSTEM_TUNING_PATH: String = "res://data/ship_systems/subsystem_tuning.json"
@@ -220,6 +222,11 @@ var away_from_start: bool = false
 # retained ShipInstance.
 var visited_ships: Dictionary = {}          # marker_id -> ShipInstance
 var home_ship = null                        # the home ShipInstance (marker_id "")
+# Live Persistent Ships Phase 1: monotonic in-run simulation clock (seconds).
+# Accumulates every _process frame (before branching) so ships can stamp
+# last_sim_time against it and be fast-forwarded by elapsed world_time on
+# revisit (Phase 4 catch-up). Persisted in WorldSnapshot (additive).
+var world_time: float = 0.0
 # Phase 5a Task 7: the physical lifeboat docked to the starting derelict.
 # Port-docked to the home ship's airlock at boot; shares ship_systems_manager with it.
 var lifeboat_ship = null                    # ShipInstance (docked to home_ship)
@@ -346,6 +353,7 @@ var water_recycler_state  # WaterRecyclerState
 var power_grid_state  # PowerGridState
 var life_support_expanded_state  # LifeSupportState
 var hull_integrity_state  # HullIntegrityState
+var hull_web_state  # WebInfestationState (hub hull's live web damage source)
 var fire_suppression_state  # FireSuppressionState
 var extinguisher_state  # ExtinguisherState
 var propulsion_expanded_state  # PropulsionState
@@ -1323,6 +1331,8 @@ func _configure_expanded_ship_system_models() -> void:
 	power_grid_state.configure(_load_json_dict(POWER_GRID_CONFIG_PATH))
 	hull_integrity_state = HullIntegrityStateScript.new()
 	hull_integrity_state.configure(_load_json_dict(HULL_COMPARTMENTS_CONFIG_PATH))
+	hull_web_state = WebInfestationStateScript.new()
+	hull_web_state.configure(_load_json_dict(WEB_INFESTATION_CONFIG_PATH))
 	var tuning: Dictionary = _load_json_dict(SHIP_SUBSYSTEM_TUNING_PATH)
 	life_support_expanded_state = LifeSupportExpandedStateScript.new()
 	life_support_expanded_state.configure(tuning.get("life_support", {}))
@@ -1335,6 +1345,16 @@ func _configure_expanded_ship_system_models() -> void:
 	sustenance_state = SustenanceStateScript.new()
 	sustenance_state.configure(_load_json_dict(FACILITY_UPGRADES_CONFIG_PATH))
 
+## Seed a freshly-generated derelict's per-ship structural models from tuning and stamp
+## its sim clock. Called ONCE on first visit (not on revisit — a retained instance already
+## carries its caught-up state). The hub never uses this (it has the coordinator singletons).
+func _seed_ship_models(inst) -> void:
+	if inst == null:
+		return
+	inst.get_hull().configure(_load_json_dict(HULL_COMPARTMENTS_CONFIG_PATH))
+	inst.get_web().configure(_load_json_dict(WEB_INFESTATION_CONFIG_PATH))   # attached_to_web=true by default
+	inst.last_sim_time = world_time
+
 func _manager_broken_systems() -> Array[String]:
 	var broken: Array[String] = []
 	if ship_systems_manager == null:
@@ -1343,6 +1363,69 @@ func _manager_broken_systems() -> Array[String]:
 		if not ship_systems_manager.systems.has(subsystem_id) or not ship_systems_manager.is_operational(subsystem_id):
 			broken.append(subsystem_id)
 	return broken
+
+## Tick the active ship's fire model (home: hub; away: derelict) once and apply
+## its per-compartment system damage. Extracted from _recompute_expanded_ship_systems
+## so the recompute can run on BOTH _process branches (Domain 4) without double-
+## ticking the fire the away branch already owns. Call exactly once per branch.
+func _tick_active_fire(delta: float) -> void:
+	var afs = _active_fire_state()
+	if afs == null:
+		return
+	if afs.tick(delta, _build_fire_context()):
+		_refresh_fire_zones()
+	# A burning compartment degrades the ship system housed there (M7-B Task 8).
+	_apply_fire_system_damage(delta)
+
+## Foundation contagion seed: while away and docked to a still-web-attached
+## derelict, the web creeps onto the hub faster (contact boost). Full dock-graph
+## spread is the follow-on web spec.
+func _active_derelict_web_attached() -> bool:
+	return away_from_start and current_ship != null and current_ship.is_web_attached()
+
+## Live Persistent Ships Phase 3: the unified per-ship sim tick. Advances ONE ship's
+## systems manager and applies its biomatter-web hull damage, resolving the ship's own
+## models via _web_for/_hull_for. Works for any ship (hub or derelict); used continuously
+## for present ships and (Phase 4) for catch-up over a large dt. Does NOT tick fire (that
+## stays on the active-ship scene path) or the hub expanded recompute.
+func _advance_ship(ship, delta: float) -> void:
+	if ship == null:
+		return
+	ship.last_sim_time = world_time   # FIX C1: stamp present ship's clock so catch-up on revisit covers absence only (not presence+absence)
+	if ship.systems_manager != null:
+		ship.systems_manager.advance(delta)
+	var web = _web_for(ship)
+	var hull = _hull_for(ship)
+	if web == null or hull == null:
+		return
+	# Contact boost is the hub's only (an attached derelict docked to the hub). A derelict's
+	# own attachment drives its base web growth; cross-ship spread is a follow-on.
+	var contact: bool = _active_derelict_web_attached() if ship == home_ship else false
+	var dmg: float = web.tick(delta, contact)
+	if dmg <= 0.0:
+		return
+	for cid in hull.compartments.keys():
+		hull.damage_compartment(str(cid), dmg)
+
+const CATCHUP_SUBSTEP_SECONDS: float = 5.0     # cap per advance step so fire/system models stay stable over big gaps
+const MAX_CATCHUP_SECONDS: float = 1800.0      # bound total absence catch-up to 30 min of sim (no infinite decay)
+
+## Live Persistent Ships Phase 4: fast-forward an absent ship's sim by the world_time elapsed
+## since it was last advanced, in capped sub-steps. The hub is never absent (ticked every
+## frame) so it is excluded. New derelicts have last_sim_time == world_time (seeded), so a
+## first visit is a no-op. Idempotent: stamps last_sim_time = world_time so a re-entry without
+## further world_time advance does nothing.
+func _catch_up_ship(inst) -> void:
+	if inst == null or inst == home_ship:
+		return
+	var dt: float = minf(world_time - inst.last_sim_time, MAX_CATCHUP_SECONDS)
+	if dt <= 0.0:
+		return
+	inst.last_sim_time = world_time
+	while dt > 0.0:
+		var step: float = minf(CATCHUP_SUBSTEP_SECONDS, dt)
+		_advance_ship(inst, step)
+		dt -= step
 
 func _recompute_expanded_ship_systems(delta: float) -> void:
 	if power_grid_state == null:
@@ -1366,12 +1449,6 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 			"breach_count": hull_integrity_state.get_breach_count(),
 			"recycled_water": recycled_water,
 		})
-	var _afs_home = _active_fire_state()
-	if _afs_home != null:
-		if _afs_home.tick(delta, _build_fire_context()):
-			_refresh_fire_zones()
-		# M7-B Task 8: a burning compartment degrades the ship system housed there.
-		_apply_fire_system_damage(delta)
 	# ADR-0038: drive station power from the same "stations" channel, then advance the
 	# single active craft. Field crafting is unpowered, so it ticks regardless (and also in
 	# the _process away-branch for emergency crafts started before travel).
@@ -1388,8 +1465,6 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 	# channel as the crafting stations, but its power is independent of crafting_state.
 	if is_instance_valid(extinguisher_recharge_port):
 		extinguisher_recharge_port.set_powered(power_grid_state.get_allocation_ratio("stations") > 0.0)
-	if field_crafting_state != null and field_crafting_state.tick(delta):
-		_on_field_craft_completed()
 	if sustenance_state != null:
 		sustenance_state.tick(delta, {
 			"powered_ratio": power_grid_state.get_allocation_ratio("sustenance"),
@@ -1403,6 +1478,7 @@ func _expanded_ship_systems_summary() -> Dictionary:
 		"power_grid_summary": power_grid_state.get_summary() if power_grid_state != null else {},
 		"life_support_state_summary": life_support_expanded_state.get_summary() if life_support_expanded_state != null else {},
 		"hull_integrity_summary": hull_integrity_state.get_summary() if hull_integrity_state != null else {},
+		"web_infestation_summary": hull_web_state.get_summary() if hull_web_state != null else {},
 		"fire_suppression_summary": fire_suppression_state.get_summary() if fire_suppression_state != null else {},
 		"extinguisher_summary": extinguisher_state.get_summary() if extinguisher_state != null else {},
 		"propulsion_state_summary": propulsion_expanded_state.get_summary() if propulsion_expanded_state != null else {},
@@ -1805,6 +1881,9 @@ func travel_to_marker_id(marker_id: String) -> Dictionary:
 ## Phase 5a Task 5: home ship is NO LONGER detached. Home and derelict are
 ## co-present at distinct world positions (origin vs DERELICT_DOCK_OFFSET).
 func _attach_derelict_active(inst, new_root: Node3D) -> void:
+	# Live Persistent Ships Phase 4: fast-forward the absent ship's sim by elapsed world_time
+	# before activating it. First visit: dt=0 (seeded), no-op. Revisit: applies the absence.
+	_catch_up_ship(inst)
 	inst.scene_root = new_root
 	add_child(new_root)
 	new_root.position = DERELICT_DOCK_OFFSET   # initial world anchor; piloted ship docks TO it
@@ -2558,12 +2637,13 @@ func _clear_repair_points() -> void:
 
 func _build_breach_seal_points() -> void:
 	_clear_breach_seal_points()
-	if hull_integrity_state == null:
+	var hull = _active_hull()
+	if hull == null:
 		return
 	# Only seal breached compartments; healthy hull needs no seal node.
 	var breached: Array = []
-	for cid in hull_integrity_state.compartments:
-		if bool((hull_integrity_state.compartments[cid] as Dictionary).get("breach_open", false)):
+	for cid in hull.compartments:
+		if bool((hull.compartments[cid] as Dictionary).get("breach_open", false)):
 			breached.append(str(cid))
 	if breached.is_empty():
 		return
@@ -2577,7 +2657,7 @@ func _build_breach_seal_points() -> void:
 		var pos: Vector3 = positions[idx % positions.size()]
 		idx += 1
 		var sp = BreachSealPointScript.new()
-		sp.configure(cid, hull_integrity_state, inventory_state, player_progression, pos, 4.0, "hull_sealant", 1.0, 1.8)
+		sp.configure(cid, hull, inventory_state, player_progression, pos, 4.0, "hull_sealant", 1.0, 1.8)
 		if not sp.breach_sealed.is_connected(_on_breach_sealed):
 			sp.breach_sealed.connect(_on_breach_sealed)
 		if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
@@ -3118,6 +3198,30 @@ func _active_fire_state():
 		return current_ship.get_fire()
 	return fire_suppression_state
 
+## The hull/web of the ship the player is currently aboard: the derelict's per-ship
+## model when away, the hub's coordinator singleton otherwise. Mirrors _active_fire_state().
+func _active_hull():
+	if away_from_start and current_ship != null and current_ship != home_ship:
+		return current_ship.get_hull()
+	return hull_integrity_state
+
+func _active_web():
+	if away_from_start and current_ship != null and current_ship != home_ship:
+		return current_ship.get_web()
+	return hull_web_state
+
+## Resolve a SPECIFIC ship's hull/web (hub -> singleton, any other ship -> its own model).
+## Used by the unified per-ship tick (_advance_ship) in Phase 3.
+func _hull_for(ship):
+	if ship == null or ship == home_ship:
+		return hull_integrity_state
+	return ship.get_hull()
+
+func _web_for(ship):
+	if ship == null or ship == home_ship:
+		return hull_web_state
+	return ship.get_web()
+
 ## Floor-cell world positions distributed across the active ship's rooms, for repair-point
 ## placement. Reuses the active loader's room/cell resolution where available.
 func _distributed_room_positions() -> Array:
@@ -3604,6 +3708,7 @@ func travel_to(marker) -> Dictionary:
 		new_mgr.configure(new_mgr.load_definitions(), new_bp.condition, new_bp.seed_value)
 		inst = ShipInstanceScript.create("ship_%s" % mid, mid, new_bp, new_mgr, null)
 		visited_ships[mid] = inst
+		_seed_ship_models(inst)
 
 	_attach_derelict_active(inst, new_root)
 	_configure_threat_runtime_for_current_ship()
@@ -4787,8 +4892,9 @@ func _combined_system_status_lines() -> PackedStringArray:
 	if life_support_expanded_state != null:
 		for line in life_support_expanded_state.get_status_lines():
 			lines.append(String(line))
-	if hull_integrity_state != null:
-		for line in hull_integrity_state.get_status_lines():
+	var hull = _active_hull()
+	if hull != null:
+		for line in hull.get_status_lines():
 			lines.append(String(line))
 	if fire_suppression_state != null:
 		for line in fire_suppression_state.get_status_lines():
@@ -4903,6 +5009,7 @@ func get_route_gate_collision_enabled_count() -> int:
 # and is intentionally a no-op before ship load completes.
 
 func _process(delta: float) -> void:
+	world_time += delta  # Live Persistent Ships Phase 1: advance before any branch/return
 	if away_from_start:
 		# Keep the vitals panel live on a boarded derelict: Heavy-Load, repair
 		# progress, and the repair_blocked message + its countdown still apply
@@ -4927,26 +5034,18 @@ func _process(delta: float) -> void:
 					hallucination_manager.render(delta, ppos_away)
 		# Derelict-side fire (wire BOTH branches): tick the active (derelict) fire model so
 		# it spreads, degrades derelict systems, and feeds the player-vitals teeth below.
-		# The home branch ticks fire inside _recompute_expanded_ship_systems, which this
-		# branch never calls. This closes the "away path early-return" gap for fire — the
-		# same pattern used by the sanity/hallucination and audio fixes (Codex PRs #43-44).
-		var _afs_away = _active_fire_state()
-		if _afs_away != null:
-			if _afs_away.tick(delta, _build_fire_context()):
-				_refresh_fire_zones()
-			_apply_fire_system_damage(delta)
-		# Recharge port is power-gated on the DERELICT's own power system (engineering gate):
-		# present but dead until the player restores derelict power.
-		if is_instance_valid(extinguisher_recharge_port):
-			var _dmgr = _active_systems_manager()
-			extinguisher_recharge_port.set_powered(_dmgr != null and _dmgr.is_operational("power"))
+		# Fire is ticked here via _tick_active_fire on BOTH branches (home and away).
+		# Live Persistent Ships Phase 3: _advance_ship (hub + boarded derelict) +
+		# _recompute_expanded_ship_systems run in the block below.
+		_tick_active_fire(delta)
 		# Domain 1: survival attrition + stakes on the derelict branch (shared
 		# helper). Runs radiation/body-temp/status + the vitals cascade + death,
 		# so the away path is no longer starved past the 4808 early-return.
 		_tick_survival_attrition(delta)
 		_refresh_player_vitals(delta)
-		# ADR-0038: emergency field crafting completes even away from home (powered-station
-		# crafts pause while away, by design — only field_crafting_state advances here).
+		# ADR-0038 (superseded by Domain 4): field crafting completes away from home.
+		# Powered-station crafting is NO LONGER paused away — the hub recompute runs on
+		# both branches now (live sim), so powered stations stay live on a derelict too.
 		if field_crafting_state != null and field_crafting_state.tick(delta):
 			_on_field_craft_completed()
 		# Timed autosave still advances on a derelict — a long boarding run is
@@ -4958,8 +5057,24 @@ func _process(delta: float) -> void:
 		if is_instance_valid(audio_manager) and audio_manager.has_method("tick"):
 			audio_manager.tick(delta)
 			_refresh_audio_state(false, delta)
-		# Domain 3: food spoilage + production advance on the derelict branch too (see
-		# _tick_food_runtime — deliberate divergence from crafting, which pauses away).
+		# Live Persistent Ships Phase 3: _advance_ship ticks BOTH present ships on the
+		# away branch — the hub (always co-present) and the boarded derelict (guarded so
+		# the hub is never advanced twice if current_ship == home_ship). Fire stays on
+		# _tick_active_fire above; _recompute_expanded_ship_systems follows for hub power.
+		_advance_ship(home_ship, delta)
+		if current_ship != null and current_ship != home_ship:
+			_advance_ship(current_ship, delta)
+		_recompute_expanded_ship_systems(delta)
+		# Recharge port is power-gated on the DERELICT's own power system (engineering gate):
+		# present but dead until the player restores derelict power. This MUST run AFTER
+		# _recompute_expanded_ship_systems (which sets the port to hub power_grid state),
+		# so the derelict-based gate takes final precedence on the away branch.
+		if is_instance_valid(extinguisher_recharge_port):
+			var _dmgr = _active_systems_manager()
+			extinguisher_recharge_port.set_powered(_dmgr != null and _dmgr.is_operational("power"))
+		# Domain 3 + Phase 3: food spoilage + production advance on the derelict branch too (see
+		# _tick_food_runtime). Powered station crafting also advances on both branches
+		# via _recompute_expanded_ship_systems called above (ADR-0038 superseded).
 		_tick_food_runtime(delta)
 		return
 	if not playable_started or slice_complete:
@@ -4968,13 +5083,15 @@ func _process(delta: float) -> void:
 		return
 	_tick_autosave_policy(delta)
 	_tick_threat_runtime(delta)
-	if ship_systems_manager != null:
-		ship_systems_manager.advance(delta)
+	_advance_ship(home_ship, delta)
 	_recompute_expanded_ship_systems(delta)
+	_tick_active_fire(delta)
+	if field_crafting_state != null and field_crafting_state.tick(delta):
+		_on_field_craft_completed()
 	_refresh_oxygen_state(false, delta)
-	# M7-B Task 7: the authoritative fire model is ticked inside
-	# _recompute_expanded_ship_systems(delta) above (with _build_fire_context()),
-	# which also refreshes the passable fire zones when the burning set changes.
+	# M7-B Task 7: the authoritative fire model is ticked via _tick_active_fire(delta)
+	# (called directly on BOTH branches, NOT inside _recompute_expanded_ship_systems).
+	# Passable fire zones are refreshed when the burning set changes.
 	# REQ-013: tick the electrical-arc model with the same per-frame
 	# delta so its phase / passability advance in lock-step with fire.
 	# electrical_arc_state.tick ignores the second arg (no per-frame
@@ -6311,6 +6428,8 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 			life_support_expanded_state.apply_summary(snapshot.ship_systems_summary.get("life_support_state_summary", {}))
 		if hull_integrity_state != null:
 			hull_integrity_state.apply_summary(snapshot.ship_systems_summary.get("hull_integrity_summary", {}))
+		if hull_web_state != null:
+			hull_web_state.apply_summary(snapshot.ship_systems_summary.get("web_infestation_summary", {}))
 		if fire_suppression_state != null:
 			fire_suppression_state.apply_summary(snapshot.ship_systems_summary.get("fire_suppression_summary", {}))
 		if extinguisher_state != null:
@@ -6492,6 +6611,7 @@ func _build_world_snapshot():
 	for mid in visited_ships:
 		ws.visited_ships[String(mid)] = visited_ships[mid].get_summary()
 	ws.current_location = String(current_ship.marker_id) if current_ship != null else ""
+	ws.world_time = world_time
 	if player != null and player is Node3D:
 		var p: Vector3 = (player as Node3D).global_position
 		ws.player_position_in_ship = [p.x, p.y, p.z]
@@ -6689,6 +6809,7 @@ func _apply_world_snapshot(ws) -> bool:
 		var inst = ShipInstanceScript.create("", "", ShipBlueprintScript.new(), null, null)
 		if inst.apply_summary(ws.visited_ships[mid]):
 			visited_ships[String(mid)] = inst
+	world_time = float(ws.world_time)  # Live Persistent Ships Phase 1 (additive; 0.0 default for older saves)
 	# 4. If saved aboard a derelict, re-activate it.
 	if String(ws.current_location) != "":
 		var active = visited_ships.get(String(ws.current_location), null)
