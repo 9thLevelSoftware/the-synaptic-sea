@@ -138,7 +138,27 @@ func _initialize() -> void:
 		_fail("registry reader did not surface unlocked entry %s" % unlocked_id)
 		return
 
-	print("META SCREENS INTERACTIVE PASS hub_purchase=true skill_unlock=true registry_reader=true")
+	# --- Class selection gate ---
+	meta.unlock_class("field_medic")  # make an unlockable class available
+	_coord.open_meta_screen("class")
+	var centries: Array = _coord.get_meta_screen_panel("class").get_class_entries()
+	var fm_index: int = -1
+	for i in range(centries.size()):
+		if str((centries[i] as Dictionary).get("class_id", "")) == "field_medic":
+			fm_index = i
+			break
+	if fm_index < 0:
+		_fail("field_medic not in class entries")
+		return
+	_coord.meta_screen_move_selection(-9999)
+	for _j in range(fm_index):
+		_coord.meta_screen_move_selection(1)
+	var cls_result: Dictionary = _coord.meta_screen_confirm()
+	if not bool(cls_result.get("ok", false)) or meta.get_selected_class() != "field_medic":
+		_fail("class select failed: %s selected=%s" % [str(cls_result), meta.get_selected_class()])
+		return
+
+	print("META SCREENS INTERACTIVE PASS hub_purchase=true skill_unlock=true registry_reader=true class_select=true")
 	_cleanup()
 	quit(0)
 

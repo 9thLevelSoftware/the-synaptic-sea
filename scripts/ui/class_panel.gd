@@ -14,6 +14,37 @@ const CATALOG_PATH: String = "res://data/player/classes.json"
 var _classes: Dictionary = {}
 var _selected_class_id: String = ""
 var _list_label: RichTextLabel = null
+var _meta_state = null
+var _selected_index: int = 0
+
+func set_meta_state(meta_state) -> void:
+	_meta_state = meta_state
+
+func get_meta_state_panel():
+	return _meta_state
+
+## A class is selectable if it is a base class (not unlockable) or an unlockable
+## class present in the meta unlock set.
+func is_available(class_id: String) -> bool:
+	if not _classes.has(class_id):
+		return false
+	var unlockable: bool = bool((_classes[class_id] as Dictionary).get("unlockable", false))
+	if not unlockable:
+		return true
+	return _meta_state != null and _meta_state.has_method("is_class_unlocked") and _meta_state.is_class_unlocked(class_id)
+
+func move_selection(direction: int) -> void:
+	var n: int = get_class_entries().size()
+	if n <= 0:
+		_selected_index = 0
+		return
+	_selected_index = clampi(_selected_index + direction, 0, n - 1)
+
+func get_selected_id() -> String:
+	var entries: Array = get_class_entries()
+	if _selected_index < 0 or _selected_index >= entries.size():
+		return ""
+	return str((entries[_selected_index] as Dictionary).get("class_id", ""))
 
 func _ready() -> void:
 	_list_label = RichTextLabel.new()
@@ -71,6 +102,8 @@ func get_class_entries() -> Array:
 			"description": str(entry.get("description", "")),
 			"starting_skills": starting,
 			"selected": cid == _selected_class_id,
+			"unlockable": bool(entry.get("unlockable", false)),
+			"available": is_available(cid),
 		})
 	out.sort_custom(func(a, b): return String(a.get("class_id", "")) < String(b.get("class_id", "")))
 	return out
@@ -78,11 +111,14 @@ func get_class_entries() -> Array:
 func get_status_lines() -> PackedStringArray:
 	var lines := PackedStringArray()
 	lines.append("Class Roster: %d  Selected: %s" % [_classes.size(), _selected_class_id if not _selected_class_id.is_empty() else "(none)"])
+	var idx: int = 0
 	for entry in get_class_entries():
 		var cid: String = str(entry.get("class_id", ""))
 		var display: String = str(entry.get("display_name", cid))
 		var selected: bool = bool(entry.get("selected", false))
-		var marker: String = ">>" if selected else "  "
+		var available: bool = bool(entry.get("available", false))
+		var cursor: String = ">" if idx == _selected_index else " "
+		var marker: String = ">>" if selected else ("[ ]" if available else "[LOCKED]")
 		var starting: Dictionary = entry.get("starting_skills", {}) as Dictionary
 		var starting_str: String = ""
 		if not starting.is_empty():
@@ -90,7 +126,8 @@ func get_status_lines() -> PackedStringArray:
 			for sid in starting:
 				parts.append("%s=%d" % [sid, int(starting[sid])])
 			starting_str = "  [%s]" % ", ".join(parts)
-		lines.append("%s %s%s" % [marker, display, starting_str])
+		lines.append("%s%s %s%s" % [cursor, marker, display, starting_str])
+		idx += 1
 	return lines
 
 func render() -> void:

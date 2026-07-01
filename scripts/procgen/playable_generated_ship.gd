@@ -1288,7 +1288,15 @@ func _configure_player_progression() -> void:
 	if player_progression == null:
 		return
 	var classes: Dictionary = ClassDefinitionScript.load_all()
-	var class_def = classes.get(starting_class_id, classes.get("engineer", null))
+	var chosen_class: String = starting_class_id
+	if meta_progression_state != null:
+		var sel: String = meta_progression_state.get_selected_class()
+		if not sel.is_empty() and classes.has(sel):
+			# Only honor the selection if it is a base class or an unlocked one.
+			var is_unlockable: bool = bool(classes[sel].unlockable)
+			if not is_unlockable or meta_progression_state.is_class_unlocked(sel):
+				chosen_class = sel
+	var class_def = classes.get(chosen_class, classes.get("engineer", null))
 	if class_def == null:
 		push_error("PlayableGeneratedShip: no class definition for '%s' or fallback 'engineer' (data/player/classes.json missing or malformed)" % starting_class_id)
 	player_progression.configure(
@@ -6451,16 +6459,21 @@ func _apply_meta_payout_and_persist(reason: String = "completion") -> int:
 		"reason": reason,
 	}
 	var payout: int = int(meta_progression_state.apply_meta_payout(run_summary))
-	# Persist meta + unlocks to disk so the next run picks them up.
-	meta_progression_state.save_to_disk()
+	# Persist unlocks; bridge registry class-unlocks into the meta class set so the
+	# class picker can select them next run, then persist meta AFTER the bridge.
 	if unlock_registry != null:
 		if training_event_bus != null:
 			for entry in training_event_bus.get_log():
 				var evt: String = str(entry.get("event_id", ""))
 				var tgt: String = str(entry.get("target_id", ""))
 				if not evt.is_empty():
-					unlock_registry.unlock_for_trigger(evt, tgt)
+					var resolved: String = unlock_registry.unlock_for_trigger(evt, tgt)
+					if not resolved.is_empty() and unlock_registry.get_category(resolved) == "class":
+						var cls: String = unlock_registry.get_class_id(resolved)
+						if not cls.is_empty():
+							meta_progression_state.unlock_class(cls)
 		unlock_registry.save_to_disk()
+	meta_progression_state.save_to_disk()
 	print("META PAYOUT reason=%s payout=%d meta_currency=%d runs_completed=%d" % [
 		reason,
 		payout,

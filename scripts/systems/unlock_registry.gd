@@ -80,6 +80,11 @@ func get_trigger_target(unlock_id: String) -> String:
 		return ""
 	return str(_catalog_by_id[unlock_id].get("trigger_target", ""))
 
+func get_class_id(unlock_id: String) -> String:
+	if not is_known(unlock_id):
+		return ""
+	return str(_catalog_by_id[unlock_id].get("class_id", ""))
+
 ## Returns true on first-time unlock; false when the id is unknown,
 ## already unlocked, or empty. The `trigger_event` / `trigger_target`
 ## are stored on the catalog entry — callers pass the event id and

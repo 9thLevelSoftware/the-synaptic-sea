@@ -483,6 +483,7 @@ func bind_meta_screens(p_achievement_state, p_audio_manager, p_skill_tree_state,
 		hub_upgrade_panel.render()
 	if is_instance_valid(class_panel):
 		class_panel.load_catalog()
+		class_panel.set_meta_state(p_meta_progression_state)
 		if p_player_progression != null and p_player_progression.has_method("get_class_id"):
 			class_panel.set_selected_class(str(p_player_progression.get_class_id()))
 		class_panel.render()
@@ -584,6 +585,10 @@ func meta_screen_move_selection(direction: int) -> void:
 			if is_instance_valid(skill_tree_panel):
 				skill_tree_panel.move_selection(direction)
 				skill_tree_panel.render()
+		"class":
+			if is_instance_valid(class_panel):
+				class_panel.move_selection(direction)
+				class_panel.render()
 
 ## Domain 6 host/input seam: confirm (purchase/unlock/select) on the active
 ## interactive meta screen. Returns {screen, action, ok, detail}.
@@ -609,6 +614,18 @@ func meta_screen_confirm() -> Dictionary:
 			if is_instance_valid(skill_tree_panel):
 				skill_tree_panel.render()
 			return {"screen": "skill_tree", "action": "unlock", "ok": ok_s, "detail": sel_s}
+		"class":
+			var sel_c: String = class_panel.get_selected_id() if is_instance_valid(class_panel) else ""
+			var ok_c: bool = false
+			if _meta_progression_state != null and not sel_c.is_empty() and class_panel.is_available(sel_c):
+				_meta_progression_state.set_selected_class(sel_c)
+				_meta_progression_state.save_to_disk()
+				if is_instance_valid(class_panel):
+					class_panel.set_selected_class(sel_c)
+				ok_c = true
+			if is_instance_valid(class_panel):
+				class_panel.render()
+			return {"screen": "class", "action": "select", "ok": ok_c, "detail": sel_c}
 	return {"screen": _active_meta_screen, "action": "none", "ok": false, "detail": ""}
 
 func get_meta_screen_ids() -> Array:
