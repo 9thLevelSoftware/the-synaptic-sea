@@ -6327,6 +6327,8 @@ func _build_run_snapshot() -> RunSnapshot:
 		snapshot.objective_progress_summary = objective_progress_state.get_summary()
 	if player_progression != null:
 		snapshot.player_progression_summary = player_progression.get_summary()
+	if skill_tree_state != null:
+		snapshot.skill_tree_summary = skill_tree_state.to_dict()
 	if is_instance_valid(menu_coordinator):
 		snapshot.settings_summary = menu_coordinator.get_settings_summary()
 	if is_instance_valid(audio_manager):
@@ -6466,11 +6468,12 @@ func _apply_meta_payout_and_persist(reason: String = "completion") -> int:
 				var evt: String = str(entry.get("event_id", ""))
 				var tgt: String = str(entry.get("target_id", ""))
 				if not evt.is_empty():
-					var resolved: String = unlock_registry.unlock_for_trigger(evt, tgt)
-					if not resolved.is_empty() and unlock_registry.get_category(resolved) == "class":
-						var cls: String = unlock_registry.get_class_id(resolved)
-						if not cls.is_empty():
-							meta_progression_state.unlock_class(cls)
+					# Keep the registry's own first-match unlock accounting (codex/scene display).
+					unlock_registry.unlock_for_trigger(evt, tgt)
+					# Bridge EVERY class row for this trigger into the meta class set,
+					# independent of unlock_for_trigger's single return (P1 fix).
+					for cls in unlock_registry.class_ids_for_trigger(evt, tgt):
+						meta_progression_state.unlock_class(cls)
 		unlock_registry.save_to_disk()
 	meta_progression_state.save_to_disk()
 	print("META PAYOUT reason=%s payout=%d meta_currency=%d runs_completed=%d" % [
@@ -6635,6 +6638,8 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		objective_progress_state.apply_summary(snapshot.objective_progress_summary)
 	if player_progression != null and not snapshot.player_progression_summary.is_empty():
 		player_progression.apply_summary(snapshot.player_progression_summary)
+	if skill_tree_state != null and not snapshot.skill_tree_summary.is_empty():
+		skill_tree_state.apply_summary(snapshot.skill_tree_summary)
 	if is_instance_valid(menu_coordinator) and not snapshot.settings_summary.is_empty():
 		menu_coordinator.apply_settings_summary(snapshot.settings_summary)
 	# REQ-AU-010: re-apply the audio summary to the AudioManager so save/load

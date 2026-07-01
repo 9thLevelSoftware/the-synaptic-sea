@@ -85,6 +85,28 @@ func get_class_id(unlock_id: String) -> String:
 		return ""
 	return str(_catalog_by_id[unlock_id].get("class_id", ""))
 
+## Returns the class_ids of ALL class-category catalog rows whose trigger matches
+## (event,target), unlocking each in the registry (idempotent). The run-end bridge
+## uses this so a class unlock is not starved when a codex row shares the trigger
+## and sorts first (unlock_for_trigger only returns the first match).
+func class_ids_for_trigger(trigger_event: String, trigger_target: String) -> Array:
+	var out: Array = []
+	if trigger_event.is_empty():
+		return out
+	var exact: String = "%s|%s" % [trigger_event, trigger_target]
+	var wild: String = "%s|*" % trigger_event
+	for uid in _catalog_by_id:
+		var entry: Dictionary = _catalog_by_id[uid]
+		if str(entry.get("category", "")) != "class":
+			continue
+		var key: String = "%s|%s" % [str(entry.get("trigger_event", "")), str(entry.get("trigger_target", ""))]
+		if key == exact or key == wild:
+			unlock(uid)
+			var cls: String = str(entry.get("class_id", ""))
+			if not cls.is_empty():
+				out.append(cls)
+	return out
+
 ## Returns true on first-time unlock; false when the id is unknown,
 ## already unlocked, or empty. The `trigger_event` / `trigger_target`
 ## are stored on the catalog entry — callers pass the event id and

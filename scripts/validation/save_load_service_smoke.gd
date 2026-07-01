@@ -55,7 +55,7 @@ func _initialize() -> void:
 	var fire_summary: Dictionary = {"state": "CLEARED", "hazard_kind": "fire"}
 
 	# REQ-013: include the electrical-arc summary in the round-trip so the
-	# smoke proves all 26 SUMMARY_FIELDS survive a save / load cycle.
+	# smoke proves all 27 SUMMARY_FIELDS survive a save / load cycle.
 	# Force a non-default state by ticking halfway through the arcing
 	# phase, so the round-trip proves we captured the runtime number.
 	var arc := ElectricalArcStateScript.new()
@@ -89,6 +89,9 @@ func _initialize() -> void:
 	progression.configure(ClassDefinitionScript.load_all()["engineer"], PlayerProgressionStateScript.load_skills_catalog())
 	progression.grant_xp("repair", 100)
 	original.player_progression_summary = progression.get_summary()
+	# Domain 6 P2 fix: skill-tree unlocks must survive save/load too, or the
+	# rebuilt tree drops XP for skills the player already unlocked.
+	original.skill_tree_summary = {"unlocked": {"fabrication": true}}
 	# ADR-0034: add food summaries
 	original.spoilage_summary = _make_spoilage_summary_for_smoke()
 	original.hydroponics_summary = _make_hydroponics_summary_for_smoke()
@@ -143,8 +146,8 @@ func _initialize() -> void:
 	if loaded.current_objective_sequence != original.current_objective_sequence:
 		_fail("current_objective_sequence mismatch")
 		return
-	if loaded.get_summary_count() != 26:
-		_fail("summary_count=%d expected 26" % loaded.get_summary_count())
+	if loaded.get_summary_count() != 27:
+		_fail("summary_count=%d expected 27" % loaded.get_summary_count())
 		return
 	if not loaded.ship_systems_summary.has("systems") or not loaded.ship_systems_summary.has("system_order"):
 		_fail("ship_systems_summary missing manager keys after round-trip")
@@ -181,6 +184,9 @@ func _initialize() -> void:
 		return
 	if str(loaded.player_progression_summary.get("class_id", "")) != "engineer":
 		_fail("player_progression_summary class_id not restored")
+		return
+	if loaded.skill_tree_summary != original.skill_tree_summary:
+		_fail("skill_tree_summary mismatch")
 		return
 	if not _dicts_equal(loaded.consumable_summary, original.consumable_summary):
 		_fail("consumable_summary mismatch")
@@ -253,7 +259,7 @@ func _initialize() -> void:
 		_fail("delete_current_run did not remove the file")
 		return
 
-	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=26")
+	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=27")
 	quit(0)
 
 func _make_spoilage_summary_for_smoke() -> Dictionary:
