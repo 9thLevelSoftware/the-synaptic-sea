@@ -19,7 +19,6 @@ func _initialize() -> void:
 	inventory.reset()
 	inventory.add_item("bandage_kit", 1)
 	inventory.add_item("focus_ampoule", 1)
-	inventory.add_item("pistol_ammo_box", 1)
 	inventory.add_item("flare", 1)
 
 	var dispatcher := EffectDispatcherScript.new()
@@ -66,10 +65,6 @@ func _initialize() -> void:
 	if not consumable.assign_hotbar_slot(1, "focus_ampoule"):
 		_fail("assign_hotbar_slot focus_ampoule failed")
 		return
-	if not consumable.assign_hotbar_slot(2, "pistol_ammo_box"):
-		_fail("assign_hotbar_slot pistol_ammo_box failed")
-		return
-
 	var med := consumable.use_hotbar_slot(0, inventory, context)
 	if not bool(med.get("ok", false)) or inventory.get_quantity("bandage_kit") != 0 or absf(vitals.health - 78.0) > 0.001:
 		_fail("medicine hotbar use mismatch")
@@ -77,10 +72,6 @@ func _initialize() -> void:
 	var stim := consumable.use_hotbar_slot(1, inventory, context)
 	if not bool(stim.get("ok", false)) or inventory.get_quantity("focus_ampoule") != 0 or not statuses.has_effect("stim_focus"):
 		_fail("stimulant hotbar use mismatch")
-		return
-	var ammo_result := consumable.use_hotbar_slot(2, inventory, context)
-	if not bool(ammo_result.get("ok", false)) or inventory.get_quantity("pistol_ammo_box") != 0 or ammo.get_reserve("pistol") != 12:
-		_fail("ammo hotbar use mismatch")
 		return
 	var utility_result := consumable.use_item("flare", inventory, context)
 	if not bool(utility_result.get("ok", false)) or inventory.get_quantity("flare") != 0 or not utility.active_flags.has("flare"):
@@ -97,7 +88,7 @@ func _initialize() -> void:
 		_fail("hotbar summary mismatch")
 		return
 
-	print("CONSUMABLE STATE PASS used=4 hotbar=true health=78 stim=true ammo=12 utility=flare")
+	print("CONSUMABLE STATE PASS used=3 hotbar=true health=78 stim=true utility=flare")
 	quit(0)
 
 func _fail(reason: String) -> void:

@@ -81,14 +81,6 @@ func dispatch_inline(effect_id: String, definition: Dictionary, context: Diction
 						cured.append(status_id)
 			result["cured"] = cured
 			result["summary"] = statuses.get_summary()
-		"ammo_reserve":
-			var ammo = context.get("ammo_state", null)
-			if ammo == null or not ammo.has_method("add_ammo"):
-				return _missing_target(effect_id, "ammo_state")
-			var ammo_kind: String = str(definition.get("ammo_kind", ""))
-			var amount: int = max(0, int(definition.get("amount", 0)))
-			result["added"] = ammo.add_ammo(ammo_kind, amount)
-			result["summary"] = ammo.get_summary()
 		_:
 			result["ok"] = false
 			result["reason"] = "unsupported_kind"

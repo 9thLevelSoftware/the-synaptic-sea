@@ -39,7 +39,7 @@ func _initialize() -> void:
 		}
 	})
 	var ammo := AmmoStateScript.new()
-	ammo.configure({"reserves": {"pistol": 12}})
+	ammo.configure({"magazines": {"flare_pistol": 6}})
 	var utility := UtilityItemResolverScript.new()
 	utility.configure({
 		"active_flags": {
@@ -97,14 +97,14 @@ func _initialize() -> void:
 	if restored_addiction.get_tolerance("focus_ampoule") <= 0.0 or not restored_addiction.has_withdrawal():
 		_fail("addiction summary mismatch")
 		return
-	if restored_ammo.get_reserve("pistol") != 12:
+	if restored_ammo.loaded("flare_pistol") != 6:
 		_fail("ammo summary mismatch")
 		return
 	if not restored_utility.active_flags.has("flare"):
 		_fail("utility summary mismatch")
 		return
 
-	print("CONSUMABLE SAVE LOAD PASS hotbar=true stimulant=true addiction=true ammo=12 utility=flare")
+	print("CONSUMABLE SAVE LOAD PASS hotbar=true stimulant=true addiction=true ammo=flare_pistol=6 utility=flare")
 	quit(0)
 
 func _fail(reason: String) -> void:

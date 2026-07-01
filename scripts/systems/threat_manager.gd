@@ -102,7 +102,7 @@ func tick_threats(delta: float, vitals_state = null, status_effects_state = null
 		_update_placeholder(threat, player_position)
 	_sweep_dead_threats()
 
-func attack_with_weapon(weapon_id: String, inventory_state, equipment_state, target_id: String = "") -> Dictionary:
+func attack_with_weapon(weapon_id: String, inventory_state, equipment_state, ammo_state = null, target_id: String = "") -> Dictionary:
 	var weapon: Dictionary = weapon_definitions.get(weapon_id, {}) if weapon_definitions.get(weapon_id, {}) is Dictionary else {}
 	if weapon.is_empty():
 		return {"ok": false, "reason": "unknown_weapon"}
@@ -113,9 +113,13 @@ func attack_with_weapon(weapon_id: String, inventory_state, equipment_state, tar
 			return {"ok": false, "reason": "weapon_not_equipped"}
 	var ammo_item_id: String = str(weapon.get("ammo_item_id", ""))
 	if not ammo_item_id.is_empty():
-		if inventory_state == null or int(inventory_state.get_quantity(ammo_item_id)) <= 0:
+		# Domain 5: fire from the per-weapon magazine, not raw inventory.
+		if ammo_state == null:
 			return {"ok": false, "reason": "no_ammo", "ammo_item_id": ammo_item_id}
-		inventory_state.remove_item(ammo_item_id, 1)
+		if ammo_state.is_reloading():
+			return {"ok": false, "reason": "reloading", "ammo_item_id": ammo_item_id}
+		if not ammo_state.spend(weapon_id):
+			return {"ok": false, "reason": "empty_magazine", "ammo_item_id": ammo_item_id}
 	var target = _pick_target(target_id)
 	if target == null:
 		return {"ok": false, "reason": "no_target"}
@@ -133,7 +137,7 @@ func attack_with_weapon(weapon_id: String, inventory_state, equipment_state, tar
 	result["weapon_id"] = weapon_id
 	result["target_id"] = target.instance_id
 	result["ammo_item_id"] = ammo_item_id
-	result["ammo_remaining"] = int(inventory_state.get_quantity(ammo_item_id)) if inventory_state != null and not ammo_item_id.is_empty() else -1
+	result["ammo_remaining"] = ammo_state.loaded(weapon_id) if ammo_state != null and not ammo_item_id.is_empty() else -1
 	last_attack_result = result.duplicate(true)
 	return result
 

@@ -36,11 +36,9 @@ func _on_process_frame() -> void:
 func _setup_and_use() -> void:
 	playable.inventory_state.add_item("bandage_kit", 2)
 	playable.inventory_state.add_item("focus_ampoule", 1)
-	playable.inventory_state.add_item("pistol_ammo_box", 1)
 	playable.inventory_state.add_item("flare", 1)
 	playable.assign_hotbar_slot_for_validation(0, "bandage_kit")
 	playable.assign_hotbar_slot_for_validation(1, "focus_ampoule")
-	playable.assign_hotbar_slot_for_validation(2, "pistol_ammo_box")
 
 	var med := playable.use_hotbar_slot_for_validation(0)
 	if not bool(med.get("ok", false)):
@@ -50,16 +48,9 @@ func _setup_and_use() -> void:
 	if not bool(stim.get("ok", false)):
 		_fail("stim hotbar use failed")
 		return
-	var ammo := playable.use_hotbar_slot_for_validation(2)
-	if not bool(ammo.get("ok", false)):
-		_fail("ammo hotbar use failed")
-		return
 	var utility := playable.use_inventory_item_for_validation("flare")
 	if not bool(utility.get("ok", false)):
 		_fail("flare use failed")
-		return
-	if playable.ammo_state.get_reserve("pistol") != 12:
-		_fail("ammo reserve mismatch before save")
 		return
 	if not playable.status_effects_state.has_effect("stim_focus"):
 		_fail("stim effect missing before save")
@@ -69,7 +60,6 @@ func _setup_and_use() -> void:
 		_fail("request_save failed")
 		return
 	playable.vitals_state.health = 5.0
-	playable.ammo_state.consume("pistol", 12)
 	playable.status_effects_state.remove_effect("stim_focus", 9999)
 	if not playable.request_load():
 		_fail("request_load failed")
@@ -77,9 +67,6 @@ func _setup_and_use() -> void:
 	_verify_load()
 
 func _verify_load() -> void:
-	if playable.ammo_state.get_reserve("pistol") != 12:
-		_fail("ammo reserve mismatch after load")
-		return
 	if absf(playable.vitals_state.health - expected_loaded_health) > 0.001:
 		_fail("health did not restore after load")
 		return
@@ -94,7 +81,7 @@ func _verify_load() -> void:
 		_fail("consumable summaries missing from snapshot")
 		return
 	finished = true
-	print("MAIN PLAYABLE CONSUMABLES PASS save_load=true hotbar=true ammo=12 stim=true utility=true")
+	print("MAIN PLAYABLE CONSUMABLES PASS save_load=true hotbar=true stim=true utility=true")
 	_cleanup_and_quit(0)
 
 func _find_playable(node: Node) -> PlayableGeneratedShip:

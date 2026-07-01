@@ -116,23 +116,25 @@ func _use_once(item_id: String, category: String, definition: Dictionary, invent
 				inventory_state.remove_item(item_id, 1)
 			return stim_result
 		"ammo":
+			# Domain 5: ammo reserve lives in inventory; the magazine (AmmoState) is
+			# loaded via the reload pipeline (KEY_R). Per-round items (flare_round,
+			# capacitor_cell, fuel_canister) carry no effects and return ok=false so they
+			# are never consumed via the hotbar — only the reload path touches them.
 			if dispatcher == null:
 				return {"ok": false, "reason": "effect_dispatcher_missing"}
-			var ammo = pipeline_context.get("ammo_state", null)
-			if ammo == null:
-				return {"ok": false, "reason": "ammo_pipeline_missing"}
-			var ammo_kind: String = str(definition.get("ammo_kind", ""))
-			var before: int = ammo.get_reserve(ammo_kind)
-			var ammo_results: Array = []
 			var effects: Variant = definition.get("effects", [])
+			var ammo_results: Array = []
+			var any_ok: bool = false
 			if effects is Array:
-				for effect_id_variant in effects:
-					ammo_results.append(dispatcher.dispatch_effect(str(effect_id_variant), pipeline_context))
-			var added: int = ammo.get_reserve(ammo_kind) - before
-			if added > 0:
+				for effect_id_variant in (effects as Array):
+					var er: Dictionary = dispatcher.dispatch_effect(str(effect_id_variant), pipeline_context)
+					ammo_results.append(er)
+					if bool(er.get("ok", false)):
+						any_ok = true
+			if any_ok:
 				inventory_state.remove_item(item_id, 1)
-				return {"ok": true, "item_id": item_id, "ammo_kind": ammo_kind, "added": added, "results": ammo_results}
-			return {"ok": false, "reason": "no_ammo_added"}
+				return {"ok": true, "item_id": item_id, "results": ammo_results}
+			return {"ok": false, "reason": "ammo_no_effect"}
 		"utility":
 			var utility = pipeline_context.get("utility_state", null)
 			if utility == null or dispatcher == null:

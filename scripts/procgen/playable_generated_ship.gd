@@ -441,6 +441,7 @@ const DEFAULT_INTERACT_BINDINGS: Array[Key] = [KEY_E, KEY_ENTER, KEY_SPACE, KEY_
 const DEFAULT_SAVE_RUN_BINDINGS: Array[Key] = [KEY_F5]
 const DEFAULT_LOAD_RUN_BINDINGS: Array[Key] = [KEY_F9]
 const DEFAULT_ATTACK_BINDINGS: Array[Key] = [KEY_F]
+const DEFAULT_RELOAD_BINDINGS: Array[Key] = [KEY_R]
 const DEFAULT_CROUCH_BINDINGS: Array[Key] = [KEY_CTRL]
 
 func ensure_default_input_actions() -> void:
@@ -448,6 +449,7 @@ func ensure_default_input_actions() -> void:
 		_ensure_key_action_set(action_name, DEFAULT_MOVE_BINDINGS[action_name])
 	_ensure_key_action_set("interact", DEFAULT_INTERACT_BINDINGS)
 	_ensure_key_action_set("attack_primary", DEFAULT_ATTACK_BINDINGS)
+	_ensure_key_action_set("reload_weapon", DEFAULT_RELOAD_BINDINGS)
 	_ensure_key_action_set("crouch", DEFAULT_CROUCH_BINDINGS)
 	# ADR-0038: emergency field crafting bound to C (previously unbound).
 	_ensure_key_action_set("field_craft", [KEY_C])
@@ -4125,13 +4127,14 @@ func _attack_with_equipped_weapon() -> Dictionary:
 	var weapon_id: String = _equipped_primary_weapon_id()
 	if weapon_id.is_empty():
 		weapon_id = "crowbar"
-	var result: Dictionary = threat_manager.attack_with_weapon(weapon_id, inventory_state, equipment_state)
+	var result: Dictionary = threat_manager.attack_with_weapon(weapon_id, inventory_state, equipment_state, ammo_state)
 	if bool(result.get("ok", false)):
 		_refresh_inventory_hud()
 		_refresh_player_vitals(0.0)
 		_sync_current_ship_combat_summary()
-	# ADR-0042: a swing also dissipates a phantom within reach. Ammo was already spent by
-	# attack_with_weapon (even on a no_target result) — that is the wasted-action teeth.
+	# ADR-0042: a swing also dissipates a phantom within reach. On an empty magazine
+	# the shot is a dry-fire click (no round spent) but the swing still counts as the
+	# wasted-action teeth.
 	if hallucination_manager != null and is_instance_valid(hallucination_manager):
 		var ppos: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
 		if hallucination_manager.dissipate_phantom_in_range(ppos):
@@ -4140,6 +4143,27 @@ func _attack_with_equipped_weapon() -> Dictionary:
 			_refresh_inventory_hud()
 	_refresh_weapon_hotbar()
 	return result
+
+## Domain 5: begin a timed reload for the currently equipped ranged weapon. Debits
+## reload_target rounds from inventory immediately; AmmoState credits the magazine on
+## completion (after RELOAD_SECONDS). Melee weapons (no ammo_item_id) are no-ops.
+func _begin_weapon_reload() -> void:
+	if ammo_state == null or ammo_state.is_reloading() or threat_manager == null:
+		return
+	var weapon_id: String = _equipped_primary_weapon_id()
+	if weapon_id.is_empty():
+		return
+	var weapon: Dictionary = threat_manager.weapon_definitions.get(weapon_id, {}) if threat_manager.weapon_definitions.get(weapon_id, {}) is Dictionary else {}
+	var ammo_item_id: String = str(weapon.get("ammo_item_id", ""))
+	if ammo_item_id.is_empty():
+		return  # melee: no reload
+	var mag_size: int = int(weapon.get("magazine_size", 0))
+	var reserve: int = inventory_state.get_quantity(ammo_item_id) if inventory_state != null else 0
+	if ammo_state.begin_reload(weapon_id, mag_size, reserve):
+		if inventory_state != null:
+			inventory_state.remove_item(ammo_item_id, ammo_state.reload_target)  # commit reserve
+		_refresh_inventory_hud()
+		_refresh_weapon_hotbar()
 
 ## Domain 2 (BP2): a derived "is the player in a lit area" signal. A powered ship is
 ## lit (player more visible); an unpowered/derelict ship is dark (stealthier). Uses
@@ -5076,6 +5100,9 @@ func _process(delta: float) -> void:
 		# _tick_food_runtime). Powered station crafting also advances on both branches
 		# via _recompute_expanded_ship_systems called above (ADR-0038 superseded).
 		_tick_food_runtime(delta)
+		# Domain 5: tick the reload timer on the away branch (derelict = primary combat context).
+		if ammo_state != null and not ammo_state.tick(delta).is_empty():
+			_refresh_weapon_hotbar()
 		return
 	if not playable_started or slice_complete:
 		return
@@ -5103,6 +5130,9 @@ func _process(delta: float) -> void:
 		stimulant_state.tick(delta, addiction_state, _consumable_pipeline_context())
 	if addiction_state != null:
 		addiction_state.tick(delta, status_effects_state)
+	# Domain 5: tick the reload timer on the home branch too (symmetry with away branch).
+	if ammo_state != null and not ammo_state.tick(delta).is_empty():
+		_refresh_weapon_hotbar()
 	# REQ-SV / Domain 1: survival attrition + stakes (shared by both branches).
 	_tick_survival_attrition(delta)
 	if sanity_state != null:
@@ -7373,6 +7403,10 @@ func _input(event: InputEvent) -> void:
 			return
 	if event.is_action_pressed("attack_primary"):
 		_attack_with_equipped_weapon()
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("reload_weapon"):
+		_begin_weapon_reload()
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("save_run"):

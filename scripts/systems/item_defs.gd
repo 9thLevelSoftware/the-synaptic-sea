@@ -10,7 +10,7 @@ class_name ItemDefs
 const ITEM_DEFINITIONS_PATH: String = "res://data/items/item_definitions.json"
 const MEDICINE_DEFINITIONS_PATH: String = "res://data/items/medicine_definitions.json"
 const STIMULANT_DEFINITIONS_PATH: String = "res://data/items/stimulant_definitions.json"
-const AMMO_DEFINITIONS_PATH: String = "res://data/items/ammo_definitions.json"
+const AMMO_DEFINITIONS_PATH: String = "res://data/combat/ammo_definitions.json"
 const UTILITY_DEFINITIONS_PATH: String = "res://data/items/utility_item_definitions.json"
 const TRADE_DEFINITIONS_PATH: String = "res://data/items/trade_item_definitions.json"
 const TOOL_DEFINITIONS_PATH: String = "res://data/tools/tool_definitions.json"
