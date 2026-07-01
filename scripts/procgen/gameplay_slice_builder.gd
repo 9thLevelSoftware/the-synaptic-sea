@@ -11,6 +11,17 @@ const CONNECTIVE_ROLES: Array[String] = [
 	"corridor", "main_spine", "hub", "ramp", "elevator", "airlock", "dock",
 ]
 
+const RoomVariantSelectorScript := preload("res://scripts/procgen/room_variant_selector.gd")
+var _variant_selector: RefCounted = RoomVariantSelectorScript.new()
+
+
+# Returns the loot_table key a room should use: the variant's loot_bias when
+# present and non-empty, otherwise the supplied role-derived default.
+func _loot_table_for_room(room: Dictionary, role_default: String) -> String:
+	var variant: String = str(room.get("variant", "standard"))
+	var bias: String = str((_variant_selector.effects_for(variant).get("sim", {}) as Dictionary).get("loot_bias", ""))
+	return bias if not bias.is_empty() else role_default
+
 
 func build(layout: Dictionary) -> Dictionary:
 	var proto: Dictionary = layout.get("prototype", {})
@@ -56,7 +67,7 @@ func build(layout: Dictionary) -> Dictionary:
 			"kind": "single",
 			"room_id": rid,
 			"approach_cell": approach_cell,
-			"loot_table": _salvage_loot_table_for_role(role),
+			"loot_table": _loot_table_for_room(room, _salvage_loot_table_for_role(role)),
 		})
 		sequence += 1
 
@@ -93,7 +104,7 @@ func build(layout: Dictionary) -> Dictionary:
 			"kind": kind2,
 			"room_id": rid2,
 			"approach_cell": cell2,
-			"loot_table": kind2,
+			"loot_table": _loot_table_for_room(room, kind2),
 		})
 		container_index += 1
 
