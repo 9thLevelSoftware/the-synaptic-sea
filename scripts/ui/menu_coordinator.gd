@@ -570,6 +570,10 @@ func meta_screen_move_selection(direction: int) -> void:
 			if is_instance_valid(hub_upgrade_panel):
 				hub_upgrade_panel.move_selection(direction)
 				hub_upgrade_panel.render()
+		"skill_tree":
+			if is_instance_valid(skill_tree_panel):
+				skill_tree_panel.move_selection(direction)
+				skill_tree_panel.render()
 
 ## Domain 6 host/input seam: confirm (purchase/unlock/select) on the active
 ## interactive meta screen. Returns {screen, action, ok, detail}.
@@ -585,6 +589,16 @@ func meta_screen_confirm() -> Dictionary:
 			if is_instance_valid(hub_upgrade_panel):
 				hub_upgrade_panel.render()
 			return {"screen": "hub_upgrades", "action": "purchase", "ok": ok, "detail": sel}
+		"skill_tree":
+			var sel_s: String = skill_tree_panel.get_selected_id() if is_instance_valid(skill_tree_panel) else ""
+			var ok_s: bool = false
+			if _skill_tree_state != null and not sel_s.is_empty():
+				var chk: Dictionary = _skill_tree_state.can_unlock(sel_s, _player_progression, _meta_progression_state)
+				if bool(chk.get("can", false)):
+					ok_s = _skill_tree_state.unlock(sel_s)
+			if is_instance_valid(skill_tree_panel):
+				skill_tree_panel.render()
+			return {"screen": "skill_tree", "action": "unlock", "ok": ok_s, "detail": sel_s}
 	return {"screen": _active_meta_screen, "action": "none", "ok": false, "detail": ""}
 
 func get_meta_screen_ids() -> Array:

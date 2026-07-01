@@ -15,6 +15,7 @@ const PrereqsPath: String = "res://data/player/skill_tree.json"
 var _tree = null
 var _progression = null
 var _list_label: RichTextLabel = null
+var _selected_index: int = 0
 
 func _ready() -> void:
 	_list_label = RichTextLabel.new()
@@ -35,6 +36,25 @@ func get_tree_panel():
 func get_progression_panel():
 	return _progression
 
+## Domain 6 host/input seam: moves the selection cursor by `direction` rows
+## (typically -1/+1), clamped to the current skill-entry list bounds.
+func move_selection(direction: int) -> void:
+	var n: int = _tree.get_skill_entries().size() if _tree != null else 0
+	if n <= 0:
+		_selected_index = 0
+		return
+	_selected_index = clampi(_selected_index + direction, 0, n - 1)
+
+## Returns the skill_id at the cursor (in `get_skill_entries()` order),
+## or "" when the tree is uninitialized or the cursor is out of bounds.
+func get_selected_id() -> String:
+	if _tree == null:
+		return ""
+	var entries: Array = _tree.get_skill_entries()
+	if _selected_index < 0 or _selected_index >= entries.size():
+		return ""
+	return str((entries[_selected_index] as Dictionary).get("skill_id", ""))
+
 ## Returns the panel's status text lines. Used by the smoke and the HUD.
 func get_status_lines() -> PackedStringArray:
 	var lines := PackedStringArray()
@@ -44,6 +64,7 @@ func get_status_lines() -> PackedStringArray:
 	var entries: Array = _tree.get_skill_entries()
 	var unlocked_count: int = _tree.get_unlocked().size()
 	lines.append("Skill Tree: %d / %d unlocked" % [unlocked_count, entries.size()])
+	var idx: int = 0
 	for entry in entries:
 		var sid: String = str(entry.get("skill_id", ""))
 		var display: String = str(entry.get("display_name", sid))
@@ -61,7 +82,8 @@ func get_status_lines() -> PackedStringArray:
 			else:
 				xp_to_next = "  (max)"
 		var marker: String = "[X]" if is_unlocked else "[ ]"
-		lines.append("%s %s [%s] L%d%s" % [marker, display, cat, lvl, xp_to_next])
+		var cursor: String = ">" if idx == _selected_index else " "
+		lines.append("%s%s %s [%s] L%d%s" % [cursor, marker, display, cat, lvl, xp_to_next])
 		var prereqs: Array = _tree.get_prerequisites(sid)
 		if prereqs.is_empty() and book.is_empty():
 			lines.append("    prereq: none")
@@ -73,6 +95,7 @@ func get_status_lines() -> PackedStringArray:
 				])
 			if not book.is_empty():
 				lines.append("    prereq: read %s" % book)
+		idx += 1
 	return lines
 
 ## Re-renders the BBCode list label with the current tree + progression

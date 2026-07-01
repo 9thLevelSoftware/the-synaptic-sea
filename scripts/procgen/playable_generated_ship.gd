@@ -1111,6 +1111,14 @@ func _build_runtime_nodes() -> void:
 		PlayerProgressionScript.load_books_catalog(),
 	)
 	skill_tree_state.load_prerequisites()
+	# Domain 6 (WI-2): gate live XP so an advanced skill trains only once its
+	# skill-tree node is unlocked. Base skills (not in skill_tree.json) are ungated.
+	training_event_bus.skill_gate = func(skill_id: String) -> bool:
+		if skill_tree_state == null:
+			return true
+		if not skill_tree_state.is_gated(skill_id):
+			return true
+		return skill_tree_state.is_unlocked(skill_id)
 	# REQ-PM-006 / ADR-0033 — meta state (cross-run). Loaded from
 	# user://meta_progression.json; missing file defaults to zeroed.
 	meta_progression_state = MetaProgressionStateScript.new()
@@ -3367,6 +3375,11 @@ func _on_field_craft_completed() -> void:
 	_recompute_player_encumbrance()
 	print("FIELD CRAFT COMPLETED item=%s qty=%d quality=%s" % [
 		item_id, qty, str(result.get("quality_tier", "standard"))])
+	# Domain 6 (WI-2): field fabrication trains the tree-gated `fabrication` skill
+	# through the bus. When the Fabrication node is locked the skill_gate drops the
+	# event (no XP); once unlocked, field-crafting advances fabrication — which in
+	# turn improves field-craft quality (get_skill_level("fabrication") at :3415).
+	emit_training_event("fabricate_part", item_id)
 
 ## ADR-0038: a salvage station deconstructed an item (the station already deposited the
 ## yield into inventory); just refresh HUD + encumbrance and report.

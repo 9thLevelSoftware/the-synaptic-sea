@@ -96,7 +96,34 @@ func _initialize() -> void:
 		_fail("no hub upgrade recorded after purchase")
 		return
 
-	print("META SCREENS INTERACTIVE PASS hub_purchase=true")
+	# --- Skill-tree unlock (fabrication requires repair >= 2, no book) ---
+	# Level repair to 2 so the fabrication node is unlockable.
+	while prog.get_skill_level("repair") < 2:
+		prog.grant_xp("repair", 500)
+	_coord.open_meta_screen("skill_tree")
+	# Move the cursor to fabrication deterministically by scanning entries order.
+	var entries: Array = tree.get_skill_entries()
+	var skill_target_index: int = -1
+	for i in range(entries.size()):
+		if str((entries[i] as Dictionary).get("skill_id", "")) == "fabrication":
+			skill_target_index = i
+			break
+	if skill_target_index < 0:
+		_fail("fabrication not found in skill entries")
+		return
+	# Reset cursor to 0 then step down to the target.
+	_coord.meta_screen_move_selection(-9999)
+	for _i in range(skill_target_index):
+		_coord.meta_screen_move_selection(1)
+	var unlock_result: Dictionary = _coord.meta_screen_confirm()
+	if not bool(unlock_result.get("ok", false)):
+		_fail("skill unlock confirm failed: %s" % str(unlock_result))
+		return
+	if not tree.is_unlocked("fabrication"):
+		_fail("fabrication should be unlocked after confirm")
+		return
+
+	print("META SCREENS INTERACTIVE PASS hub_purchase=true skill_unlock=true")
 	_cleanup()
 	quit(0)
 
