@@ -5103,6 +5103,13 @@ func _process(delta: float) -> void:
 		# Domain 5: tick the reload timer on the away branch (derelict = primary combat context).
 		if ammo_state != null and not ammo_state.tick(delta).is_empty():
 			_refresh_weapon_hotbar()
+		# Domain 5: stimulant buff timers + addiction withdrawal/tolerance decay advance
+		# on the derelict branch too (item USE already worked away; only per-frame decay
+		# was home-only). Shared with the home block at the bottom of _process.
+		if stimulant_state != null:
+			stimulant_state.tick(delta, addiction_state, _consumable_pipeline_context())
+		if addiction_state != null:
+			addiction_state.tick(delta, status_effects_state)
 		return
 	if not playable_started or slice_complete:
 		return
