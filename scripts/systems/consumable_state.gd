@@ -132,7 +132,8 @@ func _use_once(item_id: String, category: String, definition: Dictionary, invent
 					if bool(er.get("ok", false)):
 						any_ok = true
 			if any_ok:
-				inventory_state.remove_item(item_id, 1)
+				if inventory_state != null:
+					inventory_state.remove_item(item_id, 1)
 				return {"ok": true, "item_id": item_id, "results": ammo_results}
 			return {"ok": false, "reason": "ammo_no_effect"}
 		"utility":

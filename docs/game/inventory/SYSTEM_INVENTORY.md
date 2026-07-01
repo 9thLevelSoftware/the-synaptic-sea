@@ -35,8 +35,8 @@
 | Stimulants | 🟢 | 90% | [V] | playable_generated_ship.gd:4830 |
 | Addiction / Tolerance | 🟢 | 90% | [V] | playable_generated_ship.gd:4832 |
 | Utility Items | 🟢 | 90% | [V] | consumable_state.gd:140 |
-| Ammo Magazine (Per-Weapon) | 🟢 | 90% | [V] | playable_generated_ship.gd:5187 (home) / 5224 (away) |
-| Sealed Hatch | 🟢 | 90% | [V] | playable_generated_ship.gd:2604-2605 (_build_sealed_hatches connect), 3604 (_try_bypass_nearest_hatch) |
+| Ammo Magazine (Per-Weapon) | 🟢 | 90% | [V] | playable_generated_ship.gd:5184 (away) / 5221 (home) |
+| Sealed Hatch | 🟢 | 90% | [V] | playable_generated_ship.gd:2600-2601 (_build_sealed_hatches connect), 3601 (_try_bypass_nearest_hatch) |
 
 ## food
 

@@ -20,6 +20,7 @@ var _player_in_range: bool = false
 var _blocker: StaticBody3D = null
 
 func configure(p_hatch_id: String, p_lock_kind: String, world_position: Vector3, radius: float = 1.8) -> void:
+	assert(radius >= 0.0, "radius must be non-negative")
 	hatch_id = p_hatch_id
 	lock_kind = p_lock_kind if (p_lock_kind == MECHANICAL or p_lock_kind == ELECTRONIC) else MECHANICAL
 	_radius = radius
@@ -49,13 +50,13 @@ func try_bypass(player_body: Node, active_flags: Dictionary) -> Dictionary:
 	if not active_flags.has(flag):
 		return {"ok": false, "reason": "locked", "hatch_id": hatch_id, "needs": flag, "lock_kind": lock_kind}
 	set_bypassed(true)
-	hatch_bypassed.emit(hatch_id, lock_kind)
+	emit_signal("hatch_bypassed", hatch_id, lock_kind)
 	return {"ok": true, "hatch_id": hatch_id, "lock_kind": lock_kind, "consumed_flag": flag}
 
 func _is_player_in_range(player_body: Node) -> bool:
 	if _player_in_range:
 		return true
-	if player_body is Node3D:
+	if is_instance_valid(player_body) and player_body is Node3D:
 		return global_position.distance_to((player_body as Node3D).global_position) <= _radius
 	return false
 
@@ -75,7 +76,7 @@ func _ensure_detection(radius: float) -> void:
 		body_exited.connect(_on_body_exited)
 
 func _ensure_blocker(radius: float) -> void:
-	if _blocker != null and is_instance_valid(_blocker):
+	if is_instance_valid(_blocker):
 		return
 	_blocker = StaticBody3D.new()
 	_blocker.name = "HatchBlocker"
@@ -87,16 +88,16 @@ func _ensure_blocker(radius: float) -> void:
 	add_child(_blocker)
 
 func _apply_blocked_state() -> void:
-	if _blocker == null or not is_instance_valid(_blocker):
+	if not is_instance_valid(_blocker):
 		return
 	for c in _blocker.get_children():
 		if c is CollisionShape3D:
 			(c as CollisionShape3D).disabled = bypassed
 
 func _on_body_entered(body: Node3D) -> void:
-	if body != null and body is PlayerController:
+	if is_instance_valid(body) and body is PlayerController:
 		_player_in_range = true
 
 func _on_body_exited(body: Node3D) -> void:
-	if body != null and body is PlayerController:
+	if is_instance_valid(body) and body is PlayerController:
 		_player_in_range = false

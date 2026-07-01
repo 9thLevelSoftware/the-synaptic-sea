@@ -3578,9 +3578,12 @@ func _on_loot_container_searched(container_id: String, granted: Array) -> void:
 ## any associated status effect, and records the bypass for per-ship persistence.
 func _on_hatch_bypassed(hatch_id: String, lock_kind: String) -> void:
 	var flag: String = "lockpick" if lock_kind == SealedHatchScript.MECHANICAL else "hack_chip"
+	var depleted: bool = false
 	if utility_item_state != null:
-		utility_item_state.consume_flag(flag)
-	if status_effects_state != null and status_effects_state.has_method("remove_effect"):
+		depleted = utility_item_state.consume_flag(flag)
+	# Only clear the ready-status when all charges of this flag are spent; stacked
+	# lockpick/hack_chip sets should retain the status until the last charge fires.
+	if depleted and status_effects_state != null and status_effects_state.has_method("remove_effect"):
 		status_effects_state.remove_effect("utility_%s_ready" % flag, 9999)
 	# Track for persistence so a revisited derelict remembers the open hatch.
 	if current_ship != null and not current_ship.bypassed_hatch_ids.has(hatch_id):
@@ -3590,7 +3593,7 @@ func _on_hatch_bypassed(hatch_id: String, lock_kind: String) -> void:
 ## Domain 5: attempts to bypass the nearest unblocked sealed hatch using the player's
 ## active utility flags. Returns true iff a hatch was opened.
 func _try_bypass_nearest_hatch() -> bool:
-	if player == null:
+	if not is_instance_valid(player):
 		return false
 	for h in sealed_hatches:
 		if not is_instance_valid(h) or h.bypassed:

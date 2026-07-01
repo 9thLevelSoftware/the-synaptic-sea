@@ -19,8 +19,8 @@ func _initialize() -> void:
 	if not bool(result.get("ok", false)):
 		push_error("THERMAL CONSUMABLE FAIL reason=dispatch_%s" % str(result.get("reason", "?")))
 		quit(1); return
-	if after <= before + 0.001:
-		push_error("THERMAL CONSUMABLE FAIL reason=no_shift before=%.3f after=%.3f" % [before, after])
+	if abs((after - before) - 8.0) >= 0.001:
+		push_error("THERMAL CONSUMABLE FAIL reason=wrong_shift before=%.3f after=%.3f expected_shift=8.0" % [before, after])
 		quit(1); return
 	print("THERMAL CONSUMABLE PASS temp_before=%.3f temp_after=%.3f temp_shifted=true" % [before, after])
 	quit(0)

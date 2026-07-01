@@ -103,6 +103,8 @@ func tick_threats(delta: float, vitals_state = null, status_effects_state = null
 	_sweep_dead_threats()
 
 func attack_with_weapon(weapon_id: String, inventory_state, equipment_state, ammo_state = null, target_id: String = "") -> Dictionary:
+	assert(inventory_state != null, "inventory_state dependency cannot be null")
+	assert(equipment_state != null, "equipment_state dependency cannot be null")
 	var weapon: Dictionary = weapon_definitions.get(weapon_id, {}) if weapon_definitions.get(weapon_id, {}) is Dictionary else {}
 	if weapon.is_empty():
 		return {"ok": false, "reason": "unknown_weapon"}

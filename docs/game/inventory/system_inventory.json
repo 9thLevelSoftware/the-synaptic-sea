@@ -2231,8 +2231,8 @@
       },
       "output": {
         "live": true,
-        "desc": "dispatches each utility effect through the shared dispatcher (utility_item_resolver.gd:25); utility_flare adds status -> coordinator reads has_effect('utility_flare') -> sanity_state.steady_multiplier=0.5 on BOTH _process branches (playable_generated_ship.gd:5131 home / 5232 away); lockpick/hack_chip consume_flag via _on_hatch_bypassed (coordinator:3588) when SealedHatch.try_bypass succeeds; repair_foam->heal_small reaches live vitals.",
-        "at": "utility_item_resolver.gd:25; playable_generated_ship.gd:5131,5232,3588"
+        "desc": "dispatches each utility effect through the shared dispatcher (utility_item_resolver.gd:25); utility_flare adds status -> coordinator reads has_effect('utility_flare') -> sanity_state.steady_multiplier=0.5 on BOTH _process branches (playable_generated_ship.gd:5128 away / 5229 home); lockpick/hack_chip consume_flag via _on_hatch_bypassed (coordinator:3583) when SealedHatch.try_bypass succeeds; repair_foam->heal_small reaches live vitals.",
+        "at": "utility_item_resolver.gd:25; playable_generated_ship.gd:5128,5229,3583"
       },
       "confidence": "V",
       "loops": [
@@ -2260,7 +2260,7 @@
         {
           "to": "sanity_state",
           "via": "utility_flare has_effect -> steady_multiplier=0.5 halves sanity drain (BOTH _process branches)",
-          "at": "playable_generated_ship.gd:5131",
+          "at": "playable_generated_ship.gd:5128,5229",
           "health": "healthy"
         }
       ],
@@ -2282,11 +2282,11 @@
       "smoke": "scripts/validation/ammo_magazine_state_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:5187 (home) / 5224 (away)",
+      "driven_at": "playable_generated_ship.gd:5184 (away) / 5221 (home)",
       "input": {
         "live": true,
-        "desc": "spend(weapon_id) called from threat_manager.attack_with_weapon (coordinator:4208); begin_reload(wid, mag_size, reserve) on KEY_R (coordinator:4240); tick(delta) advances reload timer on BOTH _process branches (5187 home / 5224 away)",
-        "at": "playable_generated_ship.gd:4208,4240,5187,5224"
+        "desc": "spend(weapon_id) called from threat_manager.attack_with_weapon (coordinator:4205); begin_reload(wid, mag_size, reserve) on KEY_R (coordinator:4237); tick(delta) advances reload timer on BOTH _process branches (5184 away / 5221 home)",
+        "at": "playable_generated_ship.gd:4205,4237,5184,5221"
       },
       "output": {
         "live": true,
@@ -6020,16 +6020,16 @@
       "smoke": "scripts/validation/sealed_hatch_node_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "playable_generated_ship.gd:2604-2605 (_build_sealed_hatches connect), 3604 (_try_bypass_nearest_hatch)",
+      "driven_at": "playable_generated_ship.gd:2600-2601 (_build_sealed_hatches connect), 3601 (_try_bypass_nearest_hatch)",
       "input": {
         "live": true,
-        "desc": "try_bypass(player_body, active_flags) called from _try_bypass_nearest_hatch (coordinator:3604); active_flags sourced from utility_item_state.active_flags (lockpick or hack_chip flag). Seeded per derelict by _build_sealed_hatches (coordinator:2580), two hatches per ship, deterministic per marker_id.",
-        "at": "playable_generated_ship.gd:3604; sealed_hatch.gd:43"
+        "desc": "try_bypass(player_body, active_flags) called from _try_bypass_nearest_hatch (coordinator:3601); active_flags sourced from utility_item_state.active_flags (lockpick or hack_chip flag). Seeded per derelict by _build_sealed_hatches (coordinator:2576), two hatches per ship, deterministic per marker_id.",
+        "at": "playable_generated_ship.gd:3601; sealed_hatch.gd:44"
       },
       "output": {
         "live": true,
         "desc": "hatch_bypassed(hatch_id, lock_kind) signal emitted on success -> _on_hatch_bypassed calls utility_item_state.consume_flag(flag) and removes the ready status. StaticBody3D collider (HatchBlocker) disabled on bypass (traversal unblocked). Bypassed hatch_id appended to current_ship.bypassed_hatch_ids for persistence.",
-        "at": "sealed_hatch.gd:52; playable_generated_ship.gd:3588"
+        "at": "sealed_hatch.gd:53; playable_generated_ship.gd:3583"
       },
       "confidence": "V",
       "loops": [
@@ -6039,7 +6039,7 @@
         {
           "to": "utility_item_resolver",
           "via": "active_flags read for bypass check; consume_flag(lockpick|hack_chip) on success",
-          "at": "playable_generated_ship.gd:3588,3604",
+          "at": "playable_generated_ship.gd:3583,3601",
           "health": "healthy"
         }
       ],
