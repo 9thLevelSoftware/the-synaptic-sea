@@ -5627,7 +5627,7 @@
         }
       ],
       "content": "partial",
-      "content_note": "VERIFIED display-only: grep of skill_tree_panel.gd shows no signal/emit/purchase — only render of unlocked counts; cannot spend points",
+      "content_note": "Domain 6 (WI-2): interactive selection surface, NOT display-only. Panel adds move_selection (skill_tree_panel.gd:41) + get_selected_id (:50) + cursor-aware render; MenuCoordinator.meta_screen_confirm reads get_selected_id() and calls SkillTreeState.unlock() on ui_accept (menu_coordinator.gd:613). Advanced-skill unlocks are driven through this panel's cursor.",
       "functional": null,
       "gaps": [
         "panel shows tree but cannot spend points (no mutate signal)"
@@ -5668,7 +5668,7 @@
         }
       ],
       "content": "partial",
-      "content_note": "VERIFIED display-only: full read of hub_upgrade_panel.gd shows no signal/input/button — only get_status_lines + render. Doc comment describes a coordinator-side purchase() path but the panel itself emits nothing",
+      "content_note": "Domain 6 (WI-1): interactive selection surface, NOT display-only. Panel adds move_selection (hub_upgrade_panel.gd:89) + get_selected_id (:98) + cursor-aware render; the panel holds no Button/signal of its own, but MenuCoordinator.meta_screen_confirm reads get_selected_id() and calls HubUpgradeState.purchase() on ui_accept (menu_coordinator.gd:601), spending meta_currency and persisting via save_to_disk.",
       "functional": null,
       "gaps": [
         "no purchase output wired from panel"
@@ -5709,7 +5709,7 @@
         }
       ],
       "content": "partial",
-      "content_note": "VERIFIED: load_catalog/set_selected_class/render at 462-466; class catalog display",
+      "content_note": "Domain 6 (WI-4): interactive class picker, NOT catalog-display-only. Panel adds set_meta_state (class_panel.gd:20) + is_available (:28, gates unlockable classes on the meta unlock set) + move_selection (:36) + get_selected_id (:43) + lock-aware render; MenuCoordinator.meta_screen_confirm persists the chosen available class via MetaProgressionState.set_selected_class (menu_coordinator.gd:621), applied on the next run by _configure_player_progression.",
       "functional": null,
       "gaps": [],
       "subsystems": []
