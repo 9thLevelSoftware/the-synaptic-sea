@@ -79,6 +79,13 @@ var _hotbar_slot_labels: Array = []
 var _selected_hotbar_index: int = 0
 var _last_closed_menu: String = ""
 
+# Domain 6: model refs for interactive meta screens (set in bind_meta_screens).
+var _hub_upgrade_state = null
+var _skill_tree_state = null
+var _meta_progression_state = null
+var _player_progression = null
+var _unlock_registry = null
+
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -164,6 +171,16 @@ func handle_ui_input(event: InputEvent) -> bool:
 		if event.is_action_pressed("ui_cancel"):
 			_close_meta_screen()
 			return true
+		if _active_meta_screen in ["hub_upgrades", "skill_tree", "class"]:
+			if event.is_action_pressed("ui_up"):
+				meta_screen_move_selection(-1)
+				return true
+			if event.is_action_pressed("ui_down"):
+				meta_screen_move_selection(1)
+				return true
+			if event.is_action_pressed("ui_accept"):
+				meta_screen_confirm()
+				return true
 		if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down") \
 				or event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right") \
 				or event.is_action_pressed("ui_accept"):
@@ -432,7 +449,7 @@ func _build_meta_screens() -> void:
 ## on a HUD rebuild. The coordinator constructs/owns every required dependency before
 ## calling this, so a null is a wiring bug — asserted in debug. The catalog-backed panels
 ## need an explicit render() after binding (their setters assign data but don't redraw).
-func bind_meta_screens(p_achievement_state, p_audio_manager, p_skill_tree_state, p_player_progression, p_hub_upgrade_state, p_meta_progression_state, p_localization_catalog, p_build_metadata_state, p_save_load_menu, p_a11y) -> void:
+func bind_meta_screens(p_achievement_state, p_audio_manager, p_skill_tree_state, p_player_progression, p_hub_upgrade_state, p_meta_progression_state, p_localization_catalog, p_build_metadata_state, p_save_load_menu, p_a11y, p_unlock_registry = null) -> void:
 	assert(p_achievement_state != null, "p_achievement_state dependency is missing")
 	assert(p_audio_manager != null, "p_audio_manager dependency is missing")
 	assert(p_skill_tree_state != null, "p_skill_tree_state dependency is missing")
@@ -444,6 +461,11 @@ func bind_meta_screens(p_achievement_state, p_audio_manager, p_skill_tree_state,
 	assert(p_save_load_menu != null, "p_save_load_menu dependency is missing")
 	# p_a11y stays optional (its body use is null-guarded), matching the rest of the
 	# coordinator, which tolerates a null accessibility_settings.
+	_skill_tree_state = p_skill_tree_state
+	_player_progression = p_player_progression
+	_hub_upgrade_state = p_hub_upgrade_state
+	_meta_progression_state = p_meta_progression_state
+	_unlock_registry = p_unlock_registry
 	save_load_menu = p_save_load_menu
 	# Catalog-backed panels: set data, then render() (the setters do not auto-redraw, so
 	# without this the panel is visible but its RichTextLabel stays blank).
@@ -461,6 +483,7 @@ func bind_meta_screens(p_achievement_state, p_audio_manager, p_skill_tree_state,
 		hub_upgrade_panel.render()
 	if is_instance_valid(class_panel):
 		class_panel.load_catalog()
+		class_panel.set_meta_state(p_meta_progression_state)
 		if p_player_progression != null and p_player_progression.has_method("get_class_id"):
 			class_panel.set_selected_class(str(p_player_progression.get_class_id()))
 		class_panel.render()
@@ -480,6 +503,16 @@ func bind_meta_screens(p_achievement_state, p_audio_manager, p_skill_tree_state,
 		credits_screen.load_catalog()
 	_refresh_save_load_panel()
 	_meta_bound = true
+
+## Domain 6 (WI-3): the cross-run unlock registry's unlocked entries, for the
+## codex/records screen. Empty when no registry is bound.
+func get_registry_unlock_lines() -> PackedStringArray:
+	var out := PackedStringArray()
+	if _unlock_registry == null:
+		return out
+	for uid in _unlock_registry.get_unlocked_ids():
+		out.append("- [%s] %s" % [_unlock_registry.get_category(uid), _unlock_registry.get_display_name(uid)])
+	return out
 
 func _refresh_save_load_panel() -> void:
 	if not is_instance_valid(_save_load_panel):
@@ -540,6 +573,58 @@ func open_meta_screen(screen_id: String) -> void:
 
 func get_active_meta_screen() -> String:
 	return _active_meta_screen
+
+## Domain 6 host/input seam: move the active interactive meta screen's cursor.
+func meta_screen_move_selection(direction: int) -> void:
+	match _active_meta_screen:
+		"hub_upgrades":
+			if is_instance_valid(hub_upgrade_panel):
+				hub_upgrade_panel.move_selection(direction)
+				hub_upgrade_panel.render()
+		"skill_tree":
+			if is_instance_valid(skill_tree_panel):
+				skill_tree_panel.move_selection(direction)
+				skill_tree_panel.render()
+		"class":
+			if is_instance_valid(class_panel):
+				class_panel.move_selection(direction)
+				class_panel.render()
+
+## Domain 6 host/input seam: confirm (purchase/unlock/select) on the active
+## interactive meta screen. Returns {screen, action, ok, detail}.
+func meta_screen_confirm() -> Dictionary:
+	match _active_meta_screen:
+		"hub_upgrades":
+			var sel: String = hub_upgrade_panel.get_selected_id() if is_instance_valid(hub_upgrade_panel) else ""
+			var ok: bool = false
+			if _hub_upgrade_state != null and _meta_progression_state != null and not sel.is_empty():
+				if _hub_upgrade_state.purchase(sel, _meta_progression_state):
+					ok = _meta_progression_state.save_to_disk()
+			if is_instance_valid(hub_upgrade_panel):
+				hub_upgrade_panel.render()
+			return {"screen": "hub_upgrades", "action": "purchase", "ok": ok, "detail": sel}
+		"skill_tree":
+			var sel_s: String = skill_tree_panel.get_selected_id() if is_instance_valid(skill_tree_panel) else ""
+			var ok_s: bool = false
+			if _skill_tree_state != null and not sel_s.is_empty():
+				var chk: Dictionary = _skill_tree_state.can_unlock(sel_s, _player_progression, _meta_progression_state)
+				if bool(chk.get("can", false)):
+					ok_s = _skill_tree_state.unlock(sel_s)
+			if is_instance_valid(skill_tree_panel):
+				skill_tree_panel.render()
+			return {"screen": "skill_tree", "action": "unlock", "ok": ok_s, "detail": sel_s}
+		"class":
+			var sel_c: String = class_panel.get_selected_id() if is_instance_valid(class_panel) else ""
+			var ok_c: bool = false
+			if _meta_progression_state != null and not sel_c.is_empty() and class_panel.is_available(sel_c):
+				_meta_progression_state.set_selected_class(sel_c)
+				ok_c = _meta_progression_state.save_to_disk()
+				if is_instance_valid(class_panel):
+					class_panel.set_selected_class(sel_c)
+			if is_instance_valid(class_panel):
+				class_panel.render()
+			return {"screen": "class", "action": "select", "ok": ok_c, "detail": sel_c}
+	return {"screen": _active_meta_screen, "action": "none", "ok": false, "detail": ""}
 
 func get_meta_screen_ids() -> Array:
 	return META_SCREEN_IDS.duplicate()
@@ -645,6 +730,11 @@ func _refresh_codex() -> void:
 		lines.append("  %s" % str(entry.get("body", "")))
 	if lines.size() == 1:
 		lines.append("No unlocked entries yet.")
+	var registry_lines: PackedStringArray = get_registry_unlock_lines()
+	if registry_lines.size() > 0:
+		lines.append("— CROSS-RUN UNLOCKS —")
+		for rl in registry_lines:
+			lines.append(String(rl))
 	codex_panel.set_entries(lines)
 
 func _refresh_minimap() -> void:

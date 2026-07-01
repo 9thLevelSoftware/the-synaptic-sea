@@ -91,6 +91,11 @@ func get_book_prerequisite(skill_id: String) -> String:
 func is_known_skill(skill_id: String) -> bool:
 	return _skills_catalog.has(skill_id)
 
+## Domain 6: true when the skill is tree-gated (has a prerequisite entry in
+## skill_tree.json). Base skills return false and are always trainable.
+func is_gated(skill_id: String) -> bool:
+	return _prereqs.has(skill_id)
+
 ## Returns the unlocked set (idempotent copy).
 func get_unlocked() -> Dictionary:
 	return _unlocked.duplicate()

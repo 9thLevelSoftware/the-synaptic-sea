@@ -294,7 +294,6 @@ var unique_item_state
 var _loot_biome_ids_cache: Array[String] = []
 var _last_loot_feedback_line: String = ""
 var _home_player_position: Vector3 = Vector3.ZERO
-const REPAIR_OBJECTIVE_XP: int = 50
 # Narrative objective flags with no manager backing (supplies/logs). Set on
 # completion; persisted in the snapshot; read by _manager_compat_summary().
 var completed_objective_types: Dictionary = {}
@@ -1111,6 +1110,14 @@ func _build_runtime_nodes() -> void:
 		PlayerProgressionScript.load_books_catalog(),
 	)
 	skill_tree_state.load_prerequisites()
+	# Domain 6 (WI-2): gate live XP so an advanced skill trains only once its
+	# skill-tree node is unlocked. Base skills (not in skill_tree.json) are ungated.
+	training_event_bus.skill_gate = func(skill_id: String) -> bool:
+		if skill_tree_state == null:
+			return true
+		if not skill_tree_state.is_gated(skill_id):
+			return true
+		return skill_tree_state.is_unlocked(skill_id)
 	# REQ-PM-006 / ADR-0033 — meta state (cross-run). Loaded from
 	# user://meta_progression.json; missing file defaults to zeroed.
 	meta_progression_state = MetaProgressionStateScript.new()
@@ -1280,9 +1287,17 @@ func _configure_player_progression() -> void:
 	if player_progression == null:
 		return
 	var classes: Dictionary = ClassDefinitionScript.load_all()
-	var class_def = classes.get(starting_class_id, classes.get("engineer", null))
+	var chosen_class: String = starting_class_id
+	if meta_progression_state != null:
+		var sel: String = meta_progression_state.get_selected_class()
+		if not sel.is_empty() and classes.has(sel):
+			# Only honor the selection if it is a base class or an unlocked one.
+			var is_unlockable: bool = bool(classes[sel].unlockable)
+			if not is_unlockable or meta_progression_state.is_class_unlocked(sel):
+				chosen_class = sel
+	var class_def = classes.get(chosen_class, classes.get("engineer", null))
 	if class_def == null:
-		push_error("PlayableGeneratedShip: no class definition for '%s' or fallback 'engineer' (data/player/classes.json missing or malformed)" % starting_class_id)
+		push_error("PlayableGeneratedShip: no class definition for '%s' (fell back from starting_class_id '%s') or fallback 'engineer' (data/player/classes.json missing or malformed)" % [chosen_class, starting_class_id])
 	player_progression.configure(
 		class_def,
 		PlayerProgressionScript.load_skills_catalog(),
@@ -3367,6 +3382,11 @@ func _on_field_craft_completed() -> void:
 	_recompute_player_encumbrance()
 	print("FIELD CRAFT COMPLETED item=%s qty=%d quality=%s" % [
 		item_id, qty, str(result.get("quality_tier", "standard"))])
+	# Domain 6 (WI-2): field fabrication trains the tree-gated `fabrication` skill
+	# through the bus. When the Fabrication node is locked the skill_gate drops the
+	# event (no XP); once unlocked, field-crafting advances fabrication — which in
+	# turn improves field-craft quality (get_skill_level("fabrication") at :3415).
+	emit_training_event("fabricate_part", item_id)
 
 ## ADR-0038: a salvage station deconstructed an item (the station already deposited the
 ## yield into inventory); just refresh HUD + encumbrance and report.
@@ -3990,6 +4010,7 @@ func _build_hud_layer() -> void:
 		build_metadata_state,
 		save_load_menu,
 		accessibility_settings,
+		unlock_registry,
 	)
 	menu_coordinator.set_load_available(is_load_available())
 	menu_coordinator.set_inventory_items(_inventory_hotbar_ids())
@@ -4828,9 +4849,9 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 		for pair in OBJECTIVE_REPAIR_MAP.get(objective_type, []):
 			ship_systems_manager.force_repair(str(pair[0]), str(pair[1]))
 		if player_progression != null and (objective_type == "restore_systems" or objective_type == "stabilize_reactor"):
-			player_progression.grant_xp("repair", REPAIR_OBJECTIVE_XP)
-			# REQ-PM-002 — funnel the objective-completion XP through the
-			# training bus so the log captures the deterministic event.
+			# Domain 6 (WI-5): single ingest path -- the bus is the sole grant
+			# (repair_full_system = 120). The prior direct grant_xp (50) plus
+			# the bus (120) double-granted 170 XP; removed.
 			if training_event_bus != null:
 				training_event_bus.emit("repair_full_system", str(sequence), player_progression)
 		var compat: Dictionary = _manager_compat_summary()
@@ -6306,6 +6327,8 @@ func _build_run_snapshot() -> RunSnapshot:
 		snapshot.objective_progress_summary = objective_progress_state.get_summary()
 	if player_progression != null:
 		snapshot.player_progression_summary = player_progression.get_summary()
+	if skill_tree_state != null:
+		snapshot.skill_tree_summary = skill_tree_state.to_dict()
 	if is_instance_valid(menu_coordinator):
 		snapshot.settings_summary = menu_coordinator.get_settings_summary()
 	if is_instance_valid(audio_manager):
@@ -6437,16 +6460,22 @@ func _apply_meta_payout_and_persist(reason: String = "completion") -> int:
 		"reason": reason,
 	}
 	var payout: int = int(meta_progression_state.apply_meta_payout(run_summary))
-	# Persist meta + unlocks to disk so the next run picks them up.
-	meta_progression_state.save_to_disk()
+	# Persist unlocks; bridge registry class-unlocks into the meta class set so the
+	# class picker can select them next run, then persist meta AFTER the bridge.
 	if unlock_registry != null:
 		if training_event_bus != null:
 			for entry in training_event_bus.get_log():
 				var evt: String = str(entry.get("event_id", ""))
 				var tgt: String = str(entry.get("target_id", ""))
 				if not evt.is_empty():
+					# Keep the registry's own first-match unlock accounting (codex/scene display).
 					unlock_registry.unlock_for_trigger(evt, tgt)
+					# Bridge EVERY class row for this trigger into the meta class set,
+					# independent of unlock_for_trigger's single return (P1 fix).
+					for cls in unlock_registry.class_ids_for_trigger(evt, tgt):
+						meta_progression_state.unlock_class(cls)
 		unlock_registry.save_to_disk()
+	meta_progression_state.save_to_disk()
 	print("META PAYOUT reason=%s payout=%d meta_currency=%d runs_completed=%d" % [
 		reason,
 		payout,
@@ -6609,6 +6638,8 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		objective_progress_state.apply_summary(snapshot.objective_progress_summary)
 	if player_progression != null and not snapshot.player_progression_summary.is_empty():
 		player_progression.apply_summary(snapshot.player_progression_summary)
+	if skill_tree_state != null and not snapshot.skill_tree_summary.is_empty():
+		skill_tree_state.apply_summary(snapshot.skill_tree_summary)
 	if is_instance_valid(menu_coordinator) and not snapshot.settings_summary.is_empty():
 		menu_coordinator.apply_settings_summary(snapshot.settings_summary)
 	# REQ-AU-010: re-apply the audio summary to the AudioManager so save/load

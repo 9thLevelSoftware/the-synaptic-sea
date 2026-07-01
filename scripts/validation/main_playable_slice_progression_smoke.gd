@@ -10,6 +10,14 @@ var finished: bool = false
 func _initialize() -> void:
 	var bootstrap := SaveLoadService.new()
 	bootstrap.delete_current_run()
+	# Defensive: another smoke run earlier in the same bundle invocation (e.g.
+	# meta_screens_interactive_smoke.gd's class-select confirm) may have
+	# written user://meta_progression.json via the real coordinator save path.
+	# Start from a clean meta state so the class=engineer assertion below is
+	# deterministic regardless of prior test-process state.
+	const REAL_META_PATH := "user://meta_progression.json"
+	if FileAccess.file_exists(REAL_META_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(REAL_META_PATH))
 	main_node = MAIN_SCENE.instantiate()
 	if main_node == null:
 		_fail("could not instantiate main scene")

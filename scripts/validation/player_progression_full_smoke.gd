@@ -35,9 +35,9 @@ func _initialize() -> void:
 	var books: Dictionary = PlayerProgressionScript.load_books_catalog()
 	var classes: Dictionary = ClassDefinitionScript.load_all()
 
-	# REQ-PM-001 — data-driven class roster, all 8 classes load.
-	if classes.size() != 8:
-		_fail("expected 8 classes, got %d" % classes.size())
+	# REQ-PM-001 — data-driven class roster, all 11 classes load (8 base + 3 unlockable, Domain 6).
+	if classes.size() != 11:
+		_fail("expected 11 classes, got %d" % classes.size())
 		return
 
 	# Configure an engineer for the meat of the test.
@@ -341,8 +341,8 @@ func _initialize() -> void:
 		_fail("skill_tree_panel status lines should be >= 5, got %d" % tree_lines.size())
 		return
 	var class_panel = ClassPanelScript.build_default("engineer")
-	if class_panel == null or class_panel.get_class_count() != 8:
-		_fail("class_panel should load 8 classes, got %s" % str(null if class_panel == null else class_panel.get_class_count()))
+	if class_panel == null or class_panel.get_class_count() != 11:
+		_fail("class_panel should load 11 classes, got %s" % str(null if class_panel == null else class_panel.get_class_count()))
 		return
 	var hub_panel = HubUpgradePanelScript.build_default(meta4)
 	if hub_panel == null or hub_panel.get_upgrade_count() < 5:
@@ -352,7 +352,7 @@ func _initialize() -> void:
 	tree_panel.free()
 	class_panel.free()
 	hub_panel.free()
-	print("PLAYER PROGRESSION FULL PASS classes=8 cross_training=true books=true meta_payout=70 unlocks=true panels=true")
+	print("PLAYER PROGRESSION FULL PASS classes=11 cross_training=true books=true meta_payout=70 unlocks=true panels=true")
 	quit(0)
 
 func _fail(reason: String) -> void:

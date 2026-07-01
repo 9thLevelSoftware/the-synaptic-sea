@@ -147,6 +147,23 @@ func _initialize() -> void:
 	if not u2.is_empty() and (u2 == u1 or not unlock.is_unlocked(u2)):
 		_fail("second trigger should either no-op or unlock a different valid id; got %s" % u2)
 		return
+
+	# P1 regression (PR #55 Codex D): unlock_for_trigger only ever returns the
+	# FIRST matching catalog row (the codex row, e.g. codex_scavenging_intro),
+	# which starves any class-category row sharing the same trigger
+	# (class_unlock_salvage_captain). class_ids_for_trigger must still surface
+	# every class row for the trigger, independent of what unlock_for_trigger
+	# already consumed. Use a CONCRETE fired target ("cargo_hold_crate", not
+	# "any") — the catalog row's trigger_target is "any", which must now be
+	# treated as a ROW-SIDE wildcard matching any real logged target.
+	var unlock_cls = UnlockRegistryScript.new()
+	unlock_cls.configure(catalog_parsed)
+	unlock_cls.unlock_for_trigger("scavenge_container", "cargo_hold_crate")
+	var bridged_classes: Array = unlock_cls.class_ids_for_trigger("scavenge_container", "cargo_hold_crate")
+	if not bridged_classes.has("salvage_captain"):
+		_fail("class_ids_for_trigger(scavenge_container, cargo_hold_crate) missing salvage_captain: %s" % str(bridged_classes))
+		return
+
 	# Round-trip via to_dict / apply_summary.
 	var dump: Dictionary = unlock.to_dict()
 	var unlock2 = UnlockRegistryScript.new()
@@ -190,7 +207,31 @@ func _initialize() -> void:
 		_fail("reset_all should clear total_runs_completed")
 		return
 
-	print("META PROGRESSION STATE PASS payout=39 unlocks=true persistence=true reset=true")
+	# --- selected_class_id (Domain 6): default empty, set, persist, reset ---
+	var meta_cls = MetaProgressionStateScript.new()
+	meta_cls.configure({})
+	if meta_cls.get_selected_class() != "":
+		_fail("selected_class default should be empty")
+		return
+	meta_cls.set_selected_class("field_medic")
+	if meta_cls.get_selected_class() != "field_medic":
+		_fail("set_selected_class did not stick")
+		return
+	var cls_dump: Dictionary = meta_cls.to_dict()
+	var meta_cls2 = MetaProgressionStateScript.new()
+	meta_cls2.configure({})
+	if not meta_cls2.apply_summary(cls_dump):
+		_fail("apply_summary rejected selected_class dump")
+		return
+	if meta_cls2.get_selected_class() != "field_medic":
+		_fail("selected_class did not round-trip through apply_summary")
+		return
+	meta_cls2.reset_all()
+	if meta_cls2.get_selected_class() != "":
+		_fail("reset_all should clear selected_class")
+		return
+
+	print("META PROGRESSION STATE PASS payout=39 unlocks=true persistence=true reset=true selected_class=true class_bridge=true")
 	quit(0)
 
 func _fail(reason: String) -> void:

@@ -29,6 +29,7 @@ var fire_summary: Dictionary = {}
 var electrical_arc_summary: Dictionary = {}
 var objective_progress_summary: Dictionary = {}
 var player_progression_summary: Dictionary = {}
+var skill_tree_summary: Dictionary = {}
 var settings_summary: Dictionary = {}
 var audio_summary: Dictionary = {}
 var spoilage_summary: Dictionary = {}
@@ -71,6 +72,7 @@ const SUMMARY_FIELDS: Array = [
 	"electrical_arc_summary",
 	"objective_progress_summary",
 	"player_progression_summary",
+	"skill_tree_summary",
 	"settings_summary",
 	"audio_summary",
 	"spoilage_summary",
@@ -109,6 +111,7 @@ func to_dict() -> Dictionary:
 		"electrical_arc_summary": electrical_arc_summary.duplicate(true),
 		"objective_progress_summary": objective_progress_summary.duplicate(true),
 		"player_progression_summary": player_progression_summary.duplicate(true),
+		"skill_tree_summary": skill_tree_summary.duplicate(true),
 		"settings_summary": settings_summary.duplicate(true),
 		"audio_summary": audio_summary.duplicate(true),
 		"spoilage_summary": spoilage_summary.duplicate(true),
@@ -169,6 +172,7 @@ static func from_dict(data: Variant, expected_slice_version: String, expected_go
 	snapshot.electrical_arc_summary = _deep_copy_dict(dict.get("electrical_arc_summary", {}))
 	snapshot.objective_progress_summary = _deep_copy_dict(dict.get("objective_progress_summary", {}))
 	snapshot.player_progression_summary = _deep_copy_dict(dict.get("player_progression_summary", {}))
+	snapshot.skill_tree_summary = _deep_copy_dict(dict.get("skill_tree_summary", {}))
 	snapshot.settings_summary = _deep_copy_dict(dict.get("settings_summary", {}))
 	snapshot.audio_summary = _deep_copy_dict(dict.get("audio_summary", {}))
 	snapshot.spoilage_summary = _deep_copy_dict(dict.get("spoilage_summary", {}))

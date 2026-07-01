@@ -23,8 +23,18 @@ const DEFAULT_TRAINING_ACTIONS_PATH := "res://data/player/training_actions.json"
 ## Signature: func(event: Dictionary) -> void
 var on_event_resolved: Callable = Callable()
 ## Optional per-event suppression. When set, returns false from emit().
-## Signature: func(event_id: String, target_id: String) -> bool
+## Signature: func(event_id: String, target_id: String) -> bool.
+## Convention: returning true SUPPRESSES/DROPS the event (opposite of
+## `skill_gate` below — do not confuse the two).
 var event_filter: Callable = Callable()
+
+## Optional Domain 6 skill gate. When set, resolves the event's target_skill
+## and consults this callable before XP is granted. Signature:
+## func(skill_id: String) -> bool.
+## Convention: returning true means the skill is ALLOWED to train (the event
+## proceeds); returning false DROPS the event. This is the opposite
+## convention from `event_filter` above — do not confuse the two.
+var skill_gate: Callable = Callable()
 
 var _actions_by_id: Dictionary = {}     # event_id -> {target_skill, base_xp, category}
 var _log: Array = []                    # ordered list of resolved events
@@ -72,15 +82,22 @@ func get_dropped_count() -> int:
 func get_total_xp_delivered() -> int:
 	return _xp_total
 
-## Emits a training event. Returns the resolved (skill_id, base_xp) pair
-## as a Dictionary on success; returns null on unknown id, suppressed
-## event, or empty target skill. The `target_id` argument is informational
+## Emits a training event. Returns the resolved record Dictionary on
+## success; returns null on unknown id, `event_filter`-suppressed event,
+## or empty target skill. The `target_id` argument is informational
 ## (e.g. "power_distribution"); it does not affect XP resolution.
 ##
-## On success the bus calls `progression.grant_xp(skill_id, base_xp,
-## is_cross_training)`. The cross-training flag is computed by comparing
-## the action's category to the player's primary category (the first
-## multiplier > 1.0 wins; ties broken alphabetically).
+## Domain 6 skill gate: when `skill_gate` is set and rejects the event's
+## skill, the event is still APPENDED to the log (with `"gated": true`)
+## so run-end unlock-trigger persistence (which iterates `get_log()`) can
+## still see it fire — only the XP grant is suppressed. `_dropped` /
+## `get_dropped_count()` is reserved for unknown-id / `event_filter` /
+## empty-skill cases; a gated event does NOT increment it.
+##
+## On a non-gated success the bus calls `progression.grant_xp(skill_id,
+## base_xp, is_cross_training)`. The cross-training flag is computed by
+## comparing the action's category to the player's primary category (the
+## first multiplier > 1.0 wins; ties broken alphabetically).
 func emit(event_id: String, target_id: String, progression) -> Variant:
 	if not _actions_by_id.has(event_id):
 		_dropped += 1
@@ -95,9 +112,15 @@ func emit(event_id: String, target_id: String, progression) -> Variant:
 		_dropped += 1
 		return null
 	var is_cross: bool = _is_cross_training(action.get("category", ""), progression)
-	if progression != null and progression.has_method("grant_xp"):
-		progression.grant_xp(skill_id, base_xp, is_cross)
-	_xp_total += base_xp
+	# Domain 6 skill gate (PR #55 Codex P1): when a tree-gated skill is NOT yet
+	# unlocked, SUPPRESS the XP grant but STILL log the event, so the run-end
+	# unlock-trigger stream (get_log) sees the action fire (e.g. field-crafting
+	# must count toward the workshop/class unlock even before Fabrication trains).
+	var gated: bool = skill_gate.is_valid() and not bool(skill_gate.call(skill_id))
+	if not gated:
+		if progression != null and progression.has_method("grant_xp"):
+			progression.grant_xp(skill_id, base_xp, is_cross)
+		_xp_total += base_xp
 	var record: Dictionary = {
 		"event_id": event_id,
 		"target_id": target_id,
@@ -106,6 +129,7 @@ func emit(event_id: String, target_id: String, progression) -> Variant:
 		"category": str(action.get("category", "")),
 		"is_cross_training": is_cross,
 		"sequence": _log.size(),
+		"gated": gated,
 	}
 	_log.append(record)
 	if on_event_resolved.is_valid():
@@ -123,6 +147,8 @@ func replay_into(progression) -> int:
 		var base_xp: int = int(record.get("base_xp", 0))
 		var is_cross: bool = bool(record.get("is_cross_training", false))
 		if skill_id.is_empty() or base_xp <= 0:
+			continue
+		if bool(record.get("gated", false)):
 			continue
 		if progression.has_method("grant_xp"):
 			progression.grant_xp(skill_id, base_xp, is_cross)
