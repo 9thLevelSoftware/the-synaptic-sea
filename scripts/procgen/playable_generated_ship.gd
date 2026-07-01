@@ -1297,7 +1297,7 @@ func _configure_player_progression() -> void:
 				chosen_class = sel
 	var class_def = classes.get(chosen_class, classes.get("engineer", null))
 	if class_def == null:
-		push_error("PlayableGeneratedShip: no class definition for '%s' or fallback 'engineer' (data/player/classes.json missing or malformed)" % starting_class_id)
+		push_error("PlayableGeneratedShip: no class definition for '%s' (fell back from starting_class_id '%s') or fallback 'engineer' (data/player/classes.json missing or malformed)" % [chosen_class, starting_class_id])
 	player_progression.configure(
 		class_def,
 		PlayerProgressionScript.load_skills_catalog(),

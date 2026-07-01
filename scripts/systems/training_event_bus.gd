@@ -23,11 +23,17 @@ const DEFAULT_TRAINING_ACTIONS_PATH := "res://data/player/training_actions.json"
 ## Signature: func(event: Dictionary) -> void
 var on_event_resolved: Callable = Callable()
 ## Optional per-event suppression. When set, returns false from emit().
-## Signature: func(event_id: String, target_id: String) -> bool
+## Signature: func(event_id: String, target_id: String) -> bool.
+## Convention: returning true SUPPRESSES/DROPS the event (opposite of
+## `skill_gate` below — do not confuse the two).
 var event_filter: Callable = Callable()
 
-## Optional Domain 6 skill gate. When set, an event whose resolved target_skill
-## returns false is dropped before XP is granted. Signature: func(skill_id: String) -> bool
+## Optional Domain 6 skill gate. When set, resolves the event's target_skill
+## and consults this callable before XP is granted. Signature:
+## func(skill_id: String) -> bool.
+## Convention: returning true means the skill is ALLOWED to train (the event
+## proceeds); returning false DROPS the event. This is the opposite
+## convention from `event_filter` above — do not confuse the two.
 var skill_gate: Callable = Callable()
 
 var _actions_by_id: Dictionary = {}     # event_id -> {target_skill, base_xp, category}

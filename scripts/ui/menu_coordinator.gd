@@ -598,9 +598,8 @@ func meta_screen_confirm() -> Dictionary:
 			var sel: String = hub_upgrade_panel.get_selected_id() if is_instance_valid(hub_upgrade_panel) else ""
 			var ok: bool = false
 			if _hub_upgrade_state != null and _meta_progression_state != null and not sel.is_empty():
-				ok = bool(_hub_upgrade_state.purchase(sel, _meta_progression_state))
-				if ok:
-					_meta_progression_state.save_to_disk()
+				if _hub_upgrade_state.purchase(sel, _meta_progression_state):
+					ok = _meta_progression_state.save_to_disk()
 			if is_instance_valid(hub_upgrade_panel):
 				hub_upgrade_panel.render()
 			return {"screen": "hub_upgrades", "action": "purchase", "ok": ok, "detail": sel}
@@ -619,10 +618,9 @@ func meta_screen_confirm() -> Dictionary:
 			var ok_c: bool = false
 			if _meta_progression_state != null and not sel_c.is_empty() and class_panel.is_available(sel_c):
 				_meta_progression_state.set_selected_class(sel_c)
-				_meta_progression_state.save_to_disk()
+				ok_c = _meta_progression_state.save_to_disk()
 				if is_instance_valid(class_panel):
 					class_panel.set_selected_class(sel_c)
-				ok_c = true
 			if is_instance_valid(class_panel):
 				class_panel.render()
 			return {"screen": "class", "action": "select", "ok": ok_c, "detail": sel_c}

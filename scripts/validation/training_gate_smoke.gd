@@ -13,7 +13,11 @@ const ClassDefinitionScript := preload("res://scripts/systems/class_definition.g
 
 func _initialize() -> void:
 	var tree = SkillTreeStateScript.new()
-	tree.configure(SkillTreeStateScript.load_skills_catalog(), SkillTreeStateScript.load_books_catalog())
+	var tree_catalog: Dictionary = SkillTreeStateScript.load_skills_catalog()
+	if tree_catalog.is_empty():
+		_fail("skill tree catalog is empty")
+		return
+	tree.configure(tree_catalog, SkillTreeStateScript.load_books_catalog())
 	tree.load_prerequisites()
 
 	# is_gated partitions advanced (in skill_tree.json) vs base skills.
@@ -26,11 +30,16 @@ func _initialize() -> void:
 
 	# Build a progression on the engineer class so grant_xp works.
 	var classes: Dictionary = ClassDefinitionScript.load_all()
+	if classes.get("engineer", null) == null:
+		_fail("engineer class missing")
+		return
 	var prog = PlayerProgressionScript.new()
 	prog.configure(classes.get("engineer", null), PlayerProgressionScript.load_skills_catalog(), PlayerProgressionScript.load_books_catalog())
 
 	var bus = TrainingEventBusScript.new()
-	bus.configure()
+	if not bus.configure():
+		_fail("bus.configure failed")
+		return
 	# Gate: a skill is trainable if it is not gated, or its node is unlocked.
 	bus.skill_gate = func(skill_id: String) -> bool:
 		if not tree.is_gated(skill_id):

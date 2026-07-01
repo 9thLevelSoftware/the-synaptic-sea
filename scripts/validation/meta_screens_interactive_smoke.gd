@@ -89,7 +89,11 @@ func _initialize() -> void:
 	if target_index < 0:
 		_fail("target upgrade '%s' not found in catalog" % target_id)
 		return
-	_coord.meta_screen_move_selection(target_index)
+	# Reset cursor to 0 then step down to the target (meta_screen_move_selection
+	# takes a step delta, not an absolute index).
+	_coord.meta_screen_move_selection(-9999)
+	for _k in range(target_index):
+		_coord.meta_screen_move_selection(1)
 	var hub_panel = _coord.get_meta_screen_panel("hub_upgrades")
 	if hub_panel == null or hub_panel.get_selected_id() != target_id:
 		_fail("cursor did not land on %s (got %s)" % [target_id, str(hub_panel.get_selected_id() if hub_panel != null else "<null>")])

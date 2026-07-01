@@ -34,7 +34,7 @@ func _initialize() -> void:
 
 func _cleanup() -> void:
 	if is_instance_valid(_panel):
-		_panel.free()
+		_panel.queue_free()
 
 func _fail(reason: String) -> void:
 	push_error("CLASS GATE CONFIG FAIL reason=%s" % reason)
