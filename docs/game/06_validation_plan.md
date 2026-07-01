@@ -159,7 +159,8 @@ run_clean 'Phase 1 world time persistence smoke' 'WORLD TIME PASS advances=true 
 run_clean 'Phase 2 ship instance models smoke' 'SHIP INSTANCE MODELS PASS hull_roundtrip=true web_roundtrip=true web_attached_delegates=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_instance_models_smoke.gd
 run_clean 'Phase 2 ship models seed smoke' 'SHIP MODELS SEED PASS hull_seeded=true web_attached=true timestamp_set=true active_resolves=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_models_seed_smoke.gd
 run_clean 'Phase 4 ship catch-up smoke' 'SHIP CATCHUP PASS web_grew=true hull_degraded=true timestamp_stamped=true bounded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_catchup_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=88 clean_output=true'
+run_clean 'Domain 5 sealed hatch seed + bypass smoke' 'SEALED HATCH PASS away_ticks=3 seeded=true mechanical_open=true flag_consumed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sealed_hatch_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=89 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

@@ -32,6 +32,14 @@ func use_item(item_id: String, definition: Dictionary, dispatcher, context: Dict
 		}
 	return {"ok": true, "item_id": item_id, "utility_flag": utility_flag, "note": last_note}
 
+## Domain 5: a utility flag is consumed when its promised bypass fires (e.g. a
+## sealed hatch opened by lockpick/hack_chip). Returns true if a flag was removed.
+func consume_flag(flag: String) -> bool:
+	if flag.is_empty() or not active_flags.has(flag):
+		return false
+	active_flags.erase(flag)
+	return true
+
 func get_summary() -> Dictionary:
 	return {
 		"last_item_id": last_item_id,
