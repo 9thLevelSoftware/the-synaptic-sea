@@ -123,7 +123,22 @@ func _initialize() -> void:
 		_fail("fabrication should be unlocked after confirm")
 		return
 
-	print("META SCREENS INTERACTIVE PASS hub_purchase=true skill_unlock=true")
+	# --- Unlock-registry records reader ---
+	var unlocked_id: String = reg.unlock_for_trigger("scavenge_container", "any")
+	if unlocked_id.is_empty():
+		_fail("registry did not unlock on scavenge_container")
+		return
+	var lines: PackedStringArray = _coord.get_registry_unlock_lines()
+	var found: bool = false
+	for l in lines:
+		if String(l).findn(reg.get_display_name(unlocked_id)) != -1:
+			found = true
+			break
+	if not found:
+		_fail("registry reader did not surface unlocked entry %s" % unlocked_id)
+		return
+
+	print("META SCREENS INTERACTIVE PASS hub_purchase=true skill_unlock=true registry_reader=true")
 	_cleanup()
 	quit(0)
 

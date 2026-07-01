@@ -503,6 +503,16 @@ func bind_meta_screens(p_achievement_state, p_audio_manager, p_skill_tree_state,
 	_refresh_save_load_panel()
 	_meta_bound = true
 
+## Domain 6 (WI-3): the cross-run unlock registry's unlocked entries, for the
+## codex/records screen. Empty when no registry is bound.
+func get_registry_unlock_lines() -> PackedStringArray:
+	var out := PackedStringArray()
+	if _unlock_registry == null:
+		return out
+	for uid in _unlock_registry.get_unlocked_ids():
+		out.append("- [%s] %s" % [_unlock_registry.get_category(uid), _unlock_registry.get_display_name(uid)])
+	return out
+
 func _refresh_save_load_panel() -> void:
 	if not is_instance_valid(_save_load_panel):
 		return
@@ -705,6 +715,11 @@ func _refresh_codex() -> void:
 		lines.append("  %s" % str(entry.get("body", "")))
 	if lines.size() == 1:
 		lines.append("No unlocked entries yet.")
+	var registry_lines: PackedStringArray = get_registry_unlock_lines()
+	if registry_lines.size() > 0:
+		lines.append("— CROSS-RUN UNLOCKS —")
+		for rl in registry_lines:
+			lines.append(String(rl))
 	codex_panel.set_entries(lines)
 
 func _refresh_minimap() -> void:
