@@ -38,5 +38,14 @@
     "utility_flag": "repair_foam",
     "use_note": "Repair foam patches suit tears and field wounds.",
     "icon": "res://assets/placeholder/repair_foam.png"
+  },
+  "heat_pack": {
+    "display_name": "Heat Pack",
+    "category": "utility",
+    "weight": 0.3,
+    "max_stack": 6,
+    "effects": ["heatpack"],
+    "use_note": "A chemical heat pack pushes back the cold of a dead ship.",
+    "icon": "res://assets/placeholder/repair_foam.png"
   }
 }
