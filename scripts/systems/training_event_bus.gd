@@ -26,6 +26,10 @@ var on_event_resolved: Callable = Callable()
 ## Signature: func(event_id: String, target_id: String) -> bool
 var event_filter: Callable = Callable()
 
+## Optional Domain 6 skill gate. When set, an event whose resolved target_skill
+## returns false is dropped before XP is granted. Signature: func(skill_id: String) -> bool
+var skill_gate: Callable = Callable()
+
 var _actions_by_id: Dictionary = {}     # event_id -> {target_skill, base_xp, category}
 var _log: Array = []                    # ordered list of resolved events
 var _dropped: int = 0
@@ -92,6 +96,9 @@ func emit(event_id: String, target_id: String, progression) -> Variant:
 	var skill_id: String = str(action.get("target_skill", ""))
 	var base_xp: int = int(action.get("base_xp", 0))
 	if skill_id.is_empty() or base_xp <= 0:
+		_dropped += 1
+		return null
+	if skill_gate.is_valid() and not bool(skill_gate.call(skill_id)):
 		_dropped += 1
 		return null
 	var is_cross: bool = _is_cross_training(action.get("category", ""), progression)
