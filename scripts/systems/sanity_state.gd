@@ -15,6 +15,7 @@ var recovery_rate: float = DEFAULT_RECOVERY_RATE
 
 var sanity: float = DEFAULT_MAX_SANITY
 var in_safe_zone: bool = false
+var steady_multiplier: float = 1.0  # Domain 5: <1.0 when a flare steadies the player
 
 func configure(config: Dictionary) -> void:
 	max_sanity = _f(config, "max_sanity", DEFAULT_MAX_SANITY)
@@ -22,6 +23,7 @@ func configure(config: Dictionary) -> void:
 	recovery_rate = _f(config, "recovery_rate", DEFAULT_RECOVERY_RATE)
 	sanity = clampf(_f(config, "sanity", sanity), 0.0, max_sanity)
 	in_safe_zone = bool(config.get("in_safe_zone", false))
+	steady_multiplier = 1.0
 
 func tick(delta_seconds: float, _context: Dictionary = {}) -> bool:
 	if delta_seconds <= 0.0:
@@ -33,7 +35,7 @@ func tick(delta_seconds: float, _context: Dictionary = {}) -> bool:
 			sanity = minf(max_sanity, sanity + rec)
 			changed = true
 	else:
-		var drn: float = drain_rate * delta_seconds
+		var drn: float = drain_rate * steady_multiplier * delta_seconds
 		if drn > 0.0 and sanity > 0.0:
 			sanity = maxf(0.0, sanity - drn)
 			changed = true

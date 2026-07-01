@@ -5128,6 +5128,7 @@ func _process(delta: float) -> void:
 		# below (Domain 1 Task 6: shared helper now covers the full vitals + death cascade).
 		if sanity_state != null:
 			sanity_state.in_safe_zone = false
+			sanity_state.steady_multiplier = 0.5 if (status_effects_state != null and status_effects_state.has_effect("utility_flare")) else 1.0
 			sanity_state.tick(delta)
 			if hallucination_director != null:
 				hallucination_director.tick(delta, {
@@ -5228,6 +5229,7 @@ func _process(delta: float) -> void:
 		# Synaptic Sea field = not in a safe zone (away_from_start or breach open)
 		var in_safe: bool = not away_from_start and (oxygen_state == null or not oxygen_state.get_summary().get("breach_open", false))
 		sanity_state.in_safe_zone = in_safe
+		sanity_state.steady_multiplier = 0.5 if (status_effects_state != null and status_effects_state.has_effect("utility_flare")) else 1.0
 		sanity_state.tick(delta)
 		# ADR-0042: drive sanity hallucinations from the post-tick sanity value.
 		if hallucination_director != null:
