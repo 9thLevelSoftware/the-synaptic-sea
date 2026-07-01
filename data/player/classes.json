@@ -24,6 +24,15 @@
      "xp_multipliers": {"technical": 0.9, "medical": 0.9, "navigation": 1.0, "survival": 1.2, "social": 1.1}},
     {"class_id": "communications", "name": "Communications", "description": "Scanner range, signal analysis, distress calls.",
      "starting_skills": {"repair": 0, "comms": 3, "signal_analysis": 2, "negotiation": 1},
-     "xp_multipliers": {"technical": 0.9, "medical": 0.8, "navigation": 1.3, "survival": 0.8, "social": 1.5}}
+     "xp_multipliers": {"technical": 0.9, "medical": 0.8, "navigation": 1.3, "survival": 0.8, "social": 1.5}},
+    {"class_id": "salvage_captain", "name": "Salvage Captain", "description": "Elite scavenger; superior salvage yield and field fabrication.", "unlockable": true,
+      "starting_skills": {"scavenging": 3, "repair": 1, "resource_management": 1},
+      "xp_multipliers": {"technical": 1.1, "medical": 0.8, "navigation": 1.0, "survival": 1.4, "social": 0.9}},
+    {"class_id": "field_medic", "name": "Field Medic", "description": "Combat medic; advanced surgery and hazard triage under fire.", "unlockable": true,
+      "starting_skills": {"first_aid": 3, "surgery": 1, "quarantine": 1},
+      "xp_multipliers": {"technical": 0.8, "medical": 1.5, "navigation": 0.9, "survival": 1.1, "social": 1.0}},
+    {"class_id": "signal_specialist", "name": "Signal Specialist", "description": "Decodes derelict transmissions; long-range scan and comms mastery.", "unlockable": true,
+      "starting_skills": {"signal_analysis": 3, "scanner_operation": 1, "comms": 1},
+      "xp_multipliers": {"technical": 1.0, "medical": 0.9, "navigation": 1.4, "survival": 0.8, "social": 1.2}}
   ]
 }

@@ -11,6 +11,7 @@ var display_name: String = ""
 var description: String = ""
 var starting_skills: Dictionary = {}   # skill_id -> int
 var xp_multipliers: Dictionary = {}    # category -> float
+var unlockable: bool = false           # Domain 6: base classes false; earned classes true
 
 static func from_dict(d: Dictionary) -> ClassDefinition:
 	# Self-reference to our own class_name isn't safe inside the script
@@ -29,6 +30,7 @@ static func from_dict(d: Dictionary) -> ClassDefinition:
 	if typeof(mult_variant) == TYPE_DICTIONARY:
 		for k in (mult_variant as Dictionary):
 			c.xp_multipliers[str(k)] = float((mult_variant as Dictionary)[k])
+	c.unlockable = bool(d.get("unlockable", false))
 	return c
 
 ## Returns { class_id -> ClassDefinition }. Empty dict on a malformed file.
