@@ -46,23 +46,36 @@ func _initialize() -> void:
 			return true
 		return tree.is_unlocked(skill_id)
 
-	# perform_surgery -> surgery (+150) is DROPPED while surgery is locked.
+	# perform_surgery -> surgery (+150) is GATED while surgery is locked: the
+	# event STILL reaches the log (record.gated == true) so run-end unlock
+	# persistence sees it fire, but it grants NO XP and does NOT increment
+	# the dropped counter (PR #55 Codex P1 — gate suppresses XP only).
 	var before_surgery: int = prog.get_skill_xp("surgery")
+	var events_before: int = bus.get_event_count()
 	var r1: Variant = bus.emit("perform_surgery", "", prog)
-	if r1 != null:
-		_fail("locked surgery event should be dropped (returned non-null)")
+	if r1 == null:
+		_fail("locked surgery event should still return a logged record (gated, not dropped)")
+		return
+	if not bool((r1 as Dictionary).get("gated", false)):
+		_fail("locked surgery record should have gated=true")
 		return
 	if prog.get_skill_xp("surgery") != before_surgery:
 		_fail("locked surgery should have gained no XP")
 		return
-	if bus.get_dropped_count() != 1:
-		_fail("dropped count should be 1 after a gated drop, got %d" % bus.get_dropped_count())
+	if bus.get_dropped_count() != 0:
+		_fail("dropped count should be 0 for a gated (not dropped) event, got %d" % bus.get_dropped_count())
+		return
+	if bus.get_event_count() != events_before + 1:
+		_fail("gated event should still be appended to the log, event_count=%d expected %d" % [bus.get_event_count(), events_before + 1])
 		return
 
 	# A base-skill event (scavenge_container -> scavenging) always grants.
 	var r2: Variant = bus.emit("scavenge_container", "", prog)
 	if r2 == null:
 		_fail("base-skill event should NOT be dropped")
+		return
+	if bool((r2 as Dictionary).get("gated", false)):
+		_fail("base-skill event should not be gated")
 		return
 	if prog.get_skill_xp("scavenging") <= 0:
 		_fail("scavenging should have gained XP")
@@ -74,11 +87,14 @@ func _initialize() -> void:
 	if r3 == null:
 		_fail("unlocked surgery event should grant (returned null)")
 		return
+	if bool((r3 as Dictionary).get("gated", false)):
+		_fail("unlocked surgery record should have gated=false")
+		return
 	if prog.get_skill_xp("surgery") <= before_surgery:
 		_fail("unlocked surgery should have gained XP")
 		return
 
-	print("TRAINING GATE PASS gated=true drop=1 unlock_grants=true")
+	print("TRAINING GATE PASS gated=true drop=0 unlock_grants=true gated_logged=true")
 	quit(0)
 
 func _fail(reason: String) -> void:

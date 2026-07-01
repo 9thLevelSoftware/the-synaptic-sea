@@ -58,16 +58,41 @@ func _initialize() -> void:
 	if prog.get_skill_xp("scavenging") <= xp_before:
 		_fail("away kill should have granted scavenging XP")
 		return
-	# The live-wired advanced subject: fabricate_part -> fabrication is DROPPED while
+	# The live-wired advanced subject: fabricate_part -> fabrication is GATED while
 	# the Fabrication node is locked (this is exactly what _on_field_craft_completed
-	# emits). Unlock it and the same event grants — proving the gate controls a real
-	# gameplay action, not an inert path.
-	if bus.emit("fabricate_part", "field_bench", prog) != null:
-		_fail("locked fabrication should be gated (field-craft training subject)")
+	# emits). The gate suppresses XP only — the event is still logged so run-end
+	# unlock-trigger persistence sees it fire (PR #55 Codex P1). Unlock the node and
+	# the same event grants XP — proving the gate controls a real gameplay action,
+	# not an inert path.
+	var fabrication_xp_before: int = prog.get_skill_xp("fabrication")
+	var r_gated: Variant = bus.emit("fabricate_part", "field_bench", prog)
+	if r_gated == null:
+		_fail("locked fabrication event should still return a logged record (gated, not dropped)")
+		return
+	if not bool((r_gated as Dictionary).get("gated", false)):
+		_fail("locked fabrication record should have gated=true")
+		return
+	if prog.get_skill_xp("fabrication") != fabrication_xp_before:
+		_fail("locked fabrication should have gained no XP")
+		return
+	var logged_gated_event: bool = false
+	for entry in bus.get_log():
+		if str((entry as Dictionary).get("event_id", "")) == "fabricate_part" and bool((entry as Dictionary).get("gated", false)):
+			logged_gated_event = true
+			break
+	if not logged_gated_event:
+		_fail("gated fabricate_part event should be present in bus.get_log()")
 		return
 	tree.unlock("fabrication")
-	if bus.emit("fabricate_part", "field_bench", prog) == null:
+	var r_unlocked: Variant = bus.emit("fabricate_part", "field_bench", prog)
+	if r_unlocked == null:
 		_fail("unlocked fabrication should train from a field craft")
+		return
+	if bool((r_unlocked as Dictionary).get("gated", false)):
+		_fail("unlocked fabrication record should have gated=false")
+		return
+	if prog.get_skill_xp("fabrication") <= fabrication_xp_before:
+		_fail("unlocked fabrication should have gained XP")
 		return
 
 	# 3) Class selection persists.
@@ -79,7 +104,7 @@ func _initialize() -> void:
 		_fail("selected class did not persist")
 		return
 
-	print("PROGRESSION META CLOSURE PASS away_ticks=%d hub_bonus=1 gate=held class_persist=true" % away_ticks)
+	print("PROGRESSION META CLOSURE PASS away_ticks=%d hub_bonus=1 gate=held gated_logged=true class_persist=true" % away_ticks)
 	quit(0)
 
 func _fail(reason: String) -> void:

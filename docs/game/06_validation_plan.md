@@ -166,14 +166,14 @@ run_clean 'Domain 5 ammo magazine away-branch smoke' 'AMMO MAGAZINE PASS away_ti
 run_clean 'Domain 5 consumables away tick smoke' 'CONSUMABLES AWAY TICK PASS away_ticks=20 stim_decayed=true addiction_ticked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/consumables_away_tick_smoke.gd
 run_clean 'Domain 5 sealed hatch node smoke' 'SEALED HATCH NODE PASS locked=true opened=true collision_off=true signalled=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sealed_hatch_node_smoke.gd
 run_clean 'Domain 5 flare steady sanity smoke' 'FLARE STEADY PASS drain_no_flare=15.000 drain_flare=7.500 steadier=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/flare_steady_smoke.gd
-run_clean 'Domain 6 training gate model smoke' 'TRAINING GATE PASS gated=true drop=1 unlock_grants=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/training_gate_smoke.gd
+run_clean 'Domain 6 training gate model smoke' 'TRAINING GATE PASS gated=true drop=0 unlock_grants=true gated_logged=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/training_gate_smoke.gd
 run_clean 'Domain 6 class catalog data smoke' 'CLASS CATALOG PASS base=8 unlockable=3 registry_class_ids=ok' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/class_catalog_smoke.gd
 run_clean 'Domain 6 class gate config smoke' 'CLASS GATE CONFIG PASS available_gate=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/class_gate_config_smoke.gd
 run_clean 'Domain 6 repair ingest smoke' 'REPAIR INGEST PASS bus_xp=120 single_grant=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_ingest_smoke.gd
 run_clean 'Domain 6 meta progression state smoke' 'META PROGRESSION STATE PASS payout=39 unlocks=true persistence=true reset=true selected_class=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_progression_state_smoke.gd
 run_clean 'Domain 6 player progression full smoke' 'PLAYER PROGRESSION FULL PASS classes=11 cross_training=true books=true meta_payout=70 unlocks=true panels=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_progression_full_smoke.gd
 run_clean 'Domain 6 interactive meta-screens smoke' 'META SCREENS INTERACTIVE PASS hub_purchase=true skill_unlock=true registry_reader=true class_select=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_screens_interactive_smoke.gd
-run_clean 'Domain 6 progression meta closure smoke' 'PROGRESSION META CLOSURE PASS away_ticks=1 hub_bonus=1 gate=held class_persist=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/progression_meta_smoke.gd
+run_clean 'Domain 6 progression meta closure smoke' 'PROGRESSION META CLOSURE PASS away_ticks=1 hub_bonus=1 gate=held gated_logged=true class_persist=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/progression_meta_smoke.gd
 echo 'SYNAPTIC_SEA REGRESSION PASS commands=104 clean_output=true'
 ```
 

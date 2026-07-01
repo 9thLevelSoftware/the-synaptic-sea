@@ -85,6 +85,16 @@ func get_class_id(unlock_id: String) -> String:
 		return ""
 	return str(_catalog_by_id[unlock_id].get("class_id", ""))
 
+## True when a catalog row's (event,target) matches a fired (event,target).
+## Row-side "*" AND "any" are wildcards matching any fired target (unlock_tables
+## encodes wildcard rows as "any"). PR #55 Codex P1.
+func _trigger_matches(row_event: String, row_target: String, fired_event: String, fired_target: String) -> bool:
+	if row_event != fired_event:
+		return false
+	if row_target == "*" or row_target == "any":
+		return true
+	return row_target == fired_target
+
 ## Returns the class_ids of ALL class-category catalog rows whose trigger matches
 ## (event,target), unlocking each in the registry (idempotent). The run-end bridge
 ## uses this so a class unlock is not starved when a codex row shares the trigger
@@ -93,14 +103,11 @@ func class_ids_for_trigger(trigger_event: String, trigger_target: String) -> Arr
 	var out: Array = []
 	if trigger_event.is_empty():
 		return out
-	var exact: String = "%s|%s" % [trigger_event, trigger_target]
-	var wild: String = "%s|*" % trigger_event
 	for uid in _catalog_by_id:
 		var entry: Dictionary = _catalog_by_id[uid]
 		if str(entry.get("category", "")) != "class":
 			continue
-		var key: String = "%s|%s" % [str(entry.get("trigger_event", "")), str(entry.get("trigger_target", ""))]
-		if key == exact or key == wild:
+		if _trigger_matches(str(entry.get("trigger_event", "")), str(entry.get("trigger_target", "")), trigger_event, trigger_target):
 			unlock(uid)
 			var cls: String = str(entry.get("class_id", ""))
 			if not cls.is_empty():
@@ -128,15 +135,12 @@ func unlock(unlock_id: String) -> bool:
 func unlock_for_trigger(trigger_event: String, trigger_target: String) -> String:
 	if trigger_event.is_empty():
 		return ""
-	var exact: String = "%s|%s" % [trigger_event, trigger_target]
-	var wild: String = "%s|*" % trigger_event
 	var resolved: String = ""
 	for uid in _catalog_by_id:
 		var entry: Dictionary = _catalog_by_id[uid]
 		var evt: String = str(entry.get("trigger_event", ""))
 		var tgt: String = str(entry.get("trigger_target", ""))
-		var key: String = "%s|%s" % [evt, tgt]
-		if key == exact or key == wild:
+		if _trigger_matches(evt, tgt, trigger_event, trigger_target):
 			if unlock(uid):
 				resolved = uid
 				break

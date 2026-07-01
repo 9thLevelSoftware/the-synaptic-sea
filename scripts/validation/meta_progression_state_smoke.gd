@@ -148,17 +148,20 @@ func _initialize() -> void:
 		_fail("second trigger should either no-op or unlock a different valid id; got %s" % u2)
 		return
 
-	# P1 regression: unlock_for_trigger only ever returns the FIRST matching
-	# catalog row (the codex row, e.g. codex_scavenging_intro), which starves
-	# any class-category row sharing the same trigger (class_unlock_salvage_captain).
-	# class_ids_for_trigger must still surface every class row for the trigger,
-	# independent of what unlock_for_trigger already consumed.
+	# P1 regression (PR #55 Codex D): unlock_for_trigger only ever returns the
+	# FIRST matching catalog row (the codex row, e.g. codex_scavenging_intro),
+	# which starves any class-category row sharing the same trigger
+	# (class_unlock_salvage_captain). class_ids_for_trigger must still surface
+	# every class row for the trigger, independent of what unlock_for_trigger
+	# already consumed. Use a CONCRETE fired target ("cargo_hold_crate", not
+	# "any") — the catalog row's trigger_target is "any", which must now be
+	# treated as a ROW-SIDE wildcard matching any real logged target.
 	var unlock_cls = UnlockRegistryScript.new()
 	unlock_cls.configure(catalog_parsed)
-	unlock_cls.unlock_for_trigger("scavenge_container", "any")
-	var bridged_classes: Array = unlock_cls.class_ids_for_trigger("scavenge_container", "any")
+	unlock_cls.unlock_for_trigger("scavenge_container", "cargo_hold_crate")
+	var bridged_classes: Array = unlock_cls.class_ids_for_trigger("scavenge_container", "cargo_hold_crate")
 	if not bridged_classes.has("salvage_captain"):
-		_fail("class_ids_for_trigger(scavenge_container, any) missing salvage_captain: %s" % str(bridged_classes))
+		_fail("class_ids_for_trigger(scavenge_container, cargo_hold_crate) missing salvage_captain: %s" % str(bridged_classes))
 		return
 
 	# Round-trip via to_dict / apply_summary.
