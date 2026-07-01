@@ -17,6 +17,5 @@
   "utility_flare": { "kind": "add_status", "status_id": "utility_flare", "duration": 30.0, "stacks": 1 },
   "utility_lockpick": { "kind": "add_status", "status_id": "utility_lockpick_ready", "duration": 20.0, "stacks": 1 },
   "utility_hack_chip": { "kind": "add_status", "status_id": "utility_hack_chip_ready", "duration": 20.0, "stacks": 1 },
-  "pistol_rounds_small": { "kind": "ammo_reserve", "ammo_kind": "pistol", "amount": 12 },
-  "shells_small": { "kind": "ammo_reserve", "ammo_kind": "shell", "amount": 6 }
+  "heatpack": { "kind": "temperature_delta", "amount": 8.0 }
 }

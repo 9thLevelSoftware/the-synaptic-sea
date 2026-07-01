@@ -66,6 +66,10 @@ var objective_controller = null          # DerelictObjectiveController | null
 # Salvage-point loot reuses the objective `completed` flag, so it is not listed here.
 var looted_container_ids: Array = []
 
+# Domain 5: ids of sealed hatches already bypassed on this ship. Persisted so a
+# revisited derelict remembers which passages are already open.
+var bypassed_hatch_ids: Array = []
+
 # Task 06: per-ship combat/threat persistence. The live ThreatManager node belongs to
 # the coordinator; this summary lets traveled ships free/rebuild scene roots without
 # losing threat positions, detection memory, or the last combat result.
@@ -121,6 +125,8 @@ func get_summary() -> Dictionary:
 		result["objective"] = objective_controller.get_summary()
 	if not looted_container_ids.is_empty():
 		result["looted_containers"] = looted_container_ids.duplicate()
+	if not bypassed_hatch_ids.is_empty():
+		result["bypassed_hatches"] = bypassed_hatch_ids.duplicate()
 	if not combat_summary.is_empty():
 		result["combat"] = combat_summary.duplicate(true)
 	if access != null:
@@ -170,6 +176,11 @@ func apply_summary(summary) -> bool:
 		looted_container_ids = []
 		for cid in (looted_variant as Array):
 			looted_container_ids.append(String(cid))
+	var bypassed_variant: Variant = summary.get("bypassed_hatches", null)
+	if typeof(bypassed_variant) == TYPE_ARRAY:
+		bypassed_hatch_ids = []
+		for hid in (bypassed_variant as Array):
+			bypassed_hatch_ids.append(String(hid))
 	var combat_variant: Variant = summary.get("combat", null)
 	if typeof(combat_variant) == TYPE_DICTIONARY:
 		combat_summary = (combat_variant as Dictionary).duplicate(true)

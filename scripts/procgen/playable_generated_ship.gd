@@ -106,6 +106,7 @@ const StimulantStateScript := preload("res://scripts/systems/stimulant_state.gd"
 const AddictionStateScript := preload("res://scripts/systems/addiction_state.gd")
 const AmmoStateScript := preload("res://scripts/systems/ammo_state.gd")
 const UtilityItemResolverScript := preload("res://scripts/systems/utility_item_resolver.gd")
+const SealedHatchScript := preload("res://scripts/interaction/sealed_hatch.gd")
 
 signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
@@ -153,6 +154,7 @@ const WEB_INFESTATION_CONFIG_PATH: String = "res://data/ship_systems/web_infesta
 const FACILITY_UPGRADES_CONFIG_PATH: String = "res://data/ship_systems/facility_upgrades.json"
 const HYDROPONICS_CROPS_CONFIG_PATH: String = "res://data/crops/hydroponics_crops.json"
 const SHIP_SUBSYSTEM_TUNING_PATH: String = "res://data/ship_systems/subsystem_tuning.json"
+const SEALED_HATCH_COUNT: int = 2
 
 # Objective bridge: which manager subcomponents each objective brings operational.
 # restore_systems delivers main power (distribution + battery); stabilize_reactor
@@ -248,6 +250,9 @@ var derelict_interactables: Array = []
 # Sub-project #3: scattered loot containers for the active derelict.
 var loot_container_root: Node3D = null
 var loot_containers: Array = []
+# Domain 5: sealed hatches on the active derelict (locked passages the player bypasses
+# with utility flags: lockpick for mechanical, hack_chip for electronic).
+var sealed_hatches: Array = []
 # Sub-project #4: timed repair points for damaged subcomponents.
 var repair_point_root: Node3D = null
 var repair_points: Array = []
@@ -441,6 +446,7 @@ const DEFAULT_INTERACT_BINDINGS: Array[Key] = [KEY_E, KEY_ENTER, KEY_SPACE, KEY_
 const DEFAULT_SAVE_RUN_BINDINGS: Array[Key] = [KEY_F5]
 const DEFAULT_LOAD_RUN_BINDINGS: Array[Key] = [KEY_F9]
 const DEFAULT_ATTACK_BINDINGS: Array[Key] = [KEY_F]
+const DEFAULT_RELOAD_BINDINGS: Array[Key] = [KEY_R]
 const DEFAULT_CROUCH_BINDINGS: Array[Key] = [KEY_CTRL]
 
 func ensure_default_input_actions() -> void:
@@ -448,6 +454,7 @@ func ensure_default_input_actions() -> void:
 		_ensure_key_action_set(action_name, DEFAULT_MOVE_BINDINGS[action_name])
 	_ensure_key_action_set("interact", DEFAULT_INTERACT_BINDINGS)
 	_ensure_key_action_set("attack_primary", DEFAULT_ATTACK_BINDINGS)
+	_ensure_key_action_set("reload_weapon", DEFAULT_RELOAD_BINDINGS)
 	_ensure_key_action_set("crouch", DEFAULT_CROUCH_BINDINGS)
 	# ADR-0038: emergency field crafting bound to C (previously unbound).
 	_ensure_key_action_set("field_craft", [KEY_C])
@@ -1923,6 +1930,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	current_occupancy = piloted_ship if piloted_ship != null else inst
 	_build_derelict_objectives()
 	_build_loot_containers()
+	_build_sealed_hatches()
 	_build_repair_points()
 	_build_breach_seal_points()
 	# Derelict-side fire: per-ship pre-seeded environmental fire (presence-gated, capped).
@@ -2561,6 +2569,45 @@ func _clear_loot_containers() -> void:
 	# only holds home-ship containers. The derelict containers are freed when
 	# scene_root is freed on departure — just clear the reference array.
 	loot_containers.clear()
+
+## Domain 5: seeds locked passage hatches on the active derelict, deterministically
+## per ship marker_id. Two hatches alternate mechanical/electronic lock kind.
+## No-op when not away_from_start (hatches are derelict-only) or no positions exist.
+func _build_sealed_hatches() -> void:
+	_clear_sealed_hatches()
+	if current_ship == null:
+		return
+	if not away_from_start:
+		return
+	var positions: Array = _distributed_room_positions()
+	if positions.is_empty():
+		return
+	var bypassed: Array = current_ship.bypassed_hatch_ids
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(String(current_ship.marker_id))
+	var count: int = mini(SEALED_HATCH_COUNT, positions.size())
+	for i in range(count):
+		var idx: int = (int(rng.randi()) + i * 7) % positions.size()
+		var pos_variant: Variant = positions[idx]
+		if typeof(pos_variant) != TYPE_VECTOR3:
+			continue
+		var hid: String = "%s:hatch_%d" % [String(current_ship.marker_id), i]
+		var lock_kind: String = SealedHatchScript.MECHANICAL if (i % 2 == 0) else SealedHatchScript.ELECTRONIC
+		var hatch = SealedHatchScript.new()
+		hatch.configure(hid, lock_kind, pos_variant, 1.8)
+		if bypassed.has(hid):
+			hatch.set_bypassed(true)
+		if not hatch.hatch_bypassed.is_connected(_on_hatch_bypassed):
+			hatch.hatch_bypassed.connect(_on_hatch_bypassed)
+		if current_ship != null and is_instance_valid(current_ship.scene_root):
+			current_ship.scene_root.add_child(hatch)
+		sealed_hatches.append(hatch)
+
+func _clear_sealed_hatches() -> void:
+	for h in sealed_hatches:
+		if is_instance_valid(h):
+			h.queue_free()
+	sealed_hatches.clear()
 
 ## Builds repair points for every currently-damaged subcomponent of the active ship,
 ## distributing them across the ship's rooms. Works for the lifeboat (home) and derelicts.
@@ -3527,6 +3574,35 @@ func _on_loot_container_searched(container_id: String, granted: Array) -> void:
 	print("LOOT CONTAINER SEARCHED marker=%s container=%s granted=%d" % [
 		String(current_ship.marker_id) if current_ship != null else "", container_id, granted.size()])
 
+## Domain 5: a sealed hatch was bypassed. Consumes the matching utility flag, removes
+## any associated status effect, and records the bypass for per-ship persistence.
+func _on_hatch_bypassed(hatch_id: String, lock_kind: String) -> void:
+	var flag: String = "lockpick" if lock_kind == SealedHatchScript.MECHANICAL else "hack_chip"
+	var depleted: bool = false
+	if utility_item_state != null:
+		depleted = utility_item_state.consume_flag(flag)
+	# Only clear the ready-status when all charges of this flag are spent; stacked
+	# lockpick/hack_chip sets should retain the status until the last charge fires.
+	if depleted and status_effects_state != null and status_effects_state.has_method("remove_effect"):
+		status_effects_state.remove_effect("utility_%s_ready" % flag, 9999)
+	# Track for persistence so a revisited derelict remembers the open hatch.
+	if current_ship != null and not current_ship.bypassed_hatch_ids.has(hatch_id):
+		current_ship.bypassed_hatch_ids.append(hatch_id)
+	_refresh_inventory_hud()
+
+## Domain 5: attempts to bypass the nearest unblocked sealed hatch using the player's
+## active utility flags. Returns true iff a hatch was opened.
+func _try_bypass_nearest_hatch() -> bool:
+	if not is_instance_valid(player):
+		return false
+	for h in sealed_hatches:
+		if not is_instance_valid(h) or h.bypassed:
+			continue
+		var res: Dictionary = h.try_bypass(player, utility_item_state.active_flags if utility_item_state != null else {})
+		if bool(res.get("ok", false)):
+			return true
+	return false
+
 ## Domain 2 (BP3): a threat died — grant XP through the progression bus and spawn a
 ## lootable corpse container at its position (reusing the closed loot/interact path).
 ## Runs on BOTH _process branches (the signal fires from tick_threats, called on the
@@ -3764,6 +3840,7 @@ func travel_home() -> bool:
 	_clear_fire_suppression_points()
 	_clear_extinguisher_recharge_port()
 	_build_loot_containers()
+	_build_sealed_hatches()
 	_build_repair_points()
 	_build_breach_seal_points()
 	# M7-B Task 7: returning home rebuilds interactables — re-seed/render fire.
@@ -4125,13 +4202,14 @@ func _attack_with_equipped_weapon() -> Dictionary:
 	var weapon_id: String = _equipped_primary_weapon_id()
 	if weapon_id.is_empty():
 		weapon_id = "crowbar"
-	var result: Dictionary = threat_manager.attack_with_weapon(weapon_id, inventory_state, equipment_state)
+	var result: Dictionary = threat_manager.attack_with_weapon(weapon_id, inventory_state, equipment_state, ammo_state)
 	if bool(result.get("ok", false)):
 		_refresh_inventory_hud()
 		_refresh_player_vitals(0.0)
 		_sync_current_ship_combat_summary()
-	# ADR-0042: a swing also dissipates a phantom within reach. Ammo was already spent by
-	# attack_with_weapon (even on a no_target result) — that is the wasted-action teeth.
+	# ADR-0042: a swing also dissipates a phantom within reach. On an empty magazine
+	# the shot is a dry-fire click (no round spent) but the swing still counts as the
+	# wasted-action teeth.
 	if hallucination_manager != null and is_instance_valid(hallucination_manager):
 		var ppos: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
 		if hallucination_manager.dissipate_phantom_in_range(ppos):
@@ -4140,6 +4218,27 @@ func _attack_with_equipped_weapon() -> Dictionary:
 			_refresh_inventory_hud()
 	_refresh_weapon_hotbar()
 	return result
+
+## Domain 5: begin a timed reload for the currently equipped ranged weapon. Debits
+## reload_target rounds from inventory immediately; AmmoState credits the magazine on
+## completion (after RELOAD_SECONDS). Melee weapons (no ammo_item_id) are no-ops.
+func _begin_weapon_reload() -> void:
+	if ammo_state == null or ammo_state.is_reloading() or threat_manager == null:
+		return
+	var weapon_id: String = _equipped_primary_weapon_id()
+	if weapon_id.is_empty():
+		return
+	var weapon: Dictionary = threat_manager.weapon_definitions.get(weapon_id, {}) if threat_manager.weapon_definitions.get(weapon_id, {}) is Dictionary else {}
+	var ammo_item_id: String = str(weapon.get("ammo_item_id", ""))
+	if ammo_item_id.is_empty():
+		return  # melee: no reload
+	var mag_size: int = int(weapon.get("magazine_size", 0))
+	var reserve: int = inventory_state.get_quantity(ammo_item_id) if inventory_state != null else 0
+	if ammo_state.begin_reload(weapon_id, mag_size, reserve):
+		if inventory_state != null:
+			inventory_state.remove_item(ammo_item_id, ammo_state.reload_target)  # commit reserve
+		_refresh_inventory_hud()
+		_refresh_weapon_hotbar()
 
 ## Domain 2 (BP2): a derived "is the player in a lit area" signal. A powered ship is
 ## lit (player more visible); an unpowered/derelict ship is dark (stealthier). Uses
@@ -4359,6 +4458,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_build_arc_zone()
 	_refresh_arc_state(true)
 	_build_loot_containers()
+	_build_sealed_hatches()
 	_build_repair_points()
 	_build_breach_seal_points()
 	# M7-B Task 7: genuine fresh build — seed fires from already-damaged systems,
@@ -4601,6 +4701,9 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		for lc in loot_containers:
 			if is_instance_valid(lc) and lc.try_interact(player_body):
 				return
+		# Domain 5: sealed hatch bypass (lockpick/hack_chip flag required).
+		if _try_bypass_nearest_hatch():
+			return
 		# Sub-project #2: the boarded derelict has its own objective interactables.
 		for it in derelict_interactables:
 			if is_instance_valid(it) and it.try_interact(player_body):
@@ -5022,6 +5125,7 @@ func _process(delta: float) -> void:
 		# below (Domain 1 Task 6: shared helper now covers the full vitals + death cascade).
 		if sanity_state != null:
 			sanity_state.in_safe_zone = false
+			sanity_state.steady_multiplier = 0.5 if (status_effects_state != null and status_effects_state.has_effect("utility_flare")) else 1.0
 			sanity_state.tick(delta)
 			if hallucination_director != null:
 				hallucination_director.tick(delta, {
@@ -5076,6 +5180,16 @@ func _process(delta: float) -> void:
 		# _tick_food_runtime). Powered station crafting also advances on both branches
 		# via _recompute_expanded_ship_systems called above (ADR-0038 superseded).
 		_tick_food_runtime(delta)
+		# Domain 5: tick the reload timer on the away branch (derelict = primary combat context).
+		if ammo_state != null and not ammo_state.tick(delta).is_empty():
+			_refresh_weapon_hotbar()
+		# Domain 5: stimulant buff timers + addiction withdrawal/tolerance decay advance
+		# on the derelict branch too (item USE already worked away; only per-frame decay
+		# was home-only). Shared with the home block at the bottom of _process.
+		if stimulant_state != null:
+			stimulant_state.tick(delta, addiction_state, _consumable_pipeline_context())
+		if addiction_state != null:
+			addiction_state.tick(delta, status_effects_state)
 		return
 	if not playable_started or slice_complete:
 		return
@@ -5103,12 +5217,16 @@ func _process(delta: float) -> void:
 		stimulant_state.tick(delta, addiction_state, _consumable_pipeline_context())
 	if addiction_state != null:
 		addiction_state.tick(delta, status_effects_state)
+	# Domain 5: tick the reload timer on the home branch too (symmetry with away branch).
+	if ammo_state != null and not ammo_state.tick(delta).is_empty():
+		_refresh_weapon_hotbar()
 	# REQ-SV / Domain 1: survival attrition + stakes (shared by both branches).
 	_tick_survival_attrition(delta)
 	if sanity_state != null:
 		# Synaptic Sea field = not in a safe zone (away_from_start or breach open)
 		var in_safe: bool = not away_from_start and (oxygen_state == null or not oxygen_state.get_summary().get("breach_open", false))
 		sanity_state.in_safe_zone = in_safe
+		sanity_state.steady_multiplier = 0.5 if (status_effects_state != null and status_effects_state.has_effect("utility_flare")) else 1.0
 		sanity_state.tick(delta)
 		# ADR-0042: drive sanity hallucinations from the post-tick sanity value.
 		if hallucination_director != null:
@@ -6784,6 +6902,7 @@ func _apply_world_snapshot(ws) -> bool:
 		_spawn_cart_controls_for_ship(home_ship)
 		if not away_from_start:
 			_build_loot_containers()
+			_build_sealed_hatches()
 	# 1c. Restore player equipment (player-global — runs regardless of home_ship branch).
 	#     Loading restores the EXACT saved state: a non-empty snapshot is applied; an EMPTY
 	#     snapshot (older save, or nothing was worn) clears any currently-worn gear so
@@ -7140,6 +7259,7 @@ func _reset_runtime_for_reload() -> void:
 		_clear_loot_containers()
 		_clear_repair_points()
 		_clear_breach_seal_points()
+		_clear_sealed_hatches()
 	# Allow _on_ship_loaded to re-wrap the freshly-reloaded starting ship on
 	# every reload (home-save or away-save). Previously this was only inside
 	# `if away_from_start` — but when saving at home current_ship was never
@@ -7373,6 +7493,10 @@ func _input(event: InputEvent) -> void:
 			return
 	if event.is_action_pressed("attack_primary"):
 		_attack_with_equipped_weapon()
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("reload_weapon"):
+		_begin_weapon_reload()
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("save_run"):

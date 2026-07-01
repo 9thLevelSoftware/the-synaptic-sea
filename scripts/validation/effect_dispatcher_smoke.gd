@@ -53,12 +53,7 @@ func _initialize() -> void:
 	if not bool(cure.get("ok", false)) or statuses.has_effect("radiation_sickness"):
 		_fail("cure_radiation_sickness did not clear status")
 		return
-	var rounds := dispatcher.dispatch_effect("pistol_rounds_small", context)
-	if not bool(rounds.get("ok", false)) or ammo.get_reserve("pistol") != 12:
-		_fail("pistol_rounds_small did not add ammo")
-		return
-
-	print("EFFECT DISPATCHER PASS health=68 sanity=48 radiation=40 ammo=12 status=stim_focus")
+	print("EFFECT DISPATCHER PASS health=68 sanity=48 radiation=40 status=stim_focus")
 	quit(0)
 
 func _fail(reason: String) -> void:

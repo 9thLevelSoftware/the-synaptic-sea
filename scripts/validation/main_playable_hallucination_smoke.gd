@@ -80,10 +80,11 @@ func _validate() -> void:
 	_arm_ammo_weapon()
 	_park_player_on_phantom(manager)
 	var before_phantoms: int = manager.phantom_count()
-	var ammo_before := int(playable.inventory_state.get_quantity(_ammo_id()))
+	# Domain 5: attack fires from the magazine (AmmoState), not raw inventory.
+	var ammo_before: int = playable.ammo_state.loaded("flare_pistol")
 	var result: Dictionary = playable._attack_with_equipped_weapon()
 	var attack_dissipates: bool = manager.phantom_count() < before_phantoms and bool(result.get("phantom_dissipated", false))
-	attack_dissipates = attack_dissipates and int(playable.inventory_state.get_quantity(_ammo_id())) < ammo_before
+	attack_dissipates = attack_dissipates and playable.ammo_state.loaded("flare_pistol") < ammo_before
 
 	# No-respawn (commit-to-reveal): a dissipated phantom must NOT reappear next frame.
 	# Regression guard for the director-event-not-removed bug — without remove_event the
@@ -158,9 +159,11 @@ func _ammo_id() -> String:
 
 func _arm_ammo_weapon() -> void:
 	# flare_pistol is a real primary_hand weapon with ammo_item_id == "flare_round"
-	# (data/combat/weapon_definitions.json). attack_with_weapon spends the ammo
-	# BEFORE the target check, so a swing at a phantom is a wasted real action.
+	# (data/combat/weapon_definitions.json). Domain 5: attack_with_weapon fires from
+	# the per-weapon magazine (AmmoState). We pre-seed 2 rounds so the attack can
+	# spend one even against a phantom (no real target) — a swing is a wasted action.
 	playable.inventory_state.add_item(_ammo_id(), 5)
+	playable.ammo_state.configure({"magazines": {"flare_pistol": 2}})
 	if playable.equipment_state != null and playable.equipment_state.has_method("equip"):
 		playable.equipment_state.equip("flare_pistol")
 

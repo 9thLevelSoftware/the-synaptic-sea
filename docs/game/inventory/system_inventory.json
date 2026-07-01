@@ -93,13 +93,13 @@
       "driven": true,
       "driven_at": "playable_generated_ship.gd:4887",
       "input": {
-        "live": false,
-        "desc": "in_extreme_zone = away_from_start is assigned at 4886 INSIDE the home branch where away_from_start is always false, so it is never true when tick (4887) runs; no temperature-delta consumable content exists. Temperature always recovers to safe range.",
-        "at": null
+        "live": true,
+        "desc": "temperature_delta consumable (heatpack effect, amount=8.0) dispatches adjust_temperature via effect_dispatcher.gd:59; in_extreme_zone also ticks on BOTH branches via _tick_survival_attrition (in_hazard_env = away_from_start OR breach_open)",
+        "at": "effect_dispatcher.gd:59; playable_generated_ship.gd:4886"
       },
       "output": {
         "live": true,
-        "desc": "get_thirst_multiplier() (4837) fed as temperature_thirst_mult into vitals.tick (4854); consumer is real but value is permanently 1.0 because input is dead",
+        "desc": "get_thirst_multiplier() (4837) fed as temperature_thirst_mult into vitals.tick (4854); multiplier is non-neutral when temperature is elevated (heatpack raises temperature by 8.0; in_extreme_zone on derelict branches further drives temperature above safe range)",
         "at": "playable_generated_ship.gd:4837"
       },
       "confidence": "V",
@@ -109,16 +109,16 @@
       "integrations": [
         {
           "to": "vitals_state",
-          "via": "temperature_thirst_mult into vitals.tick (always neutral 1.0)",
+          "via": "temperature_thirst_mult into vitals.tick; multiplier varies with body temperature (live on home and away branches via _tick_survival_attrition)",
           "at": "playable_generated_ship.gd:4854",
-          "health": "weak"
+          "health": "healthy"
         }
       ],
       "content": "partial",
-      "content_note": "In-code safe-range/drain constants; no extreme-zone source content and no temp-delta consumable items, so the authored content cannot exercise it.",
+      "content_note": "In-code safe-range/drain constants. heatpack effect (effect_definitions.json: kind temperature_delta amount 8.0) now exercises the adjust_temperature path. in_extreme_zone driven by in_hazard_env (away_from_start OR breach_open) in _tick_survival_attrition, both branches.",
       "functional": null,
       "gaps": [
-        "body_temperature_state.in_extreme_zone is driven by in_hazard_env (away_from_start OR breach) inside _tick_survival_attrition, which ticks on both branches — the temperature->thirst coupling engages in hazardous derelict zones (Domain 1)."
+        "temperature->thirst coupling engages in hazardous derelict zones; heatpack effect is functional. Natural temperature recovery means the derelict extreme-zone path is the primary live consumer."
       ],
       "subsystems": []
     },
@@ -2051,30 +2051,21 @@
         },
         {
           "to": "body_temperature_state",
-          "via": "temperature_delta -> adjust_temperature; CODE PATH ONLY — no effect definition uses kind temperature_delta, so never driven by data",
+          "via": "temperature_delta -> adjust_temperature (live: heatpack exercises this path)",
           "at": "effect_dispatcher.gd:59",
-          "health": "weak"
+          "health": "healthy"
         },
         {
           "to": "status_effects_state",
           "via": "add_status/cure_status -> add_effect/remove_effect",
           "at": "effect_dispatcher.gd:68",
           "health": "healthy"
-        },
-        {
-          "to": "ammo_state",
-          "via": "ammo_reserve -> add_ammo (sink only consumed for HUD/save)",
-          "at": "effect_dispatcher.gd:90",
-          "health": "weak"
         }
       ],
       "content": "partial",
-      "content_note": "CORRECTIONS to proposed note: effect_definitions.json defines 21 effects (not 20), spanning only 6 of the 7 dispatch kinds — there is NO temperature_delta effect, so the body_temperature_state branch is dead from the data side. Orphan effect ids ARE present: ammo_definitions.json references flare_burn and shock_jolt which have no entry in effect_definitions.json (dispatch returns unknown_effect).",
+      "content_note": "effect_definitions.json defines 19 effects covering all 6 dispatch kinds (vitals_delta, sanity_delta, radiation_delta, temperature_delta, add_status, cure_status). temperature_delta is now exercised by the heatpack effect. The former ammo_reserve dispatch kind has been removed from the dispatcher entirely (ammo_definitions.json deleted; per-weapon magazine model replaces the old reserve sink).",
       "functional": null,
-      "gaps": [
-        "no effect definition exercises kind temperature_delta (body_temperature_state dispatch branch unreachable from catalog)",
-        "ammo defs reference orphan effect ids flare_burn/shock_jolt (undefined) -> dispatch returns unknown_effect for flare/shock packs"
-      ],
+      "gaps": [],
       "subsystems": []
     },
     {
@@ -2240,8 +2231,8 @@
       },
       "output": {
         "live": true,
-        "desc": "dispatches each utility effect through the shared dispatcher (utility_item_resolver.gd:25) — repair_foam->heal_small reaches live vitals, flare/lockpick/hack add live statuses; also records active_flags. Effect dispatch side is live; the utility_flag bypass semantics are a sink.",
-        "at": "utility_item_resolver.gd:25"
+        "desc": "dispatches each utility effect through the shared dispatcher (utility_item_resolver.gd:25); utility_flare adds status -> coordinator reads has_effect('utility_flare') -> sanity_state.steady_multiplier=0.5 on BOTH _process branches (playable_generated_ship.gd:5128 away / 5229 home); lockpick/hack_chip consume_flag via _on_hatch_bypassed (coordinator:3583) when SealedHatch.try_bypass succeeds; repair_foam->heal_small reaches live vitals.",
+        "at": "utility_item_resolver.gd:25; playable_generated_ship.gd:5128,5229,3583"
       },
       "confidence": "V",
       "loops": [
@@ -2262,40 +2253,45 @@
         },
         {
           "to": "status_effects_state",
-          "via": "utility_flare/lockpick/hack add_status -> add_effect (statuses added but no modifier/consumer reads them)",
+          "via": "utility_flare/lockpick/hack add_status -> add_effect (flare read by sanity steady_multiplier both branches; lockpick/hack consumed at SealedHatch bypass)",
           "at": "effect_dispatcher.gd:68",
-          "health": "weak"
+          "health": "healthy"
+        },
+        {
+          "to": "sanity_state",
+          "via": "utility_flare has_effect -> steady_multiplier=0.5 halves sanity drain (BOTH _process branches)",
+          "at": "playable_generated_ship.gd:5128,5229",
+          "health": "healthy"
         }
       ],
       "content": "partial",
       "content_note": "utility_item_definitions.json has 4 items (flare, lockpick_set, hack_chip, repair_foam); all effect ids exist in effect_definitions.json. Covered by consumable_state_smoke.gd:85-88 (flare use + active_flags assertion) and consumable_save_load_smoke.gd.",
       "functional": null,
       "gaps": [
-        "No dedicated *_state_smoke.gd (covered via consumable_state_smoke).",
-        "utility_flag bypass loop is hollow: active_flags and the utility_lockpick_ready/utility_hack_chip_ready statuses are written and persisted but no gameplay system reads them (use_notes promise hatch/terminal bypass that is not wired). Only repair_foam's heal_small has a real live effect."
+        "No dedicated *_state_smoke.gd (covered via consumable_state_smoke, sealed_hatch_node_smoke, flare_steady_smoke)."
       ],
       "subsystems": []
     },
     {
       "id": "ammo_state",
       "file": "scripts/systems/ammo_state.gd",
-      "name": "Ammo Reserves",
+      "name": "Ammo Magazine (Per-Weapon)",
       "domain": "consumables",
       "kind": "simulation",
       "model_exists": true,
-      "smoke": "scripts/validation/main_playable_consumables_smoke.gd",
+      "smoke": "scripts/validation/ammo_magazine_state_smoke.gd",
       "reachable": true,
       "driven": true,
-      "driven_at": "consumable_state.gd:131",
+      "driven_at": "playable_generated_ship.gd:5184 (away) / 5221 (home)",
       "input": {
         "live": true,
-        "desc": "ammo-category item use adds reserves via dispatcher ammo_reserve kind (effect_dispatcher.gd:90); consumable ammo branch reads before/after at consumable_state.gd:125,131",
-        "at": "consumable_state.gd:131"
+        "desc": "spend(weapon_id) called from threat_manager.attack_with_weapon (coordinator:4205); begin_reload(wid, mag_size, reserve) on KEY_R (coordinator:4237); tick(delta) advances reload timer on BOTH _process branches (5184 away / 5221 home)",
+        "at": "playable_generated_ship.gd:4205,4237,5184,5221"
       },
       "output": {
-        "live": false,
-        "desc": "reserves only surfaced via get_status_lines (HUD) and get_summary (save). consume() has NO gameplay caller — combat uses weapons, never these reserves. consume() IS exercised once by main_playable_consumables_smoke.gd:72 (a test seam), but no runtime system calls it.",
-        "at": null
+        "live": true,
+        "desc": "loaded(wid)==0 gates dry-fire click (no shot on empty); is_reloading() gates reload re-entry (coordinator:4229); tick() returns non-empty dict on reload completion (both branches). Live consumers: threat_manager.attack_with_weapon reads magazine via ammo_state param; coordinator reload path at 4229-4242.",
+        "at": "playable_generated_ship.gd:4208 (spend/dry-fire) / 4229-4242 (reload)"
       },
       "confidence": "V",
       "loops": [
@@ -2303,13 +2299,9 @@
       ],
       "integrations": [],
       "content": "partial",
-      "content_note": "ammo_definitions.json has 4 packs (pistol/shotgun/flare/shock). CORRECTION to proposed 'defs are real': only pistol_ammo_box and shotgun_shell_pack work — their effect ids (pistol_rounds_small/shells_small) are defined. flare_round and shock_probe reference flare_burn/shock_jolt which are undefined in effect_definitions.json, so their use returns ok:false with no reserve added. No gameplay consumer exists for any reserve.",
+      "content_note": "Per-weapon magazine model (spend/begin_reload/tick/loaded/is_reloading/reload_target). ammo_definitions.json was deleted in Domain 5 cleanup; orphan effect ids flare_burn and shock_jolt no longer exist. Inventory reserve consumed at begin_reload via inventory_state.remove_item (coordinator:4242). Two smokes: ammo_magazine_state_smoke.gd (pure model) and ammo_magazine_smoke.gd (away-branch reload advance, main scene).",
       "functional": null,
-      "gaps": [
-        "output hollow: reserves are written but never read by gameplay (no runtime consume() caller; class docstring admits 'Combat does not exist yet')",
-        "2 of 4 ammo packs (flare_round, shock_probe) are broken at the use path due to orphan effect ids (flare_burn/shock_jolt undefined)",
-        "no dedicated ammo_state_smoke.gd; only exercised by main_playable_consumables_smoke.gd (which does call consume/get_reserve) plus consumable_state_smoke/effect_dispatcher_smoke for the add path"
-      ],
+      "gaps": [],
       "subsystems": []
     },
     {
@@ -6019,6 +6011,45 @@
       "subsystems": []
     },
     {
+      "id": "sealed_hatch",
+      "file": "scripts/interaction/sealed_hatch.gd",
+      "name": "Sealed Hatch",
+      "domain": "consumables",
+      "kind": "simulation",
+      "model_exists": true,
+      "smoke": "scripts/validation/sealed_hatch_node_smoke.gd",
+      "reachable": true,
+      "driven": true,
+      "driven_at": "playable_generated_ship.gd:2600-2601 (_build_sealed_hatches connect), 3601 (_try_bypass_nearest_hatch)",
+      "input": {
+        "live": true,
+        "desc": "try_bypass(player_body, active_flags) called from _try_bypass_nearest_hatch (coordinator:3601); active_flags sourced from utility_item_state.active_flags (lockpick or hack_chip flag). Seeded per derelict by _build_sealed_hatches (coordinator:2576), two hatches per ship, deterministic per marker_id.",
+        "at": "playable_generated_ship.gd:3601; sealed_hatch.gd:44"
+      },
+      "output": {
+        "live": true,
+        "desc": "hatch_bypassed(hatch_id, lock_kind) signal emitted on success -> _on_hatch_bypassed calls utility_item_state.consume_flag(flag) and removes the ready status. StaticBody3D collider (HatchBlocker) disabled on bypass (traversal unblocked). Bypassed hatch_id appended to current_ship.bypassed_hatch_ids for persistence.",
+        "at": "sealed_hatch.gd:53; playable_generated_ship.gd:3583"
+      },
+      "confidence": "V",
+      "loops": [
+        "consumables"
+      ],
+      "integrations": [
+        {
+          "to": "utility_item_resolver",
+          "via": "active_flags read for bypass check; consume_flag(lockpick|hack_chip) on success",
+          "at": "playable_generated_ship.gd:3583,3601",
+          "health": "healthy"
+        }
+      ],
+      "content": "partial",
+      "content_note": "Seeded per derelict by _build_sealed_hatches; lock_kind MECHANICAL/ELECTRONIC alternates per hatch index. No authored hatch data file; seeding constants (2 hatches per ship) in-code.",
+      "functional": null,
+      "gaps": [],
+      "subsystems": []
+    },
+    {
       "id": "modular_asset_spec",
       "file": "scripts/placement/modular_asset_spec.gd",
       "name": "Modular Asset Spec (schema)",
@@ -8525,14 +8556,8 @@
     {
       "id": "consumables",
       "name": "Consumables / Use-Item Loop",
-      "closes": "partial",
-      "break_points": [
-        "ammo_state is a dead-end sink: ammo-pack use increments reserves that no gameplay consumer ever reads (no runtime consume() caller; output hollow). playable_generated_ship.gd references ammo_state only for construct/context/save.",
-        "2 of 4 ammo packs (flare_round, shock_probe) reference orphan effect ids (flare_burn, shock_jolt) absent from effect_definitions.json, so those uses return ok:false (dispatch unknown_effect, no reserve added).",
-        "stimulant_state.tick + addiction_state.tick run only in the home _process branch (playable_generated_ship.gd:4830-4832); the away/derelict branch begins at :4749 and returns at :4808, so stim buff timers, expiry-withdrawal, and tolerance/dependence decay all freeze during boarding runs. (Item USE itself still works away — input at :7045-7057 is not away-gated — only per-frame decay freezes.)",
-        "utility_flag bypass is hollow: utility_item_resolver records active_flags and adds utility_lockpick_ready/utility_hack_chip_ready statuses, but no gameplay system reads them for the promised hatch/terminal bypass.",
-        "effect_dispatcher's temperature_delta -> body_temperature_state branch is never reached: no effect definition in the catalog uses kind temperature_delta."
-      ],
+      "closes": "closed",
+      "break_points": [],
       "steps": [
         {
           "system": "consumable_state",
@@ -8548,19 +8573,19 @@
         },
         {
           "system": "stimulant_state",
-          "role": "branch: stimulant -> timed buff + addiction handoff (tick home-only)"
+          "role": "branch: stimulant -> timed buff + addiction handoff (tick BOTH branches, Domain 5)"
         },
         {
           "system": "addiction_state",
-          "role": "branch: tolerance/withdrawal feedback into status + stim duration (tick home-only)"
+          "role": "branch: tolerance/withdrawal feedback into status + stim duration (tick BOTH branches, Domain 5)"
         },
         {
           "system": "utility_item_resolver",
-          "role": "branch: utility -> dispatch effects + active_flags (effects live; flag bypass unconsumed)"
+          "role": "branch: utility -> flare steadies sanity (both branches); lockpick/hack_chip bypass SealedHatch; repair_foam heals"
         },
         {
           "system": "ammo_state",
-          "role": "broken sink: reserves incremented (pistol/shotgun only), never consumed"
+          "role": "per-weapon magazine: spend (combat via threat_manager), begin_reload (KEY_R), tick (BOTH branches)"
         }
       ]
     },

@@ -10,7 +10,7 @@ class_name ItemDefs
 const ITEM_DEFINITIONS_PATH: String = "res://data/items/item_definitions.json"
 const MEDICINE_DEFINITIONS_PATH: String = "res://data/items/medicine_definitions.json"
 const STIMULANT_DEFINITIONS_PATH: String = "res://data/items/stimulant_definitions.json"
-const AMMO_DEFINITIONS_PATH: String = "res://data/items/ammo_definitions.json"
+const AMMO_DEFINITIONS_PATH: String = "res://data/combat/ammo_definitions.json"
 const UTILITY_DEFINITIONS_PATH: String = "res://data/items/utility_item_definitions.json"
 const TRADE_DEFINITIONS_PATH: String = "res://data/items/trade_item_definitions.json"
 const TOOL_DEFINITIONS_PATH: String = "res://data/tools/tool_definitions.json"
@@ -52,7 +52,17 @@ static func load_definitions() -> Dictionary:
 		for item_id in extra_defs:
 			if not (extra_defs[item_id] is Dictionary):
 				continue
-			defs[item_id] = extra_defs[item_id]
+			# Field-merge onto any existing base def so keys present only in the
+			# base (e.g. equip_slot on capacitor_cell in item_definitions.json) are
+			# preserved when a secondary file (ammo_definitions.json) also defines
+			# the same item with a different subset of fields.
+			if defs.has(item_id) and defs[item_id] is Dictionary:
+				var merged: Dictionary = (defs[item_id] as Dictionary).duplicate(true)
+				for key in (extra_defs[item_id] as Dictionary):
+					merged[key] = (extra_defs[item_id] as Dictionary)[key]
+				defs[item_id] = merged
+			else:
+				defs[item_id] = extra_defs[item_id]
 	var equip_defs: Dictionary = _read_json_dict(EQUIPMENT_DEFINITIONS_PATH)
 	for equip_id in equip_defs:
 		var raw_equip: Variant = equip_defs[equip_id]

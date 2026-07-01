@@ -17,6 +17,7 @@
     "noise": 1.00,
     "stun_seconds": 0.15,
     "ammo_item_id": "flare_round",
+    "magazine_size": 2,
     "status_effect_id": "burn"
   },
   "shock_probe": {
@@ -27,6 +28,7 @@
     "noise": 0.40,
     "stun_seconds": 1.00,
     "ammo_item_id": "capacitor_cell",
+    "magazine_size": 5,
     "status_effect_id": "stun"
   },
   "welding_lance": {
@@ -37,6 +39,7 @@
     "noise": 0.55,
     "stun_seconds": 0.20,
     "ammo_item_id": "fuel_canister",
+    "magazine_size": 6,
     "status_effect_id": "burn"
   }
 }
