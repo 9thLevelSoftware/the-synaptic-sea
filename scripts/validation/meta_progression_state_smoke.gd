@@ -190,7 +190,31 @@ func _initialize() -> void:
 		_fail("reset_all should clear total_runs_completed")
 		return
 
-	print("META PROGRESSION STATE PASS payout=39 unlocks=true persistence=true reset=true")
+	# --- selected_class_id (Domain 6): default empty, set, persist, reset ---
+	var meta_cls = MetaProgressionStateScript.new()
+	meta_cls.configure({})
+	if meta_cls.get_selected_class() != "":
+		_fail("selected_class default should be empty")
+		return
+	meta_cls.set_selected_class("field_medic")
+	if meta_cls.get_selected_class() != "field_medic":
+		_fail("set_selected_class did not stick")
+		return
+	var cls_dump: Dictionary = meta_cls.to_dict()
+	var meta_cls2 = MetaProgressionStateScript.new()
+	meta_cls2.configure({})
+	if not meta_cls2.apply_summary(cls_dump):
+		_fail("apply_summary rejected selected_class dump")
+		return
+	if meta_cls2.get_selected_class() != "field_medic":
+		_fail("selected_class did not round-trip through apply_summary")
+		return
+	meta_cls2.reset_all()
+	if meta_cls2.get_selected_class() != "":
+		_fail("reset_all should clear selected_class")
+		return
+
+	print("META PROGRESSION STATE PASS payout=39 unlocks=true persistence=true reset=true selected_class=true")
 	quit(0)
 
 func _fail(reason: String) -> void:

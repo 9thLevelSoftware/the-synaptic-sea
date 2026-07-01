@@ -21,6 +21,7 @@ var total_runs_deaths: int = 0
 var highest_skill_level_seen: int = 0
 var last_payout_currency: int = 0
 var last_payout_reason: String = ""
+var selected_class_id: String = ""                 # Domain 6: player's chosen class for the next run
 var _catalog_known_ids: Dictionary = {}            # optional whitelist (set by configure)
 
 func configure(catalog: Dictionary = {}) -> void:
@@ -44,6 +45,12 @@ func is_known(unlock_id: String) -> bool:
 
 func get_meta_currency() -> int:
 	return meta_currency
+
+func get_selected_class() -> String:
+	return selected_class_id
+
+func set_selected_class(class_id: String) -> void:
+	selected_class_id = str(class_id)
 
 func add_meta_currency(amount: int) -> bool:
 	if amount <= 0:
@@ -169,6 +176,7 @@ func reset_all() -> void:
 	highest_skill_level_seen = 0
 	last_payout_currency = 0
 	last_payout_reason = ""
+	selected_class_id = ""
 
 ## Serializes the meta state to a Dictionary (save/load agnostic).
 func to_dict() -> Dictionary:
@@ -183,6 +191,7 @@ func to_dict() -> Dictionary:
 		"highest_skill_level_seen": highest_skill_level_seen,
 		"last_payout_currency": last_payout_currency,
 		"last_payout_reason": last_payout_reason,
+		"selected_class_id": selected_class_id,
 		"saved_at": Time.get_datetime_string_from_system(true),
 	}
 
@@ -216,6 +225,7 @@ func apply_summary(summary: Variant) -> bool:
 	highest_skill_level_seen = maxi(0, int(dict.get("highest_skill_level_seen", 0)))
 	last_payout_currency = maxi(0, int(dict.get("last_payout_currency", 0)))
 	last_payout_reason = str(dict.get("last_payout_reason", ""))
+	selected_class_id = str(dict.get("selected_class_id", ""))
 	return true
 
 ## Persists to `user://meta_progression.json`. Returns false on IO failure.
