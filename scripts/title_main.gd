@@ -57,7 +57,7 @@ func _refresh_continue_enabled() -> void:
 	menu_state.set_item_enabled("main_menu", "continue", available)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if main_node != null:
+	if is_instance_valid(main_node):
 		return  # gameplay owns input once it exists
 	if menu_state.get_current_menu() == "settings_menu":
 		if event.is_action_pressed("ui_left"):
@@ -119,15 +119,15 @@ func _on_title_continue() -> void:
 func _instantiate_gameplay(should_load: bool) -> void:
 	main_node = MAIN_SCENE.instantiate()
 	add_child(main_node)
-	if menu_panel != null:
+	if is_instance_valid(menu_panel):
 		menu_panel.visible = false
 	_poll_for_playable_started(should_load)
 
 func _poll_for_playable_started(should_load: bool) -> void:
-	if main_node == null:
+	if not is_instance_valid(main_node):
 		return
 	playable_instance = main_node.playable_instance
-	if playable_instance == null or not playable_instance.playable_started:
+	if not is_instance_valid(playable_instance) or not playable_instance.playable_started:
 		call_deferred("_poll_for_playable_started", should_load)
 		return
 	# ADR-0043 (Task 5): PlayableGeneratedShip now declares
@@ -165,7 +165,7 @@ func _on_focus_changed(_new_index: int) -> void:
 	_refresh_panel()
 
 func _refresh_panel() -> void:
-	if menu_panel == null or menu_state == null:
+	if not is_instance_valid(menu_panel) or menu_state == null:
 		return
 	var current_menu: String = menu_state.get_current_menu()
 	if current_menu.is_empty():

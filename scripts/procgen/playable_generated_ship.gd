@@ -1667,7 +1667,7 @@ func _freeze_run_on_death() -> void:
 func _build_epitaph_text() -> String:
 	var location: String = ""
 	var cur = get_current_ship()
-	if cur != null:
+	if is_instance_valid(cur):
 		location = String(cur.marker_id)
 	var location_label: String = location if not location.is_empty() else "the home ship"
 	return "Died aboard %s at objective %d (run time %.0fs)" % [location_label, current_objective_sequence, world_time]
