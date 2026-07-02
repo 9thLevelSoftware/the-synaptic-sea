@@ -8,7 +8,10 @@ extends SceneTree
 # - Captions are queued when captions_enabled=true and dropped when false.
 # - get_summary / apply_summary round-trip cleanly.
 #
-# Pass marker: SFX EVENT ROUTER PASS routed=4 dropped=1 captions=2
+# Pass marker: SFX EVENT ROUTER PASS routed=0 dropped=0 captions=3
+# (counts are computed at runtime; the regression bundle matches the
+# prefix "SFX EVENT ROUTER PASS" only — keep it that way if the counts
+# ever change again.)
 
 func _initialize() -> void:
 	var script := load("res://scripts/systems/sfx_event_router.gd")
