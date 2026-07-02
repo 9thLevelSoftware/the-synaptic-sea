@@ -173,6 +173,29 @@ load the slot back, objective progress reverts while `visited_ships`/dock state 
   cosmetic-only; recorded under "Known migration behavior" in ADR-0043
   (cross-ref `ship_instance.gd:213-214`).
 
+### 3.7 Title settings sub-flow (user-added scope, 2026-07-02)
+
+The title's Settings item is fully functional, not a dead `pass` arm (user decision during
+execution — supersedes the earlier "optional" note). `title_main.gd` gains its own
+`SettingsState` instance and mirrors `menu_coordinator`'s settings handling against the same
+`settings_menu` catalog entry: confirm on `settings` → `menu_state.open_menu("settings_menu")`;
+`ui_left`/`ui_right` (and `ui_accept` on non-back rows) → a title-local `_cycle_setting(direction)`
+mirroring `menu_coordinator._cycle_setting` (`:339-360`), including preset cycling from
+`accessibility_presets.json`; `back` → `close_top()`. Row rendering mirrors `_settings_line`
+(`menu_coordinator.gd:707-717`) minus the difficulty-multiplier suffix (no `AccessibilitySettings`
+exists at title).
+
+**Persistence semantics:** settings persist only inside `RunSnapshot.settings_summary` (verified —
+no standalone settings file exists). The title flow therefore hands its summary into the session:
+`PlayableGeneratedShip` gains a production seam `apply_ui_settings_summary(summary)` (the existing
+`apply_ui_settings_summary_for_validation` delegates to it), and `title_main.gd` calls it after
+`playable_started` on BOTH New Game and Continue — but **only if the player changed a setting at
+the title** (dirty flag), so an untouched title never clobbers a loaded run's saved settings.
+A standalone `user://settings.json` layer is explicitly out of scope (future multiplayer card).
+
+Validation: `title_settings_smoke.gd`, marker
+`TITLE SETTINGS PASS open=true cycle=true back=true applied=true`.
+
 ## 4. Files
 
 **New:** `scenes/title_main.tscn`, `scripts/title_main.gd`, `scripts/systems/title_save_query.gd`,
@@ -201,11 +224,12 @@ outputs), `docs/superpowers/specs/2026-06-28-completion-roadmap-design.md` (defi
 |---|---|---|
 | `title_save_query_smoke.gd` | pure-model | `TITLE SAVE QUERY PASS no_save=true has_save=true frozen_blocks=true` |
 | `title_screen_flow_smoke.gd` | main-scene (boots `title_main.tscn`) | `TITLE SCREEN FLOW PASS new_game=true continue=true quit_signal=true` — includes the teardown/reinstantiate double-boot check |
+| `title_settings_smoke.gd` | main-scene (boots `title_main.tscn`) | `TITLE SETTINGS PASS open=true cycle=true back=true applied=true` — title settings sub-flow (§3.7) |
 | `save_load_slot_screen_smoke.gd` | main-scene | `SAVE LOAD SLOT SCREEN PASS save=true load=true delete_armed=true delete_confirmed=true` — includes the ship-only-not-world assertion |
 | `permadeath_freeze_smoke.gd` | main-scene | `PERMADEATH FREEZE PASS wrote=true died=true frozen=true reloadable=false epitaph_present=true` — drives death on both away/home branches; asserts manual-slot freeze and post-death pause-menu access |
 | `save_and_exit_smoke.gd` | main-scene | `SAVE AND EXIT PASS saved=true world_fresh=true return_signal=true` |
 
-Bundle math: 107 − 1 (deleted) + 5 (new) = **`commands=111`**. Final echo and per-smoke marker
+Bundle math: 107 − 1 (deleted) + 6 (new) = **`commands=112`**. Final echo and per-smoke marker
 entries updated in `06_validation_plan.md`.
 
 **Save-dir hygiene (hard requirement):** every new smoke deletes ALL files it wrote —
@@ -218,7 +242,7 @@ permanently disable Continue for a human running the game after tests.
 new `title_save_query` row; quicksave break-point reworded to "intentionally unwired — Save & Exit
 uses request_save directly (ADR-0043)"; cloud manifest stays a documented deferral.
 `python tools/build_system_inventory.py --check` must pass. Full regression bundle must end
-`SYNAPTIC_SEA REGRESSION PASS commands=111 clean_output=true`.
+`SYNAPTIC_SEA REGRESSION PASS commands=112 clean_output=true`.
 
 ## 6. Risks
 
