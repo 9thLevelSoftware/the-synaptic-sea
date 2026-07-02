@@ -118,10 +118,12 @@ func _build_stream_players() -> void:
 ## because their names already match between the pure model and the engine.
 ## This is the ONLY place the Master-name mismatch is bridged — every
 ## AudioServer boundary call goes through this helper (ADR-0044).
-func _engine_bus_name(bus_id: StringName) -> String:
-	if String(bus_id) == String(AudioEventSeamScript.BUS_MASTER):
-		return "Master"
-	return String(bus_id)
+## Returns StringName to avoid a String allocation per call; AudioServer's
+## bus-name APIs accept StringName/String interchangeably.
+func _engine_bus_name(bus_id: StringName) -> StringName:
+	if bus_id == AudioEventSeamScript.BUS_MASTER:
+		return &"Master"
+	return bus_id
 
 ## Push per-bus dB values into AudioServer. Skipped for buses that
 ## AudioServer doesn't know about (e.g. in headless tests where the
@@ -134,7 +136,7 @@ func _apply_bus_volumes() -> void:
 		var bus_id: String = String(bus.get("id", ""))
 		if bus_id.is_empty():
 			continue
-		var engine_name: String = _engine_bus_name(StringName(bus_id))
+		var engine_name: StringName = _engine_bus_name(StringName(bus_id))
 		var bus_idx: int = AudioServer.get_bus_index(engine_name)
 		if bus_idx < 0:
 			# Bus not registered in AudioServer yet (headless / pre-init).

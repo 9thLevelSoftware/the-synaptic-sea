@@ -20,7 +20,10 @@ extends SceneTree
 #    amendment: also drives AudioSettingsPanel._on_caption_toggled() directly
 #    (the panel path, which must funnel through the same single seam rather
 #    than writing sfx_router.captions_enabled itself) and asserts the router
-#    flag follows it in both directions.
+#    flag follows it in both directions. PR #59 Codex P2 amendment: also
+#    simulates a legacy pre-unification save whose audio_summary restore
+#    left the router flag diverged from SettingsState, and asserts
+#    _reconcile_captions_with_settings() snaps it back to SettingsState.
 #
 # Pass marker: AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true captions_toggle=true away_ticks=30
 #
@@ -200,6 +203,21 @@ func _validate_and_drive() -> void:
 	audio_panel._on_caption_toggled(true)
 	if mgr.sfx_router.captions_enabled != true:
 		_fail("expected sfx_router.captions_enabled == true after panel _on_caption_toggled(true)")
+		return
+
+	# (g) PR #59 Codex P2: simulate a legacy pre-unification save where the
+	# audio_summary restore left sfx_router.captions_enabled diverged from
+	# SettingsState. SettingsState.captions is true (the stage's restored
+	# end state from (e)/(f)); force the router flag to false directly
+	# (bypassing the seam, as a stale audio_summary write would), then call
+	# the reconciliation method and assert SettingsState wins.
+	if not playable.has_method("_reconcile_captions_with_settings"):
+		_fail("playable missing _reconcile_captions_with_settings")
+		return
+	mgr.sfx_router.captions_enabled = false
+	playable._reconcile_captions_with_settings()
+	if mgr.sfx_router.captions_enabled != true:
+		_fail("expected _reconcile_captions_with_settings to restore sfx_router.captions_enabled == true from SettingsState")
 		return
 	var captions_toggle_ok: bool = true
 

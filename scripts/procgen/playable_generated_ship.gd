@@ -6894,6 +6894,7 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	# state, spatial resolver config, and meta-event schedule.
 	if is_instance_valid(audio_manager) and not snapshot.audio_summary.is_empty():
 		audio_manager.apply_summary(snapshot.audio_summary)
+	_reconcile_captions_with_settings()
 	# REQ-SV: restore survival vitals summaries.
 	if vitals_state != null and not snapshot.vitals_summary.is_empty():
 		vitals_state.apply_summary(snapshot.vitals_summary)
@@ -6970,6 +6971,17 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		snapshot.player_position[2],
 	])
 	return true
+
+## SettingsState is the single source of truth for captions (ADR-0044).
+## Called after audio_summary restore because a pre-unification save can
+## carry a divergent router flag (the panel checkbox never worked before
+## the unification, so the two summaries were written independently).
+func _reconcile_captions_with_settings() -> void:
+	if not is_instance_valid(audio_manager) or not is_instance_valid(menu_coordinator):
+		return
+	if audio_manager.sfx_router == null:
+		return
+	audio_manager.sfx_router.captions_enabled = menu_coordinator.settings_state.is_captions_enabled()
 
 ## ADR-0031/0043 slot-screen seam: apply a manual-slot RunSnapshot onto the
 ## currently-active (already-booted) ship only. Does NOT touch

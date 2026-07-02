@@ -136,14 +136,25 @@ persisted summaries are applied in a fixed order:
 `sfx_router.captions_enabled` per path 3 above) runs **before**
 `audio_manager.apply_summary(audio_summary)`, which separately overwrites
 `sfx_router.captions_enabled` from the audio summary's own persisted value.
-The audio-summary write always wins at restore time. This is safe — the two
-persisted values can never disagree at the moment a save is written —
-**only because every live write path to `sfx_router.captions_enabled`
-funnels through `SettingsState` first** (paths 1–3 above); there is no
-write path that sets the router flag without first updating
-`SettingsState`. Any future code that writes `sfx_router.captions_enabled`
-directly, bypassing `SettingsState`, would silently break this invariant by
-letting the two summaries diverge before the next save — do not add one.
+For any save written **after** this ADR landed, the two persisted values can
+never disagree — every live write path to `sfx_router.captions_enabled`
+funnels through `SettingsState` first (paths 1–3 above), so the audio-summary
+write is a no-op in practice and which one "wins" is moot.
+
+A **pre-unification save can legitimately disagree**: before this ADR the
+`AudioSettingsPanel` checkbox never worked and no push seam from
+`SettingsState` to `sfx_router` existed, so `settings_summary.captions` and
+the audio summary's router flag were written independently and can carry
+different values. On such a save, the audio-summary write landing last would
+otherwise win, silently reintroducing the old divergence. To prevent that,
+`playable_generated_ship.gd::_apply_run_snapshot` calls
+`_reconcile_captions_with_settings()` immediately after
+`audio_manager.apply_summary(audio_summary)`, which re-reads
+`menu_coordinator.settings_state.is_captions_enabled()` and writes it into
+`sfx_router.captions_enabled` unconditionally. `SettingsState` wins at
+restore, full stop (PR #59 Codex P2). Any future code that writes
+`sfx_router.captions_enabled` directly, bypassing `SettingsState`, would
+still be wrong going forward — do not add one.
 
 ## Retained deferrals (explicitly out of scope)
 
