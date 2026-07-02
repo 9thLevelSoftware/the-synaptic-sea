@@ -37,6 +37,11 @@ var corrupt: bool = false
 var frozen: bool = false               # permadeath freeze (ADR-0032)
 var payload_size_bytes: int = 0
 var schema_version: String = ""
+# run_id slot-ownership rework: the run_id of whichever run's write last
+# stamped this row (SaveLoadService._index_run_slot/_index_world_slot).
+# Empty default so legacy index rows (predating this field) load without
+# failing validate() -- missing run_id never fails validation.
+var run_id: String = ""
 
 func is_world() -> bool:
 	return slot_kind == SLOT_KIND_WORLD
@@ -67,6 +72,7 @@ func to_dict() -> Dictionary:
 		"frozen": frozen,
 		"payload_size_bytes": payload_size_bytes,
 		"schema_version": schema_version,
+		"run_id": run_id,
 	}
 
 static func from_dict(data: Variant) -> SaveSlotState:
@@ -90,6 +96,7 @@ static func from_dict(data: Variant) -> SaveSlotState:
 	row.frozen = bool(dict.get("frozen", false))
 	row.payload_size_bytes = int(dict.get("payload_size_bytes", 0))
 	row.schema_version = str(dict.get("schema_version", ""))
+	row.run_id = str(dict.get("run_id", ""))
 	return row
 
 ## Coarse validation: rejects empty slot_id or unknown slot_kind. Used by

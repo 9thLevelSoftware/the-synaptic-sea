@@ -83,22 +83,20 @@ func _initialize() -> void:
 	assert((rt_hc.home_ship_carts as Array).size() == 1, "home_ship_carts survived round-trip")
 	assert(str(rt_hc.home_ship_carts[0].get("cart_id", "")) == "cart_home", "cart entry intact")
 
-	# --- manual_slots_written round-trip (PR #57 Codex round 2 finding C,
-	# additive, no version bump) ---
-	var ws_msw = WorldSnapshotScript.new()
-	ws_msw.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
-	ws_msw.godot_version = godot_version
-	ws_msw.manual_slots_written = ["slot_01", "slot_03"]
-	var rt_msw = WorldSnapshotScript.from_dict(ws_msw.to_dict(), WorldSnapshotScript.WORLD_SLICE_VERSION, godot_version)
-	assert(rt_msw != null, "manual_slots_written snapshot round-trips")
-	assert((rt_msw.manual_slots_written as Array).size() == 2, "manual_slots_written survived round-trip")
-	assert((rt_msw.manual_slots_written as Array).has("slot_01"), "manual_slots_written contains slot_01")
-	# Older saves (field absent) must default to an empty array, not null/error.
-	var legacy_dict: Dictionary = ws_msw.to_dict()
-	legacy_dict.erase("manual_slots_written")
+	# --- run_id round-trip (slot-ownership rework, additive, no version bump) ---
+	var ws_rid = WorldSnapshotScript.new()
+	ws_rid.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
+	ws_rid.godot_version = godot_version
+	ws_rid.run_id = "abc"
+	var rt_rid = WorldSnapshotScript.from_dict(ws_rid.to_dict(), WorldSnapshotScript.WORLD_SLICE_VERSION, godot_version)
+	assert(rt_rid != null, "run_id snapshot round-trips")
+	assert(String(rt_rid.run_id) == "abc", "run_id survived round-trip")
+	# Older saves (field absent) must default to "", not null/error.
+	var legacy_dict: Dictionary = ws_rid.to_dict()
+	legacy_dict.erase("run_id")
 	var rt_legacy = WorldSnapshotScript.from_dict(legacy_dict, WorldSnapshotScript.WORLD_SLICE_VERSION, godot_version)
-	assert(rt_legacy != null, "legacy dict without manual_slots_written still round-trips")
-	assert((rt_legacy.manual_slots_written as Array).is_empty(), "manual_slots_written defaults to [] for older saves")
+	assert(rt_legacy != null, "legacy dict without run_id still round-trips")
+	assert(String(rt_legacy.run_id) == "", "run_id defaults to \"\" for older saves")
 
 	print("WORLD SNAPSHOT PASS round_trip=true version_gated=true")
 	quit(0)

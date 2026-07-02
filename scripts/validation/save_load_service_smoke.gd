@@ -283,6 +283,113 @@ func _initialize() -> void:
 		_fail("cleanup: load_world() should be null after delete_current_run")
 		return
 
+	# --- run_id slot-ownership rework: stamp + slot_ids_for_run + freeze_run ---
+	for sid in ["slot_01", "autosave_a", "autosave_b", "autosave_c", SaveLoadServiceScript.ACTIVE_AUTOSAVE_SLOT_ID]:
+		service.delete_slot(sid)
+		resolver.clear_death(sid)
+	service.delete_current_run()
+	resolver.clear_death("world")
+
+	service.set_active_run_id("A")
+	var stamp_snap := RunSnapshotScript.new()
+	stamp_snap.layout_path = original.layout_path
+	stamp_snap.kit_path = original.kit_path
+	stamp_snap.gameplay_slice_path = original.gameplay_slice_path
+	stamp_snap.slice_version = SaveLoadServiceScript.CURRENT_SLICE_VERSION
+	stamp_snap.godot_version = Engine.get_version_info()["string"]
+	if not service.save_to_slot("slot_01", stamp_snap, "manual", false, "Manual Save"):
+		_fail("run_id stamp: save_to_slot(slot_01) under run A should succeed")
+		return
+	if not service.slot_ids_for_run("A").has("slot_01"):
+		_fail("run_id stamp: slot_ids_for_run('A') should contain slot_01 after a save stamped with run A")
+		return
+	if not service.slot_ids_for_run("").is_empty():
+		_fail("run_id stamp: slot_ids_for_run('') must match nothing")
+		return
+
+	# freeze_run: freeze "A" -> has_died_in true for its slots only.
+	resolver.clear_death("slot_01")
+	service.freeze_run("A", "death", "test epitaph run A", 5.0, 1)
+	if not resolver.has_died_in("slot_01"):
+		_fail("freeze_run: slot_01 (owned by run A) should be frozen after freeze_run('A')")
+		return
+	if resolver.has_died_in("autosave_a"):
+		_fail("freeze_run: autosave_a (never written by run A) must not be frozen by freeze_run('A')")
+		return
+	resolver.clear_death("slot_01")
+
+	# index.json written WITHOUT run_id keys still loads with rows defaulting "".
+	var index_path: String = "user://saves/index.json"
+	var idx_file := FileAccess.open(index_path, FileAccess.READ)
+	if idx_file == null:
+		_fail("run_id stamp: could not read index.json to strip run_id for the legacy-index assertion")
+		return
+	var idx_text: String = idx_file.get_as_text()
+	idx_file.close()
+	var idx_parsed: Variant = JSON.parse_string(idx_text)
+	if typeof(idx_parsed) != TYPE_DICTIONARY:
+		_fail("run_id stamp: index.json did not parse as a dictionary")
+		return
+	var idx_dict: Dictionary = idx_parsed as Dictionary
+	for row in (idx_dict.get("slots", []) as Array):
+		if typeof(row) == TYPE_DICTIONARY:
+			(row as Dictionary).erase("run_id")
+	var stripped_file := FileAccess.open(index_path, FileAccess.WRITE)
+	if stripped_file == null:
+		_fail("run_id stamp: could not rewrite index.json without run_id keys")
+		return
+	stripped_file.store_string(JSON.stringify(idx_dict, "	"))
+	stripped_file.close()
+	if not service.has_slot("slot_01"):
+		_fail("run_id stamp: slot_01 should still load after index.json's run_id keys were stripped (legacy index rows default \"\")")
+		return
+	# PR #58 (Codex P2): ownership must survive a stripped/legacy index --
+	# the payload still carries run_id "A", and the disk-union scan in
+	# slot_ids_for_run must find it even when no index row matches.
+	if not service.slot_ids_for_run("A").has("slot_01"):
+		_fail("run_id ownership: slot_ids_for_run('A') must still find slot_01 via its payload when index rows carry no run_id")
+		return
+
+	# PR #58 (Codex P2): a corrupt/missing index.json parses to an EMPTY
+	# SaveIndexState -- freeze ownership must not fail open. Delete the
+	# index entirely; the payload scan alone must still resolve ownership.
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(index_path))
+	if not service.slot_ids_for_run("A").has("slot_01"):
+		_fail("run_id ownership: slot_ids_for_run('A') must find slot_01 from its payload alone after index.json is deleted")
+		return
+	resolver.clear_death("slot_01")
+	service.freeze_run("A", "death", "test epitaph no index", 5.0, 1)
+	if not resolver.has_died_in("slot_01"):
+		_fail("run_id ownership: freeze_run('A') must freeze slot_01 even with index.json missing")
+		return
+	resolver.clear_death("slot_01")
+
+	# True-legacy payload (no run_id key anywhere): fail-open is preserved --
+	# a payload written before the rework matches no run id.
+	var slot_path: String = "user://saves/slot_01.json"
+	var slot_file := FileAccess.open(slot_path, FileAccess.READ)
+	if slot_file == null:
+		_fail("run_id ownership: could not read slot_01.json for the legacy-payload assertion")
+		return
+	var slot_parsed: Variant = JSON.parse_string(slot_file.get_as_text())
+	slot_file.close()
+	if typeof(slot_parsed) != TYPE_DICTIONARY:
+		_fail("run_id ownership: slot_01.json did not parse as a dictionary")
+		return
+	(slot_parsed as Dictionary).erase("run_id")
+	var legacy_file := FileAccess.open(slot_path, FileAccess.WRITE)
+	if legacy_file == null:
+		_fail("run_id ownership: could not rewrite slot_01.json without run_id")
+		return
+	legacy_file.store_string(JSON.stringify(slot_parsed as Dictionary, "	"))
+	legacy_file.close()
+	if not service.slot_ids_for_run("A").is_empty():
+		_fail("run_id ownership: a legacy payload with no run_id must match no run (fail-open preserved)")
+		return
+
+	service.delete_slot("slot_01")
+	service.set_active_run_id("")
+
 	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=27")
 	quit(0)
 
