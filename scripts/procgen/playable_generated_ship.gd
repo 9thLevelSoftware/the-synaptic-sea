@@ -6866,6 +6866,42 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	])
 	return true
 
+## ADR-0031/0043 slot-screen seam: apply a manual-slot RunSnapshot onto the
+## currently-active (already-booted) ship only. Does NOT touch
+## visited_ships/world_time/dock topology/current_location -- manual slots
+## are ship-only side-saves, exactly ADR-0031's original text. Returns
+## true on success; false on a null snapshot or an _apply_run_snapshot
+## failure (e.g. not yet playable_started).
+func apply_manual_slot(snapshot: RunSnapshot) -> bool:
+	if snapshot == null:
+		return false
+	var applied: bool = _apply_run_snapshot(snapshot)
+	if applied and is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("manual_slot_loaded", "any")
+	return applied
+
+## ADR-0043: notices a slot-screen confirm result surfaced through
+## MenuCoordinator.get_last_meta_screen_confirm_result() and applies the
+## gameplay-side consequence the coordinator itself cannot (it owns no
+## gameplay state). Called every frame handle_ui_input returns true; a
+## non-save_load or action=="none"/"arm"/"delete_armed" result is a no-op.
+## Clears the coordinator's stored result after handling so a later
+## handle_ui_input==true call (e.g. for ui_pause) never re-applies a stale
+## confirm Dictionary from a previous, unrelated event.
+func _dispatch_save_load_confirm_result(result: Dictionary) -> void:
+	if str(result.get("screen", "")) != "save_load":
+		return
+	var action: String = str(result.get("action", ""))
+	var ok: bool = bool(result.get("ok", false))
+	var detail: String = str(result.get("detail", ""))
+	if action == "load" and ok:
+		var snapshot = result.get("snapshot", null)
+		apply_manual_slot(snapshot)
+	elif action == "save" and ok:
+		_manual_slots_written_this_run[detail] = true
+	if not action.is_empty():
+		menu_coordinator.clear_last_meta_screen_confirm_result()
+
 ## Builds a full WorldSnapshot from live state. The home-ship slice is the
 ## existing RunSnapshot; when the player is aboard a derelict the home slice's
 ## player_position is overridden with the position they left home from (the live
@@ -7649,6 +7685,7 @@ func _input(event: InputEvent) -> void:
 		if menu_coordinator.handle_ui_input(event):
 			if event.is_action_pressed("ui_open_map"):
 				menu_coordinator.reveal_room(menu_coordinator.map_fog_state.get_tracked_room_id())
+			_dispatch_save_load_confirm_result(menu_coordinator.get_last_meta_screen_confirm_result())
 			get_viewport().set_input_as_handled()
 			return
 		for action_name in ["move_forward", "move_back", "move_left", "move_right"]:
