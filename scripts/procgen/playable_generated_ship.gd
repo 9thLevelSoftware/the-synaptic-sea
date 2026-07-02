@@ -5794,10 +5794,16 @@ func dismiss_latest_tutorial_for_validation() -> bool:
 		return false
 	return menu_coordinator.dismiss_latest_tutorial()
 
-func apply_ui_settings_summary_for_validation(summary: Dictionary) -> bool:
+## Applies a settings summary to the live session's MenuCoordinator (title-screen
+## dirty-flag handoff and validation seam both delegate here).
+func apply_ui_settings_summary(summary: Dictionary) -> bool:
 	if not is_instance_valid(menu_coordinator):
 		return false
 	return menu_coordinator.apply_settings_summary(summary)
+
+## Validation-only alias kept for existing smokes; delegates to the production seam.
+func apply_ui_settings_summary_for_validation(summary: Dictionary) -> bool:
+	return apply_ui_settings_summary(summary)
 
 # --- Hazard / ElectricalArcState integration ----------------------------------
 # REQ-013: electrical-arc zone scene integration. The third hazard's pure model
