@@ -126,11 +126,13 @@ load the slot back, objective progress reverts while `visited_ships`/dock state 
 `end_run` (`playable_generated_ship.gd:1604-1621`) branches on reason:
 
 - `reason == "death"` → `_freeze_run_on_death()` — **nothing is deleted**:
-  - `PermadeathResolver.record_death(slot_id, cause, epitaph, run_time, final_seq)` for: the
-    active-autosave alias, `"world"`, every `AUTOSAVE_SLOT_IDS`, the quickslot if present, **and
-    every manual slot written this run** (new run-local set
-    `_manual_slots_written_this_run`, populated by the slot screen's Save action). Manual slots
-    freeze too — user decision; a mid-run manual save must not be a permadeath escape hatch.
+  - `save_load_service.freeze_run(_run_id, cause, epitaph, run_time, final_seq)`, which resolves
+    `slot_ids_for_run(_run_id)` against the save index and calls
+    `PermadeathResolver.record_death(...)` for each match: the active-autosave alias, `"world"`,
+    every `AUTOSAVE_SLOT_IDS`, the quickslot if present, **and every manual slot written this
+    run** — all of them found structurally (whichever slot/index rows were actually stamped with
+    `_run_id`), not via a separately-maintained tracked set. Manual slots freeze too — user
+    decision; a mid-run manual save must not be a permadeath escape hatch.
   - `world.json` stays on disk, frozen via its death record — the slot screen renders DEAD rows
     with epitaphs (ADR-0032's browse-the-epitaph intent, wired for the first time).
 - Extraction/completion path **unchanged** (still deletes — a finished run has nothing to
@@ -147,14 +149,19 @@ load the slot back, objective progress reverts while `visited_ships`/dock state 
   never unfreezes a still-DEAD payload (PR #57 Codex round 3 P2), while the next live run's
   successful system write still reclaims a previously-frozen slot instead of permanently bricking
   Continue/that autosave slot (final-review finding; see ADR-0043).
-- **Freeze-set ownership (PR #57 Codex round 3 P1; corrected round 4 P1):** `_freeze_run_on_death()`
-  only freezes the shared lineage (active-autosave alias, `"world"`, `AUTOSAVE_SLOT_IDS`, quickslot)
-  when the run-local `_persisted_lineage_active` flag is true — set via `_mark_shared_lineage()` on
-  a successful Continue/F9 load or this run's first successful world/autosave write — so a fresh New
-  Game that dies before ever loading or saving cannot brick a different, still-live run's Continue.
-  **Manual slots never call `_mark_shared_lineage()`** (round 4 P1 fix — manual saves must not claim
-  the shared lineage). Manual slots (`_manual_slots_written_this_run`) are always frozen regardless
-  of the lineage flag, since that set is already write-tracked per run.
+- **Freeze-set ownership (run_id slot-ownership rework, superseding the PR #57 round 3 P1 /
+  round 4 P1 flag-based fix):** every save stamps the writing run's identity onto the payload and
+  index row *inside* `SaveLoadService` itself (`save_world()`/`save_to_slot()` stamp
+  `_active_run_id`, set via `set_active_run_id()` at session start and on a successful Continue/F9
+  load) — no coordinator call site can forget to mark ownership, because there is no longer a
+  separate ownership flag to mark. `_freeze_run_on_death()` asks
+  `slot_ids_for_run(_run_id)` which slots this run actually wrote and freezes exactly those. A
+  fresh New Game that dies before ever loading or saving has an `_run_id` that matches no index
+  row, so nothing freezes — it cannot brick a different, still-live run's Continue. Manual slots
+  need no special-casing: a manual save is stamped with `_run_id` the same way a world/autosave
+  write is, so it is found by the same query, with no risk of it ever being mistaken for a
+  world/autosave-lineage write (they are structurally separate index rows). See ADR-0043 §7 for
+  the full rationale, the rejected write-on-read alternative, and the legacy fails-open case.
 - **`_input` fix:** the `menu_coordinator` input dispatch moves ahead of the
   `slice_complete` early-return; only the gameplay-input tail stays gated. Death detection
   already ticks on both `_process` branches (`_tick_survival_attrition` at `:5254`/`:5330` →

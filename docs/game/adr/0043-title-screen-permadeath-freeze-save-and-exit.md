@@ -88,7 +88,12 @@ still-frozen slot cannot be read back mid-death, only overwritten by a
 genuinely new run.
 
 **Freeze-set ownership (lineage gate, PR #57 Codex round 3 P1; corrected
-round 4 P1).** `_freeze_run_on_death()` must only freeze the shared
+round 4 P1) — superseded by §7 below.** This paragraph documents the
+original flag-based mechanism for historical context; the fields and
+functions it describes (`_persisted_lineage_active`, `_mark_shared_lineage()`,
+`_manual_slots_written_this_run`) were deleted and replaced by the run_id
+slot-ownership rework in §7 — read that section for the current design.
+`_freeze_run_on_death()` used to only freeze the shared
 lineage — the active-autosave alias, `"world"`, every `AUTOSAVE_SLOT_IDS`
 row, and the quickslot — when THIS run instance actually owns that
 lineage. Ownership is tracked by a run-local flag,
@@ -191,6 +196,99 @@ than per-machine (the multiplayer/PZ-like direction referenced in decision
 survive independently of any specific save slot. That is out of scope for
 this domain -- title settings today only ever round-trips through whichever
 RunSnapshot is active.
+
+### 7. Freeze-set ownership rework: run_id replaces the lineage-flag/manual-set pair
+
+**Problem.** PR #57 absorbed five review findings that all traced to one
+root cause: the shared slot family (world, autosave_a/b/c, autosave_active,
+quickslot) was owned "by convention" rather than structurally.
+`_persisted_lineage_active` had to be set via `_mark_shared_lineage()` at
+four separate coordinator call sites (request_load, request_save,
+_auto_save_current_run, _tick_autosave_policy), and manual slots were
+tracked in a parallel, independently-maintained `_manual_slots_written_this_run`
+Dictionary that then had to be mirrored through
+`WorldSnapshot.manual_slots_written` just to survive a Save & Exit ->
+Continue boundary. Every one of the five findings was a call site
+forgetting to set a flag, or setting it in the wrong branch. A convention
+enforced by scattered call sites is exactly the kind of bug class that
+recurs: the fix is to stop tracking ownership by flag and start tracking it
+by what was actually written.
+
+**New fields/APIs.** `RunSnapshot.run_id`, `WorldSnapshot.run_id`, and
+`SaveSlotState.run_id` are additive `String` fields (empty default, same
+`.get`-default pattern as `breach_seeded`). `SaveLoadService` gains
+`_active_run_id` + `set_active_run_id(id)` / `get_active_run_id()`, and
+stamps `_active_run_id` onto the payload and the index row inside
+`save_world()`/`save_to_slot()` themselves -- no coordinator call site can
+forget to stamp it, because stamping no longer happens at the call site at
+all. `slot_ids_for_run(run_id)` reads the index (plus the world row) and
+returns every slot_id whose row matches; an empty run_id matches nothing,
+so a run that has never loaded or saved anything can never accidentally
+claim a match. `freeze_run(run_id, cause, epitaph, run_time, final_seq)`
+resolves `slot_ids_for_run(run_id)` and calls
+`PermadeathResolver.record_death(...)` for each.
+
+**Why `freeze_run` lives on `SaveLoadService`, not `PermadeathResolver`.**
+`PermadeathResolver` is deliberately index-blind pure file I/O (death
+records live at `<slot_id>.death.json`, resolved by slot_id alone, with no
+knowledge of which run wrote what). `SaveLoadService` already owns the
+index (`_load_index`/`_save_index`, `SaveIndexState`), so it is the only
+place that can answer "which slots does this run_id own" without either
+duplicating the index-reading logic on the resolver or making the resolver
+reach back into service internals. Keeping the resolver index-blind also
+keeps its contract simple for anything that only needs `has_died_in`/
+`load_epitaph`/`record_death` on a single slot_id, independent of ownership
+semantics.
+
+**Coordinator side.** `PlayableGeneratedShip._run_id: String` replaces both
+deleted fields. It is generated once per session
+(`_generate_run_id() -> "%d-%04x" % [Time.get_ticks_usec(), randi() % 0x10000]`)
+at the same point `save_load_service` itself is constructed, and stamped
+into the service immediately via `set_active_run_id`. `_freeze_run_on_death()`
+collapses to a single call:
+`save_load_service.freeze_run(_run_id, "death", _build_epitaph_text(), world_time, current_objective_sequence)`.
+
+**Legacy assign-on-load-fails-open rule (and the rejected alternative).**
+On a successful Continue/F9 load (`request_load()`), `_run_id` is restored
+from the loaded `WorldSnapshot.run_id` if non-empty, or a fresh id is
+generated if the loaded save predates this field (`ws.run_id == ""`).
+**Nothing is written to disk on load** -- the freshly generated id is only
+stamped on this run's *next* save, exactly like every other save-time
+stamp. A pre-rework `world.json` therefore has no `run_id` row in the
+index either, so `slot_ids_for_run()` cannot find it under the fresh id: if
+the player dies before making a single save under the new id, nothing
+freezes. This fails OPEN and is an accepted, documented gap (see "Known
+migration behavior" below) -- it is the direct legacy-data analogue of the
+old "New Game with no load/save owns nothing" case, and is no worse than
+what the flag-based design already accepted for a brand-new run.
+**Rejected alternative: write-on-read.** An earlier draft considered
+backfilling the id onto `world.json` immediately on load (so a legacy save
+would freeze correctly even before its first post-rework save). This was
+rejected: reads must not have write side effects on the save directory --
+a load path that mutates disk state complicates every other assumption
+about when saves change (corruption backups, cloud manifests, the
+reclaim-on-write ordering) for a benefit that only matters for the single
+run that first loads a pre-rework save. Do not reintroduce this.
+
+**Deletions and why they are safe.** `_persisted_lineage_active`,
+`_mark_shared_lineage()` (and its four call sites),
+`_manual_slots_written_this_run` (and its population line in
+`_dispatch_save_load_confirm_result`), and `WorldSnapshot.manual_slots_written`
+are all deleted with zero remaining references (grep-verified). Every
+behavior they implemented is now a direct consequence of
+`slot_ids_for_run`/`freeze_run` reading what `save_world`/`save_to_slot`
+already stamped -- there is no remaining call site that needs to "remember"
+ownership, because ownership is no longer a separate piece of state to
+forget.
+
+**`.corrupt` interplay.** A slot quarantined to `user://saves/.corrupt/`
+(via `_backup_corrupt_file`) keeps its `run_id` on the index row (only the
+payload file moves; the index row is separately flagged `corrupt=true`, not
+removed). If a dying run's own corrupt slot is still indexed under its
+`run_id`, `freeze_run` still freezes it -- deliberate: a corrupted slot
+belonging to a dead run should still read as dead, not silently become
+loadable again because its payload happened to fail migration/parsing
+before the death.
 
 ## Known migration behavior
 

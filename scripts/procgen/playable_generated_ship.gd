@@ -1275,6 +1275,11 @@ func _build_runtime_nodes() -> void:
 	# Constructed BEFORE _build_hud_layer() because the menu shell's meta-screen
 	# binding (below) consumes save_load_menu / localization_catalog / build_metadata.
 	save_load_service = SaveLoadServiceScript.new()
+	# run_id slot-ownership rework: stamp this session's run identity into
+	# the service immediately, so every save this run makes before any
+	# later Continue/F9 load is already attributed to this run's freeze set.
+	_run_id = _generate_run_id()
+	save_load_service.set_active_run_id(_run_id)
 	# Timed/rotating autosave loop (additive to the REQ-012 checkpoint save).
 	# Defaults: 90 in-game-second cadence, 8-event cadence, 5 s real-time budget
 	# guard, rotating autosave_a/b/c. Driven from _process via _tick_autosave_policy().
@@ -1611,44 +1616,24 @@ func get_unlock_registry():
 ##
 ## Returns the payout amount in meta_currency. Idempotent: a second call
 ## after the slice is already complete returns 0 and is a no-op.
-# Domain 8 (ADR-0043): slot ids the slot screen's Save verb has written to
-# THIS run. Permadeath freeze must also freeze these -- a mid-run manual
-# save must not be a save-scumming escape hatch from permadeath. In-memory
-# bookkeeping, but mirrored into WorldSnapshot.manual_slots_written on every
-# world save/load (PR #57 Codex round 2 finding C) so the set survives a
-# Save & Exit -> Continue boundary (a fresh PlayableGeneratedShip would
-# otherwise lose it and let a previously-manual-saved slot dodge freeze on
-# a later death in the resumed run).
-var _manual_slots_written_this_run: Dictionary = {}
+# run_id slot-ownership rework (ADR-0043 addendum): identifies THIS run
+# instance to SaveLoadService. Every save_world()/save_to_slot() call
+# stamps this id onto the payload and index row inside the service itself
+# (no coordinator call site can forget to stamp it), so
+# _freeze_run_on_death() can ask the service which slots this run actually
+# wrote instead of relying on convention-tracked flags
+# (_persisted_lineage_active / _manual_slots_written_this_run, both
+# deleted). Set at session start and re-set on a successful Continue/F9
+# load (see request_load()).
+var _run_id: String = ""
 
-# PR #57 Codex round 3 P1: true once THIS run instance owns the SHARED
-# world/autosave save lineage, i.e. either (a) it successfully loaded an
-# existing world save (Continue/F9 -- the loaded world.json + its autosave
-# family belong to this run now), or (b) it has written world.json/an
-# autosave at least once. A fresh New Game that has neither loaded nor
-# saved to that shared lineage owns NOTHING on disk yet, so
-# _freeze_run_on_death() must not stamp a death record onto a PRIOR run's
-# still-live world.json/autosaves -- doing so would brick that prior run's
-# Continue with an epitaph from a run that never wrote a byte (Codex round
-# 3 P1 finding). Set exactly at the shared-lineage success points via
-# _mark_shared_lineage(); never cleared mid-run.
-#
-# PR #57 Codex round 4 P1: shared world/autosave slot family only. Manual
-# slots NEVER call this -- they are tracked per-slot in
-# _manual_slots_written_this_run. A manual-only run must not claim the
-# shared lineage (PR #57 Codex round 4).
-var _persisted_lineage_active: bool = false
-
-## PR #57 Codex round 3 P1: call at every point where this run instance
-## takes ownership of the SHARED world/autosave save lineage (see the field
-## comment above for the exact two cases).
-##
-## PR #57 Codex round 4 P1: shared world/autosave slot family only. Manual
-## slots NEVER call this -- they are tracked per-slot in
-## _manual_slots_written_this_run. A manual-only run must not claim the
-## shared lineage (PR #57 Codex round 4). Idempotent.
-func _mark_shared_lineage() -> void:
-	_persisted_lineage_active = true
+## run_id slot-ownership rework: a fresh per-session run identity. Ticks
+## microseconds are not guaranteed unique across process starts on their
+## own, so a random 16-bit suffix is appended; collision with another
+## run's id would falsely merge two runs' freeze sets, which the suffix
+## makes astronomically unlikely without needing a UUID dependency.
+func _generate_run_id() -> String:
+	return "%d-%04x" % [Time.get_ticks_usec(), randi() % 0x10000]
 
 func end_run(reason: String = "extraction") -> int:
 	if slice_complete:
@@ -1673,41 +1658,19 @@ func end_run(reason: String = "extraction") -> int:
 	emit_signal("playable_slice_completed", get_slice_completion_summary())
 	return payout
 
-## ADR-0043: freeze every slot that represents "the state at/after death"
-## instead of deleting it. Manual slot_01..06 the player saved THIS run are
-## included (via _manual_slots_written_this_run) -- a mid-run manual save
-## must not be a permadeath escape hatch. world.json itself is never
-## deleted; PermadeathResolver.has_died_in("world") gates future loads.
-##
-## PR #57 Codex round 3 P1 lineage gate: "world" + the active-autosave alias
-## + every AUTOSAVE_SLOT_IDS row + the quickslot are only frozen when
-## _persisted_lineage_active is true -- i.e. THIS run either loaded an
-## existing world save (Continue/F9) or has written to that SHARED
-## world/autosave lineage at least once. A fresh New Game that dies before
-## ever loading or saving to the shared lineage does not own it; freezing
-## it would stamp a prior, unrelated run's still-live world.json/autosaves
-## with THIS run's epitaph and brick that prior run's Continue for a death
-## it never had. The manual-slot set is unaffected by this gate --
-## _manual_slots_written_this_run is already write-tracked (a slot only
-## appears there after this run wrote to it via the slot screen, never via
-## _mark_shared_lineage -- PR #57 Codex round 4 P1), so it is always safe
-## to freeze regardless of _persisted_lineage_active.
+## ADR-0043 / run_id slot-ownership rework: freeze every slot this run
+## instance actually wrote instead of deleting it. Replaces the old
+## convention-tracked lineage flag + manual-slot dictionary: SaveLoadService
+## already knows -- from the run_id it stamped on every write -- exactly
+## which slots (world, the active-autosave alias, AUTOSAVE_SLOT_IDS, the
+## quickslot, and any manual slot_01..06) belong to _run_id, so freeze_run()
+## resolves the whole set structurally. A fresh run whose _run_id has never
+## been stamped onto a disk row (New Game, die-before-any-save) freezes
+## nothing -- it cannot brick a different, still-live run's Continue,
+## because slot_ids_for_run() only returns rows this run's id actually
+## touched.
 func _freeze_run_on_death() -> void:
-	var resolver := PermadeathResolverScript.new()
-	var epitaph_text: String = _build_epitaph_text()
-	var run_time: float = world_time
-	var final_seq: int = current_objective_sequence
-	var slots_to_freeze: Array = []
-	if _persisted_lineage_active:
-		slots_to_freeze.append(SaveLoadServiceScript.ACTIVE_AUTOSAVE_SLOT_ID)
-		slots_to_freeze.append("world")
-		slots_to_freeze.append_array(SaveSlotStateScript.AUTOSAVE_SLOT_IDS)
-		if save_load_service.has_slot(SaveSlotStateScript.QUICKSAVE_SLOT_ID):
-			slots_to_freeze.append(SaveSlotStateScript.QUICKSAVE_SLOT_ID)
-	for manual_slot_id in _manual_slots_written_this_run.keys():
-		slots_to_freeze.append(String(manual_slot_id))
-	for slot_id in slots_to_freeze:
-		resolver.record_death(slot_id, "death", epitaph_text, run_time, final_seq)
+	save_load_service.freeze_run(_run_id, "death", _build_epitaph_text(), world_time, current_objective_sequence)
 
 ## ADR-0043: short human-readable epitaph text for the frozen slot rows /
 ## death record. Cause is always "death" today (the only end_run reason
@@ -6612,7 +6575,6 @@ func _auto_save_current_run() -> bool:
 		return false
 	if save_load_service.save_world(ws):
 		last_saved_snapshot = _build_run_snapshot()  # preserve in-memory RunSnapshot seam (get_last_saved_snapshot)
-		_mark_shared_lineage()  # PR #57 Codex round 3 P1: first world write -- this run now owns the shared lineage
 		return true
 	return false
 
@@ -6645,7 +6607,6 @@ func _tick_autosave_policy(delta: float) -> void:
 	if save_load_service.save_to_slot(slot_id, snap, SaveSlotStateScript.SLOT_KIND_AUTO, false, "Autosave"):
 		last_saved_snapshot = snap
 		_last_autosave_result = r
-		_mark_shared_lineage()  # PR #57 Codex round 3 P1: first autosave write -- this run now owns the shared lineage
 
 ## Validation seam: the live AutosavePolicy instance (null before runtime build).
 func get_autosave_policy_for_validation():
@@ -6729,7 +6690,6 @@ func request_save() -> bool:
 		return false
 	var result: bool = save_load_service.save_world(ws)
 	if result:
-		_mark_shared_lineage()  # PR #57 Codex round 3 P1: first world write -- this run now owns the shared lineage
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_SAVE)
 		print("PLAYABLE SHIP SAVED location=%s sequence=%d" % [ws.current_location, current_objective_sequence])
@@ -6766,11 +6726,17 @@ func request_load() -> bool:
 		return false
 	var loaded: bool = _apply_world_snapshot(ws)
 	if loaded:
-		# PR #57 Codex round 3 P1: a successful Continue/F9 world load means this
-		# run instance now owns the loaded shared lineage -- world.json's
-		# pre-existing autosaves belong to it too, so a death from here must
-		# freeze them.
-		_mark_shared_lineage()
+		# run_id slot-ownership rework: a successful Continue/F9 world load
+		# means this run instance now owns the loaded world.json's run_id --
+		# its pre-existing autosave family is attributed to that same id, so
+		# a death from here freezes them via the normal freeze_run(_run_id)
+		# path. If the loaded world.json predates this field (empty run_id,
+		# legacy save), generate a fresh id instead: this deliberately fails
+		# OPEN (dying before the first save under the fresh id freezes
+		# nothing) rather than writing a backfilled id to disk on load --
+		# see ADR-0043 addendum for the rejected write-on-read alternative.
+		_run_id = ws.run_id if not String(ws.run_id).is_empty() else _generate_run_id()
+		save_load_service.set_active_run_id(_run_id)
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_LOAD)
 		if is_instance_valid(menu_coordinator):
@@ -6999,7 +6965,6 @@ func _dispatch_save_load_confirm_result(result: Dictionary) -> void:
 		return
 	var action: String = str(result.get("action", ""))
 	var ok: bool = bool(result.get("ok", false))
-	var detail: String = str(result.get("detail", ""))
 	if action == "load" and ok:
 		var snapshot: RunSnapshot = result.get("snapshot", null) as RunSnapshot
 		apply_manual_slot(snapshot)
@@ -7009,15 +6974,13 @@ func _dispatch_save_load_confirm_result(result: Dictionary) -> void:
 		# gameplay state there). Route through the same proven world-apply
 		# path F9 and the title screen's Continue already use.
 		request_load()
-	elif action == "save" and ok:
-		# PR #57 Codex round 4 P1: manual slots are NEVER a shared-lineage write.
-		# They are already independently tracked in _manual_slots_written_this_run
-		# and _freeze_run_on_death() freezes them unconditionally via that set --
-		# do not also call _mark_shared_lineage() here, or a manual-only save
-		# during a fresh run would make _freeze_run_on_death() stamp a death
-		# record onto "world"/the autosave family too, bricking a PRIOR run's
-		# still-live Continue that this run never touched.
-		_manual_slots_written_this_run[detail] = true
+	# action == "save": no bookkeeping needed here. save_to_slot() already
+	# stamped _run_id onto the manual slot's payload and index row inside
+	# SaveLoadService (run_id slot-ownership rework) -- freeze_run(_run_id)
+	# finds it via the index the same way it finds world/autosave rows, so
+	# a manual save never needs a coordinator-side tracked set to freeze
+	# correctly, and never risks claiming the shared world/autosave lineage
+	# either (that is a structurally separate row).
 	if not action.is_empty():
 		menu_coordinator.clear_last_meta_screen_confirm_result()
 
@@ -7065,11 +7028,12 @@ func _build_world_snapshot():
 	ws.piloted_ship_id = piloted_ship.ship_id if piloted_ship != null else ""
 	ws.aboard_ship_id = current_occupancy.ship_id if current_occupancy != null else ""
 	ws.opened_ports = _opened_port_marker_ids()
-	# PR #57 Codex round 2 finding C: persist the manual-save freeze set so a
-	# Save & Exit -> Continue cross-run boundary does not forget which manual
-	# slots this run wrote (_manual_slots_written_this_run is otherwise
-	# in-memory-only and lost when a fresh PlayableGeneratedShip is built).
-	ws.manual_slots_written = _manual_slots_written_this_run.keys()
+	# run_id slot-ownership rework: stamp this run's identity onto the
+	# snapshot directly (SaveLoadService.save_world() also stamps it from
+	# _active_run_id right before writing, but setting it here keeps
+	# _build_world_snapshot()'s output self-consistent for any caller that
+	# inspects the snapshot before it reaches the service, e.g. validation).
+	ws.run_id = _run_id
 	ws.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
 	ws.godot_version = Engine.get_version_info()["string"]
 	ws.saved_at = Time.get_datetime_string_from_system(true)
@@ -7279,11 +7243,9 @@ func _apply_world_snapshot(ws) -> bool:
 	for b in dock_barriers:
 		if is_instance_valid(b) and ws.opened_ports.has(String(b.marker_id)):
 			b.set_opened(true)
-	# PR #57 Codex round 2 finding C: restore the manual-save freeze set, merged
-	# with any current-run keys (rather than replaced) so this stays correct
-	# even if a load somehow runs mid-run with slots already recorded.
-	for manual_slot_id in ws.manual_slots_written:
-		_manual_slots_written_this_run[String(manual_slot_id)] = true
+	# run_id restore happens in request_load() (the caller that has ws in
+	# scope for the Continue/F9 path) -- not here, so there is exactly one
+	# site that decides _run_id after a load.
 	# 5c. Ensure every derelict that is an endpoint of a saved dock edge has geometry
 	# BEFORE re-docking. Step 4 only materializes current_location; a claimed derelict the
 	# player was PILOTING (docked to a different host after rigid-pair travel) is otherwise

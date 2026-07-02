@@ -32,29 +32,35 @@ extends SceneTree
 ## writing (reclaim-on-write, ADR-0043), so a fresh run is never permanently
 ## bricked out of Continue/that autosave slot by a prior death.
 ##
-## LINEAGE stage (PR #57 Codex round 3 P1 fix): a fresh PlayableGeneratedShip
-## naturally starts with _persisted_lineage_active == false. With a LIVE,
-## unfrozen world.json already on disk (simulating a prior run's Continue),
-## simulate New Game (no load, no save) and drive death: _freeze_run_on_death
-## must NOT record a death for "world" (this run never loaded or wrote it),
-## and load_world() must still return the untouched prior snapshot. All
-## earlier/later stages in this file call request_save() (or reach
-## request_load() via load_world) before their own death, which marks
-## _persisted_lineage_active true -- so they continue to exercise the
-## lineage-active freeze path unchanged.
+## run_id slot-ownership rework: the old convention-tracked
+## _persisted_lineage_active flag + _manual_slots_written_this_run dictionary
+## are gone. Every write now stamps the writing run's SaveLoadService._run_id
+## into the payload and index row inside the service itself; freeze_run(run_id)
+## resolves the freeze set by querying the index for every slot_id stamped
+## with that id. The stages below exercise the same scenarios the old flags
+## covered, through the new structural mechanism:
 ##
-## MANUAL-ONLY stage (PR #57 Codex round 4 P1 fix): with the same LIVE prior-
-## run world.json from the LINEAGE stage still on disk and this instance's
-## _persisted_lineage_active still false, save ONLY "slot_01" through the
-## REAL slot-screen dispatch path (menu_coordinator.meta_screen_confirm() ->
+## LINEAGE stage: seeds a LIVE, unfrozen world.json stamped with a foreign
+## run_id ("prior-run-test", simulating a prior run's Continue) via
+## service.set_active_run_id("prior-run-test") + save_world(), then restores
+## service.set_active_run_id(playable._run_id) (this instance's own,
+## already-generated id -- asserted non-empty and != "prior-run-test") before
+## driving death with no load/save ever made under THIS run's id. Because
+## "world" is stamped with the foreign id, slot_ids_for_run(playable._run_id)
+## does not include it, so freeze_run(playable._run_id) leaves it untouched:
+## has_died_in("world") is false and the prior run's world.json still loads.
+##
+## MANUAL-ONLY stage: with the same LIVE prior-run-stamped world.json from
+## the LINEAGE stage still on disk, saves ONLY "slot_01" through the REAL
+## slot-screen dispatch path (menu_coordinator.meta_screen_confirm() ->
 ## PlayableGeneratedShip._dispatch_save_load_confirm_result(), the same
-## "save" arm save_load_slot_screen_smoke.gd exercises), then drive death
-## with no world/autosave write ever made this run. Asserts the manual save
-## does NOT flip _persisted_lineage_active, has_died_in("slot_01") is TRUE
-## (manual slots always freeze, tracked independently via
-## _manual_slots_written_this_run), has_died_in("world") is FALSE, and
-## load_world() still returns the prior run's untouched snapshot -- proving
-## a manual-only save can never brick a prior run's Continue.
+## "save" arm save_load_slot_screen_smoke.gd exercises) -- save_to_slot()
+## stamps slot_01 with playable._run_id inside the service, asserted via
+## service.slot_ids_for_run(playable._run_id).has("slot_01") -- then drives
+## death with no world/autosave write ever made under this run's id.
+## has_died_in("slot_01") is TRUE (that row carries this run's id) while
+## has_died_in("world") is FALSE (that row still carries the foreign id),
+## proving a manual-only save can never brick a prior run's Continue.
 ##
 ## RECLAIM-FAILURE stage (PR #57 Codex round 3 P2 fix): with a death record
 ## present on "world", force save_world()'s file write to fail (pre-creating
@@ -165,22 +171,29 @@ func _validate() -> void:
 	_wipe_all(service, resolver)
 
 	# --- LINEAGE: fresh-run-no-save must NOT freeze a prior run's world.json
-	# (PR #57 Codex round 3 P1) --- Must run FIRST, before any other stage's
-	# request_save()/request_load() call flips _persisted_lineage_active true
-	# for the rest of this smoke's lifetime (the flag is run-local and
-	# deliberately never cleared mid-run, so a genuinely fresh-instance
-	# assertion only holds here).
-	if playable._persisted_lineage_active:
-		_fail("lineage: a freshly-loaded instance must start with _persisted_lineage_active false")
+	# (run_id slot-ownership rework) --- Must run FIRST, before any other
+	# stage's own request_save()/request_load() writes under THIS instance's
+	# real _run_id (a genuinely "prior, foreign-owned world.json" state only
+	# holds before this instance has written anything of its own).
+	if String(playable._run_id).is_empty():
+		_fail("lineage: a freshly-booted instance must already have a non-empty _run_id (stamped at session start)")
 		return
-	# Simulate a LIVE Continue: write a real, unfrozen world.json belonging to
-	# a "prior run" (run A) via the service directly (bypassing
-	# request_save()/request_load() so THIS instance's flag stays false,
-	# mirroring "run B never wrote a byte"). Then reset to New Game state
-	# (slice_complete=false, health=100) and drive death with no load/save
-	# ever called on this instance -- nothing in the shared world/autosave
-	# lineage may freeze, and the prior run's world.json must still load.
+	# "prior-run-test" can never collide with _generate_run_id()'s own output:
+	# that format is always "<ticks_usec>-<4 hex digits>" (a literal '-'
+	# between an integer and exactly 4 lowercase hex chars), which this
+	# literal does not match (it has no hex-only 4-char suffix segment).
+	if String(playable._run_id) == "prior-run-test":
+		_fail("lineage: playable._run_id collided with the foreign-run literal -- test fixture invalid")
+		return
+	# Simulate a LIVE Continue: write a real, unfrozen world.json stamped with
+	# a FOREIGN run_id ("prior-run-test") by pointing the service's active id
+	# at it directly (bypassing request_save(), which would stamp THIS
+	# instance's own _run_id instead). Then restore the service's active id to
+	# this instance's real _run_id (mirroring "this run has not saved
+	# anything yet") and drive death -- nothing stamped with the foreign id
+	# may freeze, and the foreign world.json must still load.
 	playable.away_from_start = false
+	service.set_active_run_id("prior-run-test")
 	var prior_run_ws = playable._build_world_snapshot()
 	if prior_run_ws == null:
 		_fail("lineage: _build_world_snapshot() returned null while building the prior-run world save")
@@ -188,8 +201,9 @@ func _validate() -> void:
 	if not service.save_world(prior_run_ws):
 		_fail("lineage: seeding the prior run's world.json should succeed")
 		return
-	if playable._persisted_lineage_active:
-		_fail("lineage: direct service.save_world() must not itself flip _persisted_lineage_active (only the coordinator's own save/load call sites should)")
+	service.set_active_run_id(playable._run_id)
+	if not service.slot_ids_for_run("prior-run-test").has("world"):
+		_fail("lineage: 'world' should be stamped with the foreign run_id 'prior-run-test' after the seed save")
 		return
 	playable.vitals_state.health = 0.0
 	_pump(0.1)
@@ -205,30 +219,25 @@ func _validate() -> void:
 		return
 
 	# --- MANUAL-ONLY: a manual-slot save must NOT claim the shared lineage
-	# (PR #57 Codex round 4 P1) --- With the same LIVE, unfrozen prior-run
-	# world.json still on disk (seeded above) and this instance's
-	# _persisted_lineage_active still false (still New-Game-fresh -- no
-	# request_save()/request_load() has run on it), save ONLY slot_01
-	# through the REAL slot-screen dispatch path (menu_coordinator.
-	# meta_screen_confirm() -> PlayableGeneratedShip._dispatch_save_load_
-	# confirm_result(), the same route save_load_slot_screen_smoke.gd
-	# exercises), then die with no world/autosave write ever made this run.
-	# _mark_shared_lineage() must never fire from a manual save, so
-	# _freeze_run_on_death() must freeze slot_01 (per-slot tracked in
-	# _manual_slots_written_this_run) while leaving "world" untouched --
-	# proving the fix does not brick the prior run's Continue.
+	# (run_id slot-ownership rework) --- With the same LIVE, foreign-stamped
+	# ("prior-run-test") world.json still on disk (seeded above) and the
+	# service's active id restored to this instance's real _run_id, save
+	# ONLY slot_01 through the REAL slot-screen dispatch path
+	# (menu_coordinator.meta_screen_confirm() ->
+	# PlayableGeneratedShip._dispatch_save_load_confirm_result(), the same
+	# route save_load_slot_screen_smoke.gd exercises), then die with no
+	# world/autosave write ever made under this run's id. save_to_slot()
+	# stamps slot_01 with playable._run_id inside the service; "world" stays
+	# stamped with the foreign id, so freeze_run(playable._run_id) freezes
+	# slot_01 only -- proving a manual-only save can never brick the prior
+	# run's Continue.
 	#
 	# Un-end the LINEAGE stage's death (slice_complete=true, health=0) so
 	# _build_run_snapshot()/request_save() work again for this stage's own
 	# manual save + death. This does NOT touch "world" on disk (still the
-	# live prior-run snapshot seeded above) or _persisted_lineage_active
-	# (never flipped by the LINEAGE stage, since it never called
-	# request_save()/request_load() on this instance).
+	# live foreign-stamped snapshot seeded above).
 	playable.slice_complete = false
 	playable.vitals_state.health = 100.0
-	if playable._persisted_lineage_active:
-		_fail("manual-only: _persisted_lineage_active must still be false before the manual-only save (no world/autosave write happened yet)")
-		return
 	var manual_only_coord = playable.menu_coordinator
 	manual_only_coord.open_records_menu()
 	manual_only_coord.open_meta_screen("save_load")
@@ -266,11 +275,11 @@ func _validate() -> void:
 	# call site the fix touched (the "save" arm in
 	# _dispatch_save_load_confirm_result).
 	playable._dispatch_save_load_confirm_result(manual_only_confirm)
-	if not playable._manual_slots_written_this_run.has("slot_01"):
-		_fail("manual-only: 'slot_01' not recorded in _manual_slots_written_this_run after the real dispatch save")
+	if not service.slot_ids_for_run(playable._run_id).has("slot_01"):
+		_fail("manual-only: 'slot_01' not stamped with playable._run_id after the real dispatch save")
 		return
-	if playable._persisted_lineage_active:
-		_fail("manual-only: a manual-slot-only save must NOT flip _persisted_lineage_active (PR #57 Codex round 4 P1 regression)")
+	if service.slot_ids_for_run(playable._run_id).has("world"):
+		_fail("manual-only: a manual-slot-only save must NOT stamp 'world' with playable._run_id (run_id slot-ownership regression)")
 		return
 	manual_only_coord.menu_state.close_all()
 
@@ -290,12 +299,13 @@ func _validate() -> void:
 		_fail("manual-only: prior run's world.json should still be loadable after a manual-only death")
 		return
 
-	# Reset for the remaining stages, which all exercise the lineage-active
-	# path via their own request_save()/request_load() calls below.
+	# Reset for the remaining stages, which all exercise this instance's own
+	# _run_id (still the same id set at session start -- service.set_active_
+	# run_id(playable._run_id) restored it after the LINEAGE stage borrowed
+	# the foreign id) via their own request_save()/request_load() calls below.
 	_wipe_all(service, resolver)
 	playable.slice_complete = false
 	playable.vitals_state.health = 100.0
-	playable._manual_slots_written_this_run.clear()
 
 	# --- HOME-BRANCH DEATH ---
 	playable.away_from_start = false
@@ -352,7 +362,6 @@ func _validate() -> void:
 	_wipe_all(service, resolver)
 	playable.slice_complete = false
 	playable.vitals_state.health = 100.0
-	playable._manual_slots_written_this_run.clear()
 
 	# --- AWAY-BRANCH DEATH ---
 	playable.away_from_start = true
@@ -394,7 +403,6 @@ func _validate() -> void:
 	# "world" and autosave_slot2.
 	playable.slice_complete = false
 	playable.vitals_state.health = 100.0
-	playable._manual_slots_written_this_run.clear()
 
 	if not playable.request_save():
 		_fail("reclaim: next-run request_save() (world) should succeed")
@@ -418,21 +426,29 @@ func _validate() -> void:
 	if not TitleSaveQueryScript.is_continue_available(service, resolver):
 		_fail("reclaim: TitleSaveQuery.is_continue_available() should be true after reclaim")
 		return
+	# run_id slot-ownership rework: the reclaiming save re-stamps "world"
+	# with this run's own id (request_save() -> save_world() stamps
+	# _active_run_id, unchanged since session start), a free correctness
+	# bonus of reclaim-on-write.
+	if not service.slot_ids_for_run(playable._run_id).has("world"):
+		_fail("reclaim: 'world' should be stamped with playable._run_id after the reclaiming request_save()")
+		return
 
-	# --- MANUAL-SLOT CROSS-RUN FREEZE (Codex round 2 finding C) ---
-	# _manual_slots_written_this_run is in-memory-only bookkeeping; without
-	# mirroring it through WorldSnapshot.manual_slots_written, a manual save
-	# made before a world Save & Exit would be forgotten by the fresh
-	# PlayableGeneratedShip Continue creates, and a later death in the
-	# resumed run would freeze world/autosaves but leave that manual slot
-	# loadable -- reopening the save-scumming escape ADR-0043 closes.
-	# Simulate exactly that boundary: record "slot_01" into a WorldSnapshot,
-	# apply it via _apply_world_snapshot (the same primitive request_load()
-	# and Continue use), then drive death and assert the manual slot froze.
+	# --- MANUAL-SLOT CROSS-RUN FREEZE (run_id slot-ownership rework) ---
+	# Save slot_01 (stamps it with this run's _run_id inside the service),
+	# then round-trip ws.run_id through _apply_world_snapshot exactly as a
+	# Save & Exit -> Continue boundary would: build a WorldSnapshot (which
+	# carries this run's _run_id via _build_world_snapshot), apply it (the
+	# same primitive request_load() and Continue use for the ship-state
+	# half), then mirror request_load()'s own run_id-restore line (the one
+	# site that decides _run_id after a load) so this stage proves the same
+	# contract request_load() gives a real Continue: the manual slot froze
+	# under the SAME run_id across the reload, because slot_01's stamp
+	# survived the round-trip untouched (it was never rewritten) and the
+	# freshly-restored _run_id matches it again.
 	_wipe_all(service, resolver)
 	playable.slice_complete = false
 	playable.vitals_state.health = 100.0
-	playable._manual_slots_written_this_run.clear()
 	playable.away_from_start = false
 
 	var manual_run_snapshot: RunSnapshot = playable._build_run_snapshot()
@@ -442,17 +458,24 @@ func _validate() -> void:
 	if not service.save_to_slot(SaveSlotStateScript.MANUAL_SLOT_IDS[0], manual_run_snapshot, SaveSlotStateScript.SLOT_KIND_MANUAL, false, "Manual Save"):
 		_fail("manual-slot freeze: save_to_slot(slot_01) should succeed")
 		return
+	var run_id_before_reload: String = String(playable._run_id)
 
 	var ws = playable._build_world_snapshot()
 	if ws == null:
 		_fail("manual-slot freeze: _build_world_snapshot() returned null")
 		return
-	ws.manual_slots_written = [SaveSlotStateScript.MANUAL_SLOT_IDS[0]]
+	if String(ws.run_id) != run_id_before_reload:
+		_fail("manual-slot freeze: _build_world_snapshot() did not stamp ws.run_id with playable._run_id")
+		return
 	if not playable._apply_world_snapshot(ws):
 		_fail("manual-slot freeze: _apply_world_snapshot() should succeed")
 		return
-	if not playable._manual_slots_written_this_run.has(SaveSlotStateScript.MANUAL_SLOT_IDS[0]):
-		_fail("manual-slot freeze: _apply_world_snapshot did not restore manual_slots_written into the in-memory set")
+	# Mirror request_load()'s own restore line (the single site that decides
+	# _run_id after a load) so this stage exercises the real contract.
+	playable._run_id = ws.run_id if not String(ws.run_id).is_empty() else playable._generate_run_id()
+	service.set_active_run_id(playable._run_id)
+	if String(playable._run_id) != run_id_before_reload:
+		_fail("manual-slot freeze: _run_id was not restored to the pre-reload value via ws.run_id")
 		return
 
 	playable.vitals_state.health = 0.0
@@ -461,7 +484,7 @@ func _validate() -> void:
 		_fail("manual-slot freeze: health=0 should have ended the run as death")
 		return
 	if not resolver.has_died_in(SaveSlotStateScript.MANUAL_SLOT_IDS[0]):
-		_fail("manual-slot freeze: slot_01 survived death un-frozen -- manual_slots_written did not round-trip through WorldSnapshot")
+		_fail("manual-slot freeze: slot_01 survived death un-frozen -- run_id did not round-trip through WorldSnapshot")
 		return
 
 	# --- RECLAIM-FAILURE: a failed write must not clear an existing death

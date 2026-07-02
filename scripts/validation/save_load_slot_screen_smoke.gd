@@ -182,11 +182,13 @@ func _validate() -> void:
 	# just re-exposes the last one handle_ui_input's ui_accept branch stored).
 	# This smoke drives meta_screen_confirm() directly rather than through
 	# _input's InputEventAction plumbing, so it must call this dispatcher
-	# itself to get the same _manual_slots_written_this_run bookkeeping a
-	# real play session gets for free.
+	# itself to get the same save_to_slot()-inside-the-service stamping a
+	# real play session gets for free (run_id slot-ownership rework: the
+	# service stamps playable._run_id onto the slot/index row on write, so
+	# freeze_run(_run_id) finds it later without any coordinator-side set).
 	playable._dispatch_save_load_confirm_result(confirm_dict)
-	if not playable._manual_slots_written_this_run.has(TARGET_SLOT_ID):
-		_fail("manual slot '%s' not recorded in _manual_slots_written_this_run after first Save" % TARGET_SLOT_ID)
+	if not playable.save_load_service.slot_ids_for_run(playable._run_id).has(TARGET_SLOT_ID):
+		_fail("manual slot '%s' not stamped with playable._run_id after first Save" % TARGET_SLOT_ID)
 		return
 	if not playable.save_load_service.has_slot(TARGET_SLOT_ID):
 		_fail("slot file for '%s' does not exist on disk after the first save" % TARGET_SLOT_ID)
