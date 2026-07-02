@@ -26,6 +26,14 @@ extends SceneTree
 ##   4. Ship-only-not-world: a manual Save/Load round trip through the
 ##      screen must revert current_objective_sequence but leave
 ##      visited_ships untouched.
+##   5. World-row Load (PR #57 Codex P2): the world row's on-disk file is a
+##      WorldSnapshot, not a RunSnapshot, so its Load verb must dispatch as
+##      action=="load_world" and be applied via PlayableGeneratedShip.
+##      request_load() (not apply_manual_slot()). Seeds a distinguishing
+##      current_objective_sequence fixture directly into world.json (mirrors
+##      title_screen_flow_smoke.gd's Continue fixture) and asserts it lands
+##      after the world row's Load confirms -- proving request_load() was
+##      actually invoked rather than the dispatch silently no-op'ing.
 ##
 ## Pass marker:
 ##   SAVE LOAD SLOT SCREEN PASS save=true load=true delete_armed=true delete_confirmed=true
@@ -291,6 +299,93 @@ func _validate() -> void:
 	# does not reorder rows since saved_at is unchanged; already covered by
 	# the Save-half check above and the Delete-half check below).
 
+	# --- World-row Load (PR #57 Codex P2): the world row's on-disk file is a
+	# WorldSnapshot, not a RunSnapshot -- select_slot_for_load()/load_from_slot()
+	# would either no-op or misparse it, so the coordinator's Load arm must
+	# special-case is_world() into action=="load_world" and the playable
+	# dispatch must route it through request_load() (the same proven
+	# world-apply path F9/title Continue use) instead of apply_manual_slot().
+	# Write a real world save first, then stamp a distinguishing fixture value
+	# into it directly on disk (mirrors title_screen_flow_smoke's
+	# _seed_continue_fixture) so this assertion proves request_load() actually
+	# applied the file rather than the dispatch merely no-op'ing into whatever
+	# live state already matched. ---
+	if not playable.request_save():
+		_fail("request_save() failed while seeding the world-row Load fixture")
+		return
+	const WORLD_FIXTURE_SEQUENCE: int = 77
+	var world_service = playable.save_load_service
+	var ws = world_service.load_world()
+	if ws == null:
+		_fail("load_world() returned null right after request_save() while seeding the world-row fixture")
+		return
+	var fixture_home_ship: Dictionary = ws.home_ship.duplicate(true)
+	if fixture_home_ship.is_empty():
+		_fail("world save's home_ship slice was empty while seeding the world-row fixture")
+		return
+	fixture_home_ship["current_objective_sequence"] = WORLD_FIXTURE_SEQUENCE
+	ws.home_ship = fixture_home_ship
+	if not world_service.save_world(ws):
+		_fail("save_world() failed while seeding the world-row fixture")
+		return
+	# Advance live state past the fixture value so request_load() applying it
+	# back down is the only way the assertion below can pass.
+	playable.current_objective_sequence = WORLD_FIXTURE_SEQUENCE + 5
+
+	coord.open_records_menu()
+	coord.open_meta_screen("save_load")
+	if coord.get_active_meta_screen() != "save_load":
+		_fail("save_load screen did not open before world-row Load drive")
+		return
+	coord._refresh_save_load_panel()
+	coord.meta_screen_move_selection(-9999)
+	rows = coord._save_load_rows()
+	var world_index: int = _find_row_index(rows, "world")
+	if world_index < 0:
+		_fail("world row not found in save/load rows after seeding the world fixture")
+		return
+	for _i in range(world_index):
+		coord.meta_screen_move_selection(1)
+	if coord._save_load_row_index != world_index:
+		_fail("cursor did not land on world row index %d (got %d)" % [world_index, coord._save_load_row_index])
+		return
+	var world_verbs: Array = coord._valid_verbs_for_row(rows[world_index])
+	if world_verbs != ["Load"]:
+		_fail("world row verb set must be exactly [Load], got %s" % str(world_verbs))
+		return
+	var world_arm_result: Dictionary = coord.meta_screen_confirm()  # arms Load
+	if str(world_arm_result.get("action", "")) != "arm":
+		_fail("expected world row's first confirm to arm Load: %s" % str(world_arm_result))
+		return
+	var world_confirm_result: Dictionary = coord.meta_screen_confirm()  # executes Load
+	if str(world_confirm_result.get("action", "")) != "load_world" or not bool(world_confirm_result.get("ok", false)):
+		_fail("world row Load did not execute as action=='load_world': %s" % str(world_confirm_result))
+		return
+	# Production seam: the same dispatcher _input calls every frame
+	# handle_ui_input returns true. It must notice action=="load_world" and
+	# call playable.request_load() itself (menu_coordinator owns no gameplay
+	# state and cannot decode/apply a WorldSnapshot).
+	playable._dispatch_save_load_confirm_result(world_confirm_result)
+	if playable.current_objective_sequence != WORLD_FIXTURE_SEQUENCE:
+		_fail("world-row Load did not apply request_load(): current_objective_sequence=%d expected=%d" % [
+			playable.current_objective_sequence,
+			WORLD_FIXTURE_SEQUENCE,
+		])
+		return
+
+	# CRITICAL: same reload hazard as the manual-slot Load above -- request_load()
+	# -> _apply_world_snapshot reloads the ship and rebuilds the HUD/MenuCoordinator.
+	# Re-fetch the live instance and re-open Records -> Save/Load before continuing.
+	coord = playable.menu_coordinator
+	if coord == null:
+		_fail("menu_coordinator missing after world-row Load reload")
+		return
+	coord.open_records_menu()
+	coord.open_meta_screen("save_load")
+	if coord.get_active_meta_screen() != "save_load":
+		_fail("save_load screen did not re-open after the world-row post-Load reload")
+		return
+
 	# --- Extra assertion 3: frozen-row UI gate. Record a death for a SECOND
 	# manual slot via direct service + resolver calls (never actually killing
 	# the player -- record_death only writes the <slot_id>.death.json
@@ -482,6 +577,13 @@ func _cleanup_and_quit(code: int) -> void:
 		playable.save_load_service.delete_slot(FROZEN_SLOT_ID)
 		resolver.clear_death(TARGET_SLOT_ID)
 		resolver.clear_death(FROZEN_SLOT_ID)
+		# PR #57 Codex P2 world-row Load fixture: this smoke writes a real
+		# world.json (via request_save()/save_world()) that did not exist
+		# before it ran -- wipe it the same way every other world-save-
+		# touching smoke does (delete_current_run() removes both the
+		# active-autosave AND world slot files/index/manifest entries).
+		playable.save_load_service.delete_current_run()
+		resolver.clear_death("world")
 	if main_node != null and is_instance_valid(main_node):
 		main_node.queue_free()
 	quit(code)

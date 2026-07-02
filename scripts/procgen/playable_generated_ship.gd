@@ -6934,6 +6934,12 @@ func _dispatch_save_load_confirm_result(result: Dictionary) -> void:
 	if action == "load" and ok:
 		var snapshot: RunSnapshot = result.get("snapshot", null) as RunSnapshot
 		apply_manual_slot(snapshot)
+	elif action == "load_world" and ok:
+		# PR #57 Codex P2 (world-row Load): world.json is a WorldSnapshot, not
+		# a RunSnapshot, so menu_coordinator cannot decode/apply it itself (no
+		# gameplay state there). Route through the same proven world-apply
+		# path F9 and the title screen's Continue already use.
+		request_load()
 	elif action == "save" and ok:
 		_manual_slots_written_this_run[detail] = true
 	if not action.is_empty():

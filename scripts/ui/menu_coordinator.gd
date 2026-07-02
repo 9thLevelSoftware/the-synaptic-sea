@@ -812,6 +812,22 @@ func _confirm_save_load_row() -> Dictionary:
 		_refresh_save_load_panel()
 		return {"screen": "save_load", "action": "save", "ok": ok, "detail": slot_id}
 	if verb == "Load":
+		# Domain 8 (PR #57 Codex P2, world-row Load): the world row's on-disk
+		# file (world.json) holds a WorldSnapshot, not a RunSnapshot --
+		# select_slot_for_load()/load_from_slot() decode strictly as
+		# RunSnapshot, so calling that path for slot_id=="world" would
+		# either return null (silent no-op) or worse, misparse the
+		# WorldSnapshot dict and have the corrupt-file guard quarantine a
+		# perfectly good world.json. The proven world-apply path is
+		# PlayableGeneratedShip.request_load() (same one F9 / title
+		# Continue use), which this Node cannot call directly (no
+		# gameplay state) -- so signal the caller via action=="load_world"
+		# and let it dispatch request_load() itself, mirroring the
+		# action=="load" contract's split of responsibility.
+		if bool(row.is_world()):
+			_save_load_pending_verb = ""
+			_refresh_save_load_panel()
+			return {"screen": "save_load", "action": "load_world", "ok": true, "detail": slot_id}
 		var snapshot = save_load_menu.select_slot_for_load(slot_id)
 		_save_load_pending_verb = ""
 		_refresh_save_load_panel()

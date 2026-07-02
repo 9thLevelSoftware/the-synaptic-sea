@@ -45,6 +45,18 @@ REQ012_WARNING="^WARNING: SaveLoadService: save file rejected by from_dict \\(mi
 # (newer) slice_version to assert the migration-rejection path; that emits one
 # expected warning, allowlisted exactly like REQ012_WARNING above.
 MIGRATION_REJECT_WARNING="^WARNING: SaveLoadService: slot rejected by migration \\(newer than current\\), slot_id=.*\$"
+# title_save_query_smoke's corrupt-world case (PR #57 Codex P2) deliberately
+# writes literal garbage over world.json to prove TitleSaveQuery.is_continue_available
+# now calls load_world() (not just has_slot/has_died_in); load_world()'s
+# JSON-parse-failure path emits this one expected warning before returning
+# null, allowlisted the same way as REQ012_WARNING/MIGRATION_REJECT_WARNING.
+CORRUPT_WORLD_WARNING="^WARNING: SaveLoadService: world save file is not valid JSON object\$"
+# The same corrupt-world case's write goes through Godot's own JSON.parse_string,
+# which prints its own native engine-level ERROR (not a push_error) before
+# load_world() ever gets to check the parsed result. This is Godot engine
+# behavior (core/io/json.cpp), not a Synaptic Sea system error -- allowlisted
+# alongside CORRUPT_WORLD_WARNING as the deliberate/expected pair.
+CORRUPT_WORLD_JSON_ERROR="^ERROR: Parse JSON failed\\..*\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -53,7 +65,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -215,6 +227,23 @@ incompatible `slice_version` and asserts the service rejects it via
   Filtered by the strict ERROR/WARNING check above; any other
   `SaveLoadService:` warning (a real parse error, missing file on a
   fresh load, etc.) still fails the bundle.
+
+PR #57 Codex P2 (`TitleSaveQuery.is_continue_available` strengthened to
+require a parseable world save) adds one more expected `WARNING:` line:
+
+- `WARNING: SaveLoadService: world save file is not valid JSON object`
+  — emitted by `load_world()` when `title_save_query_smoke.gd`'s corrupt-world
+  case deliberately overwrites `world.json` with literal garbage to prove
+  `is_continue_available()` now calls `load_world()` (not just
+  `has_slot`/`has_died_in`) and correctly reads it as unavailable. Filtered
+  by `CORRUPT_WORLD_WARNING` in the strict check above; any other
+  `SaveLoadService:` warning during this smoke still fails the bundle.
+- `ERROR: Parse JSON failed. Error at line 0: ...` — Godot's own JSON parser
+  (`core/io/json.cpp`), not a Synaptic Sea `push_error`, printed when
+  `JSON.parse_string()` hits the literal garbage the same corrupt-world case
+  writes, immediately before `load_world()`'s own dictionary-type check
+  fires the `WARNING:` above. Filtered by `CORRUPT_WORLD_JSON_ERROR`; this is
+  expected, deterministic engine noise for this one smoke only.
 
 Evidence collection command (run before adding or removing a smoke from the
 bundle; any unexpected `ERROR:`/`WARNING:` line that is not on the allowlist
