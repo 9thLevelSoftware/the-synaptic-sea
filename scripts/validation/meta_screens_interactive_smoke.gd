@@ -71,7 +71,7 @@ func _initialize() -> void:
 	var loc := LocalizationCatalogScript.new()
 	loc.configure({})
 
-	_coord.bind_meta_screens(ach, _audio, tree, prog, hub, meta, loc, build_meta, slmenu, null, reg)
+	_coord.bind_meta_screens(ach, _audio, tree, prog, hub, meta, loc, build_meta, slmenu, null, reg, Callable())
 
 	# --- Hub upgrade purchase ---
 	_coord.open_meta_screen("hub_upgrades")

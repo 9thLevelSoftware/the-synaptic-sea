@@ -4144,6 +4144,7 @@ func _build_hud_layer() -> void:
 		save_load_menu,
 		accessibility_settings,
 		unlock_registry,
+		_build_run_snapshot,
 	)
 	menu_coordinator.set_load_available(is_load_available())
 	menu_coordinator.set_inventory_items(_inventory_hotbar_ids())
