@@ -6,6 +6,7 @@ signal modal_closed(previous_menu_id: String)
 signal save_requested
 signal load_requested
 signal quit_requested
+signal save_and_exit_requested
 signal settings_changed(summary: Dictionary)
 
 const MenuStateScript := preload("res://scripts/systems/menu_state.gd")
@@ -342,6 +343,7 @@ func _confirm_current_item() -> void:
 				"codex": menu_state.open_menu("codex")
 				"records": menu_state.open_menu("records_menu")
 				"save": save_requested.emit()
+				"save_and_exit": save_and_exit_requested.emit()
 				"quit_main": quit_requested.emit()
 		"records_menu":
 			if item_id == "back":

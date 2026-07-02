@@ -462,6 +462,10 @@ const DEFAULT_MOVE_BINDINGS: Dictionary = {
 	"move_right": [KEY_D, KEY_RIGHT],
 }
 const DEFAULT_INTERACT_BINDINGS: Array[Key] = [KEY_E, KEY_ENTER, KEY_SPACE, KEY_KP_ENTER]
+# ADR-0043: F5/F9 keep their pre-Domain-8 world.json save/load behavior
+# unchanged (request_save/request_load), now documented as dev/debug
+# keys -- the player-facing save surfaces are the pause menu's Save /
+# Save & Exit items and the interactive save_load slot screen.
 const DEFAULT_SAVE_RUN_BINDINGS: Array[Key] = [KEY_F5]
 const DEFAULT_LOAD_RUN_BINDINGS: Array[Key] = [KEY_F9]
 const DEFAULT_ATTACK_BINDINGS: Array[Key] = [KEY_F]
@@ -4115,6 +4119,7 @@ func _build_hud_layer() -> void:
 	menu_coordinator.save_requested.connect(request_save)
 	menu_coordinator.load_requested.connect(request_load)
 	menu_coordinator.quit_requested.connect(_on_ui_quit_requested)
+	menu_coordinator.save_and_exit_requested.connect(_on_save_and_exit_requested)
 	menu_coordinator.settings_changed.connect(_on_ui_settings_changed)
 	var configured: bool = menu_coordinator.configure(
 		_load_json_dict("res://data/ui/menu_definitions.json"),
@@ -4556,6 +4561,22 @@ func _on_ui_quit_requested() -> void:
 	# instead of reopening the in-scene main_menu overlay (the old stub
 	# behavior -- there was no real title/quit path before this domain).
 	emit_signal("return_to_title_requested")
+
+## ADR-0043 Save & Exit: request_save() the SAME guarded path F5/autosave
+## already use (world.json write), then leave to the title screen only on
+## success. Deliberately does NOT reuse AutosavePolicy.try_quicksave's
+## cooldown -- that guard exists to stop autosave-cadence thrashing during
+## active play, not to gate a terminal "I am leaving" action; a cooldown
+## that could silently skip the write on the player's exit is a
+## correctness footgun. On failure, surface a toast and do NOT exit --
+## never silently lose progress on a leave action.
+func _on_save_and_exit_requested() -> void:
+	var ok: bool = request_save()
+	if ok:
+		emit_signal("return_to_title_requested")
+	else:
+		if is_instance_valid(menu_coordinator):
+			menu_coordinator.trigger_tutorial("save_and_exit_failed", "any")
 
 func _on_ui_settings_changed(_summary: Dictionary) -> void:
 	apply_accessibility_settings(accessibility_settings)

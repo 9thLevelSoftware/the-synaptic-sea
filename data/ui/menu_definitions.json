@@ -15,12 +15,13 @@
       "id": "pause_menu",
       "title": "Paused",
       "items": [
-        { "id": "resume",     "label": "Resume",            "enabled": true, "kind": "command" },
-        { "id": "settings",   "label": "Settings",          "enabled": true, "kind": "command" },
-        { "id": "codex",      "label": "Codex",             "enabled": true, "kind": "command" },
-        { "id": "records",    "label": "Records",           "enabled": true, "kind": "command" },
-        { "id": "save",       "label": "Save",              "enabled": true, "kind": "command" },
-        { "id": "quit_main",  "label": "Quit to Main Menu", "enabled": true, "kind": "command" }
+        { "id": "resume",        "label": "Resume",            "enabled": true, "kind": "command" },
+        { "id": "settings",      "label": "Settings",          "enabled": true, "kind": "command" },
+        { "id": "codex",         "label": "Codex",             "enabled": true, "kind": "command" },
+        { "id": "records",       "label": "Records",           "enabled": true, "kind": "command" },
+        { "id": "save",          "label": "Save",              "enabled": true, "kind": "command" },
+        { "id": "save_and_exit", "label": "Save & Exit",       "enabled": true, "kind": "command" },
+        { "id": "quit_main",     "label": "Quit to Main Menu", "enabled": true, "kind": "command" }
       ]
     },
     {
