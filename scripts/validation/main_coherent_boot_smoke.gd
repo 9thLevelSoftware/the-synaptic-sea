@@ -2,7 +2,7 @@ extends SceneTree
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const COHERENT_LAYOUT_PATH: String = "res://data/procgen/golden/coherent_ship_001/layout.json"
-const EXPECTED_OBJECTIVES: int = 4
+const EXPECTED_OBJECTIVES: int = 5
 const EXPECTED_CRITICAL_PATH: int = 5
 const EXPECTED_LANDMARKS: int = 2
 const TIMEOUT_FRAMES: int = 240
