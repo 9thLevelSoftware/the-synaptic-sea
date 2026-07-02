@@ -13,6 +13,18 @@ extends SceneTree
 ## regressive pattern per project conventions) and asserts the pause
 ## menu is still reachable post-death (the _input dead-zone fix, Task 2).
 ##
+## Meta-progression pollution guard (review fast-follow): this smoke drives
+## two REAL vitals deaths per run, and death payouts persist into the
+## developer's real user://meta_progression.json and user://unlock_registry.json
+## (confirmed live via total_runs_deaths climbing across bundle runs). Neither
+## file's contents are load-bearing to this smoke's assertions, so at startup
+## snapshot both files' raw bytes (or record their absence), and in the
+## unconditional cleanup path (_cleanup_and_quit, reached on both success and
+## failure) restore the original bytes, or delete the file if it did not
+## exist before this run. Byte-for-byte restore, not JSON-aware -- this smoke
+## asserts nothing about either file's content, only that running it leaves
+## them exactly as found.
+##
 ## Pass marker:
 ##   PERMADEATH FREEZE PASS wrote=true died=true frozen=true reloadable=false epitaph_present=true
 
@@ -20,19 +32,66 @@ const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const SaveSlotStateScript := preload("res://scripts/systems/save_slot_state.gd")
 const PermadeathResolverScript := preload("res://scripts/systems/permadeath_resolver.gd")
 const TIMEOUT_FRAMES: int = 600
+const META_PROGRESSION_PATH: String = "user://meta_progression.json"
+const UNLOCK_REGISTRY_PATH: String = "user://unlock_registry.json"
 
 var main_node: Node
 var playable: PlayableGeneratedShip
 var frame_count: int = 0
 var finished: bool = false
+var _meta_snapshot_restored: bool = false
+## Raw bytes captured at startup, or null if the file did not exist yet --
+## PoolByteArray("") vs "file absent" must stay distinguishable so an
+## absent file is deleted (not recreated empty) on restore.
+var _meta_progression_snapshot: PackedByteArray
+var _meta_progression_existed: bool = false
+var _unlock_registry_snapshot: PackedByteArray
+var _unlock_registry_existed: bool = false
 
 func _initialize() -> void:
+	_snapshot_meta_progression_files()
 	main_node = MAIN_SCENE.instantiate()
 	if main_node == null:
 		_fail("could not instantiate main scene")
 		return
 	get_root().add_child(main_node)
 	process_frame.connect(_on_process_frame)
+
+## Reads the raw bytes of both cross-run meta-progression files before this
+## smoke's real deaths can write payouts into them. Records absence
+## explicitly (rather than treating a read failure as "empty bytes") so
+## _restore_meta_progression_files() can delete a file that did not exist
+## before this run instead of leaving behind an empty one.
+func _snapshot_meta_progression_files() -> void:
+	_meta_progression_existed = FileAccess.file_exists(META_PROGRESSION_PATH)
+	if _meta_progression_existed:
+		_meta_progression_snapshot = FileAccess.get_file_as_bytes(META_PROGRESSION_PATH)
+	_unlock_registry_existed = FileAccess.file_exists(UNLOCK_REGISTRY_PATH)
+	if _unlock_registry_existed:
+		_unlock_registry_snapshot = FileAccess.get_file_as_bytes(UNLOCK_REGISTRY_PATH)
+
+## Restores both files to their pre-run state: byte-identical if they
+## existed, deleted if they did not. Idempotent (guarded by
+## _meta_snapshot_restored) so both the success and failure cleanup paths
+## can call it unconditionally without double-restoring.
+func _restore_meta_progression_files() -> void:
+	if _meta_snapshot_restored:
+		return
+	_meta_snapshot_restored = true
+	if _meta_progression_existed:
+		var f := FileAccess.open(META_PROGRESSION_PATH, FileAccess.WRITE)
+		if f != null:
+			f.store_buffer(_meta_progression_snapshot)
+			f.close()
+	elif FileAccess.file_exists(META_PROGRESSION_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(META_PROGRESSION_PATH))
+	if _unlock_registry_existed:
+		var f2 := FileAccess.open(UNLOCK_REGISTRY_PATH, FileAccess.WRITE)
+		if f2 != null:
+			f2.store_buffer(_unlock_registry_snapshot)
+			f2.close()
+	elif FileAccess.file_exists(UNLOCK_REGISTRY_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(UNLOCK_REGISTRY_PATH))
 
 func _on_process_frame() -> void:
 	if finished:
@@ -200,6 +259,7 @@ func _fail(reason: String) -> void:
 func _cleanup_and_quit(code: int) -> void:
 	if playable != null and is_instance_valid(playable) and playable.save_load_service != null:
 		_wipe_all(playable.save_load_service, PermadeathResolverScript.new())
+	_restore_meta_progression_files()
 	if main_node != null and is_instance_valid(main_node):
 		main_node.queue_free()
 	quit(code)

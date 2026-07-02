@@ -31,7 +31,6 @@ extends SceneTree
 ##   SAVE LOAD SLOT SCREEN PASS save=true load=true delete_armed=true delete_confirmed=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
-const SaveSlotStateScript := preload("res://scripts/systems/save_slot_state.gd")
 const PermadeathResolverScript := preload("res://scripts/systems/permadeath_resolver.gd")
 const TIMEOUT_FRAMES: int = 600
 const TARGET_SLOT_ID: String = "slot_01"
@@ -41,6 +40,16 @@ var main_node: Node
 var playable: PlayableGeneratedShip
 var frame_count: int = 0
 var finished: bool = false
+
+## Real-InputEvent delete drive (review fast-follow): -1 means "not started
+## yet, _validate() is still running the direct-call setup"; 0/1/2 step
+## through a settle frame after the ui_right verb-cycle burst, the ui_accept
+## arm, and the ui_accept confirm, so each real InputEventKey has a full
+## SceneTree frame to reach PlayableGeneratedShip._input before the next one
+## fires (mirrors main_playable_ui_shell_smoke.gd's _drive_to_in_play/
+## _validate_runtime phase split -- Input.parse_input_event queues the event
+## for the engine's next input flush, it is not delivered synchronously).
+var _delete_input_phase: int = -1
 
 func _initialize() -> void:
 	main_node = MAIN_SCENE.instantiate()
@@ -59,6 +68,9 @@ func _on_process_frame() -> void:
 	if playable == null or playable.loader == null or not playable.loader.has_loaded_ship() or not playable.playable_started:
 		if frame_count > TIMEOUT_FRAMES:
 			_fail("playable did not become ready")
+		return
+	if _delete_input_phase >= 0:
+		_tick_delete_input_phase()
 		return
 	_validate()
 
@@ -238,6 +250,28 @@ func _validate() -> void:
 		_fail("apply_manual_slot via _dispatch_save_load_confirm_result did not change objective_sequence (still %d)" % seq_before_load)
 		return
 
+	# CRITICAL: apply_manual_slot -> _apply_run_snapshot reloads the ship via
+	# loader.load_from_paths(), which calls _build_hud_layer() again --
+	# _build_hud_layer() unconditionally queue_free()s the PRIOR hud_layer
+	# (and its child menu_coordinator) and constructs a brand-new
+	# MenuCoordinator, ending on open_main_menu() (REQ-014 "rebuild the
+	# HUD/tracker on every ship load, not just the first one"). The local
+	# `coord` captured at the top of this function now points at a stale,
+	# queue_free()'d Node -- every call below through the stale reference
+	# would silently succeed against a detached object instead of the live
+	# screen a real player sees. Re-fetch playable.menu_coordinator (the
+	# live one) and re-open Records -> Save/Load, exactly like a player
+	# would after a Load dumps them back to the main menu.
+	coord = playable.menu_coordinator
+	if coord == null:
+		_fail("menu_coordinator missing after manual-slot Load reload")
+		return
+	coord.open_records_menu()
+	coord.open_meta_screen("save_load")
+	if coord.get_active_meta_screen() != "save_load":
+		_fail("save_load screen did not re-open after the post-Load reload")
+		return
+
 	# Extra assertion 4 (ship-only-not-world, the single most important
 	# assertion): objective progress (an observable that was advanced AFTER
 	# the save) must revert to the saved point, while visited_ships (a
@@ -303,9 +337,17 @@ func _validate() -> void:
 	playable.save_load_service.delete_slot(FROZEN_SLOT_ID)
 	resolver.clear_death(FROZEN_SLOT_ID)
 
-	# --- Delete: two-step arm/confirm. Cycle the pending verb Load -> Save
-	# -> Delete before the arming confirm, mirroring how a player would
-	# ui_left/ui_right to Delete before pressing ui_accept twice. ---
+	# --- Delete: two-step arm/confirm, driven through REAL InputEvents this
+	# time (not direct coordinator calls) -- this is the smoke's only
+	# player-facing surface, so it must exercise the actual input-action
+	# layer: handle_ui_input's is_action_pressed branching for ui_right/
+	# ui_accept (menu_coordinator.gd:189-205) dispatched through
+	# PlayableGeneratedShip._input (playable_generated_ship.gd:7695-7701),
+	# exactly like a player pressing Right, Right, Right, Enter, Enter would.
+	# Row navigation to target_index stays a direct coordinator call (only
+	# the verb-cycle + confirm steps are the reviewer-flagged gap); moving
+	# the cursor here also resets _save_load_pending_verb to "" (unarmed),
+	# so the first real ui_right below lands on the FIRST verb ("Load").
 	coord._refresh_save_load_panel()
 	coord.meta_screen_move_selection(-9999)
 	rows = coord._save_load_rows()
@@ -315,27 +357,63 @@ func _validate() -> void:
 		return
 	for _i in range(target_index):
 		coord.meta_screen_move_selection(1)
-	# meta_screen_move_selection() above reset _save_load_pending_verb to ""
-	# (unarmed), so the first cycle lands on the FIRST verb ("Load"), not the
-	# second -- three cycles are needed to walk unset -> Load -> Save -> Delete.
-	coord._cycle_save_load_verb(1)  # unset -> Load
-	coord._cycle_save_load_verb(1)  # Load -> Save
-	coord._cycle_save_load_verb(1)  # Save -> Delete
-	if coord._save_load_pending_verb != "Delete":
-		_fail("expected pending verb 'Delete' after 3 cycles from unset, got '%s'" % coord._save_load_pending_verb)
-		return
-	var delete_arm_result: Dictionary = coord.meta_screen_confirm()  # arms Delete
-	if str(delete_arm_result.get("action", "")) != "delete_armed":
-		_fail("expected delete_armed on first Delete confirm: %s" % str(delete_arm_result))
-		return
-	var delete_confirmed_result: Dictionary = coord.meta_screen_confirm()  # second confirm deletes
-	if str(delete_confirmed_result.get("action", "")) != "delete" or not bool(delete_confirmed_result.get("ok", false)):
-		_fail("Delete did not confirm: %s" % str(delete_confirmed_result))
-		return
-	if playable.save_load_service.has_slot(TARGET_SLOT_ID):
-		_fail("slot '%s' still present after confirmed delete" % TARGET_SLOT_ID)
-		return
+	_delete_input_phase = 0
+	# Fire the three ui_right presses (unset -> Load -> Save -> Delete) now;
+	# _tick_delete_input_phase() picks up on the NEXT SceneTree frame once
+	# the engine's input flush has delivered them to PlayableGeneratedShip._input.
+	_send_key(KEY_RIGHT)
+	_send_key(KEY_RIGHT)
+	_send_key(KEY_RIGHT)
 
+func _tick_delete_input_phase() -> void:
+	var coord = playable.menu_coordinator
+	match _delete_input_phase:
+		0:
+			# One real SceneTree frame has passed since the three ui_right
+			# InputEventKey presses were parsed -- confirm the verb cycle
+			# landed on Delete via the actual handle_ui_input path before
+			# arming it, so a regression in the ui_right branch (or in
+			# _cycle_save_load_verb's wiring to it) fails this smoke instead
+			# of silently degrading back to a direct-call test.
+			if coord._save_load_pending_verb != "Delete":
+				_fail("expected pending verb 'Delete' after 3 real ui_right presses, got '%s'" % coord._save_load_pending_verb)
+				return
+			_send_key(KEY_ENTER)  # ui_accept: arms Delete
+			_delete_input_phase = 1
+		1:
+			# NOTE: coord.get_last_meta_screen_confirm_result() cannot be read
+			# here -- _dispatch_save_load_confirm_result() (the same production
+			# seam _input calls every frame handle_ui_input returns true)
+			# already cleared it synchronously within the _input call that
+			# processed the ui_accept press, one frame ago. Assert on the
+			# durable coordinator state the arm step sets instead:
+			# _pending_delete_slot_id records the armed slot until the second
+			# confirm, and _save_load_pending_verb must still read "Delete".
+			if coord._pending_delete_slot_id != TARGET_SLOT_ID:
+				_fail("expected delete_armed (_pending_delete_slot_id='%s') after real ui_accept arm press, got '%s'" % [TARGET_SLOT_ID, coord._pending_delete_slot_id])
+				return
+			if coord._save_load_pending_verb != "Delete":
+				_fail("pending verb should still be 'Delete' after the arming ui_accept, got '%s'" % coord._save_load_pending_verb)
+				return
+			_send_key(KEY_ENTER)  # ui_accept: confirms Delete
+			_delete_input_phase = 2
+		2:
+			# Second confirm executes the delete and resets both
+			# _pending_delete_slot_id and _save_load_pending_verb to "" --
+			# the durable proof of a successful delete_confirmed, since (as
+			# above) the transient confirm-result Dictionary is already
+			# cleared by the time this phase runs.
+			if not coord._pending_delete_slot_id.is_empty():
+				_fail("expected _pending_delete_slot_id cleared after confirmed delete, still '%s'" % coord._pending_delete_slot_id)
+				return
+			if playable.save_load_service.has_slot(TARGET_SLOT_ID):
+				_fail("slot '%s' still present after confirmed delete" % TARGET_SLOT_ID)
+				return
+			_delete_input_phase = -1
+			_finish_after_delete()
+
+func _finish_after_delete() -> void:
+	var coord = playable.menu_coordinator
 	# Extra assertion 2 (cursor-follows-slot, Delete half): after the
 	# confirmed delete, the cursor must land on TARGET_SLOT_ID's re-synthesized
 	# empty row (the slot's row identity persists across the transition from
@@ -364,6 +442,16 @@ func _validate() -> void:
 	finished = true
 	print("SAVE LOAD SLOT SCREEN PASS save=true load=true delete_armed=true delete_confirmed=true")
 	_cleanup_and_quit(0)
+
+func _send_key(keycode: int) -> void:
+	var press := InputEventKey.new()
+	press.keycode = keycode
+	press.pressed = true
+	Input.parse_input_event(press)
+	var release := InputEventKey.new()
+	release.keycode = keycode
+	release.pressed = false
+	Input.parse_input_event(release)
 
 func _find_row_index(rows: Array, slot_id: String) -> int:
 	for i in range(rows.size()):
