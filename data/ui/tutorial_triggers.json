@@ -72,6 +72,15 @@
       "body": "Your suit is leaking oxygen. Find a refill station or return to the lifeboat.",
       "codex_topic": "Survival",
       "codex_entry_id": "first_low_oxygen"
+    },
+    {
+      "id": "save_and_exit_failed",
+      "trigger_event": "save_and_exit_failed",
+      "trigger_target": "any",
+      "title": "Save Failed",
+      "body": "Could not save the ship. Resolve the issue before leaving — your progress was NOT saved.",
+      "codex_topic": "Survival",
+      "codex_entry_id": "save_and_exit_failed"
     }
   ]
 }

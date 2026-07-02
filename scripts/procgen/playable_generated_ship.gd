@@ -4569,7 +4569,12 @@ func _on_ui_quit_requested() -> void:
 ## active play, not to gate a terminal "I am leaving" action; a cooldown
 ## that could silently skip the write on the player's exit is a
 ## correctness footgun. On failure, surface a toast and do NOT exit --
-## never silently lose progress on a leave action.
+## never silently lose progress on a leave action. The toast is driven by
+## the "save_and_exit_failed"/"any" tutorial trigger registered in
+## data/ui/tutorial_triggers.json; menu_coordinator.trigger_tutorial()
+## returning a non-empty id (and firing TutorialState.triggered) is the
+## proof this actually renders -- an unregistered trigger id would
+## silently no-op instead (see save_and_exit_smoke.gd's failure stage).
 func _on_save_and_exit_requested() -> void:
 	var ok: bool = request_save()
 	if ok:
