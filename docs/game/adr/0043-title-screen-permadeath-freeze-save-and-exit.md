@@ -87,22 +87,27 @@ are unwritable via the UI (frozen rows offer no verbs), and the load gates
 still-frozen slot cannot be read back mid-death, only overwritten by a
 genuinely new run.
 
-**Freeze-set ownership (lineage gate, PR #57 Codex round 3 P1).**
-`_freeze_run_on_death()` must only freeze the shared lineage — the
-active-autosave alias, `"world"`, every `AUTOSAVE_SLOT_IDS` row, and the
-quickslot — when THIS run instance actually owns that lineage. Ownership
-is tracked by a run-local flag, `_persisted_lineage_active`, set true at
+**Freeze-set ownership (lineage gate, PR #57 Codex round 3 P1; corrected
+round 4 P1).** `_freeze_run_on_death()` must only freeze the shared
+lineage — the active-autosave alias, `"world"`, every `AUTOSAVE_SLOT_IDS`
+row, and the quickslot — when THIS run instance actually owns that
+lineage. Ownership is tracked by a run-local flag,
+`_persisted_lineage_active`, marked true via `_mark_shared_lineage()` at
 exactly two points: (a) a successful Continue/F9 world load (the loaded
 world.json and its pre-existing autosave family become this run's
-lineage), or (b) this run's first successful write to world.json, an
-autosave slot, or a manual slot. A brand-new run (New Game, no load, no
-save yet) that dies has the flag false, so the shared lineage is left
-untouched — a *different*, still-live Continue's world.json/autosaves must
-never be stamped with an epitaph from a run that never wrote a byte to
-them. The manual-slot set (`_manual_slots_written_this_run`) is exempt from
-this gate: it is already write-tracked per slot (a slot id only enters the
-set after this run wrote to it), so freezing it is always correct
-independent of `_persisted_lineage_active`.
+lineage), or (b) this run's first successful write to world.json or an
+autosave slot. A brand-new run (New Game, no load, no save yet) that dies
+has the flag false, so the shared lineage is left untouched — a
+*different*, still-live Continue's world.json/autosaves must never be
+stamped with an epitaph from a run that never wrote a byte to them.
+**Manual slots never call `_mark_shared_lineage()`** (round 4 P1 fix — an
+earlier version of this fix wrongly also marked the lineage on a manual
+save, so a manual-only run that died before any world/autosave write still
+froze the shared lineage and bricked a prior run's Continue). The
+manual-slot set (`_manual_slots_written_this_run`) is exempt from the
+lineage gate entirely: it is already write-tracked per slot (a slot id
+only enters the set after this run wrote to it via the slot screen), so
+freezing it is always correct independent of `_persisted_lineage_active`.
 
 ### 3. _input's post-death dead-zone is fixed
 

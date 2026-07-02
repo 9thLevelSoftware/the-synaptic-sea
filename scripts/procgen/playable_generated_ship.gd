@@ -1621,22 +1621,33 @@ func get_unlock_registry():
 # a later death in the resumed run).
 var _manual_slots_written_this_run: Dictionary = {}
 
-# PR #57 Codex round 3 P1: true once THIS run instance owns a persisted
-# save lineage, i.e. either (a) it successfully loaded an existing world
-# save (Continue/F9 -- the loaded world.json + its autosave family belong
-# to this run now), or (b) it has written world.json/an autosave/a manual
-# slot at least once. A fresh New Game that has neither loaded nor saved
-# owns NOTHING on disk yet, so _freeze_run_on_death() must not stamp a
-# death record onto a PRIOR run's still-live world.json/autosaves -- doing
-# so would brick that prior run's Continue with an epitaph from a run that
-# never wrote a byte (Codex round 3 P1 finding). Set exactly at the two
-# success points via _mark_persisted_lineage(); never cleared mid-run.
+# PR #57 Codex round 3 P1: true once THIS run instance owns the SHARED
+# world/autosave save lineage, i.e. either (a) it successfully loaded an
+# existing world save (Continue/F9 -- the loaded world.json + its autosave
+# family belong to this run now), or (b) it has written world.json/an
+# autosave at least once. A fresh New Game that has neither loaded nor
+# saved to that shared lineage owns NOTHING on disk yet, so
+# _freeze_run_on_death() must not stamp a death record onto a PRIOR run's
+# still-live world.json/autosaves -- doing so would brick that prior run's
+# Continue with an epitaph from a run that never wrote a byte (Codex round
+# 3 P1 finding). Set exactly at the shared-lineage success points via
+# _mark_shared_lineage(); never cleared mid-run.
+#
+# PR #57 Codex round 4 P1: shared world/autosave slot family only. Manual
+# slots NEVER call this -- they are tracked per-slot in
+# _manual_slots_written_this_run. A manual-only run must not claim the
+# shared lineage (PR #57 Codex round 4).
 var _persisted_lineage_active: bool = false
 
 ## PR #57 Codex round 3 P1: call at every point where this run instance
-## takes ownership of a persisted save lineage (see the field comment
-## above for the exact two cases). Idempotent.
-func _mark_persisted_lineage() -> void:
+## takes ownership of the SHARED world/autosave save lineage (see the field
+## comment above for the exact two cases).
+##
+## PR #57 Codex round 4 P1: shared world/autosave slot family only. Manual
+## slots NEVER call this -- they are tracked per-slot in
+## _manual_slots_written_this_run. A manual-only run must not claim the
+## shared lineage (PR #57 Codex round 4). Idempotent.
+func _mark_shared_lineage() -> void:
 	_persisted_lineage_active = true
 
 func end_run(reason: String = "extraction") -> int:
@@ -1671,14 +1682,16 @@ func end_run(reason: String = "extraction") -> int:
 ## PR #57 Codex round 3 P1 lineage gate: "world" + the active-autosave alias
 ## + every AUTOSAVE_SLOT_IDS row + the quickslot are only frozen when
 ## _persisted_lineage_active is true -- i.e. THIS run either loaded an
-## existing world save (Continue/F9) or has written to that lineage at
-## least once. A fresh New Game that dies before ever loading or saving
-## does not own that lineage; freezing it would stamp a prior, unrelated
-## run's still-live world.json/autosaves with THIS run's epitaph and brick
-## that prior run's Continue for a death it never had. The manual-slot set
-## is unaffected by this gate -- _manual_slots_written_this_run is already
-## write-tracked (a slot only appears there after this run wrote to it), so
-## it is always safe to freeze regardless of _persisted_lineage_active.
+## existing world save (Continue/F9) or has written to that SHARED
+## world/autosave lineage at least once. A fresh New Game that dies before
+## ever loading or saving to the shared lineage does not own it; freezing
+## it would stamp a prior, unrelated run's still-live world.json/autosaves
+## with THIS run's epitaph and brick that prior run's Continue for a death
+## it never had. The manual-slot set is unaffected by this gate --
+## _manual_slots_written_this_run is already write-tracked (a slot only
+## appears there after this run wrote to it via the slot screen, never via
+## _mark_shared_lineage -- PR #57 Codex round 4 P1), so it is always safe
+## to freeze regardless of _persisted_lineage_active.
 func _freeze_run_on_death() -> void:
 	var resolver := PermadeathResolverScript.new()
 	var epitaph_text: String = _build_epitaph_text()
@@ -6599,7 +6612,7 @@ func _auto_save_current_run() -> bool:
 		return false
 	if save_load_service.save_world(ws):
 		last_saved_snapshot = _build_run_snapshot()  # preserve in-memory RunSnapshot seam (get_last_saved_snapshot)
-		_mark_persisted_lineage()  # PR #57 Codex round 3 P1: first world write -- this run now owns the lineage
+		_mark_shared_lineage()  # PR #57 Codex round 3 P1: first world write -- this run now owns the shared lineage
 		return true
 	return false
 
@@ -6632,7 +6645,7 @@ func _tick_autosave_policy(delta: float) -> void:
 	if save_load_service.save_to_slot(slot_id, snap, SaveSlotStateScript.SLOT_KIND_AUTO, false, "Autosave"):
 		last_saved_snapshot = snap
 		_last_autosave_result = r
-		_mark_persisted_lineage()  # PR #57 Codex round 3 P1: first autosave write -- this run now owns the lineage
+		_mark_shared_lineage()  # PR #57 Codex round 3 P1: first autosave write -- this run now owns the shared lineage
 
 ## Validation seam: the live AutosavePolicy instance (null before runtime build).
 func get_autosave_policy_for_validation():
@@ -6716,7 +6729,7 @@ func request_save() -> bool:
 		return false
 	var result: bool = save_load_service.save_world(ws)
 	if result:
-		_mark_persisted_lineage()  # PR #57 Codex round 3 P1: first world write -- this run now owns the lineage
+		_mark_shared_lineage()  # PR #57 Codex round 3 P1: first world write -- this run now owns the shared lineage
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_SAVE)
 		print("PLAYABLE SHIP SAVED location=%s sequence=%d" % [ws.current_location, current_objective_sequence])
@@ -6754,9 +6767,10 @@ func request_load() -> bool:
 	var loaded: bool = _apply_world_snapshot(ws)
 	if loaded:
 		# PR #57 Codex round 3 P1: a successful Continue/F9 world load means this
-		# run instance now owns the loaded lineage -- world.json's pre-existing
-		# autosaves belong to it too, so a death from here must freeze them.
-		_mark_persisted_lineage()
+		# run instance now owns the loaded shared lineage -- world.json's
+		# pre-existing autosaves belong to it too, so a death from here must
+		# freeze them.
+		_mark_shared_lineage()
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_LOAD)
 		if is_instance_valid(menu_coordinator):
@@ -6996,8 +7010,14 @@ func _dispatch_save_load_confirm_result(result: Dictionary) -> void:
 		# path F9 and the title screen's Continue already use.
 		request_load()
 	elif action == "save" and ok:
+		# PR #57 Codex round 4 P1: manual slots are NEVER a shared-lineage write.
+		# They are already independently tracked in _manual_slots_written_this_run
+		# and _freeze_run_on_death() freezes them unconditionally via that set --
+		# do not also call _mark_shared_lineage() here, or a manual-only save
+		# during a fresh run would make _freeze_run_on_death() stamp a death
+		# record onto "world"/the autosave family too, bricking a PRIOR run's
+		# still-live Continue that this run never touched.
 		_manual_slots_written_this_run[detail] = true
-		_mark_persisted_lineage()  # PR #57 Codex round 3 P1: first manual-slot write -- this run now owns the lineage
 	if not action.is_empty():
 		menu_coordinator.clear_last_meta_screen_confirm_result()
 

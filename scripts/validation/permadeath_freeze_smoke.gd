@@ -43,6 +43,19 @@ extends SceneTree
 ## _persisted_lineage_active true -- so they continue to exercise the
 ## lineage-active freeze path unchanged.
 ##
+## MANUAL-ONLY stage (PR #57 Codex round 4 P1 fix): with the same LIVE prior-
+## run world.json from the LINEAGE stage still on disk and this instance's
+## _persisted_lineage_active still false, save ONLY "slot_01" through the
+## REAL slot-screen dispatch path (menu_coordinator.meta_screen_confirm() ->
+## PlayableGeneratedShip._dispatch_save_load_confirm_result(), the same
+## "save" arm save_load_slot_screen_smoke.gd exercises), then drive death
+## with no world/autosave write ever made this run. Asserts the manual save
+## does NOT flip _persisted_lineage_active, has_died_in("slot_01") is TRUE
+## (manual slots always freeze, tracked independently via
+## _manual_slots_written_this_run), has_died_in("world") is FALSE, and
+## load_world() still returns the prior run's untouched snapshot -- proving
+## a manual-only save can never brick a prior run's Continue.
+##
 ## RECLAIM-FAILURE stage (PR #57 Codex round 3 P2 fix): with a death record
 ## present on "world", force save_world()'s file write to fail (pre-creating
 ## a DIRECTORY at the world.json path so FileAccess.open cannot open it --
@@ -189,6 +202,92 @@ func _validate() -> void:
 	var reloaded_prior = service.load_world()
 	if reloaded_prior == null:
 		_fail("lineage: prior run's world.json should still be loadable (Continue must survive an unrelated run B death)")
+		return
+
+	# --- MANUAL-ONLY: a manual-slot save must NOT claim the shared lineage
+	# (PR #57 Codex round 4 P1) --- With the same LIVE, unfrozen prior-run
+	# world.json still on disk (seeded above) and this instance's
+	# _persisted_lineage_active still false (still New-Game-fresh -- no
+	# request_save()/request_load() has run on it), save ONLY slot_01
+	# through the REAL slot-screen dispatch path (menu_coordinator.
+	# meta_screen_confirm() -> PlayableGeneratedShip._dispatch_save_load_
+	# confirm_result(), the same route save_load_slot_screen_smoke.gd
+	# exercises), then die with no world/autosave write ever made this run.
+	# _mark_shared_lineage() must never fire from a manual save, so
+	# _freeze_run_on_death() must freeze slot_01 (per-slot tracked in
+	# _manual_slots_written_this_run) while leaving "world" untouched --
+	# proving the fix does not brick the prior run's Continue.
+	#
+	# Un-end the LINEAGE stage's death (slice_complete=true, health=0) so
+	# _build_run_snapshot()/request_save() work again for this stage's own
+	# manual save + death. This does NOT touch "world" on disk (still the
+	# live prior-run snapshot seeded above) or _persisted_lineage_active
+	# (never flipped by the LINEAGE stage, since it never called
+	# request_save()/request_load() on this instance).
+	playable.slice_complete = false
+	playable.vitals_state.health = 100.0
+	if playable._persisted_lineage_active:
+		_fail("manual-only: _persisted_lineage_active must still be false before the manual-only save (no world/autosave write happened yet)")
+		return
+	var manual_only_coord = playable.menu_coordinator
+	manual_only_coord.open_records_menu()
+	manual_only_coord.open_meta_screen("save_load")
+	if manual_only_coord.get_active_meta_screen() != "save_load":
+		_fail("manual-only: save_load screen did not open")
+		return
+	var manual_only_rows: Array = manual_only_coord._save_load_rows()
+	var manual_only_index: int = -1
+	for i in range(manual_only_rows.size()):
+		if String(manual_only_rows[i].slot_id) == "slot_01":
+			manual_only_index = i
+			break
+	if manual_only_index < 0:
+		_fail("manual-only: row for 'slot_01' not found")
+		return
+	manual_only_coord.meta_screen_move_selection(-9999)
+	for _i in range(manual_only_index):
+		manual_only_coord.meta_screen_move_selection(1)
+	if manual_only_coord._save_load_row_index != manual_only_index:
+		_fail("manual-only: cursor did not land on 'slot_01' row index %d (got %d)" % [manual_only_index, manual_only_coord._save_load_row_index])
+		return
+	manual_only_coord._save_load_pending_verb = ""
+	manual_only_coord._refresh_save_load_panel()
+	var manual_only_arm: Dictionary = manual_only_coord.meta_screen_confirm()  # arms Save
+	if str(manual_only_arm.get("action", "")) != "arm":
+		_fail("manual-only: expected the first confirm to arm a verb: %s" % str(manual_only_arm))
+		return
+	var manual_only_confirm: Dictionary = manual_only_coord.meta_screen_confirm()  # executes Save
+	if str(manual_only_confirm.get("action", "")) != "save" or not bool(manual_only_confirm.get("ok", false)):
+		_fail("manual-only: save on 'slot_01' did not execute as Save: %s" % str(manual_only_confirm))
+		return
+	# Real production seam: the coordinator's own _input dispatch calls this
+	# every frame handle_ui_input returns true -- drive it directly, exactly
+	# like save_load_slot_screen_smoke.gd does, so this exercises the actual
+	# call site the fix touched (the "save" arm in
+	# _dispatch_save_load_confirm_result).
+	playable._dispatch_save_load_confirm_result(manual_only_confirm)
+	if not playable._manual_slots_written_this_run.has("slot_01"):
+		_fail("manual-only: 'slot_01' not recorded in _manual_slots_written_this_run after the real dispatch save")
+		return
+	if playable._persisted_lineage_active:
+		_fail("manual-only: a manual-slot-only save must NOT flip _persisted_lineage_active (PR #57 Codex round 4 P1 regression)")
+		return
+	manual_only_coord.menu_state.close_all()
+
+	playable.vitals_state.health = 0.0
+	_pump(0.1)
+	if not playable.slice_complete:
+		_fail("manual-only: health=0 should have ended the run as death")
+		return
+	if not resolver.has_died_in("slot_01"):
+		_fail("manual-only: 'slot_01' survived death un-frozen -- manual slots must freeze regardless of shared-lineage state")
+		return
+	if resolver.has_died_in("world"):
+		_fail("manual-only: a manual-slot-only run recorded a death on 'world' -- bricks the prior run's Continue (PR #57 Codex round 4 P1 regression)")
+		return
+	var reloaded_after_manual_only = service.load_world()
+	if reloaded_after_manual_only == null:
+		_fail("manual-only: prior run's world.json should still be loadable after a manual-only death")
 		return
 
 	# Reset for the remaining stages, which all exercise the lineage-active
