@@ -25,12 +25,20 @@ extends SceneTree
 ## asserts nothing about either file's content, only that running it leaves
 ## them exactly as found.
 ##
+## RECLAIM stage (final-review C1 fix): after the away-branch death leaves
+## "world" and its autosave slot frozen, simulate the NEXT run's first
+## system write into those same slot ids and assert the freeze is lifted --
+## save_world()/save_to_slot() now clear the slot's death record before
+## writing (reclaim-on-write, ADR-0043), so a fresh run is never permanently
+## bricked out of Continue/that autosave slot by a prior death.
+##
 ## Pass marker:
-##   PERMADEATH FREEZE PASS wrote=true died=true frozen=true reloadable=false epitaph_present=true
+##   PERMADEATH FREEZE PASS wrote=true died=true frozen=true reloadable=false epitaph_present=true reclaim=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const SaveSlotStateScript := preload("res://scripts/systems/save_slot_state.gd")
 const PermadeathResolverScript := preload("res://scripts/systems/permadeath_resolver.gd")
+const TitleSaveQueryScript := preload("res://scripts/systems/title_save_query.gd")
 const TIMEOUT_FRAMES: int = 600
 const META_PROGRESSION_PATH: String = "user://meta_progression.json"
 const UNLOCK_REGISTRY_PATH: String = "user://unlock_registry.json"
@@ -214,8 +222,40 @@ func _validate() -> void:
 		return
 	playable.menu_coordinator.menu_state.close_all()
 
+	# --- RECLAIM: next run's first save reclaims the frozen slots ---
+	# Reset to a live state the same way the smoke resets between its
+	# home/away phases (slice_complete=false, health restored), simulating
+	# the next run starting up after the away-branch death above froze
+	# "world" and autosave_slot2.
+	playable.slice_complete = false
+	playable.vitals_state.health = 100.0
+	playable._manual_slots_written_this_run.clear()
+
+	if not playable.request_save():
+		_fail("reclaim: next-run request_save() (world) should succeed")
+		return
+	var run_snapshot: RunSnapshot = playable._build_run_snapshot()
+	if run_snapshot == null:
+		_fail("reclaim: _build_run_snapshot() returned null for next-run autosave")
+		return
+	if not service.save_to_slot(autosave_slot2, run_snapshot, SaveSlotStateScript.SLOT_KIND_AUTO, false, "Autosave"):
+		_fail("reclaim: save_to_slot(%s) should succeed for next-run autosave" % autosave_slot2)
+		return
+	if resolver.has_died_in("world"):
+		_fail("reclaim: world slot still shows has_died_in=true after next-run save_world()")
+		return
+	if resolver.has_died_in(autosave_slot2):
+		_fail("reclaim: autosave slot '%s' still shows has_died_in=true after next-run save_to_slot()" % autosave_slot2)
+		return
+	if service.load_world() == null:
+		_fail("reclaim: load_world() returned null after reclaim -- slot should be loadable again")
+		return
+	if not TitleSaveQueryScript.is_continue_available(service, resolver):
+		_fail("reclaim: TitleSaveQuery.is_continue_available() should be true after reclaim")
+		return
+
 	finished = true
-	print("PERMADEATH FREEZE PASS wrote=true died=true frozen=true reloadable=false epitaph_present=true")
+	print("PERMADEATH FREEZE PASS wrote=true died=true frozen=true reloadable=false epitaph_present=true reclaim=true")
 	_cleanup_and_quit(0)
 
 func _wipe_all(service, resolver) -> void:

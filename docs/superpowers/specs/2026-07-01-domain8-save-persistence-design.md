@@ -142,6 +142,9 @@ load the slot back, objective progress reverts while `visited_ships`/dock state 
   and intentionally survives (recorded in ADR-0043 so nobody "fixes" it away).
 - New Game after death does not touch frozen files; a "forget this death" action remains out of
   scope (ADR-0032 seam note).
+- **Reclaim-on-write:** `save_world()`/`save_to_slot()` call `PermadeathResolver.clear_death(slot_id)`
+  before writing, so the next live run's system write reclaims a previously-frozen slot instead of
+  permanently bricking Continue/that autosave slot (final-review finding; see ADR-0043).
 - **`_input` fix:** the `menu_coordinator` input dispatch moves ahead of the
   `slice_complete` early-return; only the gameplay-input tail stays gated. Death detection
   already ticks on both `_process` branches (`_tick_survival_attrition` at `:5254`/`:5330` →

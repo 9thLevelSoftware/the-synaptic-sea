@@ -93,6 +93,13 @@ func save_world(world_snapshot) -> bool:
 		return false
 	if not _ensure_save_dir():
 		return false
+	# Reclaim-on-write (ADR-0043): a death record describes the run that died
+	# in this slot, not the run writing now. A live run's system write to
+	# "world" legitimately reclaims the slot, so clear any stale death
+	# record before writing. This does not reopen save-scumming: frozen
+	# MANUAL slots offer no write verbs in the UI, and load gates fire
+	# before any write ever happens.
+	PermadeathResolverScript.new().clear_death("world")
 	var path: String = WORLD_SLOT_FILE
 	var json: String = JSON.stringify(world_snapshot.to_dict(), "	")
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -215,6 +222,13 @@ func save_to_slot(slot_id: String, snapshot: RunSnapshot, slot_kind: String, is_
 		return false
 	if not _ensure_save_dir():
 		return false
+	# Reclaim-on-write (ADR-0043): a death record describes the run that died
+	# in this slot, not the run writing now. A live run's system write to
+	# this slot legitimately reclaims it, so clear any stale death record
+	# before writing. This does not reopen save-scumming: frozen MANUAL
+	# slots offer no write verbs in the UI, and load gates fire before any
+	# write ever happens.
+	PermadeathResolverScript.new().clear_death(slot_id)
 	# Stamp the slot identity onto the snapshot before serializing so a
 	# future load round-trips the slot metadata without inspecting the
 	# file name. We only stamp slice_version when the caller did not

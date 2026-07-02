@@ -64,6 +64,20 @@ death" action remains explicitly out of scope (ADR-0032 already scoped this
 out as a seam, not a requirement); Domain 8 wires the freeze and the
 epitaph-read path only.
 
+**Reclaim-on-write.** `save_world()` and `save_to_slot()` both clear the
+target slot's death record (`PermadeathResolver.clear_death(slot_id)`)
+before writing. A death record describes the run that died in that slot;
+a subsequent live run's system write legitimately reclaims the slot for its
+own new run. Without this, the first death in a slot family permanently
+bricks Continue and that autosave slot for the lifetime of the save
+directory (final-review finding: `clear_death` had zero production callers
+before this fix, so `world.death.json`/`autosave_*.death.json` outlived
+every later save to those paths). This does **not** reopen save-scumming:
+frozen MANUAL slots are unwritable via the UI (frozen rows offer no verbs),
+and the load gates (`load_from_slot`/`load_world`) fire before any write
+happens — a still-frozen slot cannot be read back mid-death, only
+overwritten by a genuinely new run.
+
 ### 3. _input's post-death dead-zone is fixed
 
 playable_generated_ship.gd:7548-7550 used to hard-return from _input
