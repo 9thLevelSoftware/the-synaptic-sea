@@ -175,7 +175,7 @@ run_clean 'Domain 6 player progression full smoke' 'PLAYER PROGRESSION FULL PASS
 run_clean 'Domain 6 interactive meta-screens smoke' 'META SCREENS INTERACTIVE PASS hub_purchase=true skill_unlock=true registry_reader=true class_select=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_screens_interactive_smoke.gd
 run_clean 'Domain 6 progression meta closure smoke' 'PROGRESSION META CLOSURE PASS away_ticks=1 hub_bonus=1 gate=held gated_logged=true class_persist=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/progression_meta_smoke.gd
 run_clean 'Domain 7 procgen variation smoke' 'PROCGEN VARIATION PASS variants_vary=true loot_biased=true tmpl_gated=true deterministic=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_variation_smoke.gd
-run_clean 'Domain 7 procgen variant hazard smoke' 'PROCGEN VARIANT HAZARD PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_variant_hazard_smoke.gd
+run_clean 'Domain 7 procgen variant hazard smoke' 'PROCGEN VARIANT HAZARD PASS away_ticks=1 fire_lit=true breach_open=true home_clean=true guarded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_variant_hazard_smoke.gd
 echo 'SYNAPTIC_SEA REGRESSION PASS commands=106 clean_output=true'
 ```
 
