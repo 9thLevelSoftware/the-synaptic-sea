@@ -29,6 +29,8 @@ var start_position: Vector3 = Vector3.INF
 var goal_position: Vector3 = Vector3.INF
 var structural_root: Node3D
 var objective_root: Node3D
+var room_variant_descriptors: Dictionary = {}  # room_id -> {"variant": String, "dressing": String}
+const RoomVariantSelectorDressScript := preload("res://scripts/procgen/room_variant_selector.gd")
 
 
 func clear_loaded_ship() -> void:
@@ -54,6 +56,7 @@ func clear_loaded_ship() -> void:
 	goal_position = Vector3.INF
 	structural_root = null
 	objective_root = null
+	room_variant_descriptors = {}
 
 
 func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path: String) -> bool:
@@ -73,6 +76,7 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 	layout_doc = _load_json_dict(layout_abs, "layout")
 	if layout_doc.is_empty():
 		return _fail_load("layout JSON is invalid: %s" % layout_abs)
+	_build_room_variant_descriptors()
 	kit_doc = _load_json_dict(kit_abs, "kit")
 	if kit_doc.is_empty():
 		return _fail_load("kit JSON is invalid: %s" % kit_abs)
@@ -829,6 +833,37 @@ func get_breach_zone_markers() -> Array[Vector3]:
 
 func get_fire_zone_markers() -> Array[Vector3]:
 	return fire_zone_markers.duplicate()
+
+
+func get_room_variant_descriptors() -> Dictionary:
+	return room_variant_descriptors.duplicate(true)
+
+
+## Records the dressing descriptor for each room whose variant carries dressing
+## (or a hazard/loot effect). No new meshes are created — this is metadata the
+## scanner/HUD reads to label rooms (e.g. "flooded"). Reuses existing structural
+## placement props; unmapped variants are skipped.
+func _build_room_variant_descriptors() -> void:
+	room_variant_descriptors.clear()
+	var rooms_variant: Variant = layout_doc.get("rooms", [])
+	if not (rooms_variant is Array):
+		return
+	var selector := RoomVariantSelectorDressScript.new()
+	for room_variant in (rooms_variant as Array):
+		if not (room_variant is Dictionary):
+			continue
+		var room: Dictionary = room_variant
+		var variant: String = str(room.get("variant", "standard"))
+		var effects: Dictionary = selector.effects_for(variant)
+		if effects.is_empty():
+			continue
+		var rid: String = str(room.get("id", ""))
+		if rid.is_empty():
+			continue
+		room_variant_descriptors[rid] = {
+			"variant": variant,
+			"dressing": str(effects.get("dressing", "")),
+		}
 
 
 func _add_fire_zone_markers(layout_doc: Dictionary, ship_root: Node3D) -> void:
