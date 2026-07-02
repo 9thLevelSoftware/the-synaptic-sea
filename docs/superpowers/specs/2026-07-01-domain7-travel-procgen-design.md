@@ -157,8 +157,11 @@ derelict (away branch):
   away-only, guarded by a new `current_ship.breach_seeded` flag mirroring `fire_seeded`, never on
   the restore path (restored breaches come from the derelict instance's applied hull summary).
 
-The coordinator reads the derelict's room variants via `loader.get_layout_copy()` /
-`current_ship.built_layout` (rooms carry the `variant` key from A/`room_assigner`).
+The coordinator reads the derelict's room variants via `current_ship.built_layout` (rooms carry
+the `variant` key from A/`room_assigner`; the attach path populates it before seeding).
+(Correction, final review: an earlier draft prescribed a `loader.get_layout_copy()` fallback, but
+`loader` is the HOME ship's loader — the fallback was removed as a third instance of the
+home/derelict wrong-target shape.)
 
 **A3. Dressing consumer (`generated_ship_loader.gd`).**
 When materializing a room, read `variant`, look up `dressing`. If an existing structural-placement
