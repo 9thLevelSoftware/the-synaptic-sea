@@ -1,9 +1,9 @@
 # ADR-0044: Audio bus layout registration and caption settings unification
 
-Date: 2026-07-02
-Status: Accepted
-Supersedes: nothing — extends ADR-0029 (audio/music/spatial architecture).
-Roadmap source: `docs/superpowers/specs/2026-06-28-completion-roadmap-design.md` Domain 9 (`audio_reactive` loop, bus + pipeline scope).
+**Status:** Accepted
+**Date:** 2026-07-02
+**Supersedes:** nothing — extends ADR-0029 (audio/music/spatial architecture).
+**Roadmap source:** `docs/superpowers/specs/2026-06-28-completion-roadmap-design.md` Domain 9 (`audio_reactive` loop, bus + pipeline scope).
 
 ## Context
 
