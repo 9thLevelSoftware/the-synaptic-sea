@@ -28,7 +28,7 @@ var accessibility_settings: RefCounted
 # captions through. Injected by MenuCoordinator (which already owns the
 # single settings_state instance) via set_settings_state(), following the
 # same pattern as set_accessibility_settings().
-var settings_state = null
+var settings_state: SettingsState = null
 
 # Volume sliders indexed by bus id (StringName).
 var _volume_sliders: Dictionary = {}
@@ -52,7 +52,7 @@ func set_accessibility_settings(settings: RefCounted) -> void:
 	accessibility_settings = settings
 	_apply_text_scale()
 
-func set_settings_state(state) -> void:
+func set_settings_state(state: SettingsState) -> void:
 	settings_state = state
 	if is_inside_tree():
 		_refresh_from_manager()
