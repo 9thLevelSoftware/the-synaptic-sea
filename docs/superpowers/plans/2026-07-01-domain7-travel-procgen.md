@@ -351,19 +351,24 @@ var breach_seeded: bool = false
 
 ```gdscript
 ## Away-branch only: force-breaches compartments of rooms carrying a breach-kind
-## variant on the boarded derelict. Deterministic; guarded by breach_seeded so
-## revisits/restores don't re-seed (restored breaches come from the hull summary).
+## variant on the boarded derelict — on the DERELICT'S OWN hull model
+## (current_ship.get_hull()), mirroring _seed_derelict_fire's use of
+## current_ship.get_fire(). NOT the bare hull_integrity_state member: that is the
+## coordinator's home/hub hull singleton (see _active_hull()). Deterministic;
+## guarded by breach_seeded so revisits/restores don't re-seed (restored breaches
+## come from the derelict instance's applied hull summary).
 func _seed_derelict_breaches() -> void:
 	if not away_from_start or current_ship == null:
 		return
 	if current_ship.breach_seeded:
 		return
 	current_ship.breach_seeded = true
-	if hull_integrity_state == null:
+	var hull = current_ship.get_hull()
+	if hull == null:
 		return
 	for cid in _variant_hazard_compartments("breach"):
-		if hull_integrity_state.compartments.has(str(cid)):
-			hull_integrity_state.damage_compartment(str(cid), 1.0, true)
+		if hull.compartments.has(str(cid)):
+			hull.damage_compartment(str(cid), 1.0, true)
 ```
 
 - [ ] **Step 3: Call it on the derelict build path.** In the derelict build block (line 1952, right after `_seed_derelict_fire()`), add the breach seed before `_build_fire_zones()`:
@@ -700,12 +705,16 @@ extends SceneTree
 
 # procgen_variant_hazard_smoke — Domain 7 (travel loop closure), state layer.
 # Drives away_from_start = true, injects a fire variant on the engineering room
-# and a breach variant on the cargo room of the boarded derelict, then asserts:
+# and a breach variant on the bridge room of the boarded derelict, then asserts:
 #   - _seed_derelict_fire ignites the engineering compartment (forced by variant),
-#   - _seed_derelict_breaches force-breaches the cargo compartment,
+#   - _seed_derelict_breaches force-breaches the bridge compartment on the
+#     DERELICT's hull (current_ship.get_hull()) while the HOME hull's bridge
+#     stays clean (wrong-target regression guard, Task 4 review),
 #   - re-running does NOT re-seed (fire_seeded / breach_seeded guards),
 #   - the ignited/breached set is deterministic (same on a second identical run).
-# Marker: PROCGEN VARIANT HAZARD PASS away_ticks=<n> fire_lit=true breach_open=true guarded=true
+# (bridge, not cargo: hull_compartments.json ships cargo pre-breached, so a cargo
+# assertion would be vacuous.)
+# Marker: PROCGEN VARIANT HAZARD PASS away_ticks=<n> fire_lit=true breach_open=true home_clean=true guarded=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const TIMEOUT_FRAMES: int = 300
@@ -745,12 +754,12 @@ func _validate() -> void:
 		return
 
 	# Inject a fire variant on an engineering room and a breach variant on a
-	# cargo room of the derelict's built layout (deterministic test fixture).
+	# bridge room of the derelict's built layout (deterministic test fixture).
 	var layout: Dictionary = playable.current_ship.built_layout
 	if layout.is_empty() and playable.loader.has_method("get_layout_copy"):
 		layout = playable.loader.get_layout_copy()
 	var set_fire: bool = _set_room_variant(layout, "engineering", "burned_out")
-	var set_breach: bool = _set_room_variant(layout, "cargo", "breached")
+	var set_breach: bool = _set_room_variant(layout, "bridge", "breached")
 	if not set_fire or not set_breach:
 		_fail("could not inject variants: fire_room=%s breach_room=%s" % [str(set_fire), str(set_breach)])
 		return
@@ -766,9 +775,17 @@ func _validate() -> void:
 
 	var fs = playable.current_ship.get_fire()
 	var fire_lit: bool = fs != null and str("engineering") in fs.get_burning_compartments()
-	var breach_open: bool = playable.hull_integrity_state != null \
-		and playable.hull_integrity_state.compartments.has("cargo") \
-		and bool((playable.hull_integrity_state.compartments["cargo"] as Dictionary).get("breach_open", false))
+	# Breach must land on the DERELICT's hull (current_ship.get_hull()), and the
+	# home hull (playable.hull_integrity_state) must be untouched by the seeding.
+	# IMPORTANT: hull_compartments.json ships `cargo` ALREADY breached (health 0.3,
+	# breach_open true) — asserting on cargo would be vacuous. Use `bridge`, which
+	# starts health 1.0 / breach_open false in both hulls.
+	var derelict_hull = playable.current_ship.get_hull()
+	var breach_open: bool = derelict_hull != null \
+		and derelict_hull.compartments.has("bridge") \
+		and bool((derelict_hull.compartments["bridge"] as Dictionary).get("breach_open", false))
+	var home_bridge_clean: bool = playable.hull_integrity_state == null \
+		or not bool(((playable.hull_integrity_state.compartments.get("bridge", {}) as Dictionary)).get("breach_open", false))
 
 	# Guard: second seed call must not change the set (guards flip true on first run).
 	var burning_before: int = fs.get_burning_compartments().size() if fs != null else 0
@@ -776,11 +793,11 @@ func _validate() -> void:
 	playable._seed_derelict_breaches()
 	var guarded: bool = (fs.get_burning_compartments().size() == burning_before)
 
-	if fire_lit and breach_open and guarded:
-		print("PROCGEN VARIANT HAZARD PASS away_ticks=%d fire_lit=true breach_open=true guarded=true" % n)
+	if fire_lit and breach_open and home_bridge_clean and guarded:
+		print("PROCGEN VARIANT HAZARD PASS away_ticks=%d fire_lit=true breach_open=true home_clean=true guarded=true" % n)
 		_cleanup_and_quit(0)
 	else:
-		_fail("fire_lit=%s breach_open=%s guarded=%s" % [str(fire_lit), str(breach_open), str(guarded)])
+		_fail("fire_lit=%s breach_open=%s home_clean=%s guarded=%s" % [str(fire_lit), str(breach_open), str(home_bridge_clean), str(guarded)])
 
 func _set_room_variant(layout: Dictionary, role: String, variant: String) -> bool:
 	var rooms_variant: Variant = layout.get("rooms", [])
@@ -813,7 +830,7 @@ func _cleanup_and_quit(code: int) -> void:
 	quit(code)
 ```
 
-> Note: verify at implementation time that the boarded derelict's `built_layout` actually contains an `engineering` and a `cargo` room. If the default start derelict lacks one, either (a) drive the smoke to a derelict seed that has both (log its rooms first), or (b) inject a synthetic room dict with `room_role` + `id` into `layout.rooms` and add that compartment to `hull_integrity_state` before seeding. Adjust `_set_room_variant` accordingly. Do not fake the assertion — the compartment must genuinely ignite/breach through the real seeding code.
+> Note: verify at implementation time that the boarded derelict's `built_layout` actually contains an `engineering` and a `bridge` room. If the default start derelict lacks one, either (a) drive the smoke to a derelict seed that has both (log its rooms first), or (b) inject a synthetic room dict with `room_role` + `id` into `layout.rooms` (the derelict hull's compartments come from `hull_compartments.json`, so `bridge`/`engineering` always exist on the hull side). Adjust `_set_room_variant` accordingly. Do not fake the assertion — the compartment must genuinely ignite/breach through the real seeding code.
 
 - [ ] **Step 4: Run the hazard smoke, verify PASS.**
 
@@ -888,6 +905,7 @@ git commit -m "docs: close travel loop in inventory + reconcile roadmap definiti
 ## Self-Review notes (for the executor)
 
 - **Template id source (Task 8 Case 3):** `_template_id` parses `design_intent` (no `template_id` field exists). Confirm each template file's `id` matches its filename stem, or adjust the membership arrays.
-- **Derelict room availability (Task 8 Step 3 note):** confirm the boarded derelict has `engineering` + `cargo` rooms, or inject synthetic rooms + hull compartments. Never fake the assertion.
+- **Derelict room availability (Task 8 Step 3 note):** confirm the boarded derelict has `engineering` + `bridge` rooms, or inject synthetic rooms. Never fake the assertion. Breach asserts on `bridge` (starts clean); `cargo` ships pre-breached in `hull_compartments.json` and would be a vacuous assertion.
+- **Hull-target regression guard (Task 4 review):** the breach seed targets `current_ship.get_hull()` (derelict), never the bare `hull_integrity_state` (home hull singleton). The smoke asserts both sides: derelict bridge breached AND home bridge clean.
 - **`ship_instance.gd` summary round-trip (Task 4 Step 1):** if `fire_seeded` is persisted in `get_summary`/`apply_summary`, mirror `breach_seeded` there too, or a save/load mid-derelict will re-seed breaches on restore.
 - **Away-branch coverage:** the hazard smoke drives `away_from_start = true` before seeding — this is the mandatory away-branch assertion. Do not let it pass on the home branch.

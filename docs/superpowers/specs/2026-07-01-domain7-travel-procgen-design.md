@@ -148,10 +148,14 @@ derelict (away branch):
   85%-fire-free `FIRE_PRESENCE_PERCENT` roll for the variant compartments only. Deterministic per
   seed. Guarded by the existing `current_ship.fire_seeded` flag so revisits/restores don't re-seed.
 - **breach** (`kind:"breach"`): a new `_seed_derelict_breaches()` force-breaches the compartments of
-  rooms carrying a breach-kind variant via `hull_integrity_state.damage_compartment(cid, 1.0,
-  true)`. Called in the derelict build path next to `_seed_derelict_fire()` (`:1952`), away-only,
-  guarded by a new `current_ship.breach_seeded` flag mirroring `fire_seeded`, never on the restore
-  path (restored breaches come from the applied hull summary).
+  rooms carrying a breach-kind variant via `current_ship.get_hull().damage_compartment(cid, 1.0,
+  true)` — the **boarded derelict's own hull model**, mirroring how fire uses
+  `current_ship.get_fire()`. (Correction 2026-07-01, Task 4 review: an earlier draft named the bare
+  `hull_integrity_state` member, but that is the coordinator's HOME/hub hull singleton per
+  `_active_hull()`; targeting it would breach the player's home ship and persist phantom breaches in
+  the home hull summary.) Called in the derelict build path next to `_seed_derelict_fire()`,
+  away-only, guarded by a new `current_ship.breach_seeded` flag mirroring `fire_seeded`, never on
+  the restore path (restored breaches come from the derelict instance's applied hull summary).
 
 The coordinator reads the derelict's room variants via `loader.get_layout_copy()` /
 `current_ship.built_layout` (rooms carry the `variant` key from A/`room_assigner`).
