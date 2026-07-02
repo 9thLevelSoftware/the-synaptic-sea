@@ -5,7 +5,7 @@
 
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
-| Audio Manager | 🟡 | 73% | [V] | playable_generated_ship.gd:4904 |
+| Audio Manager | 🟢 | 73% | [V] | playable_generated_ship.gd:4904 |
 | ↳ Dynamic Music State Machine | 🟢 | 90% | [V] | playable_generated_ship.gd:5493 |
 | ↳ SFX Event Router | 🟢 | 90% | [V] | playable_generated_ship.gd:3966 |
 | ↳ Meta-Event Scheduler | 🟢 | 90% | [V] | audio_manager.gd:182 |
