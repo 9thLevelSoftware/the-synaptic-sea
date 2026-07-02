@@ -1,0 +1,91 @@
+# Domain 9: Audio (Bus + Pipeline) — Design Spec
+
+Date: 2026-07-02
+Status: Approved design (plan-mode approval 2026-07-02); supersedes nothing — extends ADR-0029 via new ADR-0044.
+Roadmap source: `docs/superpowers/specs/2026-06-28-completion-roadmap-design.md` Domain 9 (loop `audio_reactive`, bus + pipeline scope).
+
+## 1. Problem
+
+The audio architecture (ADR-0029) is richly built — six pure models plus an `AudioManager` node owned by `PlayableGeneratedShip`, ticked on BOTH `_process` branches, save/load round-trip working — but it is structurally silent:
+
+- No bus layout is registered: `project.godot` has no `[audio]` section; `data/audio/audio_bus_config.tres` is a custom `AudioBusConfig` Resource that nothing loads. `AudioServer.get_bus_index` returns −1 for every named bus, so every volume push (`audio_manager.gd:100-115`) is inert — in windowed builds too, not just headless.
+- No `AudioStream` is ever assigned and `.play()` is never called anywhere in the 8 audio scripts. Zero audio assets exist.
+- Captions never reach the player: `pump_captions`/`drain_captions` have zero gameplay callers.
+
+## 2. Definition of CLOSED (roadmap, verbatim scope)
+
+1. A real Godot `AudioBusLayout` is registered in `project.godot` so `get_bus_index` resolves and the volume pushes are no longer inert.
+2. The stream-loading path is proven with 1–2 real clips that actually `.play()` through a player with an assigned `.stream` (at least one SFX event and one music layer audible).
+3. Captions are pumped to the HUD in real play, on BOTH `_process` branches.
+4. Explicitly out of scope (retained deferrals, documented not engineered): full SFX/music/voice library, spatial emitter population, ambient-zone reactivity.
+
+## 3. User-locked decisions
+
+| Decision | Choice |
+|---|---|
+| Proof clips | Generated placeholder WAVs (deterministic sine/noise; feature-spec non-goals explicitly permit) |
+| 8 unregistered audio smokes | Register all 8 into the regression bundle; reconcile the feature spec's false "all registered" claim |
+| Caption toggles | Unify on `SettingsState.captions` as the single source of truth |
+
+## 4. Empirically verified facts (probe run on this machine, 2026-07-02, Godot 4.6.2 headless)
+
+A throwaway probe (`--headless --script` with a hand-authored `AudioBusLayout` .tres + `[audio]` registration) established, then was reverted:
+
+- **Headless `--script` runs DO load `audio/buses/default_bus_layout`**: `AudioServer.bus_count == 7`, all six child buses resolved with correct volumes and `send=Master`. The Dummy audio driver registers real buses; only DSP output is silenced. No runtime `set_bus_layout()` fallback is needed.
+- **`get_bus_index("master") == -1` always**: Godot's bus 0 is immutably named `"Master"` (capital M, non-renamable). The model layer's `AudioEventSeam.BUS_MASTER == &"master"` (lowercase) can never resolve directly. The AudioServer boundary therefore needs a name translation (§5.1).
+- **`AudioStreamWAV.load_from_file()` exists** on this build (`ClassDB.class_has_method` confirmed) — runtime WAV loading without the editor import pipeline is available.
+
+## 5. Design
+
+### 5.1 Bus registration (criterion 1)
+
+- New hand-authored real `AudioBusLayout` at `data/audio/default_bus_layout.tres` — six child buses (`sfx`, `music`, `voice`, `ui`, `ambient`, `meta`) sending to `Master`, volumes mirroring `AudioBusConfig.make_default()` (`sfx` −3, `music` −6, `voice` −3, `ui` −6, `ambient` −9, `meta` −6; Master 0 is engine bus 0). The exact verified `.tres` text lives in the implementation plan.
+- `project.godot`: surgical addition of an `[audio]` section with `buses/default_bus_layout="res://data/audio/default_bus_layout.tres"` — the only project.godot change. Never edit via `--editor` (it injects autoloads on this machine).
+- **Master-name translation**: `AudioManager` gains a private `_engine_bus_name(bus_id: StringName) -> String` — returns `"Master"` for `&"master"`, `String(bus_id)` otherwise — used at every AudioServer boundary (`_apply_bus_volumes`, any `get_bus_index` call). The pure model keeps lowercase `master` everywhere (save summaries, panel, config); only the engine boundary translates. `AudioStreamPlayer.bus` assignments for the six child buses need no translation (names match).
+- **Split of authority** (ADR-0044): the `AudioBusLayout` .tres owns boot-time bus *existence/hierarchy*; `AudioBusConfig` owns runtime *state* (volumes/mutes, save round-trip via `RunSnapshot.audio_summary`). The two tables must agree; any bus add/remove/rename updates both in the same PR. Drift guard: the pipeline smoke asserts `AudioServer.bus_count == 7` and per-bus name/volume agreement with `AudioBusConfig.make_default()` at boot.
+- `data/audio/audio_bus_config.tres` (orphaned custom Resource, loaded by nothing) is kept and documented as an orphan in ADR-0044; building a loader for it is out of scope.
+
+### 5.2 Stream proof (criterion 2)
+
+- Two committed placeholder WAVs, generated by a new deterministic script `tools/generate_placeholder_audio.py` (stdlib `wave` only; fixed seed/pure-function synthesis so re-running yields identical bytes):
+  - `data/audio/sfx/tool_pickup.wav` (~0.25 s, 16-bit mono PCM 22050 Hz) — backs `AudioEventSeam.SFX_TOOL_PICKUP` (`sfx.tool.pickup`): has a live gameplay callsite (item pickup, `playable_generated_ship.gd:7491`) and a caption ("Tool acquired").
+  - `data/audio/music/exploration_base.wav` (~1–2 s, loopable) — backs music layer `layer.base`, always-on in the default EXPLORATION state, so it is audible immediately after boot.
+- Loading via `AudioStreamWAV.load_from_file()` at runtime (verified available, §4): no editor import pass, no `.import`/`.uid` churn.
+- `AudioManager` gains `STREAM_CATALOG: Dictionary` (event/layer id → `res://` path) plus a `_loaded_streams: Dictionary` path-keyed cache. The catalog lives in the manager, NOT in `SfxEventRouter` — the router stays a pure RefCounted (ADR-0029: the manager is the only scene-aware object).
+  - `_play_via_bus` gains the event id: when cataloged, lazily load, assign `player.stream`, and `player.play()`; when not cataloged (the other ~25 events), behavior is byte-identical to today (volume push only) — the graceful missing-asset fallback that keeps the deferred library honest.
+  - Music: on first `_apply_music_layer_gains` (or in `_build_stream_players`), the base-layer clip is loaded with `loop_mode = LOOP_FORWARD` and played on the music bus player.
+- Missing/corrupt WAV at runtime: `load_from_file` failure logs one `push_warning` and falls back to streamless behavior — never crashes, never spams per-frame (warn-once flag per path).
+
+### 5.3 Caption pump (criterion 3)
+
+- One call added inside `_refresh_audio_state()` (`playable_generated_ship.gd:6105-6160`): `audio_manager.pump_captions(Callable(self, "_on_audio_caption"))`. Both `_process` branches already call `_refresh_audio_state(false, delta)` (away `:5358`, home `:5445`), so the criterion's both-branches requirement is satisfied structurally — no per-branch wiring, no fourth away-branch regression.
+- HUD render: new `_last_caption_line: String` member + expiry timer (2.5 s, matching `SfxEventRouter.DEFAULT_CAPTION_DURATION`), decremented in `_refresh_audio_state`; the line is appended in `_combined_system_status_lines()` as `Caption: <text>` — the exact `_last_loot_feedback_line` pattern (`:5182-5183`) into the existing `ObjectiveTracker.set_system_status_lines` path. No new HUD framework. Multiple captions in one frame: display the most recent.
+- Validation seam: `get_last_caption_line() -> String` next to `get_audio_manager()` (`:6171`).
+- **Settings unification**: `SettingsState.captions` is the single source of truth for `SfxEventRouter.captions_enabled`. Single push point: `_on_ui_settings_changed` (`playable_generated_ship.gd:4598`), which all three apply paths already funnel through via `menu_coordinator.settings_changed` — (1) in-game settings cycle (`menu_coordinator._cycle_setting` → emit), (2) title handoff (`title_main.gd` → `apply_ui_settings_summary:5845` → `apply_settings_summary` → emit), (3) save/load restore (`_apply_run_snapshot:6846` → `apply_settings_summary` → emit).
+- `AudioSettingsPanel` captions checkbox is rewired through `SettingsState` (read `is_captions_enabled()`, write via the coordinator's settings seam). This also fixes a latent pre-existing bug: `audio_settings_panel.gd:133/149` gates on `audio_manager.has_method("sfx_router")` — always false (property, not a method) — so the checkbox has never synced or written anything.
+- The panel's voice-log toggle remains a known no-op stub — flagged in ADR-0044, not fixed (separate concern, out of scope).
+
+### 5.4 Validation
+
+- New smoke `scripts/validation/audio_pipeline_smoke.gd`, marker (byte contract):
+  `AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true away_ticks=30`
+  Asserts: `AudioServer.bus_count == 7`; `get_bus_index` ≥ 0 for `"Master"` and the six lowercase children; per-bus volume agreement with `AudioBusConfig.make_default()`; after `play_sfx(&"sfx.tool.pickup")` the sfx player has `stream != null and playing`; music player `stream != null and playing`; then drives `away_from_start = true` for 30 manual `_process` ticks and asserts the caption reached `get_last_caption_line()`. Writes nothing to disk; frees the scene in both exit paths.
+- Register the 8 existing unregistered audio smokes (`audio_bus_config`, `ambient_zone_state`, `sfx_event_router`, `dynamic_music_state`, `spatial_audio_resolver`, `meta_event_state`, `main_playable_slice_audio`, `audio_save_load`) — each verified passing first; any warnings newly surfaced by real bus registration are classified per the allowlist discipline before registration.
+- Bundle: 112 + 8 + 1 = `SYNAPTIC_SEA REGRESSION PASS commands=121 clean_output=true` (verified 1 `run_clean` = 1 command).
+
+### 5.5 Docs/inventory delta
+
+- **Pre-existing docs-integrity fix**: `docs/game/features/audio-music-spatial.md:100` falsely claims all audio smokes are registered in the bundle (only 2 are). Corrected to the true post-Domain-9 state.
+- Inventory: `audio_reactive.closes → "closed"` with the three deferrals retained and reworded as deferred-not-broken (roadmap's "closed-but-thin" honesty note); `audio_manager.output.live → true`; drop the closed gaps (inert bus push, undrained captions, zero audible output), keep the thin-library gap. Regenerate via `tools/build_system_inventory.py`, then `--check` must pass.
+- No new REQ-AU ids: the new criteria are documented in the feature spec's status section and ADR-0044 (`RequirementTraceValidator` checks heading/status existence only).
+- New **ADR-0044** "Audio bus layout registration and caption settings unification" (0043 is the current max; the triple-0029 collision is a known pre-existing quirk): documents the AudioBusLayout/AudioBusConfig split of authority, the Master-name translation, the `load_from_file` placeholder-clip decision + stream registry, the SettingsState caption unification + panel bug fix, and the retained deferrals/orphan `.tres`. Added to the ADR index files if `doc_currency_validators.py` requires.
+
+## 6. Out of scope (explicit)
+
+Full SFX/music/voice asset library (later content pass); spatial emitter population; ambient-zone reactivity (`set_room_role`/`set_threat_level` stay uncalled from gameplay); a loader for `data/audio/audio_bus_config.tres`; the voice-log toggle stub; occlusion raycast (heuristic placeholder stays).
+
+## 7. Risks
+
+1. Real bus registration may surface dormant warnings in the 8 newly-registered smokes — static read found none; confirm empirically at registration time.
+2. Dual bus tables (AudioBusLayout .tres vs `AudioBusConfig`) can drift — no engine-level cross-check exists; mitigated by the pipeline smoke's count/name/volume assertions and ADR same-PR discipline.
+3. `project.godot` edit — one section only; `git diff project.godot` after any Godot invocation (`--editor` mutation trap on this machine).
