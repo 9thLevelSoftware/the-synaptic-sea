@@ -980,9 +980,9 @@
 
 **Interfaces:**
 - Consumes: `PlayableShipScript` (`res://scripts/procgen/playable_generated_ship.gd`), golden fixture `res://data/procgen/golden/coherent_ship_002/{layout.json,gameplay_slice.json}`, `res://data/kits/ship_structural_v0.json`, `get_audio_manager()`, `get_last_caption_line()`, `away_from_start` (public var), `_refresh_audio_state`/`audio_manager.tick` driven manually for the away-branch tick loop.
-- Produces marker (byte contract): `AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true away_ticks=30`
+- Produces marker (byte contract): `AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true captions_toggle=true away_ticks=30`
 
-- [ ] Write `scripts/validation/audio_pipeline_smoke.gd`, modeled on `main_playable_slice_audio_smoke.gd`'s boot/poll structure:
+> **Amendment (2026-07-02, controller, after Task 5 review):** the Task 5 review found the SettingsState→router caption unification ships with no direct regression coverage. This smoke therefore gains a `captions_toggle` stage (marker field added above and in the code's print). After the caption_hud stage passes, the smoke must: (a) capture `playable.menu_coordinator.get_settings_summary()`; (b) build a copy with `captions=false` and call `playable.menu_coordinator.apply_settings_summary(copy)`; (c) assert `playable.get_audio_manager().sfx_router.captions_enabled == false`; (d) fire `play_sfx(&"sfx.tool.pickup")` (after waiting out the 0.10s router cooldown via one `audio_manager.tick(0.2)`), pump one `_refresh_audio_state(false, 0.0)` tick, and assert `get_last_caption_line()` did NOT gain a new caption (the previous line may still be live or expired — assert on the router's `get_pending_captions().is_empty()` and `captions_enabled` rather than HUD string equality if simpler and race-free); (e) restore `captions=true` via the same seam and assert `captions_enabled == true`; set `captions_toggle` true only if all sub-asserts held. The code block below predates this amendment — implement the stage per this note and extend the final print accordingly (already updated below).
   ```gdscript
   extends SceneTree
   # Domain 9 (audio bus + pipeline) full pipeline smoke.
@@ -999,7 +999,7 @@
   #    reached the HUD seam through _refresh_audio_state, which both
   #    _process branches already call).
   #
-  # Pass marker: AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true away_ticks=30
+  # Pass marker: AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true captions_toggle=true away_ticks=30
   #
   # Writes nothing to disk. Frees the scene in both the pass and fail exit paths.
 
@@ -1103,7 +1103,7 @@
   	var caption_hud_ok: bool = true
 
   	finished = true
-  	print("AUDIO PIPELINE PASS bus_index=%s stream_playing=%s caption_hud=%s away_ticks=%d" % [
+  	print("AUDIO PIPELINE PASS bus_index=%s stream_playing=%s caption_hud=%s captions_toggle=%s away_ticks=%d" % [
   		str(bus_index_ok).to_lower(),
   		str(stream_playing_ok).to_lower(),
   		str(caption_hud_ok).to_lower(),
@@ -1128,7 +1128,7 @@
   ROOT="C:/Users/dasbl/Documents/The Synaptic Sea"
   "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_pipeline_smoke.gd
   ```
-  Expected marker (exact byte contract): `AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true away_ticks=30`
+  Expected marker (exact byte contract): `AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true captions_toggle=true away_ticks=30`
   No `ERROR:`/`WARNING:` line beyond the two allowlisted ones. If `str(bool).to_lower()` does not produce lowercase `"true"`/`"false"` on this Godot build, replace with the ternary `"true" if bus_index_ok else "false"` pattern instead (verify actual GDScript `String` casing behavior for `bool` — `str(true)` in GDScript 4.x already yields `"true"` lowercase, so `.to_lower()` is defensive and should be a no-op; if it errors as an unknown method on `String`, drop `.to_lower()` entirely since `str(bool)` alone is already lowercase).
 
 - [ ] Stage and commit:
@@ -1170,7 +1170,7 @@
   - `META EVENT STATE PASS fired=3 pending=0 deterministic_seed=true`
   - `MAIN PLAYABLE AUDIO PASS buses=6 routed=4 fired_meta=3 ambient_role=engine`
   - `AUDIO SAVE LOAD PASS summary_keys=<N> round_trip=true` (read the actual printed key count)
-  - `AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true away_ticks=30`
+  - `AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true captions_toggle=true away_ticks=30`
   Any newly-surfaced `ERROR:`/`WARNING:` line beyond the two allowlisted ones (risk called out in spec §7.1 — real bus registration may surface dormant warnings) must be classified here before proceeding: either it is a genuine regression (stop, fix the root cause, re-verify) or it is a new deliberate/expected warning that needs its own allowlist regex added to `06_validation_plan.md` alongside the existing `BASELINE_ERROR`/`BASELINE_WARNING`/etc. definitions — do not silently register a smoke with an unclassified warning.
 
 - [ ] Read `docs/game/06_validation_plan.md` and insert the 9 `run_clean` lines directly after line 142 (`run_clean 'REQ-AU-001 callsite audio event coupling smoke' ...`), using the exact marker strings confirmed in the previous step. Old string:
@@ -1189,7 +1189,7 @@
   run_clean 'meta event state model smoke' 'META EVENT STATE PASS fired=3 pending=0 deterministic_seed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_event_state_smoke.gd
   run_clean 'main playable audio smoke' 'MAIN PLAYABLE AUDIO PASS buses=6 routed=4 fired_meta=3 ambient_role=engine' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_audio_smoke.gd
   run_clean 'audio save/load model smoke' 'AUDIO SAVE LOAD PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_save_load_smoke.gd
-  run_clean 'Domain 9 audio pipeline smoke' 'AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true away_ticks=30' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_pipeline_smoke.gd
+  run_clean 'Domain 9 audio pipeline smoke' 'AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true captions_toggle=true away_ticks=30' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_pipeline_smoke.gd
   # --- Task 15 documentation/manifest currency validators (host-side Python; no Godot) ---
   ```
   Note: `sfx_event_router_smoke` and `audio_save_load_smoke` markers use a partial-match string (`'SFX EVENT ROUTER PASS'` / `'AUDIO SAVE LOAD PASS'`) rather than the full parameterized line, matching the existing bundle's convention of using a stable prefix for markers whose suffix values are computed at runtime (e.g. line 84's `'MAIN PLAYABLE ROUTE CONTROL PASS'`) — `grep -q` on the marker only needs the prefix substring to match, so this is consistent with the file's existing style, not a deviation.
