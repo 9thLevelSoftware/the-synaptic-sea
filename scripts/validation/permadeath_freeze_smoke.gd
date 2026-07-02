@@ -254,6 +254,51 @@ func _validate() -> void:
 		_fail("reclaim: TitleSaveQuery.is_continue_available() should be true after reclaim")
 		return
 
+	# --- MANUAL-SLOT CROSS-RUN FREEZE (Codex round 2 finding C) ---
+	# _manual_slots_written_this_run is in-memory-only bookkeeping; without
+	# mirroring it through WorldSnapshot.manual_slots_written, a manual save
+	# made before a world Save & Exit would be forgotten by the fresh
+	# PlayableGeneratedShip Continue creates, and a later death in the
+	# resumed run would freeze world/autosaves but leave that manual slot
+	# loadable -- reopening the save-scumming escape ADR-0043 closes.
+	# Simulate exactly that boundary: record "slot_01" into a WorldSnapshot,
+	# apply it via _apply_world_snapshot (the same primitive request_load()
+	# and Continue use), then drive death and assert the manual slot froze.
+	_wipe_all(service, resolver)
+	playable.slice_complete = false
+	playable.vitals_state.health = 100.0
+	playable._manual_slots_written_this_run.clear()
+	playable.away_from_start = false
+
+	var manual_run_snapshot: RunSnapshot = playable._build_run_snapshot()
+	if manual_run_snapshot == null:
+		_fail("manual-slot freeze: _build_run_snapshot() returned null")
+		return
+	if not service.save_to_slot(SaveSlotStateScript.MANUAL_SLOT_IDS[0], manual_run_snapshot, SaveSlotStateScript.SLOT_KIND_MANUAL, false, "Manual Save"):
+		_fail("manual-slot freeze: save_to_slot(slot_01) should succeed")
+		return
+
+	var ws = playable._build_world_snapshot()
+	if ws == null:
+		_fail("manual-slot freeze: _build_world_snapshot() returned null")
+		return
+	ws.manual_slots_written = [SaveSlotStateScript.MANUAL_SLOT_IDS[0]]
+	if not playable._apply_world_snapshot(ws):
+		_fail("manual-slot freeze: _apply_world_snapshot() should succeed")
+		return
+	if not playable._manual_slots_written_this_run.has(SaveSlotStateScript.MANUAL_SLOT_IDS[0]):
+		_fail("manual-slot freeze: _apply_world_snapshot did not restore manual_slots_written into the in-memory set")
+		return
+
+	playable.vitals_state.health = 0.0
+	_pump(0.1)
+	if not playable.slice_complete:
+		_fail("manual-slot freeze: health=0 should have ended the run as death")
+		return
+	if not resolver.has_died_in(SaveSlotStateScript.MANUAL_SLOT_IDS[0]):
+		_fail("manual-slot freeze: slot_01 survived death un-frozen -- manual_slots_written did not round-trip through WorldSnapshot")
+		return
+
 	finished = true
 	print("PERMADEATH FREEZE PASS wrote=true died=true frozen=true reloadable=false epitaph_present=true reclaim=true")
 	_cleanup_and_quit(0)

@@ -1613,9 +1613,12 @@ func get_unlock_registry():
 ## after the slice is already complete returns 0 and is a no-op.
 # Domain 8 (ADR-0043): slot ids the slot screen's Save verb has written to
 # THIS run. Permadeath freeze must also freeze these -- a mid-run manual
-# save must not be a save-scumming escape hatch from permadeath. Cleared
-# implicitly by process restart / fresh PlayableGeneratedShip; never
-# persisted itself (it is a run-local bookkeeping set, not save data).
+# save must not be a save-scumming escape hatch from permadeath. In-memory
+# bookkeeping, but mirrored into WorldSnapshot.manual_slots_written on every
+# world save/load (PR #57 Codex round 2 finding C) so the set survives a
+# Save & Exit -> Continue boundary (a fresh PlayableGeneratedShip would
+# otherwise lose it and let a previously-manual-saved slot dodge freeze on
+# a later death in the resumed run).
 var _manual_slots_written_this_run: Dictionary = {}
 
 func end_run(reason: String = "extraction") -> int:
@@ -5835,6 +5838,18 @@ func apply_ui_settings_summary(summary: Dictionary) -> bool:
 		return false
 	return menu_coordinator.apply_settings_summary(summary)
 
+## ADR-0043 title handoff seam: dismisses the in-scene boot-time main_menu
+## _build_runtime_nodes() parks open via menu_coordinator.open_main_menu().
+## The title screen already collected New Game / Continue intent before
+## instantiating this scene, so the child's own main_menu overlay is
+## redundant and must not survive the handoff (it would otherwise keep
+## capturing input via menu_coordinator.handle_ui_input, parking the
+## player on a second menu instead of gameplay).
+func dismiss_boot_menu() -> bool:
+	if not is_instance_valid(menu_coordinator):
+		return false
+	return menu_coordinator.dismiss_boot_menu()
+
 ## Validation-only alias kept for existing smokes; delegates to the production seam.
 func apply_ui_settings_summary_for_validation(summary: Dictionary) -> bool:
 	return apply_ui_settings_summary(summary)
@@ -6989,6 +7004,11 @@ func _build_world_snapshot():
 	ws.piloted_ship_id = piloted_ship.ship_id if piloted_ship != null else ""
 	ws.aboard_ship_id = current_occupancy.ship_id if current_occupancy != null else ""
 	ws.opened_ports = _opened_port_marker_ids()
+	# PR #57 Codex round 2 finding C: persist the manual-save freeze set so a
+	# Save & Exit -> Continue cross-run boundary does not forget which manual
+	# slots this run wrote (_manual_slots_written_this_run is otherwise
+	# in-memory-only and lost when a fresh PlayableGeneratedShip is built).
+	ws.manual_slots_written = _manual_slots_written_this_run.keys()
 	ws.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
 	ws.godot_version = Engine.get_version_info()["string"]
 	ws.saved_at = Time.get_datetime_string_from_system(true)
@@ -7198,6 +7218,11 @@ func _apply_world_snapshot(ws) -> bool:
 	for b in dock_barriers:
 		if is_instance_valid(b) and ws.opened_ports.has(String(b.marker_id)):
 			b.set_opened(true)
+	# PR #57 Codex round 2 finding C: restore the manual-save freeze set, merged
+	# with any current-run keys (rather than replaced) so this stays correct
+	# even if a load somehow runs mid-run with slots already recorded.
+	for manual_slot_id in ws.manual_slots_written:
+		_manual_slots_written_this_run[String(manual_slot_id)] = true
 	# 5c. Ensure every derelict that is an endpoint of a saved dock edge has geometry
 	# BEFORE re-docking. Step 4 only materializes current_location; a claimed derelict the
 	# player was PILOTING (docked to a different host after rigid-pair travel) is otherwise

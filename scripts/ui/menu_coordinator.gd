@@ -288,6 +288,17 @@ func open_main_menu() -> void:
 	menu_state.open_menu("main_menu")
 	_refresh_all()
 
+## ADR-0043 title handoff seam: dismisses the in-scene boot-time main_menu
+## _build_runtime_nodes() parks open via open_main_menu(). The title screen
+## already collected the player's New Game / Continue intent, so this menu
+## is redundant once the title handoff completes -- mirrors the same
+## in-play transition menu_coordinator._confirm_current_item()'s main_menu
+## "start" arm drives (menu_state.close_all()) when the game is NOT booted
+## through the title screen. Idempotent: closing an already-closed menu
+## stack is a no-op in MenuState.
+func dismiss_boot_menu() -> bool:
+	return menu_state.close_all()
+
 func get_current_menu() -> String:
 	return menu_state.get_current_menu()
 

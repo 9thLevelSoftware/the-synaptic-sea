@@ -144,6 +144,20 @@ func _poll_for_playable_started(should_load: bool) -> void:
 	# an untouched title would clobber whatever request_load() just restored.
 	if _settings_dirty:
 		playable_instance.apply_ui_settings_summary(settings_state.get_summary())
+		# Codex round 2 finding B: the handoff consumed the edit -- clear the flag so
+		# a LATER Continue in the same process (after in-game settings changes were
+		# saved) does not re-push this stale title-local summary over a freshly
+		# loaded run's settings. settings_state's values are left as last shown;
+		# only the dirty flag resets.
+		_settings_dirty = false
+	# Codex round 2 finding A: the child PlayableGeneratedShip's _build_runtime_nodes
+	# parks its own boot-time main_menu open (menu_coordinator.open_main_menu()) --
+	# a pre-title-era overlay that is redundant here because the title screen already
+	# collected New Game / Continue intent. Left open it would keep capturing input
+	# (menu_coordinator.handle_ui_input) and strand the player on a second menu
+	# instead of gameplay. Dismiss it through the same seam the in-scene "start"
+	# confirm uses (menu_state.close_all()).
+	playable_instance.dismiss_boot_menu()
 
 func _on_title_quit() -> void:
 	get_tree().quit()

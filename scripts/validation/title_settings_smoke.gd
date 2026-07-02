@@ -146,6 +146,15 @@ func _on_process_frame() -> void:
 			if bool(summary.get("captions", not _expect_captions)) != _expect_captions:
 				_fail("applied captions mismatch: %s (expected %s)" % [str(summary.get("captions")), str(_expect_captions)])
 				return
+			# Codex round 2 finding B: the dirty-flag handoff must consume the
+			# edit -- _settings_dirty should be false immediately after
+			# apply_ui_settings_summary() ran, so a LATER Continue in this
+			# same process (after in-game settings were changed and saved)
+			# does not re-push this stale title-local summary over a freshly
+			# loaded run's settings.
+			if title_node._settings_dirty:
+				_fail("_settings_dirty still true after New Game handoff consumed it")
+				return
 			finished = true
 			print("TITLE SETTINGS PASS open=true cycle=true back=true applied=true")
 			_cleanup()

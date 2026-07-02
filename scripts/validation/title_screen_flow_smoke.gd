@@ -88,6 +88,21 @@ func _await_new_game_playable() -> void:
 	var playable: PlayableGeneratedShip = title_node.playable_instance
 	if playable == null or not playable.playable_started:
 		return
+	# Codex round 2 finding A: _build_runtime_nodes parks the child's own
+	# boot-time main_menu open (menu_coordinator.open_main_menu()). The title
+	# handoff (_poll_for_playable_started) must dismiss it via
+	# dismiss_boot_menu() once should_load/settings handling is done, or the
+	# player would land on a SECOND parked menu capturing input instead of
+	# gameplay. By the time playable_started is observed true here, the
+	# handoff has already run synchronously -- assert the child's own menu
+	# coordinator is back in-play (no menu open), not still parked.
+	var ui = playable.get_menu_coordinator_for_validation()
+	if ui == null or not is_instance_valid(ui):
+		_fail("menu_coordinator missing after New Game handoff")
+		return
+	if not ui.menu_state.is_in_play():
+		_fail("child menu still open after New Game handoff: current_menu=%s" % ui.get_current_menu())
+		return
 	# Save a real world.json through the live instance so Continue (later
 	# stage, after a fresh title rebuild) has something to load.
 	if not playable.request_save():
