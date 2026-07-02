@@ -1,6 +1,12 @@
 extends RefCounted
 class_name RoomGraphGenerator
 
+# DEPRECATED 2026-07-01 (Domain 7): orphaned from the live generation pipeline.
+# The live path is TemplateSelector -> RoomAssigner -> CellLayoutEngine ->
+# WallDoorResolver -> LayoutSerializer -> GeneratedShipLoader. This graph
+# generator is retained for reference / unit-test use only and is excluded from
+# the system-inventory completion %. Do not wire into live generation.
+
 # Preload the peer data classes for headless --script compatibility.
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const RoomGraphScript := preload("res://scripts/procgen/room_graph.gd")
