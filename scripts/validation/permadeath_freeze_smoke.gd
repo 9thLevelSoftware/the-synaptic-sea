@@ -32,6 +32,25 @@ extends SceneTree
 ## writing (reclaim-on-write, ADR-0043), so a fresh run is never permanently
 ## bricked out of Continue/that autosave slot by a prior death.
 ##
+## LINEAGE stage (PR #57 Codex round 3 P1 fix): a fresh PlayableGeneratedShip
+## naturally starts with _persisted_lineage_active == false. With a LIVE,
+## unfrozen world.json already on disk (simulating a prior run's Continue),
+## simulate New Game (no load, no save) and drive death: _freeze_run_on_death
+## must NOT record a death for "world" (this run never loaded or wrote it),
+## and load_world() must still return the untouched prior snapshot. All
+## earlier/later stages in this file call request_save() (or reach
+## request_load() via load_world) before their own death, which marks
+## _persisted_lineage_active true -- so they continue to exercise the
+## lineage-active freeze path unchanged.
+##
+## RECLAIM-FAILURE stage (PR #57 Codex round 3 P2 fix): with a death record
+## present on "world", force save_world()'s file write to fail (pre-creating
+## a DIRECTORY at the world.json path so FileAccess.open cannot open it --
+## verified empirically reliable on Windows/Godot 4.6.2, error=12/
+## ERR_CANT_OPEN) and assert save_world() returns false AND
+## has_died_in("world") is STILL true -- the death record must not be
+## cleared until the write is confirmed on disk.
+##
 ## Pass marker:
 ##   PERMADEATH FREEZE PASS wrote=true died=true frozen=true reloadable=false epitaph_present=true reclaim=true
 
@@ -131,6 +150,53 @@ func _validate() -> void:
 
 	# Clean slate for every slot family this smoke touches.
 	_wipe_all(service, resolver)
+
+	# --- LINEAGE: fresh-run-no-save must NOT freeze a prior run's world.json
+	# (PR #57 Codex round 3 P1) --- Must run FIRST, before any other stage's
+	# request_save()/request_load() call flips _persisted_lineage_active true
+	# for the rest of this smoke's lifetime (the flag is run-local and
+	# deliberately never cleared mid-run, so a genuinely fresh-instance
+	# assertion only holds here).
+	if playable._persisted_lineage_active:
+		_fail("lineage: a freshly-loaded instance must start with _persisted_lineage_active false")
+		return
+	# Simulate a LIVE Continue: write a real, unfrozen world.json belonging to
+	# a "prior run" (run A) via the service directly (bypassing
+	# request_save()/request_load() so THIS instance's flag stays false,
+	# mirroring "run B never wrote a byte"). Then reset to New Game state
+	# (slice_complete=false, health=100) and drive death with no load/save
+	# ever called on this instance -- nothing in the shared world/autosave
+	# lineage may freeze, and the prior run's world.json must still load.
+	playable.away_from_start = false
+	var prior_run_ws = playable._build_world_snapshot()
+	if prior_run_ws == null:
+		_fail("lineage: _build_world_snapshot() returned null while building the prior-run world save")
+		return
+	if not service.save_world(prior_run_ws):
+		_fail("lineage: seeding the prior run's world.json should succeed")
+		return
+	if playable._persisted_lineage_active:
+		_fail("lineage: direct service.save_world() must not itself flip _persisted_lineage_active (only the coordinator's own save/load call sites should)")
+		return
+	playable.vitals_state.health = 0.0
+	_pump(0.1)
+	if not playable.slice_complete:
+		_fail("lineage: health=0 should have ended the run as death")
+		return
+	if resolver.has_died_in("world"):
+		_fail("lineage: a fresh run with no load/save recorded a death on 'world' -- bricks the prior run's Continue")
+		return
+	var reloaded_prior = service.load_world()
+	if reloaded_prior == null:
+		_fail("lineage: prior run's world.json should still be loadable (Continue must survive an unrelated run B death)")
+		return
+
+	# Reset for the remaining stages, which all exercise the lineage-active
+	# path via their own request_save()/request_load() calls below.
+	_wipe_all(service, resolver)
+	playable.slice_complete = false
+	playable.vitals_state.health = 100.0
+	playable._manual_slots_written_this_run.clear()
 
 	# --- HOME-BRANCH DEATH ---
 	playable.away_from_start = false
@@ -297,6 +363,37 @@ func _validate() -> void:
 		return
 	if not resolver.has_died_in(SaveSlotStateScript.MANUAL_SLOT_IDS[0]):
 		_fail("manual-slot freeze: slot_01 survived death un-frozen -- manual_slots_written did not round-trip through WorldSnapshot")
+		return
+
+	# --- RECLAIM-FAILURE: a failed write must not clear an existing death
+	# record (PR #57 Codex round 3 P2) ---
+	_wipe_all(service, resolver)
+	var epitaph_run_time: float = 12.0
+	resolver.record_death("world", "death", "Died aboard the home ship at objective 1 (run time 12s)", epitaph_run_time, 1)
+	if not resolver.has_died_in("world"):
+		_fail("reclaim-failure: setup record_death('world') did not take")
+		return
+	var world_path_abs: String = ProjectSettings.globalize_path("user://saves/world.json")
+	if FileAccess.file_exists("user://saves/world.json"):
+		DirAccess.remove_absolute(world_path_abs)
+	var mkdir_err: int = DirAccess.make_dir_absolute(world_path_abs)
+	if mkdir_err != OK:
+		_fail("reclaim-failure: setup could not pre-create a blocking directory at world.json's path, error=%d" % mkdir_err)
+		return
+	var forced_fail_ws = playable._build_world_snapshot()
+	if forced_fail_ws == null:
+		DirAccess.remove_absolute(world_path_abs)
+		_fail("reclaim-failure: _build_world_snapshot() returned null")
+		return
+	var write_result: bool = service.save_world(forced_fail_ws)
+	# Clean up the blocking directory immediately, success or failure, before
+	# any further assertions or cleanup paths touch user://saves/world.json.
+	DirAccess.remove_absolute(world_path_abs)
+	if write_result:
+		_fail("reclaim-failure: save_world() should have returned false when the file could not be opened for writing")
+		return
+	if not resolver.has_died_in("world"):
+		_fail("reclaim-failure: a FAILED write cleared the death record -- a dead run's Continue would now silently load")
 		return
 
 	finished = true

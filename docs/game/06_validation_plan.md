@@ -57,6 +57,14 @@ CORRUPT_WORLD_WARNING="^WARNING: SaveLoadService: world save file is not valid J
 # behavior (core/io/json.cpp), not a Synaptic Sea system error -- allowlisted
 # alongside CORRUPT_WORLD_WARNING as the deliberate/expected pair.
 CORRUPT_WORLD_JSON_ERROR="^ERROR: Parse JSON failed\\..*\$"
+# permadeath_freeze_smoke's reclaim-failure stage (PR #57 Codex round 3 P2)
+# deliberately pre-creates a directory at world.json's path so
+# FileAccess.open fails, proving save_world() leaves an existing death
+# record intact when the write itself fails (clear_death now runs only
+# after a confirmed write). That forced failure emits one expected warning,
+# allowlisted the same way as the other deliberate-failure-path warnings
+# above.
+WORLD_WRITE_FAIL_WARNING="^WARNING: SaveLoadService: cannot open world save file for writing, error=.*\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -65,7 +73,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -244,6 +252,18 @@ require a parseable world save) adds one more expected `WARNING:` line:
   writes, immediately before `load_world()`'s own dictionary-type check
   fires the `WARNING:` above. Filtered by `CORRUPT_WORLD_JSON_ERROR`; this is
   expected, deterministic engine noise for this one smoke only.
+
+PR #57 Codex round 3 P2 (`save_world()`/`save_to_slot()` move `clear_death`
+to after a confirmed write) adds one more expected `WARNING:` line:
+
+- `WARNING: SaveLoadService: cannot open world save file for writing, error=...`
+  — emitted by `save_world()` when `permadeath_freeze_smoke.gd`'s
+  reclaim-failure stage deliberately pre-creates a directory at
+  `world.json`'s path so `FileAccess.open` cannot open it, proving the
+  forced write failure leaves an existing death record intact (the ordering
+  fix under test). Filtered by `WORLD_WRITE_FAIL_WARNING` in the strict
+  check above; any other `SaveLoadService:` warning during this smoke still
+  fails the bundle.
 
 Evidence collection command (run before adding or removing a smoke from the
 bundle; any unexpected `ERROR:`/`WARNING:` line that is not on the allowlist

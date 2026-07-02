@@ -66,17 +66,43 @@ epitaph-read path only.
 
 **Reclaim-on-write.** `save_world()` and `save_to_slot()` both clear the
 target slot's death record (`PermadeathResolver.clear_death(slot_id)`)
-before writing. A death record describes the run that died in that slot;
-a subsequent live run's system write legitimately reclaims the slot for its
-own new run. Without this, the first death in a slot family permanently
-bricks Continue and that autosave slot for the lifetime of the save
-directory (final-review finding: `clear_death` had zero production callers
-before this fix, so `world.death.json`/`autosave_*.death.json` outlived
-every later save to those paths). This does **not** reopen save-scumming:
-frozen MANUAL slots are unwritable via the UI (frozen rows offer no verbs),
-and the load gates (`load_from_slot`/`load_world`) fire before any write
-happens — a still-frozen slot cannot be read back mid-death, only
-overwritten by a genuinely new run.
+*after* the write to disk is confirmed (file opened, written, and closed
+successfully) — **not** before opening the file. A death record describes
+the run that died in that slot; a subsequent live run's system write
+legitimately reclaims the slot for its own new run, but only once that
+write has actually landed. Clearing before the write (the original
+implementation) left a window where a locked/unwritable path made
+`FileAccess.open` fail: the death record was already gone, the stale DEAD
+payload was still on disk, and the slot silently read back as alive
+(PR #57 Codex round 3 P2 finding). Ordering the clear after a confirmed
+write closes that window — a failed write leaves the death record intact,
+so `has_died_in(slot_id)` still gates the load. Without reclaim-on-write at
+all, the first death in a slot family would permanently brick Continue and
+that autosave slot for the lifetime of the save directory (final-review
+finding: `clear_death` had zero production callers before this fix, so
+`world.death.json`/`autosave_*.death.json` outlived every later save to
+those paths). This does **not** reopen save-scumming: frozen MANUAL slots
+are unwritable via the UI (frozen rows offer no verbs), and the load gates
+(`load_from_slot`/`load_world`) fire before any write happens — a
+still-frozen slot cannot be read back mid-death, only overwritten by a
+genuinely new run.
+
+**Freeze-set ownership (lineage gate, PR #57 Codex round 3 P1).**
+`_freeze_run_on_death()` must only freeze the shared lineage — the
+active-autosave alias, `"world"`, every `AUTOSAVE_SLOT_IDS` row, and the
+quickslot — when THIS run instance actually owns that lineage. Ownership
+is tracked by a run-local flag, `_persisted_lineage_active`, set true at
+exactly two points: (a) a successful Continue/F9 world load (the loaded
+world.json and its pre-existing autosave family become this run's
+lineage), or (b) this run's first successful write to world.json, an
+autosave slot, or a manual slot. A brand-new run (New Game, no load, no
+save yet) that dies has the flag false, so the shared lineage is left
+untouched — a *different*, still-live Continue's world.json/autosaves must
+never be stamped with an epitaph from a run that never wrote a byte to
+them. The manual-slot set (`_manual_slots_written_this_run`) is exempt from
+this gate: it is already write-tracked per slot (a slot id only enters the
+set after this run wrote to it), so freezing it is always correct
+independent of `_persisted_lineage_active`.
 
 ### 3. _input's post-death dead-zone is fixed
 

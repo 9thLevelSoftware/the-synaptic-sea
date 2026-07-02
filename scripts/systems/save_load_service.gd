@@ -93,13 +93,6 @@ func save_world(world_snapshot) -> bool:
 		return false
 	if not _ensure_save_dir():
 		return false
-	# Reclaim-on-write (ADR-0043): a death record describes the run that died
-	# in this slot, not the run writing now. A live run's system write to
-	# "world" legitimately reclaims the slot, so clear any stale death
-	# record before writing. This does not reopen save-scumming: frozen
-	# MANUAL slots offer no write verbs in the UI, and load gates fire
-	# before any write ever happens.
-	PermadeathResolverScript.new().clear_death("world")
 	var path: String = WORLD_SLOT_FILE
 	var json: String = JSON.stringify(world_snapshot.to_dict(), "	")
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -108,6 +101,18 @@ func save_world(world_snapshot) -> bool:
 		return false
 	file.store_string(json)
 	file.close()
+	# Reclaim-on-write (ADR-0043): a death record describes the run that died
+	# in this slot, not the run writing now. A live run's system write to
+	# "world" legitimately reclaims the slot, so clear any stale death
+	# record -- but only AFTER the write is confirmed on disk (PR #57 Codex
+	# round 3 P2). Clearing before opening the file left a window where a
+	# failed write (locked/unwritable path) discarded the death record while
+	# the old DEAD payload was still on disk, silently unfreezing a dead run
+	# and letting Continue load past a death that never actually reclaimed
+	# anything. This does not reopen save-scumming: frozen MANUAL slots
+	# offer no write verbs in the UI, and load gates fire before any write
+	# ever happens.
+	PermadeathResolverScript.new().clear_death("world")
 	# Index the world slot row + write its cloud manifest.
 	_index_world_slot(world_snapshot)
 	_write_cloud_manifest("world", path, WorldSnapshotScript.WORLD_SLICE_VERSION)
@@ -222,13 +227,6 @@ func save_to_slot(slot_id: String, snapshot: RunSnapshot, slot_kind: String, is_
 		return false
 	if not _ensure_save_dir():
 		return false
-	# Reclaim-on-write (ADR-0043): a death record describes the run that died
-	# in this slot, not the run writing now. A live run's system write to
-	# this slot legitimately reclaims it, so clear any stale death record
-	# before writing. This does not reopen save-scumming: frozen MANUAL
-	# slots offer no write verbs in the UI, and load gates fire before any
-	# write ever happens.
-	PermadeathResolverScript.new().clear_death(slot_id)
 	# Stamp the slot identity onto the snapshot before serializing so a
 	# future load round-trips the slot metadata without inspecting the
 	# file name. We only stamp slice_version when the caller did not
@@ -255,6 +253,18 @@ func save_to_slot(slot_id: String, snapshot: RunSnapshot, slot_kind: String, is_
 		return false
 	file.store_string(json)
 	file.close()
+	# Reclaim-on-write (ADR-0043): a death record describes the run that died
+	# in this slot, not the run writing now. A live run's system write to
+	# this slot legitimately reclaims it, so clear any stale death record --
+	# but only AFTER the write is confirmed on disk (PR #57 Codex round 3
+	# P2). Clearing before opening the file left a window where a failed
+	# write (locked/unwritable path) discarded the death record while the
+	# old DEAD payload was still on disk, silently unfreezing a dead run and
+	# letting Continue load past a death that never actually reclaimed
+	# anything. This does not reopen save-scumming: frozen MANUAL slots
+	# offer no write verbs in the UI, and load gates fire before any write
+	# ever happens.
+	PermadeathResolverScript.new().clear_death(slot_id)
 	# Update the index row + write the cloud manifest.
 	_index_run_slot(slot_id, slot_kind, display_name, snapshot, path)
 	_write_cloud_manifest(slot_id, path, CURRENT_SLICE_VERSION)

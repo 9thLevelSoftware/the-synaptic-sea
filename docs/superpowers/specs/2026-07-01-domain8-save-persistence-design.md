@@ -143,8 +143,17 @@ load the slot back, objective progress reverts while `visited_ships`/dock state 
 - New Game after death does not touch frozen files; a "forget this death" action remains out of
   scope (ADR-0032 seam note).
 - **Reclaim-on-write:** `save_world()`/`save_to_slot()` call `PermadeathResolver.clear_death(slot_id)`
-  before writing, so the next live run's system write reclaims a previously-frozen slot instead of
-  permanently bricking Continue/that autosave slot (final-review finding; see ADR-0043).
+  *after* the write to disk is confirmed successful (not before opening the file), so a failed write
+  never unfreezes a still-DEAD payload (PR #57 Codex round 3 P2), while the next live run's
+  successful system write still reclaims a previously-frozen slot instead of permanently bricking
+  Continue/that autosave slot (final-review finding; see ADR-0043).
+- **Freeze-set ownership (PR #57 Codex round 3 P1):** `_freeze_run_on_death()` only freezes the
+  shared lineage (active-autosave alias, `"world"`, `AUTOSAVE_SLOT_IDS`, quickslot) when the
+  run-local `_persisted_lineage_active` flag is true — set on a successful Continue/F9 load or this
+  run's first successful world/autosave/manual-slot write — so a fresh New Game that dies before
+  ever loading or saving cannot brick a different, still-live run's Continue. Manual slots
+  (`_manual_slots_written_this_run`) are always frozen regardless, since that set is already
+  write-tracked per run.
 - **`_input` fix:** the `menu_coordinator` input dispatch moves ahead of the
   `slice_complete` early-return; only the gameplay-input tail stays gated. Death detection
   already ticks on both `_process` branches (`_tick_survival_attrition` at `:5254`/`:5330` →
