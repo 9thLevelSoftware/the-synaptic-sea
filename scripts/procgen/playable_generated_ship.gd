@@ -22,6 +22,7 @@ const AudioManagerScript := preload("res://scripts/audio/audio_manager.gd")
 const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.gd")
 const RunSnapshotScript := preload("res://scripts/systems/run_snapshot.gd")
 const SaveSlotStateScript := preload("res://scripts/systems/save_slot_state.gd")
+const PermadeathResolverScript := preload("res://scripts/systems/permadeath_resolver.gd")
 # Timed/rotating autosave loop (ADR-0031/0032). Owned + ticked here so the
 # borderline-Bucket-1 AutosavePolicy model is finally wired into the live run.
 const AutosavePolicyScript := preload("res://scripts/systems/autosave_policy.gd")
@@ -1601,6 +1602,13 @@ func get_unlock_registry():
 ##
 ## Returns the payout amount in meta_currency. Idempotent: a second call
 ## after the slice is already complete returns 0 and is a no-op.
+# Domain 8 (ADR-0043): slot ids the slot screen's Save verb has written to
+# THIS run. Permadeath freeze must also freeze these -- a mid-run manual
+# save must not be a save-scumming escape hatch from permadeath. Cleared
+# implicitly by process restart / fresh PlayableGeneratedShip; never
+# persisted itself (it is a run-local bookkeeping set, not save data).
+var _manual_slots_written_this_run: Dictionary = {}
+
 func end_run(reason: String = "extraction") -> int:
 	if slice_complete:
 		return 0
@@ -1608,17 +1616,52 @@ func end_run(reason: String = "extraction") -> int:
 	tracker.mark_run_complete()
 	var payout: int = int(_apply_meta_payout_and_persist(reason))
 	if save_load_service != null:
-		save_load_service.delete_current_run()
-		# A terminal run (death OR extraction) must also drop the rotating
-		# autosave_a/b/c slots. delete_current_run() only clears the current_run/world
-		# rows; without this, a finished run's timed-autosave snapshots survive and
-		# stay resumable through SaveLoadMenu.list_slots() — so a fatal run could be
-		# loaded back, defeating the new death terminal-state. Mirrors the
-		# objective-completion path (Codex review on PR #35 / #50).
-		for slot_id in SaveSlotStateScript.AUTOSAVE_SLOT_IDS:
-			save_load_service.delete_slot(slot_id)
+		if reason == "death":
+			# ADR-0043: permadeath freezes, it does not delete. world.json and
+			# every slot written this run stay on disk; a death record gates
+			# every future load of them (SaveLoadService.load_world /
+			# load_from_slot), and the slot screen renders them DEAD with an
+			# epitaph (ADR-0032's original browse-the-epitaph intent).
+			_freeze_run_on_death()
+		else:
+			# Extraction/completion path UNCHANGED -- still deletes. A finished
+			# successful run has nothing to "continue"; this is not permadeath.
+			save_load_service.delete_current_run()
+			for slot_id in SaveSlotStateScript.AUTOSAVE_SLOT_IDS:
+				save_load_service.delete_slot(slot_id)
 	emit_signal("playable_slice_completed", get_slice_completion_summary())
 	return payout
+
+## ADR-0043: freeze every slot that represents "the state at/after death"
+## instead of deleting it. Manual slot_01..06 the player saved THIS run are
+## included (via _manual_slots_written_this_run) -- a mid-run manual save
+## must not be a permadeath escape hatch. world.json itself is never
+## deleted; PermadeathResolver.has_died_in("world") gates future loads.
+func _freeze_run_on_death() -> void:
+	var resolver := PermadeathResolverScript.new()
+	var epitaph_text: String = _build_epitaph_text()
+	var run_time: float = world_time
+	var final_seq: int = current_objective_sequence
+	var slots_to_freeze: Array = [SaveLoadServiceScript.ACTIVE_AUTOSAVE_SLOT_ID, "world"]
+	slots_to_freeze.append_array(SaveSlotStateScript.AUTOSAVE_SLOT_IDS)
+	if save_load_service.has_slot(SaveSlotStateScript.QUICKSAVE_SLOT_ID):
+		slots_to_freeze.append(SaveSlotStateScript.QUICKSAVE_SLOT_ID)
+	for manual_slot_id in _manual_slots_written_this_run.keys():
+		slots_to_freeze.append(String(manual_slot_id))
+	for slot_id in slots_to_freeze:
+		resolver.record_death(slot_id, "death", epitaph_text, run_time, final_seq)
+
+## ADR-0043: short human-readable epitaph text for the frozen slot rows /
+## death record. Cause is always "death" today (the only end_run reason
+## that freezes); location comes from the current ship's marker_id (empty
+## string = home ship).
+func _build_epitaph_text() -> String:
+	var location: String = ""
+	var cur = get_current_ship()
+	if cur != null:
+		location = String(cur.marker_id)
+	var location_label: String = location if not location.is_empty() else "the home ship"
+	return "Died aboard %s at objective %d (run time %.0fs)" % [location_label, current_objective_sequence, world_time]
 
 ## REQ-PM-002 / ADR-0033 — public seam for gameplay code (repair points,
 ## combat, cooking, scanners, etc.) to fire a deterministic training event

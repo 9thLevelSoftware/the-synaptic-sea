@@ -114,6 +114,11 @@ func load_world():
 	var path: String = WORLD_SLOT_FILE
 	if not FileAccess.file_exists(path):
 		return null
+	# ADR-0043 permadeath gate -- mirrors the load_from_slot:249 gate. Old
+	# saves have no world.death.json, so has_died_in defaults false and
+	# legacy loads are unaffected.
+	if PermadeathResolverScript.new().has_died_in("world"):
+		return null
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		push_warning("SaveLoadService: cannot open world save file for reading, error=%d" % FileAccess.get_open_error())
