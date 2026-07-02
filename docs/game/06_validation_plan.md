@@ -140,6 +140,15 @@ run_clean 'main hallucination loop smoke' 'MAIN PLAYABLE HALLUCINATION PASS mani
 run_clean 'biome loot_quality_modifier wired into rarity rolls' 'LOOT QUALITY MODIFIER PASS high_gt_base=true mid_between=true default_noop=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/loot_quality_modifier_smoke.gd
 run_clean 'REQ-AU-001 coordinator audio event coupling smoke' 'AUDIO COORDINATOR EVENTS PASS fire=true arc=true breath=true vitals_low_edge=true combat_music=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_coordinator_events_smoke.gd
 run_clean 'REQ-AU-001 callsite audio event coupling smoke' 'AUDIO CALLSITE EVENTS PASS door=skip footstep=skip drop=skip tool=true inv_toggle=true objective=true save=true dock=skip load=skip' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_callsite_events_smoke.gd
+run_clean 'audio bus config model smoke' 'AUDIO BUS CONFIG PASS buses=7 default=true summary_round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_bus_config_smoke.gd
+run_clean 'ambient zone state model smoke' 'AMBIENT ZONE STATE PASS roles_changed=2 crossfades_completed=1 threat_applied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ambient_zone_state_smoke.gd
+run_clean 'sfx event router model smoke' 'SFX EVENT ROUTER PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sfx_event_router_smoke.gd
+run_clean 'dynamic music state model smoke' 'DYNAMIC MUSIC STATE PASS states_visited=4 crossfade_changed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dynamic_music_state_smoke.gd
+run_clean 'spatial audio resolver model smoke' 'SPATIAL AUDIO RESOLVER PASS atten_ref=0 atten_max=-36 occluded=-6 determinism=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/spatial_audio_resolver_smoke.gd
+run_clean 'meta event state model smoke' 'META EVENT STATE PASS fired=3 pending=0 deterministic_seed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_event_state_smoke.gd
+run_clean 'main playable audio smoke' 'MAIN PLAYABLE AUDIO PASS buses=6 routed=4 fired_meta=3 ambient_role=engine' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_audio_smoke.gd
+run_clean 'audio save/load model smoke' 'AUDIO SAVE LOAD PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_save_load_smoke.gd
+run_clean 'Domain 9 audio pipeline smoke' 'AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true captions_toggle=true away_ticks=30' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_pipeline_smoke.gd
 # --- Task 15 documentation/manifest currency validators (host-side Python; no Godot) ---
 # doc_currency_validators.py auto-detects the repo root (overridable via ROOT) and
 # exits non-zero on failure. The kanban-manifest check needs the live Hermes board
@@ -202,7 +211,7 @@ run_clean 'Domain 8 title screen flow smoke' 'TITLE SCREEN FLOW PASS new_game=tr
 run_clean 'Domain 8 title settings smoke' 'TITLE SETTINGS PASS open=true cycle=true back=true applied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/title_settings_smoke.gd
 run_clean 'Domain 8 save load slot screen smoke' 'SAVE LOAD SLOT SCREEN PASS save=true load=true delete_armed=true delete_confirmed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_load_slot_screen_smoke.gd
 run_clean 'Domain 8 save and exit smoke' 'SAVE AND EXIT PASS saved=true world_fresh=true return_signal=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_and_exit_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=112 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=121 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
