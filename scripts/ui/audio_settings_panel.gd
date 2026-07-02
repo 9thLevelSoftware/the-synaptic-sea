@@ -29,6 +29,16 @@ var accessibility_settings: RefCounted
 # single settings_state instance) via set_settings_state(), following the
 # same pattern as set_accessibility_settings().
 var settings_state: SettingsState = null
+# ADR-0044 seam (final review Finding 1): the ONLY writer of
+# `sfx_router.captions_enabled` is `playable_generated_ship.gd::_on_ui_settings_changed`,
+# reached via `menu_coordinator.settings_changed`. This panel must not write
+# the router flag directly -- it mutates settings_state, then calls this
+# Callable (injected by MenuCoordinator.set_settings_push(), alongside
+# set_settings_state()) to ask the coordinator to emit `settings_changed`
+# with the current summary. Left unset (Callable()) in partially-bound
+# headless smokes: is_valid() is then false and the push is skipped, no
+# crash, matching set_settings_state()'s null-tolerant pattern.
+var _settings_push: Callable = Callable()
 
 # Volume sliders indexed by bus id (StringName).
 var _volume_sliders: Dictionary = {}
@@ -56,6 +66,14 @@ func set_settings_state(state: SettingsState) -> void:
 	settings_state = state
 	if is_inside_tree():
 		_refresh_from_manager()
+
+## ADR-0044 seam (final review Finding 1): injected by MenuCoordinator.bind_meta_screens
+## alongside set_settings_state(). Calling it emits menu_coordinator.settings_changed(summary),
+## which playable_generated_ship.gd::_on_ui_settings_changed is already connected to -- the
+## SAME emit shape _cycle_setting() uses. This is the only path allowed to push
+## SettingsState.captions into sfx_router.captions_enabled.
+func set_settings_push(push: Callable) -> void:
+	_settings_push = push
 
 func _build_layout() -> void:
 	# Title label.
@@ -163,8 +181,13 @@ func _on_caption_toggled(pressed: bool) -> void:
 	if settings_state == null:
 		return
 	settings_state.set_captions_enabled(pressed)
-	if is_instance_valid(audio_manager) and audio_manager.sfx_router != null:
-		audio_manager.sfx_router.captions_enabled = pressed
+	# ADR-0044 (final review Finding 1): do NOT write
+	# audio_manager.sfx_router.captions_enabled here. Mutate settings_state
+	# only, then ask the coordinator to push through the single seam
+	# (_on_ui_settings_changed) via the injected Callable. Unset/invalid in
+	# partially-bound headless smokes -- just skip the push, no crash.
+	if _settings_push.is_valid():
+		_settings_push.call()
 
 func _on_voice_log_toggled(pressed: bool) -> void:
 	# Voice-log enable/disable is a UI flag — audio_log entries are

@@ -113,8 +113,19 @@ is always `false` — `sfx_router` is a property, not a method — so the
 checkbox never synced from or wrote back to any state. The panel now takes
 a `settings_state` reference (injected by `MenuCoordinator.bind_meta_screens`,
 which already owns a `settings_state` instance) and reads/writes through
-`SettingsState.is_captions_enabled()` / `set_captions_enabled()`, mirroring
-the toggle into `audio_manager.sfx_router.captions_enabled` on write.
+`SettingsState.is_captions_enabled()` / `set_captions_enabled()`.
+
+Final-review fix: the panel's first pass at this also wrote
+`audio_manager.sfx_router.captions_enabled` directly on toggle, which was a
+fourth path around the single-seam invariant below. The panel now mutates
+ONLY `settings_state`, then calls a `Callable` (`set_settings_push()`,
+injected by `MenuCoordinator.bind_meta_screens` alongside
+`set_settings_state()`) whose implementation
+(`MenuCoordinator._emit_settings_changed`) emits `settings_changed` with the
+current `get_settings_summary()` — the same emit shape
+`_cycle_setting()` already uses. `_on_ui_settings_changed` in
+`playable_generated_ship.gd` remains the only writer of
+`sfx_router.captions_enabled`.
 
 The panel's voice-log toggle remains a known no-op stub, unchanged by this
 ADR — a separate concern, explicitly out of scope here.

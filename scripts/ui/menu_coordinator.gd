@@ -393,6 +393,15 @@ func _cycle_setting(direction: int) -> void:
 	settings_changed.emit(settings_state.get_summary())
 	_refresh_all()
 
+## ADR-0044 (final review Finding 1) seam: the single re-emit point handed to
+## AudioSettingsPanel via set_settings_push(). Reuses the exact emit shape
+## _cycle_setting() already uses (settings_changed with the current summary),
+## so playable_generated_ship.gd::_on_ui_settings_changed -- the ONLY writer
+## of sfx_router.captions_enabled -- picks up the panel's caption toggle the
+## same way it picks up the in-game settings menu's.
+func _emit_settings_changed() -> void:
+	settings_changed.emit(settings_state.get_summary())
+
 func _cycle_preset(direction: int) -> void:
 	if _presets.is_empty():
 		return
@@ -531,6 +540,13 @@ func bind_meta_screens(p_achievement_state, p_audio_manager, p_skill_tree_state,
 		if p_a11y != null:
 			audio_settings_panel.set_accessibility_settings(p_a11y)
 		audio_settings_panel.set_settings_state(settings_state)
+		# ADR-0044 (final review Finding 1): the panel must never write
+		# sfx_router.captions_enabled directly. It mutates settings_state,
+		# then calls this Callable to ask THIS coordinator to emit
+		# settings_changed(summary) -- the same seam _cycle_setting() already
+		# uses, which playable_generated_ship.gd::_on_ui_settings_changed is
+		# connected to.
+		audio_settings_panel.set_settings_push(_emit_settings_changed)
 	if is_instance_valid(language_selector):
 		language_selector.set_catalog(p_localization_catalog)
 	if is_instance_valid(release_badge_overlay):

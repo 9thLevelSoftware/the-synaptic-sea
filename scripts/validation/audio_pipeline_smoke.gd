@@ -16,7 +16,11 @@ extends SceneTree
 #    SettingsState -> SfxEventRouter caption seam that MenuCoordinator
 #    wires via apply_settings_summary() actually flips
 #    audio_manager.sfx_router.captions_enabled, and with captions off a
-#    freshly routed SFX event does NOT enqueue a new caption.
+#    freshly routed SFX event does NOT enqueue a new caption. Final-review
+#    amendment: also drives AudioSettingsPanel._on_caption_toggled() directly
+#    (the panel path, which must funnel through the same single seam rather
+#    than writing sfx_router.captions_enabled itself) and asserts the router
+#    flag follows it in both directions.
 #
 # Pass marker: AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true captions_toggle=true away_ticks=30
 #
@@ -175,6 +179,27 @@ func _validate_and_drive() -> void:
 		return
 	if mgr.sfx_router.captions_enabled != true:
 		_fail("expected sfx_router.captions_enabled == true after restoring captions")
+		return
+
+	# (f) final-review amendment: drive the AudioSettingsPanel path directly
+	# (Finding 2). The panel must reach the same seam -- it mutates
+	# settings_state then calls the coordinator-injected push Callable,
+	# which emits settings_changed and lands back on
+	# _on_ui_settings_changed, the sole sfx_router.captions_enabled writer.
+	var audio_panel: Node = playable.menu_coordinator.get_meta_screen_panel("audio_settings")
+	if audio_panel == null or not is_instance_valid(audio_panel):
+		_fail("audio_settings_panel missing from menu_coordinator")
+		return
+	if not audio_panel.has_method("_on_caption_toggled"):
+		_fail("audio_settings_panel missing _on_caption_toggled")
+		return
+	audio_panel._on_caption_toggled(false)
+	if mgr.sfx_router.captions_enabled != false:
+		_fail("expected sfx_router.captions_enabled == false after panel _on_caption_toggled(false)")
+		return
+	audio_panel._on_caption_toggled(true)
+	if mgr.sfx_router.captions_enabled != true:
+		_fail("expected sfx_router.captions_enabled == true after panel _on_caption_toggled(true)")
 		return
 	var captions_toggle_ok: bool = true
 
