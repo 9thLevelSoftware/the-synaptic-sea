@@ -43,6 +43,20 @@ const SaveMigrationServiceScript := preload("res://scripts/systems/save_migratio
 const PermadeathResolverScript := preload("res://scripts/systems/permadeath_resolver.gd")
 const CloudManifestStateScript := preload("res://scripts/systems/cloud_manifest_state.gd")
 
+# run_id slot-ownership rework: the identity of the run currently driving
+# this service. Stamped onto every write (save_world/save_to_slot) so the
+# shared slot family (world, autosave_a/b/c, autosave_active, quickslot) is
+# owned structurally instead of by convention-tracked flags
+# (_persisted_lineage_active / _manual_slots_written_this_run). Set by the
+# coordinator at session start and on a successful Continue/F9 load.
+var _active_run_id: String = ""
+
+func set_active_run_id(id: String) -> void:
+	_active_run_id = id
+
+func get_active_run_id() -> String:
+	return _active_run_id
+
 # `--headless --script` doesn't always repopulate the class registry for
 # scripts that are preloaded but never instantiated by name. When that
 # happens, calling `.new()` on the const preloaded script raises
@@ -93,6 +107,11 @@ func save_world(world_snapshot) -> bool:
 		return false
 	if not _ensure_save_dir():
 		return false
+	# run_id slot-ownership rework: stamp the writing run's identity onto the
+	# payload before serializing, so a later freeze_run(run_id) can find this
+	# slot via the index without any coordinator call site having to
+	# remember to mark ownership itself.
+	world_snapshot.run_id = _active_run_id
 	var path: String = WORLD_SLOT_FILE
 	var json: String = JSON.stringify(world_snapshot.to_dict(), "	")
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -237,6 +256,11 @@ func save_to_slot(slot_id: String, snapshot: RunSnapshot, slot_kind: String, is_
 	snapshot.slot_kind = slot_kind
 	snapshot.is_autosave = slot_kind == SaveSlotStateScript.SLOT_KIND_AUTO
 	snapshot.is_quicksave = is_quicksave
+	# run_id slot-ownership rework: stamp the writing run's identity onto the
+	# payload before serializing, so a later freeze_run(run_id) can find this
+	# slot via the index without any coordinator call site having to
+	# remember to mark ownership itself.
+	snapshot.run_id = _active_run_id
 	if snapshot.slice_version.is_empty():
 		snapshot.slice_version = CURRENT_SLICE_VERSION
 	snapshot.godot_version = Engine.get_version_info()["string"]
@@ -365,6 +389,34 @@ func has_slot(slot_id: String) -> bool:
 		return false
 	return FileAccess.file_exists(_slot_path(slot_id, _indexed_kind_for(slot_id)))
 
+## run_id slot-ownership rework: every slot_id whose index row (or the
+## world row) is stamped with run_id. Replaces the old convention-tracked
+## freeze set (_persisted_lineage_active + _manual_slots_written_this_run):
+## ownership is now read directly from what was actually written, not from
+## a flag a call site might forget to set. An empty run_id matches NOTHING
+## -- a fresh run that has neither loaded nor saved anything must never
+## freeze a prior run's still-live slots.
+func slot_ids_for_run(run_id: String) -> Array:
+	if run_id.is_empty():
+		return []
+	var result: Array = []
+	var idx = _load_index()
+	for row in idx.slots:
+		if row != null and String(row.run_id) == run_id:
+			result.append(String(row.slot_id))
+	return result
+
+## run_id slot-ownership rework: freezes every slot owned by run_id (per
+## slot_ids_for_run) with a PermadeathResolver death record. Lives here
+## rather than on PermadeathResolver because that class is deliberately
+## index-blind pure file I/O (ADR-0043 addendum records the rationale);
+## this service already owns the index, so it is the natural place to
+## resolve "which slots does this run own" before recording deaths.
+func freeze_run(run_id: String, cause: String, epitaph: String, run_time: float, final_seq: int) -> void:
+	var resolver := PermadeathResolverScript.new()
+	for slot_id in slot_ids_for_run(run_id):
+		resolver.record_death(slot_id, cause, epitaph, run_time, final_seq)
+
 ## Returns an Array of SaveSlotState rows sorted by saved_at desc.
 ## Reclassifies rows whose slot file is missing on disk as `corrupt=true`.
 func list_slots() -> Array:
@@ -450,6 +502,7 @@ func _index_run_slot(slot_id: String, slot_kind: String, display_name: String, s
 	row.saved_at_epoch = int(Time.get_unix_time_from_system())
 	row.schema_version = CURRENT_SLICE_VERSION
 	row.payload_size_bytes = _size_of_file(payload_path)
+	row.run_id = snapshot.run_id
 	idx.add_or_replace(row)
 	_save_index(idx)
 
@@ -465,6 +518,7 @@ func _index_world_slot(world_snapshot) -> void:
 	row.saved_at_epoch = int(Time.get_unix_time_from_system())
 	row.schema_version = WorldSnapshotScript.WORLD_SLICE_VERSION
 	row.payload_size_bytes = _size_of_file(WORLD_SLOT_FILE)
+	row.run_id = world_snapshot.run_id
 	idx.add_or_replace(row)
 	_save_index(idx)
 

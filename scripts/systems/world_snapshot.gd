@@ -28,14 +28,14 @@ var dock_edges: Array = []          # [{host, mobile, port_type:"airlock"|"hanga
 var piloted_ship_id: String = ""
 var aboard_ship_id: String = ""
 var opened_ports: Array = []        # marker_ids with an opened dock barrier
-# ADR-0043 (PR #57 Codex round 2 finding C): manual slot ids (slot_01..06) the
-# slot screen's Save verb wrote THIS run. Persisted additively (no schema
-# version bump) so the permadeath freeze set survives Save & Exit -> Continue
-# across a fresh PlayableGeneratedShip -- without this, a manual save made
-# before a world save/exit would forget it was written this run, and a later
-# death in the resumed run would freeze world/autosaves but leave that manual
-# slot loadable, reopening the save-scumming escape ADR-0043 closes.
-var manual_slots_written: Array = []
+# run_id slot-ownership rework (ADR-0043 addendum): stamped by
+# SaveLoadService.save_world() with the writing run's identity. Empty
+# default so legacy saves (predating this field) load without failing
+# validation. Replaces manual_slots_written/_persisted_lineage_active: the
+# freeze set is now computed by SaveLoadService.slot_ids_for_run(run_id)
+# reading the index, not by convention-tracked flags mirrored through this
+# snapshot.
+var run_id: String = ""
 var slice_version: String = ""
 var godot_version: String = ""
 var saved_at: String = ""
@@ -58,7 +58,7 @@ func to_dict() -> Dictionary:
 		"piloted_ship_id": piloted_ship_id,
 		"aboard_ship_id": aboard_ship_id,
 		"opened_ports": opened_ports.duplicate(),
-		"manual_slots_written": manual_slots_written.duplicate(),
+		"run_id": run_id,
 		"slice_version": slice_version,
 		"godot_version": godot_version,
 		"saved_at": saved_at,
@@ -109,12 +109,9 @@ static func from_dict(data: Variant, expected_world_version: String, expected_go
 		ws.opened_ports = []
 		for m in (op_v as Array):
 			ws.opened_ports.append(String(m))
-	# ADR-0043 finding C: additive, no version bump -- older saves default to [].
-	var msw_v: Variant = dict.get("manual_slots_written", [])
-	if typeof(msw_v) == TYPE_ARRAY:
-		ws.manual_slots_written = []
-		for sid in (msw_v as Array):
-			ws.manual_slots_written.append(String(sid))
+	# run_id slot-ownership rework: additive, no version bump -- older saves
+	# without the field default to "" (matches breach_seeded's pattern).
+	ws.run_id = str(dict.get("run_id", ""))
 	var pos = dict.get("player_position_in_ship", [0.0, 0.0, 0.0])
 	if typeof(pos) == TYPE_ARRAY and (pos as Array).size() >= 3:
 		var pa: Array = pos as Array

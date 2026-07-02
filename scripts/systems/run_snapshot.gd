@@ -62,6 +62,12 @@ var is_quicksave: bool = false
 # against a compatible world.json) is explicitly out of scope; see
 # ADR-0043 section 4.
 var parent_world_slot: String = ""
+# run_id slot-ownership rework (ADR-0043 addendum): stamped by
+# SaveLoadService on every write with the writing run's identity. Empty
+# default so legacy saves (predating this field) load without failing
+# validation; SaveLoadService.freeze_run() uses this to find every slot
+# a dying run owns instead of the old convention-based lineage flags.
+var run_id: String = ""
 var slice_version: String = ""
 var godot_version: String = ""
 var saved_at: String = ""
@@ -141,6 +147,7 @@ func to_dict() -> Dictionary:
 		"is_autosave": is_autosave,
 		"is_quicksave": is_quicksave,
 		"parent_world_slot": parent_world_slot,
+		"run_id": run_id,
 		"slice_version": slice_version,
 		"godot_version": godot_version,
 		"saved_at": saved_at,
@@ -202,6 +209,7 @@ static func from_dict(data: Variant, expected_slice_version: String, expected_go
 	snapshot.is_autosave = bool(dict.get("is_autosave", false))
 	snapshot.is_quicksave = bool(dict.get("is_quicksave", false))
 	snapshot.parent_world_slot = str(dict.get("parent_world_slot", ""))
+	snapshot.run_id = str(dict.get("run_id", ""))
 	snapshot.slice_version = str(dict.get("slice_version", ""))
 	snapshot.godot_version = str(dict.get("godot_version", ""))
 	snapshot.saved_at = str(dict.get("saved_at", ""))
