@@ -45,6 +45,26 @@ REQ012_WARNING="^WARNING: SaveLoadService: save file rejected by from_dict \\(mi
 # (newer) slice_version to assert the migration-rejection path; that emits one
 # expected warning, allowlisted exactly like REQ012_WARNING above.
 MIGRATION_REJECT_WARNING="^WARNING: SaveLoadService: slot rejected by migration \\(newer than current\\), slot_id=.*\$"
+# title_save_query_smoke's corrupt-world case (PR #57 Codex P2) deliberately
+# writes literal garbage over world.json to prove TitleSaveQuery.is_continue_available
+# now calls load_world() (not just has_slot/has_died_in); load_world()'s
+# JSON-parse-failure path emits this one expected warning before returning
+# null, allowlisted the same way as REQ012_WARNING/MIGRATION_REJECT_WARNING.
+CORRUPT_WORLD_WARNING="^WARNING: SaveLoadService: world save file is not valid JSON object\$"
+# The same corrupt-world case's write goes through Godot's own JSON.parse_string,
+# which prints its own native engine-level ERROR (not a push_error) before
+# load_world() ever gets to check the parsed result. This is Godot engine
+# behavior (core/io/json.cpp), not a Synaptic Sea system error -- allowlisted
+# alongside CORRUPT_WORLD_WARNING as the deliberate/expected pair.
+CORRUPT_WORLD_JSON_ERROR="^ERROR: Parse JSON failed\\..*\$"
+# permadeath_freeze_smoke's reclaim-failure stage (PR #57 Codex round 3 P2)
+# deliberately pre-creates a directory at world.json's path so
+# FileAccess.open fails, proving save_world() leaves an existing death
+# record intact when the write itself fails (clear_death now runs only
+# after a confirmed write). That forced failure emits one expected warning,
+# allowlisted the same way as the other deliberate-failure-path warnings
+# above.
+WORLD_WRITE_FAIL_WARNING="^WARNING: SaveLoadService: cannot open world save file for writing, error=.*\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -53,7 +73,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -112,7 +132,6 @@ run_clean 'M7-A breach seal point model smoke' 'BREACH SEAL POINT PASS sealed=tr
 run_clean 'M7-A life support vitals loop smoke' 'MAIN PLAYABLE LIFE SUPPORT VITALS PASS aboard_drain=true away_safe=true recover=true seal_loop=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_life_support_vitals_smoke.gd
 run_clean 'Domain 1 survival stakes (home) smoke' 'MAIN PLAYABLE SURVIVAL STAKES PASS gate_half=true gate_locked=true death=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_survival_stakes_smoke.gd
 run_clean 'Domain 1 survival attrition away-path smoke' 'MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true away_death=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_survival_away_smoke.gd
-run_clean 'Domain 1 death clears autosave smoke' 'MAIN PLAYABLE DEATH CLEARS AUTOSAVE PASS wrote=true died=true cleared=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_death_clears_autosave_smoke.gd
 run_clean 'vitals state model smoke' 'VITALS STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/vitals_state_smoke.gd
 run_clean 'player movement gating seam smoke' 'PLAYER MOVEMENT GATING PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_movement_gating_smoke.gd
 run_clean 'hallucination director model smoke' 'HALLUCINATION DIRECTOR PASS tiers=true gated=true deterministic=true ttl=true teeth=true fx=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hallucination_director_smoke.gd
@@ -177,7 +196,13 @@ run_clean 'Domain 6 progression meta closure smoke' 'PROGRESSION META CLOSURE PA
 run_clean 'Domain 7 room variant selector smoke' 'ROOM VARIANT SELECTOR PASS distinct_per_index=4 distinct_per_seed=7 airlock_variants=4 corridor_variants=7 extended=8 legacy=3 deterministic=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_variant_selector_smoke.gd
 run_clean 'Domain 7 procgen variation smoke' 'PROCGEN VARIATION PASS variants_vary=true loot_biased=true tmpl_gated=true deterministic=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_variation_smoke.gd
 run_clean 'Domain 7 procgen variant hazard smoke' 'PROCGEN VARIANT HAZARD PASS away_ticks=1 fire_lit=true breach_open=true home_clean=true seal_point=true guarded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_variant_hazard_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=107 clean_output=true'
+run_clean 'Domain 8 permadeath freeze smoke' 'PERMADEATH FREEZE PASS wrote=true died=true frozen=true reloadable=false epitaph_present=true reclaim=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/permadeath_freeze_smoke.gd
+run_clean 'Domain 8 title save query smoke' 'TITLE SAVE QUERY PASS no_save=true has_save=true frozen_blocks=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/title_save_query_smoke.gd
+run_clean 'Domain 8 title screen flow smoke' 'TITLE SCREEN FLOW PASS new_game=true continue=true quit_signal=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/title_screen_flow_smoke.gd
+run_clean 'Domain 8 title settings smoke' 'TITLE SETTINGS PASS open=true cycle=true back=true applied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/title_settings_smoke.gd
+run_clean 'Domain 8 save load slot screen smoke' 'SAVE LOAD SLOT SCREEN PASS save=true load=true delete_armed=true delete_confirmed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_load_slot_screen_smoke.gd
+run_clean 'Domain 8 save and exit smoke' 'SAVE AND EXIT PASS saved=true world_fresh=true return_signal=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_and_exit_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=112 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
@@ -210,6 +235,35 @@ incompatible `slice_version` and asserts the service rejects it via
   Filtered by the strict ERROR/WARNING check above; any other
   `SaveLoadService:` warning (a real parse error, missing file on a
   fresh load, etc.) still fails the bundle.
+
+PR #57 Codex P2 (`TitleSaveQuery.is_continue_available` strengthened to
+require a parseable world save) adds one more expected `WARNING:` line:
+
+- `WARNING: SaveLoadService: world save file is not valid JSON object`
+  — emitted by `load_world()` when `title_save_query_smoke.gd`'s corrupt-world
+  case deliberately overwrites `world.json` with literal garbage to prove
+  `is_continue_available()` now calls `load_world()` (not just
+  `has_slot`/`has_died_in`) and correctly reads it as unavailable. Filtered
+  by `CORRUPT_WORLD_WARNING` in the strict check above; any other
+  `SaveLoadService:` warning during this smoke still fails the bundle.
+- `ERROR: Parse JSON failed. Error at line 0: ...` — Godot's own JSON parser
+  (`core/io/json.cpp`), not a Synaptic Sea `push_error`, printed when
+  `JSON.parse_string()` hits the literal garbage the same corrupt-world case
+  writes, immediately before `load_world()`'s own dictionary-type check
+  fires the `WARNING:` above. Filtered by `CORRUPT_WORLD_JSON_ERROR`; this is
+  expected, deterministic engine noise for this one smoke only.
+
+PR #57 Codex round 3 P2 (`save_world()`/`save_to_slot()` move `clear_death`
+to after a confirmed write) adds one more expected `WARNING:` line:
+
+- `WARNING: SaveLoadService: cannot open world save file for writing, error=...`
+  — emitted by `save_world()` when `permadeath_freeze_smoke.gd`'s
+  reclaim-failure stage deliberately pre-creates a directory at
+  `world.json`'s path so `FileAccess.open` cannot open it, proving the
+  forced write failure leaves an existing death record intact (the ordering
+  fix under test). Filtered by `WORLD_WRITE_FAIL_WARNING` in the strict
+  check above; any other `SaveLoadService:` warning during this smoke still
+  fails the bundle.
 
 Evidence collection command (run before adding or removing a smoke from the
 bundle; any unexpected `ERROR:`/`WARNING:` line that is not on the allowlist
@@ -277,7 +331,6 @@ A Gate 1 Go decision requires the regression bundle plus either the automated pr
 - [x] Domain 1 survival stakes home-path smoke: `scripts/validation/main_playable_survival_stakes_smoke.gd` (expected marker `MAIN PLAYABLE SURVIVAL STAKES PASS gate_half=true gate_locked=true death=true reachable=true`) — live-scene proof via the real coordinator `_process` on the home branch (away_from_start=false) that (1) exhausted stamina halves the player's effective movement speed via the vitals movement gate, and (2) health reaching 0 locks movement entirely and ends the run as a death (`slice_complete=true`). Regression guard for Domain 1 survival stakes on the home path. Added to regression bundle.
 - [x] Domain 1 survival attrition away-path smoke: `scripts/validation/main_playable_survival_away_smoke.gd` (expected marker `MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true away_death=true`) — live-scene proof that the derelict (away_from_start=true) branch runs `_tick_survival_attrition(delta)`: radiation at 100 drains health, body temperature rises in the hazard extreme zone, and health reaching 0 ends the run as a death. Regression guard for the away early-return gap (line 4808) that previously starved all survival attrition on a boarded derelict. Added to regression bundle.
 - [x] Domain 1 player movement-gating seam smoke: `scripts/validation/player_movement_gating_smoke.gd` (expected marker `PLAYER MOVEMENT GATING PASS`) — pure-node proof that `PlayerController.set_movement_speed_multiplier()` clamps to [0,1] and `get_effective_move_speed()` scales `move_speed` accordingly (full/half/locked), the seam the coordinator's vitals gate drives. Added to regression bundle.
-- [x] Domain 1 death clears autosave smoke: `scripts/validation/main_playable_death_clears_autosave_smoke.gd` (expected marker `MAIN PLAYABLE DEATH CLEARS AUTOSAVE PASS wrote=true died=true cleared=true`) — live-scene proof that a forced rotating autosave is wiped when the player dies (`end_run("death")`), so a fatal run cannot be resumed from a stale autosave. Regression guard for the PR #50 terminal-state-integrity finding (end_run cleared only current_run/world). Added to regression bundle.
 - [x] Domain 4 web infestation model smoke: `scripts/validation/web_infestation_state_smoke.gd` (expected marker `WEB INFESTATION PASS grows=true recedes=true damage_live=true save_roundtrip=true reject=true`) — pure-model: coverage grows while web-attached and tick() returns hull damage; recedes when cut free; save round-trip; apply_summary rejects a mismatched hazard_kind. Added to regression bundle.
 - [x] Domain 4 ship systems closure smoke: `scripts/validation/ship_systems_closure_smoke.gd` (expected marker `SHIP SYSTEMS CLOSURE PASS away_ticks=60 web_grew=true hull_damaged=true breach_to_vitals=true`) — main-scene: drives `away_from_start = true` and proves the hub web infestation ticks on the away branch, damages the hull, and the resulting breach engages the life-support atmosphere→vitals drain. Closes the `ship_systems` loop's live-input + both-branch requirements. Added to regression bundle.
 - [x] Hub/meta progression smoke (deferred past Gate 2 per ADR-0003).
@@ -319,3 +372,10 @@ A Gate 1 Go decision requires the regression bundle plus either the automated pr
   - `scripts/validation/room_variant_selector_smoke.gd` (marker `ROOM VARIANT SELECTOR PASS distinct_per_index=4 distinct_per_seed=7 airlock_variants=4 corridor_variants=7 extended=8 legacy=3 deterministic=true`) — pure-model: `RoomVariantSelector.pick` determinism, per-index/per-seed variation, fallback for unknown roles, `variants_for_role` counts, `TemplateSelector` extended/legacy sets, `effects_for` hazard payloads (fire, breach, empty), and `loot_bias` keys validated against `loot_tables.json`. Added to regression bundle.
   - `scripts/validation/procgen_variation_smoke.gd` (marker `PROCGEN VARIATION PASS variants_vary=true loot_biased=true tmpl_gated=true deterministic=true`) — pure-data generation layer: (1) two different seeds produce distinct room-variant multisets, (2) a variant with `loot_bias` changes a room's `loot_table` vs role baseline (bias-only tables `salvage_cargo`/`salvage_engineering`/`hidden_cache`/`repair_parts_common` prove the override), (3) extended templates (`compact`/`dispersed`/`stacked_v2`/`derelict_a`/`derelict_b`) engage at `deep_dive` while standard difficulty stays on legacy templates (`spine`/`bifurcated`/`stacked`), (4) same seed generated twice produces identical variant + template output. Added to regression bundle.
   - `scripts/validation/procgen_variant_hazard_smoke.gd` (marker `PROCGEN VARIANT HAZARD PASS away_ticks=<n> fire_lit=true breach_open=true home_clean=true seal_point=true guarded=true`) — main-scene away-branch proof: injects a `burned_out` (fire) variant on an engineering room and a `breached` variant on a bridge room of the boarded derelict's layout, configures per-ship hull + fire from tuning, then calls the real `_seed_derelict_breaches()`/`_seed_derelict_fire()` and asserts: engineering ignites on the derelict fire model, bridge breaches on the DERELICT hull (`current_ship.get_hull()`), `_build_breach_seal_points()` creates a seal node for the breached bridge (PR #56 ordering fix), home hull bridge stays clean (wrong-target regression guard), and re-calling the seed functions does not re-seed (`fire_seeded`/`breach_seeded` guards). Added to regression bundle.
+- [x] Domain 8 save/persistence — title screen, permadeath freeze, Save & Exit — 6 smokes (ADR-0043):
+  - `scripts/validation/permadeath_freeze_smoke.gd` (marker `PERMADEATH FREEZE PASS wrote=true died=true frozen=true reloadable=false epitaph_present=true reclaim=true`) — main-scene: drives death on both the home and away branches, asserts every slot written during the run (autosave family, quickslot, and any manual slot saved to that run) gets a `PermadeathResolver.record_death` entry, the frozen slot refuses to reload through `load_from_slot`/`load_world`, and the epitaph read path (`load_epitaph`) returns a populated record. Also asserts manual-slot freeze and post-death pause-menu access (the `_input` dead-zone fix). Final stage (RECLAIM, final-review C1 fix): simulates the next run's first save into the same "world"/autosave slots frozen by the away-branch death and asserts `save_world()`/`save_to_slot()` clear the death record on write (reclaim-on-write, ADR-0043) -- `has_died_in` flips back false, `load_world()` is non-null again, and `TitleSaveQuery.is_continue_available()` is true. Added to regression bundle.
+  - `scripts/validation/title_save_query_smoke.gd` (marker `TITLE SAVE QUERY PASS no_save=true has_save=true frozen_blocks=true`) — pure-model: proves the title screen's save-presence query reports no-save on a clean `user://`, has-save once a world/slot exists, and that a frozen (permadeath) slot is excluded from what "Continue" offers. Added to regression bundle.
+  - `scripts/validation/title_screen_flow_smoke.gd` (marker `TITLE SCREEN FLOW PASS new_game=true continue=true quit_signal=true`) — main-scene (boots `title_main.tscn`): drives New Game (instantiates `scenes/main.tscn` fresh) and Continue (instantiates it against an existing save), including a teardown/reinstantiate double-boot check, and asserts the quit action emits its signal. Added to regression bundle.
+  - `scripts/validation/title_settings_smoke.gd` (marker `TITLE SETTINGS PASS open=true cycle=true back=true applied=true`) — main-scene (boots `title_main.tscn`): title settings sub-flow (spec §3.7 / ADR-0043 decision 6) — opens the title-local settings screen, cycles a setting (mirroring `menu_coordinator._cycle_setting`), backs out, and asserts the dirty-flagged summary is applied into the session via `apply_ui_settings_summary` on New Game/Continue. Added to regression bundle.
+  - `scripts/validation/save_load_slot_screen_smoke.gd` (marker `SAVE LOAD SLOT SCREEN PASS save=true load=true delete_armed=true delete_confirmed=true`) — main-scene: drives the interactive multi-slot screen's save/load/delete-arm/delete-confirm dispatch through real input, including the ship-only-not-world assertion for manual-slot loads (ADR-0043 decision 4). Added to regression bundle.
+  - `scripts/validation/save_and_exit_smoke.gd` (marker `SAVE AND EXIT PASS saved=true world_fresh=true return_signal=true`) — main-scene: drives the pause-menu Save & Exit action, asserts `request_save()` persists world.json, a fresh boot reflects the saved state, and `return_to_title_requested` fires. Added to regression bundle.

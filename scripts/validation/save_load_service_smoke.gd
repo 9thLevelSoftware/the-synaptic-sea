@@ -259,6 +259,30 @@ func _initialize() -> void:
 		_fail("delete_current_run did not remove the file")
 		return
 
+	# ADR-0043 permadeath freeze-gate: load_world() must refuse a frozen slot.
+	var resolver_script := load("res://scripts/systems/permadeath_resolver.gd")
+	var resolver = resolver_script.new()
+	resolver.clear_death("world")
+	var world_script := load("res://scripts/systems/world_snapshot.gd")
+	var ws = world_script.new()
+	ws.world_summary = {"world_seed": 5, "player_position": [0.0, 0.0, 0.0], "generated_marker_ids": ["2:0:1"]}
+	ws.home_ship = {"slice_version": "gate2-current-run-1"}
+	ws.slice_version = world_script.WORLD_SLICE_VERSION
+	ws.godot_version = Engine.get_version_info()["string"]
+	ws.saved_at = "2026-06-21T00:00:00"
+	if not service.save_world(ws):
+		_fail("save_world failed while seeding the permadeath-gate assertion")
+		return
+	resolver.record_death("world", "death", "test epitaph", 12.0, 1)
+	if service.load_world() != null:
+		_fail("load_world() returned non-null for a frozen world slot")
+		return
+	resolver.clear_death("world")
+	service.delete_current_run()
+	if service.load_world() != null:
+		_fail("cleanup: load_world() should be null after delete_current_run")
+		return
+
 	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=27")
 	quit(0)
 

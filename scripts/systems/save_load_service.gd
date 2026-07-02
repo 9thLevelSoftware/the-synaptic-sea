@@ -101,6 +101,18 @@ func save_world(world_snapshot) -> bool:
 		return false
 	file.store_string(json)
 	file.close()
+	# Reclaim-on-write (ADR-0043): a death record describes the run that died
+	# in this slot, not the run writing now. A live run's system write to
+	# "world" legitimately reclaims the slot, so clear any stale death
+	# record -- but only AFTER the write is confirmed on disk (PR #57 Codex
+	# round 3 P2). Clearing before opening the file left a window where a
+	# failed write (locked/unwritable path) discarded the death record while
+	# the old DEAD payload was still on disk, silently unfreezing a dead run
+	# and letting Continue load past a death that never actually reclaimed
+	# anything. This does not reopen save-scumming: frozen MANUAL slots
+	# offer no write verbs in the UI, and load gates fire before any write
+	# ever happens.
+	PermadeathResolverScript.new().clear_death("world")
 	# Index the world slot row + write its cloud manifest.
 	_index_world_slot(world_snapshot)
 	_write_cloud_manifest("world", path, WorldSnapshotScript.WORLD_SLICE_VERSION)
@@ -113,6 +125,11 @@ func save_world(world_snapshot) -> bool:
 func load_world():
 	var path: String = WORLD_SLOT_FILE
 	if not FileAccess.file_exists(path):
+		return null
+	# ADR-0043 permadeath gate -- mirrors the load_from_slot:249 gate. Old
+	# saves have no world.death.json, so has_died_in defaults false and
+	# legacy loads are unaffected.
+	if PermadeathResolverScript.new().has_died_in("world"):
 		return null
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
@@ -160,6 +177,12 @@ func delete_current_run() -> bool:
 		if werr != OK:
 			push_warning("SaveLoadService: failed to delete world save file, error=%d" % werr)
 			ok = false
+	# Also remove the world slot's cloud manifest (mirrors delete_slot()'s
+	# manifest removal) so a finished run does not leak
+	# user://saves/.cloud/world.manifest.json.
+	var world_manifest_path: String = "%s/world.manifest.json" % CLOUD_DIR
+	if FileAccess.file_exists(world_manifest_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(world_manifest_path))
 	# Remove the active autosave from the index so a fresh run does
 	# not see a phantom autosave row.
 	var idx = _load_index()
@@ -230,6 +253,18 @@ func save_to_slot(slot_id: String, snapshot: RunSnapshot, slot_kind: String, is_
 		return false
 	file.store_string(json)
 	file.close()
+	# Reclaim-on-write (ADR-0043): a death record describes the run that died
+	# in this slot, not the run writing now. A live run's system write to
+	# this slot legitimately reclaims it, so clear any stale death record --
+	# but only AFTER the write is confirmed on disk (PR #57 Codex round 3
+	# P2). Clearing before opening the file left a window where a failed
+	# write (locked/unwritable path) discarded the death record while the
+	# old DEAD payload was still on disk, silently unfreezing a dead run and
+	# letting Continue load past a death that never actually reclaimed
+	# anything. This does not reopen save-scumming: frozen MANUAL slots
+	# offer no write verbs in the UI, and load gates fire before any write
+	# ever happens.
+	PermadeathResolverScript.new().clear_death(slot_id)
 	# Update the index row + write the cloud manifest.
 	_index_run_slot(slot_id, slot_kind, display_name, snapshot, path)
 	_write_cloud_manifest(slot_id, path, CURRENT_SLICE_VERSION)

@@ -4239,12 +4239,12 @@
       "driven_at": "playable_generated_ship.gd:6039",
       "input": {
         "live": true,
-        "desc": "request_save (keybound save_run input at 7062-7063 + menu save_requested wired at 3638) and timed autosave/checkpoint call save_world/save_to_slot. VERIFIED: save_world live at request_save:6039 and checkpoint:5930; save_to_slot live at autosave:5961.",
+        "desc": "request_save (keybound save_run input at 7062-7063 + menu save_requested wired at 3638) and timed autosave/checkpoint call save_world/save_to_slot. VERIFIED: save_world live at request_save:6039 and checkpoint:5930; save_to_slot live at autosave:5961. Manual-slot LOAD is now live via the slot screen: menu_coordinator's save_load interactive arm (_confirm_save_load_row:814-815) calls save_load_menu.select_slot_for_load -> service.load_from_slot, surfaced back through _dispatch_save_load_confirm_result (playable_generated_ship.gd:6928-6940) which calls PlayableGeneratedShip.apply_manual_slot (6901).",
         "at": "playable_generated_ship.gd:6036-6039"
       },
       "output": {
         "live": true,
-        "desc": "request_load -> load_world() (world.json) -> _apply_world_snapshot rebuilds live world (home ship + visited ships + position). VERIFIED 6071-6075. NOTE: load_world does NOT exercise the multi-slot load_from_slot path.",
+        "desc": "request_load -> load_world() (world.json) -> _apply_world_snapshot rebuilds live world (home ship + visited ships + position). VERIFIED 6071-6075. Multi-slot load_from_slot is ALSO live-reachable now via the save_load slot screen's Load verb (menu_coordinator.gd:814-815 -> apply_manual_slot:6901), which applies the snapshot onto the already-booted ship only (ship-only side-save, not the full world checkpoint).",
         "at": "playable_generated_ship.gd:6071-6075"
       },
       "confidence": "V",
@@ -4260,13 +4260,13 @@
         },
         {
           "to": "run_snapshot",
-          "via": "save_to_slot/load_from_slot slot payload (save_to_slot live; load_from_slot has no live caller)",
+          "via": "save_to_slot/load_from_slot slot payload (save_to_slot live via autosave/manual-save; load_from_slot live via save_load slot screen's Load verb)",
           "at": "save_load_service.gd:198-303",
           "health": "healthy"
         },
         {
           "to": "save_migration_service",
-          "via": "migrate_world (live via load_world:133) + migrate_run (load_from_slot:268, not live-reached)",
+          "via": "migrate_world (live via load_world:133) + migrate_run (live via load_from_slot:279, reached through the save_load slot screen's Load verb)",
           "at": "save_load_service.gd:133",
           "health": "healthy"
         },
@@ -4284,22 +4284,21 @@
         },
         {
           "to": "permadeath_resolver",
-          "via": "has_died_in gate at load_from_slot:249 — but load_from_slot itself has no live caller AND record_death has no live producer, so doubly dead",
-          "at": "save_load_service.gd:249",
-          "health": "broken"
+          "via": "has_died_in gate at load_world:120 and load_from_slot:260 — record_death now has a live producer via end_run(\"death\")/_freeze_run_on_death (playable_generated_ship.gd:1621/1649), and both load_world and load_from_slot are live-reachable consumers of has_died_in",
+          "at": "save_load_service.gd:260",
+          "health": "healthy"
         },
         {
           "to": "cloud_manifest_state",
-          "via": "_write_cloud_manifest live on every save:235; sha gate at load_from_slot:289-302 is not live-reachable",
+          "via": "_write_cloud_manifest live on every save:235; sha gate at load_from_slot:300-313 is not live-reachable (documented deferral)",
           "at": "save_load_service.gd:235",
           "health": "healthy"
         }
       ],
       "content": "partial",
-      "content_note": "Slot taxonomy (manual/auto/quick/world), corruption/migration/death paths are code constants; no data/ tuning files back this service. Live writes go through save_world (world.json) + save_to_slot (autosave_a/b/c); the only live READ is load_world (world.json).",
+      "content_note": "Slot taxonomy (manual/auto/quick/world), corruption/migration/death paths are code constants; no data/ tuning files back this service. Live writes go through save_world (world.json) + save_to_slot (autosave_a/b/c); live reads go through load_world (world.json, full checkpoint) and load_from_slot (multi-slot, ship-only side-save via the save_load slot screen).",
       "functional": null,
       "gaps": [
-        "The entire multi-slot LOAD path (load_from_slot) has NO live caller: request_load uses load_world (world.json) only, and SaveLoadMenu.select_slot_for_load — the one route to load_from_slot — is never dispatched. Rotating autosave_a/b/c and manual slot_01..06 are write-only in live play.",
         "No boot-time auto-resume: request_load is manual (F9 / load_run input at 7065-7066)."
       ],
       "subsystems": []
@@ -4454,12 +4453,12 @@
       "driven_at": "save_load_service.gd:133",
       "input": {
         "live": true,
-        "desc": "migrate_world called on every load_world (live via request_load); migrate_run called in load_from_slot (not live-reached). VERIFIED migrate_world:133, migrate_run:268.",
+        "desc": "migrate_world called on every load_world (live via request_load); migrate_run called in load_from_slot, now live-reached via the save_load slot screen's Load verb (menu_coordinator._confirm_save_load_row -> save_load_menu.select_slot_for_load -> load_from_slot). VERIFIED migrate_world:133, migrate_run:279.",
         "at": "save_load_service.gd:133"
       },
       "output": {
         "live": true,
-        "desc": "migrated dict feeds WorldSnapshot.from_dict on the live load_world path (138); run migrated form persisted to <slot>.migrated.json (275-279) only on the non-live load_from_slot path.",
+        "desc": "migrated dict feeds WorldSnapshot.from_dict on the live load_world path (138); run migrated form persisted to <slot>.migrated.json (285-290), and load_from_slot is now live-reachable via the save_load slot screen's Load verb (menu_coordinator.gd:814-815 -> apply_manual_slot:6901).",
         "at": "save_load_service.gd:138"
       },
       "confidence": "V",
@@ -4469,7 +4468,7 @@
       "integrations": [
         {
           "to": "save_load_service",
-          "via": "invoked in load_from_slot:268 and load_world:133",
+          "via": "invoked in load_from_slot:279 and load_world:133",
           "at": "save_load_service.gd:133",
           "health": "healthy"
         },
@@ -4484,7 +4483,7 @@
       "content_note": "KNOWN_VERSIONS chain (3 run versions gate2-current-run-1..3; world legacy->world-4) is coded; v1->v2 and v2->v3 steps real, _migrate_world_legacy_to_world_4 is an explicit no-op reserved hook (save_migration_service.gd:131-133). Passthrough for current-version saves.",
       "functional": null,
       "gaps": [
-        "For current-version saves migrate_run/migrate_world are no-ops; only legacy-version files exercise real migration steps. The only LIVE migration entry is migrate_world via load_world; migrate_run runs only through the non-live load_from_slot path (smokes)."
+        "For current-version saves migrate_run/migrate_world are no-ops; only legacy-version files exercise real migration steps. Both migration entries are now live: migrate_world via load_world, and migrate_run via load_from_slot, reached through the save_load slot screen's Load verb."
       ],
       "subsystems": []
     },
@@ -4597,9 +4596,9 @@
         "at": "menu_coordinator.gd:490-491"
       },
       "output": {
-        "live": false,
-        "desc": "select_slot_for_load (-> service.load_from_slot, the ONLY live route to the multi-slot load path), confirm_save_to_slot, confirm_quicksave, confirm_delete have NO live caller — no UI button/input dispatches them. Presenter is display-only in live play (grep: select_slot_for_load/confirm_* appear only in the menu file + smoke).",
-        "at": null
+        "live": true,
+        "desc": "select_slot_for_load, confirm_save_to_slot, confirm_delete are now live-dispatched from menu_coordinator's save_load interactive arm (_confirm_save_load_row, menu_coordinator.gd:774-819): the Load/Save/Delete verb cycle on the save_load meta-screen calls these directly, and a successful Load result is applied onto the live ship via PlayableGeneratedShip.apply_manual_slot (playable_generated_ship.gd:6928-6940 -> 6901). confirm_quicksave remains unwired (see gaps) -- Save & Exit uses request_save directly per ADR-0043.",
+        "at": "menu_coordinator.gd:774-819"
       },
       "confidence": "V",
       "loops": [
@@ -4608,9 +4607,9 @@
       "integrations": [
         {
           "to": "save_load_service",
-          "via": "bind(service); refresh->list_slots (live), select_slot_for_load->load_from_slot (unwired)",
+          "via": "bind(service); refresh->list_slots (live), select_slot_for_load->load_from_slot (live via save_load verb cycle)",
           "at": "save_load_menu.gd:19-24",
-          "health": "weak"
+          "health": "healthy"
         },
         {
           "to": "save_index_state",
@@ -4620,11 +4619,10 @@
         }
       ],
       "content": "none",
-      "content_note": "Pure RefCounted presenter (scripts/ui/save_load_menu.gd). Only refresh()/list_slots is wired to the live menu render path; load/save/delete/quicksave dispatch methods exist but no live UI control invokes them (future Control node). OMITTED from the original inventory.",
+      "content_note": "Pure RefCounted presenter (scripts/ui/save_load_menu.gd). refresh()/list_slots (render) and select_slot_for_load/confirm_save_to_slot/confirm_delete (dispatch) are all wired to the live menu path via menu_coordinator's save_load interactive arm (Task 7/8).",
       "functional": null,
       "gaps": [
-        "select_slot_for_load is the only live path to load_from_slot and is never dispatched — confirms the multi-slot load path is unreachable in live play (only world.json checkpoint load via F9 works).",
-        "confirm_quicksave is unwired, matching AutosavePolicy.try_quicksave having no live caller."
+        "confirm_quicksave is unwired, matching AutosavePolicy.try_quicksave having no live caller -- intentional per ADR-0043 (Save & Exit uses request_save directly)."
       ],
       "subsystems": []
     },
@@ -4635,19 +4633,19 @@
       "domain": "save",
       "kind": "simulation",
       "model_exists": true,
-      "smoke": "scripts/validation/save_migration_service_smoke.gd",
+      "smoke": "scripts/validation/permadeath_freeze_smoke.gd",
       "reachable": true,
-      "driven": false,
-      "driven_at": null,
+      "driven": true,
+      "driven_at": "playable_generated_ship.gd:1649",
       "input": {
-        "live": false,
-        "desc": "record_death is NEVER called in live play. VERIFIED via grep: record_death/PermadeathResolver/has_died_in appear only in save_load_service.gd, save_migration_service_smoke.gd, and permadeath_resolver.gd — NOT in playable_generated_ship.gd. No player-death->record_death edge exists.",
-        "at": null
+        "live": true,
+        "desc": "end_run(\"death\") (playable_generated_ship.gd:1621) calls _freeze_run_on_death (1649), which records a death for world.json, the active autosave slot, every AUTOSAVE_SLOT_IDS slot, the quicksave slot if present, and every manual slot written this run -- ADR-0043 permadeath-freezes-not-deletes. VERIFIED via permadeath_freeze_smoke.gd.",
+        "at": "playable_generated_ship.gd:1649-1661"
       },
       "output": {
-        "live": false,
-        "desc": "load_from_slot:249 has_died_in gate would refuse a dead slot, but it is doubly dead: (a) no death file is ever created in play, and (b) load_from_slot itself has no live caller (loads go through load_world).",
-        "at": null
+        "live": true,
+        "desc": "has_died_in gates are live-reached from two consumers: load_world:120 (the F9/Continue world checkpoint) and load_from_slot:260 (the save_load slot screen's Load verb, live via menu_coordinator.gd:814-815 -> apply_manual_slot). Both refuse to load a frozen slot.",
+        "at": "save_load_service.gd:120"
       },
       "confidence": "V",
       "loops": [
@@ -4656,18 +4654,58 @@
       "integrations": [
         {
           "to": "save_load_service",
-          "via": "load gate (has_died_in:249) + delete_slot death cleanup (death_path_for:320) — consumer-only, no producer",
-          "at": "save_load_service.gd:249",
-          "health": "broken"
+          "via": "load gates (has_died_in at load_world:120, load_from_slot:260) + delete_slot death cleanup (death_path_for:331); producer is end_run(\"death\")->_freeze_run_on_death (playable_generated_ship.gd:1621/1649)",
+          "at": "save_load_service.gd:260",
+          "health": "healthy"
         }
       ],
       "content": "none",
-      "content_note": "death-1 record schema only; no epitaph data files; permadeath has no live producer. The smoke (save_migration_service_smoke.gd:128-141) is the only thing that calls record_death/has_died_in.",
+      "content_note": "death-1 record schema only; no epitaph data files. Live producer is end_run(\"death\")/_freeze_run_on_death; live consumers are load_world and load_from_slot's has_died_in gates.",
       "functional": null,
-      "gaps": [
-        "record_death has no live caller in playable_generated_ship.gd — player death never freezes a slot, so the permadeath/epitaph loop is hollow.",
-        "Both consume sites (load_from_slot:249 has_died_in, delete_slot:320 death_path_for) sit inside methods that themselves have no live caller, compounding the dead-code status."
+      "gaps": [],
+      "subsystems": []
+    },
+    {
+      "id": "title_save_query",
+      "file": "scripts/systems/title_save_query.gd",
+      "name": "Title Save Query",
+      "domain": "save",
+      "kind": "simulation",
+      "model_exists": true,
+      "smoke": "scripts/validation/title_save_query_smoke.gd",
+      "reachable": true,
+      "driven": true,
+      "driven_at": "scripts/title_main.gd:56",
+      "input": {
+        "live": true,
+        "desc": "title_main.gd calls TitleSaveQuery.is_continue_available(service, resolver) at _ready() (via _build_title_ui:35 -> _refresh_continue_enabled:51) and again on every gameplay-teardown-back-to-title (_on_gameplay_return_to_title:159 -> _build_title_ui:35).",
+        "at": "scripts/title_main.gd:56"
+      },
+      "output": {
+        "live": true,
+        "desc": "Result drives menu_state.set_item_enabled('main_menu', 'continue', value) on the title screen.",
+        "at": "scripts/title_main.gd:57"
+      },
+      "confidence": "V",
+      "loops": ["save"],
+      "integrations": [
+        {
+          "to": "save_load_service",
+          "via": "has_slot('world') existence check",
+          "at": "scripts/systems/title_save_query.gd",
+          "health": "healthy"
+        },
+        {
+          "to": "permadeath_resolver",
+          "via": "has_died_in('world') freeze check",
+          "at": "scripts/systems/title_save_query.gd",
+          "health": "healthy"
+        }
       ],
+      "content": "none",
+      "content_note": "Pure static-method decision model; no data files.",
+      "functional": null,
+      "gaps": [],
       "subsystems": []
     },
     {
@@ -4688,7 +4726,7 @@
       },
       "output": {
         "live": false,
-        "desc": "sha gate at load_from_slot:289-302 would refuse a tampered slot, but it is (a) a future-cloud-adapter stub (cloud_provider='stub') and (b) inside load_from_slot, which has no live caller. load_world does not check the manifest sha. No real cloud sync consumer.",
+        "desc": "sha gate at load_from_slot:297-313 would refuse a tampered slot; load_from_slot is now live-reachable via the save_load slot screen's Load verb (menu_coordinator.gd:814-815 -> apply_manual_slot:6901), so the gate is on a live path. Remaining gap is the manifest provider itself: cloud_provider is still a future-cloud-adapter stub (ADR-0032/ADR-0043), and load_world does not check the manifest sha. No real cloud sync consumer.",
         "at": "save_load_service.gd:298"
       },
       "confidence": "V",
@@ -4698,7 +4736,7 @@
       "integrations": [
         {
           "to": "save_load_service",
-          "via": "_write_cloud_manifest on save (live) + sha recompute gate on load (not live-reached)",
+          "via": "_write_cloud_manifest on save (live) + sha recompute gate on load, now live-reachable via the save_load slot screen's Load verb",
           "at": "save_load_service.gd:436-452",
           "health": "healthy"
         }
@@ -4708,7 +4746,7 @@
       "functional": true,
       "gaps": [
         "cloud_provider is 'stub'; no Steam/iCloud/GOG adapter consumes the manifest.",
-        "The sha-tamper gate is written live but its read side (load_from_slot:289-302) is never reached in live play; only the smoke exercises it."
+        "The sha-tamper gate (load_from_slot:297-313) is on a live path now (save_load slot screen's Load verb); the surviving gap is that cloud_provider is still a stub, so there is no real backend for the manifest to protect."
       ],
       "subsystems": []
     },
@@ -8739,14 +8777,10 @@
     {
       "id": "save",
       "name": "Save / Load / Persistence",
-      "closes": "partial",
+      "closes": "closed",
       "break_points": [
-        "The multi-slot LOAD path (load_from_slot) has NO live caller: request_load uses load_world (world.json) only, and SaveLoadMenu.select_slot_for_load (the one route to load_from_slot) is never dispatched. So the WRITE half of the loop (autosave_a/b/c + manual slot_01..06 + cloud manifest + slot index) persists, but those slots can only be READ by smokes — the live loop closes solely through the world.json checkpoint.",
-        "Permadeath sub-loop is hollow AND doubly dead: record_death has no live caller (player death never freezes a slot), and its only consume site (load_from_slot:249) is itself never live-reached.",
-        "No boot-time auto-resume: request_load is manual (F9 / load_run input at 7065-7066).",
-        "Cloud manifest sync is a stub (cloud_provider='stub'); the local sha-tamper gate is written live but its read side (load_from_slot:289-302) is never live-reached.",
-        "quicksave guards (AutosavePolicy.try_quicksave + SaveLoadMenu.confirm_quicksave) are unwired — no keybinding/UI fires them.",
-        "SaveLoadMenu is live for display (refresh/list_slots) but its load/save/delete dispatch methods have no live caller."
+        "Cloud manifest sync remains a documented stub deferral (cloud_provider='stub'); out of scope for this domain.",
+        "Quicksave guards (AutosavePolicy.try_quicksave / SaveLoadMenu.confirm_quicksave) are intentionally unwired -- Save & Exit uses request_save directly (ADR-0043); the multiplayer/PZ-like direction does not use quicksave/quickload."
       ],
       "steps": [
         {

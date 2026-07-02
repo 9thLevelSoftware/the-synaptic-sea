@@ -22,6 +22,7 @@ const AudioManagerScript := preload("res://scripts/audio/audio_manager.gd")
 const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.gd")
 const RunSnapshotScript := preload("res://scripts/systems/run_snapshot.gd")
 const SaveSlotStateScript := preload("res://scripts/systems/save_slot_state.gd")
+const PermadeathResolverScript := preload("res://scripts/systems/permadeath_resolver.gd")
 # Timed/rotating autosave loop (ADR-0031/0032). Owned + ticked here so the
 # borderline-Bucket-1 AutosavePolicy model is finally wired into the live run.
 const AutosavePolicyScript := preload("res://scripts/systems/autosave_policy.gd")
@@ -112,6 +113,11 @@ signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
 signal playable_interaction_completed(interaction_id: String, objective_id: String, sequence: int, objective_type: String, room_id: String)
 signal playable_slice_completed(summary: Dictionary)
+## ADR-0043: emitted when the player chooses to leave gameplay back to the
+## title screen (pause menu "Quit to Main Menu" or Save & Exit). title_main.gd
+## connects to this on every gameplay instantiation (New Game and Continue
+## both wire it via _poll_for_playable_started).
+signal return_to_title_requested
 
 const DEFAULT_LAYOUT_PATH: String = "res://data/procgen/smoke/seed_000017/layout.json"
 const DEFAULT_KIT_PATH: String = "res://data/kits/ship_structural_v0.json"
@@ -456,6 +462,10 @@ const DEFAULT_MOVE_BINDINGS: Dictionary = {
 	"move_right": [KEY_D, KEY_RIGHT],
 }
 const DEFAULT_INTERACT_BINDINGS: Array[Key] = [KEY_E, KEY_ENTER, KEY_SPACE, KEY_KP_ENTER]
+# ADR-0043: F5/F9 keep their pre-Domain-8 world.json save/load behavior
+# unchanged (request_save/request_load), now documented as dev/debug
+# keys -- the player-facing save surfaces are the pause menu's Save /
+# Save & Exit items and the interactive save_load slot screen.
 const DEFAULT_SAVE_RUN_BINDINGS: Array[Key] = [KEY_F5]
 const DEFAULT_LOAD_RUN_BINDINGS: Array[Key] = [KEY_F9]
 const DEFAULT_ATTACK_BINDINGS: Array[Key] = [KEY_F]
@@ -1601,6 +1611,45 @@ func get_unlock_registry():
 ##
 ## Returns the payout amount in meta_currency. Idempotent: a second call
 ## after the slice is already complete returns 0 and is a no-op.
+# Domain 8 (ADR-0043): slot ids the slot screen's Save verb has written to
+# THIS run. Permadeath freeze must also freeze these -- a mid-run manual
+# save must not be a save-scumming escape hatch from permadeath. In-memory
+# bookkeeping, but mirrored into WorldSnapshot.manual_slots_written on every
+# world save/load (PR #57 Codex round 2 finding C) so the set survives a
+# Save & Exit -> Continue boundary (a fresh PlayableGeneratedShip would
+# otherwise lose it and let a previously-manual-saved slot dodge freeze on
+# a later death in the resumed run).
+var _manual_slots_written_this_run: Dictionary = {}
+
+# PR #57 Codex round 3 P1: true once THIS run instance owns the SHARED
+# world/autosave save lineage, i.e. either (a) it successfully loaded an
+# existing world save (Continue/F9 -- the loaded world.json + its autosave
+# family belong to this run now), or (b) it has written world.json/an
+# autosave at least once. A fresh New Game that has neither loaded nor
+# saved to that shared lineage owns NOTHING on disk yet, so
+# _freeze_run_on_death() must not stamp a death record onto a PRIOR run's
+# still-live world.json/autosaves -- doing so would brick that prior run's
+# Continue with an epitaph from a run that never wrote a byte (Codex round
+# 3 P1 finding). Set exactly at the shared-lineage success points via
+# _mark_shared_lineage(); never cleared mid-run.
+#
+# PR #57 Codex round 4 P1: shared world/autosave slot family only. Manual
+# slots NEVER call this -- they are tracked per-slot in
+# _manual_slots_written_this_run. A manual-only run must not claim the
+# shared lineage (PR #57 Codex round 4).
+var _persisted_lineage_active: bool = false
+
+## PR #57 Codex round 3 P1: call at every point where this run instance
+## takes ownership of the SHARED world/autosave save lineage (see the field
+## comment above for the exact two cases).
+##
+## PR #57 Codex round 4 P1: shared world/autosave slot family only. Manual
+## slots NEVER call this -- they are tracked per-slot in
+## _manual_slots_written_this_run. A manual-only run must not claim the
+## shared lineage (PR #57 Codex round 4). Idempotent.
+func _mark_shared_lineage() -> void:
+	_persisted_lineage_active = true
+
 func end_run(reason: String = "extraction") -> int:
 	if slice_complete:
 		return 0
@@ -1608,17 +1657,69 @@ func end_run(reason: String = "extraction") -> int:
 	tracker.mark_run_complete()
 	var payout: int = int(_apply_meta_payout_and_persist(reason))
 	if save_load_service != null:
-		save_load_service.delete_current_run()
-		# A terminal run (death OR extraction) must also drop the rotating
-		# autosave_a/b/c slots. delete_current_run() only clears the current_run/world
-		# rows; without this, a finished run's timed-autosave snapshots survive and
-		# stay resumable through SaveLoadMenu.list_slots() — so a fatal run could be
-		# loaded back, defeating the new death terminal-state. Mirrors the
-		# objective-completion path (Codex review on PR #35 / #50).
-		for slot_id in SaveSlotStateScript.AUTOSAVE_SLOT_IDS:
-			save_load_service.delete_slot(slot_id)
+		if reason == "death":
+			# ADR-0043: permadeath freezes, it does not delete. world.json and
+			# every slot written this run stay on disk; a death record gates
+			# every future load of them (SaveLoadService.load_world /
+			# load_from_slot), and the slot screen renders them DEAD with an
+			# epitaph (ADR-0032's original browse-the-epitaph intent).
+			_freeze_run_on_death()
+		else:
+			# Extraction/completion path UNCHANGED -- still deletes. A finished
+			# successful run has nothing to "continue"; this is not permadeath.
+			save_load_service.delete_current_run()
+			for slot_id in SaveSlotStateScript.AUTOSAVE_SLOT_IDS:
+				save_load_service.delete_slot(slot_id)
 	emit_signal("playable_slice_completed", get_slice_completion_summary())
 	return payout
+
+## ADR-0043: freeze every slot that represents "the state at/after death"
+## instead of deleting it. Manual slot_01..06 the player saved THIS run are
+## included (via _manual_slots_written_this_run) -- a mid-run manual save
+## must not be a permadeath escape hatch. world.json itself is never
+## deleted; PermadeathResolver.has_died_in("world") gates future loads.
+##
+## PR #57 Codex round 3 P1 lineage gate: "world" + the active-autosave alias
+## + every AUTOSAVE_SLOT_IDS row + the quickslot are only frozen when
+## _persisted_lineage_active is true -- i.e. THIS run either loaded an
+## existing world save (Continue/F9) or has written to that SHARED
+## world/autosave lineage at least once. A fresh New Game that dies before
+## ever loading or saving to the shared lineage does not own it; freezing
+## it would stamp a prior, unrelated run's still-live world.json/autosaves
+## with THIS run's epitaph and brick that prior run's Continue for a death
+## it never had. The manual-slot set is unaffected by this gate --
+## _manual_slots_written_this_run is already write-tracked (a slot only
+## appears there after this run wrote to it via the slot screen, never via
+## _mark_shared_lineage -- PR #57 Codex round 4 P1), so it is always safe
+## to freeze regardless of _persisted_lineage_active.
+func _freeze_run_on_death() -> void:
+	var resolver := PermadeathResolverScript.new()
+	var epitaph_text: String = _build_epitaph_text()
+	var run_time: float = world_time
+	var final_seq: int = current_objective_sequence
+	var slots_to_freeze: Array = []
+	if _persisted_lineage_active:
+		slots_to_freeze.append(SaveLoadServiceScript.ACTIVE_AUTOSAVE_SLOT_ID)
+		slots_to_freeze.append("world")
+		slots_to_freeze.append_array(SaveSlotStateScript.AUTOSAVE_SLOT_IDS)
+		if save_load_service.has_slot(SaveSlotStateScript.QUICKSAVE_SLOT_ID):
+			slots_to_freeze.append(SaveSlotStateScript.QUICKSAVE_SLOT_ID)
+	for manual_slot_id in _manual_slots_written_this_run.keys():
+		slots_to_freeze.append(String(manual_slot_id))
+	for slot_id in slots_to_freeze:
+		resolver.record_death(slot_id, "death", epitaph_text, run_time, final_seq)
+
+## ADR-0043: short human-readable epitaph text for the frozen slot rows /
+## death record. Cause is always "death" today (the only end_run reason
+## that freezes); location comes from the current ship's marker_id (empty
+## string = home ship).
+func _build_epitaph_text() -> String:
+	var location: String = ""
+	var cur = get_current_ship()
+	if is_instance_valid(cur):
+		location = String(cur.marker_id)
+	var location_label: String = location if not location.is_empty() else "the home ship"
+	return "Died aboard %s at objective %d (run time %.0fs)" % [location_label, current_objective_sequence, world_time]
 
 ## REQ-PM-002 / ADR-0033 — public seam for gameplay code (repair points,
 ## combat, cooking, scanners, etc.) to fire a deterministic training event
@@ -4067,6 +4168,7 @@ func _build_hud_layer() -> void:
 	menu_coordinator.save_requested.connect(request_save)
 	menu_coordinator.load_requested.connect(request_load)
 	menu_coordinator.quit_requested.connect(_on_ui_quit_requested)
+	menu_coordinator.save_and_exit_requested.connect(_on_save_and_exit_requested)
 	menu_coordinator.settings_changed.connect(_on_ui_settings_changed)
 	var configured: bool = menu_coordinator.configure(
 		_load_json_dict("res://data/ui/menu_definitions.json"),
@@ -4096,6 +4198,7 @@ func _build_hud_layer() -> void:
 		save_load_menu,
 		accessibility_settings,
 		unlock_registry,
+		_build_run_snapshot,
 	)
 	menu_coordinator.set_load_available(is_load_available())
 	menu_coordinator.set_inventory_items(_inventory_hotbar_ids())
@@ -4503,8 +4606,31 @@ func _on_ui_modal_closed(_previous_menu_id: String) -> void:
 		player.set_process_unhandled_input(true)
 
 func _on_ui_quit_requested() -> void:
-	if is_instance_valid(menu_coordinator):
-		menu_coordinator.open_main_menu()
+	# ADR-0043: "Quit to Main Menu" now really returns to the title screen
+	# instead of reopening the in-scene main_menu overlay (the old stub
+	# behavior -- there was no real title/quit path before this domain).
+	emit_signal("return_to_title_requested")
+
+## ADR-0043 Save & Exit: request_save() the SAME guarded path F5/autosave
+## already use (world.json write), then leave to the title screen only on
+## success. Deliberately does NOT reuse AutosavePolicy.try_quicksave's
+## cooldown -- that guard exists to stop autosave-cadence thrashing during
+## active play, not to gate a terminal "I am leaving" action; a cooldown
+## that could silently skip the write on the player's exit is a
+## correctness footgun. On failure, surface a toast and do NOT exit --
+## never silently lose progress on a leave action. The toast is driven by
+## the "save_and_exit_failed"/"any" tutorial trigger registered in
+## data/ui/tutorial_triggers.json; menu_coordinator.trigger_tutorial()
+## returning a non-empty id (and firing TutorialState.triggered) is the
+## proof this actually renders -- an unregistered trigger id would
+## silently no-op instead (see save_and_exit_smoke.gd's failure stage).
+func _on_save_and_exit_requested() -> void:
+	var ok: bool = request_save()
+	if ok:
+		emit_signal("return_to_title_requested")
+	else:
+		if is_instance_valid(menu_coordinator):
+			menu_coordinator.trigger_tutorial("save_and_exit_failed", "any")
 
 func _on_ui_settings_changed(_summary: Dictionary) -> void:
 	apply_accessibility_settings(accessibility_settings)
@@ -5751,10 +5877,28 @@ func dismiss_latest_tutorial_for_validation() -> bool:
 		return false
 	return menu_coordinator.dismiss_latest_tutorial()
 
-func apply_ui_settings_summary_for_validation(summary: Dictionary) -> bool:
+## Applies a settings summary to the live session's MenuCoordinator (title-screen
+## dirty-flag handoff and validation seam both delegate here).
+func apply_ui_settings_summary(summary: Dictionary) -> bool:
 	if not is_instance_valid(menu_coordinator):
 		return false
 	return menu_coordinator.apply_settings_summary(summary)
+
+## ADR-0043 title handoff seam: dismisses the in-scene boot-time main_menu
+## _build_runtime_nodes() parks open via menu_coordinator.open_main_menu().
+## The title screen already collected New Game / Continue intent before
+## instantiating this scene, so the child's own main_menu overlay is
+## redundant and must not survive the handoff (it would otherwise keep
+## capturing input via menu_coordinator.handle_ui_input, parking the
+## player on a second menu instead of gameplay).
+func dismiss_boot_menu() -> bool:
+	if not is_instance_valid(menu_coordinator):
+		return false
+	return menu_coordinator.dismiss_boot_menu()
+
+## Validation-only alias kept for existing smokes; delegates to the production seam.
+func apply_ui_settings_summary_for_validation(summary: Dictionary) -> bool:
+	return apply_ui_settings_summary(summary)
 
 # --- Hazard / ElectricalArcState integration ----------------------------------
 # REQ-013: electrical-arc zone scene integration. The third hazard's pure model
@@ -6468,6 +6612,7 @@ func _auto_save_current_run() -> bool:
 		return false
 	if save_load_service.save_world(ws):
 		last_saved_snapshot = _build_run_snapshot()  # preserve in-memory RunSnapshot seam (get_last_saved_snapshot)
+		_mark_shared_lineage()  # PR #57 Codex round 3 P1: first world write -- this run now owns the shared lineage
 		return true
 	return false
 
@@ -6500,6 +6645,7 @@ func _tick_autosave_policy(delta: float) -> void:
 	if save_load_service.save_to_slot(slot_id, snap, SaveSlotStateScript.SLOT_KIND_AUTO, false, "Autosave"):
 		last_saved_snapshot = snap
 		_last_autosave_result = r
+		_mark_shared_lineage()  # PR #57 Codex round 3 P1: first autosave write -- this run now owns the shared lineage
 
 ## Validation seam: the live AutosavePolicy instance (null before runtime build).
 func get_autosave_policy_for_validation():
@@ -6583,6 +6729,7 @@ func request_save() -> bool:
 		return false
 	var result: bool = save_load_service.save_world(ws)
 	if result:
+		_mark_shared_lineage()  # PR #57 Codex round 3 P1: first world write -- this run now owns the shared lineage
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_SAVE)
 		print("PLAYABLE SHIP SAVED location=%s sequence=%d" % [ws.current_location, current_objective_sequence])
@@ -6619,6 +6766,11 @@ func request_load() -> bool:
 		return false
 	var loaded: bool = _apply_world_snapshot(ws)
 	if loaded:
+		# PR #57 Codex round 3 P1: a successful Continue/F9 world load means this
+		# run instance now owns the loaded shared lineage -- world.json's
+		# pre-existing autosaves belong to it too, so a death from here must
+		# freeze them.
+		_mark_shared_lineage()
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_LOAD)
 		if is_instance_valid(menu_coordinator):
@@ -6809,6 +6961,66 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	])
 	return true
 
+## ADR-0031/0043 slot-screen seam: apply a manual-slot RunSnapshot onto the
+## currently-active (already-booted) ship only. Does NOT touch
+## visited_ships/world_time/dock topology/current_location -- manual slots
+## are ship-only side-saves, exactly ADR-0031's original text. Returns
+## true on success; false on a null snapshot or an _apply_run_snapshot
+## failure (e.g. not yet playable_started).
+func apply_manual_slot(snapshot: RunSnapshot) -> bool:
+	if snapshot == null:
+		return false
+	# ADR-0043 review fix: the menu dispatch block (and this call) is reachable
+	# post-death (slice_complete==true) because epitaph/menu browsing must
+	# survive death by design. A manual slot from a PRIOR run can still be
+	# loadable here (extraction only deletes autosaves, never manual slots),
+	# which would let _apply_run_snapshot "succeed" into a permanently dead
+	# session (_process and gameplay input both no-op forever after death).
+	# _apply_run_snapshot itself is a shared reload primitive whose other
+	# caller (_apply_world_snapshot / request_load) is already reachable only
+	# from pre-death input, so the guard belongs here, not there.
+	if slice_complete:
+		return false
+	var applied: bool = _apply_run_snapshot(snapshot)
+	if applied and is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("manual_slot_loaded", "any")
+	return applied
+
+## ADR-0043: notices a slot-screen confirm result surfaced through
+## MenuCoordinator.get_last_meta_screen_confirm_result() and applies the
+## gameplay-side consequence the coordinator itself cannot (it owns no
+## gameplay state). Called every frame handle_ui_input returns true; a
+## non-save_load or action=="none"/"arm"/"delete_armed" result is a no-op.
+## Clears the coordinator's stored result after handling so a later
+## handle_ui_input==true call (e.g. for ui_pause) never re-applies a stale
+## confirm Dictionary from a previous, unrelated event.
+func _dispatch_save_load_confirm_result(result: Dictionary) -> void:
+	if str(result.get("screen", "")) != "save_load":
+		return
+	var action: String = str(result.get("action", ""))
+	var ok: bool = bool(result.get("ok", false))
+	var detail: String = str(result.get("detail", ""))
+	if action == "load" and ok:
+		var snapshot: RunSnapshot = result.get("snapshot", null) as RunSnapshot
+		apply_manual_slot(snapshot)
+	elif action == "load_world" and ok:
+		# PR #57 Codex P2 (world-row Load): world.json is a WorldSnapshot, not
+		# a RunSnapshot, so menu_coordinator cannot decode/apply it itself (no
+		# gameplay state there). Route through the same proven world-apply
+		# path F9 and the title screen's Continue already use.
+		request_load()
+	elif action == "save" and ok:
+		# PR #57 Codex round 4 P1: manual slots are NEVER a shared-lineage write.
+		# They are already independently tracked in _manual_slots_written_this_run
+		# and _freeze_run_on_death() freezes them unconditionally via that set --
+		# do not also call _mark_shared_lineage() here, or a manual-only save
+		# during a fresh run would make _freeze_run_on_death() stamp a death
+		# record onto "world"/the autosave family too, bricking a PRIOR run's
+		# still-live Continue that this run never touched.
+		_manual_slots_written_this_run[detail] = true
+	if not action.is_empty():
+		menu_coordinator.clear_last_meta_screen_confirm_result()
+
 ## Builds a full WorldSnapshot from live state. The home-ship slice is the
 ## existing RunSnapshot; when the player is aboard a derelict the home slice's
 ## player_position is overridden with the position they left home from (the live
@@ -6853,6 +7065,11 @@ func _build_world_snapshot():
 	ws.piloted_ship_id = piloted_ship.ship_id if piloted_ship != null else ""
 	ws.aboard_ship_id = current_occupancy.ship_id if current_occupancy != null else ""
 	ws.opened_ports = _opened_port_marker_ids()
+	# PR #57 Codex round 2 finding C: persist the manual-save freeze set so a
+	# Save & Exit -> Continue cross-run boundary does not forget which manual
+	# slots this run wrote (_manual_slots_written_this_run is otherwise
+	# in-memory-only and lost when a fresh PlayableGeneratedShip is built).
+	ws.manual_slots_written = _manual_slots_written_this_run.keys()
 	ws.slice_version = WorldSnapshotScript.WORLD_SLICE_VERSION
 	ws.godot_version = Engine.get_version_info()["string"]
 	ws.saved_at = Time.get_datetime_string_from_system(true)
@@ -7062,6 +7279,11 @@ func _apply_world_snapshot(ws) -> bool:
 	for b in dock_barriers:
 		if is_instance_valid(b) and ws.opened_ports.has(String(b.marker_id)):
 			b.set_opened(true)
+	# PR #57 Codex round 2 finding C: restore the manual-save freeze set, merged
+	# with any current-run keys (rather than replaced) so this stays correct
+	# even if a load somehow runs mid-run with slots already recorded.
+	for manual_slot_id in ws.manual_slots_written:
+		_manual_slots_written_this_run[String(manual_slot_id)] = true
 	# 5c. Ensure every derelict that is an endpoint of a saved dock edge has geometry
 	# BEFORE re-docking. Step 4 only materializes current_location; a claimed derelict the
 	# player was PILOTING (docked to a different host after rigid-pair travel) is otherwise
@@ -7546,8 +7768,14 @@ func _reset_runtime_for_reload() -> void:
 	# extra reset here.
 
 func _input(event: InputEvent) -> void:
-	if not playable_started or slice_complete:
+	if not playable_started:
 		return
+	# ADR-0043: slice_complete no longer hard-gates the whole function. Death
+	# ends the run but must not lock the player out of the menu (epitaph
+	# browsing on the frozen slot screen is the whole point of the freeze).
+	# Only the gameplay-input tail below (hotbar/attack/reload/save/load) is
+	# still gated on slice_complete -- see the "if slice_complete: return"
+	# inserted right after the menu_coordinator dispatch block.
 	# Phase 4.5: scanner panel toggle + navigation. Opening the panel freezes
 	# player movement/interaction so the shared arrow/Enter keys drive the panel.
 	# Control is restored on close by the panel_closed signal handler, which
@@ -7586,12 +7814,19 @@ func _input(event: InputEvent) -> void:
 		if menu_coordinator.handle_ui_input(event):
 			if event.is_action_pressed("ui_open_map"):
 				menu_coordinator.reveal_room(menu_coordinator.map_fog_state.get_tracked_room_id())
+			_dispatch_save_load_confirm_result(menu_coordinator.get_last_meta_screen_confirm_result())
 			get_viewport().set_input_as_handled()
 			return
 		for action_name in ["move_forward", "move_back", "move_left", "move_right"]:
 			if event.is_action_pressed(action_name):
 				menu_coordinator.trigger_tutorial("player_moved", "any")
 				break
+	# ADR-0043: everything below this point is live gameplay input (hotbar,
+	# attack, reload, manual save/load keys) -- correctly still locked out
+	# once the run has ended (death or extraction). Only the menu dispatch
+	# above this line must survive slice_complete.
+	if slice_complete:
+		return
 	if save_load_service == null:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:

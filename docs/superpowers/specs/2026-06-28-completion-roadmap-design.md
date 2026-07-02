@@ -380,13 +380,21 @@ cloud_manifest (integrity) · permadeath_resolver (death-gate).
 2. `record_death` is **called** on player death (ties to Domain 1) and freezes the run's slot;
    `load_from_slot` honors the permadeath gate.
 3. Boot-time auto-resume offers the latest autosave (or an explicit "continue" entry).
-4. Quicksave keybinding/UI fires `try_quicksave`/`confirm_quicksave`.
+4. **Amended 2026-07-01 (ADR-0043):** the game is heading multiplayer / Project-Zomboid-like, where
+   quicksave/quickload doesn't fit the design. Item 4 is satisfied instead by **Save & Exit** (a
+   new pause-menu action that calls `request_save()` and returns to the title screen).
+   `AutosavePolicy.try_quicksave`/`SaveLoadMenu.confirm_quicksave` stay intentionally unwired --
+   dead-but-harmless, model-smoked, available if a future package ships a real quicksave key.
 
 **Away-branch checklist:** autosave triggers fire on the away branch (don't lose a derelict run on
 crash); death→permadeath gate fires on the away branch.
 
-**Validation:** `save_multislot_smoke.gd` — write to a slot, load it back through the **live** path;
-death freezes a slot and load respects it; quicksave round-trips. Register markers.
+**Validation:** `permadeath_freeze_smoke.gd`, `title_save_query_smoke.gd`, `title_screen_flow_smoke.gd`,
+`title_settings_smoke.gd`, `save_load_slot_screen_smoke.gd`, `save_and_exit_smoke.gd` — write to a
+slot, load it back through the **live** path; death freezes every slot written this run and load
+respects the freeze; the title screen offers New Game/Continue/Settings and Save & Exit round-trips
+through `request_save()`. Registered in the regression bundle (`06_validation_plan.md`,
+`commands=112`).
 
 **Inventory delta:** `save.closes → "closed"`; flip `save_load_menu`/`permadeath_resolver`
 `output.live`/`input.live`; update break-points.
