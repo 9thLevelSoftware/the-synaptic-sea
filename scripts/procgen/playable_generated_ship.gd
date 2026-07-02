@@ -4604,6 +4604,14 @@ func _on_save_and_exit_requested() -> void:
 
 func _on_ui_settings_changed(_summary: Dictionary) -> void:
 	apply_accessibility_settings(accessibility_settings)
+	# REQ-AU criterion 3 (ADR-0044): SettingsState.captions is the single
+	# source of truth for SfxEventRouter.captions_enabled. _summary is the
+	# SettingsState payload emitted by menu_coordinator.settings_changed
+	# (settings_state.get_summary()), which always carries a "captions" key
+	# (schema default true) — read it directly rather than re-deriving it
+	# from menu_coordinator to keep this a pure one-line push.
+	if is_instance_valid(audio_manager) and audio_manager.sfx_router != null:
+		audio_manager.sfx_router.captions_enabled = bool(_summary.get("captions", true))
 
 func _on_ship_loaded(summary: Dictionary) -> void:
 	if playable_started:

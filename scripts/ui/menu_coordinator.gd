@@ -530,6 +530,7 @@ func bind_meta_screens(p_achievement_state, p_audio_manager, p_skill_tree_state,
 		audio_settings_panel.set_audio_manager(p_audio_manager)
 		if p_a11y != null:
 			audio_settings_panel.set_accessibility_settings(p_a11y)
+		audio_settings_panel.set_settings_state(settings_state)
 	if is_instance_valid(language_selector):
 		language_selector.set_catalog(p_localization_catalog)
 	if is_instance_valid(release_badge_overlay):

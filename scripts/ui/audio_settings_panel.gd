@@ -24,6 +24,11 @@ const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
 
 var audio_manager: Node
 var accessibility_settings: RefCounted
+# REQ-AU criterion 3 (ADR-0044): the settings seam this panel writes
+# captions through. Injected by MenuCoordinator (which already owns the
+# single settings_state instance) via set_settings_state(), following the
+# same pattern as set_accessibility_settings().
+var settings_state = null
 
 # Volume sliders indexed by bus id (StringName).
 var _volume_sliders: Dictionary = {}
@@ -46,6 +51,11 @@ func set_audio_manager(mgr: Node) -> void:
 func set_accessibility_settings(settings: RefCounted) -> void:
 	accessibility_settings = settings
 	_apply_text_scale()
+
+func set_settings_state(state) -> void:
+	settings_state = state
+	if is_inside_tree():
+		_refresh_from_manager()
 
 func _build_layout() -> void:
 	# Title label.
@@ -129,9 +139,13 @@ func _refresh_from_manager() -> void:
 		var toggle: CheckBox = _mute_toggles.get(bus_id, null)
 		if toggle != null:
 			toggle.button_pressed = audio_manager.is_bus_muted(bus_id)
-	# Caption toggle reflects the router's captions_enabled flag.
-	if _caption_toggle != null and audio_manager.has_method("sfx_router"):
-		_caption_toggle.button_pressed = bool(audio_manager.sfx_router.captions_enabled)
+	# Caption toggle reflects SettingsState.captions (the single source of
+	# truth, ADR-0044) — NOT audio_manager.sfx_router directly. The prior
+	# `audio_manager.has_method("sfx_router")` check was always false
+	# (sfx_router is a property, not a method), so this checkbox never
+	# synced before this fix.
+	if _caption_toggle != null and settings_state != null:
+		_caption_toggle.button_pressed = settings_state.is_captions_enabled()
 	if _voice_log_toggle != null and audio_manager.has_method("audio_log"):
 		_voice_log_toggle.button_pressed = true
 
@@ -146,12 +160,15 @@ func _on_mute_changed(pressed: bool, bus_id: StringName) -> void:
 	audio_manager.set_bus_muted(bus_id, pressed)
 
 func _on_caption_toggled(pressed: bool) -> void:
-	if audio_manager == null or not audio_manager.has_method("sfx_router"):
+	if settings_state == null:
 		return
-	audio_manager.sfx_router.captions_enabled = pressed
+	settings_state.set_captions_enabled(pressed)
+	if is_instance_valid(audio_manager) and audio_manager.sfx_router != null:
+		audio_manager.sfx_router.captions_enabled = pressed
 
 func _on_voice_log_toggled(pressed: bool) -> void:
 	# Voice-log enable/disable is a UI flag — audio_log entries are
 	# always available; the panel just decides whether to show them.
-	# No model change needed here.
+	# No model change needed here. Known no-op stub, flagged in ADR-0044,
+	# not fixed as part of Domain 9 (separate concern, out of scope).
 	pass
