@@ -272,6 +272,20 @@ const FIRE_COMPARTMENT_SYSTEM := {
 	"hydroponics": "life_support",
 	"cargo": "",
 }
+# Maps a room ROLE to the hull/fire compartment it belongs to. Only these
+# compartments exist (data/ship_systems/hull_compartments.json + FIRE_COMPARTMENT_SYSTEM),
+# so variant hazards on other roles are loot/dressing-only.
+const COMPARTMENT_FOR_ROLE := {
+	"bridge": "bridge",
+	"cockpit": "bridge",
+	"engineering": "engineering",
+	"reactor": "engineering",
+	"engine_bay": "engineering",
+	"hydroponics": "hydroponics",
+	"cargo": "cargo",
+	"storage": "cargo",
+}
+const RoomVariantSelectorHazardScript := preload("res://scripts/procgen/room_variant_selector.gd")
 const OXYGEN_MIN_FOR_FIRE: float = 5.0
 const FIRE_HEALTH_DRAIN_PER_SECOND: float = 2.0
 const FIRE_SYSTEM_DAMAGE_PER_SECOND: float = 0.05
@@ -2762,6 +2776,37 @@ func _configure_derelict_fire(fs) -> void:
 	if fs != null:
 		fs.configure(_fire_tuning())
 
+## Scans the boarded derelict's built layout for rooms whose variant carries a
+## hazard of `kind` ("fire" or "breach") AND whose role maps to a real
+## compartment. Returns the deterministic, de-duplicated, sorted compartment id
+## list. Empty when no such variant landed on a mapped role.
+func _variant_hazard_compartments(kind: String) -> Array:
+	var out: Dictionary = {}
+	if current_ship == null:
+		return []
+	var layout: Dictionary = current_ship.built_layout
+	if layout.is_empty() and loader != null and loader.has_method("get_layout_copy"):
+		layout = loader.get_layout_copy()
+	var rooms_variant: Variant = layout.get("rooms", [])
+	if not (rooms_variant is Array):
+		return []
+	var selector := RoomVariantSelectorHazardScript.new()
+	for room_variant in (rooms_variant as Array):
+		if not (room_variant is Dictionary):
+			continue
+		var room: Dictionary = room_variant
+		var role: String = str(room.get("room_role", room.get("role", "")))
+		var compartment: String = str(COMPARTMENT_FOR_ROLE.get(role, ""))
+		if compartment.is_empty():
+			continue
+		var variant: String = str(room.get("variant", "standard"))
+		var hazard: Dictionary = (selector.effects_for(variant).get("sim", {}) as Dictionary).get("hazard", {})
+		if str(hazard.get("kind", "")) == kind:
+			out[compartment] = true
+	var result: Array = out.keys()
+	result.sort()
+	return result
+
 ## Pre-seeds environmental fire on a freshly built derelict. Deterministic, RNG-free:
 ## a per-seed presence gate (FIRE_PRESENCE_PERCENT) decides whether THIS derelict burns at
 ## all; when it does, ignites up to a condition-scaled cap of compartments whose mapped
@@ -2780,7 +2825,12 @@ func _seed_derelict_fire() -> void:
 	# so a fire-free derelict is not re-rolled on revisit/reload.
 	current_ship.fire_seeded = true
 	var seed_int: int = _ship_seed(current_ship)
-	# Presence gate — most derelicts board fire-free.
+	# Variant-forced fire: a fire-kind variant on a compartment-mapped room
+	# means that derelict burns there regardless of the presence roll.
+	var forced_fire: Array = _variant_hazard_compartments("fire")
+	for cid in forced_fire:
+		fs.ignite(str(cid), 1.0)
+	# Presence gate — most derelicts board fire-free (variant fires already lit).
 	if (abs(hash("%d:fire_presence" % seed_int)) % 100) >= FIRE_PRESENCE_PERCENT:
 		return
 	var mgr = _active_systems_manager()
