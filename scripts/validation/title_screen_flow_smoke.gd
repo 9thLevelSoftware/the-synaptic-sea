@@ -9,6 +9,24 @@ extends SceneTree
 ## must cleanly reach playable_started in the SAME process after the first
 ## is queue_free()'d.
 ##
+## Continue fixture (Important review finding 1): a fresh New Game boot always
+## starts at current_objective_sequence=1, so round-tripping the smoke's own
+## just-created save would pass even if request_load() applied nothing. Before
+## driving Continue we overwrite world.json's embedded home_ship snapshot with
+## current_objective_sequence=3 (mutating the REAL on-disk save the live New
+## Game instance just wrote, so layout_path/kit_path/gameplay_slice_path stay
+## valid for the loader) and assert the Continue'd instance's
+## current_objective_sequence equals 3 -- a value a fresh boot can never produce.
+##
+## Quit signal (Important review finding 2): rather than self-emitting
+## return_to_title_requested, we drive the REAL producer chain: open the live
+## pause menu, focus "quit_main", and confirm it through
+## MenuCoordinator._confirm_current_item() (mirrors permadeath_freeze_smoke.gd's
+## direct menu_coordinator/menu_state access). That emits quit_requested, which
+## playable._on_ui_quit_requested (connected at boot) turns into
+## return_to_title_requested -- the exact signal chain "Quit to Main Menu"
+## drives in the real game.
+##
 ## Pass marker:
 ##   TITLE SCREEN FLOW PASS new_game=true continue=true quit_signal=true
 
@@ -16,6 +34,7 @@ const TITLE_SCENE: PackedScene = preload("res://scenes/title_main.tscn")
 const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.gd")
 const PermadeathResolverScript := preload("res://scripts/systems/permadeath_resolver.gd")
 const TIMEOUT_FRAMES: int = 900
+const FIXTURE_OBJECTIVE_SEQUENCE: int = 3
 
 var title_node: Node
 var frame_count: int = 0
@@ -74,7 +93,34 @@ func _await_new_game_playable() -> void:
 	if not playable.request_save():
 		_fail("request_save failed after New Game boot")
 		return
+	# Finding 1 fixture: mutate the just-written world.json into a
+	# distinguishable state before Continue ever gets to it. A fresh boot
+	# always starts at sequence 1, so stamping sequence=3 into the saved
+	# home_ship snapshot and asserting it later proves request_load()
+	# actually applied the file rather than merely finding one present.
+	if not _seed_continue_fixture(playable):
+		_fail("failed to seed distinguishable Continue fixture over world.json")
+		return
 	_stage = "return_to_title"
+
+## Overwrites the on-disk world.json's embedded home_ship.current_objective_sequence
+## with FIXTURE_OBJECTIVE_SEQUENCE, reusing the real layout_path/kit_path/
+## gameplay_slice_path the live New Game instance already wrote (so the loader
+## still succeeds) -- only the objective sequence is distinguished from a
+## fresh boot.
+func _seed_continue_fixture(playable: PlayableGeneratedShip) -> bool:
+	var service := playable.get_save_load_service()
+	if service == null:
+		return false
+	var ws = service.load_world()
+	if ws == null:
+		return false
+	var home_ship: Dictionary = ws.home_ship.duplicate(true)
+	if home_ship.is_empty():
+		return false
+	home_ship["current_objective_sequence"] = FIXTURE_OBJECTIVE_SEQUENCE
+	ws.home_ship = home_ship
+	return service.save_world(ws)
 
 func _drive_return_to_title() -> void:
 	var playable: PlayableGeneratedShip = title_node.playable_instance
@@ -113,6 +159,16 @@ func _await_continue_playable() -> void:
 	if not playable.get_save_load_service().has_save():
 		_fail("world save missing after Continue")
 		return
+	# Finding 1 assertion: a fresh New Game boot can only ever produce
+	# current_objective_sequence=1. Observing FIXTURE_OBJECTIVE_SEQUENCE (3)
+	# here proves request_load() actually applied the seeded world.json
+	# fixture rather than Continue silently no-op'ing into a fresh slice.
+	if playable.get_current_objective_sequence() != FIXTURE_OBJECTIVE_SEQUENCE:
+		_fail("Continue did not apply fixture: current_objective_sequence=%d expected=%d" % [
+			playable.get_current_objective_sequence(),
+			FIXTURE_OBJECTIVE_SEQUENCE,
+		])
+		return
 	_stage = "quit_signal_check"
 
 func _drive_quit_signal() -> void:
@@ -120,12 +176,36 @@ func _drive_quit_signal() -> void:
 	if playable == null:
 		_fail("playable_instance missing before quit-signal drive")
 		return
+	var menu_coordinator = playable.get_menu_coordinator_for_validation()
+	if menu_coordinator == null or not is_instance_valid(menu_coordinator):
+		_fail("menu_coordinator missing before quit-signal drive")
+		return
 	_quit_signal_received = false
 	var cb := func(): _quit_signal_received = true
 	playable.return_to_title_requested.connect(cb)
-	playable.emit_signal("return_to_title_requested")
+	# Drive the REAL producer chain instead of self-emitting the signal:
+	# open the live pause menu, focus "quit_main", and confirm it through
+	# the coordinator's real dispatch. _confirm_current_item's pause_menu
+	# arm emits quit_requested, which playable._on_ui_quit_requested (wired
+	# at boot) turns into return_to_title_requested -- the exact chain
+	# "Quit to Main Menu" drives during real play.
+	menu_coordinator.menu_state.open_menu("pause_menu")
+	if menu_coordinator.get_current_menu() != "pause_menu":
+		_fail("pause_menu did not open before quit-signal drive")
+		return
+	var items: Array = menu_coordinator.menu_state.get_items("pause_menu")
+	var quit_main_index: int = -1
+	for i in range(items.size()):
+		if str((items[i] as Dictionary).get("id", "")) == "quit_main":
+			quit_main_index = i
+			break
+	if quit_main_index < 0:
+		_fail("quit_main item not found in pause_menu catalog")
+		return
+	menu_coordinator.menu_state.set_focus_index(quit_main_index)
+	menu_coordinator._confirm_current_item()
 	if not _quit_signal_received:
-		_fail("return_to_title_requested signal did not fire its own listener")
+		_fail("return_to_title_requested did not fire via real pause-menu quit_main dispatch")
 		return
 	finished = true
 	print("TITLE SCREEN FLOW PASS new_game=true continue=true quit_signal=true")
