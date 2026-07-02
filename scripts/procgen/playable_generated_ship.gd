@@ -1962,10 +1962,11 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	_build_sealed_hatches()
 	_build_repair_points()
 	_build_breach_seal_points()
+	# Derelict-side breaches first: variant-driven hull breaches (deterministic per seed).
+	# Seeded before fire so the fire presence-gate exclusion can see variant breaches.
+	_seed_derelict_breaches()
 	# Derelict-side fire: per-ship pre-seeded environmental fire (presence-gated, capped).
 	_seed_derelict_fire()
-	# Derelict-side breaches: variant-driven hull breaches (deterministic per seed).
-	_seed_derelict_breaches()
 	_build_fire_zones()
 	# M7-B Task 9: manual extinguish nodes + recharge port share the fire lifecycle.
 	_build_fire_suppression_points()
@@ -2787,8 +2788,10 @@ func _variant_hazard_compartments(kind: String) -> Array:
 	if current_ship == null:
 		return []
 	var layout: Dictionary = current_ship.built_layout
-	if layout.is_empty() and loader != null and loader.has_method("get_layout_copy"):
-		layout = loader.get_layout_copy()
+	# Derelict layout is populated by the attach path before seeding; no home-loader
+	# fallback — wrong ship.
+	if layout.is_empty():
+		return []
 	var rooms_variant: Variant = layout.get("rooms", [])
 	if not (rooms_variant is Array):
 		return []
@@ -2839,10 +2842,13 @@ func _seed_derelict_fire() -> void:
 	if mgr == null:
 		return
 	# Candidate compartments: mapped system damaged, not breached. Deterministic order.
+	# Read the ACTIVE hull (derelict's own hull when away) so the exclusion sees
+	# the derelict's breaches, not the home hull singleton.
+	var active_hull = _active_hull()
 	var breached := {}
-	if hull_integrity_state != null:
-		for cid in hull_integrity_state.compartments:
-			if bool((hull_integrity_state.compartments[cid] as Dictionary).get("breach_open", false)):
+	if active_hull != null:
+		for cid in active_hull.compartments:
+			if bool((active_hull.compartments[cid] as Dictionary).get("breach_open", false)):
 				breached[str(cid)] = true
 	var candidates: Array = []
 	for cid in FIRE_COMPARTMENT_SYSTEM:
@@ -2873,7 +2879,7 @@ func _seed_derelict_breaches() -> void:
 		return
 	if current_ship.breach_seeded:
 		return
-	current_ship.breach_seeded = true
+	current_ship.breach_seeded = true  # Flag set before the hull fetch: even a zero-breach derelict must be marked seeded.
 	var hull = current_ship.get_hull()
 	if hull == null:
 		return
@@ -2883,10 +2889,14 @@ func _seed_derelict_breaches() -> void:
 
 ## Builds the per-frame context the authoritative fire model ticks against.
 func _build_fire_context() -> Dictionary:
+	# Read the ACTIVE hull (derelict when away, home otherwise) so the fire tick
+	# sees the correct ship's breaches. On the home branch _active_hull() returns
+	# hull_integrity_state, so home behavior is byte-identical.
+	var active_hull = _active_hull()
 	var breached: Array = []
-	if hull_integrity_state != null:
-		for cid in hull_integrity_state.compartments:
-			if bool((hull_integrity_state.compartments[cid] as Dictionary).get("breach_open", false)):
+	if active_hull != null:
+		for cid in active_hull.compartments:
+			if bool((active_hull.compartments[cid] as Dictionary).get("breach_open", false)):
 				breached.append(str(cid))
 	var damaged: Array = []
 	var oxygen_present: bool = true

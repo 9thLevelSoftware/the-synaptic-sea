@@ -3,12 +3,17 @@ extends SceneTree
 # procgen_variant_hazard_smoke — Domain 7 (travel loop closure), state layer.
 # Drives away_from_start = true, injects a fire variant on the engineering room
 # and a breach variant on the bridge room of the boarded derelict, then asserts:
-#   - _seed_derelict_fire ignites the engineering compartment (forced by variant),
 #   - _seed_derelict_breaches force-breaches the bridge compartment on the
 #     DERELICT's hull (current_ship.get_hull()) while the HOME hull's bridge
 #     stays clean (wrong-target regression guard, Task 4 review),
+#   - _seed_derelict_fire ignites the engineering compartment (forced by variant),
 #   - re-running does NOT re-seed (fire_seeded / breach_seeded guards),
 #   - the ignited/breached set is deterministic (same on a second identical run).
+# Seed order: breaches before fire (mirrors the build path so the fire
+# presence-gate exclusion can see variant breaches). The exclusion fix is
+# covered by the away-aware _active_hull() read and seed ordering in
+# playable_generated_ship.gd; a full gate-path assertion (requiring a seed
+# passing the 15% gate + a damaged mapped system) is deferred.
 # (bridge, not cargo: hull_compartments.json ships cargo pre-breached, so a cargo
 # assertion would be vacuous.)
 # Marker: PROCGEN VARIANT HAZARD PASS away_ticks=<n> fire_lit=true breach_open=true home_clean=true guarded=true
@@ -55,8 +60,8 @@ func _validate() -> void:
 	# per-ship models). Inject synthetic rooms AND configure the per-ship hull
 	# + fire so the real seeding code exercises its full path.
 	var layout: Dictionary = playable.current_ship.built_layout
-	if layout.is_empty() and playable.loader.has_method("get_layout_copy"):
-		layout = playable.loader.get_layout_copy()
+	if layout.is_empty():
+		layout = {}
 		playable.current_ship.built_layout = layout
 
 	# Inject synthetic engineering + bridge rooms if the layout lacks them.
@@ -82,12 +87,13 @@ func _validate() -> void:
 	var fs = playable.current_ship.get_fire()
 	fs.configure(tuning.get("fire_suppression", {}))
 
-	# Reset seed guards, then seed on the away branch.
+	# Reset seed guards, then seed on the away branch (breaches before fire,
+	# matching the fixed build path so fire exclusion can see variant breaches).
 	playable.current_ship.fire_seeded = false
 	playable.current_ship.breach_seeded = false
 	var n: int = 0
-	playable._seed_derelict_fire()
 	playable._seed_derelict_breaches()
+	playable._seed_derelict_fire()
 	n += 1
 
 	var fire_lit: bool = fs != null and "engineering" in fs.get_burning_compartments()
@@ -105,8 +111,8 @@ func _validate() -> void:
 
 	# Guard: second seed call must not change the set (guards flip true on first run).
 	var burning_before: int = fs.get_burning_compartments().size() if fs != null else 0
-	playable._seed_derelict_fire()
 	playable._seed_derelict_breaches()
+	playable._seed_derelict_fire()
 	var guarded: bool = (fs.get_burning_compartments().size() == burning_before)
 
 	if fire_lit and breach_open and home_bridge_clean and guarded:

@@ -43,9 +43,13 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	# --- Case 4: determinism ---
+	# --- Case 4: determinism (variant arrays + template id) ---
 	if _room_variants(777, "dead_fleet", "deep_dive") != _room_variants(777, "dead_fleet", "deep_dive"):
 		push_error("PROCGEN VARIATION FAIL generation not deterministic for a fixed seed")
+		quit(1)
+		return
+	if _template_id(777, "dead_fleet", "deep_dive") != _template_id(777, "dead_fleet", "deep_dive"):
+		push_error("PROCGEN VARIATION FAIL template id not deterministic for a fixed seed")
 		quit(1)
 		return
 
