@@ -623,7 +623,11 @@ func _save_load_row_line(row, index: int) -> String:
 		verb_text = " | verb=%s" % _save_load_pending_verb
 		if _pending_delete_slot_id == slot_id and _save_load_pending_verb == "Delete":
 			verb_text = " | verb=Delete (confirm again to delete)"
-	return "%s | %s%s" % [slot_id, display_name, verb_text]
+	# A payload-bearing row should always have a display_name (SaveLoadService stamps
+	# one on save), but guard against an empty one from another writer by falling back
+	# to the slot_id rather than rendering "slot_03 | ".
+	var shown_name: String = display_name if not display_name.is_empty() else slot_id
+	return "%s | %s%s" % [slot_id, shown_name, verb_text]
 
 ## True when a row came from SaveLoadMenu.refresh() (a real on-disk slot)
 ## rather than being one of this coordinator's synthesized empty-manual
@@ -638,6 +642,12 @@ func _open_meta_screen(screen_id: String) -> void:
 	if not _meta_panels.has(screen_id):
 		return
 	if screen_id == "save_load":
+		# Reset the cursor + any pending verb/delete-arm state on every (re)open so a
+		# stale row index from a prior visit (rows can shift under autosave rotation,
+		# etc.) never carries over into this visit.
+		_save_load_row_index = 0
+		_save_load_pending_verb = ""
+		_pending_delete_slot_id = ""
 		_refresh_save_load_panel()
 	_active_meta_screen = screen_id
 	_refresh_all()
@@ -770,6 +780,8 @@ func _confirm_save_load_row() -> Dictionary:
 		var deleted: bool = save_load_menu.confirm_delete(slot_id)
 		_pending_delete_slot_id = ""
 		_save_load_pending_verb = ""
+		if deleted:
+			_reanchor_save_load_row_index(slot_id)
 		_refresh_save_load_panel()
 		return {"screen": "save_load", "action": "delete", "ok": deleted, "detail": slot_id}
 	if verb == "Save":
@@ -780,6 +792,8 @@ func _confirm_save_load_row() -> Dictionary:
 			if snap != null:
 				ok = save_load_menu.confirm_save_to_slot(slot_id, snap, "manual", display_name)
 		_save_load_pending_verb = ""
+		if ok:
+			_reanchor_save_load_row_index(slot_id)
 		_refresh_save_load_panel()
 		return {"screen": "save_load", "action": "save", "ok": ok, "detail": slot_id}
 	if verb == "Load":
@@ -788,6 +802,29 @@ func _confirm_save_load_row() -> Dictionary:
 		_refresh_save_load_panel()
 		return {"screen": "save_load", "action": "load", "ok": snapshot != null, "detail": slot_id, "snapshot": snapshot}
 	return {"screen": "save_load", "action": "none", "ok": false, "detail": slot_id}
+
+## Domain 8 cursor-drift fix (review finding 1): _save_load_rows() is sorted by
+## saved_at DESCENDING with synthesized empty rows appended at the tail, so the
+## acted-on slot's position can move after a successful Save (a fresh save jumps
+## to the front of the list) or Delete (the slot's real row is replaced by a
+## synthesized empty row, which lives at the tail alongside the other empty
+## manual rows). Leaving _save_load_row_index as a raw, merely bounds-clamped
+## int would silently land the cursor on a DIFFERENT slot, so the player's next
+## ui_accept would act on the wrong row. Re-resolve the index by searching the
+## REFRESHED rows for slot_id: after Save the slot's real (now-freshest) row is
+## found directly; after Delete the same slot_id now appears as its synthesized
+## empty row (see _save_load_rows/_synthesize_empty_manual_row) so the search
+## still finds it and anchors there. If the slot_id is truly absent from the
+## refreshed rows (should not happen for a manual slot id, but guard anyway),
+## clamp to the nearest valid index instead of leaving a stale/out-of-range one.
+func _reanchor_save_load_row_index(slot_id: String) -> void:
+	var refreshed_rows: Array = _save_load_rows()
+	for index in range(refreshed_rows.size()):
+		var refreshed_row = refreshed_rows[index]
+		if refreshed_row != null and String(refreshed_row.slot_id) == slot_id:
+			_save_load_row_index = index
+			return
+	_save_load_row_index = clampi(_save_load_row_index, 0, max(0, refreshed_rows.size() - 1))
 
 ## Verb model per row state (spec 3.2, unconditional -- not deferrable):
 ## empty manual [Save] only; filled manual [Load, Save, Delete]; world row
@@ -826,7 +863,10 @@ func _cycle_save_load_verb(direction: int) -> void:
 		return
 	var current_index: int = verbs.find(_save_load_pending_verb)
 	if current_index < 0:
-		current_index = 0
+		# No verb armed yet: first ui_left (direction -1) lands on the LAST verb,
+		# first ui_right (direction 1) lands on the FIRST verb -- previously both
+		# directions landed on verbs[0], which made the first ui_left a no-op.
+		current_index = verbs.size() - 1 if direction < 0 else 0
 	else:
 		current_index = wrapi(current_index + direction, 0, verbs.size())
 	_save_load_pending_verb = String(verbs[current_index])
