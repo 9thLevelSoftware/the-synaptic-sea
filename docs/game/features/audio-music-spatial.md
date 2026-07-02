@@ -97,7 +97,7 @@ REQ-AU-010: Audio summary round-trips through save/load.
 - `scripts/validation/meta_event_state_smoke.gd` — `META EVENT STATE PASS`
 - `scripts/validation/main_playable_slice_audio_smoke.gd` — `MAIN PLAYABLE AUDIO PASS`
 - `scripts/validation/audio_save_load_smoke.gd` — `AUDIO SAVE LOAD PASS`
-- All seven plus save/load registered in `docs/game/06_validation_plan.md` regression bundle.
+- All seven plus save/load, plus the two coordinator-coupling smokes and the Domain 9 `audio_pipeline_smoke.gd`, are registered in `docs/game/06_validation_plan.md` regression bundle (11 audio-related `run_clean` entries total as of Domain 9).
 
 ## Stop/block conditions
 
