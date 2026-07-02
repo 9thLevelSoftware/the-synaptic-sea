@@ -7589,8 +7589,14 @@ func _reset_runtime_for_reload() -> void:
 	# extra reset here.
 
 func _input(event: InputEvent) -> void:
-	if not playable_started or slice_complete:
+	if not playable_started:
 		return
+	# ADR-0043: slice_complete no longer hard-gates the whole function. Death
+	# ends the run but must not lock the player out of the menu (epitaph
+	# browsing on the frozen slot screen is the whole point of the freeze).
+	# Only the gameplay-input tail below (hotbar/attack/reload/save/load) is
+	# still gated on slice_complete -- see the "if slice_complete: return"
+	# inserted right after the menu_coordinator dispatch block.
 	# Phase 4.5: scanner panel toggle + navigation. Opening the panel freezes
 	# player movement/interaction so the shared arrow/Enter keys drive the panel.
 	# Control is restored on close by the panel_closed signal handler, which
@@ -7635,6 +7641,12 @@ func _input(event: InputEvent) -> void:
 			if event.is_action_pressed(action_name):
 				menu_coordinator.trigger_tutorial("player_moved", "any")
 				break
+	# ADR-0043: everything below this point is live gameplay input (hotbar,
+	# attack, reload, manual save/load keys) -- correctly still locked out
+	# once the run has ended (death or extraction). Only the menu dispatch
+	# above this line must survive slice_complete.
+	if slice_complete:
+		return
 	if save_load_service == null:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:

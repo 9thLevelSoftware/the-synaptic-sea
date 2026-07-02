@@ -52,6 +52,13 @@ func _validate() -> void:
 		return
 	if playable.threat_manager != null:
 		playable.threat_manager.threats.clear()
+	# ready() leaves menu_coordinator parked on "main_menu" (menu_coordinator.gd
+	# calls open_main_menu() during setup); real play dismisses it via the
+	# "start" confirm (menu_state.close_all()) before any gameplay input runs.
+	# Mirror that here so the pause-menu assertions below exercise the real
+	# in-play -> pause_menu transition instead of the main-menu -> in-play one.
+	if is_instance_valid(playable.menu_coordinator):
+		playable.menu_coordinator.menu_state.close_all()
 	var service = playable.save_load_service
 	var resolver := PermadeathResolverScript.new()
 
