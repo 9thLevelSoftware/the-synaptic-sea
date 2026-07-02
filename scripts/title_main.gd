@@ -130,10 +130,10 @@ func _poll_for_playable_started(should_load: bool) -> void:
 	if playable_instance == null or not playable_instance.playable_started:
 		call_deferred("_poll_for_playable_started", should_load)
 		return
-	# Pre-existing gap (Task 4 domain8 report): PlayableGeneratedShip does not yet
-	# declare `return_to_title_requested` (that wiring is deferred to a later
-	# task/domain). Guard with has_signal so this poll doesn't crash now that a
-	# smoke actually drives a title New Game through to playable_started.
+	# ADR-0043 (Task 5): PlayableGeneratedShip now declares
+	# `return_to_title_requested`. has_signal + is_connected guards keep this
+	# idempotent across repeated polls and any future re-entry, in case the
+	# signal fires twice or _poll_for_playable_started runs again.
 	if playable_instance.has_signal("return_to_title_requested") \
 			and not playable_instance.return_to_title_requested.is_connected(_on_gameplay_return_to_title):
 		playable_instance.return_to_title_requested.connect(_on_gameplay_return_to_title)

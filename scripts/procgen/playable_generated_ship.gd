@@ -113,6 +113,11 @@ signal playable_ready(summary: Dictionary)
 signal playable_failed(reason: String)
 signal playable_interaction_completed(interaction_id: String, objective_id: String, sequence: int, objective_type: String, room_id: String)
 signal playable_slice_completed(summary: Dictionary)
+## ADR-0043: emitted when the player chooses to leave gameplay back to the
+## title screen (pause menu "Quit to Main Menu" or Save & Exit). title_main.gd
+## connects to this on every gameplay instantiation (New Game and Continue
+## both wire it via _poll_for_playable_started).
+signal return_to_title_requested
 
 const DEFAULT_LAYOUT_PATH: String = "res://data/procgen/smoke/seed_000017/layout.json"
 const DEFAULT_KIT_PATH: String = "res://data/kits/ship_structural_v0.json"
@@ -4546,8 +4551,10 @@ func _on_ui_modal_closed(_previous_menu_id: String) -> void:
 		player.set_process_unhandled_input(true)
 
 func _on_ui_quit_requested() -> void:
-	if is_instance_valid(menu_coordinator):
-		menu_coordinator.open_main_menu()
+	# ADR-0043: "Quit to Main Menu" now really returns to the title screen
+	# instead of reopening the in-scene main_menu overlay (the old stub
+	# behavior -- there was no real title/quit path before this domain).
+	emit_signal("return_to_title_requested")
 
 func _on_ui_settings_changed(_summary: Dictionary) -> void:
 	apply_accessibility_settings(accessibility_settings)
