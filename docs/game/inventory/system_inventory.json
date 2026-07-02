@@ -4453,12 +4453,12 @@
       "driven_at": "save_load_service.gd:133",
       "input": {
         "live": true,
-        "desc": "migrate_world called on every load_world (live via request_load); migrate_run called in load_from_slot (not live-reached). VERIFIED migrate_world:133, migrate_run:268.",
+        "desc": "migrate_world called on every load_world (live via request_load); migrate_run called in load_from_slot, now live-reached via the save_load slot screen's Load verb (menu_coordinator._confirm_save_load_row -> save_load_menu.select_slot_for_load -> load_from_slot). VERIFIED migrate_world:133, migrate_run:279.",
         "at": "save_load_service.gd:133"
       },
       "output": {
         "live": true,
-        "desc": "migrated dict feeds WorldSnapshot.from_dict on the live load_world path (138); run migrated form persisted to <slot>.migrated.json (275-279) only on the non-live load_from_slot path.",
+        "desc": "migrated dict feeds WorldSnapshot.from_dict on the live load_world path (138); run migrated form persisted to <slot>.migrated.json (285-290), and load_from_slot is now live-reachable via the save_load slot screen's Load verb (menu_coordinator.gd:814-815 -> apply_manual_slot:6901).",
         "at": "save_load_service.gd:138"
       },
       "confidence": "V",
@@ -4468,7 +4468,7 @@
       "integrations": [
         {
           "to": "save_load_service",
-          "via": "invoked in load_from_slot:268 and load_world:133",
+          "via": "invoked in load_from_slot:279 and load_world:133",
           "at": "save_load_service.gd:133",
           "health": "healthy"
         },
@@ -4483,7 +4483,7 @@
       "content_note": "KNOWN_VERSIONS chain (3 run versions gate2-current-run-1..3; world legacy->world-4) is coded; v1->v2 and v2->v3 steps real, _migrate_world_legacy_to_world_4 is an explicit no-op reserved hook (save_migration_service.gd:131-133). Passthrough for current-version saves.",
       "functional": null,
       "gaps": [
-        "For current-version saves migrate_run/migrate_world are no-ops; only legacy-version files exercise real migration steps. The only LIVE migration entry is migrate_world via load_world; migrate_run runs only through the non-live load_from_slot path (smokes)."
+        "For current-version saves migrate_run/migrate_world are no-ops; only legacy-version files exercise real migration steps. Both migration entries are now live: migrate_world via load_world, and migrate_run via load_from_slot, reached through the save_load slot screen's Load verb."
       ],
       "subsystems": []
     },
@@ -4726,7 +4726,7 @@
       },
       "output": {
         "live": false,
-        "desc": "sha gate at load_from_slot:289-302 would refuse a tampered slot, but it is (a) a future-cloud-adapter stub (cloud_provider='stub') and (b) inside load_from_slot, which has no live caller. load_world does not check the manifest sha. No real cloud sync consumer.",
+        "desc": "sha gate at load_from_slot:297-313 would refuse a tampered slot; load_from_slot is now live-reachable via the save_load slot screen's Load verb (menu_coordinator.gd:814-815 -> apply_manual_slot:6901), so the gate is on a live path. Remaining gap is the manifest provider itself: cloud_provider is still a future-cloud-adapter stub (ADR-0032/ADR-0043), and load_world does not check the manifest sha. No real cloud sync consumer.",
         "at": "save_load_service.gd:298"
       },
       "confidence": "V",
@@ -4736,7 +4736,7 @@
       "integrations": [
         {
           "to": "save_load_service",
-          "via": "_write_cloud_manifest on save (live) + sha recompute gate on load (not live-reached)",
+          "via": "_write_cloud_manifest on save (live) + sha recompute gate on load, now live-reachable via the save_load slot screen's Load verb",
           "at": "save_load_service.gd:436-452",
           "health": "healthy"
         }
@@ -4746,7 +4746,7 @@
       "functional": true,
       "gaps": [
         "cloud_provider is 'stub'; no Steam/iCloud/GOG adapter consumes the manifest.",
-        "The sha-tamper gate is written live but its read side (load_from_slot:289-302) is never reached in live play; only the smoke exercises it."
+        "The sha-tamper gate (load_from_slot:297-313) is on a live path now (save_load slot screen's Load verb); the surviving gap is that cloud_provider is still a stub, so there is no real backend for the manifest to protect."
       ],
       "subsystems": []
     },
