@@ -6176,7 +6176,7 @@ func _refresh_audio_state(force_initial: bool, _delta_seconds: float = 0.0) -> v
 	audio_manager.update_listener_transform()
 	audio_manager.apply_spatial_attenuation()
 	# REQ-AU criterion 3: pump pending captions to the HUD. Both _process
-	# branches already call _refresh_audio_state (away :5358, home :5445),
+	# branches (away and home paths) already call _refresh_audio_state,
 	# so this single call site satisfies the both-branches requirement
 	# structurally — no per-branch wiring needed here.
 	audio_manager.pump_captions(Callable(self, "_on_audio_caption"))

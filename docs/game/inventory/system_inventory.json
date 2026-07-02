@@ -3911,7 +3911,7 @@
       ],
       "integrations": [],
       "content": "partial",
-      "content_note": "Only data/audio/audio_bus_config.tres exists; AudioLog has 6 transcript entries but every clip_path (.ogg) and all SFX/music stream assets are MISSING. SfxEventRouter 27-entry catalog + DynamicMusicState gain tables are richly authored, but no playable audio asset backs them. Confirmed ticked on both away (4806) and home (4904) branches.",
+      "content_note": "Two placeholder clips exist (data/audio/sfx/tool_pickup.wav, data/audio/music/exploration_base.wav) backing sfx.tool.pickup and the base music layer; a real AudioBusLayout (data/audio/default_bus_layout.tres) is registered via project.godot. AudioLog has 6 transcript entries but every voice clip_path (.ogg) is still missing; the remaining ~25 SfxEventRouter catalog ids and DynamicMusicState layers are authored but asset-less (deferred content pass, ADR-0044). Confirmed ticked on both away and home _process branches.",
       "functional": null,
       "gaps": [
         "Deferred, not broken: only two placeholder clips exist (data/audio/sfx/tool_pickup.wav, data/audio/music/exploration_base.wav) backing 2 of ~27 catalog event/layer ids; the full SFX/voice/music asset library is a later content pass (ADR-0044).",
@@ -8749,7 +8749,7 @@
       "steps": [
         {
           "system": "audio_manager",
-          "role": "source/router: reads hazard/threat/vitals each frame and fires play_sfx + update_music_flags; ticked on BOTH _process branches (playable_generated_ship.gd:5358 away, 5445 home; refresh via _refresh_audio_state)"
+          "role": "source/router: reads hazard/threat/vitals each frame and fires play_sfx + update_music_flags; ticked on BOTH _process branches (away and home paths of playable_generated_ship.gd::_process; refresh via _refresh_audio_state)"
         },
         {
           "system": "dynamic_music_state",
