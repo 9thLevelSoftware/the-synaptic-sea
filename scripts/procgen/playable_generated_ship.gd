@@ -2862,19 +2862,24 @@ func _seed_derelict_fire() -> void:
 		lit += 1
 
 ## Away-branch only: force-breaches compartments of rooms carrying a breach-kind
-## variant on the boarded derelict. Deterministic; guarded by breach_seeded so
-## revisits/restores don't re-seed (restored breaches come from the hull summary).
+## variant on the boarded derelict — on the DERELICT'S OWN hull model
+## (current_ship.get_hull()), mirroring _seed_derelict_fire's use of
+## current_ship.get_fire(). NOT the bare hull_integrity_state member: that is the
+## coordinator's home/hub hull singleton (see _active_hull()). Deterministic;
+## guarded by breach_seeded so revisits/restores don't re-seed (restored breaches
+## come from the derelict instance's applied hull summary).
 func _seed_derelict_breaches() -> void:
 	if not away_from_start or current_ship == null:
 		return
 	if current_ship.breach_seeded:
 		return
 	current_ship.breach_seeded = true
-	if hull_integrity_state == null:
+	var hull = current_ship.get_hull()
+	if hull == null:
 		return
 	for cid in _variant_hazard_compartments("breach"):
-		if hull_integrity_state.compartments.has(str(cid)):
-			hull_integrity_state.damage_compartment(str(cid), 1.0, true)
+		if hull.compartments.has(str(cid)):
+			hull.damage_compartment(str(cid), 1.0, true)
 
 ## Builds the per-frame context the authoritative fire model ticks against.
 func _build_fire_context() -> Dictionary:
