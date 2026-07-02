@@ -586,6 +586,19 @@ func _save_load_rows() -> Array:
 	for slot_id in SaveSlotStateScriptForCoordinator.MANUAL_SLOT_IDS:
 		if not present_manual_ids.has(String(slot_id)):
 			rows.append(_synthesize_empty_manual_row(String(slot_id)))
+	# Review fix (Finding 2): SaveLoadService._index_run_slot never populates
+	# `frozen` from a death record (permadeath is written to a separate
+	# <slot_id>.death.json side-file by PermadeathResolver, not into the
+	# save index), so without this overlay the slot screen can never render
+	# "DEAD -- <epitaph>" or block verbs on a slot the player actually died
+	# in. Overlay runtime frozen state onto every row here -- the single
+	# row-list source every save/load path shares -- rather than persisting
+	# it into the index (the index is disk state; death is derived at read
+	# time from the resolver, same as _save_load_row_line already assumes).
+	var resolver := PermadeathResolverScriptForCoordinator.new()
+	for row in rows:
+		if row != null:
+			row.frozen = resolver.has_died_in(String(row.slot_id))
 	return rows
 
 ## Builds a placeholder SaveSlotState for a manual slot id that has no

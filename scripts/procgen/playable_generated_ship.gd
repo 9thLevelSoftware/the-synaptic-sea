@@ -6875,6 +6875,17 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 func apply_manual_slot(snapshot: RunSnapshot) -> bool:
 	if snapshot == null:
 		return false
+	# ADR-0043 review fix: the menu dispatch block (and this call) is reachable
+	# post-death (slice_complete==true) because epitaph/menu browsing must
+	# survive death by design. A manual slot from a PRIOR run can still be
+	# loadable here (extraction only deletes autosaves, never manual slots),
+	# which would let _apply_run_snapshot "succeed" into a permanently dead
+	# session (_process and gameplay input both no-op forever after death).
+	# _apply_run_snapshot itself is a shared reload primitive whose other
+	# caller (_apply_world_snapshot / request_load) is already reachable only
+	# from pre-death input, so the guard belongs here, not there.
+	if slice_complete:
+		return false
 	var applied: bool = _apply_run_snapshot(snapshot)
 	if applied and is_instance_valid(menu_coordinator):
 		menu_coordinator.trigger_tutorial("manual_slot_loaded", "any")
@@ -6895,7 +6906,7 @@ func _dispatch_save_load_confirm_result(result: Dictionary) -> void:
 	var ok: bool = bool(result.get("ok", false))
 	var detail: String = str(result.get("detail", ""))
 	if action == "load" and ok:
-		var snapshot = result.get("snapshot", null)
+		var snapshot: RunSnapshot = result.get("snapshot", null) as RunSnapshot
 		apply_manual_slot(snapshot)
 	elif action == "save" and ok:
 		_manual_slots_written_this_run[detail] = true
