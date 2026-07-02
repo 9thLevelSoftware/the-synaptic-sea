@@ -47,6 +47,7 @@ const UniqueItemStateScript := preload("res://scripts/systems/unique_item_state.
 const RarityTierScript := preload("res://scripts/systems/rarity_tier.gd")
 const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
 const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
+const SfxEventRouterScript := preload("res://scripts/systems/sfx_event_router.gd")
 const RepairPointScript := preload("res://scripts/tools/repair_point.gd")
 const BreachSealPointScript := preload("res://scripts/tools/breach_seal_point.gd")
 const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
@@ -313,6 +314,12 @@ var _salvage_loot_tables: Dictionary = {}   # objective_id -> loot_table key
 var unique_item_state
 var _loot_biome_ids_cache: Array[String] = []
 var _last_loot_feedback_line: String = ""
+# REQ-AU-001..010: most-recent audio caption + its remaining display time.
+# Mirrors the _last_loot_feedback_line pattern: no new HUD framework, just
+# another line folded into _combined_system_status_lines(). Multiple
+# captions arriving in one frame keep only the most recent (pump order).
+var _last_caption_line: String = ""
+var _caption_expiry_seconds: float = 0.0
 var _home_player_position: Vector3 = Vector3.ZERO
 # Narrative objective flags with no manager backing (supplies/logs). Set on
 # completion; persisted in the snapshot; read by _manager_compat_summary().
@@ -5181,6 +5188,8 @@ func _combined_system_status_lines() -> PackedStringArray:
 			lines.append(inv_text)
 	if not _last_loot_feedback_line.is_empty():
 		lines.append(_last_loot_feedback_line)
+	if not _last_caption_line.is_empty():
+		lines.append("Caption: %s" % _last_caption_line)
 	if unique_item_state != null:
 		for line in unique_item_state.get_status_lines():
 			lines.append(String(line))
@@ -6158,6 +6167,28 @@ func _refresh_audio_state(force_initial: bool, _delta_seconds: float = 0.0) -> v
 		audio_manager.attach_listener(player as Node3D)
 	audio_manager.update_listener_transform()
 	audio_manager.apply_spatial_attenuation()
+	# REQ-AU criterion 3: pump pending captions to the HUD. Both _process
+	# branches already call _refresh_audio_state (away :5358, home :5445),
+	# so this single call site satisfies the both-branches requirement
+	# structurally — no per-branch wiring needed here.
+	audio_manager.pump_captions(Callable(self, "_on_audio_caption"))
+	if not _last_caption_line.is_empty():
+		_caption_expiry_seconds -= _delta_seconds
+		if _caption_expiry_seconds <= 0.0:
+			_last_caption_line = ""
+			_caption_expiry_seconds = 0.0
+
+## Callback for audio_manager.pump_captions(): records the most recent
+## caption dict as the HUD's displayed caption line. `caption` carries at
+## least {event_id, text, duration, elapsed} (SfxEventRouter's queue shape).
+## Multiple captions pumped in the same frame: last call wins (most recent).
+func _on_audio_caption(caption: Dictionary) -> void:
+	var text: String = String(caption.get("text", ""))
+	if text.is_empty():
+		return
+	_last_caption_line = text
+	var duration: float = float(caption.get("duration", SfxEventRouterScript.DEFAULT_CAPTION_DURATION))
+	_caption_expiry_seconds = duration
 
 ## Validation seam: full audio summary from the manager. Used by the
 ## main playable slice audio smoke and by the audio_save_load smoke.
@@ -6170,6 +6201,11 @@ func get_audio_summary() -> Dictionary:
 ## inspect the audio manager's state without poking at its internals.
 func get_audio_manager() -> Node:
 	return audio_manager
+
+## Validation seam: the most recently pumped audio caption, or "" if none is
+## currently displayed (either nothing has fired yet, or the last one expired).
+func get_last_caption_line() -> String:
+	return _last_caption_line
 
 func get_audio_bus_player_count() -> int:
 	if audio_manager == null:
