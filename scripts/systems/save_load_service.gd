@@ -403,8 +403,39 @@ func slot_ids_for_run(run_id: String) -> Array:
 	var idx = _load_index()
 	for row in idx.slots:
 		if row != null and String(row.run_id) == run_id:
-			result.append(String(row.slot_id))
+			var indexed_id := String(row.slot_id)
+			if not result.has(indexed_id):
+				result.append(indexed_id)
+	# PR #58 (Codex P2): the index is a derived cache -- list_slots()
+	# reclassifies it against the disk, and a corrupt/missing index.json
+	# parses to an EMPTY SaveIndexState. If freeze ownership trusted the
+	# index alone, a dead run whose index was lost (corruption, manual
+	# deletion, partial sync) would freeze nothing and stay continuable.
+	# Payload files carry the authoritative run_id stamp, so union in a
+	# direct disk scan; the index remains a fast path, never the gate.
+	for disk_id in _all_slot_ids_on_disk():
+		var slot_id := String(disk_id)
+		if slot_id == "index" or result.has(slot_id):
+			continue
+		if _payload_run_id(slot_id) == run_id:
+			result.append(slot_id)
 	return result
+
+## Reads only the top-level run_id key from a slot's payload file.
+## Returns "" for missing/unreadable/corrupt payloads and legacy saves
+## written before the run_id rework -- both fail OPEN by design.
+func _payload_run_id(slot_id: String) -> String:
+	var path := _slot_path(slot_id, _indexed_kind_for(slot_id))
+	if not FileAccess.file_exists(path):
+		return ""
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return ""
+	var parsed: Variant = JSON.parse_string(f.get_as_text())
+	f.close()
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return ""
+	return str((parsed as Dictionary).get("run_id", ""))
 
 ## run_id slot-ownership rework: freezes every slot owned by run_id (per
 ## slot_ids_for_run) with a PermadeathResolver death record. Lives here

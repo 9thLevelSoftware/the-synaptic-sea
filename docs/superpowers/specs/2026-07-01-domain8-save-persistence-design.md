@@ -127,7 +127,8 @@ load the slot back, objective progress reverts while `visited_ships`/dock state 
 
 - `reason == "death"` → `_freeze_run_on_death()` — **nothing is deleted**:
   - `save_load_service.freeze_run(_run_id, cause, epitaph, run_time, final_seq)`, which resolves
-    `slot_ids_for_run(_run_id)` against the save index and calls
+    `slot_ids_for_run(_run_id)` — the union of matching index rows and a direct payload-file scan
+    (payload-authoritative, index-accelerated; PR #58 Codex P2) — and calls
     `PermadeathResolver.record_death(...)` for each match: the active-autosave alias, `"world"`,
     every `AUTOSAVE_SLOT_IDS`, the quickslot if present, **and every manual slot written this
     run** — all of them found structurally (whichever slot/index rows were actually stamped with
@@ -155,9 +156,11 @@ load the slot back, objective progress reverts while `visited_ships`/dock state 
   `_active_run_id`, set via `set_active_run_id()` at session start and on a successful Continue/F9
   load) — no coordinator call site can forget to mark ownership, because there is no longer a
   separate ownership flag to mark. `_freeze_run_on_death()` asks
-  `slot_ids_for_run(_run_id)` which slots this run actually wrote and freezes exactly those. A
-  fresh New Game that dies before ever loading or saving has an `_run_id` that matches no index
-  row, so nothing freezes — it cannot brick a different, still-live run's Continue. Manual slots
+  `slot_ids_for_run(_run_id)` which slots this run actually wrote and freezes exactly those —
+  reading matching index rows unioned with each payload file's own `run_id` stamp, so a
+  corrupt/missing `index.json` cannot silently empty the freeze set (PR #58 Codex P2). A
+  fresh New Game that dies before ever loading or saving has an `_run_id` that matches no row
+  or payload, so nothing freezes — it cannot brick a different, still-live run's Continue. Manual slots
   need no special-casing: a manual save is stamped with `_run_id` the same way a world/autosave
   write is, so it is found by the same query, with no risk of it ever being mistaken for a
   world/autosave-lineage write (they are structurally separate index rows). See ADR-0043 §7 for

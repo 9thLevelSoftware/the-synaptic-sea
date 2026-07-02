@@ -222,12 +222,25 @@ by what was actually written.
 stamps `_active_run_id` onto the payload and the index row inside
 `save_world()`/`save_to_slot()` themselves -- no coordinator call site can
 forget to stamp it, because stamping no longer happens at the call site at
-all. `slot_ids_for_run(run_id)` reads the index (plus the world row) and
-returns every slot_id whose row matches; an empty run_id matches nothing,
-so a run that has never loaded or saved anything can never accidentally
-claim a match. `freeze_run(run_id, cause, epitaph, run_time, final_seq)`
-resolves `slot_ids_for_run(run_id)` and calls
+all. `slot_ids_for_run(run_id)` returns every slot_id owned by that run;
+an empty run_id matches nothing, so a run that has never loaded or saved
+anything can never accidentally claim a match.
+`freeze_run(run_id, cause, epitaph, run_time, final_seq)` resolves
+`slot_ids_for_run(run_id)` and calls
 `PermadeathResolver.record_death(...)` for each.
+
+**Ownership is payload-authoritative, index-accelerated (PR #58 Codex
+P2).** `slot_ids_for_run` unions two sources: matching index rows AND a
+direct disk scan (`_all_slot_ids_on_disk` + `_payload_run_id`, which reads
+only the top-level `run_id` key of each slot's payload file). The index is
+a derived cache -- `list_slots()` already reclassifies it against the disk,
+and a corrupt/missing `index.json` parses to an EMPTY `SaveIndexState`. If
+freeze ownership trusted the index alone, losing the index (corruption,
+manual deletion, partial sync) while `world.json` still loaded would mean
+`freeze_run` writes no `world.death.json` and a dead run stays continuable
+-- exactly the bug class this rework exists to kill, reintroduced through a
+side door. The payload stamp written by `save_world()`/`save_to_slot()` is
+the source of truth; the index row is a fast path, never the gate.
 
 **Why `freeze_run` lives on `SaveLoadService`, not `PermadeathResolver`.**
 `PermadeathResolver` is deliberately index-blind pure file I/O (death
@@ -255,13 +268,18 @@ from the loaded `WorldSnapshot.run_id` if non-empty, or a fresh id is
 generated if the loaded save predates this field (`ws.run_id == ""`).
 **Nothing is written to disk on load** -- the freshly generated id is only
 stamped on this run's *next* save, exactly like every other save-time
-stamp. A pre-rework `world.json` therefore has no `run_id` row in the
-index either, so `slot_ids_for_run()` cannot find it under the fresh id: if
-the player dies before making a single save under the new id, nothing
-freezes. This fails OPEN and is an accepted, documented gap (see "Known
-migration behavior" below) -- it is the direct legacy-data analogue of the
-old "New Game with no load/save owns nothing" case, and is no worse than
-what the flag-based design already accepted for a brand-new run.
+stamp. This fail-open rule covers the ENTIRE pre-rework slot family, not
+just `world.json`: every legacy row -- world, autosave_a/b/c,
+autosave_active, quickslot, and any manual slot_NN -- carries
+`run_id = ""` in both its payload and its index row, so
+`slot_ids_for_run()` cannot match any of them under the fresh id. If the
+player dies before making a single save under the new id, nothing (world
+OR legacy manual slots) freezes. This fails OPEN and is an accepted,
+documented gap (see "Known migration behavior" below) -- it is the direct
+legacy-data analogue of the old "New Game with no load/save owns nothing"
+case, and is no worse than what the flag-based design already accepted for
+a brand-new run. Each slot re-enters ownership individually on its first
+post-rework write.
 **Rejected alternative: write-on-read.** An earlier draft considered
 backfilling the id onto `world.json` immediately on load (so a legacy save
 would freeze correctly even before its first post-rework save). This was
