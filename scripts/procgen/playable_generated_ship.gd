@@ -272,6 +272,20 @@ const FIRE_COMPARTMENT_SYSTEM := {
 	"hydroponics": "life_support",
 	"cargo": "",
 }
+# Maps a room ROLE to the hull/fire compartment it belongs to. Only these
+# compartments exist (data/ship_systems/hull_compartments.json + FIRE_COMPARTMENT_SYSTEM),
+# so variant hazards on other roles are loot/dressing-only.
+const COMPARTMENT_FOR_ROLE := {
+	"bridge": "bridge",
+	"cockpit": "bridge",
+	"engineering": "engineering",
+	"reactor": "engineering",
+	"engine_bay": "engineering",
+	"hydroponics": "hydroponics",
+	"cargo": "cargo",
+	"storage": "cargo",
+}
+const RoomVariantSelectorHazardScript := preload("res://scripts/procgen/room_variant_selector.gd")
 const OXYGEN_MIN_FOR_FIRE: float = 5.0
 const FIRE_HEALTH_DRAIN_PER_SECOND: float = 2.0
 const FIRE_SYSTEM_DAMAGE_PER_SECOND: float = 0.05
@@ -1947,6 +1961,12 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	_build_loot_containers()
 	_build_sealed_hatches()
 	_build_repair_points()
+	# Derelict-side breaches: variant-driven hull breaches (deterministic per seed).
+	# Seeded BEFORE _build_breach_seal_points() so the seal-point builder sees
+	# variant breaches in the hull and creates player-interactable seal nodes.
+	# Also seeded before fire so the fire presence-gate exclusion can see variant
+	# breaches (fire ordering preserved by being earlier than both fire calls).
+	_seed_derelict_breaches()
 	_build_breach_seal_points()
 	# Derelict-side fire: per-ship pre-seeded environmental fire (presence-gated, capped).
 	_seed_derelict_fire()
@@ -2762,6 +2782,39 @@ func _configure_derelict_fire(fs) -> void:
 	if fs != null:
 		fs.configure(_fire_tuning())
 
+## Scans the boarded derelict's built layout for rooms whose variant carries a
+## hazard of `kind` ("fire" or "breach") AND whose role maps to a real
+## compartment. Returns the deterministic, de-duplicated, sorted compartment id
+## list. Empty when no such variant landed on a mapped role.
+func _variant_hazard_compartments(kind: String) -> Array:
+	var out: Dictionary = {}
+	if current_ship == null:
+		return []
+	var layout: Dictionary = current_ship.built_layout
+	# Derelict layout is populated by the attach path before seeding; no home-loader
+	# fallback — wrong ship.
+	if layout.is_empty():
+		return []
+	var rooms_variant: Variant = layout.get("rooms", [])
+	if not (rooms_variant is Array):
+		return []
+	var selector := RoomVariantSelectorHazardScript.new()
+	for room_variant in (rooms_variant as Array):
+		if not (room_variant is Dictionary):
+			continue
+		var room: Dictionary = room_variant
+		var role: String = str(room.get("room_role", room.get("role", "")))
+		var compartment: String = str(COMPARTMENT_FOR_ROLE.get(role, ""))
+		if compartment.is_empty():
+			continue
+		var variant: String = str(room.get("variant", "standard"))
+		var hazard: Dictionary = (selector.effects_for(variant).get("sim", {}) as Dictionary).get("hazard", {})
+		if str(hazard.get("kind", "")) == kind:
+			out[compartment] = true
+	var result: Array = out.keys()
+	result.sort()
+	return result
+
 ## Pre-seeds environmental fire on a freshly built derelict. Deterministic, RNG-free:
 ## a per-seed presence gate (FIRE_PRESENCE_PERCENT) decides whether THIS derelict burns at
 ## all; when it does, ignites up to a condition-scaled cap of compartments whose mapped
@@ -2780,17 +2833,25 @@ func _seed_derelict_fire() -> void:
 	# so a fire-free derelict is not re-rolled on revisit/reload.
 	current_ship.fire_seeded = true
 	var seed_int: int = _ship_seed(current_ship)
-	# Presence gate — most derelicts board fire-free.
+	# Variant-forced fire: a fire-kind variant on a compartment-mapped room
+	# means that derelict burns there regardless of the presence roll.
+	var forced_fire: Array = _variant_hazard_compartments("fire")
+	for cid in forced_fire:
+		fs.ignite(str(cid), 1.0)
+	# Presence gate — most derelicts board fire-free (variant fires already lit).
 	if (abs(hash("%d:fire_presence" % seed_int)) % 100) >= FIRE_PRESENCE_PERCENT:
 		return
 	var mgr = _active_systems_manager()
 	if mgr == null:
 		return
 	# Candidate compartments: mapped system damaged, not breached. Deterministic order.
+	# Read the ACTIVE hull (derelict's own hull when away) so the exclusion sees
+	# the derelict's breaches, not the home hull singleton.
+	var active_hull = _active_hull()
 	var breached := {}
-	if hull_integrity_state != null:
-		for cid in hull_integrity_state.compartments:
-			if bool((hull_integrity_state.compartments[cid] as Dictionary).get("breach_open", false)):
+	if active_hull != null:
+		for cid in active_hull.compartments:
+			if bool((active_hull.compartments[cid] as Dictionary).get("breach_open", false)):
 				breached[str(cid)] = true
 	var candidates: Array = []
 	for cid in FIRE_COMPARTMENT_SYSTEM:
@@ -2809,12 +2870,36 @@ func _seed_derelict_fire() -> void:
 		fs.ignite(cid, 1.0)
 		lit += 1
 
+## Away-branch only: force-breaches compartments of rooms carrying a breach-kind
+## variant on the boarded derelict — on the DERELICT'S OWN hull model
+## (current_ship.get_hull()), mirroring _seed_derelict_fire's use of
+## current_ship.get_fire(). NOT the bare hull_integrity_state member: that is the
+## coordinator's home/hub hull singleton (see _active_hull()). Deterministic;
+## guarded by breach_seeded so revisits/restores don't re-seed (restored breaches
+## come from the derelict instance's applied hull summary).
+func _seed_derelict_breaches() -> void:
+	if not away_from_start or current_ship == null:
+		return
+	if current_ship.breach_seeded:
+		return
+	current_ship.breach_seeded = true  # Flag set before the hull fetch: even a zero-breach derelict must be marked seeded.
+	var hull = current_ship.get_hull()
+	if hull == null:
+		return
+	for cid in _variant_hazard_compartments("breach"):
+		if hull.compartments.has(str(cid)):
+			hull.damage_compartment(str(cid), 1.0, true)
+
 ## Builds the per-frame context the authoritative fire model ticks against.
 func _build_fire_context() -> Dictionary:
+	# Read the ACTIVE hull (derelict when away, home otherwise) so the fire tick
+	# sees the correct ship's breaches. On the home branch _active_hull() returns
+	# hull_integrity_state, so home behavior is byte-identical.
+	var active_hull = _active_hull()
 	var breached: Array = []
-	if hull_integrity_state != null:
-		for cid in hull_integrity_state.compartments:
-			if bool((hull_integrity_state.compartments[cid] as Dictionary).get("breach_open", false)):
+	if active_hull != null:
+		for cid in active_hull.compartments:
+			if bool((active_hull.compartments[cid] as Dictionary).get("breach_open", false)):
 				breached.append(str(cid))
 	var damaged: Array = []
 	var oxygen_present: bool = true

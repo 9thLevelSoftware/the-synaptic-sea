@@ -41,7 +41,7 @@ const VARIANTS_BY_ROLE: Dictionary = {
 		"standard", "command", "observation", "dark_bridge",
 	],
 	"cargo": [
-		"standard", "hold", "refrigerated", "secure", "empty_hold",
+		"standard", "hold", "refrigerated", "secure", "empty_hold", "breached",
 	],
 	"medical": [
 		"standard", "triage", "surgery", "contaminated",
@@ -50,7 +50,7 @@ const VARIANTS_BY_ROLE: Dictionary = {
 		"standard", "bunks", "officer", "derelict_bunks",
 	],
 	"engineering": [
-		"standard", "reactor", "life_support", "propulsion", "burned_out",
+		"standard", "reactor", "life_support", "propulsion", "burned_out", "breached",
 	],
 	"maintenance": [
 		"standard", "tool_storage", "junction", "sealed",
@@ -101,6 +101,39 @@ const VARIANTS_BY_ROLE: Dictionary = {
 		"standard", "primary", "service",
 	],
 }
+
+
+# Variant -> gameplay/dressing effect payload. Sparse: only variants with a
+# real consequence appear; everything else resolves to {} (neutral) via
+# effects_for(). `sim.loot_bias` must be a key in data/items/loot_tables.json.
+# `sim.hazard.kind` is "fire" or "breach" and only bites on compartment-mapped
+# rooms (bridge/engineering/hydroponics/cargo). `weight` is reserved for future
+# probabilistic seeding; state-level seeding today treats presence as forced.
+const VARIANT_EFFECTS: Dictionary = {
+	# --- fire ---
+	"burned_out":   {"sim": {"loot_bias": "salvage_engineering", "hazard": {"kind": "fire", "weight": 0.6}}, "dressing": "scorch"},
+	"unstable":     {"sim": {"hazard": {"kind": "fire", "weight": 0.5}}, "dressing": "sparks"},
+	# --- breach ---
+	"breached":     {"sim": {"loot_bias": "salvage_cargo", "hazard": {"kind": "breach", "weight": 0.6}}, "dressing": "vacuum"},
+	"collapsed":    {"sim": {"hazard": {"kind": "breach", "weight": 0.4}}, "dressing": "rubble"},
+	# --- loot-bias only ---
+	"refrigerated": {"sim": {"loot_bias": "salvage_cargo"}, "dressing": "frost"},
+	"secure":       {"sim": {"loot_bias": "hidden_cache"}, "dressing": "locked"},
+	"triage":       {"sim": {"loot_bias": "repair_parts_common"}, "dressing": "medical"},
+	# --- dressing only ---
+	"flooded":      {"dressing": "water_plane"},
+	"biomatter_crusted": {"dressing": "biomatter"},
+	"contaminated": {"dressing": "haze"},
+}
+
+
+# Returns the effect payload for `variant`, or an empty Dictionary for
+# unmapped variants (neutral: no loot bias, no hazard, no dressing).
+func effects_for(variant: String) -> Dictionary:
+	var raw: Variant = VARIANT_EFFECTS.get(variant, {})
+	if raw is Dictionary:
+		return (raw as Dictionary).duplicate(true)
+	return {}
 
 
 # Returns a variant string for `role` at `room_index` under the

@@ -37,12 +37,18 @@ func configure_run_context(p_biome_id: String, p_difficulty_id: String) -> void:
 func generate(blueprint, archetype: Dictionary = {}) -> Node3D:
 	assert(blueprint != null, "ShipGenerator: blueprint must not be null")
 
-	var layout: Dictionary = layout_generator.generate_with_options(blueprint, archetype, biome_id, difficulty_id, false)
+	var layout: Dictionary = layout_generator.generate_with_options(blueprint, archetype, biome_id, difficulty_id, _extended_for(difficulty_id))
 	if layout.is_empty():
 		push_error("SHIP GENERATOR FAIL layout generation returned empty")
 		return null
 
 	return _load_layout_as_scene(layout)
+
+
+# Extended structural templates unlock on the more dangerous run tiers so
+# structural variety scales with difficulty. Deterministic per seed downstream.
+func _extended_for(diff_id: String) -> bool:
+	return diff_id in ["deep_dive", "hardened"]
 
 
 func generate_layout(blueprint, archetype: Dictionary = {}) -> Dictionary:
