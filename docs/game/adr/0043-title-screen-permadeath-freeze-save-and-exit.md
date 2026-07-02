@@ -30,8 +30,9 @@ sequence change.
 end_run("death") now calls _freeze_run_on_death() instead of deleting
 world.json/autosaves. Every slot written this run -- the active-autosave
 alias, world, every AUTOSAVE_SLOT_IDS row, the quickslot if present, and
-any manual slot the player saved to this run (tracked in the new run-local
-_manual_slots_written_this_run set) -- gets a PermadeathResolver.record_death
+any manual slot the player saved to this run (originally tracked in a
+run-local _manual_slots_written_this_run set; superseded by the run_id
+index ownership in section 7) -- gets a PermadeathResolver.record_death
 entry. world.json and every slot's payload file stay on disk; a
 <slot_id>.death.json record gates future loads (SaveLoadService.load_world /
 load_from_slot both refuse a frozen slot).
