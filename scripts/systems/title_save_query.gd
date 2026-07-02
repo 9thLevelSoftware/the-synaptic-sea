@@ -9,6 +9,11 @@ class_name TitleSaveQuery
 
 const WORLD_SLOT_ID: String = "world"
 
+# `service`/`resolver` are intentionally typed `Object`, not
+# `SaveLoadService`/`PermadeathResolver`: those two scripts do not preload
+# this file, so a typed param here would risk a preload cycle if either of
+# them ever needs to reference TitleSaveQuery. Do not "fix" this to a
+# concrete type without first checking neither script preloads this one.
 static func is_continue_available(service: Object, resolver: Object) -> bool:
 	if service == null or resolver == null:
 		return false

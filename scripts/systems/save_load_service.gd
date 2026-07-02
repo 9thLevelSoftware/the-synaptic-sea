@@ -165,6 +165,12 @@ func delete_current_run() -> bool:
 		if werr != OK:
 			push_warning("SaveLoadService: failed to delete world save file, error=%d" % werr)
 			ok = false
+	# Also remove the world slot's cloud manifest (mirrors delete_slot()'s
+	# manifest removal) so a finished run does not leak
+	# user://saves/.cloud/world.manifest.json.
+	var world_manifest_path: String = "%s/world.manifest.json" % CLOUD_DIR
+	if FileAccess.file_exists(world_manifest_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(world_manifest_path))
 	# Remove the active autosave from the index so a fresh run does
 	# not see a phantom autosave row.
 	var idx = _load_index()
