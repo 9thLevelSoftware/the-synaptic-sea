@@ -350,7 +350,7 @@ injection must remain deterministic per seed. Fire/breach hazard seeding runs aw
 **Validation:** `procgen_variation_smoke.gd` (marker `PROCGEN VARIATION PASS variants_vary=true
 loot_biased=true tmpl_gated=true deterministic=true`) + `procgen_variant_hazard_smoke.gd` (marker
 `PROCGEN VARIANT HAZARD PASS away_ticks=1 fire_lit=true breach_open=true home_clean=true
-guarded=true`). Both registered in the regression bundle (`commands=106`).
+guarded=true`). All three registered in the regression bundle (`commands=107`).
 
 **Inventory delta:** `travel.closes → "closed"`; `room_variant_selector.output.live → true`; break-points
 replaced with closure evidence; `room_graph_generator` name/content_note/gaps updated to document
