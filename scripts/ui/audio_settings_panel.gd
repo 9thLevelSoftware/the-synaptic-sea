@@ -24,6 +24,21 @@ const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
 
 var audio_manager: Node
 var accessibility_settings: RefCounted
+# REQ-AU criterion 3 (ADR-0044): the settings seam this panel writes
+# captions through. Injected by MenuCoordinator (which already owns the
+# single settings_state instance) via set_settings_state(), following the
+# same pattern as set_accessibility_settings().
+var settings_state: SettingsState = null
+# ADR-0044 seam (final review Finding 1): the ONLY writer of
+# `sfx_router.captions_enabled` is `playable_generated_ship.gd::_on_ui_settings_changed`,
+# reached via `menu_coordinator.settings_changed`. This panel must not write
+# the router flag directly -- it mutates settings_state, then calls this
+# Callable (injected by MenuCoordinator.set_settings_push(), alongside
+# set_settings_state()) to ask the coordinator to emit `settings_changed`
+# with the current summary. Left unset (Callable()) in partially-bound
+# headless smokes: is_valid() is then false and the push is skipped, no
+# crash, matching set_settings_state()'s null-tolerant pattern.
+var _settings_push: Callable = Callable()
 
 # Volume sliders indexed by bus id (StringName).
 var _volume_sliders: Dictionary = {}
@@ -46,6 +61,19 @@ func set_audio_manager(mgr: Node) -> void:
 func set_accessibility_settings(settings: RefCounted) -> void:
 	accessibility_settings = settings
 	_apply_text_scale()
+
+func set_settings_state(state: SettingsState) -> void:
+	settings_state = state
+	if is_inside_tree():
+		_refresh_from_manager()
+
+## ADR-0044 seam (final review Finding 1): injected by MenuCoordinator.bind_meta_screens
+## alongside set_settings_state(). Calling it emits menu_coordinator.settings_changed(summary),
+## which playable_generated_ship.gd::_on_ui_settings_changed is already connected to -- the
+## SAME emit shape _cycle_setting() uses. This is the only path allowed to push
+## SettingsState.captions into sfx_router.captions_enabled.
+func set_settings_push(push: Callable) -> void:
+	_settings_push = push
 
 func _build_layout() -> void:
 	# Title label.
@@ -129,9 +157,13 @@ func _refresh_from_manager() -> void:
 		var toggle: CheckBox = _mute_toggles.get(bus_id, null)
 		if toggle != null:
 			toggle.button_pressed = audio_manager.is_bus_muted(bus_id)
-	# Caption toggle reflects the router's captions_enabled flag.
-	if _caption_toggle != null and audio_manager.has_method("sfx_router"):
-		_caption_toggle.button_pressed = bool(audio_manager.sfx_router.captions_enabled)
+	# Caption toggle reflects SettingsState.captions (the single source of
+	# truth, ADR-0044) — NOT audio_manager.sfx_router directly. The prior
+	# `audio_manager.has_method("sfx_router")` check was always false
+	# (sfx_router is a property, not a method), so this checkbox never
+	# synced before this fix.
+	if _caption_toggle != null and settings_state != null:
+		_caption_toggle.button_pressed = settings_state.is_captions_enabled()
 	if _voice_log_toggle != null and audio_manager.has_method("audio_log"):
 		_voice_log_toggle.button_pressed = true
 
@@ -146,12 +178,20 @@ func _on_mute_changed(pressed: bool, bus_id: StringName) -> void:
 	audio_manager.set_bus_muted(bus_id, pressed)
 
 func _on_caption_toggled(pressed: bool) -> void:
-	if audio_manager == null or not audio_manager.has_method("sfx_router"):
+	if settings_state == null:
 		return
-	audio_manager.sfx_router.captions_enabled = pressed
+	settings_state.set_captions_enabled(pressed)
+	# ADR-0044 (final review Finding 1): do NOT write
+	# audio_manager.sfx_router.captions_enabled here. Mutate settings_state
+	# only, then ask the coordinator to push through the single seam
+	# (_on_ui_settings_changed) via the injected Callable. Unset/invalid in
+	# partially-bound headless smokes -- just skip the push, no crash.
+	if _settings_push.is_valid():
+		_settings_push.call()
 
 func _on_voice_log_toggled(pressed: bool) -> void:
 	# Voice-log enable/disable is a UI flag — audio_log entries are
 	# always available; the panel just decides whether to show them.
-	# No model change needed here.
+	# No model change needed here. Known no-op stub, flagged in ADR-0044,
+	# not fixed as part of Domain 9 (separate concern, out of scope).
 	pass

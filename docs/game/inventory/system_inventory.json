@@ -3901,8 +3901,8 @@
         "at": "playable_generated_ship.gd:5493"
       },
       "output": {
-        "live": false,
-        "desc": "Terminal output only sets AudioStreamPlayer.volume_db on streamless players (_play_via_bus audio_manager.gd:330-338, _apply_music_layer_gains 385, apply_spatial_attenuation 247); VERIFIED no AudioStream is ever assigned and .play() is never called anywhere in the 8 audio scripts (grep confirmed), so nothing is audible. Captions are never drained by the HUD in gameplay (pump_captions/drain_captions have zero callers in the coordinator).",
+        "live": true,
+        "desc": "Domain 9: real playback is now live. _play_via_bus (audio_manager.gd) assigns a cataloged event id's AudioStream via STREAM_CATALOG + _load_stream_cached, then calls player.play() -- verified for sfx.tool.pickup (item pickup callsite) and the music base layer (always-on in EXPLORATION, lazily assigned in _apply_music_layer_gains). AudioBusLayout is registered via project.godot's [audio] section (data/audio/default_bus_layout.tres), so AudioServer.get_bus_index resolves for Master + all six child buses and volume pushes are no longer inert. Captions now reach the HUD: pump_captions is called every _refresh_audio_state (both _process branches), landing in playable_generated_ship.gd's _last_caption_line / get_last_caption_line() seam.",
         "at": "audio_manager.gd:330"
       },
       "confidence": "V",
@@ -3911,13 +3911,12 @@
       ],
       "integrations": [],
       "content": "partial",
-      "content_note": "Only data/audio/audio_bus_config.tres exists; AudioLog has 6 transcript entries but every clip_path (.ogg) and all SFX/music stream assets are MISSING. SfxEventRouter 27-entry catalog + DynamicMusicState gain tables are richly authored, but no playable audio asset backs them. Confirmed ticked on both away (4806) and home (4904) branches.",
+      "content_note": "Two placeholder clips exist (data/audio/sfx/tool_pickup.wav, data/audio/music/exploration_base.wav) backing sfx.tool.pickup and the base music layer; a real AudioBusLayout (data/audio/default_bus_layout.tres) is registered via project.godot. AudioLog has 6 transcript entries but every voice clip_path (.ogg) is still missing; the remaining ~25 SfxEventRouter catalog ids and DynamicMusicState layers are authored but asset-less (deferred content pass, ADR-0044). Confirmed ticked on both away and home _process branches.",
       "functional": null,
       "gaps": [
-        "No AudioStream assets anywhere in data/ (no .ogg/.wav); system produces zero audible output (verified: no .play()/.stream= in any audio script)",
-        "AudioLog voice clip_paths reference res://data/audio/voice/*.ogg which do not exist",
-        "HUD never drains the SfxEventRouter caption queue during gameplay (no pump_captions/drain_captions call in coordinator — verified)",
-        "Bus volume push to AudioServer is inert: the .tres is a custom Resource (not a Godot AudioBusLayout) and project.godot registers no bus layout, so get_bus_index returns -1 ALWAYS (not just headless) audio_manager.gd:107-114"
+        "Deferred, not broken: only two placeholder clips exist (data/audio/sfx/tool_pickup.wav, data/audio/music/exploration_base.wav) backing 2 of ~27 catalog event/layer ids; the full SFX/voice/music asset library is a later content pass (ADR-0044).",
+        "Deferred, not broken: AudioLog voice clip_paths still reference res://data/audio/voice/*.ogg which do not exist; voice-log playback pushes bus volume only, same fallback path as any other uncataloged event id.",
+        "Deferred, not broken: spatial emitter population and ambient-zone reactivity (set_room_role/set_threat_level) remain uncalled from gameplay (ADR-0044 explicit deferrals)."
       ],
       "subsystems": [
         {
@@ -8746,19 +8745,19 @@
     {
       "id": "audio_reactive",
       "name": "Audio Reactivity Loop (gameplay state -> audio -> player perception)",
-      "closes": "broken",
+      "closes": "closed",
       "steps": [
         {
           "system": "audio_manager",
-          "role": "source/router: reads hazard/threat/vitals each frame and fires play_sfx + update_music_flags; ticked on BOTH _process branches (playable_generated_ship.gd:4806 away, 4904 home; refresh 5460-5514)"
+          "role": "source/router: reads hazard/threat/vitals each frame and fires play_sfx + update_music_flags; ticked on BOTH _process branches (away and home paths of playable_generated_ship.gd::_process; refresh via _refresh_audio_state)"
         },
         {
           "system": "dynamic_music_state",
-          "role": "music state machine -> layer gains -> music bus volume_db (audio_manager.gd:378->385)"
+          "role": "music state machine -> layer gains -> music bus volume_db + base-layer stream playback (audio_manager.gd:378->385, Domain 9 lazily assigns + plays the base layer clip)"
         },
         {
           "system": "sfx_event_router",
-          "role": "event routing -> bus volume_db + caption queue (audio_manager.gd:202)"
+          "role": "event routing -> bus volume_db + caption queue (audio_manager.gd:202); Domain 9 pumps the caption queue to the HUD every _refresh_audio_state call"
         },
         {
           "system": "meta_event_state",
@@ -8766,12 +8765,12 @@
         }
       ],
       "break_points": [
-        "TERMINAL BREAK (verified): no AudioStream assets exist (only audio_bus_config.tres); grep confirms no .play() call or .stream= assignment in any of the 8 audio scripts — every model resolves to setting volume_db on a streamless player, so nothing is ever audible",
-        "Captions never reach the player: HUD/coordinator never calls pump_captions/drain_captions in gameplay (verified zero callers)",
-        "Ambient zone never reacts: set_room_role/set_threat_level have zero coordinator callers (room pinned to 'docking'), and ambient gains are never consumed for a volume push (_apply_music_layer_gains reads music_state only)",
-        "Spatial audio is dead: every play_sfx call is single-arg (no position), so the spatial emitter pool is always empty and resolve_volume_db never runs",
-        "Bus volume push is inert in ALL modes: the .tres is a custom Resource (not a Godot AudioBusLayout) and no bus layout is registered in project.godot, so AudioServer.get_bus_index always returns -1",
-        "Voice logs reference missing res://data/audio/voice/*.ogg clips"
+        "Domain 9 CLOSED: AudioBusLayout is registered (data/audio/default_bus_layout.tres via project.godot's [audio] section); AudioServer.get_bus_index resolves for Master (translated via AudioManager._engine_bus_name) and all six child buses; volume pushes are no longer inert in any run mode.",
+        "Domain 9 CLOSED: two placeholder clips actually play — sfx.tool.pickup (item pickup) and the always-on music base layer — proving the STREAM_CATALOG + load_from_file path end-to-end.",
+        "Domain 9 CLOSED: captions reach the HUD on both _process branches via pump_captions inside _refresh_audio_state, landing in _last_caption_line / get_last_caption_line(); the caption toggle is unified on SettingsState.captions (ADR-0044), fixing a latent AudioSettingsPanel bug.",
+        "Deferred, not broken: ambient zone reactivity (set_room_role/set_threat_level) has zero coordinator callers (room stays pinned to 'docking') — explicit Domain 9 out-of-scope item.",
+        "Deferred, not broken: spatial audio stays dark — every current play_sfx callsite is single-arg (no position), so the spatial emitter pool is never populated — explicit Domain 9 out-of-scope item.",
+        "Deferred, not broken: voice logs still reference missing res://data/audio/voice/*.ogg clips; voice-log playback uses the same honest volume-push-only fallback as any other uncataloged event."
       ]
     },
     {

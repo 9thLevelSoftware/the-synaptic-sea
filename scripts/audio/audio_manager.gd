@@ -54,6 +54,24 @@ var audio_log: AudioLog = AudioLogScript.new()
 ## Last-played voice-log entry id (for the panel to show "now playing").
 var current_voice_log_id: String = ""
 
+## Event/layer id -> res:// path. Lives in the manager (the only scene-aware
+## audio object), NOT in SfxEventRouter, which stays a pure RefCounted
+## (ADR-0029/ADR-0044). Only entries listed here get a real .stream assigned;
+## every other cataloged event id falls back to the pre-Domain-9 volume-push-
+## only behavior (the deferred asset library is honest about what plays).
+const STREAM_CATALOG: Dictionary = {
+	"sfx.tool.pickup": "res://data/audio/sfx/tool_pickup.wav",
+	"layer.base": "res://data/audio/music/exploration_base.wav",
+}
+
+## Path -> loaded AudioStream cache. Avoids re-loading the same WAV from
+## disk on every play_sfx call.
+var _loaded_streams: Dictionary = {}
+
+## Paths that already logged a missing/corrupt-file warning (warn-once so a
+## missing asset doesn't spam push_warning every frame it's requested).
+var _warned_missing_paths: Dictionary = {}
+
 func _ready() -> void:
 	_build_stream_players()
 	_apply_bus_volumes()
@@ -93,6 +111,20 @@ func _build_stream_players() -> void:
 		add_child(player)
 		_bus_players[String(bus_id)] = player
 
+## Translate a pure-model bus id (lowercase, e.g. &"master") to the engine's
+## AudioServer bus name. Godot's bus 0 is immutably named "Master" (capital
+## M) and AudioServer.get_bus_index("master") always returns -1 for it; the
+## six child buses (sfx/music/voice/ui/ambient/meta) need no translation
+## because their names already match between the pure model and the engine.
+## This is the ONLY place the Master-name mismatch is bridged — every
+## AudioServer boundary call goes through this helper (ADR-0044).
+## Returns StringName to avoid a String allocation per call; AudioServer's
+## bus-name APIs accept StringName/String interchangeably.
+func _engine_bus_name(bus_id: StringName) -> StringName:
+	if bus_id == AudioEventSeamScript.BUS_MASTER:
+		return &"Master"
+	return bus_id
+
 ## Push per-bus dB values into AudioServer. Skipped for buses that
 ## AudioServer doesn't know about (e.g. in headless tests where the
 ## .tres has not been loaded). The pure-model state remains the source
@@ -104,7 +136,8 @@ func _apply_bus_volumes() -> void:
 		var bus_id: String = String(bus.get("id", ""))
 		if bus_id.is_empty():
 			continue
-		var bus_idx: int = AudioServer.get_bus_index(bus_id)
+		var engine_name: StringName = _engine_bus_name(StringName(bus_id))
+		var bus_idx: int = AudioServer.get_bus_index(engine_name)
 		if bus_idx < 0:
 			# Bus not registered in AudioServer yet (headless / pre-init).
 			# Skip without error so the manager survives --script mode.
@@ -210,7 +243,7 @@ func play_sfx(event_id: StringName, position: Variant = null) -> bool:
 	if position != null and position is Vector3:
 		_play_spatial(event_id, position, bus_id, vol_db)
 	else:
-		_play_via_bus(bus_id, vol_db)
+		_play_via_bus(bus_id, vol_db, event_id)
 	return true
 
 ## Convenience: get pending captions and clear the queue. The HUD calls
@@ -326,16 +359,43 @@ func get_spatial_player_count() -> int:
 		total += (_spatial_pool[key] as Array).size()
 	return total
 
-## Internal: play through a non-spatial AudioStreamPlayer on a bus.
-func _play_via_bus(bus_id: String, volume_db: float) -> void:
+## Internal: load (and cache) an AudioStream from a res:// path. Returns null
+## on a missing/corrupt file; logs exactly one push_warning per path (never
+## per-frame spam) via the _warned_missing_paths flag.
+func _load_stream_cached(path: String) -> AudioStream:
+	if _loaded_streams.has(path):
+		return _loaded_streams[path]
+	if not FileAccess.file_exists(path):
+		if not _warned_missing_paths.has(path):
+			push_warning("AudioManager: stream file missing, path='%s'" % path)
+			_warned_missing_paths[path] = true
+		return null
+	var stream: AudioStreamWAV = AudioStreamWAV.load_from_file(path)
+	if stream == null:
+		if not _warned_missing_paths.has(path):
+			push_warning("AudioManager: load_from_file failed, path='%s'" % path)
+			_warned_missing_paths[path] = true
+		return null
+	_loaded_streams[path] = stream
+	return stream
+
+## Internal: play through a non-spatial AudioStreamPlayer on a bus. When
+## `event_id` is cataloged in STREAM_CATALOG, lazily loads and assigns the
+## clip and calls play(); when not cataloged, behavior is byte-identical to
+## pre-Domain-9 (volume push only) — the graceful missing-asset fallback
+## that keeps the deferred asset library honest (ADR-0044).
+func _play_via_bus(bus_id: String, volume_db: float, event_id: StringName = &"") -> void:
 	var player: AudioStreamPlayer = _bus_players.get(bus_id, null)
 	if player == null:
 		return
-	# Without an actual AudioStream resource there is nothing to play in
-	# the headless case, but we still set the volume so the smoke can
-	# verify the push path runs without errors. The smoke inspects
-	# player.volume_db after each call.
 	player.volume_db = volume_db
+	var id_str: String = String(event_id)
+	if not id_str.is_empty() and STREAM_CATALOG.has(id_str):
+		var stream: AudioStream = _load_stream_cached(String(STREAM_CATALOG[id_str]))
+		if stream != null:
+			if player.stream != stream:
+				player.stream = stream
+			player.play()
 
 ## Internal: play through a spatial AudioStreamPlayer3D pool entry.
 func _play_spatial(event_id: StringName, position: Vector3, bus_id: String, volume_db: float) -> void:
@@ -375,6 +435,20 @@ func _apply_music_layer_gains() -> void:
 	var player: AudioStreamPlayer = _bus_players.get(String(AudioEventSeamScript.BUS_MUSIC), null)
 	if player == null:
 		return
+	# Base layer proof-of-stream (REQ-AU criterion 2): the base layer is
+	# always-on in the default EXPLORATION state, so it is the one music
+	# layer that gets an actual assigned+looping .stream. Lazily assigned
+	# once; subsequent calls only touch volume_db (avoids restarting the
+	# clip every frame).
+	if player.stream == null:
+		var base_path: Variant = STREAM_CATALOG.get(String(AudioEventSeamScript.MUSIC_LAYER_BASE), null)
+		if base_path != null:
+			var stream: AudioStream = _load_stream_cached(String(base_path))
+			if stream != null:
+				if stream is AudioStreamWAV:
+					(stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
+				player.stream = stream
+				player.play()
 	var gains: Dictionary = music_state.get_layer_gains()
 	# Combined layer gain is the maximum across the four layers (they
 	# stack rather than average so exploration always has audible base).

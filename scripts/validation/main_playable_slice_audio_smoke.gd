@@ -12,7 +12,7 @@ extends SceneTree
 # - meta-event scheduler fires a beacon within the default schedule
 # - get_audio_summary round-trips all six sub-summaries through JSON
 #
-# Pass marker: MAIN PLAYABLE AUDIO PASS buses=6 routed=4 fired_meta=1 ambient_role=engine
+# Pass marker: MAIN PLAYABLE AUDIO PASS buses=6 routed=4 fired_meta=3 ambient_role=engine
 #
 # Headless:
 #   /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless
