@@ -55,6 +55,12 @@ var slot_id: String = ""
 var slot_kind: String = ""
 var is_autosave: bool = false
 var is_quicksave: bool = false
+# ADR-0043: reserved/unused. Manual-slot loads (the interactive slot
+# screen's Load verb, PlayableGeneratedShip.apply_manual_slot) apply the
+# RunSnapshot onto the currently-active ship only and never read this
+# field -- full world-coherent slot pairing (validating a manual slot
+# against a compatible world.json) is explicitly out of scope; see
+# ADR-0043 section 4.
 var parent_world_slot: String = ""
 var slice_version: String = ""
 var godot_version: String = ""

@@ -1,0 +1,175 @@
+# ADR-0043: Title Screen, Permadeath Freeze, and Save & Exit
+
+**Status:** Accepted
+**Date:** 2026-07-01
+**Domain:** Completion roadmap Domain 8 (save loop, closes: "partial" -> "closed")
+
+## Context
+
+The save subsystem's write half was live (autosave rotation, world.json via F5)
+but the read half and the death-gate were dead code: load_from_slot had no
+live caller, PermadeathResolver.record_death was never called, no title
+screen existed anywhere, and AutosavePolicy.try_quicksave /
+SaveLoadMenu.confirm_quicksave were unwired. See
+docs/superpowers/specs/2026-07-01-domain8-save-persistence-design.md for
+the full design.
+
+## Decisions
+
+### 1. Title screen is a new bootstrap wrapper; main.tscn is unchanged
+
+scenes/title_main.tscn / scripts/title_main.gd become the new
+run/main_scene. They instantiate scenes/main.tscn (unchanged) as a child
+only on New Game / Continue. This means every existing main-scene smoke
+(which preloads res://scenes/main.tscn directly, not via project.godot's
+run/main_scene setting) is entirely unaffected by this domain's boot-
+sequence change.
+
+### 2. Permadeath freezes, it does not delete
+
+end_run("death") now calls _freeze_run_on_death() instead of deleting
+world.json/autosaves. Every slot written this run -- the active-autosave
+alias, world, every AUTOSAVE_SLOT_IDS row, the quickslot if present, and
+any manual slot the player saved to this run (tracked in the new run-local
+_manual_slots_written_this_run set) -- gets a PermadeathResolver.record_death
+entry. world.json and every slot's payload file stay on disk; a
+<slot_id>.death.json record gates future loads (SaveLoadService.load_world /
+load_from_slot both refuse a frozen slot).
+
+**Why freeze instead of delete:** deleting the save would destroy the epitaph
+browsing UX ADR-0032 explicitly designed for
+(PermadeathResolver.load_epitaph) but never wired up. Freezing costs one
+extra gate check (already-proven at load_from_slot:249) and lets the slot
+screen render "DEAD -- <epitaph>" rows.
+
+**Manual slots freeze too.** A mid-run manual save is a valid save of a run
+that was alive at that moment, but the user-locked decision for this domain
+is that permadeath must have no escape hatch: a manual save right before a
+fatal encounter must not let the player reload past their death. Every
+manual slot the slot screen's Save verb wrote to during the run that just
+ended freezes along with the autosave family.
+
+**Extraction/completion is unaffected** -- that path still deletes
+(delete_current_run + autosave wipe), unchanged from before this domain. A
+successfully finished run has nothing to "continue"; that is not permadeath.
+
+**_apply_meta_payout_and_persist(reason) still runs unconditionally on
+death.** This is deliberate and must not be "fixed" away in a future change:
+meta progression (currency, unlocks, class gates) is explicitly cross-run
+state per ADR-0007/ADR-0033 and survives permadeath by design -- only the
+RUN's own save freezes, not the player's meta progress.
+
+**New Game after a death does not touch the frozen slot.** A "forget this
+death" action remains explicitly out of scope (ADR-0032 already scoped this
+out as a seam, not a requirement); Domain 8 wires the freeze and the
+epitaph-read path only.
+
+### 3. _input's post-death dead-zone is fixed
+
+playable_generated_ship.gd:7548-7550 used to hard-return from _input
+whenever slice_complete was true, which meant the player could not open
+ANY menu after death -- including the frozen-slot epitaph screen this domain
+adds. The fix moves the menu_coordinator.handle_ui_input(event) dispatch
+ahead of the slice_complete gate; only the gameplay-input tail (hotbar,
+attack, reload, F5/F9) stays gated on a completed run. This is a
+pre-existing bug (present since slice_complete was introduced, not
+something this domain's other changes caused), fixed here because Domain 8
+is the first feature that needs post-death menu access to work.
+
+### 4. Manual-slot loads are ship-only, not full-world (ADR-0031, implemented
+at last)
+
+Loading a manual slot from the interactive slot screen restores the active
+ship's RunSnapshot only (apply_manual_slot -> _apply_run_snapshot). It
+does **not** touch visited_ships, dock edges, world_time, or
+current_location -- exactly ADR-0031's original text, never implemented
+until now. RunSnapshot.parent_world_slot stays reserved/unused; resurrecting
+it to validate a manual slot against a compatible world.json (schema for
+compatibility, refusal UX, location-drift edge cases) is real additional
+scope, explicitly deferred.
+
+### 5. Save & Exit repurposes the pause menu, not quicksave
+
+A new save_and_exit pause-menu item calls request_save() (the same
+guarded world.json write path F5/autosave already use) and, on success,
+emits return_to_title_requested. On failure it surfaces a tutorial toast
+(registered as the tutorial_triggers entry save_and_exit_failed) and does
+**not** leave -- silently losing progress on an exit action is unacceptable.
+
+Save & Exit deliberately does **not** reuse AutosavePolicy.try_quicksave's
+cooldown: that cooldown exists to stop autosave-cadence thrashing during
+active play, not to gate a terminal "I am leaving" action. Gating the
+player's exit-save behind a cooldown that could silently skip the write
+would be a correctness footgun.
+
+**Quicksave stays dead-but-harmless.** The roadmap's original Domain 8
+"definition of closed" item 4 called for wiring
+AutosavePolicy.try_quicksave/SaveLoadMenu.confirm_quicksave to a
+keybinding. This is superseded: the game is heading toward a
+multiplayer / Project-Zomboid-like persistent-world direction where
+quicksave/quickload does not fit the design (see
+docs/superpowers/specs/2026-06-28-completion-roadmap-design.md's amended
+item 4). try_quicksave/confirm_quicksave remain small, model-smoked, and
+available if a future package ships a real quicksave key.
+
+**F5/F9 stay as dev/debug keys**, unchanged behavior, documentation-only
+comment added at DEFAULT_SAVE_RUN_BINDINGS/DEFAULT_LOAD_RUN_BINDINGS.
+
+### 6. Title settings is its own sub-flow, not a standalone settings file
+
+The title screen's settings entry (spec §3.7) mirrors menu_coordinator's
+in-run settings handling against the same settings_menu catalog entry,
+rather than introducing a second settings system: confirm on settings
+opens a title-local settings screen; ui_left/ui_right (and ui_accept on
+non-back rows) drive a title-local _cycle_setting(direction) mirroring
+menu_coordinator._cycle_setting (:339-360), including preset cycling from
+accessibility_presets.json; back closes the screen. Row rendering mirrors
+_settings_line (menu_coordinator.gd:707-717) minus the difficulty-multiplier
+suffix, since no AccessibilitySettings instance exists at the title (no
+active run yet).
+
+**Persistence semantics:** settings persist only inside
+RunSnapshot.settings_summary -- verified, no standalone settings file
+exists anywhere in the codebase. The title flow therefore hands its summary
+into the session rather than owning its own save file:
+PlayableGeneratedShip gains a production seam
+apply_ui_settings_summary(summary) (the existing
+apply_ui_settings_summary_for_validation delegates to it), and title_main.gd
+calls it after playable_started on BOTH New Game and Continue -- but only
+if the player changed a setting at the title (a dirty flag), so an
+untouched title screen never clobbers a loaded run's saved settings.
+
+**A standalone user://settings.json layer is explicitly deferred**, called
+out here as a future multiplayer card: once saves are per-character rather
+than per-machine (the multiplayer/PZ-like direction referenced in decision
+5), machine-local display/audio/accessibility preferences will need to
+survive independently of any specific save slot. That is out of scope for
+this domain -- title settings today only ever round-trips through whichever
+RunSnapshot is active.
+
+## Known migration behavior
+
+Pre-Domain-7 ShipInstance summaries lack breach_seeded/fire_seeded
+fields (default false on load -> benign re-seed on revisit), and Domain 7's
+variant-list additions shift deterministic pick() results, so a
+pre-Domain-7 world.json loaded through Title-Continue may re-roll room
+variants on ships it had already visited. This is expected and
+cosmetic-only -- cross-ref scripts/systems/ship_instance.gd:213-214. Domain
+8 does not attempt to freeze historical variant rolls or force *_seeded
+flags true on legacy loads.
+
+## Consequences
+
+- save.closes flips from "partial" to "closed" in
+  docs/game/inventory/system_inventory.json.
+- The roadmap's Domain 8 definition-of-closed item 4 is amended from
+  "Quicksave keybinding/UI fires try_quicksave/confirm_quicksave" to
+  "Save & Exit (pause menu) fires request_save and returns to the title
+  screen; quicksave stays intentionally unwired per the multiplayer/PZ-like
+  direction."
+- main_playable_death_clears_autosave_smoke.gd is deleted (its
+  cleared=true contract inverted) and replaced by
+  permadeath_freeze_smoke.gd.
+- Title settings ships as a sixth new smoke (title_settings_smoke.gd),
+  registered in the regression bundle alongside the other five Domain 8
+  smokes; no standalone settings file is introduced by this domain.
