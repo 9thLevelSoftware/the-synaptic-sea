@@ -1961,10 +1961,13 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	_build_loot_containers()
 	_build_sealed_hatches()
 	_build_repair_points()
-	_build_breach_seal_points()
-	# Derelict-side breaches first: variant-driven hull breaches (deterministic per seed).
-	# Seeded before fire so the fire presence-gate exclusion can see variant breaches.
+	# Derelict-side breaches: variant-driven hull breaches (deterministic per seed).
+	# Seeded BEFORE _build_breach_seal_points() so the seal-point builder sees
+	# variant breaches in the hull and creates player-interactable seal nodes.
+	# Also seeded before fire so the fire presence-gate exclusion can see variant
+	# breaches (fire ordering preserved by being earlier than both fire calls).
 	_seed_derelict_breaches()
+	_build_breach_seal_points()
 	# Derelict-side fire: per-ship pre-seeded environmental fire (presence-gated, capped).
 	_seed_derelict_fire()
 	_build_fire_zones()

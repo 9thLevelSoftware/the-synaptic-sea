@@ -7,6 +7,9 @@ extends SceneTree
 #     DERELICT's hull (current_ship.get_hull()) while the HOME hull's bridge
 #     stays clean (wrong-target regression guard, Task 4 review),
 #   - _seed_derelict_fire ignites the engineering compartment (forced by variant),
+#   - _build_breach_seal_points() (called AFTER seeding, mirroring the fixed
+#     attach path) creates a BreachSealPoint node for the variant-breached
+#     bridge compartment (PR #56 ordering fix),
 #   - re-running does NOT re-seed (fire_seeded / breach_seeded guards),
 #   - the ignited/breached set is deterministic (same on a second identical run).
 # Seed order: breaches before fire (mirrors the build path so the fire
@@ -16,7 +19,7 @@ extends SceneTree
 # passing the 15% gate + a damaged mapped system) is deferred.
 # (bridge, not cargo: hull_compartments.json ships cargo pre-breached, so a cargo
 # assertion would be vacuous.)
-# Marker: PROCGEN VARIANT HAZARD PASS away_ticks=<n> fire_lit=true breach_open=true home_clean=true guarded=true
+# Marker: PROCGEN VARIANT HAZARD PASS away_ticks=<n> fire_lit=true breach_open=true home_clean=true seal_point=true guarded=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const TIMEOUT_FRAMES: int = 300
@@ -109,18 +112,34 @@ func _validate() -> void:
 	var home_bridge_clean: bool = playable.hull_integrity_state == null \
 		or not bool(((playable.hull_integrity_state.compartments.get("bridge", {}) as Dictionary)).get("breach_open", false))
 
+	# Seal-point assertion: after seeding, build seal points (mirroring the
+	# fixed attach order: seed → build) and verify a seal node exists for the
+	# variant-breached bridge compartment. _build_breach_seal_points reads
+	# _active_hull() which returns current_ship.get_hull() when away AND
+	# current_ship != home_ship. The smoke reuses home_ship as the derelict,
+	# so temporarily null home_ship so _active_hull sees the derelict hull.
+	var saved_home = playable.home_ship
+	playable.home_ship = null
+	playable._build_breach_seal_points()
+	playable.home_ship = saved_home
+	var seal_point: bool = false
+	for sp in playable.breach_seal_points:
+		if is_instance_valid(sp) and "compartment_id" in sp and str(sp.compartment_id) == "bridge":
+			seal_point = true
+			break
+
 	# Guard: second seed call must not change the set (guards flip true on first run).
 	var burning_before: int = fs.get_burning_compartments().size() if fs != null else 0
 	playable._seed_derelict_breaches()
 	playable._seed_derelict_fire()
 	var guarded: bool = (fs.get_burning_compartments().size() == burning_before)
 
-	if fire_lit and breach_open and home_bridge_clean and guarded:
-		print("PROCGEN VARIANT HAZARD PASS away_ticks=%d fire_lit=true breach_open=true home_clean=true guarded=true" % n)
+	if fire_lit and breach_open and home_bridge_clean and seal_point and guarded:
+		print("PROCGEN VARIANT HAZARD PASS away_ticks=%d fire_lit=true breach_open=true home_clean=true seal_point=true guarded=true" % n)
 		_cleanup_and_quit(0)
 	else:
-		_fail("fire_lit=%s breach_open=%s home_clean=%s guarded=%s burning=%s derelict_bridge=%s" % [
-			str(fire_lit), str(breach_open), str(home_bridge_clean), str(guarded),
+		_fail("fire_lit=%s breach_open=%s home_clean=%s seal_point=%s guarded=%s burning=%s derelict_bridge=%s" % [
+			str(fire_lit), str(breach_open), str(home_bridge_clean), str(seal_point), str(guarded),
 			str(fs.get_burning_compartments() if fs != null else []),
 			str(derelict_hull.compartments.get("bridge", {}) if derelict_hull != null else {})])
 
