@@ -1964,6 +1964,8 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	_build_breach_seal_points()
 	# Derelict-side fire: per-ship pre-seeded environmental fire (presence-gated, capped).
 	_seed_derelict_fire()
+	# Derelict-side breaches: variant-driven hull breaches (deterministic per seed).
+	_seed_derelict_breaches()
 	_build_fire_zones()
 	# M7-B Task 9: manual extinguish nodes + recharge port share the fire lifecycle.
 	_build_fire_suppression_points()
@@ -2858,6 +2860,21 @@ func _seed_derelict_fire() -> void:
 			break
 		fs.ignite(cid, 1.0)
 		lit += 1
+
+## Away-branch only: force-breaches compartments of rooms carrying a breach-kind
+## variant on the boarded derelict. Deterministic; guarded by breach_seeded so
+## revisits/restores don't re-seed (restored breaches come from the hull summary).
+func _seed_derelict_breaches() -> void:
+	if not away_from_start or current_ship == null:
+		return
+	if current_ship.breach_seeded:
+		return
+	current_ship.breach_seeded = true
+	if hull_integrity_state == null:
+		return
+	for cid in _variant_hazard_compartments("breach"):
+		if hull_integrity_state.compartments.has(str(cid)):
+			hull_integrity_state.damage_compartment(str(cid), 1.0, true)
 
 ## Builds the per-frame context the authoritative fire model ticks against.
 func _build_fire_context() -> Dictionary:
