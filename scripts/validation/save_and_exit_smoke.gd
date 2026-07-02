@@ -95,9 +95,13 @@ func _drive_failure_stage() -> bool:
 ## Review finding 3: after a successful Save & Exit, load the just-written
 ## world save back and assert an observable field (current_objective_sequence)
 ## matches the live session at save time -- existence-only is not enough to
-## prove the write actually reflects the session.
+## prove the write actually reflects the session. Mutated away from the
+## default-init value (1) before saving (Task 12 hardening) so a bug that
+## silently persisted the default would not slip past a 1==1 comparison --
+## mirrors title_screen_flow_smoke.gd's FIXTURE_OBJECTIVE_SEQUENCE pattern.
 func _drive_success_stage() -> bool:
 	var coord = playable.menu_coordinator
+	playable.current_objective_sequence = 2
 	var expected_sequence: int = playable.get_current_objective_sequence()
 	if not _open_pause_menu_and_confirm(coord, "save_and_exit"):
 		return false
