@@ -90,7 +90,7 @@ truth, not a hand-maintained doc.
 | 4 | Ship Systems | `ship_systems` | 🟡 partial | 1 |
 | 5 | Consumables | `consumables` | 🟡 partial | 1, 2 (ammo→combat) |
 | 6 | Progression & Meta | `progression` | 🟡 partial | 2 (kill XP), 8 (persist unlocks) |
-| 7 | Travel / Procgen | `travel` | 🟡 partial | — |
+| 7 | Travel / Procgen | `travel` | 🟢 closed | — |
 | 8 | Save / Persistence | `save` | 🟡 partial | 1 (permadeath needs death) |
 | 9 | Audio | `audio_reactive` | 🔴 broken | — |
 | 10 | UI/UX Polish | `tooltip`, `map_reveal` | 🔴 / 🟡 | — |
@@ -320,32 +320,41 @@ tool XP routes through the bus. Register markers.
 
 ---
 
-### Domain 7: Travel / Procgen  [loop: `travel`, current: 🟡 partial]
+### Domain 7: Travel / Procgen  [loop: `travel`, current: 🟢 closed]
 
 **Loop steps:** the full layout pipeline (template_selector → … → generated_ship_loader) plus
 biome/difficulty tuning and the encounter injector.
 
-**Verified break-points (from inventory):**
-- `room_variant_selector` output is **inert**: `data/procgen/room_variants/` directory is **ABSENT**,
-  so the selector at `ship_layout_generator.gd:74` produces no variation.
-- Structural-template variety (`extended_templates` path) defaults **off** on live derelict generation
-  (`ship_generator.gd:40` passes false).
-- `room_graph_generator` (legacy) is orphaned from the live pipeline (only smokes/dumps reference it).
+**Closed break-points (Domain 7):**
+- Variant effects live in `room_variant_selector.VARIANT_EFFECTS` (code, per Domain-7 spec decision #2)
+  and are consumed: `gameplay_slice_builder` applies `loot_bias`; `playable_generated_ship` drives live
+  fire/breach hazard state for compartment-mapped variant rooms; `generated_ship_loader` records
+  dressing descriptors → rooms vary.
+- Extended structural templates enabled at `deep_dive`/`hardened` difficulty tiers
+  (`ship_generator.gd:_extended_for`), producing visible structural variety.
+- Legacy `room_graph_generator` carries a DEPRECATED banner (line 4); excluded from the travel loop
+  steps and completion % (`loops: []`, `reachable: false`, `driven: false`).
 
 **Definition of CLOSED:**
-1. `data/procgen/room_variants/` exists with real variant data the selector consumes → rooms vary.
-2. Extended structural templates are **enabled** on live generation (or the path is removed if cut),
-   producing visible structural variety.
-3. Legacy `room_graph_generator` is removed or explicitly documented as deprecated/test-only.
+1. Variant effects live in `room_variant_selector.VARIANT_EFFECTS` (code, per Domain-7 spec decision #2) and are consumed: `gameplay_slice_builder` applies `loot_bias`; `playable_generated_ship` drives live fire/breach hazard state for compartment-mapped variant rooms; `generated_ship_loader` records dressing descriptors → rooms vary.
+2. Extended structural templates are **enabled** on live generation at `deep_dive`/`hardened` tiers
+   (`ship_generator.gd:_extended_for`), producing visible structural variety.
+3. Legacy `room_graph_generator` is explicitly documented as deprecated/test-only (DEPRECATED banner
+   at line 4, excluded from travel loop and completion %).
 
 **Away-branch checklist:** N/A (generation is pre-run, not per-frame), but the slice's encounter/loot
-injection must remain deterministic per seed.
+injection must remain deterministic per seed. Fire/breach hazard seeding runs away-branch only
+(`_seed_derelict_fire`/`_seed_derelict_breaches` check `away_from_start`), guarded by
+`fire_seeded`/`breach_seeded` flags on `ShipInstance`.
 
-**Validation:** `procgen_variation_smoke.gd` — assert two different seeds produce distinct room
-variants and structural templates; determinism per seed preserved. Register markers.
+**Validation:** `procgen_variation_smoke.gd` (marker `PROCGEN VARIATION PASS variants_vary=true
+loot_biased=true tmpl_gated=true deterministic=true`) + `procgen_variant_hazard_smoke.gd` (marker
+`PROCGEN VARIANT HAZARD PASS away_ticks=1 fire_lit=true breach_open=true home_clean=true
+guarded=true`). Both registered in the regression bundle (`commands=106`).
 
-**Inventory delta:** `travel.closes → "closed"`; flip `room_variant_selector.output.live`; update
-break-points; mark legacy generator deprecated in inventory.
+**Inventory delta:** `travel.closes → "closed"`; `room_variant_selector.output.live → true`; break-points
+replaced with closure evidence; `room_graph_generator` name/content_note/gaps updated to document
+deprecation.
 
 ---
 

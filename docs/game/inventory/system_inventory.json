@@ -3232,9 +3232,9 @@
         "at": "ship_layout_generator.gd:71-75"
       },
       "output": {
-        "live": false,
-        "desc": "pick() variant string written to room dict (room_assigner.gd:90) and serialized into layout.json (layout_serializer.gd:40,59) but NO live gameplay consumer reads room['variant'] — produced and stored, never used",
-        "at": "room_assigner.gd:90"
+        "live": true,
+        "desc": "VARIANT_EFFECTS (room_variant_selector.gd:112) consumed by three live paths: gameplay_slice_builder._loot_table_for_room reads effects_for(variant).sim.loot_bias to bias room loot tables; generated_ship_loader._build_room_variant_descriptors reads effects_for(variant).dressing into room_variant_descriptors (get_room_variant_descriptors); playable_generated_ship._variant_hazard_compartments reads effects_for(variant).sim.hazard to drive _seed_derelict_fire and _seed_derelict_breaches on compartment-mapped rooms.",
+        "at": "gameplay_slice_builder.gd:_loot_table_for_room; generated_ship_loader.gd:_build_room_variant_descriptors; playable_generated_ship.gd:_variant_hazard_compartments"
       },
       "confidence": "V",
       "loops": [
@@ -3245,20 +3245,19 @@
           "to": "room_assigner",
           "via": "assign_with_selector -> pick() -> room['variant']",
           "at": "ship_layout_generator.gd:74",
-          "health": "weak"
+          "health": "healthy"
         },
         {
           "to": "layout_serializer",
-          "via": "variant serialized into layout rooms (then unread)",
+          "via": "variant serialized into layout rooms, read by loader + slice builder",
           "at": "layout_serializer.gd:40",
-          "health": "weak"
+          "health": "healthy"
         }
       ],
       "content": "partial",
-      "content_note": "RE-VERIFIED V. Independently opened all cited lines: room_assigner.gd:85 _pick_variant -> :90 writes room['variant']; layout_serializer.gd:40 reads room.get('variant') and :59 emits 'variant' into the serialized room_dict; ship_layout_generator.gd:71-75 constructs RoomVariantSelectorScript.new() only when biome non-empty (:72) and drives via assign_with_selector (:74). VARIANTS_BY_ROLE is an in-code table (room_variant_selector.gd:29-103, ~24 roles), NOT data-driven from data/procgen/room_variants/. Output confirmed DEAD: grep of generated_ship_loader/gameplay_slice_builder/readability_prop_factory/playable_generated_ship for 'variant' returns only local *_variant Variant-typed loop variables (e.g. rooms_variant, room_variant, module_variant) — none read the serialized room['variant'] field. Inert despite full upstream wiring.",
+      "content_note": "Domain 7 closed the output gap. VARIANT_EFFECTS const (room_variant_selector.gd:112) is an in-code table mapping variants to loot_bias/hazard/dressing effects. effects_for() accessor is consumed by gameplay_slice_builder._loot_table_for_room (loot_bias), generated_ship_loader._build_room_variant_descriptors (dressing), and playable_generated_ship._variant_hazard_compartments (fire/breach hazard seeding on compartment-mapped rooms). No per-biome variant lists yet (biome param accepted but every biome uses the same default table).",
       "functional": null,
       "gaps": [
-        "no live gameplay consumer reads the serialized room['variant'] field — selector output is dead despite being constructed, driven, and serialized",
         "no per-biome variant lists yet (biome param accepted but every biome uses the same default table)"
       ],
       "subsystems": []
@@ -3665,7 +3664,7 @@
     {
       "id": "room_graph_generator",
       "file": "scripts/procgen/room_graph_generator.gd",
-      "name": "Room Graph Generator (legacy)",
+      "name": "Room Graph Generator (DEPRECATED, test-only)",
       "domain": "procgen",
       "kind": "simulation",
       "model_exists": true,
@@ -3675,12 +3674,12 @@
       "driven_at": null,
       "input": {
         "live": false,
-        "desc": "seed/archetype -> room graph (legacy generator)",
+        "desc": "seed/archetype -> room graph (legacy generator, DEPRECATED Domain 7)",
         "at": null
       },
       "output": {
         "live": false,
-        "desc": "room graph; superseded by CellLayoutEngine pipeline",
+        "desc": "room graph; superseded by CellLayoutEngine pipeline. DEPRECATED Domain 7: file carries DEPRECATED banner (room_graph_generator.gd:4); excluded from travel loop and completion %.",
         "at": null
       },
       "confidence": "V",
@@ -3694,10 +3693,10 @@
         }
       ],
       "content": "none",
-      "content_note": "Verified orphaned: grep for RoomGraphGenerator/room_graph_generator hits only validation/dump scripts (derelict_generator_smoke, archetype_load_smoke, ship_generator_smoke, ship_dump, ship_data_export, procgen_stress_test, its own smoke) + itself. No production .gd in scripts/procgen references it. Not wired into the live layout pipeline.",
+      "content_note": "DEPRECATED Domain 7 (2026-07-01). Orphaned from the live generation pipeline; the live path is TemplateSelector -> RoomAssigner -> CellLayoutEngine -> WallDoorResolver -> LayoutSerializer -> GeneratedShipLoader. Only exercised by smokes/dumps. File carries a DEPRECATED banner at line 4. Excluded from the travel loop steps and completion % (loops: [], reachable: false, driven: false).",
       "functional": null,
       "gaps": [
-        "orphaned: superseded by ShipLayoutGenerator/CellLayoutEngine; only exercised by smokes/dumps"
+        "DEPRECATED: orphaned from live pipeline (Domain 7); superseded by ShipLayoutGenerator/CellLayoutEngine; retained for smoke/dump tooling only"
       ],
       "subsystems": []
     },
@@ -8641,7 +8640,7 @@
     {
       "id": "travel",
       "name": "Derelict travel & procedural generation",
-      "closes": "partial",
+      "closes": "closed",
       "steps": [
         {
           "system": "playable_generated_ship",
@@ -8701,9 +8700,9 @@
         }
       ],
       "break_points": [
-        "room_variant_selector output is inert: data/procgen/room_variants/ directory is ABSENT (does not exist), so the constructed selector at ship_layout_generator.gd:74 produces no variation",
-        "structural-template variety (extended_templates path) defaults off on the live derelict generation (ship_generator.gd:40 passes false)",
-        "room_graph_generator (legacy) orphaned from the live pipeline; only smokes/dumps reference it"
+        "Variant effects live in room_variant_selector.VARIANT_EFFECTS (effects_for); gameplay_slice_builder applies loot_bias to room loot_table (gameplay_slice_builder.gd:_loot_table_for_room); generated_ship_loader records dressing descriptors (generated_ship_loader.gd:get_room_variant_descriptors).",
+        "Fire/breach variants on compartment-mapped rooms drive live derelict hazard state: _seed_derelict_fire forces ignition via current_ship.get_fire() (playable_generated_ship.gd) and _seed_derelict_breaches force-breaches hull via current_ship.get_hull() (playable_generated_ship.gd), away-branch, guarded by fire_seeded/breach_seeded.",
+        "Extended structural templates enabled at deep_dive/hardened (ship_generator.gd:_extended_for); legacy room_graph_generator deprecated/test-only (excluded from completion %)."
       ]
     },
     {
