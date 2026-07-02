@@ -93,6 +93,18 @@ func _build_stream_players() -> void:
 		add_child(player)
 		_bus_players[String(bus_id)] = player
 
+## Translate a pure-model bus id (lowercase, e.g. &"master") to the engine's
+## AudioServer bus name. Godot's bus 0 is immutably named "Master" (capital
+## M) and AudioServer.get_bus_index("master") always returns -1 for it; the
+## six child buses (sfx/music/voice/ui/ambient/meta) need no translation
+## because their names already match between the pure model and the engine.
+## This is the ONLY place the Master-name mismatch is bridged — every
+## AudioServer boundary call goes through this helper (ADR-0044).
+func _engine_bus_name(bus_id: StringName) -> String:
+	if String(bus_id) == String(AudioEventSeamScript.BUS_MASTER):
+		return "Master"
+	return String(bus_id)
+
 ## Push per-bus dB values into AudioServer. Skipped for buses that
 ## AudioServer doesn't know about (e.g. in headless tests where the
 ## .tres has not been loaded). The pure-model state remains the source
@@ -104,7 +116,8 @@ func _apply_bus_volumes() -> void:
 		var bus_id: String = String(bus.get("id", ""))
 		if bus_id.is_empty():
 			continue
-		var bus_idx: int = AudioServer.get_bus_index(bus_id)
+		var engine_name: String = _engine_bus_name(StringName(bus_id))
+		var bus_idx: int = AudioServer.get_bus_index(engine_name)
 		if bus_idx < 0:
 			# Bus not registered in AudioServer yet (headless / pre-init).
 			# Skip without error so the manager survives --script mode.
