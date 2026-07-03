@@ -7657,6 +7657,13 @@ func _reset_runtime_for_reload() -> void:
 		# Co-presence: home hull / loader / gameplay roots were never detached —
 		# no re-attach needed here (contrast with old single-active model).
 		away_from_start = false
+		# Domain 10 Task 5 fix wave 2 (re-review): third away_from_start=false
+		# transition — reload-while-away. Same stale-focus-cache root cause as the
+		# board/unboard sites: reset the subject cache and force-clear the tooltip
+		# panel so a same-typed interactable after reload is not suppressed.
+		_last_tooltip_focus_subject_id = ""
+		if is_instance_valid(menu_coordinator):
+			menu_coordinator.set_tooltip_query({"subject_kind": "interactable", "subject_id": ""})
 		# Phase 5a Task 6: keep occupancy in lockstep — reload returns to the home
 		# ship (home hull is never detached under co-presence, so home_ship is valid).
 		current_occupancy = home_ship
