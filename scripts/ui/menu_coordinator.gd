@@ -241,6 +241,10 @@ func set_hotbar_slots(slot_labels: Array, selected_index: int = 0) -> void:
 	_selected_hotbar_index = clampi(selected_index, 0, max(0, _hotbar_slot_labels.size() - 1))
 	_refresh_hotbar()
 
+## Two gameplay pushers call this (ADR-0045): PlayableGeneratedShip's
+## proximity focus (_refresh_tooltip_focus) and InventoryPanel's selection
+## push (tooltip_query_push). Arbitration between them is deliberately
+## absent -- whichever calls last wins, there is no priority/lock concept.
 func set_tooltip_query(query: Dictionary) -> void:
 	tooltip_presenter.resolve(query)
 

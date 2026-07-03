@@ -7900,14 +7900,11 @@ func _input(event: InputEvent) -> void:
 				chart_panel.close()
 				get_viewport().set_input_as_handled()
 			return  # swallow other input while the chart is open (read-only panel)
-		if event.is_action_pressed("ui_open_map"):
+		if event.is_action_pressed("ui_open_map") and (not is_instance_valid(inventory_panel) or not inventory_panel.is_open()):
 			var has_chart: bool = inventory_state != null and int(inventory_state.get_quantity("web_chart")) > 0
 			if has_chart:
 				chart_panel.open()
-				if player != null:
-					player.set_physics_process(false)
-					player.set_process_input(false)
-					player.set_process_unhandled_input(false)
+				_freeze_player_for_panel()
 			else:
 				# Domain 10 (ADR-0045): no chart possessed -- surface a HUD feedback
 				# line via the existing system-status-lines seam (mirrors

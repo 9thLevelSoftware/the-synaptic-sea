@@ -9,6 +9,12 @@ extends SceneTree
 ##      ever incremented ONCE for that focus change (change-gated, not spammed).
 ##  (b) leaving the interactable's range clears the focus.
 ##  (c) selecting exactly one inventory item pushes an item tooltip.
+##  (c.1) panel-stacking guard: with the inventory panel open, ui_open_map
+##      (KEY_M) must NOT open the chart panel underneath it, and the
+##      inventory panel must remain open/functional afterward (final-review
+##      finding 1). This does not change the PASS marker's byte contract --
+##      it gates PASS via the existing _fail() machinery like every other
+##      assertion in this file.
 ##  (d) ui_open_map without a chart -> gate feedback, panel stays closed.
 ##  (e) granting a web_chart + scanning -> chart panel renders the recorded marker.
 ## Frees the scene on both the pass and fail exit paths. Writes nothing to disk.
@@ -16,7 +22,10 @@ extends SceneTree
 ## (away_ticks totals the _process calls in _setup_away_and_focus (3) + the
 ## two no-op change-gating ticks + the one clear-focus tick in
 ## _validate_focus_and_clear (3) = 6; if the actual run prints a different
-## number, that printed value is the byte-exact contract, not this comment.)
+## number, that printed value is the byte-exact contract, not this comment.
+## The panel-stacking interleave added for finding 1b drives its two-phase
+## send/check via inventory_panel state and KEY_M dispatch only -- it does
+## NOT call playable._process(), so it does not perturb this count.)
 ##
 ## Implementation deviations from the task-8 brief, found while verifying
 ## against the live coordinator (both required a real fix, not a smoke-only
@@ -98,9 +107,27 @@ func _on_process_frame() -> void:
 			_validate_chart_gate(playable)
 			phase = 6
 		6:
-			_send_chart_open_probe(playable)
+			_grant_chart_and_repair(playable)
 			phase = 7
 		7:
+			# Panel-stacking guard (final-review finding 1). The chart is now
+			# possessed, so this is the only point in the run where the
+			# regression (ui_open_map ignoring an open inventory panel) is
+			# actually observable -- gating this probe before the chart is
+			# granted would be vacuous, since the "no chart" branch never
+			# opens chart_panel regardless of the guard.
+			_send_inventory_open_chart_stack_probe(playable)
+			phase = 8
+		8:
+			# Same one-frame dispatch-delay rule as every other probe here: the
+			# KEY_M sent in phase 7 is only queued, not yet delivered to
+			# _input(), until this next process_frame.
+			_validate_inventory_open_chart_stack_probe(playable)
+			phase = 9
+		9:
+			_send_chart_open_probe(playable)
+			phase = 10
+		10:
 			_validate_chart_recording(playable)
 			if not finished:
 				finished = true
@@ -230,11 +257,13 @@ func _validate_chart_gate(playable: PlayableGeneratedShip) -> void:
 ## detail_level on the current ship's "navigation" system being operational --
 ## a fresh boot's hub starts unrepaired, so an ungated scan() would otherwise
 ## always return detail_level=0; travel_integration_smoke establishes the same
-## precondition via the same seam), scans (which auto-records the chart per
-## scan()'s Domain 10 Source B contract), then sends the KEY_M open-probe.
-## Same one-frame dispatch-delay rule as _send_chart_gate_probe applies -- the
-## panel-open assertion happens one phase later in _validate_chart_recording.
-func _send_chart_open_probe(playable: PlayableGeneratedShip) -> void:
+## precondition via the same seam), and scans (which auto-records the chart
+## per scan()'s Domain 10 Source B contract). Split from the KEY_M open-probe
+## (now sent later, in _send_chart_open_probe) so the panel-stacking guard
+## below can be exercised with a chart already possessed -- that guard is
+## vacuous before the chart exists, since the no-chart branch never opens
+## chart_panel regardless of the guard.
+func _grant_chart_and_repair(playable: PlayableGeneratedShip) -> void:
 	playable.inventory_state.add_item("web_chart", 1)
 	playable.force_repair_all_for_validation()
 	var scan_result: Dictionary = playable.scan()
@@ -244,6 +273,53 @@ func _send_chart_open_probe(playable: PlayableGeneratedShip) -> void:
 	if int(playable.web_chart_state.get_known_count()) < 1:
 		_fail("web_chart_state recorded nothing after scan with chart possessed")
 		return
+
+## Final-review finding 1: panel-stacking guard. A web_chart is now possessed
+## (granted by _grant_chart_and_repair above), so ui_open_map WOULD open
+## chart_panel if pressed with no inventory panel open -- this is the only
+## point in the run where the panel-stacking regression (ui_open_map ignoring
+## an already-open inventory panel) is actually observable. Opens the
+## inventory panel, then sends ui_open_map (KEY_M) while it is open. Only
+## sends the key here -- the same Input.parse_input_event() dispatch-delay
+## rule as every other probe in this file applies, so the assertion happens
+## one phase later in _validate_inventory_open_chart_stack_probe.
+func _send_inventory_open_chart_stack_probe(playable: PlayableGeneratedShip) -> void:
+	if playable.inventory_state.get_quantity("web_chart") <= 0:
+		_fail("test setup error: web_chart not possessed before stacking check")
+		return
+	playable._open_inventory_self()
+	if not playable.inventory_panel.is_open():
+		_fail("inventory panel did not open for the panel-stacking probe")
+		return
+	_send_action(KEY_M)
+
+## Asserts the guarded chart branch (playable_generated_ship.gd _input, finding
+## 1's fix) rejected the KEY_M press while the inventory panel was open, even
+## though a web_chart is possessed (so the gate-without-chart path above
+## cannot be masking a stacking regression here): the chart panel must NOT
+## have opened, and the inventory panel must still be open and functional
+## (closing it here doubles as the "still functional" proof -- a
+## frozen/broken panel would leave is_open() true after close()).
+func _validate_inventory_open_chart_stack_probe(playable: PlayableGeneratedShip) -> void:
+	if finished:
+		return
+	if playable.chart_panel != null and playable.chart_panel.is_open():
+		_fail("chart_panel opened while inventory panel was open (panel-stacking regression)")
+		return
+	if not playable.inventory_panel.is_open():
+		_fail("inventory panel closed itself after the guarded KEY_M press (should have swallowed input)")
+		return
+	playable.inventory_panel.close()
+	if playable.inventory_panel.is_open():
+		_fail("inventory panel did not close on demand after the stacking probe (frozen)")
+		return
+
+## Sends the KEY_M open-probe now that the chart is possessed (granted by
+## _grant_chart_and_repair) and the inventory panel is closed (by the
+## stacking probe above). Same one-frame dispatch-delay rule as every other
+## probe applies -- the panel-open assertion happens one phase later in
+## _validate_chart_recording.
+func _send_chart_open_probe(playable: PlayableGeneratedShip) -> void:
 	_send_action(KEY_M)
 
 func _validate_chart_recording(playable: PlayableGeneratedShip) -> void:
