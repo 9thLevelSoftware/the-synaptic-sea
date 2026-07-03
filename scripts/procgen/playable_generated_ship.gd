@@ -8,6 +8,8 @@ const IsoCameraRigScript := preload("res://scripts/camera/iso_camera_rig.gd")
 const InteractableScript := preload("res://scripts/interaction/interactable.gd")
 const ObjectiveTrackerScript := preload("res://scripts/ui/objective_tracker.gd")
 const ScannerPanelScript := preload("res://scripts/ui/scanner_panel.gd")
+const ChartPanelScript := preload("res://scripts/ui/chart_panel.gd")
+const WebChartStateScript := preload("res://scripts/systems/web_chart_state.gd")
 const InventoryPanelScript := preload("res://scripts/ui/inventory_panel.gd")
 const AccessibilitySettingsScript := preload("res://scripts/ui/accessibility_settings.gd")
 const MenuCoordinatorScript := preload("res://scripts/ui/menu_coordinator.gd")
@@ -183,6 +185,8 @@ var player
 var camera_rig
 var hud_layer: CanvasLayer
 var scanner_panel   # ScannerPanel
+var chart_panel      # ChartPanel
+var web_chart_state = WebChartStateScript.new()
 var inventory_panel
 var tracker
 var vitals_model            # PlayerVitalsModel
@@ -1965,7 +1969,13 @@ func scan() -> Dictionary:
 	var skill: int = 0
 	if player_progression != null and player_progression.has_method("get_skill_level"):
 		skill = int(player_progression.get_skill_level("scanner_operation"))
-	return scanner_state.scan(synaptic_sea_world, ops, skill)
+	var result: Dictionary = scanner_state.scan(synaptic_sea_world, ops, skill)
+	# Domain 10 (ADR-0045) Source B: a possessed web_chart auto-records every
+	# scan's markers at the scan's own detail_level. Scanning without a chart
+	# records nothing (nothing to write on) -- no RNG, fully deterministic.
+	if inventory_state != null and int(inventory_state.get_quantity("web_chart")) > 0:
+		web_chart_state.record_views(result.get("markers", []) as Array, int(result.get("detail_level", 0)))
+	return result
 
 ## Resolves a marker by id from the in-range set and travels to it. Returns
 ## {success:false, reason:"unknown_marker"} if the id is not currently in range.
@@ -4121,6 +4131,14 @@ func _build_hud_layer() -> void:
 	# Restore player control on every panel close path via the signal, not just
 	# the two close paths wired into _input.
 	scanner_panel.panel_closed.connect(_on_scanner_panel_closed)
+	chart_panel = ChartPanelScript.new()
+	chart_panel.name = "ChartPanel"
+	chart_panel.visible = false
+	hud_layer.add_child(chart_panel)
+	chart_panel.bind(web_chart_state)
+	# Restore player control on every panel close path via the signal, not just
+	# the toggle-close path wired into _input.
+	chart_panel.panel_closed.connect(_on_chart_panel_closed)
 	inventory_panel = InventoryPanelScript.new()
 	inventory_panel.name = "InventoryPanel"
 	inventory_panel.visible = false
@@ -4174,6 +4192,12 @@ func _build_hud_layer() -> void:
 	menu_coordinator.open_main_menu()
 
 func _on_scanner_panel_closed() -> void:
+	if player != null:
+		player.set_physics_process(true)
+		player.set_process_input(true)
+		player.set_process_unhandled_input(true)
+
+func _on_chart_panel_closed() -> void:
 	if player != null:
 		player.set_physics_process(true)
 		player.set_process_input(true)
@@ -7494,6 +7518,22 @@ func _postprocess_loot_grants(granted: Array, source_id: String) -> void:
 			meta_progression_state.unlock_codex_entry(codex_entry_id)
 		if equipment_state != null and item_id != "" and equipment_state.can_equip(item_id):
 			_equip_from_inventory(item_id, true)
+		# Domain 10 (ADR-0045) Source A: a found web_chart imports every currently
+		# in-range world marker at detail 2 (position + ship_type), the "paper map"
+		# import. Idempotent (record_views never downgrades), so repeat pickups are
+		# harmless -- no first-pickup tracking is needed. Deterministic, no RNG.
+		if item_id == "web_chart" and synaptic_sea_world != null:
+			var scan_range: float = scanner_state.range_radius if scanner_state != null else 250.0
+			var import_views: Array = []
+			for m in synaptic_sea_world.markers_in_range(scan_range):
+				import_views.append({
+					"marker_id": m.marker_id,
+					"position": [m.position.x, m.position.y, m.position.z],
+					"distance": m.position.distance_to(synaptic_sea_world.player_position),
+					"size_class": m.size_class,
+					"ship_type": m.ship_type,
+				})
+			web_chart_state.record_views(import_views, 2)
 	var first: Dictionary = granted[0] as Dictionary
 	var rarity_text: String = RarityTierScript.label(str(first.get("rarity", "common")))
 	_last_loot_feedback_line = "Loot: %s x%d [%s]" % [
@@ -7775,6 +7815,27 @@ func _input(event: InputEvent) -> void:
 				scanner_panel.confirm_selection()
 				get_viewport().set_input_as_handled()
 			return  # swallow other input while the scanner is open
+	if chart_panel != null:
+		if chart_panel.is_open():
+			if event.is_action_pressed("ui_open_map") or event.is_action_pressed("ui_cancel"):
+				chart_panel.close()
+				get_viewport().set_input_as_handled()
+			return  # swallow other input while the chart is open (read-only panel)
+		if event.is_action_pressed("ui_open_map"):
+			var has_chart: bool = inventory_state != null and int(inventory_state.get_quantity("web_chart")) > 0
+			if has_chart:
+				chart_panel.open()
+				if player != null:
+					player.set_physics_process(false)
+					player.set_process_input(false)
+					player.set_process_unhandled_input(false)
+			else:
+				# Domain 10 (ADR-0045): no chart possessed -- surface a HUD feedback
+				# line via the existing system-status-lines seam (mirrors
+				# _last_loot_feedback_line) rather than opening an empty panel.
+				_last_loot_feedback_line = "No web chart"
+			get_viewport().set_input_as_handled()
+			return
 	if is_instance_valid(inventory_panel):
 		if inventory_panel.is_open():
 			if event.is_action_pressed("toggle_inventory") or event.is_action_pressed("ui_cancel"):
