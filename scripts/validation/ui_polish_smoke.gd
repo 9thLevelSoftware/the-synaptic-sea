@@ -147,6 +147,9 @@ func _validate_focus_and_clear(playable: PlayableGeneratedShip) -> void:
 		_fail("tooltip focus empty after moving player into interactable range")
 		return
 	var ui = playable.get_menu_coordinator_for_validation()
+	if ui == null:
+		_fail("menu coordinator missing")
+		return
 	if ui.get_tooltip_panel_text().is_empty():
 		_fail("tooltip panel text empty after focus")
 		return
@@ -196,6 +199,9 @@ func _validate_inventory_tooltip(playable: PlayableGeneratedShip) -> void:
 		return
 	playable.inventory_panel.select_row("self", idx, false, false)
 	var ui = playable.get_menu_coordinator_for_validation()
+	if ui == null:
+		_fail("menu coordinator missing")
+		return
 	if ui.get_tooltip_panel_text().find("Circuit Board") == -1:
 		_fail("inventory selection did not push item tooltip")
 		return

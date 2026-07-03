@@ -47,7 +47,14 @@ func _on_process_frame() -> void:
 			_drive_to_in_play()
 			phase = 4
 		4:
-			if _validate_runtime(playable, ui):
+			if _validate_runtime_pre_chart(playable, ui):
+				phase = 5
+		5:
+			# Input.parse_input_event()-queued events are only dispatched to
+			# _input() on the NEXT process_frame, not synchronously -- this
+			# phase boundary is the required one-frame wait before the KEY_M
+			# sent in phase 4 has actually reached PlayableGeneratedShip._input.
+			if _validate_chart_gate(playable):
 				finished = true
 				print("MAIN PLAYABLE UI SHELL PASS boot=main_menu pause=true codex=1 hotbar=true tooltip=true chart_gated=true")
 				quit(0)
@@ -84,7 +91,7 @@ func _drive_to_in_play() -> void:
 	_send_action(KEY_ESCAPE)
 	_send_action(KEY_F1)
 
-func _validate_runtime(playable: PlayableGeneratedShip, ui) -> bool:
+func _validate_runtime_pre_chart(playable: PlayableGeneratedShip, ui) -> bool:
 	if ui.get_current_menu() != "codex":
 		_fail("codex not opened from pause/menu flow: %s" % ui.get_current_menu())
 		return false
@@ -108,8 +115,14 @@ func _validate_runtime(playable: PlayableGeneratedShip, ui) -> bool:
 		return false
 	# Domain 10 (ADR-0045): no web_chart possessed in this smoke run -- ui_open_map
 	# must be gate-rejected (chart_panel never opens) rather than silently opening
-	# an empty panel.
+	# an empty panel. Input.parse_input_event() only queues the events for
+	# dispatch on the NEXT process_frame, so the assertion cannot happen in
+	# this same call -- it runs one phase later in _validate_chart_gate, once
+	# _input has genuinely run.
 	_send_action(KEY_M)
+	return true
+
+func _validate_chart_gate(playable: PlayableGeneratedShip) -> bool:
 	if playable.chart_panel != null and playable.chart_panel.is_open():
 		_fail("chart_panel opened without a possessed web_chart")
 		return false
