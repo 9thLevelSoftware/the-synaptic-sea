@@ -9,6 +9,7 @@ var sequence: int = 0
 var objective_type: String = ""
 var room_id: String = ""
 var prompt_text: String = "Interact"
+var tooltip_subject_id: String = ""
 var completed: bool = false
 var active: bool = true
 var interaction_radius: float = 1.8
@@ -38,6 +39,7 @@ func configure_from_objective(objective: Dictionary, world_position: Vector3, ra
 	room_id = str(objective.get("room_id", ""))
 	interaction_id = "objective:%02d:%s" % [sequence, objective_id]
 	prompt_text = "Interact: %s" % objective_type
+	tooltip_subject_id = objective_type
 	active = true
 	interaction_radius = radius
 	completed = false
@@ -65,6 +67,7 @@ func configure_from_step(objective: Dictionary, step: Dictionary, world_position
 		step_id = "step_%s" % interaction_id
 	interaction_id = "%s:%s" % [interaction_id, step_id]
 	prompt_text = "Repair: %s" % step_id
+	tooltip_subject_id = "junction_step"
 	name = "Interactable_seq%d_step_%s" % [sequence, step_id]
 	set_meta("step_id", step_id)
 	set_meta("is_step", true)

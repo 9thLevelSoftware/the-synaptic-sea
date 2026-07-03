@@ -112,6 +112,14 @@
       "title": "Fire Extinguisher",
       "body": "Single-use. Clears a burning room.",
       "footer": ""
+    },
+    {
+      "id": "interactable_junction_step",
+      "subject_kind": "interactable",
+      "subject_id": "junction_step",
+      "title": "Repair Step",
+      "body": "One of several steps required to complete this junction repair.",
+      "footer": "[E] Repair"
     }
   ]
 }

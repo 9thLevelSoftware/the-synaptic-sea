@@ -323,6 +323,7 @@ var _last_loot_feedback_line: String = ""
 # another line folded into _combined_system_status_lines(). Multiple
 # captions arriving in one frame keep only the most recent (pump order).
 var _last_caption_line: String = ""
+var _last_tooltip_focus_subject_id: String = ""
 var _caption_expiry_seconds: float = 0.0
 var _home_player_position: Vector3 = Vector3.ZERO
 # Narrative objective flags with no manager backing (supplies/logs). Set on
@@ -4547,6 +4548,44 @@ func _refresh_ui_shell_runtime() -> void:
 	menu_coordinator.set_hotbar_slots(_get_consumable_slot_labels())
 	_refresh_weapon_hotbar()
 
+## Domain 10 (ADR-0045) tooltip trigger 1: proximity focus on interactables.
+## Called from BOTH _process branches (mirrors _refresh_audio_state's dual
+## wiring -- the derelict field run is the PRIMARY gameplay context, so this
+## must not be home-only). Scans the live interactable collections
+## (candidate_player is already maintained by Interactable's own
+## body_entered/body_exited physics callbacks -- this scan is read-only) for
+## the nearest node whose candidate_player == player, and calls
+## set_tooltip_query ONLY when the focused subject id changes (TooltipPresenter.
+## resolve() emits payload_changed unconditionally on every call, so an
+## unguarded per-frame call here would spam the signal). On focus lost, pushes
+## an empty subject_id -- an unknown/empty id resolves to a null payload
+## (TooltipPresenter's existing graceful path), which hides the panel.
+func _refresh_tooltip_focus() -> void:
+	if not is_instance_valid(menu_coordinator) or player == null:
+		return
+	var nearest: Node = null
+	var nearest_dist: float = INF
+	var player_pos: Vector3 = (player as Node3D).global_position if player is Node3D else Vector3.ZERO
+	for collection in [interactables, derelict_interactables]:
+		for it in collection:
+			if not is_instance_valid(it) or it.candidate_player != player:
+				continue
+			var it_pos: Vector3 = (it as Node3D).global_position if it is Node3D else Vector3.ZERO
+			var dist: float = it_pos.distance_to(player_pos)
+			if dist < nearest_dist:
+				nearest_dist = dist
+				nearest = it
+	var subject_id: String = String(nearest.tooltip_subject_id) if nearest != null else ""
+	if subject_id == _last_tooltip_focus_subject_id:
+		return
+	_last_tooltip_focus_subject_id = subject_id
+	menu_coordinator.set_tooltip_query({"subject_kind": "interactable", "subject_id": subject_id})
+
+## Validation seam: the last subject_id pushed by _refresh_tooltip_focus
+## (matches the get_last_caption_line() convention).
+func get_focused_tooltip_subject_for_validation() -> String:
+	return _last_tooltip_focus_subject_id
+
 func _on_ui_modal_opened(_menu_id: String) -> void:
 	_freeze_player_for_panel()
 
@@ -5383,6 +5422,9 @@ func _process(delta: float) -> void:
 			stimulant_state.tick(delta, addiction_state, _consumable_pipeline_context())
 		if addiction_state != null:
 			addiction_state.tick(delta, status_effects_state)
+		# Domain 10 (ADR-0045): proximity tooltip focus on the away branch too --
+		# the derelict field run is the PRIMARY exploration context.
+		_refresh_tooltip_focus()
 		return
 	if not playable_started or slice_complete:
 		return
@@ -5441,6 +5483,8 @@ func _process(delta: float) -> void:
 	if is_instance_valid(audio_manager) and audio_manager.has_method("tick"):
 		audio_manager.tick(delta)
 		_refresh_audio_state(false, delta)
+	# Domain 10 (ADR-0045): proximity tooltip focus on the home branch too.
+	_refresh_tooltip_focus()
 
 ## Domain 1 (survival_vitals): the single survival-attrition tick, called from
 ## BOTH _process branches so radiation / body-temperature / status / the vitals
