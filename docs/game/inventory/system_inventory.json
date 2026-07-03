@@ -4957,6 +4957,84 @@
       "subsystems": []
     },
     {
+      "id": "web_chart_state",
+      "file": "scripts/systems/web_chart_state.gd",
+      "name": "Web Chart State",
+      "domain": "ui",
+      "kind": "ui",
+      "model_exists": true,
+      "smoke": "scripts/validation/web_chart_state_smoke.gd",
+      "reachable": true,
+      "driven": true,
+      "driven_at": "playable_generated_ship.gd:scan",
+      "input": {
+        "live": true,
+        "desc": "record_views merged from two sources: scan() when web_chart possessed (Source B), and _postprocess_loot_grants on a found web_chart pickup (Source A, detail 2 import)",
+        "at": "playable_generated_ship.gd:scan, _postprocess_loot_grants"
+      },
+      "output": {
+        "live": true,
+        "desc": "known markers rendered by chart_panel",
+        "at": "chart_panel.gd:refresh"
+      },
+      "confidence": "V",
+      "loops": [
+        "map_reveal"
+      ],
+      "integrations": [
+        {
+          "to": "chart_panel",
+          "via": "get_known_marker_ids/get_entry read by refresh()",
+          "at": "chart_panel.gd:refresh",
+          "health": "healthy"
+        }
+      ],
+      "content": "sufficient",
+      "content_note": "ADR-0045: session-only by user decision -- no get_summary/apply_summary/SAVE_KEY (deliberate, not a gap).",
+      "functional": true,
+      "gaps": [],
+      "subsystems": []
+    },
+    {
+      "id": "chart_panel",
+      "file": "scripts/ui/chart_panel.gd",
+      "name": "Chart Panel",
+      "domain": "ui",
+      "kind": "ui",
+      "model_exists": true,
+      "smoke": "scripts/validation/ui_polish_smoke.gd",
+      "reachable": true,
+      "driven": true,
+      "driven_at": "playable_generated_ship.gd:_input",
+      "input": {
+        "live": true,
+        "desc": "opened by ui_open_map only when inventory_state.get_quantity('web_chart') > 0; otherwise gated with a HUD feedback line",
+        "at": "playable_generated_ship.gd:_input"
+      },
+      "output": {
+        "live": true,
+        "desc": "renders web_chart_state's known markers as text rows; read-only, no travel action",
+        "at": "chart_panel.gd:_render"
+      },
+      "confidence": "V",
+      "loops": [
+        "map_reveal"
+      ],
+      "integrations": [
+        {
+          "to": "web_chart_state",
+          "via": "bind() + get_known_marker_ids/get_entry",
+          "at": "chart_panel.gd:bind",
+          "health": "healthy"
+        }
+      ],
+      "content": "partial",
+      "content_note": "ADR-0045: text-only rows (ScannerPanel presentation style); visual/graphical map pass is an explicit documented deferral.",
+      "functional": true,
+      "gaps": [],
+      "subsystems": []
+    },
+    {
       "id": "tooltip_presenter",
       "file": "scripts/systems/tooltip_presenter.gd",
       "name": "Tooltip Presenter",
@@ -4968,9 +5046,9 @@
       "driven": true,
       "driven_at": "menu_coordinator.gd:234",
       "input": {
-        "live": false,
-        "desc": "resolve(query) only called from set_tooltip_query (coordinator:233-234), whose ONLY callers are two validation smokes — no live gameplay source",
-        "at": "main_playable_ui_shell_smoke.gd:109"
+        "live": true,
+        "desc": "resolve(query) called from set_tooltip_query, driven by two live gameplay triggers (ADR-0045): PlayableGeneratedShip._refresh_tooltip_focus (proximity focus, both _process branches) and InventoryPanel.select_row's injected tooltip_query_push (single-item selection)",
+        "at": "playable_generated_ship.gd:_refresh_tooltip_focus, inventory_panel.gd:select_row"
       },
       "output": {
         "live": true,
@@ -4986,15 +5064,13 @@
           "to": "tooltip_panel",
           "via": "payload_changed",
           "at": "menu_coordinator.gd:108",
-          "health": "weak"
+          "health": "healthy"
         }
       ],
       "content": "sufficient",
-      "content_note": "VERIFIED input.live=false: grep confirms set_tooltip_query callers are ONLY main_playable_ui_shell_smoke.gd:109 and main_playable_slice_ui_shell_smoke.gd:105 — no gameplay hover/focus source",
-      "functional": null,
-      "gaps": [
-        "no live gameplay caller of set_tooltip_query (hover/focus never wired) — tooltip path is smoke-only"
-      ],
+      "content_note": "VERIFIED input.live=true (ADR-0045): set_tooltip_query is now called live from playable_generated_ship.gd's _refresh_tooltip_focus (proximity focus, wired on both _process branches -- away 5449, home 5509) and from inventory_panel.gd's select_row via the injected tooltip_query_push callable (menu_coordinator.gd:set_tooltip_query bound at playable_generated_ship.gd:4214). The two validation-smoke callers (main_playable_ui_shell_smoke.gd:112, main_playable_slice_ui_shell_smoke.gd:108) remain but are no longer the only callers.",
+      "functional": true,
+      "gaps": [],
       "subsystems": []
     },
     {
@@ -8828,8 +8904,8 @@
     },
     {
       "id": "tooltip",
-      "name": "Hover/focus -> tooltip",
-      "closes": "broken",
+      "name": "Proximity focus + inventory selection -> tooltip",
+      "closes": "closed",
       "steps": [
         {
           "system": "tooltip_presenter",
@@ -8840,9 +8916,23 @@
           "role": "sink"
         }
       ],
-      "break_points": [
-        "set_tooltip_query has no live gameplay caller — only main_playable_ui_shell_smoke.gd:109 and main_playable_slice_ui_shell_smoke.gd:105 (verified by grep) — tooltip never appears in real play"
-      ]
+      "break_points": []
+    },
+    {
+      "id": "map_reveal",
+      "name": "Scanner contacts / found charts -> web chart",
+      "closes": "closed",
+      "steps": [
+        {
+          "system": "web_chart_state",
+          "role": "recorder"
+        },
+        {
+          "system": "chart_panel",
+          "role": "sink (render)"
+        }
+      ],
+      "break_points": []
     }
   ]
 }
