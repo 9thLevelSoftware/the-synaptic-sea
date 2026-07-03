@@ -6262,6 +6262,12 @@ func get_audio_manager() -> Node:
 func get_last_caption_line() -> String:
 	return _last_caption_line
 
+## Validation seam: the most recent loot-feedback line (mirrors
+## get_last_caption_line()). Domain 10 (ADR-0045) reuses this seam for the
+## "No web chart" ui_open_map gate-rejection feedback.
+func get_last_loot_feedback_line_for_validation() -> String:
+	return _last_loot_feedback_line
+
 func get_audio_bus_player_count() -> int:
 	if audio_manager == null:
 		return 0
