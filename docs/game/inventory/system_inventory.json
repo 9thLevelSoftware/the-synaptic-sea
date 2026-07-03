@@ -5241,9 +5241,9 @@
       "driven": true,
       "driven_at": "menu_coordinator.gd:719",
       "input": {
-        "live": false,
-        "desc": "only set_payload from tooltip_presenter.payload_changed, which is only smoke-driven (set_tooltip_query has no gameplay caller)",
-        "at": "menu_coordinator.gd:719-723"
+        "live": true,
+        "desc": "set_payload from tooltip_presenter.payload_changed, which is now driven live (ADR-0045) by two gameplay triggers upstream: PlayableGeneratedShip._refresh_tooltip_focus (proximity focus, both _process branches) and InventoryPanel.select_row's injected tooltip_query_push (single-item selection)",
+        "at": "menu_coordinator.gd:719-723, playable_generated_ship.gd:_refresh_tooltip_focus, inventory_panel.gd:select_row"
       },
       "output": {
         "live": true,
@@ -5259,15 +5259,13 @@
           "to": "tooltip_presenter",
           "via": "payload_changed",
           "at": "menu_coordinator.gd:719",
-          "health": "weak"
+          "health": "healthy"
         }
       ],
-      "content": "partial",
-      "content_note": "VERIFIED: _on_payload_changed at 719 calls set_payload at 723; faithfully renders an upstream with no live gameplay input",
-      "functional": null,
-      "gaps": [
-        "upstream tooltip_presenter never queried by gameplay — panel stays blank in real play"
-      ],
+      "content": "sufficient",
+      "content_note": "VERIFIED: _on_payload_changed at 719 calls set_payload at 723; upstream tooltip_presenter is now query-live in real play (ADR-0045), not just smoke-driven.",
+      "functional": true,
+      "gaps": [],
       "subsystems": []
     },
     {
