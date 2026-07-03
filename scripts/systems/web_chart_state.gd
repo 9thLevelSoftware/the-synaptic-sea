@@ -23,6 +23,7 @@ var _entries: Dictionary = {}   # marker_id -> {position, size_class, detail, ..
 ## upgraded (equal-or-lower detail on an already-known marker is a no-op and
 ## does not count).
 func record_views(views: Array, detail_level: int) -> int:
+	assert(detail_level >= 0, "WebChartState.record_views: detail_level must be non-negative")
 	var changed: int = 0
 	for view_variant in views:
 		if typeof(view_variant) != TYPE_DICTIONARY:
@@ -35,6 +36,8 @@ func record_views(views: Array, detail_level: int) -> int:
 				break
 		if not ok:
 			continue
+		if not (view.get("position") is Array):
+			continue   # malformed non-Array position -- skip like any other malformed view
 		var marker_id: String = str(view.get("marker_id", ""))
 		if marker_id.is_empty():
 			continue

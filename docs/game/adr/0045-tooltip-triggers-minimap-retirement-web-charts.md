@@ -80,6 +80,21 @@ entries were added for them, plus `interactable_junction_step` and
 `item_web_chart` (Decision 3). The catalog grew from ADR-0033's original 14
 entries to **20** (`data/ui/tooltip_catalog.json`).
 
+**Correction (PR #60 review, Codex P2):** the claim above that the four
+GOLDEN objective types (`recover_supplies`, `restore_systems`,
+`download_logs`, `stabilize_reactor`) closed the catalog gap was incomplete —
+it only covered the hand-authored GOLDEN derelicts. `GameplaySliceBuilder`
+(`scripts/procgen/gameplay_slice_builder.gd`), which emits objectives for
+every **generated** derelict (the primary gameplay context — most runs are
+on generated ships, not the three GOLDEN layouts), emits its own objective
+`type` strings: `"salvage"` (:66, one per non-connective room) and
+`"interact"` (:83, the final "reach goal" objective). Neither existed in the
+catalog, so every generated derelict's salvage/reach-goal interactables
+resolved a null tooltip payload — silently, per the graceful-fallback design
+in Decision 1, so it produced no warnings and was easy to miss. Two more
+interactable entries (`salvage`, `interact`) were added to close this;
+the catalog is now **22** entries.
+
 ## Decision 2: Minimap deleted outright, not extended
 
 `MapFogState`, `MapFogStateSchema`, `MinimapPanel`, and

@@ -35,6 +35,7 @@ func _ready() -> void:
 	_render()
 
 func bind(chart_state) -> void:
+	assert(chart_state != null, "ChartPanel.bind: chart_state must not be null")
 	_chart_state = chart_state
 
 func is_open() -> bool:

@@ -50,11 +50,9 @@
   },
   "web_chart": {
     "display_name": "Web Chart",
-    "category": "utility",
+    "category": "chart",
     "weight": 0.4,
     "max_stack": 1,
-    "effects": [],
-    "utility_flag": "web_chart",
     "use_note": "A paper chart of nearby ship positions in the web. Possessing one records scanner contacts; each new chart found imports its own recorded markers.",
     "icon": "res://assets/placeholder/repair_foam.png"
   }

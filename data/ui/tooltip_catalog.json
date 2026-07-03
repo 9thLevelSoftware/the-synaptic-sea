@@ -160,6 +160,22 @@
       "title": "Web Chart",
       "body": "A paper chart of nearby ship positions in the web. Possessing one records scanner contacts.",
       "footer": ""
+    },
+    {
+      "id": "interactable_salvage",
+      "subject_kind": "interactable",
+      "subject_id": "salvage",
+      "title": "Supply Cache",
+      "body": "A marked supply cache. Salvage it to recover what the derelict left behind.",
+      "footer": "[E] Salvage"
+    },
+    {
+      "id": "interactable_interact",
+      "subject_kind": "interactable",
+      "subject_id": "interact",
+      "title": "Objective",
+      "body": "The derelict's final objective. Interact to complete it.",
+      "footer": "[E] Interact"
     }
   ]
 }

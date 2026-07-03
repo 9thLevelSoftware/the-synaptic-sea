@@ -4221,7 +4221,7 @@ func _on_scanner_panel_closed() -> void:
 		player.set_process_unhandled_input(true)
 
 func _on_chart_panel_closed() -> void:
-	if player != null:
+	if is_instance_valid(player):
 		player.set_physics_process(true)
 		player.set_process_input(true)
 		player.set_process_unhandled_input(true)
@@ -4583,7 +4583,7 @@ func _refresh_ui_shell_runtime() -> void:
 ## an empty subject_id -- an unknown/empty id resolves to a null payload
 ## (TooltipPresenter's existing graceful path), which hides the panel.
 func _refresh_tooltip_focus() -> void:
-	if not is_instance_valid(menu_coordinator) or player == null:
+	if not is_instance_valid(menu_coordinator) or not is_instance_valid(player):
 		return
 	var nearest: Node = null
 	var nearest_dist: float = INF
@@ -7594,7 +7594,7 @@ func _postprocess_loot_grants(granted: Array, source_id: String) -> void:
 		# in-range world marker at detail 2 (position + ship_type), the "paper map"
 		# import. Idempotent (record_views never downgrades), so repeat pickups are
 		# harmless -- no first-pickup tracking is needed. Deterministic, no RNG.
-		if item_id == "web_chart" and synaptic_sea_world != null:
+		if item_id == "web_chart" and is_instance_valid(synaptic_sea_world):
 			var scan_range: float = scanner_state.range_radius if scanner_state != null else 250.0
 			var import_views: Array = []
 			for m in synaptic_sea_world.markers_in_range(scan_range):
@@ -7894,7 +7894,7 @@ func _input(event: InputEvent) -> void:
 				scanner_panel.confirm_selection()
 				get_viewport().set_input_as_handled()
 			return  # swallow other input while the scanner is open
-	if chart_panel != null:
+	if is_instance_valid(chart_panel):
 		if chart_panel.is_open():
 			if event.is_action_pressed("ui_open_map") or event.is_action_pressed("ui_cancel"):
 				chart_panel.close()
