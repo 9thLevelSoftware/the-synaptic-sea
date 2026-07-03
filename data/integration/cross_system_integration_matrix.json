@@ -418,7 +418,8 @@
         "scripts/systems/menu_state.gd",
         "scripts/systems/settings_state.gd",
         "scripts/systems/tutorial_state.gd",
-        "scripts/systems/map_fog_state.gd",
+        "scripts/systems/web_chart_state.gd",
+        "scripts/ui/chart_panel.gd",
         "scripts/ui/hotbar_panel.gd"
       ],
       "docs_files": [

@@ -26,6 +26,11 @@ var _player_inv = null              # InventoryState
 var _equip = null                   # EquipmentState
 var _container = null               # ShipInventory (TRANSFER mode), else null
 var _container_label: String = ""
+# Domain 10 (ADR-0045) tooltip trigger 2: same injection pattern as
+# AudioSettingsPanel.set_settings_push (ADR-0044) -- the coordinator hands this
+# panel a Callable at bind time rather than the panel reaching for a
+# MenuCoordinator reference directly.
+var tooltip_query_push: Callable = Callable()
 
 # Selection models, one per visible list. "self"/"you" share the player list model.
 var _sel_self := InventorySelectionModelScript.new()
@@ -80,6 +85,12 @@ func close() -> void:
 	_mode = "closed"
 	visible = false
 	panel_closed.emit()
+	_push_tooltip_clear()
+
+## Domain 10 (ADR-0045) injection seam: the coordinator calls this once at
+## bind time (mirrors AudioSettingsPanel.set_settings_push, ADR-0044).
+func set_tooltip_query_push(push: Callable) -> void:
+	tooltip_query_push = push
 
 func open_transfer(player_inv, container_hold, container_label: String, equip) -> void:
 	assert(player_inv != null, "Player inventory dependency must not be null")
@@ -136,6 +147,25 @@ func select_row(pane: String, index: int, additive: bool, range_sel: bool) -> vo
 	else:
 		m.select_single(index)
 	_render()
+	_push_tooltip_for_selection(pane)
+
+## Domain 10 (ADR-0045) tooltip trigger 2: pushes an item tooltip query when
+## exactly one item is selected in `pane`; clears on empty/multi selection.
+## Both panes share one tooltip focus (there is only one TooltipPanel), so the
+## most recently interacted-with pane wins -- matching how a real player only
+## looks at one pane's selection at a time.
+func _push_tooltip_for_selection(pane: String) -> void:
+	if not tooltip_query_push.is_valid():
+		return
+	var selected: Array = _model_for_pane(pane).get_selected_ids()
+	if selected.size() == 1:
+		tooltip_query_push.call({"subject_kind": "item", "subject_id": String(selected[0])})
+	else:
+		_push_tooltip_clear()
+
+func _push_tooltip_clear() -> void:
+	if tooltip_query_push.is_valid():
+		tooltip_query_push.call({"subject_kind": "item", "subject_id": ""})
 
 func get_selected_ids(pane: String) -> Array:
 	return _model_for_pane(pane).get_selected_ids()
@@ -241,6 +271,20 @@ func _after_mutation() -> void:
 	_rebuild_models()
 	transfer_completed.emit()
 	_render()
+	# Domain 10 Task 6 (re-review adjacent gap): a mutation (equip/transfer) can
+	# remove the previously-pushed item from its pane — _rebuild_models() drops it
+	# from the selection, but nothing re-pushed the tooltip, leaving it stale on
+	# the just-equipped item. Re-sync against the post-mutation selection: exactly
+	# one item selected in exactly one pane -> push it; anything else -> clear.
+	if tooltip_query_push.is_valid():
+		var self_sel: Array = _sel_self.get_selected_ids()
+		var container_sel: Array = _sel_container.get_selected_ids()
+		if self_sel.size() == 1 and container_sel.is_empty():
+			_push_tooltip_for_selection("self")
+		elif container_sel.size() == 1 and self_sel.is_empty():
+			_push_tooltip_for_selection("container")
+		else:
+			_push_tooltip_clear()
 
 # --- interactive-widget coordinator callbacks (rows/zones forward here) ---
 
@@ -259,6 +303,7 @@ func row_drag_payload(pane: String, index: int) -> Variant:
 	var m = _model_for_pane(pane)
 	if not m.is_selected(index):
 		m.select_single(index)
+		_push_tooltip_for_selection(pane)
 	var data: Dictionary = _build_drag_payload(pane)
 	return null if (data["ids"] as Array).is_empty() else data
 
@@ -267,6 +312,7 @@ func row_context(pane: String, index: int, global_pos: Vector2) -> void:
 	if not m.is_selected(index):
 		m.select_single(index)
 		_render()
+		_push_tooltip_for_selection(pane)
 	var menu: PopupMenu = _build_context_menu(pane, index)
 	add_child(menu)
 	menu.position = global_pos
@@ -307,6 +353,7 @@ func zone_drop(target: String, data) -> void:
 					equip_from_container(String(id))
 				else:
 					_sel_self.select_single(_ids_for_pane("self").find(String(id)))
+					_push_tooltip_for_selection("self")
 					equip_selected()
 				return
 		return
@@ -381,6 +428,7 @@ func _on_context_id(id: int, pane: String, index: int) -> void:
 				equip_from_container(String(ids[index]))
 		else:
 			_model_for_pane(pane).select_single(index)
+			_push_tooltip_for_selection(pane)
 			equip_selected()
 	elif id == _ACT_USE or id == _ACT_USE_ALL:
 		var ids: Array = _ids_for_pane(pane)

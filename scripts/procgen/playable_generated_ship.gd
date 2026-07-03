@@ -8,6 +8,8 @@ const IsoCameraRigScript := preload("res://scripts/camera/iso_camera_rig.gd")
 const InteractableScript := preload("res://scripts/interaction/interactable.gd")
 const ObjectiveTrackerScript := preload("res://scripts/ui/objective_tracker.gd")
 const ScannerPanelScript := preload("res://scripts/ui/scanner_panel.gd")
+const ChartPanelScript := preload("res://scripts/ui/chart_panel.gd")
+const WebChartStateScript := preload("res://scripts/systems/web_chart_state.gd")
 const InventoryPanelScript := preload("res://scripts/ui/inventory_panel.gd")
 const AccessibilitySettingsScript := preload("res://scripts/ui/accessibility_settings.gd")
 const MenuCoordinatorScript := preload("res://scripts/ui/menu_coordinator.gd")
@@ -183,6 +185,8 @@ var player
 var camera_rig
 var hud_layer: CanvasLayer
 var scanner_panel   # ScannerPanel
+var chart_panel      # ChartPanel
+var web_chart_state = WebChartStateScript.new()
 var inventory_panel
 var tracker
 var vitals_model            # PlayerVitalsModel
@@ -319,6 +323,7 @@ var _last_loot_feedback_line: String = ""
 # another line folded into _combined_system_status_lines(). Multiple
 # captions arriving in one frame keep only the most recent (pump order).
 var _last_caption_line: String = ""
+var _last_tooltip_focus_subject_id: String = ""
 var _caption_expiry_seconds: float = 0.0
 var _home_player_position: Vector3 = Vector3.ZERO
 # Narrative objective flags with no manager backing (supplies/logs). Set on
@@ -1965,7 +1970,13 @@ func scan() -> Dictionary:
 	var skill: int = 0
 	if player_progression != null and player_progression.has_method("get_skill_level"):
 		skill = int(player_progression.get_skill_level("scanner_operation"))
-	return scanner_state.scan(synaptic_sea_world, ops, skill)
+	var result: Dictionary = scanner_state.scan(synaptic_sea_world, ops, skill)
+	# Domain 10 (ADR-0045) Source B: a possessed web_chart auto-records every
+	# scan's markers at the scan's own detail_level. Scanning without a chart
+	# records nothing (nothing to write on) -- no RNG, fully deterministic.
+	if inventory_state != null and int(inventory_state.get_quantity("web_chart")) > 0:
+		web_chart_state.record_views(result.get("markers", []) as Array, int(result.get("detail_level", 0)))
+	return result
 
 ## Resolves a marker by id from the in-range set and travels to it. Returns
 ## {success:false, reason:"unknown_marker"} if the id is not currently in range.
@@ -1998,6 +2009,14 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 		inst.built_layout = new_root.get_layout_copy()
 	current_ship = inst
 	away_from_start = true
+	# Domain 10 Task 5 fix (finding 2): reset the proximity-tooltip focus cache on
+	# board too — objective types repeat across derelicts, so a stale subject_id
+	# left over from the previous ship would suppress a legitimate re-query for a
+	# same-typed interactable on THIS ship. Mirror _refresh_tooltip_focus's own
+	# focus-lost clear transition (empty subject_id -> null payload -> panel hides).
+	_last_tooltip_focus_subject_id = ""
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.set_tooltip_query({"subject_kind": "interactable", "subject_id": ""})
 	# Phase 5b Task 5: the piloted ship (lifeboat) PHYSICALLY undocks from its old
 	# host and re-docks to this derelict, so the ride — and the player aboard it —
 	# moves with it. The player is carried by preserving their pose relative to the
@@ -3857,8 +3876,6 @@ func _on_derelict_interactable_completed(interaction_id: String, objective_id: S
 		String(current_ship.marker_id), sequence, objective_type, str(controller.is_cleared()).to_lower()])
 	if is_instance_valid(menu_coordinator):
 		menu_coordinator.trigger_tutorial("objective_completed", objective_type)
-		if not room_id.is_empty():
-			menu_coordinator.reveal_room(room_id)
 
 ## Validation seam: complete a derelict objective by sequence through the real
 ## interaction path (bypassing proximity via set_validation_player_in_range).
@@ -4005,6 +4022,14 @@ func travel_home() -> bool:
 	current_ship = home_ship
 	away_from_start = false
 	_configure_threat_runtime_for_current_ship()
+	# Domain 10 Task 5 fix (finding 2): the proximity-tooltip focus cache is keyed
+	# only by subject_id, which repeats across derelicts (objective types are
+	# reused per ship). Reset it on unboard so a same-typed interactable on the
+	# NEXT ship is not suppressed as a "no change" — mirror _refresh_tooltip_focus's
+	# own focus-lost clear transition (empty subject_id -> null payload -> panel hides).
+	_last_tooltip_focus_subject_id = ""
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.set_tooltip_query({"subject_kind": "interactable", "subject_id": ""})
 	_clear_derelict_objectives()
 	_clear_loot_containers()
 	_clear_repair_points()
@@ -4123,6 +4148,14 @@ func _build_hud_layer() -> void:
 	# Restore player control on every panel close path via the signal, not just
 	# the two close paths wired into _input.
 	scanner_panel.panel_closed.connect(_on_scanner_panel_closed)
+	chart_panel = ChartPanelScript.new()
+	chart_panel.name = "ChartPanel"
+	chart_panel.visible = false
+	hud_layer.add_child(chart_panel)
+	chart_panel.bind(web_chart_state)
+	# Restore player control on every panel close path via the signal, not just
+	# the toggle-close path wired into _input.
+	chart_panel.panel_closed.connect(_on_chart_panel_closed)
 	inventory_panel = InventoryPanelScript.new()
 	inventory_panel.name = "InventoryPanel"
 	inventory_panel.visible = false
@@ -4173,10 +4206,22 @@ func _build_hud_layer() -> void:
 	menu_coordinator.set_load_available(is_load_available())
 	menu_coordinator.set_inventory_items(_inventory_hotbar_ids())
 	menu_coordinator.set_hotbar_slots(_get_consumable_slot_labels())
+	# Domain 10 (ADR-0045) tooltip trigger 2: same injection pattern as
+	# audio_settings_panel.set_settings_push (ADR-0044) -- hand the panel a
+	# Callable into this coordinator's menu_coordinator seam rather than the
+	# panel holding a MenuCoordinator reference directly.
+	if is_instance_valid(inventory_panel):
+		inventory_panel.set_tooltip_query_push(Callable(menu_coordinator, "set_tooltip_query"))
 	menu_coordinator.open_main_menu()
 
 func _on_scanner_panel_closed() -> void:
 	if player != null:
+		player.set_physics_process(true)
+		player.set_process_input(true)
+		player.set_process_unhandled_input(true)
+
+func _on_chart_panel_closed() -> void:
+	if is_instance_valid(player):
 		player.set_physics_process(true)
 		player.set_process_input(true)
 		player.set_process_unhandled_input(true)
@@ -4517,42 +4562,6 @@ func _use_consumable_hotbar_slot(slot_index: int) -> Dictionary:
 		_refresh_consumable_ui(slot_index)
 	return result
 
-func _build_ui_room_payload() -> Dictionary:
-	var room_set: Dictionary = {}
-	var neighbours: Dictionary = {}
-	if loader != null and loader.has_method("get_room_links"):
-		for link_variant in loader.get_room_links():
-			if typeof(link_variant) != TYPE_DICTIONARY:
-				continue
-			var link: Dictionary = link_variant
-			var from_room: String = str(link.get("from_room", ""))
-			var to_room: String = str(link.get("to_room", ""))
-			if from_room.is_empty() or to_room.is_empty():
-				continue
-			room_set[from_room] = true
-			room_set[to_room] = true
-			if not neighbours.has(from_room):
-				neighbours[from_room] = []
-			if not neighbours.has(to_room):
-				neighbours[to_room] = []
-			if not (neighbours[from_room] as Array).has(to_room):
-				(neighbours[from_room] as Array).append(to_room)
-			if not (neighbours[to_room] as Array).has(from_room):
-				(neighbours[to_room] as Array).append(from_room)
-	for objective in loader.get_objective_specs_copy() if loader != null and loader.has_method("get_objective_specs_copy") else []:
-		if typeof(objective) == TYPE_DICTIONARY:
-			var room_id: String = str((objective as Dictionary).get("room_id", ""))
-			if not room_id.is_empty():
-				room_set[room_id] = true
-	if not arc_zone_resolved_room_id.is_empty():
-		room_set[arc_zone_resolved_room_id] = true
-	var rooms: Array = room_set.keys()
-	rooms.sort()
-	for room_id in rooms:
-		if not neighbours.has(room_id):
-			neighbours[room_id] = []
-	return {"rooms": rooms, "neighbours": neighbours}
-
 func _refresh_ui_shell_runtime() -> void:
 	if not is_instance_valid(menu_coordinator):
 		return
@@ -4560,11 +4569,44 @@ func _refresh_ui_shell_runtime() -> void:
 	menu_coordinator.set_inventory_items(_inventory_hotbar_ids())
 	menu_coordinator.set_hotbar_slots(_get_consumable_slot_labels())
 	_refresh_weapon_hotbar()
-	menu_coordinator.configure_map(_build_ui_room_payload())
-	if loader != null and loader.has_method("get_critical_path"):
-		var critical: Array[String] = loader.get_critical_path()
-		if not critical.is_empty():
-			menu_coordinator.track_room(critical[0])
+
+## Domain 10 (ADR-0045) tooltip trigger 1: proximity focus on interactables.
+## Called from BOTH _process branches (mirrors _refresh_audio_state's dual
+## wiring -- the derelict field run is the PRIMARY gameplay context, so this
+## must not be home-only). Scans the live interactable collections
+## (candidate_player is already maintained by Interactable's own
+## body_entered/body_exited physics callbacks -- this scan is read-only) for
+## the nearest node whose candidate_player == player, and calls
+## set_tooltip_query ONLY when the focused subject id changes (TooltipPresenter.
+## resolve() emits payload_changed unconditionally on every call, so an
+## unguarded per-frame call here would spam the signal). On focus lost, pushes
+## an empty subject_id -- an unknown/empty id resolves to a null payload
+## (TooltipPresenter's existing graceful path), which hides the panel.
+func _refresh_tooltip_focus() -> void:
+	if not is_instance_valid(menu_coordinator) or not is_instance_valid(player):
+		return
+	var nearest: Node = null
+	var nearest_dist: float = INF
+	var player_pos: Vector3 = (player as Node3D).global_position if player is Node3D else Vector3.ZERO
+	for collection in [interactables, derelict_interactables]:
+		for it in collection:
+			if not is_instance_valid(it) or it.candidate_player != player:
+				continue
+			var it_pos: Vector3 = (it as Node3D).global_position if it is Node3D else Vector3.ZERO
+			var dist: float = it_pos.distance_to(player_pos)
+			if dist < nearest_dist:
+				nearest_dist = dist
+				nearest = it
+	var subject_id: String = String(nearest.tooltip_subject_id) if nearest != null else ""
+	if subject_id == _last_tooltip_focus_subject_id:
+		return
+	_last_tooltip_focus_subject_id = subject_id
+	menu_coordinator.set_tooltip_query({"subject_kind": "interactable", "subject_id": subject_id})
+
+## Validation seam: the last subject_id pushed by _refresh_tooltip_focus
+## (matches the get_last_caption_line() convention).
+func get_focused_tooltip_subject_for_validation() -> String:
+	return _last_tooltip_focus_subject_id
 
 func _on_ui_modal_opened(_menu_id: String) -> void:
 	_freeze_player_for_panel()
@@ -5402,6 +5444,9 @@ func _process(delta: float) -> void:
 			stimulant_state.tick(delta, addiction_state, _consumable_pipeline_context())
 		if addiction_state != null:
 			addiction_state.tick(delta, status_effects_state)
+		# Domain 10 (ADR-0045): proximity tooltip focus on the away branch too --
+		# the derelict field run is the PRIMARY exploration context.
+		_refresh_tooltip_focus()
 		return
 	if not playable_started or slice_complete:
 		return
@@ -5460,6 +5505,8 @@ func _process(delta: float) -> void:
 	if is_instance_valid(audio_manager) and audio_manager.has_method("tick"):
 		audio_manager.tick(delta)
 		_refresh_audio_state(false, delta)
+	# Domain 10 (ADR-0045): proximity tooltip focus on the home branch too.
+	_refresh_tooltip_focus()
 
 ## Domain 1 (survival_vitals): the single survival-attrition tick, called from
 ## BOTH _process branches so radiation / body-temperature / status / the vitals
@@ -6214,6 +6261,12 @@ func get_audio_manager() -> Node:
 ## currently displayed (either nothing has fired yet, or the last one expired).
 func get_last_caption_line() -> String:
 	return _last_caption_line
+
+## Validation seam: the most recent loot-feedback line (mirrors
+## get_last_caption_line()). Domain 10 (ADR-0045) reuses this seam for the
+## "No web chart" ui_open_map gate-rejection feedback.
+func get_last_loot_feedback_line_for_validation() -> String:
+	return _last_loot_feedback_line
 
 func get_audio_bus_player_count() -> int:
 	if audio_manager == null:
@@ -7537,6 +7590,22 @@ func _postprocess_loot_grants(granted: Array, source_id: String) -> void:
 			meta_progression_state.unlock_codex_entry(codex_entry_id)
 		if equipment_state != null and item_id != "" and equipment_state.can_equip(item_id):
 			_equip_from_inventory(item_id, true)
+		# Domain 10 (ADR-0045) Source A: a found web_chart imports every currently
+		# in-range world marker at detail 2 (position + ship_type), the "paper map"
+		# import. Idempotent (record_views never downgrades), so repeat pickups are
+		# harmless -- no first-pickup tracking is needed. Deterministic, no RNG.
+		if item_id == "web_chart" and is_instance_valid(synaptic_sea_world):
+			var scan_range: float = scanner_state.range_radius if scanner_state != null else 250.0
+			var import_views: Array = []
+			for m in synaptic_sea_world.markers_in_range(scan_range):
+				import_views.append({
+					"marker_id": m.marker_id,
+					"position": [m.position.x, m.position.y, m.position.z],
+					"distance": m.position.distance_to(synaptic_sea_world.player_position),
+					"size_class": m.size_class,
+					"ship_type": m.ship_type,
+				})
+			web_chart_state.record_views(import_views, 2)
 	var first: Dictionary = granted[0] as Dictionary
 	var rarity_text: String = RarityTierScript.label(str(first.get("rarity", "common")))
 	_last_loot_feedback_line = "Loot: %s x%d [%s]" % [
@@ -7600,6 +7669,13 @@ func _reset_runtime_for_reload() -> void:
 		# Co-presence: home hull / loader / gameplay roots were never detached —
 		# no re-attach needed here (contrast with old single-active model).
 		away_from_start = false
+		# Domain 10 Task 5 fix wave 2 (re-review): third away_from_start=false
+		# transition — reload-while-away. Same stale-focus-cache root cause as the
+		# board/unboard sites: reset the subject cache and force-clear the tooltip
+		# panel so a same-typed interactable after reload is not suppressed.
+		_last_tooltip_focus_subject_id = ""
+		if is_instance_valid(menu_coordinator):
+			menu_coordinator.set_tooltip_query({"subject_kind": "interactable", "subject_id": ""})
 		# Phase 5a Task 6: keep occupancy in lockstep — reload returns to the home
 		# ship (home hull is never detached under co-presence, so home_ship is valid).
 		current_occupancy = home_ship
@@ -7818,6 +7894,24 @@ func _input(event: InputEvent) -> void:
 				scanner_panel.confirm_selection()
 				get_viewport().set_input_as_handled()
 			return  # swallow other input while the scanner is open
+	if is_instance_valid(chart_panel):
+		if chart_panel.is_open():
+			if event.is_action_pressed("ui_open_map") or event.is_action_pressed("ui_cancel"):
+				chart_panel.close()
+				get_viewport().set_input_as_handled()
+			return  # swallow other input while the chart is open (read-only panel)
+		if event.is_action_pressed("ui_open_map") and (not is_instance_valid(inventory_panel) or not inventory_panel.is_open()):
+			var has_chart: bool = inventory_state != null and int(inventory_state.get_quantity("web_chart")) > 0
+			if has_chart:
+				chart_panel.open()
+				_freeze_player_for_panel()
+			else:
+				# Domain 10 (ADR-0045): no chart possessed -- surface a HUD feedback
+				# line via the existing system-status-lines seam (mirrors
+				# _last_loot_feedback_line) rather than opening an empty panel.
+				_last_loot_feedback_line = "No web chart"
+			get_viewport().set_input_as_handled()
+			return
 	if is_instance_valid(inventory_panel):
 		if inventory_panel.is_open():
 			if event.is_action_pressed("toggle_inventory") or event.is_action_pressed("ui_cancel"):
@@ -7830,8 +7924,6 @@ func _input(event: InputEvent) -> void:
 			return
 	if is_instance_valid(menu_coordinator):
 		if menu_coordinator.handle_ui_input(event):
-			if event.is_action_pressed("ui_open_map"):
-				menu_coordinator.reveal_room(menu_coordinator.map_fog_state.get_tracked_room_id())
 			_dispatch_save_load_confirm_result(menu_coordinator.get_last_meta_screen_confirm_result())
 			get_viewport().set_input_as_handled()
 			return

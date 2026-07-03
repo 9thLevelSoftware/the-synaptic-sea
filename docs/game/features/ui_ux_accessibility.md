@@ -11,6 +11,8 @@ codex entries.
 
 - Build plan: `docs/game/build-plans/09-ui-ux-accessibility-e2e.md`
 - ADR: `docs/game/adr/0033-ui-ux-accessibility-architecture.md`
+- ADR: `docs/game/adr/0045-tooltip-triggers-minimap-retirement-web-charts.md`
+  (retires the minimap described in ADR-0033; item-gated web charts replace it)
 - Requirements: REQ-UI-001..016 in `docs/game/05_requirements.md`
 - Validation plan: `docs/game/06_validation_plan.md`
 
@@ -55,7 +57,7 @@ is maintained.
 ### HUD (in-play)
 - Top-left: Objective tracker
 - Bottom-left: Player vitals panel
-- Top-right: Minimap (with fog-of-war)
+- Top-right: (retired — see "Web charts" below)
 - Bottom-center: Hotbar (5 slots)
 - Center: Context prompt (ToolTipPresenter-driven)
 - Top-center: Tutorial banner (transient; 5s default)
@@ -66,11 +68,17 @@ is maintained.
 - Entry list per topic
 - Selected entry shows transcript
 
-### Minimap
-- Per-room footprint (5×5 grid sample)
-- Fog-of-war overlay (unrevealed rooms render as dark cells)
-- Player position marker
-- Optional objective room markers (gold)
+### Web charts (Domain 10, ADR-0045 — retires the minimap)
+The room-fog minimap (`MapFogState` / `MinimapPanel`) is deleted outright,
+not extended — see
+`docs/game/adr/0045-tooltip-triggers-minimap-retirement-web-charts.md`.
+Interior room-mapping is retired for good on horror-pacing grounds. In its
+place, `ui_open_map` opens `ChartPanel`, an item-gated, read-only text
+screen of recorded **ship positions in the surrounding web** (not interior
+rooms), requiring a possessed `web_chart` item; without one, a HUD feedback
+line ("No web chart") surfaces instead of an empty panel. Chart knowledge is
+recorded via found `web_chart` items and scanner use, and is session-only
+(no save/load persistence, a deliberate scope decision per the ADR).
 
 ## Functional contract
 
@@ -88,9 +96,9 @@ is maintained.
   matching codex entry.
 - Codex entries unlocked via `tutorial_state.unlock_codex(id)` are
   available in the codex panel immediately and persist through save/load.
-- Map fog of war advances one room per interact (every room the player
-  walks into is `discovered` and `revealed`; rooms adjacent to revealed
-  rooms are `discovered` but not `revealed`).
+- Room-fog mapping is retired (ADR-0045); there is no interior map of any
+  kind. `ui_open_map` instead opens the item-gated `ChartPanel` (requires a
+  possessed `web_chart`), showing recorded ship positions in the web.
 - Controller glyph resolution reads the **actually bound** keycode at
   boot, so swapping input bindings updates the glyph on the next menu
   open.
@@ -116,7 +124,10 @@ is maintained.
     on dismiss, or on a new trigger.
 12. Codex is reachable from the pause menu and lists every unlocked
     entry.
-13. Minimap shows the player position and the fog-of-war overlay.
+13. `ui_open_map` opens the item-gated `ChartPanel` when a `web_chart` is
+    possessed (showing recorded web ship positions), and otherwise surfaces
+    a "No web chart" HUD feedback line without opening a panel (minimap
+    retired, ADR-0045).
 14. Save/load round-trips the settings state; the loaded settings
     match the saved settings field-for-field.
 

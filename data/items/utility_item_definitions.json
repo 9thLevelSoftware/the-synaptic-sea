@@ -47,5 +47,13 @@
     "effects": ["heatpack"],
     "use_note": "A chemical heat pack pushes back the cold of a dead ship.",
     "icon": "res://assets/placeholder/repair_foam.png"
+  },
+  "web_chart": {
+    "display_name": "Web Chart",
+    "category": "chart",
+    "weight": 0.4,
+    "max_stack": 1,
+    "use_note": "A paper chart of nearby ship positions in the web. Possessing one records scanner contacts; each new chart found imports its own recorded markers.",
+    "icon": "res://assets/placeholder/repair_foam.png"
   }
 }

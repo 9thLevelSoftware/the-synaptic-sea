@@ -211,7 +211,18 @@ run_clean 'Domain 8 title screen flow smoke' 'TITLE SCREEN FLOW PASS new_game=tr
 run_clean 'Domain 8 title settings smoke' 'TITLE SETTINGS PASS open=true cycle=true back=true applied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/title_settings_smoke.gd
 run_clean 'Domain 8 save load slot screen smoke' 'SAVE LOAD SLOT SCREEN PASS save=true load=true delete_armed=true delete_confirmed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_load_slot_screen_smoke.gd
 run_clean 'Domain 8 save and exit smoke' 'SAVE AND EXIT PASS saved=true world_fresh=true return_signal=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_and_exit_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=121 clean_output=true'
+run_clean 'Domain 10 tooltip presenter model smoke' 'TOOLTIP PRESENTER PASS title=Circuit Board' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tooltip_presenter_smoke.gd
+run_clean 'Domain 10 menu state model smoke' 'MENU STATE PASS menus=2 navigation=true enable_toggle=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_state_smoke.gd
+run_clean 'Domain 10 settings state model smoke' 'SETTINGS STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_state_smoke.gd
+run_clean 'Domain 10 tutorial state model smoke' 'TUTORIAL STATE PASS once=true dismiss=true codex_unlocks=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tutorial_state_smoke.gd
+run_clean 'Domain 10 controller glyph state model smoke' 'CONTROLLER GLYPH STATE PASS schemes=3 action=interact' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/controller_glyph_state_smoke.gd
+run_clean 'Domain 10 UI shell parse check' 'UI SHELL PARSE PASS classes=12' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_shell_parse_check.gd
+run_clean 'Domain 10 UI shell save/load smoke' 'UI SHELL SAVE LOAD PASS restored=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_shell_save_load_smoke.gd
+run_clean 'Domain 10 main playable UI shell smoke' 'MAIN PLAYABLE UI SHELL PASS boot=main_menu pause=true codex=1 hotbar=true tooltip=true chart_gated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_ui_shell_smoke.gd
+run_clean 'Domain 10 main playable slice UI shell smoke' 'MAIN PLAYABLE SLICE UI SHELL PASS boot=main_menu pause=true codex=1 hotbar=true tooltip=true chart_gated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_ui_shell_smoke.gd
+run_clean 'Domain 10 web chart state model smoke' 'WEB CHART STATE PASS known=2 detail_upgrade=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/web_chart_state_smoke.gd
+run_clean 'Domain 10 UI polish end-to-end smoke' 'UI POLISH PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_polish_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=132 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

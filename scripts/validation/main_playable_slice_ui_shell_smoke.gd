@@ -47,10 +47,17 @@ func _on_process_frame() -> void:
 			_drive_to_in_play()
 			phase = 4
 		4:
-			_validate_runtime(playable, ui)
-			finished = true
-			print("MAIN PLAYABLE UI SHELL PASS boot=main_menu pause=true codex=1 minimap=true hotbar=true tooltip=true")
-			quit(0)
+			if _validate_runtime_pre_chart(playable, ui):
+				phase = 5
+		5:
+			# Input.parse_input_event()-queued events are only dispatched to
+			# _input() on the NEXT process_frame, not synchronously -- this
+			# phase boundary is the required one-frame wait before the KEY_M
+			# sent in phase 4 has actually reached PlayableGeneratedShip._input.
+			if _validate_chart_gate(playable):
+				finished = true
+				print("MAIN PLAYABLE SLICE UI SHELL PASS boot=main_menu pause=true codex=1 hotbar=true tooltip=true chart_gated=true")
+				quit(0)
 
 func _validate_boot(ui) -> void:
 	if ui.get_current_menu() != "main_menu":
@@ -80,31 +87,42 @@ func _drive_to_in_play() -> void:
 	_send_action(KEY_ESCAPE)
 	_send_action(KEY_F1)
 
-func _validate_runtime(playable: PlayableGeneratedShip, ui) -> void:
+func _validate_runtime_pre_chart(playable: PlayableGeneratedShip, ui) -> bool:
 	if ui.get_current_menu() != "codex":
 		_fail("codex not opened from pause/menu flow: %s" % ui.get_current_menu())
-		return
+		return false
 	ui.trigger_tutorial("player_moved", "any")
 	if ui.get_tutorial_text().is_empty():
 		_fail("tutorial banner missing after trigger")
-		return
+		return false
 	if not playable.dismiss_latest_tutorial_for_validation():
 		_fail("tutorial dismiss failed")
-		return
+		return false
 	if ui.get_codex_unlocked_ids().size() < 1:
 		_fail("codex did not unlock after tutorial dismiss")
-		return
+		return false
 	_send_action(KEY_ESCAPE)
-	_send_action(KEY_M)
-	if ui.get_minimap_text().find("Tracked:") == -1:
-		_fail("minimap text missing tracked line")
-		return
 	if ui.get_hotbar_text().find("HOTBAR") == -1:
 		_fail("hotbar text missing")
-		return
+		return false
 	ui.set_tooltip_query({"subject_kind": "interactable", "subject_id": "circuit_board"})
 	if ui.get_tooltip_panel_text().find("Circuit Board") == -1:
 		_fail("tooltip text missing circuit board payload")
+		return false
+	# Domain 10 (ADR-0045): no web_chart possessed in this smoke run -- ui_open_map
+	# must be gate-rejected (chart_panel never opens) rather than silently opening
+	# an empty panel. Input.parse_input_event() only queues the events for
+	# dispatch on the NEXT process_frame, so the assertion cannot happen in
+	# this same call -- it runs one phase later in _validate_chart_gate, once
+	# _input has genuinely run.
+	_send_action(KEY_M)
+	return true
+
+func _validate_chart_gate(playable: PlayableGeneratedShip) -> bool:
+	if playable.chart_panel != null and playable.chart_panel.is_open():
+		_fail("chart_panel opened without a possessed web_chart")
+		return false
+	return true
 
 func _send_action(keycode: int) -> void:
 	var press := InputEventKey.new()
@@ -129,5 +147,5 @@ func _fail(reason: String) -> void:
 	if finished:
 		return
 	finished = true
-	push_error("MAIN PLAYABLE UI SHELL FAIL reason=%s" % reason)
+	push_error("MAIN PLAYABLE SLICE UI SHELL FAIL reason=%s" % reason)
 	quit(1)

@@ -10,23 +10,22 @@ const SettingsStateScript    := preload("res://scripts/systems/settings_state.gd
 const TooltipPresenterScript := preload("res://scripts/systems/tooltip_presenter.gd")
 const TooltipPayloadScript   := preload("res://scripts/systems/tooltip_payload.gd")
 const TutorialStateScript    := preload("res://scripts/systems/tutorial_state.gd")
-const MapFogStateScript      := preload("res://scripts/systems/map_fog_state.gd")
 const ControllerGlyphStateScript := preload("res://scripts/systems/controller_glyph_state.gd")
+const WebChartStateScript    := preload("res://scripts/systems/web_chart_state.gd")
 
 const MenuStateSchemaScript        := preload("res://scripts/schemas/menu_state_schema.gd")
 const SettingsStateSchemaScript    := preload("res://scripts/schemas/settings_state_schema.gd")
 const TooltipSchemaScript          := preload("res://scripts/schemas/tooltip_schema.gd")
 const TutorialStateSchemaScript    := preload("res://scripts/schemas/tutorial_state_schema.gd")
-const MapFogStateSchemaScript      := preload("res://scripts/schemas/map_fog_schema.gd")
 const ControllerGlyphSchemaScript  := preload("res://scripts/schemas/controller_glyph_schema.gd")
 
 func _initialize() -> void:
 	var classes := [
 		MenuStateScript, SettingsStateScript, TooltipPresenterScript,
-		TooltipPayloadScript, TutorialStateScript, MapFogStateScript,
-		ControllerGlyphStateScript,
+		TooltipPayloadScript, TutorialStateScript,
+		ControllerGlyphStateScript, WebChartStateScript,
 		MenuStateSchemaScript, SettingsStateSchemaScript, TooltipSchemaScript,
-		TutorialStateSchemaScript, MapFogStateSchemaScript,
+		TutorialStateSchemaScript,
 		ControllerGlyphSchemaScript,
 	]
 	for cls in classes:
