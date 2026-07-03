@@ -152,6 +152,14 @@
       "title": "Reactor Excursion",
       "body": "The reactor is running hot. Halt the excursion before it cascades.",
       "footer": "[E] Stabilize"
+    },
+    {
+      "id": "item_web_chart",
+      "subject_kind": "item",
+      "subject_id": "web_chart",
+      "title": "Web Chart",
+      "body": "A paper chart of nearby ship positions in the web. Possessing one records scanner contacts.",
+      "footer": ""
     }
   ]
 }

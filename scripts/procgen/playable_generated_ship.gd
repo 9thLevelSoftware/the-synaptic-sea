@@ -4206,6 +4206,12 @@ func _build_hud_layer() -> void:
 	menu_coordinator.set_load_available(is_load_available())
 	menu_coordinator.set_inventory_items(_inventory_hotbar_ids())
 	menu_coordinator.set_hotbar_slots(_get_consumable_slot_labels())
+	# Domain 10 (ADR-0045) tooltip trigger 2: same injection pattern as
+	# audio_settings_panel.set_settings_push (ADR-0044) -- hand the panel a
+	# Callable into this coordinator's menu_coordinator seam rather than the
+	# panel holding a MenuCoordinator reference directly.
+	if is_instance_valid(inventory_panel):
+		inventory_panel.set_tooltip_query_push(Callable(menu_coordinator, "set_tooltip_query"))
 	menu_coordinator.open_main_menu()
 
 func _on_scanner_panel_closed() -> void:
