@@ -271,6 +271,20 @@ func _after_mutation() -> void:
 	_rebuild_models()
 	transfer_completed.emit()
 	_render()
+	# Domain 10 Task 6 (re-review adjacent gap): a mutation (equip/transfer) can
+	# remove the previously-pushed item from its pane — _rebuild_models() drops it
+	# from the selection, but nothing re-pushed the tooltip, leaving it stale on
+	# the just-equipped item. Re-sync against the post-mutation selection: exactly
+	# one item selected in exactly one pane -> push it; anything else -> clear.
+	if tooltip_query_push.is_valid():
+		var self_sel: Array = _sel_self.get_selected_ids()
+		var container_sel: Array = _sel_container.get_selected_ids()
+		if self_sel.size() == 1 and container_sel.is_empty():
+			_push_tooltip_for_selection("self")
+		elif container_sel.size() == 1 and self_sel.is_empty():
+			_push_tooltip_for_selection("container")
+		else:
+			_push_tooltip_clear()
 
 # --- interactive-widget coordinator callbacks (rows/zones forward here) ---
 
