@@ -2009,6 +2009,14 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 		inst.built_layout = new_root.get_layout_copy()
 	current_ship = inst
 	away_from_start = true
+	# Domain 10 Task 5 fix (finding 2): reset the proximity-tooltip focus cache on
+	# board too — objective types repeat across derelicts, so a stale subject_id
+	# left over from the previous ship would suppress a legitimate re-query for a
+	# same-typed interactable on THIS ship. Mirror _refresh_tooltip_focus's own
+	# focus-lost clear transition (empty subject_id -> null payload -> panel hides).
+	_last_tooltip_focus_subject_id = ""
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.set_tooltip_query({"subject_kind": "interactable", "subject_id": ""})
 	# Phase 5b Task 5: the piloted ship (lifeboat) PHYSICALLY undocks from its old
 	# host and re-docks to this derelict, so the ride — and the player aboard it —
 	# moves with it. The player is carried by preserving their pose relative to the
@@ -4014,6 +4022,14 @@ func travel_home() -> bool:
 	current_ship = home_ship
 	away_from_start = false
 	_configure_threat_runtime_for_current_ship()
+	# Domain 10 Task 5 fix (finding 2): the proximity-tooltip focus cache is keyed
+	# only by subject_id, which repeats across derelicts (objective types are
+	# reused per ship). Reset it on unboard so a same-typed interactable on the
+	# NEXT ship is not suppressed as a "no change" — mirror _refresh_tooltip_focus's
+	# own focus-lost clear transition (empty subject_id -> null payload -> panel hides).
+	_last_tooltip_focus_subject_id = ""
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.set_tooltip_query({"subject_kind": "interactable", "subject_id": ""})
 	_clear_derelict_objectives()
 	_clear_loot_containers()
 	_clear_repair_points()
