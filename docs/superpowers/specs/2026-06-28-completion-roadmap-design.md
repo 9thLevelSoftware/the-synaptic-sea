@@ -84,16 +84,22 @@ truth, not a hand-maintained doc.
 
 | # | Domain | Loop(s) | Current | Depends on |
 |---|---|---|---|---|
-| 1 | Survival & Stakes ⭐ | `survival_vitals` | 🔴 broken | — |
-| 2 | Combat | `combat` | 🟡 partial | 1 (death), loot, progression |
-| 3 | Food | `food` | 🟡 partial | 1 (away-branch pattern) |
-| 4 | Ship Systems | `ship_systems` | 🟡 partial | 1 |
-| 5 | Consumables | `consumables` | 🟡 partial | 1, 2 (ammo→combat) |
-| 6 | Progression & Meta | `progression` | 🟡 partial | 2 (kill XP), 8 (persist unlocks) |
-| 7 | Travel / Procgen | `travel` | 🟢 closed | — |
-| 8 | Save / Persistence | `save` | 🟡 partial | 1 (permadeath needs death) |
-| 9 | Audio | `audio_reactive` | 🔴 broken | — |
-| 10 | UI/UX Polish | `tooltip`, `map_reveal` | 🟢 closed (2026-07-02, ADR-0045) | — |
+| 1 | Survival & Stakes ⭐ | `survival_vitals` | 🟢 closed (PR #50, 2026-06-29) | — |
+| 2 | Combat | `combat` | 🟢 closed (PR #51, 2026-06-30) | 1 (death), loot, progression |
+| 3 | Food | `food` | 🟢 closed (PR #52, 2026-06-30) | 1 (away-branch pattern) |
+| 4 | Ship Systems | `ship_systems` | 🟢 closed (PR #53, 2026-07-01) | 1 |
+| 5 | Consumables | `consumables` | 🟢 closed (PR #54, 2026-07-01) | 1, 2 (ammo→combat) |
+| 6 | Progression & Meta | `progression` | 🟢 closed (PR #55, 2026-07-01) | 2 (kill XP), 8 (persist unlocks) |
+| 7 | Travel / Procgen | `travel` | 🟢 closed (deepened: PR #56, 2026-07-02) | — |
+| 8 | Save / Persistence | `save` | 🟢 closed (PR #57 + run_id rework PR #58, 2026-07-02) | 1 (permadeath needs death) |
+| 9 | Audio | `audio_reactive` | 🟢 closed (PR #59, 2026-07-02, ADR-0044; bus+pipeline scope, asset library deferred) | — |
+| 10 | UI/UX Polish | `tooltip`, `map_reveal` | 🟢 closed (PR #60, 2026-07-03, ADR-0045; map_reveal redefined — item-based web charts) | — |
+
+> **Roadmap complete (2026-07-03).** All 18 loops read `closed` in `system_inventory.json`
+> (`--check` 191/191; bundle `commands=132 clean_output=true` at PR #60's HEAD). The whole-roadmap
+> definition of done at the bottom of this spec is met; the audio asset library is the only
+> deliberate deferral, per the risk note. (This table was stale from 2026-06-29 to 2026-07-03 —
+> rows were not updated as Domains 1–9 merged, contrary to the Execution model's own instruction.)
 
 > Dependency notes are advisory ordering hints; the hard rule is **Domain 1 first**. Domains 6 and 8
 > have a mild circular hint (meta unlocks persist via save; permadeath needs death from D1) — D1
