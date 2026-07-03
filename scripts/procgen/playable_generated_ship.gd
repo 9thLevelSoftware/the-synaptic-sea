@@ -3857,8 +3857,6 @@ func _on_derelict_interactable_completed(interaction_id: String, objective_id: S
 		String(current_ship.marker_id), sequence, objective_type, str(controller.is_cleared()).to_lower()])
 	if is_instance_valid(menu_coordinator):
 		menu_coordinator.trigger_tutorial("objective_completed", objective_type)
-		if not room_id.is_empty():
-			menu_coordinator.reveal_room(room_id)
 
 ## Validation seam: complete a derelict objective by sequence through the real
 ## interaction path (bypassing proximity via set_validation_player_in_range).
@@ -4517,42 +4515,6 @@ func _use_consumable_hotbar_slot(slot_index: int) -> Dictionary:
 		_refresh_consumable_ui(slot_index)
 	return result
 
-func _build_ui_room_payload() -> Dictionary:
-	var room_set: Dictionary = {}
-	var neighbours: Dictionary = {}
-	if loader != null and loader.has_method("get_room_links"):
-		for link_variant in loader.get_room_links():
-			if typeof(link_variant) != TYPE_DICTIONARY:
-				continue
-			var link: Dictionary = link_variant
-			var from_room: String = str(link.get("from_room", ""))
-			var to_room: String = str(link.get("to_room", ""))
-			if from_room.is_empty() or to_room.is_empty():
-				continue
-			room_set[from_room] = true
-			room_set[to_room] = true
-			if not neighbours.has(from_room):
-				neighbours[from_room] = []
-			if not neighbours.has(to_room):
-				neighbours[to_room] = []
-			if not (neighbours[from_room] as Array).has(to_room):
-				(neighbours[from_room] as Array).append(to_room)
-			if not (neighbours[to_room] as Array).has(from_room):
-				(neighbours[to_room] as Array).append(from_room)
-	for objective in loader.get_objective_specs_copy() if loader != null and loader.has_method("get_objective_specs_copy") else []:
-		if typeof(objective) == TYPE_DICTIONARY:
-			var room_id: String = str((objective as Dictionary).get("room_id", ""))
-			if not room_id.is_empty():
-				room_set[room_id] = true
-	if not arc_zone_resolved_room_id.is_empty():
-		room_set[arc_zone_resolved_room_id] = true
-	var rooms: Array = room_set.keys()
-	rooms.sort()
-	for room_id in rooms:
-		if not neighbours.has(room_id):
-			neighbours[room_id] = []
-	return {"rooms": rooms, "neighbours": neighbours}
-
 func _refresh_ui_shell_runtime() -> void:
 	if not is_instance_valid(menu_coordinator):
 		return
@@ -4560,11 +4522,6 @@ func _refresh_ui_shell_runtime() -> void:
 	menu_coordinator.set_inventory_items(_inventory_hotbar_ids())
 	menu_coordinator.set_hotbar_slots(_get_consumable_slot_labels())
 	_refresh_weapon_hotbar()
-	menu_coordinator.configure_map(_build_ui_room_payload())
-	if loader != null and loader.has_method("get_critical_path"):
-		var critical: Array[String] = loader.get_critical_path()
-		if not critical.is_empty():
-			menu_coordinator.track_room(critical[0])
 
 func _on_ui_modal_opened(_menu_id: String) -> void:
 	_freeze_player_for_panel()
@@ -7830,8 +7787,6 @@ func _input(event: InputEvent) -> void:
 			return
 	if is_instance_valid(menu_coordinator):
 		if menu_coordinator.handle_ui_input(event):
-			if event.is_action_pressed("ui_open_map"):
-				menu_coordinator.reveal_room(menu_coordinator.map_fog_state.get_tracked_room_id())
 			_dispatch_save_load_confirm_result(menu_coordinator.get_last_meta_screen_confirm_result())
 			get_viewport().set_input_as_handled()
 			return

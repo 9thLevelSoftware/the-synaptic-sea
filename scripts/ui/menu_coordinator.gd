@@ -13,11 +13,9 @@ const MenuStateScript := preload("res://scripts/systems/menu_state.gd")
 const SettingsStateScript := preload("res://scripts/systems/settings_state.gd")
 const TutorialStateScript := preload("res://scripts/systems/tutorial_state.gd")
 const TooltipPresenterScript := preload("res://scripts/systems/tooltip_presenter.gd")
-const MapFogStateScript := preload("res://scripts/systems/map_fog_state.gd")
 const ControllerGlyphStateScript := preload("res://scripts/systems/controller_glyph_state.gd")
 const MenuPanelScript := preload("res://scripts/ui/menu_panel.gd")
 const CodexPanelScript := preload("res://scripts/ui/codex_panel.gd")
-const MinimapPanelScript := preload("res://scripts/ui/minimap_panel.gd")
 const HotbarPanelScript := preload("res://scripts/ui/hotbar_panel.gd")
 const TooltipPanelScript := preload("res://scripts/ui/tooltip_panel.gd")
 const TutorialOverlayPanelScript := preload("res://scripts/ui/tutorial_overlay_panel.gd")
@@ -46,12 +44,10 @@ var menu_state = MenuStateScript.new()
 var settings_state = SettingsStateScript.new()
 var tutorial_state = TutorialStateScript.new()
 var tooltip_presenter = TooltipPresenterScript.new()
-var map_fog_state = MapFogStateScript.new()
 var controller_glyph_state = ControllerGlyphStateScript.new()
 
 var menu_panel
 var codex_panel
-var minimap_panel
 var hotbar_panel
 var tooltip_panel
 var tutorial_overlay_panel
@@ -111,9 +107,6 @@ func _ready() -> void:
 	codex_panel = CodexPanelScript.new()
 	codex_panel.name = "CodexPanel"
 	add_child(codex_panel)
-	minimap_panel = MinimapPanelScript.new()
-	minimap_panel.name = "MinimapPanel"
-	add_child(minimap_panel)
 	hotbar_panel = HotbarPanelScript.new()
 	hotbar_panel.name = "HotbarPanel"
 	add_child(hotbar_panel)
@@ -172,9 +165,6 @@ func handle_ui_input(event: InputEvent) -> bool:
 			menu_state.open_menu("codex")
 		else:
 			menu_state.open_menu("codex")
-		return true
-	if event.is_action_pressed("ui_open_map"):
-		minimap_panel.visible = not minimap_panel.visible
 		return true
 	if menu_state.is_in_play():
 		return false
@@ -241,25 +231,6 @@ func set_load_available(value: bool) -> void:
 		menu_state.set_item_enabled("main_menu", "continue", value)
 	_refresh_menu_panel()
 
-func configure_map(room_payload: Dictionary) -> bool:
-	var ok: bool = map_fog_state.configure_for_rooms(room_payload)
-	_refresh_minimap()
-	return ok
-
-func track_room(room_id: String) -> bool:
-	if room_id.is_empty() or not map_fog_state.is_known_room(room_id):
-		return false
-	var ok: bool = map_fog_state.track(room_id)
-	_refresh_minimap()
-	return ok
-
-func reveal_room(room_id: String) -> bool:
-	if room_id.is_empty() or not map_fog_state.is_known_room(room_id):
-		return false
-	var ok: bool = map_fog_state.reveal(room_id)
-	_refresh_minimap()
-	return ok
-
 func set_inventory_items(item_ids: Array, selected_index: int = 0) -> void:
 	_inventory_item_ids = item_ids.duplicate()
 	_selected_hotbar_index = clampi(selected_index, 0, max(0, _inventory_item_ids.size() - 1))
@@ -325,9 +296,6 @@ func get_hotbar_text() -> String:
 
 func get_menu_text() -> String:
 	return menu_panel.body_label.text if menu_panel != null and menu_panel.body_label != null else ""
-
-func get_minimap_text() -> String:
-	return minimap_panel.label.text if minimap_panel != null and minimap_panel.label != null else ""
 
 func get_tutorial_text() -> String:
 	return tutorial_overlay_panel.label.text if tutorial_overlay_panel != null and tutorial_overlay_panel.label != null else ""
@@ -971,14 +939,13 @@ func meta_screen_is_populated(screen_id: String) -> bool:
 func _apply_accessibility_to_children() -> void:
 	if accessibility_settings == null:
 		return
-	for child in [menu_panel, codex_panel, minimap_panel, hotbar_panel, tooltip_panel, tutorial_overlay_panel]:
+	for child in [menu_panel, codex_panel, hotbar_panel, tooltip_panel, tutorial_overlay_panel]:
 		if child != null and child.has_method("apply_accessibility_settings"):
 			child.apply_accessibility_settings(accessibility_settings)
 
 func _refresh_all() -> void:
 	_refresh_menu_panel()
 	_refresh_codex()
-	_refresh_minimap()
 	_refresh_hotbar()
 	_refresh_tutorial()
 	_refresh_meta_screens()
@@ -1042,19 +1009,6 @@ func _refresh_codex() -> void:
 		for rl in registry_lines:
 			lines.append(String(rl))
 	codex_panel.set_entries(lines)
-
-func _refresh_minimap() -> void:
-	if minimap_panel == null:
-		return
-	var lines := PackedStringArray()
-	lines.append("MAP")
-	lines.append("Tracked: %s" % (map_fog_state.get_tracked_room_id() if not map_fog_state.get_tracked_room_id().is_empty() else "<none>"))
-	lines.append("Revealed: %d" % map_fog_state.get_revealed_count())
-	lines.append("Discovered: %d" % map_fog_state.get_discovered_count())
-	for room_id in map_fog_state.get_room_ids().slice(0, 5):
-		var state_text: String = "revealed" if map_fog_state.is_revealed(room_id) else ("seen" if map_fog_state.is_discovered(room_id) else "hidden")
-		lines.append("- %s [%s]" % [room_id, state_text])
-	minimap_panel.set_map_text("\n".join(lines))
 
 func _refresh_hotbar() -> void:
 	if hotbar_panel == null:
