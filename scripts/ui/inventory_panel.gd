@@ -289,6 +289,7 @@ func row_drag_payload(pane: String, index: int) -> Variant:
 	var m = _model_for_pane(pane)
 	if not m.is_selected(index):
 		m.select_single(index)
+		_push_tooltip_for_selection(pane)
 	var data: Dictionary = _build_drag_payload(pane)
 	return null if (data["ids"] as Array).is_empty() else data
 
@@ -297,6 +298,7 @@ func row_context(pane: String, index: int, global_pos: Vector2) -> void:
 	if not m.is_selected(index):
 		m.select_single(index)
 		_render()
+		_push_tooltip_for_selection(pane)
 	var menu: PopupMenu = _build_context_menu(pane, index)
 	add_child(menu)
 	menu.position = global_pos
@@ -337,6 +339,7 @@ func zone_drop(target: String, data) -> void:
 					equip_from_container(String(id))
 				else:
 					_sel_self.select_single(_ids_for_pane("self").find(String(id)))
+					_push_tooltip_for_selection("self")
 					equip_selected()
 				return
 		return
@@ -411,6 +414,7 @@ func _on_context_id(id: int, pane: String, index: int) -> void:
 				equip_from_container(String(ids[index]))
 		else:
 			_model_for_pane(pane).select_single(index)
+			_push_tooltip_for_selection(pane)
 			equip_selected()
 	elif id == _ACT_USE or id == _ACT_USE_ALL:
 		var ids: Array = _ids_for_pane(pane)
