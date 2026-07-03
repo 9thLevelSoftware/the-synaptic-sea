@@ -4918,45 +4918,6 @@
       "subsystems": []
     },
     {
-      "id": "map_fog_state",
-      "file": "scripts/systems/map_fog_state.gd",
-      "name": "Map Fog State",
-      "domain": "ui",
-      "kind": "ui",
-      "model_exists": true,
-      "smoke": "scripts/validation/map_fog_state_smoke.gd",
-      "reachable": true,
-      "driven": true,
-      "driven_at": "playable_generated_ship.gd:4029",
-      "input": {
-        "live": true,
-        "desc": "configure_for_rooms via configure_map (4029); track critical[0] (4033); reveal_room on objective_completed (3364)",
-        "at": "playable_generated_ship.gd:4029-4033, 3364"
-      },
-      "output": {
-        "live": true,
-        "desc": "revealed/tracked room state rendered into minimap panel",
-        "at": "menu_coordinator.gd:650-661"
-      },
-      "confidence": "V",
-      "loops": [
-        "map_reveal"
-      ],
-      "integrations": [
-        {
-          "to": "minimap_panel",
-          "via": "_refresh_minimap",
-          "at": "menu_coordinator.gd:650",
-          "health": "healthy"
-        }
-      ],
-      "content": "partial",
-      "content_note": "VERIFIED: configure_map->map_fog_state.configure_for_rooms at coordinator 205; fog built at runtime from generated room payload, no static data file",
-      "functional": null,
-      "gaps": [],
-      "subsystems": []
-    },
-    {
       "id": "controller_glyph_state",
       "file": "scripts/systems/controller_glyph_state.gd",
       "name": "Controller Glyph State",
@@ -5149,45 +5110,6 @@
       ],
       "content": "sufficient",
       "content_note": "VERIFIED: _refresh_codex at 634, get_unlocked_codex_ids at 640, set_entries at 648",
-      "functional": null,
-      "gaps": [],
-      "subsystems": []
-    },
-    {
-      "id": "minimap_panel",
-      "file": "scripts/ui/minimap_panel.gd",
-      "name": "Minimap Panel",
-      "domain": "ui",
-      "kind": "ui",
-      "model_exists": true,
-      "smoke": "scripts/validation/main_playable_ui_shell_smoke.gd",
-      "reachable": true,
-      "driven": true,
-      "driven_at": "menu_coordinator.gd:650",
-      "input": {
-        "live": true,
-        "desc": "map_fog_state tracked/revealed/discovered rooms",
-        "at": "menu_coordinator.gd:654-660"
-      },
-      "output": {
-        "live": true,
-        "desc": "renders map text; toggled by ui_open_map",
-        "at": "menu_coordinator.gd:661, 153-155"
-      },
-      "confidence": "V",
-      "loops": [
-        "map_reveal"
-      ],
-      "integrations": [
-        {
-          "to": "map_fog_state",
-          "via": "reads fog state",
-          "at": "menu_coordinator.gd:655",
-          "health": "healthy"
-        }
-      ],
-      "content": "partial",
-      "content_note": "VERIFIED: set_map_text at 661, toggle at handle_ui_input 153-155; text-only map, visual pass pending",
       "functional": null,
       "gaps": [],
       "subsystems": []
@@ -8903,24 +8825,6 @@
         }
       ],
       "break_points": []
-    },
-    {
-      "id": "map_reveal",
-      "name": "Exploration -> fog reveal -> minimap",
-      "closes": "partial",
-      "steps": [
-        {
-          "system": "map_fog_state",
-          "role": "fog state"
-        },
-        {
-          "system": "minimap_panel",
-          "role": "sink (render)"
-        }
-      ],
-      "break_points": [
-        "reveal only fires on objective_completed (playable:3364) / critical-room track (4033) / ui_open_map tracked-room reveal (7036); no per-step proximity discovery wired"
-      ]
     },
     {
       "id": "tooltip",
