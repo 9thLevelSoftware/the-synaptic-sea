@@ -191,7 +191,8 @@ reload (mirrors the existing scanner / inventory teardown contract).
 
 - 6 new pure-state smokes:
   `menu_state_smoke`, `settings_state_smoke`, `tooltip_presenter_smoke`,
-  `tutorial_state_smoke`, `map_fog_state_smoke`, `controller_glyph_state_smoke`.
+  `tutorial_state_smoke`, `map_fog_state_smoke` (deleted in Domain 10 — see
+  ADR-0045), `controller_glyph_state_smoke`.
 - 1 new main-playable end-to-end smoke:
   `main_playable_slice_ui_shell_smoke` — drives the coordinator through
   the full menu stack via `Input.action_press` / `Input.parse_input_event`.
@@ -201,4 +202,10 @@ reload (mirrors the existing scanner / inventory teardown contract).
   and `main_playable_slice_text_scale_smoke` are re-verified after the
   changes and stay green.
 
-All eight entries are added to the regression bundle.
+**Correction (Domain 10, 2026-07-02):** the claim below this line originally
+read "All eight entries are added to the regression bundle." This was false
+— none of them were registered in `docs/game/06_validation_plan.md` at the
+time this ADR was written (verified by grep). Domain 10 (ADR-0045) registers
+all 9 UI-shell smokes that survive its `map_fog_state_smoke` deletion, plus
+2 new ones, for 11 total `run_clean` entries (`06_validation_plan.md`,
+`commands=121 → 132`).

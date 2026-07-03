@@ -29,6 +29,7 @@ Validated by: Task 15 (`t_c7ac4d08`) / `REQUIREMENT TRACE PASS`
 | 0041 | docs/game/adr/0041-fire-as-persistent-compartment-hazard.md | fire as authoritative compartment hazard; FireState retired; three extinguish paths |
 | 0042 | docs/game/adr/0042-sanity-hallucinations.md | sanity hallucination director (4 channels, deterministic, tier-3 teeth); closes M1 sanity cosmetic gap |
 | 0044 | docs/game/adr/0044-audio-bus-layout-registration-and-caption-settings-unification.md | AudioBusLayout registration, Master-name translation, stream catalog + placeholder clips, SettingsState caption unification; closes Domain 9 audio_reactive loop |
+| 0045 | docs/game/adr/0045-tooltip-triggers-minimap-retirement-web-charts.md | Proximity + inventory tooltip triggers; MapFogState/MinimapPanel deleted outright; item-gated WebChartState/ChartPanel; closes Domain 10 tooltip + map_reveal loops |
 
 ## Notes
 

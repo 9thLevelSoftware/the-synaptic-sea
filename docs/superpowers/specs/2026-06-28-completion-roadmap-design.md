@@ -93,7 +93,7 @@ truth, not a hand-maintained doc.
 | 7 | Travel / Procgen | `travel` | 🟢 closed | — |
 | 8 | Save / Persistence | `save` | 🟡 partial | 1 (permadeath needs death) |
 | 9 | Audio | `audio_reactive` | 🔴 broken | — |
-| 10 | UI/UX Polish | `tooltip`, `map_reveal` | 🔴 / 🟡 | — |
+| 10 | UI/UX Polish | `tooltip`, `map_reveal` | 🟢 closed (2026-07-02, ADR-0045) | — |
 
 > Dependency notes are advisory ordering hints; the hard rule is **Domain 1 first**. Domains 6 and 8
 > have a mild circular hint (meta unlocks persist via save; permadeath needs death from D1) — D1
@@ -440,28 +440,46 @@ audio closed-but-thin honestly.
 
 ---
 
-### Domain 10: UI/UX Polish  [loops: `tooltip` 🔴, `map_reveal` 🟡]
+### Domain 10: UI/UX Polish  [loops: `tooltip` 🟢, `map_reveal` 🟢 — CLOSED 2026-07-02]
 
-**Verified break-points (from inventory):**
-- `tooltip`: `set_tooltip_query` has **no live gameplay caller** (only two smokes) → tooltip never
-  appears in real play.
-- `map_reveal`: reveal only fires on `objective_completed` (3364) / critical-room track (4033) /
+**Verified break-points (from inventory, now resolved — see ADR-0045):**
+- `tooltip`: `set_tooltip_query` had **no live gameplay caller** (only two smokes) → tooltip never
+  appeared in real play. **Resolved:** proximity focus (interactables) + inventory single-selection
+  now both call it, change-gated, on both `_process` branches.
+- `map_reveal`: reveal only fired on `objective_completed` (3364) / critical-room track (4033) /
   `ui_open_map` tracked-room reveal (7036); **no per-step proximity discovery** wired.
 
-**Definition of CLOSED:**
-1. `set_tooltip_query` is **called** from real hover/focus interaction (interactables, inventory,
-   HUD) so tooltips appear in play.
-2. Map fog reveals on **player proximity** as they move through the derelict (per-step discovery), not
-   only on objective completion.
+**User redefinition (2026-07-02, superseding this section's original plan):** the user overrode the
+`map_reveal` per-step-proximity plan below before implementation. A traditional room minimap "cuts
+down on the horror" this game is built around. `map_reveal` is redefined as **item-based web charts**
+(Project Zomboid-style paper maps) tracking **ship positions in the web**, not interior rooms.
+`MapFogState`/`MinimapPanel` are **deleted outright** (not extended); see
+`docs/superpowers/specs/2026-07-02-domain10-ui-polish-design.md` and ADR-0045 for the full design and
+rationale.
 
-**Away-branch checklist:** tooltip queries + proximity reveal both live on the away branch (the
-derelict is where exploration happens).
+**Definition of CLOSED (as implemented):**
+1. `set_tooltip_query` is called from real gameplay: proximity focus on interactables AND inventory
+   row selection, live on BOTH `_process` branches.
+2. The room-fog minimap is deleted; `ui_open_map` opens a web chart screen gated on possessing a chart
+   item, rendering recorded ship-marker knowledge from two sources (scanner auto-record while a chart
+   is possessed; found chart items importing current in-range markers).
 
-**Validation:** `ui_polish_smoke.gd` — assert a hover query surfaces a tooltip; assert moving near an
-undiscovered room reveals it on the minimap; `away_ticks=` on a derelict. Register markers.
+**Away-branch checklist:** tooltip proximity focus is wired into both `_process` branches
+(`_refresh_tooltip_focus`, called from both the away and home branches).
 
-**Inventory delta:** `tooltip.closes → "closed"` and `map_reveal.closes → "closed"`; flip
-`tooltip_presenter.input.live` and `map_fog_state.input.live`; update break-points.
+**Validation:** `ui_polish_smoke.gd` — asserts proximity focus set/change-gated/cleared, inventory
+selection tooltip push, and the chart gate (denied without a chart, rendered with one after a scan),
+with an `away_ticks=` marker field. Registered in the regression bundle (`06_validation_plan.md`,
+`commands=132`).
+
+**Inventory delta:** `tooltip.closes → "closed"` and `map_reveal.closes → "closed"` (redefined loop:
+steps now `web_chart_state` → `chart_panel`); `tooltip_presenter.input.live → true`; `map_fog_state`/
+`minimap_panel` system rows and the `map_reveal` loop entry (whose only steps were those two systems)
+were **deleted outright** from `docs/game/inventory/system_inventory.json` (commit `263dc0f`) rather
+than flipped to closed, since the systems themselves no longer exist. **Correction against this
+section's original plan:** `web_chart_state`/`chart_panel` are **not yet** added as inventory system
+entries — `tools/build_system_inventory.py --coverage` (not gated in the regression bundle) flags this
+as an explicit follow-up, noted in commit `263dc0f` and ADR-0045's retained deferrals.
 
 ---
 
