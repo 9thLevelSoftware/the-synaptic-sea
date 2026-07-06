@@ -14,6 +14,7 @@ const AMMO_DEFINITIONS_PATH: String = "res://data/combat/ammo_definitions.json"
 const UTILITY_DEFINITIONS_PATH: String = "res://data/items/utility_item_definitions.json"
 const TRADE_DEFINITIONS_PATH: String = "res://data/items/trade_item_definitions.json"
 const TOOL_DEFINITIONS_PATH: String = "res://data/tools/tool_definitions.json"
+const MATERIAL_DEFINITIONS_PATH: String = "res://data/materials/material_definitions.json"
 const EQUIPMENT_DEFINITIONS_PATH: String = "res://data/items/equipment_definitions.json"
 const JUNK_ITEMS_PATH: String = "res://data/items/junk_items.json"
 const UNIQUE_ITEMS_PATH: String = "res://data/items/unique_items.json"
@@ -63,6 +64,20 @@ static func load_definitions() -> Dictionary:
 				defs[item_id] = merged
 			else:
 				defs[item_id] = extra_defs[item_id]
+	# Crafting materials (data/materials/material_definitions.json, wrapped in
+	# a "materials" root key). FILL-ONLY: an id already defined above (e.g.
+	# scrap_metal, power_cell in item_definitions.json) keeps its live-balance
+	# definition; only the ~26 material-only ids are added. Before this merge
+	# every crafting material resolved with weight=0 and no category.
+	var material_root: Dictionary = _read_json_dict(MATERIAL_DEFINITIONS_PATH)
+	var material_defs: Variant = material_root.get("materials", {})
+	if material_defs is Dictionary:
+		for mat_id in (material_defs as Dictionary):
+			var raw_mat: Variant = (material_defs as Dictionary)[mat_id]
+			if not (raw_mat is Dictionary):
+				continue
+			if not defs.has(mat_id):
+				defs[mat_id] = raw_mat
 	var equip_defs: Dictionary = _read_json_dict(EQUIPMENT_DEFINITIONS_PATH)
 	for equip_id in equip_defs:
 		var raw_equip: Variant = equip_defs[equip_id]

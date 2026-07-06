@@ -100,7 +100,7 @@
         "docs/game/balance/food_cooking_spoilage_tuning.md"
       ],
       "data_files": [
-        "data/items/food_definitions.json"
+        "data/items/item_definitions.json"
       ],
       "smoke_files": [
         "scripts/validation/food_state_smoke.gd",

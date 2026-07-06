@@ -217,6 +217,7 @@ func _spawn_from_markers(markers: Array, anchor: Vector3) -> void:
 			continue
 		var encounter_kind: String = _normalize_encounter_kind(str((marker as Dictionary).get("encounter_kind", "biomatter_swarm")))
 		var count: int = max(1, int((marker as Dictionary).get("count", 1)))
+		var local_pos: Variant = (marker as Dictionary).get("local_position", null)
 		for i in range(count):
 			var def: Dictionary = threat_archetypes.get(encounter_kind, {}) if threat_archetypes.get(encounter_kind, {}) is Dictionary else {}
 			if def.is_empty():
@@ -227,7 +228,19 @@ func _spawn_from_markers(markers: Array, anchor: Vector3) -> void:
 			merged["archetype_id"] = encounter_kind
 			merged["room_id"] = str((marker as Dictionary).get("room_id", ""))
 			merged["cell"] = (marker as Dictionary).get("cell", [0, 0])
-			merged["world_position"] = [anchor.x + cos(float(idx)) * 4.0, anchor.y, anchor.z + sin(float(idx)) * 4.0]
+			if local_pos is Array and (local_pos as Array).size() >= 3:
+				# EncounterInjector markers carry the rolled room's floor-cell
+				# offset — spawn the threat IN its room. Multiple threats on
+				# one marker fan out by half a cell so they don't stack.
+				merged["world_position"] = [
+					anchor.x + float((local_pos as Array)[0]) + float(i) * 0.5,
+					anchor.y + float((local_pos as Array)[1]),
+					anchor.z + float((local_pos as Array)[2]),
+				]
+			else:
+				# Legacy markers (hand-authored gameplay slices, older saves)
+				# have no local_position: keep the anchor-circle fallback.
+				merged["world_position"] = [anchor.x + cos(float(idx)) * 4.0, anchor.y, anchor.z + sin(float(idx)) * 4.0]
 			threat.configure(merged)
 			threats.append(threat)
 			_spawn_placeholder(threat, idx, anchor)

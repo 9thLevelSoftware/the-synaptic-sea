@@ -12,7 +12,10 @@ class_name EncounterInjector
 #   id               String, unique within the layout
 #   room_id          String, in layout.rooms
 #   deck             int,    matches room.deck
-#   cell             Array   [x, y] or [x, y, deck], in room.cells
+#   cell             Array   [x, y], one of the room's floor cells
+#   local_position   Array   [x, y, z], scene-local world offset of the
+#                            chosen floor cell (cell * cell_size); the
+#                            loader/ThreatManager adds the ship anchor
 #   encounter_kind   String, non-empty (e.g. "biomatter_lurker")
 #   count            int,    >= 1
 #   difficulty_tier  String, matches the supplied difficulty id
@@ -135,6 +138,7 @@ func inject(
 
 	var difficulty_id: String = _safe_difficulty_id(difficulty)
 	var encounter_table_id: String = _safe_encounter_table_id(biome)
+	var cell_size: float = float(layout.get("cell_size", 4.0))
 
 	var rooms_raw: Variant = layout.get("rooms", [])
 	var rooms: Array = []
@@ -173,24 +177,19 @@ func inject(
 		if encounter_kind.is_empty():
 			continue
 
-		var cells_raw: Variant = room.get("cells", [])
-		var cells: Array = []
-		if cells_raw is Array:
-			cells = cells_raw
-		var cell_entry: Variant = null
-		var cell_xy: Vector2i = Vector2i.ZERO
-		if not cells.is_empty():
-			var cell: Variant = cells[0]
-			if cell is Vector2i:
-				cell_xy = cell
-				cell_entry = [cell.x, cell.y]
-			elif cell is Array:
-				var arr: Array = cell
-				if arr.size() >= 2:
-					cell_xy = Vector2i(int(arr[0]), int(arr[1]))
-					cell_entry = arr.duplicate()
-		if cell_entry == null:
-			cell_entry = [0, 0]
+		# Serialized rooms (LayoutSerializer / golden layouts) carry their
+		# floor cells as structural_placements, NOT a `cells` array — the old
+		# `room.get("cells")` read only ever matched hand-built test fixtures
+		# and every real marker fell back to cell [0, 0]. Derive from either.
+		var entries: Array = floor_cell_entries(room, cell_size)
+		var cell_entry: Array = [0, 0]
+		var local_position: Array = [0.0, 0.0, 0.0]
+		if not entries.is_empty():
+			# Deterministic pick: middle floor cell (no extra rng draw, so
+			# per-seed marker replay is unchanged).
+			var pick: Dictionary = entries[entries.size() >> 1]
+			cell_entry = pick["cell"]
+			local_position = pick["local_position"]
 
 		marker_index += 1
 		var marker: Dictionary = {
@@ -198,6 +197,7 @@ func inject(
 			"room_id": rid,
 			"deck": int(room.get("deck", 0)),
 			"cell": cell_entry,
+			"local_position": local_position,
 			"encounter_kind": encounter_kind,
 			"count": 1,
 			"difficulty_tier": difficulty_id,
@@ -242,6 +242,7 @@ static func validate(layout: Dictionary) -> Dictionary:
 		result["missing_room"] = "<no rooms array>"
 		return result
 
+	var validate_cell_size: float = float(layout.get("cell_size", 4.0))
 	var room_lookup: Dictionary = {}
 	for room in (rooms_raw as Array):
 		if not (room is Dictionary):
@@ -250,15 +251,9 @@ static func validate(layout: Dictionary) -> Dictionary:
 		if rid.is_empty():
 			continue
 		var cells: Dictionary = {}
-		var cells_raw: Variant = room.get("cells", [])
-		if cells_raw is Array:
-			for c in (cells_raw as Array):
-				if c is Vector2i:
-					cells["%d,%d" % [c.x, c.y]] = true
-				elif c is Array:
-					var a: Array = c
-					if a.size() >= 2:
-						cells["%d,%d" % [int(a[0]), int(a[1])]] = true
+		for entry in floor_cell_entries(room, validate_cell_size):
+			var xz: Array = (entry as Dictionary)["cell"]
+			cells["%d,%d" % [int(xz[0]), int(xz[1])]] = true
 		room_lookup[rid] = {
 			"deck": int(room.get("deck", 0)),
 			"cells": cells,
@@ -336,6 +331,48 @@ static func validate(layout: Dictionary) -> Dictionary:
 
 
 # --- Internal helpers ---
+
+# Enumerates a room's floor cells as [{cell: [x, z], local_position: [x, y, z]}].
+# Prefers an explicit `cells` array (pre-serialization dicts / hand-built
+# fixtures); otherwise derives from the serialized `structural_placements`,
+# whose floor entries are named "floor_cell_*" with world_position =
+# cell * cell_size (LayoutSerializer._build_structural_placements).
+static func floor_cell_entries(room: Dictionary, cell_size: float) -> Array:
+	# Guard degenerate cell_size once for BOTH branches: a zero/negative size
+	# would silently produce wrong local positions (cells branch) or divide
+	# incorrectly (placements branch). The grid contract is CELL_SIZE = 4.0.
+	var safe_size: float = cell_size if cell_size > 0.0 else 4.0
+	var out: Array = []
+	var cells_raw: Variant = room.get("cells", [])
+	if cells_raw is Array:
+		for c in (cells_raw as Array):
+			var xz: Variant = null
+			if c is Vector2i:
+				xz = [c.x, c.y]
+			elif c is Array and (c as Array).size() >= 2:
+				xz = [int((c as Array)[0]), int((c as Array)[1])]
+			if xz != null:
+				out.append({
+					"cell": xz,
+					"local_position": [float(xz[0]) * safe_size, 0.0, float(xz[1]) * safe_size],
+				})
+	if not out.is_empty():
+		return out
+	var placements_raw: Variant = room.get("structural_placements", [])
+	if placements_raw is Array:
+		for p in (placements_raw as Array):
+			if not (p is Dictionary):
+				continue
+			if not str((p as Dictionary).get("name", "")).begins_with("floor_cell"):
+				continue
+			var wp: Variant = (p as Dictionary).get("world_position", null)
+			if wp is Array and (wp as Array).size() >= 3:
+				out.append({
+					"cell": [int(roundf(float(wp[0]) / safe_size)), int(roundf(float(wp[2]) / safe_size))],
+					"local_position": [float(wp[0]), float(wp[1]), float(wp[2])],
+				})
+	return out
+
 
 func _safe_combined(biome, difficulty, dial: String) -> float:
 	if biome != null and difficulty != null:

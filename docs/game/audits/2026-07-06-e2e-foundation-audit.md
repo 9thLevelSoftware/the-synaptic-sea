@@ -1,0 +1,909 @@
+## [CRITICAL] scripts/audio/audio_manager.gd:401 (stubs/stub)
+**_play_spatial never loads a stream or calls player.play() — spatial audio is permanently silent**
+
+play_sfx(event_id, position) routes to _play_spatial when a 3D position is provided. _play_spatial creates and positions an AudioStreamPlayer3D node but never assigns a stream and never calls player.play(). All spatially-emitted sounds — fire crackle, footsteps, hallucination whispers at 3D positions, dock land, etc. — produce zero audio. This defeats the core horror atmosphere of the game. The non-spatial path (_play_via_bus) also only calls play() when the event is in STREAM_CATALOG, so even the non-spatial path is silent for 24 of 26 catalogued events.
+
+Evidence: func _play_spatial(event_id: StringName, position: Vector3, bus_id: String, volume_db: float) -> void:
+    ...
+    player.bus = bus_id
+    player.volume_db = volume_db
+    player.global_position = position
+    # ← no player.play() and no stream load
+
+Verifier: Read scripts/audio/audio_manager.gd lines 401-418. _play_spatial creates or reuses an AudioStreamPlayer3D, sets bus/volume_db/global_position, then returns — no stream is loaded or assigned and player.play() is never called. A grep for "player.stream" and "player.play()" confirms these calls appear only in _play_via_bus (lines 396-398) and _apply_music_layer_gains (lines 450-451), never in _play_spatial. Every call to play_sfx with a Vector3 position (line 244) routes exclusively through _play_spatial and produces zero audio.
+
+---
+
+## [CRITICAL] scripts/procgen/encounter_injector.gd:176 (procgen-pipeline/bug)
+**EncounterInjector reads room.cells which never exists in serialized layout rooms, placing all encounter markers at cell [0,0]**
+
+inject() reads `room.get("cells", [])` from the layout dict produced by LayoutSerializer. Serialized rooms have no "cells" key — only "structural_placements". Because cells_raw is always [], cell_entry falls through to `[0, 0]` (line 193). Every encounter marker emitted for every room is placed at the airlock origin cell. validate() has the same flaw: it builds its room_lookup cells from `room.get("cells", [])` (line 253), so cells is always empty, and the guard `if not cells.is_empty()` (line 318) silently skips the cell check — corrupt markers pass validation undetected. Encounter spawn positions consumed by threat_manager via _combat_markers_for_current_ship (playable_generated_ship.gd:4371) are all wrong for every procgen ship where biome or difficulty is set.
+
+Evidence: encounter_injector.gd:176-193: `var cells_raw: Variant = room.get("cells", [])` ... `if cell_entry == null: cell_entry = [0, 0]`. validate() line 253: same `room.get("cells", [])` lookup → empty cells dict → line 318: `if not cells.is_empty() and not cells.has(cell_key)` skips check.
+
+Verifier: LayoutSerializer (layout_serializer.gd:56-78) does not include "cells" in the serialized room dict — it only writes structural_placements, portals, interior_zones, etc. Golden layout JSON confirms rooms have only ['id', 'room_role', 'deck', 'structural_placements']. encounter_injector.gd:176 reads room.get("cells", []) which always returns [] for real pipeline output, causing cell_entry to fall through to [0,0] at line 192-193. validate() at line 253 has the identical lookup, builds an empty cells dict, and the guard at line 318 (if not cells.is_empty()) always skips the cell check, so corrupt [0,0] markers pass undetected. The validation smoke (encounter_injector_smoke.gd:37,175) manually injects "cells": [Vector2i(i,0)] into its synthetic rooms, making it blind to the production bug. Downstream: _combat_markers_for_current_ship() at playable_generated_ship.gd:4371 feeds these all-[0,0] markers into threat_manager.configure_for_layout() for every procgen ship with biome/difficulty set.
+
+---
+
+## [CRITICAL] data/recipes/recipe_definitions.json:173 (data-integrity/data-integrity)
+**29 of 43 recipes produce items with no definition in any loaded data file**
+
+crafting_state.gd adds the produced item_id to inventory via inventory_state.add_item(), but item_defs.gd has no entry for these items. Result: every crafted item in this set enters inventory with weight=0, category='', display_name=item_id (raw). Affected outputs include stimulant (line 173), nanite_patch (185), synthesized_paste (233), field_bandage (281), emergency_patch (293), improvised_splint (305), filter_mask (317), graphene_weave (375), pneumatic_actuator (387), cryo_unit (399), radiation_suit_lining (411), memory_drive (425), solenoid_rig (437), biomatter_filter (449), hydraulic_clamp (483), thermal_pad (499), filter_cartridge (513), graphene_ink (525), fiber_strand (537), docking_brace (545), nav_chip (557), propulsion_coupling (569), emergency_beacon (581), survival_tent (593), breather_mask (605), radiation_badge (617), portable_oxygen_pump_mk2 (629), junction_calibrator_mk2 (641), fishing_line (653), improvised_torch (665). Tool upgrades (mk2) are also absent from data/tools/tool_definitions.json.
+
+Evidence: "produces": { "item_id": "stimulant", "quantity": 1 } (line 173); item_defs.gd lines 10-20 list all loaded paths — stimulant, nanite_patch, etc. appear in none of them.
+
+Verifier: All 10 data files actually loaded by item_defs.gd (item_definitions.json, medicine_definitions.json, stimulant_definitions.json, ammo_definitions.json, utility_item_definitions.json, trade_item_definitions.json, tool_definitions.json, equipment_definitions.json, junk_items.json, unique_items.json) were searched for every item_id named in the claim. None of the 29 output item IDs appear in any of those files. stimulant_definitions.json keys are focus_ampoule/combat_stim/calm_patch — not "stimulant". synthesized_paste exists only in food_definitions.json which is absent from the load list. tool_definitions.json has only portable_oxygen_pump and junction_calibrator, not their _mk2 variants. item_defs.gd lines 120-128 confirm the fallback: weight=0.0, category="", display_name falls back to capitalized item_id for any unknown key. The consequence is real and widespread across 29 of 43 recipes.
+
+---
+
+## [CRITICAL] data/items/food_definitions.json:1 (data-integrity/dead-code)
+**food_definitions.json is never loaded and has 27 numerical conflicts with the canonical item_definitions.json**
+
+item_defs.gd (scripts/systems/item_defs.gd) lists exactly which extra files it merges (lines 44-50): medicine, stimulant, ammo, utility, trade. food_definitions.json is absent from that list and from every other loader. The 7 food items it defines (ration_pack, cooked_meal, alien_flora, scavenged_protein, purified_water, hydroponic_greens, synthesized_paste) are therefore invisible to the inventory weight/category/spoilage system. Worse, where items overlap with item_definitions.json the values conflict: cooked_meal.hunger_restore 40 vs 25, cooked_meal.spoilage_seconds 2400 vs 1800, purified_water.thirst_restore 30 vs 15, purified_water.spoilage_seconds 7200 vs 86400, alien_flora.sanity_restore -5 vs -2 (27 conflicting field values across 6 items). synthesized_paste is produced by recipe synthesize_nutrient_paste but exists only here, doubling finding #1.
+
+Evidence: item_defs.gd line 44: 'for extra_path in [MEDICINE_DEFINITIONS_PATH, STIMULANT_DEFINITIONS_PATH, AMMO_DEFINITIONS_PATH, UTILITY_DEFINITIONS_PATH, TRADE_DEFINITIONS_PATH]:' — FOOD_DEFINITIONS_PATH constant does not exist in the file.
+
+Verifier: Directly verified: item_defs.gd has no FOOD_DEFINITIONS_PATH constant and the merge loop at lines 44-50 lists only MEDICINE/STIMULANT/AMMO/UTILITY/TRADE. Grep across all of scripts/ returns zero matches for food_definitions or FOOD_DEFINITIONS. The spoilage registration path in playable_generated_ship.gd line 3513 uses ItemDefsScript.load_definitions(), which never loads food_definitions.json. synthesized_paste appears only in food_definitions.json (not in item_definitions.json), making it completely invisible to ItemDefs. Six items appear in both JSON files with conflicting numerical values; the live game uses item_definitions.json values. ADR-0034 line 20 explicitly designates food_definitions.json as the intended data source, confirming this is an unimplemented wiring, not a deliberate design decision.
+
+---
+
+## [CRITICAL] scripts/procgen/playable_generated_ship.gd:4460 (combat-ammo-acquisition-chain/bug)
+**_begin_weapon_reload() always reads reserve=0, permanently locking all ranged weapon reloads**
+
+At line 4460, reserve is read as inventory_state.get_quantity(ammo_item_id). Because no production code path ever deposits flare_round, capacitor_cell (ammo), or fuel_canister into inventory_state, get_quantity always returns 0. This value is passed to ammo_state.begin_reload(), which rejects it (can_load=0), so reload never succeeds and ammo_state.reload_target is never set. All three ranged weapons are permanently un-reloadable in actual gameplay.
+
+Evidence: Line 4460: `var reserve: int = inventory_state.get_quantity(ammo_item_id) if inventory_state != null else 0`
+Line 4461: `if ammo_state.begin_reload(weapon_id, mag_size, reserve):`
+With reserve always 0, ammo_state.begin_reload returns false (see ammo_state.gd:54), so the if-body that debits inventory and refreshes HUD is never entered.
+
+Verifier: Code at line 4460 is exactly as claimed. ammo_state.configure({}) at line 1245 initialises all magazines to 0. No loot table (loot_tables.json), recipe (recipe_definitions.json), class starting inventory (classes.json), hub upgrade, or facility upgrade ever deposits flare_round, capacitor_cell, or fuel_canister into inventory_state. ammo_state.begin_reload() returns false when reserve_available=0 (ammo_state.gd lines 53-54). All three validation smokes that test reload manually inject ammo via add_item, masking the acquisition gap. All ranged weapons start empty and can never be reloaded in production gameplay.
+
+---
+
+## [HIGH] scripts/systems/save_migration_service.gd:75 (save-load/bug)
+**migrate_world() null guard uses `== null` instead of `not .is_valid()`, so an empty Callable is always invoked for unrecognized world versions**
+
+In GDScript 4, `Callable()` (the empty callable returned by `_world_step()` for any unrecognized version) is never `== null` — that comparison evaluates false. The guard at line 75 therefore never fires. Line 77 then calls the empty Callable, which returns null; assigning null to the typed `var working: Dictionary` produces a runtime type error (`Cannot cast value of type "Nil" to "Dictionary"`); working collapses to `{}`. Line 78 stamps only `slice_version` on it; `WorldSnapshot.from_dict()` rejects it for missing `godot_version`; `SaveLoadService` quarantines the valid world file as corrupt rather than gracefully rejecting it as "from a newer version". By contrast, `migrate_run()` line 53 uses the correct pattern `if step == null or not step.is_valid()`. Any user who upgrades to a future version, then downgrades to the current build, loses their world save silently to a corrupt-file quarantine.
+
+Evidence: line 75: `if _world_step(current) == null:` — _world_step() at lines 89-93 returns `Callable()` (not null) for unknown versions. Compare migrate_run() line 53: `if step == null or not step.is_valid():`
+
+Verifier: File confirmed at C:/Users/dasbl/Documents/The Synaptic Sea/scripts/systems/save_migration_service.gd. Line 75 reads `if _world_step(current) == null:` exactly as claimed. _world_step() at lines 89-93 is typed `-> Callable` and returns `Callable()` (empty/invalid callable) for any version not in the "world-1","world-2","world-3" match arm — it never returns null. In GDScript 4, `Callable() == null` is false (type Callable vs type Nil), so the guard never fires. Execution proceeds to line 77 `var working: Dictionary = _world_step(current).call(dict)`, which calls an empty Callable, producing a null return and a type-mismatch on the typed Dictionary variable. migrate_run() at line 53 uses the correct `if step == null or not step.is_valid():` pattern. The bug is real but only triggers on a downgrade-from-future-version scenario (a save from a hypothetical world-5+ loaded by the current build); no such version exists today, so severity is high rather than critical.
+
+---
+
+## [HIGH] scripts/validation/save_load_service_smoke.gd:149 (validation-gaps/save-load-hole)
+**save_load_service_smoke counts 27 summary fields but never populates or verifies 6 of them, making the round-trip check hollow for survival attrition state**
+
+The smoke asserts `get_summary_count() == 27` at line 149, which passes trivially because all 27 SUMMARY_FIELDS in RunSnapshot are counted by name, not by content. However, `vitals_summary`, `sanity_summary`, `radiation_summary`, `temperature_summary`, `status_effects_summary`, and `settings_summary` are never assigned non-empty values (lines 161-225 enumerate verified fields and these six are absent). A bug in the serialize or deserialize path for any of these six summaries would leave them at `{}` on both sides of the round-trip and the smoke would still print PASS. The purpose-built `vitals_state_save_load_smoke.gd` (which sets all five survival attrition fields to real values and asserts exact numeric matches) is orphaned from the bundle.
+
+Evidence: smoke line 393: `print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=27")` — but grep of smoke for `sanity_summary`, `radiation_summary`, `temperature_summary`, `status_effects_summary`, `vitals_summary`, `settings_summary` returns zero hits. RunSnapshot.SUMMARY_FIELDS lists all six; coordinator sets them at lines 6627-6635 of playable_generated_ship.gd: `snapshot.vitals_summary = vitals_state.get_summary()` etc.
+
+Verifier: Confirmed by direct inspection. In save_load_service_smoke.gd, grep for vitals_summary, sanity_summary, radiation_summary, temperature_summary, status_effects_summary, and settings_summary returns zero hits — none of the six are assigned non-empty values in the `original` snapshot, and none appear in the round-trip assertions (lines 161–218). The `get_summary_count() == 27` check at line 149 returns SUMMARY_FIELDS.size() (a static constant), not a count of populated fields (confirmed in run_snapshot.gd line 109). All six fields default to {} and round-trip trivially as {}. The coordinator at lines 6622–6635 and 6943–6961 of playable_generated_ship.gd does set and apply all six fields correctly, so production code works; the smoke is simply hollow for these fields. vitals_state_save_load_smoke.gd exists and is thorough (sets real numeric values, asserts exact matches) but is not in the regression bundle in docs/game/06_validation_plan.md (grep confirmed only vitals_state_smoke.gd is registered, not vitals_state_save_load_smoke.gd). Severity adjusted from critical to high: the production serialization path is intact; this is a test coverage gap, not a broken implementation.
+
+---
+
+## [HIGH] scripts/ui/audio_log_panel.gd:69 (ui-wiring/bug)
+**Audio Log panel is permanently empty because has_method() is called on a var property**
+
+audio_manager.audio_log is a var property (line 52 of audio_manager.gd: `var audio_log: AudioLog = AudioLogScript.new()`), not a func. GDScript's has_method() only detects functions, so this guard always evaluates to false and _populate_entries() returns immediately on every call. The Audio Log meta screen shows nothing regardless of entries in the log. The bug was fixed for sfx_router in the caption path (noted in audio_settings_panel.gd:162-164 comment) but was missed here.
+
+Evidence: if audio_manager == null or not audio_manager.has_method("audio_log"): return
+
+Verifier: Personally read both files. audio_manager.gd line 52 declares `var audio_log: AudioLog = AudioLogScript.new()` — a property, not a method. audio_log_panel.gd line 69 reads `if audio_manager == null or not audio_manager.has_method("audio_log"): return`. GDScript's has_method() only returns true for callable methods, never for var properties, so this condition is always true and _populate_entries() returns immediately on every call. The Audio Log panel is permanently empty regardless of log contents. Note _refresh_status() at line 85 accesses audio_manager.audio_log directly (no has_method guard) and would work if reached, confirming this is a guard bug, not an absent property.
+
+---
+
+## [HIGH] scripts/systems/save_load_service.gd:529 (stubs/stub)
+**SaveSlotState.current_location is populated with the player's X-coordinate float-as-string instead of a location ID**
+
+_index_run_slot() assigns `row.current_location = str(snapshot.player_position[0])` — the X component of the player's 3D position serialized as a string. SaveSlotState.current_location is documented as a location identifier (the world slot path uses world_snapshot.current_location, a proper marker_id string). The save-screen UI and any code reading current_location from a run slot will display and act on a meaningless float value like "3.14" instead of a ship or area name.
+
+Evidence: row.current_location = str(snapshot.player_position[0]) if snapshot.player_position.size() >= 3 else ""
+
+Verifier: Line 529 of scripts/systems/save_load_service.gd reads: `row.current_location = str(snapshot.player_position[0]) if snapshot.player_position.size() >= 3 else ""`. RunSnapshot (scripts/systems/run_snapshot.gd) has no current_location field — only `player_position: Array = [0.0, 0.0, 0.0]`. The sibling line 527 is even commented `# placeholder`, confirming intentional stub status. The world-slot counterpart _index_world_slot() at line 546 correctly uses `str(world_snapshot.current_location)` (world_snapshot.gd line 22: `var current_location: String = "" # "" = home ship, else marker_id`). The run-slot index entry will always carry a raw X-coordinate float string (e.g. "0.0") as its location identifier.
+
+---
+
+## [HIGH] scripts/procgen/playable_generated_ship.gd:5470 (coordinator-wiring/miswired)
+**electrical_arc_state.tick and _refresh_arc_state absent from the away branch — same regression class as PRs #42/#43/#44**
+
+Lines 5470-5472 tick the ElectricalArcState and refresh the arc zone's collision/visuals, but ONLY on the home branch. The away branch has no equivalent. Consequence 1 (audio, both frames): _refresh_audio_state is called on BOTH branches (lines 5417 and 5507). It reads electrical_arc_state at lines 6185 ('if electrical_arc_state != null and bool(electrical_arc_state.is_passability_blocked()): hazard_active = true') and 6211 ('if electrical_arc_state.phase == ElectricalArcState.Phase.ARCING: audio_manager.play_sfx(SFX_ARC_ZAP)'). If the arc was ARCING when the player departed, it stays ARCING for the entire derelict run — hazard_active flag stays true (wrong music context) and arc-zap SFX fires every cooldown window throughout the derelict boarding. Consequence 2 (collision): arc zone collision is never updated during away; on return home the arc is still in whatever phase it was at departure — the timer was never advanced. Consequence 3 (save/load hole): _build_run_snapshot at line 6613 captures electrical_arc_state.get_summary() including the frozen ARCING phase; _apply_run_snapshot at line 6934 restores it; an autosave made mid-derelict-run will reload with a perpetually-stale ARCING arc that should have cycled to DISCHARGED long ago.
+
+Evidence: Home branch lines 5470-5472: 'if electrical_arc_state != null:\n\telectrical_arc_state.tick(delta, {})\n\t_refresh_arc_state(false)'. Away branch (lines 5370-5450): no tick of electrical_arc_state anywhere. _refresh_audio_state (called on both branches at 5417 and 5507) reads arc at lines 6185 and 6211 unconditionally.
+
+Verifier: Read lines 5368-5509 of playable_generated_ship.gd. The away branch (5370-5450) ticks many systems but has no electrical_arc_state.tick or _refresh_arc_state call; it returns at line 5450. The home branch at lines 5470-5472 has the only arc tick. _refresh_audio_state is called on both branches (lines 5417 and 5507) and unconditionally reads electrical_arc_state.is_passability_blocked() (line 6185) and electrical_arc_state.phase (line 6211) — a frozen ARCING phase produces wrong hazard_active music flags and arc-zap SFX every frame throughout the derelict run. _build_run_snapshot at line 6613 captures the stale arc summary; _apply_run_snapshot at line 6934 restores it, making mid-derelict saves load with a perpetually-frozen arc phase. All three claimed consequences are directly evidenced in source.
+
+---
+
+## [HIGH] scripts/procgen/playable_generated_ship.gd:6569 (save-load/save-load-hole)
+**HallucinationDirector state (active events, rng step, tier debuffs) is never captured or restored in the run save/load path**
+
+`hallucination_director` is coordinator-owned (declared around line 411), ticked on both `_process` branches (lines 5384-5392 away, 5489-5498 home), and has fully implemented `get_summary()` / `apply_summary()` methods (lines 132-152 of `hallucination_director.gd`) covering `rng_seed`, `step`, `active_events`, `health_drain_per_second`, `stamina_recovery_mult`, and `_current_tier`. `_build_run_snapshot()` (lines 6569-6658) never calls `hallucination_director.get_summary()`, and `_apply_run_snapshot()` never calls `apply_summary()`. After a save/load cycle, `_reset_runtime_for_reload()` reinitializes the director to a fresh state: all active hallucination events disappear, the deterministic step counter resets to 0, and any tier-3 health_drain / stamina_recovery_mult debuffs vanish until the next tick recomputes tier from the (correctly restored) sanity value. The `RunSnapshot` has no dedicated field for the hallucination director summary; it must be added to carry this state.
+
+Evidence: _build_run_snapshot() lines 6569-6658 have no reference to hallucination_director; hallucination_director.gd lines 132-152 show get_summary() captures `{"seed": rng_seed, "step": step, "active_events": active_events.duplicate(true), "current_tier": _current_tier, ...}` — none of these are in RunSnapshot or SUMMARY_FIELDS.
+
+Verifier: Personally verified across three files. RunSnapshot (scripts/systems/run_snapshot.gd) has no hallucination_summary field and SUMMARY_FIELDS (lines 78-106) lists 27 fields with no hallucination entry. _build_run_snapshot() (playable_generated_ship.gd lines 6569-6658) calls get_summary() on every coordinator-owned model including sanity_state (line 6629) but contains zero references to hallucination_director. _apply_run_snapshot() (lines 6847-7026) applies sanity_state.apply_summary() at line 6955 but has no hallucination_director.apply_summary() call anywhere in its body. hallucination_director.gd lines 132-152 confirm get_summary()/apply_summary() are fully implemented (seed, step, active_events, current_tier, health_drain_per_second, stamina_recovery_mult). After reload, _build_hallucination_runtime() (called from the boarding path, line 4724) reinitializes the director via configure({"seed": _ship_seed(current_ship)}) (line 3143), resetting all accumulated state to fresh values.
+
+---
+
+## [HIGH] scripts/systems/save_migration_service.gd:131 (save-load/save-load-hole)
+**_migrate_world_legacy_to_world_4 is a no-op that does not migrate the embedded home_ship RunSnapshot, causing world loads to fail for saves written before gate2-current-run-3**
+
+`_migrate_world_legacy_to_world_4` (lines 131-134) returns `dict.duplicate(true)` unchanged. A world save written when `CURRENT_SLICE_VERSION` was `"gate2-current-run-1"` or `"gate2-current-run-2"` has `home_ship["slice_version"]` set to that old version. After `migrate_world()` upgrades the world dict to `"world-4"` (no-op otherwise), the embedded `home_ship` dict still carries the old run slice_version. `_apply_world_snapshot()` line 7280 then calls `RunSnapshotScript.from_dict(ws.home_ship, SaveLoadServiceScript.CURRENT_SLICE_VERSION, ...)` with `CURRENT_SLICE_VERSION = "gate2-current-run-3"`. `from_dict()` checks `slice_version` for an exact match (line 167 of run_snapshot.gd) and returns null on mismatch. The warning at line 7282 fires and `_apply_world_snapshot()` returns false — the user's entire world-level progress (visited derelicts, meta progression, unique items) is discarded and a fresh run starts. The fix is for `_migrate_world_legacy_to_world_4` to also call `SaveMigrationService.migrate_run()` on the embedded `home_ship` dict.
+
+Evidence: save_migration_service.gd lines 131-134: `func _migrate_world_legacy_to_world_4(dict: Dictionary) -> Dictionary: return dict.duplicate(true)`. playable_generated_ship.gd line 7280: `var home_snap = RunSnapshotScript.from_dict(ws.home_ship, SaveLoadServiceScript.CURRENT_SLICE_VERSION, ...)`. run_snapshot.gd line 167: `if str(dict.get("slice_version", "")) != expected_slice_version: return null`.
+
+Verifier: All five code points match the claim exactly. save_migration_service.gd lines 131-134: _migrate_world_legacy_to_world_4 returns dict.duplicate(true) with no call to migrate_run() on dict["home_ship"]. save_load_service.gd line 169 calls migrate_world() which invokes that no-op, then passes the result to WorldSnapshot.from_dict(). world_snapshot.gd line 87: from_dict() copies home_ship as a raw dict via _deep_copy_dict() with no migration. playable_generated_ship.gd line 7280 calls RunSnapshotScript.from_dict(ws.home_ship, SaveLoadServiceScript.CURRENT_SLICE_VERSION, ...) with no preceding migrate_run() call. run_snapshot.gd line 167: strict equality check "if str(dict.get('slice_version', '')) != expected_slice_version: return null" returns null when home_ship carries an old version string. Lines 7281-7283 of playable_generated_ship.gd then push_warning and return false, discarding the entire world load. The fix described — calling migrate_run() on the embedded home_ship dict inside _migrate_world_legacy_to_world_4 — is correct.
+
+---
+
+## [HIGH] scripts/procgen/generated_ship_loader.gd:834 (procgen-pipeline/dead-code)
+**get_fire_zone_markers() and get_fire_zone_specs() are defined but never called anywhere in the codebase**
+
+The loader populates fire_zone_markers (line 885) and fire_zone_specs (line 886) from layout_doc.get("fire_zones", []) in _add_fire_zone_markers(). get_fire_zone_markers() (line 834) and get_fire_zone_specs() (line 934) are defined as public accessors. A grep of the entire codebase finds no call sites for either method. Derelict fire seeding in playable_generated_ship.gd uses _seed_derelict_fire() which reads FIRE_COMPARTMENT_SYSTEM and variant-forced compartments — completely independent of the layout's fire_zones. The layout fire_zone data populates arrays that are never read, making all fire_zones entries in layout documents dead data from the runtime perspective.
+
+Evidence: generated_ship_loader.gd:834: `func get_fire_zone_markers() -> Array[Vector3]:`; line 934: `func get_fire_zone_specs() -> Array:`. Bash grep of entire /scripts tree for `get_fire_zone_markers|get_fire_zone_specs` returns only these two definition lines.
+
+Verifier: Grep across the entire repository finds zero call sites for get_fire_zone_markers() or get_fire_zone_specs() in any runtime code. Both methods are defined only at generated_ship_loader.gd:834 and :934. The parallel accessors for arc zones (get_arc_zone_markers/get_arc_zone_specs) and breach zones (get_breach_zone_markers) are all wired in playable_generated_ship.gd (lines 5628-5629, 5979-5980, 6002-6004, 6019-6021). The fire zone build path (_build_fire_zones, line 3076) uses _distributed_room_positions() from burning compartments and never queries the loader. The plan doc docs/superpowers/plans/2026-06-19-timed-fire-hazard.md:519-520 shows the intended consumer wiring but it exists only in the plan, not in playable_generated_ship.gd. All layout fire_zones data is dead at runtime.
+
+---
+
+## [HIGH] scripts/procgen/room_assigner.gd:129 (procgen-pipeline/validation-gap)
+**guaranteed_roles and max_duplicates archetype fields are never read, making archetype-level constraints silently unenforced**
+
+assign_with_selector() reads only `archetype.get("role_weights", {})` from the archetype dict (line 129). The fields guaranteed_roles and max_duplicates — present in all four archetype files — are never accessed. derelict.json specifies `"guaranteed_roles": ["dock"]`: the derelict templates happen to always include a dock zone, so this constraint appears satisfied by coincidence, but nothing enforces it. medium_cruiser.json specifies `"guaranteed_roles": ["cargo", "corridor"]`: not enforced. life_boat.json specifies `"max_duplicates": 1`: not enforced. A template selected for a medium_cruiser archetype could produce a layout with no cargo room despite the archetype declaring it guaranteed.
+
+Evidence: room_assigner.gd:129: `var weights: Dictionary = archetype.get("role_weights", {})` — only field read. data/procgen/archetypes/derelict.json:22: `"guaranteed_roles": ["dock"]`. data/procgen/archetypes/medium_cruiser.json:21: `"guaranteed_roles": ["cargo", "corridor"]`. No `guaranteed_roles` or `max_duplicates` reads exist in the file.
+
+Verifier: Confirmed by reading the source. `scripts/procgen/room_graph_generator.gd` lines 4–8 explicitly states "DEPRECATED 2026-07-01 (Domain 7): orphaned from the live generation pipeline … retained for reference / unit-test use only." That file is the only place `guaranteed_roles` (line 183) and `max_duplicates` (lines 124, 201) are read from the archetype dict. The live Stage 2 is `scripts/procgen/room_assigner.gd`, called directly by `ship_layout_generator.gd` lines 74–77. In `room_assigner.gd::_pick_role()` (lines 123–149), only `archetype.get("role_weights", {})` is accessed; `guaranteed_roles` and `max_duplicates` are never touched. The archetype-level constraints declared in the JSON files (`guaranteed_roles: ["cargo","corridor"]` in medium_cruiser.json; `max_duplicates: 1` in life_boat.json) are therefore silently unenforced in every live generation run. The deprecated `RoomGraphGenerator` used in validation smokes enforces them, creating a false impression of coverage.
+
+---
+
+## [HIGH] scripts/tools/fire_suppression_point.gd:10 (signal-wiring/dead-code)
+**extinguish_blocked signal is emitted on five failure paths but never connected in the coordinator**
+
+playable_generated_ship.gd _build_fire_suppression_points() connects only fire_extinguished (line 3222); extinguish_blocked is never wired. Five failure reasons (not_burning, missing_extinguisher, no_charge, extinguish_failed) fire into the void, leaving the player with no feedback when fire suppression fails.
+
+Evidence: signal extinguish_blocked(compartment_id: String, reason: String)  — emitted at lines 69,72,75,108,112,123; playable_generated_ship.gd:3222: if not fp.fire_extinguished.is_connected(_on_fire_extinguished): fp.fire_extinguished.connect(_on_fire_extinguished)  — no connect call for extinguish_blocked anywhere
+
+Verifier: Personally verified in fire_suppression_point.gd: signal extinguish_blocked is declared at line 10 and emitted at lines 69, 72, 75, 108, 112, 123. In playable_generated_ship.gd _build_fire_suppression_points() (lines 3219–3224) only fire_extinguished is connected; no connect call for extinguish_blocked exists. A repo-wide grep of scripts/ finds zero handler or connect sites for extinguish_blocked outside fire_suppression_point.gd itself. The implementation plan doc also only wires fire_extinguished, confirming the omission is in the spec. All five failure reasons fire into the void.
+
+---
+
+## [HIGH] scripts/ui/language_selector.gd:20 (signal-wiring/dead-code)
+**language_changed signal is emitted when the player picks a language but is never connected anywhere**
+
+The class docstring explicitly states 'the HUD re-renders labels via the language_changed signal', but menu_coordinator.gd never connects to it. Changing the active language in the UI updates LanguageSelector._active_language locally but propagates to no other system; every translate() call in every other panel keeps returning the original language. The localization feature is architecturally wired but behaviourally broken.
+
+Evidence: language_selector.gd:84: language_changed.emit(_active_language)  — grepping the entire scripts/ tree for .connect(…language_changed…) returns zero matches outside validation/
+
+Verifier: Read language_selector.gd: signal language_changed declared at line 20, emitted at line 84. Codebase-wide grep for "language_changed" across all scripts/ and scenes/ returns exactly four hits — all inside language_selector.gd itself (two docstring references, the declaration, and the emit). No .connect(…language_changed…) call exists anywhere. menu_coordinator.gd (lines 432-434) instantiates LanguageSelector and calls set_catalog() on it (line 523) but never connects the signal. ADR 0031 (docs/game/adr/0031-localization-catalog-and-routing.md line 70) documents "language_changed(id); UI panels re-render via signal listen" as the intended architecture — confirming the wiring was supposed to exist. Severity high is correct: picking a language in the UI emits the signal into a void; no panel ever receives it or re-translates its labels.
+
+---
+
+## [HIGH] scripts/procgen/playable_generated_ship.gd:4745 (signal-wiring/dead-code)
+**playable_failed is emitted on load failure but never connected, causing title_main.gd to loop forever via call_deferred**
+
+_on_loader_failed emits playable_failed but never sets playable_started = true. title_main.gd _poll_for_playable_started checks only the playable_started boolean; when it is false it schedules itself again with call_deferred. With no failure exit condition, a load failure causes _poll_for_playable_started to queue itself every frame indefinitely — the game hangs on a black screen and the deferred call never drains.
+
+Evidence: playable_generated_ship.gd:4742-4745: func _on_loader_failed(reason: String) -> void:\n\tlast_failure_reason = reason\n\tpush_error(...)\n\temit_signal("playable_failed", reason)  — title_main.gd:130-131: if not is_instance_valid(playable_instance) or not playable_instance.playable_started:\n\tcall_deferred("_poll_for_playable_started", should_load)\n\treturn  — no else/failure branch, no timeout
+
+Verifier: Personally verified in the source: (1) scripts/procgen/playable_generated_ship.gd:4742-4745 — _on_loader_failed emits playable_failed but never sets playable_started = true (only _on_ship_loaded at line 4661 does that). (2) scripts/title_main.gd:126-132 — _poll_for_playable_started exits only when playable_instance.playable_started is true; on failure it calls call_deferred("_poll_for_playable_started", should_load) and returns with no timeout or failure branch. Grep of title_main.gd for "playable_failed" returns zero matches — the signal is never connected there. (3) scripts/main.gd:14-19 — main_node.playable_instance is a scene-tree-attached node not freed on failure, so is_instance_valid(main_node) stays true and the early-return escape hatch never fires. Any initial ship-load failure produces an infinite call_deferred loop; the game hangs on a black screen.
+
+---
+
+## [HIGH] scripts/validation/:1 (validation-gaps/validation-gap)
+**203 of 331 smoke files (61%) are not registered in the regression bundle, leaving large subsystems with no automated regression gate**
+
+The bundle in docs/game/06_validation_plan.md runs 128 Godot smokes out of 331 on disk. 203 smokes are orphaned: they exist in scripts/validation/ but are never invoked by any run_clean command. Whole subsystems have their only smoke outside the bundle, including life_support_state, damage_pipeline, save_migration_service, status_effects, world_snapshot, vitals_state_save_load, sanity_state, radiation_state, body_temperature_state, hull_integrity_state (no smoke at all), skill_tree_panel, addiction_state, world_persist_restore, derelict_gameplay, and derelict_loot. Passing the regression bundle is defined as the completion contract, but 61% of written tests never run.
+
+Evidence: comm -23 /tmp/all_smokes.txt /tmp/bundle_smokes.txt yields 203 entries. Bundle header: `echo 'SYNAPTIC_SEA REGRESSION PASS commands=132 clean_output=true'`.
+
+Verifier: Direct filesystem enumeration: `find scripts/validation -name "*.gd"` returns 331 files; extracting `run_clean` smoke paths from `docs/game/06_validation_plan.md` (excluding the `$s.gd` bash-variable token in the documentation evidence-gathering loop) yields 128 unique Godot smokes; `comm -23` between the two sorted lists returns exactly 203 orphaned entries. Every specific example cited by the finder is confirmed orphaned: `life_support_state_smoke.gd`, `damage_pipeline_smoke.gd`, `save_migration_service_smoke.gd`, `status_effects_smoke.gd`, `world_snapshot_smoke.gd`, `vitals_state_save_load_smoke.gd`, `sanity_state_smoke.gd`, `radiation_state_smoke.gd`, `body_temperature_state_smoke.gd`, `skill_tree_panel_smoke.gd`, `addiction_state_smoke.gd`, `world_persist_restore_smoke.gd`, `derelict_gameplay_smoke.gd`, `derelict_loot_smoke.gd` are all on disk but absent from the bundle. No `hull_integrity_state` smoke exists anywhere. The secondary runner `tools/synaptic_sea_gate4_regression.sh` is an older 30-smoke macOS-pathed script, not the canonical gate. Feature docs (`docs/game/features/survival_vitals.md`, `combat_threat_ai.md`) and `05_requirements.md` name several orphaned smokes as the stated validation contract for those features, making this a genuine gap in the completion gate rather than merely optional bonus coverage.
+
+---
+
+## [HIGH] scripts/validation/save_load_service_smoke.gd:1 (validation-gaps/save-load-hole)
+**vitals_state_save_load_smoke.gd (REQ-SV-008) is orphaned despite being the only smoke that round-trips survival attrition summaries**
+
+vitals_state_save_load_smoke.gd sets sanity=38.0, radiation=65.0, temperature=35.0, status_effect='radiation_sickness'/8.5s, and vitals health explicitly, calls _build_run_snapshot(), and asserts each summary field is non-empty and numerically correct (line 103: `absf(float(snapshot.sanity_summary.get("sanity", 0.0)) - 38.0) > 0.1`). This is the only smoke that can catch a regression where these summaries are silently dropped or miscoded. It is not in the bundle.
+
+Evidence: `grep 'vitals_state_save_load_smoke' /tmp/bundle_smokes.txt` returns nothing. vitals_state_save_load_smoke.gd line 87: `if snapshot.sanity_summary.is_empty(): _fail("sanity_summary is empty")`.
+
+Verifier: vitals_state_save_load_smoke.gd is fully implemented and matches every quoted line precisely (line 87: `if snapshot.sanity_summary.is_empty(): _fail("sanity_summary is empty")`; line 103: `absf(float(snapshot.sanity_summary.get("sanity", 0.0)) - 38.0) > 0.1`). A full-text grep of docs/game/06_validation_plan.md returns zero hits for "vitals_state_save_load_smoke", confirming it has no run_clean entry in the regression bundle. The smoke is explicitly cited in docs/game/05_requirements.md line 429 (REQ-SV-008), docs/game/features/survival_vitals.md line 46, docs/game/build-plans/01-survival-vitals-e2e.md line 101, and data/integration/cross_system_integration_matrix.json line 68 — it is a required deliverable that was never registered. The existing bundle smokes (save_load_service_smoke.gd, main_playable_slice_save_load_smoke.gd) do not perform exact-value assertions for sanity, radiation, temperature, or status-effect stacks; those assertions exist only in this orphaned smoke.
+
+---
+
+## [HIGH] scripts/validation/sanity_state_smoke.gd:1 (validation-gaps/validation-gap)
+**Pure-model smokes for all three survival attrition models (sanity, radiation, body temperature) are orphaned — no direct behavior assertion in the bundle**
+
+sanity_state_smoke.gd, radiation_state_smoke.gd, and body_temperature_state_smoke.gd each exercise drain/recovery/round-trip for models ticked via `_tick_survival_attrition` on BOTH _process branches. None are in the bundle. The bundle relies on main_playable_survival_away_smoke for indirect coverage, which only checks that `away_death=true` occurs; it does not verify intermediate numeric state, get_summary round-trip, or get_health_drain_per_second. A regression that broke SanityState.tick() without causing immediate death would pass the bundle.
+
+Evidence: `grep 'sanity_state_smoke\|radiation_state_smoke\|body_temperature_state_smoke' /tmp/bundle_smokes.txt` returns nothing. playable_generated_ship.gd line 5383: `sanity_state.tick(delta)` on away branch; line 5487 on home branch.
+
+Verifier: All three smoke files exist with complete implementations (drain, recovery, round-trip, get_health_drain_per_second). A grep of docs/game/06_validation_plan.md returns zero matches for sanity_state_smoke, radiation_state_smoke, and body_temperature_state_smoke — none are in the bundle. The only bundle coverage is main_playable_survival_away_smoke.gd (line 134), which reading the file confirms contains no reference to sanity whatsoever and only checks that radiation=100 causes health loss and temperature rises, not intermediate numeric state or round-trips. sanity_state.tick(delta) is confirmed on both _process branches (lines 5383 and 5487 of playable_generated_ship.gd). A SanityState.tick() regression that does not cause immediate death is fully undetected by the bundle.
+
+---
+
+## [HIGH] scripts/validation/damage_pipeline_smoke.gd:1 (validation-gaps/validation-gap)
+**damage_pipeline_smoke.gd is orphaned — DamagePipeline.apply_to_vitals and apply_to_threat have no direct bundle coverage**
+
+damage_pipeline_smoke.gd asserts armor mitigation math (physical 0.25 resistance on 20 damage -> health drops from 80 to 65), status effect application (bleed), and threat stun after combat hit. This is the only smoke that exercises the DamagePipeline model directly. It is not in the bundle. The bundle's combat_closure_smoke drives the kill path but does not explicitly verify the damage arithmetic or status-effect injection at the pipeline level.
+
+Evidence: `grep 'damage_pipeline_smoke' /tmp/bundle_smokes.txt` returns nothing. damage_pipeline_smoke.gd line 21: `var hit := pipeline.apply_to_vitals(vitals, statuses, {...}, {...})`; line 24: `if absf(vitals.health - 65.0) > 0.01: _fail(...)`.
+
+Verifier: damage_pipeline_smoke.gd exists at the cited path with the exact assertions described (apply_to_vitals with 0.25 physical resistance on 20 damage → health==65.0, bleed status, apply_to_threat stun, processed_hits==2). Grep of docs/game/06_validation_plan.md for "damage_pipeline_smoke" returns no matches — the smoke is definitively absent from the regression bundle. The bundle's combat_closure_smoke.gd (bundle line 178) drives the kill path only (threat.health set to 0.0) and does not assert armor mitigation arithmetic, status-effect injection, or stun at the pipeline level. e2e_combat_loot_craft_smoke.gd also uses DamagePipelineScript but only checks threat.health >= 24.0 (hit registered). No other bundle entry covers the specific arithmetic gates that damage_pipeline_smoke.gd uniquely validates. ADR-0037 and requirements doc cite damage_pipeline_smoke.gd as the intended gate, confirming the omission is not intentional.
+
+---
+
+## [HIGH] scripts/validation/save_migration_service_smoke.gd:1 (validation-gaps/validation-gap)
+**save_migration_service_smoke.gd (REQ-SL-007/009) is orphaned — v1→v2→v3 migration path and PermadeathResolver not regression-gated in the bundle**
+
+save_migration_service_smoke.gd constructs a v1 save dict (missing player_progression_summary), runs SaveMigrationService.migrate(), and asserts the result has the v3 shape including a default player_progression_summary. It also asserts forward-only migration (newer-than-current snapshots are rejected) and that PermadeathResolver.record_death blocks load_from_slot. None of this is covered by any bundle smoke. The bundle's permadeath_freeze_smoke tests the live coordinator path but not the migration service in isolation.
+
+Evidence: `grep 'save_migration_service_smoke' /tmp/bundle_smokes.txt` returns nothing. save_migration_service_smoke.gd line 16: `const SaveMigrationServiceScript := preload("res://scripts/systems/save_migration_service.gd")`; line 14: `## Pass marker: SAVE MIGRATION SERVICE PASS`.
+
+Verifier: Directly verified: `scripts/validation/save_migration_service_smoke.gd` exists, contains exactly what the claim describes — preloads `SaveMigrationServiceScript` at line 17 and `PermadeathResolverScript` at line 18, exercises the v1→v2→v3 migration walk (lines 57-80), forward-only rejection (lines 83-87), and PermadeathResolver.record_death blocking load_from_slot (lines 127-142). A full read of `docs/game/06_validation_plan.md` lines 83–225 (the entire `run_clean` bundle, ending with `SYNAPTIC_SEA REGRESSION PASS commands=132`) confirms that `save_migration_service_smoke` appears nowhere in the file. `permadeath_freeze_smoke.gd` IS in the bundle at line 208 but it tests the live coordinator path for Domain 8; it does not cover the pure-model migration service or PermadeathResolver isolation contract. The smoke is also referenced in `docs/game/05_requirements.md`, `docs/game/inventory/system_inventory.json`, and `docs/game/adr/0032-migration-permadeath-cloud-manifest.md`, confirming it is intentionally part of the system's contract but was never added to the regression bundle.
+
+---
+
+## [HIGH] scripts/validation/life_support_state_smoke.gd:1 (validation-gaps/validation-gap)
+**life_support_state_smoke.gd is orphaned — direct pure-model test of atmosphere→vitals drain (offline, breach race, M7-A teeth) not in the bundle**
+
+life_support_state_smoke.gd tests LifeSupportState.tick() in powered and unpowered modes, verifies breaches cause oxygen drain even while powered (the 'race to seal' contract), and asserts atmosphere teeth (low oxygen/high CO2 produce positive get_health_drain_per_second). It is not in the bundle. The bundle covers this indirectly via main_playable_life_support_vitals_smoke (live-scene proof), but that smoke does not verify the atmosphere→vitals teeth formula or the powered-but-breached leak path directly.
+
+Evidence: `grep 'life_support_state_smoke' /tmp/bundle_smokes.txt` returns nothing. life_support_state_smoke.gd line 47: `leaky.tick(2.0, {"powered_ratio": 1.0, "breach_count": 3, ...})`; line 51: `if leaky.oxygen_percent >= 100.0: _fail("breaches should leak oxygen even while powered")`.
+
+Verifier: life_support_state_smoke.gd exists at scripts/validation/life_support_state_smoke.gd and contains all the described tests (offline drain, round-trip save/load, atmosphere teeth at lines 44-69, and the powered-but-breached "race to seal" test at lines 71-81). Three independent grep runs against docs/game/06_validation_plan.md for "life_support_state_smoke", "life_support_state_smoke.gd", and "life_support_state" all returned no matches. The bundle's only life-support entry is main_playable_life_support_vitals_smoke.gd (line 132). The spec (docs/superpowers/specs/2026-06-27-m7a-life-support-vitals-loop-design.md line 236) incorrectly states the smoke is "already in the bundle" — it was never added. The pure-model formula paths (atmosphere teeth formula, powered-but-breached leak) tested by the smoke are not exercised by the live-scene smoke, confirming the validation gap is real. Claimed line numbers (47/51 for the breach test) are wrong — those are at 75/76 — but the substance of the finding is correct.
+
+---
+
+## [HIGH] scripts/validation/status_effects_smoke.gd:1 (validation-gaps/validation-gap)
+**status_effects_smoke.gd is orphaned — StatusEffectsState stacking, expiry, and get_modifier have no direct bundle coverage**
+
+status_effects_smoke.gd adds two effects (bleed/burn), verifies stack counts, drives tick to expiry, and calls get_modifier. StatusEffectsState is used by damage_pipeline, addiction_state, and survival attrition on every frame. The bundle covers this only indirectly through flare_steady_smoke (checks steadier=true via status effect), but does not assert add/tick/expire or stack arithmetic.
+
+Evidence: `grep '^status_effects_smoke$' /tmp/bundle_smokes.txt` returns nothing. status_effects_smoke.gd line 8: `if not state.add_effect("bleed", 5.0, 1): _fail(...)`; line 29: `if state.has_effect("bleed") or state.has_effect("burn"): _fail("expected all effects to expire")`.
+
+Verifier: status_effects_smoke.gd at scripts/validation/status_effects_smoke.gd lines 8-32 does exactly what the claim describes: add_effect("bleed", 5.0, 1), add_effect("burn", 3.0, 2), get_stacks("burn") == 2, tick, remove_effect, tick to expiry, and get_modifier. A grep for "status_effects" in docs/game/06_validation_plan.md returns zero matches — the smoke is absent from the regression bundle. The only indirect coverage is flare_steady_smoke (bundle line 196), which calls status_effects_state.add_effect("utility_flare") in a loop for an integration check but never tests stacking, expiry, remove_effect, or get_modifier. The gap is real and the severity is appropriate: StatusEffectsState is called per-frame by damage_pipeline, addiction_state, and survival attrition in the primary (away-from-start) context, so silent regressions in its core contract will not be caught by the bundle.
+
+---
+
+## [HIGH] scripts/validation/world_persist_restore_smoke.gd:1 (validation-gaps/validation-gap)
+**world_persist_restore_smoke.gd is an orphaned away-branch smoke — in-session derelict revisit state persistence has no regression gate**
+
+world_persist_restore_smoke.gd proves: travel to derelict A registers a ShipInstance; mutating A's systems then leaving (travel to B) retains A's instance with its mutated state; revisiting A restores that state (not a fresh regenerate) with identical geometry signature. This is the primary regression for the visited_ships persistence loop. It is not in the bundle. The bundle covers world time (world_time_persistence_smoke) and ship catchup (ship_catchup_smoke) but has no smoke that follows the full travel→mutate→leave→revisit cycle.
+
+Evidence: `grep 'world_persist_restore_smoke' /tmp/bundle_smokes.txt` returns nothing. world_persist_restore_smoke.gd comment: '## In-session persist-and-restore smoke. Proves: travel to derelict A registers a ShipInstance; mutating A's systems then leaving (travel to B) keeps A's instance with its mutated state; revisiting A restores that state (NOT a fresh regenerate)'.
+
+Verifier: Personally verified all three elements of the claim. (1) scripts/validation/world_persist_restore_smoke.gd exists (161 lines) and carries the exact header comment quoted — it exercises travel_to_marker_id, visited_ships retention, state preservation across leave/revisit, and travel_home. (2) grep 'world_persist_restore' in docs/game/06_validation_plan.md returns zero matches — the smoke is absent from the regression bundle. The bundle covers world_time_persistence_smoke (line 186) and ship_catchup_smoke (line 189) but has no entry for the full travel→mutate→leave→revisit cycle. (3) docs/superpowers/plans/2026-06-21-world-persistence-foundation.md line 1131 contains the exact run_clean instruction that was supposed to add this smoke to the bundle ('run_clean "world_persist_restore" ... "WORLD PERSIST RESTORE PASS registered=true state_preserved=true revisit_restores=true travel_home=true"'), confirming the omission was a missed step, not intentional. Severity is appropriate: the smoke tests the primary in-session derelict persistence loop (visited_ships state retention across multi-hop travel), which is a core gameplay system with no other bundle coverage.
+
+---
+
+## [HIGH] scripts/procgen/playable_generated_ship.gd:3246 (hazard-contract/bug)
+**_build_extinguisher_recharge_port() missing `not away_from_start` guard causes port to be placed at lifeboat-local coordinates on the derelict**
+
+Every peer builder that must switch between lifeboat-local and derelict-frame positions guards with `(not away_from_start) and lifeboat_ship != null`: _build_fire_zones() line 3087, _build_fire_suppression_points() line 3210, _build_repair_points() line 2752, and _build_breach_seal_points() line 2822 all carry the `not away_from_start` condition. _build_extinguisher_recharge_port() at line 3246 omits it. When the player boards a derelict and a lifeboat ship is valid, `use_lifeboat` evaluates true, `positions` is filled from `_lifeboat_local_repair_positions()` (Node3D.position values relative to the lifeboat's ShipStructure), and the resulting port is attached to `current_ship.scene_root` (the derelict) via `_attach_zone_to_active_ship()`. The port is therefore placed at lifeboat-local coordinates inside the derelict tree, landing at the wrong world position. The `main_playable_derelict_fire_smoke.gd` does not catch this because it tests only the port's power-gating flag, not its world position.
+
+Evidence: line 3087: `var use_lifeboat: bool = (not away_from_start) and lifeboat_ship != null ...` (fire zones)
+line 3210: `var use_lifeboat: bool = (not away_from_start) and lifeboat_ship != null ...` (suppression points)
+line 3246: `var use_lifeboat: bool = lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root)` (recharge port — MISSING `not away_from_start`)
+
+Verifier: At line 2011 in _attach_derelict_active, away_from_start is set to true, then _build_extinguisher_recharge_port() is called at line 2066 with away_from_start = true. Inside that function (line 3246), use_lifeboat omits the `not away_from_start` check that both peer functions (line 3087, line 3210) include. When lifeboat_ship is valid, use_lifeboat evaluates true, positions are filled from _lifeboat_local_repair_positions(), but _attach_zone_to_active_ship routes the port to current_ship.scene_root (the derelict) — a coordinate-frame mismatch. No call-site guard, comment, ADR, or spec indicates this is intentional.
+
+---
+
+## [HIGH] data/procgen/golden/coherent_ship_002/gameplay_slice.json:32 (hazard-contract/dead-code)
+**Derelict arc zones declared in golden layouts 002 and 003 are never instantiated or ticked — dead data with no gameplay effect**
+
+Golden derelict layouts 002 and 003 each carry a populated `arc_zones` array in both their `layout.json` and `gameplay_slice.json`. When either ship is boarded as a derelict via `travel_to()`, `_attach_derelict_active()` (playable_generated_ship.gd line 2001) builds breach seal points, repair points, fire zones, suppression points, and breach seed, but never calls `_build_arc_zone()`. The coordinator's single `electrical_arc_state` is a home-ship model allocated at line 1219 and configured for the home loader's arc markers; it is not ticked in the away branch (see Finding 3). `ShipInstance` has no per-ship arc field. The result is that derelicts with arc zone markers in their data files present no arc hazard at runtime; the zone never appears, never cycles, and never affects passability.
+
+Evidence: gameplay_slice.json:32-43: `"arc_zones": [{ "id": "corridor_to_arc_side_arc", "kind": "electrical_arc", ... }]`
+playable_generated_ship.gd:2050-2066 (_attach_derelict_active tail — _build_arc_zone() absent):
+  `_build_derelict_objectives()
+  _build_loot_containers()
+  _build_sealed_hatches()
+  _build_repair_points()
+  _seed_derelict_breaches()
+  _build_breach_seal_points()
+  _seed_derelict_fire()
+  _build_fire_zones()
+  _build_fire_suppression_points()
+  _build_extinguisher_recharge_port()`
+ship_instance.gd: no arc field
+
+Verifier: Verified in source: (1) arc_zones arrays are populated in both data/procgen/golden/coherent_ship_002/gameplay_slice.json (lines 32-43) and coherent_ship_003/gameplay_slice.json (lines 37-56). (2) _build_arc_zone() is called only at line 4710 inside _on_ship_loaded() — the home-ship loader callback — and is absent from _attach_derelict_active() (lines 2001-2066). (3) The away branch of _process (lines 5370-5450) returns at line 5450 without ticking electrical_arc_state or calling _refresh_arc_state; those calls appear only at lines 5470-5472 in the home branch. (4) A single electrical_arc_state instance (line 1219) is configured for the home ship's arc markers and is never reconfigured per-derelict. The result is that derelict arc zone data has no runtime effect: no arc zone node is built on boarding and the model is never ticked while away_from_start is true.
+
+---
+
+## [HIGH] scripts/procgen/playable_generated_ship.gd:7878 (ui-wiring/bug)
+**Scanner, chart, and inventory panel toggles lack a menu-modal guard, enabling concurrent conflicting overlay states**
+
+The input handler processes scanner (7878), chart (7903), and inventory (7921) toggles BEFORE reaching menu_coordinator.handle_ui_input (line 7926). None of the three toggle checks test whether menu_coordinator has an active modal open. Consequence: when the main menu is open, pressing toggle_scanner or toggle_inventory also opens that panel — two panels occupy the HUD simultaneously with conflicting player-freeze state. Closing the secondary panel via its own `ui_cancel` path then calls _on_*_panel_closed and re-enables player physics while the menu is still visible. The inverse is also a hazard: if scanner_panel.is_open() the handler returns early at line 7896, so the menu can never be opened while the scanner is active.
+
+Evidence: if event.is_action_pressed("toggle_scanner") and (not is_instance_valid(inventory_panel) or not inventory_panel.is_open()):
+    scanner_panel.toggle()  // no guard: menu_coordinator.has_active_modal()
+
+Verifier: Code at line 7878 exactly matches the claimed evidence: `if event.is_action_pressed("toggle_scanner") and (not is_instance_valid(inventory_panel) or not inventory_panel.is_open()):` — no `menu_coordinator.has_active_modal()` guard. Same omission at lines 7903 (chart) and 7921 (inventory). The three panel-closed handlers (`_on_scanner_panel_closed` line 4217, `_on_chart_panel_closed` line 4223, `_on_inventory_panel_closed` line 4235) all unconditionally re-enable player physics with no check that a menu modal is still open. `_on_ui_modal_opened` (line 4611) does freeze the player, but its inverse `_on_ui_modal_closed` (line 4614) is the only intended restore path — the panel-closed handlers can race it and re-enable physics prematurely. No ADR or nearby comment documents this as intentional behavior. The early `return` at line 7896 while scanner is open does block the menu from opening (confirmed asymmetry), but the primary hazard path (menu open → panel toggled open → panel closed → premature player unfreeze) is real.
+
+---
+
+## [HIGH] scripts/systems/item_defs.gd:27 (data-integrity/data-integrity)
+**material_definitions.json (26 crafting material IDs) is never merged into item_defs — all 26 materials have weight=0 and empty category in inventory**
+
+item_defs.gd.load_definitions() (lines 27-98) never loads data/materials/material_definitions.json. inventory_state.gd uses item_defs exclusively for weight and category lookups. Result: ceramic_plate, titanium_ingot, synth_fiber, wiring_bundle, adhesive_paste, polymer_pellet, reactive_gel, graphene_sheet, and 18 other recipe ingredients all have weight_each=0.0 in inventory. The weight cap enforcement is meaningless for the bulk of the crafting economy. material_state.gd does load material_definitions.json independently, but that data never flows into inventory weight calculations.
+
+Evidence: item_defs.gd lines 10-20 list every loaded path constant; 'MATERIAL_DEFINITIONS_PATH' is absent. material_definitions.json materials sub-dict: ceramic_plate weight=0.7, titanium_ingot weight=1.5, synth_fiber weight=0.1 — none accessible via ItemDefs.weight_each().
+
+Verifier: item_defs.gd lines 10-20 list every loaded path constant; MATERIAL_DEFINITIONS_PATH is absent. Of the 33 materials in data/materials/material_definitions.json, 26 have no top-level entry in any file loaded by item_defs.gd (item_definitions.json, medicine/stimulant/ammo/utility/trade/tool/equipment/junk/unique definitions). inventory_state.gd.get_weight_each() delegates to ItemDefs.weight_each(_definitions, item_id) which returns 0.0 for unknown IDs. material_state.gd header comment confirms "quantities live in InventoryState" but its _definitions dict is never injected into ItemDefs. recipe_definitions.json confirms that adhesive_paste, wiring_bundle, reactive_gel, sensor_array, optical_lens, and others are live recipe ingredients consumed via InventoryState.remove_item(), so these 26 zero-weight materials circulate actively through the inventory weight system. The weight cap is effectively bypassed for the bulk of the crafting economy.
+
+---
+
+## [HIGH] data/procgen/encounter_tables/biomatter_lurker.json:1 (data-integrity/dead-code)
+**All 3 encounter table JSON files are never loaded; encounter_injector.gd bypasses them with hardcoded constants**
+
+encounter_injector.gd (scripts/procgen/encounter_injector.gd) uses hardcoded ROLE_TO_ENCOUNTER_KIND (line 74) and DEFAULT_ENCOUNTER_KIND (line 101) constants to assign encounter kinds. It reads encounter_table_id from the biome (line 137) and stores it as metadata in the marker dict (line 204), but never uses it to load or consult any of the three JSON files in data/procgen/encounter_tables/ (biomatter_lurker.json, derelict_pirate.json, threat_drone_swarm.json). No other script loads these files either. They have zero runtime effect and are dead data files.
+
+Evidence: encounter_injector.gd line 74: 'const ROLE_TO_ENCOUNTER_KIND: Dictionary = {"corridor": "biomatter_lurker", ...}' — no file I/O for the encounter_tables directory. Grep of all scripts for 'data/procgen/encounter' returns zero results.
+
+Verifier: Personally verified: no GDScript file anywhere in the project contains a path reference to data/procgen/encounter_tables/ or to biomatter_lurker.json, derelict_pirate.json, or threat_drone_swarm.json (grep of all *.gd files returns zero matches). encounter_injector.gd line 74 uses hardcoded ROLE_TO_ENCOUNTER_KIND; line 137 reads encounter_table_id from the biome and line 204 stores it as marker metadata, but no code ever uses that field to load a JSON file. threat_manager.gd _spawn_from_markers() (line 218) resolves encounter_kind only against data/combat/threat_archetypes.json (loaded at line 34 via three hardcoded constants). The three encounter table JSON files have zero runtime effect.
+
+---
+
+## [HIGH] docs/game/06_validation_plan.md:356 (docs-drift/validation-gap)
+**main_playable_slice_progression_smoke.gd exists on disk and was modified in Domain 6 but is not registered in the regression bundle**
+
+The smoke file scripts/validation/main_playable_slice_progression_smoke.gd exists, prints marker 'MAIN PLAYABLE PROGRESSION PASS class=engineer repair_xp_gained=true hud=true round_trip=true', and was explicitly patched in Domain 6 Task 9 (line 390 of the plan notes it now wipes user://meta_progression.json for determinism). The future-additions item '[x] Hub/meta progression smoke (deferred past Gate 2 per ADR-0003)' is checked, yet no run_clean entry for this file exists anywhere in the bundle. The live coordinator's repair-XP path (obj completion → _on_interactable_completed → training_event_bus.emit → player_progression.grant_xp) has no regression coverage in the bundle.
+
+Evidence: grep -n 'main_playable_slice_progression_smoke' 06_validation_plan.md → only line 390 (as 'also fixed'); smoke file prints MAIN PLAYABLE PROGRESSION PASS; zero run_clean entries match this filename
+
+Verifier: Verified by grepping the full validation plan: the smoke file scripts/validation/main_playable_slice_progression_smoke.gd exists on disk, prints marker "MAIN PLAYABLE PROGRESSION PASS class=engineer repair_xp_gained=true hud=true round_trip=true" (line 83 of the smoke), and appears in 06_validation_plan.md exactly once — at line 390 as a side-fix note ("Also fixed as part of this task: ... now defensively wipes user://meta_progression.json") not as a run_clean entry. Of 132 total run_clean entries in the plan, zero reference this filename. The [x] at line 356 ("Hub/meta progression smoke (deferred past Gate 2 per ADR-0003)") was closed by the 8 Domain 6 smokes added at lines 197-204, but main_playable_slice_progression_smoke.gd was not among them. The live coordinator path it covers — restore_systems objective completion → TrainingEventBus → repair XP grant → HUD → save/load round-trip — has no bundle regression entry.
+
+---
+
+## [HIGH] scripts/validation/main_playable_slice_arc_smoke.gd:125 (validation-gaps/validation-gap)
+**main_playable_slice_arc_smoke drives the arc model directly rather than through _process, so it cannot detect removal of the home-branch electrical_arc_state.tick() call**
+
+The smoke manually calls `playable.electrical_arc_state.tick(ARC_TICK_DELTA, {})` and `playable._refresh_arc_state(false)` each frame (lines 126-127) to fast-forward cycles. The comment says 'First, let real _process frames run' but _observe_summary() only reads state; it does not assert that _process advanced the model. If the home-branch arc tick at playable_generated_ship.gd:5471 was removed, the smoke would still count 2 cycles because all phase transitions are driven by its own explicit tick calls. This is the exact hallmark of a hollow gate for the per-_process wiring.
+
+Evidence: main_playable_slice_arc_smoke.gd line 126: `playable.electrical_arc_state.tick(ARC_TICK_DELTA, {})`. playable_generated_ship.gd line 5470-5472 (home branch only): `if electrical_arc_state != null: electrical_arc_state.tick(delta, {}) / _refresh_arc_state(false)`. No arc tick on the away branch (lines 5370-5450).
+
+Verifier: Read scripts/validation/main_playable_slice_arc_smoke.gd lines 116–133: every frame up to MAX_REAL_FRAMES=600, the smoke calls playable.electrical_arc_state.tick(ARC_TICK_DELTA, {}) and playable._refresh_arc_state(false) directly before calling _observe_summary(); the cycles counter is incremented inside _observe_summary() after the manual tick, so the two required ARCING→DISCHARGED transitions are produced entirely by the explicit tick calls, not by _process. Read playable_generated_ship.gd lines 5370–5450 (the away_from_start branch): the branch ticks sanity_state, fire, survival attrition, field_crafting_state, autosave, audio_manager, ammo_state, stimulant_state, addiction_state, and tooltip focus — but contains no call to electrical_arc_state.tick() or _refresh_arc_state(). The home-branch arc tick at lines 5470–5472 is the only per-frame call. Both parts of the claim are directly evidenced: (1) the smoke is a hollow gate for detecting removal of that tick, and (2) the away branch is missing the arc tick entirely, meaning arc hazards freeze during all derelict field runs — the primary gameplay context per the architecture rules.
+
+---
+
+## [HIGH] scripts/validation/main_playable_slice_arc_smoke.gd:21 (hazard-contract/validation-gap)
+**Arc smoke tests template 002 loaded directly as home ship, not as a boarded derelict — derelict arc zone gap has no validation coverage**
+
+The `main_playable_slice_arc_smoke.gd` creates a `PlayableShipScript.new()` with `layout_path = "res://data/procgen/golden/coherent_ship_002/layout.json"` — that is, it loads the golden layout as a fresh home-ship instance, not as a traveled derelict via `travel_to_marker_id()`. The finding that derelict arc zones are never instantiated (Finding 2) would pass this smoke unnoticed, because the smoke drives the home ship's arc model directly against the loaded template, not the derelict boarding code path. There is no smoke in the regression bundle that boards a derelict (via `travel_to()`) whose layout carries `arc_zones` and asserts that the arc zone activates.
+
+Evidence: main_playable_slice_arc_smoke.gd:21-23:
+  `const LAYOUT_PATH: String = "res://data/procgen/golden/coherent_ship_002/layout.json"
+  const KIT_PATH: String = ...
+  const GAMEPLAY_SLICE_PATH: String = "res://data/procgen/golden/coherent_ship_002/gameplay_slice.json"`
+  (no travel_to call; 002 is used as the home ship for the smoke)
+
+Verifier: The smoke at lines 40-46 of main_playable_slice_arc_smoke.gd constructs PlayableShipScript.new() directly and sets layout_path = LAYOUT_PATH — no travel_to_marker_id() call, no main.tscn, so away_from_start stays false for the entire smoke run. This is the home-ship path. No other smoke in scripts/validation/ boards a derelict and asserts arc zone activation. More critically, _process in playable_generated_ship.gd has its arc tick exclusively in the home branch: lines 5470-5472 (electrical_arc_state.tick(delta, {}) + _refresh_arc_state(false)) appear after the away branch's unconditional return at line 5450, and the away branch (lines 5370-5450) has no arc tick at all. The validation gap is real and directly masks a live away-branch omission — arc zones on derelicts never cycle during actual boarding play. Severity adjusted to high because the gap hides a production bug in the primary gameplay context (boarding derelicts), matching the pattern of shipped regressions PRs #42/#43/#44.
+
+---
+
+## [HIGH] data/items/loot_tables.json:1 (combat-ammo-acquisition-chain/dead-code)
+**All three ammo item IDs are absent from every loot table entry**
+
+No loot table in data/items/loot_tables.json (8 tables: generic_crate, generic_locker, salvage_engineering, salvage_cargo, repair_parts_common, repair_parts_starter, repair_tools, hidden_cache, combat_drop_common) contains item_id 'flare_round', 'capacitor_cell' (ammo), or 'fuel_canister'. There is zero loot-roll acquisition path for ranged-weapon ammo.
+
+Evidence: Grep over data/items/loot_tables.json for flare_round|capacitor_cell|fuel_canister returns no matches. All 97 lines of the file were read and confirmed. By contrast, crowbar/welder/plasma_cutter appear in entries but none of the three ammo items do.
+
+Verifier: Personally read all 97 lines of data/items/loot_tables.json and confirmed zero entries for flare_round, capacitor_cell (ammo), or fuel_canister across all 9 tables. Checked every other acquisition path: data/recipes/recipe_definitions.json has no ammo recipes; data/player/classes.json, hub_upgrades.json, and unlock_tables.json have no ammo grants; data/items/trade_item_definitions.json has no ammo entries; no vendor/shop system exists. All three ammo IDs are defined in data/combat/ammo_definitions.json and referenced by weapon_definitions.json lines 19/30/41, proving the combat system expects them — but has zero production loot path. Combat smokes (e.g., main_playable_slice_combat_encounter_smoke.gd line 76) inject ammo via add_item() directly, masking the gap. No ADR or spec documents this as intentional deferral. Severity adjusted from critical to high: melee (crowbar) still functions, but all three ranged weapons are permanently dry in normal play.
+
+---
+
+## [HIGH] data/recipes/recipe_definitions.json:1 (combat-ammo-acquisition-chain/dead-code)
+**No crafting recipe produces flare_round, capacitor_cell (ammo), or fuel_canister**
+
+All 47 recipes in recipe_definitions.json were read. None produce 'flare_round', 'fuel_canister', or 'capacitor_cell' as output. None accept them as ingredients either. There is zero crafting acquisition path for ranged-weapon ammo.
+
+Evidence: Grep over data/recipes/recipe_definitions.json for flare_round|capacitor_cell|fuel_canister returns no matches. The file was read in full (733 lines). recipes include power_cell, sensor_module, reactor_core, medkit, etc. but no ammo items.
+
+Verifier: Personally verified by reading all relevant files. recipe_definitions.json (all 47 recipes, lines 1–733): no recipe produces or consumes flare_round, fuel_canister, or capacitor_cell (as ammo). loot_tables.json (8 tables, lines 1–97): no entry for flare_round, fuel_canister, or capacitor_cell. The ranged weapons flare_pistol and welding_lance do not appear in any loot table either — making the weapons themselves unacquirable alongside their ammo. ammo_definitions.json confirms all three ammo items exist and are linked to weapons. item_definitions.json line 30 also reveals a naming collision: capacitor_cell is defined as a tool item (equip_slot secondary_hand, weight 2.2, max_stack 1) while ammo_definitions.json defines a separate capacitor_cell as ammo (weight 0.3, max_stack 10). Validation smokes (ammo_magazine_smoke.gd, main_playable_combat_encounter_smoke.gd) bypass the acquisition chain by calling inventory_state.add_item() directly, so passing smokes do not cover the missing loot/crafting integration. No ADR or feature spec documents this as intentional deferral. Severity adjusted to high (not critical) because there is no crash/corruption/save-load failure — the combat logic itself is correct, the smokes pass, and this is a cross-system content integration gap fixable by adding JSON entries to loot tables and/or recipes.
+
+---
+
+## [HIGH] scripts/systems/demo_scope_gate.gd:40 (demo-scope-gate-unlock-registry-wiring/dead-code)
+**DemoScopeGate.is_allowed() has zero production callsites — demo builds silently allow all features**
+
+A grep of all scripts/ excluding scripts/validation/ finds no reference to `is_allowed`, `DemoScopeGate`, or `demo_scope_gate` in any production file. The class is never instantiated by playable_generated_ship.gd, any UI coordinator, or any scene node. `build_metadata_state.gd` mentions it only in a doc-comment. Consequence: when `data/release/build_metadata.json` has `build_kind=demo`, every call that should consult the gate never happens — the gate object is never created, so every demo-restricted feature silently passes as allowed. The entire REQ-RL-006 / ADR-0029 demo-scope enforcement mechanism is a tested stub with no integration into the live game path.
+
+Evidence: Full grep of scripts/**/*.gd for `is_allowed|DemoScopeGate|demo_scope_gate` returns only: scripts/systems/build_metadata_state.gd:8 (doc comment), scripts/systems/demo_scope_gate.gd:2/6/40/62 (class definition), scripts/validation/demo_scope_gate_smoke.gd:5/12/53/56/60/64/75/78/89/92 (validation only). playable_generated_ship.gd has no match.
+
+Verifier: Grep of all scripts/**/*.gd confirms zero production callsites: DemoScopeGate/is_allowed/demo_scope_gate appear only in the class itself (demo_scope_gate.gd), a doc-comment in build_metadata_state.gd:8, and the validation smoke. playable_generated_ship.gd has no match. release_badge_overlay.gd cites REQ-RL-006 but never calls is_allowed. The canonical system_inventory.json (lines 6226–6263) explicitly records "reachable": false, "driven": false, output "live": false, and lists the gap as "not wired into runtime: no gameplay/UI call site gates a feature through is_allowed()" with content_note "Confirmed zero non-smoke references in codebase." integration_debt.md line 73 falsely claims demo_scope_gate is "no longer unreachable" — contradicting the canonical inventory — because it was never struck through as graduated to reachable. Severity downgraded from critical to high: no demo build is currently being distributed (Steamworks/demo distribution is explicitly deferred in ADR-0029), the gap is documented in the canonical inventory, and the consequence is dormant until a demo is shipped.
+
+---
+
+## [MEDIUM] scripts/procgen/layout_serializer.gd:95 (procgen-pipeline/schema-drift)
+**LayoutSerializer emits schema_version 1.2.0 but its own header comment and all three golden layouts declare 1.1.0**
+
+The class comment on line 5 reads "Output matches the golden layout schema version 1.1.0 exactly." The code emits `"schema_version": "1.2.0"`. All three golden fixtures (coherent_ship_001/002/003 layout.json) have `"schema_version": "1.1.0"`. GeneratedShipLoader never validates schema_version, so the version drift is invisible at runtime. The two documents are structurally different (serializer adds prototype, arc_zones, breach_zones, encounters top-level keys; room entries gain variant, portals, interior_zones, motif_requests) yet share a loader path with no version gate, making future schema evolution undetectable.
+
+Evidence: layout_serializer.gd:5: `# Output matches the golden layout schema version 1.1.0 exactly.`; line 95: `"schema_version": "1.2.0"`. data/procgen/golden/coherent_ship_001/layout.json:2: `"schema_version": "1.1.0"`.
+
+Verifier: All three cited facts check out: layout_serializer.gd line 5 reads "# Output matches the golden layout schema version 1.1.0 exactly." while line 95 emits "schema_version": "1.2.0"; all three golden layout.json files open with "schema_version": "1.1.0"; and generated_ship_loader.gd contains zero references to schema_version (no validation gate). However, the version bump was intentional: ship_layout_generator.gd lines 15-16 explicitly document it as a Task 12 change ("generate() returns a layout with schema_version 1.2.0 and a new top-level encounters array"). The stale comment in layout_serializer.gd and the stale procgen spec (line 272 still shows 1.1.0) are real documentation drift, and the missing loader version gate is a real maintenance hazard. The structural additions (prototype, arc_zones, breach_zones, encounters, per-room variant/portals/interior_zones/motif_requests) are additive and backward-compatible with 1.1.0 golden fixtures, so no runtime breakage occurs today. Severity should be medium (doc drift + missing guard), not critical.
+
+---
+
+## [MEDIUM] scripts/systems/save_load_service.gd:531 (stubs/stub)
+**SaveSlotState.play_time_seconds is populated with the Unix epoch timestamp instead of actual play time**
+
+_index_run_slot() assigns `row.play_time_seconds = float(snapshot.saved_at_epoch)` with the comment 'no play_time field on RunSnapshot yet; use saved_at_epoch'. RunSnapshot has no play_time field. The save slot index therefore stores a Unix epoch value (e.g. 1,700,000,000+) as the play time in seconds, which the save-screen would display as an impossibly large play duration. SaveSlotState.play_time_seconds is intended to show "2h 34m" style HUD metadata.
+
+Evidence: row.play_time_seconds = float(snapshot.saved_at_epoch)  # no play_time field on RunSnapshot yet; use saved_at_epoch
+
+Verifier: Line 531 of scripts/systems/save_load_service.gd contains exactly `row.play_time_seconds = float(snapshot.saved_at_epoch)  # no play_time field on RunSnapshot yet; use saved_at_epoch`. A project-wide grep confirms RunSnapshot (scripts/systems/run_snapshot.gd) has no `play_time` field, so the assignment is not dead code — it actively writes a Unix epoch value (~1.7 billion) into the save-slot index. However, the consequence is currently overstated: a grep of all .gd files shows `play_time_seconds` is only referenced in save_slot_state.gd (definition + serialization) and save_load_service.gd (the bad write). Neither save_load_menu.gd nor menu_coordinator.gd nor any other UI script reads `play_time_seconds`, so no "2h 34m" display currently renders the wrong value. The bug is real and the stored data is corrupt, but the visible gameplay impact is zero until a UI wire-up is added — making high severity an overstatement.
+
+---
+
+## [MEDIUM] scripts/systems/save_load_service.gd:527 (stubs/stub)
+**SaveSlotState.synaptic_sea_seed is populated with player_position[0] * 1000 — self-documented as placeholder**
+
+_index_run_slot() assigns `row.synaptic_sea_seed = int(snapshot.player_position[0] * 1000)` and the inline comment reads '# placeholder'. The seed is meant to identify the procedurally generated world the save belongs to. Using the player's scaled X coordinate produces a value that changes on every save at a different position and bears no relation to the world generation seed in ShipBlueprint.
+
+Evidence: row.synaptic_sea_seed = int(snapshot.player_position[0] * 1000) if snapshot.player_position.size() >= 3 else 0  # placeholder
+
+Verifier: Line 527 of scripts/systems/save_load_service.gd reads exactly: `row.synaptic_sea_seed = int(snapshot.player_position[0] * 1000) if snapshot.player_position.size() >= 3 else 0  # placeholder`. The grep over the entire repo shows `.synaptic_sea_seed` is only ever written (save_load_service.gd:527) and deserialized from JSON (save_slot_state.gd:87) — no code ever reads the value to drive any game decision. The system inventory (system_inventory.json:4532) already explicitly documents it: "synaptic_sea_seed is a placeholder derived from player_position[0]*1000 (VERIFIED :409)." This is a confirmed stub, but severity high is overstated because the field currently has no consumer and causes no active defect; it is already tracked as known debt.
+
+---
+
+## [MEDIUM] scripts/tools/breach_seal_point.gd:10 (signal-wiring/dead-code)
+**seal_blocked signal is emitted on four failure paths but never connected in the coordinator**
+
+playable_generated_ship.gd _build_breach_seal_points() connects only breach_sealed (line 2834); seal_blocked is never wired. When a seal attempt fails for any reason (not_breached, missing_sealant, seal_failed) the signal fires into the void, so the coordinator cannot run a tutorial trigger, audio cue, or HUD notice. The player receives zero feedback on a failed critical survival action.
+
+Evidence: signal seal_blocked(compartment_id: String, reason: String)  — emitted at lines 81,84,118,129; playable_generated_ship.gd:2834: if not sp.breach_sealed.is_connected(_on_breach_sealed): sp.breach_sealed.connect(_on_breach_sealed)  — no connect call for seal_blocked anywhere
+
+Verifier: Confirmed by direct file reads and a full-scripts grep. breach_seal_point.gd line 10 defines `signal seal_blocked(compartment_id: String, reason: String)` and emits it at lines 81, 84, 118, and 129. A grep of all files under scripts/ returns zero matches for `seal_blocked` outside of breach_seal_point.gd itself — it is never connected anywhere. playable_generated_ship.gd line 2834 connects only `breach_sealed`; no connect call for `seal_blocked` exists in the coordinator or anywhere else. The signal fires into the void on all four failure paths. Severity adjusted to medium (not high) because the success handler `_on_breach_sealed` (line 2852-2856) is itself a `pass` stub with a "Hook for HUD/audio later" comment — the entire breach-sealing feedback layer is an acknowledged TODO, making the omission of `seal_blocked` a consistent incompleteness rather than an asymmetric regression.
+
+---
+
+## [MEDIUM] scripts/audio/audio_log.gd:21 (data-integrity/dead-code)
+**All 6 voice audio clip paths reference files that do not exist (data/audio/voice/ directory is absent)**
+
+audio_log.gd DEFAULT_ENTRIES (lines 16-64) hardcodes 6 OGG paths under res://data/audio/voice/: log_beacon_01.ogg (21), log_beacon_02.ogg (29), log_pulse_01.ogg (37), log_groan_01.ogg (45), log_tutorial_pickup.ogg (53), log_tutorial_calibrator.ogg (61). The directory data/audio/voice/ does not exist in the project; only data/audio/music/exploration_base.wav and data/audio/sfx/tool_pickup.wav exist. Any runtime attempt to load and play these clips will produce a null AudioStream resource, causing AudioStreamPlayer errors.
+
+Evidence: audio_log.gd line 21: '"clip_path": "res://data/audio/voice/log_beacon_01.ogg"'; directory listing of data/audio/ shows only music/ and sfx/ subdirectories — no voice/ subdirectory.
+
+Verifier: Confirmed: data/audio/voice/ is absent and no .ogg files exist anywhere in the project (glob for *.ogg returns nothing; ls data/audio/ shows only music/ and sfx/ subdirectories). All 6 clip_path values in AudioLog.DEFAULT_ENTRIES point to non-existent files. However, the stated consequence (AudioStreamPlayer errors) is incorrect. play_voice_log (audio_manager.gd line 331) calls _play_via_bus(BUS_VOICE, vol_db) without passing an event_id, so event_id defaults to the empty StringName. Inside _play_via_bus (line 393), the stream-loading branch is gated on `if not id_str.is_empty() and STREAM_CATALOG.has(id_str)` — both conditions fail — so _load_stream_cached is never reached and player.play() is never called. clip_path is dead data never read at runtime; voice log playback is a silent no-op, not an error-producing path. Severity adjusted down from high to medium: functional gap (voice audio never plays), but no crashes or error spam.
+
+---
+
+## [MEDIUM] docs/game/integration_debt.md:48 (docs-drift/docs-drift)
+**Reachability audit script referenced at /tmp/reach.py does not exist anywhere in this repo or on this machine**
+
+The integration debt doc instructs: 'Re-run the audit script at /tmp/reach.py (seed = scenes/main.tscn, diff base = 5445480) after any integration change to confirm a script has moved into the reachable set.' The file /tmp/reach.py does not exist on this Windows machine, and no equivalent path exists under the repo root or tools/. This was a macOS-specific artifact. The 'living record' cannot be re-run as documented, making the Bucket-1 unreachable-8 claim unverifiable by any documented process.
+
+Evidence: ls /c/tmp/reach.py → No such file; ls tools/reach.py → No such file; integration_debt.md line 48: 'Re-run the audit script at /tmp/reach.py'
+
+Verifier: The reference at docs/game/integration_debt.md lines 47-49 ("Re-run the audit script at `/tmp/reach.py`") and line 19 ("A fresh audit (`/tmp/reach.py`) reports ...") is confirmed. No reach.py exists anywhere in the repo (Glob over the entire project root returned nothing; tools/ contains only check_export_pipeline.py, build_system_inventory.py, generate_placeholder_audio.py, synaptic_sea_gate4_regression.sh, and test files). The path /tmp/reach.py and /c/tmp/reach.py both return "NOT FOUND" on this Windows machine. The audit methodology is described in prose (lines 28-35) but the actual script was a macOS /tmp artifact never committed. The "living record" cannot be re-run as documented. Adjusted severity to medium: the 8 remaining unreachable scripts are all explicitly listed as expected Bucket-1 infra tooling, so the current documented state is accurate and stable — the broken process only matters if a future integration change needs reachability verification.
+
+---
+
+## [MEDIUM] docs/game/inventory/system_inventory.json:1 (docs-drift/docs-drift)
+**SYSTEM_INVENTORY.md 'driven at' line numbers are substantially stale for many coordinator-side systems**
+
+Multiple driven_at entries in system_inventory.json cite line numbers in playable_generated_ship.gd that now point to completely different code: vitals_state:4853 → add_child(player) in _spawn_player(); stimulant_state:4830 → _dock_piloted_to() dock-condition check; electrical_arc_state:4827 → DockPortsScript.for_derelict() return; sanity_state:4868 → REQ-014 comment in _build_interactables(); hallucination_director:4876 → child.free() in interaction_root cleanup; audio_manager:4904 → interactable.configure_from_step() call; player_progression_state:4856 → player.field_craft_requested.connect() in _spawn_player(). The --check tool (cited as verification) validates only file existence and JSON schema, not line numbers. STATUS.md's claim of 'code-verified inventory' does not extend to the driven_at column.
+
+Evidence: system_inventory.json vitals_state driven_at='playable_generated_ship.gd:4853'; actual line 4853: 'add_child(player)' inside _spawn_player(); stimulant_state driven_at=':4830'; actual line 4830: 'if piloted_ship == null or host == null' in _dock_piloted_to(); arc_state driven_at=':4827'; actual line 4827: 'return DockPortsScript.for_derelict(...)'
+
+Verifier: All eight driven_at line numbers cited by the finder were verified against the actual file. vitals_state:4853 = add_child(player) in _spawn_player(); stimulant_state:4830 = docking null-check in _dock_piloted_to(); electrical_arc_state:4827 = return DockPortsScript.for_derelict() in _piloted_port_local(); sanity_state:4868 = REQ-014 comment in _build_interactables(); hallucination_director:4876 = child.free() in interaction_root cleanup; audio_manager:4879 = continue in _build_interactables() loop; addiction_state:4832 = condition-class assignment in _dock_piloted_to(); player_progression_state:4856 = player.field_craft_requested.connect() in _spawn_player(). build_system_inventory.py --check (lines 54-78, 233-239) validates only: id presence, file-on-disk existence, integration target IDs, loop step IDs, and generated-file freshness — line numbers in driven_at/input.at/output.at are never verified. The STATUS.md claim of 'code-verified inventory' does not extend to the driven_at column.
+
+---
+
+## [MEDIUM] scripts/procgen/playable_generated_ship.gd:2852 (stubs/stub)
+**_on_breach_sealed is a pass-only no-op — no HUD refresh or audio fires when a hull breach is sealed**
+
+_on_breach_sealed is connected to the breach_sealed signal on every seal point (line 2833-2834). Its body is a single pass with a comment 'Hook for HUD/audio later.' When the player seals a hull breach, HullIntegrityState is mutated by the seal node, but the coordinator fires no HUD update, no audio event, and no visual feedback through this callback. The player has no confirmation that their sealing action took effect beyond the interactable completing.
+
+Evidence: func _on_breach_sealed(_compartment_id: String) -> void:
+    # HullIntegrityState already mutated by the seal node; nothing else needed here
+    # beyond letting the next _recompute_expanded_ship_systems pick up the lower
+    # breach_count. Hook for HUD/audio later.
+    pass
+
+Verifier: At line 2852 of scripts/procgen/playable_generated_ship.gd the function body is exactly `pass` with the comment "Hook for HUD/audio later." No audio call exists anywhere on the seal path: BreachSealPoint._complete() (scripts/tools/breach_seal_point.gd line 114-129) has no SFX call, and the sfx_event_router has no breach-seal entry. _recompute_expanded_ship_systems does feed breach_count into life_support_expanded_state each frame on both branches, but it never calls _refresh_tracker_system_status_lines — that path only runs via _refresh_oxygen_state, which is absent from the away-branch _process loop (primary derelict context), so the tracker hull-integrity line does not update promptly after sealing on a derelict. The only immediate feedback is the BreachSealPoint marker hiding (set_sealed(true)) and item consumption. The comment explicitly calls this deferred, making it a known stub rather than a hidden omission, but no HUD refresh or audio event fires through _on_breach_sealed.
+
+---
+
+## [MEDIUM] scripts/procgen/playable_generated_ship.gd:5403 (coordinator-wiring/dead-code)
+**HUD tracker status lines never refresh per-frame during a derelict boarding run**
+
+The per-frame path to _refresh_tracker_system_status_lines() runs exclusively through _refresh_oxygen_state(false, delta) at line 5462 (home branch only). Inside _refresh_oxygen_state, _refresh_tracker_system_status_lines() is called at lines 5731 (force_initial path) and 5738 (per-tick path). The away branch calls _refresh_player_vitals(delta) directly at line 5403, but never calls _refresh_tracker_system_status_lines(). The result: the objective tracker's combined system status lines (power%, reactor%, routes, hull, fire, sustenance, etc.) freeze for the entire derelict boarding run. Players boarding a derelict after repairing the home reactor will see stale 'Reactor: 0%' / 'Main Power: OFF' until they return home.
+
+Evidence: Away branch line 5403: '_refresh_player_vitals(delta)' — no _refresh_tracker_system_status_lines() call anywhere in lines 5370-5450. Home branch: _refresh_oxygen_state(false, delta) at line 5462 calls _refresh_tracker_system_status_lines() at lines 5738 and 5731.
+
+Verifier: Confirmed by reading scripts/procgen/playable_generated_ship.gd. The away branch of _process() (lines 5370-5450) calls _refresh_player_vitals(delta) at line 5403 but never calls _refresh_tracker_system_status_lines(). The sole per-frame path to _refresh_tracker_system_status_lines() is through _refresh_oxygen_state(false, delta) at line 5462 in the home branch, which calls it at lines 5718, 5731, and 5738. None of the functions called in the away branch (_tick_threat_runtime, _tick_survival_attrition, _recompute_expanded_ship_systems, _advance_ship, _tick_food_runtime, _refresh_audio_state) transitively call _refresh_tracker_system_status_lines(). The tracker's combined status built by _combined_system_status_lines() (line 5216) includes Power%, Reactor%, Main Power ON/OFF, route control lines, hull integrity, fire suppression, sustenance, and inventory items — all frozen for the entire derelict boarding run.
+
+---
+
+## [MEDIUM] scripts/procgen/playable_generated_ship.gd:5370 (coordinator-wiring/bug)
+**Away branch has no slice_complete guard — all per-frame systems continue ticking after death on a derelict**
+
+The home branch begins with 'if not playable_started or slice_complete: return' at line 5451. The away branch begins at line 5370 with 'if away_from_start:' and has no such guard. end_run('death') at line 1653 sets slice_complete = true but does NOT reset away_from_start; there is no away_from_start = false assignment inside end_run. On the next frame after dying on a derelict, the away-branch block executes in full: _tick_threat_runtime (threats keep attacking), sanity_state.tick (sanity keeps draining), _tick_active_fire (fire keeps spreading and degrading derelict systems), _tick_survival_attrition (vitals keep draining — _check_vitals_death is guarded internally but vitals_state.tick runs), _refresh_player_vitals, audio_manager.tick, _advance_ship on both ships, _recompute_expanded_ship_systems, _tick_food_runtime, ammo reload timer, stimulant/addiction decay. All of this runs every frame until the scene is freed in response to playable_slice_completed.
+
+Evidence: line 5451 (home): 'if not playable_started or slice_complete:\n\treturn'. line 5370 (away entry): 'if away_from_start:' — no slice_complete check before any tick. end_run at line 1653 sets 'slice_complete = true'; grep shows no 'away_from_start = false' inside end_run().
+
+Verifier: Directly read lines 5368–5452 of playable_generated_ship.gd. The away branch (`if away_from_start:` at line 5370) has no `slice_complete` check; it ticks all systems and returns at line 5450 before the home-branch guard (`if not playable_started or slice_complete: return`) at line 5451 is ever reached. `end_run` (lines 1650–1671) sets `slice_complete = true` but contains no `away_from_start = false` assignment; the only two `away_from_start = false` sites are in the unboard (line 4023) and reload (line 7671) functions. Therefore, after death on a derelict every subsequent frame enters the away branch and runs `_tick_threat_runtime`, `sanity_state.tick`, `_tick_active_fire`, `_tick_survival_attrition`, `vitals_state.tick`, `audio_manager.tick`, `_advance_ship`, `_recompute_expanded_ship_systems`, `_tick_food_runtime`, and the stimulant/addiction/ammo ticks — all without a `slice_complete` guard. `_check_vitals_death` is guarded (line 5594) so no double end_run call, and the save/freeze is recorded inside end_run before any extra ticks. However, the `playable_slice_completed` signal has no connect site anywhere in the repo (confirmed by grep of all .gd and .tscn files), so the extra-tick window after death may be unbounded rather than just a few frames.
+
+---
+
+## [MEDIUM] scripts/validation/save_load_service_smoke.gd:149 (save-load/validation-gap)
+**Service-level round-trip smoke leaves 7 survival summaries as empty `{}`, making the 27-field count assertion meaningless for those fields**
+
+The `save_load_service_smoke` does not populate `vitals_summary`, `sanity_summary`, `radiation_summary`, `temperature_summary`, `status_effects_summary`, `spoilage_summary`, or `hydroponics_summary` before writing to disk. The smoke's correctness assertion `if loaded.get_summary_count() != 27:` (line 149) calls `SUMMARY_FIELDS.size()` which is a hard-coded constant (27) and will never fail regardless of how many fields are empty. The separate `vitals_state_save_load_smoke.gd` exercises these state models in isolation (no disk I/O). If `SaveLoadService` silently dropped or mangled any of these 7 summary dicts during the JSON encode/decode cycle, neither smoke would detect it.
+
+Evidence: save_load_service_smoke.gd line 149: `if loaded.get_summary_count() != 27:` — run_snapshot.gd lines 108-109: `func get_summary_count() -> int: return SUMMARY_FIELDS.size()` (SUMMARY_FIELDS is `const`, always 27). Smoke lines 96-149 contain no assignment to vitals_summary, sanity_summary, radiation_summary, temperature_summary, status_effects_summary, spoilage_summary, or hydroponics_summary.
+
+Verifier: Confirmed with one correction to the evidence: only 5 of the claimed 7 summaries are unpopulated, not 7. `spoilage_summary` (line 96) and `hydroponics_summary` (line 97) are both assigned via helper functions in the smoke and are round-trip checked at lines 215-217 — the claim's evidence that "lines 96-149 contain no assignment to spoilage_summary or hydroponics_summary" is factually wrong. However, the 5 REQ-SV summaries (`vitals_summary`, `sanity_summary`, `radiation_summary`, `temperature_summary`, `status_effects_summary`) are confirmed absent from the entire smoke file (grep returns zero hits). All 5 remain as empty `{}` defaults in the snapshot that gets written and loaded. No `_dicts_equal` assertions cover them after the load. The `get_summary_count()` tautology is also confirmed: `run_snapshot.gd` lines 108-109 show it returns `SUMMARY_FIELDS.size()` — a compile-time constant 27 — so the line-149 assertion can never fail. The `vitals_state_save_load_smoke.gd` does exercise these 5 summaries but only through `_build_run_snapshot()` + `apply_summary()`, with no call to `SaveLoadService.save_current_run()` or `load_current_run()`, so a JSON serialization bug in the service for these fields would go undetected. Core finding confirmed at medium severity.
+
+---
+
+## [MEDIUM] scripts/systems/meta_progression_state.gd:204 (save-load/schema-drift)
+**MetaProgressionState.apply_summary() silently discards all meta-progression data on schema mismatch with no migration fallback**
+
+`apply_summary()` lines 204-206 check `schema != SCHEMA_VERSION` (`"meta-progression-1"`) and return false without restoring any data. No `SaveMigrationService` handler exists for the meta-progression schema. Any world save written before `"meta-progression-1"` was established (or from a future schema version on downgrade) would cause `apply_summary()` to return false, silently discarding all class unlocks (`unlocked_classes`, `selected_class_id`), hub upgrades (`hub_upgrades`), meta-currency (`meta_currency`), and codex entries (`codex_unlocked_ids`). `_apply_world_snapshot()` calls `meta_progression_state.apply_summary(ws.meta_progression_summary)` but does not check the return value, so the failure is invisible to the coordinator.
+
+Evidence: meta_progression_state.gd lines 204-206: `if summary.get("schema", "") != SCHEMA_VERSION: push_warning(...); return false`. No world migration step touches `meta_progression_summary`. _apply_world_snapshot() calls `meta_progression_state.apply_summary(ws.meta_progression_summary)` with the return value unchecked.
+
+Verifier: All cited code is exactly as claimed. `meta_progression_state.gd` lines 204-206 returns false on any schema != "meta-progression-1" with no partial restore. `playable_generated_ship.gd` line 7324 calls `meta_progression_state.apply_summary(ws.meta_progression_summary)` with the return value unchecked. `save_migration_service.gd` `migrate_world()` (lines 65-79) dispatches to `_migrate_world_legacy_to_world_4` (lines 131-134) which is a pure no-op — no code in the migrator touches the `meta_progression_summary` key within the world dict. Partial mitigation exists: the coordinator loads meta-progression from `user://meta_progression.json` independently at line 1160 before any world-snapshot load, so a schema mismatch on the embedded copy would leave the disk-loaded state in place rather than wiping to defaults. However, the migration gap is real (any future schema version will silently fail), the unchecked return is real, and if both the disk file and world snapshot are simultaneously from an incompatible schema era (e.g., after a schema version bump), all meta-progression data — unlocked classes, hub upgrades, meta-currency, codex entries — is silently discarded. Medium severity is correct.
+
+---
+
+## [MEDIUM] scripts/procgen/topology_template.gd:52 (procgen-pipeline/dead-code)
+**template.connections is populated from JSON but never consumed by any pipeline stage; all topology is driven by zone attach_to fields**
+
+TopologyTemplate.from_dict() writes parsed connection entries to template.connections (line 52). A grep of all pipeline stages (CellLayoutEngine, RoomAssigner, WallDoorResolver, LayoutSerializer, ShipLayoutGenerator, GameplaySliceBuilder) finds zero reads of template.connections. The layout topology is driven solely by get_zones_attached_to() which iterates zone.attach_to fields. Two validation smokes check connections is non-empty (template_data_smoke.gd:40, topology_template_smoke.gd:55), but the field has no effect on actual layout generation. Any developer who edits the connections arrays in template JSON files expecting to change the layout will see no effect. stacked_v2's elevator→upper_hub connection (stacked_v2.json connections) is particularly misleading — see related finding.
+
+Evidence: topology_template.gd:52: `template.connections.append({...})`. Bash grep of scripts/ for `.connections` returns only topology_template.gd:52 (write) and two validation smoke read sites — no pipeline stage reads.
+
+Verifier: Read topology_template.gd: line 52 confirms template.connections.append() writes parsed JSON connection entries. Grep of all scripts/procgen/*.gd for ".connections" returns only that single write site. CellLayoutEngine._build_zone_order() (lines 144-165) iterates template.zones and calls template.get_zones_attached_to() using attach_to fields — no reference to template.connections. CellLayoutEngine._add_cross_deck_adjacencies() (lines 385-434) also uses template.zones + attach_to fields only. No ADR or spec documents connections as intentionally deferred/reserved; the pipeline design spec (procgen-layout-pipeline-design.md line 208) says "follow the template connections" as the intended algorithm, but the actual implementation pivoted to attach_to without recording the change. The two validation smokes that check connections is non-empty (topology_template_smoke.gd:55, template_data_smoke.gd:40) give false assurance the field has runtime effect. template.connections is confirmed dead — populated from JSON but never consumed by any pipeline stage.
+
+---
+
+## [MEDIUM] data/procgen/templates/stacked_v2.json:95 (procgen-pipeline/miswired)
+**stacked_v2 elevator zone has no cross-deck adjacency to upper_hub because connections array is dead data and upper_hub.attach_to points to ramp_2, not elevator**
+
+stacked_v2 declares connection `{"from": "elevator", "to": "upper_hub"}` (line 95) documenting the elevator as a second path between deck 1 and deck 2. But template.connections is never read by the pipeline (see prior finding). CellLayoutEngine._add_cross_deck_adjacencies() only creates cross-deck links for zone parent-child pairs where attach_to differs in deck. upper_hub.attach_to is "ramp_2" (not "elevator"), so no elevator→upper_hub cross-deck adjacency is ever added. The elevator zone (deck 1, attach_to="service_corridor", same deck) is placed as a normal deck-1 room adjacent to service_corridor with no connection to the upper deck. The stacked_v2 template is missing a viable second vertical path despite documenting one.
+
+Evidence: stacked_v2.json zones: elevator (deck 1, attach_to="service_corridor"), upper_hub (deck 2, attach_to="ramp_2"). stacked_v2.json:95: `{"from": "elevator", "to": "upper_hub", "distribution": "adjacent"}`. cell_layout_engine.gd:396-425: cross-deck adjacency only added when child attach_to parent and they are on different decks — elevator attaches to service_corridor (same deck), so no cross-deck entry.
+
+Verifier: Directly verified in source. stacked_v2.json line 95 declares {"from": "elevator", "to": "upper_hub"} but the pipeline never reads template.connections. cell_layout_engine.gd _add_cross_deck_adjacencies() (lines 385-443) iterates template.zones and only creates cross-deck adjacency when zone.attach_to points to a room on a different deck. elevator.attach_to is "service_corridor" (both deck 1) so line 424-425 skips it. upper_hub.attach_to is "ramp_2" (deck 1 → deck 2) so that link is correctly created. Grep of all scripts/procgen/*.gd confirms template.connections is written once (topology_template.gd:52) and never read by any stage. The elevator-to-upper_hub second vertical path is dead data.
+
+---
+
+## [MEDIUM] scripts/procgen/playable_generated_ship.gd:1670 (signal-wiring/dead-code)
+**playable_slice_completed is emitted on both death and completion paths but is never connected in production code**
+
+meta-payout is handled inline by _apply_meta_payout_and_persist so game data is correct, but the signal itself has no consumer in main.gd or title_main.gd. Any future results-screen, meta-progression watcher, or external system that hooks this signal would receive nothing at runtime. The signal appears in validation scripts only.
+
+Evidence: playable_generated_ship.gd:1670: emit_signal("playable_slice_completed", get_slice_completion_summary())  — also line 5134 same pattern; grep for .connect(…playable_slice_completed…) in scripts/ (excl. validation/) returns zero matches
+
+Verifier: Grep over all .gd and .tscn files in the project finds playable_slice_completed only in playable_generated_ship.gd: declared at line 118, referenced in a comment at line 1286, and emitted at lines 1670 and 5134. There are zero .connect() calls wiring this signal anywhere — not in main.gd, title_main.gd (which explicitly connects the sibling signal return_to_title_requested at line 139 but omits this one), any .tscn scene connection, or any validation script. The signal is genuinely orphaned in production code.
+
+---
+
+## [MEDIUM] scripts/validation/main_playable_slice_vitals_full_smoke.gd:1 (validation-gaps/validation-gap)
+**main_playable_slice_vitals_full_smoke.gd is orphaned — the only smoke proving all five survival-state model references are non-null in the live scene**
+
+This smoke proves the live coordinator has sanity_state, radiation_state, body_temperature_state, status_effects_state, and vitals_state all non-null and that each one contributes a named token to the PlayerVitalsPanel output. The bundle has main_playable_survival_away_smoke (death path) and main_playable_survival_stakes_smoke (home path), but neither asserts that all five model references are wired to the HUD. If any of these model references was null-initialized and silently skipped, the bundle would not catch it.
+
+Evidence: `grep 'main_playable_slice_vitals_full_smoke' /tmp/bundle_smokes.txt` returns nothing. main_playable_slice_vitals_full_smoke.gd lines 63-72: `if playable.get("sanity_state") == null: _fail("sanity_state is null"); if playable.get("radiation_state") == null: _fail(...); ...`.
+
+Verifier: The smoke file exists at scripts/validation/main_playable_slice_vitals_full_smoke.gd with the exact null-checks at lines 59-73 (vitals_state, sanity_state, radiation_state, body_temperature_state, status_effects_state) and HUD token assertions at lines 83-109. A grep of docs/game/06_validation_plan.md for both "main_playable_slice_vitals_full_smoke" and "vitals_full" returns no matches — the smoke is absent from the regression bundle. The two bundled survival smokes do not cover this gap: main_playable_survival_away_smoke.gd line 40 checks only vitals_state/radiation_state/body_temperature_state (missing sanity_state and status_effects_state); main_playable_survival_stakes_smoke.gd checks none of the five. The smoke is referenced as required coverage in docs/game/05_requirements.md:416, docs/game/features/survival_vitals.md:45, data/integration/cross_system_integration_matrix.json:67, and docs/game/build-plans/01-survival-vitals-e2e.md:100, confirming it was intended for the bundle but never added.
+
+---
+
+## [MEDIUM] scripts/validation/world_snapshot_smoke.gd:1 (validation-gaps/validation-gap)
+**world_snapshot_smoke.gd is orphaned — WorldSnapshot.to_dict()/from_dict() round-trip (visited_ships, current_location) not regression-gated**
+
+WorldSnapshot carries visited_ships (per-ship state map), current_location, player_position_in_ship, home_ship dict, and world_summary. world_snapshot_smoke.gd directly tests to_dict()/from_dict() with all these fields populated and asserts exact round-trip. The bundle covers world_time_persistence_smoke (world_time numeric persistence) and ship_instance_models_smoke (per-ship hull/web round-trip via ShipInstance) but has no smoke that directly exercises the WorldSnapshot container class.
+
+Evidence: `grep 'world_snapshot_smoke' /tmp/bundle_smokes.txt` returns nothing. world_snapshot_smoke.gd lines 27-40: `if int(rebuilt.world_summary.get("world_seed", -1)) != 99: _fail("world_summary not restored"); if String(rebuilt.current_location) != "3:1:0": _fail(...)`.
+
+Verifier: world_snapshot_smoke.gd exists at scripts/validation/world_snapshot_smoke.gd and contains exactly the assertions described (lines 27-40 check world_summary["world_seed"], current_location, visited_ships, home_ship, and player_position_in_ship round-trips). A grep of docs/game/06_validation_plan.md for "world_snapshot_smoke" returns zero matches — the smoke is absent from the entire regression bundle. The closest related bundle entry is world_time_persistence_smoke.gd (bundle line 186), but that smoke only round-trips the single numeric world_time field; it does not exercise visited_ships, current_location, player_position_in_ship, home_ship, or world_summary. The superpowers plan docs/superpowers/plans/2026-06-21-world-persistence-foundation.md (line 1129) explicitly intended this smoke to be added to the bundle but it was never committed to 06_validation_plan.md.
+
+---
+
+## [MEDIUM] scripts/systems/phase_timer.gd:1 (validation-gaps/stub)
+**phase_timer.gd has no dedicated smoke — the ADR-0005 timer helper tick(), normalized_progress(), and boundary behavior are never directly tested**
+
+PhaseTimer is the only shared timer primitive used by ElectricalArcState (the sole ADR-0005 PhaseTimer owner). It has no named smoke in scripts/validation/. hazard_contract_smoke.gd verifies PhaseTimer does not carry a HAZARD_KIND discriminator (structural check only) but never calls tick(), asserts normalized_progress(), or tests boundary clamping. A regression in _clamp_duration or the phase-transition edge would be caught only if ElectricalArcState's behavior visibly regressed via the arc smokes.
+
+Evidence: `find scripts/validation -name phase_timer*` returns nothing. hazard_contract_smoke.gd line 102: `var timer := PhaseTimer.new()` — only existence check, no tick assertions.
+
+Verifier: Confirmed by direct file reads. hazard_contract_smoke.gd lines 102–115 create PhaseTimer and check only that it lacks HAZARD_KIND constants — no tick(), normalized_progress(), or boundary assertions. Grep across all scripts/ shows normalized_progress() is defined only in phase_timer.gd and is never called by any caller (not by ElectricalArcState.get_summary(), not by any validation smoke). ElectricalArcState.configure() clamps durations independently before passing to _phase_timer.configure(), so _clamp_duration()'s non-numeric-type fallback branch (phase_timer.gd lines 97–98) is never exercised. tick() is exercised indirectly through electrical_arc_state_smoke.gd's two-cycle loop (which calls model.tick() → _phase_timer.tick()), but that is exactly what the finder's DETAIL already acknowledges. Severity medium is appropriate: the implementation appears correct but normalized_progress() has genuinely zero test coverage and a documented contract method (_clamp_duration non-numeric path) is unreachable by any current smoke.
+
+---
+
+## [MEDIUM] docs/game/06_validation_plan.md:390 (validation-gaps/validation-gap)
+**main_playable_slice_progression_smoke.gd is documented as a bundle dependency (meta_screens_interactive_smoke ordering fix) but is not in the bundle**
+
+Line 390 of 06_validation_plan.md states: 'Also fixed as part of this task: scripts/validation/main_playable_slice_progression_smoke.gd now defensively wipes user://meta_progression.json in _initialize() so its class=engineer assertion is deterministic regardless of what ran earlier in the same bundle invocation.' This implies the smoke runs in the same bundle invocation as meta_screens_interactive_smoke. However, main_playable_slice_progression_smoke does not appear in any run_clean command in the bundle. The fix it describes (meta file cleanup) can only matter if the smoke runs; if it never runs, the fix is dead code and the test intent is missing.
+
+Evidence: `grep 'main_playable_slice_progression_smoke' /tmp/bundle_smokes.txt` returns nothing. `grep 'slice_progression_smoke' docs/game/06_validation_plan.md` returns only the line 390 prose mention, not a run_clean invocation.
+
+Verifier: Confirmed by direct inspection. `grep -n "slice_progression" docs/game/06_validation_plan.md` returns only line 390 (a prose note, not a run_clean call). `grep -n "run_clean.*main_playable_slice" 06_validation_plan.md` lists 17 main-scene smokes with run_clean invocations - progression is absent from all of them. The file `scripts/validation/main_playable_slice_progression_smoke.gd` exists and does contain the defensive `user://meta_progression.json` wipe (lines 18-20), confirming it was maintained as a live smoke. The bundle at line 201-204 covers pure-model progression smokes (meta_progression_state_smoke, player_progression_full_smoke, progression_meta_smoke) but the coordinator-level main-scene slice that proves the away-branch wires repair XP, HUD, and class=engineer is not invoked anywhere in the bundle.
+
+---
+
+## [MEDIUM] scripts/validation/a11y_p1_002_idempotency_smoke.gd:1 (validation-gaps/validation-gap)
+**A11Y-P1-002 idempotency smoke is not in the bundle despite being an A11Y acceptance criterion**
+
+a11y_p1_002_idempotency_smoke.gd calls ensure_default_input_actions() twice and asserts the registered keycode set is unchanged (no duplicates on re-registration). The companion alternate-input smokes (main_playable_slice_alternate_input_smoke, playable_slice_alternate_input_smoke) are in the bundle and test that alternate bindings exist and work, but neither tests idempotency of the registration function. A regression where double-registration duplicates keycodes would not be caught.
+
+Evidence: `grep 'a11y_p1_002' /tmp/bundle_smokes.txt` returns nothing. a11y_p1_002_idempotency_smoke.gd line 6: '# A11Y-P1-002 idempotency probe. Calls ensure_default_input_actions() twice and asserts the registered keycode set is unchanged'.
+
+Verifier: The smoke file exists at scripts/validation/a11y_p1_002_idempotency_smoke.gd and its header (lines 3-6) matches the claim verbatim. Searching docs/game/06_validation_plan.md for "a11y_p1_002", "IDEMPOTENCY", and the script filename returns zero matches. The two companion alternate-input smokes (main_playable_slice_alternate_input_smoke.gd, playable_slice_alternate_input_smoke.gd) are in the bundle at lines 115-116. No other file in the repo registers this smoke as part of any automated run. The gap is real.
+
+---
+
+## [MEDIUM] scripts/validation/addiction_state_smoke.gd:1 (validation-gaps/validation-gap)
+**addiction_state_smoke.gd is orphaned — tolerance/dependence/withdrawal cycle not directly covered in the bundle**
+
+addiction_state_smoke.gd proves record_dose accumulates tolerance and dependence, activate_withdrawal_if_needed triggers effects into StatusEffectsState, get_summary/apply_summary round-trips the profile, and tick() clears withdrawal after enough time. The bundle's consumables_away_tick_smoke checks `addiction_ticked=true` on the away branch but does not assert profile persistence across save/load or that the withdrawal-clear path fires correctly.
+
+Evidence: `grep '^addiction_state_smoke$' /tmp/bundle_smokes.txt` returns nothing. addiction_state_smoke.gd line 36: `addiction.tick(40.0, statuses); if addiction.has_withdrawal() ...: _fail("withdrawal did not clear")`.
+
+Verifier: addiction_state_smoke.gd exists at scripts/validation/addiction_state_smoke.gd (confirmed) and contains exactly the code described — record_dose x2, activate_withdrawal_if_needed, get_summary/apply_summary round-trip, and tick(40.0) + has_withdrawal() clear check (lines 17-39). A full-text search of docs/game/06_validation_plan.md for "addiction_state_smoke" returns zero matches; the file is not in the regression bundle. The only addiction coverage in the bundle is consumables_away_tick_smoke.gd (bundle line 194), which only checks tolerance.get_tolerance() decays by >0.001 over 20 ticks — it does not exercise withdrawal triggering, profile persistence across save/load, or withdrawal clearance. The omission is real and not documented as intentional anywhere in the ADRs or spec files.
+
+---
+
+## [MEDIUM] scripts/validation/main_playable_slice_hud_smoke.gd:1 (validation-gaps/validation-gap)
+**main_playable_slice_hud_smoke.gd is orphaned — ObjectiveTracker HUD size, parent, and text content assertions not in the bundle**
+
+main_playable_slice_hud_smoke.gd asserts the tracker is parented under hud_layer (not the scene root), size.x >= 520.0, label.custom_minimum_size.x >= 480.0, and that get_hud_text() includes expected strings ('Synaptic Sea First Playable', 'Current: 01 Recover Supplies', controls text). The bundle's main_playable_slice_readability_smoke checks objective_props count and blocked/ramp markers but not HUD panel geometry. A regression that moved the tracker outside hud_layer or shrank its minimum size would not be caught.
+
+Evidence: `grep 'main_playable_slice_hud_smoke' /tmp/bundle_smokes.txt` returns nothing. main_playable_slice_hud_smoke.gd line 47: `if tracker.size.x < MIN_HUD_WIDTH: _fail("tracker width %.1f below %.1f")`.
+
+Verifier: main_playable_slice_hud_smoke.gd exists at line 47 with `if tracker.size.x < MIN_HUD_WIDTH: _fail(...)` plus tracker-parent-is-hud_layer, label min-width, and HUD text token assertions exactly as described. Grep of docs/game/06_validation_plan.md for the smoke name returns no matches; the bundle tail is `commands=132` with no run_clean line for this smoke. ADR-0027 (docs/game/adr/0027-vitals-hud-cleanup.md line 13) explicitly acknowledges "The orphaned main_playable_slice_hud_smoke was never registered in the regression bundle" and Decision 3 requires registering it (commands 119→120), but the fix was never applied — the bundle grew to 132 via other commits while this smoke remained absent. The readability smoke covers prop counts and marker/beacon geometry, not tracker parentage or HUD panel sizing. The gap is real and unguarded.
+
+---
+
+## [MEDIUM] scripts/validation/derelict_gameplay_smoke.gd:1 (validation-gaps/validation-gap)
+**derelict_gameplay_smoke.gd and derelict_loot_smoke.gd are orphaned away-branch smokes with no equivalent in the bundle**
+
+Both smokes set away_from_start and drive the derelict loop (encounter presence, loot availability). They are not in the bundle. The bundle has main_playable_derelict_encounter_injection_smoke (injection reachability) and derelict_fire_* smokes but no smoke that drives the core derelict gameplay tick (random encounter activation, loot container spawning from derelict loot tables) on the away branch through a complete iteration.
+
+Evidence: `grep 'derelict_gameplay_smoke\|derelict_loot_smoke' /tmp/bundle_smokes.txt` returns nothing. `grep -l 'away_from_start' scripts/validation/derelict_gameplay_smoke.gd scripts/validation/derelict_loot_smoke.gd` returns both files.
+
+Verifier: Both scripts/validation/derelict_gameplay_smoke.gd and scripts/validation/derelict_loot_smoke.gd are complete, substantive smokes (not stubs). Neither name appears anywhere in docs/game/06_validation_plan.md (grep returns no matches). The only derelict smoke in the bundle is main_playable_derelict_encounter_injection_smoke (bundle line 126), which tests encounter injection reachability only — not objective completion/persistence/HUD or loot container search/persistence/save-load. docs/game/07_risk_register.md line 38 cites derelict_loot_smoke as active mitigation for RISK-028 (high impact, medium likelihood), making the omission a claimed-but-inoperative control. Severity medium is appropriate: it is a validation gap, not a direct runtime defect, but the regression bundle will silently miss regressions in the primary derelict gameplay and loot paths.
+
+---
+
+## [MEDIUM] scripts/ui/audio_settings_panel.gd:167 (ui-wiring/miswired)
+**Voice-log toggle initial checked state is never set due to has_method() property bug**
+
+Same root cause as audio_log_panel.gd:69 — has_method("audio_log") on a var property always returns false. _refresh_from_manager() skips setting `_voice_log_toggle.button_pressed`, so the checkbox always renders unchecked at panel open regardless of the actual audio_log state. The comment at lines 162-164 explicitly notes the sfx_router variant of this bug was fixed for the caption toggle, but the audio_log check on line 167 was not updated.
+
+Evidence: if _voice_log_toggle != null and audio_manager.has_method("audio_log"):
+    _voice_log_toggle.button_pressed = true
+
+Verifier: audio_manager.gd:52 declares `var audio_log: AudioLog = AudioLogScript.new()` — a property, not a method. So `audio_manager.has_method("audio_log")` at audio_settings_panel.gd:167 always returns false, and `_voice_log_toggle.button_pressed` is never assigned in `_refresh_from_manager()`. The surrounding comment at lines 160–164 explicitly documents the identical bug having been fixed for the caption toggle (sfx_router was also a property), but the audio_log line directly below was not updated. Additionally, if the guard somehow passed, line 168 hard-codes `true` instead of reading any actual state. Severity left at medium: the toggle's _on_voice_log_toggled handler is a documented no-op stub (lines 192–197, ADR-0044), so the visual-only impact is limited to a stale unchecked checkbox on panel open.
+
+---
+
+## [MEDIUM] scripts/ui/menu_coordinator.gd:929 (ui-wiring/validation-gap)
+**meta_screen_is_populated("audio_log") returns true even when the panel list is empty, masking the audio_log bug**
+
+The audio_log case only tests `audio_log_panel.audio_manager != null`. Since audio_manager is always injected, this returns true unconditionally regardless of whether the entry list actually populated. Other meta screen cases (achievements, skill_tree, hub_upgrades, class) require a positive count from the panel before returning true. The audio_log case skips that sanity check, meaning no smoke or coordinator health-check can detect that the audio log screen is broken.
+
+Evidence: "audio_log":
+    return is_instance_valid(audio_log_panel) and audio_log_panel.audio_manager != null
+
+Verifier: Line 929 of scripts/ui/menu_coordinator.gd reads exactly `return is_instance_valid(audio_log_panel) and audio_log_panel.audio_manager != null`, while the six sibling cases (achievements, skill_tree, hub_upgrades, class, language, credits) all require a positive count/size. The function docstring at line 917 states "Returns true when the screen has live content", but the audio_log case verifies only injection, not content. A secondary finding in scripts/ui/audio_log_panel.gd line 69 compounds this: `_populate_entries()` guards with `audio_manager.has_method("audio_log")`, and because `audio_log` is a `var` property (not a `func`), `has_method()` returns false in Godot 4 every time, so the entry list is never populated. The validation gap in `meta_screen_is_populated` therefore masks a real rendering defect that the count-check would have exposed.
+
+---
+
+## [MEDIUM] scripts/ui/menu_coordinator.gd:992 (ui-wiring/validation-gap)
+**Difficulty multiplier always displays x1.0 because get_difficulty_multiplier() does not exist on AccessibilitySettings**
+
+The label builder calls `accessibility_settings.get_difficulty_multiplier()` guarded by `accessibility_settings.has_method("get_difficulty_multiplier")`. AccessibilitySettings has no such method (the class exposes get_text_scale, colorblind, motion_reduce, captions, hold_to_tap, difficulty, and glyph_scheme getters but not a multiplier converter). The has_method guard silently falls back to the else branch returning 1.0, so the accessibility panel's difficulty row always reads "x1.0" regardless of the chosen difficulty preset.
+
+Evidence: "difficulty": return "%s: %s (x%.1f)" % [base_label, settings_state.get_difficulty(), accessibility_settings.get_difficulty_multiplier() if accessibility_settings != null and accessibility_settings.has_method("get_difficulty_multiplier") else 1.0]
+
+Verifier: Read scripts/ui/accessibility_settings.gd (182 lines) in full: the class exposes get_text_scale, get_colorblind_mode, is_motion_reduce, is_captions_enabled, is_hold_to_tap, get_difficulty (returns String), get_glyph_scheme, get_preset_id, and several scaling helpers — no get_difficulty_multiplier anywhere. A project-wide grep for "get_difficulty_multiplier" returned zero matches. Line 992 of menu_coordinator.gd reads exactly as claimed: the has_method guard will always be false, so the ternary always returns 1.0 and the difficulty row always displays "x1.0".
+
+---
+
+## [MEDIUM] data/procgen/smoke/seed_000017/layout.json:1 (data-integrity/schema-drift)
+**Smoke fixture layout is schema_version 1.0.0, missing 7 fields required by the 1.1.0/1.2.0 standard used by all golden ships and the serializer**
+
+layout_serializer.gd outputs schema_version 1.2.0 (line 95). All three golden layouts are 1.1.0. The seed_000017 smoke layout is 1.0.0 and is missing: landmarks, cell_size, room_links, design_intent, blocked_links, fire_zones, and critical_path (empty []). Multiple validation smokes load this fixture (procgen_loader_playable_contract_smoke.gd, autosave_policy_smoke.gd, food_save_load_smoke.gd, performance_profiler.gd). With no critical_path array, any smoke that tests critical-path-exclusion logic gets an empty set and passes vacuously. Fire zone absence means these smokes never exercise fire_zone injection against this fixture.
+
+Evidence: data/procgen/smoke/seed_000017/layout.json top keys: ['schema_version', 'document_kind', 'source_program', 'program_id', 'kit_id', 'rooms', 'connections', 'vertical_connections', 'warnings', 'coherence_report', 'top_down_proof', 'prototype', 'floorplan_placement_mode'] — no landmarks, cell_size, room_links, fire_zones, or critical_path.
+
+Verifier: data/procgen/smoke/seed_000017/layout.json line 2 confirms schema_version "1.0.0". Top-level keys are schema_version, document_kind, source_program, program_id, kit_id, rooms, connections, vertical_connections, warnings, coherence_report, top_down_proof, prototype, floorplan_placement_mode — landmarks, cell_size, room_links, design_intent, blocked_links, and fire_zones are absent. layout_serializer.gd line 95 emits "1.2.0"; golden layouts are "1.1.0". generated_ship_loader.gd line 760 reads layout_doc.get("critical_path", []) — a top-level-only lookup that returns [] for this fixture since critical_path lives only under prototype.critical_path (lines 6429-6434, 4 entries). The fallback to gameplay_doc on line 762 is unreachable because [] is a valid Array. All missing fields are handled by .get() defaults (empty arrays) so load succeeds silently. One detail in the claim is wrong: critical_path is not "empty []" in the file — it has 4 real entries under prototype — but from the loader's perspective the return value is still []. No ADR or comment designates this fixture as intentionally schema 1.0.0.
+
+---
+
+## [MEDIUM] scripts/procgen/encounter_injector.gd:204 (data-integrity/dead-code)
+**encounter_table_id is written into every spawn marker but no downstream system ever reads it — the biome JSON field is dead metadata**
+
+encounter_injector.gd reads encounter_table_id from the biome (line 137) and stores it in each marker dict (line 204: '"encounter_table_id": encounter_table_id'). However, neither threat_manager.gd nor playable_generated_ship.gd nor any other script reads that field from the marker. Encounter kind selection is entirely determined by the injector's hardcoded ROLE_TO_ENCOUNTER_KIND lookup at line 172. The encounter_table_id field in biome JSON files (data/procgen/biomes/*.json) and the marker dict is therefore purely ornamental.
+
+Evidence: encounter_injector.gd line 204: '"encounter_table_id": encounter_table_id'. Grep of all scripts for encounter_table_id excluding biome_profile.gd, encounter_injector.gd, seed_determinism_contract.gd, ship_layout_generator.gd returns zero results in threat_manager.gd or playable_generated_ship.gd.
+
+Verifier: Personally verified in source: (1) encounter_injector.gd line 204 writes "encounter_table_id" into every marker as claimed; (2) threat_manager.gd::_spawn_from_markers() (lines 212-234) reads only encounter_kind/count/id/room_id/cell — encounter_table_id is never accessed anywhere in the file; (3) grep of scripts/ for "encounter_tables" returns zero results — the three JSON files under data/procgen/encounter_tables/ are never loaded; (4) the biomatter_lurker.json table has weighted per-role rolls with variable counts (e.g. "count": [1, 3]) that the implementation ignores entirely, always emitting count=1 via the hardcoded ROLE_TO_ENCOUNTER_KIND dict; (5) the feature spec (procedural_generation_expansion.md line 142) says the injector "rolls against the biome's encounter table" but the spec's own marker schema does not include encounter_table_id, and no ADR documents this as a deliberate deferral. The biome's encounter_table_id field has zero runtime effect.
+
+---
+
+## [MEDIUM] docs/game/integration_debt.md:73 (demo-scope-gate-unlock-registry-wiring/docs-drift)
+**integration_debt.md falsely certifies demo_scope_gate as no longer unreachable**
+
+Line 73 reads: 'The fresh audit shows `demo_scope_gate` and `release_readiness_ledger` are no longer unreachable either'. The grep audit conducted here confirms this claim is incorrect — `demo_scope_gate` has zero production callsites outside of its own class file and the validation smoke. The doc's assertion that it was graduated to 'reachable' status is unsupported by the code and actively misleads anyone triaging integration debt.
+
+Evidence: docs/game/integration_debt.md:73: 'The fresh audit shows `demo_scope_gate` and `release_readiness_ledger` are no longer unreachable either; the live unreachable set is now exactly the 7 non-struck items above plus `junk_yield_resolver`'. Grep result: zero production callers found.
+
+Verifier: system_inventory.json (the canonical source of truth per CLAUDE.md) at lines 6233 and 6272 records both demo_scope_gate and release_readiness_ledger as "reachable": false, "driven": false. The content_note for demo_scope_gate explicitly reads "Confirmed zero non-smoke references in codebase." and its gaps field states "not wired into runtime: no gameplay/UI call site gates a feature through is_allowed()". release_readiness_ledger's content_note similarly reads "Confirmed zero non-smoke references." The grep of the full repo found only the validation smoke (scripts/validation/demo_scope_gate_smoke.gd) and documentation referencing demo_scope_gate — no production call site. integration_debt.md line 73 therefore contains a false assertion. Severity adjusted to medium (not high) because the canonical inventory correctly records the unreachable status; the inaccuracy is isolated to the secondary tracking document.
+
+---
+
+## [MEDIUM] docs/game/06_validation_plan.md:1 (demo-scope-gate-unlock-registry-wiring/validation-gap)
+**demo_scope_gate_smoke.gd is absent from the regression bundle**
+
+A grep of all `run_clean` commands in 06_validation_plan.md finds no entry for `demo_scope_gate_smoke.gd`. The feature spec docs/game/features/release_distribution.md explicitly states the smoke should produce marker `DEMO SCOPE GATE PASS build_kind=<full|demo> blocked=<n> allowed=<n> unknown_rejected=true` and be included in the bundle. It is not. Combined with the production dead-code finding above, the gate has no runtime verification in the regression suite and no production wiring — both enforcement layers are missing.
+
+Evidence: Grep of docs/game/06_validation_plan.md for `demo_scope_gate_smoke|demo_scope` returns zero run_clean matches. docs/game/features/release_distribution.md:131: '- `demo_scope_gate_smoke.gd` — marker `DEMO SCOPE GATE PASS build_kind=<full|demo> blocked=<n> allowed=<n> unknown_rejected=true`.' docs/game/build-plans/13-distribution-store-postlaunch-e2e.md:104: '- demo_scope_gate_smoke.gd'.
+
+Verifier: Grep of every run_clean command in docs/game/06_validation_plan.md (lines 83–224) returns zero matches for demo_scope_gate_smoke or demo_scope. The smoke file scripts/validation/demo_scope_gate_smoke.gd exists on disk. docs/game/features/release_distribution.md line 134 states "All five added to docs/game/06_validation_plan.md regression bundle" — demo_scope_gate_smoke.gd is explicitly the fourth of those five. The bundle omission is real. Severity is adjusted to medium (not high) because docs/game/integration_debt.md lines 73–81 and system_inventory.json lines 6243/6249 both classify demo_scope_gate as intentional release/audit tooling correctly absent from the gameplay scene; the gap is a missing regression-bundle registration for release-tooling, not a broken gameplay system.
+
+---
+
+## [MEDIUM] [UNVERIFIED-medium] scripts/validation/ammo_magazine_smoke.gd:38 (combat-ammo-acquisition-chain/validation-gap)
+**Validation smokes inject ammo via seam add_item() calls, masking the production acquisition gap — smokes pass but prove nothing about gameplay reachability**
+
+ammo_magazine_smoke.gd line 38 calls playable.inventory_state.add_item('flare_round', 5) directly. main_playable_combat_encounter_smoke.gd lines 38-39 call add_item('flare_pistol', 1) then add_item('flare_round', 2). main_playable_slice_combat_encounter_smoke.gd line 76 calls add_item('flare_round', REQUIRED_AMMO). These seam injections are the only code in the entire repo that ever puts ammo items into InventoryState. All combat smokes pass, but they are validating logic paths that can never be reached by a player in production.
+
+Evidence: scripts/validation/ammo_magazine_smoke.gd:38: `playable.inventory_state.add_item("flare_round", 5)`
+scripts/validation/main_playable_combat_encounter_smoke.gd:38-39: `playable.inventory_state.add_item("flare_pistol", 1)` / `playable.inventory_state.add_item("flare_round", 2)`
+scripts/validation/main_playable_slice_combat_encounter_smoke.gd:76: `playable.inventory_state.add_item("flare_round", REQUIRED_AMMO)`
+
+Verifier: (unverified)
+
+---
+
+## [MEDIUM] [UNVERIFIED-medium] scripts/procgen/playable_generated_ship.gd:4315 (combat-ammo-acquisition-chain/data-integrity)
+**_weapon_ammo_item_id() hardcoded match duplicates the ammo_item_id field in weapon_definitions.json, creating two independent sources of truth**
+
+_weapon_ammo_item_id() at line 4315 is a hardcoded match statement mapping weapon IDs to ammo IDs. _begin_weapon_reload() at line 4456 independently reads the same mapping from weapon_definitions.json via weapon.get('ammo_item_id'). Both currently agree, but they are consulted by different call paths (HUD display uses _weapon_ammo_item_id; reload logic uses weapon_definitions). Any future weapon addition that updates only one source will silently break either the HUD display or the reload logic.
+
+Evidence: Line 4315-4324: `func _weapon_ammo_item_id(weapon_id: String) -> String:\n\tmatch weapon_id:\n\t\t"flare_pistol":\n\t\t\treturn "flare_round"\n\t\t"shock_probe":\n\t\t\treturn "capacitor_cell"\n\t\t"welding_lance":\n\t\t\treturn "fuel_canister"`
+Line 4456: `var ammo_item_id: String = str(weapon.get("ammo_item_id", ""))` — reads from weapon_definitions.json, not the function above.
+
+Verifier: (unverified)
+
+---
+
+## [MEDIUM] [UNVERIFIED-medium] scripts/validation/interactable_distance_fallback_smoke.gd:25 (interactable-area3d-physics-proximity/validation-gap)
+**interactable_distance_fallback_smoke.gd proves only the Euclidean fallback branch, not the body_entered primary path**
+
+The smoke places an Interactable at Vector3.ZERO and teleports the player to Vector3(0.0, 0.55, 0.0), then immediately calls try_interact. No physics frames are processed; there is no StaticBody3D floor; body_entered is never emitted so candidate_player remains null throughout. try_interact at interactable.gd:93 evaluates 'candidate_player != player_body' (true, since null != player) and falls through to _is_player_in_direct_range, which checks Euclidean distance (0.55 < 1.8 → true). The test correctly confirms the fallback, but the name implies the primary Area3D-overlap path is covered elsewhere — it is not. This means the only confirmed behavior is the secondary distance check; the Area3D physics overlap that is the designed proximity signal has never been exercised in any test.
+
+Evidence: interactable_distance_fallback_smoke.gd:8-36: no StaticBody3D, no physics_frame.connect, no set_validation_player_in_range call, candidate_player is null at line 27 when try_interact is invoked. interactable.gd:93: 'if candidate_player != player_body and not _is_player_in_direct_range(player_body)' — null != player is true, so fallback branch is taken.
+
+Verifier: (unverified)
+
+---
+
+## [LOW] scripts/procgen/layout_serializer.gd:71 (procgen-pipeline/data-integrity)
+**Portals copied verbatim from WallDoorResolver with Vector3/Vector2i fields; JSON.stringify converts them to opaque strings in the saved procgen layout**
+
+serialize() copies portals directly: `room_dict["portals"] = geo.get("portals", [])` (line 71). WallDoorResolver portal dicts contain `"position": Vector3(...)`, `"from_cell": Vector2i(...)`, `"to_cell": Vector2i(...)`. ShipGenerator._load_layout_as_scene() (ship_generator.gd:79) calls `JSON.stringify(layout, "  ")`. Godot 4 JSON serializes non-primitive types via str(), so Vector3 becomes the string `"(x, y, z)"` and Vector2i becomes `"(x, y)"`. The written user://procgen_temp/layout.json has portal position as a bare string instead of a numeric array. Any future code reading portals from the saved file receives strings, not coordinates. (Wall placements in structural_placements ARE correctly serialized via _build_wall_placements; only portals are affected.)
+
+Evidence: layout_serializer.gd:71: `room_dict["portals"] = geo.get("portals", [])`. WallDoorResolver wall_door_resolver.gd:99: `portals.append({... "position": portal_pos, ... "from_cell": cell, "to_cell": neighbor})` — portal_pos is Vector3, cell/neighbor are Vector2i. ship_generator.gd:79: `var layout_json: String = JSON.stringify(layout, "  ")`.
+
+Verifier: The serialization defect is real: layout_serializer.gd:71 copies portals verbatim from WallDoorResolver (which contains Vector3 position and Vector2i from_cell/to_cell fields), and ship_generator.gd:79 runs JSON.stringify() on the result — Godot 4 will serialize these as opaque strings. However, the severity is overstated. generated_ship_loader.gd contains zero references to the room-level "portals" key; it reads only structural_placements and room_links. _build_room_links() (serializer lines 205-206) correctly converts Vector2i to numeric arrays before JSON serialization, so the actual wiring path used by the loader is sound. All three golden layouts (coherent_ship_001/002/003) have 0 portals in their room dicts, confirming portals has never been a live field in the loaded schema. The portals data is corrupt in the written JSON but is currently dead/unread — no runtime defect today, only a latent schema integrity issue if a future developer tries to consume room-level portals from the saved file.
+
+---
+
+## [LOW] docs/game/06_validation_plan.md:225 (docs-drift/docs-drift)
+**Regression bundle echo claims commands=132 but the file contains only 131 run_clean invocations**
+
+The final echo in the regression bundle (`echo 'SYNAPTIC_SEA REGRESSION PASS commands=132 clean_output=true'`) claims 132 commands, and STATUS.md repeats this number. Running `grep -c '^run_clean ' docs/game/06_validation_plan.md` returns 131. The count is off by 1, meaning the self-reported gate criterion has been wrong since the last addition. Any automated check that greps for 'commands=132' in bundle output against the actual run will mismatch.
+
+Evidence: grep -c '^run_clean' 06_validation_plan.md → 131; final line: echo 'SYNAPTIC_SEA REGRESSION PASS commands=132 clean_output=true'; STATUS.md: 'regression bundle commands=132 clean_output=true'
+
+Verifier: Confirmed by two independent grep counts: `grep -c "^run_clean '" docs/game/06_validation_plan.md` returns 131, while the echo at line 225 hardcodes `commands=132` and STATUS.md line 44 also states `commands=132`. The only line that makes a broader grep return 132 is the function definition `run_clean() {` at line 68, which is not a command invocation. The off-by-one is real, but the severity is overstated — the echo is a static string that always prints 132 regardless of actual invocation count, so no automated PASS-marker grep would ever fail on this; it is a bookkeeping error in a documentation echo line, not a broken gate or missing coverage. Adjusted to low.
+
+---
+
+## [LOW] scripts/systems/run_snapshot.gd:83 (save-load/dead-code)
+**fire_summary is listed in SUMMARY_FIELDS and in RunSnapshot but is permanently empty {} in live gameplay; the smoke masks this by artificially seeding it**
+
+`fire_summary` appears in `SUMMARY_FIELDS` (line 83) and in `to_dict()`/`from_dict()`, implying it is a required active summary. In practice, `_build_run_snapshot()` (lines 6609-6612) explicitly never writes it — the comment confirms it is a legacy back-compat stub: real fire state lives in `ship_systems_summary["fire_suppression_summary"]`. The `save_load_service_smoke.gd` line 55 artificially seeds `snapshot.fire_summary = {"state": "CLEARED", "hazard_kind": "fire"}` before the round-trip test, creating a false green signal. The `get_summary_count() == 27` assertion (line 149 of the smoke) counts `SUMMARY_FIELDS.size()` — a constant — not the number of non-empty entries. Any future developer adding a real per-slot fire summary would read SUMMARY_FIELDS and expect `fire_summary` to be the slot for it, colliding with the existing but dead field.
+
+Evidence: run_snapshot.gd line 83: `"fire_summary"` in SUMMARY_FIELDS. playable_generated_ship.gd lines 6609-6612: `# The legacy snapshot.fire_summary field is left at its default for save-format back-compat.` (never assigned). save_load_service_smoke.gd line 55: `snapshot.fire_summary = {"state": "CLEARED", "hazard_kind": "fire"}` — not present in the coordinator build path.
+
+Verifier: All three factual claims are verified in source. (1) `fire_summary` is at line 83 of run_snapshot.gd in SUMMARY_FIELDS. (2) playable_generated_ship.gd lines 6609-6612 and 6929 both carry explicit "intentionally not..." comments confirming the coordinator never writes or reads `fire_summary` — real fire state travels via `ship_systems_summary["fire_suppression_summary"]`. (3) save_load_service_smoke.gd line 84 artificially seeds it with a literal dict for back-compat testing, not because the build path populates it. (4) `get_summary_count()` (lines 108-109) returns `SUMMARY_FIELDS.size()`, a compile-time constant that includes the dead field. The behavior is intentional and documented at both sites; no game state is lost. Severity "medium" overstates the risk — this is documented dead/legacy code with no data-loss consequence, not an accidental save-load hole.
+
+---
+
+## [LOW] scripts/procgen/layout_serializer.gd:205 (procgen-pipeline/bug)
+**_build_room_links() hardcodes deck=0 for all link cell arrays, producing wrong deck values for cross-deck adjacencies in multi-deck layouts**
+
+_build_room_links() converts adjacency cells as `[from_cell.x, from_cell.y, 0]` (line 205-206), always placing deck=0. For stacked/stacked_v2 layouts, cross-deck adjacencies (e.g. ramp on deck 0 adjacent to spine on deck 1) are present in the adjacencies array with correct room-level deck info, but the emitted room_links cell arrays always carry deck=0. GeneratedShipLoader._cell_name_candidates() interprets cell[2] as deck when building floor cell name candidates for position lookups — a deck-1 cell at [4, 0] serialized as [4, 0, 0] would resolve to `floor_cell_x4_z0` instead of `floor_cell_d1_x4_z0`. _build_vertical_connections() correctly handles deck (line 237-238), but room_links does not. Any consumer using room_link cell arrays for deck-sensitive floor lookups (objectives, blocked-route markers) on multi-deck layouts will resolve to wrong deck-0 cells.
+
+Evidence: layout_serializer.gd:205: `var from_arr: Array = [from_cell.x, from_cell.y, 0] if from_cell is Vector2i else [0, 0, 0]`; line 206: same for to_arr. Contrast with _build_vertical_connections() line 237: `[from_cell.x, from_cell.y, from_deck]`.
+
+Verifier: Lines 205-206 of layout_serializer.gd confirm the exact code: `var from_arr: Array = [from_cell.x, from_cell.y, 0] if from_cell is Vector2i else [0, 0, 0]` — deck is hardcoded to 0 for all room_links cells. _build_vertical_connections() at lines 237-238 uses from_deck/to_deck correctly, making the asymmetry visible. The serializer defect is real. However, the claimed consequence (wrong deck-0 floor cell resolution for objectives/blocked-route markers) does not hold in the current codebase: get_room_links() is defined once (generated_ship_loader.gd:770) and has zero runtime callers; template_c_traversal.gd uses only from_room/to_room strings from room_links (never the cell arrays); and _cell_world_from_link_endpoint (the deck-sensitive lookup path) is only invoked for fire_zones, arc_zones, blocked_links, and vertical_connections — none sourced from room_links. The wrong deck-0 data sits in the serialized output but nothing currently reads it for position resolution. Adjusted severity to low: latent data defect with no active consumer exercising the wrong path.
+
+---
+
+## [LOW] scripts/systems/menu_state.gd:147 (signal-wiring/dead-code)
+**enabled_changed signal is emitted when set_item_enabled is called but is never connected anywhere**
+
+Both callers of set_item_enabled (title_main.gd:57, menu_coordinator.gd:231) manually refresh the panel immediately after the call, so the signal is effectively dead. Any future code that connects to enabled_changed expecting reactive updates would silently receive nothing. The signal is architectural noise that misleads maintainers into thinking enabled-state changes are observable.
+
+Evidence: menu_state.gd:147: emit_signal("enabled_changed", item_id, enabled)  — no .connect(…enabled_changed…) call found anywhere in scripts/ (excluding validation/)
+
+Verifier: Grep across all .gd files finds `enabled_changed` only in menu_state.gd — declared at line 27, emitted at line 147, and mentioned in the class docblock (lines 17–19) as a signal "the scene coordinator subscribes to." Neither title_main.gd (which connects only menu_changed and focus_changed at lines 49–50, then calls set_item_enabled at line 57 without any reactive hookup) nor menu_coordinator.gd (which calls set_item_enabled at line 231 then manually calls _refresh_menu_panel() at line 232) ever connect to it. The signal is live and would fire if connected, so it does not break existing functionality, but the docblock claim of subscription is false and the pattern is inconsistent with the other two signals. Severity adjusted to low: no runtime breakage, no silent data loss, no miswired logic — purely a misleading/dead API.
+
+---
+
+## [LOW] docs/game/06_validation_plan.md:362 (validation-gaps/docs-drift)
+**Hazard contract smoke docs description claims models=3 phase_timer_owners=2 but smoke outputs models=2 phase_timer_owners=1**
+
+Line 362 of 06_validation_plan.md describes the hazard_contract_smoke marker as 'HAZARD CONTRACT PASS models=3 phase_timer_owners=2 wrong_kind_rejected=3 configure_dict=3' — the value from before FireSuppressionState left the timer-hazard set (ADR-0041). The smoke itself (line 17) documents and emits 'models=2 phase_timer_owners=1 wrong_kind_rejected=2 configure_dict=2', and the bundle run_clean at line 121 correctly greeps for 'models=2'. A contributor reading the Future validation additions section would see models=3 and incorrectly believe FireState is still a PhaseTimer hazard.
+
+Evidence: 06_validation_plan.md line 362: '`HAZARD CONTRACT PASS models=3 phase_timer_owners=2 wrong_kind_rejected=3 configure_dict=3`'. hazard_contract_smoke.gd line 17: '# Pass marker: HAZARD CONTRACT PASS models=2 phase_timer_owners=1'. Bundle line 121: `run_clean ... 'HAZARD CONTRACT PASS models=2 phase_timer_owners=1 wrong_kind_rejected=2 configure_dict=2'`.
+
+Verifier: Line 362 of docs/game/06_validation_plan.md contains the prose description "expected marker `HAZARD CONTRACT PASS models=3 phase_timer_owners=2 wrong_kind_rejected=3 configure_dict=3`" — the pre-ADR-0041 values. hazard_contract_smoke.gd line 17 documents and emits `models=2 phase_timer_owners=1 wrong_kind_rejected=2 configure_dict=2` (FireState retired, only ElectricalArc + Oxygen remain). The regression bundle at line 121 is already correct and greps for the updated `models=2` values. The drift is confined to the human-readable prose in the [x] checklist entry at line 362; no test will misfire. Severity stays medium — it is misleading documentation, not a broken gate.
+
+---
+
+## [LOW] docs/game/06_validation_plan.md:225 (interactable-area3d-physics-proximity/validation-gap)
+**body_entered physics path for Interactable/Area3D has zero physics-driven test coverage in the regression bundle**
+
+All 11 smokes that exercise interaction completion inject the candidate via set_validation_player_in_range (the bypass shim at interactable.gd:58-59) or rely on _is_player_in_direct_range. No bundled smoke ever runs a physics simulation that moves a CharacterBody3D into an Area3D and asserts body_entered fires. The interactable_distance_fallback_smoke.gd (which does exist on disk) explicitly tests only the Euclidean fallback — it creates no floor, runs no physics frames, and candidate_player is never populated from the signal. If the project.godot physics-layer configuration, the in-_ready monitoring/layer assignment, or any Godot 4 quirk prevented body_entered from firing in production, nothing in the 132-run bundle would catch it.
+
+Evidence: grep across scripts/validation/ for set_validation_player_in_range returns 11 files; interactable_distance_fallback_smoke.gd line 27 calls try_interact with candidate_player==null and no physics frames, relying on _is_player_in_direct_range. 06_validation_plan.md lines 83-225 contain zero run_clean entries for interactable_distance_fallback_smoke or player_gravity_floor_snap_smoke.
+
+Verifier: All structural claims are verified on disk. interactable.gd:58-59 has the bypass shim. interactable_distance_fallback_smoke.gd exercises only _is_player_in_direct_range (player at Vector3(0,0.55,0), candidate_player==null, no physics frames). Neither that smoke nor player_gravity_floor_snap_smoke appears in the 06_validation_plan.md regression bundle. Grep finds exactly 10 (not 11) validation files using set_validation_player_in_range, all of which manually inject candidate_player, bypassing body_entered. However, severity should be LOW not HIGH: interactable.gd:88-98 shows try_interact gates on "candidate_player != player_body AND NOT _is_player_in_direct_range(player_body)" — the body_entered path only populates a cache; the Euclidean fallback is the real gate and IS exercised. breach_seal_point_smoke.gd:29-32 explicitly documents this as an acknowledged headless-physics limitation, not an accidental omission.
+
+---
+
+
+# REFUTED
+- STREAM_CATALOG has only 2 of the 26 catalogued SFX events — 24 events produce zero audio via _play_via_bus @ scripts/audio/audio_manager.gd:62 — The behavior is intentional and explicitly documented. ADR-0044 Decision 3 states: "Events not in the catalog behave exactly as before this ADR (volume push only, no stream) — the honest, deferred-asset fallback." Its "Retained deferrals" section lists "Full SFX/music/voice asset library (a later content pass; only two placeholder clips exist)" as explicitly out of scope. The code at audio_manager.gd lines 59–61 says "the deferred asset library is honest about what plays" and lines 385–386 repeat "graceful missing-asset fallback that keeps the deferred asset library honest (ADR-0044)." The STREAM_CATALOG having only 2 entries is a documented design decision for the Domain 9 audio pass, not a hidden defect. The audio routing infrastructure (buses, SfxEventRouter, captions, spatial pool) is fully wired; the gap is solely the content asset library, which is an acknowledged future content pass.
+- Entire enemy system uses placeholder geometry meshes and linear-interpolation movement — no real AI, pathfinding, or models @ scripts/systems/threat_manager.gd:278 — The code at threat_manager.gd:317-328 and threat_placeholder_renderer.gd does exactly what is described — lerp movement and primitive geometry meshes. However, this is intentional and explicitly documented, not a hidden defect. `docs/game/features/combat_threat_ai.md` lists "Final art/audio juice beyond placeholder threat silhouettes and HUD text" as explicitly OUT OF SCOPE for the feature. `STATUS.md` lines 58-59 categorizes "bespoke enemy behaviors + bosses" as "Content/polish (known-future, not gaps)" alongside real audio assets and the visual/art pass. The underlying AI model (ThreatAIState) is a genuine pure-model implementation with seven states, detection sensitivities, memory, health/damage/armor, and save/load round-trips — the lerp movement and primitive geometry are acknowledged placeholder scaffolding for a navigation/art pass that is on the roadmap but explicitly deferred. Characterizing this as a "stub pretending to be an implementation" is contradicted by the project's own documentation.
+- GameplaySliceBuilder emits fire_zones/arc_zones/breach_zones in gameplay_slice, but GeneratedShipLoader reads them exclusively from layout_doc, silently ignoring the gameplay_slice versions @ scripts/procgen/gameplay_slice_builder.gd:116 — The behavior is intentional per hazard_type_3.md (docs/game/features/hazard_type_3.md line 67: "No procedural arc placement per run; Alpha placement is hand-authored per template"; line 81: "Missing/null means no arc zones; the coordinator skips arc setup rather than injecting a fallback, because placement is template-specific"). The coordinator at playable_generated_ship.gd:5963 returns early cleanly when world_position==Vector3.INF — no hardcoded fallback is forced. Golden ships coherent_ship_002 and coherent_ship_003 have arc_zones populated in layout.json, which is where the loader correctly reads from. The breach zone fallback (lines 5634-5651) derives position from actual game-object positions (objective-3/4 interactables), not hardcoded coordinates. gameplay_slice_builder.gd's empty arrays are a known placeholder; the design never intended gameplay_slice to be the source of zone marker data.
+- hull_integrity_state.gd has no dedicated smoke at all — the core per-compartment breach model is untested in isolation @ scripts/systems/hull_integrity_state.gd:1 — No dedicated hull_integrity_state_smoke.gd exists — true. But the claim's key severity assertion ("a regression in average_integrity() or the apply_summary compartment restore path would not be caught directly") is demonstrably wrong. (1) ship_systems_closure_smoke.gd (in bundle, line 100 of 06_validation_plan.md) captures playable.hull_integrity_state.average_integrity() before and after 60 driven ticks and asserts the result dropped by >0.05 — a broken average_integrity() would fail this smoke. (2) main_playable_slice_ship_systems_expanded_smoke.gd (in bundle, line 98) forces a hull breach, snapshots via _build_run_snapshot() (which calls hull_integrity_state.get_summary()), mutates the hull again, calls _apply_run_snapshot() which at playable_generated_ship.gd:6877 calls hull_integrity_state.apply_summary(), and then asserts at line 138 that the mutation was overwritten — a broken apply_summary() restore would fail this smoke. The claim also significantly understates the existing coverage: 7-8 validation files exercise hull_integrity_state (the claim lists only 3, entirely missing main_playable_slice_ship_systems_expanded_smoke). Residual gap exists (no isolated tests of the 0.45/0.75 threshold hysteresis, get_status_lines() untested) but the two specific methods the claim calls out as uncovered are both actively asserted in regression-bundle smokes.
+- _on_voice_log_toggled is a documented no-op stub — voice-log checkbox does nothing @ scripts/ui/audio_settings_panel.gd:193 — The no-op handler at audio_settings_panel.gd line 192-197 is real, but the behavior is intentional and documented. ADR-0044 (accepted 2026-07-02) explicitly lists "The AudioSettingsPanel voice-log toggle stub" as a retained deferral (line 168) and states at line 131: "The panel's voice-log toggle remains a known no-op stub, unchanged by this ADR — a separate concern, explicitly out of scope here." The in-code comment at lines 195-196 repeats this. This is named, architected technical debt with an ADR record, not a hidden stub pretending to be a working implementation. It has no hazard, save/load, or away-branch gameplay impact.
+- Voice log toggle is a no-op stub and is unconditionally hardcoded to true in _refresh_from_manager @ scripts/ui/audio_settings_panel.gd:192 — The code at the cited location is exactly as described — `_on_voice_log_toggled()` is only `pass` and `_refresh_from_manager()` uses `has_method("audio_log")` which is always false (since `audio_log` is a `var` property at `audio_manager.gd:52`, not a method). However, ADR-0044 (`docs/game/adr/0044-audio-bus-layout-registration-and-caption-settings-unification.md`, lines 130–131 and 168) explicitly lists the voice-log toggle as a "known no-op stub" that is "a separate concern, explicitly out of scope" and a "retained deferral." The code comment at lines 192–196 also directly says "Known no-op stub, flagged in ADR-0044, not fixed as part of Domain 9 (separate concern, out of scope)." Per the refutation criteria, documented intentional behavior must be refuted — this is not a stub masquerading as an implementation; it is a clearly labeled, ADR-backed deferral.
+- _is_occluded uses a Y-band/distance heuristic instead of LOS raycasting — audio occlusion is fake @ scripts/audio/audio_manager.gd:423 — The code at lines 423-431 of scripts/audio/audio_manager.gd does exactly match the claimed excerpt — a Y-band/distance heuristic labeled in comments as "a placeholder for a real LOS raycast." However, ADR-0044 (docs/game/adr/0044-audio-bus-layout-registration-and-caption-settings-unification.md, lines 169-170) explicitly lists this as a deliberate out-of-scope deferral: "Occlusion raycast (the deterministic distance/Y-band heuristic in AudioManager._is_occluded stays as a placeholder)." ADR-0029 (line 98) also declares real spatialization out of scope per REQ-AU-005. The behavior is intentional and architecturally documented — not a hidden stub. Additionally, the claimed consequence ("all spatial audio falloff computed incorrectly") overstates the impact: scripts/systems/spatial_audio_resolver.gd line 62 shows the occluded flag only gates a -6 dB penalty; distance-based rolloff is computed independently and remains correct regardless of the heuristic's accuracy.
+- _migrate_world_legacy_to_world_4 is a no-op body that still causes migrate_world() to return migrated:true @ scripts/systems/save_migration_service.gd:131 — The no-op body of _migrate_world_legacy_to_world_4 and the resulting migrated:true return from migrate_world() are both real, but the claimed consequence is wrong. The sole caller of migrate_world() (save_load_service.gd line 169) never checks migration_result["migrated"] — it only uses migration_result["dict"]. The .migrated.json write at line 332–338 is triggered only by migrate_run()'s migrated flag, a completely separate code path. No unnecessary .migrated.json is ever written for world saves. The no-op is intentional and documented with an explicit comment ("field set grew additively").
+- OxygenState.tick is never called during a derelict run — home breach oxygen model completely frozen away @ scripts/procgen/playable_generated_ship.gd:5462 — The away branch (lines 5370-5450) indeed omits _refresh_oxygen_state, but this is an explicitly documented design decision: line 5373 reads "the home oxygen/hazard loop is paused here." The claimed consequence for _tick_survival_attrition is also moot: line 5529 evaluates `var in_hazard_env: bool = away_from_start or breach_open` — when away_from_start is true the OR short-circuits, so the stale breach_open value has zero effect on in_hazard_env (and therefore on radiation_state.in_radiation_zone / body_temperature_state.in_extreme_zone). The passability_blocked stale-state concern is similarly harmless: the player is on the derelict, not the home breach zone, so the collision gate is inactive; on return the very first home-branch _process frame calls _refresh_oxygen_state(false, delta) which ticks OxygenState and calls _apply_breach_zone_scene_state(), clearing the stale value within one frame. All three cited consequences are either nullified by surrounding logic or are one-frame cosmetic artifacts, and the root absence is explicitly acknowledged as intentional in the source comment.
+- world_save_anywhere_smoke.gd is an orphaned away-branch smoke — save from a derelict (away_from_start=true) has no regression gate in the bundle @ scripts/validation/world_save_anywhere_smoke.gd:1 — The claim relies on checking 06_validation_plan.md's inline `for s in ...` bash block (which is an old/stale evidence-collection snippet, not the live bundle runner). The actual regression bundle is .superpowers/sdd/run_bundle.sh. Line 91 of that file reads: `run_clean 'world save anywhere smoke' 'WORLD SAVE ANYWHERE PASS away_save=true location_restored=true state_restored=true home_save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_save_anywhere_smoke.gd` — it is wired into the bundle. The bundle's final line shows `SARGASSO REGRESSION PASS commands=73 clean_output=true`, consistent with a 73-smoke expanded bundle. The smoke itself (scripts/validation/world_save_anywhere_smoke.gd lines 64–113) drives `away_from_start=true` explicitly: it calls `travel_to_marker_id`, asserts `playable.away_from_start` is true after load, and checks derelict systems and position restoration. The finding is false — the orphaned-smoke premise does not hold.
+- skill_tree_panel_smoke.gd is orphaned — SkillTreeState.can_unlock prereq + book requirement contract not in the bundle @ scripts/validation/skill_tree_panel_smoke.gd:1 — player_progression_full_smoke.gd (in the bundle at line 202 of 06_validation_plan.md) covers the exact behaviors claimed missing. Lines 147-170 of that smoke call tree.can_unlock("welding_mastery", prog_book) before prereqs (asserts can=false), call grant_xp_from_book("advanced_welding_schematic") to satisfy the book prereq, raise welding to level 5, call can_unlock again (asserts can=true), call tree.unlock("welding_mastery") (asserts true), and call it a second time (asserts false for idempotency). Lines 329-341 also load SkillTreePanel, call build_default(), and call get_status_lines() with a size assertion. The claim's stated rationale that player_progression_full_smoke "does not call can_unlock or exercise the book prereq path" is directly contradicted by the source code.
+- main_playable_slice_crafting_smoke.gd is orphaned — CraftingStation UI integration with live inventory not in the bundle @ scripts/validation/main_playable_slice_crafting_smoke.gd:1 — main_playable_slice_station_craft_smoke.gd lines 3–8 contain an explicit docblock stating it was written to supersede main_playable_slice_crafting_smoke.gd ("a model test in a main-scene costume that manually injects the snapshot fields") and proves the coordinator populates crafting_summary itself with no manual injection. The station_craft_smoke IS registered in 06_validation_plan.md (line 122) and covers more ground: it verifies the coordinator owns all four crafting models, drives station craft, salvage/deconstruct, and field crafting through live coordinator entrypoints, and validates coordinator-driven snapshot population. The crafting_smoke's absence from the bundle is the intended outcome of that design decision, not an oversight. Neither smoke tests the Godot CraftingStation UI node class directly, so the claimed "UI integration gap" applies equally to both and is not a distinction that makes the crafting_smoke's exclusion a regression blind spot.
+- FireSuppressionState.get_summary() omits the ADR-0005-required hazard_kind and passability_blocked keys @ scripts/systems/fire_suppression_state.gd:171 — ADR-0041 and the amended ADR-0005 explicitly remove FireSuppressionState from the full HazardStateContract, not just the PhaseTimer requirement. ADR-0005's amendment note (lines 7-14) states the contract "remain[s] in force for oxygen and electrical arc" only. ADR-0041 explicitly states fire "no longer blocks passability" (superseding REQ-010), making `passability_blocked` intentionally absent. Fire's save path is nested inside `ship_systems_summary`, not the top-level `hazards` dict, so `hazard_kind` discrimination at apply_summary() serves no purpose here. `hazard_contract_smoke.gd` lines 12-18 explicitly exclude fire from the contract check, asserting `models=2 phase_timer_owners=1` (arc + oxygen only). The absence of both keys is documented design, not a gap.
+- FireSuppressionState.apply_summary() accepts any non-empty dictionary — no hazard_kind guard, risk of silent state corruption @ scripts/systems/fire_suppression_state.gd:188 — ADR-0005 (amended by ADR-0041) explicitly restricts the HazardStateContract — including the hazard_kind requirement in get_summary() and the rejection guard in apply_summary() — to oxygen and electrical_arc only: "The HazardStateContract … remain in force for oxygen and electrical arc." ADR-0041 further states "Fire diverges from the ADR-0005 timer-hazard contract" and its verification target for hazard_contract_smoke.gd specifies wrong_kind_rejected=2 (not 3), confirming fire is intentionally excluded. get_summary() (line 171) and apply_summary() (line 188) both match this documented design — the missing hazard_kind check is intentional, not a defect.
+- Smoke gameplay_slice (schema 1.0.0) lacks loot_containers key that all golden ship slices carry @ data/procgen/smoke/seed_000017/gameplay_slice.json:1 — The claim's core premise is factually wrong: only coherent_ship_001/gameplay_slice.json carries a loot_containers array; coherent_ship_002 and coherent_ship_003 (both schema 1.1.0) omit the key exactly as seed_000017 does — so seed_000017 is not anomalous relative to the full golden set. The loader at generated_ship_loader.gd line 388 uses gameplay_doc.get("loot_containers", []) which gracefully defaults to an empty array when the key is absent. Three dedicated live-scene smokes (derelict_loot_smoke.gd, container_variety_smoke.gd, main_playable_slice_loot_ecosystem_smoke.gd) exercise _build_loot_containers() through procedural generation at runtime — they do not depend on the seed_000017 fixture at all — so the claimed "validation blind spot for that code path" does not hold.
+
+# UNVERIFIED LOW/OVERFLOW
+- [low] (stubs) scripts/systems/cloud_manifest_state.gd:24 — CloudManifestState.cloud_provider is hardcoded 'stub' — cloud sync infrastructure is entirely absent
+- [low] (stubs) scripts/systems/build_metadata_state.gd:27 — telemetry_endpoint_placeholder is a named placeholder field that is stored and serialized but never consumed
+- [low] (coordinator-wiring) scripts/procgen/playable_generated_ship.gd:5256 — _combined_system_status_lines uses home fire_suppression_state instead of _active_fire_state() — derelict fire never shown in tracker
+- [low] (save-load) scripts/systems/spoilage_state.gd:62 — SpoilageState.apply_summary() does not restore _last_transition_count; the field is written by get_summary() but silently dropped on load
+- [low] (procgen-pipeline) scripts/procgen/room_assigner.gd:14 — Roles compartment and quarters used in derelict_a/derelict_b zone role_pools are absent from ROOM_FOOTPRINT_OPTIONS
+- [low] (procgen-pipeline) data/procgen/golden/coherent_ship_001/layout.json:199 — Golden layouts use room_role names absent from the procgen pipeline — medbay in coherent_ship_001, side_storage in coherent_ship_002 — reducing their value as procgen regression fixtures
+- [low] (procgen-pipeline) scripts/procgen/layout_serializer.gd:5 — Stale header comment claims output matches schema 1.1.0 while code emits 1.2.0 with structurally different room and top-level fields
+- [low] (signal-wiring) scripts/ui/credits_screen.gd:74 — credits_dismissed is emitted by dismiss() but dismiss() is never called from menu_coordinator and the signal has no consumer
+- [low] (signal-wiring) scripts/ui/release_badge_overlay.gd:36 — metadata_changed signal is emitted once on configure but is never connected anywhere
+- [low] (signal-wiring) scripts/procgen/playable_generated_ship.gd:4740 — playable_ready and playable_interaction_completed are emitted at runtime but never connected in production code
+- [low] (validation-gaps) docs/game/06_validation_plan.md:343 — Save/load service docs description lists summaries=7 but smoke emits summaries=27 and bundle checks for summaries=27
+- [low] (validation-gaps) scripts/validation/achievement_state_smoke.gd:12 — achievement_state_smoke.gd has a hardcoded macOS fallback path that makes it silently fail on Windows without the ROOT env var
+- [low] (hazard-contract) scripts/systems/fire_state.gd.uid:1 — fire_state.gd.uid orphan remains after fire_state.gd was deleted per ADR-0041
+- [low] (ui-wiring) scripts/procgen/playable_generated_ship.gd:4218 — _on_scanner_panel_closed uses `player != null` instead of is_instance_valid, inconsistent with adjacent functions
+- [low] (ui-wiring) scripts/procgen/playable_generated_ship.gd:4230 — _freeze_player_for_panel uses `player != null` instead of is_instance_valid
+- [low] (ui-wiring) scripts/procgen/playable_generated_ship.gd:4238 — _on_inventory_panel_closed uses `player != null` instead of is_instance_valid
+- [low] (data-integrity) data/ui/status_effect_icons.json:1 — status_effect_icons.json is never loaded by any script — the 5 icon paths it defines are never used
+- [low] (data-integrity) data/ui/settings_schema.json:1 — settings_schema.json is never loaded by any script
+- [low] (data-integrity) data/procgen/encounter_tables/threat_drone_swarm.json:1 — threat_drone_swarm encounter table is orphaned — no biome's encounter_table_id references it and no script loads it
