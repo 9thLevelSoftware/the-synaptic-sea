@@ -124,8 +124,10 @@ run_clean 'Bucket 3 meta-screen reachability smoke' 'MAIN PLAYABLE META SCREENS 
 run_clean 'AutosavePolicy reachability smoke' 'MAIN PLAYABLE META AUTOSAVE PASS slot_rotated=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_meta_autosave_smoke.gd
 run_clean 'KitCatalog lifeboat biome-skin reachability smoke' 'MAIN PLAYABLE LIFEBOAT BIOME SKIN PASS biomes=3 live_match=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_lifeboat_biome_skin_smoke.gd
 run_clean 'procgen derelict encounter-injection reachability smoke' 'MAIN PLAYABLE DERELICT ENCOUNTER INJECTION PASS injected_threats=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_derelict_encounter_injection_smoke.gd
+run_clean 'procgen encounter placement smoke' 'ENCOUNTER PLACEMENT PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encounter_placement_smoke.gd
 run_clean 'REQ-FC food consumption reachability smoke' 'MAIN PLAYABLE FOOD CONSUMPTION PASS hunger_restored=true thirst_restored=true spoilage_tracked=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_food_consumption_smoke.gd
 run_clean 'item economy data smoke' 'ITEM ECONOMY PASS sealant_def=true ext_def=true sealant_loot=true ext_loot=true sealant_recipe=true ext_recipe=true skill_enforced=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/item_economy_smoke.gd
+run_clean 'item data integrity smoke' 'ITEM DATA INTEGRITY PASS recipes=60 loot_ids=30 materials=33 no_shadow_defs=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/item_data_integrity_smoke.gd
 run_clean 'main item economy reachability smoke' 'MAIN PLAYABLE ITEM ECONOMY PASS crafted_sealant=true sealed=true crafted_ext=true extinguished=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_item_economy_smoke.gd
 run_clean 'spoilage stage threaded into eat path smoke' 'SPOILAGE EAT SCALING PASS stale_lt_fresh=true rotten_lt_stale=true fresh_fallback=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/spoilage_eat_scaling_smoke.gd
 run_clean 'M7-A breach seal point model smoke' 'BREACH SEAL POINT PASS sealed=true breach_cleared=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/breach_seal_point_smoke.gd
@@ -149,6 +151,7 @@ run_clean 'meta event state model smoke' 'META EVENT STATE PASS fired=3 pending=
 run_clean 'main playable audio smoke' 'MAIN PLAYABLE AUDIO PASS buses=6 routed=4 fired_meta=3 ambient_role=engine' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_audio_smoke.gd
 run_clean 'audio save/load model smoke' 'AUDIO SAVE LOAD PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_save_load_smoke.gd
 run_clean 'Domain 9 audio pipeline smoke' 'AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true captions_toggle=true away_ticks=30' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_pipeline_smoke.gd
+run_clean 'REQ-AU-005 spatial audio playback smoke' 'AUDIO SPATIAL PASS catalogued_playing=true fallback_honest=true production_pickup=true position_tracked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_spatial_playback_smoke.gd
 # --- Task 15 documentation/manifest currency validators (host-side Python; no Godot) ---
 # doc_currency_validators.py auto-detects the repo root (overridable via ROOT) and
 # exits non-zero on failure. The kanban-manifest check needs the live Hermes board
@@ -191,6 +194,7 @@ run_clean 'Domain 5 sealed hatch seed + bypass smoke' 'SEALED HATCH PASS away_ti
 run_clean 'Domain 5 thermal consumable smoke' 'THERMAL CONSUMABLE PASS temp_before=12.000 temp_after=20.000 temp_shifted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/thermal_consumable_smoke.gd
 run_clean 'Domain 5 ammo magazine state model smoke' 'AMMO MAGAZINE STATE PASS spent=true empty=true reloaded=true roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ammo_magazine_state_smoke.gd
 run_clean 'Domain 5 ammo magazine away-branch smoke' 'AMMO MAGAZINE PASS away_ticks=30 spent=true dry_fire=true reloaded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ammo_magazine_smoke.gd
+run_clean 'Domain 5 weapon/ammo acquisition chain smoke' 'WEAPON AMMO ACQUISITION PASS data_reachable=true looted_ammo=true production_reload=true away_ticks=30' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/weapon_ammo_acquisition_smoke.gd
 run_clean 'Domain 5 consumables away tick smoke' 'CONSUMABLES AWAY TICK PASS away_ticks=20 stim_decayed=true addiction_ticked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/consumables_away_tick_smoke.gd
 run_clean 'Domain 5 sealed hatch node smoke' 'SEALED HATCH NODE PASS locked=true opened=true collision_off=true signalled=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sealed_hatch_node_smoke.gd
 run_clean 'Domain 5 flare steady sanity smoke' 'FLARE STEADY PASS drain_no_flare=15.000 drain_flare=7.500 steadier=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/flare_steady_smoke.gd
@@ -222,7 +226,7 @@ run_clean 'Domain 10 main playable UI shell smoke' 'MAIN PLAYABLE UI SHELL PASS 
 run_clean 'Domain 10 main playable slice UI shell smoke' 'MAIN PLAYABLE SLICE UI SHELL PASS boot=main_menu pause=true codex=1 hotbar=true tooltip=true chart_gated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_ui_shell_smoke.gd
 run_clean 'Domain 10 web chart state model smoke' 'WEB CHART STATE PASS known=2 detail_upgrade=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/web_chart_state_smoke.gd
 run_clean 'Domain 10 UI polish end-to-end smoke' 'UI POLISH PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_polish_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=132 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=135 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
