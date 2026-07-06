@@ -54,9 +54,8 @@ static func load_definitions() -> Dictionary:
 			if not (extra_defs[item_id] is Dictionary):
 				continue
 			# Field-merge onto any existing base def so keys present only in the
-			# base (e.g. equip_slot on capacitor_cell in item_definitions.json) are
-			# preserved when a secondary file (ammo_definitions.json) also defines
-			# the same item with a different subset of fields.
+			# base are preserved when a secondary file defines the same item with
+			# a different subset of fields (the extra file's fields win per-key).
 			if defs.has(item_id) and defs[item_id] is Dictionary:
 				var merged: Dictionary = (defs[item_id] as Dictionary).duplicate(true)
 				for key in (extra_defs[item_id] as Dictionary):

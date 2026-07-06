@@ -11,7 +11,7 @@ extends SceneTree
 ## This smoke closes both holes:
 ## 1. data_reachable — for EVERY weapon in data/combat/weapon_definitions.json
 ##    with a non-empty ammo_item_id: the ammo item AND the weapon's equip item
-##    (shock_probe is wielded by equipping capacitor_cell) appear in at least
+##    (weapon ids ARE the equip item ids since PR #61) appear in at least
 ##    one entry of data/items/loot_tables.json, and both resolve in the merged
 ##    ItemDefs registry. Ammo/weapons that exist only in definitions are
 ##    unreachable content — that is a FAIL, not a balance choice.
@@ -60,11 +60,10 @@ func _load_json(path: String) -> Dictionary:
 	var parsed: Variant = JSON.parse_string(f.get_as_text())
 	return parsed if parsed is Dictionary else {}
 
-## The inventory item the player equips to wield this weapon. Mirrors
-## _equipped_primary_weapon_id(): shock_probe is wielded via capacitor_cell.
+## The inventory item the player equips to wield this weapon. Weapon ids ARE
+## the equip item ids (the pre-PR-#61 capacitor_cell alias let auto-equip eat
+## looted ammo and never satisfied ThreatManager's literal equipped-id check).
 func _equip_item_for_weapon(weapon_id: String) -> String:
-	if weapon_id == "shock_probe":
-		return "capacitor_cell"
 	return weapon_id
 
 func _validate() -> void:
@@ -164,6 +163,20 @@ func _validate() -> void:
 		_fail("reload did not complete on away branch: loaded=%d target=%d" % [playable.ammo_state.loaded("flare_pistol"), target])
 		return
 	var production_reload: bool = true
+
+	# PR #61 Codex P2 guard: shock_probe is its own equip item (no
+	# capacitor_cell alias). Equipping it must satisfy attack_with_weapon's
+	# literal equipped-id check — an empty magazine ("empty_magazine") is the
+	# expected outcome; "weapon_not_equipped" means the alias defect is back.
+	playable.inventory_state.add_item("shock_probe", 1)
+	if not playable._equip_from_inventory("shock_probe", false):
+		_fail("could not equip shock_probe as its own item")
+		return
+	var probe_result: Dictionary = playable.threat_manager.attack_with_weapon(
+		"shock_probe", playable.inventory_state, playable.equipment_state, playable.ammo_state)
+	if str(probe_result.get("reason", "")) == "weapon_not_equipped":
+		_fail("attack_with_weapon rejected an equipped shock_probe (equip-id alias regression)")
+		return
 
 	print("WEAPON AMMO ACQUISITION PASS data_reachable=%s looted_ammo=%s production_reload=%s away_ticks=%d" % [
 		str(data_reachable).to_lower(), str(looted_ammo).to_lower(), str(production_reload).to_lower(), away_ticks])

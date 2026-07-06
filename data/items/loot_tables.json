@@ -38,7 +38,8 @@
       { "item_id": "fire_extinguisher", "qty_min": 1, "qty_max": 1, "weight": 2, "rarity": "uncommon" },
       { "item_id": "fuel_canister",  "qty_min": 1, "qty_max": 2, "weight": 2, "rarity": "common" },
       { "item_id": "capacitor_cell", "qty_min": 1, "qty_max": 1, "weight": 2, "rarity": "uncommon" },
-      { "item_id": "welding_lance",  "qty_min": 1, "qty_max": 1, "weight": 0.8, "rarity": "rare" }
+      { "item_id": "welding_lance",  "qty_min": 1, "qty_max": 1, "weight": 0.8, "rarity": "rare" },
+      { "item_id": "shock_probe",    "qty_min": 1, "qty_max": 1, "weight": 0.8, "rarity": "rare" }
     ]
   },
   "salvage_cargo": {

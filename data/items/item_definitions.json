@@ -27,7 +27,7 @@
   "crowbar":         { "display_name": "Crowbar",         "category": "tool",   "weight": 2.8, "max_stack": 1,  "rarity": "common",   "equip_slot": "primary_hand" },
   "flare_pistol":    { "display_name": "Flare Pistol",    "category": "tool",   "weight": 1.6, "max_stack": 1,  "rarity": "uncommon", "equip_slot": "primary_hand" },
   "welding_lance":   { "display_name": "Welding Lance",   "category": "tool",   "weight": 3.6, "max_stack": 1,  "rarity": "uncommon", "equip_slot": "primary_hand" },
-  "capacitor_cell":  { "display_name": "Capacitor Cell",  "category": "tool",   "weight": 2.2, "max_stack": 1,  "rarity": "uncommon", "equip_slot": "secondary_hand" },
+  "shock_probe":     { "display_name": "Shock Probe",     "category": "tool",   "weight": 2.2, "max_stack": 1,  "rarity": "uncommon", "equip_slot": "secondary_hand" },
   "frayed_cable_coil":   { "display_name": "Frayed Cable Coil",   "category": "junk", "weight": 1.2, "max_stack": 10, "rarity": "common",   "junk_yields": [{ "material_id": "wiring_bundle", "quantity": 2 }, { "material_id": "polymer_pellet", "quantity": 1 }] },
   "corroded_data_shard": { "display_name": "Corroded Data Shard", "category": "junk", "weight": 0.8, "max_stack": 10, "rarity": "uncommon", "junk_yields": [{ "material_id": "memory_crystal", "quantity": 1 }, { "material_id": "circuit_board", "quantity": 1 }] },
   "biomatter_tangle":    { "display_name": "Biomatter Tangle",    "category": "junk", "weight": 1.1, "max_stack": 10, "rarity": "common",   "junk_yields": [{ "material_id": "biomatter_residue", "quantity": 2 }, { "material_id": "reactive_gel", "quantity": 1 }] },
