@@ -45,9 +45,9 @@ func _on_frame() -> void:
 	if finished:
 		return
 	frame_count += 1
-	if playable == null:
+	if not is_instance_valid(playable):
 		playable = _find_playable(main_node)
-	if playable == null or playable.loader == null or not playable.loader.has_loaded_ship() or not playable.playable_started:
+	if not is_instance_valid(playable) or not is_instance_valid(playable.loader) or not playable.loader.has_loaded_ship() or not playable.playable_started:
 		if frame_count > TIMEOUT_FRAMES:
 			_fail("playable not ready after %d frames" % frame_count)
 		return
@@ -183,6 +183,6 @@ func _fail(reason: String) -> void:
 	_cleanup(1)
 
 func _cleanup(code: int) -> void:
-	if main_node != null and is_instance_valid(main_node):
+	if is_instance_valid(main_node):
 		main_node.queue_free()
 	quit(code)

@@ -4323,7 +4323,7 @@ func _weapon_ammo_item_id(weapon_id: String) -> String:
 	# Single source of truth: weapon_definitions.json's ammo_item_id (the same
 	# field _begin_weapon_reload reads). The old hardcoded match here silently
 	# diverged from the data file for any new/renamed weapon.
-	if threat_manager == null:
+	if not is_instance_valid(threat_manager):
 		return ""
 	var weapon: Variant = threat_manager.weapon_definitions.get(weapon_id, {})
 	if weapon is Dictionary:
@@ -7623,7 +7623,7 @@ func _postprocess_loot_grants(granted: Array, source_id: String, source: Node3D 
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		# Emit at the source container's world position when known (spatial
 		# pickup audio, REQ-AU-005); fall back to the non-spatial bus path.
-		if source != null and is_instance_valid(source) and source.is_inside_tree():
+		if is_instance_valid(source) and source.is_inside_tree():
 			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP, source.global_position)
 		else:
 			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)

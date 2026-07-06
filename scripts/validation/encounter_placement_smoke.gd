@@ -35,6 +35,7 @@ const ANCHOR: Vector3 = Vector3(100.0, 0.0, 50.0)
 const EPS: float = 0.01
 
 var _ran: bool = false
+var tm: Node = null
 
 func _initialize() -> void:
 	# ThreatManager loads its archetype JSONs in _ready, which does not fire
@@ -112,7 +113,7 @@ func _run_validation() -> void:
 	var cells_real: bool = true
 
 	# --- Criterion 3: ThreatManager spawns at anchor + local_position -------
-	var tm: Node = ThreatManagerScript.new()
+	tm = ThreatManagerScript.new()
 	get_root().add_child(tm)
 	tm.configure_for_layout(layout, markers, ANCHOR)
 	if tm.threats.is_empty():
@@ -144,8 +145,11 @@ func _run_validation() -> void:
 
 	print("ENCOUNTER PLACEMENT PASS markers=%d cells_real=%s spawns_in_rooms=true distinct_positions=%s" % [
 		markers.size(), str(cells_real).to_lower(), str(distinct).to_lower()])
+	tm.queue_free()
 	quit(0)
 
 func _fail(reason: String) -> void:
 	push_error("ENCOUNTER PLACEMENT FAIL reason=%s" % reason)
+	if is_instance_valid(tm):
+		tm.queue_free()
 	quit(1)

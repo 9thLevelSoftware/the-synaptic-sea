@@ -338,6 +338,10 @@ static func validate(layout: Dictionary) -> Dictionary:
 # whose floor entries are named "floor_cell_*" with world_position =
 # cell * cell_size (LayoutSerializer._build_structural_placements).
 static func floor_cell_entries(room: Dictionary, cell_size: float) -> Array:
+	# Guard degenerate cell_size once for BOTH branches: a zero/negative size
+	# would silently produce wrong local positions (cells branch) or divide
+	# incorrectly (placements branch). The grid contract is CELL_SIZE = 4.0.
+	var safe_size: float = cell_size if cell_size > 0.0 else 4.0
 	var out: Array = []
 	var cells_raw: Variant = room.get("cells", [])
 	if cells_raw is Array:
@@ -350,7 +354,7 @@ static func floor_cell_entries(room: Dictionary, cell_size: float) -> Array:
 			if xz != null:
 				out.append({
 					"cell": xz,
-					"local_position": [float(xz[0]) * cell_size, 0.0, float(xz[1]) * cell_size],
+					"local_position": [float(xz[0]) * safe_size, 0.0, float(xz[1]) * safe_size],
 				})
 	if not out.is_empty():
 		return out
@@ -363,7 +367,6 @@ static func floor_cell_entries(room: Dictionary, cell_size: float) -> Array:
 				continue
 			var wp: Variant = (p as Dictionary).get("world_position", null)
 			if wp is Array and (wp as Array).size() >= 3:
-				var safe_size: float = cell_size if cell_size > 0.0 else 4.0
 				out.append({
 					"cell": [int(roundf(float(wp[0]) / safe_size)), int(roundf(float(wp[2]) / safe_size))],
 					"local_position": [float(wp[0]), float(wp[1]), float(wp[2])],

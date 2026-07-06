@@ -48,7 +48,7 @@ func _on_process_frame() -> void:
 	if finished:
 		return
 	frame_count += 1
-	if playable == null or not is_instance_valid(playable):
+	if not is_instance_valid(playable):
 		_fail("playable freed unexpectedly")
 		return
 	if not playable.playable_started:
@@ -72,8 +72,8 @@ func _validate() -> void:
 		_fail("get_audio_manager missing")
 		return
 	var mgr: Node = playable.get_audio_manager()
-	if mgr == null:
-		_fail("audio_manager is null")
+	if not is_instance_valid(mgr):
+		_fail("audio_manager is invalid")
 		return
 
 	# --- Criterion 1: catalogued event plays spatially ---
@@ -115,7 +115,7 @@ func _validate() -> void:
 	var fallback_honest_ok: bool = true
 
 	# --- Criterion 3: production corpse-loot pickup emits at the container position ---
-	if playable.player == null or not is_instance_valid(playable.player):
+	if not is_instance_valid(playable.player):
 		_fail("player missing")
 		return
 	# Wait out the router cooldown so the pickup event re-routes.
@@ -167,6 +167,6 @@ func _fail(reason: String) -> void:
 		return
 	finished = true
 	push_error("AUDIO SPATIAL FAIL reason=%s" % reason)
-	if playable != null and is_instance_valid(playable):
+	if is_instance_valid(playable):
 		playable.queue_free()
 	quit(1)
