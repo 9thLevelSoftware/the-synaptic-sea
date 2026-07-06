@@ -4337,9 +4337,13 @@ func _equipped_primary_weapon_id() -> String:
 	# capacitor_cell->shock_probe alias made the ammo double as the weapon,
 	# so auto-equip consumed looted ammo and ThreatManager.attack_with_weapon
 	# (which compares equipped ids literally) always rejected the probe.
+	# The weapon set comes from weapon_definitions.json (same source
+	# _begin_weapon_reload reads) — no hardcoded list to diverge.
+	if not is_instance_valid(threat_manager):
+		return ""
 	for slot_id in ["primary_hand", "secondary_hand"]:
 		var item_id: String = str(equipment_state.get_equipped(slot_id))
-		if item_id in ["crowbar", "flare_pistol", "welding_lance", "shock_probe"]:
+		if threat_manager.weapon_definitions.has(item_id):
 			return item_id
 	return ""
 
@@ -7326,6 +7330,16 @@ func _apply_world_snapshot(ws) -> bool:
 	if equipment_state != null:
 		if not ws.player_equipment.is_empty():
 			equipment_state.apply_summary(ws.player_equipment)
+			# Legacy-save reconciliation (PR #62): apply_summary restores slot
+			# ids blindly. An id that no longer declares an equip slot (e.g.
+			# capacitor_cell, demoted from equip item to pure ammo) is moved
+			# back to inventory instead of squatting in the slot.
+			for slot in equipment_state.slots.keys():
+				var equipped_id: String = str(equipment_state.slots[slot])
+				if equipped_id != "" and not equipment_state.can_equip(equipped_id):
+					equipment_state.unequip(String(slot))
+					if inventory_state != null:
+						inventory_state.add_item(equipped_id, 1)
 		else:
 			equipment_state.slots.clear()
 	_recompute_player_encumbrance()
