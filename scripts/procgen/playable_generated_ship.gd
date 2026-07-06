@@ -4333,11 +4333,13 @@ func _weapon_ammo_item_id(weapon_id: String) -> String:
 func _equipped_primary_weapon_id() -> String:
 	if equipment_state == null:
 		return ""
+	# Weapon ids ARE the equip item ids (PR #61 Codex P2): the old
+	# capacitor_cell->shock_probe alias made the ammo double as the weapon,
+	# so auto-equip consumed looted ammo and ThreatManager.attack_with_weapon
+	# (which compares equipped ids literally) always rejected the probe.
 	for slot_id in ["primary_hand", "secondary_hand"]:
 		var item_id: String = str(equipment_state.get_equipped(slot_id))
-		if item_id == "capacitor_cell":
-			return "shock_probe"
-		if item_id in ["crowbar", "flare_pistol", "welding_lance"]:
+		if item_id in ["crowbar", "flare_pistol", "welding_lance", "shock_probe"]:
 			return item_id
 	return ""
 

@@ -121,6 +121,7 @@ func _validate() -> void:
 	# Wait out the router cooldown so the pickup event re-routes.
 	mgr.tick(0.5)
 	var production_ok: bool = false
+	var position_tracked_ok: bool = false
 	var tries: int = 0
 	for i in range(MAX_CORPSE_TRIES):
 		tries += 1
@@ -143,6 +144,7 @@ func _validate() -> void:
 		if sp.global_position.distance_to(pos) > 0.01:
 			_fail("production pickup did not reposition spatial player: at %s, expected %s (tries=%d)" % [str(sp.global_position), str(pos), tries])
 			return
+		position_tracked_ok = true
 		if sp.stream == null or not sp.playing:
 			_fail("production pickup spatial player not streaming/playing (tries=%d)" % tries)
 			return
@@ -157,7 +159,7 @@ func _validate() -> void:
 		str(catalogued_playing_ok).to_lower(),
 		str(fallback_honest_ok).to_lower(),
 		str(production_ok).to_lower(),
-		str(production_ok).to_lower(),
+		str(position_tracked_ok).to_lower(),
 	])
 	playable.queue_free()
 	quit(0)
