@@ -4320,15 +4320,15 @@ func _inventory_hotbar_ids() -> Array:
 	return out
 
 func _weapon_ammo_item_id(weapon_id: String) -> String:
-	match weapon_id:
-		"flare_pistol":
-			return "flare_round"
-		"shock_probe":
-			return "capacitor_cell"
-		"welding_lance":
-			return "fuel_canister"
-		_:
-			return ""
+	# Single source of truth: weapon_definitions.json's ammo_item_id (the same
+	# field _begin_weapon_reload reads). The old hardcoded match here silently
+	# diverged from the data file for any new/renamed weapon.
+	if threat_manager == null:
+		return ""
+	var weapon: Variant = threat_manager.weapon_definitions.get(weapon_id, {})
+	if weapon is Dictionary:
+		return str((weapon as Dictionary).get("ammo_item_id", ""))
+	return ""
 
 func _equipped_primary_weapon_id() -> String:
 	if equipment_state == null:
