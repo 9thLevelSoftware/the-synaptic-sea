@@ -397,7 +397,11 @@ func _play_via_bus(bus_id: String, volume_db: float, event_id: StringName = &"")
 				player.stream = stream
 			player.play()
 
-## Internal: play through a spatial AudioStreamPlayer3D pool entry.
+## Internal: play through a spatial AudioStreamPlayer3D pool entry. Stream
+## assignment mirrors _play_via_bus exactly (ADR-0044): a STREAM_CATALOG
+## event lazily loads + assigns the clip and calls play(); an uncatalogued
+## event keeps the volume-push-only fallback so the deferred asset library
+## stays honest about what plays.
 func _play_spatial(event_id: StringName, position: Vector3, bus_id: String, volume_db: float) -> void:
 	var key: String = String(event_id)
 	var pool: Array = _spatial_pool.get(key, [])
@@ -416,6 +420,12 @@ func _play_spatial(event_id: StringName, position: Vector3, bus_id: String, volu
 	player.bus = bus_id
 	player.volume_db = volume_db
 	player.global_position = position
+	if STREAM_CATALOG.has(key):
+		var stream: AudioStream = _load_stream_cached(String(STREAM_CATALOG[key]))
+		if stream != null:
+			if player.stream != stream:
+				player.stream = stream
+			player.play()
 
 ## Internal: deterministic "is this emitter occluded" check. Real LOS
 ## raycasts are out of scope; we report true when the emitter sits in a

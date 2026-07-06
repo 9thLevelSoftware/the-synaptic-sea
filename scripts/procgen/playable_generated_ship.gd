@@ -2672,8 +2672,11 @@ func _build_loot_containers() -> void:
 			inventory_state, _loot_tables, pos_variant, 1.8, _build_loot_context(spec))
 		if looted.has(cid):
 			lc.set_searched(true)
-		if not lc.container_searched.is_connected(_on_loot_container_searched):
-			lc.container_searched.connect(_on_loot_container_searched)
+		# Bind the container node so the handler can pass its world position
+		# into play_sfx (spatial pickup audio, REQ-AU-005).
+		var searched_cb: Callable = _on_loot_container_searched.bind(lc)
+		if not lc.container_searched.is_connected(searched_cb):
+			lc.container_searched.connect(searched_cb)
 		# Phase 5a Task 5 (co-presence): derelict loot containers parent under the
 		# derelict's scene_root so they inherit DERELICT_DOCK_OFFSET and are freed
 		# automatically with the derelict on departure. Home loot containers continue
@@ -3752,10 +3755,12 @@ func _apply_lifeboat_opening_damage() -> void:
 		blocker.health = ShipSystemsManagerScript.DAMAGED_HEALTH
 
 ## Records a searched scattered container on the per-ship slice + refreshes the HUD.
-func _on_loot_container_searched(container_id: String, granted: Array) -> void:
+## `source` is the emitting LootContainer node (bound at connect time); null for
+## callers without a scene position (objective loot, legacy validation seams).
+func _on_loot_container_searched(container_id: String, granted: Array, source: Node3D = null) -> void:
 	if current_ship != null and not current_ship.looted_container_ids.has(container_id):
 		current_ship.looted_container_ids.append(container_id)
-	_postprocess_loot_grants(granted, container_id)
+	_postprocess_loot_grants(granted, container_id, source)
 	_refresh_inventory_hud()
 	# Auto-equip granted containers into empty slots (Phase-7 deferral: no equip UI yet).
 	for entry in granted:
@@ -3828,8 +3833,10 @@ func _on_threat_killed(record: Dictionary) -> void:
 	var seed_source: String = "kill:%s" % cid
 	lc.configure(cid, str(record.get("loot_table", "combat_drop_common")), seed_source,
 		inventory_state, _loot_tables, pos, 1.8, {})
-	if not lc.container_searched.is_connected(_on_loot_container_searched):
-		lc.container_searched.connect(_on_loot_container_searched)
+	# Bind the corpse container so the pickup SFX emits at its world position.
+	var searched_cb: Callable = _on_loot_container_searched.bind(lc)
+	if not lc.container_searched.is_connected(searched_cb):
+		lc.container_searched.connect(searched_cb)
 	parent_node.add_child(lc)
 	loot_containers.append(lc)
 
@@ -7571,7 +7578,7 @@ func _loot_biome_ids() -> Array[String]:
 		_loot_biome_ids_cache.append("abyssal_synaptic_sea")
 	return _loot_biome_ids_cache
 
-func _postprocess_loot_grants(granted: Array, source_id: String) -> void:
+func _postprocess_loot_grants(granted: Array, source_id: String, source: Node3D = null) -> void:
 	if granted.is_empty():
 		_last_loot_feedback_line = "Loot: %s empty" % source_id
 		return
@@ -7614,7 +7621,12 @@ func _postprocess_loot_grants(granted: Array, source_id: String) -> void:
 		rarity_text,
 	]
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
+		# Emit at the source container's world position when known (spatial
+		# pickup audio, REQ-AU-005); fall back to the non-spatial bus path.
+		if source != null and is_instance_valid(source) and source.is_inside_tree():
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP, source.global_position)
+		else:
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
 
 ## Tear down every runtime child so a fresh load can rebuild the slice
 ## cleanly. Mirrors the setup done by _build_runtime_nodes() and the
