@@ -76,6 +76,9 @@ func _validation_marker_evidence(root_path: String, matrix) -> String:
 		if not (entry_variant is Dictionary):
 			continue
 		var entry: Dictionary = entry_variant
+		var markers: Array = _string_array(entry.get("smoke_markers", []))
+		if markers.is_empty():
+			continue
 		var smoke_files: Variant = entry.get("smoke_files", [])
 		if not (smoke_files is Array):
 			continue
@@ -84,10 +87,43 @@ func _validation_marker_evidence(root_path: String, matrix) -> String:
 			if smoke_path.is_empty():
 				continue
 			var path: String = smoke_path if smoke_path.begins_with("res://") else root_path.path_join(smoke_path)
-			var text: String = _read_text(path)
-			if not text.is_empty():
-				evidence += "\n" + text
+			var marker_lines: PackedStringArray = _extract_marker_print_lines(path, markers)
+			if not marker_lines.is_empty():
+				evidence += "\n" + "\n".join(marker_lines)
 	return evidence
+
+func _extract_marker_print_lines(path: String, markers: Array) -> PackedStringArray:
+	var matches := PackedStringArray()
+	var seen: Dictionary = {}
+	var text: String = _read_text(path)
+	if text.is_empty():
+		return matches
+	for raw_line in text.split("\n", false):
+		var line: String = str(raw_line).strip_edges()
+		if line.is_empty() or line.begins_with("#"):
+			continue
+		if line.find("#") == 0:
+			continue
+		if not line.contains("print("):
+			continue
+		for marker_variant in markers:
+			var marker: String = str(marker_variant)
+			if marker.is_empty() or seen.has(marker):
+				continue
+			if line.contains(marker):
+				matches.append(line)
+				seen[marker] = true
+	return matches
+
+func _string_array(value: Variant) -> Array:
+	if value is Array:
+		var out: Array = []
+		for item in value:
+			out.append(str(item))
+		return out
+	if value == null:
+		return []
+	return [str(value)]
 
 func _fail(reason: String) -> void:
 	push_error("CROSS SYSTEM DEPENDENCY FAIL reason=%s" % reason)
