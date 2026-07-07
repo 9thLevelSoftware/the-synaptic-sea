@@ -130,12 +130,23 @@ func get_fx_intensity() -> float:
 	return clampf(float(_current_tier) / 3.0, 0.0, 1.0)
 
 func get_summary() -> Dictionary:
+	# Session 3 B3: event positions are Vector3, which JSON.stringify turns
+	# into an opaque string — a naive duplicate would round-trip to a String
+	# and crash HallucinationManager.render's typed `var pos: Vector3`
+	# assignment. Serialize positions as [x, y, z] arrays instead.
+	var events_out: Array = []
+	for e in active_events:
+		var copy: Dictionary = (e as Dictionary).duplicate(true)
+		var pos: Variant = copy.get("position", null)
+		if pos is Vector3:
+			copy["position"] = [(pos as Vector3).x, (pos as Vector3).y, (pos as Vector3).z]
+		events_out.append(copy)
 	return {
 		"seed": rng_seed,
 		"step": step,
 		"health_drain_per_second": health_drain_per_second,
 		"stamina_recovery_mult": stamina_recovery_mult,
-		"active_events": active_events.duplicate(true),
+		"active_events": events_out,
 		"current_tier": _current_tier,
 	}
 
@@ -147,7 +158,26 @@ func apply_summary(summary: Dictionary) -> bool:
 	health_drain_per_second = maxf(0.0, float(summary.get("health_drain_per_second", health_drain_per_second)))
 	stamina_recovery_mult = clampf(float(summary.get("stamina_recovery_mult", stamina_recovery_mult)), 0.0, 1.0)
 	if summary.get("active_events", null) is Array:
-		active_events = (summary["active_events"] as Array).duplicate(true)
+		active_events.clear()
+		var max_id: int = 0
+		for raw in summary["active_events"] as Array:
+			if not (raw is Dictionary):
+				continue
+			var e: Dictionary = (raw as Dictionary).duplicate(true)
+			# Parse serialized [x, y, z] back into Vector3; tolerate an
+			# in-memory Vector3 (pre-serialization apply path).
+			var pos: Variant = e.get("position", null)
+			if pos is Array and (pos as Array).size() >= 3:
+				var pa: Array = pos as Array
+				e["position"] = Vector3(float(pa[0]), float(pa[1]), float(pa[2]))
+			elif not (pos is Vector3):
+				continue  # unusable event (e.g. a legacy stringified position)
+			active_events.append(e)
+			max_id = maxi(max_id, int(e.get("id", 0)))
+		# _next_id is not persisted: re-derive past the restored ids so a
+		# newly-spawned event cannot collide with (and be dissipated as)
+		# a restored one via remove_event's first-id match.
+		_next_id = max_id + 1
 	_current_tier = int(summary.get("current_tier", _current_tier))
 	return true
 

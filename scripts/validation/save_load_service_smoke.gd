@@ -12,6 +12,7 @@ const PlayerProgressionStateScript := preload("res://scripts/systems/player_prog
 const ClassDefinitionScript := preload("res://scripts/systems/class_definition.gd")
 const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
 const MaterialStateScript := preload("res://scripts/systems/material_state.gd")
+const HallucinationDirectorScript := preload("res://scripts/systems/hallucination_director.gd")
 
 func _initialize() -> void:
 	# Direct service smoke (REQ-012).
@@ -115,6 +116,20 @@ func _initialize() -> void:
 	crafting.tick(10.0)
 	original.crafting_summary = crafting.get_summary()
 	original.material_summary = materials.get_summary()
+	# Session 3 B3 (audit): HallucinationDirector state (active events, rng
+	# step, tier teeth) was never persisted. Build a director in a real
+	# mid-hallucination state (tier 3, active events with Vector3 anchors)
+	# and prove the summary survives the DISK round-trip — JSON does not
+	# preserve Vector3, so the model must serialize event positions.
+	var hallu := HallucinationDirectorScript.new()
+	hallu.configure({"seed": 17})
+	var hallu_anchors: Array = [Vector3(1.0, 0.0, 2.0), Vector3(4.0, 0.0, 6.0)]
+	for i in range(24):
+		hallu.tick(0.5, {"sanity": 12.0, "in_safe_zone": false, "anchor_positions": hallu_anchors})
+	if hallu.get_active_events().is_empty():
+		_fail("hallucination fixture produced no active events (fixture bug)")
+		return
+	original.set("hallucination_summary", hallu.get_summary())
 	original.slice_version = SaveLoadServiceScript.CURRENT_SLICE_VERSION
 	original.godot_version = Engine.get_version_info()["string"]
 	original.saved_at = Time.get_datetime_string_from_system(true)
@@ -146,8 +161,8 @@ func _initialize() -> void:
 	if loaded.current_objective_sequence != original.current_objective_sequence:
 		_fail("current_objective_sequence mismatch")
 		return
-	if loaded.get_summary_count() != 27:
-		_fail("summary_count=%d expected 27" % loaded.get_summary_count())
+	if loaded.get_summary_count() != 28:
+		_fail("summary_count=%d expected 28" % loaded.get_summary_count())
 		return
 	if not loaded.ship_systems_summary.has("systems") or not loaded.ship_systems_summary.has("system_order"):
 		_fail("ship_systems_summary missing manager keys after round-trip")
@@ -214,6 +229,28 @@ func _initialize() -> void:
 		return
 	if not _dicts_equal(loaded.water_recycler_summary, original.water_recycler_summary):
 		_fail("water_recycler_summary mismatch")
+		return
+	# B3: hallucination_summary must round-trip the disk write AND remain
+	# usable — a fresh director applying the loaded summary must yield
+	# Vector3 event positions (JSON turns naive Vector3s into strings,
+	# which would crash HallucinationManager.render's typed assignment).
+	var loaded_hallu: Variant = loaded.get("hallucination_summary")
+	if loaded_hallu == null or not (loaded_hallu is Dictionary) or (loaded_hallu as Dictionary).is_empty():
+		_fail("hallucination_summary missing/empty after round-trip: %s" % str(loaded_hallu))
+		return
+	var hallu2 := HallucinationDirectorScript.new()
+	if not hallu2.apply_summary(loaded_hallu as Dictionary):
+		_fail("hallucination apply_summary rejected the loaded summary")
+		return
+	if hallu2.get_tier() != hallu.get_tier():
+		_fail("hallucination tier=%d did not round-trip (expected %d)" % [hallu2.get_tier(), hallu.get_tier()])
+		return
+	var hallu2_events: Array = hallu2.get_active_events()
+	if hallu2_events.size() != hallu.get_active_events().size():
+		_fail("hallucination active_events count=%d did not round-trip (expected %d)" % [hallu2_events.size(), hallu.get_active_events().size()])
+		return
+	if not (hallu2_events[0].get("position") is Vector3):
+		_fail("hallucination event position not a Vector3 after disk round-trip (got %s)" % str(hallu2_events[0].get("position")))
 		return
 
 	# Version mismatch rejection: write a snapshot with the wrong slice_version
@@ -390,7 +427,7 @@ func _initialize() -> void:
 	service.delete_slot("slot_01")
 	service.set_active_run_id("")
 
-	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=27")
+	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=28")
 	quit(0)
 
 func _make_spoilage_summary_for_smoke() -> Dictionary:

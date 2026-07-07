@@ -57,6 +57,11 @@ var sanity_summary: Dictionary = {}
 var radiation_summary: Dictionary = {}
 var temperature_summary: Dictionary = {}
 var status_effects_summary: Dictionary = {}
+# Session 3 B3 (audit, rides ADR-0046's gate2-current-run-4 bump):
+# HallucinationDirector state (ADR-0042) — active events, rng step, tier
+# teeth — was never persisted, so saving mid-hallucination silently reset
+# the director on load.
+var hallucination_summary: Dictionary = {}
 
 # ADR-0046: real slot metadata. play_time_seconds is the coordinator's
 # accumulated in-run play time (ticked every _process frame on BOTH the
@@ -120,6 +125,7 @@ const SUMMARY_FIELDS: Array = [
 	"radiation_summary",
 	"temperature_summary",
 	"status_effects_summary",
+	"hallucination_summary",
 ]
 
 func get_summary_count() -> int:
@@ -159,6 +165,7 @@ func to_dict() -> Dictionary:
 		"radiation_summary": radiation_summary.duplicate(true),
 		"temperature_summary": temperature_summary.duplicate(true),
 		"status_effects_summary": status_effects_summary.duplicate(true),
+		"hallucination_summary": hallucination_summary.duplicate(true),
 		"play_time_seconds": play_time_seconds,
 		"current_location": current_location,
 		"world_seed": world_seed,
@@ -224,6 +231,7 @@ static func from_dict(data: Variant, expected_slice_version: String, expected_go
 	snapshot.radiation_summary = _deep_copy_dict(dict.get("radiation_summary", {}))
 	snapshot.temperature_summary = _deep_copy_dict(dict.get("temperature_summary", {}))
 	snapshot.status_effects_summary = _deep_copy_dict(dict.get("status_effects_summary", {}))
+	snapshot.hallucination_summary = _deep_copy_dict(dict.get("hallucination_summary", {}))
 	snapshot.play_time_seconds = float(dict.get("play_time_seconds", 0.0))
 	snapshot.current_location = str(dict.get("current_location", ""))
 	snapshot.world_seed = int(dict.get("world_seed", 0))

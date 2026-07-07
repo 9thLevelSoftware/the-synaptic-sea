@@ -6766,6 +6766,11 @@ func _build_run_snapshot(use_home_arc_summary: bool = false) -> RunSnapshot:
 		snapshot.temperature_summary = body_temperature_state.get_summary()
 	if status_effects_state != null:
 		snapshot.status_effects_summary = status_effects_state.get_summary()
+	# Session 3 B3 (ADR-0042): persist the hallucination director — active
+	# events, deterministic rng step, tier teeth — so saving mid-episode
+	# does not silently reset it on load.
+	if hallucination_director != null:
+		snapshot.hallucination_summary = hallucination_director.get_summary()
 	# ADR-0034: capture food / cooking / spoilage summaries.
 	if spoilage_state != null:
 		snapshot.spoilage_summary = spoilage_state.get_summary()
@@ -7107,6 +7112,12 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		body_temperature_state.apply_summary(snapshot.temperature_summary)
 	if status_effects_state != null and not snapshot.status_effects_summary.is_empty():
 		status_effects_state.apply_summary(snapshot.status_effects_summary)
+	# Session 3 B3 (ADR-0042): restore the hallucination director. Ordering
+	# matters — the loader reload above already ran _build_hallucination_runtime
+	# (a fresh director per ship), so applying here lands on the rebuilt
+	# instance instead of being wiped by the rebuild.
+	if hallucination_director != null and not snapshot.hallucination_summary.is_empty():
+		hallucination_director.apply_summary(snapshot.hallucination_summary)
 	# ADR-0034: restore food / cooking / spoilage summaries.
 	if spoilage_state != null and not snapshot.spoilage_summary.is_empty():
 		spoilage_state.apply_summary(snapshot.spoilage_summary)
