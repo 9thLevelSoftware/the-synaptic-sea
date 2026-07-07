@@ -28,11 +28,19 @@ const TIMEOUT_FRAMES: int = 300
 
 ## Duck-typed stand-in for a visited ShipInstance. The snapshot builder calls
 ## get_summary(); dock-edge bookkeeping walks visited entries' parent_ship.
-## Lets the smoke plant a NON-current visited entry.
+## Lets the smoke plant a NON-current visited entry — optionally one whose
+## summary ship_id matches a snapshot reference (piloted/aboard/dock edge),
+## which the demo strip must KEEP (PR #68 review, Codex P2).
 class StubVisitedShip:
 	var parent_ship = null
+	var docked_ships: Array = []
+	var summary_ship_id: String = ""
+	func _init(p_ship_id: String = "") -> void:
+		summary_ship_id = p_ship_id
 	func get_summary() -> Dictionary:
-		return {"stub": true}
+		if summary_ship_id.is_empty():
+			return {"stub": true}
+		return {"ship_id": summary_ship_id}
 
 var main_node: Node
 var playable: PlayableGeneratedShip
@@ -171,6 +179,14 @@ func _validate() -> void:
 	# discriminates demo (stripped) from dev (persisted). ---
 	var current_marker: String = String(playable.get_current_ship().marker_id)
 	playable.visited_ships["synthetic_marker"] = StubVisitedShip.new()
+	# PR #68 review (Codex P2): a visited ship the snapshot still REFERENCES
+	# (piloted/aboard/dock edge — e.g. a claimed mobile derelict) must survive
+	# the demo strip, or _apply_docking_snapshot cannot rebuild it on load.
+	if playable.piloted_ship == null:
+		_fail("no piloted ship while boarded (cannot exercise the referenced-ship keep)")
+		return
+	var piloted_id: String = String(playable.piloted_ship.ship_id)
+	playable.visited_ships["synthetic_piloted_marker"] = StubVisitedShip.new(piloted_id)
 	var ws_demo = playable._build_world_snapshot()
 	if ws_demo == null:
 		_fail("could not build a world snapshot")
@@ -180,6 +196,9 @@ func _validate() -> void:
 		return
 	if not ws_demo.visited_ships.has(current_marker):
 		_fail("demo world snapshot dropped the CURRENT ship entry (away-save no longer restorable)")
+		return
+	if not ws_demo.visited_ships.has("synthetic_piloted_marker"):
+		_fail("demo strip dropped a visited ship referenced by piloted_ship_id — docking unreconstructable after a demo load (Codex P2)")
 		return
 
 	# --- dev_unaffected (2): flip back to dev — all visited_ships persist again ---
@@ -192,6 +211,7 @@ func _validate() -> void:
 		_fail("dev world snapshot lost visited_ships (strip is not demo-conditional)")
 		return
 	playable.visited_ships.erase("synthetic_marker")
+	playable.visited_ships.erase("synthetic_piloted_marker")
 
 	print("DEMO SCOPE ENFORCEMENT PASS dev_unaffected=true save_cap=true world_skip=true hub_blocked=true hazards_capped=true cargo_capped=true")
 	_cleanup(0)

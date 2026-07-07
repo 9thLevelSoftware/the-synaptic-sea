@@ -7409,17 +7409,6 @@ func _build_world_snapshot():
 	ws.visited_ships = {}
 	for mid in visited_ships:
 		ws.visited_ships[String(mid)] = visited_ships[mid].get_summary()
-	# Tranche 6 (REQ-RL-006): demo builds do not persist cross-run world state.
-	# Keep only the currently-boarded ship's entry so a same-run away-save can
-	# still restore the derelict the player is standing in; every other visited
-	# ship is stripped from the demo snapshot.
-	if demo_scope_gate != null and demo_scope_gate.is_blocked("world_persistence.cross_run"):
-		var demo_kept: Dictionary = {}
-		if away_from_start and current_ship != null:
-			var keep_id: String = String(current_ship.marker_id)
-			if ws.visited_ships.has(keep_id):
-				demo_kept[keep_id] = ws.visited_ships[keep_id]
-		ws.visited_ships = demo_kept
 	ws.current_location = String(current_ship.marker_id) if current_ship != null else ""
 	ws.world_time = world_time
 	if player != null and player is Node3D:
@@ -7429,6 +7418,42 @@ func _build_world_snapshot():
 	ws.piloted_ship_id = piloted_ship.ship_id if piloted_ship != null else ""
 	ws.aboard_ship_id = current_occupancy.ship_id if current_occupancy != null else ""
 	ws.opened_ports = _opened_port_marker_ids()
+	# Tranche 6 (REQ-RL-006): demo builds do not persist cross-run world state.
+	# PR #68 review (Codex P2): the kept set must cover every ship the snapshot
+	# still REFERENCES — the currently-boarded ship (same-run away-saves stay
+	# restorable) plus anything named by piloted_ship_id / aboard_ship_id / the
+	# dock edges (edge shape: host = marker_id, mobile = ship_id) — otherwise a
+	# claimed mobile derelict docked to a host is unreconstructable in
+	# _apply_docking_snapshot after a demo load. Runs AFTER those fields are
+	# stamped so the keep set derives from the snapshot's own references.
+	if demo_scope_gate != null and demo_scope_gate.is_blocked("world_persistence.cross_run"):
+		var keep_markers: Dictionary = {}
+		var keep_ship_ids: Dictionary = {}
+		if away_from_start and current_ship != null:
+			keep_markers[String(current_ship.marker_id)] = true
+		if String(ws.piloted_ship_id) != "":
+			keep_ship_ids[String(ws.piloted_ship_id)] = true
+		if String(ws.aboard_ship_id) != "":
+			keep_ship_ids[String(ws.aboard_ship_id)] = true
+		for edge_v in ws.dock_edges:
+			if typeof(edge_v) != TYPE_DICTIONARY:
+				continue
+			var edge_host: String = String((edge_v as Dictionary).get("host", ""))
+			var edge_mobile: String = String((edge_v as Dictionary).get("mobile", ""))
+			if not edge_host.is_empty():
+				keep_markers[edge_host] = true
+			if not edge_mobile.is_empty():
+				keep_ship_ids[edge_mobile] = true
+		var demo_kept: Dictionary = {}
+		for kept_mid in ws.visited_ships:
+			var summ_v: Variant = ws.visited_ships[kept_mid]
+			var summ_ship_id: String = ""
+			if summ_v is Dictionary:
+				summ_ship_id = String((summ_v as Dictionary).get("ship_id", ""))
+			if keep_markers.has(String(kept_mid)) \
+					or (not summ_ship_id.is_empty() and keep_ship_ids.has(summ_ship_id)):
+				demo_kept[String(kept_mid)] = summ_v
+		ws.visited_ships = demo_kept
 	# run_id slot-ownership rework: stamp this run's identity onto the
 	# snapshot directly (SaveLoadService.save_world() also stamps it from
 	# _active_run_id right before writing, but setting it here keeps
