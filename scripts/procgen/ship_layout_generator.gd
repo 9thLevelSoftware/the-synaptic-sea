@@ -162,36 +162,7 @@ func _resolve_biome(biome_id: String) -> Dictionary:
 
 
 func _resolve_difficulty(difficulty_id: String) -> Dictionary:
-	if difficulty_id.is_empty():
-		return {"id": "standard"}
-	var rel_path: String = "res://data/procgen/difficulty/" + difficulty_id + ".json"
-	if FileAccess.file_exists(rel_path):
-		var text: String = FileAccess.get_file_as_string(rel_path)
-		var parsed: Variant = JSON.parse_string(text)
-		if parsed is Dictionary:
-			return parsed
-	match difficulty_id:
-		"hardened":
-			return {
-				"id": "hardened",
-				"hazard_modifier": 1.4,
-				"loot_quality_modifier": 0.85,
-				"encounter_density_modifier": 1.3,
-				"ambient_intensity": 1.0,
-			}
-		"deep_dive":
-			return {
-				"id": "deep_dive",
-				"hazard_modifier": 1.7,
-				"loot_quality_modifier": 1.1,
-				"encounter_density_modifier": 1.6,
-				"ambient_intensity": 1.0,
-			}
-		_:
-			return {
-				"id": "standard",
-				"hazard_modifier": 1.0,
-				"loot_quality_modifier": 1.0,
-				"encounter_density_modifier": 1.0,
-				"ambient_intensity": 1.0,
-			}
+	# Tranche 4 (2026-07-06 audit): the id -> dials mapping moved verbatim to
+	# DifficultyProfile.resolve_dict() so the settings menu renders the same
+	# canonical values this generator consumes (no split-brain).
+	return DifficultyProfileScript.resolve_dict(difficulty_id)

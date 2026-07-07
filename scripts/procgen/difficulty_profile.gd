@@ -67,6 +67,59 @@ static func from_file(abs_path: String) -> RefCounted:
 	return from_dict(parsed)
 
 
+# Canonical difficulty_id -> profile-dict resolution (single source of
+# truth; Tranche 4, 2026-07-06 audit). Order: authored JSON override at
+# res://data/procgen/difficulty/<id>.json -> built-in presets -> standard.
+# ship_layout_generator._resolve_difficulty delegates here and the settings
+# menu renders for_id(id).hazard_modifier — keep both consumers in mind
+# before changing any value.
+static func resolve_dict(difficulty_id: String) -> Dictionary:
+	if difficulty_id.is_empty():
+		return {"id": STANDARD_ID}
+	var rel_path: String = "res://data/procgen/difficulty/" + difficulty_id + ".json"
+	if FileAccess.file_exists(rel_path):
+		var text: String = FileAccess.get_file_as_string(rel_path)
+		var parsed: Variant = JSON.parse_string(text)
+		if parsed is Dictionary:
+			return parsed
+		# PR #66 review (Gemini): a present-but-malformed override must be
+		# loud, not a silent fallback — the bundle's strict WARNING filter
+		# turns this into a gate failure if a broken file ever ships.
+		push_warning("DifficultyProfile: override file is not a JSON object, falling back to built-ins: %s" % rel_path)
+	match difficulty_id:
+		HARDENED_ID:
+			return {
+				"id": HARDENED_ID,
+				"hazard_modifier": 1.4,
+				"loot_quality_modifier": 0.85,
+				"encounter_density_modifier": 1.3,
+				"ambient_intensity": 1.0,
+			}
+		DEEP_DIVE_ID:
+			return {
+				"id": DEEP_DIVE_ID,
+				"hazard_modifier": 1.7,
+				"loot_quality_modifier": 1.1,
+				"encounter_density_modifier": 1.6,
+				"ambient_intensity": 1.0,
+			}
+		_:
+			return {
+				"id": STANDARD_ID,
+				"hazard_modifier": 1.0,
+				"loot_quality_modifier": 1.0,
+				"encounter_density_modifier": 1.0,
+				"ambient_intensity": 1.0,
+			}
+
+
+# Convenience object form of resolve_dict() for consumers that want the
+# dials directly (e.g. the settings menu's difficulty line). Typed return
+# (PR #66 review, Kilo) so property access on the dials is type-safe.
+static func for_id(difficulty_id: String) -> DifficultyProfile:
+	return from_dict(resolve_dict(difficulty_id)) as DifficultyProfile
+
+
 # Returns the modifier value for `dial`. Unknown dial returns 1.0.
 func modifier(dial: String) -> float:
 	match dial:

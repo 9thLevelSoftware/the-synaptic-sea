@@ -135,8 +135,14 @@ func _on_process_frame() -> void:
 				_cleanup_and_quit(0)
 
 func _drive_to_in_play() -> void:
+	# ENTER confirms the boot main_menu's "start" arm, whose handler is
+	# menu_state.close_all() -> in-play. Tranche 4 fix (pre-existing smoke
+	# bug): this used to ALSO send KEY_ESCAPE, but ESC from in-play is
+	# ui_pause and re-OPENED the pause menu — every later probe ran under an
+	# open menu modal. Harmless while panel toggles ignored menus; exposed
+	# the moment the menu-modal guard landed (the chart-gate probe was
+	# correctly rejected). _send_chart_gate_probe now asserts in-play.
 	_send_action(KEY_ENTER)
-	_send_action(KEY_ESCAPE)
 
 ## Drives away_from_start = true (mandatory per CLAUDE.md's away-branch
 ## convention) and moves the player onto the first derelict interactable so
@@ -241,6 +247,12 @@ func _validate_inventory_tooltip(playable: PlayableGeneratedShip) -> void:
 func _send_chart_gate_probe(playable: PlayableGeneratedShip) -> void:
 	if playable.inventory_state.get_quantity("web_chart") > 0:
 		_fail("test setup error: web_chart already possessed before gate check")
+		return
+	# The gate probe must run in-play: with a menu open, the menu-modal guard
+	# (Tranche 4) correctly swallows ui_open_map before the chart gate.
+	var ui = playable.get_menu_coordinator_for_validation()
+	if ui == null or not ui.menu_state.is_in_play():
+		_fail("not in-play before the chart-gate probe (menu=%s)" % (ui.get_current_menu() if ui != null else "<none>"))
 		return
 	_send_action(KEY_M)
 

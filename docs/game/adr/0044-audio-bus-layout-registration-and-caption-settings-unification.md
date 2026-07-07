@@ -160,6 +160,19 @@ still be wrong going forward — do not add one.
 
 - Full SFX/music/voice asset library (a later content pass; only two
   placeholder clips exist).
+  - Voice-log clips (Tranche 4, 2026-07-06 audit): the 6 `clip_path` entries
+    authored on `scripts/audio/audio_log.gd` reference a `data/audio/voice/`
+    directory that does not exist —
+    `log_beacon_01.ogg`, `log_beacon_02.ogg`, `log_pulse_01.ogg`,
+    `log_groan_01.ogg`, `log_tutorial_pickup.ogg`,
+    `log_tutorial_calibrator.ogg`. `play_voice_log` now routes each
+    `clip_path` through `_load_stream_cached` (this ADR's warn-once
+    missing-asset contract; previously the paths were silently dead), so
+    every play emits one honest `stream file missing` warning per path until
+    the clips land. `_load_stream_cached` dispatches by extension (PR #66
+    review): `.ogg` decodes via `AudioStreamOggVorbis.load_from_file`,
+    everything else via `AudioStreamWAV.load_from_file` — so the authored
+    `.ogg` paths play as-is once the assets are delivered.
 - Spatial emitter population (`play_sfx` with a `position` argument has a
   live code path, but no gameplay callsite passes one yet).
 - Ambient-zone reactivity (`set_room_role`/`set_threat_level` stay uncalled
@@ -174,7 +187,10 @@ still be wrong going forward — do not add one.
 `scripts/validation/audio_pipeline_smoke.gd` is the single smoke covering all
 four decisions end-to-end; it is registered in the regression bundle as
 `AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true
-captions_toggle=true away_ticks=30`. The `captions_toggle=true` stage was
+captions_toggle=true voice_toggle=true away_ticks=30` (the `voice_toggle=true`
+stage landed in Tranche 4: `_refresh_from_manager` must set the voice-log
+toggle's initial checked state — its old `has_method("audio_log")` guard on a
+var property never did). The `captions_toggle=true` stage was
 added after the Task 5 review found the unified caption push (Decision 4)
 had no direct regression coverage — the original smoke only asserted the HUD
 line rendered once, not that the settings seam actually drove the router

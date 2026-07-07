@@ -92,6 +92,15 @@ NULL_WORLD_WARNING="^WARNING: SaveLoadService: cannot save null world snapshot\$
 # backup; the engine's JSON parse ERROR is covered by CORRUPT_WORLD_JSON_ERROR
 # and this is the service's own expected warning, pinned to the smoke's slot.
 CORRUPT_SLOT_WARNING="^WARNING: SaveLoadService: slot file is not valid JSON object, slot_id=slot_03\$"
+# Tranche 4 (2026-07-06 audit): play_voice_log now routes each AudioLog
+# entry's authored clip_path through the warn-once stream loader (ADR-0044
+# honest-deferred-assets). The voice clip library is still deferred
+# (data/audio/voice/ absent), so any smoke that plays a voice log — the
+# audio log panel smoke directly, and main_playable_slice_audio_smoke via
+# the 12s/30s scheduled meta events — emits one expected missing-file
+# warning per distinct path. Pinned to the voice directory so a missing
+# SFX/music placeholder in any other smoke still fails the bundle.
+VOICE_CLIP_WARNING="^WARNING: AudioManager: stream file missing, path='res://data/audio/voice/.*'\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -100,7 +109,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -181,7 +190,7 @@ run_clean 'spatial audio resolver model smoke' 'SPATIAL AUDIO RESOLVER PASS atte
 run_clean 'meta event state model smoke' 'META EVENT STATE PASS fired=3 pending=0 deterministic_seed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_event_state_smoke.gd
 run_clean 'main playable audio smoke' 'MAIN PLAYABLE AUDIO PASS buses=6 routed=4 fired_meta=3 ambient_role=engine' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_audio_smoke.gd
 run_clean 'audio save/load model smoke' 'AUDIO SAVE LOAD PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_save_load_smoke.gd
-run_clean 'Domain 9 audio pipeline smoke' 'AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true captions_toggle=true away_ticks=30' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_pipeline_smoke.gd
+run_clean 'Domain 9 audio pipeline smoke' 'AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true captions_toggle=true voice_toggle=true away_ticks=30' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_pipeline_smoke.gd
 run_clean 'REQ-AU-005 spatial audio playback smoke' 'AUDIO SPATIAL PASS catalogued_playing=true fallback_honest=true production_pickup=true position_tracked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_spatial_playback_smoke.gd
 # --- Task 15 documentation/manifest currency validators (host-side Python; no Godot) ---
 # doc_currency_validators.py auto-detects the repo root (overridable via ROOT) and
@@ -288,7 +297,11 @@ run_clean 'Tranche 3 progression main-scene smoke' 'MAIN PLAYABLE PROGRESSION PA
 # --- Tranche 3: new coverage — PhaseTimer behavior + real Area3D interaction path ---
 run_clean 'Tranche 3 phase timer model smoke' 'PHASE TIMER PASS clamp=true boundary=true carry=true single_flip=true progress=true durations=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/phase_timer_smoke.gd
 run_clean 'Tranche 3 interactable body-entered physics smoke' 'INTERACTABLE BODY ENTERED PASS far_null=true entered=true interact=true exited_cleared=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interactable_body_entered_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=167 clean_output=true'
+# --- Tranche 4 (2026-07-06): UI wiring — audio log panel, difficulty label, menu-modal guard ---
+run_clean 'Tranche 4 audio log panel smoke' 'AUDIO LOG PANEL PASS entries=6 play=true stop=true clip_attempted=true populated_gate=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_log_panel_smoke.gd
+run_clean 'Tranche 4 settings difficulty label smoke' 'SETTINGS DIFFICULTY LABEL PASS standard=x1.0 hardened=x1.4 deep_dive=x1.7 delegation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_difficulty_label_smoke.gd
+run_clean 'Tranche 4 panel menu-modal guard smoke' 'PANEL MENU MODAL GUARD PASS scanner_blocked=true chart_blocked=true inventory_blocked=true reopens=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/panel_menu_modal_guard_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=170 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

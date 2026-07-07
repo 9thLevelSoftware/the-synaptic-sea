@@ -31,6 +31,7 @@ const ReleaseBadgeOverlayScript := preload("res://scripts/ui/release_badge_overl
 const CreditsScreenScript := preload("res://scripts/ui/credits_screen.gd")
 const PermadeathResolverScriptForCoordinator := preload("res://scripts/systems/permadeath_resolver.gd")
 const SaveSlotStateScriptForCoordinator := preload("res://scripts/systems/save_slot_state.gd")
+const DifficultyProfileScript := preload("res://scripts/procgen/difficulty_profile.gd")
 
 ## The ten records/meta screens in display order. The same ids are the menu item ids
 ## in `records_menu` (data/ui/menu_definitions.json) and the keys of `_meta_panels`.
@@ -933,7 +934,11 @@ func meta_screen_is_populated(screen_id: String) -> bool:
 		"class":
 			return is_instance_valid(class_panel) and class_panel.get_class_count() > 0
 		"audio_log":
-			return is_instance_valid(audio_log_panel) and audio_log_panel.audio_manager != null
+			# Tranche 4 (2026-07-06 audit): require actual listed entries, not
+			# just an injected manager — the old manager-only check masked the
+			# permanently-empty panel (has_method-on-var bug) from the bundled
+			# meta-screens reachability smoke. Mirrors the achievements case.
+			return is_instance_valid(audio_log_panel) and audio_log_panel.get_entry_count() > 0
 		"audio_settings":
 			return is_instance_valid(audio_settings_panel) and audio_settings_panel.audio_manager != null
 		"language":
@@ -996,7 +1001,15 @@ func _settings_line(item_id: String, base_label: String) -> String:
 		"motion_reduce": return "%s: %s" % [base_label, "On" if settings_state.is_motion_reduce() else "Off"]
 		"captions": return "%s: %s" % [base_label, "On" if settings_state.is_captions_enabled() else "Off"]
 		"hold_to_tap": return "%s: %s" % [base_label, "On" if settings_state.is_hold_to_tap() else "Off"]
-		"difficulty": return "%s: %s (x%.1f)" % [base_label, settings_state.get_difficulty(), accessibility_settings.get_difficulty_multiplier() if accessibility_settings != null and accessibility_settings.has_method("get_difficulty_multiplier") else 1.0]
+		"difficulty":
+			# Tranche 4 (2026-07-06 audit): the old line probed a nonexistent
+			# AccessibilitySettings.get_difficulty_multiplier() behind a
+			# has_method guard, so every difficulty rendered "(x1.0)". Render
+			# the REAL hazard dial from the canonical procgen mapping instead
+			# (DifficultyProfile.resolve_dict — the same values the generator
+			# feeds the encounter injector).
+			var difficulty_id: String = settings_state.get_difficulty()
+			return "%s: %s (hazard x%.1f)" % [base_label, difficulty_id, float(DifficultyProfileScript.for_id(difficulty_id).hazard_modifier)]
 		"glyph_scheme": return "%s: %s" % [base_label, settings_state.get_glyph_scheme()]
 	return base_label
 

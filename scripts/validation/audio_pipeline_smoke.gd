@@ -25,7 +25,11 @@ extends SceneTree
 #    left the router flag diverged from SettingsState, and asserts
 #    _reconcile_captions_with_settings() snaps it back to SettingsState.
 #
-# Pass marker: AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true captions_toggle=true away_ticks=30
+# 5. Voice-log toggle initial state (Tranche 4 amendment): after
+#    _refresh_from_manager(), _voice_log_toggle.button_pressed is true —
+#    the old has_method("audio_log") guard on a var property never set it.
+#
+# Pass marker: AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true captions_toggle=true voice_toggle=true away_ticks=30
 #
 # Writes nothing to disk. Frees the scene in both the pass and fail exit paths.
 
@@ -221,12 +225,27 @@ func _validate_and_drive() -> void:
 		return
 	var captions_toggle_ok: bool = true
 
+	# --- Criterion 5 (Tranche 4, 2026-07-06 audit MEDIUM): the voice-log
+	# toggle's initial checked state must be set by _refresh_from_manager().
+	# The old `audio_manager.has_method("audio_log")` guard was always false
+	# (audio_log is a var property), so the checkbox rendered unchecked at
+	# every panel open regardless of the audio_log state.
+	audio_panel._refresh_from_manager()
+	if audio_panel._voice_log_toggle == null:
+		_fail("audio_settings_panel missing _voice_log_toggle")
+		return
+	if audio_panel._voice_log_toggle.button_pressed != true:
+		_fail("voice-log toggle not checked after _refresh_from_manager (has_method-on-var bug at audio_settings_panel.gd:167)")
+		return
+	var voice_toggle_ok: bool = true
+
 	finished = true
-	print("AUDIO PIPELINE PASS bus_index=%s stream_playing=%s caption_hud=%s captions_toggle=%s away_ticks=%d" % [
+	print("AUDIO PIPELINE PASS bus_index=%s stream_playing=%s caption_hud=%s captions_toggle=%s voice_toggle=%s away_ticks=%d" % [
 		str(bus_index_ok).to_lower(),
 		str(stream_playing_ok).to_lower(),
 		str(caption_hud_ok).to_lower(),
 		str(captions_toggle_ok).to_lower(),
+		str(voice_toggle_ok).to_lower(),
 		away_ticks,
 	])
 	playable.queue_free()
