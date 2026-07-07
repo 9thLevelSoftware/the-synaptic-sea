@@ -72,9 +72,16 @@ func migrate_world(parsed: Variant) -> Dictionary:
 	if current.is_empty():
 		current = "world-1"  # legacy world snapshot
 	# For worlds we only know world-4 today. Future ADRs extend.
-	if _world_step(current) == null:
+	# Session 3 (audit): _world_step returns Callable() for unknown versions —
+	# an EMPTY Callable is never `== null` in GDScript 4, so the old guard
+	# never fired and `.call()` collapsed the dict. Guard with is_valid()
+	# (the migrate_run pattern); pass-through is the documented intent so a
+	# NEWER-version world reaches the graceful from_dict rejection path
+	# instead of being quarantined as corrupt.
+	var step: Callable = _world_step(current)
+	if not step.is_valid():
 		return {"dict": dict, "from_version": current, "to_version": WORLD_TARGET_VERSION, "migrated": false}
-	var working: Dictionary = _world_step(current).call(dict)
+	var working: Dictionary = step.call(dict)
 	working["slice_version"] = WORLD_TARGET_VERSION
 	return {"dict": working, "from_version": current, "to_version": WORLD_TARGET_VERSION, "migrated": true}
 
@@ -129,6 +136,19 @@ func _migrate_v2_to_v3(dict: Dictionary) -> Dictionary:
 	return out
 
 func _migrate_world_legacy_to_world_4(dict: Dictionary) -> Dictionary:
-	# No-op body: world schema has been stable through v1..v3 in practice
-	# (the field set grew additively). Reserved hook for future ADRs.
-	return dict.duplicate(true)
+	# The OUTER world field set grew additively through v1..v3, but the
+	# EMBEDDED home_ship dict is a full RunSnapshot.to_dict() with its own
+	# slice_version — a legacy world file survives the outer migration and
+	# then fails RunSnapshot.from_dict unless the inner slice is migrated
+	# too (Session 3 audit fix; this was a pure duplicate before).
+	var out: Dictionary = dict.duplicate(true)
+	var home_ship: Variant = out.get("home_ship", null)
+	if home_ship is Dictionary and not (home_ship as Dictionary).is_empty():
+		var inner: Dictionary = migrate_run(home_ship)
+		var inner_dict: Variant = inner.get("dict", null)
+		if inner_dict is Dictionary:
+			out["home_ship"] = inner_dict
+		# A null inner result (newer-than-us home_ship inside a LEGACY world
+		# file — contradictory, effectively corrupt) keeps the original dict;
+		# RunSnapshot.from_dict then rejects it with the allowlisted warning.
+	return out
