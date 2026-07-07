@@ -3883,6 +3883,13 @@ func _apply_lifeboat_opening_damage() -> void:
 func _on_loot_container_searched(container_id: String, granted: Array, source: Node3D = null) -> void:
 	if current_ship != null and not current_ship.looted_container_ids.has(container_id):
 		current_ship.looted_container_ids.append(container_id)
+	# Tranche 6 (corrected unlock-wiring audit item): searching a container is
+	# the authored scavenge_container training action (+50 scavenging XP,
+	# data/player/training_actions.json) and the trigger for the
+	# codex_scavenging_intro + salvage_captain unlocks — it was never emitted
+	# in production, so all three were dead. Event-driven (fires from the
+	# interact path on BOTH home and away), not a per-frame system.
+	emit_training_event("scavenge_container", container_id)
 	_postprocess_loot_grants(granted, container_id, source)
 	_refresh_inventory_hud()
 	# Auto-equip granted containers into empty slots (Phase-7 deferral: no equip UI yet).
