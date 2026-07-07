@@ -15,9 +15,11 @@ derelict run. **As of 2026-06-26 the Bucket 2 crafting/salvage economy (6 script
 wired into the live run (ADR-0038 integration), and the Bucket 3 menu/meta-UI shell
 (10 screens, plus the `localization_catalog` + `build_metadata_state` they consume) is
 now player-reachable, the `autosave_policy` timed/rotating autosave loop is wired into the
-live run, and `kit_catalog` now drives the lifeboat's biome-skinned structure. A fresh audit
-(`/tmp/reach.py`) reports 94 reachable / 8 unreachable — the 8 remaining are all genuine
-Bucket-1 infra/audit tooling + `junk_yield_resolver`.**
+live run, and `kit_catalog` now drives the lifeboat's biome-skinned structure. The
+reachability source of truth is `docs/game/inventory/system_inventory.json` (rendered by
+`tools/build_system_inventory.py`); as of the Tranche-6 correction it reports
+`demo_scope_gate` reachable (wired 2026-07-07) and `release_readiness_ledger` +
+the Bucket-1 tooling below still expected-unreached.**
 See Buckets 2, 3, and the autosave + kit-catalog notes below.
 
 These are **not stubs** — the models are real and smoke-backed. They are
@@ -44,9 +46,15 @@ reachable** (`kit_catalog` graduated). The 8
 remaining unreachable are the Bucket-1 infra/audit tooling below plus `junk_yield_resolver`
 — all expected-unreached.
 
-Re-run the audit script at `/tmp/reach.py` (seed = `scenes/main.tscn`, diff base =
-`5445480`) after any integration change to confirm a script has moved into the
-reachable set.
+Tranche 6 correction (2026-07-07): the original audit script lived at `/tmp/reach.py`
+on the original developer's machine and **no longer exists anywhere** — the historical
+counts above are kept as history, not as a reproducible method. To re-verify
+reachability after an integration change, use the canonical inventory instead:
+`docs/game/inventory/system_inventory.json` records `reachable`/`driven` per system
+(code-verified), `python3 tools/build_system_inventory.py --check` guards the rendered
+outputs against drift, and `--coverage` sweeps for runtime scripts missing from the
+inventory. For a quick spot check, grep the target script's path/`class_name` across
+`scripts/` and `scenes/` excluding `scripts/validation/`.
 
 ## Bucket 1 — Infra / release / audit tooling (13). Expected to be unreached.
 
@@ -70,9 +78,15 @@ count toward "playable systems."
 - ~~`scripts/procgen/kit_catalog.gd`~~ — **graduated to reachable** (drives the lifeboat's
   biome-skinned structural modules via `StructuralPlacer`; see the kit-catalog note below)
 
-The fresh audit shows `demo_scope_gate` and `release_readiness_ledger` are no longer
-unreachable either; the live unreachable set is now exactly the 7 non-struck items above
-plus `junk_yield_resolver` (Bucket 2) — 8 in total. The audit list is the source of truth.
+Tranche 6 correction (2026-07-07): the previous claim here — that `demo_scope_gate` and
+`release_readiness_ledger` had graduated to reachable — was **false** (2026-07-06 audit,
+MEDIUM): the inventory showed both `reachable: false, driven: false` and a code sweep
+confirmed zero non-smoke references. The truth: `demo_scope_gate` **became genuinely
+reachable in Tranche 6** — `playable_generated_ship.gd` now owns and consults it at the
+five demo-manifest enforcement points (saves, world snapshot, hub meta, derelict
+hazards, cargo cap; see `demo_scope_enforcement_smoke`). `release_readiness_ledger`
+**remains unreachable** (release/audit tooling, expected-unreached, Bucket 1). The
+inventory JSON is the source of truth for the live counts.
 
 Action: none required for playability. `build_metadata_state`, `localization_catalog`,
 `autosave_policy`, and `kit_catalog` are now wired. The remaining unreached scripts are all
