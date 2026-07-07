@@ -169,6 +169,11 @@ func apply_summary(summary: Dictionary) -> bool:
 			var pos: Variant = e.get("position", null)
 			if pos is Array and (pos as Array).size() >= 3:
 				var pa: Array = pos as Array
+				# PR #64 review: float(non-numeric) silently yields 0.0 —
+				# a corrupt ["x","y","z"] would become an origin-anchored
+				# phantom. Drop the event instead.
+				if not ((pa[0] is int or pa[0] is float) and (pa[1] is int or pa[1] is float) and (pa[2] is int or pa[2] is float)):
+					continue
 				e["position"] = Vector3(float(pa[0]), float(pa[1]), float(pa[2]))
 			elif not (pos is Vector3):
 				continue  # unusable event (e.g. a legacy stringified position)

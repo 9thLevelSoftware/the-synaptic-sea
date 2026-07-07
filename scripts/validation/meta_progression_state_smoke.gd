@@ -213,6 +213,26 @@ func _initialize() -> void:
 	if int(meta_tol.get_unlock_count()) != int(meta.get_unlock_count()):
 		_fail("tolerant apply lost unlocks: %d expected %d" % [int(meta_tol.get_unlock_count()), int(meta.get_unlock_count())])
 		return
+	# PR #64 review (Kilo, accepted): the apply contract is "merge what's
+	# present, leave what's absent" — a PARTIAL legacy dict carrying only
+	# meta_currency must not wipe existing unlocks/counters back to defaults.
+	var meta_partial = MetaProgressionStateScript.new()
+	meta_partial.configure({})
+	meta_partial.unlock_class("salvage_captain")
+	meta_partial.unlock_codex_entry("codex_repair_intro")
+	meta_partial.total_runs_completed = 4
+	if not meta_partial.apply_summary({"schema": "meta-progression-0", "meta_currency": 33}):
+		_fail("partial legacy dict with a known field should best-effort apply")
+		return
+	if int(meta_partial.meta_currency) != 33:
+		_fail("partial apply did not set meta_currency (got %d)" % int(meta_partial.meta_currency))
+		return
+	if int(meta_partial.get_unlock_count()) != 2:
+		_fail("partial apply wiped unlocks absent from the dict (count=%d expected 2)" % int(meta_partial.get_unlock_count()))
+		return
+	if int(meta_partial.total_runs_completed) != 4:
+		_fail("partial apply reset total_runs_completed absent from the dict (got %d)" % int(meta_partial.total_runs_completed))
+		return
 	var alien: Dictionary = {"schema": "not-meta", "unrelated_field": 1}
 	var meta_keep = MetaProgressionStateScript.new()
 	meta_keep.configure({})

@@ -92,6 +92,9 @@ func _validate() -> void:
 		_fail("row.current_location='%s' expected 'home' (placeholder was player X)" % str(row.current_location))
 		return
 	var play_time: float = float(row.play_time_seconds)
+	# The 100000.0 upper bound is a spurious-fail cutoff, not a legitimate
+	# ceiling: the old placeholder was the Unix epoch (~1.7e9), so anything
+	# under ~28h proves the value is an accumulated clock, not a timestamp.
 	if play_time <= 0.0 or play_time >= 100000.0:
 		_fail("row.play_time_seconds=%f not a real accumulated play time (placeholder was the Unix epoch)" % play_time)
 		return
