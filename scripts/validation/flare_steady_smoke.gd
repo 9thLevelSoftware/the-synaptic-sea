@@ -26,18 +26,31 @@ func _on_frame() -> void:
 		return
 	_validate()
 
+func _boost_vitals() -> void:
+	# Tranche 1 away death guard: 20s of away attrition would kill the player
+	# and (correctly) freeze the sim mid-measurement — this smoke measures
+	# SANITY drain, not survival, so keep the player alive like
+	# ship_systems_closure_smoke does.
+	if playable.vitals_state != null:
+		playable.vitals_state.hunger = playable.vitals_state.max_hunger
+		playable.vitals_state.thirst = playable.vitals_state.max_thirst
+		playable.vitals_state.health = playable.vitals_state.max_health
+
 func _validate() -> void:
 	finished = true
 	playable.away_from_start = true  # unsafe zone
 	# Run A: no flare.
 	playable.sanity_state.configure({})
 	var a0: float = playable.sanity_state.sanity
-	for i in range(10): playable._process(1.0)
+	for i in range(10):
+		_boost_vitals()
+		playable._process(1.0)
 	var drain_no_flare: float = a0 - playable.sanity_state.sanity
 	# Run B: flare active for the whole window.
 	playable.sanity_state.configure({})
 	var b0: float = playable.sanity_state.sanity
 	for i in range(10):
+		_boost_vitals()
 		playable.status_effects_state.add_effect("utility_flare", 5.0, 1)  # keep it topped up
 		playable._process(1.0)
 	var drain_flare: float = b0 - playable.sanity_state.sanity
