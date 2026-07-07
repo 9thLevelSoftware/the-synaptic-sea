@@ -1,3 +1,16 @@
+# E2E Foundation Audit — Findings Ledger (2026-07-06)
+
+## Disposition log
+
+| Date | Scope | Dispositions |
+|---|---|---|
+| 2026-07-06 | PR #61/#62 | 5 CRITICAL fixed (spatial audio, ammo/weapon acquisition, encounter placement, recipe/item defs, food_definitions shadow) + material merge, ammo dual-source, capacitor_cell equip alias |
+| 2026-07-06 | Tranche 1 (`fix/away-branch-cluster`) | FIXED: arc-away tick + derelict arc zones (incl. gameplay_slice_builder arc authoring), extinguisher-port away frame, away HUD tracker refresh, away death guard, playable_failed → title recovery, extinguish_blocked + seal_blocked feedback, _on_breach_sealed no-op. New bundle smokes: derelict_arc, away_branch_integrity, title_load_failure, hazard_feedback (bundle 135→139). |
+
+**Still open from Tranche 1 (T1.6 remainder):** language_changed → menu relabel consumer; playable_slice_completed → title outcome line; menu_state.enabled_changed → panel refresh. Each needs a small production consumer + smoke assertion (see plan `curried-seeking-snowglobe.md`).
+
+---
+
 ## [CRITICAL] scripts/audio/audio_manager.gd:401 (stubs/stub)
 **_play_spatial never loads a stream or calls player.play() — spatial audio is permanently silent**
 
