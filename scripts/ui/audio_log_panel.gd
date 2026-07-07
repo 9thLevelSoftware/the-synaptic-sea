@@ -27,6 +27,14 @@ func set_audio_manager(mgr: Node) -> void:
 	if is_inside_tree():
 		_populate_entries()
 
+## Number of entries currently listed. The coordinator's
+## meta_screen_is_populated("audio_log") gate reads this so an empty panel
+## can never masquerade as populated (2026-07-06 audit, Tranche 4).
+func get_entry_count() -> int:
+	if _entry_list == null:
+		return 0
+	return _entry_list.item_count
+
 func _build_layout() -> void:
 	var title: Label = Label.new()
 	title.name = "TitleLabel"
@@ -66,7 +74,12 @@ func _populate_entries() -> void:
 	if _entry_list == null:
 		return
 	_entry_list.clear()
-	if audio_manager == null or not audio_manager.has_method("audio_log"):
+	# `audio_log` is a var property on AudioManager (audio_manager.gd:52), not
+	# a method — the old has_method("audio_log") probe was always false, so
+	# this panel never populated (2026-07-06 audit, HIGH). Same bug class as
+	# the sfx_router caption fix noted in audio_settings_panel.gd. Use a safe
+	# property fetch instead.
+	if audio_manager == null or audio_manager.get("audio_log") == null:
 		return
 	var ids: Array = audio_manager.audio_log.list_entry_ids()
 	for entry_id in ids:

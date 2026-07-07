@@ -164,7 +164,12 @@ func _refresh_from_manager() -> void:
 	# synced before this fix.
 	if _caption_toggle != null and settings_state != null:
 		_caption_toggle.button_pressed = settings_state.is_captions_enabled()
-	if _voice_log_toggle != null and audio_manager.has_method("audio_log"):
+	# `audio_log` is a var property on AudioManager, not a method — the old
+	# has_method("audio_log") probe was always false (same bug class as the
+	# sfx_router caption fix above; 2026-07-06 audit, Tranche 4), so this
+	# checkbox never received its initial checked state. Voice logs are
+	# available whenever the manager carries an audio_log registry.
+	if _voice_log_toggle != null and audio_manager.get("audio_log") != null:
 		_voice_log_toggle.button_pressed = true
 
 func _on_volume_changed(value: float, bus_id: StringName) -> void:
