@@ -285,7 +285,10 @@ run_clean 'Tranche 3 world persist/restore main-scene smoke' 'WORLD PERSIST REST
 run_clean 'Tranche 3 world save anywhere main-scene smoke' 'WORLD SAVE ANYWHERE PASS away_save=true location_restored=true state_restored=true home_save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_save_anywhere_smoke.gd
 run_clean 'Tranche 3 input-action idempotency smoke' 'IDEMPOTENCY PASS actions=7 no_duplicates_after_second_call=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/a11y_p1_002_idempotency_smoke.gd
 run_clean 'Tranche 3 progression main-scene smoke' 'MAIN PLAYABLE PROGRESSION PASS class=engineer repair_xp_gained=true hud=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_progression_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=165 clean_output=true'
+# --- Tranche 3: new coverage — PhaseTimer behavior + real Area3D interaction path ---
+run_clean 'Tranche 3 phase timer model smoke' 'PHASE TIMER PASS clamp=true boundary=true carry=true single_flip=true progress=true durations=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/phase_timer_smoke.gd
+run_clean 'Tranche 3 interactable body-entered physics smoke' 'INTERACTABLE BODY ENTERED PASS far_null=true entered=true interact=true exited_cleared=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interactable_body_entered_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=167 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
