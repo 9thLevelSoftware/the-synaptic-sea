@@ -328,7 +328,13 @@ func play_voice_log(entry_id: StringName) -> bool:
 		return false
 	var entry: Dictionary = audio_log.get_entry(entry_id)
 	var vol_db: float = float(entry.get("volume_db", -3.0))
-	_play_via_bus(String(AudioEventSeamScript.BUS_VOICE), vol_db)
+	# Tranche 4 (2026-07-06 audit): route the entry's authored clip_path
+	# through the warn-once stream loader. Before this, the clip_path data
+	# was dead — no load attempt, so not even the ADR-0044 honest missing-
+	# asset warning fired. With the voice library still deferred the loader
+	# warns once per path and the volume push remains the fallback; when the
+	# assets land they play with no further code change.
+	_play_via_bus(String(AudioEventSeamScript.BUS_VOICE), vol_db, &"", String(entry.get("clip_path", "")))
 	current_voice_log_id = String(entry_id)
 	return true
 
@@ -384,14 +390,22 @@ func _load_stream_cached(path: String) -> AudioStream:
 ## clip and calls play(); when not cataloged, behavior is byte-identical to
 ## pre-Domain-9 (volume push only) — the graceful missing-asset fallback
 ## that keeps the deferred asset library honest (ADR-0044).
-func _play_via_bus(bus_id: String, volume_db: float, event_id: StringName = &"") -> void:
+## `stream_path` (Tranche 4, 2026-07-06 audit): callers whose clip path lives
+## outside STREAM_CATALOG (voice logs author clip_path on their AudioLog
+## entries) pass it directly; it takes precedence over the catalog lookup and
+## goes through the same warn-once loader.
+func _play_via_bus(bus_id: String, volume_db: float, event_id: StringName = &"", stream_path: String = "") -> void:
 	var player: AudioStreamPlayer = _bus_players.get(bus_id, null)
 	if player == null:
 		return
 	player.volume_db = volume_db
-	var id_str: String = String(event_id)
-	if not id_str.is_empty() and STREAM_CATALOG.has(id_str):
-		var stream: AudioStream = _load_stream_cached(String(STREAM_CATALOG[id_str]))
+	var path: String = stream_path
+	if path.is_empty():
+		var id_str: String = String(event_id)
+		if not id_str.is_empty() and STREAM_CATALOG.has(id_str):
+			path = String(STREAM_CATALOG[id_str])
+	if not path.is_empty():
+		var stream: AudioStream = _load_stream_cached(path)
 		if stream != null:
 			if player.stream != stream:
 				player.stream = stream
