@@ -19,7 +19,7 @@ const BuildMetadataStateScript := preload("res://scripts/systems/build_metadata_
 @export var release_color: Color = Color(0.2, 0.85, 0.3, 1.0)
 
 var _badge_label: Label = null
-var _metadata: BuildMetadataState = null
+var _metadata = null
 
 signal metadata_changed
 
@@ -30,12 +30,12 @@ func _ready() -> void:
 	_badge_label.add_theme_color_override("font_color", dev_color)
 	add_child(_badge_label)
 
-func set_metadata(metadata: BuildMetadataState) -> void:
+func set_metadata(metadata) -> void:
 	_metadata = metadata
 	_refresh_badge()
 	metadata_changed.emit()
 
-func get_metadata() -> BuildMetadataState:
+func get_metadata():
 	return _metadata
 
 func get_badge_text() -> String:

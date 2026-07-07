@@ -20,7 +20,9 @@ const ROOM_FOOTPRINT_OPTIONS: Dictionary = {
 	"cargo":          [Vector2i(2, 2), Vector2i(3, 3), Vector2i(2, 3)],
 	"bay":            [Vector2i(2, 2), Vector2i(3, 3), Vector2i(2, 3)],
 	"hangar":         [Vector2i(2, 2), Vector2i(3, 3), Vector2i(2, 3)],
+	"compartment":    [Vector2i(2, 2)],
 	"medical":        [Vector2i(2, 2), Vector2i(2, 1)],
+	"quarters":       [Vector2i(2, 2)],
 	"crew_quarters":  [Vector2i(2, 2), Vector2i(2, 1)],
 	"mess_hall":      [Vector2i(2, 2), Vector2i(3, 2)],
 	"armory":         [Vector2i(1, 2), Vector2i(2, 2)],
@@ -32,6 +34,7 @@ const ROOM_FOOTPRINT_OPTIONS: Dictionary = {
 	"ramp":           [Vector2i(1, 1)],
 	"elevator":       [Vector2i(1, 1)],
 	"storage":        [Vector2i(1, 2), Vector2i(2, 2)],
+	"tool_storage":   [Vector2i(2, 2)],
 }
 
 const DEFAULT_FOOTPRINT: Vector2i = Vector2i(2, 2)

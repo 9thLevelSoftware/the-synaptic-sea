@@ -91,6 +91,10 @@ func apply_summary(summary: Dictionary) -> bool:
 		for item_id in to_remove:
 			foods.erase(item_id)
 			changed = true
+	var restored_transition_count: int = int(summary.get("transition_count", 0))
+	if _last_transition_count != restored_transition_count:
+		changed = true
+	_last_transition_count = restored_transition_count
 	return changed
 
 func get_status_lines() -> PackedStringArray:

@@ -88,7 +88,7 @@ func _validate() -> void:
 ## Read per-item elapsed_seconds from spoilage_state.get_summary().
 ## Real shape: summary["foods"][item_id]["elapsed_seconds"] (from food_state.gd get_summary()).
 func _spoil_age(item_id: String) -> float:
-	var s: SpoilageState = playable.spoilage_state as SpoilageState
+	var s = playable.spoilage_state
 	if s == null:
 		return 0.0
 	var summary: Dictionary = s.get_summary()

@@ -371,7 +371,7 @@ const TOOL_PICKUP_FALLBACK_OFFSET: Vector3 = Vector3(4.0, 0.0, 0.0)
 # unlock events when gameplay milestones fire (tool pickup, objective
 # completion, reactor stabilization, run complete). Cross-run state is
 # a deferred Steamworks concern (ADR-0029); this is the per-run hook.
-var achievement_state: AchievementState
+var achievement_state  # AchievementState (untyped: class_name unreliable headless)
 # REQ-014: junction calibrator pickup. Sits in a different side room so
 # the player can pick it up independently of the oxygen pump.
 var junction_calibrator_pickup: ToolPickup
@@ -608,6 +608,7 @@ func get_playable_summary() -> Dictionary:
 		"player_spawned": player != null,
 		"camera_spawned": camera_rig != null and camera_rig.camera != null,
 		"objective_count": interactables.size(),
+		"objective_sequence_count": sequence_interactables.size(),
 		"objectives_completed": objective_completion_count,
 		"collision_shape_count": loader.count_collision_shapes() if loader != null else 0,
 		"start_position": player.global_position if player != null else Vector3.INF,
@@ -3959,7 +3960,7 @@ func _on_threat_killed(record: Dictionary) -> void:
 		pos = (current_ship.scene_root as Node3D).to_local(pos)
 	if parent_node == null or not is_instance_valid(parent_node):
 		return
-	var lc: LootContainer = LootContainerScript.new()
+	var lc = LootContainerScript.new()
 	var seed_source: String = "kill:%s" % cid
 	lc.configure(cid, str(record.get("loot_table", "combat_drop_common")), seed_source,
 		inventory_state, _loot_tables, pos, 1.8, {})
@@ -4360,7 +4361,7 @@ func _build_hud_layer() -> void:
 	menu_coordinator.open_main_menu()
 
 func _on_scanner_panel_closed() -> void:
-	if player != null:
+	if is_instance_valid(player):
 		player.set_physics_process(true)
 		player.set_process_input(true)
 		player.set_process_unhandled_input(true)
@@ -4372,7 +4373,7 @@ func _on_chart_panel_closed() -> void:
 		player.set_process_unhandled_input(true)
 
 func _freeze_player_for_panel() -> void:
-	if player != null:
+	if is_instance_valid(player):
 		player.set_physics_process(false)
 		player.set_process_input(false)
 		player.set_process_unhandled_input(false)
@@ -4380,7 +4381,7 @@ func _freeze_player_for_panel() -> void:
 func _on_inventory_panel_closed() -> void:
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.UI_INVENTORY_CLOSE)
-	if player != null:
+	if is_instance_valid(player):
 		player.set_physics_process(true)
 		player.set_process_input(true)
 		player.set_process_unhandled_input(true)
@@ -5419,8 +5420,9 @@ func _combined_system_status_lines() -> PackedStringArray:
 	if hull != null:
 		for line in hull.get_status_lines():
 			lines.append(String(line))
-	if fire_suppression_state != null:
-		for line in fire_suppression_state.get_status_lines():
+	var active_fire_state = _active_fire_state()
+	if active_fire_state != null:
+		for line in active_fire_state.get_status_lines():
 			lines.append(String(line))
 	if propulsion_expanded_state != null:
 		for line in propulsion_expanded_state.get_status_lines():

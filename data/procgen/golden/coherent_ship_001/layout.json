@@ -196,7 +196,7 @@
     },
     {
       "id": "medbay_01",
-      "room_role": "medbay",
+      "room_role": "medical",
       "deck": 1,
       "structural_placements": [
         {

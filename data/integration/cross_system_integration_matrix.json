@@ -28,7 +28,7 @@
       "requirements": [],
       "code_files": [],
       "docs_files": [
-        "docs/game/build-plan.md",
+        "docs/game/build-plans/14-cross-system-integration-review-e2e.md",
         "docs/game/build-plans/README.md",
         ".omh/kanban/synaptic-sea-e2e-systems-task-graph.json"
       ],
@@ -90,8 +90,8 @@
       ],
       "code_files": [
         "scripts/systems/food_state.gd",
+        "scripts/systems/spoilage_state.gd",
         "scripts/systems/hydroponics_state.gd",
-        "scripts/systems/synthesizer_state.gd",
         "scripts/systems/water_recycler_state.gd"
       ],
       "docs_files": [

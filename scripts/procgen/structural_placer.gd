@@ -95,8 +95,8 @@ var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 # catalog has no explicit mapping for a role, _modules_for_role falls back to
 # the built-in ROOM_MODULES const so the default/no-biome output is
 # byte-identical to the pre-KitCatalog behaviour.
-static var _shared_kit_catalog: KitCatalog = null
-var kit_catalog: KitCatalog = null
+static var _shared_kit_catalog = null
+var kit_catalog = null
 # Biome id used to pick a biome-biased kit (e.g. breach_field -> hazard kit).
 # Empty selects the default kit (ship_structural_v0 == ROOM_MODULES).
 var biome: String = ""

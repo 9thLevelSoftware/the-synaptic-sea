@@ -1,11 +1,13 @@
 extends RefCounted
 class_name DeconstructionResolver
 
+const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
+
 ## Pure model for breaking items down into base materials.
 ## Reads deconstruction recipes (category == "deconstruction") from the
 ## recipe catalog and resolves them against inventory. Never touches the scene tree.
 
-var _crafting_state: CraftingState = CraftingState.new()
+var _crafting_state = CraftingStateScript.new()
 
 func _init() -> void:
 	pass

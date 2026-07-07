@@ -11,7 +11,7 @@ class_name AchievementsPanel
 const AchievementStateScript := preload("res://scripts/systems/achievement_state.gd")
 const CATALOG_PATH: String = "res://data/release/achievement_catalog.json"
 
-var _state: AchievementState = null
+var _state = null
 var _catalog: Dictionary = {}
 var _list_label: RichTextLabel = null
 
@@ -22,10 +22,10 @@ func _ready() -> void:
 	_list_label.fit_content = true
 	add_child(_list_label)
 
-func set_state(state: AchievementState) -> void:
+func set_state(state) -> void:
 	_state = state
 
-func get_state() -> AchievementState:
+func get_state():
 	return _state
 
 func load_catalog(json_text: String = "") -> int:

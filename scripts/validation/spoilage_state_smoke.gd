@@ -63,6 +63,9 @@ func _initialize() -> void:
 	var summary: Dictionary = ss.get_summary()
 	var restored := SpoilageStateScript.new()
 	restored.apply_summary(summary)
+	if restored.get_summary()["transition_count"] != summary["transition_count"]:
+		_fail("round-trip transition_count mismatch")
+		return
 	if restored.get_food_count_by_stage(FoodStateScript.Stage.ROTTEN) != 2:
 		_fail("round-trip rotten count mismatch")
 		return

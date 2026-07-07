@@ -40,7 +40,7 @@ func _validate() -> void:
 	if playable.threat_manager == null or playable.player == null:
 		_fail("threat_manager / player missing")
 		return
-	var tm: ThreatManager = playable.threat_manager
+	var tm = playable.threat_manager
 	# Board a derelict so the whole loop is exercised on the away branch.
 	playable.away_from_start = true
 	# Ensure at least one threat exists to kill.

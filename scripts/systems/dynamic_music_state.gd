@@ -1,6 +1,8 @@
 extends RefCounted
 class_name DynamicMusicState
 
+const AudioEventSeam := preload("res://scripts/audio/audio_event_seam.gd")
+
 ## DynamicMusicState — pure model for the four-state music layer machine
 ## (REQ-AU-004, ADR-0029).
 ##

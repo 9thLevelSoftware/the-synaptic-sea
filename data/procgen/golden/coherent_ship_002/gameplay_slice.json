@@ -78,7 +78,7 @@
       "sequence": 3,
       "type": "download_logs",
       "room_id": "medbay_01",
-      "room_role": "medbay",
+      "room_role": "medical",
       "placement_id": "medbay_terminal",
       "semantic": "command_console",
       "cell": [2, 3, 0],
@@ -116,7 +116,7 @@
   "summary": {
     "objective_count": 5,
     "role_count": 5,
-    "roles": ["cargo", "maintenance", "medbay", "bridge", "reactor"],
+    "roles": ["cargo", "maintenance", "medical", "bridge", "reactor"],
     "has_goal_room_objective": true,
     "passes": true
   }

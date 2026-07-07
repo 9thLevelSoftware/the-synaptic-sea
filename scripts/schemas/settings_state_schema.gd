@@ -1,6 +1,8 @@
 extends RefCounted
 class_name SettingsStateSchema
 ## Static validation for `SettingsState` payloads (REQ-UI-003 / ADR-0033).
+## Live authority for settings payload shape; supersedes the deleted
+## `data/ui/settings_schema.json` duplicate.
 ##
 ## A settings payload is a flat Dictionary of typed fields:
 ##

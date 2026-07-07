@@ -16,16 +16,12 @@ extends SceneTree
 
 const ExportPresetsValidatorScript := preload("res://scripts/release/export_presets_validator.gd")
 const BuildMetadataStateScript := preload("res://scripts/systems/build_metadata_state.gd")
-const ROOT_DEFAULT: String = "/Users/christopherwilloughby/the-synaptic-sea"
 
 func _initialize() -> void:
-	var root_path: String = OS.get_environment("ROOT")
-	if root_path.is_empty():
-		root_path = ROOT_DEFAULT
-	var cfg_path: String = root_path + "/export_presets.cfg"
-	var credits_path: String = root_path + "/data/release/credits.json"
-	var manifest_path: String = root_path + "/data/release/build_metadata.json"
-	var demo_path: String = root_path + "/data/release/demo_scope_manifest.json"
+	var cfg_path: String = "res://export_presets.cfg"
+	var credits_path: String = "res://data/release/credits.json"
+	var manifest_path: String = "res://data/release/build_metadata.json"
+	var demo_path: String = "res://data/release/demo_scope_manifest.json"
 
 	var validator := ExportPresetsValidatorScript.new()
 	var presets: Array = validator.parse(cfg_path)

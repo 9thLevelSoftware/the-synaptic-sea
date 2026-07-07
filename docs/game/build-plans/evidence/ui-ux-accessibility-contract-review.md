@@ -66,7 +66,7 @@ accessibility presets, fog-of-war map state).
 - `scripts/schemas/controller_glyph_schema.gd` — ControllerGlyphStateSchema
 
 ### Configuration data (JSON / data-Resource)
-- `data/ui/settings_schema.json` — settings field definitions
+- `scripts/schemas/settings_state_schema.gd` — live settings field definitions; supersedes deleted `data/ui/settings_schema.json`
 - `data/ui/tutorial_triggers.json` — tutorial catalog
 - `data/ui/codex_entries.json` — codex entries
 - `data/ui/input_glyphs.json` — glyph table per scheme

@@ -13,10 +13,10 @@ extends SceneTree
 ## starts at current_objective_sequence=1, so round-tripping the smoke's own
 ## just-created save would pass even if request_load() applied nothing. Before
 ## driving Continue we overwrite world.json's embedded home_ship snapshot with
-## current_objective_sequence=3 (mutating the REAL on-disk save the live New
-## Game instance just wrote, so layout_path/kit_path/gameplay_slice_path stay
-## valid for the loader) and assert the Continue'd instance's
-## current_objective_sequence equals 3 -- a value a fresh boot can never produce.
+## a different saved slice plus current_objective_sequence=3 (mutating the REAL
+## on-disk save the live New Game instance just wrote) and assert the Continue'd
+## instance's current_objective_sequence equals 3 -- a value a fresh boot can
+## never produce.
 ##
 ## Quit signal (Important review finding 2): rather than self-emitting
 ## return_to_title_requested, we drive the REAL producer chain: open the live
@@ -35,6 +35,10 @@ const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.
 const PermadeathResolverScript := preload("res://scripts/systems/permadeath_resolver.gd")
 const TIMEOUT_FRAMES: int = 900
 const FIXTURE_OBJECTIVE_SEQUENCE: int = 3
+const CONTINUE_LAYOUT_PATH: String = "res://data/procgen/golden/coherent_ship_002/layout.json"
+const CONTINUE_KIT_PATH: String = "res://data/kits/ship_structural_v0.json"
+const CONTINUE_GAMEPLAY_SLICE_PATH: String = "res://data/procgen/golden/coherent_ship_002/gameplay_slice.json"
+const CONTINUE_LOGICAL_OBJECTIVE_COUNT: int = 5
 
 var title_node: Node
 var frame_count: int = 0
@@ -133,6 +137,9 @@ func _seed_continue_fixture(playable: PlayableGeneratedShip) -> bool:
 	var home_ship: Dictionary = ws.home_ship.duplicate(true)
 	if home_ship.is_empty():
 		return false
+	home_ship["layout_path"] = CONTINUE_LAYOUT_PATH
+	home_ship["kit_path"] = CONTINUE_KIT_PATH
+	home_ship["gameplay_slice_path"] = CONTINUE_GAMEPLAY_SLICE_PATH
 	home_ship["current_objective_sequence"] = FIXTURE_OBJECTIVE_SEQUENCE
 	ws.home_ship = home_ship
 	return service.save_world(ws)
@@ -182,6 +189,41 @@ func _await_continue_playable() -> void:
 		_fail("Continue did not apply fixture: current_objective_sequence=%d expected=%d" % [
 			playable.get_current_objective_sequence(),
 			FIXTURE_OBJECTIVE_SEQUENCE,
+		])
+		return
+	var live_summary: Dictionary = playable.get_playable_summary()
+	var live_sequence_count: int = int(live_summary.get("objective_sequence_count", 0))
+	if live_sequence_count != CONTINUE_LOGICAL_OBJECTIVE_COUNT:
+		_fail("Continue loaded unexpected logical objective count=%d expected=%d" % [
+			live_sequence_count,
+			CONTINUE_LOGICAL_OBJECTIVE_COUNT,
+		])
+		return
+	var title_summary: Dictionary = title_node.get("_last_playable_summary")
+	if int(title_summary.get("objective_sequence_count", 0)) != CONTINUE_LOGICAL_OBJECTIVE_COUNT:
+		_fail("title cached stale playable summary after Continue: objective_sequence_count=%d expected=%d" % [
+			int(title_summary.get("objective_sequence_count", 0)),
+			CONTINUE_LOGICAL_OBJECTIVE_COUNT,
+		])
+		return
+	if not playable.teleport_player_to_objective_for_validation(FIXTURE_OBJECTIVE_SEQUENCE):
+		_fail("Continue fixture could not move player to objective %d" % FIXTURE_OBJECTIVE_SEQUENCE)
+		return
+	var interactable = playable.get_interactable_by_sequence(FIXTURE_OBJECTIVE_SEQUENCE)
+	if interactable == null or not interactable.has_method("set_validation_player_in_range"):
+		_fail("Continue fixture objective %d interactable missing" % FIXTURE_OBJECTIVE_SEQUENCE)
+		return
+	interactable.set_validation_player_in_range(playable.player)
+	playable.player.request_interact()
+	var expected_progress: String = "objectives %d/%d" % [
+		FIXTURE_OBJECTIVE_SEQUENCE,
+		CONTINUE_LOGICAL_OBJECTIVE_COUNT,
+	]
+	var actual_progress: String = String(title_node.get("_last_run_progress"))
+	if actual_progress != expected_progress:
+		_fail("Continue progress used stale title summary: got='%s' expected='%s'" % [
+			actual_progress,
+			expected_progress,
 		])
 		return
 	_stage = "quit_signal_check"

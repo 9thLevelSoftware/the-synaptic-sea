@@ -187,7 +187,11 @@ func handle_ui_input(event: InputEvent) -> bool:
 	# Language OptionButton, Audio Settings sliders, Audio Log ItemList) stay operable.
 	if not _active_meta_screen.is_empty():
 		if event.is_action_pressed("ui_cancel"):
-			_close_meta_screen()
+			var active_meta_node = _active_meta_screen_node()
+			if is_instance_valid(active_meta_node) and active_meta_node.has_method("dismiss"):
+				active_meta_node.dismiss()
+			else:
+				_close_meta_screen()
 			return true
 		if _active_meta_screen in ["hub_upgrades", "skill_tree", "class", "save_load"]:
 			if event.is_action_pressed("ui_up"):
@@ -450,9 +454,11 @@ func _build_meta_screens() -> void:
 	release_badge_overlay = ReleaseBadgeOverlayScript.new()
 	release_badge_overlay.name = "ReleaseBadgeOverlay"
 	add_child(release_badge_overlay)
+	release_badge_overlay.metadata_changed.connect(_refresh_all)
 	credits_screen = CreditsScreenScript.new()
 	credits_screen.name = "CreditsScreen"
 	add_child(credits_screen)
+	credits_screen.credits_dismissed.connect(_on_credits_dismissed)
 	# save_load_menu is a RefCounted model; its rows render into this label.
 	_save_load_panel = RichTextLabel.new()
 	_save_load_panel.name = "SaveLoadList"
@@ -709,6 +715,11 @@ func open_meta_screen(screen_id: String) -> void:
 
 func get_active_meta_screen() -> String:
 	return _active_meta_screen
+
+func _active_meta_screen_node():
+	if _active_meta_screen.is_empty() or not _meta_panels.has(_active_meta_screen):
+		return null
+	return _meta_panels[_active_meta_screen]
 
 ## Domain 8 seam: the Dictionary returned by the last meta_screen_confirm()
 ## call driven through handle_ui_input's ui_accept branch. Used by
@@ -1102,6 +1113,9 @@ func get_active_language() -> String:
 func _on_language_changed(language_id: String) -> void:
 	_active_language = language_id
 	_refresh_all()
+
+func _on_credits_dismissed() -> void:
+	_close_meta_screen()
 
 func _on_item_enabled_changed(_item_id: String, _enabled: bool) -> void:
 	_refresh_all()

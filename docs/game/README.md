@@ -21,7 +21,7 @@ The operating model is:
 - `06_validation_plan.md` — smoke/regression/playtest gates.
 - `07_risk_register.md` — project risks, mitigations, and status.
 - `08_milestone_gates.md` — gate entry/exit criteria and current gate state.
-- `build-plan.md` — Kanban board strategy and task graph summary.
+- `build-plans/` — Kanban package plans and task graph summaries.
 - `adr/` — Architecture Decision Records.
 - `features/` — one feature spec per gameplay/system feature.
 - `playtests/` — playtest protocol and logs.

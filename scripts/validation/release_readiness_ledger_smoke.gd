@@ -16,14 +16,10 @@ extends SceneTree
 
 const ReleaseReadinessLedgerScript := preload("res://scripts/systems/release_readiness_ledger.gd")
 const CrashReportBundleScript := preload("res://scripts/systems/crash_report_bundle.gd")
-const ROOT_DEFAULT: String = "/Users/christopherwilloughby/the-synaptic-sea"
 const TEST_CRASH_PATH: String = "user://release_crash_bundle_test.json"
 
 func _initialize() -> void:
-	var root_path: String = OS.get_environment("ROOT")
-	if root_path.is_empty():
-		root_path = ROOT_DEFAULT
-	var checklist_path: String = root_path + "/data/release/release_checklist.json"
+	var checklist_path: String = "res://data/release/release_checklist.json"
 	if not FileAccess.file_exists(checklist_path):
 		_fail("checklist unreadable: %s" % checklist_path)
 		return

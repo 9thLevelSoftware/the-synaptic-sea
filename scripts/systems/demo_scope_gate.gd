@@ -22,11 +22,11 @@ const FULL_KIND: String = "release"
 const DEV_KIND: String = "dev"
 
 var _manifest: Dictionary = {}
-var _build_metadata: BuildMetadataState = null
+var _build_metadata = null
 var _features: Array = []
 var _params_by_feature: Dictionary = {}
 
-func configure(manifest: Dictionary, build_metadata: BuildMetadataState) -> void:
+func configure(manifest: Dictionary, build_metadata) -> void:
 	_manifest = manifest if manifest != null else {}
 	_build_metadata = build_metadata
 	_features.clear()

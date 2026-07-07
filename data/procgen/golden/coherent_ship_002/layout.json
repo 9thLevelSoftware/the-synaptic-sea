@@ -8,7 +8,7 @@
   "rooms": [
     {
       "id": "arc_side_01",
-      "room_role": "side_storage",
+      "room_role": "storage",
       "deck": 0,
       "structural_placements": [
         { "name": "floor_cell_x1_z-1", "module": "floor_1x1", "world_position": [4.0, 0.0, -4.0] }
@@ -92,7 +92,7 @@
     },
     {
       "id": "medbay_01",
-      "room_role": "medbay",
+      "room_role": "medical",
       "deck": 0,
       "structural_placements": [
         { "name": "floor_cell_x2_z2", "module": "floor_1x1", "world_position": [8.0, 0.0, 8.0] },

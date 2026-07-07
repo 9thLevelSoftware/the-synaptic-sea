@@ -26,7 +26,7 @@ func _initialize() -> void:
 		_fail("expected detection to expire")
 		return
 	# Domain 2: emitted profile is the post-crouch signal the AI consumes.
-	var de: DetectionState = DetectionStateScript.new()
+	var de = DetectionStateScript.new()
 	de.configure({})
 	de.update_inputs(1.0, 0.5, 0.8, false, "")
 	var prof: Dictionary = de.get_emitted_profile()

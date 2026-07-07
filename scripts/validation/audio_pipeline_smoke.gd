@@ -84,7 +84,7 @@ func _validate_and_drive() -> void:
 	if AudioServer.get_bus_index("Master") != 0:
 		_fail("expected Master bus_index == 0, got %d" % AudioServer.get_bus_index("Master"))
 		return
-	var default_cfg: AudioBusConfig = AudioBusConfigScript.make_default()
+	var default_cfg = AudioBusConfigScript.make_default()
 	for bus_id in ["sfx", "music", "voice", "ui", "ambient", "meta"]:
 		var idx: int = AudioServer.get_bus_index(bus_id)
 		if idx < 1:

@@ -1,6 +1,8 @@
 extends RefCounted
 class_name AmbientZoneState
 
+const AudioEventSeam := preload("res://scripts/audio/audio_event_seam.gd")
+
 ## AmbientZoneState — pure model for per-room-role ambient layers (REQ-AU-003,
 ## ADR-0029).
 ##
