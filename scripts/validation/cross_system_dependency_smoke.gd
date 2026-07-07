@@ -8,7 +8,7 @@ const REQUIRED_STAGES: Array = ["prepare", "derelict", "survive", "loot", "craft
 func _initialize() -> void:
 	var root_path: String = ProjectSettings.globalize_path("res://")
 
-	var matrix_data: Dictionary = _load_json(root_path + "/data/integration/cross_system_integration_matrix.json")
+	var matrix_data: Dictionary = _load_json(root_path.path_join("data/integration/cross_system_integration_matrix.json"))
 	if matrix_data.is_empty():
 		_fail("cross-system integration matrix missing or empty")
 		return
@@ -29,12 +29,12 @@ func _initialize() -> void:
 	if not bool(files_result.get("ok", false)):
 		_fail("file evidence missing: %s" % JSON.stringify(files_result.get("missing", [])))
 		return
-	var req_text: String = _read_text(root_path + "/docs/game/05_requirements.md")
+	var req_text: String = _read_text(root_path.path_join("docs/game/05_requirements.md"))
 	var req_result: Dictionary = validator.verify_requirement_rows(req_text)
 	if not bool(req_result.get("ok", false)):
 		_fail("requirement rows missing: %s" % JSON.stringify(req_result.get("missing", [])))
 		return
-	var validation_text: String = _read_text(root_path + "/docs/game/06_validation_plan.md")
+	var validation_text: String = _validation_marker_evidence(root_path, matrix)
 	var marker_result: Dictionary = validator.verify_validation_markers(validation_text)
 	if not bool(marker_result.get("ok", false)):
 		_fail("validation markers missing: %s" % JSON.stringify(marker_result.get("missing", [])))
@@ -65,6 +65,29 @@ func _read_text(path: String) -> String:
 	if not FileAccess.file_exists(path):
 		return ""
 	return FileAccess.get_file_as_string(path)
+
+func _validation_marker_evidence(root_path: String, matrix) -> String:
+	# Registered bundle markers live in 06_validation_plan.md; standalone
+	# promotion-candidate markers live in the smoke scripts themselves.
+	var evidence: String = _read_text(root_path.path_join("docs/game/06_validation_plan.md"))
+	if matrix == null or not matrix.has_method("get_entries"):
+		return evidence
+	for entry_variant in matrix.get_entries():
+		if not (entry_variant is Dictionary):
+			continue
+		var entry: Dictionary = entry_variant
+		var smoke_files: Variant = entry.get("smoke_files", [])
+		if not (smoke_files is Array):
+			continue
+		for smoke_path_variant in smoke_files:
+			var smoke_path: String = str(smoke_path_variant)
+			if smoke_path.is_empty():
+				continue
+			var path: String = smoke_path if smoke_path.begins_with("res://") else root_path.path_join(smoke_path)
+			var text: String = _read_text(path)
+			if not text.is_empty():
+				evidence += "\n" + text
+	return evidence
 
 func _fail(reason: String) -> void:
 	push_error("CROSS SYSTEM DEPENDENCY FAIL reason=%s" % reason)

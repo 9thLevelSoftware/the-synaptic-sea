@@ -119,6 +119,13 @@ DOCK_GUARANTEE_WARNING="^WARNING: RoomAssigner: guaranteed role 'dock' has no el
 # blueprint to prove load_from_blueprint refuses it; this is the expected
 # rejection line.
 BLUEPRINT_NULL_ERROR="^ERROR: PlayableGeneratedShip.load_from_blueprint: blueprint must not be null\$"
+# release_readiness_ledger_smoke deliberately sends one unknown check id, one
+# invalid status, and one missing external evidence path to prove
+# ReleaseReadinessLedger rejects malformed evidence rows instead of accepting
+# them into the release ledger.
+RELEASE_LEDGER_UNKNOWN_WARNING="^WARNING: ReleaseReadinessLedger: unknown check_id=totally_made_up_check\$"
+RELEASE_LEDGER_STATUS_WARNING="^WARNING: ReleaseReadinessLedger: invalid status=WAT\$"
+RELEASE_LEDGER_EXTERNAL_WARNING="^WARNING: ReleaseReadinessLedger: external evidence rejected, evidence_path is required\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -127,7 +134,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$BLUEPRINT_NULL_ERROR" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$BLUEPRINT_NULL_ERROR|$RELEASE_LEDGER_UNKNOWN_WARNING|$RELEASE_LEDGER_STATUS_WARNING|$RELEASE_LEDGER_EXTERNAL_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -429,6 +436,19 @@ to after a confirmed write) adds one more expected `WARNING:` line:
   fix under test). Filtered by `WORLD_WRITE_FAIL_WARNING` in the strict
   check above; any other `SaveLoadService:` warning during this smoke still
   fails the bundle.
+
+`release_readiness_ledger_smoke.gd` adds three expected `WARNING:` lines:
+
+- `WARNING: ReleaseReadinessLedger: unknown check_id=totally_made_up_check`
+- `WARNING: ReleaseReadinessLedger: invalid status=WAT`
+- `WARNING: ReleaseReadinessLedger: external evidence rejected, evidence_path is required`
+
+These are deliberate rejection-path cases proving the release ledger refuses
+unknown checks, invalid statuses, and external rows without evidence paths.
+They are pinned to the smoke's sentinel values by
+`RELEASE_LEDGER_UNKNOWN_WARNING`, `RELEASE_LEDGER_STATUS_WARNING`, and
+`RELEASE_LEDGER_EXTERNAL_WARNING`; any other `ReleaseReadinessLedger:` warning
+still fails the bundle.
 
 Evidence collection command (run before adding or removing a smoke from the
 bundle; any unexpected `ERROR:`/`WARNING:` line that is not on the allowlist
