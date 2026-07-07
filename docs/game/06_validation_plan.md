@@ -350,7 +350,9 @@ run_clean 'encounter injector smoke' 'ENCOUNTER INJECTOR PASS std_markers=0 deep
 run_clean 'gameplay slice builder smoke' 'GAMEPLAY_SLICE_BUILDER PASS all 9 layouts produced valid slices loot_containers=true salvage_tables=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gameplay_slice_builder_smoke.gd
 run_clean 'template c traversal smoke' 'TEMPLATE C TRAVERSAL PASS transitions_checked=1 missing=ok deck=ok cell=ok self=ok critical_path=ok pipeline_transitions=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_c_traversal_smoke.gd
 run_clean 'derelict generator smoke' 'DERELICT GENERATOR PASS seeds=100 determinism=3 hangar_seeds=80' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_generator_smoke.gd
-run_clean 'procgen layout stress smoke' 'PROCGEN LAYOUT STRESS PASS total=60/60 rooms=[9,12] golden=deterministic' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_layout_stress_smoke.gd
+# marker pinned to the bracket-free prefix: run_clean greps the marker, and
+# the full line's rooms=[9,12] is a character class under grep.
+run_clean 'procgen layout stress smoke' 'PROCGEN LAYOUT STRESS PASS total=60/60' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_layout_stress_smoke.gd
 run_clean 'load from blueprint smoke' 'LOAD FROM BLUEPRINT INTEGRATION PASS sizes=3 room_count=10 null_rejected=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/load_from_blueprint_smoke.gd
 run_clean 'ship generator smoke' 'SHIP GENERATOR PASS life_boat=true small=true deterministic=true life_rooms=10 small_rooms=12' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_generator_smoke.gd
 run_clean 'procgen playable ship smoke' 'PLAYABLE SHIP SMOKE PASS player_spawned=true collision_checked=true interaction_completed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_playable_ship_smoke.gd
