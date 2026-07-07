@@ -123,9 +123,10 @@ func build(layout: Dictionary) -> Dictionary:
 
 # Deterministic single arc zone on a NON-critical link, mirroring the
 # hand-authored golden intent ("non-critical side branch; arc cannot trap the
-# player or block any main objective"): the to_room must be off the critical
-# path, must not be the start/goal room, and must not host an objective —
-# the arc cycles passability, and the objective spine must stay traversable.
+# player or block any main objective"): both endpoints must be off the
+# critical path, must not be the start/goal room, and must not host an
+# objective — the arc cycles passability, and the objective spine must stay
+# traversable.
 # First qualifying link in layout order (no rng: per-seed replay stable).
 # Returns [] when no safe side link exists (small spine ships stay arc-free).
 func _build_arc_zones(layout: Dictionary, start_room: String, goal_room: String, objectives: Array) -> Array:
@@ -148,7 +149,7 @@ func _build_arc_zones(layout: Dictionary, start_room: String, goal_room: String,
 		var to_room: String = str(link.get("to_room", ""))
 		if from_room.is_empty() or to_room.is_empty():
 			continue
-		if excluded.has(to_room):
+		if excluded.has(from_room) or excluded.has(to_room):
 			continue
 		var entry: Dictionary = {
 			"id": "%s_to_%s_arc" % [from_room, to_room],

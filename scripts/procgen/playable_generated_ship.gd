@@ -2067,7 +2067,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	# Tranche 1 (audit): the derelict's own arc zones were dead data — build
 	# them from the DERELICT loader (away_from_start is already true here).
 	_build_arc_zone()
-	_refresh_arc_state(true)
+	_restore_arc_summary_for_current_ship()
 
 ## Captures the player's world pose relative to the piloted ship's scene_root so the
 ## player can be carried when the piloted ship is repositioned by a dock. Returns
@@ -3996,6 +3996,7 @@ func travel_to(marker) -> Dictionary:
 	# in-tree. A DERELICT (non-empty marker_id) keeps its retained ShipInstance in
 	# visited_ships but frees its scene_root (geometry regenerates from seed on revisit).
 	_sync_current_ship_combat_summary()
+	_sync_current_ship_arc_summary()
 	var leaving = current_ship
 	if String(leaving.marker_id) == "":
 		# Leaving home: record the player's position so travel_home can restore it.
@@ -4048,6 +4049,7 @@ func travel_home() -> bool:
 	if not away_from_start or home_ship == null:
 		return false
 	_sync_current_ship_combat_summary()
+	_sync_current_ship_arc_summary()
 	# Phase 5b Task 5: undock the piloted ship from the current derelict so the ride
 	# physically detaches before the host is freed (capture the player carry first so
 	# they ride the piloted ship back home rather than being left in the freed frame).
@@ -4099,7 +4101,7 @@ func travel_home() -> bool:
 	# Tranche 1 (audit): the derelict arc zone was freed with the derelict
 	# root — rebuild against the HOME loader (away_from_start is false here).
 	_build_arc_zone()
-	_refresh_arc_state(true)
+	_restore_arc_summary_for_current_ship()
 	# ADR-0042: the hallucination manager was attached to the (now-freed) derelict root,
 	# so rebuild it on the home ship — otherwise home-side hallucinations never render
 	# after a round trip while the director still feeds tier-3 teeth into vitals.
@@ -4441,6 +4443,19 @@ func _sync_current_ship_combat_summary() -> void:
 		return
 	current_ship.combat_summary = threat_manager.get_summary()
 
+func _sync_current_ship_arc_summary() -> void:
+	if current_ship == null or electrical_arc_state == null:
+		return
+	current_ship.arc_summary = electrical_arc_state.get_summary().duplicate(true)
+
+func _restore_arc_summary_for_current_ship() -> void:
+	if current_ship == null or electrical_arc_state == null:
+		return
+	if not current_ship.arc_summary.is_empty():
+		electrical_arc_state.apply_summary(current_ship.arc_summary)
+	_refresh_arc_state(true)
+	_sync_current_ship_arc_summary()
+
 func _configure_threat_runtime_for_current_ship() -> void:
 	if threat_manager == null:
 		return
@@ -4767,7 +4782,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_refresh_oxygen_state(true, 0.0)
 	_refresh_weapon_hotbar()
 	_build_arc_zone()
-	_refresh_arc_state(true)
+	_restore_arc_summary_for_current_ship()
 	_build_loot_containers()
 	_build_sealed_hatches()
 	_build_repair_points()
@@ -6072,7 +6087,7 @@ func _active_arc_loader() -> Node:
 	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root) \
 			and current_ship.scene_root.has_method("get_arc_zone_markers"):
 		return current_ship.scene_root
-	return loader if (loader is Node) else null
+	return loader if (loader is Node and is_instance_valid(loader)) else null
 
 func _resolve_arc_zone_world_position() -> Dictionary:
 	var arc_loader: Node = _active_arc_loader()
@@ -6666,7 +6681,7 @@ func acquire_tool_for_validation(p_tool_id: String) -> bool:
 
 ## Captures a fresh RunSnapshot from the current runtime state. Returns
 ## null if the slice is not started or any required model is missing.
-func _build_run_snapshot() -> RunSnapshot:
+func _build_run_snapshot(use_home_arc_summary: bool = false) -> RunSnapshot:
 	if not playable_started or slice_complete:
 		return null
 	if save_load_service == null:
@@ -6710,7 +6725,11 @@ func _build_run_snapshot() -> RunSnapshot:
 	# round-trips via fire_suppression_summary (see _expanded_ship_systems_summary
 	# / the ship_systems_summary restore path). The legacy snapshot.fire_summary
 	# field is left at its default for save-format back-compat.
-	if electrical_arc_state != null:
+	if use_home_arc_summary:
+		if home_ship != null and not home_ship.arc_summary.is_empty():
+			snapshot.electrical_arc_summary = home_ship.arc_summary.duplicate(true)
+	elif electrical_arc_state != null:
+		_sync_current_ship_arc_summary()
 		snapshot.electrical_arc_summary = electrical_arc_state.get_summary()
 	if objective_progress_state != null:
 		snapshot.objective_progress_summary = objective_progress_state.get_summary()
@@ -7034,6 +7053,7 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	if electrical_arc_state != null and not snapshot.electrical_arc_summary.is_empty():
 		electrical_arc_state.apply_summary(snapshot.electrical_arc_summary)
 		_refresh_arc_state(true)
+		_sync_current_ship_arc_summary()
 	if objective_progress_state != null and not snapshot.objective_progress_summary.is_empty():
 		objective_progress_state.apply_summary(snapshot.objective_progress_summary)
 	if player_progression != null and not snapshot.player_progression_summary.is_empty():
@@ -7201,6 +7221,7 @@ func _dispatch_save_load_confirm_result(result: Dictionary) -> void:
 ## active ship.
 func _build_world_snapshot():
 	_sync_current_ship_combat_summary()
+	_sync_current_ship_arc_summary()
 	var ws = WorldSnapshotScript.new()
 	if synaptic_sea_world != null:
 		ws.world_summary = synaptic_sea_world.get_summary()
@@ -7208,7 +7229,7 @@ func _build_world_snapshot():
 		ws.meta_progression_summary = meta_progression_state.to_dict()
 	if unique_item_state != null:
 		ws.unique_item_summary = unique_item_state.get_summary()
-	var home_snap = _build_run_snapshot()
+	var home_snap = _build_run_snapshot(away_from_start)
 	if home_snap != null:
 		if away_from_start:
 			home_snap.player_position = [_home_player_position.x, _home_player_position.y, _home_player_position.z]

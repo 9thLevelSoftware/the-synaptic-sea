@@ -14,9 +14,11 @@ extends SceneTree
 ## away_from_start flag-flip): after boarding a derelict whose layout declares
 ## arc zones, an arc zone node must exist under the derelict's scene_root, the
 ## model must cycle DISCHARGED->ARCING through _process away ticks, and the
-## zone's collision must block while arcing.
+## zone's collision must block while arcing. It then saves/reloads while arcing
+## and leaves/revisits the same derelict to prove the active derelict arc phase
+## is persisted on the ShipInstance instead of resetting to DISCHARGED.
 ##
-## Pass marker: DERELICT ARC PASS boarded=true zone_on_derelict=true away_ticks=<n> arcing_observed=true collision_blocked=true
+## Pass marker: DERELICT ARC PASS boarded=true zone_on_derelict=true away_ticks=<n> arcing_observed=true collision_blocked=true reload_preserved=true revisit_preserved=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const TIMEOUT_FRAMES: int = 300
@@ -62,6 +64,28 @@ func _find_arc_zone_under(node: Node) -> Node:
 			return found
 	return null
 
+func _arc_collision_blocked(zone: Node) -> bool:
+	if zone == null:
+		return false
+	if str(zone.get_meta("arc_zone_phase", "")) != "ARCING":
+		return false
+	for child in zone.get_children():
+		if child is CollisionShape3D and not (child as CollisionShape3D).disabled:
+			return true
+	return false
+
+func _active_derelict_arc_blocks() -> bool:
+	if playable == null or playable.get_current_ship() == null:
+		return false
+	var derelict_root: Node = playable.get_current_ship().scene_root
+	if derelict_root == null:
+		return false
+	var zone: Node = _find_arc_zone_under(derelict_root)
+	if zone == null:
+		return false
+	var summary: Dictionary = playable.get_arc_summary()
+	return bool(summary.get("arcing", false)) and _arc_collision_blocked(zone)
+
 func _validate() -> void:
 	finished = true
 	_all_operational(playable.get_ship_systems_manager())
@@ -73,16 +97,19 @@ func _validate() -> void:
 		_fail("no markers in range")
 		return
 	var boarded_with_arc: bool = false
+	var boarded_marker_id: String = ""
 	var tried: int = 0
 	for m in in_range:
 		if tried >= MAX_MARKERS:
 			break
 		tried += 1
-		if not bool(playable.travel_to_marker_id(String(m.marker_id)).get("success", false)):
+		var marker_id: String = String(m.marker_id)
+		if not bool(playable.travel_to_marker_id(marker_id).get("success", false)):
 			continue
 		var root: Node = playable.get_current_ship().scene_root
 		if root != null and root.has_method("get_arc_zone_specs") and not (root.get_arc_zone_specs() as Array).is_empty():
 			boarded_with_arc = true
+			boarded_marker_id = marker_id
 			break
 	if not boarded_with_arc:
 		_fail("no derelict among first %d markers declares arc zones (gameplay_slice_builder arc population missing?)" % tried)
@@ -124,7 +151,30 @@ func _validate() -> void:
 		_fail("model is ARCING but the derelict zone node did not block (scene state not refreshed on away branch)")
 		return
 
-	print("DERELICT ARC PASS boarded=true zone_on_derelict=true away_ticks=%d arcing_observed=true collision_blocked=true" % ticks)
+	if not playable.request_save():
+		_fail("request_save while derelict arc was ARCING failed")
+		return
+	if not playable.request_load():
+		_fail("request_load of arcing derelict world save failed")
+		return
+	if not playable.away_from_start or String(playable.get_current_ship().marker_id) != boarded_marker_id:
+		_fail("reload did not restore the saved boarded derelict '%s'" % boarded_marker_id)
+		return
+	if not _active_derelict_arc_blocks():
+		_fail("reload reset or failed to render the arcing derelict arc")
+		return
+
+	if not playable.travel_home():
+		_fail("travel_home failed after arcing derelict reload")
+		return
+	if not bool(playable.travel_to_marker_id(boarded_marker_id).get("success", false)):
+		_fail("revisit to arcing derelict '%s' failed" % boarded_marker_id)
+		return
+	if not _active_derelict_arc_blocks():
+		_fail("revisit reset or failed to render the arcing derelict arc")
+		return
+
+	print("DERELICT ARC PASS boarded=true zone_on_derelict=true away_ticks=%d arcing_observed=true collision_blocked=true reload_preserved=true revisit_preserved=true" % ticks)
 	_cleanup(0)
 
 func _find_playable(node: Node) -> PlayableGeneratedShip:

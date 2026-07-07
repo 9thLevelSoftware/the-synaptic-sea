@@ -79,6 +79,10 @@ var combat_summary: Dictionary = {}
 # persisted under "fire" only when a compartment is actually burning. Home fire stays
 # on the coordinator (fire_suppression_state); this is for boarded derelicts.
 var fire = null                          # FireSuppressionState | null
+# Per-ship electrical arc summary. The live ElectricalArcState node is owned by
+# the coordinator, but traveled derelicts need their cycle phase/time preserved
+# while their scene_root is freed or rebuilt.
+var arc_summary: Dictionary = {}
 # True once the coordinator has run its one-time environmental fire pre-seed for this
 # derelict. Persisted so a revisit/reload does NOT re-roll the presence gate or re-ignite
 # compartments the player already extinguished. Set even when the presence gate yields no
@@ -146,6 +150,8 @@ func get_summary() -> Dictionary:
 		result["carts"] = cart_dicts
 	if has_fire():
 		result["fire"] = fire.get_summary()
+	if not arc_summary.is_empty():
+		result["arc"] = arc_summary.duplicate(true)
 	if fire_seeded:
 		result["fire_seeded"] = true
 	if breach_seeded:
@@ -210,6 +216,9 @@ func apply_summary(summary) -> bool:
 	var fire_summary: Variant = summary.get("fire", null)
 	if typeof(fire_summary) == TYPE_DICTIONARY and not (fire_summary as Dictionary).is_empty():
 		get_fire().apply_summary(fire_summary as Dictionary)
+	var arc_variant: Variant = summary.get("arc", null)
+	if typeof(arc_variant) == TYPE_DICTIONARY:
+		arc_summary = (arc_variant as Dictionary).duplicate(true)
 	fire_seeded = bool(summary.get("fire_seeded", fire_seeded))
 	breach_seeded = bool(summary.get("breach_seeded", breach_seeded))
 	var hull_summary: Variant = summary.get("hull", null)
