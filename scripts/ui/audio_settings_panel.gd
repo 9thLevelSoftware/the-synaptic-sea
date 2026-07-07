@@ -28,7 +28,7 @@ var accessibility_settings: RefCounted
 # captions through. Injected by MenuCoordinator (which already owns the
 # single settings_state instance) via set_settings_state(), following the
 # same pattern as set_accessibility_settings().
-var settings_state: SettingsState = null
+var settings_state = null
 # ADR-0044 seam (final review Finding 1): the ONLY writer of
 # `sfx_router.captions_enabled` is `playable_generated_ship.gd::_on_ui_settings_changed`,
 # reached via `menu_coordinator.settings_changed`. This panel must not write
@@ -62,7 +62,7 @@ func set_accessibility_settings(settings: RefCounted) -> void:
 	accessibility_settings = settings
 	_apply_text_scale()
 
-func set_settings_state(state: SettingsState) -> void:
+func set_settings_state(state) -> void:
 	settings_state = state
 	if is_inside_tree():
 		_refresh_from_manager()

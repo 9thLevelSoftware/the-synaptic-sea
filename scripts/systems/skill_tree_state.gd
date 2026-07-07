@@ -15,6 +15,7 @@ class_name SkillTreeState
 const DEFAULT_SKILLS_PATH := "res://data/player/skills.json"
 const DEFAULT_BOOKS_PATH := "res://data/player/skill_books.json"
 const DEFAULT_PREREQS_PATH := "res://data/player/skill_tree.json"
+const PlayerProgressionScript := preload("res://scripts/systems/player_progression_state.gd")
 
 var _skills_catalog: Dictionary = {}        # skill_id -> {category, display_name}
 var _books_catalog: Dictionary = {}         # book_id -> {target_skill, book_xp, unlocks_skill}
@@ -22,10 +23,10 @@ var _prereqs: Dictionary = {}              # skill_id -> {requires: [...], book_
 var _unlocked: Dictionary = {}             # skill_id -> true (idempotent set)
 
 static func load_skills_catalog(path: String = DEFAULT_SKILLS_PATH) -> Dictionary:
-	return PlayerProgressionState.load_skills_catalog(path)
+	return PlayerProgressionScript.load_skills_catalog(path)
 
 static func load_books_catalog(path: String = DEFAULT_BOOKS_PATH) -> Dictionary:
-	return PlayerProgressionState.load_books_catalog(path)
+	return PlayerProgressionScript.load_books_catalog(path)
 
 ## Loads the prerequisite table. Returns false if the file is missing or
 ## malformed; the tree still works without prereqs (every skill is

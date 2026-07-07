@@ -179,7 +179,11 @@ func _poll_for_playable_started(should_load: bool) -> void:
 	# live summary immediately once the signal is wired to avoid missing it.
 	_on_gameplay_ready(playable_instance.get_playable_summary())
 	if should_load:
-		playable_instance.request_load()
+		if playable_instance.request_load():
+			# Continue can rebuild the playable from the saved world snapshot.
+			# Refresh the cached title summary so later progress math uses the
+			# loaded slice's logical objective sequence count, not the pre-load boot.
+			_last_playable_summary = playable_instance.get_playable_summary().duplicate(true)
 	# Dirty-flag handoff (spec 3.7): only push title-local settings into the fresh
 	# session when the player actually touched them at the title screen — otherwise
 	# an untouched title would clobber whatever request_load() just restored.

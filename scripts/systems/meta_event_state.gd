@@ -1,6 +1,8 @@
 extends RefCounted
 class_name MetaEventState
 
+const AudioEventSeam := preload("res://scripts/audio/audio_event_seam.gd")
+
 ## MetaEventState — deterministic seed-derived meta-event scheduler
 ## (REQ-AU-007, ADR-0029).
 ##

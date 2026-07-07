@@ -43,13 +43,13 @@ var _listener: AudioListener3D
 ## each frame in _process when set.
 var _listener_anchor: Node3D
 
-var bus_config: AudioBusConfig = AudioBusConfigScript.make_default()
-var ambient_zone_state: AmbientZoneState = AmbientZoneStateScript.new()
-var sfx_router: SfxEventRouter = SfxEventRouterScript.new()
-var music_state: DynamicMusicState = DynamicMusicStateScript.new()
-var spatial_resolver: SpatialAudioResolver = SpatialAudioResolverScript.new()
-var meta_event_state: MetaEventState = MetaEventStateScript.new()
-var audio_log: AudioLog = AudioLogScript.new()
+var bus_config = AudioBusConfigScript.make_default()
+var ambient_zone_state = AmbientZoneStateScript.new()
+var sfx_router = SfxEventRouterScript.new()
+var music_state = DynamicMusicStateScript.new()
+var spatial_resolver = SpatialAudioResolverScript.new()
+var meta_event_state = MetaEventStateScript.new()
+var audio_log = AudioLogScript.new()
 
 ## Last-played voice-log entry id (for the panel to show "now playing").
 var current_voice_log_id: String = ""

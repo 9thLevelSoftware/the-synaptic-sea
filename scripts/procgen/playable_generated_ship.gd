@@ -371,7 +371,7 @@ const TOOL_PICKUP_FALLBACK_OFFSET: Vector3 = Vector3(4.0, 0.0, 0.0)
 # unlock events when gameplay milestones fire (tool pickup, objective
 # completion, reactor stabilization, run complete). Cross-run state is
 # a deferred Steamworks concern (ADR-0029); this is the per-run hook.
-var achievement_state: AchievementState
+var achievement_state  # AchievementState (untyped: class_name unreliable headless)
 # REQ-014: junction calibrator pickup. Sits in a different side room so
 # the player can pick it up independently of the oxygen pump.
 var junction_calibrator_pickup: ToolPickup
@@ -3960,7 +3960,7 @@ func _on_threat_killed(record: Dictionary) -> void:
 		pos = (current_ship.scene_root as Node3D).to_local(pos)
 	if parent_node == null or not is_instance_valid(parent_node):
 		return
-	var lc: LootContainer = LootContainerScript.new()
+	var lc = LootContainerScript.new()
 	var seed_source: String = "kill:%s" % cid
 	lc.configure(cid, str(record.get("loot_table", "combat_drop_common")), seed_source,
 		inventory_state, _loot_tables, pos, 1.8, {})

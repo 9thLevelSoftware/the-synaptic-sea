@@ -43,8 +43,9 @@ var _validated: bool = false
 
 ## Construct a default bus layout matching ADR-0029. Call this from a
 ## factory or from a .tres loader that wants a known-good baseline.
-static func make_default() -> AudioBusConfig:
-	var cfg := AudioBusConfig.new()
+static func make_default():
+	var script: GDScript = load("res://scripts/systems/audio_bus_config.gd")
+	var cfg = script.new()
 	cfg.buses = [
 		{"id": AudioEventSeam.BUS_MASTER, "parent_id": &"", "volume_db": DEFAULT_MASTER_DB, "muted": false},
 		{"id": AudioEventSeam.BUS_SFX, "parent_id": AudioEventSeam.BUS_MASTER, "volume_db": DEFAULT_SFX_DB, "muted": false},

@@ -13,7 +13,7 @@ class_name LanguageSelector
 
 const LocalizationCatalogScript := preload("res://scripts/systems/localization_catalog.gd")
 
-var _catalog: LocalizationCatalog = null
+var _catalog = null
 var _option_button: OptionButton = null
 var _active_language: String = "en"
 
@@ -25,12 +25,12 @@ func _ready() -> void:
 	add_child(_option_button)
 	_option_button.item_selected.connect(_on_item_selected)
 
-func set_catalog(catalog: LocalizationCatalog) -> void:
+func set_catalog(catalog) -> void:
 	_catalog = catalog
 	if _option_button != null:
 		_populate_options()
 
-func get_catalog() -> LocalizationCatalog:
+func get_catalog():
 	return _catalog
 
 func get_active_language() -> String:

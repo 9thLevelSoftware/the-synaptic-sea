@@ -23,6 +23,7 @@ const DEFAULT_CADENCE_SECONDS: float = 90.0
 const DEFAULT_CADENCE_EVENTS: int = 8
 const DEFAULT_MIN_REAL_INTERVAL_SECONDS: float = 5.0
 const DEFAULT_QUICKSAVE_COOLDOWN_SECONDS: float = 10.0
+const SaveSlotStateScript := preload("res://scripts/systems/save_slot_state.gd")
 
 var cadence_seconds: float = DEFAULT_CADENCE_SECONDS
 var cadence_events: int = DEFAULT_CADENCE_EVENTS
@@ -86,9 +87,9 @@ func _advance_rotation() -> void:
 func try_quicksave() -> Dictionary:
 	var now_real: float = float(Time.get_ticks_msec()) / 1000.0
 	if _last_quicksave_real_time >= 0.0 and (now_real - _last_quicksave_real_time) < quicksave_cooldown_seconds:
-		return {"should_save": false, "slot_id": SaveSlotState.QUICKSAVE_SLOT_ID, "reason": "cooldown"}
+		return {"should_save": false, "slot_id": SaveSlotStateScript.QUICKSAVE_SLOT_ID, "reason": "cooldown"}
 	_last_quicksave_real_time = now_real
-	return {"should_save": true, "slot_id": SaveSlotState.QUICKSAVE_SLOT_ID, "reason": "manual"}
+	return {"should_save": true, "slot_id": SaveSlotStateScript.QUICKSAVE_SLOT_ID, "reason": "manual"}
 
 ## Direct quicksave guard for test scenarios where Time.get_ticks_msec
 ## is not the right clock. Test-only.

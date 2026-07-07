@@ -1,6 +1,8 @@
 extends RefCounted
 class_name SfxEventRouter
 
+const AudioEventSeam := preload("res://scripts/audio/audio_event_seam.gd")
+
 ## SfxEventRouter — pure model that routes named audio events to buses
 ## (REQ-AU-001, ADR-0029).
 ##
@@ -22,7 +24,7 @@ const DEFAULT_CAPTION_DURATION: float = 2.5
 const MAX_CAPTION_QUEUE: int = 16
 
 ## Per-event catalog. Each entry: {bus, volume_db, cooldown, caption}.
-const EVENT_CATALOG: Dictionary = {
+static var EVENT_CATALOG: Dictionary = {
 	String(AudioEventSeam.SFX_TOOL_PICKUP): {"bus": AudioEventSeam.BUS_SFX, "volume_db": -3.0, "cooldown": 0.10, "caption": "Tool acquired"},
 	String(AudioEventSeam.SFX_TOOL_USE): {"bus": AudioEventSeam.BUS_SFX, "volume_db": -3.0, "cooldown": 0.05, "caption": "Tool used"},
 	String(AudioEventSeam.SFX_SUIT_BREATH): {"bus": AudioEventSeam.BUS_SFX, "volume_db": -12.0, "cooldown": 2.0, "caption": ""},
