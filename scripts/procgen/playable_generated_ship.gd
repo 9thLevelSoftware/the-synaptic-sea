@@ -4360,7 +4360,7 @@ func _build_hud_layer() -> void:
 	menu_coordinator.open_main_menu()
 
 func _on_scanner_panel_closed() -> void:
-	if player != null:
+	if is_instance_valid(player):
 		player.set_physics_process(true)
 		player.set_process_input(true)
 		player.set_process_unhandled_input(true)
@@ -4372,7 +4372,7 @@ func _on_chart_panel_closed() -> void:
 		player.set_process_unhandled_input(true)
 
 func _freeze_player_for_panel() -> void:
-	if player != null:
+	if is_instance_valid(player):
 		player.set_physics_process(false)
 		player.set_process_input(false)
 		player.set_process_unhandled_input(false)
@@ -4380,7 +4380,7 @@ func _freeze_player_for_panel() -> void:
 func _on_inventory_panel_closed() -> void:
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.UI_INVENTORY_CLOSE)
-	if player != null:
+	if is_instance_valid(player):
 		player.set_physics_process(true)
 		player.set_process_input(true)
 		player.set_process_unhandled_input(true)
