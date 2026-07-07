@@ -363,7 +363,11 @@ run_clean 'kit catalog smoke' 'KIT CATALOG PASS loaded=3 default=ship_structural
 run_clean 'floor wrapper collision footprint smoke' 'FLOOR WRAPPER COLLISION FOOTPRINT PASS checked=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/floor_wrapper_collision_footprint_smoke.gd
 run_clean 'readability prop factory smoke' 'READABILITY PROP FACTORY PASS props=9' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/readability_prop_factory_smoke.gd
 run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=122' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=204 clean_output=true'
+# --- Tranche 6 (2026-07-07): demo gate wiring + unlock triggers + the promoted gate model smoke ---
+run_clean 'Tranche 6 demo scope gate model smoke' 'DEMO SCOPE GATE PASS build_kind=release blocked=5 allowed=0 unknown_rejected=true params=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_gate_smoke.gd
+run_clean 'Tranche 6 demo scope enforcement smoke' 'DEMO SCOPE ENFORCEMENT PASS dev_unaffected=true save_cap=true world_skip=true hub_blocked=true hazards_capped=true cargo_capped=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_enforcement_smoke.gd
+run_clean 'Tranche 6 unlock trigger production smoke' 'UNLOCK TRIGGER PRODUCTION PASS triggers_valid=true scavenge_emitted=true codex_unlocked=true class_unlocked=true bridge_unlocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_production_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=207 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
@@ -558,7 +562,10 @@ orphan below so none is silent. Dispositions:
   reclassified the other 4: `procgen_stress_test` (superseded by
   `procgen_layout_stress_smoke`), `gridmap_meshlibrary_smoke` and the two arg-driven ship
   walkers (debug-tool).
-- **deferred-pending-T6** — `demo_scope_gate_smoke`; promoted when Tranche 6 wires the gate.
+- **deferred-pending-T6** — RESOLVED 2026-07-07: Tranche 6 wired DemoScopeGate into
+  production (5 manifest enforcement points) and promoted `demo_scope_gate_smoke` into the
+  bundle (marker gained `params=true`), alongside the new `demo_scope_enforcement_smoke` +
+  `unlock_trigger_production_smoke`. The tag has no remaining members.
 - **legacy-capture** — display-server/PNG/export artifact tools, self-excluded from headless
   regression by design.
 - **debug-tool** — developer probes without pass-marker discipline (plus, since Tranche 5,
@@ -611,7 +618,6 @@ membership changes).
 | `cross_training_smoke` | promotion-candidate |
 | `debug_apply_summary` | debug-tool |
 | `debug_save_load` | debug-tool |
-| `demo_scope_gate_smoke` | deferred-pending-T6 |
 | `derelict_loot_smoke` | promotion-candidate |
 | `derelict_objective_controller_smoke` | promotion-candidate |
 | `difficulty_profile_smoke` | promotion-candidate |

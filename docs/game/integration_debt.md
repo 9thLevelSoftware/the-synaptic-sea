@@ -258,3 +258,35 @@ Verified by hand against `audio_manager.gd` — they are ticked every frame.
 after `autosave_policy` → 8 after `kit_catalog`). The 8 remaining unreachable are Bucket-1
 infra/audit/dev tooling plus `junk_yield_resolver` — all expected-unreached, with **no
 borderline player-facing systems left**. Everything that is reachable is genuinely driven.
+
+## Unlock-trigger content debt (Tranche 6, 2026-07-07)
+
+`data/player/unlock_tables.json` authors 23 unlocks whose `trigger_event`s resolve
+through the TrainingEventBus log at run end (`_apply_meta_payout_and_persist`). The
+pipeline itself is wired; the debt is **emission**: production only fires the training
+events whose player actions exist. After the Tranche-6 retargets
+(`hub_scene_bridge` → `threat_killed`, `codex_repair_intro` → `repair_full_system`) and
+the new `scavenge_container` emission at the loot-search handler, the live set is:
+
+**Reachable in production (5 unlocks):** `hub_scene_workshop` (`fabricate_part`),
+`hub_scene_bridge` (`threat_killed`), `codex_repair_intro` (`repair_full_system`),
+`codex_scavenging_intro` + `class_unlock_salvage_captain` (`scavenge_container`).
+Proven end-to-end by `unlock_trigger_production_smoke`.
+
+**Content-pending (18 unlocks — trigger events with no production emission because the
+player action does not exist yet):** `diagnose_fault`, `first_aid_self`,
+`perform_surgery` (×3 unlocks: codex_surgery_intro, hub_scene_medical,
+class_unlock_field_medic), `plot_course`, `complete_astrogation` (×2:
+codex_astrogation_intro, hub_scene_reactor), `scan_derelict`, `decode_signal` (×2:
+codex_signal_intro, class_unlock_signal_specialist), `cook_meal`, `build_shelter`,
+`ration_supplies`, `inspire_crew`, `negotiate_truce`, `intimidate_threat`,
+`transmit_relay`. These are authored content awaiting their interactions (medical,
+navigation-ritual, social systems) — wiring an emission without the action would grant
+XP for nothing. The orphaned `defeat_enemy` training action (intimidation +100) is
+likewise content-pending: the kill path deliberately stays on the Domain-2 spec'd
+`threat_killed` action (re-targetable data; emitting both would double-grant per kill).
+
+Per user decision 2026-07-07 (retarget + flagship wire), these stay documented here
+rather than force-wired. The `unlock_trigger_production_smoke` structural guard keeps
+every catalog `trigger_event` inside the valid training-action vocabulary, so a future
+content pass only needs to emit the event at its new interaction.

@@ -41,15 +41,19 @@ This is the scheme in the dated specs and git PRs #41–#46 — **not** the "Gat
 
 **The completion roadmap (`docs/superpowers/specs/2026-06-28-completion-roadmap-design.md`)
 is done.** Domains 1–10 landed as PRs #50–#60 (2026-06-29 → 2026-07-03); all 18 loops read
-`closed` in the inventory (`--check` 191/191; regression bundle `commands=204 clean_output=true`
+`closed` in the inventory (`--check` 191/191; regression bundle `commands=207 clean_output=true`
 after the 2026-07-06 audit-remediation tranches — PRs #61–#64 fixed the audit's criticals plus
 the away-branch and save/load clusters, Tranche 3 (PR #65) promoted 25 smokes and classified
 every remaining orphan, Tranche 4 (PR #66) closed the UI-wiring cluster (audio-log panel,
-difficulty label, panel menu-modal guard, voice clip_path wiring), and Tranche 5 closed the
+difficulty label, panel menu-modal guard, voice clip_path wiring), Tranche 5 closed the
 procgen/data-coherence cluster (schema 1.2.0 everywhere + drift gate, archetype constraint
 enforcement, template.connections + stacked_v2 elevator, authoritative encounter tables
 ADR-0047, loader fire-zone getters wired, seed_000017 pipeline-regenerated, 32 procgen smokes
-promoted); see `docs/game/audits/2026-07-06-e2e-foundation-audit.md` for dispositions).
+promoted), and Tranche 6 wired DemoScopeGate into production at all 5 demo-manifest
+enforcement points, made the unlock pipeline fire from production events (scavenge XP +
+catalog retargets), replaced the phantom reachability method + false certifications in
+integration_debt.md, and recomputed 732 stale inventory pins via git archaeology; see
+`docs/game/audits/2026-07-06-e2e-foundation-audit.md` for dispositions).
 The 2026-06-28 "open functional gaps" list that used to live here was closed by that arc
 (git history has the old text).
 
