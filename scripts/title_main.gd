@@ -28,6 +28,9 @@ var _resolver = null
 var settings_state = SettingsStateScript.new()
 var _settings_dirty: bool = false
 var _presets: Array = []
+## Tranche 1 (audit): last gameplay boot/reload failure reason, surfaced on the
+## title menu after playable_failed tears the dead session down.
+var _last_boot_error: String = ""
 
 func _ready() -> void:
 	_save_load_service = SaveLoadServiceScript.new()
@@ -117,6 +120,7 @@ func _on_title_continue() -> void:
 	_instantiate_gameplay(true)
 
 func _instantiate_gameplay(should_load: bool) -> void:
+	_last_boot_error = ""
 	main_node = MAIN_SCENE.instantiate()
 	add_child(main_node)
 	if is_instance_valid(menu_panel):
@@ -127,6 +131,18 @@ func _poll_for_playable_started(should_load: bool) -> void:
 	if not is_instance_valid(main_node):
 		return
 	playable_instance = main_node.playable_instance
+	if is_instance_valid(playable_instance):
+		# Tranche 1 (audit): playable_failed was emitted on load failure but
+		# never connected — the deferred poll below spun forever on a dead
+		# boot. Connect the signal for the async case, and check the
+		# last_failure_reason flag for a failure that fired before this poll
+		# iteration could connect (no race window).
+		if playable_instance.has_signal("playable_failed") \
+				and not playable_instance.playable_failed.is_connected(_on_gameplay_failed):
+			playable_instance.playable_failed.connect(_on_gameplay_failed)
+		if not String(playable_instance.last_failure_reason).is_empty():
+			_on_gameplay_failed(playable_instance.last_failure_reason)
+			return
 	if not is_instance_valid(playable_instance) or not playable_instance.playable_started:
 		call_deferred("_poll_for_playable_started", should_load)
 		return
@@ -161,6 +177,14 @@ func _poll_for_playable_started(should_load: bool) -> void:
 
 func _on_title_quit() -> void:
 	get_tree().quit()
+
+## Tranche 1 (audit): a gameplay boot/reload failure returns the player to the
+## title menu with the reason surfaced, instead of stranding them in a broken
+## session (or spinning the boot poll forever).
+func _on_gameplay_failed(reason: String) -> void:
+	push_warning("TitleMain: gameplay boot failed (%s) — returning to title" % reason)
+	_last_boot_error = reason
+	_on_gameplay_return_to_title()
 
 func _on_gameplay_return_to_title() -> void:
 	if main_node != null and is_instance_valid(main_node):
@@ -197,6 +221,9 @@ func _refresh_panel() -> void:
 		var prefix: String = "> " if index == menu_state.get_focus_index() else "  "
 		var enabled_suffix: String = "" if menu_state.is_item_enabled(current_menu, item_id) else " (disabled)"
 		lines.append(prefix + label_text + enabled_suffix)
+	if not _last_boot_error.is_empty():
+		lines.append("")
+		lines.append("Load failed: %s" % _last_boot_error)
 	menu_panel.set_content("The Synaptic Sea", lines)
 
 ## Title-local mirror of `menu_coordinator._cycle_setting` (same ids/setters/enum
