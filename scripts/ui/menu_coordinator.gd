@@ -118,6 +118,10 @@ func _ready() -> void:
 	add_child(tutorial_overlay_panel)
 	_build_meta_screens()
 	menu_state.menu_changed.connect(_on_menu_changed)
+	# Session 3 (audit): enabled_changed was emitted by set_item_enabled but
+	# connected nowhere — enable/disable only rendered if the caller happened
+	# to hand-refresh. The renderer now follows the model signal.
+	menu_state.enabled_changed.connect(_on_item_enabled_changed)
 	tutorial_state.triggered.connect(_on_tutorial_triggered)
 	tutorial_state.dismissed.connect(_on_tutorial_dismissed)
 	tutorial_state.codex_unlocked.connect(_on_codex_unlocked)
@@ -432,6 +436,9 @@ func _build_meta_screens() -> void:
 	language_selector = LanguageSelectorScript.new()
 	language_selector.name = "LanguageSelector"
 	add_child(language_selector)
+	# Session 3 (audit): language_changed had zero subscribers — a language
+	# pick did nothing. Record it on the coordinator and re-render.
+	language_selector.language_changed.connect(_on_language_changed)
 	release_badge_overlay = ReleaseBadgeOverlayScript.new()
 	release_badge_overlay.name = "ReleaseBadgeOverlay"
 	add_child(release_badge_overlay)
@@ -1047,6 +1054,20 @@ func _refresh_tutorial() -> void:
 		tutorial_overlay_panel.show_tutorial(tutorial_state.get_title(tutorial_id), tutorial_state.get_body(tutorial_id))
 	else:
 		tutorial_overlay_panel.show_tutorial("", "")
+
+## Session 3 (audit): the coordinator's record of the picked UI language.
+## LanguageSelector owns the OptionButton; this is the game-side consumer.
+var _active_language: String = "en"
+
+func get_active_language() -> String:
+	return _active_language
+
+func _on_language_changed(language_id: String) -> void:
+	_active_language = language_id
+	_refresh_all()
+
+func _on_item_enabled_changed(_item_id: String, _enabled: bool) -> void:
+	_refresh_all()
 
 func _on_menu_changed(new_menu_id: String, previous_menu_id: String) -> void:
 	_last_closed_menu = previous_menu_id

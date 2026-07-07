@@ -239,7 +239,8 @@ run_clean 'Domain 10 main playable UI shell smoke' 'MAIN PLAYABLE UI SHELL PASS 
 run_clean 'Domain 10 main playable slice UI shell smoke' 'MAIN PLAYABLE SLICE UI SHELL PASS boot=main_menu pause=true codex=1 hotbar=true tooltip=true chart_gated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_ui_shell_smoke.gd
 run_clean 'Domain 10 web chart state model smoke' 'WEB CHART STATE PASS known=2 detail_upgrade=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/web_chart_state_smoke.gd
 run_clean 'Domain 10 UI polish end-to-end smoke' 'UI POLISH PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_polish_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=139 clean_output=true'
+run_clean 'menu signal wiring smoke' 'MENU SIGNAL WIRING PASS language=true enabled_render=true run_outcome=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_signal_wiring_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=140 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

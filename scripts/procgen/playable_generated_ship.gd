@@ -1667,7 +1667,11 @@ func end_run(reason: String = "extraction") -> int:
 			save_load_service.delete_current_run()
 			for slot_id in SaveSlotStateScript.AUTOSAVE_SLOT_IDS:
 				save_load_service.delete_slot(slot_id)
-	emit_signal("playable_slice_completed", get_slice_completion_summary())
+	# Session 3 (audit): the title screen consumes this summary — carry the
+	# end_run reason so "Last run: death" vs "Last run: extraction" renders.
+	var completion_summary: Dictionary = get_slice_completion_summary()
+	completion_summary["reason"] = reason
+	emit_signal("playable_slice_completed", completion_summary)
 	return payout
 
 ## ADR-0043 / run_id slot-ownership rework: freeze every slot this run
@@ -5205,7 +5209,9 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 			# defeating the REQ-012 stale-resume guard above (Codex review on PR #35).
 			for slot_id in SaveSlotStateScript.AUTOSAVE_SLOT_IDS:
 				save_load_service.delete_slot(slot_id)
-		emit_signal("playable_slice_completed", get_slice_completion_summary())
+		var objective_completion_summary: Dictionary = get_slice_completion_summary()
+		objective_completion_summary["reason"] = "complete"
+		emit_signal("playable_slice_completed", objective_completion_summary)
 		return
 	# REQ-012: auto-save at every stable objective-completion boundary.
 	# Multi-step objectives only fire this once (after the final step
