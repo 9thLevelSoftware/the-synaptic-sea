@@ -958,11 +958,11 @@ Verifier: All structural claims are verified on disk. interactable.gd:58-59 has 
 - [low] (save-load) scripts/systems/spoilage_state.gd:62 — SpoilageState.apply_summary() does not restore _last_transition_count; the field is written by get_summary() but silently dropped on load
 - [low] (procgen-pipeline) scripts/procgen/room_assigner.gd:14 — Roles compartment and quarters used in derelict_a/derelict_b zone role_pools are absent from ROOM_FOOTPRINT_OPTIONS
 - [low] (procgen-pipeline) data/procgen/golden/coherent_ship_001/layout.json:199 — Golden layouts use room_role names absent from the procgen pipeline — medbay in coherent_ship_001, side_storage in coherent_ship_002 — reducing their value as procgen regression fixtures
-- [low] (procgen-pipeline) scripts/procgen/layout_serializer.gd:5 — Stale header comment claims output matches schema 1.1.0 while code emits 1.2.0 with structurally different room and top-level fields
+- [low] (procgen-pipeline) scripts/procgen/layout_serializer.gd:5 — fixed@c92ca9b: stale header comment claimed schema 1.1.0 while the serializer and goldens moved to 1.2.0 with structurally different room and top-level fields
 - [low] (signal-wiring) scripts/ui/credits_screen.gd:74 — credits_dismissed is emitted by dismiss() but dismiss() is never called from menu_coordinator and the signal has no consumer
 - [low] (signal-wiring) scripts/ui/release_badge_overlay.gd:36 — metadata_changed signal is emitted once on configure but is never connected anywhere
 - [low] (signal-wiring) scripts/procgen/playable_generated_ship.gd:4740 — playable_ready and playable_interaction_completed are emitted at runtime but never connected in production code
-- [low] (validation-gaps) docs/game/06_validation_plan.md:343 — Save/load service docs description lists summaries=7 but smoke emits summaries=27 and bundle checks for summaries=27
+- [low] (validation-gaps) docs/game/06_validation_plan.md:343 — fixed@f445750: save/load service docs row now matches the live `summaries=28` contract introduced by the HallucinationDirector snapshot persistence commit
 - [low] (validation-gaps) scripts/validation/achievement_state_smoke.gd:12 — achievement_state_smoke.gd has a hardcoded macOS fallback path that makes it silently fail on Windows without the ROOT env var
 - [low] (hazard-contract) scripts/systems/fire_state.gd.uid:1 — fire_state.gd.uid orphan remains after fire_state.gd was deleted per ADR-0041
 - [low] (ui-wiring) scripts/procgen/playable_generated_ship.gd:4218 — _on_scanner_panel_closed uses `player != null` instead of is_instance_valid, inconsistent with adjacent functions
