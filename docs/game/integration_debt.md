@@ -290,3 +290,15 @@ Per user decision 2026-07-07 (retarget + flagship wire), these stay documented h
 rather than force-wired. The `unlock_trigger_production_smoke` structural guard keeps
 every catalog `trigger_event` inside the valid training-action vocabulary, so a future
 content pass only needs to emit the event at its new interaction.
+
+## Content-pending authored data (W9, 2026-07-07)
+
+- `data/ui/status_effect_icons.json` — content-pending. The file authors 8 status-effect
+  icon ids, but every path still points at `res://assets/placeholder/`, which does not
+  exist on disk, and there is no live status-effect panel/assets pass yet. Keep the data;
+  finish it in the future icon UI + assets integration pass.
+- `data/procgen/encounter_tables/threat_drone_swarm.json` — content-pending. The encounter
+  table is coherent authored data and ADR-0047 makes table JSON authoritative once a biome
+  references it, but no biome currently points at `threat_drone_swarm`. Future wiring
+  options: author a new biome around it or re-point `breach_field`; gameplay choice
+  deferred, so keep the table authored but unwired for now.
