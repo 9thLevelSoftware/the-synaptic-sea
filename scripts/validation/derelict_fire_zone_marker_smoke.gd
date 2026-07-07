@@ -94,6 +94,15 @@ func _validate() -> void:
 		_fail("derelict has no fire state")
 		return
 	fs.ignite("cargo_hold", 1.0)
+	var combined_status_lines: PackedStringArray = playable.get_combined_system_status_lines()
+	var derelict_fire_visible: bool = false
+	for line in combined_status_lines:
+		if String(line).begins_with("Fire cargo_hold intensity="):
+			derelict_fire_visible = true
+			break
+	if not derelict_fire_visible:
+		_fail("combined system status omitted active derelict fire line while away")
+		return
 	playable._build_fire_zones()
 
 	if playable.fire_zone_nodes.is_empty():

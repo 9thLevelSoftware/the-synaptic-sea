@@ -5419,8 +5419,9 @@ func _combined_system_status_lines() -> PackedStringArray:
 	if hull != null:
 		for line in hull.get_status_lines():
 			lines.append(String(line))
-	if fire_suppression_state != null:
-		for line in fire_suppression_state.get_status_lines():
+	var active_fire_state = _active_fire_state()
+	if active_fire_state != null:
+		for line in active_fire_state.get_status_lines():
 			lines.append(String(line))
 	if propulsion_expanded_state != null:
 		for line in propulsion_expanded_state.get_status_lines():
