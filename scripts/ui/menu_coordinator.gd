@@ -187,8 +187,9 @@ func handle_ui_input(event: InputEvent) -> bool:
 	# Language OptionButton, Audio Settings sliders, Audio Log ItemList) stay operable.
 	if not _active_meta_screen.is_empty():
 		if event.is_action_pressed("ui_cancel"):
-			if _active_meta_screen == "credits" and is_instance_valid(credits_screen):
-				credits_screen.dismiss()
+			var active_meta_node = _active_meta_screen_node()
+			if is_instance_valid(active_meta_node) and active_meta_node.has_method("dismiss"):
+				active_meta_node.dismiss()
 			else:
 				_close_meta_screen()
 			return true
@@ -714,6 +715,11 @@ func open_meta_screen(screen_id: String) -> void:
 
 func get_active_meta_screen() -> String:
 	return _active_meta_screen
+
+func _active_meta_screen_node():
+	if _active_meta_screen.is_empty() or not _meta_panels.has(_active_meta_screen):
+		return null
+	return _meta_panels[_active_meta_screen]
 
 ## Domain 8 seam: the Dictionary returned by the last meta_screen_confirm()
 ## call driven through handle_ui_input's ui_accept branch. Used by

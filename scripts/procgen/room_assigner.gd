@@ -253,7 +253,6 @@ func _next_index(role: String, role_counter: Dictionary) -> int:
 
 func _pick_footprint(role: String, blueprint: RefCounted) -> Vector2i:
 	if not ROOM_FOOTPRINT_OPTIONS.has(role):
-		push_warning("RoomAssigner: unknown footprint role '%s'; using default footprint %s" % [role, str(DEFAULT_FOOTPRINT)])
 		return DEFAULT_FOOTPRINT
 
 	var options: Array = ROOM_FOOTPRINT_OPTIONS[role]

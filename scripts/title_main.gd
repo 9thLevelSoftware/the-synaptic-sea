@@ -181,9 +181,9 @@ func _poll_for_playable_started(should_load: bool) -> void:
 	if should_load:
 		if playable_instance.request_load():
 			# Continue can rebuild the playable from the saved world snapshot.
-			# Refresh the cached title summary so later progress math uses the
-			# loaded slice's logical objective sequence count, not the pre-load boot.
-			_last_playable_summary = playable_instance.get_playable_summary().duplicate(true)
+			# Consume the loaded-run summary through the same ready handler as a
+			# fresh boot so stale previous-run outcome/progress are cleared too.
+			_on_gameplay_ready(playable_instance.get_playable_summary())
 	# Dirty-flag handoff (spec 3.7): only push title-local settings into the fresh
 	# session when the player actually touched them at the title screen — otherwise
 	# an untouched title would clobber whatever request_load() just restored.
@@ -242,17 +242,15 @@ func _on_gameplay_ready(summary: Dictionary) -> void:
 	_last_run_outcome = ""
 	_last_run_progress = ""
 
-func _summary_logical_objective_count(summary: Dictionary) -> int:
-	var total_sequences: int = int(summary.get("objective_sequence_count", 0))
-	if total_sequences > 0:
-		return total_sequences
-	return int(summary.get("objective_count", 0))
-
 func _on_gameplay_interaction_completed(_interaction_id: String, _objective_id: String, sequence: int, _objective_type: String, _room_id: String) -> void:
-	var total_objectives: int = _summary_logical_objective_count(_last_playable_summary)
+	var total_objectives: int = int(_last_playable_summary.get("objective_sequence_count", 0))
+	if total_objectives <= 0:
+		total_objectives = int(_last_playable_summary.get("objective_count", 0))
 	if total_objectives <= 0 and is_instance_valid(playable_instance):
 		_last_playable_summary = playable_instance.get_playable_summary()
-		total_objectives = _summary_logical_objective_count(_last_playable_summary)
+		total_objectives = int(_last_playable_summary.get("objective_sequence_count", 0))
+		if total_objectives <= 0:
+			total_objectives = int(_last_playable_summary.get("objective_count", 0))
 	_last_run_progress = "objectives %d/%d" % [sequence, total_objectives]
 
 func _on_gameplay_slice_completed(summary: Dictionary) -> void:

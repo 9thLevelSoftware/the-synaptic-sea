@@ -60,12 +60,7 @@ func _panel_text() -> String:
 	return _node_text(title.menu_panel)
 
 func _has_property(node: Object, property_name: String) -> bool:
-	if node == null:
-		return false
-	for prop in node.get_property_list():
-		if str((prop as Dictionary).get("name", "")) == property_name:
-			return true
-	return false
+	return node != null and property_name in node
 
 func _pressed_action(action_name: String) -> InputEventAction:
 	var event := InputEventAction.new()

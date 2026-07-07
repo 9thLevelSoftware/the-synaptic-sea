@@ -4,8 +4,12 @@ const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const TopologyTemplateScript := preload("res://scripts/procgen/topology_template.gd")
 const RoomAssignerScript := preload("res://scripts/procgen/room_assigner.gd")
 
+var _fatal_error: bool = false
+
 func _initialize() -> void:
 	var missing_footprints: Array[String] = _collect_missing_footprint_roles()
+	if _fatal_error:
+		return
 	if not missing_footprints.is_empty():
 		push_error("ROOM ASSIGNER FAIL footprint vocabulary missing=%s" % str(missing_footprints))
 		quit(1)
@@ -161,13 +165,19 @@ func _initialize() -> void:
 func _collect_missing_footprint_roles() -> Array[String]:
 	var missing: Array[String] = []
 	_collect_template_role_pool_gaps("res://data/procgen/templates", missing)
+	if _fatal_error:
+		return missing
 	_collect_archetype_role_weight_gaps("res://data/procgen/archetypes", missing)
 	return missing
 
 
 func _collect_template_role_pool_gaps(dir_path: String, missing: Array[String]) -> void:
 	for rel_path in _sorted_json_paths(dir_path):
+		if _fatal_error:
+			return
 		var doc: Dictionary = _load_json_dict(rel_path)
+		if _fatal_error:
+			return
 		var zones_raw: Variant = doc.get("zones", [])
 		if not (zones_raw is Array):
 			continue
@@ -187,7 +197,11 @@ func _collect_template_role_pool_gaps(dir_path: String, missing: Array[String]) 
 
 func _collect_archetype_role_weight_gaps(dir_path: String, missing: Array[String]) -> void:
 	for rel_path in _sorted_json_paths(dir_path):
+		if _fatal_error:
+			return
 		var doc: Dictionary = _load_json_dict(rel_path)
+		if _fatal_error:
+			return
 		var role_weights: Dictionary = doc.get("role_weights", {})
 		for role_variant in role_weights.keys():
 			var role: String = str(role_variant)
@@ -198,8 +212,7 @@ func _collect_archetype_role_weight_gaps(dir_path: String, missing: Array[String
 func _sorted_json_paths(dir_path: String) -> Array[String]:
 	var dir: DirAccess = DirAccess.open(dir_path)
 	if dir == null:
-		push_error("ROOM ASSIGNER FAIL cannot open directory %s" % dir_path)
-		quit(1)
+		_fail("cannot open directory %s" % dir_path)
 		return []
 	var files: Array[String] = []
 	dir.list_dir_begin()
@@ -216,23 +229,25 @@ func _sorted_json_paths(dir_path: String) -> Array[String]:
 func _load_json_dict(path: String) -> Dictionary:
 	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if file == null:
-		push_error("ROOM ASSIGNER FAIL cannot open %s" % path)
-		quit(1)
+		_fail("cannot open %s" % path)
 		return {}
 	var text: String = file.get_as_text()
 	file.close()
 	var json: JSON = JSON.new()
 	var parse_err: int = json.parse(text)
 	if parse_err != OK:
-		push_error("ROOM ASSIGNER FAIL invalid JSON %s line=%d error=%s" % [
+		_fail("invalid JSON %s line=%d error=%s" % [
 			path,
 			json.get_error_line(),
 			json.get_error_message(),
 		])
-		quit(1)
 		return {}
 	if not (json.data is Dictionary):
-		push_error("ROOM ASSIGNER FAIL JSON root is not an object: %s" % path)
-		quit(1)
+		_fail("JSON root is not an object: %s" % path)
 		return {}
 	return json.data
+
+func _fail(reason: String) -> void:
+	_fatal_error = true
+	push_error("ROOM ASSIGNER FAIL %s" % reason)
+	quit(1)

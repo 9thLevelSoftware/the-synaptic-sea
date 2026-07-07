@@ -117,8 +117,6 @@ func _extract_marker_print_lines(path: String, markers: Array) -> PackedStringAr
 		var line: String = str(raw_line).strip_edges()
 		if line.is_empty() or line.begins_with("#"):
 			continue
-		if line.find("#") == 0:
-			continue
 		if not line.contains("print("):
 			continue
 		for marker_variant in markers:
