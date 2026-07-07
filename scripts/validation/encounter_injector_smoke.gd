@@ -221,7 +221,125 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	print("ENCOUNTER INJECTOR PASS std_markers=%d deep_markers=%d markers_valid=true deterministic=true critical_safe=true legacy_compat=true" % [
+	# --- Case 9 (Tranche 5, 2026-07-06 audit HIGH): the authored encounter
+	# tables (data/procgen/encounter_tables/*.json) were never loaded — kinds
+	# came from the hardcoded ROLE_TO_ENCOUNTER_KIND constants and count was
+	# always 1. FULL table semantics (user decision 2026-07-07): kind via
+	# deterministic weighted roll among the table's rolls for the role, count
+	# from the roll's authored int-or-[min,max]; roles the table does not
+	# cover fall back to the constants.
+	# dead_fleet's derelict_pirate table diverges from the constants:
+	#   bay     -> drone_scout  (constant: drone_swarm)
+	#   hangar  -> drone_scout, count [1,2]  (constant: drone_swarm, count 1)
+	#   airlock -> NOT in the table -> constants fallback (breach_lurker)
+	var table_rooms: Array = []
+	for spec in [["crit_a", "corridor"], ["bay_room", "bay"], ["hangar_room", "hangar"],
+			["airlock_room", "airlock"], ["compartment_room", "compartment"], ["crit_b", "corridor"]]:
+		table_rooms.append({
+			"id": spec[0],
+			"room_role": spec[1],
+			"deck": 0,
+			"cells": [Vector2i(table_rooms.size(), 0)],
+		})
+	var layout_table: Dictionary = {
+		"schema_version": "1.2.0",
+		"document_kind": "ship_layout",
+		"rooms": table_rooms,
+		"room_links": [],
+		"critical_path": ["crit_a", "crit_b"],
+	}
+	var biome_fleet = BiomeProfileScript.from_dict({"id": "dead_fleet",
+		"encounter_table_id": "derelict_pirate", "encounter_density_modifier": 2.5})
+	var diff_table = DifficultyProfileScript.from_dict({"id": "deep_dive",
+		"encounter_density_modifier": 2.5})
+	# combined_modifier clamps at 3.0, so per-room probabilities cannot
+	# saturate (bay caps at 0.75). Sample deterministic seeds until every
+	# probed room has produced a marker — each seed's outcome is fixed, so
+	# this loop is replay-stable.
+	var by_room: Dictionary = {}
+	for probe_seed in range(1, 201):
+		injector_std.inject(layout_table, biome_fleet, diff_table, probe_seed)
+		for marker in layout_table["encounters"]:
+			var mr: String = str(marker.get("room_id", ""))
+			if not by_room.has(mr):
+				by_room[mr] = marker
+		if by_room.size() >= 4:
+			break
+	for wanted_room in ["bay_room", "hangar_room", "airlock_room", "compartment_room"]:
+		if not by_room.has(wanted_room):
+			push_error("ENCOUNTER INJECTOR FAIL 200 seeds never marked %s" % wanted_room)
+			quit(1)
+			return
+
+	if str(by_room["bay_room"].get("encounter_kind", "")) != "drone_scout":
+		push_error("ENCOUNTER INJECTOR FAIL derelict_pirate table not applied: bay kind=%s expected=drone_scout (table unloaded, constants used)" % str(by_room["bay_room"].get("encounter_kind", "")))
+		quit(1)
+		return
+	if str(by_room["hangar_room"].get("encounter_kind", "")) != "drone_scout":
+		push_error("ENCOUNTER INJECTOR FAIL derelict_pirate table not applied: hangar kind=%s expected=drone_scout" % str(by_room["hangar_room"].get("encounter_kind", "")))
+		quit(1)
+		return
+	var hangar_count: int = int(by_room["hangar_room"].get("count", 0))
+	if hangar_count < 1 or hangar_count > 2:
+		push_error("ENCOUNTER INJECTOR FAIL hangar count=%d outside authored [1,2] range" % hangar_count)
+		quit(1)
+		return
+	if str(by_room["airlock_room"].get("encounter_kind", "")) != "breach_lurker":
+		push_error("ENCOUNTER INJECTOR FAIL constants fallback broken for table-uncovered role: airlock kind=%s expected=breach_lurker" % str(by_room["airlock_room"].get("encounter_kind", "")))
+		quit(1)
+		return
+	# compartment has DUAL rolls (drone_scout w5 / biomatter_lurker w4) — the
+	# weighted pick must land on one of the authored kinds.
+	var compartment_kind: String = str(by_room["compartment_room"].get("encounter_kind", ""))
+	if compartment_kind != "drone_scout" and compartment_kind != "biomatter_lurker":
+		push_error("ENCOUNTER INJECTOR FAIL compartment dual-roll produced unauthored kind=%s" % compartment_kind)
+		quit(1)
+		return
+	if str(by_room["bay_room"].get("encounter_table_id", "")) != "derelict_pirate":
+		push_error("ENCOUNTER INJECTOR FAIL marker encounter_table_id=%s expected=derelict_pirate" % str(by_room["bay_room"].get("encounter_table_id", "")))
+		quit(1)
+		return
+
+	# --- Case 10: table path stays deterministic per seed ---
+	var layout_table_a: Dictionary = layout_table.duplicate(true)
+	var layout_table_b: Dictionary = layout_table.duplicate(true)
+	injector_std.inject(layout_table_a, biome_fleet, diff_table, 314)
+	injector_std.inject(layout_table_b, biome_fleet, diff_table, 314)
+	if str(layout_table_a["encounters"]) != str(layout_table_b["encounters"]):
+		push_error("ENCOUNTER INJECTOR FAIL table-driven markers differ across identical runs")
+		quit(1)
+		return
+
+	# --- Case 11: missing table file -> constants fallback (warn-once) ---
+	var layout_missing: Dictionary = {
+		"schema_version": "1.2.0",
+		"document_kind": "ship_layout",
+		"rooms": [
+			{"id": "crit_x", "room_role": "corridor", "deck": 0, "cells": [Vector2i(0, 0)]},
+			{"id": "bay_x", "room_role": "bay", "deck": 0, "cells": [Vector2i(1, 0)]},
+		],
+		"room_links": [],
+		"critical_path": ["crit_x"],
+	}
+	var biome_missing = BiomeProfileScript.from_dict({"id": "test_biome",
+		"encounter_table_id": "no_such_table", "encounter_density_modifier": 5.0})
+	var missing_marker: Dictionary = {}
+	for probe_seed in range(1, 201):
+		injector_std.inject(layout_missing, biome_missing, diff_table, probe_seed)
+		var mm: Array = layout_missing["encounters"]
+		if not mm.is_empty():
+			missing_marker = mm[0]
+			break
+	if missing_marker.is_empty():
+		push_error("ENCOUNTER INJECTOR FAIL missing-table case: 200 seeds never marked bay_x")
+		quit(1)
+		return
+	if str(missing_marker.get("encounter_kind", "")) != "drone_swarm":
+		push_error("ENCOUNTER INJECTOR FAIL missing-table fallback: bay kind=%s expected=drone_swarm (constants)" % str(missing_marker.get("encounter_kind", "")))
+		quit(1)
+		return
+
+	print("ENCOUNTER INJECTOR PASS std_markers=%d deep_markers=%d markers_valid=true deterministic=true critical_safe=true legacy_compat=true table_driven=true table_fallback=true" % [
 		int(layout_std["encounters"].size()),
 		int(layout_deep["encounters"].size()),
 	])

@@ -62,6 +62,7 @@ func assign_with_selector(
 
 	var room_plan: Array[Dictionary] = []
 	var role_counter: Dictionary = {}  # role -> next index
+	var zone_pools: Dictionary = {}  # zone_id -> Array[String] role pool
 
 	# Process zones in template order. The template zone ordering defines
 	# the room ordering: entry first, destination last.
@@ -72,6 +73,7 @@ func assign_with_selector(
 		if role_pool_raw is Array:
 			for entry in role_pool_raw:
 				role_pool.append(str(entry))
+		zone_pools[zone_id] = role_pool
 
 		var count: int = _resolve_count(zone.get("count", 1))
 		var deck: int = int(zone.get("deck", 0))
@@ -95,7 +97,76 @@ func assign_with_selector(
 				"footprint": footprint,
 			})
 
+	# Tranche 5 (2026-07-06 audit HIGH): archetype guaranteed_roles were
+	# authored in every archetype JSON (derelict guarantees "dock") but never
+	# enforced. Deterministic post-pass — no RNG, so per-seed replay is stable.
+	_enforce_guaranteed_roles(room_plan, archetype, zone_pools, blueprint, biome)
+
 	return room_plan
+
+
+# Ensures every archetype guaranteed_role appears at least once, replacing the
+# most-duplicated non-guaranteed room whose zone role_pool permits the missing
+# role. Entry (first) and destination (last) rooms are never replaced.
+# Candidate choice uses no RNG (duplicate count descending, later plan index
+# breaking ties); the replacement's footprint/variant re-rolls draw from the
+# seeded rng, so per-seed replay stays byte-identical. When no eligible room
+# exists the guarantee is skipped with a warning — generation never fails.
+func _enforce_guaranteed_roles(room_plan: Array[Dictionary], archetype: Dictionary,
+		zone_pools: Dictionary, blueprint: RefCounted, biome: String) -> void:
+	var guaranteed_raw: Variant = archetype.get("guaranteed_roles", [])
+	if not (guaranteed_raw is Array) or (guaranteed_raw as Array).is_empty():
+		return
+	var guaranteed: Array[String] = []
+	for entry in (guaranteed_raw as Array):
+		guaranteed.append(str(entry))
+
+	var replaced_any: bool = false
+	for wanted in guaranteed:
+		var present: bool = false
+		for room in room_plan:
+			if str(room.get("role", "")) == wanted:
+				present = true
+				break
+		if present:
+			continue
+
+		var role_counts: Dictionary = {}
+		for room in room_plan:
+			var r: String = str(room.get("role", ""))
+			role_counts[r] = int(role_counts.get(r, 0)) + 1
+
+		var best_index: int = -1
+		var best_count: int = 0
+		for i in range(1, room_plan.size() - 1):  # never the entry or destination
+			var room: Dictionary = room_plan[i]
+			var role: String = str(room.get("role", ""))
+			if role in guaranteed:
+				continue
+			var pool: Array = zone_pools.get(str(room.get("zone_id", "")), [])
+			if not (wanted in pool):
+				continue
+			var count: int = int(role_counts.get(role, 0))
+			if count >= best_count:  # >= so later plan index wins ties
+				best_count = count
+				best_index = i
+		if best_index < 0:
+			push_warning("RoomAssigner: guaranteed role '%s' has no eligible zone in this template; guarantee skipped" % wanted)
+			continue
+
+		var target: Dictionary = room_plan[best_index]
+		target["role"] = wanted
+		target["footprint"] = _pick_footprint(wanted, blueprint)
+		target["target_cells"] = int(target["footprint"].x) * int(target["footprint"].y)
+		target["variant"] = _pick_variant(wanted, best_index, blueprint, biome)
+		replaced_any = true
+
+	if replaced_any:
+		# Re-derive ids so role indices stay contiguous and unique in plan order.
+		var counter: Dictionary = {}
+		for room in room_plan:
+			var role: String = str(room.get("role", ""))
+			room["id"] = "%s_%02d" % [role, _next_index(role, counter)]
 
 
 # Picks a variant string via the supplied selector (if any). Falls
@@ -124,7 +195,15 @@ func _pick_role(pool: Array[String], archetype: Dictionary, role_counter: Dictio
 	if pool.is_empty():
 		return "corridor"
 	if pool.size() == 1:
+		# Single-role zones are authored intent (the zone demands that role);
+		# max_duplicates applies only where alternatives exist.
 		return pool[0]
+
+	# Tranche 5 (2026-07-06 audit HIGH): archetype max_duplicates was authored
+	# in every archetype JSON but never enforced. Roles already at the cap are
+	# excluded from the weighted pick; if EVERY pool role is capped, fall back
+	# to the least-used pool role — generation never fails.
+	var max_dup: int = int(archetype.get("max_duplicates", 0))  # 0 = unlimited
 
 	var weights: Dictionary = archetype.get("role_weights", {})
 	var candidates: Array[String] = []
@@ -132,12 +211,24 @@ func _pick_role(pool: Array[String], archetype: Dictionary, role_counter: Dictio
 	var total: int = 0
 
 	for role in pool:
+		if max_dup > 0 and int(role_counter.get(role, 0)) >= max_dup:
+			continue
 		var w: int = int(weights.get(role, 1))
 		if w <= 0:
 			w = 1
 		candidates.append(role)
 		candidate_weights.append(w)
 		total += w
+
+	if candidates.is_empty():
+		var least_used: String = pool[0]
+		var least_count: int = int(role_counter.get(pool[0], 0))
+		for role in pool:
+			var used: int = int(role_counter.get(role, 0))
+			if used < least_count:
+				least_count = used
+				least_used = role
+		return least_used
 
 	var roll: int = rng.randi_range(1, total)
 	var cumulative: int = 0

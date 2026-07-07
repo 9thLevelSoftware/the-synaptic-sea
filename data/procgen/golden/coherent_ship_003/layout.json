@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "document_kind": "ship_layout",
   "program_id": "coherent-proof-ship-003",
   "kit_id": "ship_structural_v0",
@@ -885,5 +885,6 @@
   "prototype": {
     "start_room": "airlock_03",
     "goal_room": "reactor_03"
-  }
+  },
+  "encounters": []
 }

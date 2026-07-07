@@ -103,6 +103,19 @@ const ROLE_TO_ENCOUNTER_KIND: Dictionary = {
 
 const DEFAULT_ENCOUNTER_KIND: String = "biomatter_lurker"
 
+const ENCOUNTER_TABLE_DIR: String = "res://data/procgen/encounter_tables/"
+
+# Tranche 5 (2026-07-06 audit HIGH): the authored encounter tables under
+# data/procgen/encounter_tables/ were never loaded — the biome's
+# encounter_table_id was stamped on markers but selected nothing. FULL table
+# semantics (user decision 2026-07-07): for a role the table covers, the kind
+# is a deterministic weighted roll among that role's table rolls and the count
+# comes from the roll's authored int-or-[min,max]; roles the table does not
+# cover (and biomes whose table file is missing/malformed) fall back to the
+# ROLE_TO_ENCOUNTER_KIND constants with count 1, exactly as before.
+# Cache: table_id -> Dictionary ({} = missing/malformed, warned once).
+var _table_cache: Dictionary = {}
+
 
 # Injects encounter spawn markers into `layout` in place. Returns
 # the same Dictionary with an `encounters` Array populated. The
@@ -173,7 +186,15 @@ func inject(
 		if roll >= p_final:
 			continue
 
-		var encounter_kind: String = str(ROLE_TO_ENCOUNTER_KIND.get(role, DEFAULT_ENCOUNTER_KIND))
+		var encounter_kind: String
+		var marker_count: int = 1
+		var table_rolls: Array = _table_rolls_for_role(encounter_table_id, role)
+		if not table_rolls.is_empty():
+			var pick: Dictionary = _pick_table_roll(table_rolls, rng)
+			encounter_kind = str(pick.get("encounter_kind", ""))
+			marker_count = _resolve_roll_count(pick.get("count", 1), rng)
+		else:
+			encounter_kind = str(ROLE_TO_ENCOUNTER_KIND.get(role, DEFAULT_ENCOUNTER_KIND))
 		if encounter_kind.is_empty():
 			continue
 
@@ -199,7 +220,7 @@ func inject(
 			"cell": cell_entry,
 			"local_position": local_position,
 			"encounter_kind": encounter_kind,
-			"count": 1,
+			"count": marker_count,
 			"difficulty_tier": difficulty_id,
 			"encounter_table_id": encounter_table_id,
 			"seed_offset": marker_index,
@@ -372,6 +393,78 @@ static func floor_cell_entries(room: Dictionary, cell_size: float) -> Array:
 					"local_position": [float(wp[0]), float(wp[1]), float(wp[2])],
 				})
 	return out
+
+
+# Loads (and caches) the encounter table for `table_id`, returning the rolls
+# whose `role` matches. Missing/malformed tables warn once per injector
+# instance and resolve to {} so every role falls back to the constants.
+func _table_rolls_for_role(table_id: String, role: String) -> Array:
+	if table_id.is_empty() or role.is_empty():
+		return []
+	var table: Dictionary = _load_encounter_table(table_id)
+	var rolls_raw: Variant = table.get("rolls", [])
+	if not (rolls_raw is Array):
+		return []
+	var matched: Array = []
+	for roll_variant in (rolls_raw as Array):
+		if not (roll_variant is Dictionary):
+			continue
+		if str((roll_variant as Dictionary).get("role", "")) == role:
+			matched.append(roll_variant)
+	return matched
+
+
+func _load_encounter_table(table_id: String) -> Dictionary:
+	if _table_cache.has(table_id):
+		return _table_cache[table_id]
+	var path: String = ENCOUNTER_TABLE_DIR + table_id + ".json"
+	var result: Dictionary = {}
+	if not FileAccess.file_exists(path):
+		push_warning("EncounterInjector: encounter table file missing, falling back to role constants: %s" % path)
+	else:
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+		if parsed is Dictionary:
+			result = parsed
+		else:
+			push_warning("EncounterInjector: encounter table is not a JSON object, falling back to role constants: %s" % path)
+	_table_cache[table_id] = result
+	return result
+
+
+# Deterministic weighted pick among a role's table rolls. A single roll is
+# returned without consuming an rng draw; non-positive weights count as 1.
+func _pick_table_roll(rolls: Array, rng: RandomNumberGenerator) -> Dictionary:
+	if rolls.size() == 1:
+		return rolls[0]
+	var total: int = 0
+	var weights: Array[int] = []
+	for roll in rolls:
+		var w: int = int((roll as Dictionary).get("weight", 1))
+		if w <= 0:
+			w = 1
+		weights.append(w)
+		total += w
+	var drawn: int = rng.randi_range(1, total)
+	var cumulative: int = 0
+	for i in range(rolls.size()):
+		cumulative += weights[i]
+		if drawn <= cumulative:
+			return rolls[i]
+	return rolls[0]
+
+
+# Authored count is either an int or an inclusive [min, max] range; ranges
+# consume one rng draw. Result is floored at 1 (validate() requires count>=1).
+func _resolve_roll_count(count_value: Variant, rng: RandomNumberGenerator) -> int:
+	if count_value is Array:
+		var arr: Array = count_value
+		if arr.size() >= 2:
+			var lo: int = int(arr[0])
+			var hi: int = int(arr[1])
+			if hi < lo:
+				hi = lo
+			return maxi(1, rng.randi_range(lo, hi))
+	return maxi(1, int(count_value))
 
 
 func _safe_combined(biome, difficulty, dial: String) -> float:

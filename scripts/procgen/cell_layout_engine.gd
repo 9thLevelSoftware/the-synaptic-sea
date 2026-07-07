@@ -138,6 +138,12 @@ func layout(room_plan: Array[Dictionary], template: RefCounted, seed_value: int)
 	# (cell adjacency can't discover these since rooms are on separate deck grids)
 	_add_cross_deck_adjacencies(adjacencies, placed, room_zone_map, zone_rooms_map, template)
 
+	# Tranche 5 (2026-07-06 audit M+M): honor the template's authored
+	# `connections` array — previously parsed by TopologyTemplate but consumed
+	# by nothing, which left stacked_v2's declared elevator -> upper_hub edge
+	# unemitted (the elevator zone had no vertical path).
+	_add_template_connection_adjacencies(adjacencies, placed, zone_rooms_map, template)
+
 	return {"rooms": placed, "adjacencies": adjacencies}
 
 
@@ -440,6 +446,87 @@ func _add_cross_deck_adjacencies(adjacencies: Array[Dictionary], placed: Diction
 			"from_cell": from_cell,
 			"to_cell": to_cell,
 		})
+
+
+# Consumes template.connections (authored zone-level edges). For each declared
+# connection whose zone pair is not already connected: cross-deck pairs gain a
+# logical adjacency (same policy as _add_cross_deck_adjacencies — cell
+# discovery cannot see across deck grids); same-deck pairs that placement
+# failed to make physically adjacent get a warning instead of an invented
+# doorway through empty cells. Zone refs like "spine[0]" / "spine[*]" resolve
+# at zone granularity (the index syntax is a placement-distribution hint, not
+# a separate zone).
+func _add_template_connection_adjacencies(adjacencies: Array[Dictionary], placed: Dictionary,
+		zone_rooms_map: Dictionary, template: RefCounted) -> void:
+	var existing_pairs: Dictionary = {}
+	for adj in adjacencies:
+		existing_pairs[_pair_key(str(adj["from_room"]), str(adj["to_room"]))] = true
+
+	for conn_variant in template.connections:
+		if typeof(conn_variant) != TYPE_DICTIONARY:
+			continue
+		var conn: Dictionary = conn_variant
+		var from_zone: String = _zone_ref_id(str(conn.get("from", "")))
+		var to_zone: String = _zone_ref_id(str(conn.get("to", "")))
+		if from_zone.is_empty() or to_zone.is_empty() or from_zone == to_zone:
+			continue
+
+		# Mirror the attach_to policy: last placed room of the from-zone,
+		# first placed room of the to-zone.
+		var from_rid: String = ""
+		for rid in zone_rooms_map.get(from_zone, []):
+			if placed.has(rid):
+				from_rid = rid
+		var to_rid: String = ""
+		for rid in zone_rooms_map.get(to_zone, []):
+			if placed.has(rid):
+				to_rid = rid
+				break
+		if from_rid.is_empty() or to_rid.is_empty():
+			continue
+
+		# Already satisfied if ANY room of the from-zone touches ANY room of
+		# the to-zone (cell discovery or attach_to already covered it).
+		var satisfied: bool = false
+		for fr in zone_rooms_map.get(from_zone, []):
+			for tr in zone_rooms_map.get(to_zone, []):
+				if existing_pairs.has(_pair_key(str(fr), str(tr))):
+					satisfied = true
+					break
+			if satisfied:
+				break
+		if satisfied:
+			continue
+
+		var from_deck: int = int(placed[from_rid].get("deck", 0))
+		var to_deck: int = int(placed[to_rid].get("deck", 0))
+		if from_deck == to_deck:
+			# Same-deck declared connections are placement HINTS: the greedy
+			# placer routinely satisfies connectivity through other rooms
+			# instead (ship-wide BFS connectivity is separately guaranteed and
+			# smoke-asserted). Inventing a doorway between non-touching rooms
+			# would be geometrically wrong, and warning here fires on nearly
+			# every seed for spine/bifurcated — placement-emergent same-deck
+			# routing is the historical norm, not an anomaly.
+			continue
+
+		existing_pairs[_pair_key(from_rid, to_rid)] = true
+		var from_cells: Array = placed[from_rid].get("cells", [])
+		var to_cells: Array = placed[to_rid].get("cells", [])
+		adjacencies.append({
+			"from_room": from_rid,
+			"to_room": to_rid,
+			"from_cell": from_cells[0] if not from_cells.is_empty() else Vector2i.ZERO,
+			"to_cell": to_cells[0] if not to_cells.is_empty() else Vector2i.ZERO,
+		})
+
+
+# "spine", "spine[0]", "spine[*]", "spine[*+1]" all refer to zone "spine".
+func _zone_ref_id(zone_ref: String) -> String:
+	var bracket: int = zone_ref.find("[")
+	if bracket >= 0:
+		return zone_ref.substr(0, bracket)
+	return zone_ref
 
 
 func _pair_key(a: String, b: String) -> String:
