@@ -10,13 +10,9 @@ extends SceneTree
 ##  - missing key inside a known language returns the default text
 
 const LocalizationCatalogScript := preload("res://scripts/systems/localization_catalog.gd")
-const ROOT_DEFAULT: String = "/Users/christopherwilloughby/the-synaptic-sea"
 
 func _initialize() -> void:
-	var root_path: String = OS.get_environment("ROOT")
-	if root_path.is_empty():
-		root_path = ROOT_DEFAULT
-	var catalog_path: String = root_path + "/data/release/localization_catalog.json"
+	var catalog_path: String = "res://data/release/localization_catalog.json"
 	if not FileAccess.file_exists(catalog_path):
 		_fail("catalog unreadable: %s" % catalog_path)
 		return

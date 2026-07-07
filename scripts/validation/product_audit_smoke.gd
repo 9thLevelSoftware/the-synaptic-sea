@@ -3,15 +3,10 @@ extends SceneTree
 const ProductAuditReportScript := preload("res://scripts/systems/product_audit_report.gd")
 const IntegrationMatrixScript := preload("res://scripts/systems/integration_matrix.gd")
 
-const ROOT_DEFAULT: String = "/Users/christopherwilloughby/the-synaptic-sea"
-
 func _initialize() -> void:
-	var root_path: String = OS.get_environment("ROOT")
-	if root_path.is_empty():
-		root_path = ROOT_DEFAULT
-	var report_data: Dictionary = _load_json(root_path + "/data/integration/product_audit_report.json")
-	var matrix_data: Dictionary = _load_json(root_path + "/data/integration/cross_system_integration_matrix.json")
-	var issue_manifest: Dictionary = _load_json(root_path + "/data/integration/known_issue_fix_manifest.json")
+	var report_data: Dictionary = _load_json("res://data/integration/product_audit_report.json")
+	var matrix_data: Dictionary = _load_json("res://data/integration/cross_system_integration_matrix.json")
+	var issue_manifest: Dictionary = _load_json("res://data/integration/known_issue_fix_manifest.json")
 	if report_data.is_empty() or matrix_data.is_empty() or issue_manifest.is_empty():
 		_fail("audit report, matrix, or issue manifest missing")
 		return

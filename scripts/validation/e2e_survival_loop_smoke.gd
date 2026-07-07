@@ -3,14 +3,9 @@ extends SceneTree
 const AutomatedPlaytestRubricScript := preload("res://scripts/systems/automated_playtest_rubric.gd")
 const BalanceLedgerScript := preload("res://scripts/systems/balance_ledger.gd")
 
-const ROOT_DEFAULT: String = "/Users/christopherwilloughby/the-synaptic-sea"
-
 func _initialize() -> void:
-	var root_path: String = OS.get_environment("ROOT")
-	if root_path.is_empty():
-		root_path = ROOT_DEFAULT
-	var rubric_data: Dictionary = _load_json(root_path + "/data/integration/automated_playtest_rubric.json")
-	var balance_data: Dictionary = _load_json(root_path + "/data/integration/balance_ledger.json")
+	var rubric_data: Dictionary = _load_json("res://data/integration/automated_playtest_rubric.json")
+	var balance_data: Dictionary = _load_json("res://data/integration/balance_ledger.json")
 	if rubric_data.is_empty() or balance_data.is_empty():
 		_fail("rubric or balance ledger data missing")
 		return

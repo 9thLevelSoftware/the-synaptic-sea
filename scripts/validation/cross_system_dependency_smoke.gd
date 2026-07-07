@@ -3,13 +3,10 @@ extends SceneTree
 const IntegrationMatrixScript := preload("res://scripts/systems/integration_matrix.gd")
 const DependencyValidatorScript := preload("res://scripts/systems/dependency_validator.gd")
 
-const ROOT_DEFAULT: String = "/Users/christopherwilloughby/the-synaptic-sea"
 const REQUIRED_STAGES: Array = ["prepare", "derelict", "survive", "loot", "craft", "return", "upgrade"]
 
 func _initialize() -> void:
-	var root_path: String = OS.get_environment("ROOT")
-	if root_path.is_empty():
-		root_path = ROOT_DEFAULT
+	var root_path: String = ProjectSettings.globalize_path("res://")
 
 	var matrix_data: Dictionary = _load_json(root_path + "/data/integration/cross_system_integration_matrix.json")
 	if matrix_data.is_empty():
