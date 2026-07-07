@@ -141,7 +141,7 @@
       "sequence": 3,
       "type": "download_logs",
       "room_id": "medbay_03",
-      "room_role": "medbay",
+      "room_role": "medical",
       "placement_id": "medbay_terminal",
       "semantic": "command_console",
       "cell": [
@@ -204,7 +204,7 @@
     "objective_count": 5,
     "role_count": 5,
     "roles": [
-      "medbay",
+      "medical",
       "reactor",
       "storage",
       "maintenance",

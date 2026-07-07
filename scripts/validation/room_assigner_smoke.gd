@@ -5,6 +5,12 @@ const TopologyTemplateScript := preload("res://scripts/procgen/topology_template
 const RoomAssignerScript := preload("res://scripts/procgen/room_assigner.gd")
 
 func _initialize() -> void:
+	var missing_footprints: Array[String] = _collect_missing_footprint_roles()
+	if not missing_footprints.is_empty():
+		push_error("ROOM ASSIGNER FAIL footprint vocabulary missing=%s" % str(missing_footprints))
+		quit(1)
+		return
+
 	var template_data: Dictionary = {
 		"id": "test",
 		"description": "Test",
@@ -150,3 +156,83 @@ func _initialize() -> void:
 
 	print("ROOM ASSIGNER PASS rooms=%d first=airlock last=reactor keys=valid ids=unique deterministic=true guaranteed=enforced max_duplicates=enforced" % room_plan.size())
 	quit(0)
+
+
+func _collect_missing_footprint_roles() -> Array[String]:
+	var missing: Array[String] = []
+	_collect_template_role_pool_gaps("res://data/procgen/templates", missing)
+	_collect_archetype_role_weight_gaps("res://data/procgen/archetypes", missing)
+	return missing
+
+
+func _collect_template_role_pool_gaps(dir_path: String, missing: Array[String]) -> void:
+	for rel_path in _sorted_json_paths(dir_path):
+		var doc: Dictionary = _load_json_dict(rel_path)
+		var zones_raw: Variant = doc.get("zones", [])
+		if not (zones_raw is Array):
+			continue
+		for zone_raw in zones_raw:
+			if not (zone_raw is Dictionary):
+				continue
+			var zone: Dictionary = zone_raw
+			var zone_id: String = str(zone.get("id", ""))
+			var role_pool_raw: Variant = zone.get("role_pool", [])
+			if not (role_pool_raw is Array):
+				continue
+			for role_raw in role_pool_raw:
+				var role: String = str(role_raw)
+				if not RoomAssignerScript.ROOM_FOOTPRINT_OPTIONS.has(role):
+					missing.append("%s zone=%s role_pool=%s" % [rel_path, zone_id, role])
+
+
+func _collect_archetype_role_weight_gaps(dir_path: String, missing: Array[String]) -> void:
+	for rel_path in _sorted_json_paths(dir_path):
+		var doc: Dictionary = _load_json_dict(rel_path)
+		var role_weights: Dictionary = doc.get("role_weights", {})
+		for role_variant in role_weights.keys():
+			var role: String = str(role_variant)
+			if not RoomAssignerScript.ROOM_FOOTPRINT_OPTIONS.has(role):
+				missing.append("%s role_weights=%s" % [rel_path, role])
+
+
+func _sorted_json_paths(dir_path: String) -> Array[String]:
+	var dir: DirAccess = DirAccess.open(dir_path)
+	if dir == null:
+		push_error("ROOM ASSIGNER FAIL cannot open directory %s" % dir_path)
+		quit(1)
+		return []
+	var files: Array[String] = []
+	dir.list_dir_begin()
+	var entry: String = dir.get_next()
+	while entry != "":
+		if not dir.current_is_dir() and entry.ends_with(".json"):
+			files.append("%s/%s" % [dir_path, entry])
+		entry = dir.get_next()
+	dir.list_dir_end()
+	files.sort()
+	return files
+
+
+func _load_json_dict(path: String) -> Dictionary:
+	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		push_error("ROOM ASSIGNER FAIL cannot open %s" % path)
+		quit(1)
+		return {}
+	var text: String = file.get_as_text()
+	file.close()
+	var json: JSON = JSON.new()
+	var parse_err: int = json.parse(text)
+	if parse_err != OK:
+		push_error("ROOM ASSIGNER FAIL invalid JSON %s line=%d error=%s" % [
+			path,
+			json.get_error_line(),
+			json.get_error_message(),
+		])
+		quit(1)
+		return {}
+	if not (json.data is Dictionary):
+		push_error("ROOM ASSIGNER FAIL JSON root is not an object: %s" % path)
+		quit(1)
+		return {}
+	return json.data
