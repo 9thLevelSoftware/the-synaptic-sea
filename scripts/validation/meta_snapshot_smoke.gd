@@ -60,13 +60,19 @@ func _initialize() -> void:
 		_fail("codex unlock lost across round-trip")
 		return
 
-	# 2. Schema mismatch is rejected.
+	# 2. Session 3 B5 (PR #64): schema mismatch with known meta fields is
+	# TOLERANT — best-effort apply instead of silently discarding the whole
+	# meta progression. Only a dict with no known fields is rejected
+	# (asserted in meta_progression_state_smoke).
 	var tampered: Dictionary = dump.duplicate(true)
 	tampered["schema"] = "meta-progression-0-legacy"
 	var meta_bad = MetaProgressionStateScript.new()
 	meta_bad.configure({})
-	if meta_bad.apply_summary(tampered):
-		_fail("apply_summary should reject legacy schema")
+	if not meta_bad.apply_summary(tampered):
+		_fail("apply_summary should best-effort apply a legacy-schema summary with known fields")
+		return
+	if int(meta_bad.meta_currency) != 480:
+		_fail("tolerant apply lost meta_currency across legacy schema: %d" % int(meta_bad.meta_currency))
 		return
 
 	# 3. Missing / null input is rejected.

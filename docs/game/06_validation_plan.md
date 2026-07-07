@@ -83,6 +83,15 @@ TITLE_BOOT_FAIL_WARNING="^WARNING: TitleMain: gameplay boot failed \\(smoke_forc
 # apply (and a no-known-fields rejection); each emits one expected
 # warn-once line, allowlisted like the deliberate-failure paths above.
 META_SCHEMA_WARNING="^WARNING: MetaProgressionState: schema mismatch \\('.*' != 'meta-progression-1'\\); (best-effort apply of known fields|rejected \\(no known meta fields\\))\$"
+# world_save_service_smoke's rejects_null case (Tranche 3 promotion)
+# deliberately passes a null world snapshot to prove save_world refuses it;
+# that emits this one expected warning.
+NULL_WORLD_WARNING="^WARNING: SaveLoadService: cannot save null world snapshot\$"
+# save_slot_state_smoke's corruption case (Tranche 3 promotion) deliberately
+# writes garbage over slot_03.json to prove corruption detection + .corrupt/
+# backup; the engine's JSON parse ERROR is covered by CORRUPT_WORLD_JSON_ERROR
+# and this is the service's own expected warning, pinned to the smoke's slot.
+CORRUPT_SLOT_WARNING="^WARNING: SaveLoadService: slot file is not valid JSON object, slot_id=slot_03\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -91,7 +100,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -251,7 +260,32 @@ run_clean 'Domain 10 UI polish end-to-end smoke' 'UI POLISH PASS' "$GODOT" --hea
 run_clean 'menu signal wiring smoke' 'MENU SIGNAL WIRING PASS language=true enabled_render=true run_outcome=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_signal_wiring_smoke.gd
 run_clean 'world migration smoke' 'SAVE MIGRATION WORLD PASS unknown_version_passthrough=true legacy_home_ship_migrated=true current_world_home_ship_migrated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_migration_world_smoke.gd
 run_clean 'slot metadata smoke' 'SLOT METADATA PASS location=home play_time_real=true seed_real=true roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/slot_metadata_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=142 clean_output=true'
+# --- Tranche 3 (2026-07-06): orphaned-smoke promotion — pure-model batch ---
+run_clean 'Tranche 3 sanity state model smoke' 'SANITY STATE PASS drain=35.0 recovery=35.0 pressure=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sanity_state_smoke.gd
+run_clean 'Tranche 3 radiation state model smoke' 'RADIATION STATE PASS accumulation=true drain=true decay=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/radiation_state_smoke.gd
+run_clean 'Tranche 3 body temperature state model smoke' 'BODY TEMPERATURE STATE PASS safe=false extreme=true recovery=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/body_temperature_state_smoke.gd
+run_clean 'Tranche 3 status effects model smoke' 'STATUS EFFECTS PASS count=2 expired=true modifier=1.00' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/status_effects_smoke.gd
+run_clean 'Tranche 3 addiction state model smoke' 'ADDICTION STATE PASS tolerance=0.70 dependence=1.10 withdrawal=true cleared=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/addiction_state_smoke.gd
+run_clean 'Tranche 3 damage pipeline model smoke' 'DAMAGE PIPELINE PASS vitals=65.0 threat=19.0 absorbed=10.0 status=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/damage_pipeline_smoke.gd
+run_clean 'Tranche 3 life support state model smoke' 'LIFE SUPPORT STATE PASS offline_drain=true recovery=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/life_support_state_smoke.gd
+run_clean 'Tranche 3 save migration service model smoke' 'SAVE MIGRATION SERVICE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_migration_service_smoke.gd
+run_clean 'Tranche 3 world snapshot model smoke' 'WORLD SNAPSHOT PASS round_trip=true version_gated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_snapshot_smoke.gd
+run_clean 'Tranche 3 save slot state model smoke' 'SAVE SLOT STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_slot_state_smoke.gd
+run_clean 'Tranche 3 autosave policy model smoke' 'AUTOSAVE POLICY PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/autosave_policy_smoke.gd
+run_clean 'Tranche 3 synaptic sea world model smoke' 'SYNAPTIC_SEA WORLD PASS in_range_sorted=true generated=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/synaptic_sea_world_smoke.gd
+run_clean 'Tranche 3 meta snapshot model smoke' 'META SNAPSHOT PASS meta=true unlocks=true boundary=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_snapshot_smoke.gd
+run_clean 'Tranche 3 world save service smoke' 'WORLD SAVE SERVICE PASS disk_round_trip=true rejects_null=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_save_service_smoke.gd
+run_clean 'Tranche 3 interactable distance fallback smoke' 'INTERACTABLE DISTANCE FALLBACK PASS completed_count=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interactable_distance_fallback_smoke.gd
+# --- Tranche 3: orphaned-smoke promotion — main-scene batch ---
+run_clean 'Tranche 3 vitals save/load main-scene smoke' 'VITALS SAVE LOAD PASS vitals=true sanity=true radiation=true temperature=true status=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/vitals_state_save_load_smoke.gd
+run_clean 'Tranche 3 vitals full main-scene smoke' 'MAIN PLAYABLE VITALS FULL PASS panel=true health=true stamina=true hunger=true thirst=true sanity=true radiation=true temperature=true status=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_vitals_full_smoke.gd
+run_clean 'Tranche 3 HUD main-scene smoke' 'MAIN PLAYABLE SLICE HUD PASS canvas_layer=true width=520 current_sequence=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_hud_smoke.gd
+run_clean 'Tranche 3 derelict gameplay main-scene smoke' 'DERELICT GAMEPLAY PASS built=true cleared=true persists=true home_intact=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_gameplay_smoke.gd
+run_clean 'Tranche 3 world persist/restore main-scene smoke' 'WORLD PERSIST RESTORE PASS registered=true state_preserved=true revisit_restores=true travel_home=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_persist_restore_smoke.gd
+run_clean 'Tranche 3 world save anywhere main-scene smoke' 'WORLD SAVE ANYWHERE PASS away_save=true location_restored=true state_restored=true home_save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_save_anywhere_smoke.gd
+run_clean 'Tranche 3 input-action idempotency smoke' 'IDEMPOTENCY PASS actions=7 no_duplicates_after_second_call=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/a11y_p1_002_idempotency_smoke.gd
+run_clean 'Tranche 3 progression main-scene smoke' 'MAIN PLAYABLE PROGRESSION PASS class=engineer repair_xp_gained=true hud=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_progression_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=165 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
