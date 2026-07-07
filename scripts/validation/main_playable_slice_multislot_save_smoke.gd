@@ -198,7 +198,7 @@ func _build_world_snapshot(playable: PlayableGeneratedShip):
 	var ws_script := load("res://scripts/systems/world_snapshot.gd")
 	var ws = ws_script.new()
 	ws.world_summary = {"world_seed": 1, "generated_marker_ids": []}
-	ws.home_ship = {"slice_version": "gate2-current-run-3", "current_objective_sequence": playable.get_current_objective_sequence()}
+	ws.home_ship = {"slice_version": SaveLoadService.CURRENT_SLICE_VERSION, "current_objective_sequence": playable.get_current_objective_sequence()}
 	ws.visited_ships = {}
 	ws.current_location = ""
 	ws.player_position_in_ship = [playable.player.global_position.x, playable.player.global_position.y, playable.player.global_position.z]

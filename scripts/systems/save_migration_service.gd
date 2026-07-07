@@ -20,9 +20,10 @@ const KNOWN_VERSIONS: Array = [
 	"gate2-current-run-1",  # legacy: 6 model summaries, no player_progression
 	"gate2-current-run-2",  # added player_progression_summary (Phase 3)
 	"gate2-current-run-3",  # added slot_id / slot_kind / parent_world_slot metadata (Task 11)
+	"gate2-current-run-4",  # added play_time_seconds / current_location / world_seed (ADR-0046)
 ]
 
-const TARGET_VERSION: String = "gate2-current-run-3"
+const TARGET_VERSION: String = "gate2-current-run-4"
 const WORLD_TARGET_VERSION: String = "world-4"
 
 func migrate_run(parsed: Variant) -> Dictionary:
@@ -91,6 +92,8 @@ func _step(from_version: String) -> Callable:
 			return _migrate_v1_to_v2
 		"gate2-current-run-2":
 			return _migrate_v2_to_v3
+		"gate2-current-run-3":
+			return _migrate_v3_to_v4
 	return Callable()
 
 func _world_step(from_version: String) -> Callable:
@@ -133,6 +136,20 @@ func _migrate_v2_to_v3(dict: Dictionary) -> Dictionary:
 		out["is_quicksave"] = false
 	if not out.has("parent_world_slot"):
 		out["parent_world_slot"] = ""
+	return out
+
+func _migrate_v3_to_v4(dict: Dictionary) -> Dictionary:
+	# ADR-0046: real slot metadata. Older saves have no accumulated play
+	# time, no location stamp, and no world seed; default them so the
+	# slot browser renders honest zeros instead of the old placeholders
+	# (player X as location, Unix epoch as play time).
+	var out: Dictionary = dict.duplicate(true)
+	if not out.has("play_time_seconds"):
+		out["play_time_seconds"] = 0.0
+	if not out.has("current_location"):
+		out["current_location"] = ""
+	if not out.has("world_seed"):
+		out["world_seed"] = 0
 	return out
 
 func _migrate_world_legacy_to_world_4(dict: Dictionary) -> Dictionary:

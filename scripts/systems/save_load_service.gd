@@ -23,7 +23,7 @@ class_name SaveLoadService
 ## permadeath freezes a slot via user://saves/<slot_id>.death.json.
 
 const SAVE_PATH: String = "user://saves/current_run.json"
-const CURRENT_SLICE_VERSION: String = "gate2-current-run-3"
+const CURRENT_SLICE_VERSION: String = "gate2-current-run-4"
 const SAVES_DIR: String = "user://saves"
 const INDEX_PATH: String = "user://saves/index.json"
 const CORRUPT_DIR: String = "user://saves/.corrupt"
@@ -524,11 +524,14 @@ func _index_run_slot(slot_id: String, slot_kind: String, display_name: String, s
 	row.slot_id = slot_id
 	row.slot_kind = slot_kind
 	row.display_name = display_name if not display_name.is_empty() else slot_id
-	row.synaptic_sea_seed = int(snapshot.player_position[0] * 1000) if snapshot.player_position.size() >= 3 else 0  # placeholder
+	# ADR-0046: index REAL metadata from the snapshot's dedicated fields
+	# (the old placeholders derived location from player X, the seed from
+	# pos.x*1000, and play time from the Unix epoch).
+	row.synaptic_sea_seed = int(snapshot.world_seed)
 	row.player_class = str(snapshot.player_progression_summary.get("class_id", ""))
-	row.current_location = str(snapshot.player_position[0]) if snapshot.player_position.size() >= 3 else ""
+	row.current_location = str(snapshot.current_location)
 	row.objective_sequence = int(snapshot.current_objective_sequence)
-	row.play_time_seconds = float(snapshot.saved_at_epoch)  # no play_time field on RunSnapshot yet; use saved_at_epoch
+	row.play_time_seconds = float(snapshot.play_time_seconds)
 	row.saved_at = snapshot.saved_at
 	row.saved_at_epoch = int(Time.get_unix_time_from_system())
 	row.schema_version = CURRENT_SLICE_VERSION
