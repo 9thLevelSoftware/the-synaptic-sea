@@ -101,6 +101,10 @@ var _unlock_registry = null
 # Tranche 6 (REQ-RL-006): DemoScopeGate — blocks hub/meta progression
 # persistence in demo builds. Null outside the playable coordinator wiring.
 var _demo_scope_gate = null
+# PR #68 review (Codex P2 #2): the playable's _demo_save_refused predicate —
+# the slot screen's Save verb must honor the SAME demo play-time refusal as
+# request_save()/autosaves (play time lives on the playable, not this Node).
+var _demo_save_refused_cb: Callable = Callable()
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -476,7 +480,7 @@ func _build_meta_screens() -> void:
 ## on a HUD rebuild. The coordinator constructs/owns every required dependency before
 ## calling this, so a null is a wiring bug — asserted in debug. The catalog-backed panels
 ## need an explicit render() after binding (their setters assign data but don't redraw).
-func bind_meta_screens(p_achievement_state, p_audio_manager, p_skill_tree_state, p_player_progression, p_hub_upgrade_state, p_meta_progression_state, p_localization_catalog, p_build_metadata_state, p_save_load_menu, p_a11y, p_unlock_registry = null, p_snapshot_builder: Callable = Callable(), p_demo_scope_gate = null) -> void:
+func bind_meta_screens(p_achievement_state, p_audio_manager, p_skill_tree_state, p_player_progression, p_hub_upgrade_state, p_meta_progression_state, p_localization_catalog, p_build_metadata_state, p_save_load_menu, p_a11y, p_unlock_registry = null, p_snapshot_builder: Callable = Callable(), p_demo_scope_gate = null, p_demo_save_refused: Callable = Callable()) -> void:
 	assert(p_achievement_state != null, "p_achievement_state dependency is missing")
 	assert(p_audio_manager != null, "p_audio_manager dependency is missing")
 	assert(p_skill_tree_state != null, "p_skill_tree_state dependency is missing")
@@ -494,6 +498,7 @@ func bind_meta_screens(p_achievement_state, p_audio_manager, p_skill_tree_state,
 	_meta_progression_state = p_meta_progression_state
 	_unlock_registry = p_unlock_registry
 	_demo_scope_gate = p_demo_scope_gate
+	_demo_save_refused_cb = p_demo_save_refused
 	save_load_menu = p_save_load_menu
 	# Catalog-backed panels: set data, then render() (the setters do not auto-redraw, so
 	# without this the panel is visible but its RichTextLabel stays blank).
@@ -820,6 +825,13 @@ func _confirm_save_load_row() -> Dictionary:
 		_refresh_save_load_panel()
 		return {"screen": "save_load", "action": "delete", "ok": deleted, "detail": slot_id}
 	if verb == "Save":
+		# Tranche 6 / PR #68 review (Codex P2 #2): honor the demo play-time
+		# save refusal here too — otherwise Records -> Save/Load bypasses the
+		# cap that request_save() and the autosave loops enforce.
+		if _demo_save_refused_cb.is_valid() and bool(_demo_save_refused_cb.call()):
+			_save_load_pending_verb = ""
+			_refresh_save_load_panel()
+			return {"screen": "save_load", "action": "save", "ok": false, "detail": "demo_blocked"}
 		var display_name: String = String(row.display_name) if not String(row.display_name).is_empty() else slot_id
 		var ok: bool = false
 		if _snapshot_builder.is_valid():

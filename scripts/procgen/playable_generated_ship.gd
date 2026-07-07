@@ -4346,6 +4346,7 @@ func _build_hud_layer() -> void:
 		unlock_registry,
 		_build_run_snapshot,
 		demo_scope_gate,
+		_demo_save_refused,
 	)
 	menu_coordinator.set_load_available(is_load_available())
 	menu_coordinator.set_inventory_items(_inventory_hotbar_ids())

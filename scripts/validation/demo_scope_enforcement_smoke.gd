@@ -114,16 +114,39 @@ func _validate() -> void:
 	if playable._auto_save_current_run():
 		_fail("demo build allowed an auto-save past max_play_seconds")
 		return
-	playable.run_play_time_seconds = 10.0
-	if not playable.request_save():
-		_fail("demo build refused a save UNDER the cap (over-blocking)")
-		return
-
-	# --- hub_blocked: meta progression persistence refused in demo ---
+	# PR #68 review (Codex P2 #2): the Records -> Save/Load slot screen must
+	# honor the SAME refusal — otherwise it bypasses the pause-menu save cap.
 	var ui = playable.menu_coordinator
 	if not is_instance_valid(ui):
 		_fail("no menu_coordinator")
 		return
+	var slot_rows: Array = ui._save_load_rows()
+	var save_row_idx: int = -1
+	for i in range(slot_rows.size()):
+		if "Save" in ui._valid_verbs_for_row(slot_rows[i]):
+			save_row_idx = i
+			break
+	if save_row_idx < 0:
+		_fail("no Save-capable slot row on the save/load screen")
+		return
+	ui._save_load_row_index = save_row_idx
+	ui._save_load_pending_verb = "Save"
+	var slot_blocked: Dictionary = ui._confirm_save_load_row()
+	if bool(slot_blocked.get("ok", true)) or str(slot_blocked.get("detail", "")) != "demo_blocked":
+		_fail("demo slot-screen save not blocked past the cap (got %s)" % str(slot_blocked))
+		return
+	playable.run_play_time_seconds = 10.0
+	if not playable.request_save():
+		_fail("demo build refused a save UNDER the cap (over-blocking)")
+		return
+	ui._save_load_row_index = save_row_idx
+	ui._save_load_pending_verb = "Save"
+	var slot_allowed: Dictionary = ui._confirm_save_load_row()
+	if not bool(slot_allowed.get("ok", false)):
+		_fail("demo slot-screen save refused UNDER the cap (over-blocking, got %s)" % str(slot_allowed))
+		return
+
+	# --- hub_blocked: meta progression persistence refused in demo ---
 	ui._active_meta_screen = "hub_upgrades"
 	var hub_result: Dictionary = ui.meta_screen_confirm()
 	if bool(hub_result.get("ok", true)) or str(hub_result.get("detail", "")) != "demo_blocked":
