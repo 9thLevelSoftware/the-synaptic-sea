@@ -420,6 +420,26 @@ func _initialize() -> void:
 	if not (future_after is Dictionary) or str((future_after as Dictionary).get("future_sentinel", "")) != "keep_me":
 		_fail("future world preserve: world.json contents were not preserved")
 		return
+
+	# PR #64 Codex P1: the outer world schema stayed at world-4 while the
+	# embedded home RunSnapshot schema advanced to gate2-current-run-4.
+	# load_world() must still migrate that inner home slice.
+	var stale_home_world = world_script.new()
+	stale_home_world.world_summary = {"world_seed": 100, "player_position": [0.0, 0.0, 0.0], "generated_marker_ids": ["stale-home"]}
+	stale_home_world.home_ship = {"slice_version": "gate2-current-run-3", "player_position": [1.0, 0.0, 2.0]}
+	stale_home_world.slice_version = world_script.WORLD_SLICE_VERSION
+	stale_home_world.godot_version = Engine.get_version_info()["string"]
+	stale_home_world.saved_at = "2026-07-07T00:01:00"
+	if not service.save_world(stale_home_world):
+		_fail("current world home migration: save_world fixture failed")
+		return
+	var stale_loaded = service.load_world()
+	if stale_loaded == null:
+		_fail("current world home migration: load_world returned null")
+		return
+	if str(stale_loaded.home_ship.get("slice_version", "")) != SaveLoadServiceScript.CURRENT_SLICE_VERSION:
+		_fail("current world home migration: home_ship slice_version='%s' expected '%s'" % [str(stale_loaded.home_ship.get("slice_version", "")), SaveLoadServiceScript.CURRENT_SLICE_VERSION])
+		return
 	service.delete_current_run()
 
 	# --- run_id slot-ownership rework: stamp + slot_ids_for_run + freeze_run ---
