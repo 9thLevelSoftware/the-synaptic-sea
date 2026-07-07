@@ -6,7 +6,9 @@ extends SceneTree
 ## kinds (full + demo) and asserts:
 ##  - in demo, every feature in the manifest is blocked
 ##  - in full build, every feature is allowed
-##  - unknown feature ids are rejected (no silent allow)
+##  - blocklist semantics: feature ids NOT in the manifest are allowed;
+##    only the empty string is rejected (defensive)
+##  - Tranche 6: machine-readable enforcement params round-trip
 ##  - the gate round-trips its summary
 
 const DemoScopeGateScript := preload("res://scripts/systems/demo_scope_gate.gd")
@@ -65,6 +67,32 @@ func _initialize() -> void:
 		_fail("empty feature id should be rejected")
 		return
 
+	# ----- Tranche 6 (audit :439-444): machine-readable enforcement params -----
+	# The coordinator's wired enforcements read their caps from the manifest
+	# (data-driven per ADR-0029), not from hardcoded constants.
+	if not demo_gate.has_method("get_params"):
+		_fail("gate lacks get_params (Tranche 6 enforcement params)")
+		return
+	var cargo_params: Dictionary = demo_gate.get_params("cargo_hold.full_inventory")
+	if absf(float(cargo_params.get("max_weight_kg", 0.0)) - 6.0) > 0.001:
+		_fail("cargo params missing max_weight_kg=6.0 (got %s)" % str(cargo_params))
+		return
+	var hazard_params: Dictionary = demo_gate.get_params("multi_hazard.run")
+	if int(hazard_params.get("max_hazards", 0)) != 1:
+		_fail("hazard params missing max_hazards=1 (got %s)" % str(hazard_params))
+		return
+	var save_params: Dictionary = demo_gate.get_params("long_run.persistence")
+	if int(save_params.get("max_play_seconds", 0)) != 1200:
+		_fail("save params missing max_play_seconds=1200 (got %s)" % str(save_params))
+		return
+	# Entries without authored params and unknown ids return an empty dict.
+	if not demo_gate.get_params("hub.meta_progression").is_empty():
+		_fail("param-less entry should return empty params")
+		return
+	if not demo_gate.get_params("definitely.not.in.manifest").is_empty():
+		_fail("unknown feature id should return empty params")
+		return
+
 	# ----- full build -----
 	var full_metadata = BuildMetadataStateScript.new()
 	full_metadata.configure({
@@ -102,7 +130,7 @@ func _initialize() -> void:
 		_fail("summary blocked_count drift: %d vs %d" % [int(summary.get("blocked_count", -1)), feature_ids.size()])
 		return
 
-	print("DEMO SCOPE GATE PASS build_kind=release blocked=%d allowed=%d unknown_rejected=true" % [
+	print("DEMO SCOPE GATE PASS build_kind=release blocked=%d allowed=%d unknown_rejected=true params=true" % [
 		feature_ids.size(),
 		0,  # in full build every listed feature is allowed
 	])

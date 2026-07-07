@@ -31,6 +31,7 @@ const AutosavePolicyScript := preload("res://scripts/systems/autosave_policy.gd"
 # Bucket 3 meta-screen shell deps (constructed here, injected into MenuCoordinator).
 const LocalizationCatalogScript := preload("res://scripts/systems/localization_catalog.gd")
 const BuildMetadataStateScript := preload("res://scripts/systems/build_metadata_state.gd")
+const DemoScopeGateScript := preload("res://scripts/systems/demo_scope_gate.gd")
 const SaveLoadMenuScript := preload("res://scripts/ui/save_load_menu.gd")
 const AchievementStateScript := preload("res://scripts/systems/achievement_state.gd")
 const WorldSnapshotScript := preload("res://scripts/systems/world_snapshot.gd")
@@ -449,6 +450,12 @@ var _last_autosave_result: Dictionary = {}
 var localization_catalog          # LocalizationCatalog
 var build_metadata_state          # BuildMetadataState
 var save_load_menu                # SaveLoadMenu (RefCounted slot presenter)
+# Tranche 6 (REQ-RL-006 / ADR-0029): demo scope gate — coordinator-owned,
+# consulted at the five manifest enforcement points. Inert unless the live
+# BuildMetadataState reports build_kind == "demo".
+var demo_scope_gate               # DemoScopeGate
+var _last_derelict_hazard_budget: int = -1   # validation seam: hazard cap applied on last derelict travel (-1 unlimited)
+var _last_derelict_hazards_seeded: Array = []  # validation seam: hazard kinds whose seeding RAN on last travel
 
 ## NOTE: This scene relies on GeneratedShipLoader.load_from_paths() being
 ## SYNCHRONOUS and emitting `ship_loaded` on the same call stack — the
@@ -1308,6 +1315,11 @@ func _build_runtime_nodes() -> void:
 	localization_catalog.configure(_load_json_dict("res://data/release/localization_catalog.json"))
 	build_metadata_state = BuildMetadataStateScript.new()
 	build_metadata_state.configure(_load_json_dict("res://data/release/build_metadata.json"))
+	# Tranche 6 (2026-07-06 audit HIGH): the demo scope gate finally gets its
+	# production callsites. Configured against the SAME BuildMetadataState
+	# instance so the gate reads the live build kind at every consult.
+	demo_scope_gate = DemoScopeGateScript.new()
+	demo_scope_gate.configure(_load_json_dict("res://data/release/demo_scope_manifest.json"), build_metadata_state)
 	save_load_menu = SaveLoadMenuScript.new()
 	save_load_menu.bind(save_load_service)
 	# Construct the per-run achievement state here (previously only injected by the
@@ -2066,17 +2078,28 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	# variant breaches in the hull and creates player-interactable seal nodes.
 	# Also seeded before fire so the fire presence-gate exclusion can see variant
 	# breaches (fire ordering preserved by being earlier than both fire calls).
-	_seed_derelict_breaches()
+	# Tranche 6 (REQ-RL-006): demo builds cap how many hazard KINDS a derelict
+	# seeds (manifest multi_hazard.run params.max_hazards; -1 = unlimited in
+	# dev/release). Cap order is the code's existing seed order: breach, fire, arc.
+	_last_derelict_hazard_budget = _demo_max_hazards()
+	_last_derelict_hazards_seeded = []
+	if _last_derelict_hazard_budget != 0:
+		_seed_derelict_breaches()
+		_last_derelict_hazards_seeded.append("breach")
 	_build_breach_seal_points()
 	# Derelict-side fire: per-ship pre-seeded environmental fire (presence-gated, capped).
-	_seed_derelict_fire()
+	if _last_derelict_hazard_budget < 0 or _last_derelict_hazard_budget > 1:
+		_seed_derelict_fire()
+		_last_derelict_hazards_seeded.append("fire")
 	_build_fire_zones()
 	# M7-B Task 9: manual extinguish nodes + recharge port share the fire lifecycle.
 	_build_fire_suppression_points()
 	_build_extinguisher_recharge_port()
 	# Tranche 1 (audit): the derelict's own arc zones were dead data — build
 	# them from the DERELICT loader (away_from_start is already true here).
-	_build_arc_zone()
+	if _last_derelict_hazard_budget < 0 or _last_derelict_hazard_budget > 2:
+		_build_arc_zone()
+		_last_derelict_hazards_seeded.append("arc")
 	_restore_arc_summary_for_current_ship()
 
 ## Captures the player's world pose relative to the piloted ship's scene_root so the
@@ -2289,6 +2312,11 @@ func _clear_hangar_controls() -> void:
 func _spawn_cargo_hold_control(inst) -> void:
 	if inst == null or not is_instance_valid(inst.scene_root):
 		return
+	# Tranche 6 (REQ-RL-006): demo builds cap the ship cargo hold BEFORE the
+	# cargo-room check — in demo the hold is eagerly created capped, so every
+	# later lazy get_inventory() consumer (deposits, snapshots) sees the cap.
+	# No-op in dev/release (preserves the "no lazy ShipInventory" intent below).
+	_apply_demo_cargo_cap(inst)
 	var center: Vector3 = DockPortsScript._room_floor_center(inst.built_layout, "cargo", "cargo")
 	if center == Vector3.INF:
 		return   # no cargo room -> no hold, no lazy ShipInventory
@@ -4310,6 +4338,7 @@ func _build_hud_layer() -> void:
 		accessibility_settings,
 		unlock_registry,
 		_build_run_snapshot,
+		demo_scope_gate,
 	)
 	menu_coordinator.set_load_available(is_load_available())
 	menu_coordinator.set_inventory_items(_inventory_hotbar_ids())
@@ -6857,6 +6886,8 @@ func _build_run_snapshot(use_home_arc_summary: bool = false) -> RunSnapshot:
 func _auto_save_current_run() -> bool:
 	if save_load_service == null or slice_complete:
 		return false
+	if _demo_save_refused():
+		return false
 	var ws = _build_world_snapshot()
 	if ws == null:
 		return false
@@ -6880,6 +6911,8 @@ func _autosave_event_count() -> int:
 ## current_run.json path the resume smokes depend on.
 func _tick_autosave_policy(delta: float) -> void:
 	if autosave_policy == null or save_load_service == null or slice_complete:
+		return
+	if _demo_save_refused():
 		return
 	_autosave_run_seconds += delta
 	var r: Dictionary = autosave_policy.tick(_autosave_run_seconds, _autosave_event_count())
@@ -6972,6 +7005,12 @@ func request_save() -> bool:
 		return false
 	if save_load_service == null:
 		return false
+	# Tranche 6 (REQ-RL-006, user decision 2026-07-07): demo builds REFUSE
+	# further saves past the authored play-time cap — existing saves are kept,
+	# nothing is ever wiped. Surfaced on the HUD feedback line.
+	if _demo_save_refused():
+		_last_loot_feedback_line = "Demo build: save limit reached (20 min)"
+		return false
 	var ws = _build_world_snapshot()
 	if ws == null:
 		return false
@@ -6984,6 +7023,38 @@ func request_save() -> bool:
 			menu_coordinator.trigger_tutorial("run_saved", "any")
 			menu_coordinator.set_load_available(true)
 	return result
+
+## Tranche 6 (REQ-RL-006) demo-gate helpers. All three are permissive when the
+## gate is absent or the live build kind is dev/release — demo enforcement
+## only ever narrows behavior in an actual demo build.
+
+## True when a demo build has exhausted its authored play-time save budget
+## (long_run.persistence params.max_play_seconds). Saves are refused, never wiped.
+func _demo_save_refused() -> bool:
+	if demo_scope_gate == null or not demo_scope_gate.is_blocked("long_run.persistence"):
+		return false
+	var cap: float = float(demo_scope_gate.get_params("long_run.persistence").get("max_play_seconds", 1200))
+	return run_play_time_seconds >= cap
+
+## Demo derelict hazard-kind budget (multi_hazard.run params.max_hazards).
+## -1 = unlimited (dev/release or gate absent).
+func _demo_max_hazards() -> int:
+	if demo_scope_gate == null or not demo_scope_gate.is_blocked("multi_hazard.run"):
+		return -1
+	return maxi(0, int(demo_scope_gate.get_params("multi_hazard.run").get("max_hazards", 1)))
+
+## Caps a ship's cargo hold to the demo max weight (cargo_hold.full_inventory
+## params.max_weight_kg). Eagerly creates the hold in demo so every later lazy
+## get_inventory() consumer sees the cap. No-op outside demo builds.
+func _apply_demo_cargo_cap(inst) -> void:
+	if inst == null or demo_scope_gate == null:
+		return
+	if not demo_scope_gate.is_blocked("cargo_hold.full_inventory"):
+		return
+	var cap: float = float(demo_scope_gate.get_params("cargo_hold.full_inventory").get("max_weight_kg", 6.0))
+	var hold = inst.get_inventory()
+	if hold != null and hold.get_max_weight() > cap:
+		hold.max_weight = cap
 
 ## Validation / public seam: the SaveLoadService instance. Returns null
 ## before _build_runtime_nodes() has run.
@@ -7331,6 +7402,17 @@ func _build_world_snapshot():
 	ws.visited_ships = {}
 	for mid in visited_ships:
 		ws.visited_ships[String(mid)] = visited_ships[mid].get_summary()
+	# Tranche 6 (REQ-RL-006): demo builds do not persist cross-run world state.
+	# Keep only the currently-boarded ship's entry so a same-run away-save can
+	# still restore the derelict the player is standing in; every other visited
+	# ship is stripped from the demo snapshot.
+	if demo_scope_gate != null and demo_scope_gate.is_blocked("world_persistence.cross_run"):
+		var demo_kept: Dictionary = {}
+		if away_from_start and current_ship != null:
+			var keep_id: String = String(current_ship.marker_id)
+			if ws.visited_ships.has(keep_id):
+				demo_kept[keep_id] = ws.visited_ships[keep_id]
+		ws.visited_ships = demo_kept
 	ws.current_location = String(current_ship.marker_id) if current_ship != null else ""
 	ws.world_time = world_time
 	if player != null and player is Node3D:
