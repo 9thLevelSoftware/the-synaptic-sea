@@ -65,6 +65,15 @@ CORRUPT_WORLD_JSON_ERROR="^ERROR: Parse JSON failed\\..*\$"
 # allowlisted the same way as the other deliberate-failure-path warnings
 # above.
 WORLD_WRITE_FAIL_WARNING="^WARNING: SaveLoadService: cannot open world save file for writing, error=.*\$"
+# title_load_failure_smoke (Tranche 1 audit fix) deliberately fires the
+# loader-failure entry point (reason=smoke_forced_failure) to prove the title
+# screen tears down a dead boot instead of polling forever. That forced
+# failure emits exactly one push_error (the playable's existing FAIL line) and
+# one push_warning (TitleMain's new return-to-title handler). Both patterns
+# are pinned to the smoke's sentinel reason so a REAL boot failure in any
+# other smoke still fails the bundle.
+TITLE_BOOT_FAIL_ERROR="^ERROR: PLAYABLE SHIP FAIL reason=smoke_forced_failure\$"
+TITLE_BOOT_FAIL_WARNING="^WARNING: TitleMain: gameplay boot failed \\(smoke_forced_failure\\).*\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -73,7 +82,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -118,6 +127,10 @@ run_clean 'A11Y-P1-001 text scale smoke' 'MAIN PLAYABLE TEXT SCALE PASS scales=3
 run_clean 'performance baseline smoke' 'PERFORMANCE BASELINE PASS templates=3' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/performance_profiler.gd
 run_clean 'arc hazard model smoke' 'ARC STATE PASS cycles=2 phases=4 passability_switches=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/electrical_arc_state_smoke.gd
 run_clean 'main arc smoke' 'MAIN PLAYABLE ARC PASS state=DISCHARGED cycles=2 blocked_arcing=true blocked_discharged=false' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_arc_smoke.gd
+run_clean 'derelict arc away-branch smoke' 'DERELICT ARC PASS boarded=true zone_on_derelict=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_arc_smoke.gd
+run_clean 'away-branch integrity smoke' 'AWAY BRANCH INTEGRITY PASS boarded=true port_frame=true hud_refresh=true death_guard=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/away_branch_integrity_smoke.gd
+run_clean 'title load-failure recovery smoke' 'TITLE LOAD FAILURE PASS returned_to_title=true error_surfaced=true menu_visible=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/title_load_failure_smoke.gd
+run_clean 'hazard interaction feedback smoke' 'HAZARD FEEDBACK PASS extinguish_blocked=true seal_blocked=true breach_sealed=true sfx_routed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_feedback_smoke.gd
 run_clean 'ADR-0005 hazard contract static smoke' 'HAZARD CONTRACT PASS models=2 phase_timer_owners=1 wrong_kind_rejected=2 configure_dict=2' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_contract_smoke.gd
 run_clean 'ADR-0038 station craft reachability smoke' 'MAIN PLAYABLE STATION CRAFT PASS crafted=true salvaged=true field=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_station_craft_smoke.gd
 run_clean 'Bucket 3 meta-screen reachability smoke' 'MAIN PLAYABLE META SCREENS PASS screens=10 reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_meta_screens_smoke.gd
@@ -226,7 +239,7 @@ run_clean 'Domain 10 main playable UI shell smoke' 'MAIN PLAYABLE UI SHELL PASS 
 run_clean 'Domain 10 main playable slice UI shell smoke' 'MAIN PLAYABLE SLICE UI SHELL PASS boot=main_menu pause=true codex=1 hotbar=true tooltip=true chart_gated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_ui_shell_smoke.gd
 run_clean 'Domain 10 web chart state model smoke' 'WEB CHART STATE PASS known=2 detail_upgrade=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/web_chart_state_smoke.gd
 run_clean 'Domain 10 UI polish end-to-end smoke' 'UI POLISH PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_polish_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=135 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=139 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

@@ -10,6 +10,23 @@ func _initialize() -> void:
 
 	var templates: Array[String] = ["spine", "bifurcated", "stacked"]
 	var test_count: int = 0
+	var guarded_arc_layout: Dictionary = {
+		"room_links": [
+			{"from_room": "start", "to_room": "side_a"},
+			{"from_room": "side_a", "to_room": "side_b"},
+		],
+		"critical_path": ["start", "goal"],
+	}
+	var guarded_arcs: Array = builder._build_arc_zones(guarded_arc_layout, "start", "goal", [{"room_id": "goal"}])
+	if guarded_arcs.is_empty():
+		push_error("GAMEPLAY_SLICE_BUILDER FAIL guarded arc regression did not choose a safe side link")
+		quit(1)
+		return
+	var guarded_arc: Dictionary = guarded_arcs[0]
+	if str(guarded_arc.get("from_room", "")) != "side_a" or str(guarded_arc.get("to_room", "")) != "side_b":
+		push_error("GAMEPLAY_SLICE_BUILDER FAIL guarded arc used protected endpoint: %s" % str(guarded_arc))
+		quit(1)
+		return
 
 	for template_id in templates:
 		for seed_val in [42, 999, 7777]:

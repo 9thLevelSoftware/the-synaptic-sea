@@ -2064,6 +2064,10 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	# M7-B Task 9: manual extinguish nodes + recharge port share the fire lifecycle.
 	_build_fire_suppression_points()
 	_build_extinguisher_recharge_port()
+	# Tranche 1 (audit): the derelict's own arc zones were dead data — build
+	# them from the DERELICT loader (away_from_start is already true here).
+	_build_arc_zone()
+	_restore_arc_summary_for_current_ship()
 
 ## Captures the player's world pose relative to the piloted ship's scene_root so the
 ## player can be carried when the piloted ship is repositioned by a dock. Returns
@@ -2835,6 +2839,10 @@ func _build_breach_seal_points() -> void:
 		sp.configure(cid, hull, inventory_state, player_progression, pos, 4.0, "hull_sealant", 1.0, 1.8)
 		if not sp.breach_sealed.is_connected(_on_breach_sealed):
 			sp.breach_sealed.connect(_on_breach_sealed)
+		# Tranche 1 (audit): seal_blocked fired on four failure paths but was
+		# never connected — a blocked seal gave zero player feedback.
+		if not sp.seal_blocked.is_connected(_on_seal_blocked):
+			sp.seal_blocked.connect(_on_seal_blocked)
 		if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
 			current_ship.scene_root.add_child(sp)
 		elif lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root):
@@ -2852,11 +2860,38 @@ func _clear_breach_seal_points() -> void:
 			sp.queue_free()
 	breach_seal_points.clear()
 
-func _on_breach_sealed(_compartment_id: String) -> void:
-	# HullIntegrityState already mutated by the seal node; nothing else needed here
-	# beyond letting the next _recompute_expanded_ship_systems pick up the lower
-	# breach_count. Hook for HUD/audio later.
-	pass
+func _on_breach_sealed(compartment_id: String) -> void:
+	# HullIntegrityState is already mutated by the seal node; the next
+	# _recompute_expanded_ship_systems picks up the lower breach_count.
+	# Tranche 1 (audit): this was a pass-only no-op — surface the seal on the
+	# HUD feedback line and fire the tool-use cue so the action lands.
+	_set_hazard_feedback_line("Breach sealed: %s" % compartment_id)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
+
+## Tranche 1 (audit): shared surface for hazard-interaction feedback. Reuses
+## the _last_loot_feedback_line channel (the one line _combined_system_status_lines
+## already folds into the HUD) — no new HUD framework, matching the caption
+## pattern documented at the var declaration.
+func _set_hazard_feedback_line(text: String) -> void:
+	_last_loot_feedback_line = text
+	_refresh_tracker_system_status_lines()
+
+func _on_extinguish_blocked(compartment_id: String, reason: String) -> void:
+	_set_hazard_feedback_line("Extinguish blocked (%s): %s" % [compartment_id, _hazard_block_reason_text(reason)])
+
+func _on_seal_blocked(compartment_id: String, reason: String) -> void:
+	_set_hazard_feedback_line("Seal blocked (%s): %s" % [compartment_id, _hazard_block_reason_text(reason)])
+
+func _hazard_block_reason_text(reason: String) -> String:
+	match reason:
+		"missing_extinguisher": return "no fire extinguisher"
+		"missing_sealant": return "no hull sealant"
+		"no_charge": return "extinguisher empty"
+		"not_burning": return "no fire here"
+		"not_breached": return "no open breach"
+		"extinguish_failed": return "extinguish failed"
+		_: return "cannot complete"
 
 # --- M7-B Task 7: authoritative compartment fire ----------------------------
 # The old timer-based FireState is retired. FireSuppressionState is the single
@@ -3223,6 +3258,10 @@ func _build_fire_suppression_points() -> void:
 		fp.configure(str(cid), afs, extinguisher_state, inventory_state, player_progression, pos, 4.0, "fire_extinguisher", 1.8)
 		if not fp.fire_extinguished.is_connected(_on_fire_extinguished):
 			fp.fire_extinguished.connect(_on_fire_extinguished)
+		# Tranche 1 (audit): extinguish_blocked fired on five failure paths but
+		# was never connected — a blocked extinguish gave zero player feedback.
+		if not fp.extinguish_blocked.is_connected(_on_extinguish_blocked):
+			fp.extinguish_blocked.connect(_on_extinguish_blocked)
 		_attach_zone_to_active_ship(fp)
 		fire_suppression_points.append(fp)
 
@@ -3245,8 +3284,11 @@ func _build_extinguisher_recharge_port() -> void:
 	if extinguisher_state == null:
 		return
 	# Codex P1: the recharge port parents under lifeboat_ship.scene_root, so its position
-	# must be LIFEBOAT-LOCAL — matching repair/breach/fire builders.
-	var use_lifeboat: bool = lifeboat_ship != null \
+	# must be LIFEBOAT-LOCAL — matching repair/breach/fire builders. Tranche 1 (audit):
+	# the `not away_from_start` term was missing here (its fire-zone sibling has it), so
+	# a derelict rebuild positioned the port at LIFEBOAT-local coords while parenting it
+	# under the DERELICT root — the port landed off-floor in the wrong frame.
+	var use_lifeboat: bool = (not away_from_start) and lifeboat_ship != null \
 		and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root)
 	var positions: Array = _lifeboat_local_repair_positions() if use_lifeboat else _distributed_room_positions()
 	var pos: Vector3 = positions[0] if not positions.is_empty() else Vector3(0.0, PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR, 0.0)
@@ -3954,6 +3996,7 @@ func travel_to(marker) -> Dictionary:
 	# in-tree. A DERELICT (non-empty marker_id) keeps its retained ShipInstance in
 	# visited_ships but frees its scene_root (geometry regenerates from seed on revisit).
 	_sync_current_ship_combat_summary()
+	_sync_current_ship_arc_summary()
 	var leaving = current_ship
 	if String(leaving.marker_id) == "":
 		# Leaving home: record the player's position so travel_home can restore it.
@@ -4006,6 +4049,7 @@ func travel_home() -> bool:
 	if not away_from_start or home_ship == null:
 		return false
 	_sync_current_ship_combat_summary()
+	_sync_current_ship_arc_summary()
 	# Phase 5b Task 5: undock the piloted ship from the current derelict so the ride
 	# physically detaches before the host is freed (capture the player carry first so
 	# they ride the piloted ship back home rather than being left in the freed frame).
@@ -4054,6 +4098,10 @@ func travel_home() -> bool:
 	# M7-B Task 7: returning home rebuilds interactables — re-seed/render fire.
 	_seed_fires_from_damage()
 	_build_fire_zones()
+	# Tranche 1 (audit): the derelict arc zone was freed with the derelict
+	# root — rebuild against the HOME loader (away_from_start is false here).
+	_build_arc_zone()
+	_restore_arc_summary_for_current_ship()
 	# ADR-0042: the hallucination manager was attached to the (now-freed) derelict root,
 	# so rebuild it on the home ship — otherwise home-side hallucinations never render
 	# after a round trip while the director still feeds tier-3 teeth into vitals.
@@ -4395,6 +4443,19 @@ func _sync_current_ship_combat_summary() -> void:
 		return
 	current_ship.combat_summary = threat_manager.get_summary()
 
+func _sync_current_ship_arc_summary() -> void:
+	if current_ship == null or electrical_arc_state == null:
+		return
+	current_ship.arc_summary = electrical_arc_state.get_summary().duplicate(true)
+
+func _restore_arc_summary_for_current_ship() -> void:
+	if current_ship == null or electrical_arc_state == null:
+		return
+	if not current_ship.arc_summary.is_empty():
+		electrical_arc_state.apply_summary(current_ship.arc_summary)
+	_refresh_arc_state(true)
+	_sync_current_ship_arc_summary()
+
 func _configure_threat_runtime_for_current_ship() -> void:
 	if threat_manager == null:
 		return
@@ -4721,7 +4782,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_refresh_oxygen_state(true, 0.0)
 	_refresh_weapon_hotbar()
 	_build_arc_zone()
-	_refresh_arc_state(true)
+	_restore_arc_summary_for_current_ship()
 	_build_loot_containers()
 	_build_sealed_hatches()
 	_build_repair_points()
@@ -5381,6 +5442,11 @@ func get_route_gate_collision_enabled_count() -> int:
 func _process(delta: float) -> void:
 	world_time += delta  # Live Persistent Ships Phase 1: advance before any branch/return
 	if away_from_start:
+		# Tranche 1 (audit): mirror the home branch's post-death guard — death
+		# away (end_run sets slice_complete) must stop the sim exactly like
+		# death at home; previously every system kept ticking on a corpse.
+		if not playable_started or slice_complete:
+			return
 		# Keep the vitals panel live on a boarded derelict: Heavy-Load, repair
 		# progress, and the repair_blocked message + its countdown still apply
 		# away from home, even though the home oxygen/hazard loop is paused here.
@@ -5414,6 +5480,10 @@ func _process(delta: float) -> void:
 		# so the away path is no longer starved past the 4808 early-return.
 		_tick_survival_attrition(delta)
 		_refresh_player_vitals(delta)
+		# Tranche 1 (audit): home gets per-frame tracker status lines through
+		# _refresh_oxygen_state; the away branch skipped them, so Power/Reactor/
+		# Threats lines froze for the whole boarding run.
+		_refresh_tracker_system_status_lines()
 		# ADR-0038 (superseded by Domain 4): field crafting completes away from home.
 		# Powered-station crafting is NO LONGER paused away — the hub recompute runs on
 		# both branches now (live sim), so powered stations stay live on a derelict too.
@@ -5450,6 +5520,12 @@ func _process(delta: float) -> void:
 		# Domain 5: tick the reload timer on the away branch (derelict = primary combat context).
 		if ammo_state != null and not ammo_state.tick(delta).is_empty():
 			_refresh_weapon_hotbar()
+		# REQ-013 / Tranche 1 (audit): the electrical-arc hazard cycles on the
+		# derelict too — this was the #42/#43/#44 regression class (system
+		# ticked on the home branch only, dead in the primary field context).
+		if electrical_arc_state != null:
+			electrical_arc_state.tick(delta, {})
+			_refresh_arc_state(false)
 		# Domain 5: stimulant buff timers + addiction withdrawal/tolerance decay advance
 		# on the derelict branch too (item USE already worked away; only per-frame decay
 		# was home-only). Shared with the home block at the bottom of _process.
@@ -5954,6 +6030,14 @@ func _build_arc_zone() -> void:
 	for child in arc_root.get_children():
 		arc_root.remove_child(child)
 		child.queue_free()
+	# Derelict arc nodes parent under the derelict's scene_root (freed with it
+	# on departure), so also clear by handle in case the previous zone lives
+	# outside arc_root.
+	for stale in [arc_zone_node, arc_zone_label]:
+		if stale != null and is_instance_valid(stale):
+			if stale.get_parent() != null:
+				stale.get_parent().remove_child(stale)
+			stale.queue_free()
 	arc_zone_node = null
 	arc_zone_label = null
 	arc_zone_resolved_room_id = ""
@@ -5984,13 +6068,31 @@ func _build_arc_zone() -> void:
 		"discharged_duration": ElectricalArcStateScript.DEFAULT_DISCHARGED_DURATION,
 	})
 	arc_zone_node = _create_arc_zone_node(zone_id, world_position)
-	arc_root.add_child(arc_zone_node)
 	arc_zone_label = _create_arc_zone_label(world_position)
-	arc_root.add_child(arc_zone_label)
+	# Away: parent under the derelict's scene_root so the zone inherits the
+	# dock offset and is freed with the derelict (loot-container pattern).
+	# Home: keep the original arc_root parent.
+	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
+		current_ship.scene_root.add_child(arc_zone_node)
+		current_ship.scene_root.add_child(arc_zone_label)
+	else:
+		arc_root.add_child(arc_zone_node)
+		arc_root.add_child(arc_zone_label)
+
+# The loader whose arc markers drive the CURRENT context: the boarded
+# derelict's own loader root when away (Tranche 1 audit fix — derelict arc
+# zones were dead data before), the home loader otherwise. Mirrors the
+# active_loader selection in _build_loot_containers.
+func _active_arc_loader() -> Node:
+	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root) \
+			and current_ship.scene_root.has_method("get_arc_zone_markers"):
+		return current_ship.scene_root
+	return loader if (loader is Node and is_instance_valid(loader)) else null
 
 func _resolve_arc_zone_world_position() -> Dictionary:
-	if loader != null and loader.has_method("get_arc_zone_markers"):
-		var markers: Array = loader.call("get_arc_zone_markers")
+	var arc_loader: Node = _active_arc_loader()
+	if arc_loader != null and arc_loader.has_method("get_arc_zone_markers"):
+		var markers: Array = arc_loader.call("get_arc_zone_markers")
 		if markers.size() > 0 and markers[0] is Vector3:
 			var candidate: Vector3 = markers[0]
 			if candidate != Vector3.INF:
@@ -6009,9 +6111,9 @@ func _resolve_arc_zone_world_position() -> Dictionary:
 # fire zones so the validation smoke can confirm marker-to-resolved-room
 # agreement without re-walking the loader's internal arrays.
 func _resolved_arc_marker_room_id() -> String:
-	if loader == null or not (loader is Node):
+	var loader_node: Node = _active_arc_loader()
+	if loader_node == null:
 		return ""
-	var loader_node: Node = loader as Node
 	if not loader_node.has_method("get_arc_zone_specs"):
 		return ""
 	var specs_variant: Variant = loader_node.call("get_arc_zone_specs")
@@ -6026,9 +6128,9 @@ func _resolved_arc_marker_room_id() -> String:
 	return ""
 
 func _resolved_arc_marker_zone_id() -> String:
-	if loader == null or not (loader is Node):
+	var loader_node: Node = _active_arc_loader()
+	if loader_node == null:
 		return ""
-	var loader_node: Node = loader as Node
 	if not loader_node.has_method("get_arc_zone_specs"):
 		return ""
 	var specs_variant: Variant = loader_node.call("get_arc_zone_specs")
@@ -6579,7 +6681,7 @@ func acquire_tool_for_validation(p_tool_id: String) -> bool:
 
 ## Captures a fresh RunSnapshot from the current runtime state. Returns
 ## null if the slice is not started or any required model is missing.
-func _build_run_snapshot() -> RunSnapshot:
+func _build_run_snapshot(use_home_arc_summary: bool = false) -> RunSnapshot:
 	if not playable_started or slice_complete:
 		return null
 	if save_load_service == null:
@@ -6623,7 +6725,11 @@ func _build_run_snapshot() -> RunSnapshot:
 	# round-trips via fire_suppression_summary (see _expanded_ship_systems_summary
 	# / the ship_systems_summary restore path). The legacy snapshot.fire_summary
 	# field is left at its default for save-format back-compat.
-	if electrical_arc_state != null:
+	if use_home_arc_summary:
+		if home_ship != null and not home_ship.arc_summary.is_empty():
+			snapshot.electrical_arc_summary = home_ship.arc_summary.duplicate(true)
+	elif electrical_arc_state != null:
+		_sync_current_ship_arc_summary()
 		snapshot.electrical_arc_summary = electrical_arc_state.get_summary()
 	if objective_progress_state != null:
 		snapshot.objective_progress_summary = objective_progress_state.get_summary()
@@ -6947,6 +7053,7 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	if electrical_arc_state != null and not snapshot.electrical_arc_summary.is_empty():
 		electrical_arc_state.apply_summary(snapshot.electrical_arc_summary)
 		_refresh_arc_state(true)
+		_sync_current_ship_arc_summary()
 	if objective_progress_state != null and not snapshot.objective_progress_summary.is_empty():
 		objective_progress_state.apply_summary(snapshot.objective_progress_summary)
 	if player_progression != null and not snapshot.player_progression_summary.is_empty():
@@ -7114,6 +7221,7 @@ func _dispatch_save_load_confirm_result(result: Dictionary) -> void:
 ## active ship.
 func _build_world_snapshot():
 	_sync_current_ship_combat_summary()
+	_sync_current_ship_arc_summary()
 	var ws = WorldSnapshotScript.new()
 	if synaptic_sea_world != null:
 		ws.world_summary = synaptic_sea_world.get_summary()
@@ -7121,7 +7229,7 @@ func _build_world_snapshot():
 		ws.meta_progression_summary = meta_progression_state.to_dict()
 	if unique_item_state != null:
 		ws.unique_item_summary = unique_item_state.get_summary()
-	var home_snap = _build_run_snapshot()
+	var home_snap = _build_run_snapshot(away_from_start)
 	if home_snap != null:
 		if away_from_start:
 			home_snap.player_position = [_home_player_position.x, _home_player_position.y, _home_player_position.z]
