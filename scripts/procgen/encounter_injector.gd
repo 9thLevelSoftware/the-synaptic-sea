@@ -114,7 +114,11 @@ const ENCOUNTER_TABLE_DIR: String = "res://data/procgen/encounter_tables/"
 # cover (and biomes whose table file is missing/malformed) fall back to the
 # ROLE_TO_ENCOUNTER_KIND constants with count 1, exactly as before.
 # Cache: table_id -> Dictionary ({} = missing/malformed, warned once).
-var _table_cache: Dictionary = {}
+# Static (class scope) so the ADR-0047 warn-once contract holds across
+# injector instances — production creates one injector per pipeline run
+# (PR #67 Kilo review); tables are read-only data, so process-wide caching
+# cannot affect per-seed determinism.
+static var _table_cache: Dictionary = {}
 
 
 # Injects encounter spawn markers into `layout` in place. Returns
@@ -455,6 +459,9 @@ func _pick_table_roll(rolls: Array, rng: RandomNumberGenerator) -> Dictionary:
 
 # Authored count is either an int or an inclusive [min, max] range; ranges
 # consume one rng draw. Result is floored at 1 (validate() requires count>=1).
+# Every Array shape is handled inside the Array branch (PR #67 review:
+# int(<Array>) is not a valid conversion, and a single-element [n] is an
+# author's explicit count whose intent must not be silently dropped).
 func _resolve_roll_count(count_value: Variant, rng: RandomNumberGenerator) -> int:
 	if count_value is Array:
 		var arr: Array = count_value
@@ -464,6 +471,10 @@ func _resolve_roll_count(count_value: Variant, rng: RandomNumberGenerator) -> in
 			if hi < lo:
 				hi = lo
 			return maxi(1, rng.randi_range(lo, hi))
+		if arr.size() == 1:
+			push_warning("EncounterInjector: roll count %s is a single-element array; treating as int" % str(count_value))
+			return maxi(1, int(arr[0]))
+		return 1
 	return maxi(1, int(count_value))
 
 

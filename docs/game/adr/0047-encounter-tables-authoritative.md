@@ -24,8 +24,11 @@ count; the constants are the fallback tier.** Full table semantics (user
 decision, 2026-07-07):
 
 1. `EncounterInjector` loads `res://data/procgen/encounter_tables/<encounter_table_id>.json`
-   (cached per injector instance; `encounter_table_id` comes from the biome
-   profile and is now LIVE — it selects the table).
+   (cached in a class-scope `static var` so warn-once and the parse both hold
+   process-wide — production creates one injector per pipeline run; tables
+   are read-only data, so the shared cache cannot affect per-seed
+   determinism. PR #67 review). `encounter_table_id` comes from the biome
+   profile and is now LIVE — it selects the table.
 2. For a role the table covers: the kind is a **deterministic weighted roll**
    among that role's table rolls (single roll consumes no rng draw); the
    marker `count` comes from the roll's authored int-or-`[min, max]` value
