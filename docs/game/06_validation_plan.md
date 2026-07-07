@@ -74,6 +74,11 @@ WORLD_WRITE_FAIL_WARNING="^WARNING: SaveLoadService: cannot open world save file
 # other smoke still fails the bundle.
 TITLE_BOOT_FAIL_ERROR="^ERROR: PLAYABLE SHIP FAIL reason=smoke_forced_failure\$"
 TITLE_BOOT_FAIL_WARNING="^WARNING: TitleMain: gameplay boot failed \\(smoke_forced_failure\\).*\$"
+# meta_progression_state_smoke's tolerant-schema case (Session 3 B5)
+# deliberately applies a mismatched-schema meta dict to prove best-effort
+# apply (and a no-known-fields rejection); each emits one expected
+# warn-once line, allowlisted like the deliberate-failure paths above.
+META_SCHEMA_WARNING="^WARNING: MetaProgressionState: schema mismatch \\('.*' != 'meta-progression-1'\\); (best-effort apply of known fields|rejected \\(no known meta fields\\))\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -82,7 +87,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -114,7 +119,7 @@ run_clean 'readability smoke' 'MAIN PLAYABLE SLICE READABILITY PASS objective_pr
 run_clean 'main objective variation smoke' 'MAIN PLAYABLE OBJECTIVE VARIATION PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_objective_variation_smoke.gd
 run_clean 'objective progress state smoke' 'OBJECTIVE PROGRESS STATE PASS sequence=2 required=2 completed=2 applied_once=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/objective_progress_state_smoke.gd
 run_clean 'objective progress hud label smoke' 'OBJECTIVE PROGRESS HUD LABEL PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/objective_progress_hud_label_smoke.gd
-run_clean 'save/load service smoke' 'SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=28' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_load_service_smoke.gd
+run_clean 'save/load service smoke' 'SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=28 survival_roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_load_service_smoke.gd
 run_clean 'main save/load smoke' 'MAIN PLAYABLE SAVE LOAD PASS saved_sequence=2 loaded_sequence=2 position_match=true supplies=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_save_load_smoke.gd
 run_clean 'REQ-012 auto-save sequence smoke' 'REQ012 AUTOSAVE SEQUENCE CHECK PASS live=2 snapshot=2 file=2 has_save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/req012_autosave_sequence_smoke.gd
 run_clean 'template C stacked layout main scenario smoke' 'TEMPLATE C MAIN SCENARIO PASS objectives=5 current_sequence=6 run_complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_c_main_scenario_smoke.gd
@@ -215,7 +220,7 @@ run_clean 'Domain 6 training gate model smoke' 'TRAINING GATE PASS gated=true dr
 run_clean 'Domain 6 class catalog data smoke' 'CLASS CATALOG PASS base=8 unlockable=3 registry_class_ids=ok' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/class_catalog_smoke.gd
 run_clean 'Domain 6 class gate config smoke' 'CLASS GATE CONFIG PASS available_gate=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/class_gate_config_smoke.gd
 run_clean 'Domain 6 repair ingest smoke' 'REPAIR INGEST PASS bus_xp=120 single_grant=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_ingest_smoke.gd
-run_clean 'Domain 6 meta progression state smoke' 'META PROGRESSION STATE PASS payout=39 unlocks=true persistence=true reset=true selected_class=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_progression_state_smoke.gd
+run_clean 'Domain 6 meta progression state smoke' 'META PROGRESSION STATE PASS payout=39 unlocks=true persistence=true reset=true selected_class=true class_bridge=true tolerant=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_progression_state_smoke.gd
 run_clean 'Domain 6 player progression full smoke' 'PLAYER PROGRESSION FULL PASS classes=11 cross_training=true books=true meta_payout=70 unlocks=true panels=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_progression_full_smoke.gd
 run_clean 'Domain 6 interactive meta-screens smoke' 'META SCREENS INTERACTIVE PASS hub_purchase=true skill_unlock=true registry_reader=true class_select=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_screens_interactive_smoke.gd
 run_clean 'Domain 6 progression meta closure smoke' 'PROGRESSION META CLOSURE PASS away_ticks=1 hub_bonus=1 gate=held gated_logged=true class_persist=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/progression_meta_smoke.gd

@@ -194,6 +194,36 @@ func _initialize() -> void:
 		_fail("apply_summary should reject wrong-schema summary")
 		return
 
+	# --- Session 3 B5 (audit): schema mismatch must be TOLERANT, not a silent
+	# discard. A legacy/foreign schema stamp on an otherwise well-formed meta
+	# dict (currency, unlocks, counters present) previously returned false and
+	# dropped the player's entire meta progression on load. Contract: known
+	# fields best-effort apply + one warning; a dict with NO known meta fields
+	# is still rejected and leaves current state untouched.
+	var legacy: Dictionary = meta.to_dict()
+	legacy["schema"] = "meta-progression-0"
+	var meta_tol = MetaProgressionStateScript.new()
+	meta_tol.configure({})
+	if not meta_tol.apply_summary(legacy):
+		_fail("apply_summary should best-effort apply a mismatched-schema summary with known fields")
+		return
+	if int(meta_tol.meta_currency) != int(meta.meta_currency):
+		_fail("tolerant apply lost meta_currency: %d expected %d" % [int(meta_tol.meta_currency), int(meta.meta_currency)])
+		return
+	if int(meta_tol.get_unlock_count()) != int(meta.get_unlock_count()):
+		_fail("tolerant apply lost unlocks: %d expected %d" % [int(meta_tol.get_unlock_count()), int(meta.get_unlock_count())])
+		return
+	var alien: Dictionary = {"schema": "not-meta", "unrelated_field": 1}
+	var meta_keep = MetaProgressionStateScript.new()
+	meta_keep.configure({})
+	meta_keep.meta_currency = 7
+	if meta_keep.apply_summary(alien):
+		_fail("apply_summary must reject a mismatched-schema dict with no known meta fields")
+		return
+	if int(meta_keep.meta_currency) != 7:
+		_fail("rejected alien apply must not disturb current state (currency=%d expected 7)" % int(meta_keep.meta_currency))
+		return
+
 	# Reset path wipes everything.
 	var meta_reset = MetaProgressionStateScript.new()
 	meta_reset.configure({})
@@ -231,7 +261,7 @@ func _initialize() -> void:
 		_fail("reset_all should clear selected_class")
 		return
 
-	print("META PROGRESSION STATE PASS payout=39 unlocks=true persistence=true reset=true selected_class=true class_bridge=true")
+	print("META PROGRESSION STATE PASS payout=39 unlocks=true persistence=true reset=true selected_class=true class_bridge=true tolerant=true")
 	quit(0)
 
 func _fail(reason: String) -> void:

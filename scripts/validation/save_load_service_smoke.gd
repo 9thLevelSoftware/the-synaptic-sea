@@ -13,6 +13,11 @@ const ClassDefinitionScript := preload("res://scripts/systems/class_definition.g
 const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
 const MaterialStateScript := preload("res://scripts/systems/material_state.gd")
 const HallucinationDirectorScript := preload("res://scripts/systems/hallucination_director.gd")
+const VitalsStateScript := preload("res://scripts/systems/vitals_state.gd")
+const SanityStateScript := preload("res://scripts/systems/sanity_state.gd")
+const RadiationStateScript := preload("res://scripts/systems/radiation_state.gd")
+const BodyTemperatureStateScript := preload("res://scripts/systems/body_temperature_state.gd")
+const StatusEffectsStateScript := preload("res://scripts/systems/status_effects_state.gd")
 
 func _initialize() -> void:
 	# Direct service smoke (REQ-012).
@@ -130,6 +135,33 @@ func _initialize() -> void:
 		_fail("hallucination fixture produced no active events (fixture bug)")
 		return
 	original.set("hallucination_summary", hallu.get_summary())
+	# Session 3 B7 (audit): the survival-vitals set (vitals, sanity,
+	# radiation, temperature, status_effects) was counted in SUMMARY_FIELDS
+	# but never populated here — the "round-trip" passed {} == {}. Seed each
+	# from its real model in a NON-DEFAULT state so the disk round-trip
+	# proves the runtime numbers survive.
+	var vitals := VitalsStateScript.new()
+	vitals.configure({})
+	vitals.tick(6.0)  # passive hunger/thirst/stamina attrition
+	vitals.health = 77.5
+	var sanity := SanityStateScript.new()
+	sanity.configure({})
+	sanity.adjust_sanity(-35.0)  # 100 -> 65
+	var radiation := RadiationStateScript.new()
+	radiation.configure({"in_radiation_zone": true})
+	radiation.adjust_radiation(60.0)  # past HEALTH_DRAIN_THRESHOLD -> drain active
+	var temperature := BodyTemperatureStateScript.new()
+	temperature.configure({"in_extreme_zone": true})
+	temperature.adjust_temperature(15.0)  # 22 -> 37, outside safe_max -> thirst x1.5
+	var statuses := StatusEffectsStateScript.new()
+	statuses.configure({})
+	statuses.add_effect("radiation_sickness", 30.0, 2)
+	statuses.add_effect("stim_focus", 12.0, 1)
+	original.vitals_summary = vitals.get_summary()
+	original.sanity_summary = sanity.get_summary()
+	original.radiation_summary = radiation.get_summary()
+	original.temperature_summary = temperature.get_summary()
+	original.status_effects_summary = statuses.get_summary()
 	original.slice_version = SaveLoadServiceScript.CURRENT_SLICE_VERSION
 	original.godot_version = Engine.get_version_info()["string"]
 	original.saved_at = Time.get_datetime_string_from_system(true)
@@ -251,6 +283,38 @@ func _initialize() -> void:
 		return
 	if not (hallu2_events[0].get("position") is Vector3):
 		_fail("hallucination event position not a Vector3 after disk round-trip (got %s)" % str(hallu2_events[0].get("position")))
+		return
+	# B7: field-level round-trip of the survival set, plus spot asserts on
+	# the non-default values so an accidental {} == {} can never pass again.
+	if not _dicts_equal(loaded.vitals_summary, original.vitals_summary):
+		_fail("vitals_summary mismatch")
+		return
+	if absf(float(loaded.vitals_summary.get("health", 0.0)) - 77.5) > 0.001:
+		_fail("vitals health=%s expected 77.5" % str(loaded.vitals_summary.get("health")))
+		return
+	if not _dicts_equal(loaded.sanity_summary, original.sanity_summary):
+		_fail("sanity_summary mismatch")
+		return
+	if absf(float(loaded.sanity_summary.get("sanity", 0.0)) - 65.0) > 0.001:
+		_fail("sanity=%s expected 65.0" % str(loaded.sanity_summary.get("sanity")))
+		return
+	if not _dicts_equal(loaded.radiation_summary, original.radiation_summary):
+		_fail("radiation_summary mismatch")
+		return
+	if not bool(loaded.radiation_summary.get("health_drain_active", false)):
+		_fail("radiation health_drain_active did not round-trip true")
+		return
+	if not _dicts_equal(loaded.temperature_summary, original.temperature_summary):
+		_fail("temperature_summary mismatch")
+		return
+	if bool(loaded.temperature_summary.get("is_safe", true)):
+		_fail("temperature is_safe should round-trip false (extreme fixture)")
+		return
+	if not _dicts_equal(loaded.status_effects_summary, original.status_effects_summary):
+		_fail("status_effects_summary mismatch")
+		return
+	if int(loaded.status_effects_summary.get("count", 0)) != 2:
+		_fail("status effects count=%d expected 2" % int(loaded.status_effects_summary.get("count", 0)))
 		return
 
 	# Version mismatch rejection: write a snapshot with the wrong slice_version
@@ -427,7 +491,7 @@ func _initialize() -> void:
 	service.delete_slot("slot_01")
 	service.set_active_run_id("")
 
-	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=28")
+	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=28 survival_roundtrip=true")
 	quit(0)
 
 func _make_spoilage_summary_for_smoke() -> Dictionary:

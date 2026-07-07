@@ -195,15 +195,24 @@ func to_dict() -> Dictionary:
 		"saved_at": Time.get_datetime_string_from_system(true),
 	}
 
-## Restores from a `to_dict()` dict. Returns false on schema mismatch or
-## missing fields. Empty / null input is rejected.
+## Restores from a `to_dict()` dict. Empty / null / non-dict input is
+## rejected. Session 3 B5 (audit): a schema mismatch used to silently
+## discard the ENTIRE meta progression (currency, unlocks, counters) on
+## load. Now a mismatched-schema dict that still carries known meta
+## fields is best-effort applied with one warning; only a dict with no
+## known fields at all is rejected (leaving current state untouched).
 func apply_summary(summary: Variant) -> bool:
 	if summary == null or typeof(summary) != TYPE_DICTIONARY:
 		return false
 	var dict: Dictionary = summary as Dictionary
+	if dict.is_empty():
+		return false
 	var schema: String = str(dict.get("schema", ""))
 	if schema != SCHEMA_VERSION:
-		return false
+		if not _has_known_meta_field(dict):
+			_warn_schema_once(schema, "rejected (no known meta fields)")
+			return false
+		_warn_schema_once(schema, "best-effort apply of known fields")
 	meta_currency = maxi(0, int(dict.get("meta_currency", 0)))
 	unlocked_class_ids.clear()
 	var cls_v: Variant = dict.get("unlocked_class_ids", {})
@@ -227,6 +236,29 @@ func apply_summary(summary: Variant) -> bool:
 	last_payout_reason = str(dict.get("last_payout_reason", ""))
 	selected_class_id = str(dict.get("selected_class_id", ""))
 	return true
+
+## True when the dict carries at least one field this model owns — the
+## gate between "older/foreign schema worth salvaging" and garbage.
+func _has_known_meta_field(dict: Dictionary) -> bool:
+	for key in [
+		"meta_currency",
+		"unlocked_class_ids",
+		"unlocked_hub_upgrade_ids",
+		"unlocked_codex_entry_ids",
+		"total_runs_completed",
+		"total_runs_deaths",
+		"selected_class_id",
+	]:
+		if dict.has(key):
+			return true
+	return false
+
+var _schema_warned: bool = false
+func _warn_schema_once(found_schema: String, action: String) -> void:
+	if _schema_warned:
+		return
+	_schema_warned = true
+	push_warning("MetaProgressionState: schema mismatch ('%s' != '%s'); %s" % [found_schema, SCHEMA_VERSION, action])
 
 ## Persists to `user://meta_progression.json`. Returns false on IO failure.
 func save_to_disk(save_path: String = SAVE_PATH) -> bool:

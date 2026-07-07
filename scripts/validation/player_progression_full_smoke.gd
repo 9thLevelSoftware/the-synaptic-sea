@@ -284,13 +284,19 @@ func _initialize() -> void:
 	if int(meta5.total_runs_completed) != 7:
 		_fail("total_runs_completed round-trip mismatch: %d" % int(meta5.total_runs_completed))
 		return
-	# Schema-mismatch is rejected.
+	# Session 3 B5 (audit): schema mismatch with known meta fields is now
+	# TOLERANT — best-effort apply instead of silently discarding the whole
+	# meta progression. Only a dict with no known meta fields is rejected
+	# (asserted in meta_progression_state_smoke).
 	var bad: Dictionary = meta4.to_dict()
 	bad["schema"] = "tampered-version"
 	var meta_bad = MetaProgressionStateScript.new()
 	meta_bad.configure({})
-	if meta_bad.apply_summary(bad):
-		_fail("apply_summary should reject wrong-schema summary")
+	if not meta_bad.apply_summary(bad):
+		_fail("apply_summary should best-effort apply a wrong-schema summary with known fields")
+		return
+	if int(meta_bad.meta_currency) != int(meta4.meta_currency):
+		_fail("tolerant apply lost meta_currency across schema mismatch")
 		return
 
 	# REQ-PM-009 — UnlockRegistry for trigger-based unlocks.
