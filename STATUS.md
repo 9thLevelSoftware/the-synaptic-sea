@@ -1,6 +1,6 @@
 # The Synaptic Sea — Project Status (source of truth)
 
-**Last updated:** 2026-07-03
+**Last updated:** 2026-07-07
 
 This file is the entry point for "what is actually built and what's left." It exists
 because the older roadmap docs were inaccurate and have been quarantined (see below).
@@ -56,6 +56,16 @@ integration_debt.md, and recomputed 732 stale inventory pins via git archaeology
 `docs/game/audits/2026-07-06-e2e-foundation-audit.md` for dispositions).
 The 2026-06-28 "open functional gaps" list that used to live here was closed by that arc
 (git history has the old text).
+
+Session 8 (2026-07-07) completed the remaining 19 `UNVERIFIED LOW/OVERFLOW` audit rows in
+`docs/game/audits/2026-07-06-e2e-foundation-audit.md`: final outcomes are 15 fixed items
+(including the deleted superseded `settings_schema.json` duplicate), 2 refuted-by-design
+rows (`cloud_manifest_state`, `build_metadata_state`), and 2 content-pending rows
+(`status_effect_icons.json`, `threat_drone_swarm.json`). The regression bundle remains
+`SYNAPTIC_SEA REGRESSION PASS commands=207 clean_output=true`. Session 8 intentionally did
+not recompute the 732 inventory file:line pins; small coordinator line shifts are expected,
+with the documented git-archaeology recovery flow remaining the canonical refresh method
+when those pins need to move.
 
 **Documented deferrals (deliberate, ADR-tracked — not broken):**
 - **Audio asset library** (ADR-0044) — bus + pipeline are live with 2 placeholder clips;
