@@ -24,14 +24,18 @@ var _audio: Node = null
 
 ## The class-select confirm seam drives the real coordinator arm, which calls
 ## MetaProgressionState.save_to_disk() on the REAL default path
-## (user://meta_progression.json) — not a test-scoped path. Wipe it before and
-## after this smoke runs so it never pollutes the real meta file that other
-## main-scene smokes boot from (e.g. main_playable_slice_progression_smoke.gd's
+## (user://meta_progression.json) — not a test-scoped path. PR #65 review
+## (Codex P2, same defect class as the progression smoke): the old wipe
+## DELETED a developer's real cross-run meta progression when the bundle ran
+## against their normal user:// dir. Back the file up at start and restore it
+## on every exit path instead; the test-era file is still removed at exit so
+## later smokes boot clean (e.g. main_playable_slice_progression_smoke.gd's
 ## class=engineer assertion).
 const REAL_META_PATH := "user://meta_progression.json"
+const META_BACKUP_PATH := "user://meta_progression.json.smoke_backup"
 
 func _initialize() -> void:
-	_wipe_real_meta_file()
+	_backup_real_meta()
 	_coord = MenuCoordinatorScript.new()
 	get_root().add_child(_coord)
 	# _ready() (which builds the meta-screen panels into _meta_panels) is deferred to the
@@ -173,7 +177,7 @@ func _initialize() -> void:
 
 	print("META SCREENS INTERACTIVE PASS hub_purchase=true skill_unlock=true registry_reader=true class_select=true")
 	_cleanup()
-	_wipe_real_meta_file()
+	_restore_real_meta()
 	quit(0)
 
 func _load_json(path: String) -> Dictionary:
@@ -186,12 +190,30 @@ func _cleanup() -> void:
 	if is_instance_valid(_coord):
 		_coord.queue_free()
 
-func _wipe_real_meta_file() -> void:
+## Move the developer's real meta file aside instead of deleting it. If a
+## stale backup exists (a previous run crashed before restoring), keep the
+## OLDER backup — it is the original the player owned — and drop the
+## test-era file.
+func _backup_real_meta() -> void:
+	if not FileAccess.file_exists(REAL_META_PATH):
+		return
+	var real_abs: String = ProjectSettings.globalize_path(REAL_META_PATH)
+	if FileAccess.file_exists(META_BACKUP_PATH):
+		DirAccess.remove_absolute(real_abs)
+		return
+	DirAccess.rename_absolute(real_abs, ProjectSettings.globalize_path(META_BACKUP_PATH))
+
+## Remove the test-era file, then put the original back if one was saved.
+func _restore_real_meta() -> void:
 	if FileAccess.file_exists(REAL_META_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(REAL_META_PATH))
+	if FileAccess.file_exists(META_BACKUP_PATH):
+		DirAccess.rename_absolute(
+			ProjectSettings.globalize_path(META_BACKUP_PATH),
+			ProjectSettings.globalize_path(REAL_META_PATH))
 
 func _fail(reason: String) -> void:
 	push_error("META SCREENS INTERACTIVE FAIL reason=%s" % reason)
 	_cleanup()
-	_wipe_real_meta_file()
+	_restore_real_meta()
 	quit(1)

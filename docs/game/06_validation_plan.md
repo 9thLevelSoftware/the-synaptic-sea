@@ -487,6 +487,9 @@ orphan below so none is silent. Dispositions:
 - **release-audit-tool** — export-time checklist tools, not per-commit regression.
 - **non-headless-harness** — `Node3D` scene fixtures with no `_initialize()`; cannot run as
   `--script` at all.
+- **standalone-gate** — `gate1_automated_playtest`: documented to run ON TOP OF the bundle,
+  deliberately not a `run_clean` entry (its runtime dwarfs every smoke). Surfaced when the
+  checker was scoped to actual `run_clean` invocations (PR #65 review).
 
 The table is generated and drift-checked by `tools/classify_orphan_smokes.sh`
 (`--check` fails on any unclassified orphan or stale row; run it whenever bundle
@@ -557,6 +560,7 @@ membership changes).
 | `food_save_load_smoke` | promotion-candidate |
 | `food_state_smoke` | promotion-candidate |
 | `gameplay_slice_builder_smoke` | deferred-pending-T5 |
+| `gate1_automated_playtest` | standalone-gate |
 | `gridmap_meshlibrary_smoke` | deferred-pending-T5 |
 | `hangar_bay_smoke` | promotion-candidate |
 | `hangar_control_smoke` | promotion-candidate |

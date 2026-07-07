@@ -20,7 +20,10 @@ const InteractableScript := preload("res://scripts/interaction/interactable.gd")
 
 const FAR_POSITION := Vector3(10.0, 0.5, 10.0)
 const SETTLE_FRAMES: int = 30
-const OVERLAP_FRAMES: int = 10
+# ~1s of physics frames for the Area3D overlap engine to register a warp
+# before the smoke declares the signal dead (PR #65 review: named so the
+# intent, not arithmetic, is the source of truth).
+const SIGNAL_TIMEOUT_FRAMES: int = 60
 
 var player: PlayerController
 var interactable: Interactable
@@ -80,7 +83,7 @@ func _on_physics_frame() -> void:
 			_enter_phase("await_entered")
 		"await_entered":
 			if interactable.candidate_player == null:
-				if phase_frame > OVERLAP_FRAMES * 6:
+				if phase_frame > SIGNAL_TIMEOUT_FRAMES:
 					_fail("body_entered never fired after %d physics frames inside the sphere" % phase_frame)
 				return
 			if interactable.candidate_player != player:
@@ -98,7 +101,7 @@ func _on_physics_frame() -> void:
 			_enter_phase("await_exited")
 		"await_exited":
 			if interactable.candidate_player != null:
-				if phase_frame > OVERLAP_FRAMES * 6:
+				if phase_frame > SIGNAL_TIMEOUT_FRAMES:
 					_fail("body_exited never cleared candidate_player after %d frames" % phase_frame)
 				return
 			finished = true
