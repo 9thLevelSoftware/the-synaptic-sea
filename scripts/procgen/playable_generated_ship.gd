@@ -608,6 +608,7 @@ func get_playable_summary() -> Dictionary:
 		"player_spawned": player != null,
 		"camera_spawned": camera_rig != null and camera_rig.camera != null,
 		"objective_count": interactables.size(),
+		"objective_sequence_count": sequence_interactables.size(),
 		"objectives_completed": objective_completion_count,
 		"collision_shape_count": loader.count_collision_shapes() if loader != null else 0,
 		"start_position": player.global_position if player != null else Vector3.INF,

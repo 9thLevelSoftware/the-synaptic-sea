@@ -208,6 +208,22 @@ func _check_session_wiring(pi) -> void:
 	if not String(title.get("_last_run_progress")).is_empty():
 		_fail("playable_ready did not clear stale run progress")
 		return
+	var logical_objective_count: int = int(ready_summary.get("objective_sequence_count", 0))
+	if logical_objective_count <= 0:
+		_fail("playable_ready summary missing logical objective_sequence_count")
+		return
+	var interactable_objective_count: int = int(ready_summary.get("objective_count", 0))
+	var has_multi_step_objective: bool = false
+	for sequence in range(1, logical_objective_count + 1):
+		if pi.get_interactables_by_sequence(sequence).size() > 1:
+			has_multi_step_objective = true
+			break
+	if has_multi_step_objective and interactable_objective_count == logical_objective_count:
+		_fail("fixture no longer exercises reviewed denominator mismatch objective_count=%d objective_sequence_count=%d" % [
+			interactable_objective_count,
+			logical_objective_count,
+		])
+		return
 	_ready_ok = true
 
 	if not pi.teleport_player_to_objective_for_validation(1):
@@ -222,7 +238,7 @@ func _check_session_wiring(pi) -> void:
 	if pi.get_current_objective_sequence() != 2:
 		_fail("interaction input path did not advance current_sequence=%d" % pi.get_current_objective_sequence())
 		return
-	var expected_progress: String = "objectives 1/%d" % int(ready_summary.get("objective_count", 0))
+	var expected_progress: String = "objectives 1/%d" % logical_objective_count
 	var actual_progress: String = String(title.get("_last_run_progress"))
 	if actual_progress != expected_progress:
 		_fail("interaction progress missing expected='%s' got='%s'" % [expected_progress, actual_progress])

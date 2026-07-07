@@ -238,11 +238,17 @@ func _on_gameplay_ready(summary: Dictionary) -> void:
 	_last_run_outcome = ""
 	_last_run_progress = ""
 
+func _summary_logical_objective_count(summary: Dictionary) -> int:
+	var total_sequences: int = int(summary.get("objective_sequence_count", 0))
+	if total_sequences > 0:
+		return total_sequences
+	return int(summary.get("objective_count", 0))
+
 func _on_gameplay_interaction_completed(_interaction_id: String, _objective_id: String, sequence: int, _objective_type: String, _room_id: String) -> void:
-	var total_objectives: int = int(_last_playable_summary.get("objective_count", 0))
+	var total_objectives: int = _summary_logical_objective_count(_last_playable_summary)
 	if total_objectives <= 0 and is_instance_valid(playable_instance):
 		_last_playable_summary = playable_instance.get_playable_summary()
-		total_objectives = int(_last_playable_summary.get("objective_count", 0))
+		total_objectives = _summary_logical_objective_count(_last_playable_summary)
 	_last_run_progress = "objectives %d/%d" % [sequence, total_objectives]
 
 func _on_gameplay_slice_completed(summary: Dictionary) -> void:
