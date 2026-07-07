@@ -2,7 +2,9 @@ extends RefCounted
 class_name GameplaySliceBuilder
 
 # Builds a gameplay_slice Dictionary from a completed layout Dictionary.
-# This populates start/goal rooms, objectives, and empty hazard zone arrays.
+# This populates start/goal rooms, objectives, loot containers, and the
+# arc_zones hazard array (fire/breach stay runtime-seeded per ship:
+# _seed_derelict_fire / _seed_derelict_breaches in the coordinator).
 #
 # The layout pipeline produces structural geometry only.
 # This builder adds the gameplay layer on top.
@@ -114,9 +116,55 @@ func build(layout: Dictionary) -> Dictionary:
 		"objectives": objectives,
 		"loot_containers": loot_containers,
 		"fire_zones": [],
-		"arc_zones": [],
+		"arc_zones": _build_arc_zones(layout, start_room, goal_room, objectives),
 		"breach_zones": [],
 	}
+
+
+# Deterministic single arc zone on a NON-critical link, mirroring the
+# hand-authored golden intent ("non-critical side branch; arc cannot trap the
+# player or block any main objective"): the to_room must be off the critical
+# path, must not be the start/goal room, and must not host an objective —
+# the arc cycles passability, and the objective spine must stay traversable.
+# First qualifying link in layout order (no rng: per-seed replay stable).
+# Returns [] when no safe side link exists (small spine ships stay arc-free).
+func _build_arc_zones(layout: Dictionary, start_room: String, goal_room: String, objectives: Array) -> Array:
+	var links_variant: Variant = layout.get("room_links", [])
+	if not (links_variant is Array):
+		return []
+	var excluded: Dictionary = {start_room: true, goal_room: true}
+	var cp: Variant = layout.get("critical_path", [])
+	if cp is Array:
+		for rid in (cp as Array):
+			excluded[str(rid)] = true
+	for objective in objectives:
+		if objective is Dictionary:
+			excluded[str((objective as Dictionary).get("room_id", ""))] = true
+	for link_variant in (links_variant as Array):
+		if not (link_variant is Dictionary):
+			continue
+		var link: Dictionary = link_variant
+		var from_room: String = str(link.get("from_room", ""))
+		var to_room: String = str(link.get("to_room", ""))
+		if from_room.is_empty() or to_room.is_empty():
+			continue
+		if excluded.has(to_room):
+			continue
+		var entry: Dictionary = {
+			"id": "%s_to_%s_arc" % [from_room, to_room],
+			"from_room": from_room,
+			"to_room": to_room,
+			"kind": "electrical_arc",
+			"rationale": "generated: non-critical side link off the objective spine; arc cannot trap the player or block an objective",
+		}
+		# Reuse the link's own cell endpoints when present; the loader falls
+		# back to room centers otherwise (_cell_world_from_link_endpoint).
+		if link.has("from_cell"):
+			entry["from_cell"] = link["from_cell"]
+		if link.has("to_cell"):
+			entry["to_cell"] = link["to_cell"]
+		return [entry]
+	return []
 
 
 func _find_room(rooms: Array, room_id: String) -> Dictionary:

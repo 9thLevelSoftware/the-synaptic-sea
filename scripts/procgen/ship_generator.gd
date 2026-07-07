@@ -75,6 +75,18 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 	var layout_path: String = temp_dir + "/layout.json"
 	var gameplay_path: String = temp_dir + "/gameplay_slice.json"
 
+	# Build the gameplay slice FIRST so builder-authored hazard links can be
+	# stamped onto the layout before it is written: GeneratedShipLoader reads
+	# arc_zones from layout.json (the golden ships duplicate them in both
+	# files for the same reason).
+	var gameplay_builder: GameplaySliceBuilderScript = GameplaySliceBuilderScript.new()
+	var gameplay: Dictionary = gameplay_builder.build(layout)
+	var layout_arcs: Variant = layout.get("arc_zones", [])
+	var slice_arcs: Variant = gameplay.get("arc_zones", [])
+	if (not (layout_arcs is Array) or (layout_arcs as Array).is_empty()) \
+			and slice_arcs is Array and not (slice_arcs as Array).is_empty():
+		layout["arc_zones"] = (slice_arcs as Array).duplicate(true)
+
 	# Write layout
 	var layout_json: String = JSON.stringify(layout, "  ")
 	var layout_file: FileAccess = FileAccess.open(layout_path, FileAccess.WRITE)
@@ -92,9 +104,7 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 		push_error("SHIP GENERATOR FAIL structural kit not found: %s" % kit_path)
 		return null
 
-	# Build gameplay slice via GameplaySliceBuilder
-	var gameplay_builder: GameplaySliceBuilderScript = GameplaySliceBuilderScript.new()
-	var gameplay: Dictionary = gameplay_builder.build(layout)
+	# Write the gameplay slice (built above, before the layout write).
 	var gameplay_json: String = JSON.stringify(gameplay, "  ")
 	var gameplay_file: FileAccess = FileAccess.open(gameplay_path, FileAccess.WRITE)
 	if gameplay_file == null:

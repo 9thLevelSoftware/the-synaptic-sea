@@ -2064,6 +2064,10 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	# M7-B Task 9: manual extinguish nodes + recharge port share the fire lifecycle.
 	_build_fire_suppression_points()
 	_build_extinguisher_recharge_port()
+	# Tranche 1 (audit): the derelict's own arc zones were dead data — build
+	# them from the DERELICT loader (away_from_start is already true here).
+	_build_arc_zone()
+	_refresh_arc_state(true)
 
 ## Captures the player's world pose relative to the piloted ship's scene_root so the
 ## player can be carried when the piloted ship is repositioned by a dock. Returns
@@ -3245,8 +3249,11 @@ func _build_extinguisher_recharge_port() -> void:
 	if extinguisher_state == null:
 		return
 	# Codex P1: the recharge port parents under lifeboat_ship.scene_root, so its position
-	# must be LIFEBOAT-LOCAL — matching repair/breach/fire builders.
-	var use_lifeboat: bool = lifeboat_ship != null \
+	# must be LIFEBOAT-LOCAL — matching repair/breach/fire builders. Tranche 1 (audit):
+	# the `not away_from_start` term was missing here (its fire-zone sibling has it), so
+	# a derelict rebuild positioned the port at LIFEBOAT-local coords while parenting it
+	# under the DERELICT root — the port landed off-floor in the wrong frame.
+	var use_lifeboat: bool = (not away_from_start) and lifeboat_ship != null \
 		and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root)
 	var positions: Array = _lifeboat_local_repair_positions() if use_lifeboat else _distributed_room_positions()
 	var pos: Vector3 = positions[0] if not positions.is_empty() else Vector3(0.0, PLAYER_SPAWN_HEIGHT_ABOVE_NAV_FLOOR, 0.0)
@@ -4054,6 +4061,10 @@ func travel_home() -> bool:
 	# M7-B Task 7: returning home rebuilds interactables — re-seed/render fire.
 	_seed_fires_from_damage()
 	_build_fire_zones()
+	# Tranche 1 (audit): the derelict arc zone was freed with the derelict
+	# root — rebuild against the HOME loader (away_from_start is false here).
+	_build_arc_zone()
+	_refresh_arc_state(true)
 	# ADR-0042: the hallucination manager was attached to the (now-freed) derelict root,
 	# so rebuild it on the home ship — otherwise home-side hallucinations never render
 	# after a round trip while the director still feeds tier-3 teeth into vitals.
@@ -5381,6 +5392,11 @@ func get_route_gate_collision_enabled_count() -> int:
 func _process(delta: float) -> void:
 	world_time += delta  # Live Persistent Ships Phase 1: advance before any branch/return
 	if away_from_start:
+		# Tranche 1 (audit): mirror the home branch's post-death guard — death
+		# away (end_run sets slice_complete) must stop the sim exactly like
+		# death at home; previously every system kept ticking on a corpse.
+		if not playable_started or slice_complete:
+			return
 		# Keep the vitals panel live on a boarded derelict: Heavy-Load, repair
 		# progress, and the repair_blocked message + its countdown still apply
 		# away from home, even though the home oxygen/hazard loop is paused here.
@@ -5414,6 +5430,10 @@ func _process(delta: float) -> void:
 		# so the away path is no longer starved past the 4808 early-return.
 		_tick_survival_attrition(delta)
 		_refresh_player_vitals(delta)
+		# Tranche 1 (audit): home gets per-frame tracker status lines through
+		# _refresh_oxygen_state; the away branch skipped them, so Power/Reactor/
+		# Threats lines froze for the whole boarding run.
+		_refresh_tracker_system_status_lines()
 		# ADR-0038 (superseded by Domain 4): field crafting completes away from home.
 		# Powered-station crafting is NO LONGER paused away — the hub recompute runs on
 		# both branches now (live sim), so powered stations stay live on a derelict too.
@@ -5450,6 +5470,12 @@ func _process(delta: float) -> void:
 		# Domain 5: tick the reload timer on the away branch (derelict = primary combat context).
 		if ammo_state != null and not ammo_state.tick(delta).is_empty():
 			_refresh_weapon_hotbar()
+		# REQ-013 / Tranche 1 (audit): the electrical-arc hazard cycles on the
+		# derelict too — this was the #42/#43/#44 regression class (system
+		# ticked on the home branch only, dead in the primary field context).
+		if electrical_arc_state != null:
+			electrical_arc_state.tick(delta, {})
+			_refresh_arc_state(false)
 		# Domain 5: stimulant buff timers + addiction withdrawal/tolerance decay advance
 		# on the derelict branch too (item USE already worked away; only per-frame decay
 		# was home-only). Shared with the home block at the bottom of _process.
@@ -5954,6 +5980,14 @@ func _build_arc_zone() -> void:
 	for child in arc_root.get_children():
 		arc_root.remove_child(child)
 		child.queue_free()
+	# Derelict arc nodes parent under the derelict's scene_root (freed with it
+	# on departure), so also clear by handle in case the previous zone lives
+	# outside arc_root.
+	for stale in [arc_zone_node, arc_zone_label]:
+		if stale != null and is_instance_valid(stale):
+			if stale.get_parent() != null:
+				stale.get_parent().remove_child(stale)
+			stale.queue_free()
 	arc_zone_node = null
 	arc_zone_label = null
 	arc_zone_resolved_room_id = ""
@@ -5984,13 +6018,31 @@ func _build_arc_zone() -> void:
 		"discharged_duration": ElectricalArcStateScript.DEFAULT_DISCHARGED_DURATION,
 	})
 	arc_zone_node = _create_arc_zone_node(zone_id, world_position)
-	arc_root.add_child(arc_zone_node)
 	arc_zone_label = _create_arc_zone_label(world_position)
-	arc_root.add_child(arc_zone_label)
+	# Away: parent under the derelict's scene_root so the zone inherits the
+	# dock offset and is freed with the derelict (loot-container pattern).
+	# Home: keep the original arc_root parent.
+	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
+		current_ship.scene_root.add_child(arc_zone_node)
+		current_ship.scene_root.add_child(arc_zone_label)
+	else:
+		arc_root.add_child(arc_zone_node)
+		arc_root.add_child(arc_zone_label)
+
+# The loader whose arc markers drive the CURRENT context: the boarded
+# derelict's own loader root when away (Tranche 1 audit fix — derelict arc
+# zones were dead data before), the home loader otherwise. Mirrors the
+# active_loader selection in _build_loot_containers.
+func _active_arc_loader() -> Node:
+	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root) \
+			and current_ship.scene_root.has_method("get_arc_zone_markers"):
+		return current_ship.scene_root
+	return loader if (loader is Node) else null
 
 func _resolve_arc_zone_world_position() -> Dictionary:
-	if loader != null and loader.has_method("get_arc_zone_markers"):
-		var markers: Array = loader.call("get_arc_zone_markers")
+	var arc_loader: Node = _active_arc_loader()
+	if arc_loader != null and arc_loader.has_method("get_arc_zone_markers"):
+		var markers: Array = arc_loader.call("get_arc_zone_markers")
 		if markers.size() > 0 and markers[0] is Vector3:
 			var candidate: Vector3 = markers[0]
 			if candidate != Vector3.INF:
@@ -6009,9 +6061,9 @@ func _resolve_arc_zone_world_position() -> Dictionary:
 # fire zones so the validation smoke can confirm marker-to-resolved-room
 # agreement without re-walking the loader's internal arrays.
 func _resolved_arc_marker_room_id() -> String:
-	if loader == null or not (loader is Node):
+	var loader_node: Node = _active_arc_loader()
+	if loader_node == null:
 		return ""
-	var loader_node: Node = loader as Node
 	if not loader_node.has_method("get_arc_zone_specs"):
 		return ""
 	var specs_variant: Variant = loader_node.call("get_arc_zone_specs")
@@ -6026,9 +6078,9 @@ func _resolved_arc_marker_room_id() -> String:
 	return ""
 
 func _resolved_arc_marker_zone_id() -> String:
-	if loader == null or not (loader is Node):
+	var loader_node: Node = _active_arc_loader()
+	if loader_node == null:
 		return ""
-	var loader_node: Node = loader as Node
 	if not loader_node.has_method("get_arc_zone_specs"):
 		return ""
 	var specs_variant: Variant = loader_node.call("get_arc_zone_specs")
