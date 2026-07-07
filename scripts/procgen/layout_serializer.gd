@@ -2,7 +2,10 @@ extends RefCounted
 class_name LayoutSerializer
 
 # Assembles a complete layout.json Dictionary from pipeline stage outputs.
-# Output matches the golden layout schema version 1.1.0 exactly.
+# Output matches the golden layout schema version 1.2.0 exactly — the emitted
+# schema_version below IS the canonical version; layout_schema_coherence_smoke
+# asserts the golden fixtures declare the same version and carry every
+# top-level key emitted here. Bump both together.
 
 const CELL_SIZE: float = 4.0
 const DECK_HEIGHT: float = 4.0
@@ -68,7 +71,7 @@ func serialize(cell_grid: Dictionary, geometry: Dictionary,
 			for wp in wall_placements:
 				placements.append(wp)
 
-			room_dict["portals"] = geo.get("portals", [])
+			room_dict["portals"] = _serialize_portals(geo.get("portals", []))
 			room_dict["interior_zones"] = _serialize_interior_zones(geo.get("interior_zones", {}))
 		else:
 			room_dict["portals"] = []
@@ -78,7 +81,7 @@ func serialize(cell_grid: Dictionary, geometry: Dictionary,
 		rooms_array.append(room_dict)
 
 	# Build room_links from adjacencies
-	var room_links: Array = _build_room_links(adjacencies)
+	var room_links: Array = _build_room_links(adjacencies, rooms_data)
 
 	# Build vertical_connections
 	var vertical_connections: Array = _build_vertical_connections(rooms_data, adjacencies, room_roles)
@@ -171,6 +174,27 @@ func _build_wall_placements(wall_segments: Array) -> Array:
 	return placements
 
 
+func _serialize_portals(portals: Array) -> Array:
+	# Tranche 5 (audit LOW): portals used to be copied raw, so Vector3/Vector2i
+	# fields collapsed to opaque strings ("(6.0, 0.0, 0.0)") under
+	# JSON.stringify. Convert to plain numeric arrays (same policy as
+	# _serialize_interior_zones); values that are already arrays pass through.
+	var result: Array = []
+	for portal_variant in portals:
+		if typeof(portal_variant) != TYPE_DICTIONARY:
+			continue
+		var portal: Dictionary = (portal_variant as Dictionary).duplicate()
+		var pos: Variant = portal.get("position")
+		if pos is Vector3:
+			portal["position"] = [pos.x, pos.y, pos.z]
+		for cell_key in ["from_cell", "to_cell"]:
+			var cell: Variant = portal.get(cell_key)
+			if cell is Vector2i:
+				portal[cell_key] = [cell.x, cell.y]
+		result.append(portal)
+	return result
+
+
 func _serialize_interior_zones(zones: Dictionary) -> Dictionary:
 	var result: Dictionary = {}
 
@@ -194,7 +218,7 @@ func _serialize_interior_zones(zones: Dictionary) -> Dictionary:
 	return result
 
 
-func _build_room_links(adjacencies: Array) -> Array:
+func _build_room_links(adjacencies: Array, rooms_data: Dictionary) -> Array:
 	var links: Array = []
 	for adj in adjacencies:
 		var from_room: String = str(adj.get("from_room", ""))
@@ -202,8 +226,14 @@ func _build_room_links(adjacencies: Array) -> Array:
 		var from_cell: Variant = adj.get("from_cell", Vector2i.ZERO)
 		var to_cell: Variant = adj.get("to_cell", Vector2i.ZERO)
 
-		var from_arr: Array = [from_cell.x, from_cell.y, 0] if from_cell is Vector2i else [0, 0, 0]
-		var to_arr: Array = [to_cell.x, to_cell.y, 0] if to_cell is Vector2i else [0, 0, 0]
+		# Tranche 5 (audit LOW): the third component is the endpoint's DECK —
+		# it was hardcoded 0, so the loader's floor_cell_d<deck>_* placement
+		# lookup (_placement_matches_endpoint_cell) silently failed for every
+		# cross-deck link and dropped its nav marker.
+		var from_deck: int = int(rooms_data.get(from_room, {}).get("deck", 0))
+		var to_deck: int = int(rooms_data.get(to_room, {}).get("deck", 0))
+		var from_arr: Array = [from_cell.x, from_cell.y, from_deck] if from_cell is Vector2i else [0, 0, from_deck]
+		var to_arr: Array = [to_cell.x, to_cell.y, to_deck] if to_cell is Vector2i else [0, 0, to_deck]
 
 		links.append({
 			"id": "%s_to_%s" % [from_room, to_room],

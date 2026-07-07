@@ -101,6 +101,24 @@ CORRUPT_SLOT_WARNING="^WARNING: SaveLoadService: slot file is not valid JSON obj
 # warning per distinct path. Pinned to the voice directory so a missing
 # SFX/music placeholder in any other smoke still fails the bundle.
 VOICE_CLIP_WARNING="^WARNING: AudioManager: stream file missing, path='res://data/audio/voice/.*'\$"
+# Tranche 5 (2026-07-06 audit): encounter_injector_smoke's missing-table case
+# (Case 11) deliberately points a biome at a nonexistent encounter table to
+# prove the constants fallback + warn-once (ADR-0047). Pinned to the smoke's
+# sentinel id so a genuinely missing production table still fails the bundle.
+ENCOUNTER_TABLE_WARNING="^WARNING: EncounterInjector: encounter table file missing, falling back to role constants: res://data/procgen/encounter_tables/no_such_table\\.json\$"
+# derelict_generator_smoke drives ShipGenerator with the derelict archetype
+# against the legacy spine/bifurcated/stacked template trio, none of whose
+# zone pools can host the archetype's guaranteed "dock" — the assigner's
+# guarantee post-pass (Tranche 5 enforcement) correctly reports the skip.
+# The dock itself is guaranteed by the v3 RoomGraphGenerator layer (the same
+# smoke asserts dock_count==1) and by the derelict_a/b templates; production
+# derelict travel passes an empty archetype, so this diagnostic never fires
+# in play.
+DOCK_GUARANTEE_WARNING="^WARNING: RoomAssigner: guaranteed role 'dock' has no eligible zone in this template; guarantee skipped\$"
+# load_from_blueprint_smoke's null_rejected case deliberately passes a null
+# blueprint to prove load_from_blueprint refuses it; this is the expected
+# rejection line.
+BLUEPRINT_NULL_ERROR="^ERROR: PlayableGeneratedShip.load_from_blueprint: blueprint must not be null\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -109,7 +127,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$BLUEPRINT_NULL_ERROR" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -301,7 +319,51 @@ run_clean 'Tranche 3 interactable body-entered physics smoke' 'INTERACTABLE BODY
 run_clean 'Tranche 4 audio log panel smoke' 'AUDIO LOG PANEL PASS entries=6 play=true stop=true clip_attempted=true populated_gate=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_log_panel_smoke.gd
 run_clean 'Tranche 4 settings difficulty label smoke' 'SETTINGS DIFFICULTY LABEL PASS standard=x1.0 hardened=x1.4 deep_dive=x1.7 delegation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_difficulty_label_smoke.gd
 run_clean 'Tranche 4 panel menu-modal guard smoke' 'PANEL MENU MODAL GUARD PASS scanner_blocked=true chart_blocked=true inventory_blocked=true reopens=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/panel_menu_modal_guard_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=170 clean_output=true'
+# --- Tranche 5 (2026-07-07): procgen & data coherence — behavior guards + the promoted procgen layout gate ---
+# Two new Tranche-5 smokes, then the 32 deferred-pending-T5 promotions (run
+# first -> stale pins fixed -> registered; see the orphan classification
+# table). Long-runtime members (derelict generator 100 seeds, layout stress
+# 60 runs, the physics walkers) add several minutes to a full bundle run.
+run_clean 'Tranche 5 layout schema coherence smoke' 'LAYOUT SCHEMA COHERENCE PASS goldens=3 version_match=true keys_match=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/layout_schema_coherence_smoke.gd
+run_clean 'Tranche 5 derelict fire zone marker smoke' 'DERELICT FIRE ZONE MARKER PASS boarded=true marker_position_used=true spec_meta=true fallback_intact=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_fire_zone_marker_smoke.gd
+run_clean 'archetype load smoke' 'ARCHETYPE LOAD PASS archetypes=3 round_trip=3' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/archetype_load_smoke.gd
+run_clean 'biome profile smoke' 'BIOME PROFILE PASS biomes=3 modifiers=ok hazard_override=ok empty_safe=true select_deterministic=true density_scales=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/biome_profile_smoke.gd
+run_clean 'room graph smoke' 'ROOM GRAPH PASS rooms=3 links=2 connected=true disconnected_detected=true serialization=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_graph_smoke.gd
+run_clean 'ship blueprint smoke' 'SHIP BLUEPRINT PASS sizes=3 conditions=3 serialization=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_blueprint_smoke.gd
+run_clean 'topology template smoke' 'TOPOLOGY TEMPLATE PASS from_dict=true get_zone=true attached=true count_types=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/topology_template_smoke.gd
+run_clean 'template data smoke' 'TEMPLATE DATA PASS templates=3 all_valid=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_data_smoke.gd
+run_clean 'template selector smoke' 'TEMPLATE SELECTOR PASS explicit=true deterministic=true varied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_selector_smoke.gd
+run_clean 'marker generator smoke' 'MARKER GENERATOR PASS deterministic=true per_cell=3 round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/marker_generator_smoke.gd
+run_clean 'wall door resolver smoke' 'WALL DOOR RESOLVER PASS walls=true portals=true interior=true no_conflict=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wall_door_resolver_smoke.gd
+# seed_determinism's marker ends with the pipeline-output hash, which is
+# stable per code version but changes with ANY legitimate pipeline change —
+# the pin stops at `hash=` on purpose.
+run_clean 'seed determinism smoke' 'SEED DETERMINISM PASS fnv_empty=ok fnv_hello=ok match=true golden_match=true seeds_differ=true hash=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/seed_determinism_smoke.gd
+run_clean 'cell layout engine smoke' 'CELL LAYOUT ENGINE PASS rooms=6 adjacencies=5 no_overlap=true connected=true deterministic=true connections_wired=true stacked_v2_elevator=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cell_layout_engine_smoke.gd
+run_clean 'room assigner smoke' 'ROOM ASSIGNER PASS rooms=5 first=airlock last=reactor keys=valid ids=unique deterministic=true guaranteed=enforced max_duplicates=enforced' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_assigner_smoke.gd
+run_clean 'layout serializer smoke' 'LAYOUT SERIALIZER PASS keys=valid rooms=2 schema=1.2.0 golden_format=true prototype=valid critical_path=valid portals_json=true link_deck=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/layout_serializer_smoke.gd
+run_clean 'ship layout generator smoke' 'SHIP LAYOUT GENERATOR PASS spine=true bifurcated=true stacked=true deterministic=true varied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_layout_generator_smoke.gd
+run_clean 'ship layout integration smoke' 'SHIP LAYOUT INTEGRATION PASS generated=21/21 deterministic=true json_roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_layout_integration_smoke.gd
+run_clean 'room graph generator smoke' 'ROOM GRAPH GENERATOR PASS life_boat=4 small=5 medium=8 deterministic=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_graph_generator_smoke.gd
+run_clean 'structural placer smoke' 'STRUCTURAL PLACER PASS rooms=10 modules=24 second_rooms=8 second_modules=20 unknown_role_fallback=ok' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_placer_smoke.gd
+run_clean 'encounter injector smoke' 'ENCOUNTER INJECTOR PASS std_markers=0 deep_markers=2 markers_valid=true deterministic=true critical_safe=true legacy_compat=true table_driven=true table_fallback=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encounter_injector_smoke.gd
+run_clean 'gameplay slice builder smoke' 'GAMEPLAY_SLICE_BUILDER PASS all 9 layouts produced valid slices loot_containers=true salvage_tables=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gameplay_slice_builder_smoke.gd
+run_clean 'template c traversal smoke' 'TEMPLATE C TRAVERSAL PASS transitions_checked=1 missing=ok deck=ok cell=ok self=ok critical_path=ok pipeline_transitions=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_c_traversal_smoke.gd
+run_clean 'derelict generator smoke' 'DERELICT GENERATOR PASS seeds=100 determinism=3 hangar_seeds=80' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_generator_smoke.gd
+# marker pinned to the bracket-free prefix: run_clean greps the marker, and
+# the full line's rooms=[9,12] is a character class under grep.
+run_clean 'procgen layout stress smoke' 'PROCGEN LAYOUT STRESS PASS total=60/60' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_layout_stress_smoke.gd
+run_clean 'load from blueprint smoke' 'LOAD FROM BLUEPRINT INTEGRATION PASS sizes=3 room_count=10 null_rejected=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/load_from_blueprint_smoke.gd
+run_clean 'ship generator smoke' 'SHIP GENERATOR PASS life_boat=true small=true deterministic=true life_rooms=10 small_rooms=12' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_generator_smoke.gd
+run_clean 'procgen playable ship smoke' 'PLAYABLE SHIP SMOKE PASS player_spawned=true collision_checked=true interaction_completed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_playable_ship_smoke.gd
+run_clean 'procgen runtime demo smoke' 'RUNTIME GAMEPLAY DEMO PASS objectives=4 interactions=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_runtime_demo_smoke.gd
+run_clean 'procgen walkability smoke' 'WALKABILITY PASS spine_seed_42' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_walkability_smoke.gd
+run_clean 'interior aabb smoke' 'INTERIOR AABB PASS nondegenerate=true positioned=true contains=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interior_aabb_smoke.gd
+run_clean 'kit catalog smoke' 'KIT CATALOG PASS loaded=3 default=ship_structural_v0 airlock=3 eng=3 breach_select=ok fallback=ok real_stems=true default_role_module=floor_1x1 ids_sorted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/kit_catalog_smoke.gd
+run_clean 'floor wrapper collision footprint smoke' 'FLOOR WRAPPER COLLISION FOOTPRINT PASS checked=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/floor_wrapper_collision_footprint_smoke.gd
+run_clean 'readability prop factory smoke' 'READABILITY PROP FACTORY PASS props=9' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/readability_prop_factory_smoke.gd
+run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=122' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=204 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
@@ -491,12 +553,18 @@ orphan below so none is silent. Dispositions:
   food/survival state models, UI panels, e2e chains, and the `main_playable_slice_*`
   cluster, which needs per-file supersession review before wholesale promotion). Promote
   opportunistically when a tranche touches the subsystem.
-- **deferred-pending-T5** — procgen/layout pipeline smokes; Tranche 5 rewrites that layer
-  (schema 1.2.0, archetype enforcement, encounter tables), so promotion happens with it.
+- **deferred-pending-T5** — RESOLVED 2026-07-07: Tranche 5 promoted 32 of the 36 into the
+  bundle (their rows are removed from this table — they are no longer orphans) and
+  reclassified the other 4: `procgen_stress_test` (superseded by
+  `procgen_layout_stress_smoke`), `gridmap_meshlibrary_smoke` and the two arg-driven ship
+  walkers (debug-tool).
 - **deferred-pending-T6** — `demo_scope_gate_smoke`; promoted when Tranche 6 wires the gate.
 - **legacy-capture** — display-server/PNG/export artifact tools, self-excluded from headless
   regression by design.
-- **debug-tool** — developer probes without pass-marker discipline.
+- **debug-tool** — developer probes without pass-marker discipline (plus, since Tranche 5,
+  arg-driven external tools that cannot self-run under the bundle's bare `--script`
+  invocation).
+- **superseded-by `<smoke>`** — coverage fully owned by a bundled smoke; kept for history.
 - **release-audit-tool** — export-time checklist tools, not per-commit regression.
 - **non-headless-harness** — `Node3D` scene fixtures with no `_initialize()`; cannot run as
   `--script` at all.
@@ -512,12 +580,10 @@ membership changes).
 |---|---|
 | `_layout_visual_capture` | legacy-capture |
 | `achievement_state_smoke` | promotion-candidate |
-| `archetype_load_smoke` | deferred-pending-T5 |
 | `armor_resolver_smoke` | promotion-candidate |
 | `assert_hang_test` | debug-tool |
 | `bay_dock_launch_smoke` | promotion-candidate |
 | `bay_travel_unbay_smoke` | promotion-candidate |
-| `biome_profile_smoke` | deferred-pending-T5 |
 | `boarding_flip_smoke` | promotion-candidate |
 | `boot_dock_aligned_smoke` | promotion-candidate |
 | `bridge_terminal_login_smoke` | promotion-candidate |
@@ -528,7 +594,6 @@ membership changes).
 | `cargo_transfer_smoke` | promotion-candidate |
 | `cart_control_smoke` | promotion-candidate |
 | `cart_state_smoke` | promotion-candidate |
-| `cell_layout_engine_smoke` | deferred-pending-T5 |
 | `claim_persistence_smoke` | promotion-candidate |
 | `class_definitions_smoke` | promotion-candidate |
 | `coherent_loader_metadata_smoke` | promotion-candidate |
@@ -547,7 +612,6 @@ membership changes).
 | `debug_apply_summary` | debug-tool |
 | `debug_save_load` | debug-tool |
 | `demo_scope_gate_smoke` | deferred-pending-T6 |
-| `derelict_generator_smoke` | deferred-pending-T5 |
 | `derelict_loot_smoke` | promotion-candidate |
 | `derelict_objective_controller_smoke` | promotion-candidate |
 | `difficulty_profile_smoke` | promotion-candidate |
@@ -562,38 +626,31 @@ membership changes).
 | `e2e_ship_meta_loop_smoke` | promotion-candidate |
 | `e2e_survival_loop_smoke` | promotion-candidate |
 | `effect_dispatcher_smoke` | promotion-candidate |
-| `encounter_injector_smoke` | deferred-pending-T5 |
 | `encumbrance_smoke` | promotion-candidate |
 | `equipment_carts_smoke` | promotion-candidate |
 | `equipment_defs_smoke` | promotion-candidate |
 | `equipment_state_smoke` | promotion-candidate |
 | `export_presets_smoke` | release-audit-tool |
 | `field_crafting_state_smoke` | promotion-candidate |
-| `floor_wrapper_collision_footprint_smoke` | deferred-pending-T5 |
 | `food_save_load_smoke` | promotion-candidate |
 | `food_state_smoke` | promotion-candidate |
-| `gameplay_slice_builder_smoke` | deferred-pending-T5 |
 | `gate1_automated_playtest` | standalone-gate |
-| `gridmap_meshlibrary_smoke` | deferred-pending-T5 |
+| `gridmap_meshlibrary_smoke` | debug-tool (T5: requires CLI args, writes `.validation.json` next to each `.tres` in res://) |
 | `hangar_bay_smoke` | promotion-candidate |
 | `hangar_control_smoke` | promotion-candidate |
 | `hangar_persistence_smoke` | promotion-candidate |
 | `hangar_port_smoke` | promotion-candidate |
 | `hydroponics_state_smoke` | promotion-candidate |
-| `interior_aabb_smoke` | deferred-pending-T5 |
 | `inventory_panel_smoke` | promotion-candidate |
 | `inventory_selection_model_smoke` | promotion-candidate |
 | `inventory_widget_smoke` | promotion-candidate |
 | `item_inventory_smoke` | promotion-candidate |
 | `junk_items_smoke` | promotion-candidate |
-| `kit_catalog_smoke` | deferred-pending-T5 |
-| `layout_serializer_smoke` | deferred-pending-T5 |
 | `life_boat_layout_smoke` | promotion-candidate |
 | `life_boat_smoke` | promotion-candidate |
 | `life_support_system_smoke` | promotion-candidate |
 | `lifeboat_travel_gate_smoke` | promotion-candidate |
 | `live_main_prepare_to_upgrade_probe` | debug-tool |
-| `load_from_blueprint_smoke` | deferred-pending-T5 |
 | `localization_catalog_smoke` | promotion-candidate |
 | `locked_iso_readability_harness` | non-headless-harness |
 | `loot_distribution_smoke` | promotion-candidate |
@@ -614,7 +671,6 @@ membership changes).
 | `main_playable_slice_reload_affordance_smoke` | promotion-candidate |
 | `main_playable_slice_suit_oxygen_smoke` | promotion-candidate |
 | `main_playable_slice_vitals_hud_smoke` | promotion-candidate |
-| `marker_generator_smoke` | deferred-pending-T5 |
 | `material_state_smoke` | promotion-candidate |
 | `medicine_state_smoke` | promotion-candidate |
 | `occupancy_flip_smoke` | promotion-candidate |
@@ -627,44 +683,30 @@ membership changes).
 | `player_progression_state_smoke` | promotion-candidate |
 | `player_vitals_model_smoke` | promotion-candidate |
 | `power_grid_state_smoke` | promotion-candidate |
-| `procgen_layout_stress_smoke` | deferred-pending-T5 |
-| `procgen_loader_playable_contract_smoke` | deferred-pending-T5 |
 | `procgen_playable_ship_capture` | legacy-capture |
-| `procgen_playable_ship_smoke` | deferred-pending-T5 |
 | `procgen_runtime_demo_capture` | legacy-capture |
-| `procgen_runtime_demo_smoke` | deferred-pending-T5 |
-| `procgen_ship_gameplay_smoke` | deferred-pending-T5 |
-| `procgen_ship_walkthrough_smoke` | deferred-pending-T5 |
-| `procgen_stress_test` | deferred-pending-T5 |
-| `procgen_walkability_smoke` | deferred-pending-T5 |
+| `procgen_ship_gameplay_smoke` | debug-tool (T5: arg-driven external walker — needs --layout/--kit/--gameplay-slice; macOS-era header) |
+| `procgen_ship_walkthrough_smoke` | debug-tool (T5: arg-driven external walker — needs --layout/--kit; macOS-era header) |
+| `procgen_stress_test` | superseded-by `procgen_layout_stress_smoke` (T5: v4-broken asserts — pins the removed `ShipStructure` root name and a graph-vs-scene child-count comparison `derelict_generator_smoke` documents as wrong — plus a 1,800-generation runtime) |
 | `product_audit_smoke` | release-audit-tool |
 | `progression_repair_integration_smoke` | promotion-candidate |
 | `qt_mini_smoke` | promotion-candidate |
 | `quality_tier_smoke` | promotion-candidate |
 | `rarity_tier_smoke` | promotion-candidate |
-| `readability_prop_factory_smoke` | deferred-pending-T5 |
 | `recipe_resource_smoke` | promotion-candidate |
 | `recursive_travel_smoke` | promotion-candidate |
 | `release_readiness_ledger_smoke` | release-audit-tool |
 | `repair_consume_smoke` | promotion-candidate |
 | `repair_loop_smoke` | promotion-candidate |
 | `rigid_pair_travel_smoke` | promotion-candidate |
-| `room_assigner_smoke` | deferred-pending-T5 |
-| `room_graph_generator_smoke` | deferred-pending-T5 |
-| `room_graph_smoke` | deferred-pending-T5 |
 | `scanner_panel_smoke` | promotion-candidate |
 | `scanner_state_smoke` | promotion-candidate |
-| `seed_determinism_smoke` | deferred-pending-T5 |
 | `ship_access_smoke` | promotion-candidate |
-| `ship_blueprint_smoke` | deferred-pending-T5 |
 | `ship_data_export` | legacy-capture |
 | `ship_dump` | legacy-capture |
-| `ship_generator_smoke` | deferred-pending-T5 |
 | `ship_instance_dock_fields_smoke` | promotion-candidate |
 | `ship_instance_smoke` | promotion-candidate |
 | `ship_inventory_smoke` | promotion-candidate |
-| `ship_layout_generator_smoke` | deferred-pending-T5 |
-| `ship_layout_integration_smoke` | deferred-pending-T5 |
 | `ship_occupancy_smoke` | promotion-candidate |
 | `ship_subcomponent_smoke` | promotion-candidate |
 | `ship_system_smoke` | promotion-candidate |
@@ -678,16 +720,10 @@ membership changes).
 | `station_state_mini_smoke` | promotion-candidate |
 | `station_state_smoke` | promotion-candidate |
 | `stimulant_state_smoke` | promotion-candidate |
-| `structural_placer_smoke` | deferred-pending-T5 |
 | `sustenance_state_smoke` | promotion-candidate |
-| `template_c_traversal_smoke` | deferred-pending-T5 |
-| `template_data_smoke` | deferred-pending-T5 |
-| `template_selector_smoke` | deferred-pending-T5 |
 | `threat_ai_state_smoke` | promotion-candidate |
-| `topology_template_smoke` | deferred-pending-T5 |
 | `training_by_item_smoke` | promotion-candidate |
 | `travel_controller_smoke` | promotion-candidate |
 | `travel_integration_smoke` | promotion-candidate |
 | `unique_item_state_smoke` | promotion-candidate |
-| `wall_door_resolver_smoke` | deferred-pending-T5 |
 | `windowed_fps_capture` | legacy-capture |

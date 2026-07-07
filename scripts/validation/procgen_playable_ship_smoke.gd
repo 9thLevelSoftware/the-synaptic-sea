@@ -72,8 +72,10 @@ func _on_playable_ready(summary: Dictionary) -> void:
 	if collision_shape_count <= 0:
 		_fail("collision shape count is zero")
 		return
-	if objective_count != 5:
-		_fail("expected 5 objectives got %d" % objective_count)
+	# Tranche 5: seed_000017 regenerated through the real pipeline — the
+	# default fixture now carries 4 objectives (3 salvage + reach-goal).
+	if objective_count != 4:
+		_fail("expected 4 objectives got %d" % objective_count)
 		return
 	var player_position: Vector3 = playable_ship.player.global_position
 	var nearest_floor_top_y: float = _nearest_floor_collision_top_y(player_position)
@@ -116,7 +118,10 @@ func _nearest_floor_collision_top_y(world_position: Vector3) -> float:
 			var module_id: String = str(placement.get("module_id", placement.get("module", "")))
 			if not FLOOR_MODULES.has(module_id):
 				continue
-			var pos_variant: Variant = placement.get("position", [])
+			# Tranche 5: regenerated fixtures use the serializer's world_position
+			# key; legacy 1.0.0 fixtures used position. Dual-read like the
+			# loader's _read_placement_position.
+			var pos_variant: Variant = placement.get("world_position", placement.get("position", []))
 			if typeof(pos_variant) != TYPE_ARRAY:
 				continue
 			var pos: Array = pos_variant
@@ -155,7 +160,7 @@ func _validate_and_pass() -> void:
 	if not interaction_completed or completed_count < 1:
 		_fail("interaction_completed=false")
 		return
-	if objective_count != 5:
+	if objective_count != 4:
 		_fail("objective_count=%d" % objective_count)
 		return
 	finished = true

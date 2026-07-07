@@ -205,7 +205,7 @@ The seed picks from available options. Larger blueprints (MEDIUM) tend toward bi
 ### Placement Algorithm
 
 1. Place the entry zone room at grid origin `(0, 0)`.
-2. Follow the template connections in order. For each connection, place the target room adjacent to the source room on the grid.
+2. Placement is `attach_to`-driven: zones are ordered by a BFS over `attach_to` parents and each room is placed adjacent to its zone anchor (falling back to any placed room). The template `connections` array is consumed AFTER placement (Tranche 5, 2026-07-07): declared cross-deck edges whose zone pair placement did not connect are emitted as logical adjacencies (this is what makes stacked_v2's `elevator -> upper_hub` vertical path real); same-deck declared edges act as placement hints and are not force-materialized.
 3. Position hints guide placement direction:
    - `bow` = negative Z (forward)
    - `stern` = positive Z (aft)
@@ -265,11 +265,11 @@ For each room, compute:
 
 ## Output Format
 
-The `LayoutSerializer` assembles a Dictionary matching the golden `layout.json` schema (version 1.1.0):
+The `LayoutSerializer` assembles a Dictionary matching the golden `layout.json` schema (version 1.2.0 — the serializer's emitted version is canonical; `layout_schema_coherence_smoke` keeps the goldens in lockstep):
 
 ```json
 {
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "document_kind": "ship_layout",
   "program_id": "procgen-<archetype>-seed-<seed>",
   "kit_id": "ship_structural_v0",

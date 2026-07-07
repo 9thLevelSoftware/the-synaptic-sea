@@ -3134,12 +3134,27 @@ func _build_fire_zones() -> void:
 	# Raw _distributed_room_positions() are derelict-frame and land off the lifeboat floor.
 	var use_lifeboat: bool = (not away_from_start) and lifeboat_ship != null \
 		and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root)
+	# Tranche 5 (2026-07-06 audit HIGH): the loader's get_fire_zone_markers() /
+	# get_fire_zone_specs() had zero callers while the arc/breach siblings
+	# already consume theirs. Away branch only: the boarded derelict's
+	# layout-declared fire zones position (and annotate) the first N burning
+	# compartments' visuals; distributed positions cover the rest. Home stays
+	# lifeboat-local (Codex P1) — home-loader-frame markers would regress it.
+	var layout_zones: Array = [] if use_lifeboat else _away_fire_layout_zones()
 	var positions: Array = _lifeboat_local_repair_positions() if use_lifeboat else _distributed_room_positions()
-	if positions.is_empty():
+	if positions.is_empty() and layout_zones.is_empty():
 		return
 	var idx: int = 0
 	for cid in burning:
-		var pos: Vector3 = positions[idx % positions.size()]
+		var pos: Vector3
+		var layout_spec: Dictionary = {}
+		if idx < layout_zones.size():
+			pos = layout_zones[idx]["position"]
+			layout_spec = layout_zones[idx]["spec"]
+		else:
+			if positions.is_empty():
+				break
+			pos = positions[(idx - layout_zones.size()) % positions.size()]
 		idx += 1
 		var zone := Area3D.new()
 		zone.name = "FireZone_%s" % str(cid)
@@ -3148,6 +3163,9 @@ func _build_fire_zones() -> void:
 		zone.monitoring = false
 		zone.monitorable = false
 		zone.set_meta("fire_compartment_id", str(cid))
+		if not layout_spec.is_empty():
+			zone.set_meta("fire_zone_layout_id", str(layout_spec.get("zone_id", "")))
+			zone.set_meta("fire_zone_layout_kind", str(layout_spec.get("kind", "")))
 		zone.position = pos
 		var shape := CollisionShape3D.new()
 		var sphere := SphereShape3D.new()
@@ -3169,6 +3187,31 @@ func _build_fire_zones() -> void:
 		zone.add_child(visual)
 		_attach_zone_to_active_ship(zone)
 		fire_zone_nodes[str(cid)] = zone
+
+# Layout-declared fire zones of the BOARDED derelict, as [{position, spec}]
+# pairs in the derelict's own frame. Mirrors _active_arc_loader's away-branch
+# preference; empty at home (lifeboat frame) and for procgen layouts that
+# declare no fire_zones. Positions are the loader's precomputed midpoint
+# markers; specs carry the layout's zone_id/kind/rooms metadata.
+func _away_fire_layout_zones() -> Array:
+	if not away_from_start or current_ship == null:
+		return []
+	var root: Node = current_ship.scene_root
+	if root == null or not is_instance_valid(root):
+		return []
+	if not root.has_method("get_fire_zone_markers") or not root.has_method("get_fire_zone_specs"):
+		return []
+	var markers: Array = root.call("get_fire_zone_markers")
+	var specs: Array = root.call("get_fire_zone_specs")
+	var out: Array = []
+	for i in range(markers.size()):
+		if not (markers[i] is Vector3) or markers[i] == Vector3.INF:
+			continue
+		var spec: Dictionary = {}
+		if i < specs.size() and specs[i] is Dictionary:
+			spec = specs[i]
+		out.append({"position": markers[i], "spec": spec})
+	return out
 
 func _attach_zone_to_active_ship(node: Node) -> void:
 	if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):

@@ -84,5 +84,69 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	print("ROOM ASSIGNER PASS rooms=%d first=airlock last=reactor keys=valid ids=unique deterministic=true" % room_plan.size())
+	# --- Tranche 5 (2026-07-06 audit HIGH, room_assigner.gd:129): the archetype
+	# JSON fields guaranteed_roles / max_duplicates were authored in all four
+	# archetypes (derelict guarantees "dock") but never parsed — _pick_role read
+	# only role_weights. Mirrors the derelict shape: dock is in a zone pool but
+	# absent from role_weights, so unenforced assignment essentially never
+	# places it; max_duplicates=1 must keep multi-pool roles unique.
+	var constraint_template: TopologyTemplateScript = TopologyTemplateScript.from_dict({
+		"id": "constraint_test",
+		"description": "guaranteed_roles + max_duplicates enforcement",
+		"zones": [
+			{"id": "entry", "role_pool": ["airlock"], "count": 1,
+			 "position_hint": "bow", "deck": 0, "layout": "single", "attach_to": ""},
+			{"id": "spine", "role_pool": ["corridor", "main_spine"], "count": 2,
+			 "position_hint": "center", "deck": 0, "layout": "linear", "attach_to": "entry"},
+			{"id": "side", "role_pool": ["cargo", "engineering", "medical", "dock"], "count": 3,
+			 "position_hint": "lateral", "deck": 0, "layout": "clustered", "attach_to": "spine"},
+			{"id": "destination", "role_pool": ["reactor"], "count": 1,
+			 "position_hint": "stern", "deck": 0, "layout": "single", "attach_to": "spine"},
+		],
+		"connections": [],
+		"deck_config": {"max_decks": 1, "vertical_transition_probability": 0.0},
+	})
+	var constraint_archetype: Dictionary = {
+		"guaranteed_roles": ["dock"],
+		"max_duplicates": 1,
+		"role_weights": {"cargo": 40, "engineering": 40, "corridor": 4, "main_spine": 4},
+	}
+	var constrained: Array[Dictionary] = assigner.assign(constraint_template, bp, constraint_archetype)
+
+	var role_counts: Dictionary = {}
+	for room in constrained:
+		var r: String = str(room.get("role", ""))
+		role_counts[r] = int(role_counts.get(r, 0)) + 1
+	if int(role_counts.get("dock", 0)) < 1:
+		push_error("ROOM ASSIGNER FAIL guaranteed_roles unenforced: 'dock' guaranteed by archetype but absent from plan (roles=%s)" % str(role_counts))
+		quit(1)
+		return
+	# max_duplicates=1: every role picked from a multi-role pool appears at most once.
+	for r in role_counts:
+		if int(role_counts[r]) > 1:
+			push_error("ROOM ASSIGNER FAIL max_duplicates=1 unenforced: role '%s' appears %d times (roles=%s)" % [str(r), int(role_counts[r]), str(role_counts)])
+			quit(1)
+			return
+	# Entry/destination must survive enforcement untouched.
+	if str(constrained[0].get("role", "")) != "airlock" or str(constrained[-1].get("role", "")) != "reactor":
+		push_error("ROOM ASSIGNER FAIL enforcement disturbed entry/destination roles")
+		quit(1)
+		return
+	# Room ids stay unique after any guarantee replacement re-indexing.
+	var c_ids: Dictionary = {}
+	for room in constrained:
+		var cid: String = str(room["id"])
+		if c_ids.has(cid):
+			push_error("ROOM ASSIGNER FAIL duplicate room id after enforcement: %s" % cid)
+			quit(1)
+			return
+		c_ids[cid] = true
+	# Enforcement must stay deterministic per seed.
+	var constrained_b: Array[Dictionary] = assigner.assign(constraint_template, bp, constraint_archetype)
+	if str(constrained) != str(constrained_b):
+		push_error("ROOM ASSIGNER FAIL enforcement broke per-seed determinism")
+		quit(1)
+		return
+
+	print("ROOM ASSIGNER PASS rooms=%d first=airlock last=reactor keys=valid ids=unique deterministic=true guaranteed=enforced max_duplicates=enforced" % room_plan.size())
 	quit(0)

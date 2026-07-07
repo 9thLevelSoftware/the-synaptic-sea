@@ -53,23 +53,17 @@ classify() {
     # -- gated feature: promote with the Tranche 6 DemoScopeGate wiring --------
     demo_scope_gate_smoke)
       echo "deferred-pending-T6" ;;
-    # -- procgen / layout pipeline: promote with Tranche 5 (schema 1.2.0,
-    #    archetype enforcement, encounter tables all move under it) ------------
-    archetype_load_smoke|biome_profile_smoke|cell_layout_engine_smoke|\
-    derelict_generator_smoke|encounter_injector_smoke|\
-    floor_wrapper_collision_footprint_smoke|gameplay_slice_builder_smoke|\
-    gridmap_meshlibrary_smoke|interior_aabb_smoke|kit_catalog_smoke|\
-    layout_serializer_smoke|load_from_blueprint_smoke|marker_generator_smoke|\
-    procgen_layout_stress_smoke|procgen_loader_playable_contract_smoke|\
-    procgen_playable_ship_smoke|procgen_runtime_demo_smoke|\
-    procgen_ship_gameplay_smoke|procgen_ship_walkthrough_smoke|\
-    procgen_stress_test|procgen_walkability_smoke|readability_prop_factory_smoke|\
-    room_assigner_smoke|room_graph_generator_smoke|room_graph_smoke|\
-    seed_determinism_smoke|ship_blueprint_smoke|ship_generator_smoke|\
-    ship_layout_generator_smoke|ship_layout_integration_smoke|\
-    structural_placer_smoke|template_c_traversal_smoke|template_data_smoke|\
-    template_selector_smoke|topology_template_smoke|wall_door_resolver_smoke)
-      echo "deferred-pending-T5" ;;
+    # -- Tranche 5 (2026-07-07): the deferred-pending-T5 set was resolved --
+    #    32 promoted into the bundle (no longer orphans), 4 reclassified below.
+    #    procgen_stress_test pins the removed ShipStructure root name plus a
+    #    graph-vs-scene child-count comparison derelict_generator_smoke
+    #    documents as wrong, and runs 1,800 generations.
+    procgen_stress_test)
+      echo "superseded-by-procgen_layout_stress_smoke" ;;
+    # -- arg-driven external tools: cannot self-run under the bundle's bare
+    #    --script invocation (gridmap also writes .validation.json into res://)
+    gridmap_meshlibrary_smoke|procgen_ship_gameplay_smoke|procgen_ship_walkthrough_smoke)
+      echo "debug-tool" ;;
     # -- everything else: real unregistered coverage; promotion candidates -----
     *)
       echo "promotion-candidate" ;;
