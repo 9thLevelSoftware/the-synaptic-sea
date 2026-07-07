@@ -169,11 +169,10 @@ still be wrong going forward — do not add one.
     `clip_path` through `_load_stream_cached` (this ADR's warn-once
     missing-asset contract; previously the paths were silently dead), so
     every play emits one honest `stream file missing` warning per path until
-    the clips land. Note for the content pass: `_load_stream_cached` loads
-    via `AudioStreamWAV.load_from_file` (WAV-only, matching the two
-    existing placeholder `.wav` clips) — either deliver the voice clips as
-    WAV and update the authored extensions, or extend the loader to Ogg in
-    the same change.
+    the clips land. `_load_stream_cached` dispatches by extension (PR #66
+    review): `.ogg` decodes via `AudioStreamOggVorbis.load_from_file`,
+    everything else via `AudioStreamWAV.load_from_file` — so the authored
+    `.ogg` paths play as-is once the assets are delivered.
 - Spatial emitter population (`play_sfx` with a `position` argument has a
   live code path, but no gameplay callsite passes one yet).
 - Ambient-zone reactivity (`set_room_role`/`set_threat_level` stay uncalled

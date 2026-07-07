@@ -82,6 +82,10 @@ static func resolve_dict(difficulty_id: String) -> Dictionary:
 		var parsed: Variant = JSON.parse_string(text)
 		if parsed is Dictionary:
 			return parsed
+		# PR #66 review (Gemini): a present-but-malformed override must be
+		# loud, not a silent fallback — the bundle's strict WARNING filter
+		# turns this into a gate failure if a broken file ever ships.
+		push_warning("DifficultyProfile: override file is not a JSON object, falling back to built-ins: %s" % rel_path)
 	match difficulty_id:
 		HARDENED_ID:
 			return {
@@ -110,9 +114,10 @@ static func resolve_dict(difficulty_id: String) -> Dictionary:
 
 
 # Convenience object form of resolve_dict() for consumers that want the
-# dials directly (e.g. the settings menu's difficulty line).
-static func for_id(difficulty_id: String) -> RefCounted:
-	return from_dict(resolve_dict(difficulty_id))
+# dials directly (e.g. the settings menu's difficulty line). Typed return
+# (PR #66 review, Kilo) so property access on the dials is type-safe.
+static func for_id(difficulty_id: String) -> DifficultyProfile:
+	return from_dict(resolve_dict(difficulty_id)) as DifficultyProfile
 
 
 # Returns the modifier value for `dial`. Unknown dial returns 1.0.

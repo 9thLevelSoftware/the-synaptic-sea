@@ -376,7 +376,14 @@ func _load_stream_cached(path: String) -> AudioStream:
 			push_warning("AudioManager: stream file missing, path='%s'" % path)
 			_warned_missing_paths[path] = true
 		return null
-	var stream: AudioStreamWAV = AudioStreamWAV.load_from_file(path)
+	# PR #66 review (Codex P2): the voice-log entries author .ogg paths, so
+	# the loader must dispatch by extension — WAV-only decoding would leave
+	# the voice path silent even after the deferred assets land.
+	var stream: AudioStream = null
+	if path.get_extension().to_lower() == "ogg":
+		stream = AudioStreamOggVorbis.load_from_file(path)
+	else:
+		stream = AudioStreamWAV.load_from_file(path)
 	if stream == null:
 		if not _warned_missing_paths.has(path):
 			push_warning("AudioManager: load_from_file failed, path='%s'" % path)
