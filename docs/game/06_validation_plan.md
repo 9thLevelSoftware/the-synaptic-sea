@@ -45,6 +45,10 @@ REQ012_WARNING="^WARNING: SaveLoadService: save file rejected by from_dict \\(mi
 # (newer) slice_version to assert the migration-rejection path; that emits one
 # expected warning, allowlisted exactly like REQ012_WARNING above.
 MIGRATION_REJECT_WARNING="^WARNING: SaveLoadService: slot rejected by migration \\(newer than current\\), slot_id=.*\$"
+# save_load_service_smoke deliberately writes a world-99 payload to prove an
+# older build refuses the newer save without moving it into .corrupt; this is
+# the expected warning from that preservation path.
+WORLD_MIGRATION_REJECT_WARNING="^WARNING: SaveLoadService: world save rejected by migration \\(newer than current version\\)\$"
 # title_save_query_smoke's corrupt-world case (PR #57 Codex P2) deliberately
 # writes literal garbage over world.json to prove TitleSaveQuery.is_continue_available
 # now calls load_world() (not just has_slot/has_died_in); load_world()'s
@@ -87,7 +91,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"

@@ -136,17 +136,23 @@ func get_summary() -> Dictionary:
 	# assignment. Serialize positions as [x, y, z] arrays instead.
 	var events_out: Array = []
 	for e in active_events:
+		if not (e is Dictionary):
+			continue
 		var copy: Dictionary = (e as Dictionary).duplicate(true)
 		var pos: Variant = copy.get("position", null)
 		if pos is Vector3:
 			copy["position"] = [(pos as Vector3).x, (pos as Vector3).y, (pos as Vector3).z]
 		events_out.append(copy)
+	var timers_out: Dictionary = {}
+	for kind in _spawn_timers:
+		timers_out[str(kind)] = maxf(0.0, float(_spawn_timers[kind]))
 	return {
 		"seed": rng_seed,
 		"step": step,
 		"health_drain_per_second": health_drain_per_second,
 		"stamina_recovery_mult": stamina_recovery_mult,
 		"active_events": events_out,
+		"spawn_timers": timers_out,
 		"current_tier": _current_tier,
 	}
 
@@ -183,6 +189,16 @@ func apply_summary(summary: Dictionary) -> bool:
 		# newly-spawned event cannot collide with (and be dissipated as)
 		# a restored one via remove_event's first-id match.
 		_next_id = max_id + 1
+	if summary.get("spawn_timers", null) is Dictionary:
+		_spawn_timers.clear()
+		var timers: Dictionary = summary["spawn_timers"] as Dictionary
+		for raw_kind in timers:
+			var kind: String = str(raw_kind)
+			if not KIND_CONFIG.has(kind):
+				continue
+			var raw_value: Variant = timers[raw_kind]
+			if raw_value is int or raw_value is float:
+				_spawn_timers[kind] = maxf(0.0, float(raw_value))
 	_current_tier = int(summary.get("current_tier", _current_tier))
 	return true
 

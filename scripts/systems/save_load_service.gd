@@ -171,6 +171,9 @@ func load_world():
 		_backup_corrupt_file(path, "world", Time.get_unix_time_from_system())
 		push_warning("SaveLoadService: world save rejected by migration (newer than current version)")
 		return null
+	if bool(migration_result.get("newer_than_current", false)):
+		push_warning("SaveLoadService: world save rejected by migration (newer than current version)")
+		return null
 	var ws = WorldSnapshotScript.from_dict(migration_result["dict"], WorldSnapshotScript.WORLD_SLICE_VERSION, expected_godot)
 	if ws == null:
 		_backup_corrupt_file(path, "world", Time.get_unix_time_from_system())

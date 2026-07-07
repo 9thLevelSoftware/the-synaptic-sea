@@ -92,6 +92,18 @@ func _initialize() -> void:
 	var summ := r.get_summary()
 	var r2 = Director.new(); r2.configure({"seed": 0})
 	var rt_ok: bool = r2.apply_summary(summ) and r2.get_summary()["seed"] == summ["seed"] and r2.get_summary()["step"] == summ["step"]
+	# PR #64 Codex P2: pending spawn timers are mid-episode state too.
+	# A save at 5.5s toward the 6.0s ambient interval must fire after
+	# another 0.6s on load, not restart the wait from zero.
+	var timer_src = Director.new(); timer_src.configure({"seed": 13})
+	timer_src.tick(5.5, {"sanity": 35.0, "in_safe_zone": false, "anchor_positions": anchors})
+	var timer_summary: Dictionary = timer_src.get_summary()
+	var timer_dict: Dictionary = timer_summary.get("spawn_timers", {}) as Dictionary
+	var timers_persisted: bool = float(timer_dict.get("ambient", 0.0)) > 5.0
+	var timer_dst = Director.new(); timer_dst.configure({"seed": 0})
+	var timers_resume: bool = timer_dst.apply_summary(timer_summary)
+	timer_dst.tick(0.6, {"sanity": 35.0, "in_safe_zone": false, "anchor_positions": anchors})
+	rt_ok = rt_ok and timers_persisted and timers_resume and not timer_dst.get_active_events("ambient").is_empty()
 
 	if tiers_ok and gated_ok and det_ok and ttl_ok and teeth_ok and fx_ok and rt_ok:
 		print("HALLUCINATION DIRECTOR PASS tiers=true gated=true deterministic=true ttl=true teeth=true fx=true round_trip=true")

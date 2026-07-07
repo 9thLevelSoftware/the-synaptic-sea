@@ -7,7 +7,8 @@ extends SceneTree
 ##     (an EMPTY Callable, never null in GDScript 4). The guard never fired,
 ##     `.call()` executed the empty Callable, and a world save from a NEWER
 ##     build collapsed into a corrupt-looking dict instead of passing through
-##     to the graceful "rejected (newer than current)" path.
+##     intact so the load path can reject it without corrupt-quarantining a
+##     save that still belongs to the newer build.
 ##  2. legacy_home_ship_migrated — _migrate_world_legacy_to_world_4 was a
 ##     pure duplicate: the embedded home_ship RunSnapshot dict kept its old
 ##     slice_version, so a world-1..3 file survived the OUTER migration and
@@ -37,6 +38,9 @@ func _initialize() -> void:
 		return
 	if bool(result.get("migrated", true)):
 		_fail("future world reported migrated=true (should be pass-through)")
+		return
+	if not bool(result.get("newer_than_current", false)):
+		_fail("future world did not report newer_than_current=true")
 		return
 	var passthrough_ok: bool = true
 

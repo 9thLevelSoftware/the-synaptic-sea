@@ -284,6 +284,11 @@ func _initialize() -> void:
 	if not (hallu2_events[0].get("position") is Vector3):
 		_fail("hallucination event position not a Vector3 after disk round-trip (got %s)" % str(hallu2_events[0].get("position")))
 		return
+	var original_hallu_timers: Dictionary = original.hallucination_summary.get("spawn_timers", {}) as Dictionary
+	var loaded_hallu_timers: Dictionary = hallu2.get_summary().get("spawn_timers", {}) as Dictionary
+	if not _dicts_equal(loaded_hallu_timers, original_hallu_timers):
+		_fail("hallucination spawn_timers did not round-trip: got=%s expected=%s" % [str(loaded_hallu_timers), str(original_hallu_timers)])
+		return
 	# B7: field-level round-trip of the survival set, plus spot asserts on
 	# the non-default values so an accidental {} == {} can never pass again.
 	if not _dicts_equal(loaded.vitals_summary, original.vitals_summary):
@@ -383,6 +388,39 @@ func _initialize() -> void:
 	if service.load_world() != null:
 		_fail("cleanup: load_world() should be null after delete_current_run")
 		return
+
+	# PR #64 Codex P2: a future world save from a newer build is not corrupt.
+	# The older build must refuse to load it, but leave world.json intact so
+	# the newer build can still use it after sync/downgrade churn.
+	var future_world = world_script.new()
+	future_world.world_summary = {"world_seed": 99, "player_position": [0.0, 0.0, 0.0], "generated_marker_ids": ["future"]}
+	future_world.home_ship = {"slice_version": SaveLoadServiceScript.CURRENT_SLICE_VERSION}
+	future_world.slice_version = world_script.WORLD_SLICE_VERSION
+	future_world.godot_version = Engine.get_version_info()["string"]
+	future_world.saved_at = "2026-07-07T00:00:00"
+	if not service.save_world(future_world):
+		_fail("future world preserve: save_world fixture failed")
+		return
+	var future_dict: Dictionary = future_world.to_dict()
+	future_dict["slice_version"] = "world-99"
+	future_dict["future_sentinel"] = "keep_me"
+	var future_file := FileAccess.open(SaveLoadServiceScript.WORLD_SLOT_FILE, FileAccess.WRITE)
+	if future_file == null:
+		_fail("future world preserve: could not overwrite world fixture")
+		return
+	future_file.store_string(JSON.stringify(future_dict, "	"))
+	future_file.close()
+	if service.load_world() != null:
+		_fail("future world preserve: load_world should reject newer world-99")
+		return
+	if not FileAccess.file_exists(SaveLoadServiceScript.WORLD_SLOT_FILE):
+		_fail("future world preserve: load_world moved future world into .corrupt")
+		return
+	var future_after: Variant = JSON.parse_string(FileAccess.get_file_as_string(SaveLoadServiceScript.WORLD_SLOT_FILE))
+	if not (future_after is Dictionary) or str((future_after as Dictionary).get("future_sentinel", "")) != "keep_me":
+		_fail("future world preserve: world.json contents were not preserved")
+		return
+	service.delete_current_run()
 
 	# --- run_id slot-ownership rework: stamp + slot_ids_for_run + freeze_run ---
 	for sid in ["slot_01", "autosave_a", "autosave_b", "autosave_c", SaveLoadServiceScript.ACTIVE_AUTOSAVE_SLOT_ID]:

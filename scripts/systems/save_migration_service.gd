@@ -77,11 +77,17 @@ func migrate_world(parsed: Variant) -> Dictionary:
 	# an EMPTY Callable is never `== null` in GDScript 4, so the old guard
 	# never fired and `.call()` collapsed the dict. Guard with is_valid()
 	# (the migrate_run pattern); pass-through is the documented intent so a
-	# NEWER-version world reaches the graceful from_dict rejection path
-	# instead of being quarantined as corrupt.
+	# NEWER-version world can be rejected by the load path without being
+	# quarantined as corrupt.
 	var step: Callable = _world_step(current)
 	if not step.is_valid():
-		return {"dict": dict, "from_version": current, "to_version": WORLD_TARGET_VERSION, "migrated": false}
+		return {
+			"dict": dict,
+			"from_version": current,
+			"to_version": WORLD_TARGET_VERSION,
+			"migrated": false,
+			"newer_than_current": _is_newer_world_version(current),
+		}
 	var working: Dictionary = step.call(dict)
 	working["slice_version"] = WORLD_TARGET_VERSION
 	return {"dict": working, "from_version": current, "to_version": WORLD_TARGET_VERSION, "migrated": true}
@@ -104,6 +110,20 @@ func _world_step(from_version: String) -> Callable:
 
 func _index_of(version: String) -> int:
 	return KNOWN_VERSIONS.find(version)
+
+func _is_newer_world_version(version: String) -> bool:
+	var current_num: int = _world_version_number(version)
+	var target_num: int = _world_version_number(WORLD_TARGET_VERSION)
+	return current_num > target_num and target_num >= 0
+
+func _world_version_number(version: String) -> int:
+	var prefix: String = "world-"
+	if not version.begins_with(prefix):
+		return -1
+	var suffix: String = version.trim_prefix(prefix)
+	if suffix.is_empty() or not suffix.is_valid_int():
+		return -1
+	return int(suffix)
 
 func _migrate_v1_to_v2(dict: Dictionary) -> Dictionary:
 	# Add player_progression_summary default if missing or empty. The
