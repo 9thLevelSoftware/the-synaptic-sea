@@ -7016,7 +7016,8 @@ func request_save() -> bool:
 	# further saves past the authored play-time cap — existing saves are kept,
 	# nothing is ever wiped. Surfaced on the HUD feedback line.
 	if _demo_save_refused():
-		_last_loot_feedback_line = "Demo build: save limit reached (20 min)"
+		# PR #68 review (Kilo): render the ACTUAL manifest cap, not a literal.
+		_last_loot_feedback_line = "Demo build: save limit reached (%d min)" % int(_demo_save_cap_seconds() / 60.0)
 		return false
 	var ws = _build_world_snapshot()
 	if ws == null:
@@ -7035,13 +7036,19 @@ func request_save() -> bool:
 ## gate is absent or the live build kind is dev/release — demo enforcement
 ## only ever narrows behavior in an actual demo build.
 
+## The authored demo play-time save budget in seconds (single source of truth
+## for the refusal check AND the player-facing feedback line — PR #68 Kilo).
+func _demo_save_cap_seconds() -> float:
+	if demo_scope_gate == null:
+		return 1200.0
+	return float(demo_scope_gate.get_params("long_run.persistence").get("max_play_seconds", 1200))
+
 ## True when a demo build has exhausted its authored play-time save budget
 ## (long_run.persistence params.max_play_seconds). Saves are refused, never wiped.
 func _demo_save_refused() -> bool:
 	if demo_scope_gate == null or not demo_scope_gate.is_blocked("long_run.persistence"):
 		return false
-	var cap: float = float(demo_scope_gate.get_params("long_run.persistence").get("max_play_seconds", 1200))
-	return run_play_time_seconds >= cap
+	return run_play_time_seconds >= _demo_save_cap_seconds()
 
 ## Demo derelict hazard-kind budget (multi_hazard.run params.max_hazards).
 ## -1 = unlimited (dev/release or gate absent).
