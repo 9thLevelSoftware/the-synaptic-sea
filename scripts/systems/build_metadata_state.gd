@@ -24,6 +24,7 @@ var language_defaults: Array = ["en"]
 var achievements_supported: bool = false
 var demo_hub_unlocked_features: Array = []
 var release_date: String = ""
+# ADR-0029 deferred crash-upload endpoint placeholder; no consumer exists until crash upload is wired.
 var telemetry_endpoint_placeholder: String = ""
 
 # `true` after configure() ran with a known build_kind.

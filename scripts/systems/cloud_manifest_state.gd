@@ -13,7 +13,8 @@ class_name CloudManifestState
 ##   - payload_size_bytes
 ##   - created_at: ISO 8601
 ##   - sync_eligible: false when the save is migration-temp or corrupt
-##   - cloud_provider: "stub" today; future values: "steam", "icloud", etc.
+##   - cloud_provider: "stub" today; future values include "steam" and
+##     "icloud" once the provider adapter lands per ADR-0032.
 ##
 ## On every successful save, the service writes the manifest to
 ## `user://saves/.cloud/<slot_id>.manifest.json`. On load, the service
@@ -30,6 +31,7 @@ var payload_sha256: String = ""
 var payload_size_bytes: int = 0
 var created_at: String = ""
 var sync_eligible: bool = true
+# ADR-0032 placeholder: future values include "steam" and "icloud"; SaveLoadService already writes the manifest and verifies SHA on load.
 var cloud_provider: String = CLOUD_PROVIDER_STUB
 var slot_id: String = ""
 
