@@ -3,7 +3,13 @@ extends SceneTree
 const IntegrationMatrixScript := preload("res://scripts/systems/integration_matrix.gd")
 const DependencyValidatorScript := preload("res://scripts/systems/dependency_validator.gd")
 
+const VALIDATION_PLAN_PATH := "docs/game/06_validation_plan.md"
 const REQUIRED_STAGES: Array = ["prepare", "derelict", "survive", "loot", "craft", "return", "upgrade"]
+const ORPHAN_SOURCE_CLASSIFICATIONS := {
+	"promotion-candidate": true,
+	"release-audit-tool": true,
+	"standalone-gate": true,
+}
 
 func _initialize() -> void:
 	var root_path: String = ProjectSettings.globalize_path("res://")
@@ -67,11 +73,12 @@ func _read_text(path: String) -> String:
 	return FileAccess.get_file_as_string(path)
 
 func _validation_marker_evidence(root_path: String, matrix) -> String:
-	# Registered bundle markers live in 06_validation_plan.md; standalone
-	# promotion-candidate markers live in the smoke scripts themselves.
-	var evidence: String = _read_text(root_path.path_join("docs/game/06_validation_plan.md"))
+	var validation_plan_text: String = _read_text(root_path.path_join(VALIDATION_PLAN_PATH))
+	var evidence: String = validation_plan_text
 	if matrix == null or not matrix.has_method("get_entries"):
 		return evidence
+	var registered_smokes: Dictionary = _registered_run_clean_smokes(validation_plan_text)
+	var orphan_classifications: Dictionary = _orphan_smoke_classifications(validation_plan_text)
 	for entry_variant in matrix.get_entries():
 		if not (entry_variant is Dictionary):
 			continue
@@ -85,6 +92,14 @@ func _validation_marker_evidence(root_path: String, matrix) -> String:
 		for smoke_path_variant in smoke_files:
 			var smoke_path: String = str(smoke_path_variant)
 			if smoke_path.is_empty():
+				continue
+			var smoke_name: String = _smoke_name_from_path(smoke_path)
+			if smoke_name.is_empty():
+				continue
+			if registered_smokes.has(smoke_name):
+				continue
+			var classification: String = str(orphan_classifications.get(smoke_name, ""))
+			if not ORPHAN_SOURCE_CLASSIFICATIONS.has(classification):
 				continue
 			var path: String = smoke_path if smoke_path.begins_with("res://") else root_path.path_join(smoke_path)
 			var marker_lines: PackedStringArray = _extract_marker_print_lines(path, markers)
@@ -114,6 +129,57 @@ func _extract_marker_print_lines(path: String, markers: Array) -> PackedStringAr
 				matches.append(line)
 				seen[marker] = true
 	return matches
+
+func _registered_run_clean_smokes(validation_plan_text: String) -> Dictionary:
+	var registered: Dictionary = {}
+	var regex := RegEx.new()
+	var error: int = regex.compile('--script\\s+res://scripts/validation/([A-Za-z0-9_]+)\\.gd')
+	if error != OK:
+		return registered
+	for raw_line in validation_plan_text.split("\n", false):
+		var line: String = str(raw_line).strip_edges()
+		if not line.begins_with("run_clean "):
+			continue
+		var match: RegExMatch = regex.search(line)
+		if match == null:
+			continue
+		registered[match.get_string(1)] = true
+	return registered
+
+func _orphan_smoke_classifications(validation_plan_text: String) -> Dictionary:
+	var classifications: Dictionary = {}
+	var regex := RegEx.new()
+	var error: int = regex.compile('^\\|\\s*`?([A-Za-z0-9_]+)`?\\s*\\|\\s*([^|]+?)\\s*\\|\\s*$')
+	if error != OK:
+		return classifications
+	for raw_line in validation_plan_text.split("\n", false):
+		var line: String = str(raw_line).strip_edges()
+		if not line.begins_with("|"):
+			continue
+		var match: RegExMatch = regex.search(line)
+		if match == null:
+			continue
+		var smoke_name: String = match.get_string(1)
+		var classification: String = _classification_key(match.get_string(2))
+		if smoke_name.is_empty() or classification.is_empty():
+			continue
+		classifications[smoke_name] = classification
+	return classifications
+
+func _classification_key(raw_classification: String) -> String:
+	var trimmed: String = raw_classification.strip_edges()
+	for classification in ORPHAN_SOURCE_CLASSIFICATIONS.keys():
+		var prefix: String = str(classification)
+		if trimmed.begins_with(prefix):
+			return prefix
+	return ""
+
+func _smoke_name_from_path(smoke_path: String) -> String:
+	var normalized: String = smoke_path.replace("\\", "/")
+	var file_name: String = normalized.get_file()
+	if not file_name.ends_with(".gd"):
+		return ""
+	return file_name.trim_suffix(".gd")
 
 func _string_array(value: Variant) -> Array:
 	if value is Array:
