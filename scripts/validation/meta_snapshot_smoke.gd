@@ -104,7 +104,10 @@ func _initialize() -> void:
 	if not unlock.configure(catalog_parsed):
 		_fail("unlock.configure failed")
 		return
-	unlock.unlock_for_trigger("repair_subcomponent", "any")
+	# Tranche 6: codex_repair_intro's trigger was retargeted from the never-
+	# emitted repair_subcomponent to the canonical production event
+	# repair_full_system (the vocabulary emit_training_event actually fires).
+	unlock.unlock_for_trigger("repair_full_system", "any")
 	unlock.unlock_for_trigger("perform_surgery", "any")
 	unlock.unlock_for_trigger("decode_signal", "any")
 	if int(unlock.get_unlock_count()) < 3:

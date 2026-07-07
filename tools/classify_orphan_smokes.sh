@@ -50,9 +50,9 @@ classify() {
     # -- release-process audit tools (run at export time, not per-commit) ------
     export_presets_smoke|product_audit_smoke|release_readiness_ledger_smoke)
       echo "release-audit-tool" ;;
-    # -- gated feature: promote with the Tranche 6 DemoScopeGate wiring --------
-    demo_scope_gate_smoke)
-      echo "deferred-pending-T6" ;;
+    # -- Tranche 6 (2026-07-07): demo_scope_gate_smoke was promoted into the
+    #    bundle alongside the DemoScopeGate production wiring — it is no longer
+    #    an orphan and needs no case here.
     # -- Tranche 5 (2026-07-07): the deferred-pending-T5 set was resolved --
     #    32 promoted into the bundle (no longer orphans), 4 reclassified below.
     #    procgen_stress_test pins the removed ShipStructure root name plus a

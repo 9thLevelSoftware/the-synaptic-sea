@@ -6,12 +6,16 @@ class_name DemoScopeGate
 ## Pure data service. `is_allowed(feature_id)` returns:
 ##   - `true`  when build_kind is `dev` or `release` (no demo restriction)
 ##   - `true`  when build_kind is `demo` AND feature_id is not in the manifest
+##     (blocklist semantics: the manifest lists what a demo build restricts;
+##     everything else is allowed)
 ##   - `false` when build_kind is `demo` AND feature_id IS in the manifest
-##   - `false` for unknown feature_ids (no silent allow; the gate must be
-##     explicit, so a typo in a feature_id gets caught at the call site)
+##   - `false` for the empty string (defensive; the only rejected input)
 ##
 ## Per ADR-0029: the demo manifest is data-driven. Adding a restriction
-## is a JSON edit + a smoke re-run; no code change.
+## is a JSON edit + a smoke re-run; no code change. Tranche 6: entries may
+## carry a machine-readable `params` dict (enforcement caps) exposed via
+## `get_params(feature_id)` so the coordinator's enforcement points read
+## their caps from data, not hardcoded constants.
 
 const DEMO_KIND: String = "demo"
 const FULL_KIND: String = "release"
@@ -20,11 +24,13 @@ const DEV_KIND: String = "dev"
 var _manifest: Dictionary = {}
 var _build_metadata: BuildMetadataState = null
 var _features: Array = []
+var _params_by_feature: Dictionary = {}
 
 func configure(manifest: Dictionary, build_metadata: BuildMetadataState) -> void:
 	_manifest = manifest if manifest != null else {}
 	_build_metadata = build_metadata
 	_features.clear()
+	_params_by_feature.clear()
 	if typeof(_manifest) != TYPE_DICTIONARY:
 		return
 	var list_variant: Variant = _manifest.get("demo_blocked_features", [])
@@ -36,6 +42,18 @@ func configure(manifest: Dictionary, build_metadata: BuildMetadataState) -> void
 			if feature_id.is_empty():
 				continue
 			_features.append(feature_id)
+			var params_variant: Variant = (entry as Dictionary).get("params", {})
+			if typeof(params_variant) == TYPE_DICTIONARY and not (params_variant as Dictionary).is_empty():
+				_params_by_feature[feature_id] = (params_variant as Dictionary).duplicate(true)
+
+## Machine-readable enforcement caps for a manifest entry (Tranche 6).
+## Returns an empty Dictionary for entries without authored params and for
+## feature_ids not in the manifest.
+func get_params(feature_id: String) -> Dictionary:
+	var params_variant: Variant = _params_by_feature.get(feature_id, {})
+	if typeof(params_variant) != TYPE_DICTIONARY:
+		return {}
+	return (params_variant as Dictionary).duplicate(true)
 
 func is_allowed(feature_id: String) -> bool:
 	if feature_id.is_empty():

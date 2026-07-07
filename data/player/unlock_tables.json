@@ -6,7 +6,7 @@
       "category": "codex",
       "display_name": "Repair — Field Notes",
       "description": "How to coax a subcomponent back from zero health.",
-      "trigger_event": "repair_subcomponent",
+      "trigger_event": "repair_full_system",
       "trigger_target": "any"
     },
     {
@@ -158,7 +158,7 @@
       "category": "hub_scene",
       "display_name": "Hub Bridge",
       "description": "Unlocks the bridge scene after the first hostile encounter.",
-      "trigger_event": "defeat_enemy",
+      "trigger_event": "threat_killed",
       "trigger_target": "any"
     },
     {
