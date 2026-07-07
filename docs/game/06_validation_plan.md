@@ -130,6 +130,7 @@ run_clean 'main arc smoke' 'MAIN PLAYABLE ARC PASS state=DISCHARGED cycles=2 blo
 run_clean 'derelict arc away-branch smoke' 'DERELICT ARC PASS boarded=true zone_on_derelict=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_arc_smoke.gd
 run_clean 'away-branch integrity smoke' 'AWAY BRANCH INTEGRITY PASS boarded=true port_frame=true hud_refresh=true death_guard=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/away_branch_integrity_smoke.gd
 run_clean 'title load-failure recovery smoke' 'TITLE LOAD FAILURE PASS returned_to_title=true error_surfaced=true menu_visible=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/title_load_failure_smoke.gd
+run_clean 'hazard interaction feedback smoke' 'HAZARD FEEDBACK PASS extinguish_blocked=true seal_blocked=true breach_sealed=true sfx_routed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_feedback_smoke.gd
 run_clean 'ADR-0005 hazard contract static smoke' 'HAZARD CONTRACT PASS models=2 phase_timer_owners=1 wrong_kind_rejected=2 configure_dict=2' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_contract_smoke.gd
 run_clean 'ADR-0038 station craft reachability smoke' 'MAIN PLAYABLE STATION CRAFT PASS crafted=true salvaged=true field=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_station_craft_smoke.gd
 run_clean 'Bucket 3 meta-screen reachability smoke' 'MAIN PLAYABLE META SCREENS PASS screens=10 reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_meta_screens_smoke.gd
@@ -238,7 +239,7 @@ run_clean 'Domain 10 main playable UI shell smoke' 'MAIN PLAYABLE UI SHELL PASS 
 run_clean 'Domain 10 main playable slice UI shell smoke' 'MAIN PLAYABLE SLICE UI SHELL PASS boot=main_menu pause=true codex=1 hotbar=true tooltip=true chart_gated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_ui_shell_smoke.gd
 run_clean 'Domain 10 web chart state model smoke' 'WEB CHART STATE PASS known=2 detail_upgrade=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/web_chart_state_smoke.gd
 run_clean 'Domain 10 UI polish end-to-end smoke' 'UI POLISH PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_polish_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=138 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=139 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

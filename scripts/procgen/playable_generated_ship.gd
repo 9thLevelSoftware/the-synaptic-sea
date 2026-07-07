@@ -2839,6 +2839,10 @@ func _build_breach_seal_points() -> void:
 		sp.configure(cid, hull, inventory_state, player_progression, pos, 4.0, "hull_sealant", 1.0, 1.8)
 		if not sp.breach_sealed.is_connected(_on_breach_sealed):
 			sp.breach_sealed.connect(_on_breach_sealed)
+		# Tranche 1 (audit): seal_blocked fired on four failure paths but was
+		# never connected — a blocked seal gave zero player feedback.
+		if not sp.seal_blocked.is_connected(_on_seal_blocked):
+			sp.seal_blocked.connect(_on_seal_blocked)
 		if away_from_start and current_ship != null and current_ship.scene_root != null and is_instance_valid(current_ship.scene_root):
 			current_ship.scene_root.add_child(sp)
 		elif lifeboat_ship != null and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root):
@@ -2856,11 +2860,38 @@ func _clear_breach_seal_points() -> void:
 			sp.queue_free()
 	breach_seal_points.clear()
 
-func _on_breach_sealed(_compartment_id: String) -> void:
-	# HullIntegrityState already mutated by the seal node; nothing else needed here
-	# beyond letting the next _recompute_expanded_ship_systems pick up the lower
-	# breach_count. Hook for HUD/audio later.
-	pass
+func _on_breach_sealed(compartment_id: String) -> void:
+	# HullIntegrityState is already mutated by the seal node; the next
+	# _recompute_expanded_ship_systems picks up the lower breach_count.
+	# Tranche 1 (audit): this was a pass-only no-op — surface the seal on the
+	# HUD feedback line and fire the tool-use cue so the action lands.
+	_set_hazard_feedback_line("Breach sealed: %s" % compartment_id)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
+
+## Tranche 1 (audit): shared surface for hazard-interaction feedback. Reuses
+## the _last_loot_feedback_line channel (the one line _combined_system_status_lines
+## already folds into the HUD) — no new HUD framework, matching the caption
+## pattern documented at the var declaration.
+func _set_hazard_feedback_line(text: String) -> void:
+	_last_loot_feedback_line = text
+	_refresh_tracker_system_status_lines()
+
+func _on_extinguish_blocked(compartment_id: String, reason: String) -> void:
+	_set_hazard_feedback_line("Extinguish blocked (%s): %s" % [compartment_id, _hazard_block_reason_text(reason)])
+
+func _on_seal_blocked(compartment_id: String, reason: String) -> void:
+	_set_hazard_feedback_line("Seal blocked (%s): %s" % [compartment_id, _hazard_block_reason_text(reason)])
+
+func _hazard_block_reason_text(reason: String) -> String:
+	match reason:
+		"missing_extinguisher": return "no fire extinguisher"
+		"missing_sealant": return "no hull sealant"
+		"no_charge": return "extinguisher empty"
+		"not_burning": return "no fire here"
+		"not_breached": return "no open breach"
+		"extinguish_failed": return "extinguish failed"
+		_: return reason
 
 # --- M7-B Task 7: authoritative compartment fire ----------------------------
 # The old timer-based FireState is retired. FireSuppressionState is the single
@@ -3227,6 +3258,10 @@ func _build_fire_suppression_points() -> void:
 		fp.configure(str(cid), afs, extinguisher_state, inventory_state, player_progression, pos, 4.0, "fire_extinguisher", 1.8)
 		if not fp.fire_extinguished.is_connected(_on_fire_extinguished):
 			fp.fire_extinguished.connect(_on_fire_extinguished)
+		# Tranche 1 (audit): extinguish_blocked fired on five failure paths but
+		# was never connected — a blocked extinguish gave zero player feedback.
+		if not fp.extinguish_blocked.is_connected(_on_extinguish_blocked):
+			fp.extinguish_blocked.connect(_on_extinguish_blocked)
 		_attach_zone_to_active_ship(fp)
 		fire_suppression_points.append(fp)
 
