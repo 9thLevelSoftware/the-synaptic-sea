@@ -13,9 +13,12 @@ extends SceneTree
 ##     pure duplicate: the embedded home_ship RunSnapshot dict kept its old
 ##     slice_version, so a world-1..3 file survived the OUTER migration and
 ##     then failed RunSnapshot.from_dict on the inner slice.
+##  3. current_world_home_ship_migrated — the world schema stayed at world-4
+##     while the embedded RunSnapshot schema advanced to gate2-current-run-4,
+##     so current-version world files also need the inner home_ship migration.
 ##
 ## Pure-model smoke (no scene). Marker:
-## SAVE MIGRATION WORLD PASS unknown_version_passthrough=true legacy_home_ship_migrated=true
+## SAVE MIGRATION WORLD PASS unknown_version_passthrough=true legacy_home_ship_migrated=true current_world_home_ship_migrated=true
 
 const SaveMigrationServiceScript := preload("res://scripts/systems/save_migration_service.gd")
 
@@ -69,7 +72,32 @@ func _initialize() -> void:
 		_fail("embedded home_ship slice not migrated: slice_version='%s' expected '%s'" % [inner_version, SaveMigrationServiceScript.TARGET_VERSION])
 		return
 
-	print("SAVE MIGRATION WORLD PASS unknown_version_passthrough=%s legacy_home_ship_migrated=true" % str(passthrough_ok).to_lower())
+	# --- 3. Current world-4 files may still contain older home_ship slices ---
+	var current_world: Dictionary = {
+		"slice_version": SaveMigrationServiceScript.WORLD_TARGET_VERSION,
+		"home_ship": {
+			"slice_version": SaveMigrationServiceScript.KNOWN_VERSIONS[2],
+			"player_position": [4.0, 0.0, 8.0],
+		},
+	}
+	var current_result: Dictionary = svc.migrate_world(current_world)
+	var current_out: Variant = current_result.get("dict", null)
+	if not (current_out is Dictionary):
+		_fail("current world migration returned null")
+		return
+	var current_inner: Variant = (current_out as Dictionary).get("home_ship", null)
+	if not (current_inner is Dictionary):
+		_fail("current world home_ship missing after migration")
+		return
+	var current_inner_version: String = str((current_inner as Dictionary).get("slice_version", ""))
+	if current_inner_version != SaveMigrationServiceScript.TARGET_VERSION:
+		_fail("current world embedded home_ship slice not migrated: slice_version='%s' expected '%s'" % [current_inner_version, SaveMigrationServiceScript.TARGET_VERSION])
+		return
+	if not bool(current_result.get("migrated", false)):
+		_fail("current world embedded home_ship migration did not report migrated=true")
+		return
+
+	print("SAVE MIGRATION WORLD PASS unknown_version_passthrough=%s legacy_home_ship_migrated=true current_world_home_ship_migrated=true" % str(passthrough_ok).to_lower())
 	quit(0)
 
 func _fail(reason: String) -> void:

@@ -69,7 +69,13 @@ func migrate_world(parsed: Variant) -> Dictionary:
 	var dict: Dictionary = parsed
 	var current: String = str(dict.get("slice_version", ""))
 	if current == WORLD_TARGET_VERSION:
-		return {"dict": dict, "from_version": current, "to_version": WORLD_TARGET_VERSION, "migrated": false}
+		var current_inner: Dictionary = _migrate_world_home_ship(dict)
+		return {
+			"dict": current_inner["dict"],
+			"from_version": current,
+			"to_version": WORLD_TARGET_VERSION,
+			"migrated": bool(current_inner["migrated"]),
+		}
 	if current.is_empty():
 		current = "world-1"  # legacy world snapshot
 	# For worlds we only know world-4 today. Future ADRs extend.
@@ -178,14 +184,19 @@ func _migrate_world_legacy_to_world_4(dict: Dictionary) -> Dictionary:
 	# slice_version — a legacy world file survives the outer migration and
 	# then fails RunSnapshot.from_dict unless the inner slice is migrated
 	# too (Session 3 audit fix; this was a pure duplicate before).
+	return _migrate_world_home_ship(dict)["dict"] as Dictionary
+
+func _migrate_world_home_ship(dict: Dictionary) -> Dictionary:
 	var out: Dictionary = dict.duplicate(true)
+	var migrated: bool = false
 	var home_ship: Variant = out.get("home_ship", null)
 	if home_ship is Dictionary and not (home_ship as Dictionary).is_empty():
 		var inner: Dictionary = migrate_run(home_ship)
 		var inner_dict: Variant = inner.get("dict", null)
 		if inner_dict is Dictionary:
 			out["home_ship"] = inner_dict
+			migrated = bool(inner.get("migrated", false)) or str((home_ship as Dictionary).get("slice_version", "")) != str((inner_dict as Dictionary).get("slice_version", ""))
 		# A null inner result (newer-than-us home_ship inside a LEGACY world
 		# file — contradictory, effectively corrupt) keeps the original dict;
 		# RunSnapshot.from_dict then rejects it with the allowlisted warning.
-	return out
+	return {"dict": out, "migrated": migrated}
