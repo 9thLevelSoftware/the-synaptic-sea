@@ -284,7 +284,7 @@ run_clean 'Domain 10 main playable UI shell smoke' 'MAIN PLAYABLE UI SHELL PASS 
 run_clean 'Domain 10 main playable slice UI shell smoke' 'MAIN PLAYABLE SLICE UI SHELL PASS boot=main_menu pause=true codex=1 hotbar=true tooltip=true chart_gated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_ui_shell_smoke.gd
 run_clean 'Domain 10 web chart state model smoke' 'WEB CHART STATE PASS known=2 detail_upgrade=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/web_chart_state_smoke.gd
 run_clean 'Domain 10 UI polish end-to-end smoke' 'UI POLISH PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_polish_smoke.gd
-run_clean 'menu signal wiring smoke' 'MENU SIGNAL WIRING PASS language=true enabled_render=true run_outcome=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_signal_wiring_smoke.gd
+run_clean 'menu signal wiring smoke' 'MENU SIGNAL WIRING PASS language=true enabled_render=true credits=true metadata=true ready=true progress=true run_outcome=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_signal_wiring_smoke.gd
 run_clean 'world migration smoke' 'SAVE MIGRATION WORLD PASS unknown_version_passthrough=true legacy_home_ship_migrated=true current_world_home_ship_migrated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_migration_world_smoke.gd
 run_clean 'slot metadata smoke' 'SLOT METADATA PASS location=home play_time_real=true seed_real=true roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/slot_metadata_smoke.gd
 # --- Tranche 3 (2026-07-06): orphaned-smoke promotion — pure-model batch ---

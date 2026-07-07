@@ -35,6 +35,8 @@ var _failure_handled: bool = false
 ## Session 3 (audit): outcome of the most recent completed run
 ## (playable_slice_completed had zero subscribers before this).
 var _last_run_outcome: String = ""
+var _last_run_progress: String = ""
+var _last_playable_summary: Dictionary = {}
 
 func _ready() -> void:
 	_save_load_service = SaveLoadServiceScript.new()
@@ -161,11 +163,21 @@ func _poll_for_playable_started(should_load: bool) -> void:
 	if playable_instance.has_signal("return_to_title_requested") \
 			and not playable_instance.return_to_title_requested.is_connected(_on_gameplay_return_to_title):
 		playable_instance.return_to_title_requested.connect(_on_gameplay_return_to_title)
+	if playable_instance.has_signal("playable_ready") \
+			and not playable_instance.playable_ready.is_connected(_on_gameplay_ready):
+		playable_instance.playable_ready.connect(_on_gameplay_ready)
 	# Session 3 (audit): surface the run outcome on the title menu after the
 	# player returns from a completed run (signal was previously unconsumed).
 	if playable_instance.has_signal("playable_slice_completed") \
 			and not playable_instance.playable_slice_completed.is_connected(_on_gameplay_slice_completed):
 		playable_instance.playable_slice_completed.connect(_on_gameplay_slice_completed)
+	if playable_instance.has_signal("playable_interaction_completed") \
+			and not playable_instance.playable_interaction_completed.is_connected(_on_gameplay_interaction_completed):
+		playable_instance.playable_interaction_completed.connect(_on_gameplay_interaction_completed)
+	# _poll_for_playable_started subscribes only AFTER playable_started flips true,
+	# so playable_ready already fired on the production boot path. Consume the
+	# live summary immediately once the signal is wired to avoid missing it.
+	_on_gameplay_ready(playable_instance.get_playable_summary())
 	if should_load:
 		playable_instance.request_load()
 	# Dirty-flag handoff (spec 3.7): only push title-local settings into the fresh
@@ -221,6 +233,18 @@ func _on_focus_changed(_new_index: int) -> void:
 func _on_item_enabled_changed(_item_id: String, _enabled: bool) -> void:
 	_refresh_panel()
 
+func _on_gameplay_ready(summary: Dictionary) -> void:
+	_last_playable_summary = summary.duplicate(true)
+	_last_run_outcome = ""
+	_last_run_progress = ""
+
+func _on_gameplay_interaction_completed(_interaction_id: String, _objective_id: String, sequence: int, _objective_type: String, _room_id: String) -> void:
+	var total_objectives: int = int(_last_playable_summary.get("objective_count", 0))
+	if total_objectives <= 0 and is_instance_valid(playable_instance):
+		_last_playable_summary = playable_instance.get_playable_summary()
+		total_objectives = int(_last_playable_summary.get("objective_count", 0))
+	_last_run_progress = "objectives %d/%d" % [sequence, total_objectives]
+
 func _on_gameplay_slice_completed(summary: Dictionary) -> void:
 	_last_run_outcome = str(summary.get("reason", summary.get("outcome", "complete")))
 
@@ -249,6 +273,8 @@ func _refresh_panel() -> void:
 	if not _last_run_outcome.is_empty():
 		lines.append("")
 		lines.append("Last run: %s" % _last_run_outcome)
+	if not _last_run_progress.is_empty():
+		lines.append("Progress: %s" % _last_run_progress)
 	menu_panel.set_content("The Synaptic Sea", lines)
 
 ## Title-local mirror of `menu_coordinator._cycle_setting` (same ids/setters/enum

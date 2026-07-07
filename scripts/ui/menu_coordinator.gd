@@ -187,7 +187,10 @@ func handle_ui_input(event: InputEvent) -> bool:
 	# Language OptionButton, Audio Settings sliders, Audio Log ItemList) stay operable.
 	if not _active_meta_screen.is_empty():
 		if event.is_action_pressed("ui_cancel"):
-			_close_meta_screen()
+			if _active_meta_screen == "credits" and is_instance_valid(credits_screen):
+				credits_screen.dismiss()
+			else:
+				_close_meta_screen()
 			return true
 		if _active_meta_screen in ["hub_upgrades", "skill_tree", "class", "save_load"]:
 			if event.is_action_pressed("ui_up"):
@@ -450,9 +453,11 @@ func _build_meta_screens() -> void:
 	release_badge_overlay = ReleaseBadgeOverlayScript.new()
 	release_badge_overlay.name = "ReleaseBadgeOverlay"
 	add_child(release_badge_overlay)
+	release_badge_overlay.metadata_changed.connect(_refresh_all)
 	credits_screen = CreditsScreenScript.new()
 	credits_screen.name = "CreditsScreen"
 	add_child(credits_screen)
+	credits_screen.credits_dismissed.connect(_on_credits_dismissed)
 	# save_load_menu is a RefCounted model; its rows render into this label.
 	_save_load_panel = RichTextLabel.new()
 	_save_load_panel.name = "SaveLoadList"
@@ -1102,6 +1107,9 @@ func get_active_language() -> String:
 func _on_language_changed(language_id: String) -> void:
 	_active_language = language_id
 	_refresh_all()
+
+func _on_credits_dismissed() -> void:
+	_close_meta_screen()
 
 func _on_item_enabled_changed(_item_id: String, _enabled: bool) -> void:
 	_refresh_all()
