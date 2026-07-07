@@ -3,6 +3,9 @@ extends SceneTree
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const TIMEOUT_FRAMES: int = 600
 
+const REAL_META_PATH := "user://meta_progression.json"
+const META_BACKUP_PATH := "user://meta_progression.json.smoke_backup"
+
 var main_node: Node
 var frame_count: int = 0
 var finished: bool = false
@@ -10,14 +13,13 @@ var finished: bool = false
 func _initialize() -> void:
 	var bootstrap := SaveLoadService.new()
 	bootstrap.delete_current_run()
-	# Defensive: another smoke run earlier in the same bundle invocation (e.g.
-	# meta_screens_interactive_smoke.gd's class-select confirm) may have
-	# written user://meta_progression.json via the real coordinator save path.
-	# Start from a clean meta state so the class=engineer assertion below is
-	# deterministic regardless of prior test-process state.
-	const REAL_META_PATH := "user://meta_progression.json"
-	if FileAccess.file_exists(REAL_META_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(REAL_META_PATH))
+	# The class=engineer assertion below needs a clean meta state (another
+	# smoke may have written user://meta_progression.json via the real
+	# coordinator save path). PR #65 review (Codex P2): deleting the file
+	# outright made the documented bundle run destroy a developer's REAL
+	# cross-run meta progression — back it up instead and restore it on
+	# every exit path.
+	_backup_real_meta()
 	main_node = MAIN_SCENE.instantiate()
 	if main_node == null:
 		_fail("could not instantiate main scene")
@@ -85,6 +87,7 @@ func _validate(playable: PlayableGeneratedShip) -> void:
 		main_node.queue_free()
 	var svc := SaveLoadService.new()
 	svc.delete_current_run()
+	_restore_real_meta()
 	quit(0)
 
 func _find_playable(node: Node) -> PlayableGeneratedShip:
@@ -103,4 +106,26 @@ func _fail(reason: String) -> void:
 	push_error("MAIN PLAYABLE PROGRESSION FAIL reason=%s" % reason)
 	if main_node != null and is_instance_valid(main_node):
 		main_node.queue_free()
+	_restore_real_meta()
 	quit(1)
+
+## Move the developer's real meta file aside instead of deleting it. If a
+## stale backup exists (a previous run crashed before restoring), keep the
+## OLDER backup — it is the original the player owned — and just drop the
+## test-era file.
+func _backup_real_meta() -> void:
+	if not FileAccess.file_exists(REAL_META_PATH):
+		return
+	var real_abs: String = ProjectSettings.globalize_path(REAL_META_PATH)
+	if FileAccess.file_exists(META_BACKUP_PATH):
+		DirAccess.remove_absolute(real_abs)
+		return
+	DirAccess.rename_absolute(real_abs, ProjectSettings.globalize_path(META_BACKUP_PATH))
+
+func _restore_real_meta() -> void:
+	if not FileAccess.file_exists(META_BACKUP_PATH):
+		return
+	var real_abs: String = ProjectSettings.globalize_path(REAL_META_PATH)
+	if FileAccess.file_exists(REAL_META_PATH):
+		DirAccess.remove_absolute(real_abs)
+	DirAccess.rename_absolute(ProjectSettings.globalize_path(META_BACKUP_PATH), real_abs)

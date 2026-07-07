@@ -83,6 +83,15 @@ TITLE_BOOT_FAIL_WARNING="^WARNING: TitleMain: gameplay boot failed \\(smoke_forc
 # apply (and a no-known-fields rejection); each emits one expected
 # warn-once line, allowlisted like the deliberate-failure paths above.
 META_SCHEMA_WARNING="^WARNING: MetaProgressionState: schema mismatch \\('.*' != 'meta-progression-1'\\); (best-effort apply of known fields|rejected \\(no known meta fields\\))\$"
+# world_save_service_smoke's rejects_null case (Tranche 3 promotion)
+# deliberately passes a null world snapshot to prove save_world refuses it;
+# that emits this one expected warning.
+NULL_WORLD_WARNING="^WARNING: SaveLoadService: cannot save null world snapshot\$"
+# save_slot_state_smoke's corruption case (Tranche 3 promotion) deliberately
+# writes garbage over slot_03.json to prove corruption detection + .corrupt/
+# backup; the engine's JSON parse ERROR is covered by CORRUPT_WORLD_JSON_ERROR
+# and this is the service's own expected warning, pinned to the smoke's slot.
+CORRUPT_SLOT_WARNING="^WARNING: SaveLoadService: slot file is not valid JSON object, slot_id=slot_03\$"
 run_clean() {
   label="$1"
   marker="$2"
@@ -91,7 +100,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -251,7 +260,35 @@ run_clean 'Domain 10 UI polish end-to-end smoke' 'UI POLISH PASS' "$GODOT" --hea
 run_clean 'menu signal wiring smoke' 'MENU SIGNAL WIRING PASS language=true enabled_render=true run_outcome=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_signal_wiring_smoke.gd
 run_clean 'world migration smoke' 'SAVE MIGRATION WORLD PASS unknown_version_passthrough=true legacy_home_ship_migrated=true current_world_home_ship_migrated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_migration_world_smoke.gd
 run_clean 'slot metadata smoke' 'SLOT METADATA PASS location=home play_time_real=true seed_real=true roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/slot_metadata_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=142 clean_output=true'
+# --- Tranche 3 (2026-07-06): orphaned-smoke promotion — pure-model batch ---
+run_clean 'Tranche 3 sanity state model smoke' 'SANITY STATE PASS drain=35.0 recovery=35.0 pressure=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sanity_state_smoke.gd
+run_clean 'Tranche 3 radiation state model smoke' 'RADIATION STATE PASS accumulation=true drain=true decay=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/radiation_state_smoke.gd
+run_clean 'Tranche 3 body temperature state model smoke' 'BODY TEMPERATURE STATE PASS safe=false extreme=true recovery=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/body_temperature_state_smoke.gd
+run_clean 'Tranche 3 status effects model smoke' 'STATUS EFFECTS PASS count=2 expired=true modifier=1.00' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/status_effects_smoke.gd
+run_clean 'Tranche 3 addiction state model smoke' 'ADDICTION STATE PASS tolerance=0.70 dependence=1.10 withdrawal=true cleared=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/addiction_state_smoke.gd
+run_clean 'Tranche 3 damage pipeline model smoke' 'DAMAGE PIPELINE PASS vitals=65.0 threat=19.0 absorbed=10.0 status=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/damage_pipeline_smoke.gd
+run_clean 'Tranche 3 life support state model smoke' 'LIFE SUPPORT STATE PASS offline_drain=true recovery=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/life_support_state_smoke.gd
+run_clean 'Tranche 3 save migration service model smoke' 'SAVE MIGRATION SERVICE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_migration_service_smoke.gd
+run_clean 'Tranche 3 world snapshot model smoke' 'WORLD SNAPSHOT PASS round_trip=true version_gated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_snapshot_smoke.gd
+run_clean 'Tranche 3 save slot state model smoke' 'SAVE SLOT STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_slot_state_smoke.gd
+run_clean 'Tranche 3 autosave policy model smoke' 'AUTOSAVE POLICY PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/autosave_policy_smoke.gd
+run_clean 'Tranche 3 synaptic sea world model smoke' 'SYNAPTIC_SEA WORLD PASS in_range_sorted=true generated=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/synaptic_sea_world_smoke.gd
+run_clean 'Tranche 3 meta snapshot model smoke' 'META SNAPSHOT PASS meta=true unlocks=true boundary=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_snapshot_smoke.gd
+run_clean 'Tranche 3 world save service smoke' 'WORLD SAVE SERVICE PASS disk_round_trip=true rejects_null=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_save_service_smoke.gd
+run_clean 'Tranche 3 interactable distance fallback smoke' 'INTERACTABLE DISTANCE FALLBACK PASS completed_count=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interactable_distance_fallback_smoke.gd
+# --- Tranche 3: orphaned-smoke promotion — main-scene batch ---
+run_clean 'Tranche 3 vitals save/load main-scene smoke' 'VITALS SAVE LOAD PASS vitals=true sanity=true radiation=true temperature=true status=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/vitals_state_save_load_smoke.gd
+run_clean 'Tranche 3 vitals full main-scene smoke' 'MAIN PLAYABLE VITALS FULL PASS panel=true health=true stamina=true hunger=true thirst=true sanity=true radiation=true temperature=true status=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_vitals_full_smoke.gd
+run_clean 'Tranche 3 HUD main-scene smoke' 'MAIN PLAYABLE SLICE HUD PASS canvas_layer=true width=520 current_sequence=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_hud_smoke.gd
+run_clean 'Tranche 3 derelict gameplay main-scene smoke' 'DERELICT GAMEPLAY PASS built=true cleared=true persists=true home_intact=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_gameplay_smoke.gd
+run_clean 'Tranche 3 world persist/restore main-scene smoke' 'WORLD PERSIST RESTORE PASS registered=true state_preserved=true revisit_restores=true travel_home=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_persist_restore_smoke.gd
+run_clean 'Tranche 3 world save anywhere main-scene smoke' 'WORLD SAVE ANYWHERE PASS away_save=true location_restored=true state_restored=true home_save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/world_save_anywhere_smoke.gd
+run_clean 'Tranche 3 input-action idempotency smoke' 'IDEMPOTENCY PASS actions=7 no_duplicates_after_second_call=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/a11y_p1_002_idempotency_smoke.gd
+run_clean 'Tranche 3 progression main-scene smoke' 'MAIN PLAYABLE PROGRESSION PASS class=engineer repair_xp_gained=true hud=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_progression_smoke.gd
+# --- Tranche 3: new coverage — PhaseTimer behavior + real Area3D interaction path ---
+run_clean 'Tranche 3 phase timer model smoke' 'PHASE TIMER PASS clamp=true boundary=true carry=true single_flip=true progress=true durations=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/phase_timer_smoke.gd
+run_clean 'Tranche 3 interactable body-entered physics smoke' 'INTERACTABLE BODY ENTERED PASS far_null=true entered=true interact=true exited_cleared=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interactable_body_entered_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=167 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
@@ -428,3 +465,216 @@ A Gate 1 Go decision requires the regression bundle plus either the automated pr
   - `scripts/validation/title_settings_smoke.gd` (marker `TITLE SETTINGS PASS open=true cycle=true back=true applied=true`) — main-scene (boots `title_main.tscn`): title settings sub-flow (spec §3.7 / ADR-0043 decision 6) — opens the title-local settings screen, cycles a setting (mirroring `menu_coordinator._cycle_setting`), backs out, and asserts the dirty-flagged summary is applied into the session via `apply_ui_settings_summary` on New Game/Continue. Added to regression bundle.
   - `scripts/validation/save_load_slot_screen_smoke.gd` (marker `SAVE LOAD SLOT SCREEN PASS save=true load=true delete_armed=true delete_confirmed=true`) — main-scene: drives the interactive multi-slot screen's save/load/delete-arm/delete-confirm dispatch through real input, including the ship-only-not-world assertion for manual-slot loads (ADR-0043 decision 4). Added to regression bundle.
   - `scripts/validation/save_and_exit_smoke.gd` (marker `SAVE AND EXIT PASS saved=true world_fresh=true return_signal=true`) — main-scene: drives the pause-menu Save & Exit action, asserts `request_save()` persists world.json, a fresh boot reflects the saved state, and `return_to_title_requested` fires. Added to regression bundle.
+
+## Orphan smoke classification (Tranche 3, 2026-07-06)
+
+`scripts/validation/` carries far more smokes than the regression bundle runs. Tranche 3
+(audit remediation) promoted 25 of them (23 orphans + 2 new) and classified every remaining
+orphan below so none is silent. Dispositions:
+
+- **promotion-candidate** — real, currently-unregistered coverage (mostly pure-model unit
+  smokes plus some scene-level flows: docking/hangar is the largest fully-unrepresented
+  subsystem, followed by coherent-loader, travel/lifeboat, cargo/cart/equipment,
+  food/survival state models, UI panels, e2e chains, and the `main_playable_slice_*`
+  cluster, which needs per-file supersession review before wholesale promotion). Promote
+  opportunistically when a tranche touches the subsystem.
+- **deferred-pending-T5** — procgen/layout pipeline smokes; Tranche 5 rewrites that layer
+  (schema 1.2.0, archetype enforcement, encounter tables), so promotion happens with it.
+- **deferred-pending-T6** — `demo_scope_gate_smoke`; promoted when Tranche 6 wires the gate.
+- **legacy-capture** — display-server/PNG/export artifact tools, self-excluded from headless
+  regression by design.
+- **debug-tool** — developer probes without pass-marker discipline.
+- **release-audit-tool** — export-time checklist tools, not per-commit regression.
+- **non-headless-harness** — `Node3D` scene fixtures with no `_initialize()`; cannot run as
+  `--script` at all.
+- **standalone-gate** — `gate1_automated_playtest`: documented to run ON TOP OF the bundle,
+  deliberately not a `run_clean` entry (its runtime dwarfs every smoke). Surfaced when the
+  checker was scoped to actual `run_clean` invocations (PR #65 review).
+
+The table is generated and drift-checked by `tools/classify_orphan_smokes.sh`
+(`--check` fails on any unclassified orphan or stale row; run it whenever bundle
+membership changes).
+
+| Orphan smoke | Disposition |
+|---|---|
+| `_layout_visual_capture` | legacy-capture |
+| `achievement_state_smoke` | promotion-candidate |
+| `archetype_load_smoke` | deferred-pending-T5 |
+| `armor_resolver_smoke` | promotion-candidate |
+| `assert_hang_test` | debug-tool |
+| `bay_dock_launch_smoke` | promotion-candidate |
+| `bay_travel_unbay_smoke` | promotion-candidate |
+| `biome_profile_smoke` | deferred-pending-T5 |
+| `boarding_flip_smoke` | promotion-candidate |
+| `boot_dock_aligned_smoke` | promotion-candidate |
+| `bridge_terminal_login_smoke` | promotion-candidate |
+| `bridge_terminal_smoke` | promotion-candidate |
+| `canonical_opening_smoke` | promotion-candidate |
+| `cargo_hold_smoke` | promotion-candidate |
+| `cargo_move_item_smoke` | promotion-candidate |
+| `cargo_transfer_smoke` | promotion-candidate |
+| `cart_control_smoke` | promotion-candidate |
+| `cart_state_smoke` | promotion-candidate |
+| `cell_layout_engine_smoke` | deferred-pending-T5 |
+| `claim_persistence_smoke` | promotion-candidate |
+| `class_definitions_smoke` | promotion-candidate |
+| `coherent_loader_metadata_smoke` | promotion-candidate |
+| `coherent_playable_scene_smoke` | promotion-candidate |
+| `coherent_playable_traversal_smoke` | promotion-candidate |
+| `coherent_proof_ship_capture` | legacy-capture |
+| `coherent_runtime_loader_smoke` | promotion-candidate |
+| `coherent_static_fixture_validator` | promotion-candidate |
+| `consumable_save_load_smoke` | promotion-candidate |
+| `consumable_state_smoke` | promotion-candidate |
+| `container_variety_smoke` | promotion-candidate |
+| `crafting_debug_smoke` | debug-tool |
+| `crafting_state_smoke` | promotion-candidate |
+| `cross_system_dependency_smoke` | promotion-candidate |
+| `cross_training_smoke` | promotion-candidate |
+| `debug_apply_summary` | debug-tool |
+| `debug_save_load` | debug-tool |
+| `demo_scope_gate_smoke` | deferred-pending-T6 |
+| `derelict_generator_smoke` | deferred-pending-T5 |
+| `derelict_loot_smoke` | promotion-candidate |
+| `derelict_objective_controller_smoke` | promotion-candidate |
+| `difficulty_profile_smoke` | promotion-candidate |
+| `dock_breach_smoke` | promotion-candidate |
+| `dock_copresence_smoke` | promotion-candidate |
+| `dock_port_types_smoke` | promotion-candidate |
+| `dock_ports_smoke` | promotion-candidate |
+| `docking_loop_smoke` | promotion-candidate |
+| `docking_manager_smoke` | promotion-candidate |
+| `docking_persistence_smoke` | promotion-candidate |
+| `e2e_combat_loot_craft_smoke` | promotion-candidate |
+| `e2e_ship_meta_loop_smoke` | promotion-candidate |
+| `e2e_survival_loop_smoke` | promotion-candidate |
+| `effect_dispatcher_smoke` | promotion-candidate |
+| `encounter_injector_smoke` | deferred-pending-T5 |
+| `encumbrance_smoke` | promotion-candidate |
+| `equipment_carts_smoke` | promotion-candidate |
+| `equipment_defs_smoke` | promotion-candidate |
+| `equipment_state_smoke` | promotion-candidate |
+| `export_presets_smoke` | release-audit-tool |
+| `field_crafting_state_smoke` | promotion-candidate |
+| `floor_wrapper_collision_footprint_smoke` | deferred-pending-T5 |
+| `food_save_load_smoke` | promotion-candidate |
+| `food_state_smoke` | promotion-candidate |
+| `gameplay_slice_builder_smoke` | deferred-pending-T5 |
+| `gate1_automated_playtest` | standalone-gate |
+| `gridmap_meshlibrary_smoke` | deferred-pending-T5 |
+| `hangar_bay_smoke` | promotion-candidate |
+| `hangar_control_smoke` | promotion-candidate |
+| `hangar_persistence_smoke` | promotion-candidate |
+| `hangar_port_smoke` | promotion-candidate |
+| `hydroponics_state_smoke` | promotion-candidate |
+| `interior_aabb_smoke` | deferred-pending-T5 |
+| `inventory_panel_smoke` | promotion-candidate |
+| `inventory_selection_model_smoke` | promotion-candidate |
+| `inventory_widget_smoke` | promotion-candidate |
+| `item_inventory_smoke` | promotion-candidate |
+| `junk_items_smoke` | promotion-candidate |
+| `kit_catalog_smoke` | deferred-pending-T5 |
+| `layout_serializer_smoke` | deferred-pending-T5 |
+| `life_boat_layout_smoke` | promotion-candidate |
+| `life_boat_smoke` | promotion-candidate |
+| `life_support_system_smoke` | promotion-candidate |
+| `lifeboat_travel_gate_smoke` | promotion-candidate |
+| `live_main_prepare_to_upgrade_probe` | debug-tool |
+| `load_from_blueprint_smoke` | deferred-pending-T5 |
+| `localization_catalog_smoke` | promotion-candidate |
+| `locked_iso_readability_harness` | non-headless-harness |
+| `loot_distribution_smoke` | promotion-candidate |
+| `loot_table_biome_smoke` | promotion-candidate |
+| `loot_table_smoke` | promotion-candidate |
+| `m7_web_breached_encounter_proof` | non-headless-harness |
+| `main_coherent_boot_smoke` | promotion-candidate |
+| `main_coherent_capture` | legacy-capture |
+| `main_playable_combat_encounter_smoke` | promotion-candidate |
+| `main_playable_consumables_smoke` | promotion-candidate |
+| `main_playable_slice_affordance_smoke` | promotion-candidate |
+| `main_playable_slice_capture_sequence` | legacy-capture |
+| `main_playable_slice_combat_encounter_smoke` | promotion-candidate |
+| `main_playable_slice_crafting_smoke` | promotion-candidate |
+| `main_playable_slice_inventory_ui_smoke` | promotion-candidate |
+| `main_playable_slice_loot_ecosystem_smoke` | promotion-candidate |
+| `main_playable_slice_multislot_save_smoke` | promotion-candidate |
+| `main_playable_slice_reload_affordance_smoke` | promotion-candidate |
+| `main_playable_slice_suit_oxygen_smoke` | promotion-candidate |
+| `main_playable_slice_vitals_hud_smoke` | promotion-candidate |
+| `marker_generator_smoke` | deferred-pending-T5 |
+| `material_state_smoke` | promotion-candidate |
+| `medicine_state_smoke` | promotion-candidate |
+| `occupancy_flip_smoke` | promotion-candidate |
+| `oxygen_equipment_drain_smoke` | promotion-candidate |
+| `physical_travel_smoke` | promotion-candidate |
+| `pilot_switch_smoke` | promotion-candidate |
+| `playable_component_smoke` | promotion-candidate |
+| `playable_manager_built_smoke` | promotion-candidate |
+| `player_gravity_floor_snap_smoke` | promotion-candidate |
+| `player_progression_state_smoke` | promotion-candidate |
+| `player_vitals_model_smoke` | promotion-candidate |
+| `power_grid_state_smoke` | promotion-candidate |
+| `procgen_layout_stress_smoke` | deferred-pending-T5 |
+| `procgen_loader_playable_contract_smoke` | deferred-pending-T5 |
+| `procgen_playable_ship_capture` | legacy-capture |
+| `procgen_playable_ship_smoke` | deferred-pending-T5 |
+| `procgen_runtime_demo_capture` | legacy-capture |
+| `procgen_runtime_demo_smoke` | deferred-pending-T5 |
+| `procgen_ship_gameplay_smoke` | deferred-pending-T5 |
+| `procgen_ship_walkthrough_smoke` | deferred-pending-T5 |
+| `procgen_stress_test` | deferred-pending-T5 |
+| `procgen_walkability_smoke` | deferred-pending-T5 |
+| `product_audit_smoke` | release-audit-tool |
+| `progression_repair_integration_smoke` | promotion-candidate |
+| `qt_mini_smoke` | promotion-candidate |
+| `quality_tier_smoke` | promotion-candidate |
+| `rarity_tier_smoke` | promotion-candidate |
+| `readability_prop_factory_smoke` | deferred-pending-T5 |
+| `recipe_resource_smoke` | promotion-candidate |
+| `recursive_travel_smoke` | promotion-candidate |
+| `release_readiness_ledger_smoke` | release-audit-tool |
+| `repair_consume_smoke` | promotion-candidate |
+| `repair_loop_smoke` | promotion-candidate |
+| `rigid_pair_travel_smoke` | promotion-candidate |
+| `room_assigner_smoke` | deferred-pending-T5 |
+| `room_graph_generator_smoke` | deferred-pending-T5 |
+| `room_graph_smoke` | deferred-pending-T5 |
+| `scanner_panel_smoke` | promotion-candidate |
+| `scanner_state_smoke` | promotion-candidate |
+| `seed_determinism_smoke` | deferred-pending-T5 |
+| `ship_access_smoke` | promotion-candidate |
+| `ship_blueprint_smoke` | deferred-pending-T5 |
+| `ship_data_export` | legacy-capture |
+| `ship_dump` | legacy-capture |
+| `ship_generator_smoke` | deferred-pending-T5 |
+| `ship_instance_dock_fields_smoke` | promotion-candidate |
+| `ship_instance_smoke` | promotion-candidate |
+| `ship_inventory_smoke` | promotion-candidate |
+| `ship_layout_generator_smoke` | deferred-pending-T5 |
+| `ship_layout_integration_smoke` | deferred-pending-T5 |
+| `ship_occupancy_smoke` | promotion-candidate |
+| `ship_subcomponent_smoke` | promotion-candidate |
+| `ship_system_smoke` | promotion-candidate |
+| `ship_systems_definitions_smoke` | promotion-candidate |
+| `ship_systems_manager_force_repair_smoke` | promotion-candidate |
+| `ship_systems_manager_smoke` | promotion-candidate |
+| `ship_visualize` | legacy-capture |
+| `skill_tree_panel_smoke` | promotion-candidate |
+| `spoilage_state_smoke` | promotion-candidate |
+| `start_scenario_smoke` | promotion-candidate |
+| `station_state_mini_smoke` | promotion-candidate |
+| `station_state_smoke` | promotion-candidate |
+| `stimulant_state_smoke` | promotion-candidate |
+| `structural_placer_smoke` | deferred-pending-T5 |
+| `sustenance_state_smoke` | promotion-candidate |
+| `template_c_traversal_smoke` | deferred-pending-T5 |
+| `template_data_smoke` | deferred-pending-T5 |
+| `template_selector_smoke` | deferred-pending-T5 |
+| `threat_ai_state_smoke` | promotion-candidate |
+| `topology_template_smoke` | deferred-pending-T5 |
+| `training_by_item_smoke` | promotion-candidate |
+| `travel_controller_smoke` | promotion-candidate |
+| `travel_integration_smoke` | promotion-candidate |
+| `unique_item_state_smoke` | promotion-candidate |
+| `wall_door_resolver_smoke` | deferred-pending-T5 |
+| `windowed_fps_capture` | legacy-capture |

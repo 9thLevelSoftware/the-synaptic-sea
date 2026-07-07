@@ -41,7 +41,10 @@ This is the scheme in the dated specs and git PRs #41–#46 — **not** the "Gat
 
 **The completion roadmap (`docs/superpowers/specs/2026-06-28-completion-roadmap-design.md`)
 is done.** Domains 1–10 landed as PRs #50–#60 (2026-06-29 → 2026-07-03); all 18 loops read
-`closed` in the inventory (`--check` 191/191; regression bundle `commands=132 clean_output=true`).
+`closed` in the inventory (`--check` 191/191; regression bundle `commands=167 clean_output=true`
+after the 2026-07-06 audit-remediation tranches — PRs #61–#64 fixed the audit's criticals plus
+the away-branch and save/load clusters, and Tranche 3 promoted 25 smokes and classified every
+remaining orphan; see `docs/game/audits/2026-07-06-e2e-foundation-audit.md` for dispositions).
 The 2026-06-28 "open functional gaps" list that used to live here was closed by that arc
 (git history has the old text).
 

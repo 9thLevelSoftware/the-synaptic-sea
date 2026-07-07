@@ -3,7 +3,8 @@ extends SceneTree
 ## REQ-SL-007/009 migration + permadeath model smoke.
 ##
 ## Pure-model smoke (no scene tree) that proves:
-##   - SaveMigrationService walks v1 -> v2 -> v3 deterministically.
+##   - SaveMigrationService walks v1 -> v2 -> v3 -> v4 deterministically
+##     (v4 defaults per ADR-0046: play_time_seconds/current_location/world_seed).
 ##   - A v1 save without player_progression_summary migrates forward
 ##     and gains a default player_progression_summary.
 ##   - A new-than-current save is rejected (forward-only).
@@ -77,6 +78,20 @@ func _initialize() -> void:
 		return
 	if not (result_v12["dict"] as Dictionary).has("is_quicksave"):
 		_fail("v1 dict did not gain is_quicksave after v3 step")
+		return
+	# Session 4 (Tranche 3): the chain now ends at gate2-current-run-4
+	# (ADR-0046). Assert the _migrate_v3_to_v4 defaults land — this smoke
+	# previously stopped at the v3 fields, leaving a broken v4 step
+	# invisible.
+	var v4_dict: Dictionary = result_v12["dict"] as Dictionary
+	if not v4_dict.has("play_time_seconds") or float(v4_dict.get("play_time_seconds", -1.0)) != 0.0:
+		_fail("v1 dict did not gain play_time_seconds=0.0 after v4 step; have=%s" % str(v4_dict.get("play_time_seconds")))
+		return
+	if not v4_dict.has("current_location") or str(v4_dict.get("current_location", "x")) != "":
+		_fail("v1 dict did not gain current_location='' after v4 step; have=%s" % str(v4_dict.get("current_location")))
+		return
+	if not v4_dict.has("world_seed") or int(v4_dict.get("world_seed", -1)) != 0:
+		_fail("v1 dict did not gain world_seed=0 after v4 step; have=%s" % str(v4_dict.get("world_seed")))
 		return
 
 	# 2. Forward-only rejection of a new-version save.
