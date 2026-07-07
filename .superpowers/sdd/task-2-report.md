@@ -17,3 +17,11 @@ Verification:
 
 Result:
 - Text-only verification passed. I did not run Godot because this task is comment/ledger only and had no behavior change or runtime path to validate.
+
+Appendix:
+- Fix summary: updated the two W1 audit rows so each now visibly ends with `Disposition (Session 8): refuted.` while preserving the original evidence prose.
+- Commands run and result:
+  - `Get-Content -LiteralPath 'C:\ss8\docs\game\audits\2026-07-06-e2e-foundation-audit.md' | Select-Object -Skip 950 -First 10` -> confirmed the target rows and their surrounding context.
+  - `rg -n "scripts/systems/(cloud_manifest_state|build_metadata_state)\\.gd:(24|27).*refuted" 'C:\ss8\docs\game\audits\2026-07-06-e2e-foundation-audit.md'` -> matched both rows at lines 955-956 with the required `refuted` token.
+  - `git status --short` -> showed only `docs/game/audits/2026-07-06-e2e-foundation-audit.md` modified before the report append.
+- Files changed: `docs/game/audits/2026-07-06-e2e-foundation-audit.md`
