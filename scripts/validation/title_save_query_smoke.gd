@@ -88,7 +88,7 @@ func _initialize() -> void:
 	print("TITLE SAVE QUERY PASS no_save=true has_save=true frozen_blocks=true")
 	quit(0)
 
-func _wipe(service: SaveLoadService, resolver: PermadeathResolver) -> void:
+func _wipe(service, resolver) -> void:
 	service.delete_current_run()
 	resolver.clear_death("world")
 

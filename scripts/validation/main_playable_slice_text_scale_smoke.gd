@@ -202,7 +202,7 @@ func _finalize() -> void:
 	_cleanup_and_quit(0)
 
 func _check_vitals_scale(playable: PlayableGeneratedShip, scale: float, tag: String) -> bool:
-	var vitals: PlayerVitalsPanel = playable.vitals_panel as PlayerVitalsPanel
+	var vitals = playable.vitals_panel
 	if vitals == null:
 		_fail("%s: vitals panel missing" % tag)
 		return false

@@ -1,5 +1,7 @@
 extends SceneTree
 
+const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
+
 ## Pure-model smoke for the authoritative compartment fire model (ADR-0041).
 ## Pass marker:
 ##   FIRE SUPPRESSION STATE PASS ignite=true persist=true extinguish=true auto_suppress=true vent=true spread=true reignite=true cascade=true round_trip=true
@@ -23,7 +25,7 @@ func _initialize() -> void:
 	}
 
 	# ignite + persist (no auto-clear without a cause).
-	var m := FireSuppressionState.new()
+	var m = FireSuppressionStateScript.new()
 	m.configure(cfg)
 	m.ignite("engineering", 1.0)
 	if not m.is_burning("engineering"):
@@ -39,7 +41,7 @@ func _initialize() -> void:
 		_fail("extinguish did not clear the fire"); return
 
 	# powered auto-suppression clears over time.
-	var sup := FireSuppressionState.new(); sup.configure(cfg)
+	var sup = FireSuppressionStateScript.new(); sup.configure(cfg)
 	sup.ignite("engineering", 1.0)
 	var ctx_pow := {"powered_ratio": 1.0, "ship_oxygen_present": true, "breached_compartments": [], "damaged_compartments": [], "arc_arcing": false}
 	for i in range(60):
@@ -50,14 +52,14 @@ func _initialize() -> void:
 		_fail("powered auto-suppression never cleared the fire"); return
 
 	# vent: a breached (vacuum) compartment auto-extinguishes.
-	var vent := FireSuppressionState.new(); vent.configure(cfg)
+	var vent = FireSuppressionStateScript.new(); vent.configure(cfg)
 	vent.ignite("engineering", 1.0)
 	vent.tick(0.1, {"powered_ratio": 0.0, "ship_oxygen_present": true, "breached_compartments": ["engineering"], "damaged_compartments": [], "arc_arcing": false})
 	if vent.is_burning("engineering"):
 		_fail("vent (breach) did not extinguish the fire"); return
 
 	# spread: engineering fire spreads to an oxygenated adjacent (bridge); cargo (vented) never ignites.
-	var spr := FireSuppressionState.new(); spr.configure(cfg)
+	var spr = FireSuppressionStateScript.new(); spr.configure(cfg)
 	spr.ignite("engineering", 1.0)
 	var ctx_spread := {"powered_ratio": 0.0, "ship_oxygen_present": true, "breached_compartments": ["cargo"], "damaged_compartments": [], "arc_arcing": false}
 	for i in range(200):
@@ -70,7 +72,7 @@ func _initialize() -> void:
 		_fail("fire spread into a vented compartment (cargo) — must not"); return
 
 	# stale spread guard (fix #1): extinguishing a source must clear the spread progress it built toward neighbors.
-	var stale := FireSuppressionState.new(); stale.configure(cfg)
+	var stale = FireSuppressionStateScript.new(); stale.configure(cfg)
 	stale.ignite("engineering", 1.0)
 	var ctx_stale := {"powered_ratio": 0.0, "ship_oxygen_present": true, "breached_compartments": [], "damaged_compartments": [], "arc_arcing": false}
 	for i in range(3):
@@ -84,7 +86,7 @@ func _initialize() -> void:
 		_fail("stale spread_progress toward bridge survived extinguishing the source"); return
 
 	# re-ignition: damaged + oxygen re-ignites after extinguish; clearing the damage stops it.
-	var rei := FireSuppressionState.new(); rei.configure(cfg)
+	var rei = FireSuppressionStateScript.new(); rei.configure(cfg)
 	var ctx_dmg := {"powered_ratio": 0.0, "ship_oxygen_present": true, "breached_compartments": [], "damaged_compartments": ["engineering"], "arc_arcing": false}
 	for i in range(100):
 		rei.tick(0.1, ctx_dmg)
@@ -108,7 +110,7 @@ func _initialize() -> void:
 		_fail("repaired compartment kept re-igniting — repair must stop it"); return
 
 	# arc cascade: arcing ignites the arc compartment.
-	var cas := FireSuppressionState.new(); cas.configure(cfg)
+	var cas = FireSuppressionStateScript.new(); cas.configure(cfg)
 	var ctx_arc := {"powered_ratio": 0.0, "ship_oxygen_present": true, "breached_compartments": [], "damaged_compartments": [], "arc_arcing": true}
 	for i in range(100):
 		cas.tick(0.1, ctx_arc)
@@ -118,12 +120,12 @@ func _initialize() -> void:
 		_fail("arc cascade never ignited the arc compartment"); return
 
 	# round-trip.
-	var rt := FireSuppressionState.new(); rt.configure(cfg)
+	var rt = FireSuppressionStateScript.new(); rt.configure(cfg)
 	rt.ignite("bridge", 2.0)
 	rt.suppressant_units = 42.0
 	rt.cascade_progress = 0.3
 	var summary := rt.get_summary()
-	var rt2 := FireSuppressionState.new(); rt2.configure(cfg)
+	var rt2 = FireSuppressionStateScript.new(); rt2.configure(cfg)
 	if not rt2.apply_summary(summary):
 		_fail("apply_summary returned false on a changed summary"); return
 	if not rt2.is_burning("bridge") or absf(rt2.suppressant_units - 42.0) > 0.001 or absf(rt2.cascade_progress - 0.3) > 0.001:
