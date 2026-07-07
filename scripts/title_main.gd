@@ -31,6 +31,7 @@ var _presets: Array = []
 ## Tranche 1 (audit): last gameplay boot/reload failure reason, surfaced on the
 ## title menu after playable_failed tears the dead session down.
 var _last_boot_error: String = ""
+var _failure_handled: bool = false
 
 func _ready() -> void:
 	_save_load_service = SaveLoadServiceScript.new()
@@ -121,6 +122,7 @@ func _on_title_continue() -> void:
 
 func _instantiate_gameplay(should_load: bool) -> void:
 	_last_boot_error = ""
+	_failure_handled = false
 	main_node = MAIN_SCENE.instantiate()
 	add_child(main_node)
 	if is_instance_valid(menu_panel):
@@ -140,7 +142,7 @@ func _poll_for_playable_started(should_load: bool) -> void:
 		if playable_instance.has_signal("playable_failed") \
 				and not playable_instance.playable_failed.is_connected(_on_gameplay_failed):
 			playable_instance.playable_failed.connect(_on_gameplay_failed)
-		if not String(playable_instance.last_failure_reason).is_empty():
+		if not _failure_handled and not String(playable_instance.last_failure_reason).is_empty():
 			_on_gameplay_failed(playable_instance.last_failure_reason)
 			return
 	if not is_instance_valid(playable_instance) or not playable_instance.playable_started:
@@ -182,6 +184,9 @@ func _on_title_quit() -> void:
 ## title menu with the reason surfaced, instead of stranding them in a broken
 ## session (or spinning the boot poll forever).
 func _on_gameplay_failed(reason: String) -> void:
+	if _failure_handled:
+		return
+	_failure_handled = true
 	push_warning("TitleMain: gameplay boot failed (%s) — returning to title" % reason)
 	_last_boot_error = reason
 	_on_gameplay_return_to_title()

@@ -2891,7 +2891,7 @@ func _hazard_block_reason_text(reason: String) -> String:
 		"not_burning": return "no fire here"
 		"not_breached": return "no open breach"
 		"extinguish_failed": return "extinguish failed"
-		_: return reason
+		_: return "cannot complete"
 
 # --- M7-B Task 7: authoritative compartment fire ----------------------------
 # The old timer-based FireState is retired. FireSuppressionState is the single
