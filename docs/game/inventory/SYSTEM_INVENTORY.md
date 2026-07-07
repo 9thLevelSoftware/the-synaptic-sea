@@ -5,12 +5,12 @@
 
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
-| Audio Manager | 🟢 | 73% | [V] | playable_generated_ship.gd:4904 |
-| ↳ Dynamic Music State Machine | 🟢 | 90% | [V] | playable_generated_ship.gd:5493 |
-| ↳ SFX Event Router | 🟢 | 90% | [V] | playable_generated_ship.gd:3966 |
-| ↳ Meta-Event Scheduler | 🟢 | 90% | [V] | audio_manager.gd:182 |
-| ↳ Ambient Zone State | 🔴 | 50% | [V] | audio_manager.gd:178 |
-| ↳ Spatial Audio Resolver | 🔴 | 45% | [V] | playable_generated_ship.gd:5514 |
+| Audio Manager | 🟢 | 73% | [V] | playable_generated_ship.gd:5592 |
+| ↳ Dynamic Music State Machine | 🟢 | 90% | [V] | playable_generated_ship.gd:6411 |
+| ↳ SFX Event Router | 🟢 | 90% | [V] | playable_generated_ship.gd:4708 |
+| ↳ Meta-Event Scheduler | 🟢 | 90% | [V] | audio_manager.gd:215 |
+| ↳ Ambient Zone State | 🔴 | 50% | [V] | audio_manager.gd:211 |
+| ↳ Spatial Audio Resolver | 🔴 | 45% | [V] | playable_generated_ship.gd:6432 |
 | ↳ Audio Bus Config | ⚪ | — | [V] | — |
 | ↳ Audio Log Registry | ⚪ | — | [V] | — |
 | Audio Event Seam (id catalog) | ⚪ | — | [V] | — |
@@ -19,12 +19,12 @@
 
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
-| Threat Manager | 🟢 | 90% | [V] | playable_generated_ship.gd:3908 |
-| ↳ Detection / Stealth State | 🟢 | 90% | [V] | threat_manager.gd:67 |
-| ↳ Damage Pipeline | 🟢 | 90% | [V] | threat_manager.gd:85 |
+| Threat Manager | 🟢 | 90% | [V] | playable_generated_ship.gd:4650 |
+| ↳ Detection / Stealth State | 🟢 | 90% | [V] | threat_manager.gd:71 |
+| ↳ Damage Pipeline | 🟢 | 90% | [V] | threat_manager.gd:93 |
 | ↳ Armor Resolver | 🟢 | 90% | [V] | damage_pipeline.gd:23 |
-| ↳ Threat AI State | 🟢 | 90% | [V] | threat_manager.gd:74 |
-| Threat Placeholder Renderer | 🟢 | 75% | [V] | threat_manager.gd:266 |
+| ↳ Threat AI State | 🟢 | 90% | [V] | threat_manager.gd:82 |
+| Threat Placeholder Renderer | 🟢 | 75% | [V] | threat_manager.gd:294 |
 
 ## consumables
 
@@ -32,33 +32,33 @@
 |---|---|---|---|---|
 | Effect Dispatcher | 🟢 | 90% | [V] | consumable_state.gd:130 |
 | Medicine | 🟢 | 90% | [V] | consumable_state.gd:106 |
-| Stimulants | 🟢 | 90% | [V] | playable_generated_ship.gd:4830 |
-| Addiction / Tolerance | 🟢 | 90% | [V] | playable_generated_ship.gd:4832 |
-| Utility Items | 🟢 | 90% | [V] | consumable_state.gd:140 |
-| Ammo Magazine (Per-Weapon) | 🟢 | 90% | [V] | playable_generated_ship.gd:5184 (away) / 5221 (home) |
-| Sealed Hatch | 🟢 | 90% | [V] | playable_generated_ship.gd:2600-2601 (_build_sealed_hatches connect), 3601 (_try_bypass_nearest_hatch) |
+| Stimulants | 🟢 | 90% | [V] | playable_generated_ship.gd:5626 |
+| Addiction / Tolerance | 🟢 | 90% | [V] | playable_generated_ship.gd:5628 |
+| Utility Items | 🟢 | 90% | [V] | consumable_state.gd:143 |
+| Ammo Magazine (Per-Weapon) | 🟢 | 90% | [V] | playable_generated_ship.gd:5614 (away) / 5221 (home) |
+| Sealed Hatch | 🟢 | 90% | [V] | playable_generated_ship.gd:2770-2771 (_build_sealed_hatches connect), 3601 (_try_bypass_nearest_hatch) |
 
 ## food
 
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
 | Food Item Freshness | 🟢 | 100% | [V] | spoilage_state.gd:38 |
-| Food Spoilage Tracker | 🟢 | 100% | [V] | playable_generated_ship.gd:5035 |
-| Consumable Eat Pipeline (food/drink branch) | 🟢 | 100% | [V] | playable_generated_ship.gd:3963 |
-| Sustenance Facility Rollup | 🟢 | 90% | [V] | playable_generated_ship.gd:1390 |
-| Hydroponics Tray | 🟢 | 90% | [V] | playable_generated_ship.gd:5035 (_tick_food_runtime, both branches) |
+| Food Spoilage Tracker | 🟢 | 100% | [V] | playable_generated_ship.gd:5764 |
+| Consumable Eat Pipeline (food/drink branch) | 🟢 | 100% | [V] | playable_generated_ship.gd:4705 |
+| Sustenance Facility Rollup | 🟢 | 90% | [V] | playable_generated_ship.gd:1550 |
+| Hydroponics Tray | 🟢 | 90% | [V] | playable_generated_ship.gd:5764 (_tick_food_runtime, both branches) |
 | Nutrient Synthesizer (RETIRED) | 🔴 | 30% | [V] | — |
 | ↳ Cooking State Machine | 🔴 | 30% | [V] | — |
-| Water Recycler | 🟢 | 80% | [V] | playable_generated_ship.gd:5035 (_tick_food_runtime, both branches) |
-| Production Station | 🟢 | 100% | [V] | playable_generated_ship.gd:3033 (_build_production_stations, called at 3631/4219/6381) |
+| Water Recycler | 🟢 | 80% | [V] | playable_generated_ship.gd:5764 (_tick_food_runtime, both branches) |
+| Production Station | 🟢 | 100% | [V] | playable_generated_ship.gd:3480 (_build_production_stations, called at 3631/4219/6381) |
 
 ## infra
 
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
-| Build Metadata State | ⚪ | — | [V] | playable_generated_ship.gd:1237 |
-| Localization Catalog | ⚪ | — | [V] | playable_generated_ship.gd:1235 |
-| Demo Scope Gate | ⚪ | — | [V] | — |
+| Build Metadata State | ⚪ | — | [V] | playable_generated_ship.gd:1317 |
+| Localization Catalog | ⚪ | — | [V] | playable_generated_ship.gd:1315 |
+| Demo Scope Gate | ⚪ | — | [V] | playable_generated_ship.gd:1322 |
 | Release Readiness Ledger | ⚪ | — | [V] | — |
 | Crash Report Bundle | ⚪ | — | [V] | — |
 | Integration Matrix | ⚪ | — | [V] | — |
@@ -71,41 +71,41 @@
 
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
-| Player Inventory | 🟢 | 100% | [V] | playable_generated_ship.gd:1147 |
-| Equipment / Loadout | 🟢 | 100% | [V] | playable_generated_ship.gd:2183 |
-| Inventory Selection Model | 🟢 | 90% | [V] | inventory_panel.gd:130-138 |
-| Encumbrance | 🟢 | 90% | [V] | playable_generated_ship.gd:2164 |
-| Ship Inventory / Cargo Store | 🟢 | 90% | [V] | inventory_panel.gd:429 |
-| Cargo Transfer | 🟢 | 90% | [V] | inventory_panel.gd:429 |
-| Salvage Cart | 🟢 | 90% | [V] | playable_generated_ship.gd:7414 |
-| Cargo Hold Control | 🟢 | 90% | [V] | playable_generated_ship.gd:2069 |
-| Cart Control | 🟢 | 90% | [V] | playable_generated_ship.gd:2101 |
+| Player Inventory | 🟢 | 100% | [V] | playable_generated_ship.gd:1221 |
+| Equipment / Loadout | 🟢 | 100% | [V] | playable_generated_ship.gd:2449 |
+| Inventory Selection Model | 🟢 | 90% | [V] | inventory_panel.gd:141-149 |
+| Encumbrance | 🟢 | 90% | [V] | playable_generated_ship.gd:2430 |
+| Ship Inventory / Cargo Store | 🟢 | 90% | [V] | inventory_panel.gd:477 |
+| Cargo Transfer | 🟢 | 90% | [V] | inventory_panel.gd:477 |
+| Salvage Cart | 🟢 | 90% | [V] | playable_generated_ship.gd:8635 |
+| Cargo Hold Control | 🟢 | 90% | [V] | playable_generated_ship.gd:2335 |
+| Cart Control | 🟢 | 90% | [V] | playable_generated_ship.gd:2367 |
 
 ## loot
 
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
-| Loot Container | 🟢 | 90% | [V] | playable_generated_ship.gd:4345 |
+| Loot Container | 🟢 | 90% | [V] | playable_generated_ship.gd:5117 |
 | Loot Distribution (weighted roller) | 🟢 | 100% | [V] | scripts/tools/loot_container.gd:75 |
-| Loot Roller (legacy/table loader) | 🟢 | 100% | [V] | playable_generated_ship.gd:1222 |
+| Loot Roller (legacy/table loader) | 🟢 | 100% | [V] | playable_generated_ship.gd:1297 |
 | Rarity Tier Ladder | ⚪ | — | [V] | scripts/systems/loot_distribution.gd:85 |
-| Unique Item / Codex Claims | 🟢 | 90% | [V] | playable_generated_ship.gd:6742 |
-| Item Definitions (shared lookup) | ⚪ | — | [V] | playable_generated_ship.gd:6621 |
-| Tool Pickup | 🟢 | 90% | [V] | playable_generated_ship.gd:4378 |
+| Unique Item / Codex Claims | 🟢 | 90% | [V] | playable_generated_ship.gd:7888 |
+| Item Definitions (shared lookup) | ⚪ | — | [V] | playable_generated_ship.gd:7767 |
+| Tool Pickup | 🟢 | 90% | [V] | playable_generated_ship.gd:5158 |
 
 ## objectives
 
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
-| Objective Progress | 🟢 | 90% | [V] | playable_generated_ship.gd:4444 |
-| Derelict Objective Controller | 🟢 | 90% | [V] | playable_generated_ship.gd:3333 |
-| Bridge Terminal | 🟢 | 90% | [V] | playable_generated_ship.gd:4326 |
+| Objective Progress | 🟢 | 90% | [V] | playable_generated_ship.gd:5224 |
+| Derelict Objective Controller | 🟢 | 90% | [V] | playable_generated_ship.gd:3986 |
+| Bridge Terminal | 🟢 | 90% | [V] | playable_generated_ship.gd:5098 |
 
 ## procgen
 
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
-| Ship Generator (pipeline orchestrator) | 🟢 | 90% | [V] | playable_generated_ship.gd:3405 |
+| Ship Generator (pipeline orchestrator) | 🟢 | 90% | [V] | playable_generated_ship.gd:4056 |
 | Ship Layout Generator (5-stage + inject) | 🟢 | 90% | [V] | ship_generator.gd:40 |
 | Template Selector (Stage 1) | 🟢 | 100% | [V] | ship_layout_generator.gd:64 |
 | Room Assigner (Stage 2) | 🟢 | 90% | [V] | ship_layout_generator.gd:77 |
@@ -113,20 +113,20 @@
 | Wall/Door Resolver (Stage 4) | 🟢 | 90% | [V] | ship_layout_generator.gd:89 |
 | Layout Serializer (Stage 5) | 🟢 | 90% | [V] | ship_layout_generator.gd:93 |
 | Encounter Injector (Stage 6) | 🟢 | 90% | [V] | ship_layout_generator.gd:105 |
-| Gameplay Slice Builder | 🟢 | 90% | [V] | ship_generator.gd:91 |
-| Generated Ship Loader | 🟢 | 90% | [V] | ship_generator.gd:103 |
+| Gameplay Slice Builder | 🟢 | 90% | [V] | ship_generator.gd:83 |
+| Generated Ship Loader | 🟢 | 90% | [V] | ship_generator.gd:119 |
 | Biome Profile | 🟢 | 90% | [V] | ship_layout_generator.gd:102 |
 | Difficulty Profile | 🟢 | 90% | [V] | ship_layout_generator.gd:103 |
 | Room Variant Selector | 🟢 | 90% | [V] | ship_layout_generator.gd:74 |
-| Ship Blueprint (seed/params model) | 🟢 | 90% | [V] | playable_generated_ship.gd:3461 |
+| Ship Blueprint (seed/params model) | 🟢 | 90% | [V] | playable_generated_ship.gd:4113 |
 | Topology Template (data model) | 🟢 | 100% | [V] | template_selector.gd:99 |
-| Template-C Critical-Path Traversal | 🟢 | 90% | [V] | encounter_injector.gd:121 |
+| Template-C Critical-Path Traversal | 🟢 | 90% | [V] | encounter_injector.gd:141 |
 | Structural Placer (lifeboat geometry) | 🟢 | 90% | [V] | life_boat.gd:64 |
 | Kit Catalog (structural module skins) | 🟢 | 90% | [V] | structural_placer.gd:383 |
 | Room Graph (adjacency model) | 🟢 | 90% | [V] | life_boat.gd:51 |
-| Lifeboat Builder | 🟢 | 90% | [V] | playable_generated_ship.gd:4178 |
-| Gameplay Objective Volume | 🟡 | 50% | [V] | generated_ship_loader.gd:148 |
-| Readability Prop Factory | 🟢 | 90% | [V] | playable_generated_ship.gd:853 |
+| Lifeboat Builder | 🟢 | 90% | [V] | playable_generated_ship.gd:4950 |
+| Gameplay Objective Volume | 🟡 | 50% | [V] | generated_ship_loader.gd:152 |
+| Readability Prop Factory | 🟢 | 90% | [V] | playable_generated_ship.gd:919 |
 | Room Graph Generator (DEPRECATED, test-only) | 🔴 | 15% | [V] | — |
 | Seed Determinism Contract | ⚪ | — | [V] | — |
 | Start Scene Builder | ⚪ | — | [V] | — |
@@ -138,30 +138,30 @@
 
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
-| Player Progression (skills/XP) | 🟢 | 100% | [V] | playable_generated_ship.gd:4856 |
-| Training Event Bus | 🟢 | 100% | [V] | playable_generated_ship.gd:4856 |
-| Meta Progression (cross-run) | 🟢 | 100% | [V] | playable_generated_ship.gd:6460 |
-| Hub Upgrade Catalog | 🟢 | 100% | [V] | menu_coordinator.gd:601 |
-| Skill Tree (prereqs/unlocks) | 🟢 | 100% | [V] | menu_coordinator.gd:613 |
-| Class Definitions | 🟢 | 100% | [V] | playable_generated_ship.gd:1289 |
-| Cross-Run Unlock Registry (codex/scenes/classes) | 🟢 | 100% | [V] | playable_generated_ship.gd:6473 |
-| Achievements | 🟡 | 50% | [V] | playable_generated_ship.gd:5587 |
+| Player Progression (skills/XP) | 🟢 | 100% | [V] | playable_generated_ship.gd:5250 |
+| Training Event Bus | 🟢 | 100% | [V] | playable_generated_ship.gd:5250 |
+| Meta Progression (cross-run) | 🟢 | 100% | [V] | playable_generated_ship.gd:6981 |
+| Hub Upgrade Catalog | 🟢 | 100% | [V] | menu_coordinator.gd:754 |
+| Skill Tree (prereqs/unlocks) | 🟢 | 100% | [V] | menu_coordinator.gd:765 |
+| Class Definitions | 🟢 | 100% | [V] | playable_generated_ship.gd:1348 |
+| Cross-Run Unlock Registry (codex/scenes/classes) | 🟢 | 100% | [V] | playable_generated_ship.gd:6995 |
+| Achievements | 🟡 | 50% | [V] | playable_generated_ship.gd:6538 |
 
 ## save
 
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
-| Save/Load Service | 🟢 | 90% | [V] | playable_generated_ship.gd:6039 |
-| Run Snapshot (current-run DTO) | 🟢 | 90% | [V] | playable_generated_ship.gd:5955 |
-| World Snapshot (top-level save DTO) | 🟢 | 90% | [V] | playable_generated_ship.gd:6036 |
-| Autosave Policy | 🟢 | 90% | [V] | playable_generated_ship.gd:5952 |
-| Save Migration Service | 🟢 | 90% | [V] | save_load_service.gd:133 |
-| Save Slot State (index row) | 🟢 | 90% | [V] | save_load_service.gd:418 |
-| Save Index State | 🟢 | 90% | [V] | save_load_service.gd:419 |
-| Save/Load Menu (slot presenter) | 🟢 | 80% | [V] | playable_generated_ship.gd:1238 |
-| Permadeath Resolver | 🟢 | 80% | [V] | playable_generated_ship.gd:1649 |
-| Title Save Query | 🟢 | 80% | [V] | scripts/title_main.gd:56 |
-| Cloud Manifest State | ⚪ | — | [V] | save_load_service.gd:235 |
+| Save/Load Service | 🟢 | 90% | [V] | playable_generated_ship.gd:7024 |
+| Run Snapshot (current-run DTO) | 🟢 | 90% | [V] | playable_generated_ship.gd:6928 |
+| World Snapshot (top-level save DTO) | 🟢 | 90% | [V] | playable_generated_ship.gd:6898 |
+| Autosave Policy | 🟢 | 90% | [V] | playable_generated_ship.gd:6925 |
+| Save Migration Service | 🟢 | 90% | [V] | save_load_service.gd:169 |
+| Save Slot State (index row) | 🟢 | 90% | [V] | save_load_service.gd:543 |
+| Save Index State | 🟢 | 90% | [V] | save_load_service.gd:387 |
+| Save/Load Menu (slot presenter) | 🟢 | 80% | [V] | playable_generated_ship.gd:1323 |
+| Permadeath Resolver | 🟢 | 80% | [V] | playable_generated_ship.gd:1706 |
+| Title Save Query | 🟢 | 80% | [V] | scripts/title_main.gd:66 |
+| Cloud Manifest State | ⚪ | — | [V] | save_load_service.gd:297 |
 
 ## ship_systems
 
@@ -171,98 +171,98 @@
 | ↳ Ship System (group) | 🟢 | 100% | [V] | ship_systems_manager.gd:135 |
 | ↳ Ship Subcomponent | 🟢 | 100% | [V] | ship_systems_manager.gd:146 |
 | ↳ Life Support System (manager subclass) | 🟡 | 50% | [V] | ship_systems_manager.gd:135 |
-| Power Grid | 🟢 | 90% | [V] | playable_generated_ship.gd:1349 |
-| Propulsion (expanded) | 🟢 | 90% | [V] | playable_generated_ship.gd:1351 |
-| Life Support (expanded atmosphere) | 🟢 | 90% | [V] | playable_generated_ship.gd:1360 |
-| Hull Integrity | 🟢 | 90% | [V] | playable_generated_ship.gd:2568 |
+| Power Grid | 🟢 | 90% | [V] | playable_generated_ship.gd:1517 |
+| Propulsion (expanded) | 🟢 | 90% | [V] | playable_generated_ship.gd:1519 |
+| Life Support (expanded atmosphere) | 🟢 | 90% | [V] | playable_generated_ship.gd:1528 |
+| Hull Integrity | 🟢 | 90% | [V] | playable_generated_ship.gd:2877 |
 | Web Infestation | 🟢 | 90% | [V] | playable_generated_ship.gd:_advance_ship |
-| Fire Suppression (authoritative fire hazard) | 🟢 | 90% | [V] | playable_generated_ship.gd:1367 |
-| Extinguisher Charge | 🟢 | 90% | [V] | playable_generated_ship.gd:1386 |
-| Crafting (station) | 🟢 | 100% | [V] | playable_generated_ship.gd:1381 |
-| Crafting Station State | 🟢 | 100% | [V] | playable_generated_ship.gd:1381 |
+| Fire Suppression (authoritative fire hazard) | 🟢 | 90% | [V] | playable_generated_ship.gd:1456 |
+| Extinguisher Charge | 🟢 | 90% | [V] | playable_generated_ship.gd:1548 |
+| Crafting (station) | 🟢 | 100% | [V] | playable_generated_ship.gd:1543 |
+| Crafting Station State | 🟢 | 100% | [V] | playable_generated_ship.gd:1543 |
 | Material Quality Catalog | 🟢 | 100% | [V] | scripts/systems/crafting_state.gd:173 |
-| Field Crafting (portable) | 🟢 | 100% | [V] | playable_generated_ship.gd:1387 |
+| Field Crafting (portable) | 🟢 | 100% | [V] | playable_generated_ship.gd:3832 |
 | Deconstruction Resolver | 🟢 | 100% | [V] | scripts/tools/crafting_station.gd:139 |
 | Quality Tier Resolver | 🟢 | 100% | [V] | scripts/systems/crafting_state.gd:174 |
 | Junk Yield Resolver | ⚪ | — | [V] | — |
-| Electrical Arc Hazard | 🟢 | 90% | [V] | playable_generated_ship.gd:4827 |
+| Electrical Arc Hazard | 🟢 | 90% | [V] | playable_generated_ship.gd:5620 |
 | Phase Timer | ⚪ | — | [V] | electrical_arc_state.gd:93 |
-| Route Control | 🟢 | 90% | [V] | playable_generated_ship.gd:4563 |
-| Breach Seal Point | 🟢 | 90% | [V] | playable_generated_ship.gd:4363 |
-| Crafting Station | 🟢 | 90% | [V] | playable_generated_ship.gd:4372 |
-| Extinguisher Recharge Port | 🟢 | 90% | [V] | playable_generated_ship.gd:4793 |
-| Fire Suppression Point | 🟢 | 90% | [V] | playable_generated_ship.gd:4367 |
-| Repair Point | 🟢 | 90% | [V] | playable_generated_ship.gd:4359 |
+| Route Control | 🟢 | 90% | [V] | playable_generated_ship.gd:5345 |
+| Breach Seal Point | 🟢 | 90% | [V] | playable_generated_ship.gd:5106 |
+| Crafting Station | 🟢 | 90% | [V] | playable_generated_ship.gd:3783 |
+| Extinguisher Recharge Port | 🟢 | 90% | [V] | playable_generated_ship.gd:5608 |
+| Fire Suppression Point | 🟢 | 90% | [V] | playable_generated_ship.gd:5110 |
+| Repair Point | 🟢 | 90% | [V] | playable_generated_ship.gd:3773 |
 
 ## survival
 
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
-| Player Vitals | 🟢 | 90% | [V] | playable_generated_ship.gd:4853 |
-| Radiation | 🟢 | 90% | [V] | playable_generated_ship.gd:4884 |
-| Body Temperature | 🟢 | 90% | [V] | playable_generated_ship.gd:4887 |
-| Status Effects | 🟢 | 90% | [V] | playable_generated_ship.gd:4889 |
-| Sanity | 🟢 | 90% | [V] | playable_generated_ship.gd:4868 |
-| Hallucination Director | 🟢 | 90% | [V] | playable_generated_ship.gd:4876 |
-| Hallucination Manager | 🟢 | 90% | [V] | playable_generated_ship.gd:4879 |
-| Personal Oxygen | 🟢 | 90% | [V] | playable_generated_ship.gd:5044 |
-| Player Vitals Model (HUD aggregate) | 🟡 | 50% | [V] | playable_generated_ship.gd:5078 |
+| Player Vitals | 🟢 | 90% | [V] | playable_generated_ship.gd:5728 |
+| Radiation | 🟢 | 90% | [V] | playable_generated_ship.gd:5744 |
+| Body Temperature | 🟢 | 90% | [V] | playable_generated_ship.gd:5747 |
+| Status Effects | 🟢 | 90% | [V] | playable_generated_ship.gd:5749 |
+| Sanity | 🟢 | 90% | [V] | playable_generated_ship.gd:5555 |
+| Hallucination Director | 🟢 | 90% | [V] | playable_generated_ship.gd:5677 |
+| Hallucination Manager | 🟢 | 90% | [V] | playable_generated_ship.gd:5680 |
+| Personal Oxygen | 🟢 | 90% | [V] | playable_generated_ship.gd:5918 |
+| Player Vitals Model (HUD aggregate) | 🟡 | 50% | [V] | playable_generated_ship.gd:5952 |
 
 ## travel
 
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
-| Scanner State | 🟢 | 90% | [V] | playable_generated_ship.gd:1773 |
-| Travel Controller | 🟢 | 90% | [V] | playable_generated_ship.gd:3405 |
+| Scanner State | 🟢 | 90% | [V] | playable_generated_ship.gd:1995 |
+| Travel Controller | 🟢 | 90% | [V] | playable_generated_ship.gd:4056 |
 | Marker Generator | 🟢 | 90% | [V] | synaptic_sea_world.gd:33 |
-| Ship Instance | 🟢 | 90% | [V] | playable_generated_ship.gd:4069 |
+| Ship Instance | 🟢 | 90% | [V] | playable_generated_ship.gd:4839 |
 | Ship Marker | ⚪ | — | [V] | marker_generator.gd:30 |
-| Ship Occupancy | 🟢 | 90% | [V] | playable_generated_ship.gd:1567 |
-| Ship Access State | 🟢 | 90% | [V] | playable_generated_ship.gd:1588 |
-| Synaptic Sea World | 🟢 | 90% | [V] | playable_generated_ship.gd:1253 |
-| Dock Ports | 🟢 | 90% | [V] | playable_generated_ship.gd:4224 |
-| Docking Manager | 🟢 | 90% | [V] | playable_generated_ship.gd:4229 |
-| Hangar Bay | 🟡 | 50% | [V] | playable_generated_ship.gd:2013 |
-| Dock Port Barrier | 🟢 | 90% | [V] | playable_generated_ship.gd:4323 |
+| Ship Occupancy | 🟢 | 90% | [V] | playable_generated_ship.gd:1789 |
+| Ship Access State | 🟢 | 90% | [V] | playable_generated_ship.gd:1810 |
+| Synaptic Sea World | 🟢 | 90% | [V] | playable_generated_ship.gd:1338 |
+| Dock Ports | 🟢 | 90% | [V] | playable_generated_ship.gd:4996 |
+| Docking Manager | 🟢 | 90% | [V] | playable_generated_ship.gd:5001 |
+| Hangar Bay | 🟡 | 50% | [V] | playable_generated_ship.gd:2274 |
+| Dock Port Barrier | 🟢 | 90% | [V] | playable_generated_ship.gd:5095 |
 | Hangar Bay Control | 🔴 | 40% | [V] | — |
 
 ## ui
 
 | System | Coupling | Completion | Conf | Driven at |
 |---|---|---|---|---|
-| Menu Coordinator (UI hub) | 🟢 | 100% | [V] | playable_generated_ship.gd:7034 |
-| Menu State | 🟢 | 100% | [V] | menu_coordinator.gd:173 |
-| Settings State | 🟢 | 100% | [V] | menu_coordinator.gd:322 |
-| Tutorial State | 🟢 | 100% | [V] | playable_generated_ship.gd:3362 |
-| Controller Glyph State | 🟢 | 100% | [V] | menu_coordinator.gd:683 |
+| Menu Coordinator (UI hub) | 🟢 | 100% | [V] | playable_generated_ship.gd:8246 |
+| Menu State | 🟢 | 100% | [V] | menu_coordinator.gd:211 |
+| Settings State | 🟢 | 100% | [V] | menu_coordinator.gd:354 |
+| Tutorial State | 🟢 | 100% | [V] | playable_generated_ship.gd:4015 |
+| Controller Glyph State | 🟢 | 100% | [V] | menu_coordinator.gd:1069 |
 | Web Chart State | 🟢 | 100% | [V] | playable_generated_ship.gd:scan |
 | Chart Panel | 🟢 | 90% | [V] | playable_generated_ship.gd:_input |
-| Tooltip Presenter | 🟢 | 100% | [V] | menu_coordinator.gd:234 |
-| Accessibility Settings | 🟢 | 100% | [V] | playable_generated_ship.gd:465 |
-| Menu Panel | 🟢 | 90% | [V] | menu_coordinator.gd:595 |
-| Codex Panel | 🟢 | 100% | [V] | menu_coordinator.gd:634 |
-| Hotbar Panel | 🟢 | 90% | [V] | playable_generated_ship.gd:3945 |
-| Tooltip Panel | 🟢 | 100% | [V] | menu_coordinator.gd:719 |
-| Tutorial Overlay Panel | 🟢 | 90% | [V] | menu_coordinator.gd:688 |
-| Player Vitals Panel | 🟢 | 90% | [V] | playable_generated_ship.gd:5079 |
-| Objective Tracker HUD | 🟢 | 90% | [V] | playable_generated_ship.gd:4449 |
-| Scanner Panel | 🟢 | 90% | [V] | playable_generated_ship.gd:7005 |
-| Inventory Panel | 🟢 | 90% | [V] | playable_generated_ship.gd:3710 |
-| Inventory Row Widget | 🟢 | 90% | [V] | inventory_panel.gd:524 |
-| Inventory Drop Zone Widget | 🟢 | 90% | [V] | inventory_panel.gd:518 |
-| Hallucination FX Overlay | 🟢 | 90% | [V] | playable_generated_ship.gd:4879 |
-| Achievements Panel | 🟢 | 90% | [V] | menu_coordinator.gd:450 |
-| Skill Tree Panel | 🟢 | 90% | [V] | menu_coordinator.gd:454 |
-| Hub Upgrade Panel | 🟢 | 90% | [V] | menu_coordinator.gd:458 |
-| Class Panel | 🟢 | 90% | [V] | menu_coordinator.gd:462 |
-| Audio Log Panel | 🟢 | 90% | [V] | menu_coordinator.gd:469 |
-| Audio Settings Panel | 🟢 | 100% | [V] | menu_coordinator.gd:471 |
-| Language Selector | 🟢 | 90% | [V] | menu_coordinator.gd:475 |
-| Release Badge Overlay | 🟢 | 90% | [V] | menu_coordinator.gd:477 |
-| Credits Screen | 🟢 | 90% | [V] | menu_coordinator.gd:479 |
-| Player Controller | 🟢 | 90% | [V] | player_controller.gd:28 |
+| Tooltip Presenter | 🟢 | 100% | [V] | menu_coordinator.gd:257 |
+| Accessibility Settings | 🟢 | 100% | [V] | playable_generated_ship.gd:531 |
+| Menu Panel | 🟢 | 90% | [V] | menu_coordinator.gd:981 |
+| Codex Panel | 🟢 | 100% | [V] | menu_coordinator.gd:1028 |
+| Hotbar Panel | 🟢 | 90% | [V] | playable_generated_ship.gd:4687 |
+| Tooltip Panel | 🟢 | 100% | [V] | menu_coordinator.gd:1119 |
+| Tutorial Overlay Panel | 🟢 | 90% | [V] | menu_coordinator.gd:1074 |
+| Player Vitals Panel | 🟢 | 90% | [V] | playable_generated_ship.gd:5953 |
+| Objective Tracker HUD | 🟢 | 90% | [V] | playable_generated_ship.gd:5229 |
+| Scanner Panel | 🟢 | 90% | [V] | playable_generated_ship.gd:8199 |
+| Inventory Panel | 🟢 | 90% | [V] | playable_generated_ship.gd:4402 |
+| Inventory Row Widget | 🟢 | 90% | [V] | inventory_panel.gd:572 |
+| Inventory Drop Zone Widget | 🟢 | 90% | [V] | inventory_panel.gd:566 |
+| Hallucination FX Overlay | 🟢 | 90% | [V] | playable_generated_ship.gd:5680 |
+| Achievements Panel | 🟢 | 90% | [V] | menu_coordinator.gd:500 |
+| Skill Tree Panel | 🟢 | 90% | [V] | menu_coordinator.gd:504 |
+| Hub Upgrade Panel | 🟢 | 90% | [V] | menu_coordinator.gd:508 |
+| Class Panel | 🟢 | 90% | [V] | menu_coordinator.gd:512 |
+| Audio Log Panel | 🟢 | 90% | [V] | menu_coordinator.gd:520 |
+| Audio Settings Panel | 🟢 | 100% | [V] | menu_coordinator.gd:522 |
+| Language Selector | 🟢 | 90% | [V] | menu_coordinator.gd:534 |
+| Release Badge Overlay | 🟢 | 90% | [V] | menu_coordinator.gd:536 |
+| Credits Screen | 🟢 | 90% | [V] | menu_coordinator.gd:538 |
+| Player Controller | 🟢 | 90% | [V] | player_controller.gd:57 |
 | Iso Camera Rig | 🟢 | 90% | [V] | iso_camera_rig.gd:17 |
-| Interactable | 🟢 | 90% | [V] | interactable.gd:85 |
+| Interactable | 🟢 | 90% | [V] | interactable.gd:88 |
 | Modular Asset Spec (schema) | ⚪ | — | [V] | — |
 | Wrapper Scene Validator | ⚪ | — | [V] | — |
 | Tooltip Payload | ⚪ | — | [V] | — |
