@@ -1,6438 +1,2360 @@
 {
-  "schema_version": "1.0.0",
+  "arc_zones": [
+    {
+      "from_cell": [
+        3,
+        0,
+        0
+      ],
+      "from_room": "corridor_01",
+      "id": "corridor_01_to_corridor_02_arc",
+      "kind": "electrical_arc",
+      "rationale": "generated: non-critical side link off the objective spine; arc cannot trap the player or block an objective",
+      "to_cell": [
+        3,
+        1,
+        0
+      ],
+      "to_room": "corridor_02"
+    }
+  ],
+  "blocked_links": [],
+  "breach_zones": [],
+  "cell_size": 4.0,
+  "critical_path": [
+    "airlock_01",
+    "corridor_05",
+    "engineering_01"
+  ],
+  "design_intent": "procedurally generated bifurcated ship",
   "document_kind": "ship_layout",
-  "source_program": "/private/tmp/synaptic_sea_runtime_demo_fixture/seed_000017/program.json",
-  "program_id": "prototype-ship-000017-8r-2d",
+  "encounters": [],
+  "fire_zones": [],
   "kit_id": "ship_structural_v0",
+  "landmarks": [
+    {
+      "color": "green",
+      "id": "engineering_01_green_core",
+      "kind": "destination_core",
+      "position": [
+        -28.0,
+        0.15,
+        4.0
+      ],
+      "room_id": "engineering_01"
+    }
+  ],
+  "program_id": "procgen-default-seed-17",
+  "prototype": {
+    "goal_room": "engineering_01",
+    "start_room": "airlock_01"
+  },
+  "room_links": [
+    {
+      "from_cell": [
+        0,
+        0,
+        0
+      ],
+      "from_room": "airlock_01",
+      "id": "airlock_01_to_corridor_05",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        -1,
+        0,
+        0
+      ],
+      "to_room": "corridor_05"
+    },
+    {
+      "from_cell": [
+        0,
+        1,
+        0
+      ],
+      "from_room": "airlock_01",
+      "id": "airlock_01_to_corridor_04",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        0,
+        2,
+        0
+      ],
+      "to_room": "corridor_04"
+    },
+    {
+      "from_cell": [
+        2,
+        0,
+        0
+      ],
+      "from_room": "airlock_01",
+      "id": "airlock_01_to_corridor_01",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        3,
+        0,
+        0
+      ],
+      "to_room": "corridor_01"
+    },
+    {
+      "from_cell": [
+        2,
+        1,
+        0
+      ],
+      "from_room": "airlock_01",
+      "id": "airlock_01_to_corridor_02",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        3,
+        1,
+        0
+      ],
+      "to_room": "corridor_02"
+    },
+    {
+      "from_cell": [
+        3,
+        0,
+        0
+      ],
+      "from_room": "corridor_01",
+      "id": "corridor_01_to_corridor_02",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        3,
+        1,
+        0
+      ],
+      "to_room": "corridor_02"
+    },
+    {
+      "from_cell": [
+        6,
+        0,
+        0
+      ],
+      "from_room": "corridor_01",
+      "id": "corridor_01_to_bridge_01",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        7,
+        0,
+        0
+      ],
+      "to_room": "bridge_01"
+    },
+    {
+      "from_cell": [
+        3,
+        1,
+        0
+      ],
+      "from_room": "corridor_02",
+      "id": "corridor_02_to_corridor_03",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        3,
+        2,
+        0
+      ],
+      "to_room": "corridor_03"
+    },
+    {
+      "from_cell": [
+        3,
+        2,
+        0
+      ],
+      "from_room": "corridor_03",
+      "id": "corridor_03_to_crew_quarters_01",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        3,
+        3,
+        0
+      ],
+      "to_room": "crew_quarters_01"
+    },
+    {
+      "from_cell": [
+        -4,
+        2,
+        0
+      ],
+      "from_room": "corridor_04",
+      "id": "corridor_04_to_armory_01",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        -4,
+        3,
+        0
+      ],
+      "to_room": "armory_01"
+    },
+    {
+      "from_cell": [
+        -5,
+        0,
+        0
+      ],
+      "from_room": "corridor_05",
+      "id": "corridor_05_to_engineering_01",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        -6,
+        0,
+        0
+      ],
+      "to_room": "engineering_01"
+    }
+  ],
   "rooms": [
     {
+      "deck": 0,
       "id": "airlock_01",
-      "room_role": "airlock",
-      "origin": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "wall_segments": [
-        {
-          "room_id": "airlock_01",
-          "side": "south",
-          "origin": [
+      "interior_zones": {
+        "center_slots": [],
+        "reserved_cells": [
+          [
             0,
             0
           ],
-          "span": 3,
-          "edge": {
-            "cell": [
-              0,
-              0
-            ],
-            "side": "south"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "airlock_01",
-          "side": "west",
-          "origin": [
+          [
             0,
-            0
+            1
           ],
-          "span": 3,
-          "edge": {
-            "cell": [
-              0,
-              0
-            ],
-            "side": "west"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "airlock_01",
-          "side": "north",
-          "origin": [
-            0,
-            2
-          ],
-          "span": 3,
-          "edge": {
-            "cell": [
-              0,
-              2
-            ],
-            "side": "north"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "airlock_01",
-          "side": "east",
-          "origin": [
+          [
             2,
             0
           ],
-          "span": 1,
-          "edge": {
-            "cell": [
-              2,
-              0
-            ],
-            "side": "east"
+          [
+            2,
+            1
+          ]
+        ],
+        "wall_slots": [
+          {
+            "against_wall": true,
+            "cell": "(1, 0)"
           },
-          "module_id": "wall_straight"
-        }
-      ],
-      "structural_placements": [
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_x0_z0",
-          "position": [
-            -4.0,
-            0.0,
-            -4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_x0_z1",
-          "position": [
-            -4.0,
-            0.0,
-            0.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_x0_z2",
-          "position": [
-            -4.0,
-            0.0,
-            4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_x1_z0",
-          "position": [
-            0.0,
-            0.0,
-            -4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_x1_z1",
-          "position": [
-            0.0,
-            0.0,
-            0.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_x1_z2",
-          "position": [
-            0.0,
-            0.0,
-            4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_x2_z0",
-          "position": [
-            4.0,
-            0.0,
-            -4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_x2_z1",
-          "position": [
-            4.0,
-            0.0,
-            0.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_x2_z2",
-          "position": [
-            4.0,
-            0.0,
-            4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_x0_z0",
-          "position": [
-            -4.0,
-            0.0,
-            -6.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_x1_z0",
-          "position": [
-            0.0,
-            0.0,
-            -6.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_x2_z0",
-          "position": [
-            4.0,
-            0.0,
-            -6.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_x0_z0",
-          "position": [
-            -6.0,
-            0.0,
-            -4.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_x0_z1",
-          "position": [
-            -6.0,
-            0.0,
-            0.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_x0_z2",
-          "position": [
-            -6.0,
-            0.0,
-            4.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_x0_z2",
-          "position": [
-            -4.0,
-            0.0,
-            6.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_x1_z2",
-          "position": [
-            0.0,
-            0.0,
-            6.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_x2_z2",
-          "position": [
-            4.0,
-            0.0,
-            6.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_x2_z0",
-          "position": [
-            6.0,
-            0.0,
-            -4.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "bulkhead_portal_2x1",
-          "name": "door_east_to_corridor_01",
-          "position": [
-            6.0,
-            0.0,
-            2.0
-          ],
-          "yaw_degrees": 270.0
-        }
-      ],
+          {
+            "against_wall": true,
+            "cell": "(1, 1)"
+          }
+        ]
+      },
       "motif_requests": [
         "mot-airlock-entry-locker"
       ],
       "portals": [
         {
-          "id": "east_to_corridor_01",
-          "wall": "east",
-          "offset_cells": 1,
+          "from_cell": [
+            0,
+            0
+          ],
+          "id": "west_airlock_01_to_corridor_05",
           "module_id": "bulkhead_portal_2x1",
           "position": [
-            6.0,
-            0.0,
-            2.0
-          ],
-          "yaw_degrees": 270.0,
-          "replaced_wall_name": "wall_east_x2_z1",
-          "span_cells": 2
-        }
-      ],
-      "interior_zones": {
-        "reserved_cells": [
-          [
-            1,
-            1,
-            0
-          ],
-          [
-            1,
-            2,
-            0
-          ],
-          [
-            2,
-            1,
-            0
-          ],
-          [
-            2,
-            2,
-            0
-          ]
-        ],
-        "door_approach_cells": [
-          [
-            1,
-            1,
-            0
-          ],
-          [
-            1,
-            2,
-            0
-          ],
-          [
-            2,
-            1,
-            0
-          ],
-          [
-            2,
-            2,
-            0
-          ]
-        ],
-        "vertical_access_cells": [],
-        "route_cells": [
-          [
-            1,
-            1,
-            0
-          ],
-          [
-            1,
-            2,
-            0
-          ],
-          [
-            2,
-            1,
-            0
-          ],
-          [
-            2,
-            2,
-            0
-          ]
-        ],
-        "wall_slots": [
-          {
-            "id": "airlock_01_wall_south_x0_z0_d0",
-            "room_id": "airlock_01",
-            "cell": [
-              0,
-              0,
-              0
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "airlock_01_wall_west_x0_z1_d0",
-            "room_id": "airlock_01",
-            "cell": [
-              0,
-              1,
-              0
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 90.0,
-            "wall": "west"
-          },
-          {
-            "id": "airlock_01_wall_north_x0_z2_d0",
-            "room_id": "airlock_01",
-            "cell": [
-              0,
-              2,
-              0
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          },
-          {
-            "id": "airlock_01_wall_south_x1_z0_d0",
-            "room_id": "airlock_01",
-            "cell": [
-              1,
-              0,
-              0
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "airlock_01_wall_south_x2_z0_d0",
-            "room_id": "airlock_01",
-            "cell": [
-              2,
-              0,
-              0
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          }
-        ],
-        "center_slots": []
-      }
-    },
-    {
-      "id": "corridor_01",
-      "room_role": "corridor",
-      "origin": [
-        12.0,
-        0.0,
-        0.0
-      ],
-      "wall_segments": [
-        {
-          "room_id": "corridor_01",
-          "side": "north",
-          "origin": [
-            3,
-            1
-          ],
-          "span": 3,
-          "edge": {
-            "cell": [
-              3,
-              1
-            ],
-            "side": "north"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_01",
-          "side": "south",
-          "origin": [
-            3,
-            1
-          ],
-          "span": 3,
-          "edge": {
-            "cell": [
-              3,
-              1
-            ],
-            "side": "south"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_01",
-          "side": "east",
-          "origin": [
-            5,
-            1
-          ],
-          "span": 1,
-          "edge": {
-            "cell": [
-              5,
-              1
-            ],
-            "side": "east"
-          },
-          "module_id": "wall_straight"
-        }
-      ],
-      "structural_placements": [
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_x3_z1",
-          "position": [
-            8.0,
+            -2.0,
             0.0,
             0.0
           ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_x4_z1",
-          "position": [
-            12.0,
-            0.0,
-            0.0
+          "to_cell": [
+            -1,
+            0
           ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_x5_z1",
-          "position": [
-            16.0,
-            0.0,
-            0.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_x3_z1",
-          "position": [
-            8.0,
-            0.0,
-            -2.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_x4_z1",
-          "position": [
-            12.0,
-            0.0,
-            -2.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_x5_z1",
-          "position": [
-            16.0,
-            0.0,
-            -2.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_x3_z1",
-          "position": [
-            8.0,
-            0.0,
-            2.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_x4_z1",
-          "position": [
-            12.0,
-            0.0,
-            2.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_x5_z1",
-          "position": [
-            16.0,
-            0.0,
-            2.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_x5_z1",
-          "position": [
-            18.0,
-            0.0,
-            0.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "ramp_up_1x2",
-          "name": "vertical_corridor_ladder_01",
-          "position": [
-            12.0,
-            0.0,
-            0.0
-          ],
-          "yaw_degrees": 0.0
-        }
-      ],
-      "motif_requests": [
-        "mot-maintenance-workbench-corner"
-      ],
-      "portals": [
-        {
-          "id": "west_to_airlock_01",
+          "to_room": "corridor_05",
           "wall": "west",
-          "offset_cells": 1,
+          "yaw_degrees": 90.0
+        },
+        {
+          "from_cell": [
+            0,
+            1
+          ],
+          "id": "south_airlock_01_to_corridor_04",
           "module_id": "bulkhead_portal_2x1",
           "position": [
-            6.0,
+            0.0,
             0.0,
             2.0
           ],
-          "yaw_degrees": 90.0,
-          "replaced_wall_name": "wall_west_x3_z1",
-          "span_cells": 2
-        }
-      ]
-    },
-    {
-      "id": "corridor_02",
-      "room_role": "corridor",
-      "origin": [
-        70.0,
-        4.0,
-        10.0
-      ],
-      "wall_segments": [
-        {
-          "room_id": "corridor_02",
-          "side": "east",
-          "origin": [
-            4,
-            1,
-            1
+          "to_cell": [
+            0,
+            2
           ],
-          "span": 3,
-          "edge": {
-            "cell": [
-              4,
-              1,
-              1
-            ],
-            "side": "east"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "south",
-          "origin": [
-            4,
-            1,
-            1
-          ],
-          "span": 1,
-          "edge": {
-            "cell": [
-              4,
-              1,
-              1
-            ],
-            "side": "south"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "west",
-          "origin": [
-            4,
-            1,
-            1
-          ],
-          "span": 4,
-          "edge": {
-            "cell": [
-              4,
-              1,
-              1
-            ],
-            "side": "west"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "north",
-          "origin": [
-            4,
-            4,
-            1
-          ],
-          "span": 4,
-          "edge": {
-            "cell": [
-              4,
-              4,
-              1
-            ],
-            "side": "north"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "south",
-          "origin": [
-            5,
-            4,
-            1
-          ],
-          "span": 9,
-          "edge": {
-            "cell": [
-              5,
-              4,
-              1
-            ],
-            "side": "south"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "east",
-          "origin": [
-            8,
-            5,
-            1
-          ],
-          "span": 2,
-          "edge": {
-            "cell": [
-              8,
-              5,
-              1
-            ],
-            "side": "east"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "west",
-          "origin": [
-            8,
-            5,
-            1
-          ],
-          "span": 2,
-          "edge": {
-            "cell": [
-              8,
-              5,
-              1
-            ],
-            "side": "west"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "north",
-          "origin": [
-            9,
-            4,
-            1
-          ],
-          "span": 11,
-          "edge": {
-            "cell": [
-              9,
-              4,
-              1
-            ],
-            "side": "north"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "east",
-          "origin": [
-            14,
-            1,
-            1
-          ],
-          "span": 3,
-          "edge": {
-            "cell": [
-              14,
-              1,
-              1
-            ],
-            "side": "east"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "west",
-          "origin": [
-            14,
-            1,
-            1
-          ],
-          "span": 3,
-          "edge": {
-            "cell": [
-              14,
-              1,
-              1
-            ],
-            "side": "west"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "south",
-          "origin": [
-            15,
-            4,
-            1
-          ],
-          "span": 12,
-          "edge": {
-            "cell": [
-              15,
-              4,
-              1
-            ],
-            "side": "south"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "east",
-          "origin": [
-            20,
-            5,
-            1
-          ],
-          "span": 2,
-          "edge": {
-            "cell": [
-              20,
-              5,
-              1
-            ],
-            "side": "east"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "west",
-          "origin": [
-            20,
-            5,
-            1
-          ],
-          "span": 2,
-          "edge": {
-            "cell": [
-              20,
-              5,
-              1
-            ],
-            "side": "west"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "north",
-          "origin": [
-            21,
-            4,
-            1
-          ],
-          "span": 12,
-          "edge": {
-            "cell": [
-              21,
-              4,
-              1
-            ],
-            "side": "north"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "east",
-          "origin": [
-            27,
-            1,
-            1
-          ],
-          "span": 3,
-          "edge": {
-            "cell": [
-              27,
-              1,
-              1
-            ],
-            "side": "east"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "west",
-          "origin": [
-            27,
-            1,
-            1
-          ],
-          "span": 3,
-          "edge": {
-            "cell": [
-              27,
-              1,
-              1
-            ],
-            "side": "west"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "south",
-          "origin": [
-            28,
-            4,
-            1
-          ],
-          "span": 7,
-          "edge": {
-            "cell": [
-              28,
-              4,
-              1
-            ],
-            "side": "south"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "east",
-          "origin": [
-            33,
-            5,
-            1
-          ],
-          "span": 2,
-          "edge": {
-            "cell": [
-              33,
-              5,
-              1
-            ],
-            "side": "east"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "west",
-          "origin": [
-            33,
-            5,
-            1
-          ],
-          "span": 2,
-          "edge": {
-            "cell": [
-              33,
-              5,
-              1
-            ],
-            "side": "west"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "east",
-          "origin": [
-            34,
-            4,
-            1
-          ],
-          "span": 1,
-          "edge": {
-            "cell": [
-              34,
-              4,
-              1
-            ],
-            "side": "east"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "corridor_02",
-          "side": "north",
-          "origin": [
-            34,
-            4,
-            1
-          ],
-          "span": 1,
-          "edge": {
-            "cell": [
-              34,
-              4,
-              1
-            ],
-            "side": "north"
-          },
-          "module_id": "wall_straight"
-        }
-      ],
-      "structural_placements": [
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x4_z1",
-          "position": [
-            12.0,
-            4.0,
-            0.0
-          ],
+          "to_room": "corridor_04",
+          "wall": "south",
           "yaw_degrees": 0.0
         },
         {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x4_z2",
-          "position": [
-            12.0,
-            4.0,
-            4.0
+          "from_cell": [
+            2,
+            0
           ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x4_z3",
-          "position": [
-            12.0,
-            4.0,
-            8.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x4_z4",
-          "position": [
-            12.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x5_z4",
-          "position": [
-            16.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x6_z4",
-          "position": [
-            20.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x7_z4",
-          "position": [
-            24.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x8_z4",
-          "position": [
-            28.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x8_z5",
-          "position": [
-            28.0,
-            4.0,
-            16.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x8_z6",
-          "position": [
-            28.0,
-            4.0,
-            20.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x9_z4",
-          "position": [
-            32.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x10_z4",
-          "position": [
-            36.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x11_z4",
-          "position": [
-            40.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x12_z4",
-          "position": [
-            44.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x13_z4",
-          "position": [
-            48.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x14_z1",
-          "position": [
-            52.0,
-            4.0,
-            0.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x14_z2",
-          "position": [
-            52.0,
-            4.0,
-            4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x14_z3",
-          "position": [
-            52.0,
-            4.0,
-            8.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x14_z4",
-          "position": [
-            52.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x15_z4",
-          "position": [
-            56.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x16_z4",
-          "position": [
-            60.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x17_z4",
-          "position": [
-            64.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x18_z4",
-          "position": [
-            68.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x19_z4",
-          "position": [
-            72.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x20_z4",
-          "position": [
-            76.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x20_z5",
-          "position": [
-            76.0,
-            4.0,
-            16.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x20_z6",
-          "position": [
-            76.0,
-            4.0,
-            20.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x21_z4",
-          "position": [
-            80.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x22_z4",
-          "position": [
-            84.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x23_z4",
-          "position": [
-            88.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x24_z4",
-          "position": [
-            92.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x25_z4",
-          "position": [
-            96.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x26_z4",
-          "position": [
-            100.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x27_z1",
-          "position": [
-            104.0,
-            4.0,
-            0.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x27_z2",
-          "position": [
-            104.0,
-            4.0,
-            4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x27_z3",
-          "position": [
-            104.0,
-            4.0,
-            8.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x27_z4",
-          "position": [
-            104.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x28_z4",
-          "position": [
-            108.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x29_z4",
-          "position": [
-            112.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x30_z4",
-          "position": [
-            116.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x31_z4",
-          "position": [
-            120.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x32_z4",
-          "position": [
-            124.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x33_z4",
-          "position": [
-            128.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x33_z5",
-          "position": [
-            128.0,
-            4.0,
-            16.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x33_z6",
-          "position": [
-            128.0,
-            4.0,
-            20.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x34_z4",
-          "position": [
-            132.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x4_z1",
-          "position": [
-            12.0,
-            4.0,
-            -2.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x4_z1",
-          "position": [
-            14.0,
-            4.0,
-            0.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x4_z2",
-          "position": [
-            14.0,
-            4.0,
-            4.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x4_z3",
-          "position": [
-            14.0,
-            4.0,
-            8.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x4_z1",
+          "id": "east_airlock_01_to_corridor_01",
+          "module_id": "bulkhead_portal_2x1",
           "position": [
             10.0,
-            4.0,
+            0.0,
             0.0
           ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x4_z2",
-          "position": [
-            10.0,
-            4.0,
-            4.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x4_z3",
-          "position": [
-            10.0,
-            4.0,
-            8.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x4_z4",
-          "position": [
-            10.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x4_z4",
-          "position": [
-            12.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x5_z4",
-          "position": [
-            16.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x6_z4",
-          "position": [
-            20.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x7_z4",
-          "position": [
-            24.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x5_z4",
-          "position": [
-            16.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x6_z4",
-          "position": [
-            20.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x7_z4",
-          "position": [
-            24.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x8_z4",
-          "position": [
-            28.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x9_z4",
-          "position": [
-            32.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x10_z4",
-          "position": [
-            36.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x11_z4",
-          "position": [
-            40.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x12_z4",
-          "position": [
-            44.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x13_z4",
-          "position": [
-            48.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x8_z5",
-          "position": [
-            30.0,
-            4.0,
-            16.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x8_z6",
-          "position": [
-            30.0,
-            4.0,
-            20.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x8_z5",
-          "position": [
-            26.0,
-            4.0,
-            16.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x8_z6",
-          "position": [
-            26.0,
-            4.0,
-            20.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x9_z4",
-          "position": [
-            32.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x10_z4",
-          "position": [
-            36.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x11_z4",
-          "position": [
-            40.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x12_z4",
-          "position": [
-            44.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x13_z4",
-          "position": [
-            48.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x14_z4",
-          "position": [
-            52.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x15_z4",
-          "position": [
-            56.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x16_z4",
-          "position": [
-            60.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x17_z4",
-          "position": [
-            64.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x18_z4",
-          "position": [
-            68.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x19_z4",
-          "position": [
-            72.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x14_z1",
-          "position": [
-            54.0,
-            4.0,
-            0.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x14_z2",
-          "position": [
-            54.0,
-            4.0,
-            4.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x14_z3",
-          "position": [
-            54.0,
-            4.0,
-            8.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x14_z1",
-          "position": [
-            50.0,
-            4.0,
-            0.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x14_z2",
-          "position": [
-            50.0,
-            4.0,
-            4.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x14_z3",
-          "position": [
-            50.0,
-            4.0,
-            8.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x15_z4",
-          "position": [
-            56.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x16_z4",
-          "position": [
-            60.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x17_z4",
-          "position": [
-            64.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x18_z4",
-          "position": [
-            68.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x19_z4",
-          "position": [
-            72.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x20_z4",
-          "position": [
-            76.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x21_z4",
-          "position": [
-            80.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x22_z4",
-          "position": [
-            84.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x23_z4",
-          "position": [
-            88.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x24_z4",
-          "position": [
-            92.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x25_z4",
-          "position": [
-            96.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x26_z4",
-          "position": [
-            100.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x20_z5",
-          "position": [
-            78.0,
-            4.0,
-            16.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x20_z6",
-          "position": [
-            78.0,
-            4.0,
-            20.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x20_z5",
-          "position": [
-            74.0,
-            4.0,
-            16.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x20_z6",
-          "position": [
-            74.0,
-            4.0,
-            20.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x21_z4",
-          "position": [
-            80.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x22_z4",
-          "position": [
-            84.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x23_z4",
-          "position": [
-            88.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x24_z4",
-          "position": [
-            92.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x25_z4",
-          "position": [
-            96.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x26_z4",
-          "position": [
-            100.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x27_z4",
-          "position": [
-            104.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x28_z4",
-          "position": [
-            108.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x29_z4",
-          "position": [
-            112.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x30_z4",
-          "position": [
-            116.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x31_z4",
-          "position": [
-            120.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x32_z4",
-          "position": [
-            124.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x27_z1",
-          "position": [
-            106.0,
-            4.0,
-            0.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x27_z2",
-          "position": [
-            106.0,
-            4.0,
-            4.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x27_z3",
-          "position": [
-            106.0,
-            4.0,
-            8.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x27_z1",
-          "position": [
-            102.0,
-            4.0,
-            0.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x27_z2",
-          "position": [
-            102.0,
-            4.0,
-            4.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x27_z3",
-          "position": [
-            102.0,
-            4.0,
-            8.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x28_z4",
-          "position": [
-            108.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x29_z4",
-          "position": [
-            112.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x30_z4",
-          "position": [
-            116.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x31_z4",
-          "position": [
-            120.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x32_z4",
-          "position": [
-            124.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x33_z4",
-          "position": [
-            128.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x34_z4",
-          "position": [
-            132.0,
-            4.0,
-            10.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x33_z5",
-          "position": [
-            130.0,
-            4.0,
-            16.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x33_z6",
-          "position": [
-            130.0,
-            4.0,
-            20.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x33_z5",
-          "position": [
-            126.0,
-            4.0,
-            16.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x33_z6",
-          "position": [
-            126.0,
-            4.0,
-            20.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x34_z4",
-          "position": [
-            134.0,
-            4.0,
-            12.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x34_z4",
-          "position": [
-            132.0,
-            4.0,
-            14.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "bulkhead_portal_2x1",
-          "name": "door_north_to_cargo_01",
-          "position": [
-            78.0,
-            4.0,
-            22.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "bulkhead_portal_2x1",
-          "name": "door_north_to_galley_01",
-          "position": [
-            130.0,
-            4.0,
-            22.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "bulkhead_portal_2x1",
-          "name": "door_north_to_reactor_01",
-          "position": [
-            30.0,
-            4.0,
-            22.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "bulkhead_portal_2x1",
-          "name": "door_south_to_bridge_01",
-          "position": [
-            106.0,
-            4.0,
-            -2.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "bulkhead_portal_2x1",
-          "name": "door_south_to_maintenance_01",
-          "position": [
-            54.0,
-            4.0,
-            -2.0
-          ],
-          "yaw_degrees": 0.0
-        }
-      ],
-      "motif_requests": [
-        "mot-maintenance-workbench-corner"
-      ],
-      "portals": [
-        {
-          "id": "north_to_reactor_01",
-          "wall": "north",
-          "offset_cells": 5,
-          "module_id": "bulkhead_portal_2x1",
-          "position": [
-            30.0,
-            4.0,
-            22.0
-          ],
-          "yaw_degrees": 180.0,
-          "replaced_wall_name": "wall_north_x8_z6",
-          "span_cells": 2
-        },
-        {
-          "id": "south_to_maintenance_01",
-          "wall": "south",
-          "offset_cells": 11,
-          "module_id": "bulkhead_portal_2x1",
-          "position": [
-            54.0,
-            4.0,
-            -2.0
-          ],
-          "yaw_degrees": 0.0,
-          "replaced_wall_name": "wall_south_x14_z1",
-          "span_cells": 2
-        },
-        {
-          "id": "north_to_cargo_01",
-          "wall": "north",
-          "offset_cells": 17,
-          "module_id": "bulkhead_portal_2x1",
-          "position": [
-            78.0,
-            4.0,
-            22.0
-          ],
-          "yaw_degrees": 180.0,
-          "replaced_wall_name": "wall_north_x20_z6",
-          "span_cells": 2
-        },
-        {
-          "id": "south_to_bridge_01",
-          "wall": "south",
-          "offset_cells": 24,
-          "module_id": "bulkhead_portal_2x1",
-          "position": [
-            106.0,
-            4.0,
-            -2.0
-          ],
-          "yaw_degrees": 0.0,
-          "replaced_wall_name": "wall_south_x27_z1",
-          "span_cells": 2
-        },
-        {
-          "id": "north_to_galley_01",
-          "wall": "north",
-          "offset_cells": 30,
-          "module_id": "bulkhead_portal_2x1",
-          "position": [
-            130.0,
-            4.0,
-            22.0
-          ],
-          "yaw_degrees": 180.0,
-          "replaced_wall_name": "wall_north_x33_z6",
-          "span_cells": 2
-        }
-      ]
-    },
-    {
-      "id": "reactor_01",
-      "room_role": "reactor",
-      "origin": [
-        28.0,
-        4.0,
-        30.0
-      ],
-      "wall_segments": [
-        {
-          "room_id": "reactor_01",
-          "side": "south",
-          "origin": [
-            6,
-            7,
-            1
-          ],
-          "span": 2,
-          "edge": {
-            "cell": [
-              6,
-              7,
-              1
-            ],
-            "side": "south"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "reactor_01",
-          "side": "west",
-          "origin": [
-            6,
-            7,
-            1
-          ],
-          "span": 4,
-          "edge": {
-            "cell": [
-              6,
-              7,
-              1
-            ],
-            "side": "west"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "reactor_01",
-          "side": "north",
-          "origin": [
-            6,
-            10,
-            1
-          ],
-          "span": 5,
-          "edge": {
-            "cell": [
-              6,
-              10,
-              1
-            ],
-            "side": "north"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "reactor_01",
-          "side": "east",
-          "origin": [
-            10,
-            7,
-            1
-          ],
-          "span": 4,
-          "edge": {
-            "cell": [
-              10,
-              7,
-              1
-            ],
-            "side": "east"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "reactor_01",
-          "side": "south",
-          "origin": [
-            10,
-            7,
-            1
-          ],
-          "span": 1,
-          "edge": {
-            "cell": [
-              10,
-              7,
-              1
-            ],
-            "side": "south"
-          },
-          "module_id": "wall_straight"
-        }
-      ],
-      "structural_placements": [
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x6_z7",
-          "position": [
-            20.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x6_z8",
-          "position": [
-            20.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x6_z9",
-          "position": [
-            20.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x6_z10",
-          "position": [
-            20.0,
-            4.0,
-            36.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x7_z7",
-          "position": [
-            24.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x7_z8",
-          "position": [
-            24.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x7_z9",
-          "position": [
-            24.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x7_z10",
-          "position": [
-            24.0,
-            4.0,
-            36.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x8_z7",
-          "position": [
-            28.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x8_z8",
-          "position": [
-            28.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x8_z9",
-          "position": [
-            28.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x8_z10",
-          "position": [
-            28.0,
-            4.0,
-            36.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x9_z7",
-          "position": [
-            32.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x9_z8",
-          "position": [
-            32.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x9_z9",
-          "position": [
-            32.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x9_z10",
-          "position": [
-            32.0,
-            4.0,
-            36.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x10_z7",
-          "position": [
-            36.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x10_z8",
-          "position": [
-            36.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x10_z9",
-          "position": [
-            36.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x10_z10",
-          "position": [
-            36.0,
-            4.0,
-            36.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x6_z7",
-          "position": [
-            20.0,
-            4.0,
-            22.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x7_z7",
-          "position": [
-            24.0,
-            4.0,
-            22.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x6_z7",
-          "position": [
-            18.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x6_z8",
-          "position": [
-            18.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x6_z9",
-          "position": [
-            18.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x6_z10",
-          "position": [
-            18.0,
-            4.0,
-            36.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x6_z10",
-          "position": [
-            20.0,
-            4.0,
-            38.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x7_z10",
-          "position": [
-            24.0,
-            4.0,
-            38.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x8_z10",
-          "position": [
-            28.0,
-            4.0,
-            38.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x9_z10",
-          "position": [
-            32.0,
-            4.0,
-            38.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x10_z10",
-          "position": [
-            36.0,
-            4.0,
-            38.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x10_z7",
-          "position": [
-            36.0,
-            4.0,
-            22.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x10_z7",
-          "position": [
-            38.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x10_z8",
-          "position": [
-            38.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x10_z9",
-          "position": [
-            38.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x10_z10",
-          "position": [
-            38.0,
-            4.0,
-            36.0
-          ],
-          "yaw_degrees": 270.0
-        }
-      ],
-      "motif_requests": [
-        "mot-reactor-control-core"
-      ],
-      "portals": [
-        {
-          "id": "south_to_corridor_02",
-          "wall": "south",
-          "offset_cells": 2,
-          "module_id": "bulkhead_portal_2x1",
-          "position": [
-            30.0,
-            4.0,
-            22.0
-          ],
-          "yaw_degrees": 0.0,
-          "replaced_wall_name": "wall_south_x8_z7",
-          "span_cells": 2
-        }
-      ],
-      "interior_zones": {
-        "reserved_cells": [
-          [
-            8,
-            7,
-            1
-          ],
-          [
-            8,
-            8,
-            1
-          ],
-          [
-            8,
-            9,
-            1
-          ],
-          [
-            9,
-            7,
-            1
-          ],
-          [
-            9,
-            8,
-            1
-          ]
-        ],
-        "door_approach_cells": [
-          [
-            8,
-            7,
-            1
-          ],
-          [
-            8,
-            8,
-            1
-          ],
-          [
-            9,
-            7,
-            1
-          ],
-          [
-            9,
-            8,
-            1
-          ]
-        ],
-        "vertical_access_cells": [],
-        "route_cells": [
-          [
-            8,
-            7,
-            1
-          ],
-          [
-            8,
-            8,
-            1
-          ],
-          [
-            8,
-            9,
-            1
-          ],
-          [
-            9,
-            7,
-            1
-          ],
-          [
-            9,
-            8,
-            1
-          ]
-        ],
-        "wall_slots": [
-          {
-            "id": "reactor_01_wall_south_x6_z7_d1",
-            "room_id": "reactor_01",
-            "cell": [
-              6,
-              7,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "reactor_01_wall_west_x6_z8_d1",
-            "room_id": "reactor_01",
-            "cell": [
-              6,
-              8,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 90.0,
-            "wall": "west"
-          },
-          {
-            "id": "reactor_01_wall_west_x6_z9_d1",
-            "room_id": "reactor_01",
-            "cell": [
-              6,
-              9,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 90.0,
-            "wall": "west"
-          },
-          {
-            "id": "reactor_01_wall_north_x6_z10_d1",
-            "room_id": "reactor_01",
-            "cell": [
-              6,
-              10,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          },
-          {
-            "id": "reactor_01_wall_south_x7_z7_d1",
-            "room_id": "reactor_01",
-            "cell": [
-              7,
-              7,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "reactor_01_wall_north_x7_z10_d1",
-            "room_id": "reactor_01",
-            "cell": [
-              7,
-              10,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          },
-          {
-            "id": "reactor_01_wall_north_x8_z10_d1",
-            "room_id": "reactor_01",
-            "cell": [
-              8,
-              10,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          },
-          {
-            "id": "reactor_01_wall_north_x9_z10_d1",
-            "room_id": "reactor_01",
-            "cell": [
-              9,
-              10,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          },
-          {
-            "id": "reactor_01_wall_south_x10_z7_d1",
-            "room_id": "reactor_01",
-            "cell": [
-              10,
-              7,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "reactor_01_wall_east_x10_z8_d1",
-            "room_id": "reactor_01",
-            "cell": [
-              10,
-              8,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 270.0,
-            "wall": "east"
-          },
-          {
-            "id": "reactor_01_wall_east_x10_z9_d1",
-            "room_id": "reactor_01",
-            "cell": [
-              10,
-              9,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 270.0,
-            "wall": "east"
-          },
-          {
-            "id": "reactor_01_wall_north_x10_z10_d1",
-            "room_id": "reactor_01",
-            "cell": [
-              10,
-              10,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          }
-        ],
-        "center_slots": [
-          {
-            "id": "reactor_01_center_x7_z8_d1",
-            "room_id": "reactor_01",
-            "cell": [
-              7,
-              8,
-              1
-            ],
-            "placement": "on_floor",
-            "yaw_degrees": 0.0
-          },
-          {
-            "id": "reactor_01_center_x7_z9_d1",
-            "room_id": "reactor_01",
-            "cell": [
-              7,
-              9,
-              1
-            ],
-            "placement": "on_floor",
-            "yaw_degrees": 0.0
-          },
-          {
-            "id": "reactor_01_center_x9_z9_d1",
-            "room_id": "reactor_01",
-            "cell": [
-              9,
-              9,
-              1
-            ],
-            "placement": "on_floor",
-            "yaw_degrees": 0.0
-          }
-        ]
-      },
-      "interior_placements": [
-        {
-          "id": "reactor_01_reactor_core",
-          "room_id": "reactor_01",
-          "room_role": "reactor",
-          "semantic": "reactor_core",
-          "category": "gameplay-prop",
-          "placement": "on_floor",
-          "cell": [
-            7,
-            8,
-            1
-          ],
-          "footprint_cells": [
-            1,
-            1
-          ],
-          "position": [
-            24.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 0.0,
-          "nav_blocker": true,
-          "interactable": true,
-          "debug_color": "#e07040",
-          "source_slot_id": "reactor_01_center_x7_z8_d1"
-        },
-        {
-          "id": "reactor_01_reactor_control_panel",
-          "room_id": "reactor_01",
-          "room_role": "reactor",
-          "semantic": "reactor_control_panel",
-          "category": "gameplay-prop",
-          "placement": "against_wall",
-          "cell": [
-            10,
-            10,
-            1
-          ],
-          "footprint_cells": [
-            1,
-            1
-          ],
-          "position": [
-            36.0,
-            4.0,
-            36.0
-          ],
-          "yaw_degrees": 180.0,
-          "nav_blocker": true,
-          "interactable": true,
-          "debug_color": "#ffcc66",
-          "source_slot_id": "reactor_01_wall_north_x10_z10_d1"
-        }
-      ]
-    },
-    {
-      "id": "maintenance_01",
-      "room_role": "maintenance",
-      "origin": [
-        54.0,
-        4.0,
-        -8.0
-      ],
-      "wall_segments": [
-        {
-          "room_id": "maintenance_01",
-          "side": "south",
-          "origin": [
-            13,
-            -2,
-            1
-          ],
-          "span": 4,
-          "edge": {
-            "cell": [
-              13,
-              -2,
-              1
-            ],
-            "side": "south"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "maintenance_01",
-          "side": "west",
-          "origin": [
-            13,
-            -2,
-            1
-          ],
-          "span": 3,
-          "edge": {
-            "cell": [
-              13,
-              -2,
-              1
-            ],
-            "side": "west"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "maintenance_01",
-          "side": "north",
-          "origin": [
-            13,
-            0,
-            1
-          ],
-          "span": 1,
-          "edge": {
-            "cell": [
-              13,
-              0,
-              1
-            ],
-            "side": "north"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "maintenance_01",
-          "side": "east",
-          "origin": [
-            16,
-            -2,
-            1
-          ],
-          "span": 3,
-          "edge": {
-            "cell": [
-              16,
-              -2,
-              1
-            ],
-            "side": "east"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "maintenance_01",
-          "side": "north",
-          "origin": [
-            16,
-            0,
-            1
-          ],
-          "span": 1,
-          "edge": {
-            "cell": [
-              16,
-              0,
-              1
-            ],
-            "side": "north"
-          },
-          "module_id": "wall_straight"
-        }
-      ],
-      "structural_placements": [
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x13_z-2",
-          "position": [
-            48.0,
-            4.0,
-            -12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x13_z-1",
-          "position": [
-            48.0,
-            4.0,
-            -8.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x13_z0",
-          "position": [
-            48.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x14_z-2",
-          "position": [
-            52.0,
-            4.0,
-            -12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x14_z-1",
-          "position": [
-            52.0,
-            4.0,
-            -8.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x14_z0",
-          "position": [
-            52.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x15_z-2",
-          "position": [
-            56.0,
-            4.0,
-            -12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x15_z-1",
-          "position": [
-            56.0,
-            4.0,
-            -8.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x15_z0",
-          "position": [
-            56.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x16_z-2",
-          "position": [
-            60.0,
-            4.0,
-            -12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x16_z-1",
-          "position": [
-            60.0,
-            4.0,
-            -8.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x16_z0",
-          "position": [
-            60.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x13_z-2",
-          "position": [
-            48.0,
-            4.0,
-            -14.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x14_z-2",
-          "position": [
-            52.0,
-            4.0,
-            -14.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x15_z-2",
-          "position": [
-            56.0,
-            4.0,
-            -14.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x16_z-2",
-          "position": [
-            60.0,
-            4.0,
-            -14.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x13_z-2",
-          "position": [
-            46.0,
-            4.0,
-            -12.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x13_z-1",
-          "position": [
-            46.0,
-            4.0,
-            -8.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x13_z0",
-          "position": [
-            46.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x13_z0",
-          "position": [
-            48.0,
-            4.0,
-            -2.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x16_z-2",
-          "position": [
-            62.0,
-            4.0,
-            -12.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x16_z-1",
-          "position": [
-            62.0,
-            4.0,
-            -8.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x16_z0",
-          "position": [
-            62.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x16_z0",
-          "position": [
-            60.0,
-            4.0,
-            -2.0
-          ],
-          "yaw_degrees": 180.0
-        }
-      ],
-      "motif_requests": [
-        "mot-maintenance-workbench-corner"
-      ],
-      "portals": [
-        {
-          "id": "north_to_corridor_02",
-          "wall": "north",
-          "offset_cells": 1,
-          "module_id": "bulkhead_portal_2x1",
-          "position": [
-            54.0,
-            4.0,
-            -2.0
-          ],
-          "yaw_degrees": 180.0,
-          "replaced_wall_name": "wall_north_x14_z0",
-          "span_cells": 2
-        }
-      ],
-      "interior_zones": {
-        "reserved_cells": [
-          [
-            14,
-            -1,
-            1
-          ],
-          [
-            14,
-            0,
-            1
-          ],
-          [
-            15,
-            -1,
-            1
-          ],
-          [
-            15,
-            0,
-            1
-          ]
-        ],
-        "door_approach_cells": [
-          [
-            14,
-            -1,
-            1
-          ],
-          [
-            14,
-            0,
-            1
-          ],
-          [
-            15,
-            -1,
-            1
-          ],
-          [
-            15,
-            0,
-            1
-          ]
-        ],
-        "vertical_access_cells": [],
-        "route_cells": [
-          [
-            14,
-            -1,
-            1
-          ],
-          [
-            14,
-            0,
-            1
-          ],
-          [
-            15,
-            -1,
-            1
-          ],
-          [
-            15,
-            0,
-            1
-          ]
-        ],
-        "wall_slots": [
-          {
-            "id": "maintenance_01_wall_south_x13_z-2_d1",
-            "room_id": "maintenance_01",
-            "cell": [
-              13,
-              -2,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "maintenance_01_wall_west_x13_z-1_d1",
-            "room_id": "maintenance_01",
-            "cell": [
-              13,
-              -1,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 90.0,
-            "wall": "west"
-          },
-          {
-            "id": "maintenance_01_wall_north_x13_z0_d1",
-            "room_id": "maintenance_01",
-            "cell": [
-              13,
-              0,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          },
-          {
-            "id": "maintenance_01_wall_south_x14_z-2_d1",
-            "room_id": "maintenance_01",
-            "cell": [
-              14,
-              -2,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "maintenance_01_wall_south_x15_z-2_d1",
-            "room_id": "maintenance_01",
-            "cell": [
-              15,
-              -2,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "maintenance_01_wall_south_x16_z-2_d1",
-            "room_id": "maintenance_01",
-            "cell": [
-              16,
-              -2,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "maintenance_01_wall_east_x16_z-1_d1",
-            "room_id": "maintenance_01",
-            "cell": [
-              16,
-              -1,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 270.0,
-            "wall": "east"
-          },
-          {
-            "id": "maintenance_01_wall_north_x16_z0_d1",
-            "room_id": "maintenance_01",
-            "cell": [
-              16,
-              0,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          }
-        ],
-        "center_slots": []
-      },
-      "interior_placements": [
-        {
-          "id": "maintenance_01_maintenance_workbench",
-          "room_id": "maintenance_01",
-          "room_role": "maintenance",
-          "semantic": "maintenance_workbench",
-          "category": "gameplay-prop",
-          "placement": "against_wall",
-          "cell": [
-            16,
-            0,
-            1
-          ],
-          "footprint_cells": [
-            1,
-            1
-          ],
-          "position": [
-            60.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 180.0,
-          "nav_blocker": true,
-          "interactable": true,
-          "debug_color": "#5f7f9f",
-          "source_slot_id": "maintenance_01_wall_north_x16_z0_d1"
-        },
-        {
-          "id": "maintenance_01_tool_locker",
-          "room_id": "maintenance_01",
-          "room_role": "maintenance",
-          "semantic": "tool_locker",
-          "category": "gameplay-prop",
-          "placement": "against_wall",
-          "cell": [
-            13,
-            0,
-            1
-          ],
-          "footprint_cells": [
-            1,
-            1
-          ],
-          "position": [
-            48.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 180.0,
-          "nav_blocker": true,
-          "interactable": true,
-          "debug_color": "#7f7f7f",
-          "source_slot_id": "maintenance_01_wall_north_x13_z0_d1"
-        }
-      ]
-    },
-    {
-      "id": "cargo_01",
-      "room_role": "cargo",
-      "origin": [
-        78.0,
-        4.0,
-        30.0
-      ],
-      "wall_segments": [
-        {
-          "room_id": "cargo_01",
-          "side": "south",
-          "origin": [
-            19,
-            7,
-            1
-          ],
-          "span": 1,
-          "edge": {
-            "cell": [
-              19,
-              7,
-              1
-            ],
-            "side": "south"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "cargo_01",
-          "side": "west",
-          "origin": [
-            19,
-            7,
-            1
-          ],
-          "span": 4,
-          "edge": {
-            "cell": [
-              19,
-              7,
-              1
-            ],
-            "side": "west"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "cargo_01",
-          "side": "north",
-          "origin": [
-            19,
-            10,
-            1
-          ],
-          "span": 4,
-          "edge": {
-            "cell": [
-              19,
-              10,
-              1
-            ],
-            "side": "north"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "cargo_01",
-          "side": "east",
-          "origin": [
-            22,
-            7,
-            1
-          ],
-          "span": 4,
-          "edge": {
-            "cell": [
-              22,
-              7,
-              1
-            ],
-            "side": "east"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "cargo_01",
-          "side": "south",
-          "origin": [
-            22,
-            7,
-            1
-          ],
-          "span": 1,
-          "edge": {
-            "cell": [
-              22,
-              7,
-              1
-            ],
-            "side": "south"
-          },
-          "module_id": "wall_straight"
-        }
-      ],
-      "structural_placements": [
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x19_z7",
-          "position": [
-            72.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x19_z8",
-          "position": [
-            72.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x19_z9",
-          "position": [
-            72.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x19_z10",
-          "position": [
-            72.0,
-            4.0,
-            36.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x20_z7",
-          "position": [
-            76.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x20_z8",
-          "position": [
-            76.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x20_z9",
-          "position": [
-            76.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x20_z10",
-          "position": [
-            76.0,
-            4.0,
-            36.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x21_z7",
-          "position": [
-            80.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x21_z8",
-          "position": [
-            80.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x21_z9",
-          "position": [
-            80.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x21_z10",
-          "position": [
-            80.0,
-            4.0,
-            36.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x22_z7",
-          "position": [
-            84.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x22_z8",
-          "position": [
-            84.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x22_z9",
-          "position": [
-            84.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x22_z10",
-          "position": [
-            84.0,
-            4.0,
-            36.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x19_z7",
-          "position": [
-            72.0,
-            4.0,
-            22.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x19_z7",
-          "position": [
-            70.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x19_z8",
-          "position": [
-            70.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x19_z9",
-          "position": [
-            70.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x19_z10",
-          "position": [
-            70.0,
-            4.0,
-            36.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x19_z10",
-          "position": [
-            72.0,
-            4.0,
-            38.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x20_z10",
-          "position": [
-            76.0,
-            4.0,
-            38.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x21_z10",
-          "position": [
-            80.0,
-            4.0,
-            38.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x22_z10",
-          "position": [
-            84.0,
-            4.0,
-            38.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x22_z7",
-          "position": [
-            84.0,
-            4.0,
-            22.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x22_z7",
-          "position": [
-            86.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x22_z8",
-          "position": [
-            86.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x22_z9",
-          "position": [
-            86.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x22_z10",
-          "position": [
-            86.0,
-            4.0,
-            36.0
-          ],
-          "yaw_degrees": 270.0
-        }
-      ],
-      "motif_requests": [
-        "mot-cargo-crate-cluster"
-      ],
-      "portals": [
-        {
-          "id": "south_to_corridor_02",
-          "wall": "south",
-          "offset_cells": 1,
-          "module_id": "bulkhead_portal_2x1",
-          "position": [
-            78.0,
-            4.0,
-            22.0
-          ],
-          "yaw_degrees": 0.0,
-          "replaced_wall_name": "wall_south_x20_z7",
-          "span_cells": 2
-        }
-      ],
-      "interior_zones": {
-        "reserved_cells": [
-          [
-            20,
-            7,
-            1
-          ],
-          [
-            20,
-            8,
-            1
-          ],
-          [
-            21,
-            7,
-            1
-          ],
-          [
-            21,
-            8,
-            1
-          ],
-          [
-            21,
-            9,
-            1
-          ]
-        ],
-        "door_approach_cells": [
-          [
-            20,
-            7,
-            1
-          ],
-          [
-            20,
-            8,
-            1
-          ],
-          [
-            21,
-            7,
-            1
-          ],
-          [
-            21,
-            8,
-            1
-          ]
-        ],
-        "vertical_access_cells": [],
-        "route_cells": [
-          [
-            20,
-            7,
-            1
-          ],
-          [
-            20,
-            8,
-            1
-          ],
-          [
-            21,
-            7,
-            1
-          ],
-          [
-            21,
-            8,
-            1
-          ],
-          [
-            21,
-            9,
-            1
-          ]
-        ],
-        "wall_slots": [
-          {
-            "id": "cargo_01_wall_south_x19_z7_d1",
-            "room_id": "cargo_01",
-            "cell": [
-              19,
-              7,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "cargo_01_wall_west_x19_z8_d1",
-            "room_id": "cargo_01",
-            "cell": [
-              19,
-              8,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 90.0,
-            "wall": "west"
-          },
-          {
-            "id": "cargo_01_wall_west_x19_z9_d1",
-            "room_id": "cargo_01",
-            "cell": [
-              19,
-              9,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 90.0,
-            "wall": "west"
-          },
-          {
-            "id": "cargo_01_wall_north_x19_z10_d1",
-            "room_id": "cargo_01",
-            "cell": [
-              19,
-              10,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          },
-          {
-            "id": "cargo_01_wall_north_x20_z10_d1",
-            "room_id": "cargo_01",
-            "cell": [
-              20,
-              10,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          },
-          {
-            "id": "cargo_01_wall_north_x21_z10_d1",
-            "room_id": "cargo_01",
-            "cell": [
-              21,
-              10,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          },
-          {
-            "id": "cargo_01_wall_south_x22_z7_d1",
-            "room_id": "cargo_01",
-            "cell": [
-              22,
-              7,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "cargo_01_wall_east_x22_z8_d1",
-            "room_id": "cargo_01",
-            "cell": [
-              22,
-              8,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 270.0,
-            "wall": "east"
-          },
-          {
-            "id": "cargo_01_wall_east_x22_z9_d1",
-            "room_id": "cargo_01",
-            "cell": [
-              22,
-              9,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 270.0,
-            "wall": "east"
-          },
-          {
-            "id": "cargo_01_wall_north_x22_z10_d1",
-            "room_id": "cargo_01",
-            "cell": [
-              22,
-              10,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          }
-        ],
-        "center_slots": [
-          {
-            "id": "cargo_01_center_x20_z9_d1",
-            "room_id": "cargo_01",
-            "cell": [
-              20,
-              9,
-              1
-            ],
-            "placement": "on_floor",
-            "yaw_degrees": 0.0
-          }
-        ]
-      },
-      "interior_placements": [
-        {
-          "id": "cargo_01_cargo_crate_cluster",
-          "room_id": "cargo_01",
-          "room_role": "cargo",
-          "semantic": "cargo_crate_cluster",
-          "category": "gameplay-prop",
-          "placement": "against_wall",
-          "cell": [
-            22,
-            7,
-            1
-          ],
-          "footprint_cells": [
-            1,
-            1
-          ],
-          "position": [
-            84.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 0.0,
-          "nav_blocker": true,
-          "interactable": true,
-          "debug_color": "#b88746",
-          "source_slot_id": "cargo_01_wall_south_x22_z7_d1"
-        },
-        {
-          "id": "cargo_01_loot_container",
-          "room_id": "cargo_01",
-          "room_role": "cargo",
-          "semantic": "loot_container",
-          "category": "gameplay-prop",
-          "placement": "against_wall",
-          "cell": [
-            20,
-            10,
-            1
-          ],
-          "footprint_cells": [
-            1,
-            1
-          ],
-          "position": [
-            76.0,
-            4.0,
-            36.0
-          ],
-          "yaw_degrees": 180.0,
-          "nav_blocker": true,
-          "interactable": true,
-          "debug_color": "#d4af37",
-          "source_slot_id": "cargo_01_wall_north_x20_z10_d1"
-        }
-      ]
-    },
-    {
-      "id": "bridge_01",
-      "room_role": "bridge",
-      "origin": [
-        104.0,
-        4.0,
-        -10.0
-      ],
-      "wall_segments": [
-        {
-          "room_id": "bridge_01",
-          "side": "south",
-          "origin": [
-            25,
-            -3,
-            1
-          ],
-          "span": 5,
-          "edge": {
-            "cell": [
-              25,
-              -3,
-              1
-            ],
-            "side": "south"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "bridge_01",
-          "side": "west",
-          "origin": [
-            25,
-            -3,
-            1
-          ],
-          "span": 4,
-          "edge": {
-            "cell": [
-              25,
-              -3,
-              1
-            ],
-            "side": "west"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "bridge_01",
-          "side": "north",
-          "origin": [
-            25,
-            0,
-            1
-          ],
-          "span": 2,
-          "edge": {
-            "cell": [
-              25,
-              0,
-              1
-            ],
-            "side": "north"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "bridge_01",
-          "side": "east",
-          "origin": [
-            29,
-            -3,
-            1
-          ],
-          "span": 4,
-          "edge": {
-            "cell": [
-              29,
-              -3,
-              1
-            ],
-            "side": "east"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "bridge_01",
-          "side": "north",
-          "origin": [
-            29,
-            0,
-            1
-          ],
-          "span": 1,
-          "edge": {
-            "cell": [
-              29,
-              0,
-              1
-            ],
-            "side": "north"
-          },
-          "module_id": "wall_straight"
-        }
-      ],
-      "structural_placements": [
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x25_z-3",
-          "position": [
-            96.0,
-            4.0,
-            -16.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x25_z-2",
-          "position": [
-            96.0,
-            4.0,
-            -12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x25_z-1",
-          "position": [
-            96.0,
-            4.0,
-            -8.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x25_z0",
-          "position": [
-            96.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x26_z-3",
-          "position": [
-            100.0,
-            4.0,
-            -16.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x26_z-2",
-          "position": [
-            100.0,
-            4.0,
-            -12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x26_z-1",
-          "position": [
-            100.0,
-            4.0,
-            -8.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x26_z0",
-          "position": [
-            100.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x27_z-3",
-          "position": [
-            104.0,
-            4.0,
-            -16.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x27_z-2",
-          "position": [
-            104.0,
-            4.0,
-            -12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x27_z-1",
-          "position": [
-            104.0,
-            4.0,
-            -8.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x27_z0",
-          "position": [
-            104.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x28_z-3",
-          "position": [
-            108.0,
-            4.0,
-            -16.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x28_z-2",
-          "position": [
-            108.0,
-            4.0,
-            -12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x28_z-1",
-          "position": [
-            108.0,
-            4.0,
-            -8.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x28_z0",
-          "position": [
-            108.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x29_z-3",
-          "position": [
-            112.0,
-            4.0,
-            -16.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x29_z-2",
-          "position": [
-            112.0,
-            4.0,
-            -12.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x29_z-1",
-          "position": [
-            112.0,
-            4.0,
-            -8.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x29_z0",
-          "position": [
-            112.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x25_z-3",
-          "position": [
-            96.0,
-            4.0,
-            -18.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x26_z-3",
-          "position": [
-            100.0,
-            4.0,
-            -18.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x27_z-3",
-          "position": [
-            104.0,
-            4.0,
-            -18.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x28_z-3",
-          "position": [
-            108.0,
-            4.0,
-            -18.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x29_z-3",
-          "position": [
-            112.0,
-            4.0,
-            -18.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x25_z-3",
-          "position": [
-            94.0,
-            4.0,
-            -16.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x25_z-2",
-          "position": [
-            94.0,
-            4.0,
-            -12.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x25_z-1",
-          "position": [
-            94.0,
-            4.0,
-            -8.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x25_z0",
-          "position": [
-            94.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x25_z0",
-          "position": [
-            96.0,
-            4.0,
-            -2.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x26_z0",
-          "position": [
-            100.0,
-            4.0,
-            -2.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x29_z-3",
-          "position": [
-            114.0,
-            4.0,
-            -16.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x29_z-2",
-          "position": [
-            114.0,
-            4.0,
-            -12.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x29_z-1",
-          "position": [
-            114.0,
-            4.0,
-            -8.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x29_z0",
-          "position": [
-            114.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x29_z0",
-          "position": [
-            112.0,
-            4.0,
-            -2.0
-          ],
-          "yaw_degrees": 180.0
-        }
-      ],
-      "motif_requests": [
-        "mot-bridge-command-console"
-      ],
-      "portals": [
-        {
-          "id": "north_to_corridor_02",
-          "wall": "north",
-          "offset_cells": 2,
-          "module_id": "bulkhead_portal_2x1",
-          "position": [
-            106.0,
-            4.0,
-            -2.0
-          ],
-          "yaw_degrees": 180.0,
-          "replaced_wall_name": "wall_north_x27_z0",
-          "span_cells": 2
-        }
-      ],
-      "interior_zones": {
-        "reserved_cells": [
-          [
-            27,
-            -1,
-            1
-          ],
-          [
-            27,
-            0,
-            1
-          ],
-          [
-            28,
-            -1,
-            1
-          ],
-          [
-            28,
-            0,
-            1
-          ]
-        ],
-        "door_approach_cells": [
-          [
-            27,
-            -1,
-            1
-          ],
-          [
-            27,
-            0,
-            1
-          ],
-          [
-            28,
-            -1,
-            1
-          ],
-          [
-            28,
-            0,
-            1
-          ]
-        ],
-        "vertical_access_cells": [],
-        "route_cells": [
-          [
-            27,
-            -1,
-            1
-          ],
-          [
-            27,
-            0,
-            1
-          ],
-          [
-            28,
-            -1,
-            1
-          ],
-          [
-            28,
-            0,
-            1
-          ]
-        ],
-        "wall_slots": [
-          {
-            "id": "bridge_01_wall_south_x25_z-3_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              25,
-              -3,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "bridge_01_wall_west_x25_z-2_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              25,
-              -2,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 90.0,
-            "wall": "west"
-          },
-          {
-            "id": "bridge_01_wall_west_x25_z-1_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              25,
-              -1,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 90.0,
-            "wall": "west"
-          },
-          {
-            "id": "bridge_01_wall_north_x25_z0_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              25,
-              0,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          },
-          {
-            "id": "bridge_01_wall_south_x26_z-3_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              26,
-              -3,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "bridge_01_wall_north_x26_z0_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              26,
-              0,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          },
-          {
-            "id": "bridge_01_wall_south_x27_z-3_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              27,
-              -3,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "bridge_01_wall_south_x28_z-3_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              28,
-              -3,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "bridge_01_wall_south_x29_z-3_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              29,
-              -3,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "bridge_01_wall_east_x29_z-2_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              29,
-              -2,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 270.0,
-            "wall": "east"
-          },
-          {
-            "id": "bridge_01_wall_east_x29_z-1_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              29,
-              -1,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 270.0,
-            "wall": "east"
-          },
-          {
-            "id": "bridge_01_wall_north_x29_z0_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              29,
-              0,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          }
-        ],
-        "center_slots": [
-          {
-            "id": "bridge_01_center_x26_z-2_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              26,
-              -2,
-              1
-            ],
-            "placement": "on_floor",
-            "yaw_degrees": 0.0
-          },
-          {
-            "id": "bridge_01_center_x26_z-1_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              26,
-              -1,
-              1
-            ],
-            "placement": "on_floor",
-            "yaw_degrees": 0.0
-          },
-          {
-            "id": "bridge_01_center_x27_z-2_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              27,
-              -2,
-              1
-            ],
-            "placement": "on_floor",
-            "yaw_degrees": 0.0
-          },
-          {
-            "id": "bridge_01_center_x28_z-2_d1",
-            "room_id": "bridge_01",
-            "cell": [
-              28,
-              -2,
-              1
-            ],
-            "placement": "on_floor",
-            "yaw_degrees": 0.0
-          }
-        ]
-      },
-      "interior_placements": [
-        {
-          "id": "bridge_01_command_console",
-          "room_id": "bridge_01",
-          "room_role": "bridge",
-          "semantic": "command_console",
-          "category": "gameplay-prop",
-          "placement": "against_wall",
-          "cell": [
-            26,
-            0,
-            1
-          ],
-          "footprint_cells": [
-            1,
-            1
-          ],
-          "position": [
-            100.0,
-            4.0,
-            -4.0
-          ],
-          "yaw_degrees": 180.0,
-          "nav_blocker": true,
-          "interactable": true,
-          "debug_color": "#6699cc",
-          "source_slot_id": "bridge_01_wall_north_x26_z0_d1"
-        },
-        {
-          "id": "bridge_01_captain_marker",
-          "room_id": "bridge_01",
-          "room_role": "bridge",
-          "semantic": "captain_marker",
-          "category": "dressing",
-          "placement": "on_floor",
-          "cell": [
-            28,
-            -2,
-            1
-          ],
-          "footprint_cells": [
-            1,
-            1
-          ],
-          "position": [
-            108.0,
-            4.0,
-            -12.0
-          ],
-          "yaw_degrees": 0.0,
-          "nav_blocker": false,
-          "interactable": false,
-          "debug_color": "#ccccff",
-          "source_slot_id": "bridge_01_center_x28_z-2_d1"
-        }
-      ]
-    },
-    {
-      "id": "galley_01",
-      "room_role": "galley",
-      "origin": [
-        128.0,
-        4.0,
-        28.0
-      ],
-      "wall_segments": [
-        {
-          "room_id": "galley_01",
-          "side": "south",
-          "origin": [
-            32,
-            7,
-            1
-          ],
-          "span": 1,
-          "edge": {
-            "cell": [
-              32,
-              7,
-              1
-            ],
-            "side": "south"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "galley_01",
-          "side": "west",
-          "origin": [
-            32,
-            7,
-            1
-          ],
-          "span": 3,
-          "edge": {
-            "cell": [
-              32,
-              7,
-              1
-            ],
-            "side": "west"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "galley_01",
-          "side": "north",
-          "origin": [
-            32,
-            9,
-            1
-          ],
-          "span": 3,
-          "edge": {
-            "cell": [
-              32,
-              9,
-              1
-            ],
-            "side": "north"
-          },
-          "module_id": "wall_straight"
-        },
-        {
-          "room_id": "galley_01",
-          "side": "east",
-          "origin": [
-            34,
-            7,
-            1
-          ],
-          "span": 3,
-          "edge": {
-            "cell": [
-              34,
-              7,
-              1
-            ],
-            "side": "east"
-          },
-          "module_id": "wall_straight"
-        }
-      ],
-      "structural_placements": [
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x32_z7",
-          "position": [
-            124.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x32_z8",
-          "position": [
-            124.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x32_z9",
-          "position": [
-            124.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x33_z7",
-          "position": [
-            128.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x33_z8",
-          "position": [
-            128.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x33_z9",
-          "position": [
-            128.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x34_z7",
-          "position": [
-            132.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x34_z8",
-          "position": [
-            132.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "floor_1x1",
-          "name": "floor_cell_d1_x34_z9",
-          "position": [
-            132.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_south_d1_x32_z7",
-          "position": [
-            124.0,
-            4.0,
-            22.0
-          ],
-          "yaw_degrees": 0.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x32_z7",
-          "position": [
-            122.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x32_z8",
-          "position": [
-            122.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_west_d1_x32_z9",
-          "position": [
-            122.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 90.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x32_z9",
-          "position": [
-            124.0,
-            4.0,
-            34.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x33_z9",
-          "position": [
-            128.0,
-            4.0,
-            34.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_north_d1_x34_z9",
-          "position": [
-            132.0,
-            4.0,
-            34.0
-          ],
-          "yaw_degrees": 180.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x34_z7",
-          "position": [
-            134.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x34_z8",
-          "position": [
-            134.0,
-            4.0,
-            28.0
-          ],
-          "yaw_degrees": 270.0
-        },
-        {
-          "module_id": "wall_straight_1x1",
-          "name": "wall_east_d1_x34_z9",
-          "position": [
-            134.0,
-            4.0,
-            32.0
-          ],
-          "yaw_degrees": 270.0
-        }
-      ],
-      "motif_requests": [
-        "mot-galley-counter"
-      ],
-      "portals": [
-        {
-          "id": "south_to_corridor_02",
-          "wall": "south",
-          "offset_cells": 1,
-          "module_id": "bulkhead_portal_2x1",
-          "position": [
-            130.0,
-            4.0,
-            22.0
-          ],
-          "yaw_degrees": 0.0,
-          "replaced_wall_name": "wall_south_x33_z7",
-          "span_cells": 2
-        }
-      ],
-      "interior_zones": {
-        "reserved_cells": [
-          [
-            33,
-            7,
-            1
-          ],
-          [
-            33,
-            8,
-            1
-          ],
-          [
-            34,
-            7,
-            1
-          ],
-          [
-            34,
-            8,
-            1
-          ]
-        ],
-        "door_approach_cells": [
-          [
-            33,
-            7,
-            1
-          ],
-          [
-            33,
-            8,
-            1
-          ],
-          [
-            34,
-            7,
-            1
-          ],
-          [
-            34,
-            8,
-            1
-          ]
-        ],
-        "vertical_access_cells": [],
-        "route_cells": [
-          [
-            33,
-            7,
-            1
-          ],
-          [
-            33,
-            8,
-            1
-          ],
-          [
-            34,
-            7,
-            1
-          ],
-          [
-            34,
-            8,
-            1
-          ]
-        ],
-        "wall_slots": [
-          {
-            "id": "galley_01_wall_south_x32_z7_d1",
-            "room_id": "galley_01",
-            "cell": [
-              32,
-              7,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 0.0,
-            "wall": "south"
-          },
-          {
-            "id": "galley_01_wall_west_x32_z8_d1",
-            "room_id": "galley_01",
-            "cell": [
-              32,
-              8,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 90.0,
-            "wall": "west"
-          },
-          {
-            "id": "galley_01_wall_north_x32_z9_d1",
-            "room_id": "galley_01",
-            "cell": [
-              32,
-              9,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          },
-          {
-            "id": "galley_01_wall_north_x33_z9_d1",
-            "room_id": "galley_01",
-            "cell": [
-              33,
-              9,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          },
-          {
-            "id": "galley_01_wall_north_x34_z9_d1",
-            "room_id": "galley_01",
-            "cell": [
-              34,
-              9,
-              1
-            ],
-            "placement": "against_wall",
-            "yaw_degrees": 180.0,
-            "wall": "north"
-          }
-        ],
-        "center_slots": []
-      },
-      "interior_placements": [
-        {
-          "id": "galley_01_galley_counter",
-          "room_id": "galley_01",
-          "room_role": "galley",
-          "semantic": "galley_counter",
-          "category": "gameplay-prop",
-          "placement": "against_wall",
-          "cell": [
-            32,
-            7,
-            1
-          ],
-          "footprint_cells": [
-            1,
-            1
-          ],
-          "position": [
-            124.0,
-            4.0,
-            24.0
-          ],
-          "yaw_degrees": 0.0,
-          "nav_blocker": true,
-          "interactable": true,
-          "debug_color": "#c0a070",
-          "source_slot_id": "galley_01_wall_south_x32_z7_d1"
-        }
-      ]
-    }
-  ],
-  "connections": [
-    {
-      "id": "airlock_01_corridor_01_link",
-      "from_room": "airlock_01",
-      "from_door": "east_to_corridor_01",
-      "to_room": "corridor_01",
-      "to_door": "west_to_airlock_01",
-      "position": [
-        6.0,
-        0.0,
-        2.0
-      ]
-    },
-    {
-      "id": "corridor_02_reactor_01_deck_spoke",
-      "from_room": "corridor_02",
-      "from_door": "north_to_reactor_01",
-      "to_room": "reactor_01",
-      "to_door": "south_to_corridor_02",
-      "position": [
-        30.0,
-        4.0,
-        22.0
-      ]
-    },
-    {
-      "id": "corridor_02_maintenance_01_deck_spoke",
-      "from_room": "corridor_02",
-      "from_door": "south_to_maintenance_01",
-      "to_room": "maintenance_01",
-      "to_door": "north_to_corridor_02",
-      "position": [
-        54.0,
-        4.0,
-        -2.0
-      ]
-    },
-    {
-      "id": "corridor_02_cargo_01_deck_spoke",
-      "from_room": "corridor_02",
-      "from_door": "north_to_cargo_01",
-      "to_room": "cargo_01",
-      "to_door": "south_to_corridor_02",
-      "position": [
-        78.0,
-        4.0,
-        22.0
-      ]
-    },
-    {
-      "id": "corridor_02_bridge_01_deck_spoke",
-      "from_room": "corridor_02",
-      "from_door": "south_to_bridge_01",
-      "to_room": "bridge_01",
-      "to_door": "north_to_corridor_02",
-      "position": [
-        106.0,
-        4.0,
-        -2.0
-      ]
-    },
-    {
-      "id": "corridor_02_galley_01_deck_spoke",
-      "from_room": "corridor_02",
-      "from_door": "north_to_galley_01",
-      "to_room": "galley_01",
-      "to_door": "south_to_corridor_02",
-      "position": [
-        130.0,
-        4.0,
-        22.0
-      ]
-    }
-  ],
-  "vertical_connections": [
-    {
-      "id": "corridor_ladder_01",
-      "type": "ladder",
-      "module_id": "ramp_up_1x2",
-      "from_room": "corridor_01",
-      "from_cell": [
-        4,
-        1,
-        0
-      ],
-      "to_room": "corridor_02",
-      "to_cell": [
-        4,
-        1,
-        1
-      ]
-    }
-  ],
-  "warnings": [],
-  "coherence_report": {
-    "schema_version": "1.0.0",
-    "document_kind": "ship_coherence_report",
-    "program_id": "prototype-ship-000017-8r-2d",
-    "passed": true,
-    "summary": {
-      "rooms": 8,
-      "floor_cells": 135,
-      "corridor_cells": 49,
-      "door_interfaces": 12,
-      "wall_segments": 52,
-      "deck_count": 2,
-      "vertical_connections": 1,
-      "doors": 12,
-      "walls": 52,
-      "errors": 0,
-      "floor_contiguity_errors": 0,
-      "corridor_mediation_errors": 0,
-      "graph_reachability_errors": 0,
-      "door_interface_errors": 0,
-      "missing_wall_edges": 0,
-      "vertical_connection_errors": 0
-    },
-    "errors": []
-  },
-  "top_down_proof": {
-    "svg_path": "/private/tmp/synaptic_sea_runtime_demo_fixture/seed_000017/topdown.topdown.svg",
-    "json_path": "/private/tmp/synaptic_sea_runtime_demo_fixture/seed_000017/topdown.topdown.json",
-    "passes": true,
-    "program_id": "prototype-ship-000017-8r-2d",
-    "metadata": {
-      "schema_version": "1.0.0",
-      "document_kind": "ship_topdown_proof",
-      "program_id": "prototype-ship-000017-8r-2d",
-      "legend": [
-        {
-          "key": "room",
-          "label": "Room cells",
-          "color": "#cbe0ff"
-        },
-        {
-          "key": "corridor_room",
-          "label": "Corridor cells (room)",
-          "color": "#ffd9a8"
-        },
-        {
-          "key": "pathway",
-          "label": "Pathway cells",
-          "color": "#ffe27a"
-        },
-        {
-          "key": "wall",
-          "label": "Walls",
-          "color": "#2b2b2b"
-        },
-        {
-          "key": "door",
-          "label": "Doors",
-          "color": "#c83e3e"
-        },
-        {
-          "key": "interior",
-          "label": "Interior markers",
-          "color": "#8a5cf6"
-        },
-        {
-          "key": "clear",
-          "label": "Clear space (non-walkable)",
-          "color": "#f4f4f4"
-        }
-      ],
-      "room_cell_count": 86,
-      "corridor_cell_count": 49,
-      "walkable_cell_count": 135,
-      "pathway_cell_count": 49,
-      "door_count": 12,
-      "wall_count": 52,
-      "deck_count": 2,
-      "deck_summaries": [
-        {
-          "deck": 0,
-          "walkable_cell_count": 12,
-          "room_cell_count": 9,
-          "corridor_cell_count": 3
-        },
-        {
-          "deck": 1,
-          "walkable_cell_count": 123,
-          "room_cell_count": 77,
-          "corridor_cell_count": 46
-        }
-      ],
-      "vertical_connection_count": 1,
-      "passing_vertical_connection_count": 1,
-      "failing_vertical_connection_count": 0,
-      "vertical_connection_errors": [],
-      "interior_placement_count": 9,
-      "interior_markers": [
-        {
-          "id": "bridge_01_captain_marker",
-          "semantic": "captain_marker",
-          "room_id": "bridge_01",
-          "cell": [
-            28,
-            -2,
-            1
-          ],
-          "debug_color": "#ccccff"
-        },
-        {
-          "id": "bridge_01_command_console",
-          "semantic": "command_console",
-          "room_id": "bridge_01",
-          "cell": [
-            26,
-            0,
-            1
-          ],
-          "debug_color": "#6699cc"
-        },
-        {
-          "id": "cargo_01_cargo_crate_cluster",
-          "semantic": "cargo_crate_cluster",
-          "room_id": "cargo_01",
-          "cell": [
-            22,
-            7,
-            1
-          ],
-          "debug_color": "#b88746"
-        },
-        {
-          "id": "cargo_01_loot_container",
-          "semantic": "loot_container",
-          "room_id": "cargo_01",
-          "cell": [
-            20,
-            10,
-            1
-          ],
-          "debug_color": "#d4af37"
-        },
-        {
-          "id": "galley_01_galley_counter",
-          "semantic": "galley_counter",
-          "room_id": "galley_01",
-          "cell": [
-            32,
-            7,
-            1
-          ],
-          "debug_color": "#c0a070"
-        },
-        {
-          "id": "maintenance_01_maintenance_workbench",
-          "semantic": "maintenance_workbench",
-          "room_id": "maintenance_01",
-          "cell": [
-            16,
-            0,
-            1
-          ],
-          "debug_color": "#5f7f9f"
-        },
-        {
-          "id": "maintenance_01_tool_locker",
-          "semantic": "tool_locker",
-          "room_id": "maintenance_01",
-          "cell": [
-            13,
-            0,
-            1
-          ],
-          "debug_color": "#7f7f7f"
-        },
-        {
-          "id": "reactor_01_reactor_control_panel",
-          "semantic": "reactor_control_panel",
-          "room_id": "reactor_01",
-          "cell": [
-            10,
-            10,
-            1
-          ],
-          "debug_color": "#ffcc66"
-        },
-        {
-          "id": "reactor_01_reactor_core",
-          "semantic": "reactor_core",
-          "room_id": "reactor_01",
-          "cell": [
-            7,
-            8,
-            1
-          ],
-          "debug_color": "#e07040"
-        }
-      ],
-      "corridor_shape_summary": [
-        {
-          "room_id": "corridor_01",
-          "cell_count": 3,
-          "bounding_box_cells": [
+          "to_cell": [
             3,
-            1
+            0
           ],
-          "shape_kind": "line"
+          "to_room": "corridor_01",
+          "wall": "east",
+          "yaw_degrees": 270.0
         },
         {
-          "room_id": "corridor_02",
-          "cell_count": 46,
-          "bounding_box_cells": [
-            31,
-            6
-          ],
-          "shape_kind": "branch"
-        }
-      ],
-      "connection_count": 6,
-      "passing_connection_count": 6,
-      "failing_connection_count": 0,
-      "passes": true,
-      "failing_connections": [],
-      "connections": [
-        {
-          "connection_id": "airlock_01_corridor_01_link",
-          "from_room": "airlock_01",
-          "from_door": "east_to_corridor_01",
-          "to_room": "corridor_01",
-          "to_door": "west_to_airlock_01",
-          "from_door_cell": [
+          "from_cell": [
             2,
             1
           ],
-          "to_door_cell": [
+          "id": "east_airlock_01_to_corridor_02",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            10.0,
+            0.0,
+            4.0
+          ],
+          "to_cell": [
             3,
             1
           ],
-          "path_cells": [
-            [
-              2,
-              1
-            ],
-            [
-              3,
-              1
-            ]
-          ],
-          "corridor_cells_on_path": [
-            [
-              3,
-              1
-            ]
-          ],
-          "corridor_cell_count": 1,
-          "passes": true,
-          "reason": "1 corridor cell(s) on a 2-cell walkable path"
-        },
-        {
-          "connection_id": "corridor_02_reactor_01_deck_spoke",
-          "from_room": "corridor_02",
-          "from_door": "north_to_reactor_01",
-          "to_room": "reactor_01",
-          "to_door": "south_to_corridor_02",
-          "from_door_cell": [
-            8,
-            6,
-            1
-          ],
-          "to_door_cell": [
-            8,
-            7,
-            1
-          ],
-          "path_cells": [
-            [
-              8,
-              6,
-              1
-            ],
-            [
-              8,
-              7,
-              1
-            ]
-          ],
-          "corridor_cells_on_path": [
-            [
-              8,
-              6,
-              1
-            ]
-          ],
-          "corridor_cell_count": 1,
-          "passes": true,
-          "reason": "1 corridor cell(s) on a 2-cell walkable path"
-        },
-        {
-          "connection_id": "corridor_02_maintenance_01_deck_spoke",
-          "from_room": "corridor_02",
-          "from_door": "south_to_maintenance_01",
-          "to_room": "maintenance_01",
-          "to_door": "north_to_corridor_02",
-          "from_door_cell": [
-            14,
-            1,
-            1
-          ],
-          "to_door_cell": [
-            14,
-            0,
-            1
-          ],
-          "path_cells": [
-            [
-              14,
-              1,
-              1
-            ],
-            [
-              14,
-              0,
-              1
-            ]
-          ],
-          "corridor_cells_on_path": [
-            [
-              14,
-              1,
-              1
-            ]
-          ],
-          "corridor_cell_count": 1,
-          "passes": true,
-          "reason": "1 corridor cell(s) on a 2-cell walkable path"
-        },
-        {
-          "connection_id": "corridor_02_cargo_01_deck_spoke",
-          "from_room": "corridor_02",
-          "from_door": "north_to_cargo_01",
-          "to_room": "cargo_01",
-          "to_door": "south_to_corridor_02",
-          "from_door_cell": [
-            20,
-            6,
-            1
-          ],
-          "to_door_cell": [
-            20,
-            7,
-            1
-          ],
-          "path_cells": [
-            [
-              20,
-              6,
-              1
-            ],
-            [
-              20,
-              7,
-              1
-            ]
-          ],
-          "corridor_cells_on_path": [
-            [
-              20,
-              6,
-              1
-            ]
-          ],
-          "corridor_cell_count": 1,
-          "passes": true,
-          "reason": "1 corridor cell(s) on a 2-cell walkable path"
-        },
-        {
-          "connection_id": "corridor_02_bridge_01_deck_spoke",
-          "from_room": "corridor_02",
-          "from_door": "south_to_bridge_01",
-          "to_room": "bridge_01",
-          "to_door": "north_to_corridor_02",
-          "from_door_cell": [
-            27,
-            1,
-            1
-          ],
-          "to_door_cell": [
-            27,
-            0,
-            1
-          ],
-          "path_cells": [
-            [
-              27,
-              1,
-              1
-            ],
-            [
-              27,
-              0,
-              1
-            ]
-          ],
-          "corridor_cells_on_path": [
-            [
-              27,
-              1,
-              1
-            ]
-          ],
-          "corridor_cell_count": 1,
-          "passes": true,
-          "reason": "1 corridor cell(s) on a 2-cell walkable path"
-        },
-        {
-          "connection_id": "corridor_02_galley_01_deck_spoke",
-          "from_room": "corridor_02",
-          "from_door": "north_to_galley_01",
-          "to_room": "galley_01",
-          "to_door": "south_to_corridor_02",
-          "from_door_cell": [
-            33,
-            6,
-            1
-          ],
-          "to_door_cell": [
-            33,
-            7,
-            1
-          ],
-          "path_cells": [
-            [
-              33,
-              6,
-              1
-            ],
-            [
-              33,
-              7,
-              1
-            ]
-          ],
-          "corridor_cells_on_path": [
-            [
-              33,
-              6,
-              1
-            ]
-          ],
-          "corridor_cell_count": 1,
-          "passes": true,
-          "reason": "1 corridor cell(s) on a 2-cell walkable path"
+          "to_room": "corridor_02",
+          "wall": "east",
+          "yaw_degrees": 270.0
         }
-      ]
+      ],
+      "room_role": "airlock",
+      "structural_placements": [
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x0_z0",
+          "world_position": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x0_z1",
+          "world_position": [
+            0.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x1_z0",
+          "world_position": [
+            4.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x1_z1",
+          "world_position": [
+            4.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x2_z0",
+          "world_position": [
+            8.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x2_z1",
+          "world_position": [
+            8.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_airlock_01_north_x0_z0",
+          "world_position": [
+            0.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_airlock_01_west_x0_z1",
+          "world_position": [
+            -2.0,
+            0.0,
+            4.0
+          ],
+          "yaw_degrees": 90.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_airlock_01_north_x1_z0",
+          "world_position": [
+            4.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_airlock_01_south_x1_z1",
+          "world_position": [
+            4.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 0.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_airlock_01_north_x2_z0",
+          "world_position": [
+            8.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_airlock_01_south_x2_z1",
+          "world_position": [
+            8.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 0.0
+        }
+      ],
+      "variant": "standard"
+    },
+    {
+      "deck": 0,
+      "id": "corridor_01",
+      "interior_zones": {
+        "center_slots": [],
+        "reserved_cells": [
+          [
+            3,
+            0
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            6,
+            0
+          ]
+        ],
+        "wall_slots": [
+          {
+            "against_wall": true,
+            "cell": "(5, 0)"
+          }
+        ]
+      },
+      "motif_requests": [
+        "mot-maintenance-workbench-corner"
+      ],
+      "portals": [
+        {
+          "from_cell": [
+            3,
+            0
+          ],
+          "id": "south_corridor_01_to_corridor_02",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            12.0,
+            0.0,
+            -2.0
+          ],
+          "to_cell": [
+            3,
+            1
+          ],
+          "to_room": "corridor_02",
+          "wall": "south",
+          "yaw_degrees": 0.0
+        },
+        {
+          "from_cell": [
+            3,
+            0
+          ],
+          "id": "west_corridor_01_to_airlock_01",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            10.0,
+            0.0,
+            0.0
+          ],
+          "to_cell": [
+            2,
+            0
+          ],
+          "to_room": "airlock_01",
+          "wall": "west",
+          "yaw_degrees": 90.0
+        },
+        {
+          "from_cell": [
+            4,
+            0
+          ],
+          "id": "south_corridor_01_to_corridor_02",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            16.0,
+            0.0,
+            -2.0
+          ],
+          "to_cell": [
+            4,
+            1
+          ],
+          "to_room": "corridor_02",
+          "wall": "south",
+          "yaw_degrees": 0.0
+        },
+        {
+          "from_cell": [
+            6,
+            0
+          ],
+          "id": "east_corridor_01_to_bridge_01",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            26.0,
+            0.0,
+            0.0
+          ],
+          "to_cell": [
+            7,
+            0
+          ],
+          "to_room": "bridge_01",
+          "wall": "east",
+          "yaw_degrees": 270.0
+        }
+      ],
+      "room_role": "corridor",
+      "structural_placements": [
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x3_z0",
+          "world_position": [
+            12.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x4_z0",
+          "world_position": [
+            16.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x5_z0",
+          "world_position": [
+            20.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x6_z0",
+          "world_position": [
+            24.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_01_north_x3_z0",
+          "world_position": [
+            12.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_01_north_x4_z0",
+          "world_position": [
+            16.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_01_north_x5_z0",
+          "world_position": [
+            20.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_01_south_x5_z0",
+          "world_position": [
+            20.0,
+            0.0,
+            -2.0
+          ],
+          "yaw_degrees": 0.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_01_north_x6_z0",
+          "world_position": [
+            24.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_01_south_x6_z0",
+          "world_position": [
+            24.0,
+            0.0,
+            -2.0
+          ],
+          "yaw_degrees": 0.0
+        }
+      ],
+      "variant": "standard"
+    },
+    {
+      "deck": 0,
+      "id": "bridge_01",
+      "interior_zones": {
+        "center_slots": [
+          [
+            8,
+            1
+          ]
+        ],
+        "reserved_cells": [
+          [
+            7,
+            0
+          ]
+        ],
+        "wall_slots": [
+          {
+            "against_wall": true,
+            "cell": "(7, 1)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(7, 2)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(8, 0)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(8, 2)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(9, 0)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(9, 1)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(9, 2)"
+          }
+        ]
+      },
+      "motif_requests": [],
+      "portals": [
+        {
+          "from_cell": [
+            7,
+            0
+          ],
+          "id": "west_bridge_01_to_corridor_01",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            26.0,
+            0.0,
+            0.0
+          ],
+          "to_cell": [
+            6,
+            0
+          ],
+          "to_room": "corridor_01",
+          "wall": "west",
+          "yaw_degrees": 90.0
+        }
+      ],
+      "room_role": "bridge",
+      "structural_placements": [
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x7_z0",
+          "world_position": [
+            28.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x7_z1",
+          "world_position": [
+            28.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x7_z2",
+          "world_position": [
+            28.0,
+            0.0,
+            8.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x8_z0",
+          "world_position": [
+            32.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x8_z1",
+          "world_position": [
+            32.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x8_z2",
+          "world_position": [
+            32.0,
+            0.0,
+            8.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x9_z0",
+          "world_position": [
+            36.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x9_z1",
+          "world_position": [
+            36.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x9_z2",
+          "world_position": [
+            36.0,
+            0.0,
+            8.0
+          ]
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_bridge_01_north_x7_z0",
+          "world_position": [
+            28.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_bridge_01_west_x7_z1",
+          "world_position": [
+            26.0,
+            0.0,
+            4.0
+          ],
+          "yaw_degrees": 90.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_bridge_01_south_x7_z2",
+          "world_position": [
+            28.0,
+            0.0,
+            6.0
+          ],
+          "yaw_degrees": 0.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_bridge_01_west_x7_z2",
+          "world_position": [
+            26.0,
+            0.0,
+            8.0
+          ],
+          "yaw_degrees": 90.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_bridge_01_north_x8_z0",
+          "world_position": [
+            32.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_bridge_01_south_x8_z2",
+          "world_position": [
+            32.0,
+            0.0,
+            6.0
+          ],
+          "yaw_degrees": 0.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_bridge_01_north_x9_z0",
+          "world_position": [
+            36.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_bridge_01_east_x9_z0",
+          "world_position": [
+            38.0,
+            0.0,
+            0.0
+          ],
+          "yaw_degrees": 270.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_bridge_01_east_x9_z1",
+          "world_position": [
+            38.0,
+            0.0,
+            4.0
+          ],
+          "yaw_degrees": 270.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_bridge_01_east_x9_z2",
+          "world_position": [
+            38.0,
+            0.0,
+            8.0
+          ],
+          "yaw_degrees": 270.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_bridge_01_south_x9_z2",
+          "world_position": [
+            36.0,
+            0.0,
+            6.0
+          ],
+          "yaw_degrees": 0.0
+        }
+      ],
+      "variant": "standard"
+    },
+    {
+      "deck": 0,
+      "id": "corridor_02",
+      "interior_zones": {
+        "center_slots": [],
+        "reserved_cells": [
+          [
+            3,
+            1
+          ],
+          [
+            3,
+            1
+          ],
+          [
+            3,
+            1
+          ],
+          [
+            4,
+            1
+          ],
+          [
+            4,
+            1
+          ]
+        ],
+        "wall_slots": []
+      },
+      "motif_requests": [
+        "mot-maintenance-workbench-corner"
+      ],
+      "portals": [
+        {
+          "from_cell": [
+            3,
+            1
+          ],
+          "id": "north_corridor_02_to_corridor_01",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            12.0,
+            0.0,
+            6.0
+          ],
+          "to_cell": [
+            3,
+            0
+          ],
+          "to_room": "corridor_01",
+          "wall": "north",
+          "yaw_degrees": 180.0
+        },
+        {
+          "from_cell": [
+            3,
+            1
+          ],
+          "id": "south_corridor_02_to_corridor_03",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            12.0,
+            0.0,
+            2.0
+          ],
+          "to_cell": [
+            3,
+            2
+          ],
+          "to_room": "corridor_03",
+          "wall": "south",
+          "yaw_degrees": 0.0
+        },
+        {
+          "from_cell": [
+            3,
+            1
+          ],
+          "id": "west_corridor_02_to_airlock_01",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            10.0,
+            0.0,
+            4.0
+          ],
+          "to_cell": [
+            2,
+            1
+          ],
+          "to_room": "airlock_01",
+          "wall": "west",
+          "yaw_degrees": 90.0
+        },
+        {
+          "from_cell": [
+            4,
+            1
+          ],
+          "id": "north_corridor_02_to_corridor_01",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            16.0,
+            0.0,
+            6.0
+          ],
+          "to_cell": [
+            4,
+            0
+          ],
+          "to_room": "corridor_01",
+          "wall": "north",
+          "yaw_degrees": 180.0
+        },
+        {
+          "from_cell": [
+            4,
+            1
+          ],
+          "id": "south_corridor_02_to_corridor_03",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            16.0,
+            0.0,
+            2.0
+          ],
+          "to_cell": [
+            4,
+            2
+          ],
+          "to_room": "corridor_03",
+          "wall": "south",
+          "yaw_degrees": 0.0
+        }
+      ],
+      "room_role": "corridor",
+      "structural_placements": [
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x3_z1",
+          "world_position": [
+            12.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x4_z1",
+          "world_position": [
+            16.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_02_east_x4_z1",
+          "world_position": [
+            18.0,
+            0.0,
+            4.0
+          ],
+          "yaw_degrees": 270.0
+        }
+      ],
+      "variant": "standard"
+    },
+    {
+      "deck": 0,
+      "id": "corridor_03",
+      "interior_zones": {
+        "center_slots": [],
+        "reserved_cells": [
+          [
+            3,
+            2
+          ],
+          [
+            3,
+            2
+          ],
+          [
+            4,
+            2
+          ],
+          [
+            4,
+            2
+          ]
+        ],
+        "wall_slots": [
+          {
+            "against_wall": true,
+            "cell": "(5, 2)"
+          }
+        ]
+      },
+      "motif_requests": [
+        "mot-maintenance-workbench-corner"
+      ],
+      "portals": [
+        {
+          "from_cell": [
+            3,
+            2
+          ],
+          "id": "north_corridor_03_to_corridor_02",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            12.0,
+            0.0,
+            10.0
+          ],
+          "to_cell": [
+            3,
+            1
+          ],
+          "to_room": "corridor_02",
+          "wall": "north",
+          "yaw_degrees": 180.0
+        },
+        {
+          "from_cell": [
+            3,
+            2
+          ],
+          "id": "south_corridor_03_to_crew_quarters_01",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            12.0,
+            0.0,
+            6.0
+          ],
+          "to_cell": [
+            3,
+            3
+          ],
+          "to_room": "crew_quarters_01",
+          "wall": "south",
+          "yaw_degrees": 0.0
+        },
+        {
+          "from_cell": [
+            4,
+            2
+          ],
+          "id": "north_corridor_03_to_corridor_02",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            16.0,
+            0.0,
+            10.0
+          ],
+          "to_cell": [
+            4,
+            1
+          ],
+          "to_room": "corridor_02",
+          "wall": "north",
+          "yaw_degrees": 180.0
+        },
+        {
+          "from_cell": [
+            4,
+            2
+          ],
+          "id": "south_corridor_03_to_crew_quarters_01",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            16.0,
+            0.0,
+            6.0
+          ],
+          "to_cell": [
+            4,
+            3
+          ],
+          "to_room": "crew_quarters_01",
+          "wall": "south",
+          "yaw_degrees": 0.0
+        }
+      ],
+      "room_role": "corridor",
+      "structural_placements": [
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x3_z2",
+          "world_position": [
+            12.0,
+            0.0,
+            8.0
+          ]
+        },
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x4_z2",
+          "world_position": [
+            16.0,
+            0.0,
+            8.0
+          ]
+        },
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x5_z2",
+          "world_position": [
+            20.0,
+            0.0,
+            8.0
+          ]
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_03_west_x3_z2",
+          "world_position": [
+            10.0,
+            0.0,
+            8.0
+          ],
+          "yaw_degrees": 90.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_03_north_x5_z2",
+          "world_position": [
+            20.0,
+            0.0,
+            10.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_03_east_x5_z2",
+          "world_position": [
+            22.0,
+            0.0,
+            8.0
+          ],
+          "yaw_degrees": 270.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_03_south_x5_z2",
+          "world_position": [
+            20.0,
+            0.0,
+            6.0
+          ],
+          "yaw_degrees": 0.0
+        }
+      ],
+      "variant": "standard"
+    },
+    {
+      "deck": 0,
+      "id": "crew_quarters_01",
+      "interior_zones": {
+        "center_slots": [],
+        "reserved_cells": [
+          [
+            3,
+            3
+          ],
+          [
+            4,
+            3
+          ]
+        ],
+        "wall_slots": [
+          {
+            "against_wall": true,
+            "cell": "(3, 4)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(4, 4)"
+          }
+        ]
+      },
+      "motif_requests": [],
+      "portals": [
+        {
+          "from_cell": [
+            3,
+            3
+          ],
+          "id": "north_crew_quarters_01_to_corridor_03",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            12.0,
+            0.0,
+            14.0
+          ],
+          "to_cell": [
+            3,
+            2
+          ],
+          "to_room": "corridor_03",
+          "wall": "north",
+          "yaw_degrees": 180.0
+        },
+        {
+          "from_cell": [
+            4,
+            3
+          ],
+          "id": "north_crew_quarters_01_to_corridor_03",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            16.0,
+            0.0,
+            14.0
+          ],
+          "to_cell": [
+            4,
+            2
+          ],
+          "to_room": "corridor_03",
+          "wall": "north",
+          "yaw_degrees": 180.0
+        }
+      ],
+      "room_role": "crew_quarters",
+      "structural_placements": [
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x3_z3",
+          "world_position": [
+            12.0,
+            0.0,
+            12.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x3_z4",
+          "world_position": [
+            12.0,
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x4_z3",
+          "world_position": [
+            16.0,
+            0.0,
+            12.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x4_z4",
+          "world_position": [
+            16.0,
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_crew_quarters_01_west_x3_z3",
+          "world_position": [
+            10.0,
+            0.0,
+            12.0
+          ],
+          "yaw_degrees": 90.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_crew_quarters_01_south_x3_z4",
+          "world_position": [
+            12.0,
+            0.0,
+            14.0
+          ],
+          "yaw_degrees": 0.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_crew_quarters_01_west_x3_z4",
+          "world_position": [
+            10.0,
+            0.0,
+            16.0
+          ],
+          "yaw_degrees": 90.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_crew_quarters_01_east_x4_z3",
+          "world_position": [
+            18.0,
+            0.0,
+            12.0
+          ],
+          "yaw_degrees": 270.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_crew_quarters_01_east_x4_z4",
+          "world_position": [
+            18.0,
+            0.0,
+            16.0
+          ],
+          "yaw_degrees": 270.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_crew_quarters_01_south_x4_z4",
+          "world_position": [
+            16.0,
+            0.0,
+            14.0
+          ],
+          "yaw_degrees": 0.0
+        }
+      ],
+      "variant": "standard"
+    },
+    {
+      "deck": 0,
+      "id": "corridor_04",
+      "interior_zones": {
+        "center_slots": [],
+        "reserved_cells": [
+          [
+            -4,
+            2
+          ],
+          [
+            -3,
+            2
+          ],
+          [
+            0,
+            2
+          ]
+        ],
+        "wall_slots": [
+          {
+            "against_wall": true,
+            "cell": "(-2, 2)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(-1, 2)"
+          }
+        ]
+      },
+      "motif_requests": [
+        "mot-maintenance-workbench-corner"
+      ],
+      "portals": [
+        {
+          "from_cell": [
+            -4,
+            2
+          ],
+          "id": "south_corridor_04_to_armory_01",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            -16.0,
+            0.0,
+            6.0
+          ],
+          "to_cell": [
+            -4,
+            3
+          ],
+          "to_room": "armory_01",
+          "wall": "south",
+          "yaw_degrees": 0.0
+        },
+        {
+          "from_cell": [
+            -3,
+            2
+          ],
+          "id": "south_corridor_04_to_armory_01",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            -12.0,
+            0.0,
+            6.0
+          ],
+          "to_cell": [
+            -3,
+            3
+          ],
+          "to_room": "armory_01",
+          "wall": "south",
+          "yaw_degrees": 0.0
+        },
+        {
+          "from_cell": [
+            0,
+            2
+          ],
+          "id": "north_corridor_04_to_airlock_01",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            0.0,
+            0.0,
+            10.0
+          ],
+          "to_cell": [
+            0,
+            1
+          ],
+          "to_room": "airlock_01",
+          "wall": "north",
+          "yaw_degrees": 180.0
+        }
+      ],
+      "room_role": "corridor",
+      "structural_placements": [
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x-4_z2",
+          "world_position": [
+            -16.0,
+            0.0,
+            8.0
+          ]
+        },
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x-3_z2",
+          "world_position": [
+            -12.0,
+            0.0,
+            8.0
+          ]
+        },
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x-2_z2",
+          "world_position": [
+            -8.0,
+            0.0,
+            8.0
+          ]
+        },
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x-1_z2",
+          "world_position": [
+            -4.0,
+            0.0,
+            8.0
+          ]
+        },
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x0_z2",
+          "world_position": [
+            0.0,
+            0.0,
+            8.0
+          ]
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_04_north_x-4_z2",
+          "world_position": [
+            -16.0,
+            0.0,
+            10.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_04_west_x-4_z2",
+          "world_position": [
+            -18.0,
+            0.0,
+            8.0
+          ],
+          "yaw_degrees": 90.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_04_north_x-3_z2",
+          "world_position": [
+            -12.0,
+            0.0,
+            10.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_04_north_x-2_z2",
+          "world_position": [
+            -8.0,
+            0.0,
+            10.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_04_south_x-2_z2",
+          "world_position": [
+            -8.0,
+            0.0,
+            6.0
+          ],
+          "yaw_degrees": 0.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_04_north_x-1_z2",
+          "world_position": [
+            -4.0,
+            0.0,
+            10.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_04_south_x-1_z2",
+          "world_position": [
+            -4.0,
+            0.0,
+            6.0
+          ],
+          "yaw_degrees": 0.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_04_east_x0_z2",
+          "world_position": [
+            2.0,
+            0.0,
+            8.0
+          ],
+          "yaw_degrees": 270.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_04_south_x0_z2",
+          "world_position": [
+            0.0,
+            0.0,
+            6.0
+          ],
+          "yaw_degrees": 0.0
+        }
+      ],
+      "variant": "standard"
+    },
+    {
+      "deck": 0,
+      "id": "armory_01",
+      "interior_zones": {
+        "center_slots": [],
+        "reserved_cells": [
+          [
+            -4,
+            3
+          ],
+          [
+            -3,
+            3
+          ]
+        ],
+        "wall_slots": [
+          {
+            "against_wall": true,
+            "cell": "(-4, 4)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(-3, 4)"
+          }
+        ]
+      },
+      "motif_requests": [],
+      "portals": [
+        {
+          "from_cell": [
+            -4,
+            3
+          ],
+          "id": "north_armory_01_to_corridor_04",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            -16.0,
+            0.0,
+            14.0
+          ],
+          "to_cell": [
+            -4,
+            2
+          ],
+          "to_room": "corridor_04",
+          "wall": "north",
+          "yaw_degrees": 180.0
+        },
+        {
+          "from_cell": [
+            -3,
+            3
+          ],
+          "id": "north_armory_01_to_corridor_04",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            -12.0,
+            0.0,
+            14.0
+          ],
+          "to_cell": [
+            -3,
+            2
+          ],
+          "to_room": "corridor_04",
+          "wall": "north",
+          "yaw_degrees": 180.0
+        }
+      ],
+      "room_role": "armory",
+      "structural_placements": [
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x-4_z3",
+          "world_position": [
+            -16.0,
+            0.0,
+            12.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x-4_z4",
+          "world_position": [
+            -16.0,
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x-3_z3",
+          "world_position": [
+            -12.0,
+            0.0,
+            12.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x-3_z4",
+          "world_position": [
+            -12.0,
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_armory_01_west_x-4_z3",
+          "world_position": [
+            -18.0,
+            0.0,
+            12.0
+          ],
+          "yaw_degrees": 90.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_armory_01_south_x-4_z4",
+          "world_position": [
+            -16.0,
+            0.0,
+            14.0
+          ],
+          "yaw_degrees": 0.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_armory_01_west_x-4_z4",
+          "world_position": [
+            -18.0,
+            0.0,
+            16.0
+          ],
+          "yaw_degrees": 90.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_armory_01_east_x-3_z3",
+          "world_position": [
+            -10.0,
+            0.0,
+            12.0
+          ],
+          "yaw_degrees": 270.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_armory_01_east_x-3_z4",
+          "world_position": [
+            -10.0,
+            0.0,
+            16.0
+          ],
+          "yaw_degrees": 270.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_armory_01_south_x-3_z4",
+          "world_position": [
+            -12.0,
+            0.0,
+            14.0
+          ],
+          "yaw_degrees": 0.0
+        }
+      ],
+      "variant": "standard"
+    },
+    {
+      "deck": 0,
+      "id": "corridor_05",
+      "interior_zones": {
+        "center_slots": [],
+        "reserved_cells": [
+          [
+            -5,
+            0
+          ],
+          [
+            -1,
+            0
+          ]
+        ],
+        "wall_slots": [
+          {
+            "against_wall": true,
+            "cell": "(-4, 0)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(-3, 0)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(-2, 0)"
+          }
+        ]
+      },
+      "motif_requests": [
+        "mot-maintenance-workbench-corner"
+      ],
+      "portals": [
+        {
+          "from_cell": [
+            -5,
+            0
+          ],
+          "id": "west_corridor_05_to_engineering_01",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            -22.0,
+            0.0,
+            0.0
+          ],
+          "to_cell": [
+            -6,
+            0
+          ],
+          "to_room": "engineering_01",
+          "wall": "west",
+          "yaw_degrees": 90.0
+        },
+        {
+          "from_cell": [
+            -1,
+            0
+          ],
+          "id": "east_corridor_05_to_airlock_01",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            -2.0,
+            0.0,
+            0.0
+          ],
+          "to_cell": [
+            0,
+            0
+          ],
+          "to_room": "airlock_01",
+          "wall": "east",
+          "yaw_degrees": 270.0
+        }
+      ],
+      "room_role": "corridor",
+      "structural_placements": [
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x-5_z0",
+          "world_position": [
+            -20.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x-4_z0",
+          "world_position": [
+            -16.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x-3_z0",
+          "world_position": [
+            -12.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x-2_z0",
+          "world_position": [
+            -8.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "corridor_floor_1x1",
+          "name": "floor_cell_x-1_z0",
+          "world_position": [
+            -4.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_05_north_x-5_z0",
+          "world_position": [
+            -20.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_05_south_x-5_z0",
+          "world_position": [
+            -20.0,
+            0.0,
+            -2.0
+          ],
+          "yaw_degrees": 0.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_05_north_x-4_z0",
+          "world_position": [
+            -16.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_05_south_x-4_z0",
+          "world_position": [
+            -16.0,
+            0.0,
+            -2.0
+          ],
+          "yaw_degrees": 0.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_05_north_x-3_z0",
+          "world_position": [
+            -12.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_05_south_x-3_z0",
+          "world_position": [
+            -12.0,
+            0.0,
+            -2.0
+          ],
+          "yaw_degrees": 0.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_05_north_x-2_z0",
+          "world_position": [
+            -8.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_05_south_x-2_z0",
+          "world_position": [
+            -8.0,
+            0.0,
+            -2.0
+          ],
+          "yaw_degrees": 0.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_05_north_x-1_z0",
+          "world_position": [
+            -4.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_corridor_05_south_x-1_z0",
+          "world_position": [
+            -4.0,
+            0.0,
+            -2.0
+          ],
+          "yaw_degrees": 0.0
+        }
+      ],
+      "variant": "standard"
+    },
+    {
+      "deck": 0,
+      "id": "engineering_01",
+      "interior_zones": {
+        "center_slots": [
+          [
+            -7,
+            1
+          ]
+        ],
+        "reserved_cells": [
+          [
+            -6,
+            0
+          ]
+        ],
+        "wall_slots": [
+          {
+            "against_wall": true,
+            "cell": "(-8, 0)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(-8, 1)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(-8, 2)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(-7, 0)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(-7, 2)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(-6, 1)"
+          },
+          {
+            "against_wall": true,
+            "cell": "(-6, 2)"
+          }
+        ]
+      },
+      "motif_requests": [
+        "mot-engineering-console"
+      ],
+      "portals": [
+        {
+          "from_cell": [
+            -6,
+            0
+          ],
+          "id": "east_engineering_01_to_corridor_05",
+          "module_id": "bulkhead_portal_2x1",
+          "position": [
+            -22.0,
+            0.0,
+            0.0
+          ],
+          "to_cell": [
+            -5,
+            0
+          ],
+          "to_room": "corridor_05",
+          "wall": "east",
+          "yaw_degrees": 270.0
+        }
+      ],
+      "room_role": "engineering",
+      "structural_placements": [
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x-8_z0",
+          "world_position": [
+            -32.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x-8_z1",
+          "world_position": [
+            -32.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x-8_z2",
+          "world_position": [
+            -32.0,
+            0.0,
+            8.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x-7_z0",
+          "world_position": [
+            -28.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x-7_z1",
+          "world_position": [
+            -28.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x-7_z2",
+          "world_position": [
+            -28.0,
+            0.0,
+            8.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x-6_z0",
+          "world_position": [
+            -24.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x-6_z1",
+          "world_position": [
+            -24.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_x-6_z2",
+          "world_position": [
+            -24.0,
+            0.0,
+            8.0
+          ]
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_engineering_01_north_x-8_z0",
+          "world_position": [
+            -32.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_engineering_01_west_x-8_z0",
+          "world_position": [
+            -34.0,
+            0.0,
+            0.0
+          ],
+          "yaw_degrees": 90.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_engineering_01_west_x-8_z1",
+          "world_position": [
+            -34.0,
+            0.0,
+            4.0
+          ],
+          "yaw_degrees": 90.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_engineering_01_south_x-8_z2",
+          "world_position": [
+            -32.0,
+            0.0,
+            6.0
+          ],
+          "yaw_degrees": 0.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_engineering_01_west_x-8_z2",
+          "world_position": [
+            -34.0,
+            0.0,
+            8.0
+          ],
+          "yaw_degrees": 90.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_engineering_01_north_x-7_z0",
+          "world_position": [
+            -28.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_engineering_01_south_x-7_z2",
+          "world_position": [
+            -28.0,
+            0.0,
+            6.0
+          ],
+          "yaw_degrees": 0.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_engineering_01_north_x-6_z0",
+          "world_position": [
+            -24.0,
+            0.0,
+            2.0
+          ],
+          "yaw_degrees": 180.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_engineering_01_east_x-6_z1",
+          "world_position": [
+            -22.0,
+            0.0,
+            4.0
+          ],
+          "yaw_degrees": 270.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_engineering_01_east_x-6_z2",
+          "world_position": [
+            -22.0,
+            0.0,
+            8.0
+          ],
+          "yaw_degrees": 270.0
+        },
+        {
+          "module": "wall_straight_1x1",
+          "name": "wall_engineering_01_south_x-6_z2",
+          "world_position": [
+            -24.0,
+            0.0,
+            6.0
+          ],
+          "yaw_degrees": 0.0
+        }
+      ],
+      "variant": "standard"
     }
-  },
-  "prototype": {
-    "generator_version": "0.2.0",
-    "start_room": "airlock_01",
-    "goal_room": "reactor_01",
-    "critical_path": [
-      "airlock_01",
-      "corridor_01",
-      "corridor_02",
-      "reactor_01"
-    ],
-    "intended_room_count": 8
-  },
-  "floorplan_placement_mode": "phase_separated"
+  ],
+  "schema_version": "1.2.0",
+  "vertical_connections": []
 }
