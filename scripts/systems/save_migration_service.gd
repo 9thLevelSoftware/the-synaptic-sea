@@ -20,9 +20,10 @@ const KNOWN_VERSIONS: Array = [
 	"gate2-current-run-1",  # legacy: 6 model summaries, no player_progression
 	"gate2-current-run-2",  # added player_progression_summary (Phase 3)
 	"gate2-current-run-3",  # added slot_id / slot_kind / parent_world_slot metadata (Task 11)
+	"gate2-current-run-4",  # added play_time_seconds / current_location / world_seed (ADR-0046)
 ]
 
-const TARGET_VERSION: String = "gate2-current-run-3"
+const TARGET_VERSION: String = "gate2-current-run-4"
 const WORLD_TARGET_VERSION: String = "world-4"
 
 func migrate_run(parsed: Variant) -> Dictionary:
@@ -68,13 +69,32 @@ func migrate_world(parsed: Variant) -> Dictionary:
 	var dict: Dictionary = parsed
 	var current: String = str(dict.get("slice_version", ""))
 	if current == WORLD_TARGET_VERSION:
-		return {"dict": dict, "from_version": current, "to_version": WORLD_TARGET_VERSION, "migrated": false}
+		var current_inner: Dictionary = _migrate_world_home_ship(dict)
+		return {
+			"dict": current_inner["dict"],
+			"from_version": current,
+			"to_version": WORLD_TARGET_VERSION,
+			"migrated": bool(current_inner["migrated"]),
+		}
 	if current.is_empty():
 		current = "world-1"  # legacy world snapshot
 	# For worlds we only know world-4 today. Future ADRs extend.
-	if _world_step(current) == null:
-		return {"dict": dict, "from_version": current, "to_version": WORLD_TARGET_VERSION, "migrated": false}
-	var working: Dictionary = _world_step(current).call(dict)
+	# Session 3 (audit): _world_step returns Callable() for unknown versions —
+	# an EMPTY Callable is never `== null` in GDScript 4, so the old guard
+	# never fired and `.call()` collapsed the dict. Guard with is_valid()
+	# (the migrate_run pattern); pass-through is the documented intent so a
+	# NEWER-version world can be rejected by the load path without being
+	# quarantined as corrupt.
+	var step: Callable = _world_step(current)
+	if not step.is_valid():
+		return {
+			"dict": dict,
+			"from_version": current,
+			"to_version": WORLD_TARGET_VERSION,
+			"migrated": false,
+			"newer_than_current": _is_newer_world_version(current),
+		}
+	var working: Dictionary = step.call(dict)
 	working["slice_version"] = WORLD_TARGET_VERSION
 	return {"dict": working, "from_version": current, "to_version": WORLD_TARGET_VERSION, "migrated": true}
 
@@ -84,6 +104,8 @@ func _step(from_version: String) -> Callable:
 			return _migrate_v1_to_v2
 		"gate2-current-run-2":
 			return _migrate_v2_to_v3
+		"gate2-current-run-3":
+			return _migrate_v3_to_v4
 	return Callable()
 
 func _world_step(from_version: String) -> Callable:
@@ -94,6 +116,20 @@ func _world_step(from_version: String) -> Callable:
 
 func _index_of(version: String) -> int:
 	return KNOWN_VERSIONS.find(version)
+
+func _is_newer_world_version(version: String) -> bool:
+	var current_num: int = _world_version_number(version)
+	var target_num: int = _world_version_number(WORLD_TARGET_VERSION)
+	return current_num > target_num and target_num >= 0
+
+func _world_version_number(version: String) -> int:
+	var prefix: String = "world-"
+	if not version.begins_with(prefix):
+		return -1
+	var suffix: String = version.trim_prefix(prefix)
+	if suffix.is_empty() or not suffix.is_valid_int():
+		return -1
+	return int(suffix)
 
 func _migrate_v1_to_v2(dict: Dictionary) -> Dictionary:
 	# Add player_progression_summary default if missing or empty. The
@@ -128,7 +164,39 @@ func _migrate_v2_to_v3(dict: Dictionary) -> Dictionary:
 		out["parent_world_slot"] = ""
 	return out
 
+func _migrate_v3_to_v4(dict: Dictionary) -> Dictionary:
+	# ADR-0046: real slot metadata. Older saves have no accumulated play
+	# time, no location stamp, and no world seed; default them so the
+	# slot browser renders honest zeros instead of the old placeholders
+	# (player X as location, Unix epoch as play time).
+	var out: Dictionary = dict.duplicate(true)
+	if not out.has("play_time_seconds"):
+		out["play_time_seconds"] = 0.0
+	if not out.has("current_location"):
+		out["current_location"] = ""
+	if not out.has("world_seed"):
+		out["world_seed"] = 0
+	return out
+
 func _migrate_world_legacy_to_world_4(dict: Dictionary) -> Dictionary:
-	# No-op body: world schema has been stable through v1..v3 in practice
-	# (the field set grew additively). Reserved hook for future ADRs.
-	return dict.duplicate(true)
+	# The OUTER world field set grew additively through v1..v3, but the
+	# EMBEDDED home_ship dict is a full RunSnapshot.to_dict() with its own
+	# slice_version — a legacy world file survives the outer migration and
+	# then fails RunSnapshot.from_dict unless the inner slice is migrated
+	# too (Session 3 audit fix; this was a pure duplicate before).
+	return _migrate_world_home_ship(dict)["dict"] as Dictionary
+
+func _migrate_world_home_ship(dict: Dictionary) -> Dictionary:
+	var out: Dictionary = dict.duplicate(true)
+	var migrated: bool = false
+	var home_ship: Variant = out.get("home_ship", null)
+	if home_ship is Dictionary and not (home_ship as Dictionary).is_empty():
+		var inner: Dictionary = migrate_run(home_ship)
+		var inner_dict: Variant = inner.get("dict", null)
+		if inner_dict is Dictionary:
+			out["home_ship"] = inner_dict
+			migrated = bool(inner.get("migrated", false)) or str((home_ship as Dictionary).get("slice_version", "")) != str((inner_dict as Dictionary).get("slice_version", ""))
+		# A null inner result (newer-than-us home_ship inside a LEGACY world
+		# file — contradictory, effectively corrupt) keeps the original dict;
+		# RunSnapshot.from_dict then rejects it with the allowlisted warning.
+	return {"dict": out, "migrated": migrated}

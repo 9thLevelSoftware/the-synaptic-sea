@@ -240,6 +240,12 @@ var home_ship = null                        # the home ShipInstance (marker_id "
 # last_sim_time against it and be fast-forwarded by elapsed world_time on
 # revisit (Phase 4 catch-up). Persisted in WorldSnapshot (additive).
 var world_time: float = 0.0
+# ADR-0046: accumulated in-run play time (seconds). Unlike world_time it
+# only counts frames where the slice is actually playable (started, not
+# complete), so menu/dead time is excluded. Ticked in _process BEFORE the
+# home/away branch split so both branches count; captured into
+# RunSnapshot.play_time_seconds and restored by _apply_run_snapshot.
+var run_play_time_seconds: float = 0.0
 # Phase 5a Task 7: the physical lifeboat docked to the starting derelict.
 # Port-docked to the home ship's airlock at boot; shares ship_systems_manager with it.
 var lifeboat_ship = null                    # ShipInstance (docked to home_ship)
@@ -1667,7 +1673,11 @@ func end_run(reason: String = "extraction") -> int:
 			save_load_service.delete_current_run()
 			for slot_id in SaveSlotStateScript.AUTOSAVE_SLOT_IDS:
 				save_load_service.delete_slot(slot_id)
-	emit_signal("playable_slice_completed", get_slice_completion_summary())
+	# Session 3 (audit): the title screen consumes this summary — carry the
+	# end_run reason so "Last run: death" vs "Last run: extraction" renders.
+	var completion_summary: Dictionary = get_slice_completion_summary()
+	completion_summary["reason"] = reason
+	emit_signal("playable_slice_completed", completion_summary)
 	return payout
 
 ## ADR-0043 / run_id slot-ownership rework: freeze every slot this run
@@ -5205,7 +5215,9 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 			# defeating the REQ-012 stale-resume guard above (Codex review on PR #35).
 			for slot_id in SaveSlotStateScript.AUTOSAVE_SLOT_IDS:
 				save_load_service.delete_slot(slot_id)
-		emit_signal("playable_slice_completed", get_slice_completion_summary())
+		var objective_completion_summary: Dictionary = get_slice_completion_summary()
+		objective_completion_summary["reason"] = "complete"
+		emit_signal("playable_slice_completed", objective_completion_summary)
 		return
 	# REQ-012: auto-save at every stable objective-completion boundary.
 	# Multi-step objectives only fire this once (after the final step
@@ -5441,6 +5453,8 @@ func get_route_gate_collision_enabled_count() -> int:
 
 func _process(delta: float) -> void:
 	world_time += delta  # Live Persistent Ships Phase 1: advance before any branch/return
+	if playable_started and not slice_complete:
+		run_play_time_seconds += delta  # ADR-0046: before the branch split, so home AND away count
 	if away_from_start:
 		# Tranche 1 (audit): mirror the home branch's post-death guard — death
 		# away (end_run sets slice_complete) must stop the sim exactly like
@@ -6752,6 +6766,11 @@ func _build_run_snapshot(use_home_arc_summary: bool = false) -> RunSnapshot:
 		snapshot.temperature_summary = body_temperature_state.get_summary()
 	if status_effects_state != null:
 		snapshot.status_effects_summary = status_effects_state.get_summary()
+	# Session 3 B3 (ADR-0042): persist the hallucination director — active
+	# events, deterministic rng step, tier teeth — so saving mid-episode
+	# does not silently reset it on load.
+	if hallucination_director != null:
+		snapshot.hallucination_summary = hallucination_director.get_summary()
 	# ADR-0034: capture food / cooking / spoilage summaries.
 	if spoilage_state != null:
 		snapshot.spoilage_summary = spoilage_state.get_summary()
@@ -6771,6 +6790,15 @@ func _build_run_snapshot(use_home_arc_summary: bool = false) -> RunSnapshot:
 		snapshot.ammo_summary = ammo_state.get_summary()
 	if utility_item_state != null:
 		snapshot.utility_summary = utility_item_state.get_summary()
+	# ADR-0046: real slot metadata — accumulated play time, the active
+	# ship's location (marker id, or "home" for the hub), and the Synaptic
+	# Sea world seed. _index_run_slot reads these instead of placeholders.
+	snapshot.play_time_seconds = run_play_time_seconds
+	snapshot.current_location = "home"
+	if current_ship != null and String(current_ship.marker_id) != "":
+		snapshot.current_location = String(current_ship.marker_id)
+	if synaptic_sea_world != null:
+		snapshot.world_seed = int(synaptic_sea_world.world_seed)
 	snapshot.slice_version = SaveLoadServiceScript.CURRENT_SLICE_VERSION
 	snapshot.godot_version = Engine.get_version_info()["string"]
 	snapshot.saved_at = Time.get_datetime_string_from_system(true)
@@ -6985,6 +7013,11 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		_is_reloading = false
 		push_error("PlayableGeneratedShip: load failed because slice did not start")
 		return false
+	# ADR-0046: resume the accumulated play-time clock from the save.
+	# current_location/world_seed are stamped-at-save metadata: location is
+	# re-derived live from current_ship at the next save, and the world seed
+	# is owned by the world-save path (SynapticSeaWorld.apply_summary).
+	run_play_time_seconds = snapshot.play_time_seconds
 	# Apply the saved model state to the freshly-built slice.
 	if ship_systems_manager != null and not snapshot.ship_systems_summary.is_empty():
 		ship_systems_manager.apply_summary(snapshot.ship_systems_summary)
@@ -7079,6 +7112,12 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		body_temperature_state.apply_summary(snapshot.temperature_summary)
 	if status_effects_state != null and not snapshot.status_effects_summary.is_empty():
 		status_effects_state.apply_summary(snapshot.status_effects_summary)
+	# Session 3 B3 (ADR-0042): restore the hallucination director. Ordering
+	# matters — the loader reload above already ran _build_hallucination_runtime
+	# (a fresh director per ship), so applying here lands on the rebuilt
+	# instance instead of being wiped by the rebuild.
+	if hallucination_director != null and not snapshot.hallucination_summary.is_empty():
+		hallucination_director.apply_summary(snapshot.hallucination_summary)
 	# ADR-0034: restore food / cooking / spoilage summaries.
 	if spoilage_state != null and not snapshot.spoilage_summary.is_empty():
 		spoilage_state.apply_summary(snapshot.spoilage_summary)

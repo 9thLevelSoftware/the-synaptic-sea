@@ -195,38 +195,84 @@ func to_dict() -> Dictionary:
 		"saved_at": Time.get_datetime_string_from_system(true),
 	}
 
-## Restores from a `to_dict()` dict. Returns false on schema mismatch or
-## missing fields. Empty / null input is rejected.
+## Restores from a `to_dict()` dict. Empty / null / non-dict input is
+## rejected. Session 3 B5 (audit): a schema mismatch used to silently
+## discard the ENTIRE meta progression (currency, unlocks, counters) on
+## load. Now a mismatched-schema dict that still carries known meta
+## fields is best-effort applied with one warning; only a dict with no
+## known fields at all is rejected (leaving current state untouched).
 func apply_summary(summary: Variant) -> bool:
 	if summary == null or typeof(summary) != TYPE_DICTIONARY:
 		return false
 	var dict: Dictionary = summary as Dictionary
+	if dict.is_empty():
+		return false
 	var schema: String = str(dict.get("schema", ""))
 	if schema != SCHEMA_VERSION:
-		return false
-	meta_currency = maxi(0, int(dict.get("meta_currency", 0)))
-	unlocked_class_ids.clear()
-	var cls_v: Variant = dict.get("unlocked_class_ids", {})
-	if typeof(cls_v) == TYPE_DICTIONARY:
-		for k in (cls_v as Dictionary):
-			unlocked_class_ids[str(k)] = bool((cls_v as Dictionary)[k])
-	unlocked_hub_upgrade_ids.clear()
-	var hub_v: Variant = dict.get("unlocked_hub_upgrade_ids", {})
-	if typeof(hub_v) == TYPE_DICTIONARY:
-		for k in (hub_v as Dictionary):
-			unlocked_hub_upgrade_ids[str(k)] = bool((hub_v as Dictionary)[k])
-	unlocked_codex_entry_ids.clear()
-	var codex_v: Variant = dict.get("unlocked_codex_entry_ids", {})
-	if typeof(codex_v) == TYPE_DICTIONARY:
-		for k in (codex_v as Dictionary):
-			unlocked_codex_entry_ids[str(k)] = bool((codex_v as Dictionary)[k])
-	total_runs_completed = maxi(0, int(dict.get("total_runs_completed", 0)))
-	total_runs_deaths = maxi(0, int(dict.get("total_runs_deaths", 0)))
-	highest_skill_level_seen = maxi(0, int(dict.get("highest_skill_level_seen", 0)))
-	last_payout_currency = maxi(0, int(dict.get("last_payout_currency", 0)))
-	last_payout_reason = str(dict.get("last_payout_reason", ""))
-	selected_class_id = str(dict.get("selected_class_id", ""))
+		if not _has_known_meta_field(dict):
+			_warn_schema_once(schema, "rejected (no known meta fields)")
+			return false
+		_warn_schema_once(schema, "best-effort apply of known fields")
+	# PR #64 review (Kilo, accepted): merge what's present, leave what's
+	# absent — a partial dict must never reset fields it does not carry
+	# (a full to_dict() always carries every key, so the matching-schema
+	# round-trip is unchanged).
+	if dict.has("meta_currency"):
+		meta_currency = maxi(0, int(dict.get("meta_currency", 0)))
+	if dict.has("unlocked_class_ids") and typeof(dict.get("unlocked_class_ids")) == TYPE_DICTIONARY:
+		unlocked_class_ids.clear()
+		var cls_v: Dictionary = dict.get("unlocked_class_ids") as Dictionary
+		for k in cls_v:
+			unlocked_class_ids[str(k)] = bool(cls_v[k])
+	if dict.has("unlocked_hub_upgrade_ids") and typeof(dict.get("unlocked_hub_upgrade_ids")) == TYPE_DICTIONARY:
+		unlocked_hub_upgrade_ids.clear()
+		var hub_v: Dictionary = dict.get("unlocked_hub_upgrade_ids") as Dictionary
+		for k in hub_v:
+			unlocked_hub_upgrade_ids[str(k)] = bool(hub_v[k])
+	if dict.has("unlocked_codex_entry_ids") and typeof(dict.get("unlocked_codex_entry_ids")) == TYPE_DICTIONARY:
+		unlocked_codex_entry_ids.clear()
+		var codex_v: Dictionary = dict.get("unlocked_codex_entry_ids") as Dictionary
+		for k in codex_v:
+			unlocked_codex_entry_ids[str(k)] = bool(codex_v[k])
+	if dict.has("total_runs_completed"):
+		total_runs_completed = maxi(0, int(dict.get("total_runs_completed", 0)))
+	if dict.has("total_runs_deaths"):
+		total_runs_deaths = maxi(0, int(dict.get("total_runs_deaths", 0)))
+	if dict.has("highest_skill_level_seen"):
+		highest_skill_level_seen = maxi(0, int(dict.get("highest_skill_level_seen", 0)))
+	if dict.has("last_payout_currency"):
+		last_payout_currency = maxi(0, int(dict.get("last_payout_currency", 0)))
+	if dict.has("last_payout_reason"):
+		last_payout_reason = str(dict.get("last_payout_reason", ""))
+	if dict.has("selected_class_id"):
+		selected_class_id = str(dict.get("selected_class_id", ""))
 	return true
+
+## True when the dict carries at least one field this model owns — the
+## gate between "older/foreign schema worth salvaging" and garbage.
+func _has_known_meta_field(dict: Dictionary) -> bool:
+	for key in [
+		"meta_currency",
+		"unlocked_class_ids",
+		"unlocked_hub_upgrade_ids",
+		"unlocked_codex_entry_ids",
+		"total_runs_completed",
+		"total_runs_deaths",
+		"highest_skill_level_seen",
+		"last_payout_currency",
+		"last_payout_reason",
+		"selected_class_id",
+	]:
+		if dict.has(key):
+			return true
+	return false
+
+var _schema_warned: bool = false
+func _warn_schema_once(found_schema: String, action: String) -> void:
+	if _schema_warned:
+		return
+	_schema_warned = true
+	push_warning("MetaProgressionState: schema mismatch ('%s' != '%s'); %s" % [found_schema, SCHEMA_VERSION, action])
 
 ## Persists to `user://meta_progression.json`. Returns false on IO failure.
 func save_to_disk(save_path: String = SAVE_PATH) -> bool:

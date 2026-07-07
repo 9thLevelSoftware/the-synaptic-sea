@@ -15,6 +15,13 @@ class_name RunSnapshot
 ## so the multi-slot API can stamp every save with stable identity
 ## without parsing file names. They are pure additive fields; old saves
 ## that lack them load with empty defaults.
+##
+## Per ADR-0046 (schema gate2-current-run-4): `play_time_seconds`,
+## `current_location`, and `world_seed` carry real slot metadata so
+## SaveLoadService._index_run_slot no longer derives placeholders from
+## player_position / saved_at_epoch. All three are current-run state
+## (no hub/meta scope creep); _migrate_v3_to_v4 defaults them for
+## older saves.
 
 var layout_path: String = ""
 var kit_path: String = ""
@@ -50,6 +57,21 @@ var sanity_summary: Dictionary = {}
 var radiation_summary: Dictionary = {}
 var temperature_summary: Dictionary = {}
 var status_effects_summary: Dictionary = {}
+# Session 3 B3 (audit, rides ADR-0046's gate2-current-run-4 bump):
+# HallucinationDirector state (ADR-0042) — active events, rng step, tier
+# teeth — was never persisted, so saving mid-hallucination silently reset
+# the director on load.
+var hallucination_summary: Dictionary = {}
+
+# ADR-0046: real slot metadata. play_time_seconds is the coordinator's
+# accumulated in-run play time (ticked every _process frame on BOTH the
+# home and away branches); current_location is the active ship's marker
+# id or "home"; world_seed is the Synaptic Sea world seed the run was
+# generated from. Stamped by _build_run_snapshot; consumed by
+# _index_run_slot for the slot browser.
+var play_time_seconds: float = 0.0
+var current_location: String = ""
+var world_seed: int = 0
 
 var slot_id: String = ""
 var slot_kind: String = ""
@@ -103,6 +125,7 @@ const SUMMARY_FIELDS: Array = [
 	"radiation_summary",
 	"temperature_summary",
 	"status_effects_summary",
+	"hallucination_summary",
 ]
 
 func get_summary_count() -> int:
@@ -142,6 +165,10 @@ func to_dict() -> Dictionary:
 		"radiation_summary": radiation_summary.duplicate(true),
 		"temperature_summary": temperature_summary.duplicate(true),
 		"status_effects_summary": status_effects_summary.duplicate(true),
+		"hallucination_summary": hallucination_summary.duplicate(true),
+		"play_time_seconds": play_time_seconds,
+		"current_location": current_location,
+		"world_seed": world_seed,
 		"slot_id": slot_id,
 		"slot_kind": slot_kind,
 		"is_autosave": is_autosave,
@@ -204,6 +231,10 @@ static func from_dict(data: Variant, expected_slice_version: String, expected_go
 	snapshot.radiation_summary = _deep_copy_dict(dict.get("radiation_summary", {}))
 	snapshot.temperature_summary = _deep_copy_dict(dict.get("temperature_summary", {}))
 	snapshot.status_effects_summary = _deep_copy_dict(dict.get("status_effects_summary", {}))
+	snapshot.hallucination_summary = _deep_copy_dict(dict.get("hallucination_summary", {}))
+	snapshot.play_time_seconds = float(dict.get("play_time_seconds", 0.0))
+	snapshot.current_location = str(dict.get("current_location", ""))
+	snapshot.world_seed = int(dict.get("world_seed", 0))
 	snapshot.slot_id = str(dict.get("slot_id", ""))
 	snapshot.slot_kind = str(dict.get("slot_kind", ""))
 	snapshot.is_autosave = bool(dict.get("is_autosave", false))

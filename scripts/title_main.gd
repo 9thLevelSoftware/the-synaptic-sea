@@ -32,6 +32,9 @@ var _presets: Array = []
 ## title menu after playable_failed tears the dead session down.
 var _last_boot_error: String = ""
 var _failure_handled: bool = false
+## Session 3 (audit): outcome of the most recent completed run
+## (playable_slice_completed had zero subscribers before this).
+var _last_run_outcome: String = ""
 
 func _ready() -> void:
 	_save_load_service = SaveLoadServiceScript.new()
@@ -52,6 +55,9 @@ func _build_title_ui() -> void:
 	add_child(menu_panel)
 	menu_state.menu_changed.connect(_on_menu_changed)
 	menu_state.focus_changed.connect(_on_focus_changed)
+	# Session 3 (audit): enabled_changed was connected nowhere — the panel now
+	# follows the model instead of relying on callers to hand-refresh.
+	menu_state.enabled_changed.connect(_on_item_enabled_changed)
 	_refresh_continue_enabled()
 	menu_state.open_menu("main_menu")
 	_refresh_panel()
@@ -155,6 +161,11 @@ func _poll_for_playable_started(should_load: bool) -> void:
 	if playable_instance.has_signal("return_to_title_requested") \
 			and not playable_instance.return_to_title_requested.is_connected(_on_gameplay_return_to_title):
 		playable_instance.return_to_title_requested.connect(_on_gameplay_return_to_title)
+	# Session 3 (audit): surface the run outcome on the title menu after the
+	# player returns from a completed run (signal was previously unconsumed).
+	if playable_instance.has_signal("playable_slice_completed") \
+			and not playable_instance.playable_slice_completed.is_connected(_on_gameplay_slice_completed):
+		playable_instance.playable_slice_completed.connect(_on_gameplay_slice_completed)
 	if should_load:
 		playable_instance.request_load()
 	# Dirty-flag handoff (spec 3.7): only push title-local settings into the fresh
@@ -207,6 +218,12 @@ func _on_menu_changed(_new_menu_id: String, _previous_menu_id: String) -> void:
 func _on_focus_changed(_new_index: int) -> void:
 	_refresh_panel()
 
+func _on_item_enabled_changed(_item_id: String, _enabled: bool) -> void:
+	_refresh_panel()
+
+func _on_gameplay_slice_completed(summary: Dictionary) -> void:
+	_last_run_outcome = str(summary.get("reason", summary.get("outcome", "complete")))
+
 func _refresh_panel() -> void:
 	if not is_instance_valid(menu_panel) or menu_state == null:
 		return
@@ -229,6 +246,9 @@ func _refresh_panel() -> void:
 	if not _last_boot_error.is_empty():
 		lines.append("")
 		lines.append("Load failed: %s" % _last_boot_error)
+	if not _last_run_outcome.is_empty():
+		lines.append("")
+		lines.append("Last run: %s" % _last_run_outcome)
 	menu_panel.set_content("The Synaptic Sea", lines)
 
 ## Title-local mirror of `menu_coordinator._cycle_setting` (same ids/setters/enum

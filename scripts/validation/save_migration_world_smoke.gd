@@ -1,0 +1,105 @@
+extends SceneTree
+
+## Session 3 (audit): two world-migration defects in save_migration_service.gd.
+##
+##  1. unknown_version_passthrough — migrate_world's guard compared
+##     `_world_step(current) == null`, but _world_step returns `Callable()`
+##     (an EMPTY Callable, never null in GDScript 4). The guard never fired,
+##     `.call()` executed the empty Callable, and a world save from a NEWER
+##     build collapsed into a corrupt-looking dict instead of passing through
+##     intact so the load path can reject it without corrupt-quarantining a
+##     save that still belongs to the newer build.
+##  2. legacy_home_ship_migrated — _migrate_world_legacy_to_world_4 was a
+##     pure duplicate: the embedded home_ship RunSnapshot dict kept its old
+##     slice_version, so a world-1..3 file survived the OUTER migration and
+##     then failed RunSnapshot.from_dict on the inner slice.
+##  3. current_world_home_ship_migrated — the world schema stayed at world-4
+##     while the embedded RunSnapshot schema advanced to gate2-current-run-4,
+##     so current-version world files also need the inner home_ship migration.
+##
+## Pure-model smoke (no scene). Marker:
+## SAVE MIGRATION WORLD PASS unknown_version_passthrough=true legacy_home_ship_migrated=true current_world_home_ship_migrated=true
+
+const SaveMigrationServiceScript := preload("res://scripts/systems/save_migration_service.gd")
+
+func _initialize() -> void:
+	var svc = SaveMigrationServiceScript.new()
+
+	# --- 1. Unknown (future) world version must pass through intact ---------
+	var future_world: Dictionary = {
+		"slice_version": "world-99",
+		"sentinel_field": "keep_me",
+		"home_ship": {"slice_version": "gate2-current-run-99"},
+	}
+	var result: Dictionary = svc.migrate_world(future_world.duplicate(true))
+	var out: Variant = result.get("dict", null)
+	if not (out is Dictionary):
+		_fail("future world collapsed to %s (empty-Callable guard bug)" % str(out))
+		return
+	if str((out as Dictionary).get("sentinel_field", "")) != "keep_me":
+		_fail("future world lost fields through migrate_world: %s" % str(out))
+		return
+	if bool(result.get("migrated", true)):
+		_fail("future world reported migrated=true (should be pass-through)")
+		return
+	if not bool(result.get("newer_than_current", false)):
+		_fail("future world did not report newer_than_current=true")
+		return
+	var passthrough_ok: bool = true
+
+	# --- 2. Legacy world must migrate the embedded home_ship slice ----------
+	var legacy_world: Dictionary = {
+		"slice_version": "world-2",
+		"home_ship": {
+			"slice_version": SaveMigrationServiceScript.KNOWN_VERSIONS[0],
+			"player_position": [1.0, 0.0, 2.0],
+		},
+	}
+	var legacy_result: Dictionary = svc.migrate_world(legacy_world)
+	var legacy_out: Variant = legacy_result.get("dict", null)
+	if not (legacy_out is Dictionary):
+		_fail("legacy world migration returned null")
+		return
+	if str((legacy_out as Dictionary).get("slice_version", "")) != SaveMigrationServiceScript.WORLD_TARGET_VERSION:
+		_fail("outer world version not stamped to target")
+		return
+	var inner: Variant = (legacy_out as Dictionary).get("home_ship", null)
+	if not (inner is Dictionary):
+		_fail("home_ship missing after legacy world migration")
+		return
+	var inner_version: String = str((inner as Dictionary).get("slice_version", ""))
+	if inner_version != SaveMigrationServiceScript.TARGET_VERSION:
+		_fail("embedded home_ship slice not migrated: slice_version='%s' expected '%s'" % [inner_version, SaveMigrationServiceScript.TARGET_VERSION])
+		return
+
+	# --- 3. Current world-4 files may still contain older home_ship slices ---
+	var current_world: Dictionary = {
+		"slice_version": SaveMigrationServiceScript.WORLD_TARGET_VERSION,
+		"home_ship": {
+			"slice_version": SaveMigrationServiceScript.KNOWN_VERSIONS[2],
+			"player_position": [4.0, 0.0, 8.0],
+		},
+	}
+	var current_result: Dictionary = svc.migrate_world(current_world)
+	var current_out: Variant = current_result.get("dict", null)
+	if not (current_out is Dictionary):
+		_fail("current world migration returned null")
+		return
+	var current_inner: Variant = (current_out as Dictionary).get("home_ship", null)
+	if not (current_inner is Dictionary):
+		_fail("current world home_ship missing after migration")
+		return
+	var current_inner_version: String = str((current_inner as Dictionary).get("slice_version", ""))
+	if current_inner_version != SaveMigrationServiceScript.TARGET_VERSION:
+		_fail("current world embedded home_ship slice not migrated: slice_version='%s' expected '%s'" % [current_inner_version, SaveMigrationServiceScript.TARGET_VERSION])
+		return
+	if not bool(current_result.get("migrated", false)):
+		_fail("current world embedded home_ship migration did not report migrated=true")
+		return
+
+	print("SAVE MIGRATION WORLD PASS unknown_version_passthrough=%s legacy_home_ship_migrated=true current_world_home_ship_migrated=true" % str(passthrough_ok).to_lower())
+	quit(0)
+
+func _fail(reason: String) -> void:
+	push_error("SAVE MIGRATION WORLD FAIL reason=%s" % reason)
+	quit(1)

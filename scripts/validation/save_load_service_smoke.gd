@@ -12,6 +12,12 @@ const PlayerProgressionStateScript := preload("res://scripts/systems/player_prog
 const ClassDefinitionScript := preload("res://scripts/systems/class_definition.gd")
 const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
 const MaterialStateScript := preload("res://scripts/systems/material_state.gd")
+const HallucinationDirectorScript := preload("res://scripts/systems/hallucination_director.gd")
+const VitalsStateScript := preload("res://scripts/systems/vitals_state.gd")
+const SanityStateScript := preload("res://scripts/systems/sanity_state.gd")
+const RadiationStateScript := preload("res://scripts/systems/radiation_state.gd")
+const BodyTemperatureStateScript := preload("res://scripts/systems/body_temperature_state.gd")
+const StatusEffectsStateScript := preload("res://scripts/systems/status_effects_state.gd")
 
 func _initialize() -> void:
 	# Direct service smoke (REQ-012).
@@ -115,6 +121,47 @@ func _initialize() -> void:
 	crafting.tick(10.0)
 	original.crafting_summary = crafting.get_summary()
 	original.material_summary = materials.get_summary()
+	# Session 3 B3 (audit): HallucinationDirector state (active events, rng
+	# step, tier teeth) was never persisted. Build a director in a real
+	# mid-hallucination state (tier 3, active events with Vector3 anchors)
+	# and prove the summary survives the DISK round-trip — JSON does not
+	# preserve Vector3, so the model must serialize event positions.
+	var hallu := HallucinationDirectorScript.new()
+	hallu.configure({"seed": 17})
+	var hallu_anchors: Array = [Vector3(1.0, 0.0, 2.0), Vector3(4.0, 0.0, 6.0)]
+	for i in range(24):
+		hallu.tick(0.5, {"sanity": 12.0, "in_safe_zone": false, "anchor_positions": hallu_anchors})
+	if hallu.get_active_events().is_empty():
+		_fail("hallucination fixture produced no active events (fixture bug)")
+		return
+	original.set("hallucination_summary", hallu.get_summary())
+	# Session 3 B7 (audit): the survival-vitals set (vitals, sanity,
+	# radiation, temperature, status_effects) was counted in SUMMARY_FIELDS
+	# but never populated here — the "round-trip" passed {} == {}. Seed each
+	# from its real model in a NON-DEFAULT state so the disk round-trip
+	# proves the runtime numbers survive.
+	var vitals := VitalsStateScript.new()
+	vitals.configure({})
+	vitals.tick(6.0)  # passive hunger/thirst/stamina attrition
+	vitals.health = 77.5
+	var sanity := SanityStateScript.new()
+	sanity.configure({})
+	sanity.adjust_sanity(-35.0)  # 100 -> 65
+	var radiation := RadiationStateScript.new()
+	radiation.configure({"in_radiation_zone": true})
+	radiation.adjust_radiation(60.0)  # past HEALTH_DRAIN_THRESHOLD -> drain active
+	var temperature := BodyTemperatureStateScript.new()
+	temperature.configure({"in_extreme_zone": true})
+	temperature.adjust_temperature(15.0)  # 22 -> 37, outside safe_max -> thirst x1.5
+	var statuses := StatusEffectsStateScript.new()
+	statuses.configure({})
+	statuses.add_effect("radiation_sickness", 30.0, 2)
+	statuses.add_effect("stim_focus", 12.0, 1)
+	original.vitals_summary = vitals.get_summary()
+	original.sanity_summary = sanity.get_summary()
+	original.radiation_summary = radiation.get_summary()
+	original.temperature_summary = temperature.get_summary()
+	original.status_effects_summary = statuses.get_summary()
 	original.slice_version = SaveLoadServiceScript.CURRENT_SLICE_VERSION
 	original.godot_version = Engine.get_version_info()["string"]
 	original.saved_at = Time.get_datetime_string_from_system(true)
@@ -146,8 +193,8 @@ func _initialize() -> void:
 	if loaded.current_objective_sequence != original.current_objective_sequence:
 		_fail("current_objective_sequence mismatch")
 		return
-	if loaded.get_summary_count() != 27:
-		_fail("summary_count=%d expected 27" % loaded.get_summary_count())
+	if loaded.get_summary_count() != 28:
+		_fail("summary_count=%d expected 28" % loaded.get_summary_count())
 		return
 	if not loaded.ship_systems_summary.has("systems") or not loaded.ship_systems_summary.has("system_order"):
 		_fail("ship_systems_summary missing manager keys after round-trip")
@@ -214,6 +261,65 @@ func _initialize() -> void:
 		return
 	if not _dicts_equal(loaded.water_recycler_summary, original.water_recycler_summary):
 		_fail("water_recycler_summary mismatch")
+		return
+	# B3: hallucination_summary must round-trip the disk write AND remain
+	# usable — a fresh director applying the loaded summary must yield
+	# Vector3 event positions (JSON turns naive Vector3s into strings,
+	# which would crash HallucinationManager.render's typed assignment).
+	var loaded_hallu: Variant = loaded.get("hallucination_summary")
+	if loaded_hallu == null or not (loaded_hallu is Dictionary) or (loaded_hallu as Dictionary).is_empty():
+		_fail("hallucination_summary missing/empty after round-trip: %s" % str(loaded_hallu))
+		return
+	var hallu2 := HallucinationDirectorScript.new()
+	if not hallu2.apply_summary(loaded_hallu as Dictionary):
+		_fail("hallucination apply_summary rejected the loaded summary")
+		return
+	if hallu2.get_tier() != hallu.get_tier():
+		_fail("hallucination tier=%d did not round-trip (expected %d)" % [hallu2.get_tier(), hallu.get_tier()])
+		return
+	var hallu2_events: Array = hallu2.get_active_events()
+	if hallu2_events.size() != hallu.get_active_events().size():
+		_fail("hallucination active_events count=%d did not round-trip (expected %d)" % [hallu2_events.size(), hallu.get_active_events().size()])
+		return
+	if not (hallu2_events[0].get("position") is Vector3):
+		_fail("hallucination event position not a Vector3 after disk round-trip (got %s)" % str(hallu2_events[0].get("position")))
+		return
+	var original_hallu_timers: Dictionary = original.hallucination_summary.get("spawn_timers", {}) as Dictionary
+	var loaded_hallu_timers: Dictionary = hallu2.get_summary().get("spawn_timers", {}) as Dictionary
+	if not _dicts_equal(loaded_hallu_timers, original_hallu_timers):
+		_fail("hallucination spawn_timers did not round-trip: got=%s expected=%s" % [str(loaded_hallu_timers), str(original_hallu_timers)])
+		return
+	# B7: field-level round-trip of the survival set, plus spot asserts on
+	# the non-default values so an accidental {} == {} can never pass again.
+	if not _dicts_equal(loaded.vitals_summary, original.vitals_summary):
+		_fail("vitals_summary mismatch")
+		return
+	if absf(float(loaded.vitals_summary.get("health", 0.0)) - 77.5) > 0.001:
+		_fail("vitals health=%s expected 77.5" % str(loaded.vitals_summary.get("health")))
+		return
+	if not _dicts_equal(loaded.sanity_summary, original.sanity_summary):
+		_fail("sanity_summary mismatch")
+		return
+	if absf(float(loaded.sanity_summary.get("sanity", 0.0)) - 65.0) > 0.001:
+		_fail("sanity=%s expected 65.0" % str(loaded.sanity_summary.get("sanity")))
+		return
+	if not _dicts_equal(loaded.radiation_summary, original.radiation_summary):
+		_fail("radiation_summary mismatch")
+		return
+	if not bool(loaded.radiation_summary.get("health_drain_active", false)):
+		_fail("radiation health_drain_active did not round-trip true")
+		return
+	if not _dicts_equal(loaded.temperature_summary, original.temperature_summary):
+		_fail("temperature_summary mismatch")
+		return
+	if bool(loaded.temperature_summary.get("is_safe", true)):
+		_fail("temperature is_safe should round-trip false (extreme fixture)")
+		return
+	if not _dicts_equal(loaded.status_effects_summary, original.status_effects_summary):
+		_fail("status_effects_summary mismatch")
+		return
+	if int(loaded.status_effects_summary.get("count", 0)) != 2:
+		_fail("status effects count=%d expected 2" % int(loaded.status_effects_summary.get("count", 0)))
 		return
 
 	# Version mismatch rejection: write a snapshot with the wrong slice_version
@@ -282,6 +388,59 @@ func _initialize() -> void:
 	if service.load_world() != null:
 		_fail("cleanup: load_world() should be null after delete_current_run")
 		return
+
+	# PR #64 Codex P2: a future world save from a newer build is not corrupt.
+	# The older build must refuse to load it, but leave world.json intact so
+	# the newer build can still use it after sync/downgrade churn.
+	var future_world = world_script.new()
+	future_world.world_summary = {"world_seed": 99, "player_position": [0.0, 0.0, 0.0], "generated_marker_ids": ["future"]}
+	future_world.home_ship = {"slice_version": SaveLoadServiceScript.CURRENT_SLICE_VERSION}
+	future_world.slice_version = world_script.WORLD_SLICE_VERSION
+	future_world.godot_version = Engine.get_version_info()["string"]
+	future_world.saved_at = "2026-07-07T00:00:00"
+	if not service.save_world(future_world):
+		_fail("future world preserve: save_world fixture failed")
+		return
+	var future_dict: Dictionary = future_world.to_dict()
+	future_dict["slice_version"] = "world-99"
+	future_dict["future_sentinel"] = "keep_me"
+	var future_file := FileAccess.open(SaveLoadServiceScript.WORLD_SLOT_FILE, FileAccess.WRITE)
+	if future_file == null:
+		_fail("future world preserve: could not overwrite world fixture")
+		return
+	future_file.store_string(JSON.stringify(future_dict, "	"))
+	future_file.close()
+	if service.load_world() != null:
+		_fail("future world preserve: load_world should reject newer world-99")
+		return
+	if not FileAccess.file_exists(SaveLoadServiceScript.WORLD_SLOT_FILE):
+		_fail("future world preserve: load_world moved future world into .corrupt")
+		return
+	var future_after: Variant = JSON.parse_string(FileAccess.get_file_as_string(SaveLoadServiceScript.WORLD_SLOT_FILE))
+	if not (future_after is Dictionary) or str((future_after as Dictionary).get("future_sentinel", "")) != "keep_me":
+		_fail("future world preserve: world.json contents were not preserved")
+		return
+
+	# PR #64 Codex P1: the outer world schema stayed at world-4 while the
+	# embedded home RunSnapshot schema advanced to gate2-current-run-4.
+	# load_world() must still migrate that inner home slice.
+	var stale_home_world = world_script.new()
+	stale_home_world.world_summary = {"world_seed": 100, "player_position": [0.0, 0.0, 0.0], "generated_marker_ids": ["stale-home"]}
+	stale_home_world.home_ship = {"slice_version": "gate2-current-run-3", "player_position": [1.0, 0.0, 2.0]}
+	stale_home_world.slice_version = world_script.WORLD_SLICE_VERSION
+	stale_home_world.godot_version = Engine.get_version_info()["string"]
+	stale_home_world.saved_at = "2026-07-07T00:01:00"
+	if not service.save_world(stale_home_world):
+		_fail("current world home migration: save_world fixture failed")
+		return
+	var stale_loaded = service.load_world()
+	if stale_loaded == null:
+		_fail("current world home migration: load_world returned null")
+		return
+	if str(stale_loaded.home_ship.get("slice_version", "")) != SaveLoadServiceScript.CURRENT_SLICE_VERSION:
+		_fail("current world home migration: home_ship slice_version='%s' expected '%s'" % [str(stale_loaded.home_ship.get("slice_version", "")), SaveLoadServiceScript.CURRENT_SLICE_VERSION])
+		return
+	service.delete_current_run()
 
 	# --- run_id slot-ownership rework: stamp + slot_ids_for_run + freeze_run ---
 	for sid in ["slot_01", "autosave_a", "autosave_b", "autosave_c", SaveLoadServiceScript.ACTIVE_AUTOSAVE_SLOT_ID]:
@@ -390,7 +549,7 @@ func _initialize() -> void:
 	service.delete_slot("slot_01")
 	service.set_active_run_id("")
 
-	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=27")
+	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=28 survival_roundtrip=true")
 	quit(0)
 
 func _make_spoilage_summary_for_smoke() -> Dictionary:

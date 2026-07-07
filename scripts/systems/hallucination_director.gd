@@ -130,12 +130,29 @@ func get_fx_intensity() -> float:
 	return clampf(float(_current_tier) / 3.0, 0.0, 1.0)
 
 func get_summary() -> Dictionary:
+	# Session 3 B3: event positions are Vector3, which JSON.stringify turns
+	# into an opaque string — a naive duplicate would round-trip to a String
+	# and crash HallucinationManager.render's typed `var pos: Vector3`
+	# assignment. Serialize positions as [x, y, z] arrays instead.
+	var events_out: Array = []
+	for e in active_events:
+		if not (e is Dictionary):
+			continue
+		var copy: Dictionary = (e as Dictionary).duplicate(true)
+		var pos: Variant = copy.get("position", null)
+		if pos is Vector3:
+			copy["position"] = [(pos as Vector3).x, (pos as Vector3).y, (pos as Vector3).z]
+		events_out.append(copy)
+	var timers_out: Dictionary = {}
+	for kind in _spawn_timers:
+		timers_out[str(kind)] = maxf(0.0, float(_spawn_timers[kind]))
 	return {
 		"seed": rng_seed,
 		"step": step,
 		"health_drain_per_second": health_drain_per_second,
 		"stamina_recovery_mult": stamina_recovery_mult,
-		"active_events": active_events.duplicate(true),
+		"active_events": events_out,
+		"spawn_timers": timers_out,
 		"current_tier": _current_tier,
 	}
 
@@ -147,7 +164,41 @@ func apply_summary(summary: Dictionary) -> bool:
 	health_drain_per_second = maxf(0.0, float(summary.get("health_drain_per_second", health_drain_per_second)))
 	stamina_recovery_mult = clampf(float(summary.get("stamina_recovery_mult", stamina_recovery_mult)), 0.0, 1.0)
 	if summary.get("active_events", null) is Array:
-		active_events = (summary["active_events"] as Array).duplicate(true)
+		active_events.clear()
+		var max_id: int = 0
+		for raw in summary["active_events"] as Array:
+			if not (raw is Dictionary):
+				continue
+			var e: Dictionary = (raw as Dictionary).duplicate(true)
+			# Parse serialized [x, y, z] back into Vector3; tolerate an
+			# in-memory Vector3 (pre-serialization apply path).
+			var pos: Variant = e.get("position", null)
+			if pos is Array and (pos as Array).size() >= 3:
+				var pa: Array = pos as Array
+				# PR #64 review: float(non-numeric) silently yields 0.0 —
+				# a corrupt ["x","y","z"] would become an origin-anchored
+				# phantom. Drop the event instead.
+				if not ((pa[0] is int or pa[0] is float) and (pa[1] is int or pa[1] is float) and (pa[2] is int or pa[2] is float)):
+					continue
+				e["position"] = Vector3(float(pa[0]), float(pa[1]), float(pa[2]))
+			elif not (pos is Vector3):
+				continue  # unusable event (e.g. a legacy stringified position)
+			active_events.append(e)
+			max_id = maxi(max_id, int(e.get("id", 0)))
+		# _next_id is not persisted: re-derive past the restored ids so a
+		# newly-spawned event cannot collide with (and be dissipated as)
+		# a restored one via remove_event's first-id match.
+		_next_id = max_id + 1
+	if summary.get("spawn_timers", null) is Dictionary:
+		_spawn_timers.clear()
+		var timers: Dictionary = summary["spawn_timers"] as Dictionary
+		for raw_kind in timers:
+			var kind: String = str(raw_kind)
+			if not KIND_CONFIG.has(kind):
+				continue
+			var raw_value: Variant = timers[raw_kind]
+			if raw_value is int or raw_value is float:
+				_spawn_timers[kind] = maxf(0.0, float(raw_value))
 	_current_tier = int(summary.get("current_tier", _current_tier))
 	return true
 
