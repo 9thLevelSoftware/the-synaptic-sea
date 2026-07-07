@@ -465,3 +465,212 @@ A Gate 1 Go decision requires the regression bundle plus either the automated pr
   - `scripts/validation/title_settings_smoke.gd` (marker `TITLE SETTINGS PASS open=true cycle=true back=true applied=true`) — main-scene (boots `title_main.tscn`): title settings sub-flow (spec §3.7 / ADR-0043 decision 6) — opens the title-local settings screen, cycles a setting (mirroring `menu_coordinator._cycle_setting`), backs out, and asserts the dirty-flagged summary is applied into the session via `apply_ui_settings_summary` on New Game/Continue. Added to regression bundle.
   - `scripts/validation/save_load_slot_screen_smoke.gd` (marker `SAVE LOAD SLOT SCREEN PASS save=true load=true delete_armed=true delete_confirmed=true`) — main-scene: drives the interactive multi-slot screen's save/load/delete-arm/delete-confirm dispatch through real input, including the ship-only-not-world assertion for manual-slot loads (ADR-0043 decision 4). Added to regression bundle.
   - `scripts/validation/save_and_exit_smoke.gd` (marker `SAVE AND EXIT PASS saved=true world_fresh=true return_signal=true`) — main-scene: drives the pause-menu Save & Exit action, asserts `request_save()` persists world.json, a fresh boot reflects the saved state, and `return_to_title_requested` fires. Added to regression bundle.
+
+## Orphan smoke classification (Tranche 3, 2026-07-06)
+
+`scripts/validation/` carries far more smokes than the regression bundle runs. Tranche 3
+(audit remediation) promoted 25 of them (23 orphans + 2 new) and classified every remaining
+orphan below so none is silent. Dispositions:
+
+- **promotion-candidate** — real, currently-unregistered coverage (mostly pure-model unit
+  smokes plus some scene-level flows: docking/hangar is the largest fully-unrepresented
+  subsystem, followed by coherent-loader, travel/lifeboat, cargo/cart/equipment,
+  food/survival state models, UI panels, e2e chains, and the `main_playable_slice_*`
+  cluster, which needs per-file supersession review before wholesale promotion). Promote
+  opportunistically when a tranche touches the subsystem.
+- **deferred-pending-T5** — procgen/layout pipeline smokes; Tranche 5 rewrites that layer
+  (schema 1.2.0, archetype enforcement, encounter tables), so promotion happens with it.
+- **deferred-pending-T6** — `demo_scope_gate_smoke`; promoted when Tranche 6 wires the gate.
+- **legacy-capture** — display-server/PNG/export artifact tools, self-excluded from headless
+  regression by design.
+- **debug-tool** — developer probes without pass-marker discipline.
+- **release-audit-tool** — export-time checklist tools, not per-commit regression.
+- **non-headless-harness** — `Node3D` scene fixtures with no `_initialize()`; cannot run as
+  `--script` at all.
+
+The table is generated and drift-checked by `tools/classify_orphan_smokes.sh`
+(`--check` fails on any unclassified orphan or stale row; run it whenever bundle
+membership changes).
+
+| Orphan smoke | Disposition |
+|---|---|
+| `_layout_visual_capture` | legacy-capture |
+| `achievement_state_smoke` | promotion-candidate |
+| `archetype_load_smoke` | deferred-pending-T5 |
+| `armor_resolver_smoke` | promotion-candidate |
+| `assert_hang_test` | debug-tool |
+| `bay_dock_launch_smoke` | promotion-candidate |
+| `bay_travel_unbay_smoke` | promotion-candidate |
+| `biome_profile_smoke` | deferred-pending-T5 |
+| `boarding_flip_smoke` | promotion-candidate |
+| `boot_dock_aligned_smoke` | promotion-candidate |
+| `bridge_terminal_login_smoke` | promotion-candidate |
+| `bridge_terminal_smoke` | promotion-candidate |
+| `canonical_opening_smoke` | promotion-candidate |
+| `cargo_hold_smoke` | promotion-candidate |
+| `cargo_move_item_smoke` | promotion-candidate |
+| `cargo_transfer_smoke` | promotion-candidate |
+| `cart_control_smoke` | promotion-candidate |
+| `cart_state_smoke` | promotion-candidate |
+| `cell_layout_engine_smoke` | deferred-pending-T5 |
+| `claim_persistence_smoke` | promotion-candidate |
+| `class_definitions_smoke` | promotion-candidate |
+| `coherent_loader_metadata_smoke` | promotion-candidate |
+| `coherent_playable_scene_smoke` | promotion-candidate |
+| `coherent_playable_traversal_smoke` | promotion-candidate |
+| `coherent_proof_ship_capture` | legacy-capture |
+| `coherent_runtime_loader_smoke` | promotion-candidate |
+| `coherent_static_fixture_validator` | promotion-candidate |
+| `consumable_save_load_smoke` | promotion-candidate |
+| `consumable_state_smoke` | promotion-candidate |
+| `container_variety_smoke` | promotion-candidate |
+| `crafting_debug_smoke` | debug-tool |
+| `crafting_state_smoke` | promotion-candidate |
+| `cross_system_dependency_smoke` | promotion-candidate |
+| `cross_training_smoke` | promotion-candidate |
+| `debug_apply_summary` | debug-tool |
+| `debug_save_load` | debug-tool |
+| `demo_scope_gate_smoke` | deferred-pending-T6 |
+| `derelict_generator_smoke` | deferred-pending-T5 |
+| `derelict_loot_smoke` | promotion-candidate |
+| `derelict_objective_controller_smoke` | promotion-candidate |
+| `difficulty_profile_smoke` | promotion-candidate |
+| `dock_breach_smoke` | promotion-candidate |
+| `dock_copresence_smoke` | promotion-candidate |
+| `dock_port_types_smoke` | promotion-candidate |
+| `dock_ports_smoke` | promotion-candidate |
+| `docking_loop_smoke` | promotion-candidate |
+| `docking_manager_smoke` | promotion-candidate |
+| `docking_persistence_smoke` | promotion-candidate |
+| `e2e_combat_loot_craft_smoke` | promotion-candidate |
+| `e2e_ship_meta_loop_smoke` | promotion-candidate |
+| `e2e_survival_loop_smoke` | promotion-candidate |
+| `effect_dispatcher_smoke` | promotion-candidate |
+| `encounter_injector_smoke` | deferred-pending-T5 |
+| `encumbrance_smoke` | promotion-candidate |
+| `equipment_carts_smoke` | promotion-candidate |
+| `equipment_defs_smoke` | promotion-candidate |
+| `equipment_state_smoke` | promotion-candidate |
+| `export_presets_smoke` | release-audit-tool |
+| `field_crafting_state_smoke` | promotion-candidate |
+| `floor_wrapper_collision_footprint_smoke` | deferred-pending-T5 |
+| `food_save_load_smoke` | promotion-candidate |
+| `food_state_smoke` | promotion-candidate |
+| `gameplay_slice_builder_smoke` | deferred-pending-T5 |
+| `gridmap_meshlibrary_smoke` | deferred-pending-T5 |
+| `hangar_bay_smoke` | promotion-candidate |
+| `hangar_control_smoke` | promotion-candidate |
+| `hangar_persistence_smoke` | promotion-candidate |
+| `hangar_port_smoke` | promotion-candidate |
+| `hydroponics_state_smoke` | promotion-candidate |
+| `interior_aabb_smoke` | deferred-pending-T5 |
+| `inventory_panel_smoke` | promotion-candidate |
+| `inventory_selection_model_smoke` | promotion-candidate |
+| `inventory_widget_smoke` | promotion-candidate |
+| `item_inventory_smoke` | promotion-candidate |
+| `junk_items_smoke` | promotion-candidate |
+| `kit_catalog_smoke` | deferred-pending-T5 |
+| `layout_serializer_smoke` | deferred-pending-T5 |
+| `life_boat_layout_smoke` | promotion-candidate |
+| `life_boat_smoke` | promotion-candidate |
+| `life_support_system_smoke` | promotion-candidate |
+| `lifeboat_travel_gate_smoke` | promotion-candidate |
+| `live_main_prepare_to_upgrade_probe` | debug-tool |
+| `load_from_blueprint_smoke` | deferred-pending-T5 |
+| `localization_catalog_smoke` | promotion-candidate |
+| `locked_iso_readability_harness` | non-headless-harness |
+| `loot_distribution_smoke` | promotion-candidate |
+| `loot_table_biome_smoke` | promotion-candidate |
+| `loot_table_smoke` | promotion-candidate |
+| `m7_web_breached_encounter_proof` | non-headless-harness |
+| `main_coherent_boot_smoke` | promotion-candidate |
+| `main_coherent_capture` | legacy-capture |
+| `main_playable_combat_encounter_smoke` | promotion-candidate |
+| `main_playable_consumables_smoke` | promotion-candidate |
+| `main_playable_slice_affordance_smoke` | promotion-candidate |
+| `main_playable_slice_capture_sequence` | legacy-capture |
+| `main_playable_slice_combat_encounter_smoke` | promotion-candidate |
+| `main_playable_slice_crafting_smoke` | promotion-candidate |
+| `main_playable_slice_inventory_ui_smoke` | promotion-candidate |
+| `main_playable_slice_loot_ecosystem_smoke` | promotion-candidate |
+| `main_playable_slice_multislot_save_smoke` | promotion-candidate |
+| `main_playable_slice_reload_affordance_smoke` | promotion-candidate |
+| `main_playable_slice_suit_oxygen_smoke` | promotion-candidate |
+| `main_playable_slice_vitals_hud_smoke` | promotion-candidate |
+| `marker_generator_smoke` | deferred-pending-T5 |
+| `material_state_smoke` | promotion-candidate |
+| `medicine_state_smoke` | promotion-candidate |
+| `occupancy_flip_smoke` | promotion-candidate |
+| `oxygen_equipment_drain_smoke` | promotion-candidate |
+| `physical_travel_smoke` | promotion-candidate |
+| `pilot_switch_smoke` | promotion-candidate |
+| `playable_component_smoke` | promotion-candidate |
+| `playable_manager_built_smoke` | promotion-candidate |
+| `player_gravity_floor_snap_smoke` | promotion-candidate |
+| `player_progression_state_smoke` | promotion-candidate |
+| `player_vitals_model_smoke` | promotion-candidate |
+| `power_grid_state_smoke` | promotion-candidate |
+| `procgen_layout_stress_smoke` | deferred-pending-T5 |
+| `procgen_loader_playable_contract_smoke` | deferred-pending-T5 |
+| `procgen_playable_ship_capture` | legacy-capture |
+| `procgen_playable_ship_smoke` | deferred-pending-T5 |
+| `procgen_runtime_demo_capture` | legacy-capture |
+| `procgen_runtime_demo_smoke` | deferred-pending-T5 |
+| `procgen_ship_gameplay_smoke` | deferred-pending-T5 |
+| `procgen_ship_walkthrough_smoke` | deferred-pending-T5 |
+| `procgen_stress_test` | deferred-pending-T5 |
+| `procgen_walkability_smoke` | deferred-pending-T5 |
+| `product_audit_smoke` | release-audit-tool |
+| `progression_repair_integration_smoke` | promotion-candidate |
+| `qt_mini_smoke` | promotion-candidate |
+| `quality_tier_smoke` | promotion-candidate |
+| `rarity_tier_smoke` | promotion-candidate |
+| `readability_prop_factory_smoke` | deferred-pending-T5 |
+| `recipe_resource_smoke` | promotion-candidate |
+| `recursive_travel_smoke` | promotion-candidate |
+| `release_readiness_ledger_smoke` | release-audit-tool |
+| `repair_consume_smoke` | promotion-candidate |
+| `repair_loop_smoke` | promotion-candidate |
+| `rigid_pair_travel_smoke` | promotion-candidate |
+| `room_assigner_smoke` | deferred-pending-T5 |
+| `room_graph_generator_smoke` | deferred-pending-T5 |
+| `room_graph_smoke` | deferred-pending-T5 |
+| `scanner_panel_smoke` | promotion-candidate |
+| `scanner_state_smoke` | promotion-candidate |
+| `seed_determinism_smoke` | deferred-pending-T5 |
+| `ship_access_smoke` | promotion-candidate |
+| `ship_blueprint_smoke` | deferred-pending-T5 |
+| `ship_data_export` | legacy-capture |
+| `ship_dump` | legacy-capture |
+| `ship_generator_smoke` | deferred-pending-T5 |
+| `ship_instance_dock_fields_smoke` | promotion-candidate |
+| `ship_instance_smoke` | promotion-candidate |
+| `ship_inventory_smoke` | promotion-candidate |
+| `ship_layout_generator_smoke` | deferred-pending-T5 |
+| `ship_layout_integration_smoke` | deferred-pending-T5 |
+| `ship_occupancy_smoke` | promotion-candidate |
+| `ship_subcomponent_smoke` | promotion-candidate |
+| `ship_system_smoke` | promotion-candidate |
+| `ship_systems_definitions_smoke` | promotion-candidate |
+| `ship_systems_manager_force_repair_smoke` | promotion-candidate |
+| `ship_systems_manager_smoke` | promotion-candidate |
+| `ship_visualize` | legacy-capture |
+| `skill_tree_panel_smoke` | promotion-candidate |
+| `spoilage_state_smoke` | promotion-candidate |
+| `start_scenario_smoke` | promotion-candidate |
+| `station_state_mini_smoke` | promotion-candidate |
+| `station_state_smoke` | promotion-candidate |
+| `stimulant_state_smoke` | promotion-candidate |
+| `structural_placer_smoke` | deferred-pending-T5 |
+| `sustenance_state_smoke` | promotion-candidate |
+| `template_c_traversal_smoke` | deferred-pending-T5 |
+| `template_data_smoke` | deferred-pending-T5 |
+| `template_selector_smoke` | deferred-pending-T5 |
+| `threat_ai_state_smoke` | promotion-candidate |
+| `topology_template_smoke` | deferred-pending-T5 |
+| `training_by_item_smoke` | promotion-candidate |
+| `travel_controller_smoke` | promotion-candidate |
+| `travel_integration_smoke` | promotion-candidate |
+| `unique_item_state_smoke` | promotion-candidate |
+| `wall_door_resolver_smoke` | deferred-pending-T5 |
+| `windowed_fps_capture` | legacy-capture |

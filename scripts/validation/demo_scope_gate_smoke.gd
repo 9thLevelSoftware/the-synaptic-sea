@@ -11,13 +11,13 @@ extends SceneTree
 
 const DemoScopeGateScript := preload("res://scripts/systems/demo_scope_gate.gd")
 const BuildMetadataStateScript := preload("res://scripts/systems/build_metadata_state.gd")
-const ROOT_DEFAULT: String = "/Users/christopherwilloughby/the-synaptic-sea"
 
 func _initialize() -> void:
-	var root_path: String = OS.get_environment("ROOT")
-	if root_path.is_empty():
-		root_path = ROOT_DEFAULT
-	var manifest_path: String = root_path + "/data/release/demo_scope_manifest.json"
+	# Tranche 3 fix: this used to resolve the manifest through a hardcoded
+	# macOS ROOT_DEFAULT (missing the -of-stars suffix), so a standalone run
+	# without ROOT set always failed. The manifest lives inside the project;
+	# res:// resolves everywhere --path points.
+	var manifest_path: String = "res://data/release/demo_scope_manifest.json"
 	if not FileAccess.file_exists(manifest_path):
 		_fail("manifest unreadable: %s" % manifest_path)
 		return
