@@ -8036,6 +8036,19 @@ func _reset_runtime_for_reload() -> void:
 	# clear_loaded_ship() first, so re-driving it is safe without any
 	# extra reset here.
 
+## Menu-modal guard (Tranche 4, 2026-07-06 audit HIGH): true when no menu is
+## open, so gameplay panel toggles (scanner / chart / inventory) may act.
+## Without this, toggles stacked overlays on top of the pause/meta menu —
+## menu_coordinator.handle_ui_input never saw those actions because each
+## toggle block returns before the menu dispatch. Same guard family as the
+## chart/scanner-vs-inventory mutual exclusion (commit 849b2d5).
+func _menus_are_closed() -> bool:
+	if not is_instance_valid(menu_coordinator):
+		return true
+	if menu_coordinator.menu_state == null:
+		return true
+	return menu_coordinator.menu_state.is_in_play()
+
 func _input(event: InputEvent) -> void:
 	if not playable_started:
 		return
@@ -8050,7 +8063,7 @@ func _input(event: InputEvent) -> void:
 	# Control is restored on close by the panel_closed signal handler, which
 	# covers every close path — not just toggle-close / confirm-success.
 	if scanner_panel != null:
-		if event.is_action_pressed("toggle_scanner") and (not is_instance_valid(inventory_panel) or not inventory_panel.is_open()):
+		if event.is_action_pressed("toggle_scanner") and _menus_are_closed() and (not is_instance_valid(inventory_panel) or not inventory_panel.is_open()):
 			scanner_panel.toggle()
 			if player != null and scanner_panel.is_open():
 				player.set_physics_process(false)
@@ -8075,7 +8088,7 @@ func _input(event: InputEvent) -> void:
 				chart_panel.close()
 				get_viewport().set_input_as_handled()
 			return  # swallow other input while the chart is open (read-only panel)
-		if event.is_action_pressed("ui_open_map") and (not is_instance_valid(inventory_panel) or not inventory_panel.is_open()):
+		if event.is_action_pressed("ui_open_map") and _menus_are_closed() and (not is_instance_valid(inventory_panel) or not inventory_panel.is_open()):
 			var has_chart: bool = inventory_state != null and int(inventory_state.get_quantity("web_chart")) > 0
 			if has_chart:
 				chart_panel.open()
@@ -8093,7 +8106,7 @@ func _input(event: InputEvent) -> void:
 				inventory_panel.close()
 				get_viewport().set_input_as_handled()
 			return  # swallow other keys while the inventory panel is open (mouse drives it)
-		if event.is_action_pressed("toggle_inventory"):
+		if event.is_action_pressed("toggle_inventory") and _menus_are_closed():
 			_open_inventory_self()
 			get_viewport().set_input_as_handled()
 			return
