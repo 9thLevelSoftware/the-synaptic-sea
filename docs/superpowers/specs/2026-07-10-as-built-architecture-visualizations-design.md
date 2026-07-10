@@ -1,8 +1,11 @@
 # As-Built Architecture Visualizations — Design Specification
 
-**Date:** 2026-07-10  
-**Status:** Approved design; awaiting written-spec review  
-**Audience:** Developers onboarding to and maintaining The Synaptic Sea  
+**Date:** 2026-07-10
+
+**Status:** Design approved in conversation; pending ADR-0048 and written-spec review
+
+**Audience:** Developers onboarding to and maintaining The Synaptic Sea
+
 **Evidence baseline:** `main` at `ae28d95` before this specification commit
 
 ## Context
@@ -50,9 +53,9 @@ Use Mermaid-first Markdown under `docs/game/architecture/`.
 
 This is UML-like, documentation-as-code rather than formal UML. GitHub and Codex are the
 primary reading surfaces. A repository-local Mermaid CLI dependency validates syntax and
-produces SVG exports without relying on a globally installed renderer. The installed CLI
-version is locked by `tools/architecture/package-lock.json`; validation never uses a
-floating package version.
+produces SVG exports without relying on a globally installed renderer. `package.json`
+declares an exact CLI version, `package-lock.json` locks its transitive dependencies, and
+validation never uses a floating package version.
 
 Alternatives considered and rejected:
 
@@ -117,7 +120,7 @@ This view intentionally omits internal Godot scenes and domain modules.
 mutable save data relate?
 
 **Diagram type:** C4 container view expressed as a Mermaid flowchart.  
-**Fallback:** UML component view.
+**Fallback:** container relationship table.
 
 Containers/data stores:
 
@@ -208,7 +211,8 @@ The document must state two current gaps without drawing desired transitions:
 **Primary question:** How do the stable runtime layers depend on the composition root?
 
 **Diagram type:** UML-like component/dependency graph in Mermaid.  
-**Fallback:** package diagram or the existing generated integration matrix.
+**Fallback:** component relationship table, with the generated matrix linked for exhaustive
+tracing.
 
 Graph classification and layout:
 
@@ -236,14 +240,52 @@ Principal relationships include:
 
 ## Relationship notation
 
-Every edge carries a verb, event name, protocol, or data name.
+Every edge carries a verb, event name, protocol, or data name. Mermaid diagram families do
+not expose identical line-style semantics, so each family has an explicit notation contract:
 
-- Solid arrow: ownership, construction, direct call, or runtime control.
-- Dashed arrow: signal or event callback.
-- Dotted arrow: data/resource read or persistence read/write.
-- Explicit `inferred` label: engine lifecycle relationship not directly invoked by source.
+- **Flowchart-based C4 and dependency views:** solid arrow for ownership, construction,
+  direct call, or runtime control; dashed arrow for signal/event callback; dotted arrow for
+  data/resource or persistence access.
+- **Sequence view:** solid message for direct synchronous call; dashed message for emitted
+  signal, callback, or return; data/persistence operations use explicit message labels and
+  notes rather than a third line style.
+- **State view:** standard state-transition arrows only. Labels use
+  `event [guard] / action`; priority and global overrides are expressed through choice
+  nodes and notes rather than line style.
+- **All views:** an explicit `inferred` label marks engine lifecycle behavior not directly
+  invoked by repository source.
 
-Line style and labels carry meaning; color is supplementary only.
+Labels and diagram-specific line conventions carry meaning; color is supplementary only.
+
+## Document schema and validator rules
+
+Each of the five diagram documents uses these exact second-level headings, in order:
+
+1. `## Purpose and conclusion`
+2. `## Diagram`
+3. `## Relationship legend`
+4. `## Text equivalent`
+5. `## Evidence`
+6. `## Explicit, inferred, and omitted`
+7. `## Known current gaps`
+8. `## Export and regeneration`
+
+The title is a single level-one heading. Directly below it, a metadata block contains
+`Diagram ID`, `Audience`, `Scope`, `Evidence baseline`, and `Freshness date`. `## Diagram`
+contains exactly one canonical `mermaid` fence. `## Evidence` contains a Markdown table
+with these columns: `Element or relationship`, `Source path`, `Symbol`, and `Basis`. `Basis`
+is one of `explicit`, `engine lifecycle`, `inventory`, `feature spec`, `ADR`, or
+`requirement`.
+
+`README.md` has no Mermaid fence. It uses the exact second-level headings `Purpose`,
+`Reading order`, `Notation`, `Evidence hierarchy`, `Freshness policy`, `Regeneration and
+validation`, and `Exhaustive maps`.
+
+Automated semantic guardrails apply only to Mermaid source, where they are unambiguous.
+Current-architecture Mermaid fences may not contain the retired/currently false source IDs
+`ShipSystemState`, `FireState`, `MinimapPanel`, `MapFogState`, or `GDAIMCPRuntime`.
+Historical prose may name them only under `Known current gaps` or the index's freshness
+guidance. Manual review remains responsible for higher-order architectural correctness.
 
 ## Key as-built architecture facts
 
@@ -295,12 +337,19 @@ The diagrams preserve these current facts:
 - Validation renderer: repository-local Mermaid CLI under `tools/architecture/`.
 - Committed exports: `docs/game/architecture/rendered/*.svg`.
 - Renderer dependencies: `tools/architecture/package.json` and lockfile.
+- Runtime compatibility: `package.json` pins the CLI exactly and constrains Node to one
+  supported major; the lockfile pins the renderer's browser dependency.
+- Reproducible render configuration: `tools/architecture/mermaid.config.json`, including a
+  fixed deterministic ID seed, export dimensions, and a repository-safe font/theme policy.
 - Extraction/rendering owner: `tools/validate_architecture_diagrams.py`.
 
 The validator extracts the canonical fence to a temporary `.mmd` file, renders it with the
-locked local CLI, writes a temporary SVG, and compares it with the committed export. Failed
-renders never replace a committed export. A separate explicit update mode regenerates the
-SVG files after successful rendering.
+locked local CLI and configuration, and verifies that a temporary SVG is produced. Update
+mode injects the Mermaid-source SHA-256 and locked renderer version into each committed SVG.
+Check mode verifies those freshness fields against current source and package metadata; it
+does not byte-compare browser-generated SVG geometry across operating systems. Failed
+renders never replace a committed export. Update mode replaces the SVG set only after all
+five temporary renders succeed, preventing a partially refreshed export set.
 
 ## Error handling and diagnostics
 
@@ -308,12 +357,14 @@ Validation fails with the diagram path and actionable reason when:
 
 - an expected diagram or export is missing;
 - a diagram has zero or multiple canonical Mermaid fences;
-- required metadata, summary, outline, legend, evidence, or omissions are absent;
-- a cited repository path does not exist;
+- the exact document schema, heading order, metadata keys, evidence columns, or `Basis`
+  vocabulary is violated;
+- a repository path in an evidence-table path cell does not exist (runtime identifiers such
+  as `res://` and `user://` elsewhere in prose are not treated as local evidence paths);
 - Mermaid parsing or rendering fails;
-- a committed SVG differs from a fresh deterministic render;
-- the diagram uses an unsupported relationship style without a legend;
-- prohibited stale terms or retired authoritative models appear as current architecture.
+- an SVG's embedded source hash or renderer version differs from current source/tooling;
+- a diagram violates its family-specific relationship notation or lacks its legend;
+- a prohibited retired source ID appears in a current-architecture Mermaid fence.
 
 Relationships without sufficient current evidence are omitted from diagram semantics and
 listed as caveats. They are never silently promoted from old prose or plans.
@@ -330,12 +381,27 @@ completion is claimed:
 - ADR-0048 under `docs/game/adr/` recording Mermaid Markdown as the maintained diagram
   source, local locked rendering, and SVG export policy;
 - the ADR index and relevant documentation-currency sources;
-- a scoped Kanban implementation card on `synaptic-sea-stage-gate`, assigned according to
-  the repository operating model;
+- a scoped Kanban card set on `synaptic-sea-stage-gate`, assigned according to the
+  repository operating model;
 - `docs/game/06_validation_plan.md` registration of the feature validator and PASS marker.
 
 The ADR records a documentation/workflow decision, not a change to game runtime
-architecture.
+architecture. ADR-0048 must be accepted before renderer or diagram implementation begins.
+
+The implementation is decomposed into six Kanban cards:
+
+1. governance contract: feature spec, `REQ-DOC-009`, ADR-0048, ADR index, and validation-plan
+   registration;
+2. renderer and validator: locked tooling, configuration, validator, and validator tests;
+3. overview content: index plus the system-context and container diagrams;
+4. behavior content: gameplay sequence and threat-AI state-machine diagrams;
+5. runtime structure content: component/dependency diagram and exhaustive-map linkage;
+6. exports and verification: SVG refresh, visual QA, documentation checks, inventory check,
+   and Godot regression evidence.
+
+Every card must cite this design and `REQ-DOC-009`, enumerate allowed files, state non-goals,
+and list exact verification commands. Content cards keep disjoint allowed files and their
+own focused render/evidence checks.
 
 ## Validation plan
 
@@ -343,9 +409,11 @@ architecture.
 
 1. Install the locked renderer dependencies with `npm --prefix tools/architecture ci`.
 2. Run the architecture validator in check mode.
-3. Expect an exact success marker shaped as:
+3. Expect a success marker matching the exact regular expression below. The validator also
+   asserts that the reference count equals the number of non-empty evidence-table path
+   cells across the five diagram documents.
 
-   `ARCHITECTURE DIAGRAMS PASS diagrams=5 exports=5 references=<count>`
+   `^ARCHITECTURE DIAGRAMS PASS diagrams=5 exports=5 references=[1-9][0-9]*$`
 
 4. Run the system-inventory drift check.
 5. Run the requirement, ADR, and documentation-currency validators affected by the new
@@ -372,18 +440,20 @@ completion unless explicitly classified and accepted by the coordinator.
 ## Acceptance criteria
 
 1. The index and all five individual diagram documents exist in the approved reading order.
-2. Each document contains exactly one canonical Mermaid source, summary, text equivalent,
-   legend, evidence table, omissions, freshness date, and baseline commit.
-3. The diagrams answer their declared modeling questions without mixing abstraction levels.
-4. All nodes and relationships map to current source or are explicitly labeled inferred.
-5. Planned and deferred behavior is absent from diagram semantics.
-6. Current gaps in threat behavior and other included systems are disclosed outside the
+2. Each of the five diagram documents contains exactly one canonical Mermaid source and
+   follows the exact metadata, heading, evidence-table, and vocabulary schema.
+3. The index contains no Mermaid fence and follows its separate required-heading schema.
+4. The diagrams answer their declared modeling questions without mixing abstraction levels.
+5. All nodes and relationships map to current source or are explicitly labeled inferred.
+6. Planned and deferred behavior is absent from diagram semantics.
+7. Current gaps in threat behavior and other included systems are disclosed outside the
    diagram rather than repaired or hidden.
-7. The component view stays curated and links to the exhaustive inventory/matrix.
-8. All five Mermaid sources render successfully to current committed SVG exports.
-9. The validator, inventory check, documentation-currency checks, and Godot regression
+8. The component view stays curated and links to the exhaustive inventory/matrix.
+9. All five Mermaid sources render successfully; each committed SVG carries the matching
+   source hash and locked renderer version.
+10. The validator, inventory check, documentation-currency checks, and Godot regression
    bundle pass with fresh clean output.
-10. A developer can follow the index from system boundary to runtime detail and locate the
+11. A developer can follow the index from system boundary to runtime detail and locate the
     cited source for every major node and edge.
 
 ## Risks and mitigations
@@ -400,4 +470,3 @@ completion unless explicitly classified and accepted by the coordinator.
   package version and validate committed exports.
 - **Accessibility loss in graphics:** provide summaries, relationship outlines, visible
   labels, and line-style semantics in every file.
-
