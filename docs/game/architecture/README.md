@@ -52,4 +52,4 @@ Update mode renders all five diagrams before replacing any SVG. Check mode perfo
 - [Interactive system map and integration matrix](../inventory/system_map.html)
 - [Structured inventory source](../inventory/system_inventory.json)
 
-The curated dependency view intentionally does not draw all 191 systems or 327 integration relationships.
+The curated dependency view intentionally does not draw all 191 systems or 324 integration relationships.

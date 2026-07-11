@@ -24,7 +24,7 @@ flowchart LR
   Player input@-->|"input"| Runtime
   Runtime feedback@-->|"world, HUD, audio"| Player
   Runtime contentRead@-->|"loads packaged content"| Content
-  Runtime saveReadWrite@-->|"serializes and restores summaries"| Saves
+  Runtime saveReadWrite@-->|"serializes and restores snapshots and metadata"| Saves
 
   classDef dataEdge stroke-dasharray:2\,3;
   class contentRead,saveReadWrite dataEdge;

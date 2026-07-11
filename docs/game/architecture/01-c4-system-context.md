@@ -17,7 +17,7 @@ flowchart LR
   Player["Person: Player<br/>Moves, interacts, manages the run"]
   Platform["External system: Local platform<br/>Godot runtime, input, rendering, audio, filesystem"]
   subgraph Boundary["The Synaptic Sea system boundary"]
-    Game["Software system: The Synaptic Sea<br/>Godot 4.6.2 locked-isometric survival sim"]
+    Game["Software system: The Synaptic Sea<br/>Godot 4.6 locked-isometric survival sim"]
   end
 
   Player input@-->|"movement, interaction, menu input"| Game
@@ -46,7 +46,7 @@ Solid arrows are direct runtime interaction or execution. The short-dot arrow is
 
 | Element or relationship | Source path | Symbol | Basis |
 | --- | --- | --- | --- |
-| Godot game identity and runtime version | project.godot | application/config/name and config/features | explicit |
+| Godot game identity and runtime feature baseline | project.godot | application/config/name and config/features | explicit |
 | Player input enters runtime controller | scripts/player/player_controller.gd | _unhandled_input and request_interact | explicit |
 | Local world persistence | scripts/systems/save_load_service.gd | save_world and load_world | explicit |
 | Audiovisual/runtime consequences remain scene-owned | docs/game/04_tdd.md | Architecture principles | explicit |
