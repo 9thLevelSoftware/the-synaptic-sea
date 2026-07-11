@@ -195,11 +195,17 @@ def validate_flowchart_relationships(source: str, rel: str) -> None:
         if not line.strip() or line.lstrip().startswith("%%"):
             continue
         semantic_line = mask_mermaid_label_text(line)
+        relationships = list(FLOWCHART_RELATION_RE.finditer(semantic_line))
+        if relationships and "&" in semantic_line:
+            raise ValidationError(
+                f"{rel}: flowchart relationship on Mermaid line {line_number} "
+                "must not use grouped endpoints"
+            )
         identified = {
             match.span("operator")
             for match in FLOWCHART_EDGE_ID_RE.finditer(semantic_line)
         }
-        for relationship in FLOWCHART_RELATION_RE.finditer(semantic_line):
+        for relationship in relationships:
             if relationship.span() not in identified:
                 raise ValidationError(
                     f"{rel}: flowchart relationship on Mermaid line {line_number} "
@@ -214,6 +220,11 @@ def validate_state_transitions(source: str, rel: str) -> None:
         for statement in line.split(";"):
             transition = STATE_TRANSITION_RE.fullmatch(statement.strip())
             if not transition:
+                if "-->" in statement:
+                    raise ValidationError(
+                        f"{rel}: cannot classify state transition on Mermaid line "
+                        f"{line_number}"
+                    )
                 continue
             if "[*]" in (transition.group("source"), transition.group("target")):
                 continue

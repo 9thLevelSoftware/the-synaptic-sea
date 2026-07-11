@@ -197,6 +197,19 @@ class ValidatorTests(unittest.TestCase):
         self.assertEqual(1, code)
         self.assertIn("stable edge ID", output)
 
+    def test_rejects_grouped_flowchart_endpoints(self) -> None:
+        path = self.root / "docs/game/architecture/01-c4-system-context.md"
+        text = path.read_text(encoding="utf-8").replace(
+            "A[Source] edge@--> B[Target]",
+            "A[Source] & B[Other] edge@--> C[Target]",
+        )
+        path.write_text(text, encoding="utf-8")
+        code, output = self.run_main(
+            "--check-source", str(path.relative_to(self.root))
+        )
+        self.assertEqual(1, code)
+        self.assertIn("grouped endpoints", output)
+
     def test_ignores_flowchart_operator_inside_node_text(self) -> None:
         path = self.root / "docs/game/architecture/01-c4-system-context.md"
         text = path.read_text(encoding="utf-8").replace(
@@ -292,6 +305,19 @@ class ValidatorTests(unittest.TestCase):
                 )
                 self.assertEqual(1, code)
                 self.assertIn("event [guard] / action", output)
+
+    def test_rejects_unclassified_nested_state_transition(self) -> None:
+        path = self.root / "docs/game/architecture/04-threat-ai-state-machine.md"
+        text = path.read_text(encoding="utf-8").replace(
+            "  state Decision <<choice>>",
+            "  state Decision <<choice>>\n  state Composite { A --> B }",
+        )
+        path.write_text(text, encoding="utf-8")
+        code, output = self.run_main(
+            "--check-source", str(path.relative_to(self.root))
+        )
+        self.assertEqual(1, code)
+        self.assertIn("cannot classify state transition", output)
 
     def test_stale_hash_fails_check(self) -> None:
         code, output = self.run_main("--update")
