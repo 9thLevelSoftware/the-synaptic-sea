@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-10
 
-**Status:** Design approved in conversation; pending ADR-0048 and written-spec review
+**Status:** Approved; ADR-0048 is the first implementation gate
 
 **Audience:** Developers onboarding to and maintaining The Synaptic Sea
 
@@ -339,8 +339,9 @@ The diagrams preserve these current facts:
 - Renderer dependencies: `tools/architecture/package.json` and lockfile.
 - Runtime compatibility: `package.json` pins the CLI exactly and constrains Node to one
   supported major; the lockfile pins the renderer's browser dependency.
-- Reproducible render configuration: `tools/architecture/mermaid.config.json`, including a
-  fixed deterministic ID seed, export dimensions, and a repository-safe font/theme policy.
+- Reproducible render configuration: `tools/architecture/mermaid.config.json` owns the
+  deterministic ID seed and repository-safe font/theme policy; validator-owned CLI flags
+  fix export width, height, background, and SVG ID.
 - Extraction/rendering owner: `tools/validate_architecture_diagrams.py`.
 
 The validator extracts the canonical fence to a temporary `.mmd` file, renders it with the
