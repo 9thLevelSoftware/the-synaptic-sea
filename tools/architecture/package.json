@@ -1,0 +1,11 @@
+{
+  "name": "synaptic-sea-architecture-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "26.x"
+  },
+  "devDependencies": {
+    "@mermaid-js/mermaid-cli": "11.16.0"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "look": "classic",
+  "theme": "neutral",
+  "securityLevel": "strict",
+  "deterministicIds": true,
+  "deterministicIDSeed": "synaptic-sea-architecture-v1",
+  "fontFamily": "Arial, sans-serif",
+  "flowchart": {
+    "curve": "linear",
+    "htmlLabels": true,
+    "useMaxWidth": false
+  },
+  "sequence": {
+    "useMaxWidth": false,
+    "showSequenceNumbers": true
+  },
+  "state": {
+    "useMaxWidth": false
+  }
+}
