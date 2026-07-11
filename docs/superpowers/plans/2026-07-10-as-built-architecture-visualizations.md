@@ -155,7 +155,7 @@ Update mode renders all five diagrams before replacing any SVG. Check mode perfo
 - [Interactive system map and integration matrix](../inventory/system_map.html)
 - [Structured inventory source](../inventory/system_inventory.json)
 
-The curated dependency view intentionally does not draw all 191 systems or 327 integration relationships.
+The curated dependency view intentionally does not draw all 191 systems or 324 integration relationships.
 ````
 
 - [ ] **Step 2: Create the system-context document**
@@ -1111,7 +1111,7 @@ $components = New-ArchitectureCard `
     -Body (CardBody `
         'Create the curated runtime component/dependency view and exhaustive-map linkage.' `
         @('docs/game/architecture/05-runtime-component-dependencies.md') `
-        @('No expansion of all 191 systems or 327 edges, coordinator refactor, other diagrams, SVG exports, or tooling changes.') `
+        @('No expansion of all 191 systems or 324 edges, coordinator refactor, other diagrams, SVG exports, or tooling changes.') `
         @('python tools/validate_architecture_diagrams.py --check-source docs/game/architecture/05-runtime-component-dependencies.md','git diff --check'))
 
 $verification = New-ArchitectureCard `
@@ -1185,7 +1185,7 @@ Five individual Mermaid documents explain system context, runtime containers/dat
 ## Non-goals
 
 - No runtime, gameplay, scene, input, save, or data changes.
-- No exhaustive 191-system/327-edge node-link graph.
+- No exhaustive 191-system/324-edge node-link graph.
 - No interactive architecture explorer, XMI, UMLDI, PDF, or PNG deliverable.
 - No repair of current threat-AI behavior gaps.
 
@@ -1275,7 +1275,7 @@ Create `docs/game/adr/0048-mermaid-architecture-diagram-source-and-svg-exports.m
 
 ## Context
 
-The canonical inventory contains 191 systems and 327 relationships, while the older architecture reference predates the current title bootstrap and later integration work. Developer onboarding needs a small set of current views that can be diffed, rendered, exported, and validated without a visual-editor binary format.
+The canonical inventory contains 191 systems and 324 relationships, while the older architecture reference predates the current title bootstrap and later integration work. Developer onboarding needs a small set of current views that can be diffed, rendered, exported, and validated without a visual-editor binary format.
 
 ## Decision
 
@@ -1750,7 +1750,7 @@ Solid arrows are construction, ownership, direct call, aggregation, or runtime c
 
 ## Explicit, inferred, and omitted
 
-Shown ownership, calls, signals, reads, aggregation, and validation targets are explicit. Godot child `_ready()` execution after `add_child()` is engine lifecycle but is represented here through explicit instantiation edges rather than a separate inferred edge. Individual model classes, 109 coordinator load edges, and all 327 inventory relationships are intentionally collapsed.
+Shown ownership, calls, signals, reads, aggregation, and validation targets are explicit. Godot child `_ready()` execution after `add_child()` is engine lifecycle but is represented here through explicit instantiation edges rather than a separate inferred edge. Individual model classes, 109 coordinator load edges, and all 324 inventory relationships are intentionally collapsed.
 
 ## Known current gaps
 

@@ -6,7 +6,7 @@
 
 ## Context
 
-The canonical inventory contains 191 systems and 327 relationships, while the older architecture reference predates the current title bootstrap and later integration work. Developer onboarding needs a small set of current views that can be diffed, rendered, exported, and validated without a visual-editor binary format.
+The canonical inventory contains 191 systems and 324 relationships, while the older architecture reference predates the current title bootstrap and later integration work. Developer onboarding needs a small set of current views that can be diffed, rendered, exported, and validated without a visual-editor binary format.
 
 ## Decision
 

@@ -1,9 +1,9 @@
 # The Synaptic Sea — Complete Systems Map & Final Board Currency
 
-**Currency date:** 2026-06-26
+**Currency date:** 2026-07-10
 **Task:** Task 15 / `t_c7ac4d08`
 **Board:** `synaptic-sea-e2e-systems`
-**Validation markers:** `SYSTEMS MAP CURRENCY PASS`, `REQUIREMENT TRACE PASS`, `KANBAN MANIFEST PASS`
+**Validation markers:** `SYSTEMS MAP CURRENCY PASS`, `REQUIREMENT TRACE PASS`, `KANBAN MANIFEST PASS`, `ARCHITECTURE DIAGRAMS PASS`
 **Scope:** Final source-of-truth update for the E2E systems wave: systems map, roadmap, requirements, ADR index, validation plan, build plan, and Kanban manifest.
 
 This document intentionally supersedes earlier stale status text in this file. It is the current source-backed systems ledger for the Synaptic Sea E2E implementation wave.
@@ -40,7 +40,7 @@ The project now has a production-grade headless-validation spine across the majo
 | Procgen expansion | Validated runtime package | REQ-PG-001..012; Task 12 smokes; templates, variants, kits, biomes, difficulty, encounters, determinism |
 | Release/distribution local scaffold | Validated local scaffold; external platform evidence pending release ops | REQ-RL-001..010; Task 13 smokes; export preset validation, achievements, localization, demo, crash, readiness ledger |
 | Integration/product audit | Validated | REQ-INT-001..010; Task 14 smokes; strict 163-command regression pass |
-| Doc/manifest currency | Validated by Task 15 focused validators | REQ-DOC-001..008; SYSTEMS MAP CURRENCY PASS; REQUIREMENT TRACE PASS; KANBAN MANIFEST PASS |
+| Doc/manifest currency | Validated by Task 15 validators plus REQ-DOC-009 architecture validation | REQ-DOC-001..009; SYSTEMS MAP CURRENCY PASS; REQUIREMENT TRACE PASS; KANBAN MANIFEST PASS; ARCHITECTURE DIAGRAMS PASS |
 
 ---
 
@@ -94,6 +94,7 @@ Every completed implementation/review package below is tied to real Kanban ids, 
 | 0038 | docs/game/adr/0038-crafting-materials-stations-architecture.md | materials/crafting/stations/quality/field crafting |
 | 0039 | docs/game/adr/0039-cross-system-integration-audit-architecture.md | Task 14 integration audit models and e2e smokes |
 | 0040 | docs/game/adr/0040-systems-map-task-graph-currency.md | Task 15 doc-currency validators and board manifest checks |
+| 0048 | docs/game/adr/0048-mermaid-architecture-diagram-source-and-svg-exports.md | Mermaid as-built architecture source, evidence schema, locked rendering, and SVG freshness policy |
 
 ---
 

@@ -11,7 +11,7 @@
 ## Context
 
 The repository has a canonical, code-verified system inventory with 191 systems and
-327 directed integration relationships. It also has an older 959-line architectural
+324 directed integration relationships. It also has an older 959-line architectural
 reference, an interactive status map, and several feature-specific ADRs. Those sources
 do not currently provide a small, current, developer-onboarding diagram set:
 
@@ -40,7 +40,7 @@ component/dependency map. The diagrams describe the current implementation only.
 ## Non-goals
 
 - Diagramming planned, deferred, or aspirational architecture as though it exists.
-- Rendering all 191 systems or all 327 integration edges in one node-link view.
+- Rendering all 191 systems or all 324 integration edges in one node-link view.
 - Replacing the generated inventory, integration matrix, feature specs, requirements,
   ADRs, or validation plan.
 - Refactoring runtime code, introducing autoloads, or changing game behavior.

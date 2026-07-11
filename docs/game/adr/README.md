@@ -1,7 +1,7 @@
 # ADR Index — Synaptic Sea Current Artifact Currency
 
-Currency date: 2026-06-26
-Validated by: Task 15 (`t_c7ac4d08`) / `REQUIREMENT TRACE PASS`
+Currency date: 2026-07-10
+Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram validation
 
 | ADR | Path | Artifact reference |
 | --- | --- | --- |

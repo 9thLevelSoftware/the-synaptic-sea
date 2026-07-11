@@ -48,7 +48,7 @@ Five individual Mermaid documents explain system context, runtime containers/dat
 ## Non-goals
 
 - No runtime, gameplay, scene, input, save, or data changes.
-- No exhaustive 191-system/327-edge node-link graph.
+- No exhaustive 191-system/324-edge node-link graph.
 - No interactive architecture explorer, XMI, UMLDI, PDF, or PNG deliverable.
 - No repair of current threat-AI behavior gaps.
 
