@@ -113,7 +113,7 @@ Solid arrows are construction, ownership, direct call, aggregation, or runtime c
 | Procgen/loading | produces deterministic layouts and instantiates structural/objective scene nodes | generators and layout pipeline → `GeneratedShipLoader` → wrapper scenes |
 | World/domain | owns current world selection, mutable per-ship aggregates, pure state, and combat state | coordinator-owned or injected; `ShipInstance` aggregates per-ship models |
 | Presentation | owns player/camera nodes, HUD/menu panels, and scene-aware audio | constructed and refreshed by `PlayableGeneratedShip` |
-| Persistence | captures current-run and world summaries and writes local files | coordinator → `RunSnapshot`/`WorldSnapshot` → `SaveLoadService` → `user://` |
+| Persistence | captures current-run and world summaries and writes local files | coordinator builds `RunSnapshot`/`WorldSnapshot`; coordinator-owned `SaveLoadService` serializes/restores `WorldSnapshot`; `SaveLoadService` reads/writes `user://` |
 | Data/assets | supplies packaged read-only inputs and local mutable state | read by loaders/models/services |
 | Verification | proves production seams and maintains exhaustive relationship evidence | validation scripts and generated inventory depend on production targets |
 
