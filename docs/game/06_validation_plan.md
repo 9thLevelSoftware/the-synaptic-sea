@@ -232,6 +232,8 @@ run_clean 'kanban manifest currency' 'KANBAN MANIFEST' python3 "$ROOT/scripts/va
 # dangling integration/loop refs, or stale committed output. Marker carries a
 # systems=/verified= count suffix; the bundle matches the leading marker string.
 run_clean 'system inventory anti-drift check' 'SYSTEM INVENTORY CHECK PASS' python3 "$ROOT/tools/build_system_inventory.py" --check
+# --- REQ-DOC-009 as-built architecture visualizations (host-side Python + locked Mermaid CLI) ---
+run_clean 'architecture diagram anti-drift check' '^ARCHITECTURE DIAGRAMS PASS diagrams=5 exports=5 references=[1-9][0-9]*$' bash -lc 'npm --prefix "$1/tools/architecture" ci --silent && python3 "$1/tools/validate_architecture_diagrams.py" --check' _ "$ROOT"
 run_clean 'fire suppression round-trip smoke' 'FIRE SUPPRESSION ROUND TRIP PASS topo=true fires=true spreads=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/fire_suppression_round_trip_smoke.gd
 run_clean 'ship instance fire persistence smoke' 'SHIP INSTANCE FIRE PERSISTENCE PASS omitted=true restored=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_instance_fire_persistence_smoke.gd
 run_clean 'derelict fire seed smoke' 'DERELICT FIRE SEED PASS deterministic=true rate_ok=true cap_ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_fire_seed_smoke.gd
@@ -374,7 +376,7 @@ run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONT
 run_clean 'Tranche 6 demo scope gate model smoke' 'DEMO SCOPE GATE PASS build_kind=release blocked=5 allowed=0 unknown_rejected=true params=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_gate_smoke.gd
 run_clean 'Tranche 6 demo scope enforcement smoke' 'DEMO SCOPE ENFORCEMENT PASS dev_unaffected=true save_cap=true world_skip=true hub_blocked=true hazards_capped=true cargo_capped=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_enforcement_smoke.gd
 run_clean 'Tranche 6 unlock trigger production smoke' 'UNLOCK TRIGGER PRODUCTION PASS triggers_valid=true scavenge_emitted=true codex_unlocked=true class_unlocked=true bridge_unlocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_production_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=207 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=208 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

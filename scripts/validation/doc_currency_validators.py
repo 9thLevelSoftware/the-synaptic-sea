@@ -28,7 +28,14 @@ REQUIRED_TASK_IDS = [
     "t_67389b76", "t_cbe56420", "t_290ec958", "t_02146c59", "t_7a6849cb",
     "t_9e328a9f", "t_2d267b26", "t_4faf58cf", "t_3b217838", "t_12bf9f4a", "t_c7ac4d08",
 ]
-DOC_REQ_IDS = [f"REQ-DOC-{i:03d}" for i in range(1, 9)]
+DOC_REQUIREMENT_SOURCES = {
+    **{f"REQ-DOC-{i:03d}": "systems_map_task_graph_currency.md" for i in range(1, 9)},
+    "REQ-DOC-009": "architecture_visualizations.md",
+}
+DOC_REQUIREMENT_STATUSES = {
+    **{f"REQ-DOC-{i:03d}": "Validated" for i in range(1, 9)},
+    "REQ-DOC-009": "Validated",
+}
 REQUIRED_ADR_PATHS = [
     "docs/game/adr/0034-survival-vitals-architecture.md",
     "docs/game/adr/0034-food-cooking-spoilage-architecture.md",
@@ -48,6 +55,7 @@ REQUIRED_ADR_PATHS = [
     "docs/game/adr/0031-localization-catalog-and-routing.md",
     "docs/game/adr/0039-cross-system-integration-audit-architecture.md",
     "docs/game/adr/0040-systems-map-task-graph-currency.md",
+    "docs/game/adr/0048-mermaid-architecture-diagram-source-and-svg-exports.md",
 ]
 STALE_IN_SCOPE_PHRASES = [
     "No enemies, no AI, no weapons, no damage types",
@@ -173,7 +181,7 @@ class RequirementTraceValidator:
         validation_text = read_text(root, "docs/game/06_validation_plan.md")
         errors: list[str] = []
         checked = 0
-        for rid in DOC_REQ_IDS:
+        for rid, expected_source in DOC_REQUIREMENT_SOURCES.items():
             checked += 1
             heading = f"## {rid}:"
             if heading not in req_text:
@@ -183,16 +191,26 @@ class RequirementTraceValidator:
             start = req_text.index(heading)
             nxt = req_text.find("\n## ", start + 1)
             block = req_text[start:nxt if nxt != -1 else len(req_text)]
-            if "Status: Validated" not in block:
-                errors.append(f"{rid} is not Validated")
-            if "systems_map_task_graph_currency.md" not in block:
-                errors.append(f"{rid} missing feature spec source")
+            expected_status = DOC_REQUIREMENT_STATUSES[rid]
+            status_match = re.search(r"(?m)^- Status:\s*(.+?)\s*$", block)
+            actual_status = status_match.group(1) if status_match else None
+            if actual_status != expected_status:
+                errors.append(f"{rid} status is {actual_status!r}, expected {expected_status!r}")
+            source_match = re.search(r"(?m)^- Source:\s*`?([^`\r\n]+)`?\s*$", block)
+            actual_source = Path(source_match.group(1)).name if source_match else None
+            if actual_source != expected_source:
+                errors.append(f"{rid} feature spec source is {actual_source!r}, expected {expected_source!r}")
         for row in matrix_rows(root):
             for rid in row.get("requirements", []) or []:
                 checked += 1
                 if f"## {rid}:" not in req_text:
                     errors.append(f"matrix requirement missing from requirements doc: {rid}")
-        for marker in ("SYSTEMS MAP CURRENCY PASS", "REQUIREMENT TRACE PASS", "KANBAN MANIFEST PASS"):
+        for marker in (
+            "SYSTEMS MAP CURRENCY PASS",
+            "REQUIREMENT TRACE PASS",
+            "KANBAN MANIFEST PASS",
+            "ARCHITECTURE DIAGRAMS PASS",
+        ):
             checked += 1
             if marker not in validation_text:
                 errors.append(f"Task 15 marker missing from validation plan: {marker}")
@@ -200,7 +218,7 @@ class RequirementTraceValidator:
         checked += adr_result.checked
         if not adr_result.ok:
             errors.extend(adr_result.errors or [])
-        return ValidationResult(not errors, checked, errors, {"doc_requirements": len(DOC_REQ_IDS), "adrs": adr_result.checked})
+        return ValidationResult(not errors, checked, errors, {"doc_requirements": len(DOC_REQUIREMENT_SOURCES), "adrs": adr_result.checked})
 
 
 class KanbanManifestValidator:

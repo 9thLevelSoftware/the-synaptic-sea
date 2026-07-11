@@ -360,6 +360,22 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Verification:
   - `doc_currency_validators.py requirement-trace` (`REQUIREMENT TRACE PASS`)
 
+## REQ-DOC-009: Current architecture visualizations are source-backed and individually renderable
+
+- Source: `features/architecture_visualizations.md`
+- Type: documentation / process
+- Priority: must
+- Status: Validated
+- Rationale: Developers need a small current architecture reading path that remains traceable to source and does not confuse historical intent with live runtime behavior.
+- Acceptance criteria:
+  - Five individual Mermaid diagrams cover system context, containers/data stores, gameplay interaction, threat-AI state, and curated runtime dependencies.
+  - Every diagram includes a text equivalent, current evidence paths and symbols, inference/omission notes, current gaps, and export instructions.
+  - Five committed SVGs carry the current Mermaid-source SHA-256 and exact renderer version.
+  - Planned or deferred behavior is absent from diagram semantics.
+- Verification:
+  - `python3 tools/validate_architecture_diagrams.py --check` (`ARCHITECTURE DIAGRAMS PASS`)
+  - Complete regression bundle (`SYNAPTIC_SEA REGRESSION PASS commands=208 clean_output=true`)
+
 ## REQ-SV-001: Survival vitals (REQ-SV-001)
 
 - Source: `docs/game/features/survival_vitals.md`
