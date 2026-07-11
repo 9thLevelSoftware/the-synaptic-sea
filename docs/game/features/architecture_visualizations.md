@@ -2,7 +2,7 @@
 
 ## Status
 
-In implementation under `REQ-DOC-009` and ADR-0048.
+Validated under `REQ-DOC-009` and ADR-0048 with five rendered SVG exports and fresh host-side validation.
 
 ## Design pillar alignment
 

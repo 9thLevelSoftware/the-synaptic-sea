@@ -34,7 +34,7 @@ DOC_REQUIREMENT_SOURCES = {
 }
 DOC_REQUIREMENT_STATUSES = {
     **{f"REQ-DOC-{i:03d}": "Validated" for i in range(1, 9)},
-    "REQ-DOC-009": "In implementation",
+    "REQ-DOC-009": "Validated",
 }
 REQUIRED_ADR_PATHS = [
     "docs/game/adr/0034-survival-vitals-architecture.md",

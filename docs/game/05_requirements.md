@@ -365,7 +365,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Source: `features/architecture_visualizations.md`
 - Type: documentation / process
 - Priority: must
-- Status: In implementation
+- Status: Validated
 - Rationale: Developers need a small current architecture reading path that remains traceable to source and does not confuse historical intent with live runtime behavior.
 - Acceptance criteria:
   - Five individual Mermaid diagrams cover system context, containers/data stores, gameplay interaction, threat-AI state, and curated runtime dependencies.
