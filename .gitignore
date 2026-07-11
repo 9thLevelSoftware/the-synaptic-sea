@@ -15,3 +15,6 @@ __pycache__/
 
 # Brainstorming / visual-companion scratch sessions
 .superpowers/
+
+# Local isolated development worktrees
+.worktrees/
