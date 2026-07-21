@@ -20,6 +20,19 @@ func _init() -> void:
 func get_field_recipes() -> Array:
 	return _crafting_state.get_recipes_for_station("field_crafting")
 
+## REQ-CS-016 field residual: listing for the portable recipe picker.
+## Field crafting is intentionally skill-ungated for start (skill only affects
+## quality), so entries use a high skill level for status and only report
+## missing_ingredients / output_full as blockers.
+func list_recipe_entries(inventory) -> Array:
+	return _crafting_state.list_recipe_entries("field_crafting", inventory, 999)
+
+func first_ready_recipe_id(inventory) -> String:
+	for entry in list_recipe_entries(inventory):
+		if entry is Dictionary and bool((entry as Dictionary).get("craftable", false)):
+			return str((entry as Dictionary).get("recipe_id", ""))
+	return ""
+
 func can_craft(recipe_id: String, inventory) -> bool:
 	var recipe: Dictionary = _crafting_state.get_recipe(recipe_id)
 	if recipe.is_empty():
@@ -70,6 +83,9 @@ func finish_craft() -> Dictionary:
 
 func is_crafting() -> bool:
 	return _crafting_state.is_crafting()
+
+func get_active_recipe_id() -> String:
+	return _crafting_state.get_active_recipe_id()
 
 func cancel_craft() -> void:
 	_crafting_state.cancel_craft()

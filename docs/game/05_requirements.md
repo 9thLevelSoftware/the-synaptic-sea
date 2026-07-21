@@ -534,8 +534,9 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - Non-salvage station interact opens a recipe list for that station_kind; craft does not start until confirm.
   - Player can select and craft a non-first ready recipe; ingredients consume for the chosen recipe only.
   - Blocked recipes (ingredients/skill/output) do not start a craft on confirm.
-  - Salvage station and field craft (KEY_C) behavior remain auto-select (out of scope for this requirement).
-  - Headless smokes prove pure listing, panel selection, and main-scene chosen-recipe craft.
+  - Salvage station remains auto-select (out of scope).
+  - KEY_C opens the same picker for portable field_crafting recipes.
+  - Headless smokes prove pure listing, panel selection, and main-scene chosen-recipe craft (station + field).
 - Verification:
   - `crafting_recipe_list_smoke.gd` — `CRAFTING RECIPE LIST PASS`
   - `recipe_picker_panel_smoke.gd` — `RECIPE PICKER PANEL PASS`

@@ -24,7 +24,8 @@ At a fabricator, kitchen, medbay, workbench, or synthesizer the player browses w
 3. Default cursor is the first **ready** recipe (else index 0).
 4. Confirm on a `ready` row starts `CraftingState.begin_craft` for that recipe (ingredients consumed, quality resolved, single-active craft).
 5. Confirm on a blocked row leaves the panel open with a reason; no ingredients consumed.
-6. Cancel / close restores player control. Salvage stations and field craft (KEY_C) are unchanged.
+6. Cancel / close restores player control. Salvage stations remain auto-select.
+7. KEY_C opens the same picker for `field_crafting` portable recipes (skill-ungated start; skill still affects quality).
 
 ## Inputs
 
@@ -50,7 +51,6 @@ At a fabricator, kitchen, medbay, workbench, or synthesizer the player browses w
 
 ## Non-goals
 
-- Field crafting recipe picker (KEY_C)
 - Salvage / deconstruction item picker
 - Recipe codex / discovery unlocks
 - Multi-queue parallel crafts

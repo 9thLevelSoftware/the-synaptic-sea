@@ -117,11 +117,13 @@ borderline player-facing systems remain.
 > time (`CraftingState` is single-`_active_craft` by design). ~~stations auto-select the first
 > craftable recipe (no recipe-picker UI yet)~~ — **CLOSED REQ-CS-016 (2026-07-21):**
 > non-salvage station interact opens `RecipePickerPanel`; player selects a recipe and
-> confirms via `try_craft_recipe` / `begin_craft_from_picker`. Field craft (KEY_C) still
-> auto-selects first craftable portable recipe (separate residual). Powered-station crafts
-> advance on both branches (Domain 4). ~~`JunkYieldResolver`-based raw-junk salvage is not
-> yet in the live loop~~ — **CLOSED Stream E (2026-07-21):** salvage station falls through
-> to `DeconstructionResolver.salvage_junk` → `JunkYieldResolver` when no deconstruction
+> confirms via `try_craft_recipe` / `begin_craft_from_picker`. ~~Field craft (KEY_C) still
+> auto-selects first craftable portable recipe~~ — **CLOSED with REQ-CS-016 field residual
+> (2026-07-21):** KEY_C opens the same picker for `station_kind == field_crafting`.
+> Powered-station crafts advance on both branches (Domain 4).
+> ~~`JunkYieldResolver`-based raw-junk salvage is not yet in the live loop~~ —
+> **CLOSED Stream E (2026-07-21):** salvage station falls through to
+> `DeconstructionResolver.salvage_junk` → `JunkYieldResolver` when no deconstruction
 > recipe matches.
 
 The following were moved out of the unreachable set by this change (now reachable + driven):

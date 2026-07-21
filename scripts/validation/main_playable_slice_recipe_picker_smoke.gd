@@ -138,8 +138,62 @@ func _validate(playable) -> void:
 		_fail("output not deposited: %s" % craft_item)
 		return
 
+	# --- Field craft picker (KEY_C residual) ------------------------------------
+	inv.add_item("synth_fiber", 12)
+	inv.add_item("medical_gauze", 6)
+	inv.add_item("scrap_metal", 12)
+	inv.add_item("adhesive_paste", 6)
+	inv.add_item("ceramic_plate", 4)
+	inv.add_item("reactive_gel", 4)
+	var field_entries: Array = playable.list_station_recipe_entries("field_crafting")
+	var field_ready: Array = []
+	for e in field_entries:
+		if bool((e as Dictionary).get("craftable", false)):
+			field_ready.append(str((e as Dictionary).get("recipe_id", "")))
+	if field_ready.size() < 2:
+		_fail("need >=2 ready field recipes, got %d" % field_ready.size())
+		return
+	var field_first: String = str(field_ready[0])
+	var field_chosen: String = str(field_ready[1])
+	if not playable.open_recipe_picker_for_validation("field_crafting"):
+		_fail("field recipe picker did not open")
+		return
+	if panel.get_station_kind() != "field_crafting":
+		_fail("picker not in field_crafting mode")
+		return
+	var field_found: bool = false
+	for _j in range(panel.get_entry_count() + 2):
+		if panel.get_selected_id() == field_chosen:
+			field_found = true
+			break
+		panel.move_selection(1)
+	if not field_found:
+		_fail("could not select field recipe %s" % field_chosen)
+		return
+	var field_result: Dictionary = panel.confirm_selection()
+	if not bool(field_result.get("ok", false)):
+		_fail("field confirm failed: %s" % str(field_result.get("reason", "")))
+		return
+	var active_field: String = playable.field_crafting_state.get_active_recipe_id()
+	if active_field != field_chosen:
+		_fail("active field recipe is %s, expected %s" % [active_field, field_chosen])
+		return
+	if field_chosen == field_first:
+		_fail("field chosen_not_first broken")
+		return
+	var fprod: Dictionary = playable.crafting_state.get_produces(field_chosen)
+	var fitem: String = str(fprod.get("item_id", ""))
+	var fbefore: int = inv.get_quantity(fitem)
+	playable.advance_crafting_for_validation(120.0)
+	if playable.field_crafting_state.is_crafting():
+		_fail("field craft did not complete")
+		return
+	if inv.get_quantity(fitem) <= fbefore:
+		_fail("field output not deposited: %s" % fitem)
+		return
+
 	finished = true
-	print("MAIN PLAYABLE RECIPE PICKER PASS station=fabricator recipe=%s crafted=true chosen_not_first=true" % chosen)
+	print("MAIN PLAYABLE RECIPE PICKER PASS station=fabricator recipe=%s crafted=true chosen_not_first=true field=%s field_crafted=true" % [chosen, field_chosen])
 	quit()
 
 func _find_playable(node: Node):
