@@ -87,7 +87,7 @@ Proven by `main_playable_reachability_smoke.gd` (bundle command count 208). See
   music/voice *asset content pass* remains a polish track (pipeline wiring complete).
 - **Web-chart visual polish** (ADR-0045) — text rows + session knowledge work; graphical
   chart pass is polish, not reachability.
-- **AI pathfinding** — lerp movement until a dedicated pathfinding card.
+- ~~**AI pathfinding**~~ — **CLOSED ADR-0049:** pure `ShipNavGraph` + A* pathfollow (no wall-lerp); regression +4 smokes.
 - **Cloud saves / Steamworks** — stub manifest only (ADR-0032).
 - **Bespoke enemy/boss content, explorable hub scene, final art** — content tracks.
 

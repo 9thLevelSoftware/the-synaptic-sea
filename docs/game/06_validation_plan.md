@@ -383,7 +383,11 @@ run_clean 'Tranche 6 unlock trigger production smoke' 'UNLOCK TRIGGER PRODUCTION
 run_clean 'Stream D unlock trigger live actions smoke' 'UNLOCK TRIGGER STREAM D PASS scan=true first_aid=true cook=true fabricate=true repair=true weld=true travel=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_stream_d_smoke.gd
 run_clean 'Stream E unlock + junk salvage smoke' 'UNLOCK TRIGGER STREAM E PASS ration=true diagnose=true discover=true extract=true compound=true junk_salvage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_stream_e_smoke.gd
 run_clean 'Stream F unlock + Fire B2 smoke' 'UNLOCK TRIGGER STREAM F PASS surgery=true decode=true shelter=true social=true fire_b2=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_stream_f_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=215 clean_output=true'
+run_clean 'ADR-0049 ship nav graph smoke' 'SHIP NAV GRAPH PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_nav_graph_smoke.gd
+run_clean 'ADR-0049 threat pathfinder smoke' 'THREAT PATHFINDER PASS path=true step=true flee=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_pathfinder_smoke.gd
+run_clean 'ADR-0049 threat path follow smoke' 'THREAT PATH FOLLOW PASS advanced=true no_tunnel=true graph=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_path_follow_smoke.gd
+run_clean 'ADR-0049 main playable threat pathfinding smoke' 'MAIN PLAYABLE THREAT PATHFINDING PASS graph=true advanced=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_threat_pathfinding_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=219 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
