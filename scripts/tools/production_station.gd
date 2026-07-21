@@ -3,14 +3,17 @@ class_name ProductionStation
 
 ## A spatial, range-gated production station bound to one stateful production model
 ## (HydroponicsState or WaterRecyclerState) on the home ship. Unlike CraftingStation
-## (single-active, stateless, auto-deposit), this drives a persistent model: the first
-## interact STARTS production (consuming inputs), and a later interact HARVESTS the produce
-## once the model reports ready. The coordinator ticks the model per-frame; this node only
-## starts and collects. Mirrors the range/interact/marker contract of crafting_station.gd.
+## (single-active, timed craft), this drives a persistent model: the first interact
+## STARTS production (consuming inputs), and a later interact HARVESTS the produce
+## once the model reports ready. Hydroponics IDLE interact opens the crop picker
+## (REQ-CS-018) instead of auto-planting the first affordable crop.
+## The coordinator ticks the model per-frame; this node only starts and collects.
 
 signal production_started(station_kind: String, input_id: String)
 signal production_harvested(station_kind: String, item_id: String, qty: int)
 signal production_blocked(station_kind: String, reason: String)
+## REQ-CS-018: hydro IDLE interact opens the shared recipe picker for crop choice.
+signal crop_picker_requested(station_kind: String)
 
 const HydroStateScript := preload("res://scripts/systems/hydroponics_state.gd")
 const RecyclerStateScript := preload("res://scripts/systems/water_recycler_state.gd")
@@ -65,7 +68,7 @@ func _avail_power() -> float:
 func _skill() -> int:
 	return int(player_skill.call()) if player_skill.is_valid() else 0
 
-## Range-gated interact. Returns true when it started or harvested production.
+## Range-gated interact. Returns true when it opened the crop picker, started, or harvested.
 func try_interact(player_body: Object) -> bool:
 	if not is_instance_valid(player_body) or model == null or inventory_state == null:
 		return false
@@ -91,25 +94,102 @@ func _interact_hydro() -> bool:
 	if model.state == HydroStateScript.State.PLANTED:
 		emit_signal("production_blocked", station_kind, "in_progress")
 		return false
-	# IDLE -> plant the first affordable crop.
+	# IDLE -> open crop picker (REQ-CS-018); no auto-plant.
+	emit_signal("crop_picker_requested", station_kind)
+	return true
+
+## REQ-CS-018: list crop catalog rows for the picker (shape matches craft list entries).
+func list_crop_entries() -> Array:
+	var out: Array = []
+	if station_kind != "hydroponics" or inventory_state == null:
+		return out
 	var crops: Array = config.get("crops", []) as Array
 	var skill: int = _skill()
 	var power: float = _avail_power()
-	for crop in crops:
+	var water: float = float(inventory_state.get_quantity("purified_water"))
+	# Sort by crop_id for deterministic picker order.
+	var sorted_crops: Array = crops.duplicate()
+	sorted_crops.sort_custom(func(a, b): return str(a.get("crop_id", "")) < str(b.get("crop_id", "")))
+	for crop in sorted_crops:
+		if not (crop is Dictionary):
+			continue
 		var c: Dictionary = crop as Dictionary
+		var cid: String = str(c.get("crop_id", ""))
+		if cid.is_empty():
+			continue
+		var need_skill: int = int(c.get("required_skill_level", 0))
 		var water_cost: float = float(c.get("water_cost", 0.0))
-		if int(c.get("required_skill_level", 0)) > skill:
-			continue
-		if float(inventory_state.get_quantity("purified_water")) < water_cost:
-			continue
-		if power < float(c.get("power_cost", 0.0)):
-			continue
-		var res: Dictionary = model.plant(c, skill, float(inventory_state.get_quantity("purified_water")), power)
-		if res.get("ok", false):
-			inventory_state.remove_item("purified_water", int(ceil(water_cost)))
-			emit_signal("production_started", station_kind, str(c.get("crop_id", "")))
-			return true
-	emit_signal("production_blocked", station_kind, "no_affordable_crop")
+		var power_cost: float = float(c.get("power_cost", 0.0))
+		var produce_id: String = str(c.get("produce_item_id", ""))
+		var produce_qty: int = int(c.get("produce_quantity", 0))
+		var status: String = "ready"
+		if model != null and int(model.state) != HydroStateScript.State.IDLE:
+			status = "busy"
+		elif need_skill > skill:
+			status = "insufficient_skill"
+		elif water < water_cost:
+			status = "missing_ingredients"
+		elif power < power_cost:
+			status = "insufficient_power"
+		out.append({
+			"recipe_id": cid,
+			"display_name": str(c.get("display_name", cid)),
+			"category": "hydroponics",
+			"required_skill_level": need_skill,
+			"ingredients": {"purified_water": int(ceil(water_cost))},
+			"produces": {"item_id": produce_id, "quantity": produce_qty},
+			"craft_time_seconds": float(c.get("growth_seconds", 0.0)),
+			"status": status,
+			"craftable": status == "ready",
+			"crop_config": c.duplicate(true),
+		})
+	return out
+
+func first_ready_crop_id() -> String:
+	for entry in list_crop_entries():
+		if entry is Dictionary and bool((entry as Dictionary).get("craftable", false)):
+			return str((entry as Dictionary).get("recipe_id", ""))
+	return ""
+
+func _find_crop_config(crop_id: String) -> Dictionary:
+	for crop in config.get("crops", []) as Array:
+		if crop is Dictionary and str((crop as Dictionary).get("crop_id", "")) == crop_id:
+			return (crop as Dictionary).duplicate(true)
+	return {}
+
+## REQ-CS-018: plant a chosen crop_id (picker confirm + validation seams).
+func try_plant_crop(crop_id: String) -> bool:
+	if station_kind != "hydroponics" or model == null or inventory_state == null:
+		emit_signal("production_blocked", station_kind, "not_hydro")
+		return false
+	if crop_id.is_empty():
+		emit_signal("production_blocked", station_kind, "no_crop")
+		return false
+	if model.state != HydroStateScript.State.IDLE:
+		emit_signal("production_blocked", station_kind, "in_progress" if model.state == HydroStateScript.State.PLANTED else "busy")
+		return false
+	var c: Dictionary = _find_crop_config(crop_id)
+	if c.is_empty():
+		emit_signal("production_blocked", station_kind, "unknown_crop")
+		return false
+	var water_cost: float = float(c.get("water_cost", 0.0))
+	var skill: int = _skill()
+	var power: float = _avail_power()
+	if int(c.get("required_skill_level", 0)) > skill:
+		emit_signal("production_blocked", station_kind, "insufficient_skill")
+		return false
+	if float(inventory_state.get_quantity("purified_water")) < water_cost:
+		emit_signal("production_blocked", station_kind, "missing_ingredients")
+		return false
+	if power < float(c.get("power_cost", 0.0)):
+		emit_signal("production_blocked", station_kind, "insufficient_power")
+		return false
+	var res: Dictionary = model.plant(c, skill, float(inventory_state.get_quantity("purified_water")), power)
+	if res.get("ok", false):
+		inventory_state.remove_item("purified_water", int(ceil(water_cost)))
+		emit_signal("production_started", station_kind, crop_id)
+		return true
+	emit_signal("production_blocked", station_kind, str(res.get("reason", "plant_failed")))
 	return false
 
 func _interact_recycler() -> bool:

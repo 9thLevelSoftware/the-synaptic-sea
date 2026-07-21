@@ -173,6 +173,8 @@ func _render() -> void:
 			_title_label.text = "SALVAGE"
 		elif _station_kind == "field_crafting":
 			_title_label.text = "FIELD CRAFT"
+		elif _station_kind == "hydroponics":
+			_title_label.text = "HYDROPONICS"
 		else:
 			_title_label.text = "CRAFT — %s" % (_station_kind if not _station_kind.is_empty() else "?")
 	if _list_label == null:

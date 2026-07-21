@@ -523,6 +523,23 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - `main_playable_slice_crafting_smoke.gd`
   - `MAIN PLAYABLE CRAFTING PASS`
 
+## REQ-CS-018: Hydroponics crop picker (REQ-CS-018)
+
+- Source: `docs/game/features/crafting_recipe_picker.md` (production extension)
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Hydroponics still auto-planted the first affordable crop; players need to choose cultivar when multiple crops are affordable.
+- Acceptance criteria:
+  - Hydroponics IDLE interact opens a crop list (not auto-plant).
+  - Player can select and plant a non-first ready crop when skill/water/power allow.
+  - Harvest / in-progress interact paths unchanged.
+  - Food production smoke still PASSes via first-ready plant validation seam.
+- Verification:
+  - `hydroponics_crop_list_smoke.gd` — `HYDROPONICS CROP LIST PASS`
+  - `main_playable_slice_hydro_crop_picker_smoke.gd` — `MAIN PLAYABLE HYDRO CROP PICKER PASS`
+  - `main_playable_food_production_smoke.gd` — existing loop still green
+
 ## REQ-CS-017: Salvage station target picker (REQ-CS-017)
 
 - Source: `docs/game/features/crafting_recipe_picker.md` (salvage extension)
