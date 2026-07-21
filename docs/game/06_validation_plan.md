@@ -198,7 +198,7 @@ run_clean 'spoilage stage threaded into eat path smoke' 'SPOILAGE EAT SCALING PA
 run_clean 'M7-A breach seal point model smoke' 'BREACH SEAL POINT PASS sealed=true breach_cleared=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/breach_seal_point_smoke.gd
 run_clean 'M7-A life support vitals loop smoke' 'MAIN PLAYABLE LIFE SUPPORT VITALS PASS aboard_drain=true away_safe=true recover=true seal_loop=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_life_support_vitals_smoke.gd
 run_clean 'Domain 1 survival stakes (home) smoke' 'MAIN PLAYABLE SURVIVAL STAKES PASS gate_half=true gate_locked=true death=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_survival_stakes_smoke.gd
-run_clean 'Domain 1 survival attrition away-path smoke' 'MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true away_death=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_survival_away_smoke.gd
+run_clean 'Domain 1 survival attrition away-path smoke' 'MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true o2_drain=true o2_teeth=true away_death=true no_extract_on_death=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_survival_away_smoke.gd
 run_clean 'vitals state model smoke' 'VITALS STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/vitals_state_smoke.gd
 run_clean 'player movement gating seam smoke' 'PLAYER MOVEMENT GATING PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_movement_gating_smoke.gd
 run_clean 'hallucination director model smoke' 'HALLUCINATION DIRECTOR PASS tiers=true gated=true deterministic=true ttl=true teeth=true fx=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hallucination_director_smoke.gd
@@ -238,6 +238,10 @@ run_clean 'fire suppression round-trip smoke' 'FIRE SUPPRESSION ROUND TRIP PASS 
 run_clean 'ship instance fire persistence smoke' 'SHIP INSTANCE FIRE PERSISTENCE PASS omitted=true restored=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_instance_fire_persistence_smoke.gd
 run_clean 'derelict fire seed smoke' 'DERELICT FIRE SEED PASS deterministic=true rate_ok=true cap_ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_fire_seed_smoke.gd
 run_clean 'main playable derelict fire smoke' 'MAIN PLAYABLE DERELICT FIRE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_derelict_fire_smoke.gd
+run_clean 'main playable reachability smoke' 'MAIN PLAYABLE REACHABILITY PASS organic_cart=true home_loot=true hangar_interact=true achievements=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_reachability_smoke.gd
+run_clean 'main playable quicksave smoke' 'MAIN PLAYABLE QUICKSAVE PASS slot=quicksave kind=quick cooldown=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_quicksave_smoke.gd
+run_clean 'encounter table dead fleet smoke' 'ENCOUNTER TABLE DEAD FLEET PASS table=threat_drone_swarm kinds=drone_swarm' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encounter_table_dead_fleet_smoke.gd
+run_clean 'status effect icons smoke' 'STATUS EFFECT ICONS PASS entries=8 all_exist=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/status_effect_icons_smoke.gd
 run_clean 'derelict fire sequential persistence smoke' 'DERELICT FIRE SEQUENTIAL PERSISTENCE PASS remembered=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_fire_sequential_persistence_smoke.gd
 run_clean 'detection state model smoke' 'DETECTION STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/detection_state_smoke.gd
 run_clean 'threat detection source smoke' 'THREAT DETECTION SOURCE PASS single_source=true per_archetype=true proximity=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_detection_source_smoke.gd
@@ -245,7 +249,7 @@ run_clean 'player crouch seam smoke' 'PLAYER CROUCH PASS' "$GODOT" --headless --
 run_clean 'crouch action smoke' 'CROUCH ACTION PASS registered=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/crouch_action_smoke.gd
 run_clean 'threat kill removal smoke' 'THREAT KILL REMOVAL PASS emitted_once=true removed=true loot_table=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_kill_removal_smoke.gd
 run_clean 'combat reward data smoke' 'COMBAT REWARD DATA PASS archetypes=true table=true training=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_reward_data_smoke.gd
-run_clean 'combat closure smoke' 'COMBAT CLOSURE PASS away_kill=true noise=true crouch=true reward=true removed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_closure_smoke.gd
+run_clean 'combat closure smoke' 'COMBAT CLOSURE PASS away_kill=true noise=true crouch=true reward=true removed=true pending_corpse=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_closure_smoke.gd
 run_clean 'combat corpse position smoke' 'MAIN PLAYABLE COMBAT CORPSE POSITION PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_corpse_position_smoke.gd
 run_clean 'Domain 3 production station wiring smoke' 'PRODUCTION WIRING PASS hydro=true recycler=true spoilage_registered=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_station_wiring_smoke.gd
 run_clean 'Domain3 contaminated_water item smoke' 'CONTAMINATED WATER ITEM PASS defined=true supply=true lootable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/contaminated_water_item_smoke.gd
@@ -376,7 +380,7 @@ run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONT
 run_clean 'Tranche 6 demo scope gate model smoke' 'DEMO SCOPE GATE PASS build_kind=release blocked=5 allowed=0 unknown_rejected=true params=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_gate_smoke.gd
 run_clean 'Tranche 6 demo scope enforcement smoke' 'DEMO SCOPE ENFORCEMENT PASS dev_unaffected=true save_cap=true world_skip=true hub_blocked=true hazards_capped=true cargo_capped=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_enforcement_smoke.gd
 run_clean 'Tranche 6 unlock trigger production smoke' 'UNLOCK TRIGGER PRODUCTION PASS triggers_valid=true scavenge_emitted=true codex_unlocked=true class_unlocked=true bridge_unlocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_production_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=208 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=212 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

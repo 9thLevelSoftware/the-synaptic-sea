@@ -83,6 +83,26 @@ func _initialize() -> void:
 		_fail("oxygen regen rate should be 3.5/sec, before=%s after=%s" % [oxygen_before_regen, oxygen_after_regen])
 		return
 
+	# Field atmosphere drains suit O2 even outside the home breach zone (derelict path).
+	var field_start: float = float(model.get_summary().get("oxygen", 0.0))
+	var pass_before_field: bool = bool(model.get_summary().get("passability_blocked", false))
+	var field_changed: bool = model.tick(1.0, {"field_atmosphere": true, "player_in_breach_zone": false})
+	if not field_changed:
+		_fail("field_atmosphere tick should drain even outside home breach zone")
+		return
+	var field_after: float = float(model.get_summary().get("oxygen", -1.0))
+	if field_after >= field_start:
+		_fail("field_atmosphere should decrease oxygen, before=%s after=%s" % [field_start, field_after])
+		return
+	if absf(field_after - (field_start - 6.0)) > 0.001:
+		_fail("field drain rate should match base 6.0/sec, before=%s after=%s" % [field_start, field_after])
+		return
+	# Field drain must not flip home-corridor passability (shared pool side effect).
+	if bool(model.get_summary().get("passability_blocked", false)) != pass_before_field:
+		_fail("field_atmosphere must not change passability_blocked (was %s now %s)" % [
+			str(pass_before_field), str(model.get_summary().get("passability_blocked", false))])
+		return
+
 	# Seal the breach via objective 2 summary.
 	var seal_changed: bool = model.apply_ship_systems_summary({
 		"main_power_restored": true,
@@ -106,6 +126,14 @@ func _initialize() -> void:
 	var oxygen_after_post_seal: float = float(model.get_summary().get("oxygen", -1.0))
 	if absf(oxygen_after_post_seal - oxygen_before_post_seal) > 0.001:
 		_fail("oxygen should not change while inside sealed breach, before=%s after=%s" % [oxygen_before_post_seal, oxygen_after_post_seal])
+		return
+
+	# Field atmosphere still drains after home seal (derelict suit pressure is independent).
+	var field_sealed_start: float = float(model.get_summary().get("oxygen", -1.0))
+	model.tick(1.0, {"field_atmosphere": true})
+	var field_sealed_after: float = float(model.get_summary().get("oxygen", -1.0))
+	if field_sealed_after >= field_sealed_start - 0.001:
+		_fail("field_atmosphere should still drain after home seal, before=%s after=%s" % [field_sealed_start, field_sealed_after])
 		return
 
 	# Direct seal call should be idempotent.

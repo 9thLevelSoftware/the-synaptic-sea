@@ -1,12 +1,13 @@
 extends SceneTree
 
 ## Domain 1 away-path proof (live scene): on a boarded derelict
-## (away_from_start=true, past the line 4808 early-return) the survival attrition
+## (away_from_start=true, past the early-return) the survival attrition
 ## tick must ADVANCE — radiation drains health, the extreme-zone signal heats body
-## temperature — and draining health to 0 must end the run as a death.
+## temperature, personal O2 drains under field_atmosphere — and draining health
+## to 0 must end the run as a death.
 ##
 ## Pass marker:
-##   MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true away_death=true
+##   MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true o2_drain=true away_death=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const TIMEOUT_FRAMES: int = 360
@@ -63,15 +64,43 @@ func _validate() -> void:
 		_fail("body temperature should rise in the derelict extreme zone (%.3f -> %.3f)" % [temp_before, playable.body_temperature_state.temperature])
 		return
 
+	# Personal O2 must drain on the derelict hull (field_atmosphere) — was home-only.
+	# Occupancy null (or any non-home/non-lifeboat ship) is treated as on-hull so
+	# this pure away_from_start force still exercises field drain (Codex P2).
+	playable.current_occupancy = null
+	if playable.oxygen_state == null:
+		_fail("oxygen_state missing")
+		return
+	var o2_before: float = float(playable.oxygen_state.get_summary().get("oxygen", -1.0))
+	_pump(2.0)
+	var o2_after: float = float(playable.oxygen_state.get_summary().get("oxygen", -1.0))
+	var o2_drain: bool = o2_after < o2_before - 0.001
+	if not o2_drain:
+		_fail("personal O2 should drain on a derelict (%.3f -> %.3f)" % [o2_before, o2_after])
+		return
+
+	# Zero suit O2 must feed health drain (not HUD-only) while on the hull.
+	playable.oxygen_state.oxygen = 0.0
+	playable.vitals_state.health = 50.0
+	var hp_before: float = playable.vitals_state.health
+	_pump(1.0)
+	if playable.vitals_state.health >= hp_before - 0.001:
+		_fail("zero field O2 should drain health (%.3f -> %.3f)" % [hp_before, playable.vitals_state.health])
+		return
+
 	# Death must fire on the AWAY branch.
 	playable.vitals_state.health = 0.0
 	_pump(0.1)
 	if not playable.slice_complete:
 		_fail("health=0 on a derelict should end the run (slice_complete still false)")
 		return
+	# Death must NOT grant the Extracted achievement (run_complete|any).
+	if playable.achievement_state != null and playable.achievement_state.is_unlocked("extracted"):
+		_fail("death must not unlock extracted achievement")
+		return
 
 	finished = true
-	print("MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true away_death=true")
+	print("MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true o2_drain=true o2_teeth=true away_death=true no_extract_on_death=true")
 	_cleanup_and_quit(0)
 
 func _pump(seconds: float) -> void:

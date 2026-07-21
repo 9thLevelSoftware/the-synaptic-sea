@@ -91,7 +91,9 @@ const RadiationStateScript := preload("res://scripts/systems/radiation_state.gd"
 const BodyTemperatureStateScript := preload("res://scripts/systems/body_temperature_state.gd")
 const StatusEffectsStateScript := preload("res://scripts/systems/status_effects_state.gd")
 const SpoilageStateScript := preload("res://scripts/systems/spoilage_state.gd")
-const CookingStateScript := preload("res://scripts/systems/cooking_state.gd")
+# CookingState retired as a coordinator dependency: kitchen meal production flows
+# through CraftingState (station_kind=kitchen). cooking_state.gd remains as a
+# pure-model leftover for any residual synthesizer-era callers; do not re-wire.
 const HydroponicsStateScript := preload("res://scripts/systems/hydroponics_state.gd")
 const WaterRecyclerStateScript := preload("res://scripts/systems/water_recycler_state.gd")
 const PowerGridStateScript := preload("res://scripts/systems/power_grid_state.gd")
@@ -492,6 +494,7 @@ const DEFAULT_INTERACT_BINDINGS: Array[Key] = [KEY_E, KEY_ENTER, KEY_SPACE, KEY_
 # keys -- the player-facing save surfaces are the pause menu's Save /
 # Save & Exit items and the interactive save_load slot screen.
 const DEFAULT_SAVE_RUN_BINDINGS: Array[Key] = [KEY_F5]
+const DEFAULT_QUICKSAVE_BINDINGS: Array[Key] = [KEY_F6]
 const DEFAULT_LOAD_RUN_BINDINGS: Array[Key] = [KEY_F9]
 const DEFAULT_ATTACK_BINDINGS: Array[Key] = [KEY_F]
 const DEFAULT_RELOAD_BINDINGS: Array[Key] = [KEY_R]
@@ -508,6 +511,7 @@ func ensure_default_input_actions() -> void:
 	_ensure_key_action_set("field_craft", [KEY_C])
 	# REQ-012: manual save/load input actions. F5 saves, F9 loads.
 	_ensure_key_action_set("save_run", DEFAULT_SAVE_RUN_BINDINGS)
+	_ensure_key_action_set("quicksave_run", DEFAULT_QUICKSAVE_BINDINGS)
 	_ensure_key_action_set("load_run", DEFAULT_LOAD_RUN_BINDINGS)
 	_ensure_key_action_set("toggle_scanner", [KEY_TAB])
 	_ensure_key_action_set("toggle_inventory", [KEY_I])
@@ -1671,6 +1675,10 @@ func end_run(reason: String = "extraction") -> int:
 		return 0
 	slice_complete = true
 	tracker.mark_run_complete()
+	# REQ-RL-003: extracted achievement only for successful ends — never for
+	# death (catalog text requires completing a full run and returning home).
+	if reason != "death":
+		_try_unlock_achievement("run_complete", reason)
 	var payout: int = int(_apply_meta_payout_and_persist(reason))
 	if save_load_service != null:
 		if reason == "death":
@@ -2373,9 +2381,35 @@ func _spawn_cart_control(inst, cart) -> void:
 	control.cart_unload_requested.connect(_on_cart_unload_requested)
 	cart_controls.append(control)
 
+## Ensures a cargo-capable ship has at least one parked salvage cart so the
+## cart loop is organically reachable (grab/load/unload) without the validation
+## seam. No-op when carts already exist, or when no cargo/hangar room can host
+## a park position. Idempotent.
+func _ensure_organic_cart(inst) -> void:
+	if inst == null:
+		return
+	if not inst.get_carts().is_empty():
+		return
+	var layout: Dictionary = inst.built_layout if typeof(inst.built_layout) == TYPE_DICTIONARY else {}
+	if layout.is_empty():
+		return
+	var center: Vector3 = DockPortsScript._room_floor_center(layout, "cargo", "cargo")
+	if center == Vector3.INF:
+		center = DockPortsScript._room_floor_center(layout, "hangar", "hangar")
+	if center == Vector3.INF:
+		return
+	# Distinct id from spawn_cart_for_validation ("cart_<ship_id>") so smokes
+	# that still inject a validation cart do not collide on cart_id.
+	var cart = CartStateScript.create("organic_cart_%s" % String(inst.ship_id), 200.0)
+	cart.parked_ship_id = String(inst.ship_id)
+	# Offset slightly from hold control so the two interactables do not stack.
+	cart.parked_position = center + Vector3(1.5, 0.0, 0.0)
+	inst.get_carts().append(cart)
+
 func _spawn_cart_controls_for_ship(inst) -> void:
 	if inst == null:
 		return
+	_ensure_organic_cart(inst)
 	for cart in inst.get_carts():
 		_spawn_cart_control(inst, cart)
 
@@ -2729,6 +2763,9 @@ func _build_loot_containers() -> void:
 		else:
 			loot_container_root.add_child(lc)
 		loot_containers.append(lc)
+	# Domain 2: re-spawn unsearched combat corpses after layout crates so leave
+	# + revisit / save-load keep kill drops reachable until searched.
+	_spawn_pending_corpse_loot_containers()
 
 func _clear_loot_containers() -> void:
 	if is_instance_valid(loot_container_root):
@@ -3611,6 +3648,9 @@ func _on_repair_completed(system_id: String, subcomponent_id: String) -> void:
 	# equip/transfer. Restores the ADR-0028 invariant: every inventory-content
 	# change refreshes the reduction cache.
 	_recompute_player_encumbrance()
+	# REQ-RL-003: first_repair achievement (repair_consumed / any) — channel
+	# completion is the live "parts were spent" moment for RepairPoint.
+	_try_unlock_achievement("repair_consumed", "%s.%s" % [system_id, subcomponent_id])
 	var mgr = _active_systems_manager()
 	var operational: bool = mgr != null and mgr.is_operational(system_id)
 	print("REPAIR COMPLETED system=%s sub=%s operational=%s" % [
@@ -3884,6 +3924,10 @@ func _apply_lifeboat_opening_damage() -> void:
 func _on_loot_container_searched(container_id: String, granted: Array, source: Node3D = null) -> void:
 	if current_ship != null and not current_ship.looted_container_ids.has(container_id):
 		current_ship.looted_container_ids.append(container_id)
+	# Combat corpses leave pending_corpse_loot once searched so they do not
+	# re-spawn on revisit (looted_container_ids is the durable "already searched" set).
+	if current_ship != null and container_id.begins_with("corpse_"):
+		_clear_pending_corpse_loot(current_ship, container_id)
 	# Tranche 6 (corrected unlock-wiring audit item): searching a container is
 	# the authored scavenge_container training action (+50 scavenging XP,
 	# data/player/training_actions.json) and the trigger for the
@@ -3891,6 +3935,8 @@ func _on_loot_container_searched(container_id: String, granted: Array, source: N
 	# in production, so all three were dead. Event-driven (fires from the
 	# interact path on BOTH home and away), not a per-frame system.
 	emit_training_event("scavenge_container", container_id)
+	# REQ-RL-003: first_loot achievement (loot_searched / any).
+	_try_unlock_achievement("loot_searched", container_id)
 	_postprocess_loot_grants(granted, container_id, source)
 	_refresh_inventory_hud()
 	# Auto-equip granted containers into empty slots (Phase-7 deferral: no equip UI yet).
@@ -3938,6 +3984,10 @@ func _try_bypass_nearest_hatch() -> bool:
 ## lootable corpse container at its position (reusing the closed loot/interact path).
 ## Runs on BOTH _process branches (the signal fires from tick_threats, called on the
 ## away branch too), so derelict kills reward identically.
+##
+## Unsearched corpses are also recorded on the ship's pending_corpse_loot so a leave
+## + revisit (or save/load) re-spawns the drop — previously they lived only in the
+## transient loot_containers array and vanished with scene_root.
 func _on_threat_killed(record: Dictionary) -> void:
 	# XP (data-driven interim skill via training_actions.json).
 	emit_training_event("threat_killed", str(record.get("archetype_id", "")))
@@ -3950,6 +4000,7 @@ func _on_threat_killed(record: Dictionary) -> void:
 	# parent under the derelict's scene_root (freed with the derelict on departure); home
 	# corpses parent under loot_container_root at origin.
 	var parent_node: Node = loot_container_root
+	var local_pos: Vector3 = pos
 	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
 		parent_node = current_ship.scene_root
 		# The kill record position is GLOBAL world-space (threat world_position bakes in the
@@ -3957,19 +4008,87 @@ func _on_threat_killed(record: Dictionary) -> void:
 		# LootContainer stores the configured position as the node's LOCAL position, so under the
 		# offset scene_root (DERELICT_DOCK_OFFSET) we must convert global -> local; otherwise the
 		# corpse double-offsets ~100u away and the range interaction can never reach it.
-		pos = (current_ship.scene_root as Node3D).to_local(pos)
+		local_pos = (current_ship.scene_root as Node3D).to_local(pos)
 	if parent_node == null or not is_instance_valid(parent_node):
 		return
-	var lc = LootContainerScript.new()
+	var loot_table: String = str(record.get("loot_table", "combat_drop_common"))
 	var seed_source: String = "kill:%s" % cid
-	lc.configure(cid, str(record.get("loot_table", "combat_drop_common")), seed_source,
-		inventory_state, _loot_tables, pos, 1.8, {})
-	# Bind the corpse container so the pickup SFX emits at its world position.
+	# Persist for revisit/save before spawning the live node.
+	if current_ship != null:
+		_register_pending_corpse_loot(current_ship, cid, loot_table, seed_source, local_pos)
+	_spawn_corpse_loot_container(cid, loot_table, seed_source, local_pos, parent_node)
+
+## Records an unsearched combat corpse on the ship so leave/revisit re-spawns it.
+func _register_pending_corpse_loot(ship, container_id: String, loot_table: String, seed_source: String, local_pos: Vector3) -> void:
+	if ship == null or container_id.is_empty():
+		return
+	for entry in ship.pending_corpse_loot:
+		if typeof(entry) == TYPE_DICTIONARY and str(entry.get("container_id", "")) == container_id:
+			return
+	ship.pending_corpse_loot.append({
+		"container_id": container_id,
+		"loot_table": loot_table,
+		"seed_source": seed_source,
+		"position": [local_pos.x, local_pos.y, local_pos.z],
+	})
+
+## Drops a pending corpse record once searched (looted_container_ids is the authority
+## for "already searched"; pending list is only for unsearched re-spawns).
+func _clear_pending_corpse_loot(ship, container_id: String) -> void:
+	if ship == null or container_id.is_empty():
+		return
+	var kept: Array = []
+	for entry in ship.pending_corpse_loot:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		if str(entry.get("container_id", "")) == container_id:
+			continue
+		kept.append(entry)
+	ship.pending_corpse_loot = kept
+
+func _spawn_corpse_loot_container(container_id: String, loot_table: String, seed_source: String, local_pos: Vector3, parent_node: Node) -> void:
+	if parent_node == null or not is_instance_valid(parent_node) or inventory_state == null:
+		return
+	# Skip if already live in the current array.
+	for existing in loot_containers:
+		if is_instance_valid(existing) and String(existing.container_id) == container_id:
+			return
+	var lc = LootContainerScript.new()
+	lc.configure(container_id, loot_table, seed_source, inventory_state, _loot_tables, local_pos, 1.8, {})
 	var searched_cb: Callable = _on_loot_container_searched.bind(lc)
 	if not lc.container_searched.is_connected(searched_cb):
 		lc.container_searched.connect(searched_cb)
 	parent_node.add_child(lc)
 	loot_containers.append(lc)
+
+## Re-spawns unsearched combat corpses from the ship's pending list (after layout loot).
+func _spawn_pending_corpse_loot_containers() -> void:
+	if current_ship == null or inventory_state == null:
+		return
+	var looted: Array = current_ship.looted_container_ids
+	var parent_node: Node = loot_container_root
+	if away_from_start and is_instance_valid(current_ship.scene_root):
+		parent_node = current_ship.scene_root
+	if parent_node == null or not is_instance_valid(parent_node):
+		return
+	for entry_variant in current_ship.pending_corpse_loot:
+		if typeof(entry_variant) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = entry_variant
+		var cid: String = str(entry.get("container_id", ""))
+		if cid.is_empty() or looted.has(cid):
+			continue
+		var pos_arr: Variant = entry.get("position", null)
+		var local_pos := Vector3.ZERO
+		if pos_arr is Array and (pos_arr as Array).size() == 3:
+			local_pos = Vector3(float(pos_arr[0]), float(pos_arr[1]), float(pos_arr[2]))
+		_spawn_corpse_loot_container(
+			cid,
+			str(entry.get("loot_table", "combat_drop_common")),
+			str(entry.get("seed_source", "kill:%s" % cid)),
+			local_pos,
+			parent_node
+		)
 
 ## Validation seam: search a loot container by id through the real interaction path.
 func search_loot_container_for_validation(container_id: String) -> bool:
@@ -5125,6 +5244,9 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		for it in derelict_interactables:
 			if is_instance_valid(it) and it.try_interact(player_body):
 				return
+		# Hangar bay dock/launch (co-present ships into/out of hangar slots).
+		if _try_hangar_interact(player_body):
+			return
 		# Sub-project #6 (cargo): deposit is the lowest-priority fallback — only fires
 		# if nothing more specific (repair/loot/objective) claimed the interact here.
 		if _try_cargo_deposit(player_body):
@@ -5154,6 +5276,12 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	for st in production_stations:
 		if is_instance_valid(st) and st.try_interact(player_body):
 			return
+	# Home-ship loot containers (spawned by _build_loot_containers when current is home).
+	# Previously only the away branch iterated loot_containers, so home crates were
+	# unreachable through the real interact path (validation seam only).
+	for lc in loot_containers:
+		if is_instance_valid(lc) and lc.try_interact(player_body):
+			return
 	# REQ-007: tool pickup is an interaction like any other. Try it first
 	# (before objective interactables) so the player can pick up the pump
 	# when standing in front of it.
@@ -5169,6 +5297,9 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		var interactable = interactable_variant
 		if interactable.try_interact(player_body):
 			return
+	# Hangar bay dock/launch at home (home ship is the primary hangar host).
+	if _try_hangar_interact(player_body):
+		return
 	# Sub-project #6 (cargo): deposit-all is the lowest-priority fallback at home too —
 	# walk up to the cargo hold and interact to dump salvage when nothing else claims it.
 	if _try_cargo_deposit(player_body):
@@ -5182,6 +5313,28 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 func _try_cargo_deposit(player_body) -> bool:
 	for ch in cargo_hold_controls:
 		if is_instance_valid(ch) and ch.try_deposit(player_body):
+			return true
+	return false
+
+## Hangar bay interact: prefer docking a co-present airlock-docked ship into a free
+## slot; otherwise launch the first bayed ship. Only fires when a HangarBayControl is
+## in range AND a real dock/launch action is available (does not consume interact on
+## a silent no-op). Returns true iff a hangar request was emitted.
+func _try_hangar_interact(player_body) -> bool:
+	for c in hangar_controls:
+		if not is_instance_valid(c):
+			continue
+		var carrier = _find_ship_by_id(String(c.carrier_id))
+		if carrier == null:
+			continue
+		var bay = carrier.get_hangar()
+		if bay == null or bay.slot_count <= 0:
+			continue
+		# Prefer dock when a co-present candidate exists and a free slot is available.
+		if _bay_dock_candidate(carrier) != null and c.try_dock(player_body, -1):
+			return true
+		# Otherwise launch the first occupied slot (if any).
+		if _first_occupied_slot(bay) >= 0 and c.try_launch(player_body, -1):
 			return true
 	return false
 
@@ -5240,6 +5393,14 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 		# Fall through to single-step completion path exactly once.
 
 	objective_completion_count += 1
+	# REQ-RL-003: objective achievements. Catalog uses trigger_target
+	# "objectives[0]" for the first sequence and the objective_type string
+	# for type-specific entries (e.g. restore_systems).
+	if objective_completion_count == 1:
+		_try_unlock_achievement("objective_completed", "objectives[0]")
+	_try_unlock_achievement("objective_completed", objective_type)
+	if objective_type == "stabilize_reactor":
+		_try_unlock_achievement("reactor_stabilized", "reactor")
 	if ship_systems_manager != null:
 		completed_objective_types[objective_type] = true
 		for pair in OBJECTIVE_REPAIR_MAP.get(objective_type, []):
@@ -5279,6 +5440,8 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 		slice_complete = true
 		current_objective_sequence = total_sequences + 1
 		tracker.mark_run_complete()
+		# REQ-RL-003: extracted achievement (run_complete / any).
+		_try_unlock_achievement("run_complete", "complete")
 		print("PLAYABLE SLICE COMPLETE objectives_completed=%d" % objective_completion_count)
 		# REQ-PM-008 / ADR-0033 — apply the meta payout and persist
 		# meta + unlock state before wiping the run snapshot.
@@ -5545,7 +5708,10 @@ func _process(delta: float) -> void:
 			return
 		# Keep the vitals panel live on a boarded derelict: Heavy-Load, repair
 		# progress, and the repair_blocked message + its countdown still apply
-		# away from home, even though the home oxygen/hazard loop is paused here.
+		# away from home. Personal O2 also ticks here (field_atmosphere) so
+		# suit pressure drains on the derelict — life-support atmosphere bite
+		# is hub-only by design; personal oxygen owns the field.
+		_refresh_oxygen_state(false, delta)
 		_tick_threat_runtime(delta)
 		# ADR-0042 (Codex PR #44): the derelict field run is the PRIMARY low-sanity context,
 		# but this branch returns before the home-path sanity/hallucination tick. Drive it here
@@ -5727,15 +5893,29 @@ func _tick_survival_attrition(delta: float) -> void:
 	if life_support_expanded_state != null and not away_from_start:
 		atmo_drain = life_support_expanded_state.get_health_drain_per_second()
 		temp_mult *= life_support_expanded_state.get_thirst_multiplier()
+	# Field suit empty/critical: personal O2 feeds health drain so zero O2 is
+	# not HUD-only (Codex P1 on PR #71). Only while on derelict hull.
+	var oxygen_health_drain: float = 0.0
+	if oxygen_state != null and _is_field_suit_pressure_active():
+		var o2_level: float = float(oxygen_state.get_summary().get("oxygen", 100.0))
+		var o2_recovery: float = float(oxygen_state.get_summary().get("recovery_threshold", 30.0))
+		if o2_level <= 0.001:
+			oxygen_health_drain = 8.0  # ~12s to death from full health
+		elif o2_level <= o2_recovery + 0.001:
+			oxygen_health_drain = 2.0  # critical suit pressure teeth
 	var hteeth: Dictionary = hallucination_director.get_direct_teeth() if hallucination_director != null else {"health_drain_per_second": 0.0, "stamina_recovery_mult": 1.0}
+	var encumb_drain: float = 0.0
+	if inventory_state != null:
+		encumb_drain = EncumbranceScript.health_drain_per_second(inventory_state.get_load_ratio())
 	vitals_state.tick(delta, {
 		"temperature_thirst_mult": temp_mult,
 		"radiation_health_drain": rad_drain,
-		"atmosphere_health_drain": atmo_drain,
+		"atmosphere_health_drain": atmo_drain + oxygen_health_drain,
 		"fire_health_drain": FIRE_HEALTH_DRAIN_PER_SECOND * _player_fire_intensity(),
 		"status_stamina_recovery_mult": status_mult,
 		"sanity_health_drain": float(hteeth["health_drain_per_second"]),
 		"sanity_stamina_recovery_mult": float(hteeth["stamina_recovery_mult"]),
+		"encumbrance_health_drain": encumb_drain,
 		"moving": is_instance_valid(player) and player.has_method("is_moving") and player.is_moving(),
 	})
 	# Stakes: penalize movement from low vitals, then end the run on incapacitation.
@@ -5916,12 +6096,34 @@ func _refresh_oxygen_state(force_initial: bool, delta_seconds: float) -> void:
 		_refresh_tracker_system_status_lines()
 		_refresh_player_vitals(delta_seconds)
 		return
-	# Per-tick path: read player position, decide breach presence, tick.
-	var player_in_zone: bool = is_player_in_breach_zone()
-	oxygen_state.tick(delta_seconds, player_in_zone)
+	# Per-tick path: home uses the spatial breach-zone gate; derelict hull
+	# uses continuous suit-pressure drain (field_atmosphere). The piloted
+	# lifeboat is a safe vessel — no field drain while occupancy is the
+	# lifeboat (Codex P2 on PR #71).
+	if _is_field_suit_pressure_active():
+		oxygen_state.tick(delta_seconds, {
+			"field_atmosphere": true,
+			"player_in_breach_zone": false,
+		})
+	else:
+		oxygen_state.tick(delta_seconds, {
+			"player_in_breach_zone": is_player_in_breach_zone() if not away_from_start else false,
+			"field_atmosphere": false,
+		})
 	_apply_breach_zone_scene_state()
 	_refresh_tracker_system_status_lines()
 	_refresh_player_vitals(delta_seconds)
+
+## True when suit O2 should drain as hostile field atmosphere: boarded on a
+## derelict hull, not inside the piloted lifeboat / home ship.
+func _is_field_suit_pressure_active() -> bool:
+	if not away_from_start:
+		return false
+	if lifeboat_ship != null and current_occupancy == lifeboat_ship:
+		return false
+	if home_ship != null and current_occupancy == home_ship:
+		return false
+	return true
 
 func _refresh_player_vitals(delta_seconds: float) -> void:
 	# A freed Node stays non-null in Godot, so guard the panel with
@@ -6412,6 +6614,9 @@ func _refresh_audio_state(force_initial: bool, _delta_seconds: float = 0.0) -> v
 	if is_instance_valid(threat_manager) and threat_manager.has_method("has_combat_engagement"):
 		engagement = bool(threat_manager.has_combat_engagement())
 	audio_manager.update_music_flags(engagement, hazard_active, vitals_critical)
+	# REQ-AU-003: push live room-role ambient + hazard threat into AmbientZoneState.
+	# Previously only smokes called set_room_role/set_threat_level; production never did.
+	_push_ambient_zone_from_gameplay(hazard_active, engagement)
 	# REQ-AU-001: emit hazard-coupled SFX through the router (cooldown-gated
 	# so a burning / arcing state does not flood the bus every frame).
 	if audio_manager.has_method("play_sfx"):
@@ -6443,6 +6648,83 @@ func _refresh_audio_state(force_initial: bool, _delta_seconds: float = 0.0) -> v
 		if _caption_expiry_seconds <= 0.0:
 			_last_caption_line = ""
 			_caption_expiry_seconds = 0.0
+
+## Maps layout room_role strings onto AmbientZoneState ROOM_ROLE_* ids.
+func _ambient_role_for_layout_role(layout_role: String) -> StringName:
+	var r: String = layout_role.to_lower()
+	if r in ["cargo", "storage", "salvage"]:
+		return AudioEventSeamScript.ROOM_ROLE_CARGO
+	if r in ["engine", "engineering", "reactor", "engine_bay", "propulsion", "power"]:
+		return AudioEventSeamScript.ROOM_ROLE_ENGINE
+	if r in ["medical", "med_bay", "triage", "clinic"]:
+		return AudioEventSeamScript.ROOM_ROLE_MED_BAY
+	if r in ["crew_quarters", "quarters", "mess_hall", "habitation", "galley"]:
+		return AudioEventSeamScript.ROOM_ROLE_CREW_QUARTERS
+	if r in ["dock", "docking", "airlock", "bay", "hangar", "bridge"]:
+		return AudioEventSeamScript.ROOM_ROLE_DOCKING
+	return AudioEventSeamScript.ROOM_ROLE_DOCKING
+
+## Nearest layout room_role to the player (ship-local). Empty when no layout/player.
+func _nearest_layout_room_role() -> String:
+	if player == null or not (player is Node3D):
+		return ""
+	var layout: Dictionary = {}
+	if current_ship != null and typeof(current_ship.built_layout) == TYPE_DICTIONARY:
+		layout = current_ship.built_layout
+	elif loader != null and loader.has_method("get_layout_copy"):
+		layout = loader.get_layout_copy()
+	var rooms_variant: Variant = layout.get("rooms", [])
+	if not (rooms_variant is Array) or (rooms_variant as Array).is_empty():
+		return ""
+	var player_pos: Vector3 = (player as Node3D).global_position
+	var best_role: String = ""
+	var best_dist: float = INF
+	for room_v in (rooms_variant as Array):
+		if typeof(room_v) != TYPE_DICTIONARY:
+			continue
+		var room: Dictionary = room_v
+		var role: String = str(room.get("room_role", room.get("role", "")))
+		if role.is_empty():
+			continue
+		var center := Vector3.ZERO
+		var pos_v: Variant = room.get("world_position", room.get("position", null))
+		if pos_v is Vector3:
+			center = pos_v as Vector3
+		elif pos_v is Array and (pos_v as Array).size() >= 3:
+			center = Vector3(float(pos_v[0]), float(pos_v[1]), float(pos_v[2]))
+		elif loader != null and loader.has_method("get_room_center") and room.has("id"):
+			center = loader.get_room_center(str(room.get("id", "")))
+		else:
+			continue
+		# Prefer ship-local centers when parented under a docked root.
+		var world_center: Vector3 = center
+		if current_ship != null and is_instance_valid(current_ship.scene_root) and (current_ship.scene_root as Node3D).is_inside_tree():
+			world_center = (current_ship.scene_root as Node3D).to_global(center)
+		var dist: float = player_pos.distance_to(world_center)
+		if dist < best_dist:
+			best_dist = dist
+			best_role = role
+	return best_role
+
+## Drive AmbientZoneState from live room + hazard context (both _process branches
+## reach this via _refresh_audio_state).
+func _push_ambient_zone_from_gameplay(hazard_active: bool, engagement: bool) -> void:
+	if audio_manager == null or audio_manager.ambient_zone_state == null:
+		return
+	var layout_role: String = _nearest_layout_room_role()
+	var ambient_role: StringName = _ambient_role_for_layout_role(layout_role)
+	# Only restart crossfade when the role actually changes (set_room_role is
+	# idempotent on same role unless force_restart).
+	var current: String = String(audio_manager.ambient_zone_state.get_current_role())
+	if current != String(ambient_role):
+		audio_manager.ambient_zone_state.set_room_role(ambient_role, false, false)
+	# Threat meter: combat engagement full, active hazard partial, else calm.
+	var threat: float = 0.0
+	if engagement:
+		threat = 1.0
+	elif hazard_active:
+		threat = 0.7
+	audio_manager.ambient_zone_state.set_threat_level(threat)
 
 ## Callback for audio_manager.pump_captions(): records the most recent
 ## caption dict as the HUD's displayed caption line. `caption` carries at
@@ -6537,10 +6819,18 @@ func _on_tool_pickup_acquired(p_tool_id: String) -> void:
 	# REQ-RL-003 / REQ-RL-004: route the tool pickup into the achievement
 	# service when one is attached. Silent no-op when no service is
 	# injected (the per-run achievement service is opt-in for tests).
-	if achievement_state != null:
-		var unlocked_id: String = achievement_state.unlock_for_trigger("tool_acquired", p_tool_id)
-		if not unlocked_id.is_empty():
-			print("ACHIEVEMENT UNLOCKED trigger=tool_acquired target=%s id=%s" % [p_tool_id, unlocked_id])
+	_try_unlock_achievement("tool_acquired", p_tool_id)
+
+## REQ-RL-003: resolve (trigger_event, trigger_target) against the per-run
+## achievement catalog. Exact target first; AchievementState also matches
+## catalog entries with trigger_target "any" via the wildcard alias. Silent
+## no-op when the service is missing or no entry matches.
+func _try_unlock_achievement(trigger_event: String, trigger_target: String) -> void:
+	if achievement_state == null or trigger_event.is_empty():
+		return
+	var unlocked_id: String = str(achievement_state.unlock_for_trigger(trigger_event, trigger_target))
+	if not unlocked_id.is_empty():
+		print("ACHIEVEMENT UNLOCKED trigger=%s target=%s id=%s" % [trigger_event, trigger_target, unlocked_id])
 
 # --- REQ-014: junction_calibrator pickup -------------------------------------
 # A second ToolPickup configured with tool_id = "junction_calibrator".
@@ -7005,6 +7295,34 @@ func _apply_meta_payout_and_persist(reason: String = "completion") -> int:
 		int(meta_progression_state.total_runs_completed),
 	])
 	return payout
+
+## Manual quicksave (F6 / quicksave_run). Writes the rotating quicksave slot via
+## AutosavePolicy.try_quicksave (cooldown-gated) + SaveLoadService.save_to_slot
+## SLOT_KIND_QUICK. Distinct from F5 world save and from Save & Exit.
+func request_quicksave() -> bool:
+	if slice_complete or save_load_service == null or autosave_policy == null:
+		return false
+	if _demo_save_refused():
+		return false
+	var gate: Dictionary = autosave_policy.try_quicksave()
+	if not bool(gate.get("should_save", false)):
+		return false
+	var snap: RunSnapshot = _build_run_snapshot()
+	if snap == null:
+		return false
+	var slot_id: String = str(gate.get("slot_id", SaveSlotStateScript.QUICKSAVE_SLOT_ID))
+	if slot_id.is_empty():
+		slot_id = SaveSlotStateScript.QUICKSAVE_SLOT_ID
+	if save_load_service.save_to_slot(slot_id, snap, SaveSlotStateScript.SLOT_KIND_QUICK, true, "Quicksave"):
+		last_saved_snapshot = snap
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_SAVE)
+		return true
+	return false
+
+## Validation seam: drive the real quicksave path (respects cooldown).
+func request_quicksave_for_validation() -> bool:
+	return request_quicksave()
 
 ## Manual save trigger (F5 / save_run input). Saves the whole world, so saving is
 ## allowed anywhere — including aboard a traveled derelict (save-anywhere; ADR-0012
@@ -8317,6 +8635,9 @@ func _input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("save_run"):
 		request_save()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("quicksave_run"):
+		request_quicksave()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("load_run"):
 		request_load()

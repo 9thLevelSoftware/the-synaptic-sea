@@ -122,7 +122,22 @@ func _initialize() -> void:
 	assert(clone2.get_carts().size() == 1, "carts round-tripped")
 	assert(clone2.get_carts()[0].get_hold().get_quantity("scrap_metal") == 3, "cart contents round-tripped")
 
-	print("SHIP INSTANCE PASS round_trip=true stubs_present=true objective_round_trip=true looted_round_trip=true")
+	# --- pending combat corpse loot round-trip (Domain 2 follow-up) ---
+	assert(not inst.get_summary().has("pending_corpse_loot"), "no corpses -> omitted")
+	inst.pending_corpse_loot.append({
+		"container_id": "corpse_t1",
+		"loot_table": "combat_drop_common",
+		"seed_source": "kill:corpse_t1",
+		"position": [1.0, 0.0, 2.0],
+	})
+	var sc_corpse: Dictionary = inst.get_summary()
+	assert(sc_corpse.has("pending_corpse_loot"), "pending corpses present")
+	var clone3 = ShipInstanceScript.create(inst.ship_id, inst.marker_id, null, null, null)
+	assert(clone3.apply_summary(sc_corpse) == true, "apply_summary accepts corpses")
+	assert(clone3.pending_corpse_loot.size() == 1, "pending corpses round-tripped")
+	assert(str(clone3.pending_corpse_loot[0].get("container_id", "")) == "corpse_t1", "corpse id round-tripped")
+
+	print("SHIP INSTANCE PASS round_trip=true stubs_present=true objective_round_trip=true looted_round_trip=true corpse_loot=true")
 	quit(0)
 
 func _fail(reason: String) -> void:

@@ -1,6 +1,6 @@
 # The Synaptic Sea — Project Status (source of truth)
 
-**Last updated:** 2026-07-07
+**Last updated:** 2026-07-21
 
 This file is the entry point for "what is actually built and what's left." It exists
 because the older roadmap docs were inaccurate and have been quarantined (see below).
@@ -67,6 +67,21 @@ not recompute the 732 inventory file:line pins; small coordinator line shifts ar
 with the documented git-archaeology recovery flow remaining the canonical refresh method
 when those pins need to move.
 
+**Stream A reachability (2026-07-21):** closed four player-facing holes that had
+models/controls but no live play path — hangar bay interact, home loot containers,
+organic salvage cart spawn, and achievement catalog emitters beyond `tool_acquired`.
+Proven by `main_playable_reachability_smoke.gd` (bundle command count 208). See
+`docs/game/integration_debt.md` § Stream A.
+
+**Stream B survival + corpse loot + encumbrance teeth (2026-07-21):**
+- Personal O2 ticks on the away branch via `field_atmosphere` (suit pressure on
+  derelicts; hub life-support atmosphere bite remains home-only). Proven by
+  `main_playable_survival_away_smoke` `o2_drain=true` + `oxygen_state_smoke`.
+- Unsearched combat corpses persist on `ShipInstance.pending_corpse_loot` and
+  re-spawn on leave/revisit/save (`combat_closure_smoke` `pending_corpse=true`).
+- Overload health drain: `Encumbrance.health_drain_per_second` feeds vitals
+  attrition (PZ tier breakpoints; move mult unchanged).
+
 **Documented deferrals (deliberate, ADR-tracked — not broken):**
 - **Audio asset library** (ADR-0044) — bus + pipeline are live with 2 placeholder clips;
   the full SFX/music/voice content pass is the roadmap's one sanctioned deferral. Also
@@ -77,9 +92,14 @@ when those pins need to move.
 - **Fire B2** — deliberate-vent control + decompression danger, fire-consumes-oxygen,
   door-gated spread (deferred since M7-B).
 
-**Content/polish (known-future, not gaps):** bespoke enemy behaviors + bosses, real audio
-assets, derelict structural-template variety, explorable hub scene, real cloud saves,
-visual/art pass.
+**Stream C wiring (2026-07-21):** F6 quicksave live; ambient room-role + threat pushed
+from gameplay; `dead_fleet` → `threat_drone_swarm`; status-effect icon placeholders on
+disk. Bundle command count 212.
+
+**Content/polish (known-future, not gaps):** bespoke enemy behaviors + bosses, full audio
+asset library, derelict structural-template variety, explorable hub scene, real cloud
+saves, final art pass. 18 unlock-table triggers still content-pending (no player action
+yet). Fire B2 + web-chart polish remain ADR deferrals.
 
 With the loops closed, the next call is the one the audit anticipated: vertical-slice
 content pass vs. horizontal polish — now unblocked.

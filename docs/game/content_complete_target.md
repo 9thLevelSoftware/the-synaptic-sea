@@ -1,5 +1,12 @@
 # Alpha Content-Complete Target
 
+> **Historical / do-not-trust for current status (as of 2026-07-21).**  
+> This Gate-3 Alpha content target predates the M-lane completion roadmap (PRs #50–#60)
+> and the combat/travel/hub systems that are now live. It still claims “no enemies,”
+> hub deferred past Alpha, and three hand-authored templates as *targets*. Use
+> `STATUS.md` + `docs/game/inventory/SYSTEM_INVENTORY.md` for what is built. Kept for
+> narrative history of early Alpha scope — do not cite as live completion criteria.
+
 ## Purpose
 
 Define what "content complete" means for Synaptic Sea Alpha so Gate 3 exit criteria and Gate 4 Beta entry criteria are unambiguous. This document is the source of truth for Alpha scope; any new content category introduced after it is approved must either fit inside these targets or trigger a gate re-decision.

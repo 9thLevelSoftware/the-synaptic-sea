@@ -103,29 +103,45 @@ func configure(config: Dictionary) -> void:
 # tick(delta_seconds: float, context: Dictionary = {}) -> bool
 # - Per ADR-0005 HazardStateContract uniform boundary. The optional
 #   `context` dictionary is the seam oxygen uses to read per-frame
-#   player context: context["player_in_breach_zone"] (bool) drives the
-#   drain/regen gate, and any other keys are ignored. The legacy
-#   positional bool form was kept for direct callers (e.g. the
-#   validation smoke force_runtime_oxygen_to_zero_for_validation
-#   seam); passing a bool as the second argument is treated as
-#   `player_in_breach_zone` for backward compatibility with the
-#   pre-ADR-0005 call sites that pre-date the contract.
+#   player context:
+#     - context["player_in_breach_zone"] (bool) — home/hub breach-zone gate
+#     - context["field_atmosphere"] (bool) — derelict/field suit pressure
+#       drain (personal O2 owns atmosphere while away; independent of the
+#       home breach open/sealed flags). When true, drain always applies
+#       and regen does not.
+#   Other keys are ignored. The legacy positional bool form was kept for
+#   direct callers (e.g. force_runtime_oxygen_to_zero_for_validation);
+#   a bool second arg is treated as `player_in_breach_zone`.
 # - Returns true when oxygen / passability / breach state changed.
 func tick(delta_seconds: float, context = null) -> bool:
 	var player_in_breach_zone: bool = false
+	var field_atmosphere: bool = false
 	if context is bool:
 		# Legacy positional form: tick(delta, bool). Preserved so the
 		# validation seam and any pre-ADR call sites keep working.
 		player_in_breach_zone = context
-	elif context != null and typeof(context) == TYPE_DICTIONARY and context.has("player_in_breach_zone"):
-		player_in_breach_zone = bool(context["player_in_breach_zone"])
-	last_player_in_breach_zone = player_in_breach_zone
+	elif context != null and typeof(context) == TYPE_DICTIONARY:
+		if context.has("player_in_breach_zone"):
+			player_in_breach_zone = bool(context["player_in_breach_zone"])
+		if context.has("field_atmosphere"):
+			field_atmosphere = bool(context["field_atmosphere"])
+	last_player_in_breach_zone = player_in_breach_zone or field_atmosphere
 	if delta_seconds <= 0.0:
-		effective_drain_rate = drain_rate * _compute_drain_multiplier()
+		effective_drain_rate = drain_rate * (
+			_compute_field_drain_multiplier() if field_atmosphere else _compute_drain_multiplier()
+		)
 		return false
 	var changed: bool = false
-	if breach_open and not breach_sealed and player_in_breach_zone:
-		var multiplier: float = _compute_drain_multiplier()
+	# Field atmosphere (boarded derelict) always drains suit O2 — independent of
+	# the home breach seal state. Home breach drain still requires open+unsealed
+	# + player-in-zone.
+	var draining: bool = field_atmosphere or (
+		breach_open and not breach_sealed and player_in_breach_zone
+	)
+	if draining:
+		var multiplier: float = (
+			_compute_field_drain_multiplier() if field_atmosphere else _compute_drain_multiplier()
+		)
 		effective_drain_rate = drain_rate * multiplier
 		var drained: float = effective_drain_rate * delta_seconds
 		if drained > 0.0:
@@ -133,12 +149,16 @@ func tick(delta_seconds: float, context = null) -> bool:
 			changed = true
 	else:
 		effective_drain_rate = drain_rate * _compute_drain_multiplier()
-		if not player_in_breach_zone and oxygen < max_oxygen:
+		if not player_in_breach_zone and not field_atmosphere and oxygen < max_oxygen:
 			var regenerated: float = regen_rate * delta_seconds
 			if regenerated > 0.0:
 				oxygen = minf(max_oxygen, oxygen + regenerated)
 				changed = true
-	_recompute_passability_blocked()
+	# Home-corridor passability is a breach-zone consequence only. Field suit
+	# drain must not flip the hub corridor collision while the player is away
+	# (Codex review on PR #71); recompute only on home/breach ticks.
+	if not field_atmosphere:
+		_recompute_passability_blocked()
 	return changed
 
 # REQ-007: while the player carries the portable_oxygen_pump AND the breach
@@ -158,6 +178,11 @@ func tick(delta_seconds: float, context = null) -> bool:
 func _compute_drain_multiplier() -> float:
 	if breach_sealed or not breach_open:
 		return 1.0
+	return _summary_drain_mult(_inventory_summary) * _summary_drain_mult(_equipment_summary)
+
+## Field (derelict) drain always applies inventory/suit multipliers — the home
+## breach seal gate does not neutralize pump/hardsuit benefits while away.
+func _compute_field_drain_multiplier() -> float:
 	return _summary_drain_mult(_inventory_summary) * _summary_drain_mult(_equipment_summary)
 
 # Reads a numeric "drain_multiplier" from a source summary (inventory or

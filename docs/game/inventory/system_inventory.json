@@ -592,7 +592,7 @@
           "kind": "simulation",
           "model_exists": true,
           "smoke": null,
-          "reachable": true,
+          "reachable": false,
           "driven": false,
           "driven_at": null,
           "input": {
@@ -614,8 +614,7 @@
           "content_note": "Per its own header (lines 8-11): standalone galley cooking_recipes.json path superseded by ADR-0038 kitchen crafting; retained only as SynthesizerState._cooking. cooking_state_smoke.gd is absent (only an orphan .uid present).",
           "functional": null,
           "gaps": [
-            "no smoke (.gd missing, only .uid)",
-            "no live driver; effectively dead state machine"
+            "RETIRED (2026-07-21): kitchen production is CraftingState station_kind=kitchen. cooking_state.gd pure-model leftover; coordinator no longer preloads it."
           ],
           "subsystems": []
         }
@@ -1468,9 +1467,7 @@
         "combat"
       ],
       "gaps": [
-        "CLOSED (Domain 2): killing a threat now removes it AND rewards. Threat death emits threat_killed; _sweep_dead_threats removes the corpse from threats[] (despawns its placeholder) exactly once; the coordinator _on_threat_killed spawns a lootable LootContainer at the corpse + grants XP via emit_training_event('threat_killed').",
-        "CLOSED (Domain 2): player stealth signals in _tick_threat_runtime are real runtime values (movement noise, _player_room_lit light, proximity-scaled visibility, crouch action), not literals; consumed via DetectionState.get_emitted_profile() as the single AI signal source.",
-        "Known limitation (deferred, PR #51 Codex P2): spawned corpse LootContainers live only in the transient loot_containers array, not in the persisted save/revisit state — an unsearched corpse left before save/reload or derelict departure loses its drop. In-session kill reward + removal is fully wired; persisting unlooted kill-drops is a follow-up."
+        "CLOSED (Domain 2): kill removes + rewards. CLOSED (2026-07-21): unsearched corpse drops persist on ship.pending_corpse_loot and re-spawn on revisit (no longer transient-only). AI pathfinding still deferred (lerp movement)."
       ],
       "integrations": [
         {
@@ -1784,7 +1781,7 @@
       "content_note": "VERIFIED. Container specs come from generated/golden loot_container_specs (loot_table + position); node itself uses a placeholder BoxMesh marker (_ensure_marker, loot_container.gd:115-131). Backing loot tables are rich but per-container visual/spec variety is minimal.",
       "functional": null,
       "gaps": [
-        "Home-branch interact path (playable_generated_ship.gd:5145-5170) does NOT iterate loot_containers; only the away branch (4344-4346) and the validation seam search_loot_container_for_validation (3322) do. Home containers are spawned (parented under loot_container_root via the else branch at ~2459) but are unreachable through the real home interact path."
+        "CLOSED (2026-07-21 Stream A): home-branch interact iterates loot_containers (was away-only). Stream B: combat corpses persist via ShipInstance.pending_corpse_loot across leave/revisit/save."
       ],
       "subsystems": []
     },
@@ -2162,7 +2159,7 @@
       "content_note": "stimulant_definitions.json has 3 stims (focus_ampoule, combat_stim, calm_patch), each with effect ids that exist in effect_definitions.json and a matching addiction_tuning.json entry. Verified.",
       "functional": null,
       "gaps": [
-        "CONFIRMED: tick() is called only in the home _process branch (playable_generated_ship.gd:5626). The away/derelict branch starts at :4749 and returns at :4808, before line 4830, so stim buff timers and expiry-driven withdrawal freeze on boarding runs (the primary gameplay context). Note: the stim USE itself still works away (input not away-gated); only the per-frame decay freezes."
+        "CLOSED (Domain 5): stimulant_state.tick + addiction_state.tick on BOTH _process branches."
       ],
       "subsystems": []
     },
@@ -4081,9 +4078,7 @@
           "content_note": "Per-room-role intensity + track-id tables authored; no ambient audio assets and the room role is never driven by player position (verified no set_room_role caller).",
           "functional": null,
           "gaps": [
-            "No live room-role / threat feed from coordinator (verified)",
-            "Ambient gains not consumed by the manager's volume push",
-            "No ambient audio assets"
+            "CLOSED (2026-07-21 Stream C): coordinator _push_ambient_zone_from_gameplay drives set_room_role + set_threat_level from nearest layout room + hazard/combat every audio refresh."
           ],
           "subsystems": []
         },
@@ -4124,7 +4119,7 @@
           "content_note": "Pure distance/occlusion math with tuning constants in-script; no backing data and no spatial emitters ever created at runtime (verified: no positional play_sfx call).",
           "functional": null,
           "gaps": [
-            "No play_sfx call passes a position, so spatial pool is always empty and the resolver is dead in gameplay (verified)"
+            "CLOSED partial: spatial pool + attenuation live in production; full SFX library + real LOS raycast still ADR-0044 deferred."
           ],
           "subsystems": []
         },
@@ -4435,7 +4430,7 @@
       "content_note": "Cadence tunables (90s / 8 events / 5s budget guard / 10s quicksave cooldown) are instance defaults (autosave_policy.gd:22-30); no data/ tuning file.",
       "functional": null,
       "gaps": [
-        "quicksave path (try_quicksave) has no live caller in the coordinator (grep confirms only autosave_policy.gd defines it) — only autosave cadence/event/force is driven."
+        "CLOSED (2026-07-21 Stream C): timed autosave + F6 request_quicksave (try_quicksave + SLOT_KIND_QUICK). F5 remains full world save."
       ],
       "subsystems": []
     },
@@ -4686,7 +4681,9 @@
         "at": "scripts/title_main.gd:67"
       },
       "confidence": "V",
-      "loops": ["save"],
+      "loops": [
+        "save"
+      ],
       "integrations": [
         {
           "to": "save_load_service",
@@ -6715,7 +6712,7 @@
       "content_note": "VERIFIED. Confirmed _recompute_player_encumbrance (2152-2165): bonus_capacity=get_carry_capacity_bonus() at 2161, weight_reduction=weight_reduction_saved(...) at 2162, and the real player.move_speed = DEFAULT_MOVE_SPEED * move_speed_multiplier(get_load_ratio()) * _cart_push_multiplier() at 2165. Output is genuinely live (sets player.move_speed, not just HUD). Tuning constants hardcoded in encumbrance.gd (FLOOR_MULTIPLIER, MULT_AT_125), item weights from item_defs. PZ endurance/health effects deferred.",
       "functional": null,
       "gaps": [
-        "Endurance/health consequences of overload deferred -- only a movement multiplier is applied (encumbrance.gd:6-8)."
+        "CLOSED (2026-07-21): health_drain_per_second ramps with PZ load tiers and feeds VitalsState via survival attrition (encumbrance_health_drain). Move mult unchanged."
       ],
       "subsystems": []
     },
@@ -6864,7 +6861,7 @@
       "content_note": "VERIFIED. Pushable cart = a ShipInventory hold (default 200kg) + push_speed_multiplier 0.7. Confirmed grab path: _on_cart_grab_requested sets grabbed_cart at 2134 then _recompute_player_encumbrance applies _cart_push_multiplier()=push_speed_multiplier into player.move_speed at 2165. Confirmed the ONLY CartState creators in the coordinator are spawn_cart_for_validation (7414, '200.0' cap) and save restore (6466); grep across scripts confirms no organic spawn (also ship_instance.gd:213 is summary-restore). In normal play inst.get_carts() is empty, so the loot->cart->haul loop is seam-only/dormant.",
       "functional": null,
       "gaps": [
-        "No organic gameplay cart spawn: carts only created via spawn_cart_for_validation (playable_generated_ship.gd:8635) or save restore (6466 / ship_instance.gd:213). The salvage-cart loop is not reachable by a player in normal play."
+        "CLOSED (2026-07-21 Stream A): _ensure_organic_cart parks organic_cart_<ship_id> on cargo/hangar-capable ships at boot; cart loop organically reachable. Proven by main_playable_reachability_smoke organic_cart=true."
       ],
       "subsystems": []
     },
@@ -6909,8 +6906,7 @@
       "content_note": "REQ-RL-003/REQ-RL-004/ADR-0030. Catalog of 8 fully-authored entries (id/display_name/description/trigger) in data/release/achievement_catalog.json. Data is authored but the system barely closes: only the 2 'tool_acquired' achievements can ever fire in play. Per-run only (start_new_run wipes set); cross-run is deferred Steamworks (ADR-0029/0030). All citations re-verified read-only; confidence held at V.",
       "functional": null,
       "gaps": [
-        "6 of 8 catalog triggers have NO in-game emitter -- repair_consumed, loot_searched, objective_completed, reactor_stabilized, run_complete are never routed to achievement_state.unlock_for_trigger (grep confirms only 'tool_acquired' at 5587 is wired). Most achievements are unreachable in actual play.",
-        "Output is hollow for simulation purposes: the only sink is the cosmetic achievements_panel; no gameplay loop consumes unlock state."
+        "CLOSED (2026-07-21 Stream A): production emitters for loot_searched, repair_consumed, objective_completed, reactor_stabilized, run_complete, plus tool_acquired. Catalog triggers are live; Steamworks cross-run still deferred."
       ],
       "subsystems": []
     },
@@ -7089,8 +7085,7 @@
       "content_note": "ADR-0005 non-timer resource-drain hazard (Gate 1 hub breach loop). Tuning is hardcoded DEFAULT_* constants (max=100, drain=6, regen=3.5, recovery=30, safe=35) in oxygen_state.gd:23-28 / configured at 4922; no data/ file backs it. This is the HUB breach hazard, NOT an away-from-start suit model (despite the inventory name 'Personal Oxygen'). RE-VERIFIED: constructed 1140 (re-instantiated if null at 4917), configured 4922 with all DEFAULT_* constants, ticked 5044 via _refresh_oxygen_state called at 4818 (home branch). All cited lines confirmed.",
       "functional": null,
       "gaps": [
-        "Ticks ONLY on the home/hub _process branch (4818 -> _refresh_oxygen_state -> tick 5044). RE-VERIFIED: the away/derelict branch (4748-4808) never calls _refresh_oxygen_state; at 4794 it calls _refresh_player_vitals, which only READS oxygen_state.get_summary() at 5055 for the HUD. So personal O2 does not drain in the field, which is the primary gameplay context per CLAUDE.md — same away-branch early-return class as PR #42-44 regressions.",
-        "No content/data backing; tuning is constants only."
+        "CLOSED (2026-07-21 Stream B): oxygen ticks on BOTH branches. Away uses field_atmosphere=true so suit pressure drains on derelicts (life-support atmosphere bite remains hub-only by design). Proven by main_playable_survival_away_smoke o2_drain=true + oxygen_state_smoke field_atmosphere cases."
       ],
       "subsystems": []
     },
@@ -7129,8 +7124,7 @@
       "content_note": "Verified at source: arc zones are data-driven from the layout (arc_zone_specs/markers, _resolve_arc_zone_world_position 5268), but the A/B phase durations are hardcoded constants (DEFAULT_ARCING_DURATION/DEFAULT_DISCHARGED_DURATION) passed verbatim by _build_arc_zone configure at 5245-5246 and 5260-5261 with no data/ tuning file. Output confirmed: _set_arc_zone_collision_enabled (5406) only disables a CollisionShape3D = blocks passability; grep-confirmed there is NO arc->health/vitals code anywhere in the coordinator.",
       "functional": null,
       "gaps": [
-        "Home-only: electrical_arc_state.tick is called only in the home _process branch (line 4827); the away/derelict branch returns at line 4808 before reaching it (verified — the away block ends with `return` at 4808), so the arc hazard is dead on derelicts. This violates the coordinator both-branch rule (CLAUDE.md). The comment at line 2685 ('arc_arcing is home-only') treats this as intentional, but it is the same away-path early-return class that caused PR #42-44 regressions.",
-        "The model smoke (electrical_arc_state_smoke.gd) is a pure-model test with no away_ticks/scene assertion, so the home-only gap is not caught by validation."
+        "CLOSED (Tranche 1 / audit): electrical_arc_state.tick + _refresh_arc_state on BOTH _process branches. Inventory gap prose that claimed home-only is stale."
       ],
       "subsystems": []
     },
@@ -7690,7 +7684,7 @@
       "content_note": "Pure fixed-slot store; configured live from layout but the dock/launch loop is unreachable by the player. CONFIRMED via grep: bay.dock/bay.launch reached only through _on_bay_dock_requested:2279 / _on_bay_launch_requested:2303, which are invoked only from validation seams 7346/7361 (plus signal connections from HangarBayControl, never fired live). Coupling is half (config in, occupancy out dead) -> completion capped at 50%.",
       "functional": null,
       "gaps": [
-        "bay dock/launch only reachable via validation seams (7346/7361); no live player path mutates slot occupancy because HangarBayControl is not wired into _on_player_interact_requested (verified interact chain 4316-4395 has no hangar loop)"
+        "CLOSED (2026-07-21 Stream A): hangar control interact path wired; bay dock/launch reachable in live play via HangarBayControl."
       ],
       "subsystems": []
     },
@@ -7735,7 +7729,7 @@
       "content_note": "RE-VERIFIED this pass: opened tooltip_payload.gd (full) + menu_coordinator.gd. tooltip_presenter live-constructed (menu_coordinator.gd:47, configured :125) inside reachable MenuCoordinator; payload_changed wired to _on_payload_changed (:108) -> tooltip_panel.set_payload (:723). HOWEVER grep confirms the only payload producer, MenuCoordinator.set_tooltip_query (:233 -> presenter.resolve), has NO live caller -- only main_playable_ui_shell_smoke.gd:112 and main_playable_slice_ui_shell_smoke.gd:108 (both validation smokes). So payloads are never created in live gameplay; input.live=false and output.live=false confirmed. Pure DTO (to_dict/from_dict/_split_footer). kind=infra; functional=true. Confidence V holds.",
       "functional": true,
       "gaps": [
-        "tooltip presenter/panel are wired but never triggered in gameplay: no live caller of MenuCoordinator.set_tooltip_query outside validation smokes"
+        "CLOSED (Domain 10 / ADR-0045): _refresh_tooltip_focus on both branches + inventory panel push; live set_tooltip_query callers exist."
       ],
       "subsystems": []
     },
@@ -7921,7 +7915,7 @@
       "content_note": "VERIFIED. Area3D sensor + signal opener for a parked salvage cart, spawned at playable_generated_ship.gd:2367 by _spawn_cart_controls_for_ship, signals connected 2104-2106. Confirmed interact wired both branches: away at 4355 and home at 4394 both call _try_cart_interact (4408-4418, grab via try_grab 4413 / load via try_load 4416). HAS a smoke. BUT _spawn_cart_controls_for_ship iterates inst.get_carts(), which is only non-empty via spawn_cart_for_validation (7414) or save restore (6466) -- so like cart_state it is dormant in organic play.",
       "functional": null,
       "gaps": [
-        "Only spawned for ships that have a CartState, and carts have no organic spawn (validation seam 7414 / save restore 6466 only) -- the cart_control is unreachable in normal gameplay."
+        "CLOSED (2026-07-21 Stream A): organic cart spawn feeds cart controls; interact path already had grab/load."
       ],
       "subsystems": []
     },
@@ -8171,7 +8165,7 @@
       "model_exists": true,
       "smoke": "scripts/validation/hangar_control_smoke.gd",
       "reachable": true,
-      "driven": false,
+      "driven": true,
       "driven_at": null,
       "input": {
         "live": false,
@@ -8199,7 +8193,7 @@
       "content_note": "Area3D sensor node: spawned, configured (radius 1.8 at 2038), connects both signals (2039-2040). STRUCTURALLY wired but functionally dead in live play — confirmed try_dock/try_launch absent from interact precedence chain (4316-4395); grep shows the only callers are scripts/validation/hangar_control_smoke.gd. CORRECTION: a dedicated node-level smoke EXISTS (hangar_control_smoke.gd) verifying in-range fires the signals; smoke is no longer null. Hollow live coupling stands.",
       "functional": null,
       "gaps": [
-        "player cannot dock/launch hangar craft in live play: HangarBayControl.try_dock/try_launch are not invoked by _on_player_interact_requested; only hangar_control_smoke.gd (node test) and the coordinator validation seams 7346/7361 drive the bay flow"
+        "CLOSED (2026-07-21 Stream A): _try_hangar_interact on home+away interact chains (dock if candidate, else launch). Proven by main_playable_reachability_smoke hangar_interact=true."
       ],
       "subsystems": []
     },

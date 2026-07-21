@@ -66,6 +66,13 @@ var objective_controller = null          # DerelictObjectiveController | null
 # Salvage-point loot reuses the objective `completed` flag, so it is not listed here.
 var looted_container_ids: Array = []
 
+# Domain 2 follow-up: unsearched combat corpse drops. Transient LootContainer
+# nodes die with scene_root on leave; these descriptors re-spawn the drop on
+# revisit / save-load until the player searches them (then they move into
+# looted_container_ids and drop out of this list). Each entry:
+#   {container_id, loot_table, seed_source, position: [x,y,z]}  # ship-local pos
+var pending_corpse_loot: Array = []
+
 # Domain 5: ids of sealed hatches already bypassed on this ship. Persisted so a
 # revisited derelict remembers which passages are already open.
 var bypassed_hatch_ids: Array = []
@@ -133,6 +140,8 @@ func get_summary() -> Dictionary:
 		result["objective"] = objective_controller.get_summary()
 	if not looted_container_ids.is_empty():
 		result["looted_containers"] = looted_container_ids.duplicate()
+	if not pending_corpse_loot.is_empty():
+		result["pending_corpse_loot"] = pending_corpse_loot.duplicate(true)
 	if not bypassed_hatch_ids.is_empty():
 		result["bypassed_hatches"] = bypassed_hatch_ids.duplicate()
 	if not combat_summary.is_empty():
@@ -188,6 +197,12 @@ func apply_summary(summary) -> bool:
 		looted_container_ids = []
 		for cid in (looted_variant as Array):
 			looted_container_ids.append(String(cid))
+	var corpse_variant: Variant = summary.get("pending_corpse_loot", null)
+	if typeof(corpse_variant) == TYPE_ARRAY:
+		pending_corpse_loot = []
+		for entry in (corpse_variant as Array):
+			if typeof(entry) == TYPE_DICTIONARY:
+				pending_corpse_loot.append((entry as Dictionary).duplicate(true))
 	var bypassed_variant: Variant = summary.get("bypassed_hatches", null)
 	if typeof(bypassed_variant) == TYPE_ARRAY:
 		bypassed_hatch_ids = []

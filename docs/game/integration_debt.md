@@ -291,14 +291,50 @@ rather than force-wired. The `unlock_trigger_production_smoke` structural guard 
 every catalog `trigger_event` inside the valid training-action vocabulary, so a future
 content pass only needs to emit the event at its new interaction.
 
-## Content-pending authored data (W9, 2026-07-07)
+## Content-pending authored data (W9, 2026-07-07) — updated 2026-07-21
 
-- `data/ui/status_effect_icons.json` — content-pending. The file authors 8 status-effect
-  icon ids, but every path still points at `res://assets/placeholder/`, which does not
-  exist on disk, and there is no live status-effect panel/assets pass yet. Keep the data;
-  finish it in the future icon UI + assets integration pass.
-- `data/procgen/encounter_tables/threat_drone_swarm.json` — content-pending. The encounter
-  table is coherent authored data and ADR-0047 makes table JSON authoritative once a biome
-  references it, but no biome currently points at `threat_drone_swarm`. Future wiring
-  options: author a new biome around it or re-point `breach_field`; gameplay choice
-  deferred, so keep the table authored but unwired for now.
+- ~~`data/ui/status_effect_icons.json`~~ — **CLOSED 2026-07-21**: 8 minimal PNG
+  placeholders under `assets/placeholder/`; `status_effect_icons_smoke` asserts paths
+  exist. Final art pass still future.
+- ~~`data/procgen/encounter_tables/threat_drone_swarm.json`~~ — **CLOSED 2026-07-21**:
+  `dead_fleet` biome now references `threat_drone_swarm` (`encounter_table_dead_fleet_smoke`).
+  `derelict_pirate` remains available for retargets.
+
+## Stream C wiring (2026-07-21)
+
+1. **F6 quicksave** — `quicksave_run` → `request_quicksave()` via AutosavePolicy.try_quicksave
+   + `save_to_slot(..., SLOT_KIND_QUICK)`. Proven by `main_playable_quicksave_smoke`.
+2. **Ambient zone gameplay** — `_push_ambient_zone_from_gameplay` in `_refresh_audio_state`
+   maps nearest layout room_role → AmbientZoneState + threat from hazard/combat.
+3. Status icons + dead_fleet encounter table as above.
+
+## Stream A reachability closures (2026-07-21)
+
+Four player-facing holes identified in the 2026-07-21 gap analysis are now closed in
+`playable_generated_ship.gd` and proven by `main_playable_reachability_smoke.gd`
+(`MAIN PLAYABLE REACHABILITY PASS organic_cart=true home_loot=true hangar_interact=true achievements=true`):
+
+1. **Hangar bay interact** — `_try_hangar_interact` is on the home and away interact
+   chains; prefer dock when a co-present candidate exists, else launch. (Previously
+   HangarBayControl was spawned and signals were connected, but nothing called
+   `try_dock` / `try_launch` from player interact.)
+2. **Home loot containers** — home-branch interact iterates `loot_containers` (was
+   away-only).
+3. **Organic salvage cart** — `_ensure_organic_cart` parks an `organic_cart_<ship_id>`
+   on cargo/hangar-capable ships before cart controls spawn (no longer validation-only).
+4. **Achievement catalog emitters** — production fires `loot_searched`, `repair_consumed`,
+   `objective_completed` (`objectives[0]` + type), `reactor_stabilized`, and
+   `run_complete` in addition to the existing `tool_acquired` path.
+
+Inventory `gaps[]` for hangar/cart/achievements/home-loot/O2/corpses refreshed
+2026-07-21 via `tools/build_system_inventory.py` after Stream A+B closures.
+
+## Stream B survival + corpse loot (2026-07-21)
+
+1. **Personal O2 away branch** — `_refresh_oxygen_state` on the derelict `_process`
+   path; `OxygenState.tick` accepts `field_atmosphere` so suit pressure drains while
+   boarded (independent of home breach seal). Hub life-support atmosphere bite stays
+   home-only.
+2. **Combat corpse persistence** — `ShipInstance.pending_corpse_loot` records
+   unsearched kill drops; `_build_loot_containers` re-spawns them on revisit/save.
+   Searched corpses leave the pending list and stay in `looted_container_ids`.
