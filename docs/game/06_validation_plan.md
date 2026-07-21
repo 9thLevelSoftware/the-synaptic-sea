@@ -721,6 +721,7 @@ membership changes).
 | `main_playable_slice_crafting_smoke` | promotion-candidate |
 | `main_playable_slice_recipe_picker_smoke` | promotion-candidate |
 | `main_playable_slice_salvage_picker_smoke` | promotion-candidate |
+| `main_playable_slice_hydro_crop_picker_smoke` | promotion-candidate |
 | `main_playable_slice_inventory_ui_smoke` | promotion-candidate |
 | `main_playable_slice_loot_ecosystem_smoke` | promotion-candidate |
 | `main_playable_slice_multislot_save_smoke` | promotion-candidate |
