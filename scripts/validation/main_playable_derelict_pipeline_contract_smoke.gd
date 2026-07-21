@@ -58,11 +58,15 @@ func _validate() -> void:
 	if layout.is_empty():
 		_fail("temp layout empty after generate")
 		return
-	if str(layout.get("biome_id", "")) != biome and not biome.is_empty():
-		# biome stamp required for production HUD/path
-		if str(layout.get("biome_id", "")).is_empty():
-			_fail("biome_id not stamped")
-			return
+	var stamped_biome: String = str(layout.get("biome_id", ""))
+	if biome.is_empty():
+		pass
+	elif stamped_biome.is_empty():
+		_fail("biome_id not stamped (expected %s)" % biome)
+		return
+	elif stamped_biome != biome:
+		_fail("biome_id mismatch stamped=%s expected=%s" % [stamped_biome, biome])
+		return
 	var rooms: Array = layout.get("rooms", []) as Array
 	if rooms.size() < 3:
 		_fail("too few rooms %d" % rooms.size())

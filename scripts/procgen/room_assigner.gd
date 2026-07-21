@@ -122,8 +122,15 @@ func assign_with_selector(
 		var role_pool_raw: Variant = zone.get("role_pool", [])
 		var role_pool: Array[String] = []
 		if role_pool_raw is Array:
+			# Normalize pool tokens so weights/guarantees share one vocabulary
+			# with derelict templates that still author compartment/quarters/bay.
+			var seen_pool: Dictionary = {}
 			for entry in role_pool_raw:
-				role_pool.append(str(entry))
+				var nr: String = normalize_role(str(entry))
+				if seen_pool.has(nr):
+					continue
+				seen_pool[nr] = true
+				role_pool.append(nr)
 		zone_pools[zone_id] = role_pool
 
 		var count: int = _resolve_count(zone.get("count", 1))

@@ -115,6 +115,9 @@ ENCOUNTER_TABLE_WARNING="^WARNING: EncounterInjector: encounter table file missi
 # derelict travel passes an empty archetype, so this diagnostic never fires
 # in play.
 DOCK_GUARANTEE_WARNING="^WARNING: RoomAssigner: guaranteed role 'dock' has no eligible zone in this template; guarantee skipped\$"
+# Soft-fail when all salted connectivity retries still produce a disconnected layout
+# (best-effort ship still returned; quality gate fails hard on disconnect).
+CONNECTIVITY_SOFT_FAIL_WARNING="^WARNING: ShipLayoutGenerator: layout connectivity soft-fail after [0-9]+ attempts seed="
 # load_from_blueprint_smoke's null_rejected case deliberately passes a null
 # blueprint to prove load_from_blueprint refuses it; this is the expected
 # rejection line.
@@ -134,7 +137,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$BLUEPRINT_NULL_ERROR|$RELEASE_LEDGER_UNKNOWN_WARNING|$RELEASE_LEDGER_STATUS_WARNING|$RELEASE_LEDGER_EXTERNAL_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$CONNECTIVITY_SOFT_FAIL_WARNING|$BLUEPRINT_NULL_ERROR|$RELEASE_LEDGER_UNKNOWN_WARNING|$RELEASE_LEDGER_STATUS_WARNING|$RELEASE_LEDGER_EXTERNAL_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"

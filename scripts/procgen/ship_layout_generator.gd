@@ -58,32 +58,32 @@ func generate_with_options(
 	self.difficulty_id = difficulty_id
 
 	var base_seed: int = int(blueprint.seed_value)
-	var last_layout: Dictionary = {}
+	var best_effort: Dictionary = {}
 	for attempt in range(MAX_CONNECTIVITY_ATTEMPTS):
 		# F2: deterministic seed salt on retry so bad connectivity is not sticky.
 		var attempt_seed: int = base_seed if attempt == 0 else int(base_seed ^ (attempt * 0x9E3779B9))
-		var attempt_blueprint = blueprint
-		if attempt > 0 and blueprint.has_method("duplicate") == false:
-			# ShipBlueprint is RefCounted with seed_value field — clone via configure if needed.
-			pass
+		var candidate: Dictionary = {}
 		if attempt > 0:
 			# Mutate seed for this attempt only (restore after).
 			var saved: int = int(blueprint.seed_value)
 			blueprint.seed_value = attempt_seed
-			last_layout = _generate_once(blueprint, archetype, biome_id, difficulty_id, extended_templates)
+			candidate = _generate_once(blueprint, archetype, biome_id, difficulty_id, extended_templates)
 			blueprint.seed_value = saved
 		else:
-			last_layout = _generate_once(blueprint, archetype, biome_id, difficulty_id, extended_templates)
-		if last_layout.is_empty():
+			candidate = _generate_once(blueprint, archetype, biome_id, difficulty_id, extended_templates)
+		if candidate.is_empty():
 			continue
-		if _layout_is_connected(last_layout):
-			return last_layout
-	# Last attempt failed connectivity — still return best effort if non-empty so
+		# Keep best non-empty across attempts (do not lose a usable ship if a
+		# later salted attempt returns {}).
+		best_effort = candidate
+		if _layout_is_connected(candidate):
+			return candidate
+	# All attempts failed connectivity — still return best effort if non-empty so
 	# loaders do not hard-crash; quality gate smoke fails disconnected layouts.
-	if not last_layout.is_empty():
+	if not best_effort.is_empty():
 		push_warning("ShipLayoutGenerator: layout connectivity soft-fail after %d attempts seed=%d" % [
 			MAX_CONNECTIVITY_ATTEMPTS, base_seed])
-		return last_layout
+		return best_effort
 	push_error("SHIP LAYOUT GENERATOR FAIL all connectivity attempts empty")
 	return {}
 

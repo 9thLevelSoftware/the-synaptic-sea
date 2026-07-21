@@ -68,10 +68,10 @@ func _initialize() -> void:
 				var rr: String = str((room_v2 as Dictionary).get("room_role", ""))
 				if not rr.is_empty():
 					roles[rr] = true
-		var has_dock: bool = roles.has("dock") or roles.has("airlock")
-		if not has_dock:
-			# Accept airlock as entry equivalent when dock guarantee mapped poorly
-			pass
+		var has_board: bool = roles.has("dock") or roles.has("airlock")
+		if not has_board:
+			_fail("layout has neither dock nor airlock boarding role seed=%d roles=%s" % [s, str(roles.keys())])
+			return
 		# Nav graph walkable start → goal
 		var graph = ShipNavGraphScript.new()
 		var n: int = graph.build_from_layout(layout)

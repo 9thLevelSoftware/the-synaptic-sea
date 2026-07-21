@@ -1,10 +1,12 @@
 {
   "id": "derelict_a",
-  "description": "Derelict variant A — dock + compartments with one biomatter blockage on a non-critical side link. Player enters via the dock and explores compartments.",
+  "description": "Derelict variant A \u2014 dock + compartments with one biomatter blockage on a non-critical side link. Player enters via the dock and explores compartments.",
   "zones": [
     {
       "id": "entry",
-      "role_pool": ["dock"],
+      "role_pool": [
+        "dock"
+      ],
       "count": 1,
       "position_hint": "lateral",
       "deck": 0,
@@ -13,7 +15,9 @@
     },
     {
       "id": "corridor_a",
-      "role_pool": ["corridor"],
+      "role_pool": [
+        "corridor"
+      ],
       "count": 1,
       "position_hint": "center",
       "deck": 0,
@@ -22,8 +26,14 @@
     },
     {
       "id": "compartment_a",
-      "role_pool": ["compartment", "quarters"],
-      "count": [1, 2],
+      "role_pool": [
+        "cargo",
+        "crew_quarters"
+      ],
+      "count": [
+        1,
+        2
+      ],
       "position_hint": "lateral",
       "deck": 0,
       "layout": "clustered",
@@ -31,7 +41,9 @@
     },
     {
       "id": "corridor_b",
-      "role_pool": ["corridor"],
+      "role_pool": [
+        "corridor"
+      ],
       "count": 1,
       "position_hint": "stern",
       "deck": 0,
@@ -40,8 +52,14 @@
     },
     {
       "id": "compartment_b",
-      "role_pool": ["compartment", "bay", "hangar"],
-      "count": [1, 2],
+      "role_pool": [
+        "cargo",
+        "hangar"
+      ],
+      "count": [
+        1,
+        2
+      ],
       "position_hint": "lateral",
       "deck": 0,
       "layout": "clustered",
@@ -49,7 +67,9 @@
     },
     {
       "id": "destination",
-      "role_pool": ["bridge"],
+      "role_pool": [
+        "bridge"
+      ],
       "count": 1,
       "position_hint": "bow",
       "deck": 0,
@@ -58,11 +78,31 @@
     }
   ],
   "connections": [
-    {"from": "entry", "to": "corridor_a", "distribution": "adjacent"},
-    {"from": "corridor_a", "to": "compartment_a", "distribution": "spread"},
-    {"from": "corridor_a", "to": "corridor_b", "distribution": "adjacent"},
-    {"from": "corridor_b", "to": "compartment_b", "distribution": "spread"},
-    {"from": "corridor_b", "to": "destination", "distribution": "adjacent"}
+    {
+      "from": "entry",
+      "to": "corridor_a",
+      "distribution": "adjacent"
+    },
+    {
+      "from": "corridor_a",
+      "to": "compartment_a",
+      "distribution": "spread"
+    },
+    {
+      "from": "corridor_a",
+      "to": "corridor_b",
+      "distribution": "adjacent"
+    },
+    {
+      "from": "corridor_b",
+      "to": "compartment_b",
+      "distribution": "spread"
+    },
+    {
+      "from": "corridor_b",
+      "to": "destination",
+      "distribution": "adjacent"
+    }
   ],
   "deck_config": {
     "max_decks": 1,
