@@ -107,8 +107,14 @@ vent with decompression/hull breach teeth), fire-consumes-oxygen (`fire_oxygen_d
 emission path. `defeat_enemy` stays intentionally unused (kill path uses `threat_killed`
 to avoid double-grant; retargetable data).
 
+**Procgen validation & coherence (2026-07-21):** quality gate (16 seeds × biome/diff,
+schema/connectivity/nav/encounters/determinism), golden parity + live derelict pipeline
+contract smokes; archetype role aliases; connectivity retry; default derelict archetype
+on travel; extended templates when difficulty set; biome-biased room variants; encounter
+table role coverage; `hazard_source=runtime` (ADR-0050). Bundle **commands=222**.
+
 With integration gaps closed, remaining work is content/polish (audio assets, art,
-pathfinding, cloud, hub scene) — not reachability.
+cloud, hub scene, deeper kit art) — not reachability.
 
 ## Quarantined / do-not-trust docs
 

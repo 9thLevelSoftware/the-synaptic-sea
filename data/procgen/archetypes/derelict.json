@@ -12,12 +12,13 @@
         }
     },
     "role_weights": {
-        "compartment": 4,
+        "cargo": 4,
         "corridor": 3,
         "bridge": 3,
-        "bay": 2,
-        "quarters": 2,
-        "hangar": 2
+        "crew_quarters": 2,
+        "hangar": 2,
+        "engineering": 2,
+        "dock": 1
     },
     "guaranteed_roles": ["dock"],
     "max_duplicates": 3

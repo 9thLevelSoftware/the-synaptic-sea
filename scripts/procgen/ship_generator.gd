@@ -37,6 +37,11 @@ func configure_run_context(p_biome_id: String, p_difficulty_id: String) -> void:
 func generate(blueprint, archetype: Dictionary = {}) -> Node3D:
 	assert(blueprint != null, "ShipGenerator: blueprint must not be null")
 
+	# F5: production travel often passed {}; load derelict archetype defaults so
+	# guaranteed_roles / role_weights actually apply.
+	if archetype.is_empty() and (not biome_id.is_empty() or not difficulty_id.is_empty()):
+		archetype = _default_derelict_archetype()
+
 	var layout: Dictionary = layout_generator.generate_with_options(blueprint, archetype, biome_id, difficulty_id, _extended_for(difficulty_id))
 	if layout.is_empty():
 		push_error("SHIP GENERATOR FAIL layout generation returned empty")
@@ -45,10 +50,26 @@ func generate(blueprint, archetype: Dictionary = {}) -> Node3D:
 	return _load_layout_as_scene(layout)
 
 
-# Extended structural templates unlock on the more dangerous run tiers so
-# structural variety scales with difficulty. Deterministic per seed downstream.
+func _default_derelict_archetype() -> Dictionary:
+	var path: String = "res://data/procgen/archetypes/derelict.json"
+	if FileAccess.file_exists(path):
+		var text: String = FileAccess.get_file_as_string(path)
+		var parsed: Variant = JSON.parse_string(text)
+		if parsed is Dictionary:
+			return (parsed as Dictionary).duplicate(true)
+	return {
+		"name": "Derelict",
+		"guaranteed_roles": ["dock"],
+		"max_duplicates": 3,
+		"role_weights": {"cargo": 4, "corridor": 3, "bridge": 3, "crew_quarters": 2, "hangar": 2},
+	}
+
+
+# E1: any real difficulty (production travel always sets one) unlocks the
+# extended template pool. Empty difficulty keeps the legacy three-template
+# contract for unit smokes that call generate() without run context.
 func _extended_for(diff_id: String) -> bool:
-	return diff_id in ["deep_dive", "hardened"]
+	return not str(diff_id).is_empty()
 
 
 func generate_layout(blueprint, archetype: Dictionary = {}) -> Dictionary:

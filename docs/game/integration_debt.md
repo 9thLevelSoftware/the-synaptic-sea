@@ -370,3 +370,12 @@ closed — `JunkYieldResolver` is a live consumer via `DeconstructionResolver.sa
 See Unlock-trigger content debt above. Fire B2 (ADR-0041 deferred follow-ups) closed:
 deliberate vent on `FireSuppressionPoint` when no extinguisher/charge, `OxygenState`
 `fire_oxygen_drain`, sealed-hatch bulkhead `closed_links` on fire spread.
+
+## Procgen validation & coherence (2026-07-21)
+
+- Quality gate + golden parity + live derelict pipeline contract smokes (bundle).
+- Archetype role aliases (`compartment`→`cargo`, etc.); derelict JSON vocabulary aligned.
+- Connectivity soft-retry in `ShipLayoutGenerator`; `hazard_source=runtime` (ADR-0050).
+- Extended templates whenever difficulty is set (not only hardened/deep_dive).
+- Biome-biased room variants; encounter table role coverage expanded.
+- Residual content: richer kits/art, bespoke bosses, StructuralPlacer for derelicts (deliberate dual path).

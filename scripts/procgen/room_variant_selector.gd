@@ -137,10 +137,8 @@ func effects_for(variant: String) -> Dictionary:
 
 
 # Returns a variant string for `role` at `room_index` under the
-# supplied `seed_value`. `biome` is optional and reserved for future
-# per-biome variant lists; today every biome uses the same default
-# list, but the parameter is part of the public signature so callers
-# don't have to change when biome-specific variants are added.
+# supplied `seed_value`. When `biome` is non-empty, biome-preferred
+# variants (E2) are weighted higher via a biased pick.
 func pick(role: String, room_index: int, seed_value: int, biome: String = "") -> String:
 	var variant_list: Array = _variants_for_role(role)
 	if variant_list.is_empty():
@@ -151,8 +149,42 @@ func pick(role: String, room_index: int, seed_value: int, biome: String = "") ->
 
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = _seed_for(role, room_index, seed_value, biome)
-	var idx: int = rng.randi_range(0, variant_list.size() - 1)
-	return str(variant_list[idx])
+	if biome.is_empty():
+		var idx: int = rng.randi_range(0, variant_list.size() - 1)
+		return str(variant_list[idx])
+	# Weighted: preferred variants get weight 3, others 1.
+	var preferred: Dictionary = _biome_preferred_variants(biome)
+	var weights: Array[int] = []
+	var total: int = 0
+	for v in variant_list:
+		var w: int = 3 if preferred.has(str(v)) else 1
+		weights.append(w)
+		total += w
+	var roll: int = rng.randi_range(1, maxi(1, total))
+	var cumulative: int = 0
+	for i in range(variant_list.size()):
+		cumulative += weights[i]
+		if roll <= cumulative:
+			return str(variant_list[i])
+	return str(variant_list[0])
+
+
+## Biome → set of preferred variant strings (E2). Sparse; unknown biomes = no bias.
+func _biome_preferred_variants(biome: String) -> Dictionary:
+	var out: Dictionary = {}
+	var list: Array = []
+	match biome:
+		"abyssal_synaptic_sea":
+			list = ["biomatter_crusted", "flooded", "contaminated", "collapsed", "breached"]
+		"breach_field":
+			list = ["breached", "collapsed", "burned_out", "unstable", "flooded"]
+		"dead_fleet":
+			list = ["burned_out", "empty_hold", "derelict_bunks", "collapsed", "secure"]
+		_:
+			list = []
+	for v in list:
+		out[str(v)] = true
+	return out
 
 
 # Returns the list of variants registered for `role`, or an empty

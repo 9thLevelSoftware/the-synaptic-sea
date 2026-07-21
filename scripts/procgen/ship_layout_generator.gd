@@ -44,6 +44,8 @@ func generate(blueprint: RefCounted, archetype: Dictionary = {}) -> Dictionary:
 # one is built), and after Stage 5 the EncounterInjector populates
 # `layout.encounters`. When the biome / difficulty ids are empty
 # strings, the legacy behaviour is preserved exactly.
+const MAX_CONNECTIVITY_ATTEMPTS: int = 4
+
 func generate_with_options(
 		blueprint: RefCounted,
 		archetype: Dictionary = {},
@@ -55,6 +57,43 @@ func generate_with_options(
 	self.biome_id = biome_id
 	self.difficulty_id = difficulty_id
 
+	var base_seed: int = int(blueprint.seed_value)
+	var last_layout: Dictionary = {}
+	for attempt in range(MAX_CONNECTIVITY_ATTEMPTS):
+		# F2: deterministic seed salt on retry so bad connectivity is not sticky.
+		var attempt_seed: int = base_seed if attempt == 0 else int(base_seed ^ (attempt * 0x9E3779B9))
+		var attempt_blueprint = blueprint
+		if attempt > 0 and blueprint.has_method("duplicate") == false:
+			# ShipBlueprint is RefCounted with seed_value field — clone via configure if needed.
+			pass
+		if attempt > 0:
+			# Mutate seed for this attempt only (restore after).
+			var saved: int = int(blueprint.seed_value)
+			blueprint.seed_value = attempt_seed
+			last_layout = _generate_once(blueprint, archetype, biome_id, difficulty_id, extended_templates)
+			blueprint.seed_value = saved
+		else:
+			last_layout = _generate_once(blueprint, archetype, biome_id, difficulty_id, extended_templates)
+		if last_layout.is_empty():
+			continue
+		if _layout_is_connected(last_layout):
+			return last_layout
+	# Last attempt failed connectivity — still return best effort if non-empty so
+	# loaders do not hard-crash; quality gate smoke fails disconnected layouts.
+	if not last_layout.is_empty():
+		push_warning("ShipLayoutGenerator: layout connectivity soft-fail after %d attempts seed=%d" % [
+			MAX_CONNECTIVITY_ATTEMPTS, base_seed])
+		return last_layout
+	push_error("SHIP LAYOUT GENERATOR FAIL all connectivity attempts empty")
+	return {}
+
+
+func _generate_once(
+		blueprint: RefCounted,
+		archetype: Dictionary,
+		biome_id: String,
+		difficulty_id: String,
+		extended_templates: bool) -> Dictionary:
 	# Stage 1: Select topology template.
 	var template: RefCounted
 	if extended_templates:
@@ -104,14 +143,80 @@ func generate_with_options(
 		var injector: RefCounted = EncounterInjectorScript.new()
 		layout = injector.inject(layout, biome, difficulty, int(blueprint.seed_value))
 
-	# Stamp biome / difficulty / kit_id on the layout for the
-	# scanner / HUD layer to read without re-running the seed.
+	# Stamp biome / difficulty / kit_id / hazard authority on the layout.
 	if not biome_id.is_empty():
 		layout["biome_id"] = biome_id
+		# E3: biome-biased structural kit preference (loader still uses module ids).
+		layout["kit_id"] = _kit_id_for_biome(biome_id)
 	if not difficulty_id.is_empty():
 		layout["difficulty_id"] = difficulty_id
+	# F4: runtime coordinator owns fire/breach seeding for derelicts; layout arrays
+	# remain optional overlays (goldens may still author markers).
+	layout["hazard_source"] = "runtime"
 
 	return layout
+
+
+## Room-link connectivity: every room id must be reachable from prototype.start_room.
+func _layout_is_connected(layout: Dictionary) -> bool:
+	var rooms_v: Variant = layout.get("rooms", [])
+	if not (rooms_v is Array) or (rooms_v as Array).is_empty():
+		return false
+	var room_ids: Array[String] = []
+	for r in (rooms_v as Array):
+		if r is Dictionary:
+			var rid: String = str((r as Dictionary).get("id", ""))
+			if not rid.is_empty():
+				room_ids.append(rid)
+	if room_ids.is_empty():
+		return false
+	var start: String = str((layout.get("prototype", {}) as Dictionary).get("start_room", room_ids[0]))
+	if start.is_empty():
+		start = room_ids[0]
+	var adj: Dictionary = {}  # id -> Array[String]
+	for rid in room_ids:
+		adj[rid] = [] as Array
+	var links_v: Variant = layout.get("room_links", [])
+	if links_v is Array:
+		for link_v in (links_v as Array):
+			if not (link_v is Dictionary):
+				continue
+			var a: String = str((link_v as Dictionary).get("from_room", ""))
+			var b: String = str((link_v as Dictionary).get("to_room", ""))
+			if a.is_empty() or b.is_empty():
+				continue
+			if not adj.has(a):
+				adj[a] = [] as Array
+			if not adj.has(b):
+				adj[b] = [] as Array
+			(adj[a] as Array).append(b)
+			(adj[b] as Array).append(a)
+	# BFS
+	var seen: Dictionary = {}
+	var q: Array = [start]
+	seen[start] = true
+	while not q.is_empty():
+		var cur: String = str(q.pop_front())
+		for nxt in adj.get(cur, []):
+			var n: String = str(nxt)
+			if seen.has(n):
+				continue
+			seen[n] = true
+			q.append(n)
+	return seen.size() >= room_ids.size()
+
+
+func _kit_id_for_biome(biome: String) -> String:
+	# Prefer abyssal-biased kit when present; else structural default.
+	match biome:
+		"abyssal_synaptic_sea":
+			return "ship_structural_v0"
+		"breach_field":
+			return "ship_structural_v0"
+		"dead_fleet":
+			return "ship_structural_v0"
+		_:
+			return "ship_structural_v0"
 
 
 # Resolves a biome dictionary from `biome_id`. When `biome_id` is
