@@ -3983,15 +3983,15 @@ func craft_at_station_for_validation(station_kind: String) -> bool:
 			if crafting_state != null:
 				crafting_state.get_or_create_station(station_kind).set_power(true)
 			st.set_powered(true)
-			if station_kind == "salvage":
-				return st.try_interact(player)
 			var rid: String = st.first_ready_recipe_id() if st.has_method("first_ready_recipe_id") else ""
 			if rid.is_empty():
 				return false
+			if station_kind == "salvage":
+				return st.try_salvage_target(rid) if st.has_method("try_salvage_target") else false
 			return st.try_craft_recipe(rid)
 	return false
 
-## REQ-CS-016 validation seam: craft an explicit recipe at a station (no UI).
+## REQ-CS-016 / REQ-CS-017 validation seam: craft/salvage an explicit target (no UI).
 func craft_recipe_at_station_for_validation(station_kind: String, recipe_id: String) -> bool:
 	if not is_instance_valid(player):
 		return false
@@ -3999,9 +3999,11 @@ func craft_recipe_at_station_for_validation(station_kind: String, recipe_id: Str
 		if is_instance_valid(st) and st.station_kind == station_kind:
 			if player.has_method("teleport_to"):
 				player.teleport_to(st.global_position)
-			if crafting_state != null:
+			if crafting_state != null and station_kind != "salvage":
 				crafting_state.get_or_create_station(station_kind).set_power(true)
 			st.set_powered(true)
+			if station_kind == "salvage":
+				return st.try_salvage_target(recipe_id) if st.has_method("try_salvage_target") else false
 			return st.try_craft_recipe(recipe_id)
 	return false
 
@@ -4766,7 +4768,7 @@ func _on_recipe_picker_requested(station_kind: String) -> void:
 	recipe_picker_panel.open_for_station(station_kind)
 	_freeze_player_for_panel()
 
-## REQ-CS-016: pure listing seam used by RecipePickerPanel + smokes.
+## REQ-CS-016 / REQ-CS-017: pure listing seam used by RecipePickerPanel + smokes.
 func list_station_recipe_entries(station_kind: String) -> Array:
 	if inventory_state == null:
 		return []
@@ -4774,6 +4776,10 @@ func list_station_recipe_entries(station_kind: String) -> Array:
 		if field_crafting_state == null:
 			return []
 		return field_crafting_state.list_recipe_entries(inventory_state)
+	if station_kind == "salvage":
+		if deconstruction_resolver == null:
+			return []
+		return deconstruction_resolver.list_salvage_entries(inventory_state)
 	if crafting_state == null:
 		return []
 	var skill: int = 0
@@ -4781,8 +4787,8 @@ func list_station_recipe_entries(station_kind: String) -> Array:
 		skill = int(player_progression.get_skill_level("fabrication"))
 	return crafting_state.list_recipe_entries(station_kind, inventory_state, skill)
 
-## REQ-CS-016: panel confirm handler. Station crafts use the station node; portable
-## field crafts use FieldCraftingState (KEY_C path).
+## REQ-CS-016 / REQ-CS-017: panel confirm handler. Station crafts use the station
+## node; portable field crafts use FieldCraftingState; salvage uses try_salvage_target.
 func begin_craft_from_picker(station_kind: String, recipe_id: String) -> Dictionary:
 	if recipe_id.is_empty() or station_kind.is_empty():
 		return {"ok": false, "reason": "bad_args", "recipe_id": recipe_id}
@@ -4792,6 +4798,13 @@ func begin_craft_from_picker(station_kind: String, recipe_id: String) -> Diction
 		if begin_field_craft_recipe(recipe_id):
 			return {"ok": true, "reason": "started", "recipe_id": recipe_id}
 		return {"ok": false, "reason": "begin_failed", "recipe_id": recipe_id}
+	if station_kind == "salvage":
+		for st in crafting_stations:
+			if is_instance_valid(st) and st.station_kind == "salvage":
+				if st.try_salvage_target(recipe_id):
+					return {"ok": true, "reason": "salvaged", "recipe_id": recipe_id}
+				return {"ok": false, "reason": "salvage_failed", "recipe_id": recipe_id}
+		return {"ok": false, "reason": "station_missing", "recipe_id": recipe_id}
 	if crafting_state != null and crafting_state.is_crafting():
 		return {"ok": false, "reason": "busy", "recipe_id": recipe_id}
 	for st in crafting_stations:

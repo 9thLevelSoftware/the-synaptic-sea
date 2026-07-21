@@ -169,7 +169,12 @@ func _format_row(entry: Dictionary) -> String:
 
 func _render() -> void:
 	if _title_label != null:
-		_title_label.text = "CRAFT — %s" % (_station_kind if not _station_kind.is_empty() else "?")
+		if _station_kind == "salvage":
+			_title_label.text = "SALVAGE"
+		elif _station_kind == "field_crafting":
+			_title_label.text = "FIELD CRAFT"
+		else:
+			_title_label.text = "CRAFT — %s" % (_station_kind if not _station_kind.is_empty() else "?")
 	if _list_label == null:
 		return
 	var lines: Array = []

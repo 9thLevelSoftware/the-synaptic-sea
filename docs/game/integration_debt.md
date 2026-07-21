@@ -120,6 +120,9 @@ borderline player-facing systems remain.
 > confirms via `try_craft_recipe` / `begin_craft_from_picker`. ~~Field craft (KEY_C) still
 > auto-selects first craftable portable recipe~~ — **CLOSED with REQ-CS-016 field residual
 > (2026-07-21):** KEY_C opens the same picker for `station_kind == field_crafting`.
+> ~~Salvage auto-selects first deconstructable/junk~~ — **CLOSED REQ-CS-017 (2026-07-21):**
+> salvage station opens the picker with deconstruct + junk targets; confirm runs
+> `try_salvage_target` / `execute_salvage_target`.
 > Powered-station crafts advance on both branches (Domain 4).
 > ~~`JunkYieldResolver`-based raw-junk salvage is not yet in the live loop~~ —
 > **CLOSED Stream E (2026-07-21):** salvage station falls through to

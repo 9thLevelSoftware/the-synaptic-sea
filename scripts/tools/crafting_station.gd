@@ -8,9 +8,8 @@ class_name CraftingStation
 ##    begins it via CraftingState (the coordinator ticks the global craft to completion
 ##    and deposits the output — this node does NOT channel in _process, unlike RepairPoint,
 ##    because CraftingState is single-active and ticked globally).
-##  - a "salvage" station runs DeconstructionResolver on the first inventory item that has
-##    a deconstruction recipe (instantaneous; no timed channel). When no recipe matches,
-##    falls back to JunkYieldResolver via DeconstructionResolver.salvage_junk (Stream E).
+##  - a "salvage" station opens the same picker with deconstruct + junk targets
+##    (REQ-CS-017); try_salvage_target runs DeconstructionResolver (instantaneous).
 ## Never advances crafting itself; it only starts work and reports it. Mirrors the
 ## interaction/range contract of repair_point.gd / loot_container.gd.
 
@@ -98,14 +97,12 @@ func try_interact(player_body: Node) -> bool:
 	if crafting_state.is_crafting():
 		emit_signal("craft_blocked", station_kind, "busy")
 		return false
-	if station_kind == "salvage":
-		return _try_salvage()
 	# Stream F: medbay field surgery when the patient is critical (before crafts).
 	if station_kind == "medbay" and surgery_provider != null \
 			and surgery_provider.has_method("try_medbay_surgery"):
 		if surgery_provider.try_medbay_surgery(player_body):
 			return true
-	# REQ-CS-016: open the recipe picker instead of auto-selecting the first craftable recipe.
+	# REQ-CS-016 / REQ-CS-017: open the recipe/salvage picker (no auto-select).
 	emit_signal("recipe_picker_requested", station_kind)
 	return true
 
@@ -142,6 +139,8 @@ func try_craft_recipe(recipe_id: String) -> bool:
 
 ## First ready recipe for this station (validation / auto-smoke path). Empty if none.
 func first_ready_recipe_id() -> String:
+	if station_kind == "salvage":
+		return first_ready_salvage_id()
 	if crafting_state == null or inventory_state == null:
 		return ""
 	if not crafting_state.has_method("list_recipe_entries"):
@@ -152,34 +151,37 @@ func first_ready_recipe_id() -> String:
 			return str((entry as Dictionary).get("recipe_id", ""))
 	return ""
 
-func _try_salvage() -> bool:
-	if deconstruction_resolver == null or material_state == null:
+func first_ready_salvage_id() -> String:
+	if deconstruction_resolver == null or inventory_state == null:
+		return ""
+	if deconstruction_resolver.has_method("first_ready_salvage_id"):
+		return deconstruction_resolver.first_ready_salvage_id(inventory_state)
+	return ""
+
+## REQ-CS-017: execute a chosen salvage target (deconstruct recipe_id or junk:<item>).
+func try_salvage_target(target_id: String) -> bool:
+	if station_kind != "salvage":
+		emit_signal("craft_blocked", station_kind, "not_salvage")
+		return false
+	if target_id.is_empty() or deconstruction_resolver == null or material_state == null:
 		emit_signal("craft_blocked", station_kind, "no_resolver")
 		return false
-	for recipe in deconstruction_resolver.get_deconstruction_recipes():
-		var rid: String = str(recipe.get("recipe_id", ""))
-		if rid.is_empty():
-			continue
-		if not deconstruction_resolver.can_deconstruct(rid, inventory_state):
-			continue
-		var produced: Dictionary = deconstruction_resolver.deconstruct(rid, inventory_state, material_state)
-		if not produced.is_empty():
-			var out_id: String = str(produced.get("item_id", ""))
-			var out_qty: int = int(produced.get("quantity", 0))
-			if not out_id.is_empty() and out_qty > 0:
-				inventory_state.add_item(out_id, out_qty)
-			emit_signal("salvage_completed", out_id, produced)
-			return true
-	# Stream E residual MVP: raw junk catalog salvage when no deconstruction recipe matches.
-	if deconstruction_resolver.has_method("salvage_junk"):
-		var junk_produced: Dictionary = deconstruction_resolver.salvage_junk(inventory_state, material_state)
-		if not junk_produced.is_empty():
-			# Materials already deposited by salvage_junk; signal mirrors recipe salvage.
-			var junk_out: String = str(junk_produced.get("item_id", ""))
-			emit_signal("salvage_completed", junk_out, junk_produced)
-			return true
-	emit_signal("craft_blocked", station_kind, "nothing_to_salvage")
-	return false
+	if not deconstruction_resolver.has_method("execute_salvage_target"):
+		emit_signal("craft_blocked", station_kind, "no_resolver")
+		return false
+	var produced: Dictionary = deconstruction_resolver.execute_salvage_target(
+		target_id, inventory_state, material_state)
+	if produced.is_empty():
+		emit_signal("craft_blocked", station_kind, "nothing_to_salvage")
+		return false
+	var out_id: String = str(produced.get("item_id", ""))
+	var out_qty: int = int(produced.get("quantity", 0))
+	# Deconstruct returns produces without depositing; junk already deposited materials.
+	if not target_id.begins_with("junk:"):
+		if not out_id.is_empty() and out_qty > 0:
+			inventory_state.add_item(out_id, out_qty)
+	emit_signal("salvage_completed", out_id, produced)
+	return true
 
 func _interaction_radius() -> float:
 	if is_instance_valid(collision_shape) and collision_shape.shape is SphereShape3D:
