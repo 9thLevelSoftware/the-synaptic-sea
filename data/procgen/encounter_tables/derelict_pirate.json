@@ -1,6 +1,6 @@
 {
   "id": "derelict_pirate",
-  "description": "Derelict-pirate encounter table. Drone scouts and lurkers in derelict compartments. Lower density than biomatter_lurker. Default encounter table for dead_fleet biome.",
+  "description": "Derelict-pirate encounter table. Drone scouts and lurkers in derelict compartments. Lower density than biomatter_lurker. Available for custom biome retargets (dead_fleet now uses threat_drone_swarm).",
   "version": 1,
   "default_count": 1,
   "rolls": [

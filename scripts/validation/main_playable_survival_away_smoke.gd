@@ -1,12 +1,13 @@
 extends SceneTree
 
 ## Domain 1 away-path proof (live scene): on a boarded derelict
-## (away_from_start=true, past the line 4808 early-return) the survival attrition
+## (away_from_start=true, past the early-return) the survival attrition
 ## tick must ADVANCE — radiation drains health, the extreme-zone signal heats body
-## temperature — and draining health to 0 must end the run as a death.
+## temperature, personal O2 drains under field_atmosphere — and draining health
+## to 0 must end the run as a death.
 ##
 ## Pass marker:
-##   MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true away_death=true
+##   MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true o2_drain=true away_death=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const TIMEOUT_FRAMES: int = 360
@@ -63,6 +64,18 @@ func _validate() -> void:
 		_fail("body temperature should rise in the derelict extreme zone (%.3f -> %.3f)" % [temp_before, playable.body_temperature_state.temperature])
 		return
 
+	# Personal O2 must drain on the derelict (field_atmosphere) — was home-only.
+	if playable.oxygen_state == null:
+		_fail("oxygen_state missing")
+		return
+	var o2_before: float = float(playable.oxygen_state.get_summary().get("oxygen", -1.0))
+	_pump(2.0)
+	var o2_after: float = float(playable.oxygen_state.get_summary().get("oxygen", -1.0))
+	var o2_drain: bool = o2_after < o2_before - 0.001
+	if not o2_drain:
+		_fail("personal O2 should drain on a derelict (%.3f -> %.3f)" % [o2_before, o2_after])
+		return
+
 	# Death must fire on the AWAY branch.
 	playable.vitals_state.health = 0.0
 	_pump(0.1)
@@ -71,7 +84,7 @@ func _validate() -> void:
 		return
 
 	finished = true
-	print("MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true away_death=true")
+	print("MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true o2_drain=true away_death=true")
 	_cleanup_and_quit(0)
 
 func _pump(seconds: float) -> void:

@@ -47,8 +47,8 @@
 | Consumable Eat Pipeline (food/drink branch) | 🟢 | 100% | [V] | playable_generated_ship.gd:4705 |
 | Sustenance Facility Rollup | 🟢 | 90% | [V] | playable_generated_ship.gd:1550 |
 | Hydroponics Tray | 🟢 | 90% | [V] | playable_generated_ship.gd:5764 (_tick_food_runtime, both branches) |
-| Nutrient Synthesizer (RETIRED) | 🔴 | 30% | [V] | — |
-| ↳ Cooking State Machine | 🔴 | 30% | [V] | — |
+| Nutrient Synthesizer (RETIRED) | 🔴 | 15% | [V] | — |
+| ↳ Cooking State Machine | 🔴 | 15% | [V] | — |
 | Water Recycler | 🟢 | 80% | [V] | playable_generated_ship.gd:5764 (_tick_food_runtime, both branches) |
 | Production Station | 🟢 | 100% | [V] | playable_generated_ship.gd:3480 (_build_production_stations, called at 3631/4219/6381) |
 
@@ -224,7 +224,7 @@
 | Docking Manager | 🟢 | 90% | [V] | playable_generated_ship.gd:5001 |
 | Hangar Bay | 🟡 | 50% | [V] | playable_generated_ship.gd:2274 |
 | Dock Port Barrier | 🟢 | 90% | [V] | playable_generated_ship.gd:5095 |
-| Hangar Bay Control | 🔴 | 40% | [V] | — |
+| Hangar Bay Control | 🔴 | 50% | [V] | — |
 
 ## ui
 

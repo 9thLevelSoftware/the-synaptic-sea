@@ -1,6 +1,6 @@
 {
   "id": "dead_fleet",
-  "description": "Many derelicts. High loot quality, lower encounter density. Warm orange ambient. Favours exploration over combat.",
+  "description": "Many derelicts. High loot quality, lower encounter density. Warm orange ambient. Engineering bays host dormant defence drones.",
   "hazard_modifier": 1.1,
   "loot_quality_modifier": 1.4,
   "encounter_density_modifier": 0.8,
@@ -11,7 +11,7 @@
     "oxygen_breach": 0.9,
     "electrical_arc": 1.0
   },
-  "encounter_table_id": "derelict_pirate",
+  "encounter_table_id": "threat_drone_swarm",
   "loot_table_overrides": {
     "compartment": "dead_fleet_cache",
     "quarters": "dead_fleet_cache"

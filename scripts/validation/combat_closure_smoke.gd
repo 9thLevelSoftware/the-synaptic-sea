@@ -7,7 +7,7 @@ extends SceneTree
 ##   BP3: killing a threat spawns a lootable corpse container AND removes the threat.
 ##
 ## Pass marker:
-##   COMBAT CLOSURE PASS away_kill=true noise=true crouch=true reward=true removed=true
+##   COMBAT CLOSURE PASS away_kill=true noise=true crouch=true reward=true removed=true pending_corpse=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const TIMEOUT_FRAMES: int = 600
@@ -82,6 +82,14 @@ func _validate() -> void:
 	playable._process(1.0 / 30.0)
 	var reward_ok: bool = playable.loot_containers.size() > before_containers
 	var removed_ok: bool = tm.threats.size() < before_threats
+	# Domain 2 follow-up: kill must also register pending_corpse_loot on the ship
+	# so leave/revisit can re-spawn the drop.
+	var pending_ok: bool = false
+	if playable.current_ship != null:
+		for entry in playable.current_ship.pending_corpse_loot:
+			if typeof(entry) == TYPE_DICTIONARY and str(entry.get("container_id", "")).begins_with("corpse_"):
+				pending_ok = true
+				break
 	if not noise_ok:
 		_fail("moving should raise emitted noise (%.3f vs %.3f)" % [move_noise, idle_noise])
 		return
@@ -94,8 +102,11 @@ func _validate() -> void:
 	if not removed_ok:
 		_fail("kill should remove the threat from the active array")
 		return
+	if not pending_ok:
+		_fail("kill should register pending_corpse_loot on current_ship for revisit")
+		return
 	finished = true
-	print("COMBAT CLOSURE PASS away_kill=true noise=true crouch=true reward=true removed=true coord_feed=true")
+	print("COMBAT CLOSURE PASS away_kill=true noise=true crouch=true reward=true removed=true pending_corpse=true coord_feed=true")
 	_cleanup_and_quit(0)
 
 func _find_playable(node: Node) -> PlayableGeneratedShip:

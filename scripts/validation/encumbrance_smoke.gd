@@ -17,6 +17,13 @@ func _init() -> void:
 	assert(EncumbranceScript.move_speed_multiplier(3.0) == 0.25, "far over -> floor 0.25")
 	assert(EncumbranceScript.move_speed_multiplier(-1.0) == 1.0, "negative ratio clamps to full")
 
+	# Health teeth while overloaded (same tier breakpoints as move mult).
+	assert(EncumbranceScript.health_drain_per_second(0.5) == 0.0, "under capacity -> no health drain")
+	assert(EncumbranceScript.health_drain_per_second(1.0) == 0.0, "at capacity -> no health drain")
+	assert(_approx(EncumbranceScript.health_drain_per_second(1.25), 0.5), "125% -> 0.5 HP/s")
+	assert(_approx(EncumbranceScript.health_drain_per_second(1.75), 2.0), "175% -> 2.0 HP/s")
+	assert(EncumbranceScript.health_drain_per_second(3.0) == 2.0, "far over -> cap 2.0 HP/s")
+
 	# Monotonic non-increasing across a sweep.
 	var prev: float = 2.0
 	for i in range(0, 31):
@@ -40,5 +47,5 @@ func _init() -> void:
 	# Non-positive weight -> 0 saved.
 	assert(_approx(EncumbranceScript.weight_reduction_saved(-5.0, [{"capacity": 40.0, "reduction": 0.30}]), 0.0), "negative weight saves 0")
 
-	print("EQUIPMENT ENCUMBRANCE SMOKE PASS floor=0.25")
+	print("EQUIPMENT ENCUMBRANCE SMOKE PASS floor=0.25 health_drain=true")
 	quit()
