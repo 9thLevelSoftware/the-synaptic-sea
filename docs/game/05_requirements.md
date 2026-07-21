@@ -523,6 +523,25 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - `main_playable_slice_crafting_smoke.gd`
   - `MAIN PLAYABLE CRAFTING PASS`
 
+## REQ-CS-016: Crafting station recipe picker (REQ-CS-016)
+
+- Source: `docs/game/features/crafting_recipe_picker.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: ADR-0038 residual MVP left stations auto-selecting the first craftable recipe; players need explicit choice when multiple recipes are ready.
+- Acceptance criteria:
+  - Non-salvage station interact opens a recipe list for that station_kind; craft does not start until confirm.
+  - Player can select and craft a non-first ready recipe; ingredients consume for the chosen recipe only.
+  - Blocked recipes (ingredients/skill/output) do not start a craft on confirm.
+  - Salvage station and field craft (KEY_C) behavior remain auto-select (out of scope for this requirement).
+  - Headless smokes prove pure listing, panel selection, and main-scene chosen-recipe craft.
+- Verification:
+  - `crafting_recipe_list_smoke.gd` — `CRAFTING RECIPE LIST PASS`
+  - `recipe_picker_panel_smoke.gd` — `RECIPE PICKER PANEL PASS`
+  - `main_playable_slice_recipe_picker_smoke.gd` — `MAIN PLAYABLE RECIPE PICKER PASS`
+  - `main_playable_slice_station_craft_smoke.gd` — existing reachability still green
+
 ## REQ-LE-001: Loot ecosystem (REQ-LE-001)
 
 - Source: `docs/game/features/loot_ecosystem.md`

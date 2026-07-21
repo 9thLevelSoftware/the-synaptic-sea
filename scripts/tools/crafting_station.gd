@@ -2,11 +2,12 @@ extends Area3D
 class_name CraftingStation
 
 ## A spatial, range-gated crafting/salvage station bound to a station_kind on the home
-## ship. Interacting auto-selects work and hands it to the coordinator-owned models:
-##  - a normal station (fabricator/medbay/kitchen/synthesizer/workbench) begins the first
-##    craftable recipe for its kind via CraftingState (the coordinator ticks the global
-##    craft to completion and deposits the output — this node does NOT channel in _process,
-##    unlike RepairPoint, because CraftingState is single-active and ticked globally).
+## ship. Interaction hands work to the coordinator-owned models:
+##  - a normal station (fabricator/medbay/kitchen/synthesizer/workbench) requests the
+##    recipe picker (REQ-CS-016); the player chooses a recipe, then try_craft_recipe
+##    begins it via CraftingState (the coordinator ticks the global craft to completion
+##    and deposits the output — this node does NOT channel in _process, unlike RepairPoint,
+##    because CraftingState is single-active and ticked globally).
 ##  - a "salvage" station runs DeconstructionResolver on the first inventory item that has
 ##    a deconstruction recipe (instantaneous; no timed channel). When no recipe matches,
 ##    falls back to JunkYieldResolver via DeconstructionResolver.salvage_junk (Stream E).
@@ -16,6 +17,8 @@ class_name CraftingStation
 signal craft_started(station_kind: String, recipe_id: String)
 signal salvage_completed(item_id: String, yields: Dictionary)
 signal craft_blocked(station_kind: String, reason: String)
+## REQ-CS-016: non-salvage interact opens the coordinator recipe picker for this kind.
+signal recipe_picker_requested(station_kind: String)
 
 var station_kind: String = ""
 var crafting_state                       # CraftingState
@@ -83,7 +86,8 @@ func _player_skill() -> int:
 		return int(player_progression.get_skill_level("fabrication"))
 	return 0
 
-## Range-gated interact. Returns true if it started a craft or completed a salvage.
+## Range-gated interact. Returns true if it opened the recipe picker, started a craft
+## (validation path), completed a salvage, or ran medbay surgery.
 func try_interact(player_body: Node) -> bool:
 	if not is_instance_valid(player_body) or crafting_state == null or inventory_state == null:
 		return false
@@ -101,39 +105,52 @@ func try_interact(player_body: Node) -> bool:
 			and surgery_provider.has_method("try_medbay_surgery"):
 		if surgery_provider.try_medbay_surgery(player_body):
 			return true
-	return _try_craft()
+	# REQ-CS-016: open the recipe picker instead of auto-selecting the first craftable recipe.
+	emit_signal("recipe_picker_requested", station_kind)
+	return true
 
-func _try_craft() -> bool:
-	var recipes: Array = crafting_state.get_recipes_for_station(station_kind)
-	# Deterministic order: catalog order is dictionary-key order, so sort by recipe_id.
-	recipes.sort_custom(func(a, b): return str(a.get("recipe_id", "")) < str(b.get("recipe_id", "")))
-	var blocked_by_full: bool = false
-	for recipe in recipes:
-		var rid: String = str(recipe.get("recipe_id", ""))
-		if rid.is_empty():
-			continue
-		# Deconstruction belongs to the dedicated salvage bench (DeconstructionResolver), not
-		# normal stations — some deconstruction recipes share a normal station_kind (e.g.
-		# deconstruct_scrap is station_kind "workbench"), so skip them here.
-		if str(recipe.get("category", "")) == "deconstruction":
-			continue
-		if not crafting_state.can_craft(rid, inventory_state):
-			continue
-		# Skip recipes the player lacks the skill for, so selection falls through to a
-		# craftable one rather than picking a too-high-skill recipe that begin_craft rejects.
-		if crafting_state.get_required_skill_level(rid) > _player_skill():
-			continue
-		# Don't consume ingredients for an output that won't fit (begin_craft consumes
-		# immediately; add_item silently drops over-stack overflow). Try the next recipe.
-		var produces: Dictionary = crafting_state.get_produces(rid)
-		if not inventory_state.can_accept(str(produces.get("item_id", "")), int(produces.get("quantity", 0))):
-			blocked_by_full = true
-			continue
-		if crafting_state.begin_craft(rid, inventory_state, material_state, _player_skill()):
-			emit_signal("craft_started", station_kind, rid)
-			return true
-	emit_signal("craft_blocked", station_kind, "output_full" if blocked_by_full else "no_craftable_recipe")
+## Explicit craft for a chosen recipe_id (picker confirm + validation seams).
+## Reuses the same gates as the former auto-select loop.
+func try_craft_recipe(recipe_id: String) -> bool:
+	if recipe_id.is_empty() or crafting_state == null or inventory_state == null:
+		emit_signal("craft_blocked", station_kind, "no_craftable_recipe")
+		return false
+	if crafting_state.is_crafting():
+		emit_signal("craft_blocked", station_kind, "busy")
+		return false
+	if crafting_state.get_station_kind(recipe_id) != station_kind:
+		emit_signal("craft_blocked", station_kind, "wrong_station")
+		return false
+	if str(crafting_state.get_recipe(recipe_id).get("category", "")) == "deconstruction":
+		emit_signal("craft_blocked", station_kind, "deconstruction_not_here")
+		return false
+	if not crafting_state.can_craft(recipe_id, inventory_state):
+		emit_signal("craft_blocked", station_kind, "missing_ingredients")
+		return false
+	if crafting_state.get_required_skill_level(recipe_id) > _player_skill():
+		emit_signal("craft_blocked", station_kind, "insufficient_skill")
+		return false
+	var produces: Dictionary = crafting_state.get_produces(recipe_id)
+	if not inventory_state.can_accept(str(produces.get("item_id", "")), int(produces.get("quantity", 0))):
+		emit_signal("craft_blocked", station_kind, "output_full")
+		return false
+	if crafting_state.begin_craft(recipe_id, inventory_state, material_state, _player_skill()):
+		emit_signal("craft_started", station_kind, recipe_id)
+		return true
+	emit_signal("craft_blocked", station_kind, "begin_failed")
 	return false
+
+## First ready recipe for this station (validation / auto-smoke path). Empty if none.
+func first_ready_recipe_id() -> String:
+	if crafting_state == null or inventory_state == null:
+		return ""
+	if not crafting_state.has_method("list_recipe_entries"):
+		return ""
+	var entries: Array = crafting_state.list_recipe_entries(station_kind, inventory_state, _player_skill())
+	for entry in entries:
+		if entry is Dictionary and bool((entry as Dictionary).get("craftable", false)):
+			return str((entry as Dictionary).get("recipe_id", ""))
+	return ""
 
 func _try_salvage() -> bool:
 	if deconstruction_resolver == null or material_state == null:

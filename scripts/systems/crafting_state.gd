@@ -127,6 +127,58 @@ func get_craft_time(recipe_id: String) -> float:
 func get_power_cost(recipe_id: String) -> float:
 	return float(get_recipe(recipe_id).get("power_cost", 0.0))
 
+## Headless listing for the station recipe picker (REQ-CS-016).
+## Returns Array[Dictionary] sorted by recipe_id. Excludes deconstruction recipes
+## (those belong to the salvage bench / DeconstructionResolver).
+## Each entry:
+##   recipe_id, display_name, category, required_skill_level, ingredients, produces,
+##   craft_time_seconds, status ("ready"|"missing_ingredients"|"insufficient_skill"|"output_full"),
+##   craftable:bool
+func list_recipe_entries(station_kind: String, inventory, player_skill_level: int) -> Array:
+	var out: Array = []
+	var recipes: Array = get_recipes_for_station(station_kind)
+	recipes.sort_custom(func(a, b): return str(a.get("recipe_id", "")) < str(b.get("recipe_id", "")))
+	for recipe in recipes:
+		if not (recipe is Dictionary):
+			continue
+		var rid: String = str(recipe.get("recipe_id", ""))
+		if rid.is_empty():
+			continue
+		if str(recipe.get("category", "")) == "deconstruction":
+			continue
+		var required_skill: int = int(recipe.get("required_skill_level", 0))
+		var produces: Dictionary = {}
+		var produces_raw: Variant = recipe.get("produces", {})
+		if produces_raw is Dictionary:
+			produces = (produces_raw as Dictionary).duplicate()
+		var ingredients: Dictionary = {}
+		var ingredients_raw: Variant = recipe.get("ingredients", {})
+		if ingredients_raw is Dictionary:
+			ingredients = (ingredients_raw as Dictionary).duplicate()
+		var status: String = "ready"
+		if player_skill_level < required_skill:
+			status = "insufficient_skill"
+		elif not can_craft(rid, inventory):
+			status = "missing_ingredients"
+		elif inventory != null and inventory.has_method("can_accept"):
+			var out_id: String = str(produces.get("item_id", ""))
+			var out_qty: int = int(produces.get("quantity", 0))
+			if not out_id.is_empty() and out_qty > 0 and not inventory.can_accept(out_id, out_qty):
+				status = "output_full"
+		var entry: Dictionary = {
+			"recipe_id": rid,
+			"display_name": str(recipe.get("display_name", rid)),
+			"category": str(recipe.get("category", "")),
+			"required_skill_level": required_skill,
+			"ingredients": ingredients,
+			"produces": produces,
+			"craft_time_seconds": float(recipe.get("craft_time_seconds", 0.0)),
+			"status": status,
+			"craftable": status == "ready",
+		}
+		out.append(entry)
+	return out
+
 # --- station management ---
 
 func get_or_create_station(station_kind: String):
