@@ -8,6 +8,8 @@ class_name FireSuppressionPoint
 
 signal fire_extinguished(compartment_id: String)
 signal extinguish_blocked(compartment_id: String, reason: String)
+## Fire B2: deliberate vacuum vent (no extinguisher required; decompression danger).
+signal compartment_vented(compartment_id: String)
 
 var compartment_id: String = ""
 var fire_state                          # FireSuppressionState
@@ -68,15 +70,30 @@ func try_start(player_body: Node) -> bool:
 	if not fire_state.is_burning(compartment_id):
 		emit_signal("extinguish_blocked", compartment_id, "not_burning")
 		return false
-	if not _has_required_tool():
-		emit_signal("extinguish_blocked", compartment_id, "missing_extinguisher")
-		return false
-	if extinguisher_state == null or not extinguisher_state.has_charge_for_use():
-		emit_signal("extinguish_blocked", compartment_id, "no_charge")
-		return false
+	# Fire B2: no extinguisher / empty charge → deliberate vent (instant vacuum).
+	# Decompression danger is the trade-off for extinguishing without a tool.
+	if not _has_required_tool() or extinguisher_state == null or not extinguisher_state.has_charge_for_use():
+		return try_vent(player_body)
 	_channel_player = player_body
 	channeling = true
 	progress = 0.0
+	return true
+
+## Fire B2 deliberate vent: open vacuum in this compartment (kills fire, costs air).
+func try_vent(player_body: Node) -> bool:
+	if fire_state == null or not is_instance_valid(player_body):
+		return false
+	if not _is_player_in_direct_range(player_body):
+		return false
+	if fire_state.has_method("is_vented") and fire_state.is_vented(compartment_id):
+		emit_signal("extinguish_blocked", compartment_id, "already_vented")
+		return false
+	if not fire_state.has_method("deliberate_vent") or not fire_state.deliberate_vent(compartment_id):
+		emit_signal("extinguish_blocked", compartment_id, "vent_failed")
+		return false
+	extinguished = true
+	_set_extinguished_visual()
+	emit_signal("compartment_vented", compartment_id)
 	return true
 
 func _has_required_tool() -> bool:

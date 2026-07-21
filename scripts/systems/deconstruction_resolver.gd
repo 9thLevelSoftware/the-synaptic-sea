@@ -2,15 +2,19 @@ extends RefCounted
 class_name DeconstructionResolver
 
 const CraftingStateScript := preload("res://scripts/systems/crafting_state.gd")
+const JunkYieldResolverScript := preload("res://scripts/systems/junk_yield_resolver.gd")
 
 ## Pure model for breaking items down into base materials.
 ## Reads deconstruction recipes (category == "deconstruction") from the
-## recipe catalog and resolves them against inventory. Never touches the scene tree.
+## recipe catalog and resolves them against inventory. Also runs the
+## JunkYieldResolver catalog for raw junk salvage (Stream E residual MVP).
+## Never touches the scene tree.
 
 var _crafting_state = CraftingStateScript.new()
+var _junk_defs: Dictionary = {}
 
 func _init() -> void:
-	pass
+	_junk_defs = JunkYieldResolverScript.load_definitions()
 
 ## Returns all deconstruction recipes.
 func get_deconstruction_recipes() -> Array:
@@ -57,9 +61,81 @@ func auto_deconstruct(item_id: String, inventory, material_state) -> Dictionary:
 			return deconstruct(str(recipe.get("recipe_id", "")), inventory, material_state)
 	return {}
 
+## Stream E: salvage the first inventory junk item that has a JunkYieldResolver
+## catalog entry. Deterministic (sorted item ids). Returns produces-shaped dict
+## for the primary material plus multi-yield metadata, or empty on no match.
+##
+## Shape on success:
+##   {item_id, quantity, source_junk, materials: {mid: qty}, multi_yield: true}
+func salvage_junk(inventory, material_state) -> Dictionary:
+	if inventory == null:
+		return {}
+	if _junk_defs.is_empty():
+		_junk_defs = JunkYieldResolverScript.load_definitions()
+	var ids: Array = inventory.items.keys() if inventory.items is Dictionary else []
+	ids.sort()
+	for item_id_variant in ids:
+		var item_id: String = str(item_id_variant)
+		if inventory.get_quantity(item_id) <= 0:
+			continue
+		var yields: Array = JunkYieldResolverScript.yields_for_item(item_id, _junk_defs)
+		if yields.is_empty():
+			continue
+		# Pre-check stack room for every yield so we never consume junk without
+		# depositing its materials (mirrors craft can_accept guards).
+		var can_all: bool = true
+		for entry_variant in yields:
+			if not (entry_variant is Dictionary):
+				continue
+			var entry: Dictionary = entry_variant
+			var mid: String = str(entry.get("material_id", ""))
+			var qty: int = int(entry.get("quantity", 0))
+			if mid.is_empty() or qty <= 0:
+				continue
+			if not inventory.can_accept(mid, qty):
+				can_all = false
+				break
+		if not can_all:
+			continue
+		if inventory.remove_item(item_id, 1) != 1:
+			continue
+		var materials: Dictionary = {}
+		var first_id: String = ""
+		var first_qty: int = 0
+		for entry_variant2 in yields:
+			if not (entry_variant2 is Dictionary):
+				continue
+			var y: Dictionary = entry_variant2
+			var mid2: String = str(y.get("material_id", ""))
+			var qty2: int = int(y.get("quantity", 0))
+			if mid2.is_empty() or qty2 <= 0:
+				continue
+			inventory.add_item(mid2, qty2)
+			if material_state != null and material_state.has_method("has_definition") \
+					and material_state.has_definition(mid2) \
+					and material_state.has_method("set_quality"):
+				material_state.set_quality(mid2, 0.5)
+			materials[mid2] = int(materials.get(mid2, 0)) + qty2
+			if first_id.is_empty():
+				first_id = mid2
+				first_qty = qty2
+		if first_id.is_empty():
+			# No depositable yields — restore junk (should not happen after pre-check).
+			inventory.add_item(item_id, 1)
+			return {}
+		return {
+			"item_id": first_id,
+			"quantity": first_qty,
+			"source_junk": item_id,
+			"materials": materials,
+			"multi_yield": materials.size() > 1,
+		}
+	return {}
+
 func get_summary() -> Dictionary:
 	return {
 		"deconstruction_recipes": get_deconstruction_recipes().size(),
+		"junk_catalog_items": _junk_defs.size(),
 	}
 
 func apply_summary(summary: Dictionary) -> bool:

@@ -116,6 +116,7 @@ func configure(config: Dictionary) -> void:
 func tick(delta_seconds: float, context = null) -> bool:
 	var player_in_breach_zone: bool = false
 	var field_atmosphere: bool = false
+	var fire_oxygen_drain: float = 0.0  # Fire B2: extra O2/s from active fires
 	if context is bool:
 		# Legacy positional form: tick(delta, bool). Preserved so the
 		# validation seam and any pre-ADR call sites keep working.
@@ -125,6 +126,8 @@ func tick(delta_seconds: float, context = null) -> bool:
 			player_in_breach_zone = bool(context["player_in_breach_zone"])
 		if context.has("field_atmosphere"):
 			field_atmosphere = bool(context["field_atmosphere"])
+		if context.has("fire_oxygen_drain"):
+			fire_oxygen_drain = maxf(0.0, float(context["fire_oxygen_drain"]))
 	last_player_in_breach_zone = player_in_breach_zone or field_atmosphere
 	if delta_seconds <= 0.0:
 		effective_drain_rate = drain_rate * (
@@ -154,6 +157,12 @@ func tick(delta_seconds: float, context = null) -> bool:
 			if regenerated > 0.0:
 				oxygen = minf(max_oxygen, oxygen + regenerated)
 				changed = true
+	# Fire B2: active fires consume ambient/suit oxygen even outside a breach zone.
+	if fire_oxygen_drain > 0.0 and oxygen > 0.0:
+		var fire_drained: float = fire_oxygen_drain * delta_seconds
+		if fire_drained > 0.0:
+			oxygen = maxf(0.0, oxygen - fire_drained)
+			changed = true
 	# Home-corridor passability is a breach-zone consequence only. Field suit
 	# drain must not flip the hub corridor collision while the player is away
 	# (Codex review on PR #71); recompute only on home/breach ticks.

@@ -115,9 +115,11 @@ borderline player-facing systems remain.
 >
 > **Residual MVP limits (Bucket 3 follow-ups, not blockers):** single active craft at a
 > time (`CraftingState` is single-`_active_craft` by design); stations auto-select the first
-> craftable recipe (no recipe-picker UI yet); powered-station crafts pause while away from
-> home (only field crafting advances on a derelict); `JunkYieldResolver`-based raw-junk
-> salvage is not yet in the live loop (the wired salvage path uses deconstruction recipes).
+> craftable recipe (no recipe-picker UI yet). Powered-station crafts advance on both
+> branches (Domain 4). ~~`JunkYieldResolver`-based raw-junk salvage is not yet in the live
+> loop~~ — **CLOSED Stream E (2026-07-21):** salvage station falls through to
+> `DeconstructionResolver.salvage_junk` → `JunkYieldResolver` when no deconstruction
+> recipe matches.
 
 The following were moved out of the unreachable set by this change (now reachable + driven):
 
@@ -127,8 +129,8 @@ The following were moved out of the unreachable set by this change (now reachabl
 - `scripts/systems/deconstruction_resolver.gd` — driven by the salvage station
 - `scripts/systems/station_state.gd` — driven via `CraftingState` (power + progress)
 - `scripts/systems/quality_tier_resolver.gd` — driven transitively by `begin_craft`
-- `scripts/systems/junk_yield_resolver.gd` — still NOT in the live loop (static helper;
-  the wired salvage path uses deconstruction recipes — see residual limits above)
+- `scripts/systems/junk_yield_resolver.gd` — **graduated Stream E (2026-07-21)**: live
+  consumer via `DeconstructionResolver.salvage_junk` on the salvage station fallback
 
 ## Bucket 3 — Menu / meta UI screens. RESOLVED (2026-06-26) — now player-reachable.
 
@@ -268,28 +270,42 @@ events whose player actions exist. After the Tranche-6 retargets
 (`hub_scene_bridge` → `threat_killed`, `codex_repair_intro` → `repair_full_system`) and
 the new `scavenge_container` emission at the loot-search handler, the live set is:
 
-**Reachable in production (5 unlocks):** `hub_scene_workshop` (`fabricate_part`),
-`hub_scene_bridge` (`threat_killed`), `codex_repair_intro` (`repair_full_system`),
-`codex_scavenging_intro` + `class_unlock_salvage_captain` (`scavenge_container`).
-Proven end-to-end by `unlock_trigger_production_smoke`.
+**Reachable in production (Tranche 6 baseline, 5 unlocks):** `hub_scene_workshop`
+(`fabricate_part`), `hub_scene_bridge` (`threat_killed`), `codex_repair_intro`
+(`repair_full_system`), `codex_scavenging_intro` + `class_unlock_salvage_captain`
+(`scavenge_container`). Proven end-to-end by `unlock_trigger_production_smoke`.
 
-**Content-pending (18 unlocks — trigger events with no production emission because the
-player action does not exist yet):** `diagnose_fault`, `first_aid_self`,
-`perform_surgery` (×3 unlocks: codex_surgery_intro, hub_scene_medical,
-class_unlock_field_medic), `plot_course`, `complete_astrogation` (×2:
-codex_astrogation_intro, hub_scene_reactor), `scan_derelict`, `decode_signal` (×2:
-codex_signal_intro, class_unlock_signal_specialist), `cook_meal`, `build_shelter`,
-`ration_supplies`, `inspire_crew`, `negotiate_truce`, `intimidate_threat`,
-`transmit_relay`. These are authored content awaiting their interactions (medical,
-navigation-ritual, social systems) — wiring an emission without the action would grant
-XP for nothing. The orphaned `defeat_enemy` training action (intimidation +100) is
-likewise content-pending: the kill path deliberately stays on the Domain-2 spec'd
-`threat_killed` action (re-targetable data; emitting both would double-grant per kill).
+**Stream D additions (2026-07-21) — live actions that already existed, now emit:**
+`scan_derelict` (scanner panel open), `first_aid_self` (medicine consumable use),
+`cook_meal` (kitchen/synthesizer craft complete), station `fabricate_part`
+(fabricator/workbench craft complete; field craft already emitted),
+`repair_subcomponent` (repair channel complete), `weld_panel` (breach seal complete),
+`plot_course` + `complete_astrogation` (successful `travel_to`). Proven by
+`unlock_trigger_stream_d_smoke`. Catalog unlocks newly reachable via these events
+include `codex_scanner_intro`, `codex_first_aid_intro`, `codex_cooking_intro`,
+`codex_piloting_intro`, `codex_astrogation_intro`, `hub_scene_reactor`, and the
+repair-intro path via subcomponent repairs (in addition to full-system).
 
-Per user decision 2026-07-07 (retarget + flagship wire), these stay documented here
-rather than force-wired. The `unlock_trigger_production_smoke` structural guard keeps
-every catalog `trigger_event` inside the valid training-action vocabulary, so a future
-content pass only needs to emit the event at its new interaction.
+**Stream E additions (2026-07-21):** `ration_supplies` (food/drink use),
+`diagnose_fault` (`repair_started` on channel begin), `discover_room` (once per
+`room_id` on objective complete), `extract_data` (`download_logs` objectives),
+`compound_stimulant` (medbay stim recipes). Catalog unlocks newly reachable include
+`codex_diagnostics_intro`, `codex_resource_intro`. Junk salvage live as above.
+
+**Stream F additions (2026-07-21) — final unlock emissions + Fire B2:**
+`perform_surgery` (medbay critical-health surgery), `decode_signal` (voice log play),
+`build_shelter` (hatch bypass + breach seal), `inspire_crew` (restore_systems /
+stabilize_reactor objectives), `negotiate_truce` (hangar bay dock), `intimidate_threat`
+(melee kill via `weapon_id` on threat_killed), `transmit_relay` (end_run non-death).
+Fire B2: deliberate vent, fire→O2 drain, sealed-hatch door-gated spread.
+
+**No content-pending unlock catalog triggers remain.** The orphaned `defeat_enemy`
+training action stays intentionally unused: the kill path stays on Domain-2
+`threat_killed` (re-targetable data; emitting both would double-grant per kill).
+
+The `unlock_trigger_production_smoke` structural guard keeps every catalog
+`trigger_event` inside the valid training-action vocabulary; Streams D–F only wire
+emissions at real existing interactions.
 
 ## Content-pending authored data (W9, 2026-07-07) — updated 2026-07-21
 
@@ -338,3 +354,19 @@ Inventory `gaps[]` for hangar/cart/achievements/home-loot/O2/corpses refreshed
 2. **Combat corpse persistence** — `ShipInstance.pending_corpse_loot` records
    unsearched kill drops; `_build_loot_containers` re-spawns them on revisit/save.
    Searched corpses leave the pending list and stay in `looted_container_ids`.
+
+## Stream D unlock emissions (2026-07-21)
+
+See Unlock-trigger content debt above. Wiring only at existing player actions —
+no new interactions invented for XP.
+
+## Stream E unlock + junk salvage (2026-07-21)
+
+See Unlock-trigger content debt above. Additionally: salvage station residual MVP
+closed — `JunkYieldResolver` is a live consumer via `DeconstructionResolver.salvage_junk`.
+
+## Stream F final unlocks + Fire B2 (2026-07-21)
+
+See Unlock-trigger content debt above. Fire B2 (ADR-0041 deferred follow-ups) closed:
+deliberate vent on `FireSuppressionPoint` when no extinguisher/charge, `OxygenState`
+`fire_oxygen_drain`, sealed-hatch bulkhead `closed_links` on fire spread.

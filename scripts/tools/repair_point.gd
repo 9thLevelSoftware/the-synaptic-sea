@@ -9,6 +9,10 @@ class_name RepairPoint
 
 signal repair_completed(system_id: String, subcomponent_id: String)
 signal repair_blocked(system_id: String, subcomponent_id: String, reason: String)
+## Stream E: fired when a channel successfully begins (prechecks passed). The
+## coordinator uses this for diagnose_fault training — identifying the broken
+## subcomponent is the diagnostic act; completing the channel is the repair act.
+signal repair_started(system_id: String, subcomponent_id: String)
 
 var system_id: String = ""
 var subcomponent_id: String = ""
@@ -106,6 +110,7 @@ func try_start(player_body: Node) -> bool:
 	progress = 0.0
 	var factor: float = 1.0 + 0.1 * float(maxi(0, skill - min_skill))
 	_scaled_seconds = maxf(0.01, repair_seconds / factor)
+	emit_signal("repair_started", system_id, subcomponent_id)
 	return true
 
 ## Returns "ok" or a rejection reason, without mutating anything.

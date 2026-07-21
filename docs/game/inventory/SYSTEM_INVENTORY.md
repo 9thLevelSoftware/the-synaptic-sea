@@ -184,7 +184,7 @@
 | Field Crafting (portable) | 🟢 | 100% | [V] | playable_generated_ship.gd:3832 |
 | Deconstruction Resolver | 🟢 | 100% | [V] | scripts/tools/crafting_station.gd:139 |
 | Quality Tier Resolver | 🟢 | 100% | [V] | scripts/systems/crafting_state.gd:174 |
-| Junk Yield Resolver | ⚪ | — | [V] | — |
+| Junk Yield Resolver | ⚪ | — | [V] | deconstruction_resolver.gd:salvage_junk |
 | Electrical Arc Hazard | 🟢 | 90% | [V] | playable_generated_ship.gd:5620 |
 | Phase Timer | ⚪ | — | [V] | electrical_arc_state.gd:93 |
 | Route Control | 🟢 | 90% | [V] | playable_generated_ship.gd:5345 |

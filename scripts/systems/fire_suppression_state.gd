@@ -38,6 +38,10 @@ var arc_compartment: String = DEFAULT_ARC_COMPARTMENT
 var spread_progress: Dictionary = {}           # compartment_id -> float accumulator
 var ignition_progress: Dictionary = {}         # compartment_id -> float accumulator
 var cascade_progress: float = 0.0
+# Fire B2: deliberate vents (player-opened vacuum without full hull rupture)
+# and door-gated spread (closed bulkhead links block adjacency).
+var vented_compartments: Dictionary = {}       # compartment_id -> true
+var closed_links: Dictionary = {}              # "a|b" sorted key -> true
 
 func configure(config: Dictionary) -> void:
 	compartments.clear()
@@ -47,6 +51,17 @@ func configure(config: Dictionary) -> void:
 	spread_progress.clear()
 	ignition_progress.clear()
 	cascade_progress = 0.0
+	vented_compartments.clear()
+	closed_links.clear()
+	var closed_v: Variant = config.get("closed_links", [])
+	if closed_v is Array:
+		for pair in (closed_v as Array):
+			if pair is Array and (pair as Array).size() >= 2:
+				set_link_closed(str(pair[0]), str(pair[1]), true)
+	var vented_v: Variant = config.get("vented_compartments", [])
+	if vented_v is Array:
+		for cid in (vented_v as Array):
+			set_vented(str(cid), true)
 	suppressant_units = maxf(0.0, float(config.get("suppressant_units", DEFAULT_SUPPRESSANT_UNITS)))
 	suppression_rate_per_second = maxf(0.1, float(config.get("suppression_rate_per_second", DEFAULT_SUPPRESSION_RATE)))
 	power_threshold = clampf(float(config.get("power_threshold", DEFAULT_POWER_THRESHOLD)), 0.05, 1.0)
@@ -96,6 +111,53 @@ func get_intensity(compartment_id: String) -> float:
 func get_active_fire_count() -> int:
 	return active_fires.size()
 
+## Sum of active fire intensities (Fire B2: drives oxygen consumption).
+func get_total_intensity() -> float:
+	var total: float = 0.0
+	for cid in active_fires:
+		total += float(active_fires[cid])
+	return total
+
+## Fire B2: deliberate vent — vacuum the compartment without requiring a hull
+## rupture event. Extinguishes fire immediately via the oxygen-loss path next tick
+## (and synchronously here). Returns true if state changed.
+func set_vented(compartment_id: String, vented: bool = true) -> bool:
+	if compartment_id.is_empty():
+		return false
+	if vented:
+		if vented_compartments.has(compartment_id):
+			return false
+		vented_compartments[compartment_id] = true
+		if active_fires.has(compartment_id):
+			extinguish(compartment_id)
+		return true
+	if not vented_compartments.has(compartment_id):
+		return false
+	vented_compartments.erase(compartment_id)
+	return true
+
+func is_vented(compartment_id: String) -> bool:
+	return vented_compartments.has(compartment_id)
+
+func deliberate_vent(compartment_id: String) -> bool:
+	return set_vented(compartment_id, true)
+
+## Fire B2: door/bulkhead gating. Closed links block spread in both directions.
+func set_link_closed(a: String, b: String, closed: bool = true) -> void:
+	if a.is_empty() or b.is_empty() or a == b:
+		return
+	var key: String = _link_key(a, b)
+	if closed:
+		closed_links[key] = true
+	else:
+		closed_links.erase(key)
+
+func is_link_closed(a: String, b: String) -> bool:
+	return closed_links.has(_link_key(a, b))
+
+func _link_key(a: String, b: String) -> String:
+	return a + "|" + b if a < b else b + "|" + a
+
 func tick(delta: float, context: Dictionary) -> bool:
 	if delta <= 0.0:
 		return false
@@ -105,8 +167,10 @@ func tick(delta: float, context: Dictionary) -> bool:
 	var ship_oxygen: bool = bool(context.get("ship_oxygen_present", true))
 	var powered_ratio: float = float(context.get("powered_ratio", 0.0))
 	var arc_arcing: bool = bool(context.get("arc_arcing", false))
+	# Optional per-tick closed-link override (merges onto model closed_links).
+	var ctx_closed: Dictionary = _to_set(context.get("closed_links", []))
 
-	# 1. Vent / oxygen-loss extinguish.
+	# 1. Vent / oxygen-loss extinguish (breach OR deliberate vent).
 	for cid in active_fires.keys():
 		if not _has_oxygen(cid, ship_oxygen, breached):
 			extinguish(cid)
@@ -123,12 +187,13 @@ func tick(delta: float, context: Dictionary) -> bool:
 				active_fires[cid] = reduced
 			changed = true
 
-	# 3. Spread to oxygenated, non-burning adjacent compartments.
+	# 3. Spread to oxygenated, non-burning adjacent compartments (door-gated).
 	var spread_ignites: Array = []
 	for cid in active_fires.keys():
 		var intensity: float = float(active_fires[cid])
 		for adj in _adjacent(cid):
-			if active_fires.has(adj) or not _has_oxygen(adj, ship_oxygen, breached):
+			if active_fires.has(adj) or not _has_oxygen(adj, ship_oxygen, breached) \
+					or is_link_closed(str(cid), str(adj)) or ctx_closed.has(_link_key(str(cid), str(adj))):
 				spread_progress.erase(adj)
 				continue
 			var p: float = float(spread_progress.get(adj, 0.0)) + spread_rate_per_second * delta * intensity
@@ -183,6 +248,8 @@ func get_summary() -> Dictionary:
 		"spread_progress": spread_progress.duplicate(true),
 		"ignition_progress": ignition_progress.duplicate(true),
 		"cascade_progress": cascade_progress,
+		"vented_compartments": vented_compartments.keys(),
+		"closed_links": closed_links.keys(),
 	}
 
 func apply_summary(summary: Dictionary) -> bool:
@@ -283,7 +350,8 @@ func _has_burning_neighbour(compartment_id: String) -> bool:
 	return false
 
 func _has_oxygen(compartment_id: String, ship_oxygen: bool, breached: Dictionary) -> bool:
-	return ship_oxygen and not breached.has(compartment_id)
+	# Fire B2: deliberate vents count as vacuum for ignition/spread/extinguish.
+	return ship_oxygen and not breached.has(compartment_id) and not vented_compartments.has(compartment_id)
 
 func _to_set(list_variant: Variant) -> Dictionary:
 	var out: Dictionary = {}

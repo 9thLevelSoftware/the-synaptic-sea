@@ -51,6 +51,11 @@ func open() -> void:
 	# Always reopen at the top contact rather than a stale prior index.
 	_selected = 0
 	refresh()
+	# Stream D: deliberate open is the scan action (refresh already ran scan()).
+	# Emit once per open via the coordinator seam — not per row refresh — so
+	# reopening is a player choice rather than a per-frame farm.
+	if _coordinator != null and _coordinator.has_method("emit_training_event"):
+		_coordinator.emit_training_event("scan_derelict", "scanner_panel")
 
 func close() -> void:
 	_open = false
