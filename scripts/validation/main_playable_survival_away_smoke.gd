@@ -64,7 +64,10 @@ func _validate() -> void:
 		_fail("body temperature should rise in the derelict extreme zone (%.3f -> %.3f)" % [temp_before, playable.body_temperature_state.temperature])
 		return
 
-	# Personal O2 must drain on the derelict (field_atmosphere) — was home-only.
+	# Personal O2 must drain on the derelict hull (field_atmosphere) — was home-only.
+	# Occupancy null (or any non-home/non-lifeboat ship) is treated as on-hull so
+	# this pure away_from_start force still exercises field drain (Codex P2).
+	playable.current_occupancy = null
 	if playable.oxygen_state == null:
 		_fail("oxygen_state missing")
 		return
@@ -76,15 +79,28 @@ func _validate() -> void:
 		_fail("personal O2 should drain on a derelict (%.3f -> %.3f)" % [o2_before, o2_after])
 		return
 
+	# Zero suit O2 must feed health drain (not HUD-only) while on the hull.
+	playable.oxygen_state.oxygen = 0.0
+	playable.vitals_state.health = 50.0
+	var hp_before: float = playable.vitals_state.health
+	_pump(1.0)
+	if playable.vitals_state.health >= hp_before - 0.001:
+		_fail("zero field O2 should drain health (%.3f -> %.3f)" % [hp_before, playable.vitals_state.health])
+		return
+
 	# Death must fire on the AWAY branch.
 	playable.vitals_state.health = 0.0
 	_pump(0.1)
 	if not playable.slice_complete:
 		_fail("health=0 on a derelict should end the run (slice_complete still false)")
 		return
+	# Death must NOT grant the Extracted achievement (run_complete|any).
+	if playable.achievement_state != null and playable.achievement_state.is_unlocked("extracted"):
+		_fail("death must not unlock extracted achievement")
+		return
 
 	finished = true
-	print("MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true o2_drain=true away_death=true")
+	print("MAIN PLAYABLE SURVIVAL AWAY PASS away_ticks=true rad_drain=true temp_rise=true o2_drain=true o2_teeth=true away_death=true no_extract_on_death=true")
 	_cleanup_and_quit(0)
 
 func _pump(seconds: float) -> void:

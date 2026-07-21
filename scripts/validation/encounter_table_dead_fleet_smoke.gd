@@ -1,9 +1,10 @@
 extends SceneTree
 
-## Asserts the live dead_fleet biome points at threat_drone_swarm (Stream C
-## content wiring) and that the table file is loadable by EncounterInjector.
+## Asserts the live dead_fleet biome points at threat_drone_swarm and that
+## EncounterInjector actually emits drone_swarm markers from that table
+## (reads layout["encounters"], not a phantom field).
 ##
-## Marker: ENCOUNTER TABLE DEAD FLEET PASS table=threat_drone_swarm kinds=drone_swarm
+## Marker: ENCOUNTER TABLE DEAD FLEET PASS table=threat_drone_swarm kinds=drone_swarm markers=N
 
 const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
 const EncounterInjectorScript := preload("res://scripts/procgen/encounter_injector.gd")
@@ -28,47 +29,68 @@ func _init() -> void:
 	if not FileAccess.file_exists(table_path):
 		_fail("table file missing: %s" % table_path)
 		return
-	# Inject into a tiny synthetic layout to prove the table loads kinds.
-	var layout: Dictionary = {
-		"rooms": [
-			{"id": "eng", "room_role": "engineering", "deck": 0, "structural_placements": [], "cells": [[0, 0], [1, 0]]},
-			{"id": "rx", "room_role": "reactor", "deck": 0, "structural_placements": [], "cells": [[2, 0], [3, 0]]},
-		],
+
+	# Table-covered roles for threat_drone_swarm: engineering, reactor, armory,
+	# bay, hangar, engine_bay. Non-critical rooms only (injector skips critical_path).
+	var rooms: Array = [
+		{"id": "crit_a", "room_role": "corridor", "deck": 0, "cells": [Vector2i(0, 0)]},
+		{"id": "crit_b", "room_role": "corridor", "deck": 0, "cells": [Vector2i(1, 0)]},
+		{"id": "eng_room", "room_role": "engineering", "deck": 0, "cells": [Vector2i(2, 0), Vector2i(3, 0)]},
+		{"id": "rx_room", "room_role": "reactor", "deck": 0, "cells": [Vector2i(4, 0), Vector2i(5, 0)]},
+		{"id": "bay_room", "room_role": "bay", "deck": 0, "cells": [Vector2i(6, 0)]},
+		{"id": "hangar_room", "room_role": "hangar", "deck": 0, "cells": [Vector2i(7, 0)]},
+	]
+	var layout_template: Dictionary = {
+		"schema_version": "1.2.0",
+		"document_kind": "ship_layout",
+		"cell_size": 4.0,
+		"rooms": rooms,
+		"room_links": [],
+		"critical_path": ["crit_a", "crit_b"],
 	}
 	var biome = BiomeProfileScript.from_dict({
 		"id": "dead_fleet",
 		"encounter_table_id": table_id,
 		"encounter_density_modifier": 3.0,
 	})
-	var diff = DifficultyProfileScript.from_dict({"id": "standard"})
+	# deep_dive density helps saturate room rolls (combined clamps at 3.0).
+	var diff = DifficultyProfileScript.from_dict({
+		"id": "deep_dive",
+		"encounter_density_modifier": 2.5,
+	})
 	var injector = EncounterInjectorScript.new()
-	injector.inject(layout, biome, diff, 42)
-	var markers: Array = layout.get("encounter_markers", [])
-	if markers.is_empty():
-		# Density may still yield empty for tiny layouts — fall back to table file content.
-		var tf := FileAccess.open(table_path, FileAccess.READ)
-		var tparsed: Variant = JSON.parse_string(tf.get_as_text())
-		tf.close()
-		var rolls: Array = (tparsed as Dictionary).get("rolls", []) if typeof(tparsed) == TYPE_DICTIONARY else []
-		var kinds: Dictionary = {}
-		for roll in rolls:
-			if typeof(roll) == TYPE_DICTIONARY:
-				kinds[str(roll.get("encounter_kind", ""))] = true
-		if not kinds.has("drone_swarm"):
-			_fail("threat_drone_swarm table missing drone_swarm kind")
-			return
-		print("ENCOUNTER TABLE DEAD FLEET PASS table=threat_drone_swarm kinds=drone_swarm markers=0 file_ok=true")
-		quit()
-		return
+
+	# Sample seeds until we see at least one drone_swarm marker (determinism-safe).
 	var saw_drone: bool = false
-	for m in markers:
-		if typeof(m) == TYPE_DICTIONARY and str(m.get("encounter_kind", "")) == "drone_swarm":
-			saw_drone = true
+	var marker_count: int = 0
+	var last_encounters: Array = []
+	for probe_seed in range(1, 201):
+		var layout: Dictionary = layout_template.duplicate(true)
+		injector.inject(layout, biome, diff, probe_seed)
+		var encounters: Array = layout.get("encounters", [])
+		if typeof(encounters) != TYPE_ARRAY:
+			_fail("inject did not write layout.encounters array")
+			return
+		last_encounters = encounters
+		marker_count = encounters.size()
+		for m in encounters:
+			if typeof(m) != TYPE_DICTIONARY:
+				continue
+			if str(m.get("encounter_kind", "")) == "drone_swarm":
+				saw_drone = true
+				# Table id must be stamped live on markers.
+				if str(m.get("encounter_table_id", "")) != table_id:
+					_fail("marker encounter_table_id=%s expected %s" % [str(m.get("encounter_table_id", "")), table_id])
+					return
+				break
+		if saw_drone:
 			break
+
 	if not saw_drone:
-		_fail("injected markers missing drone_swarm kind (count=%d)" % markers.size())
+		_fail("200 seeds never produced drone_swarm from threat_drone_swarm (last markers=%d)" % last_encounters.size())
 		return
-	print("ENCOUNTER TABLE DEAD FLEET PASS table=threat_drone_swarm kinds=drone_swarm markers=%d" % markers.size())
+
+	print("ENCOUNTER TABLE DEAD FLEET PASS table=threat_drone_swarm kinds=drone_swarm markers=%d" % marker_count)
 	quit()
 
 func _fail(reason: String) -> void:

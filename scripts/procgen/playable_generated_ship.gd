@@ -1675,9 +1675,10 @@ func end_run(reason: String = "extraction") -> int:
 		return 0
 	slice_complete = true
 	tracker.mark_run_complete()
-	# REQ-RL-003: extracted achievement also fires on explicit end_run
-	# (extraction/death) so non-slice completion paths still unlock.
-	_try_unlock_achievement("run_complete", reason)
+	# REQ-RL-003: extracted achievement only for successful ends — never for
+	# death (catalog text requires completing a full run and returning home).
+	if reason != "death":
+		_try_unlock_achievement("run_complete", reason)
 	var payout: int = int(_apply_meta_payout_and_persist(reason))
 	if save_load_service != null:
 		if reason == "death":
@@ -5892,6 +5893,16 @@ func _tick_survival_attrition(delta: float) -> void:
 	if life_support_expanded_state != null and not away_from_start:
 		atmo_drain = life_support_expanded_state.get_health_drain_per_second()
 		temp_mult *= life_support_expanded_state.get_thirst_multiplier()
+	# Field suit empty/critical: personal O2 feeds health drain so zero O2 is
+	# not HUD-only (Codex P1 on PR #71). Only while on derelict hull.
+	var oxygen_health_drain: float = 0.0
+	if oxygen_state != null and _is_field_suit_pressure_active():
+		var o2_level: float = float(oxygen_state.get_summary().get("oxygen", 100.0))
+		var o2_recovery: float = float(oxygen_state.get_summary().get("recovery_threshold", 30.0))
+		if o2_level <= 0.001:
+			oxygen_health_drain = 8.0  # ~12s to death from full health
+		elif o2_level <= o2_recovery + 0.001:
+			oxygen_health_drain = 2.0  # critical suit pressure teeth
 	var hteeth: Dictionary = hallucination_director.get_direct_teeth() if hallucination_director != null else {"health_drain_per_second": 0.0, "stamina_recovery_mult": 1.0}
 	var encumb_drain: float = 0.0
 	if inventory_state != null:
@@ -5899,7 +5910,7 @@ func _tick_survival_attrition(delta: float) -> void:
 	vitals_state.tick(delta, {
 		"temperature_thirst_mult": temp_mult,
 		"radiation_health_drain": rad_drain,
-		"atmosphere_health_drain": atmo_drain,
+		"atmosphere_health_drain": atmo_drain + oxygen_health_drain,
 		"fire_health_drain": FIRE_HEALTH_DRAIN_PER_SECOND * _player_fire_intensity(),
 		"status_stamina_recovery_mult": status_mult,
 		"sanity_health_drain": float(hteeth["health_drain_per_second"]),
@@ -6085,22 +6096,34 @@ func _refresh_oxygen_state(force_initial: bool, delta_seconds: float) -> void:
 		_refresh_tracker_system_status_lines()
 		_refresh_player_vitals(delta_seconds)
 		return
-	# Per-tick path: home uses the spatial breach-zone gate; derelict/field
-	# uses continuous suit-pressure drain (field_atmosphere) so personal O2
-	# advances on the primary gameplay context (both-branch rule).
-	if away_from_start:
+	# Per-tick path: home uses the spatial breach-zone gate; derelict hull
+	# uses continuous suit-pressure drain (field_atmosphere). The piloted
+	# lifeboat is a safe vessel — no field drain while occupancy is the
+	# lifeboat (Codex P2 on PR #71).
+	if _is_field_suit_pressure_active():
 		oxygen_state.tick(delta_seconds, {
 			"field_atmosphere": true,
 			"player_in_breach_zone": false,
 		})
 	else:
 		oxygen_state.tick(delta_seconds, {
-			"player_in_breach_zone": is_player_in_breach_zone(),
+			"player_in_breach_zone": is_player_in_breach_zone() if not away_from_start else false,
 			"field_atmosphere": false,
 		})
 	_apply_breach_zone_scene_state()
 	_refresh_tracker_system_status_lines()
 	_refresh_player_vitals(delta_seconds)
+
+## True when suit O2 should drain as hostile field atmosphere: boarded on a
+## derelict hull, not inside the piloted lifeboat / home ship.
+func _is_field_suit_pressure_active() -> bool:
+	if not away_from_start:
+		return false
+	if lifeboat_ship != null and current_occupancy == lifeboat_ship:
+		return false
+	if home_ship != null and current_occupancy == home_ship:
+		return false
+	return true
 
 func _refresh_player_vitals(delta_seconds: float) -> void:
 	# A freed Node stays non-null in Godot, so guard the panel with

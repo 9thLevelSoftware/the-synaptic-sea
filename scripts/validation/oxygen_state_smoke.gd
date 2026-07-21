@@ -85,6 +85,7 @@ func _initialize() -> void:
 
 	# Field atmosphere drains suit O2 even outside the home breach zone (derelict path).
 	var field_start: float = float(model.get_summary().get("oxygen", 0.0))
+	var pass_before_field: bool = bool(model.get_summary().get("passability_blocked", false))
 	var field_changed: bool = model.tick(1.0, {"field_atmosphere": true, "player_in_breach_zone": false})
 	if not field_changed:
 		_fail("field_atmosphere tick should drain even outside home breach zone")
@@ -95,6 +96,11 @@ func _initialize() -> void:
 		return
 	if absf(field_after - (field_start - 6.0)) > 0.001:
 		_fail("field drain rate should match base 6.0/sec, before=%s after=%s" % [field_start, field_after])
+		return
+	# Field drain must not flip home-corridor passability (shared pool side effect).
+	if bool(model.get_summary().get("passability_blocked", false)) != pass_before_field:
+		_fail("field_atmosphere must not change passability_blocked (was %s now %s)" % [
+			str(pass_before_field), str(model.get_summary().get("passability_blocked", false))])
 		return
 
 	# Seal the breach via objective 2 summary.

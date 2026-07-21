@@ -154,7 +154,11 @@ func tick(delta_seconds: float, context = null) -> bool:
 			if regenerated > 0.0:
 				oxygen = minf(max_oxygen, oxygen + regenerated)
 				changed = true
-	_recompute_passability_blocked()
+	# Home-corridor passability is a breach-zone consequence only. Field suit
+	# drain must not flip the hub corridor collision while the player is away
+	# (Codex review on PR #71); recompute only on home/breach ticks.
+	if not field_atmosphere:
+		_recompute_passability_blocked()
 	return changed
 
 # REQ-007: while the player carries the portable_oxygen_pump AND the breach

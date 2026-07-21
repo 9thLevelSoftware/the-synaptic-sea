@@ -45,12 +45,18 @@ decision, 2026-07-07):
 
 ## Consequences
 
-- dead_fleet derelicts now spawn scouts (not swarms) in bays/hangars/corridors
-  per the authored table — a deliberate balance shift the table author
-  intended; per-seed marker replay changes for table-covered biomes.
-- Editing a table JSON changes spawns without touching GDScript; the constants
-  remain the single fallback and the procgen↔combat kind contract.
+- Biome → table binding is data-owned. As of 2026-07-21, `dead_fleet` points at
+  `threat_drone_swarm` (engineering-focused `drone_swarm` rolls) rather than
+  `derelict_pirate` (scout/lurker mix). That retarget is a deliberate content
+  choice under the same decision rule — tables govern *what* spawns; swapping a
+  biome's `encounter_table_id` does not require a new ADR, only a table that
+  exists and is validated. The earlier "scouts in bays" consequence described
+  the initial `derelict_pirate` binding and no longer applies to `dead_fleet`.
+- Editing a table JSON (or retargeting a biome's `encounter_table_id`) changes
+  spawns without touching GDScript; the constants remain the single fallback
+  and the procgen↔combat kind contract.
 - Validation: `encounter_injector_smoke` cases 9–11 pin the divergent
-  `derelict_pirate` kinds, the authored count range, dual-roll determinism,
-  the uncovered-role constants fallback, and the missing-table warn-once
-  fallback.
+  `derelict_pirate` kinds (when that table is selected explicitly), the authored
+  count range, dual-roll determinism, the uncovered-role constants fallback, and
+  the missing-table warn-once fallback. `encounter_table_dead_fleet_smoke` pins
+  the live `dead_fleet` → `threat_drone_swarm` binding and real inject markers.
