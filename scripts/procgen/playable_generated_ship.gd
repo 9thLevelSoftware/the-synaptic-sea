@@ -3891,9 +3891,10 @@ func _on_player_field_craft_requested(_player_body) -> void:
 	if field_crafting_state.is_crafting():
 		print("FIELD CRAFT BLOCKED reason=busy")
 		return
-	if crafting_state != null and crafting_state.is_crafting():
-		print("FIELD CRAFT BLOCKED reason=station_busy")
-		return
+	# Do NOT block on crafting_state.is_crafting() — FieldCraftingState and
+	# CraftingState are independent models that both tick on home and away
+	# branches. Station crafts may run in the background while the player uses
+	# emergency KEY_C (pre-PR #75 behavior; Devin review on #75).
 	if is_instance_valid(recipe_picker_panel) and recipe_picker_panel.is_open():
 		return
 	if is_instance_valid(scanner_panel) and scanner_panel.is_open():
