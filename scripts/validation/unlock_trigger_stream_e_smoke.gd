@@ -76,7 +76,7 @@ func _validate() -> void:
 	if not _log_has("extract_data"):
 		_fail("download_logs objective did not emit extract_data")
 		return
-	# Second call same room must NOT re-emit discover (once-per-room).
+	# Second call same ship+room must NOT re-emit discover.
 	var disc_count: int = 0
 	for entry in playable.training_event_bus.get_log():
 		if str(entry.get("event_id", "")) == "discover_room":
@@ -87,7 +87,22 @@ func _validate() -> void:
 		if str(entry2.get("event_id", "")) == "discover_room":
 			disc_after += 1
 	if disc_after != disc_count:
-		_fail("discover_room re-emitted for same room_id (before=%d after=%d)" % [disc_count, disc_after])
+		_fail("discover_room re-emitted for same ship:room (before=%d after=%d)" % [disc_count, disc_after])
+		return
+	# Different ship marker with same room_id must still discover (ship-scoped keys).
+	var prev_marker: String = ""
+	if playable.current_ship != null:
+		prev_marker = str(playable.current_ship.marker_id)
+		playable.current_ship.marker_id = "other_derelict_stream_e"
+	playable._emit_objective_training("salvage", "bridge_room_stream_e", "obj_other_ship")
+	if playable.current_ship != null:
+		playable.current_ship.marker_id = prev_marker
+	var disc_cross: int = 0
+	for entry3 in playable.training_event_bus.get_log():
+		if str(entry3.get("event_id", "")) == "discover_room":
+			disc_cross += 1
+	if disc_cross != disc_count + 1:
+		_fail("discover_room not ship-scoped (expected %d got %d)" % [disc_count + 1, disc_cross])
 		return
 
 	# --- compound_stimulant via medbay craft complete path ---

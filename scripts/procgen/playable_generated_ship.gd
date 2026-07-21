@@ -314,6 +314,12 @@ const FIRE_OXYGEN_DRAIN_PER_INTENSITY: float = 1.5
 ## Stream F: medbay surgery heals when health is below this threshold.
 const SURGERY_HEALTH_THRESHOLD: float = 75.0
 const SURGERY_HEAL_AMOUNT: float = 40.0
+## Fire B2: sealed hatches map onto these bulkhead pairs (round-robin per hatch).
+const HATCH_BULKHEAD_LINKS: Array = [
+	["bridge", "engineering"],
+	["engineering", "cargo"],
+	["engineering", "hydroponics"],
+]
 # Derelict-side fire: only ~1 in 7 boarded derelicts present any fire (deterministic per
 # seed). Fire is one of several possible derelict conditions, not a default.
 const FIRE_PRESENCE_PERCENT: int = 15
@@ -2819,7 +2825,9 @@ func _build_sealed_hatches() -> void:
 		var hid: String = "%s:hatch_%d" % [String(current_ship.marker_id), i]
 		var lock_kind: String = SealedHatchScript.MECHANICAL if (i % 2 == 0) else SealedHatchScript.ELECTRONIC
 		var hatch = SealedHatchScript.new()
-		hatch.configure(hid, lock_kind, pos_variant, 1.8)
+		# Fire B2: assign a bulkhead pair so door-gated spread is per-hatch, not global.
+		var link: Array = HATCH_BULKHEAD_LINKS[i % HATCH_BULKHEAD_LINKS.size()]
+		hatch.configure(hid, lock_kind, pos_variant, 1.8, str(link[0]), str(link[1]))
 		if bypassed.has(hid):
 			hatch.set_bypassed(true)
 		if not hatch.hatch_bypassed.is_connected(_on_hatch_bypassed):
@@ -3153,17 +3161,16 @@ func _build_fire_context() -> Dictionary:
 		# nondeterministically based on travel timing). Stays false when away.
 		if electrical_arc_state != null:
 			arc_arcing = electrical_arc_state.phase == ElectricalArcState.Phase.ARCING
-	# Fire B2: sealed (unbypassed) hatches act as closed bulkheads — block
-	# engineering↔bridge and engineering↔cargo by default when any hatch is sealed.
+	# Fire B2: each unbypassed sealed hatch closes only its own bulkhead link.
 	var closed: Array = []
-	var any_sealed: bool = false
 	for h in sealed_hatches:
-		if is_instance_valid(h) and not h.bypassed:
-			any_sealed = true
-			break
-	if any_sealed:
-		closed.append("bridge|engineering")
-		closed.append("cargo|engineering")
+		if not is_instance_valid(h) or h.bypassed:
+			continue
+		var a: String = str(h.compartment_a)
+		var b: String = str(h.compartment_b)
+		if a.is_empty() or b.is_empty() or a == b:
+			continue
+		closed.append(a + "|" + b if a < b else b + "|" + a)
 	return {
 		"powered_ratio": powered,
 		"ship_oxygen_present": oxygen_present,
@@ -3696,14 +3703,16 @@ func _on_voice_log_played(entry_id: String) -> void:
 	emit_training_event("decode_signal", entry_id)
 
 ## Stream F: medbay field surgery when health is critical. Called by CraftingStation
-## before crafts. Consumes medical_gauze if present; always heals + trains surgery.
+## before crafts. Requires medical_gauze (survival economy); heals + trains surgery.
 func try_medbay_surgery(_player_body: Node) -> bool:
 	if vitals_state == null:
 		return false
 	if float(vitals_state.health) >= SURGERY_HEALTH_THRESHOLD:
 		return false
-	if inventory_state != null and inventory_state.get_quantity("medical_gauze") > 0:
-		inventory_state.remove_item("medical_gauze", 1)
+	if inventory_state == null or inventory_state.get_quantity("medical_gauze") <= 0:
+		return false
+	if inventory_state.remove_item("medical_gauze", 1) != 1:
+		return false
 	vitals_state.health = minf(100.0, float(vitals_state.health) + SURGERY_HEAL_AMOUNT)
 	emit_training_event("perform_surgery", "medbay")
 	_refresh_player_vitals(0.0)
@@ -3782,15 +3791,31 @@ func _on_craft_completed() -> void:
 		item_id, qty, str(result.get("quality_tier", "standard"))])
 	# Stream D/E: station crafts train the matching skill.
 	# Field craft already emits fabricate_part in _on_field_craft_completed.
-	# perform_surgery stays content-pending (no operating-table interaction).
+	# Kitchen always cooks; synthesizer only when the *recipe* is cooking-class
+	# (category cooking) or the output item is food/drink — industrial synthesis
+	# must not farm cook_meal XP (PR #72 review).
 	var station_kind: String = str(result.get("station_kind", ""))
 	var recipe_id: String = str(result.get("recipe_id", ""))
-	if station_kind in ["kitchen", "synthesizer"]:
+	if station_kind == "kitchen" or (station_kind == "synthesizer" and _recipe_is_cooking(recipe_id, item_id)):
 		emit_training_event("cook_meal", item_id)
 	elif station_kind in ["fabricator", "workbench"]:
 		emit_training_event("fabricate_part", item_id)
 	elif station_kind == "medbay" and ("stim" in recipe_id or "stim" in item_id):
 		emit_training_event("compound_stimulant", item_id)
+
+## True when a craft completion should train cooking (not industrial synthesis).
+func _recipe_is_cooking(recipe_id: String, item_id: String) -> bool:
+	if crafting_state != null and not recipe_id.is_empty():
+		var recipe: Dictionary = crafting_state.get_recipe(recipe_id)
+		var cat: String = str(recipe.get("category", ""))
+		if cat == "cooking":
+			return true
+		# Nutrient paste etc. may be category "synthesis" but food-class output.
+	if inventory_state != null and not item_id.is_empty():
+		var out_cat: String = inventory_state.get_category(item_id)
+		if out_cat == "food" or out_cat == "drink":
+			return true
+	return false
 
 ## ADR-0038: an emergency field craft finished. Same deposit path as station crafts.
 func _on_field_craft_completed() -> void:
@@ -4059,11 +4084,16 @@ func _on_hatch_bypassed(hatch_id: String, lock_kind: String) -> void:
 		current_ship.bypassed_hatch_ids.append(hatch_id)
 	# Stream F: forcing a sealed bulkhead is field construction (build_shelter).
 	emit_training_event("build_shelter", hatch_id)
-	# Fire B2: opening a hatch clears the default sealed bulkhead closed-links.
-	var afs = _active_fire_state()
-	if afs != null and afs.has_method("set_link_closed"):
-		afs.set_link_closed("bridge", "engineering", false)
-		afs.set_link_closed("cargo", "engineering", false)
+	# Fire B2: opening this hatch clears only its bulkhead pair (context rebuild
+	# also drops it from closed_links on the next fire tick).
+	for h in sealed_hatches:
+		if not is_instance_valid(h) or str(h.hatch_id) != hatch_id:
+			continue
+		var afs = _active_fire_state()
+		if afs != null and afs.has_method("set_link_closed") \
+				and not str(h.compartment_a).is_empty() and not str(h.compartment_b).is_empty():
+			afs.set_link_closed(str(h.compartment_a), str(h.compartment_b), false)
+		break
 	_refresh_inventory_hud()
 
 ## Domain 5: attempts to bypass the nearest unblocked sealed hatch using the player's
@@ -4239,11 +4269,21 @@ func _on_derelict_interactable_completed(interaction_id: String, objective_id: S
 		menu_coordinator.trigger_tutorial("objective_completed", objective_type)
 
 ## Stream E: objective completions that map to authored training events.
-## discover_room is once-per-room-id; download_logs → extract_data.
+## discover_room is once per (ship, room_id) — room ids reuse across derelicts.
+## download_logs → extract_data.
 func _emit_objective_training(objective_type: String, room_id: String, objective_id: String) -> void:
-	if not room_id.is_empty() and not discovered_room_ids.has(room_id):
-		discovered_room_ids[room_id] = true
-		emit_training_event("discover_room", room_id)
+	if not room_id.is_empty():
+		var ship_key: String = "home"
+		if current_ship != null:
+			ship_key = str(current_ship.marker_id)
+			if ship_key.is_empty():
+				ship_key = str(current_ship.ship_id)
+			if ship_key.is_empty():
+				ship_key = "home"
+		var disc_key: String = "%s:%s" % [ship_key, room_id]
+		if not discovered_room_ids.has(disc_key):
+			discovered_room_ids[disc_key] = true
+			emit_training_event("discover_room", disc_key)
 	if objective_type == "download_logs":
 		emit_training_event("extract_data", objective_id if not objective_id.is_empty() else "download_logs")
 	# Stream F: restoring ship systems / stabilizing the reactor is leadership.
@@ -4976,11 +5016,11 @@ func _use_consumable_hotbar_slot(slot_index: int) -> Dictionary:
 
 ## Stream D/E: medicine → first_aid_self; food/drink → ration_supplies.
 ## Stimulants/utility keep non-unlock effects only (no force-wired XP).
+## Uses InventoryState's cached defs — do not reload ItemDefs every use.
 func _emit_consumable_training(item_id: String) -> void:
-	if item_id.is_empty():
+	if item_id.is_empty() or inventory_state == null:
 		return
-	var defs: Dictionary = ItemDefsScript.load_definitions()
-	var cat: String = ItemDefsScript.category(defs, item_id)
+	var cat: String = inventory_state.get_category(item_id)
 	if cat == "medicine":
 		emit_training_event("first_aid_self", item_id)
 	elif cat == "food" or cat == "drink":

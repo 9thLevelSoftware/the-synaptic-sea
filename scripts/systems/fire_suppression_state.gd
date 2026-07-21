@@ -328,6 +328,27 @@ func apply_summary(summary: Dictionary) -> bool:
 		if absf(new_cascade_rate - cascade_rate_per_second) > 0.001:
 			cascade_rate_per_second = new_cascade_rate
 			changed = true
+	# Fire B2: round-trip deliberate vents + model-level closed bulkhead links.
+	var vented_raw: Variant = summary.get("vented_compartments", null)
+	if typeof(vented_raw) == TYPE_ARRAY:
+		var new_vented: Dictionary = {}
+		for cid in (vented_raw as Array):
+			var c: String = str(cid)
+			if not c.is_empty():
+				new_vented[c] = true
+		if new_vented != vented_compartments:
+			vented_compartments = new_vented
+			changed = true
+	var closed_raw: Variant = summary.get("closed_links", null)
+	if typeof(closed_raw) == TYPE_ARRAY:
+		var new_closed: Dictionary = {}
+		for key in (closed_raw as Array):
+			var k: String = str(key)
+			if not k.is_empty():
+				new_closed[k] = true
+		if new_closed != closed_links:
+			closed_links = new_closed
+			changed = true
 	return changed
 
 func get_status_lines() -> PackedStringArray:

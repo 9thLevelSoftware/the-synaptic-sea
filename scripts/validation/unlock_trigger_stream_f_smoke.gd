@@ -17,6 +17,7 @@ const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
 const OxygenStateScript := preload("res://scripts/systems/oxygen_state.gd")
 const TIMEOUT_FRAMES: int = 400
+const FIRE_OXYGEN_DRAIN_PROBE: float = 15.0
 
 var main_node: Node
 var playable: PlayableGeneratedShip
@@ -99,17 +100,23 @@ func _validate() -> void:
 		_fail("training bus missing")
 		return
 
-	# --- perform_surgery via medbay surgery ---
+	# --- perform_surgery via medbay surgery (gauze required) ---
 	playable.vitals_state.health = 50.0
+	if playable.try_medbay_surgery(playable.player):
+		_fail("surgery should fail without medical_gauze")
+		return
 	playable.inventory_state.add_item("medical_gauze", 1)
 	if not playable.try_medbay_surgery(playable.player):
-		_fail("try_medbay_surgery failed at low health")
+		_fail("try_medbay_surgery failed with gauze at low health")
 		return
 	if not _log_has("perform_surgery"):
 		_fail("medbay surgery did not emit perform_surgery")
 		return
 	if float(playable.vitals_state.health) < 80.0:
 		_fail("surgery did not heal (health=%.1f)" % float(playable.vitals_state.health))
+		return
+	if playable.inventory_state.get_quantity("medical_gauze") != 0:
+		_fail("surgery did not consume medical_gauze")
 		return
 
 	# --- decode_signal via voice log ---
@@ -185,10 +192,32 @@ func _validate() -> void:
 				_fail("coordinator fire oxygen path inert")
 				return
 
+	# Fire B2 save round-trip: vented + closed_links survive apply_summary.
+	var fire_rt = FireSuppressionStateScript.new()
+	fire_rt.configure({
+		"compartments": ["bridge", "engineering"],
+		"adjacency": {"bridge": ["engineering"], "engineering": ["bridge"]},
+	})
+	fire_rt.deliberate_vent("engineering")
+	fire_rt.set_link_closed("bridge", "engineering", true)
+	var snap: Dictionary = fire_rt.get_summary()
+	var fire_rt2 = FireSuppressionStateScript.new()
+	fire_rt2.configure({
+		"compartments": ["bridge", "engineering"],
+		"adjacency": {"bridge": ["engineering"], "engineering": ["bridge"]},
+	})
+	if not fire_rt2.apply_summary(snap):
+		_fail("apply_summary returned false for vented/closed fire state")
+		return
+	if not fire_rt2.is_vented("engineering"):
+		_fail("vented_compartments not restored by apply_summary")
+		return
+	if not fire_rt2.is_link_closed("bridge", "engineering"):
+		_fail("closed_links not restored by apply_summary")
+		return
+
 	print("UNLOCK TRIGGER STREAM F PASS surgery=true decode=true shelter=true social=true fire_b2=true")
 	_cleanup(0)
-
-const FIRE_OXYGEN_DRAIN_PROBE: float = 15.0
 
 func _find_playable(node: Node) -> PlayableGeneratedShip:
 	if node is PlayableGeneratedShip:
