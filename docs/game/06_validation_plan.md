@@ -188,6 +188,9 @@ run_clean 'title load-failure recovery smoke' 'TITLE LOAD FAILURE PASS returned_
 run_clean 'hazard interaction feedback smoke' 'HAZARD FEEDBACK PASS extinguish_blocked=true seal_blocked=true breach_sealed=true sfx_routed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_feedback_smoke.gd
 run_clean 'ADR-0005 hazard contract static smoke' 'HAZARD CONTRACT PASS models=2 phase_timer_owners=1 wrong_kind_rejected=2 configure_dict=2' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_contract_smoke.gd
 run_clean 'ADR-0038 station craft reachability smoke' 'MAIN PLAYABLE STATION CRAFT PASS crafted=true salvaged=true field=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_station_craft_smoke.gd
+run_clean 'REQ-CS-016 crafting recipe list smoke' 'CRAFTING RECIPE LIST PASS ready=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/crafting_recipe_list_smoke.gd
+run_clean 'REQ-CS-016 recipe picker panel smoke' 'RECIPE PICKER PANEL PASS rows=3 move=true confirm=true closed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recipe_picker_panel_smoke.gd
+run_clean 'REQ-CS-016 main playable recipe picker smoke' 'MAIN PLAYABLE RECIPE PICKER PASS station=fabricator' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_recipe_picker_smoke.gd
 run_clean 'Bucket 3 meta-screen reachability smoke' 'MAIN PLAYABLE META SCREENS PASS screens=10 reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_meta_screens_smoke.gd
 run_clean 'AutosavePolicy reachability smoke' 'MAIN PLAYABLE META AUTOSAVE PASS slot_rotated=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_meta_autosave_smoke.gd
 run_clean 'KitCatalog lifeboat biome-skin reachability smoke' 'MAIN PLAYABLE LIFEBOAT BIOME SKIN PASS biomes=3 live_match=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_lifeboat_biome_skin_smoke.gd
@@ -652,6 +655,7 @@ membership changes).
 | `consumable_state_smoke` | promotion-candidate |
 | `container_variety_smoke` | promotion-candidate |
 | `crafting_debug_smoke` | debug-tool |
+| `crafting_recipe_list_smoke` | promotion-candidate |
 | `crafting_state_smoke` | promotion-candidate |
 | `cross_system_dependency_smoke` | promotion-candidate |
 | `cross_training_smoke` | promotion-candidate |
@@ -710,6 +714,7 @@ membership changes).
 | `main_playable_slice_capture_sequence` | legacy-capture |
 | `main_playable_slice_combat_encounter_smoke` | promotion-candidate |
 | `main_playable_slice_crafting_smoke` | promotion-candidate |
+| `main_playable_slice_recipe_picker_smoke` | promotion-candidate |
 | `main_playable_slice_inventory_ui_smoke` | promotion-candidate |
 | `main_playable_slice_loot_ecosystem_smoke` | promotion-candidate |
 | `main_playable_slice_multislot_save_smoke` | promotion-candidate |
@@ -738,6 +743,7 @@ membership changes).
 | `qt_mini_smoke` | promotion-candidate |
 | `quality_tier_smoke` | promotion-candidate |
 | `rarity_tier_smoke` | promotion-candidate |
+| `recipe_picker_panel_smoke` | promotion-candidate |
 | `recipe_resource_smoke` | promotion-candidate |
 | `recursive_travel_smoke` | promotion-candidate |
 | `release_readiness_ledger_smoke` | release-audit-tool |

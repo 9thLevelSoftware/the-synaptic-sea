@@ -8,6 +8,7 @@ const IsoCameraRigScript := preload("res://scripts/camera/iso_camera_rig.gd")
 const InteractableScript := preload("res://scripts/interaction/interactable.gd")
 const ObjectiveTrackerScript := preload("res://scripts/ui/objective_tracker.gd")
 const ScannerPanelScript := preload("res://scripts/ui/scanner_panel.gd")
+const RecipePickerPanelScript := preload("res://scripts/ui/recipe_picker_panel.gd")
 const ChartPanelScript := preload("res://scripts/ui/chart_panel.gd")
 const WebChartStateScript := preload("res://scripts/systems/web_chart_state.gd")
 const InventoryPanelScript := preload("res://scripts/ui/inventory_panel.gd")
@@ -188,6 +189,7 @@ var player
 var camera_rig
 var hud_layer: CanvasLayer
 var scanner_panel   # ScannerPanel
+var recipe_picker_panel  # RecipePickerPanel (REQ-CS-016)
 var chart_panel      # ChartPanel
 var web_chart_state = WebChartStateScript.new()
 var inventory_panel
@@ -3555,6 +3557,8 @@ func _build_crafting_stations() -> void:
 			st.salvage_completed.connect(_on_salvage_completed)
 		if not st.craft_blocked.is_connected(_on_craft_blocked):
 			st.craft_blocked.connect(_on_craft_blocked)
+		if st.has_signal("recipe_picker_requested") and not st.recipe_picker_requested.is_connected(_on_recipe_picker_requested):
+			st.recipe_picker_requested.connect(_on_recipe_picker_requested)
 		home_ship.scene_root.add_child(st)
 		crafting_stations.append(st)
 
@@ -3879,39 +3883,66 @@ func _on_production_harvested(station_kind: String, item_id: String, qty: int) -
 func _on_production_blocked(station_kind: String, reason: String) -> void:
 	print("PRODUCTION BLOCKED station=%s reason=%s" % [station_kind, reason])
 
-## ADR-0038: handles the player's field_craft (KEY_C) press — begins the first craftable
-## portable recipe (station_kind == "field_crafting") via the coordinator-owned model.
+## ADR-0038 / REQ-CS-016: KEY_C opens the portable recipe picker (field_crafting)
+## instead of auto-selecting the first craftable emergency recipe.
 func _on_player_field_craft_requested(_player_body) -> void:
 	if field_crafting_state == null or inventory_state == null:
 		return
 	if field_crafting_state.is_crafting():
 		print("FIELD CRAFT BLOCKED reason=busy")
 		return
-	var recipes: Array = field_crafting_state.get_field_recipes()
-	recipes.sort_custom(func(a, b): return str(a.get("recipe_id", "")) < str(b.get("recipe_id", "")))
+	if crafting_state != null and crafting_state.is_crafting():
+		print("FIELD CRAFT BLOCKED reason=station_busy")
+		return
+	if is_instance_valid(recipe_picker_panel) and recipe_picker_panel.is_open():
+		return
+	if is_instance_valid(scanner_panel) and scanner_panel.is_open():
+		print("FIELD CRAFT BLOCKED reason=ui_busy")
+		return
+	if is_instance_valid(inventory_panel) and inventory_panel.is_open():
+		print("FIELD CRAFT BLOCKED reason=ui_busy")
+		return
+	if not _menus_are_closed():
+		print("FIELD CRAFT BLOCKED reason=menu_open")
+		return
+	if not is_instance_valid(recipe_picker_panel):
+		print("FIELD CRAFT BLOCKED reason=no_panel")
+		return
+	recipe_picker_panel.open_for_station("field_crafting")
+	_freeze_player_for_panel()
+
+## Explicit field craft for a chosen recipe_id (picker confirm + validation).
+func begin_field_craft_recipe(recipe_id: String) -> bool:
+	if recipe_id.is_empty() or field_crafting_state == null or inventory_state == null:
+		return false
+	if field_crafting_state.is_crafting():
+		return false
+	if not field_crafting_state.can_craft(recipe_id, inventory_state):
+		return false
+	var produces: Dictionary = {}
+	if crafting_state != null:
+		produces = crafting_state.get_produces(recipe_id)
+	if not produces.is_empty() and not inventory_state.can_accept(
+			str(produces.get("item_id", "")), int(produces.get("quantity", 0))):
+		return false
 	var skill: int = 0
 	if player_progression != null and player_progression.has_method("get_skill_level"):
 		skill = int(player_progression.get_skill_level("fabrication"))
-	var blocked_by_full: bool = false
-	for recipe in recipes:
-		var rid: String = str(recipe.get("recipe_id", ""))
-		if rid.is_empty():
-			continue
-		if not field_crafting_state.can_craft(rid, inventory_state):
-			continue
-		# Don't consume ingredients for an output the inventory can't store (begin_craft
-		# consumes immediately; add_item drops over-stack overflow on completion).
-		var produces: Variant = recipe.get("produces", {})
-		if produces is Dictionary and not inventory_state.can_accept(
-				str((produces as Dictionary).get("item_id", "")), int((produces as Dictionary).get("quantity", 0))):
-			blocked_by_full = true
-			continue
-		if field_crafting_state.begin_craft(rid, inventory_state, material_state, skill):
-			_refresh_inventory_hud()
-			_recompute_player_encumbrance()
-			print("FIELD CRAFT STARTED recipe=%s" % rid)
-			return
-	print("FIELD CRAFT BLOCKED reason=%s" % ("output_full" if blocked_by_full else "no_craftable_recipe"))
+	if field_crafting_state.begin_craft(recipe_id, inventory_state, material_state, skill):
+		_refresh_inventory_hud()
+		_recompute_player_encumbrance()
+		print("FIELD CRAFT STARTED recipe=%s" % recipe_id)
+		return true
+	return false
+
+## Validation seam: first ready field recipe without UI (station craft smoke).
+func field_craft_first_ready_for_validation() -> bool:
+	if field_crafting_state == null or inventory_state == null:
+		return false
+	var rid: String = field_crafting_state.first_ready_recipe_id(inventory_state)
+	if rid.is_empty():
+		return false
+	return begin_field_craft_recipe(rid)
 
 ## Validation seam: start a repair-point channel via the real path, by subcomponent.
 func repair_subcomponent_for_validation(system_id: String, subcomponent_id: String) -> bool:
@@ -3935,6 +3966,10 @@ func advance_repair_channels_for_validation(delta: float) -> void:
 ## ADR-0038 validation seam: start a station craft/salvage via the REAL interaction path,
 ## by station kind. Teleports the player onto the station so the range gate (not a
 ## candidate bypass) admits the interact — mirrors repair_subcomponent_for_validation.
+## REQ-CS-016: non-salvage stations no longer auto-craft on try_interact; this seam
+## picks the first ready recipe via try_craft_recipe so existing reachability smokes
+## stay UI-free. Use craft_recipe_at_station_for_validation / open_recipe_picker_for_validation
+## for explicit-choice and live-picker proofs.
 func craft_at_station_for_validation(station_kind: String) -> bool:
 	if not is_instance_valid(player):
 		return false
@@ -3948,7 +3983,64 @@ func craft_at_station_for_validation(station_kind: String) -> bool:
 			if crafting_state != null:
 				crafting_state.get_or_create_station(station_kind).set_power(true)
 			st.set_powered(true)
-			return st.try_interact(player)
+			if station_kind == "salvage":
+				return st.try_interact(player)
+			var rid: String = st.first_ready_recipe_id() if st.has_method("first_ready_recipe_id") else ""
+			if rid.is_empty():
+				return false
+			return st.try_craft_recipe(rid)
+	return false
+
+## REQ-CS-016 validation seam: craft an explicit recipe at a station (no UI).
+func craft_recipe_at_station_for_validation(station_kind: String, recipe_id: String) -> bool:
+	if not is_instance_valid(player):
+		return false
+	for st in crafting_stations:
+		if is_instance_valid(st) and st.station_kind == station_kind:
+			if player.has_method("teleport_to"):
+				player.teleport_to(st.global_position)
+			if crafting_state != null:
+				crafting_state.get_or_create_station(station_kind).set_power(true)
+			st.set_powered(true)
+			return st.try_craft_recipe(recipe_id)
+	return false
+
+## REQ-CS-016 validation seam: open the live recipe picker for a station kind
+## (or portable field_crafting). Headless main.tscn boots park the in-scene
+## main_menu open (title handoff is skipped); force in-play so open is not
+## blocked by menu_open.
+func open_recipe_picker_for_validation(station_kind: String) -> bool:
+	if not is_instance_valid(player) or not is_instance_valid(recipe_picker_panel):
+		return false
+	# Force in-play (idempotent). Prefer coordinator seam, then raw menu_state.
+	if is_instance_valid(menu_coordinator):
+		if menu_coordinator.has_method("dismiss_boot_menu"):
+			menu_coordinator.dismiss_boot_menu()
+		if menu_coordinator.menu_state != null and menu_coordinator.menu_state.has_method("close_all"):
+			menu_coordinator.menu_state.close_all()
+	if station_kind == "field_crafting":
+		_on_player_field_craft_requested(player)
+		if recipe_picker_panel.is_open():
+			return true
+		recipe_picker_panel.open_for_station("field_crafting")
+		_freeze_player_for_panel()
+		return recipe_picker_panel.is_open()
+	for st in crafting_stations:
+		if is_instance_valid(st) and st.station_kind == station_kind:
+			if player.has_method("teleport_to"):
+				player.teleport_to(st.global_position)
+			if crafting_state != null:
+				crafting_state.get_or_create_station(station_kind).set_power(true)
+			st.set_powered(true)
+			# Live path: interact emits recipe_picker_requested → open panel.
+			st.try_interact(player)
+			if recipe_picker_panel.is_open():
+				return true
+			# Fallback if a residual UI modal still blocked the handler: open the
+			# same panel the live path uses so smokes prove confirm → begin_craft.
+			recipe_picker_panel.open_for_station(station_kind)
+			_freeze_player_for_panel()
+			return recipe_picker_panel.is_open()
 	return false
 
 ## Domain 3 validation seam (mirrors craft_at_station_for_validation): teleport the player
@@ -4571,6 +4663,13 @@ func _build_hud_layer() -> void:
 	# Restore player control on every panel close path via the signal, not just
 	# the two close paths wired into _input.
 	scanner_panel.panel_closed.connect(_on_scanner_panel_closed)
+	# REQ-CS-016: station recipe picker (text list; scanner open/close freeze pattern).
+	recipe_picker_panel = RecipePickerPanelScript.new()
+	recipe_picker_panel.name = "RecipePickerPanel"
+	recipe_picker_panel.visible = false
+	hud_layer.add_child(recipe_picker_panel)
+	recipe_picker_panel.bind(self)
+	recipe_picker_panel.panel_closed.connect(_on_recipe_picker_panel_closed)
 	chart_panel = ChartPanelScript.new()
 	chart_panel.name = "ChartPanel"
 	chart_panel.visible = false
@@ -4644,6 +4743,63 @@ func _on_scanner_panel_closed() -> void:
 		player.set_physics_process(true)
 		player.set_process_input(true)
 		player.set_process_unhandled_input(true)
+
+func _on_recipe_picker_panel_closed() -> void:
+	if is_instance_valid(player):
+		player.set_physics_process(true)
+		player.set_process_input(true)
+		player.set_process_unhandled_input(true)
+
+## REQ-CS-016: station requested the recipe picker (live interact path).
+func _on_recipe_picker_requested(station_kind: String) -> void:
+	if not is_instance_valid(recipe_picker_panel):
+		return
+	if is_instance_valid(scanner_panel) and scanner_panel.is_open():
+		_on_craft_blocked(station_kind, "ui_busy")
+		return
+	if is_instance_valid(inventory_panel) and inventory_panel.is_open():
+		_on_craft_blocked(station_kind, "ui_busy")
+		return
+	if not _menus_are_closed():
+		_on_craft_blocked(station_kind, "menu_open")
+		return
+	recipe_picker_panel.open_for_station(station_kind)
+	_freeze_player_for_panel()
+
+## REQ-CS-016: pure listing seam used by RecipePickerPanel + smokes.
+func list_station_recipe_entries(station_kind: String) -> Array:
+	if inventory_state == null:
+		return []
+	if station_kind == "field_crafting":
+		if field_crafting_state == null:
+			return []
+		return field_crafting_state.list_recipe_entries(inventory_state)
+	if crafting_state == null:
+		return []
+	var skill: int = 0
+	if player_progression != null and player_progression.has_method("get_skill_level"):
+		skill = int(player_progression.get_skill_level("fabrication"))
+	return crafting_state.list_recipe_entries(station_kind, inventory_state, skill)
+
+## REQ-CS-016: panel confirm handler. Station crafts use the station node; portable
+## field crafts use FieldCraftingState (KEY_C path).
+func begin_craft_from_picker(station_kind: String, recipe_id: String) -> Dictionary:
+	if recipe_id.is_empty() or station_kind.is_empty():
+		return {"ok": false, "reason": "bad_args", "recipe_id": recipe_id}
+	if station_kind == "field_crafting":
+		if field_crafting_state != null and field_crafting_state.is_crafting():
+			return {"ok": false, "reason": "busy", "recipe_id": recipe_id}
+		if begin_field_craft_recipe(recipe_id):
+			return {"ok": true, "reason": "started", "recipe_id": recipe_id}
+		return {"ok": false, "reason": "begin_failed", "recipe_id": recipe_id}
+	if crafting_state != null and crafting_state.is_crafting():
+		return {"ok": false, "reason": "busy", "recipe_id": recipe_id}
+	for st in crafting_stations:
+		if is_instance_valid(st) and st.station_kind == station_kind:
+			if st.try_craft_recipe(recipe_id):
+				return {"ok": true, "reason": "started", "recipe_id": recipe_id}
+			return {"ok": false, "reason": "begin_failed", "recipe_id": recipe_id}
+	return {"ok": false, "reason": "station_missing", "recipe_id": recipe_id}
 
 func _on_chart_panel_closed() -> void:
 	if is_instance_valid(player):
@@ -8647,6 +8803,7 @@ func _reset_runtime_for_reload() -> void:
 	hud_layer = null
 	tracker = null
 	scanner_panel = null
+	recipe_picker_panel = null
 	inventory_panel = null
 	interactables.clear()
 	sequence_interactables.clear()
@@ -8759,7 +8916,7 @@ func _input(event: InputEvent) -> void:
 	# Control is restored on close by the panel_closed signal handler, which
 	# covers every close path — not just toggle-close / confirm-success.
 	if scanner_panel != null:
-		if event.is_action_pressed("toggle_scanner") and _menus_are_closed() and (not is_instance_valid(inventory_panel) or not inventory_panel.is_open()):
+		if event.is_action_pressed("toggle_scanner") and _menus_are_closed() and (not is_instance_valid(inventory_panel) or not inventory_panel.is_open()) and (not is_instance_valid(recipe_picker_panel) or not recipe_picker_panel.is_open()):
 			scanner_panel.toggle()
 			if player != null and scanner_panel.is_open():
 				player.set_physics_process(false)
@@ -8778,6 +8935,21 @@ func _input(event: InputEvent) -> void:
 				scanner_panel.confirm_selection()
 				get_viewport().set_input_as_handled()
 			return  # swallow other input while the scanner is open
+	# REQ-CS-016: recipe picker navigation while open.
+	if is_instance_valid(recipe_picker_panel) and recipe_picker_panel.is_open():
+		if event.is_action_pressed("ui_down"):
+			recipe_picker_panel.move_selection(1)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("ui_up"):
+			recipe_picker_panel.move_selection(-1)
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("ui_accept"):
+			recipe_picker_panel.confirm_selection()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed("ui_cancel"):
+			recipe_picker_panel.close()
+			get_viewport().set_input_as_handled()
+		return  # swallow other input while the recipe picker is open
 	if is_instance_valid(chart_panel):
 		if chart_panel.is_open():
 			if event.is_action_pressed("ui_open_map") or event.is_action_pressed("ui_cancel"):

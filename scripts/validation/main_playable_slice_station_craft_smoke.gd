@@ -146,8 +146,16 @@ func _validate(playable) -> void:
 		_fail("no craftable field recipe seeded")
 		return
 	var field_before: int = inv.get_quantity(field_item)
-	# Drive the REAL signal handler (the KEY_C path) rather than the model directly.
-	playable._on_player_field_craft_requested(playable.player)
+	# REQ-CS-016: KEY_C opens the field recipe picker; reachability still proves
+	# the coordinator field model via first-ready begin (UI-free). Live picker
+	# choice for field is covered by main_playable_slice_recipe_picker_smoke /
+	# begin_craft_from_picker("field_crafting", ...).
+	if playable.has_method("field_craft_first_ready_for_validation"):
+		if not playable.field_craft_first_ready_for_validation():
+			_fail("field craft first-ready did not start")
+			return
+	else:
+		playable._on_player_field_craft_requested(playable.player)
 	if not playable.field_crafting_state.is_crafting():
 		_fail("field craft did not start via the player entrypoint")
 		return
