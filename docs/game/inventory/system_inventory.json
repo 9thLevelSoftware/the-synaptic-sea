@@ -1468,7 +1468,7 @@
         "combat"
       ],
       "gaps": [
-        "CLOSED (Domain 2): kill removes + rewards. CLOSED (2026-07-21): unsearched corpse drops persist on ship.pending_corpse_loot and re-spawn on revisit (no longer transient-only). AI pathfinding still deferred (lerp movement)."
+        "CLOSED ADR-0049: pure ShipNavGraph + ThreatPathfinder pathfollow; lerp replaced. INVESTIGATE/FLEE have state-specific targets."
       ],
       "integrations": [
         {

@@ -36,6 +36,14 @@ var last_known_room: String = ""
 var status_on_hit: String = ""
 var armor_profile: Dictionary = {}
 var tags: Array = []
+## ADR-0049: metres per second (base). Multipliers scale by AI state.
+var move_speed: float = 2.5
+var hunt_speed_mult: float = 1.0
+var flee_speed_mult: float = 1.35
+var investigate_speed_mult: float = 0.7
+var attack_range: float = 1.4
+## Last known player world position for INVESTIGATE (optional; room_id still used).
+var last_known_position: Array = []
 
 func configure(config: Dictionary = {}) -> void:
 	instance_id = str(config.get("instance_id", instance_id))
@@ -71,6 +79,14 @@ func configure(config: Dictionary = {}) -> void:
 	var raw_tags: Variant = config.get("tags", tags)
 	if raw_tags is Array:
 		tags = (raw_tags as Array).duplicate(true)
+	move_speed = maxf(0.1, float(config.get("move_speed", move_speed)))
+	hunt_speed_mult = maxf(0.1, float(config.get("hunt_speed_mult", hunt_speed_mult)))
+	flee_speed_mult = maxf(0.1, float(config.get("flee_speed_mult", flee_speed_mult)))
+	investigate_speed_mult = maxf(0.1, float(config.get("investigate_speed_mult", investigate_speed_mult)))
+	attack_range = maxf(0.3, float(config.get("attack_range", attack_range)))
+	var lkp: Variant = config.get("last_known_position", last_known_position)
+	if lkp is Array and (lkp as Array).size() >= 3:
+		last_known_position = [float(lkp[0]), float(lkp[1]), float(lkp[2])]
 
 func tick(delta: float, context: Dictionary = {}) -> bool:
 	if delta < 0.0:
@@ -99,6 +115,11 @@ func tick(delta: float, context: Dictionary = {}) -> bool:
 	if awareness_score >= detection_threshold:
 		memory_remaining = memory_seconds
 		last_known_room = str(context.get("room_id", room_id))
+		var ppos: Variant = context.get("player_position", null)
+		if ppos is Vector3:
+			last_known_position = [(ppos as Vector3).x, (ppos as Vector3).y, (ppos as Vector3).z]
+		elif ppos is Array and (ppos as Array).size() >= 3:
+			last_known_position = [float(ppos[0]), float(ppos[1]), float(ppos[2])]
 		if same_room:
 			_change_state(STATE_ATTACK)
 		else:
@@ -165,7 +186,29 @@ func get_summary() -> Dictionary:
 		"status_on_hit": status_on_hit,
 		"armor_profile": armor_profile.duplicate(true),
 		"tags": tags.duplicate(true),
+		"move_speed": move_speed,
+		"hunt_speed_mult": hunt_speed_mult,
+		"flee_speed_mult": flee_speed_mult,
+		"investigate_speed_mult": investigate_speed_mult,
+		"attack_range": attack_range,
+		"last_known_position": last_known_position.duplicate(true),
 	}
+
+func effective_move_speed() -> float:
+	match state:
+		STATE_FLEE:
+			return move_speed * flee_speed_mult
+		STATE_INVESTIGATE:
+			return move_speed * investigate_speed_mult
+		STATE_HUNT, STATE_ATTACK:
+			return move_speed * hunt_speed_mult
+		_:
+			return 0.0
+
+func last_known_world_position() -> Vector3:
+	if last_known_position.size() >= 3:
+		return Vector3(float(last_known_position[0]), float(last_known_position[1]), float(last_known_position[2]))
+	return Vector3.INF
 
 func apply_summary(summary: Dictionary) -> bool:
 	if summary == null or summary.is_empty():

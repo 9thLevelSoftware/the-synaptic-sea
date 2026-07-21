@@ -640,6 +640,36 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - `main_playable_slice_combat_encounter_smoke.gd`
   - `MAIN PLAYABLE COMBAT ENCOUNTER PASS`
 
+## REQ-D-019: Threat pathfollowing on layout nav graph
+
+- Source: `docs/game/features/combat_threat_ai.md`, ADR-0049
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Replace lerp-through-walls threat motion with pure A* pathfollowing on floor cells.
+- Acceptance criteria:
+  - Threats in HUNT/ATTACK advance along `ShipNavGraph` waypoints without leaving the graph corridor.
+  - INVESTIGATE targets last-known position; FLEE targets farthest reachable node.
+  - Pure unit smokes + main-scene smoke pass headless.
+- Verification:
+  - `ship_nav_graph_smoke.gd` / `SHIP NAV GRAPH PASS`
+  - `threat_pathfinder_smoke.gd` / `THREAT PATHFINDER PASS`
+  - `threat_path_follow_smoke.gd` / `THREAT PATH FOLLOW PASS`
+  - `main_playable_threat_pathfinding_smoke.gd` / `MAIN PLAYABLE THREAT PATHFINDING PASS`
+
+## REQ-D-020: Dynamic path blockers (fire, sealed hatches)
+
+- Source: `docs/game/features/combat_threat_ai.md`, ADR-0049
+- Type: gameplay / technical
+- Priority: should
+- Status: Validated
+- Rationale: Path costs must react to live fire intensity and sealed-hatch bulkheads.
+- Acceptance criteria:
+  - Coordinator pushes fire rooms + unbypassed hatch bulkheads into `ThreatManager.update_nav_dynamic_costs`.
+  - Blocked/costed edges affect A* routes.
+- Verification:
+  - Covered by pathfinder unit tests + live `_refresh_threat_nav_costs` wiring.
+
 ## REQ-SS-001: Expanded ship systems and sustenance infrastructure (REQ-SS-001)
 
 - Source: `docs/game/features/ship_systems_sustenance_infrastructure.md`

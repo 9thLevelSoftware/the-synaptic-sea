@@ -4833,6 +4833,9 @@ func _configure_threat_runtime_for_current_ship() -> void:
 	threat_manager.fallback_anchor = anchor
 	if current_ship != null and not current_ship.combat_summary.is_empty():
 		threat_manager.apply_summary(current_ship.combat_summary)
+		# ADR-0049: repath graph after restore (waypoints not persisted).
+		if threat_manager.has_method("configure_nav_graph"):
+			threat_manager.configure_nav_graph(_combat_layout_for_current_ship())
 	else:
 		threat_manager.configure_for_layout(_combat_layout_for_current_ship(), _combat_markers_for_current_ship(), anchor)
 	_refresh_weapon_hotbar()
@@ -4928,9 +4931,29 @@ func _tick_threat_runtime(delta: float) -> void:
 		crouching,                          # crouch reduces emitted noise + visibility in DetectionState
 		"",
 	)
+	_refresh_threat_nav_costs()
 	threat_manager.tick_threats(delta, vitals_state, status_effects_state, _player_armor_profile(), player_pos)
 	_sync_current_ship_combat_summary()
 	_refresh_weapon_hotbar()
+
+## ADR-0049: push fire + sealed-hatch bulkhead costs into the threat nav graph.
+func _refresh_threat_nav_costs() -> void:
+	if threat_manager == null or not threat_manager.has_method("update_nav_dynamic_costs"):
+		return
+	if threat_manager.nav_graph == null or threat_manager.nav_graph.node_count() == 0:
+		if threat_manager.has_method("configure_nav_graph"):
+			threat_manager.configure_nav_graph(_combat_layout_for_current_ship())
+	var fire_rooms: Dictionary = {}
+	var afs = _active_fire_state()
+	if afs != null:
+		for cid in afs.get_burning_compartments():
+			fire_rooms[str(cid)] = afs.get_intensity(str(cid))
+	var bulkheads: Array = []
+	for h in sealed_hatches:
+		if is_instance_valid(h) and not h.bypassed \
+				and not str(h.compartment_a).is_empty() and not str(h.compartment_b).is_empty():
+			bulkheads.append([str(h.compartment_a), str(h.compartment_b)])
+	threat_manager.update_nav_dynamic_costs(fire_rooms, bulkheads)
 
 func _consumable_pipeline_context() -> Dictionary:
 	return {

@@ -4,10 +4,14 @@ class_name ThreatManager
 const ThreatAIStateScript := preload("res://scripts/systems/threat_ai_state.gd")
 const DetectionStateScript := preload("res://scripts/systems/detection_state.gd")
 const DamagePipelineScript := preload("res://scripts/systems/damage_pipeline.gd")
+const ShipNavGraphScript := preload("res://scripts/systems/ship_nav_graph.gd")
+const ThreatPathfinderScript := preload("res://scripts/systems/threat_pathfinder.gd")
 const THREAT_ARCHETYPE_PATH: String = "res://data/combat/threat_archetypes.json"
 const WEAPON_DEFINITIONS_PATH: String = "res://data/combat/weapon_definitions.json"
 const AMMO_DEFINITIONS_PATH: String = "res://data/combat/ammo_definitions.json"
 const SIGHT_RANGE: float = 12.0
+const REPATH_INTERVAL: float = 0.35
+const REPATH_TARGET_MOVE: float = 1.25
 
 signal threat_killed(record: Dictionary)
 
@@ -30,6 +34,10 @@ var last_attack_result: Dictionary = {}
 var placeholder_nodes: Dictionary = {}
 var _rewarded_kills: Dictionary = {}  # instance_id -> true (reward/remove once)
 var _last_attack_weapon_id: String = ""  # Stream F: melee intimidate on kill
+## ADR-0049: pure nav graph for pathfollowing (null = legacy hold still).
+var nav_graph = null
+## instance_id -> {waypoints, index, target, repath_cooldown}
+var _path_runtime: Dictionary = {}
 
 func _ready() -> void:
 	threat_archetypes = _load_json_dict(THREAT_ARCHETYPE_PATH)
@@ -43,7 +51,29 @@ func configure_for_layout(layout: Dictionary, markers: Array = [], anchor: Vecto
 	encounter_markers = markers.duplicate(true)
 	if encounter_markers.is_empty():
 		encounter_markers = _fallback_markers_from_layout(layout)
+	configure_nav_graph(layout)
 	_spawn_from_markers(encounter_markers, fallback_anchor)
+
+## ADR-0049: (re)build the pure nav graph for the active ship layout.
+func configure_nav_graph(layout: Dictionary) -> int:
+	nav_graph = ShipNavGraphScript.new()
+	var n: int = nav_graph.build_from_layout(layout if layout is Dictionary else {})
+	_path_runtime.clear()
+	return n
+
+## Optional dynamic costs each frame / on dirty events.
+## fire_rooms: room_id -> intensity; blocked_bulkheads: Array of [a,b] pairs.
+func update_nav_dynamic_costs(fire_rooms: Dictionary = {}, blocked_bulkheads: Array = []) -> void:
+	if nav_graph == null:
+		return
+	nav_graph.reset_dynamic_costs()
+	if not fire_rooms.is_empty():
+		nav_graph.apply_fire_costs(fire_rooms)
+	for pair in blocked_bulkheads:
+		if pair is Array and (pair as Array).size() >= 2:
+			nav_graph.block_bulkhead(str(pair[0]), str(pair[1]))
+		elif pair is Dictionary:
+			nav_graph.block_bulkhead(str(pair.get("a", "")), str(pair.get("b", "")))
 
 func inject_validation_encounter(archetype_ids: Array, anchor: Vector3 = Vector3.ZERO) -> void:
 	var markers: Array = []
@@ -88,6 +118,7 @@ func tick_threats(delta: float, vitals_state = null, status_effects_state = null
 			"room_id": player_room_id,
 			"same_room": same_room,
 			"detect_threshold": detection_state.detect_threshold,
+			"player_position": player_position,
 		})
 		awareness_indicator = maxf(awareness_indicator, float(threat.awareness_score))
 		if same_room and threat.can_attack() and vitals_state != null:
@@ -100,6 +131,7 @@ func tick_threats(delta: float, vitals_state = null, status_effects_state = null
 			})
 			threat.consume_attack()
 			combat_engaged = true
+		_advance_threat_motion(threat, delta, player_position)
 		_update_placeholder(threat, player_position)
 	_sweep_dead_threats()
 
@@ -331,18 +363,91 @@ func _proximity_factor(threat, player_position: Vector3) -> float:
 	var tp: Vector3 = Vector3(float(threat.world_position[0]), float(threat.world_position[1]), float(threat.world_position[2]))
 	return clampf(1.0 - tp.distance_to(player_position) / SIGHT_RANGE, 0.0, 1.0)
 
-func _update_placeholder(threat, player_position: Vector3) -> void:
+## ADR-0049: pathfollow toward a state-specific target (no wall-tunneling lerp).
+func _advance_threat_motion(threat, delta: float, player_position: Vector3) -> void:
+	if threat == null or delta <= 0.0:
+		return
+	if threat.state in [ThreatAIStateScript.STATE_IDLE, ThreatAIStateScript.STATE_STUN, ThreatAIStateScript.STATE_DEAD]:
+		_path_runtime.erase(threat.instance_id)
+		return
+	var speed: float = threat.effective_move_speed() if threat.has_method("effective_move_speed") else 2.5
+	if speed <= 0.0:
+		return
+	var current := Vector3(float(threat.world_position[0]), float(threat.world_position[1]), float(threat.world_position[2]))
+	var target: Vector3 = _motion_target_for(threat, player_position)
+	if target == Vector3.INF:
+		return
+	# Attack range: stop advancing once close enough to strike.
+	if threat.state == ThreatAIStateScript.STATE_ATTACK:
+		var ar: float = float(threat.attack_range) if "attack_range" in threat else 1.4
+		if current.distance_to(player_position) <= ar:
+			return
+	if nav_graph == null or nav_graph.node_count() == 0:
+		# Fallback: slow direct step (still no lerp-through-fraction) — only when
+		# no graph (e.g. empty layout). Prefer staying put over tunneling far.
+		var step: Vector3 = current.move_toward(target, speed * delta)
+		threat.world_position = [step.x, step.y, step.z]
+		return
+	var rt: Dictionary = _path_runtime.get(threat.instance_id, {}) as Dictionary
+	if rt.is_empty():
+		rt = {"waypoints": [], "index": 0, "target": Vector3.INF, "repath_cooldown": 0.0}
+	rt["repath_cooldown"] = maxf(0.0, float(rt.get("repath_cooldown", 0.0)) - delta)
+	var need_repath: bool = false
+	var waypoints: Array = rt.get("waypoints", []) as Array
+	var prev_target: Vector3 = rt.get("target", Vector3.INF) as Vector3
+	if waypoints.is_empty() or int(rt.get("index", 0)) >= waypoints.size():
+		need_repath = true
+	elif prev_target != Vector3.INF and prev_target.distance_to(target) > REPATH_TARGET_MOVE:
+		need_repath = true
+	elif float(rt.get("repath_cooldown", 0.0)) <= 0.0:
+		need_repath = true
+	if need_repath:
+		var path: Array = []
+		if threat.state == ThreatAIStateScript.STATE_FLEE:
+			var flee_goal: Vector3 = ThreatPathfinderScript.farthest_point(nav_graph, current, player_position)
+			path = ThreatPathfinderScript.find_path(nav_graph, current, flee_goal)
+		else:
+			path = ThreatPathfinderScript.find_path(nav_graph, current, target)
+		rt["waypoints"] = path
+		rt["index"] = 0
+		rt["target"] = target
+		rt["repath_cooldown"] = REPATH_INTERVAL
+		waypoints = path
+	var step_result: Dictionary = ThreatPathfinderScript.step_along_path(
+		waypoints, int(rt.get("index", 0)), current, speed, delta
+	)
+	var new_pos: Vector3 = step_result.get("position", current) as Vector3
+	rt["index"] = int(step_result.get("path_index", 0))
+	_path_runtime[threat.instance_id] = rt
+	threat.world_position = [new_pos.x, new_pos.y, new_pos.z]
+	# Best-effort room_id from nearest graph node.
+	var nid: String = nav_graph.nearest_node(new_pos)
+	if not nid.is_empty():
+		var rid: String = nav_graph.get_node_room(nid)
+		if not rid.is_empty():
+			threat.room_id = rid
+
+func _motion_target_for(threat, player_position: Vector3) -> Vector3:
+	match threat.state:
+		ThreatAIStateScript.STATE_HUNT, ThreatAIStateScript.STATE_ATTACK:
+			return player_position
+		ThreatAIStateScript.STATE_INVESTIGATE:
+			if threat.has_method("last_known_world_position"):
+				var lkp: Vector3 = threat.last_known_world_position()
+				if lkp != Vector3.INF:
+					return lkp
+			return player_position
+		ThreatAIStateScript.STATE_FLEE:
+			return player_position  # used as avoid point; pathfinder picks farthest
+		_:
+			return Vector3.INF
+
+func _update_placeholder(threat, _player_position: Vector3) -> void:
 	var node = placeholder_nodes.get(threat.instance_id, null)
 	if node == null or not is_instance_valid(node):
 		return
 	var y_bob: float = 0.2 if threat.state == ThreatAIStateScript.STATE_ATTACK else 0.0
 	node.position = Vector3(float(threat.world_position[0]), float(threat.world_position[1]) + y_bob, float(threat.world_position[2]))
-	if threat.state == ThreatAIStateScript.STATE_HUNT or threat.state == ThreatAIStateScript.STATE_ATTACK:
-		threat.world_position = [
-			lerpf(float(threat.world_position[0]), player_position.x, 0.02),
-			float(threat.world_position[1]),
-			lerpf(float(threat.world_position[2]), player_position.z, 0.02),
-		]
 
 func _clear_runtime_nodes() -> void:
 	for child in get_children():
@@ -351,6 +456,7 @@ func _clear_runtime_nodes() -> void:
 	placeholder_nodes.clear()
 	_rewarded_kills.clear()
 	threats.clear()
+	_path_runtime.clear()
 	combat_engaged = false
 	awareness_indicator = 0.0
 

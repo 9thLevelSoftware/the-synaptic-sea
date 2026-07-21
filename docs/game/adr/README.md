@@ -31,6 +31,7 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0044 | docs/game/adr/0044-audio-bus-layout-registration-and-caption-settings-unification.md | AudioBusLayout registration, Master-name translation, stream catalog + placeholder clips, SettingsState caption unification; closes Domain 9 audio_reactive loop |
 | 0045 | docs/game/adr/0045-tooltip-triggers-minimap-retirement-web-charts.md | Proximity + inventory tooltip triggers; MapFogState/MinimapPanel deleted outright; item-gated WebChartState/ChartPanel; closes Domain 10 tooltip + map_reveal loops |
 | 0048 | docs/game/adr/0048-mermaid-architecture-diagram-source-and-svg-exports.md | Mermaid-first as-built architecture source, evidence schema, locked rendering, and SVG freshness policy |
+| 0049 | docs/game/adr/0049-threat-pathfinding.md | Pure ShipNavGraph + A* threat pathfollowing; replaces lerp motion; navmesh remains tooling |
 
 ## Notes
 
