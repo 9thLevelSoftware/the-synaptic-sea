@@ -523,6 +523,23 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - `main_playable_slice_crafting_smoke.gd`
   - `MAIN PLAYABLE CRAFTING PASS`
 
+## REQ-CS-017: Salvage station target picker (REQ-CS-017)
+
+- Source: `docs/game/features/crafting_recipe_picker.md` (salvage extension)
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: After REQ-CS-016, salvage still auto-selected the first deconstructable/junk item; players need to choose what to break down.
+- Acceptance criteria:
+  - Salvage station interact opens a target list (deconstruction recipes + catalog junk in inventory).
+  - Player can select and execute a non-first ready target; only that item is consumed.
+  - Headless smokes prove pure listing and main-scene chosen salvage.
+  - Station craft reachability smoke still PASSes (first-ready validation seam).
+- Verification:
+  - `salvage_list_smoke.gd` — `SALVAGE LIST PASS`
+  - `main_playable_slice_salvage_picker_smoke.gd` — `MAIN PLAYABLE SALVAGE PICKER PASS`
+  - `main_playable_slice_station_craft_smoke.gd` — existing reachability still green
+
 ## REQ-CS-016: Crafting station recipe picker (REQ-CS-016)
 
 - Source: `docs/game/features/crafting_recipe_picker.md`

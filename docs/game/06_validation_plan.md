@@ -191,6 +191,8 @@ run_clean 'ADR-0038 station craft reachability smoke' 'MAIN PLAYABLE STATION CRA
 run_clean 'REQ-CS-016 crafting recipe list smoke' 'CRAFTING RECIPE LIST PASS ready=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/crafting_recipe_list_smoke.gd
 run_clean 'REQ-CS-016 recipe picker panel smoke' 'RECIPE PICKER PANEL PASS rows=3 move=true confirm=true closed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recipe_picker_panel_smoke.gd
 run_clean 'REQ-CS-016 main playable recipe picker smoke' 'MAIN PLAYABLE RECIPE PICKER PASS station=fabricator' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_recipe_picker_smoke.gd
+run_clean 'REQ-CS-017 salvage list smoke' 'SALVAGE LIST PASS ready=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/salvage_list_smoke.gd
+run_clean 'REQ-CS-017 main playable salvage picker smoke' 'MAIN PLAYABLE SALVAGE PICKER PASS target=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_salvage_picker_smoke.gd
 run_clean 'Bucket 3 meta-screen reachability smoke' 'MAIN PLAYABLE META SCREENS PASS screens=10 reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_meta_screens_smoke.gd
 run_clean 'AutosavePolicy reachability smoke' 'MAIN PLAYABLE META AUTOSAVE PASS slot_rotated=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_meta_autosave_smoke.gd
 run_clean 'KitCatalog lifeboat biome-skin reachability smoke' 'MAIN PLAYABLE LIFEBOAT BIOME SKIN PASS biomes=3 live_match=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_lifeboat_biome_skin_smoke.gd
@@ -715,6 +717,7 @@ membership changes).
 | `main_playable_slice_combat_encounter_smoke` | promotion-candidate |
 | `main_playable_slice_crafting_smoke` | promotion-candidate |
 | `main_playable_slice_recipe_picker_smoke` | promotion-candidate |
+| `main_playable_slice_salvage_picker_smoke` | promotion-candidate |
 | `main_playable_slice_inventory_ui_smoke` | promotion-candidate |
 | `main_playable_slice_loot_ecosystem_smoke` | promotion-candidate |
 | `main_playable_slice_multislot_save_smoke` | promotion-candidate |
@@ -750,6 +753,7 @@ membership changes).
 | `repair_consume_smoke` | promotion-candidate |
 | `repair_loop_smoke` | promotion-candidate |
 | `rigid_pair_travel_smoke` | promotion-candidate |
+| `salvage_list_smoke` | promotion-candidate |
 | `scanner_panel_smoke` | promotion-candidate |
 | `scanner_state_smoke` | promotion-candidate |
 | `ship_access_smoke` | promotion-candidate |

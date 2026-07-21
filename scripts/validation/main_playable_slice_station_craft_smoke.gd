@@ -105,15 +105,16 @@ func _validate(playable) -> void:
 	var crafted: bool = true
 
 	# --- 2) Salvage / deconstruct through the real interaction path ------------------------
-	# Compute the expected output the same way the salvage station selects it (first
-	# deconstructable recipe in catalog order) so the assertion is order-independent.
+	# REQ-CS-017: first-ready is list_salvage_entries order (recipe_id sort), not raw
+	# catalog iteration — match the validation seam so the assertion is order-stable.
 	var salvage_item: String = ""
-	for recipe in playable.deconstruction_resolver.get_deconstruction_recipes():
-		var drid: String = str(recipe.get("recipe_id", ""))
-		if drid.is_empty():
-			continue
-		if playable.deconstruction_resolver.can_deconstruct(drid, inv):
-			var dproduces: Variant = recipe.get("produces", {})
+	var first_salvage: String = playable.deconstruction_resolver.first_ready_salvage_id(inv)
+	if first_salvage.is_empty():
+		_fail("no ready salvage target seeded")
+		return
+	for entry in playable.deconstruction_resolver.list_salvage_entries(inv):
+		if str((entry as Dictionary).get("recipe_id", "")) == first_salvage:
+			var dproduces: Variant = (entry as Dictionary).get("produces", {})
 			if dproduces is Dictionary:
 				salvage_item = str((dproduces as Dictionary).get("item_id", ""))
 			break
