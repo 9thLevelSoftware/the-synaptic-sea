@@ -8,7 +8,8 @@ class_name CraftingStation
 ##    craft to completion and deposits the output — this node does NOT channel in _process,
 ##    unlike RepairPoint, because CraftingState is single-active and ticked globally).
 ##  - a "salvage" station runs DeconstructionResolver on the first inventory item that has
-##    a deconstruction recipe (instantaneous; no timed channel).
+##    a deconstruction recipe (instantaneous; no timed channel). When no recipe matches,
+##    falls back to JunkYieldResolver via DeconstructionResolver.salvage_junk (Stream E).
 ## Never advances crafting itself; it only starts work and reports it. Mirrors the
 ## interaction/range contract of repair_point.gd / loot_container.gd.
 
@@ -22,6 +23,9 @@ var material_state                       # MaterialState
 var inventory_state                      # InventoryState
 var deconstruction_resolver              # DeconstructionResolver
 var player_progression                   # PlayerProgressionState | null
+## Optional coordinator ref for medbay surgery (Stream F). When set and
+## station_kind == "medbay", try_interact prefers try_medbay_surgery first.
+var surgery_provider = null
 var interaction_radius: float = 1.8
 var powered: bool = true                 # mirrors the model station; gates feedback only
 
@@ -92,6 +96,11 @@ func try_interact(player_body: Node) -> bool:
 		return false
 	if station_kind == "salvage":
 		return _try_salvage()
+	# Stream F: medbay field surgery when the patient is critical (before crafts).
+	if station_kind == "medbay" and surgery_provider != null \
+			and surgery_provider.has_method("try_medbay_surgery"):
+		if surgery_provider.try_medbay_surgery(player_body):
+			return true
 	return _try_craft()
 
 func _try_craft() -> bool:
@@ -143,6 +152,14 @@ func _try_salvage() -> bool:
 			if not out_id.is_empty() and out_qty > 0:
 				inventory_state.add_item(out_id, out_qty)
 			emit_signal("salvage_completed", out_id, produced)
+			return true
+	# Stream E residual MVP: raw junk catalog salvage when no deconstruction recipe matches.
+	if deconstruction_resolver.has_method("salvage_junk"):
+		var junk_produced: Dictionary = deconstruction_resolver.salvage_junk(inventory_state, material_state)
+		if not junk_produced.is_empty():
+			# Materials already deposited by salvage_junk; signal mirrors recipe salvage.
+			var junk_out: String = str(junk_produced.get("item_id", ""))
+			emit_signal("salvage_completed", junk_out, junk_produced)
 			return true
 	emit_signal("craft_blocked", station_kind, "nothing_to_salvage")
 	return false

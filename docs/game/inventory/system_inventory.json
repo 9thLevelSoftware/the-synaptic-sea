@@ -159,7 +159,7 @@
       "content_note": "data/combat/status_effect_definitions.json + status_effect_icons.json exist, but the get_modifier() multiplier table is HARDCODED in status_effects_state.gd, so the JSON is largely unused by the live modifier path. Sources stimulant_state.gd/addiction_state.gd are not catalogued as their own survival systems (arguably consumables/drug domain).",
       "functional": null,
       "gaps": [
-        "status_effects_state.tick runs on both _process branches via _tick_survival_attrition, so status durations decay on a derelict (Domain 1). Its stimulant/addiction SOURCES remain home-only pending Domain 5."
+        "status_effects_state.tick runs on both _process branches via _tick_survival_attrition. Stimulant/addiction sources also tick on both branches (Domain 5 / consumables_away_tick_smoke)."
       ],
       "subsystems": []
     },
@@ -1087,7 +1087,7 @@
       "content_note": "VERIFIED. Tuning in subsystem_tuning.json fire_suppression section. Confirmed ticked on BOTH branches (home 1367, away 4782) and _apply_fire_system_damage runs on both (1370/4784).",
       "functional": null,
       "gaps": [
-        "ticked on BOTH branches (home 1367, away 4782) - correctly wired; deferred follow-ups: deliberate-vent control, fire-consumes-oxygen, door-gated spread"
+        "CLOSED Stream F (2026-07-21): deliberate vent + fire-consumes-oxygen + door-gated spread (sealed hatches). Both-branch tick retained."
       ],
       "subsystems": []
     },
@@ -1360,7 +1360,8 @@
       "content_note": "VERIFIED. Deconstruction recipes live in recipe_definitions.json (category=='deconstruction'). Live salvage path confirmed at crafting_station.gd:_try_salvage (129-148).",
       "functional": null,
       "gaps": [
-        "no dedicated unit smoke; exercised live by main_playable_slice_station_craft_smoke (deconstruct path)"
+        "no dedicated unit smoke; exercised live by main_playable_slice_station_craft_smoke (deconstruct path)",
+        "Stream E: salvage_junk() drives JunkYieldResolver for raw junk items."
       ],
       "subsystems": []
     },
@@ -1413,9 +1414,9 @@
       "kind": "tooling",
       "model_exists": true,
       "smoke": "scripts/validation/junk_items_smoke.gd",
-      "reachable": false,
-      "driven": false,
-      "driven_at": null,
+      "reachable": true,
+      "driven": true,
+      "driven_at": "deconstruction_resolver.gd:salvage_junk",
       "input": {
         "live": false,
         "desc": "static helper resolving junk item -> material yields",
@@ -1433,7 +1434,7 @@
       "content_note": "VERIFIED. data/items/junk_items.json supplies yield tables; resolver is static tooling. Grep over scripts/ confirms only the two validation smokes reference it - no live consumer.",
       "functional": true,
       "gaps": [
-        "no live consumer in playable_generated_ship or loot distribution - only referenced from validation smokes"
+        "CLOSED Stream E (2026-07-21): salvage station falls through to DeconstructionResolver.salvage_junk -> JunkYieldResolver when no deconstruction recipe matches (unlock_trigger_stream_e_smoke junk_salvage=true)."
       ],
       "subsystems": []
     },
@@ -2206,7 +2207,7 @@
       "content_note": "addiction_tuning.json has 3 entries (focus_ampoule/combat_stim/calm_patch) with withdrawal_threshold/duration/effects matching the 3 stimulants. Verified coherent.",
       "functional": null,
       "gaps": [
-        "CONFIRMED: tick() is called only in the home _process branch (playable_generated_ship.gd:5628), after the away early-return at :4808 — tolerance/dependence decay and withdrawal-window countdown freeze on derelict runs."
+        "CLOSED (Domain 5): addiction_state.tick on BOTH _process branches (away 5796 + home 5827); consumables_away_tick_smoke asserts tolerance decay while boarded."
       ],
       "subsystems": []
     },
@@ -2638,7 +2639,7 @@
       "content_note": "REQ-PM-009/ADR-0033. Catalog of 23 entries (codex/hub_scene/class) authored in data/player/unlock_tables.json; persists to user://unlock_registry.json independently of meta_progression.json. unlock_for_trigger resolves exact + 'event|*' wildcard (unlock_registry.gd:135). Domain 6 added the in-game reader (menu_coordinator.get_registry_unlock_lines, folded into the codex screen) and the class-selection bridge (meta_progression_state.unlock_class) -- the registry is no longer write-only.",
       "functional": null,
       "gaps": [
-        "The 23 catalog triggers (repair_subcomponent, diagnose_fault, scan_derelict, etc.) depend on events emitted into training_event_bus; full coverage of those emitters beyond repair_full_system/fabricate_part was not re-traced in this pass."
+        "Streams D+E+F (2026-07-21): all catalog unlock trigger_events have production emissions. defeat_enemy remains intentional unused (threat_killed path)."
       ],
       "subsystems": []
     },
@@ -4616,7 +4617,7 @@
       "content_note": "Pure RefCounted presenter (scripts/ui/save_load_menu.gd). refresh()/list_slots (render) and select_slot_for_load/confirm_save_to_slot/confirm_delete (dispatch) are all wired to the live menu path via menu_coordinator's save_load interactive arm (Task 7/8).",
       "functional": null,
       "gaps": [
-        "confirm_quicksave is unwired, matching AutosavePolicy.try_quicksave having no live caller -- intentional per ADR-0043 (Save & Exit uses request_save directly)."
+        "CLOSED Stream C: F6 request_quicksave live via AutosavePolicy.try_quicksave; confirm_quicksave UI path still unused (ADR-0043 Save & Exit uses request_save)."
       ],
       "subsystems": []
     },
@@ -7085,7 +7086,8 @@
       "content_note": "ADR-0005 non-timer resource-drain hazard (Gate 1 hub breach loop). Tuning is hardcoded DEFAULT_* constants (max=100, drain=6, regen=3.5, recovery=30, safe=35) in oxygen_state.gd:23-28 / configured at 4922; no data/ file backs it. This is the HUB breach hazard, NOT an away-from-start suit model (despite the inventory name 'Personal Oxygen'). RE-VERIFIED: constructed 1140 (re-instantiated if null at 4917), configured 4922 with all DEFAULT_* constants, ticked 5044 via _refresh_oxygen_state called at 4818 (home branch). All cited lines confirmed.",
       "functional": null,
       "gaps": [
-        "CLOSED (2026-07-21 Stream B): oxygen ticks on BOTH branches. Away uses field_atmosphere=true so suit pressure drains on derelicts (life-support atmosphere bite remains hub-only by design). Proven by main_playable_survival_away_smoke o2_drain=true + oxygen_state_smoke field_atmosphere cases."
+        "CLOSED (2026-07-21 Stream B): oxygen ticks on BOTH branches. Away uses field_atmosphere=true so suit pressure drains on derelicts (life-support atmosphere bite remains hub-only by design). Proven by main_playable_survival_away_smoke o2_drain=true + oxygen_state_smoke field_atmosphere cases.",
+        "Stream F: fire_oxygen_drain context key drains O2 from active fire intensity."
       ],
       "subsystems": []
     },

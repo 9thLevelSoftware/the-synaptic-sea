@@ -380,7 +380,10 @@ run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONT
 run_clean 'Tranche 6 demo scope gate model smoke' 'DEMO SCOPE GATE PASS build_kind=release blocked=5 allowed=0 unknown_rejected=true params=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_gate_smoke.gd
 run_clean 'Tranche 6 demo scope enforcement smoke' 'DEMO SCOPE ENFORCEMENT PASS dev_unaffected=true save_cap=true world_skip=true hub_blocked=true hazards_capped=true cargo_capped=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_enforcement_smoke.gd
 run_clean 'Tranche 6 unlock trigger production smoke' 'UNLOCK TRIGGER PRODUCTION PASS triggers_valid=true scavenge_emitted=true codex_unlocked=true class_unlocked=true bridge_unlocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_production_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=212 clean_output=true'
+run_clean 'Stream D unlock trigger live actions smoke' 'UNLOCK TRIGGER STREAM D PASS scan=true first_aid=true cook=true fabricate=true repair=true weld=true travel=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_stream_d_smoke.gd
+run_clean 'Stream E unlock + junk salvage smoke' 'UNLOCK TRIGGER STREAM E PASS ration=true diagnose=true discover=true extract=true compound=true junk_salvage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_stream_e_smoke.gd
+run_clean 'Stream F unlock + Fire B2 smoke' 'UNLOCK TRIGGER STREAM F PASS surgery=true decode=true shelter=true social=true fire_b2=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unlock_trigger_stream_f_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=215 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

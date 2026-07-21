@@ -215,6 +215,11 @@ func finish_craft() -> Dictionary:
 		"quality_tier": str(_active_craft.get("quality_tier", "standard")),
 		"quality_multiplier": float(_active_craft.get("quality_multiplier", 1.0)),
 		"quality_score": float(_active_craft.get("quality_score", 0.5)),
+		# Stream D: station_kind/recipe_id survive finish so the coordinator can
+		# route training emissions (cook_meal vs fabricate_part) without racing
+		# _active_craft.clear().
+		"station_kind": station_kind,
+		"recipe_id": recipe_id,
 	}
 	var next_recipe: String = station.finish_and_advance()
 	if next_recipe.is_empty():

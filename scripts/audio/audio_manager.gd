@@ -33,6 +33,9 @@ const AudioLogScript := preload("res://scripts/audio/audio_log.gd")
 
 const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
 
+## Stream F: voice log successfully scheduled (decode_signal training).
+signal voice_log_played(entry_id: String)
+
 ## Bus -> AudioStreamPlayer node (one per bus, all routed through master).
 var _bus_players: Dictionary = {}
 ## Bus -> AudioStreamPlayer3D pool (spatial emitters, keyed by event id).
@@ -336,6 +339,7 @@ func play_voice_log(entry_id: StringName) -> bool:
 	# assets land they play with no further code change.
 	_play_via_bus(String(AudioEventSeamScript.BUS_VOICE), vol_db, &"", String(entry.get("clip_path", "")))
 	current_voice_log_id = String(entry_id)
+	voice_log_played.emit(String(entry_id))
 	return true
 
 ## Trigger an immediate meta-event (in addition to the scheduled ones).

@@ -309,6 +309,17 @@ const RoomVariantSelectorHazardScript := preload("res://scripts/procgen/room_var
 const OXYGEN_MIN_FOR_FIRE: float = 5.0
 const FIRE_HEALTH_DRAIN_PER_SECOND: float = 2.0
 const FIRE_SYSTEM_DAMAGE_PER_SECOND: float = 0.05
+## Fire B2: oxygen consumed per unit of total fire intensity per second.
+const FIRE_OXYGEN_DRAIN_PER_INTENSITY: float = 1.5
+## Stream F: medbay surgery heals when health is below this threshold.
+const SURGERY_HEALTH_THRESHOLD: float = 75.0
+const SURGERY_HEAL_AMOUNT: float = 40.0
+## Fire B2: sealed hatches map onto these bulkhead pairs (round-robin per hatch).
+const HATCH_BULKHEAD_LINKS: Array = [
+	["bridge", "engineering"],
+	["engineering", "cargo"],
+	["engineering", "hydroponics"],
+]
 # Derelict-side fire: only ~1 in 7 boarded derelicts present any fire (deterministic per
 # seed). Fire is one of several possible derelict conditions, not a default.
 const FIRE_PRESENCE_PERCENT: int = 15
@@ -338,6 +349,8 @@ var _home_player_position: Vector3 = Vector3.ZERO
 # Narrative objective flags with no manager backing (supplies/logs). Set on
 # completion; persisted in the snapshot; read by _manager_compat_summary().
 var completed_objective_types: Dictionary = {}
+# Stream E: rooms first touched via objective completion (discover_room training).
+var discovered_room_ids: Dictionary = {}
 var route_control_state: RouteControlState
 var route_control_root: Node3D
 var route_gate_nodes: Array = []
@@ -1276,6 +1289,9 @@ func _build_runtime_nodes() -> void:
 	# uses.
 	audio_manager = AudioManagerScript.new()
 	audio_manager.name = "AudioManager"
+	if audio_manager.has_signal("voice_log_played") \
+			and not audio_manager.voice_log_played.is_connected(_on_voice_log_played):
+		audio_manager.voice_log_played.connect(_on_voice_log_played)
 	add_child(audio_manager)
 	audio_root = Node3D.new()
 	audio_root.name = "AudioRoot"
@@ -1694,6 +1710,10 @@ func end_run(reason: String = "extraction") -> int:
 			save_load_service.delete_current_run()
 			for slot_id in SaveSlotStateScript.AUTOSAVE_SLOT_IDS:
 				save_load_service.delete_slot(slot_id)
+	# Stream F: a completed run transmits the mission log (transmit_relay).
+	# Death freezes; extraction/completion still transmit.
+	if reason != "death":
+		emit_training_event("transmit_relay", reason)
 	# Session 3 (audit): the title screen consumes this summary — carry the
 	# end_run reason so "Last run: death" vs "Last run: extraction" renders.
 	var completion_summary: Dictionary = get_slice_completion_summary()
@@ -2588,6 +2608,9 @@ func _on_bay_dock_requested(carrier_id: String, slot_index: int) -> void:
 		carrier.docked_ships.append(candidate)
 	_place_in_slot(carrier, candidate, idx)
 	recompute_occupancy()
+	# Stream F: docking a co-present ship into a hangar bay is a peaceful
+	# logistics/truce action (negotiate_truce training).
+	emit_training_event("negotiate_truce", carrier_id)
 
 ## Launches a bayed ship of `carrier_id` back out to a co-present anchor near the
 ## carrier. slot_index -1 = first occupied. Silent refusal when nothing is bayed.
@@ -2802,7 +2825,9 @@ func _build_sealed_hatches() -> void:
 		var hid: String = "%s:hatch_%d" % [String(current_ship.marker_id), i]
 		var lock_kind: String = SealedHatchScript.MECHANICAL if (i % 2 == 0) else SealedHatchScript.ELECTRONIC
 		var hatch = SealedHatchScript.new()
-		hatch.configure(hid, lock_kind, pos_variant, 1.8)
+		# Fire B2: assign a bulkhead pair so door-gated spread is per-hatch, not global.
+		var link: Array = HATCH_BULKHEAD_LINKS[i % HATCH_BULKHEAD_LINKS.size()]
+		hatch.configure(hid, lock_kind, pos_variant, 1.8, str(link[0]), str(link[1]))
 		if bypassed.has(hid):
 			hatch.set_bypassed(true)
 		if not hatch.hatch_bypassed.is_connected(_on_hatch_bypassed):
@@ -2854,6 +2879,8 @@ func _build_repair_points() -> void:
 				rp.repair_completed.connect(_on_repair_completed)
 			if not rp.repair_blocked.is_connected(_on_repair_blocked):
 				rp.repair_blocked.connect(_on_repair_blocked)
+			if rp.has_signal("repair_started") and not rp.repair_started.is_connected(_on_repair_started):
+				rp.repair_started.connect(_on_repair_started)
 			# Phase 5a Task 5 (co-presence): derelict repair points parent under the
 			# derelict's scene_root so they inherit DERELICT_DOCK_OFFSET and are freed
 			# automatically with the derelict on departure.
@@ -2944,6 +2971,9 @@ func _on_breach_sealed(compartment_id: String) -> void:
 	_set_hazard_feedback_line("Breach sealed: %s" % compartment_id)
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
+	# Stream D/F: sealing a breach is welding + field construction.
+	emit_training_event("weld_panel", compartment_id)
+	emit_training_event("build_shelter", compartment_id)
 
 ## Tranche 1 (audit): shared surface for hazard-interaction feedback. Reuses
 ## the _last_loot_feedback_line channel (the one line _combined_system_status_lines
@@ -3131,11 +3161,22 @@ func _build_fire_context() -> Dictionary:
 		# nondeterministically based on travel timing). Stays false when away.
 		if electrical_arc_state != null:
 			arc_arcing = electrical_arc_state.phase == ElectricalArcState.Phase.ARCING
+	# Fire B2: each unbypassed sealed hatch closes only its own bulkhead link.
+	var closed: Array = []
+	for h in sealed_hatches:
+		if not is_instance_valid(h) or h.bypassed:
+			continue
+		var a: String = str(h.compartment_a)
+		var b: String = str(h.compartment_b)
+		if a.is_empty() or b.is_empty() or a == b:
+			continue
+		closed.append(a + "|" + b if a < b else b + "|" + a)
 	return {
 		"powered_ratio": powered,
 		"ship_oxygen_present": oxygen_present,
 		"breached_compartments": breached,
 		"damaged_compartments": damaged,
+		"closed_links": closed,
 		"arc_arcing": arc_arcing,
 	}
 
@@ -3381,6 +3422,8 @@ func _build_fire_suppression_points() -> void:
 		# was never connected — a blocked extinguish gave zero player feedback.
 		if not fp.extinguish_blocked.is_connected(_on_extinguish_blocked):
 			fp.extinguish_blocked.connect(_on_extinguish_blocked)
+		if fp.has_signal("compartment_vented") and not fp.compartment_vented.is_connected(_on_compartment_vented):
+			fp.compartment_vented.connect(_on_compartment_vented)
 		_attach_zone_to_active_ship(fp)
 		fire_suppression_points.append(fp)
 
@@ -3397,6 +3440,16 @@ func _on_fire_extinguished(_compartment_id: String) -> void:
 	# _refresh_fire_zones() already rebuilds suppression points when the burning
 	# set changes (Task 9), so no second explicit _build_fire_suppression_points().
 	_refresh_fire_zones()
+
+## Fire B2: deliberate vent extinguished the fire via vacuum. Surface feedback
+## and apply decompression teeth (force-open the matching hull compartment).
+func _on_compartment_vented(compartment_id: String) -> void:
+	_set_hazard_feedback_line("Emergency vent: %s (decompression risk)" % compartment_id)
+	var hull = _active_hull()
+	if hull != null and hull.compartments.has(compartment_id):
+		hull.damage_compartment(compartment_id, 0.0, true)
+	_refresh_fire_zones()
+	_refresh_oxygen_state(false, 0.0)
 
 func _build_extinguisher_recharge_port() -> void:
 	_clear_extinguisher_recharge_port()
@@ -3495,6 +3548,7 @@ func _build_crafting_stations() -> void:
 		var st = CraftingStationScript.new()
 		st.configure(kind, crafting_state, material_state, inventory_state,
 			deconstruction_resolver, player_progression, pos, 1.8)
+		st.surgery_provider = self  # Stream F medbay surgery
 		if not st.craft_started.is_connected(_on_craft_started):
 			st.craft_started.connect(_on_craft_started)
 		if not st.salvage_completed.is_connected(_on_salvage_completed):
@@ -3639,6 +3693,33 @@ func _distributed_room_positions() -> Array:
 				out.append(spec["position"])
 	return out
 
+func _on_repair_started(system_id: String, subcomponent_id: String) -> void:
+	# Stream E: starting a repair channel is the live diagnose_fault action —
+	# the player has identified the broken subcomponent and committed to work.
+	emit_training_event("diagnose_fault", "%s.%s" % [system_id, subcomponent_id])
+
+## Stream F: play a voice log → signal analysis training (decode_signal).
+func _on_voice_log_played(entry_id: String) -> void:
+	emit_training_event("decode_signal", entry_id)
+
+## Stream F: medbay field surgery when health is critical. Called by CraftingStation
+## before crafts. Requires medical_gauze (survival economy); heals + trains surgery.
+func try_medbay_surgery(_player_body: Node) -> bool:
+	if vitals_state == null:
+		return false
+	if float(vitals_state.health) >= SURGERY_HEALTH_THRESHOLD:
+		return false
+	if inventory_state == null or inventory_state.get_quantity("medical_gauze") <= 0:
+		return false
+	if inventory_state.remove_item("medical_gauze", 1) != 1:
+		return false
+	vitals_state.health = minf(100.0, float(vitals_state.health) + SURGERY_HEAL_AMOUNT)
+	emit_training_event("perform_surgery", "medbay")
+	_refresh_player_vitals(0.0)
+	_refresh_inventory_hud()
+	print("MEDBAY SURGERY health=%.1f" % float(vitals_state.health))
+	return true
+
 func _on_repair_completed(system_id: String, subcomponent_id: String) -> void:
 	_refresh_inventory_hud()
 	# Repairs consume parts from the player inventory (RepairPoint is configured
@@ -3651,6 +3732,9 @@ func _on_repair_completed(system_id: String, subcomponent_id: String) -> void:
 	# REQ-RL-003: first_repair achievement (repair_consumed / any) — channel
 	# completion is the live "parts were spent" moment for RepairPoint.
 	_try_unlock_achievement("repair_consumed", "%s.%s" % [system_id, subcomponent_id])
+	# Stream D: each subcomponent channel trains `repair` (repair_subcomponent).
+	# Full-system operational still emits repair_full_system separately (objective path).
+	emit_training_event("repair_subcomponent", "%s.%s" % [system_id, subcomponent_id])
 	var mgr = _active_systems_manager()
 	var operational: bool = mgr != null and mgr.is_operational(system_id)
 	print("REPAIR COMPLETED system=%s sub=%s operational=%s" % [
@@ -3705,6 +3789,33 @@ func _on_craft_completed() -> void:
 	_recompute_player_encumbrance()
 	print("CRAFT COMPLETED item=%s qty=%d quality=%s" % [
 		item_id, qty, str(result.get("quality_tier", "standard"))])
+	# Stream D/E: station crafts train the matching skill.
+	# Field craft already emits fabricate_part in _on_field_craft_completed.
+	# Kitchen always cooks; synthesizer only when the *recipe* is cooking-class
+	# (category cooking) or the output item is food/drink — industrial synthesis
+	# must not farm cook_meal XP (PR #72 review).
+	var station_kind: String = str(result.get("station_kind", ""))
+	var recipe_id: String = str(result.get("recipe_id", ""))
+	if station_kind == "kitchen" or (station_kind == "synthesizer" and _recipe_is_cooking(recipe_id, item_id)):
+		emit_training_event("cook_meal", item_id)
+	elif station_kind in ["fabricator", "workbench"]:
+		emit_training_event("fabricate_part", item_id)
+	elif station_kind == "medbay" and ("stim" in recipe_id or "stim" in item_id):
+		emit_training_event("compound_stimulant", item_id)
+
+## True when a craft completion should train cooking (not industrial synthesis).
+func _recipe_is_cooking(recipe_id: String, item_id: String) -> bool:
+	if crafting_state != null and not recipe_id.is_empty():
+		var recipe: Dictionary = crafting_state.get_recipe(recipe_id)
+		var cat: String = str(recipe.get("category", ""))
+		if cat == "cooking":
+			return true
+		# Nutrient paste etc. may be category "synthesis" but food-class output.
+	if inventory_state != null and not item_id.is_empty():
+		var out_cat: String = inventory_state.get_category(item_id)
+		if out_cat == "food" or out_cat == "drink":
+			return true
+	return false
 
 ## ADR-0038: an emergency field craft finished. Same deposit path as station crafts.
 func _on_field_craft_completed() -> void:
@@ -3735,7 +3846,13 @@ func _on_field_craft_completed() -> void:
 func _on_salvage_completed(item_id: String, yields: Dictionary) -> void:
 	_refresh_inventory_hud()
 	_recompute_player_encumbrance()
-	print("SALVAGE COMPLETED item=%s qty=%d" % [item_id, int(yields.get("quantity", 0))])
+	var source_junk: String = str(yields.get("source_junk", ""))
+	if not source_junk.is_empty():
+		print("SALVAGE COMPLETED junk=%s primary=%s qty=%d multi=%s" % [
+			source_junk, item_id, int(yields.get("quantity", 0)),
+			str(bool(yields.get("multi_yield", false))).to_lower()])
+	else:
+		print("SALVAGE COMPLETED item=%s qty=%d" % [item_id, int(yields.get("quantity", 0))])
 
 func _on_craft_blocked(station_kind: String, reason: String) -> void:
 	print("CRAFT BLOCKED station=%s reason=%s" % [station_kind, reason])
@@ -3965,6 +4082,18 @@ func _on_hatch_bypassed(hatch_id: String, lock_kind: String) -> void:
 	# Track for persistence so a revisited derelict remembers the open hatch.
 	if current_ship != null and not current_ship.bypassed_hatch_ids.has(hatch_id):
 		current_ship.bypassed_hatch_ids.append(hatch_id)
+	# Stream F: forcing a sealed bulkhead is field construction (build_shelter).
+	emit_training_event("build_shelter", hatch_id)
+	# Fire B2: opening this hatch clears only its bulkhead pair (context rebuild
+	# also drops it from closed_links on the next fire tick).
+	for h in sealed_hatches:
+		if not is_instance_valid(h) or str(h.hatch_id) != hatch_id:
+			continue
+		var afs = _active_fire_state()
+		if afs != null and afs.has_method("set_link_closed") \
+				and not str(h.compartment_a).is_empty() and not str(h.compartment_b).is_empty():
+			afs.set_link_closed(str(h.compartment_a), str(h.compartment_b), false)
+		break
 	_refresh_inventory_hud()
 
 ## Domain 5: attempts to bypass the nearest unblocked sealed hatch using the player's
@@ -3991,6 +4120,10 @@ func _try_bypass_nearest_hatch() -> bool:
 func _on_threat_killed(record: Dictionary) -> void:
 	# XP (data-driven interim skill via training_actions.json).
 	emit_training_event("threat_killed", str(record.get("archetype_id", "")))
+	# Stream F: melee/unarmed kills train intimidation (crowbar / empty weapon).
+	var weapon_id: String = str(record.get("weapon_id", record.get("killed_by_weapon", "")))
+	if weapon_id.is_empty() or weapon_id == "crowbar" or weapon_id == "unarmed":
+		emit_training_event("intimidate_threat", str(record.get("archetype_id", "")))
 	# Lootable corpse container.
 	if inventory_state == null:
 		return
@@ -4129,10 +4262,33 @@ func _on_derelict_interactable_completed(interaction_id: String, objective_id: S
 		_postprocess_loot_grants(granted, objective_id)
 		_refresh_inventory_hud()
 		_recompute_player_encumbrance()   # salvage rewards change carry weight -> refresh Heavy Load
+	_emit_objective_training(objective_type, room_id, objective_id)
 	print("DERELICT OBJECTIVE COMPLETE marker=%s sequence=%d type=%s cleared=%s" % [
 		String(current_ship.marker_id), sequence, objective_type, str(controller.is_cleared()).to_lower()])
 	if is_instance_valid(menu_coordinator):
 		menu_coordinator.trigger_tutorial("objective_completed", objective_type)
+
+## Stream E: objective completions that map to authored training events.
+## discover_room is once per (ship, room_id) — room ids reuse across derelicts.
+## download_logs → extract_data.
+func _emit_objective_training(objective_type: String, room_id: String, objective_id: String) -> void:
+	if not room_id.is_empty():
+		var ship_key: String = "home"
+		if current_ship != null:
+			ship_key = str(current_ship.marker_id)
+			if ship_key.is_empty():
+				ship_key = str(current_ship.ship_id)
+			if ship_key.is_empty():
+				ship_key = "home"
+		var disc_key: String = "%s:%s" % [ship_key, room_id]
+		if not discovered_room_ids.has(disc_key):
+			discovered_room_ids[disc_key] = true
+			emit_training_event("discover_room", disc_key)
+	if objective_type == "download_logs":
+		emit_training_event("extract_data", objective_id if not objective_id.is_empty() else "download_logs")
+	# Stream F: restoring ship systems / stabilizing the reactor is leadership.
+	if objective_type == "restore_systems" or objective_type == "stabilize_reactor":
+		emit_training_event("inspire_crew", objective_type)
 
 ## Validation seam: complete a derelict objective by sequence through the real
 ## interaction path (bypassing proximity via set_validation_player_in_range).
@@ -4244,6 +4400,10 @@ func travel_to(marker) -> Dictionary:
 	# the player along. They cross the (closed) dock barrier themselves to board the
 	# host. recompute_occupancy() confirms the player is still aboard the piloted ship.
 	recompute_occupancy()
+	# Stream D: a successful hop trains piloting (plot) + astrogation (complete).
+	# Both events share the same player action; they target different skills.
+	emit_training_event("plot_course", mid)
+	emit_training_event("complete_astrogation", mid)
 	return result
 
 ## Returns the player to the home ship instance: frees the active derelict's
@@ -4832,11 +4992,16 @@ func _use_consumable_item(item_id: String, use_all: bool = false) -> Dictionary:
 		_refresh_oxygen_state(false, 0.0)
 		_refresh_player_vitals(0.0)
 		_refresh_consumable_ui()
+		_emit_consumable_training(item_id)
 	return result
 
 func _use_consumable_hotbar_slot(slot_index: int) -> Dictionary:
 	if consumable_state == null or inventory_state == null:
 		return {"ok": false, "reason": "consumable_pipeline_missing"}
+	var used_id: String = ""
+	if consumable_state.hotbar_slots is Array and slot_index >= 0 \
+			and slot_index < consumable_state.hotbar_slots.size():
+		used_id = str(consumable_state.hotbar_slots[slot_index])
 	var result: Dictionary = consumable_state.use_hotbar_slot(slot_index, inventory_state, _consumable_pipeline_context())
 	if bool(result.get("ok", false)):
 		_ensure_consumable_hotbar_assignments()
@@ -4844,7 +5009,22 @@ func _use_consumable_hotbar_slot(slot_index: int) -> Dictionary:
 		_refresh_oxygen_state(false, 0.0)
 		_refresh_player_vitals(0.0)
 		_refresh_consumable_ui(slot_index)
+		var train_id: String = str(result.get("item_id", used_id))
+		if not train_id.is_empty():
+			_emit_consumable_training(train_id)
 	return result
+
+## Stream D/E: medicine → first_aid_self; food/drink → ration_supplies.
+## Stimulants/utility keep non-unlock effects only (no force-wired XP).
+## Uses InventoryState's cached defs — do not reload ItemDefs every use.
+func _emit_consumable_training(item_id: String) -> void:
+	if item_id.is_empty() or inventory_state == null:
+		return
+	var cat: String = inventory_state.get_category(item_id)
+	if cat == "medicine":
+		emit_training_event("first_aid_self", item_id)
+	elif cat == "food" or cat == "drink":
+		emit_training_event("ration_supplies", item_id)
 
 func _refresh_ui_shell_runtime() -> void:
 	if not is_instance_valid(menu_coordinator):
@@ -5428,6 +5608,7 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 			int(route_summary.get("active_blocker_count", 0)),
 		])
 	tracker.mark_completed(sequence)
+	_emit_objective_training(objective_type, room_id, objective_id)
 	print("PLAYABLE INTERACTION interaction=%s objective=%s sequence=%d type=%s room=%s" % [interaction_id, objective_id, sequence, objective_type, room_id])
 	emit_signal("playable_interaction_completed", interaction_id, objective_id, sequence, objective_type, room_id)
 	# A "sequence" is one logical objective; multi-step objectives contribute
@@ -6100,15 +6281,22 @@ func _refresh_oxygen_state(force_initial: bool, delta_seconds: float) -> void:
 	# uses continuous suit-pressure drain (field_atmosphere). The piloted
 	# lifeboat is a safe vessel — no field drain while occupancy is the
 	# lifeboat (Codex P2 on PR #71).
+	# Fire B2: active fires consume suit/ambient oxygen proportional to intensity.
+	var fire_o2: float = 0.0
+	var afs_o2 = _active_fire_state()
+	if afs_o2 != null and afs_o2.has_method("get_total_intensity"):
+		fire_o2 = FIRE_OXYGEN_DRAIN_PER_INTENSITY * float(afs_o2.get_total_intensity())
 	if _is_field_suit_pressure_active():
 		oxygen_state.tick(delta_seconds, {
 			"field_atmosphere": true,
 			"player_in_breach_zone": false,
+			"fire_oxygen_drain": fire_o2,
 		})
 	else:
 		oxygen_state.tick(delta_seconds, {
 			"player_in_breach_zone": is_player_in_breach_zone() if not away_from_start else false,
 			"field_atmosphere": false,
+			"fire_oxygen_drain": fire_o2,
 		})
 	_apply_breach_zone_scene_state()
 	_refresh_tracker_system_status_lines()

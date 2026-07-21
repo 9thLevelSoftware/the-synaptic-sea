@@ -14,15 +14,20 @@ const ELECTRONIC: String = "electronic"
 var hatch_id: String = ""
 var lock_kind: String = MECHANICAL
 var bypassed: bool = false
+## Fire B2: optional bulkhead endpoints this hatch seals (empty = no fire link).
+var compartment_a: String = ""
+var compartment_b: String = ""
 
 var _radius: float = 1.8
 var _player_in_range: bool = false
 var _blocker: StaticBody3D = null
 
-func configure(p_hatch_id: String, p_lock_kind: String, world_position: Vector3, radius: float = 1.8) -> void:
+func configure(p_hatch_id: String, p_lock_kind: String, world_position: Vector3, radius: float = 1.8, p_compartment_a: String = "", p_compartment_b: String = "") -> void:
 	assert(radius >= 0.0, "radius must be non-negative")
 	hatch_id = p_hatch_id
 	lock_kind = p_lock_kind if (p_lock_kind == MECHANICAL or p_lock_kind == ELECTRONIC) else MECHANICAL
+	compartment_a = p_compartment_a
+	compartment_b = p_compartment_b
 	_radius = radius
 	position = world_position
 	_ensure_detection(radius)

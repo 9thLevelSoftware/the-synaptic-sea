@@ -82,27 +82,33 @@ Proven by `main_playable_reachability_smoke.gd` (bundle command count 208). See
 - Overload health drain: `Encumbrance.health_drain_per_second` feeds vitals
   attrition (PZ tier breakpoints; move mult unchanged).
 
-**Documented deferrals (deliberate, ADR-tracked — not broken):**
-- **Audio asset library** (ADR-0044) — bus + pipeline are live with 2 placeholder clips;
-  the full SFX/music/voice content pass is the roadmap's one sanctioned deferral. Also
-  deferred there: spatial emitter population, ambient-zone reactivity, occlusion raycast.
-- **Web-chart follow-ons** (ADR-0045) — chart visual/graphical pass (text rows today),
-  chart-knowledge persistence (session-only by decision), hazard tooltips (catalog
-  entries exist, smoke-only).
-- **Fire B2** — deliberate-vent control + decompression danger, fire-consumes-oxygen,
-  door-gated spread (deferred since M7-B).
+**Documented deferrals (deliberate, ADR-tracked — not broken / not gap work):**
+- **Audio asset library** (ADR-0044) — bus + pipeline live with placeholders; full SFX/
+  music/voice *asset content pass* remains a polish track (pipeline wiring complete).
+- **Web-chart visual polish** (ADR-0045) — text rows + session knowledge work; graphical
+  chart pass is polish, not reachability.
+- **AI pathfinding** — lerp movement until a dedicated pathfinding card.
+- **Cloud saves / Steamworks** — stub manifest only (ADR-0032).
+- **Bespoke enemy/boss content, explorable hub scene, final art** — content tracks.
 
-**Stream C wiring (2026-07-21):** F6 quicksave live; ambient room-role + threat pushed
-from gameplay; `dead_fleet` → `threat_drone_swarm`; status-effect icon placeholders on
-disk. Bundle command count 212.
+**~~Fire B2~~ CLOSED Stream F (2026-07-21):** deliberate vent (no extinguisher → vacuum
+vent with decompression/hull breach teeth), fire-consumes-oxygen (`fire_oxygen_drain` on
+`OxygenState.tick`), door-gated spread (sealed hatches close bulkhead links). Proven in
+`unlock_trigger_stream_f_smoke` + existing fire smokes.
 
-**Content/polish (known-future, not gaps):** bespoke enemy behaviors + bosses, full audio
-asset library, derelict structural-template variety, explorable hub scene, real cloud
-saves, final art pass. 18 unlock-table triggers still content-pending (no player action
-yet). Fire B2 + web-chart polish remain ADR deferrals.
+**Streams C–F gap closure (2026-07-21):**
+- **C:** F6 quicksave, ambient zones, dead_fleet encounter table, status icons.
+- **D:** scan / medicine / cook / fabricate / repair_sub / weld / travel training emits.
+- **E:** ration / diagnose / discover / extract / compound_stim + junk salvage live.
+- **F:** surgery (medbay), decode_signal (voice log), build_shelter (hatch/seal),
+  social suite (inspire/negotiate/intimidate/transmit), Fire B2. Bundle **commands=215**.
 
-With the loops closed, the next call is the one the audit anticipated: vertical-slice
-content pass vs. horizontal polish — now unblocked.
+**Unlock catalog:** every `unlock_tables.json` trigger_event now has a production
+emission path. `defeat_enemy` stays intentionally unused (kill path uses `threat_killed`
+to avoid double-grant; retargetable data).
+
+With integration gaps closed, remaining work is content/polish (audio assets, art,
+pathfinding, cloud, hub scene) — not reachability.
 
 ## Quarantined / do-not-trust docs
 

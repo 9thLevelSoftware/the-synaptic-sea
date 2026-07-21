@@ -29,6 +29,7 @@ var combat_engaged: bool = false
 var last_attack_result: Dictionary = {}
 var placeholder_nodes: Dictionary = {}
 var _rewarded_kills: Dictionary = {}  # instance_id -> true (reward/remove once)
+var _last_attack_weapon_id: String = ""  # Stream F: melee intimidate on kill
 
 func _ready() -> void:
 	threat_archetypes = _load_json_dict(THREAT_ARCHETYPE_PATH)
@@ -141,6 +142,8 @@ func attack_with_weapon(weapon_id: String, inventory_state, equipment_state, amm
 	result["ammo_item_id"] = ammo_item_id
 	result["ammo_remaining"] = ammo_state.loaded(weapon_id) if ammo_state != null and not ammo_item_id.is_empty() else -1
 	last_attack_result = result.duplicate(true)
+	# Stream F: stamp last weapon so threat_killed can train intimidate on melee.
+	_last_attack_weapon_id = weapon_id
 	return result
 
 func get_summary() -> Dictionary:
@@ -309,6 +312,7 @@ func _sweep_dead_threats() -> void:
 			"archetype_id": threat.archetype_id,
 			"position": Vector3(float(threat.world_position[0]), float(threat.world_position[1]), float(threat.world_position[2])),
 			"loot_table": str((threat_archetypes.get(threat.archetype_id, {}) as Dictionary).get("loot_table", "combat_drop_common")),
+			"weapon_id": _last_attack_weapon_id,
 		})
 		_remove_threat(threat)
 
