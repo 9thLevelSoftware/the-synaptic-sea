@@ -2779,7 +2779,7 @@
       "content_note": "Verified all 5 stage calls + Stage-6 inject (lines 64/74/83/89/93/105). _resolve_biome (122-161) / _resolve_difficulty (164-197) carry built-in defaults for 3 biomes/3 difficulties. extended_templates kwarg defaults off; ship_generator passes false (:40).",
       "functional": null,
       "gaps": [
-        "structural-template variety (extended_templates) not enabled on the live derelict path"
+        "CLOSED 2026-07-21: extended templates when difficulty set; connectivity retry + quality gate; production uses derelict archetype defaults."
       ],
       "subsystems": []
     },
@@ -2864,7 +2864,9 @@
       "content": "partial",
       "content_note": "Verified: live derelict path has non-empty biome_id so variant_selector is constructed (lines 71-72) and assign_with_selector runs (:74); legacy/empty-biome path uses assign() (:77). Role weighting from 4 archetypes (data/procgen/archetypes/). Variant path effectively inert (no variant data).",
       "functional": null,
-      "gaps": [],
+      "gaps": [
+        "CLOSED 2026-07-21: ROLE_ALIASES normalize compartment/bay/quarters onto template pool tokens; guarantees enforce real roles."
+      ],
       "subsystems": []
     },
     {
@@ -3086,7 +3088,7 @@
       "content_note": "Verified: build(layout) at ship_generator.gd:83; fire_zones/arc_zones/breach_zones emitted as [] at gameplay_slice_builder.gd:118-120 (filled by other systems). Loot-table-per-role mapping inline.",
       "functional": null,
       "gaps": [
-        "fire_zones/arc_zones/breach_zones emitted empty here"
+        "Layout fire/breach stay empty by design; ADR-0050 runtime hazard seed is authoritative for derelicts. Arc may be dual-sourced."
       ],
       "subsystems": []
     },
@@ -3256,7 +3258,7 @@
       "content_note": "Domain 7 closed the output gap. VARIANT_EFFECTS const (room_variant_selector.gd:112) is an in-code table mapping variants to loot_bias/hazard/dressing effects. effects_for() accessor is consumed by gameplay_slice_builder._loot_table_for_room (loot_bias), generated_ship_loader._build_room_variant_descriptors (dressing), and playable_generated_ship._variant_hazard_compartments (fire/breach hazard seeding on compartment-mapped rooms). No per-biome variant lists yet (biome param accepted but every biome uses the same default table).",
       "functional": null,
       "gaps": [
-        "no per-biome variant lists yet (biome param accepted but every biome uses the same default table)"
+        "CLOSED 2026-07-21: biome-biased preferred variants (abyssal/breach_field/dead_fleet) weighted 3:1."
       ],
       "subsystems": []
     },
@@ -3438,7 +3440,7 @@
       "content_note": "RE-VERIFIED V. life_boat.gd:63-64 confirmed StructuralPlacerScript.new().place_structure(graph, 0, biome). Live path confirmed: playable_generated_ship.gd:4852 _build_lifeboat_at_home() (called during home-ship build) -> :4178 LifeBoatBuilderScript.build(_resolve_current_loot_biome_id()) -> life_boat.gd:64. structural_placer.gd:378-384 _ensure_kit_catalog/configure and :395-396 has_role_for/kits_for_role confirmed. Output is real walkable lifeboat geometry parented as the player's ride. Main derelict path bypasses StructuralPlacer (uses CellLayoutEngine + generated_ship_loader). V holds.",
       "functional": null,
       "gaps": [
-        "main derelict loader bypasses StructuralPlacer entirely; only the fixed 3-room lifeboat exercises it at runtime"
+        "Still lifeboat-only by design; derelicts use layout.json pipeline."
       ],
       "subsystems": []
     },
@@ -3479,8 +3481,7 @@
       "content_note": "RE-VERIFIED V. structural_placer.gd:378-384 _ensure_kit_catalog: KitCatalogScript.new() + configure('res://data/kits/') (process-wide static cache _shared_kit_catalog). :387-398 _modules_for_role prefers kit_catalog.kits_for_role(role, biome) when has_role_for(role, biome) is true (:395-396), else falls through to ROOM_MODULES const. Live only on the lifeboat path (via StructuralPlacer at playable_generated_ship.gd:4950). For default v0 kit has_role_for returns true so the kit list is used. V holds.",
       "functional": null,
       "gaps": [
-        "only 3 kits and a single biome_preference entry (abyssal 0.9) authored; biome-biased skinning barely populated",
-        "exercised only via the lifeboat StructuralPlacer; main derelict loader reads the kit JSON directly without KitCatalog"
+        "kit_id stamped on layouts from biome (still ship_structural_v0); derelicts remain layout.json not StructuralPlacer."
       ],
       "subsystems": []
     },

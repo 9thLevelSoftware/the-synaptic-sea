@@ -39,12 +39,58 @@ const ROOM_FOOTPRINT_OPTIONS: Dictionary = {
 
 const DEFAULT_FOOTPRINT: Vector2i = Vector2i(2, 2)
 
+## Procgen program F1: alias authored archetype role names onto template role_pool tokens
+## so guaranteed_roles / role_weights actually match zone pools (derelict used
+## compartment/bay/quarters while templates use cargo/crew_quarters/dock).
+const ROLE_ALIASES: Dictionary = {
+	"compartment": "cargo",
+	"bay": "cargo",
+	"quarters": "crew_quarters",
+	"tool_storage": "storage",
+	"engine_bay": "engineering",
+	"cockpit": "bridge",
+}
+
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var variant_selector: RefCounted = null  # set by assign() if RoomVariantSelector is passed
 
 
 func assign(template: RefCounted, blueprint: RefCounted, archetype: Dictionary) -> Array[Dictionary]:
 	return assign_with_selector(template, blueprint, archetype, null)
+
+
+## Normalize a single role token through ROLE_ALIASES (identity if unmapped).
+static func normalize_role(role: String) -> String:
+	var r: String = str(role)
+	if ROLE_ALIASES.has(r):
+		return str(ROLE_ALIASES[r])
+	return r
+
+
+## Returns a shallow-normalized archetype dict (weights + guarantees remapped).
+static func normalize_archetype(archetype: Dictionary) -> Dictionary:
+	if archetype.is_empty():
+		return {}
+	var out: Dictionary = archetype.duplicate(true)
+	var weights_v: Variant = out.get("role_weights", {})
+	if weights_v is Dictionary:
+		var nw: Dictionary = {}
+		for k in (weights_v as Dictionary):
+			var nk: String = normalize_role(str(k))
+			nw[nk] = int(nw.get(nk, 0)) + int((weights_v as Dictionary)[k])
+		out["role_weights"] = nw
+	var g_v: Variant = out.get("guaranteed_roles", [])
+	if g_v is Array:
+		var ng: Array = []
+		var seen: Dictionary = {}
+		for entry in (g_v as Array):
+			var nr: String = normalize_role(str(entry))
+			if seen.has(nr):
+				continue
+			seen[nr] = true
+			ng.append(nr)
+		out["guaranteed_roles"] = ng
+	return out
 
 
 # Same as assign() but additionally accepts a RoomVariantSelector
@@ -62,6 +108,8 @@ func assign_with_selector(
 	variant_selector = selector
 
 	rng.seed = int(blueprint.seed_value)
+	# F1: normalize before any pick/guarantee so weights and pools share a vocabulary.
+	archetype = normalize_archetype(archetype)
 
 	var room_plan: Array[Dictionary] = []
 	var role_counter: Dictionary = {}  # role -> next index
@@ -74,8 +122,15 @@ func assign_with_selector(
 		var role_pool_raw: Variant = zone.get("role_pool", [])
 		var role_pool: Array[String] = []
 		if role_pool_raw is Array:
+			# Normalize pool tokens so weights/guarantees share one vocabulary
+			# with derelict templates that still author compartment/quarters/bay.
+			var seen_pool: Dictionary = {}
 			for entry in role_pool_raw:
-				role_pool.append(str(entry))
+				var nr: String = normalize_role(str(entry))
+				if seen_pool.has(nr):
+					continue
+				seen_pool[nr] = true
+				role_pool.append(nr)
 		zone_pools[zone_id] = role_pool
 
 		var count: int = _resolve_count(zone.get("count", 1))
