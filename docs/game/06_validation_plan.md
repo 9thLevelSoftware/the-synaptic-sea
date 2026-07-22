@@ -398,7 +398,10 @@ run_clean 'ADR-0049 main playable threat pathfinding smoke' 'MAIN PLAYABLE THREA
 run_clean 'Procgen quality gate smoke' 'PROCGEN QUALITY GATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_quality_gate_smoke.gd
 run_clean 'Procgen golden parity smoke' 'PROCGEN GOLDEN PARITY PASS goldens=3 nav=true schema=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_golden_parity_smoke.gd
 run_clean 'Procgen derelict pipeline contract smoke' 'MAIN PLAYABLE DERELICT PIPELINE CONTRACT PASS layout=true nav=true biome=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_derelict_pipeline_contract_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=222 clean_output=true'
+# --- Pre-polish foundations (2026-07-22 Wave 0): SimKeys + TuningCatalog shells ---
+run_clean 'SimKeys contract smoke' 'SIM KEYS PASS hot=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sim_keys_smoke.gd
+run_clean 'TuningCatalog shell smoke' 'TUNING CATALOG PASS shell=true dir_loaded=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tuning_catalog_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=224 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise

@@ -4,6 +4,8 @@ class_name VitalsState
 ## Pure model for player core vitals: health, stamina, hunger, thirst.
 ## Per REQ-SV-001.  No scene-tree access.
 
+const SimKeysScript := preload("res://scripts/systems/sim_keys.gd")
+
 const DEFAULT_MAX_HEALTH: float = 100.0
 const DEFAULT_MAX_STAMINA: float = 100.0
 const DEFAULT_MAX_HUNGER: float = 100.0
@@ -50,16 +52,16 @@ func configure(config: Dictionary) -> void:
 	hunger = clampf(_f(config, "hunger", hunger), 0.0, max_hunger)
 	thirst = clampf(_f(config, "thirst", thirst), 0.0, max_thirst)
 
-## tick updates all four vitals.  context keys used by downstream systems:
-##   "radiation_health_drain" -> float (added to health drain when radiation high)
-##   "atmosphere_health_drain" -> float (added to health drain when the hub atmosphere is fouled)
-##   "fire_health_drain" -> float (added to health drain while standing in a burning compartment)
-##   "sanity_health_drain" -> float (added to health drain at sanity tier 3)
-##   "encumbrance_health_drain" -> float (added while inventory load_ratio > 1)
-##   "temperature_thirst_mult" -> float (multiplies thirst drain when temp unsafe)
-##   "status_stamina_recovery_mult" -> float (multiplier from active effects)
-##   "sanity_stamina_recovery_mult" -> float (multiplies stamina recovery at sanity tier 3)
-##   "moving" -> bool (when false stamina recovers instead of draining)
+## tick updates all four vitals.  context keys (SimKeys / historical wire names):
+##   SimKeys.RADIATION_HEALTH_DRAIN -> float
+##   SimKeys.ATMOSPHERE_HEALTH_DRAIN -> float
+##   SimKeys.FIRE_HEALTH_DRAIN -> float
+##   SimKeys.SANITY_HEALTH_DRAIN -> float
+##   SimKeys.ENCUMBRANCE_HEALTH_DRAIN -> float (inventory load_ratio > 1)
+##   SimKeys.TEMPERATURE_THIRST_MULT -> float
+##   SimKeys.STATUS_STAMINA_RECOVERY_MULT -> float
+##   SimKeys.SANITY_STAMINA_RECOVERY_MULT -> float
+##   SimKeys.MOVING -> bool (when false stamina recovers instead of draining)
 func tick(delta_seconds: float, context: Dictionary = {}) -> bool:
 	if delta_seconds <= 0.0:
 		return false
@@ -68,12 +70,12 @@ func tick(delta_seconds: float, context: Dictionary = {}) -> bool:
 	var stamina_recovery_mult: float = 1.0
 	if hunger < HUNGER_STAMINA_CASCADE_THRESHOLD:
 		stamina_recovery_mult = 0.5
-	if context.has("status_stamina_recovery_mult"):
-		stamina_recovery_mult *= float(context.get("status_stamina_recovery_mult", 1.0))
-	if context.has("sanity_stamina_recovery_mult"):
-		stamina_recovery_mult *= float(context.get("sanity_stamina_recovery_mult", 1.0))
+	if context.has(SimKeysScript.STATUS_STAMINA_RECOVERY_MULT):
+		stamina_recovery_mult *= float(context.get(SimKeysScript.STATUS_STAMINA_RECOVERY_MULT, 1.0))
+	if context.has(SimKeysScript.SANITY_STAMINA_RECOVERY_MULT):
+		stamina_recovery_mult *= float(context.get(SimKeysScript.SANITY_STAMINA_RECOVERY_MULT, 1.0))
 	# Stamina
-	var moving: bool = bool(context.get("moving", true))
+	var moving: bool = bool(context.get(SimKeysScript.MOVING, true))
 	if moving:
 		var s_drain: float = stamina_drain_rate * delta_seconds
 		if s_drain > 0.0 and stamina > 0.0:
@@ -86,16 +88,16 @@ func tick(delta_seconds: float, context: Dictionary = {}) -> bool:
 			changed = true
 	# Health (passive drain + optional radiation drain + optional atmosphere drain)
 	var h_drain: float = health_drain_rate * delta_seconds
-	if context.has("radiation_health_drain"):
-		h_drain += float(context.get("radiation_health_drain", 0.0)) * delta_seconds
-	if context.has("atmosphere_health_drain"):
-		h_drain += float(context.get("atmosphere_health_drain", 0.0)) * delta_seconds
-	if context.has("fire_health_drain"):
-		h_drain += float(context.get("fire_health_drain", 0.0)) * delta_seconds
-	if context.has("sanity_health_drain"):
-		h_drain += float(context.get("sanity_health_drain", 0.0)) * delta_seconds
-	if context.has("encumbrance_health_drain"):
-		h_drain += float(context.get("encumbrance_health_drain", 0.0)) * delta_seconds
+	if context.has(SimKeysScript.RADIATION_HEALTH_DRAIN):
+		h_drain += float(context.get(SimKeysScript.RADIATION_HEALTH_DRAIN, 0.0)) * delta_seconds
+	if context.has(SimKeysScript.ATMOSPHERE_HEALTH_DRAIN):
+		h_drain += float(context.get(SimKeysScript.ATMOSPHERE_HEALTH_DRAIN, 0.0)) * delta_seconds
+	if context.has(SimKeysScript.FIRE_HEALTH_DRAIN):
+		h_drain += float(context.get(SimKeysScript.FIRE_HEALTH_DRAIN, 0.0)) * delta_seconds
+	if context.has(SimKeysScript.SANITY_HEALTH_DRAIN):
+		h_drain += float(context.get(SimKeysScript.SANITY_HEALTH_DRAIN, 0.0)) * delta_seconds
+	if context.has(SimKeysScript.ENCUMBRANCE_HEALTH_DRAIN):
+		h_drain += float(context.get(SimKeysScript.ENCUMBRANCE_HEALTH_DRAIN, 0.0)) * delta_seconds
 	if h_drain > 0.0 and health > 0.0:
 		health = maxf(0.0, health - h_drain)
 		changed = true
@@ -109,7 +111,7 @@ func tick(delta_seconds: float, context: Dictionary = {}) -> bool:
 		hunger = maxf(0.0, hunger - hgr_drain)
 		changed = true
 	# Thirst (temperature cascade)
-	var t_mult: float = float(context.get("temperature_thirst_mult", 1.0))
+	var t_mult: float = float(context.get(SimKeysScript.TEMPERATURE_THIRST_MULT, 1.0))
 	var t_drain: float = thirst_drain_rate * t_mult * delta_seconds
 	if t_drain > 0.0 and thirst > 0.0:
 		thirst = maxf(0.0, thirst - t_drain)

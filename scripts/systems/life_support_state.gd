@@ -1,6 +1,8 @@
 extends RefCounted
 class_name LifeSupportState
 
+const SimKeysScript := preload("res://scripts/systems/sim_keys.gd")
+
 var oxygen_percent: float = 100.0
 var co2_percent: float = 2.0
 var temperature_c: float = 21.0
@@ -46,9 +48,9 @@ func configure(config: Dictionary) -> void:
 func tick(delta: float, context: Dictionary) -> void:
 	if delta <= 0.0:
 		return
-	var powered_ratio: float = clampf(float(context.get("powered_ratio", 0.0)), 0.0, 1.0)
-	var breach_count: int = max(0, int(context.get("breach_count", 0)))
-	var recycled_water: float = maxf(0.0, float(context.get("recycled_water", 0.0)))
+	var powered_ratio: float = clampf(float(context.get(SimKeysScript.POWERED_RATIO, 0.0)), 0.0, 1.0)
+	var breach_count: int = max(0, int(context.get(SimKeysScript.BREACH_COUNT, 0)))
+	var recycled_water: float = maxf(0.0, float(context.get(SimKeysScript.RECYCLED_WATER, 0.0)))
 	var powered: bool = powered_ratio >= life_support_power_threshold
 	if powered:
 		oxygen_percent = minf(100.0, oxygen_percent + online_oxygen_recovery_per_second * powered_ratio * delta)

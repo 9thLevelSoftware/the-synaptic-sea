@@ -1109,3 +1109,81 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Verification:
   - `cross_system_dependency_smoke.gd`
   - `CROSS SYSTEM DEPENDENCY PASS`
+
+## Pre-polish foundations (2026-07-22 wave)
+
+## REQ-MI-001: Module integrity FSM and sparse persistence
+
+- Source: `features/module_integrity.md`, ADR-0051
+- Type: gameplay / technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Structural modules own integrity state `intact|damaged|breached|destroyed`.
+  - Only touched modules serialize as sparse deltas from pristine.
+  - Deterministic under fixed seed + event order.
+- Verification:
+  - `module_integrity_state_smoke.gd` (when implemented)
+  - `MODULE INTEGRITY PASS` marker
+
+## REQ-WA-001: WorkAction catalog and pure progress model
+
+- Source: `features/work_actions.md`, ADR-0051
+- Type: gameplay / technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Verbs cut/unbolt/weld/patch/pry/splice are data-defined.
+  - Progress, interrupt, tool/skill/material gates are pure-tested.
+- Verification:
+  - `work_action_state_smoke.gd` (when implemented)
+
+## REQ-CMP-001: Component slot population is deterministic
+
+- Source: `features/component_slots.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Wall/center slots fill from a seeded placement stage without overlap.
+  - Ship-system subcomponents link to placed components where authored.
+- Verification:
+  - `component_slot_population_smoke.gd` (when implemented)
+
+## REQ-SMOD-001: Ship modification is mechanical fleet payoff
+
+- Source: `features/ship_modification.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Salvaged components install into ship slots under power budget constraints.
+  - Hub growth is physical (components/modules), not a separate hub scene.
+- Verification:
+  - `ship_modification_smoke.gd` (when implemented)
+
+## REQ-ARCH-001: SimKeys contract for tick context
+
+- Source: pre-polish plan PKG-A2
+- Type: technical
+- Priority: must
+- Status: Implemented
+- Acceptance criteria:
+  - Vitals hot-path context keys are defined once in `SimKeys`.
+  - Pure vitals consumers use `SimKeys` constants; wire strings remain stable.
+- Verification:
+  - `sim_keys_smoke.gd`
+  - `SIM KEYS PASS`
+
+## REQ-ARCH-002: TuningCatalog shell
+
+- Source: pre-polish plan PKG-A4
+- Type: technical
+- Priority: must
+- Status: Implemented
+- Acceptance criteria:
+  - `TuningCatalog` loads `data/balance/*.json` with const fallbacks for missing keys.
+  - Shell fixture proves load/override without mass-migrating coordinator literals.
+- Verification:
+  - `tuning_catalog_smoke.gd`
+  - `TUNING CATALOG PASS`

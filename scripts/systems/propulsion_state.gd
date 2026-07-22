@@ -1,6 +1,8 @@
 extends RefCounted
 class_name PropulsionState
 
+const SimKeysScript := preload("res://scripts/systems/sim_keys.gd")
+
 var thrust_percent: float = 0.0
 var engine_temperature_c: float = 28.0
 var fuel_efficiency: float = 1.0
@@ -15,9 +17,9 @@ func configure(config: Dictionary) -> void:
 	operational = bool(config.get("operational", true))
 
 func tick(delta: float, context: Dictionary) -> void:
-	var powered_ratio: float = clampf(float(context.get("powered_ratio", 0.0)), 0.0, 1.0)
-	var manager_operational: bool = bool(context.get("manager_operational", true))
-	var hull_penalty: float = clampf(float(context.get("hull_penalty", 0.0)), 0.0, 1.0)
+	var powered_ratio: float = clampf(float(context.get(SimKeysScript.POWERED_RATIO, 0.0)), 0.0, 1.0)
+	var manager_operational: bool = bool(context.get(SimKeysScript.MANAGER_OPERATIONAL, true))
+	var hull_penalty: float = clampf(float(context.get(SimKeysScript.HULL_PENALTY, 0.0)), 0.0, 1.0)
 	operational = manager_operational and powered_ratio >= power_threshold and hull_penalty < 0.6
 	var target: float = 100.0 * maxf(0.0, powered_ratio - hull_penalty)
 	if not operational:
