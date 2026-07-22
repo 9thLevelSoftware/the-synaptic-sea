@@ -49,11 +49,21 @@ func _initialize() -> void:
 	if map2.get_state("w1") != ModuleIntegrityStateScript.STATE_DAMAGED:
 		_fail("round-trip state mismatch")
 		return
-	if map.fingerprint() != map2.fingerprint():
-		# w2 not in map2 — fingerprints differ by design; compare only delta modules
-		if map2.get_state("w1") != map.get_state("w1"):
-			_fail("determinism/round-trip state for w1")
-			return
+	# Determinism: two maps given the same damage sequence share fingerprints.
+	var map_a = ModuleIntegrityMapScript.new()
+	var map_b = ModuleIntegrityMapScript.new()
+	map_a.apply_damage("d1", 0.35, "wall_straight_1x1")
+	map_b.apply_damage("d1", 0.35, "wall_straight_1x1")
+	if map_a.fingerprint() != map_b.fingerprint():
+		_fail("determinism fingerprint mismatch")
+		return
+	# Mounted components on intact modules must still sparse-persist.
+	var mcomp = ModuleIntegrityStateScript.new()
+	mcomp.configure({"module_id": "c1", "kind": "wall_straight_1x1"})
+	mcomp.mounted_components = [{"component_id": "console_a"}]
+	if mcomp.is_pristine():
+		_fail("mounted components should make module non-pristine for sparse save")
+		return
 
 	# materials table loads
 	var path: String = "res://data/kits/ship_structural_v0.materials.json"
