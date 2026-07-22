@@ -1262,11 +1262,11 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 - Source: \eatures/work_actions.md- Type: gameplay / technical
 - Priority: must
-- Status: Approved
+- Status: Implemented (PKG-B2.5)
 - Acceptance criteria:
   - One progress/interrupt/UI path covers patch/weld/seal/suppress; authored repair_point remains objective wrapper.
 - Verification:
-  - Repair unification smoke (when implemented)
+  - `scripts/validation/repair_unification_smoke.gd` marker `REPAIR UNIFICATION PASS repair=true seal=true suppress=true interrupt=true catalog=true`
 
 ## REQ-CMP-002: Components link to ship-system subcomponents
 

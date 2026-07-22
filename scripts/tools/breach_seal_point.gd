@@ -5,6 +5,11 @@ class_name BreachSealPoint
 ## HullIntegrityState. Modeled on RepairPoint: interacting starts a channel that ticks in
 ## this node's OWN _process; leaving range cancels with no item loss; completing consumes
 ## the sealant and seals the compartment.
+##
+## PKG-B2.5: progress/interrupt rides WorkActionChannel (action patch_breach).
+
+const WorkActionChannelScript := preload("res://scripts/systems/work_action_channel.gd")
+const WORK_ACTION_ID: String = "patch_breach"
 
 signal breach_sealed(compartment_id: String)
 signal seal_blocked(compartment_id: String, reason: String)
@@ -22,6 +27,7 @@ var channeling: bool = false
 var progress: float = 0.0
 var sealed: bool = false
 var _channel_player: Node = null
+var _work_channel: RefCounted = null ## WorkActionChannel while channeling
 var candidate_player: Node
 var collision_shape: CollisionShape3D
 var marker: MeshInstance3D
@@ -83,6 +89,20 @@ func try_start(player_body: Node) -> bool:
 	if not _has_required_item():
 		emit_signal("seal_blocked", compartment_id, "missing_sealant")
 		return false
+	var sealant_qty: int = 0
+	if inventory_state != null:
+		sealant_qty = int(inventory_state.get_quantity(required_item))
+	var ctx: Dictionary = {
+		"tool_class": "sealant",
+		"skill_id": "repair",
+		"skill_level": 0,
+		"inventory": {required_item: sealant_qty},
+	}
+	var channel = WorkActionChannelScript.new()
+	if not channel.begin(WORK_ACTION_ID, compartment_id, seal_seconds, ctx):
+		emit_signal("seal_blocked", compartment_id, "work_action")
+		return false
+	_work_channel = channel
 	_channel_player = player_body
 	channeling = true
 	progress = 0.0
@@ -105,14 +125,18 @@ func _process(delta: float) -> void:
 
 ## Pumps the channel by delta; seals when progress reaches 1.0. Exposed for smokes.
 func advance_channel(delta: float) -> void:
-	if not channeling:
+	if not channeling or _work_channel == null:
 		return
-	progress = clampf(progress + delta / seal_seconds, 0.0, 1.0)
-	if progress >= 1.0:
+	var st: String = str(_work_channel.call("tick", delta, {}))
+	progress = float(_work_channel.call("progress_ratio"))
+	if st == "completed" or progress >= 1.0:
 		_complete()
 
 func _complete() -> void:
 	channeling = false
+	if _work_channel != null:
+		_work_channel.call("cancel")
+		_work_channel = null
 	if not _has_required_item():
 		progress = 0.0
 		emit_signal("seal_blocked", compartment_id, "missing_sealant")
@@ -132,6 +156,16 @@ func _cancel() -> void:
 	channeling = false
 	progress = 0.0
 	_channel_player = null
+	if _work_channel != null:
+		_work_channel.call("cancel")
+		_work_channel = null
+
+
+## PKG-B2.5: catalog action driving this channel (empty when idle).
+func get_work_action_id() -> String:
+	if _work_channel != null:
+		return str(_work_channel.get("action_id"))
+	return ""
 
 func _interaction_radius() -> float:
 	if collision_shape != null and collision_shape.shape is SphereShape3D:

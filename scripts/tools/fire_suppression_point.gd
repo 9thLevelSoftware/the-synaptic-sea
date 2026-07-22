@@ -5,6 +5,11 @@ class_name FireSuppressionPoint
 ## FireSuppressionState. Modeled on BreachSealPoint: interacting starts a channel that
 ## ticks in this node's OWN _process; leaving range cancels with no cost; completing
 ## consumes one extinguisher use and extinguishes the compartment.
+##
+## PKG-B2.5: progress/interrupt rides WorkActionChannel (action suppress_fire).
+
+const WorkActionChannelScript := preload("res://scripts/systems/work_action_channel.gd")
+const WORK_ACTION_ID: String = "suppress_fire"
 
 signal fire_extinguished(compartment_id: String)
 signal extinguish_blocked(compartment_id: String, reason: String)
@@ -24,6 +29,7 @@ var channeling: bool = false
 var progress: float = 0.0
 var extinguished: bool = false
 var _channel_player: Node = null
+var _work_channel: RefCounted = null ## WorkActionChannel while channeling
 var candidate_player: Node
 var collision_shape: CollisionShape3D
 var marker: MeshInstance3D
@@ -74,6 +80,11 @@ func try_start(player_body: Node) -> bool:
 	# Decompression danger is the trade-off for extinguishing without a tool.
 	if not _has_required_tool() or extinguisher_state == null or not extinguisher_state.has_charge_for_use():
 		return try_vent(player_body)
+	var channel = WorkActionChannelScript.new()
+	if not channel.begin(WORK_ACTION_ID, compartment_id, extinguish_seconds, {}):
+		emit_signal("extinguish_blocked", compartment_id, "work_action")
+		return false
+	_work_channel = channel
 	_channel_player = player_body
 	channeling = true
 	progress = 0.0
@@ -112,14 +123,18 @@ func _process(delta: float) -> void:
 	advance_channel(delta)
 
 func advance_channel(delta: float) -> void:
-	if not channeling:
+	if not channeling or _work_channel == null:
 		return
-	progress = clampf(progress + delta / extinguish_seconds, 0.0, 1.0)
-	if progress >= 1.0:
+	var st: String = str(_work_channel.call("tick", delta, {}))
+	progress = float(_work_channel.call("progress_ratio"))
+	if st == "completed" or progress >= 1.0:
 		_complete()
 
 func _complete() -> void:
 	channeling = false
+	if _work_channel != null:
+		_work_channel.call("cancel")
+		_work_channel = null
 	if extinguisher_state == null or not extinguisher_state.has_charge_for_use():
 		progress = 0.0
 		emit_signal("extinguish_blocked", compartment_id, "no_charge")
@@ -143,6 +158,16 @@ func _cancel() -> void:
 	channeling = false
 	progress = 0.0
 	_channel_player = null
+	if _work_channel != null:
+		_work_channel.call("cancel")
+		_work_channel = null
+
+
+## PKG-B2.5: catalog action driving this channel (empty when idle).
+func get_work_action_id() -> String:
+	if _work_channel != null:
+		return str(_work_channel.get("action_id"))
+	return ""
 
 func _set_extinguished_visual() -> void:
 	if collision_shape != null:

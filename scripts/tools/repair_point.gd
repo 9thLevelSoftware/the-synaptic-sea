@@ -6,6 +6,13 @@ class_name RepairPoint
 ## channel that ticks in this node's OWN _process (independent of the coordinator's frozen
 ## per-frame loop). Leaving range cancels with no part loss; completing consumes the parts
 ## and restores the subcomponent.
+##
+## PKG-B2.5: progress/interrupt rides WorkActionChannel (action repair_subcomponent).
+## Domain gates + repair_with_inventory completion stay here; authored repair_point
+## remains the objective wrapper.
+
+const WorkActionChannelScript := preload("res://scripts/systems/work_action_channel.gd")
+const WORK_ACTION_ID: String = "repair_subcomponent"
 
 signal repair_completed(system_id: String, subcomponent_id: String)
 signal repair_blocked(system_id: String, subcomponent_id: String, reason: String)
@@ -28,6 +35,7 @@ var progress: float = 0.0                # 0..1
 var repaired: bool = false
 var _channel_player: Node = null
 var _scaled_seconds: float = 1.0
+var _work_channel: RefCounted = null ## WorkActionChannel while channeling
 var candidate_player: Node
 var collision_shape: CollisionShape3D
 var marker: MeshInstance3D
@@ -105,11 +113,17 @@ func try_start(player_body: Node) -> bool:
 	if reason != "ok":
 		emit_signal("repair_blocked", system_id, subcomponent_id, reason)
 		return false
+	var factor: float = 1.0 + 0.1 * float(maxi(0, skill - min_skill))
+	_scaled_seconds = maxf(0.01, repair_seconds / factor)
+	var channel = WorkActionChannelScript.new()
+	var target_key: String = "%s/%s" % [system_id, subcomponent_id]
+	if not channel.begin(WORK_ACTION_ID, target_key, _scaled_seconds, {}):
+		emit_signal("repair_blocked", system_id, subcomponent_id, "work_action")
+		return false
+	_work_channel = channel
 	_channel_player = player_body
 	channeling = true
 	progress = 0.0
-	var factor: float = 1.0 + 0.1 * float(maxi(0, skill - min_skill))
-	_scaled_seconds = maxf(0.01, repair_seconds / factor)
 	emit_signal("repair_started", system_id, subcomponent_id)
 	return true
 
@@ -148,14 +162,18 @@ func _process(delta: float) -> void:
 ## Pumps the channel by delta; completes the repair when progress reaches 1.0.
 ## Exposed so a validation smoke can drive the channel deterministically.
 func advance_channel(delta: float) -> void:
-	if not channeling:
+	if not channeling or _work_channel == null:
 		return
-	progress = clampf(progress + delta / _scaled_seconds, 0.0, 1.0)
-	if progress >= 1.0:
+	var st: String = str(_work_channel.call("tick", delta, {}))
+	progress = float(_work_channel.call("progress_ratio"))
+	if st == "completed" or progress >= 1.0:
 		_complete()
 
 func _complete() -> void:
 	channeling = false
+	if _work_channel != null:
+		_work_channel.call("cancel")
+		_work_channel = null
 	var skill: int = _player_skill()
 	var result: Dictionary = target_manager.repair_with_inventory(system_id, subcomponent_id, inventory_state, skill)
 	if bool(result.get("success", false)):
@@ -172,6 +190,16 @@ func _cancel() -> void:
 	channeling = false
 	progress = 0.0
 	_channel_player = null
+	if _work_channel != null:
+		_work_channel.call("cancel")
+		_work_channel = null
+
+
+## PKG-B2.5: catalog action driving this channel (empty when idle).
+func get_work_action_id() -> String:
+	if _work_channel != null:
+		return str(_work_channel.get("action_id"))
+	return ""
 
 func _interaction_radius() -> float:
 	if collision_shape != null and collision_shape.shape is SphereShape3D:
