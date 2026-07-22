@@ -1347,3 +1347,17 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Verification:
   - main_playable_survival_away_smoke.gd
   - ship_runtime_smoke.gd / ship_catchup_smoke.gd
+
+## REQ-ARCH-006: Tick stratification FRAME/SLOW/LAZY
+
+- Source: eatures/ship_runtime.md, pre-polish PKG-A3
+- Type: technical
+- Priority: must
+- Status: Implemented
+- Acceptance criteria:
+  - ShipRuntime exposes FRAME/SLOW/LAZY band polling with fixed intervals.
+  - Present-ship systems advance every frame; hub expanded recompute is SLOW-banded.
+  - Catch-up uses LAZY-aligned quanta and is still bounded.
+- Verification:
+  - 	ick_bands_smoke.gd — TICK BANDS PASS
+  - ship_catchup_smoke.gd remains green

@@ -16,6 +16,10 @@ class_name ShipRuntime
 const CATCHUP_SUBSTEP_SECONDS: float = 5.0
 const MAX_CATCHUP_SECONDS: float = 1800.0
 
+## PKG-A3 tick bands (accumulators; no balance retune of rates themselves).
+const SLOW_INTERVAL_SECONDS: float = 0.35
+const LAZY_INTERVAL_SECONDS: float = 3.0
+
 const ShipInstanceScript: GDScript = preload("res://scripts/systems/ship_instance.gd")
 const HullIntegrityStateScript: GDScript = preload("res://scripts/systems/hull_integrity_state.gd")
 const WebInfestationStateScript: GDScript = preload("res://scripts/systems/web_infestation_state.gd")
@@ -30,6 +34,13 @@ var web_override: RefCounted = null
 ## Callable() -> bool: contact boost for hub web growth (attached derelict docked).
 var contact_boost_provider: Callable = Callable()
 
+var _slow_acc: float = 0.0
+var _lazy_acc: float = 0.0
+## Diagnostic counters (smokes / balance tools).
+var frame_band_fires: int = 0
+var slow_band_fires: int = 0
+var lazy_band_fires: int = 0
+
 
 func configure(ship_inst: RefCounted, opts: Dictionary = {}) -> void:
 	ship = ship_inst
@@ -43,6 +54,11 @@ func configure(ship_inst: RefCounted, opts: Dictionary = {}) -> void:
 		contact_boost_provider = provider as Callable
 	else:
 		contact_boost_provider = Callable()
+	_slow_acc = 0.0
+	_lazy_acc = 0.0
+	frame_band_fires = 0
+	slow_band_fires = 0
+	lazy_band_fires = 0
 
 
 func get_ship() -> RefCounted:
@@ -75,11 +91,12 @@ func _contact_boost() -> bool:
 	return false
 
 
-## Advance ONE ship's systems manager + biomatter-web hull damage.
+## Advance ONE ship's systems manager + biomatter-web hull damage (FRAME band).
 ## Does NOT tick fire, expanded hub recompute, player, or UI.
 func advance(delta: float, world_time: float) -> void:
 	if ship == null or delta < 0.0:
 		return
+	frame_band_fires += 1
 	ship.set("last_sim_time", world_time)
 	var systems_manager: Variant = ship.get("systems_manager")
 	if systems_manager != null and systems_manager is Object and (systems_manager as Object).has_method("advance"):
@@ -101,8 +118,38 @@ func advance(delta: float, world_time: float) -> void:
 		hull.call("damage_compartment", str(cid), dmg)
 
 
+## PKG-A3: accumulate delta and report which bands should fire this call.
+## Returns { "frame": true, "slow": bool, "lazy": bool, "slow_dt": float, "lazy_dt": float }.
+func poll_bands(delta: float) -> Dictionary:
+	var result: Dictionary = {
+		"frame": true,
+		"slow": false,
+		"lazy": false,
+		"slow_dt": 0.0,
+		"lazy_dt": 0.0,
+	}
+	if delta <= 0.0:
+		result["frame"] = false
+		return result
+	_slow_acc += delta
+	_lazy_acc += delta
+	if _slow_acc >= SLOW_INTERVAL_SECONDS:
+		result["slow"] = true
+		result["slow_dt"] = _slow_acc
+		_slow_acc = 0.0
+		slow_band_fires += 1
+	if _lazy_acc >= LAZY_INTERVAL_SECONDS:
+		result["lazy"] = true
+		result["lazy_dt"] = _lazy_acc
+		_lazy_acc = 0.0
+		lazy_band_fires += 1
+	return result
+
+
 ## Fast-forward an absent ship by world_time - last_sim_time in capped sub-steps.
 ## Home ships are never catch-up targets (always present).
+## PKG-A3: prefer LAZY quanta for inactive catch-up when gap is large; still
+## bounded by CATCHUP_SUBSTEP_SECONDS so model rates stay stable.
 func catch_up(world_time: float) -> void:
 	if ship == null or is_home:
 		return
@@ -111,9 +158,11 @@ func catch_up(world_time: float) -> void:
 	if dt <= 0.0:
 		return
 	ship.set("last_sim_time", world_time)
+	var quantum: float = minf(CATCHUP_SUBSTEP_SECONDS, LAZY_INTERVAL_SECONDS)
 	while dt > 0.0:
-		var step: float = minf(CATCHUP_SUBSTEP_SECONDS, dt)
+		var step: float = minf(quantum, dt)
 		advance(step, world_time)
+		lazy_band_fires += 1
 		dt -= step
 
 

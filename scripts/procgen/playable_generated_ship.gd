@@ -6145,12 +6145,19 @@ func _process(delta: float) -> void:
 	_refresh_tooltip_focus()
 
 
-## PKG-A1c: advance all present ships via ShipRuntime + hub expanded recompute.
+## PKG-A1c / A3: advance present ships every frame (FRAME); hub expanded
+## recompute on SLOW band only (reduces per-frame thrash; rates unchanged).
+var _hub_slow_acc: float = 0.0
+
 func _tick_present_ships(delta: float) -> void:
 	_advance_ship(home_ship, delta)
 	if away_from_start and current_ship != null and current_ship != home_ship:
 		_advance_ship(current_ship, delta)
-	_recompute_expanded_ship_systems(delta)
+	_hub_slow_acc += delta
+	if _hub_slow_acc >= ShipRuntimeScript.SLOW_INTERVAL_SECONDS:
+		var slow_dt: float = _hub_slow_acc
+		_hub_slow_acc = 0.0
+		_recompute_expanded_ship_systems(slow_dt)
 
 
 func _tick_sanity_and_hallucinations(delta: float, in_safe: bool) -> void:
