@@ -28,11 +28,13 @@ Module integrity is the unit of destruction. **No voxels.** See `docs/game/adr/0
 
 | ID | Title | Status |
 | --- | --- | --- |
-| PKG-A0 | ADR-0051 | **Done** (2026-07-22) |
-| PKG-SPEC-PILLAR | Feature specs MI/WA/CMP/SMOD | **Done** |
-| PKG-A2 | SimKeys pure consumers | **Done** (hot path + major pure systems) |
-| PKG-A4 | TuningCatalog shell | **Done** |
-| PKG-A1a–c | ShipRuntime strangler | Pending |
+| PKG-A0 | ADR-0051 | **Done** (PR #78) |
+| PKG-SPEC-PILLAR | Feature specs MI/WA/CMP/SMOD | **Done** (PR #78) |
+| PKG-A2 | SimKeys pure consumers | **Done** (PR #78) |
+| PKG-A4 | TuningCatalog shell | **Done** (PR #78) |
+| PKG-A1a | ShipRuntime advance/catch-up | **Done** (PR #79) |
+| PKG-A1b | ShipRuntime snapshots + multi-runtime | **Done** (PR #80) |
+| PKG-A1c | Collapse away-branch dup | Pending |
 | PKG-A3 | Tick bands FRAME/SLOW/LAZY | Pending |
 | PKG-B2.1a–b | Module integrity | Pending |
 | PKG-B2.2a–b | WorkActions | Pending |
