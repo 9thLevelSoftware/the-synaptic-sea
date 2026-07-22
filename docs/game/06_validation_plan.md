@@ -412,7 +412,8 @@ run_clean 'WorkAction pure smoke' 'WORK ACTION STATE PASS catalog=true gates=tru
 run_clean 'Module integrity consequences smoke' 'MODULE INTEGRITY CONSEQUENCES PASS fire=true breach_derived=true scene=true nav=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/module_integrity_consequences_smoke.gd
 run_clean 'WorkAction resolve smoke' 'WORK ACTION RESOLVE PASS cut=true weld=true yields=true noise=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_resolve_smoke.gd
 run_clean 'Component slot population smoke' 'COMPONENT SLOT POPULATION PASS catalog=true placed=true deterministic=true no_collision=true linked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_slot_population_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=232 clean_output=true'
+run_clean 'Crafting quality knowledge smoke' 'CRAFTING QUALITY KNOWLEDGE PASS quality=true knowledge=true reverse=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/crafting_quality_knowledge_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=233 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
