@@ -8,6 +8,10 @@ class_name TuningCatalog
 ## opportunistically — this class does not mass-migrate the coordinator.
 
 const DEFAULT_BALANCE_DIR: String = "res://data/balance/"
+## Explicit paths that work under PCK export (DirAccess listing of res:// is unreliable in release).
+const DEFAULT_BALANCE_FILES: Array = [
+	"res://data/balance/shell.json",
+]
 
 var _values: Dictionary = {}
 var _loaded_paths: PackedStringArray = PackedStringArray()
@@ -37,23 +41,33 @@ func load_file(path: String) -> bool:
 	return true
 
 
+## Load the known balance file list (export-safe). Prefer this for production boot.
+func load_defaults() -> int:
+	var loaded: int = 0
+	for path in DEFAULT_BALANCE_FILES:
+		if load_file(path):
+			loaded += 1
+	return loaded
+
+
 ## Load every `*.json` directly under dir_path (non-recursive).
+## Editor/dev convenience. Falls back to load_defaults() when DirAccess cannot list res://.
 func load_directory(dir_path: String = DEFAULT_BALANCE_DIR) -> int:
 	var loaded: int = 0
 	var dir := DirAccess.open(dir_path)
 	if dir == null:
-		return 0
+		return load_defaults()
 	dir.list_dir_begin()
 	var entry: String = dir.get_next()
 	while entry != "":
 		if not dir.current_is_dir() and entry.ends_with(".json"):
-			var full: String = dir_path.path_join(entry) if dir_path.ends_with("/") else "%s/%s" % [dir_path.rstrip("/"), entry]
-			# DirAccess + res://: prefer path_join when available
-			full = dir_path.rstrip("/") + "/" + entry
+			var full: String = dir_path.rstrip("/") + "/" + entry
 			if load_file(full):
 				loaded += 1
 		entry = dir.get_next()
 	dir.list_dir_end()
+	if loaded == 0:
+		return load_defaults()
 	return loaded
 
 

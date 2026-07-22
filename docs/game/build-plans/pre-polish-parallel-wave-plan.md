@@ -70,7 +70,7 @@ Module integrity is the unit of destruction. **No voxels.** See `docs/game/adr/0
 ## Wave 0 verification (landed)
 
 ```
-SIM KEYS PASS hot=8 total=49 vitals_wired=true
+SIM KEYS PASS hot=9 total=52 vitals_wired=true
 TUNING CATALOG PASS shell=true dir_loaded=1 override=true
 ```
 

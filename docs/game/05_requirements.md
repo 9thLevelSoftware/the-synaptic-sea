@@ -1187,3 +1187,107 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Verification:
   - `tuning_catalog_smoke.gd`
   - `TUNING CATALOG PASS`
+
+## REQ-MI-002: Module integrity has physical scene consequences
+
+- Source: \eatures/module_integrity.md\, ADR-0051
+- Type: gameplay / technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Damaged/breached/destroyed states update mesh, collision, and nav as authored.
+  - Breached walls couple to atmosphere/hull breach accounting.
+- Verification:
+  - Scene integrity smoke (when implemented)
+
+## REQ-MI-003: Module integrity persists as sparse deltas
+
+- Source: \eatures/module_integrity.md\, ADR-0051
+- Type: technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Save/load and revisit restore only touched modules over regenerate-from-seed geometry.
+- Verification:
+  - Integrity snapshot round-trip smoke (when implemented)
+
+## REQ-MI-004: Structure damage sources route through module integrity
+
+- Source: \eatures/module_integrity.md- Type: gameplay
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Fire, decompression, threat structure attacks, and player tools can damage modules.
+- Verification:
+  - Multi-source damage smoke (when implemented)
+
+## REQ-WA-002: WorkActions emit noise, XP, and inventory yields
+
+- Source: \eatures/work_actions.md- Type: gameplay
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Completed work emits noise into threat detection, XP via TrainingEventBus, and yields into inventory/encumbrance.
+- Verification:
+  - WorkAction scene smoke (when implemented)
+
+## REQ-WA-003: WorkActions interrupt on damage without double-consume
+
+- Source: \eatures/work_actions.md- Type: gameplay
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Mid-work damage interrupts progress; materials are not double-consumed.
+- Verification:
+  - WorkAction interrupt pure smoke (when implemented)
+
+## REQ-WA-004: Repair/seal/suppress unify onto WorkActions
+
+- Source: \eatures/work_actions.md- Type: gameplay / technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - One progress/interrupt/UI path covers patch/weld/seal/suppress; authored repair_point remains objective wrapper.
+- Verification:
+  - Repair unification smoke (when implemented)
+
+## REQ-CMP-002: Components link to ship-system subcomponents
+
+- Source: \eatures/component_slots.md- Type: gameplay / technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Where authored, systems.json subcomponents map onto placed physical components.
+- Verification:
+  - Component link smoke (when implemented)
+
+## REQ-CMP-003: Components mount and dismount as WorkActions
+
+- Source: \eatures/component_slots.md- Type: gameplay
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Dismount yields a heavy inventory item; remount restores placed component.
+- Verification:
+  - Mount/dismount smoke (when implemented)
+
+## REQ-SMOD-002: Installs respect power budget constraints
+
+- Source: \eatures/ship_modification.md- Type: gameplay
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Over-budget installs are rejected or force authored degradation; better components draw more power.
+- Verification:
+  - Power budget install smoke (when implemented)
+
+## REQ-SMOD-003: Hub growth is the walkable home ship
+
+- Source: \eatures/ship_modification.md- Type: gameplay / design
+- Priority: should
+- Status: Approved
+- Acceptance criteria:
+  - Home ship stations/components/hydro support the explorable-hub fantasy without a separate hub scene.
+- Verification:
+  - Home-ship interaction verification smoke/playtest (when implemented)
+

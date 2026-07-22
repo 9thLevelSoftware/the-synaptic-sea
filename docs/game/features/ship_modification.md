@@ -54,7 +54,7 @@ Docking/hangar/ship-in-ship are mechanically complete, but ships are not differe
 - Extends ShipRuntime / ShipInstance snapshots
 - WorkAction install/uninstall verbs
 - Power budget consumers already data-backed
-- Requirements: REQ-SMOD-001..005
+- Requirements: REQ-SMOD-001..REQ-SMOD-003
 - Depends: component_slots, work_actions, module_integrity, ShipRuntime multi-instance
 
 ## Acceptance criteria

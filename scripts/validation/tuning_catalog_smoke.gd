@@ -40,7 +40,17 @@ func _initialize() -> void:
 		_fail("catalog_shell_version expected 1")
 		return
 
-	# Directory load
+	# Explicit defaults load (export-safe path list)
+	var cat_defaults = TuningCatalogScript.new()
+	var n_defaults: int = cat_defaults.load_defaults()
+	if n_defaults < 1:
+		_fail("load_defaults should load shell.json")
+		return
+	if absf(cat_defaults.get_float("tuning.example_float", 0.0) - 1.5) > 0.0001:
+		_fail("load_defaults missing example_float")
+		return
+
+	# Directory load (dev convenience; falls back to defaults if listing fails)
 	var cat2 = TuningCatalogScript.new()
 	var n: int = cat2.load_directory("res://data/balance/")
 	if n < 1:

@@ -54,7 +54,7 @@ Structure damage today is abstract (`breach_count`, fire zones) without per-modu
 - Data: kit materials JSON under `data/kits/` or `data/materials/`
 - Scene applier: loader / integrity applier; ShipNavGraph link updates
 - ADR: `docs/game/adr/0051-module-integrity-not-voxels.md`
-- Requirements: REQ-MI-001..006
+- Requirements: REQ-MI-001..REQ-MI-004
 
 ## Acceptance criteria
 

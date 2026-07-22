@@ -58,7 +58,7 @@ Data-defined WorkAction:
 
 - `WorkActionCatalog` data + `WorkActionState` pure model
 - Scene driver + salvage-target-picker (PR #76) as universal "what can I do" surface
-- ADR-0051 for targets; requirements REQ-WA-001..008
+- ADR-0051 for targets; requirements REQ-WA-001..REQ-WA-004
 
 ## Acceptance criteria
 

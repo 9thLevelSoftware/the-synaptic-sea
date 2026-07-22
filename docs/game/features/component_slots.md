@@ -54,7 +54,7 @@ Rooms are full of machines you can repair in place or rip out and haul home. The
 - New placement stage script in procgen/loader chain
 - Component catalog under `data/`
 - WorkAction verbs for mount/dismount
-- Requirements: REQ-CMP-001..006
+- Requirements: REQ-CMP-001..REQ-CMP-003
 - Depends: ADR-0051, work_actions, preferred after dressing consumption
 
 ## Acceptance criteria
