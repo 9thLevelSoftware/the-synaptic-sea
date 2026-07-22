@@ -31,7 +31,9 @@ func can_deconstruct(recipe_id: String, inventory) -> bool:
 
 ## Deconstructs an item, consuming it and producing base materials.
 ## Returns the produces dict {item_id, quantity} or empty dict on failure.
-func deconstruct(recipe_id: String, inventory, material_state) -> Dictionary:
+## PKG-B2.4a: output quality inherits source material quality × skill × tool (no 0.5 hardcode).
+## context optional keys: skill_level (int), tool_factor (float, default 1.0)
+func deconstruct(recipe_id: String, inventory, material_state, context: Dictionary = {}) -> Dictionary:
 	var recipe: Dictionary = _crafting_state.get_recipe(recipe_id)
 	if recipe.is_empty():
 		return {}
@@ -39,18 +41,48 @@ func deconstruct(recipe_id: String, inventory, material_state) -> Dictionary:
 		return {}
 	if not can_deconstruct(recipe_id, inventory):
 		return {}
-	# For deconstruction, material quality of the source item doesn't affect output
-	# (deconstruction yields base materials at standard quality).
+	var source_quality: float = _source_ingredient_quality(recipe, material_state)
+	var skill_level: int = int(context.get("skill_level", 0))
+	var tool_factor: float = maxf(0.25, float(context.get("tool_factor", 1.0)))
+	var out_quality: float = _resolve_yield_quality(source_quality, skill_level, tool_factor)
 	if _crafting_state.consume_ingredients(recipe_id, inventory):
 		var produces: Dictionary = _crafting_state.get_produces(recipe_id)
 		var out_id: String = str(produces.get("item_id", ""))
 		var out_qty: int = int(produces.get("quantity", 0))
 		if not out_id.is_empty() and out_qty > 0:
-			# Set output material quality to standard (0.5) if it's a known material
-			if material_state.has_definition(out_id):
-				material_state.set_quality(out_id, 0.5)
-			return produces.duplicate()
+			if material_state != null and material_state.has_method("has_definition") \
+					and material_state.has_definition(out_id) \
+					and material_state.has_method("set_quality"):
+				material_state.set_quality(out_id, out_quality)
+			var result: Dictionary = produces.duplicate()
+			result["quality"] = out_quality
+			result["source_quality"] = source_quality
+			return result
 	return {}
+
+
+func _source_ingredient_quality(recipe: Dictionary, material_state) -> float:
+	if material_state == null or not material_state.has_method("get_quality"):
+		return 0.5
+	var ingredients: Variant = recipe.get("ingredients", {})
+	if typeof(ingredients) != TYPE_DICTIONARY or (ingredients as Dictionary).is_empty():
+		return 0.5
+	var total: float = 0.0
+	var weight: float = 0.0
+	for mat_id in (ingredients as Dictionary).keys():
+		var qty: float = float((ingredients as Dictionary)[mat_id])
+		var q: float = float(material_state.get_quality(str(mat_id)))
+		total += q * qty
+		weight += qty
+	if weight <= 0.0:
+		return 0.5
+	return clampf(total / weight, 0.0, 1.0)
+
+
+## Quality inheritance curve: source × (0.8 + 0.04*skill) × tool_factor, clamped.
+static func _resolve_yield_quality(source_quality: float, skill_level: int, tool_factor: float) -> float:
+	var skill_curve: float = 0.80 + 0.04 * float(clampi(skill_level, 0, 10))
+	return clampf(source_quality * skill_curve * tool_factor, 0.0, 1.0)
 
 ## Auto-deconstruct: finds the first deconstruction recipe for a given item_id
 ## and executes it. Returns the produces dict or empty.
@@ -241,7 +273,9 @@ func salvage_junk_item(item_id: String, inventory, material_state) -> Dictionary
 		if material_state != null and material_state.has_method("has_definition") \
 				and material_state.has_definition(mid2) \
 				and material_state.has_method("set_quality"):
-			material_state.set_quality(mid2, 0.5)
+			# PKG-B2.4a: junk salvage inherits a soft base from tool quality context later;
+			# default inheritance curve with standard source (0.5).
+			material_state.set_quality(mid2, _resolve_yield_quality(0.5, 0, 1.0))
 		materials[mid2] = int(materials.get(mid2, 0)) + qty2
 		if first_id.is_empty():
 			first_id = mid2

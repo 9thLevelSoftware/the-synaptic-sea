@@ -71,9 +71,12 @@ func has_recipe(recipe_id: String) -> bool:
 # --- ingredient validation ---
 
 ## Returns true if the inventory has enough of every ingredient.
-func can_craft(recipe_id: String, inventory) -> bool:
+## PKG-B2.4a: optional knowledge gate — pass knowledge state as third arg.
+func can_craft(recipe_id: String, inventory, knowledge = null) -> bool:
 	var recipe: Dictionary = get_recipe(recipe_id)
 	if recipe.is_empty():
+		return false
+	if knowledge != null and knowledge.has_method("is_known") and not bool(knowledge.call("is_known", recipe_id)):
 		return false
 	var ingredients: Variant = recipe.get("ingredients", {})
 	if not (ingredients is Dictionary):
