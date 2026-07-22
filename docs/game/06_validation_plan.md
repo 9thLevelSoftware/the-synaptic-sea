@@ -408,7 +408,8 @@ run_clean 'ShipRuntime shell smoke' 'SHIP RUNTIME PASS advance=true catchup=true
 run_clean 'Tick bands smoke' 'TICK BANDS PASS frame=true slow=true lazy=true catchup_lazy=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tick_bands_smoke.gd
 run_clean 'Module integrity pure smoke' 'MODULE INTEGRITY PASS fsm=true sparse=true determinism=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/module_integrity_smoke.gd
 run_clean 'Dressing consumption smoke' 'DRESSING CONSUMPTION PASS presets=true descriptors=true lights=true density=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dressing_consumption_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=228 clean_output=true'
+run_clean 'WorkAction pure smoke' 'WORK ACTION STATE PASS catalog=true gates=true progress=true interrupt=true yield=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_state_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=229 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
