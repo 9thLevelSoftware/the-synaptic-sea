@@ -139,6 +139,8 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 	var vertical_link_count: int = _add_vertical_links(layout_doc, structural_root)
 
 	_add_coherence_runtime_nodes(layout_doc, structural_root)
+	# PKG-B5.1: apply dressing fog/tint/light meta per room variant descriptors.
+	_apply_dressing_visuals(layout_doc, structural_root)
 
 	objective_volumes = []
 	for objective_variant in objective_specs:
@@ -840,9 +842,8 @@ func get_room_variant_descriptors() -> Dictionary:
 
 
 ## Records the dressing descriptor for each room whose variant carries dressing
-## (or a hazard/loot effect). No new meshes are created — this is metadata the
-## scanner/HUD reads to label rooms (e.g. "flooded"). Reuses existing structural
-## placement props; unmapped variants are skipped.
+## (or a hazard/loot effect). PKG-B5.1 expands this with fog/tint/light/prop_density
+## presets so the loader and HUD consume live visual parameters, not bare tags.
 func _build_room_variant_descriptors() -> void:
 	room_variant_descriptors.clear()
 	var rooms_variant: Variant = layout_doc.get("rooms", [])
@@ -860,10 +861,79 @@ func _build_room_variant_descriptors() -> void:
 		var rid: String = str(room.get("id", ""))
 		if rid.is_empty():
 			continue
-		room_variant_descriptors[rid] = {
+		var dressing: String = str(effects.get("dressing", ""))
+		var preset: Dictionary = selector.dressing_preset(dressing)
+		var entry: Dictionary = {
 			"variant": variant,
-			"dressing": str(effects.get("dressing", "")),
+			"dressing": dressing,
+			"prop_density": float(preset.get("prop_density", 1.0)),
+			"fog_density": float(preset.get("fog_density", 0.0)),
+			"light_energy": float(preset.get("light_energy", 0.5)),
 		}
+		var tint_v: Variant = preset.get("tint", [1.0, 1.0, 1.0, 1.0])
+		if tint_v is Array and (tint_v as Array).size() >= 3:
+			entry["tint"] = (tint_v as Array).duplicate()
+		var light_v: Variant = preset.get("light_color", [1.0, 1.0, 1.0, 1.0])
+		if light_v is Array and (light_v as Array).size() >= 3:
+			entry["light_color"] = (light_v as Array).duplicate()
+		room_variant_descriptors[rid] = entry
+
+
+## PKG-B5.1: per-room OmniLight + fog volume markers driven by dressing presets.
+## Deterministic positions from room centers; no RNG.
+func _apply_dressing_visuals(layout_doc: Dictionary, ship_root: Node3D) -> void:
+	if ship_root == null or room_variant_descriptors.is_empty():
+		return
+	var rooms_variant: Variant = layout_doc.get("rooms", [])
+	if typeof(rooms_variant) != TYPE_ARRAY:
+		return
+	var dressing_root := Node3D.new()
+	dressing_root.name = "DressingVisuals"
+	ship_root.add_child(dressing_root)
+	for rid in room_variant_descriptors.keys():
+		var desc: Dictionary = room_variant_descriptors[rid]
+		var dressing: String = str(desc.get("dressing", ""))
+		if dressing.is_empty():
+			continue
+		var center: Vector3 = _room_center(rooms_variant as Array, str(rid))
+		if center == Vector3.INF:
+			continue
+		var light := OmniLight3D.new()
+		light.name = "DressingLight_%s" % str(rid)
+		light.position = center + Vector3(0.0, 2.0, 0.0)
+		light.light_energy = float(desc.get("light_energy", 0.5))
+		light.omni_range = 6.0
+		var lc: Variant = desc.get("light_color", [1.0, 1.0, 1.0, 1.0])
+		if lc is Array and (lc as Array).size() >= 3:
+			light.light_color = Color(float(lc[0]), float(lc[1]), float(lc[2]), 1.0)
+		light.set_meta("dressing", dressing)
+		light.set_meta("prop_density", float(desc.get("prop_density", 1.0)))
+		light.set_meta("fog_density", float(desc.get("fog_density", 0.0)))
+		var tint: Variant = desc.get("tint", [])
+		if tint is Array:
+			light.set_meta("tint", (tint as Array).duplicate())
+		dressing_root.add_child(light)
+		# Lightweight fog marker mesh (visible volume cue pre-polish).
+		var fog_density: float = float(desc.get("fog_density", 0.0))
+		if fog_density > 0.001:
+			var fog_marker := MeshInstance3D.new()
+			fog_marker.name = "DressingFog_%s" % str(rid)
+			var sphere := SphereMesh.new()
+			sphere.radius = 1.5 + fog_density * 20.0
+			sphere.height = sphere.radius * 2.0
+			fog_marker.mesh = sphere
+			var mat := StandardMaterial3D.new()
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			if tint is Array and (tint as Array).size() >= 3:
+				mat.albedo_color = Color(float(tint[0]), float(tint[1]), float(tint[2]), clampf(fog_density * 4.0, 0.05, 0.35))
+			else:
+				mat.albedo_color = Color(0.5, 0.5, 0.5, 0.12)
+			fog_marker.material_override = mat
+			fog_marker.position = center + Vector3(0.0, 1.5, 0.0)
+			fog_marker.set_meta("dressing", dressing)
+			fog_marker.set_meta("fog_density", fog_density)
+			dressing_root.add_child(fog_marker)
 
 
 func _add_fire_zone_markers(layout_doc: Dictionary, ship_root: Node3D) -> void:
