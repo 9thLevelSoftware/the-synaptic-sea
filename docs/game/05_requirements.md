@@ -1333,3 +1333,17 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - compose_runtime_snapshots bundles multiple runtimes under a stable schema.
 - Verification:
   - \ship_runtime_smoke.gd  - \SHIP RUNTIME PASS\ with \snapshot=true multi=true
+
+## REQ-ARCH-005: Shared home/away sim helpers (ShipRuntime A1c)
+
+- Source: eatures/ship_runtime.md, pre-polish PKG-A1c
+- Type: technical
+- Priority: must
+- Status: Implemented
+- Acceptance criteria:
+  - Present ships advance through _tick_present_ships (ShipRuntime) on both branches.
+  - Sanity, arc, ammo/consumable decay, audio, and food helpers are shared — no home-only reimplementation for those systems.
+  - Away survival smoke still PASSes with away_ticks.
+- Verification:
+  - main_playable_survival_away_smoke.gd
+  - ship_runtime_smoke.gd / ship_catchup_smoke.gd
