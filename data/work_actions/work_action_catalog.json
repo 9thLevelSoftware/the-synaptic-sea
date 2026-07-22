@@ -1,0 +1,83 @@
+{
+  "schema": "work_action_catalog_v1",
+  "actions": {
+    "cut_wall": {
+      "verb": "cut",
+      "target_kind": "module",
+      "tool_class": "welding_lance",
+      "min_skill": "salvage",
+      "min_skill_level": 0,
+      "duration": 4.0,
+      "materials_consumed": {},
+      "materials_yielded": { "scrap_metal": 2 },
+      "noise": 0.85,
+      "xp_event": "weld",
+      "interruptible": true
+    },
+    "unbolt_component": {
+      "verb": "unbolt",
+      "target_kind": "component",
+      "tool_class": "wrench",
+      "min_skill": "salvage",
+      "min_skill_level": 1,
+      "duration": 6.0,
+      "materials_consumed": {},
+      "materials_yielded": {},
+      "noise": 0.15,
+      "xp_event": "salvage",
+      "interruptible": true
+    },
+    "weld_patch": {
+      "verb": "weld",
+      "target_kind": "module",
+      "tool_class": "welding_lance",
+      "min_skill": "repair",
+      "min_skill_level": 0,
+      "duration": 5.0,
+      "materials_consumed": { "hull_plate": 1 },
+      "materials_yielded": {},
+      "noise": 0.55,
+      "xp_event": "weld",
+      "interruptible": true
+    },
+    "patch_breach": {
+      "verb": "patch",
+      "target_kind": "breach",
+      "tool_class": "sealant",
+      "min_skill": "repair",
+      "min_skill_level": 0,
+      "duration": 3.5,
+      "materials_consumed": { "hull_sealant": 1 },
+      "materials_yielded": {},
+      "noise": 0.25,
+      "xp_event": "repair",
+      "interruptible": true
+    },
+    "pry_panel": {
+      "verb": "pry",
+      "target_kind": "module",
+      "tool_class": "prybar",
+      "min_skill": "salvage",
+      "min_skill_level": 0,
+      "duration": 3.0,
+      "materials_consumed": {},
+      "materials_yielded": { "scrap_metal": 1 },
+      "noise": 0.40,
+      "xp_event": "salvage",
+      "interruptible": true
+    },
+    "splice_conduit": {
+      "verb": "splice",
+      "target_kind": "component",
+      "tool_class": "multitool",
+      "min_skill": "repair",
+      "min_skill_level": 1,
+      "duration": 4.5,
+      "materials_consumed": { "wire_spool": 1 },
+      "materials_yielded": {},
+      "noise": 0.20,
+      "xp_event": "repair",
+      "interruptible": true
+    }
+  }
+}
