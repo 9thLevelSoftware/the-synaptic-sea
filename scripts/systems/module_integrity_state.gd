@@ -65,7 +65,14 @@ func _recompute_state() -> String:
 
 
 func is_pristine() -> bool:
-	return state == STATE_INTACT and absf(integrity - base_integrity) < 0.0001
+	# Sparse persistence must keep modules with component mutations even if undamaged.
+	if state != STATE_INTACT:
+		return false
+	if absf(integrity - base_integrity) > 0.0001:
+		return false
+	if not mounted_components.is_empty():
+		return false
+	return true
 
 
 func get_summary() -> Dictionary:
