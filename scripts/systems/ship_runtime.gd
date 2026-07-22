@@ -117,15 +117,22 @@ func catch_up(world_time: float) -> void:
 		dt -= step
 
 
-## Extension points for later packages (snapshots, integrity map, components).
+## PKG-A1b: compose one ship's runtime state for higher-level snapshots.
+## RunSnapshot/WorldSnapshot still own top-level schema; this is the per-ship
+## composition unit (ship_summary + last_sim_time + empty extension slots).
 func to_snapshot() -> Dictionary:
 	if ship == null:
 		return {}
 	var ship_id: String = str(ship.get("ship_id"))
 	var last_sim_time: float = float(ship.get("last_sim_time"))
 	var out: Dictionary = {
+		"schema": "ship_runtime_v1",
 		"ship_id": ship_id,
 		"last_sim_time": last_sim_time,
+		"is_home": is_home,
+		# Extension points for pillar packages (empty until those land).
+		"module_integrity": {},
+		"component_manifest": {},
 	}
 	if ship.has_method("get_summary"):
 		out["ship_summary"] = ship.call("get_summary")
@@ -137,3 +144,16 @@ func from_snapshot(data: Dictionary) -> void:
 		return
 	if data.has("last_sim_time"):
 		ship.set("last_sim_time", float(data.get("last_sim_time", ship.get("last_sim_time"))))
+	if data.has("ship_summary") and ship.has_method("apply_summary"):
+		var summary: Variant = data.get("ship_summary", {})
+		if typeof(summary) == TYPE_DICTIONARY and not (summary as Dictionary).is_empty():
+			ship.call("apply_summary", summary)
+
+
+## Compose multiple runtimes into one dictionary for multi-ship persistence tests.
+static func compose_runtime_snapshots(runtimes: Array) -> Dictionary:
+	var ships: Array = []
+	for rt_variant in runtimes:
+		if rt_variant is RefCounted and (rt_variant as RefCounted).has_method("to_snapshot"):
+			ships.append((rt_variant as RefCounted).call("to_snapshot"))
+	return {"schema": "ship_runtime_bundle_v1", "ships": ships}
