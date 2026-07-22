@@ -1487,49 +1487,36 @@ func _tick_active_fire(delta: float) -> void:
 func _active_derelict_web_attached() -> bool:
 	return away_from_start and current_ship != null and current_ship.is_web_attached()
 
-## Live Persistent Ships Phase 3: the unified per-ship sim tick. Advances ONE ship's
-## systems manager and applies its biomatter-web hull damage, resolving the ship's own
-## models via _web_for/_hull_for. Works for any ship (hub or derelict); used continuously
-## for present ships and (Phase 4) for catch-up over a large dt. Does NOT tick fire (that
-## stays on the active-ship scene path) or the hub expanded recompute.
+const ShipRuntimeScript := preload("res://scripts/systems/ship_runtime.gd")
+
+## Live Persistent Ships Phase 3 / PKG-A1a: per-ship sim tick via ShipRuntime.
+## Does NOT tick fire (active-ship scene path) or hub expanded recompute.
 func _advance_ship(ship, delta: float) -> void:
 	if ship == null:
 		return
-	ship.last_sim_time = world_time   # FIX C1: stamp present ship's clock so catch-up on revisit covers absence only (not presence+absence)
-	if ship.systems_manager != null:
-		ship.systems_manager.advance(delta)
-	var web = _web_for(ship)
-	var hull = _hull_for(ship)
-	if web == null or hull == null:
-		return
-	# Contact boost is the hub's only (an attached derelict docked to the hub). A derelict's
-	# own attachment drives its base web growth; cross-ship spread is a follow-on.
-	var contact: bool = _active_derelict_web_attached() if ship == home_ship else false
-	var dmg: float = web.tick(delta, contact)
-	if dmg <= 0.0:
-		return
-	for cid in hull.compartments.keys():
-		hull.damage_compartment(str(cid), dmg)
+	_runtime_for(ship).advance(delta, world_time)
 
-const CATCHUP_SUBSTEP_SECONDS: float = 5.0     # cap per advance step so fire/system models stay stable over big gaps
-const MAX_CATCHUP_SECONDS: float = 1800.0      # bound total absence catch-up to 30 min of sim (no infinite decay)
 
-## Live Persistent Ships Phase 4: fast-forward an absent ship's sim by the world_time elapsed
-## since it was last advanced, in capped sub-steps. The hub is never absent (ticked every
-## frame) so it is excluded. New derelicts have last_sim_time == world_time (seeded), so a
-## first visit is a no-op. Idempotent: stamps last_sim_time = world_time so a re-entry without
-## further world_time advance does nothing.
+## Build (or refresh) a ShipRuntime for a ship handle. Hub injects coordinator-owned
+## hull/web models; derelicts use ShipInstance models.
+func _runtime_for(ship) -> RefCounted:
+	var is_home: bool = ship == home_ship
+	var opts: Dictionary = {
+		"is_home": is_home,
+	}
+	if is_home:
+		opts["hull_override"] = hull_integrity_state
+		opts["web_override"] = hull_web_state
+		opts["contact_boost_provider"] = Callable(self, "_active_derelict_web_attached")
+	var rt = ShipRuntimeScript.new()
+	rt.configure(ship, opts)
+	return rt
+
+## Live Persistent Ships Phase 4: fast-forward an absent ship's sim via ShipRuntime.
 func _catch_up_ship(inst) -> void:
 	if inst == null or inst == home_ship:
 		return
-	var dt: float = minf(world_time - inst.last_sim_time, MAX_CATCHUP_SECONDS)
-	if dt <= 0.0:
-		return
-	inst.last_sim_time = world_time
-	while dt > 0.0:
-		var step: float = minf(CATCHUP_SUBSTEP_SECONDS, dt)
-		_advance_ship(inst, step)
-		dt -= step
+	_runtime_for(inst).catch_up(world_time)
 
 func _recompute_expanded_ship_systems(delta: float) -> void:
 	if power_grid_state == null:

@@ -127,7 +127,10 @@ Parallel decomposition: `docs/game/build-plans/pre-polish-parallel-wave-plan.md`
 - `SimKeys` contract + pure-system hot-path consumers (`sim_keys_smoke`)
 - `TuningCatalog` shell + `data/balance/` (`tuning_catalog_smoke`)
 
-**Next critical path:** ShipRuntime strangler (`playable_generated_ship.gd` single-owner), then pillar packages in parallel waves.
+**Wave 1 in progress:**
+- PKG-A1a: `ShipRuntime` owns advance/catch-up; coordinator wrappers remain for smokes.
+
+**Next critical path:** A1b snapshot composition → A1c away-branch collapse → A3 tick bands, then pillar packages.
 
 ## Quarantined / do-not-trust docs
 

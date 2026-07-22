@@ -401,7 +401,9 @@ run_clean 'Procgen derelict pipeline contract smoke' 'MAIN PLAYABLE DERELICT PIP
 # --- Pre-polish foundations (2026-07-22 Wave 0): SimKeys + TuningCatalog shells ---
 run_clean 'SimKeys contract smoke' 'SIM KEYS PASS hot=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sim_keys_smoke.gd
 run_clean 'TuningCatalog shell smoke' 'TUNING CATALOG PASS shell=true dir_loaded=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tuning_catalog_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=224 clean_output=true'
+# --- Pre-polish PKG-A1a: ShipRuntime advance/catch-up ---
+run_clean 'ShipRuntime shell smoke' 'SHIP RUNTIME PASS advance=true catchup=true idempotent=true hub_skip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_runtime_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=225 clean_output=true'
 ```
 
 ## Baseline Godot teardown noise
