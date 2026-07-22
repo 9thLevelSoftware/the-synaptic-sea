@@ -2,7 +2,9 @@
 
 ## Status
 
-Approved (pre-implementation)
+In progress — pure WorkActionState/catalog/resolver landed (PKG-B2.2a/b);
+repair/seal/suppress wrappers ride WorkActionChannel (PKG-B2.5). Scene driver
++ salvage picker full wiring still open for B2.2b scene package.
 
 ## Design pillar alignment
 

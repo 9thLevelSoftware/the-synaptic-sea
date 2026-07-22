@@ -78,6 +78,34 @@
       "noise": 0.20,
       "xp_event": "repair",
       "interruptible": true
+    },
+    "repair_subcomponent": {
+      "verb": "splice",
+      "target_kind": "repair_point",
+      "tool_class": "",
+      "min_skill": "",
+      "min_skill_level": 0,
+      "duration": 8.0,
+      "materials_consumed": {},
+      "materials_yielded": {},
+      "noise": 0.35,
+      "xp_event": "repair",
+      "interruptible": true,
+      "notes": "PKG-B2.5: RepairPoint wrapper owns parts/tools/skill gates; materials consume on complete via repair_with_inventory"
+    },
+    "suppress_fire": {
+      "verb": "suppress",
+      "target_kind": "fire",
+      "tool_class": "",
+      "min_skill": "",
+      "min_skill_level": 0,
+      "duration": 4.0,
+      "materials_consumed": {},
+      "materials_yielded": {},
+      "noise": 0.10,
+      "xp_event": "repair",
+      "interruptible": true,
+      "notes": "PKG-B2.5: FireSuppressionPoint wrapper owns extinguisher/charge gates; charge consume on complete"
     }
   }
 }

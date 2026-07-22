@@ -40,7 +40,7 @@ Module integrity is the unit of destruction. **No voxels.** See `docs/game/adr/0
 | PKG-B2.2a–b | WorkActions | Pending |
 | PKG-B2.3a–b | Component slots | Pending |
 | PKG-B2.4a–b | Crafting depth | Pending |
-| PKG-B2.5 | Repair unification | Pending |
+| PKG-B2.5 | Repair unification | **Done** (PR pending) |
 | PKG-B5.1 | Dressing consumption | Pending |
 | PKG-C3.1a–b | Wounds / vitals v2 | Pending |
 | PKG-C3.2 | Food closure | Pending |
