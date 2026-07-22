@@ -102,6 +102,8 @@ const LifeSupportExpandedStateScript := preload("res://scripts/systems/life_supp
 const HullIntegrityStateScript := preload("res://scripts/systems/hull_integrity_state.gd")
 const WebInfestationStateScript := preload("res://scripts/systems/web_infestation_state.gd")
 const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
+const ModuleIntegrityMapScript := preload("res://scripts/systems/module_integrity_map.gd")
+const ModuleIntegrityConsequencesScript := preload("res://scripts/systems/module_integrity_consequences.gd")
 const ExtinguisherStateScript := preload("res://scripts/systems/extinguisher_state.gd")
 const FireSuppressionPointScript := preload("res://scripts/tools/fire_suppression_point.gd")
 const ExtinguisherRechargePortScript := preload("res://scripts/tools/extinguisher_recharge_port.gd")
@@ -415,6 +417,8 @@ var life_support_expanded_state  # LifeSupportState
 var hull_integrity_state  # HullIntegrityState
 var hull_web_state  # WebInfestationState (hub hull's live web damage source)
 var fire_suppression_state  # FireSuppressionState
+## PKG-B2.1b: structural module integrity map (ADR-0051); fire + tools feed this.
+var module_integrity_map  # ModuleIntegrityMap
 var extinguisher_state  # ExtinguisherState
 var propulsion_expanded_state  # PropulsionState
 var sustenance_state  # SustenanceState
@@ -1442,6 +1446,7 @@ func _configure_expanded_ship_system_models() -> void:
 	life_support_expanded_state.configure(tuning.get("life_support", {}))
 	fire_suppression_state = FireSuppressionStateScript.new()
 	fire_suppression_state.configure(tuning.get("fire_suppression", {}))
+	module_integrity_map = ModuleIntegrityMapScript.new()
 	extinguisher_state = ExtinguisherStateScript.new()
 	extinguisher_state.configure(tuning.get("extinguisher", {}))
 	propulsion_expanded_state = PropulsionExpandedStateScript.new()
@@ -1480,6 +1485,8 @@ func _tick_active_fire(delta: float) -> void:
 		_refresh_fire_zones()
 	# A burning compartment degrades the ship system housed there (M7-B Task 8).
 	_apply_fire_system_damage(delta)
+	# PKG-B2.1b: fire damages wall modules; scene/nav consequences update.
+	_apply_fire_module_integrity(delta)
 
 ## Foundation contagion seed: while away and docked to a still-web-attached
 ## derelict, the web creeps onto the hub faster (contact boost). Full dock-graph
@@ -1508,6 +1515,7 @@ func _runtime_for(ship) -> RefCounted:
 		opts["hull_override"] = hull_integrity_state
 		opts["web_override"] = hull_web_state
 		opts["contact_boost_provider"] = Callable(self, "_active_derelict_web_attached")
+		opts["module_integrity"] = module_integrity_map
 	var rt = ShipRuntimeScript.new()
 	rt.configure(ship, opts)
 	return rt
@@ -1537,7 +1545,7 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 			recycled_water = float(water_recycler_state.output_ready)
 		life_support_expanded_state.tick(delta, {
 			"powered_ratio": power_grid_state.get_allocation_ratio("life_support"),
-			"breach_count": hull_integrity_state.get_breach_count(),
+			"breach_count": _derived_breach_count(),
 			"recycled_water": recycled_water,
 		})
 	# ADR-0038: drive station power from the same "stations" channel, then advance the
@@ -3216,6 +3224,93 @@ func _apply_fire_system_damage(delta: float) -> void:
 			continue
 		var intensity: float = afs.get_intensity(str(cid))
 		_active_systems_manager().damage_system(sid, FIRE_SYSTEM_DAMAGE_PER_SECOND * intensity * delta)
+
+
+## PKG-B2.1b: fire intensity damages structural wall modules in mapped rooms.
+func _apply_fire_module_integrity(delta: float) -> void:
+	if module_integrity_map == null or delta <= 0.0:
+		return
+	var afs = _active_fire_state()
+	if afs == null:
+		return
+	var burning: Dictionary = {}
+	for cid in afs.get_burning_compartments():
+		burning[str(cid)] = afs.get_intensity(str(cid))
+	if burning.is_empty():
+		return
+	var layout: Dictionary = {}
+	if is_instance_valid(loader) and loader.has_method("get_layout_copy"):
+		layout = loader.get_layout_copy()
+	if layout.is_empty() and away_from_start and current_ship != null and current_ship.built_layout is Dictionary:
+		layout = current_ship.built_layout
+	if layout.is_empty():
+		return
+	if module_integrity_map.size() == 0:
+		ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
+	var changed: Array = ModuleIntegrityConsequencesScript.apply_fire_damage(
+		module_integrity_map, layout, burning, COMPARTMENT_FOR_ROLE, delta
+	)
+	if changed.is_empty():
+		return
+	_apply_module_integrity_scene(changed)
+	# Soften nav through rooms with breaches/destroyed walls (threat nav graph).
+	var nav = null
+	if threat_manager != null and "nav_graph" in threat_manager:
+		nav = threat_manager.nav_graph
+	if nav != null and nav is RefCounted and (nav as RefCounted).has_method("set_edge_cost_multiplier"):
+		var gap_rooms: PackedStringArray = module_integrity_map.rooms_with_nav_gaps()
+		ModuleIntegrityConsequencesScript.apply_nav_gaps(nav as RefCounted, gap_rooms)
+
+
+## Hull breaches + module wall breaches (atmosphere links).
+func _derived_breach_count() -> int:
+	var hull_n: int = 0
+	if hull_integrity_state != null:
+		hull_n = int(hull_integrity_state.get_breach_count())
+	var module_n: int = 0
+	if module_integrity_map != null:
+		module_n = int(module_integrity_map.count_wall_breaches())
+	return hull_n + module_n
+
+
+func get_module_integrity_map_for_validation():
+	return module_integrity_map
+
+
+func get_derived_breach_count_for_validation() -> int:
+	return _derived_breach_count()
+
+
+## Apply mesh/collision meta consequences for changed modules.
+func _apply_module_integrity_state_to_scene() -> void:
+	if module_integrity_map == null:
+		return
+	_apply_module_integrity_scene(module_integrity_map.module_ids())
+
+
+func _apply_module_integrity_scene(module_ids: Array) -> void:
+	var root: Node3D = null
+	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
+		root = current_ship.scene_root
+	elif is_instance_valid(loader):
+		root = loader
+	if root == null:
+		return
+	for mid_v in module_ids:
+		var mid: String = str(mid_v)
+		var st: String = str(module_integrity_map.get_state(mid))
+		var node: Node = _find_structural_module_node(root, mid)
+		if node is Node3D:
+			ModuleIntegrityConsequencesScript.apply_to_node(node as Node3D, st)
+
+
+func _find_structural_module_node(root: Node, module_key: String) -> Node:
+	# module_key format: room_id/placement_name → node name room_id_placement_name
+	var parts: PackedStringArray = module_key.split("/")
+	if parts.size() < 2:
+		return root.find_child(module_key, true, false)
+	var expected: String = "%s_%s" % [parts[0], parts[1]]
+	return root.find_child(expected, true, false)
 
 func _build_fire_zones() -> void:
 	_clear_fire_zones()

@@ -20,11 +20,14 @@ var material_composition: Dictionary = {}
 var mounted_components: Array = []
 var base_integrity: float = 1.0
 var tool_class_required: String = ""
+## Owning room (optional; used for fire/nav routing).
+var room_id: String = ""
 
 
 func configure(config: Dictionary = {}) -> void:
 	module_id = str(config.get("module_id", module_id))
 	kind = str(config.get("kind", kind))
+	room_id = str(config.get("room_id", room_id))
 	base_integrity = maxf(0.01, float(config.get("base_integrity", 1.0)))
 	integrity = clampf(float(config.get("integrity", base_integrity)), 0.0, base_integrity)
 	tool_class_required = str(config.get("tool_class", tool_class_required))
@@ -79,6 +82,7 @@ func get_summary() -> Dictionary:
 	return {
 		"module_id": module_id,
 		"kind": kind,
+		"room_id": room_id,
 		"integrity": integrity,
 		"base_integrity": base_integrity,
 		"state": state,
