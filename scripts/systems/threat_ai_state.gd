@@ -1,6 +1,8 @@
 extends RefCounted
 class_name ThreatAIState
 
+const SimKeysScript := preload("res://scripts/systems/sim_keys.gd")
+
 const STATE_IDLE: String = "idle"
 const STATE_INVESTIGATE: String = "investigate"
 const STATE_HUNT: String = "hunt"
@@ -102,20 +104,20 @@ func tick(delta: float, context: Dictionary = {}) -> bool:
 		_change_state(STATE_STUN)
 		return true
 	awareness_score = clampf(
-		float(context.get("noise_level", 0.0)) * noise_sensitivity +
-		float(context.get("light_level", 0.0)) * light_sensitivity +
-		float(context.get("sight_level", 0.0)) * sight_sensitivity,
+		float(context.get(SimKeysScript.NOISE_LEVEL, 0.0)) * noise_sensitivity +
+		float(context.get(SimKeysScript.LIGHT_LEVEL, 0.0)) * light_sensitivity +
+		float(context.get(SimKeysScript.SIGHT_LEVEL, 0.0)) * sight_sensitivity,
 		0.0,
 		3.0
 	)
-	var crouch_mult: float = 0.65 if bool(context.get("crouching", false)) else 1.0
+	var crouch_mult: float = 0.65 if bool(context.get(SimKeysScript.CROUCHING, false)) else 1.0
 	awareness_score *= crouch_mult
-	var same_room: bool = bool(context.get("same_room", true))
-	var detection_threshold: float = float(context.get("detect_threshold", 0.85))
+	var same_room: bool = bool(context.get(SimKeysScript.SAME_ROOM, true))
+	var detection_threshold: float = float(context.get(SimKeysScript.DETECT_THRESHOLD, 0.85))
 	if awareness_score >= detection_threshold:
 		memory_remaining = memory_seconds
-		last_known_room = str(context.get("room_id", room_id))
-		var ppos: Variant = context.get("player_position", null)
+		last_known_room = str(context.get(SimKeysScript.ROOM_ID, room_id))
+		var ppos: Variant = context.get(SimKeysScript.PLAYER_POSITION, null)
 		if ppos is Vector3:
 			last_known_position = [(ppos as Vector3).x, (ppos as Vector3).y, (ppos as Vector3).z]
 		elif ppos is Array and (ppos as Array).size() >= 3:

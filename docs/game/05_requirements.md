@@ -1109,3 +1109,185 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Verification:
   - `cross_system_dependency_smoke.gd`
   - `CROSS SYSTEM DEPENDENCY PASS`
+
+## Pre-polish foundations (2026-07-22 wave)
+
+## REQ-MI-001: Module integrity FSM and sparse persistence
+
+- Source: `features/module_integrity.md`, ADR-0051
+- Type: gameplay / technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Structural modules own integrity state `intact|damaged|breached|destroyed`.
+  - Only touched modules serialize as sparse deltas from pristine.
+  - Deterministic under fixed seed + event order.
+- Verification:
+  - `module_integrity_state_smoke.gd` (when implemented)
+  - `MODULE INTEGRITY PASS` marker
+
+## REQ-WA-001: WorkAction catalog and pure progress model
+
+- Source: `features/work_actions.md`, ADR-0051
+- Type: gameplay / technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Verbs cut/unbolt/weld/patch/pry/splice are data-defined.
+  - Progress, interrupt, tool/skill/material gates are pure-tested.
+- Verification:
+  - `work_action_state_smoke.gd` (when implemented)
+
+## REQ-CMP-001: Component slot population is deterministic
+
+- Source: `features/component_slots.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Wall/center slots fill from a seeded placement stage without overlap.
+  - Ship-system subcomponents link to placed components where authored.
+- Verification:
+  - `component_slot_population_smoke.gd` (when implemented)
+
+## REQ-SMOD-001: Ship modification is mechanical fleet payoff
+
+- Source: `features/ship_modification.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Salvaged components install into ship slots under power budget constraints.
+  - Hub growth is physical (components/modules), not a separate hub scene.
+- Verification:
+  - `ship_modification_smoke.gd` (when implemented)
+
+## REQ-ARCH-001: SimKeys contract for tick context
+
+- Source: pre-polish plan PKG-A2
+- Type: technical
+- Priority: must
+- Status: Implemented
+- Acceptance criteria:
+  - Vitals hot-path context keys are defined once in `SimKeys`.
+  - Pure vitals consumers use `SimKeys` constants; wire strings remain stable.
+- Verification:
+  - `sim_keys_smoke.gd`
+  - `SIM KEYS PASS`
+
+## REQ-ARCH-002: TuningCatalog shell
+
+- Source: pre-polish plan PKG-A4
+- Type: technical
+- Priority: must
+- Status: Implemented
+- Acceptance criteria:
+  - `TuningCatalog` loads `data/balance/*.json` with const fallbacks for missing keys.
+  - Shell fixture proves load/override without mass-migrating coordinator literals.
+- Verification:
+  - `tuning_catalog_smoke.gd`
+  - `TUNING CATALOG PASS`
+
+## REQ-MI-002: Module integrity has physical scene consequences
+
+- Source: \eatures/module_integrity.md\, ADR-0051
+- Type: gameplay / technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Damaged/breached/destroyed states update mesh, collision, and nav as authored.
+  - Breached walls couple to atmosphere/hull breach accounting.
+- Verification:
+  - Scene integrity smoke (when implemented)
+
+## REQ-MI-003: Module integrity persists as sparse deltas
+
+- Source: \eatures/module_integrity.md\, ADR-0051
+- Type: technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Save/load and revisit restore only touched modules over regenerate-from-seed geometry.
+- Verification:
+  - Integrity snapshot round-trip smoke (when implemented)
+
+## REQ-MI-004: Structure damage sources route through module integrity
+
+- Source: \eatures/module_integrity.md- Type: gameplay
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Fire, decompression, threat structure attacks, and player tools can damage modules.
+- Verification:
+  - Multi-source damage smoke (when implemented)
+
+## REQ-WA-002: WorkActions emit noise, XP, and inventory yields
+
+- Source: \eatures/work_actions.md- Type: gameplay
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Completed work emits noise into threat detection, XP via TrainingEventBus, and yields into inventory/encumbrance.
+- Verification:
+  - WorkAction scene smoke (when implemented)
+
+## REQ-WA-003: WorkActions interrupt on damage without double-consume
+
+- Source: \eatures/work_actions.md- Type: gameplay
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Mid-work damage interrupts progress; materials are not double-consumed.
+- Verification:
+  - WorkAction interrupt pure smoke (when implemented)
+
+## REQ-WA-004: Repair/seal/suppress unify onto WorkActions
+
+- Source: \eatures/work_actions.md- Type: gameplay / technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - One progress/interrupt/UI path covers patch/weld/seal/suppress; authored repair_point remains objective wrapper.
+- Verification:
+  - Repair unification smoke (when implemented)
+
+## REQ-CMP-002: Components link to ship-system subcomponents
+
+- Source: \eatures/component_slots.md- Type: gameplay / technical
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Where authored, systems.json subcomponents map onto placed physical components.
+- Verification:
+  - Component link smoke (when implemented)
+
+## REQ-CMP-003: Components mount and dismount as WorkActions
+
+- Source: \eatures/component_slots.md- Type: gameplay
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Dismount yields a heavy inventory item; remount restores placed component.
+- Verification:
+  - Mount/dismount smoke (when implemented)
+
+## REQ-SMOD-002: Installs respect power budget constraints
+
+- Source: \eatures/ship_modification.md- Type: gameplay
+- Priority: must
+- Status: Approved
+- Acceptance criteria:
+  - Over-budget installs are rejected or force authored degradation; better components draw more power.
+- Verification:
+  - Power budget install smoke (when implemented)
+
+## REQ-SMOD-003: Hub growth is the walkable home ship
+
+- Source: \eatures/ship_modification.md- Type: gameplay / design
+- Priority: should
+- Status: Approved
+- Acceptance criteria:
+  - Home ship stations/components/hydro support the explorable-hub fantasy without a separate hub scene.
+- Verification:
+  - Home-ship interaction verification smoke/playtest (when implemented)
+

@@ -1,6 +1,6 @@
 # The Synaptic Sea — Project Status (source of truth)
 
-**Last updated:** 2026-07-21
+**Last updated:** 2026-07-22
 
 This file is the entry point for "what is actually built and what's left." It exists
 because the older roadmap docs were inaccurate and have been quarantined (see below).
@@ -115,6 +115,19 @@ table role coverage; `hazard_source=runtime` (ADR-0050). Bundle **commands=222**
 
 With integration gaps closed, remaining work is content/polish (audio assets, art,
 cloud, hub scene, deeper kit art) — not reachability.
+
+## Pre-polish program (started 2026-07-22)
+
+Source plan: system-by-system path to content-capable state (module integrity, not voxels).
+Parallel decomposition: `docs/game/build-plans/pre-polish-parallel-wave-plan.md`.
+
+**Wave 0 landed:**
+- ADR-0051 module integrity (not voxels)
+- Feature specs: `module_integrity`, `work_actions`, `component_slots`, `ship_modification`
+- `SimKeys` contract + pure-system hot-path consumers (`sim_keys_smoke`)
+- `TuningCatalog` shell + `data/balance/` (`tuning_catalog_smoke`)
+
+**Next critical path:** ShipRuntime strangler (`playable_generated_ship.gd` single-owner), then pillar packages in parallel waves.
 
 ## Quarantined / do-not-trust docs
 

@@ -1,6 +1,8 @@
 extends RefCounted
 class_name SustenanceState
 
+const SimKeysScript := preload("res://scripts/systems/sim_keys.gd")
+
 var facilities: Dictionary = {}
 var total_power_consumed: float = 0.0
 var total_materials_consumed: float = 0.0
@@ -17,15 +19,15 @@ func configure(config: Dictionary) -> void:
 	meals_ready = 0
 
 func tick(_delta: float, context: Dictionary) -> void:
-	var powered_ratio: float = clampf(float(context.get("powered_ratio", 0.0)), 0.0, 1.0)
-	var hydro: Dictionary = (context.get("hydroponics_summary", {}) as Dictionary).duplicate(true)
-	var water: Dictionary = (context.get("water_recycler_summary", {}) as Dictionary).duplicate(true)
+	var powered_ratio: float = clampf(float(context.get(SimKeysScript.POWERED_RATIO, 0.0)), 0.0, 1.0)
+	var hydro: Dictionary = (context.get(SimKeysScript.HYDROPONICS_SUMMARY, {}) as Dictionary).duplicate(true)
+	var water: Dictionary = (context.get(SimKeysScript.WATER_RECYCLER_SUMMARY, {}) as Dictionary).duplicate(true)
 	total_power_consumed = float(hydro.get("power_cost", 0.0)) + float(water.get("power_cost", 0.0))
 	if powered_ratio < 0.5:
 		total_power_consumed = 0.0
 	total_materials_consumed = float(hydro.get("water_cost", 0.0)) + float(water.get("input_quantity", 0))
 	harvest_ready = 1 if int(hydro.get("state", 0)) == 2 else 0  # 2 == HydroponicsState.State.HARVESTABLE
-	meals_ready = 1 if bool(context.get("meals_active", false)) else 0
+	meals_ready = 1 if bool(context.get(SimKeysScript.MEALS_ACTIVE, false)) else 0
 	purified_water_ready = int(water.get("output_ready", 0))
 
 func get_summary() -> Dictionary:

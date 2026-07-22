@@ -1,6 +1,8 @@
 extends RefCounted
 class_name FireSuppressionState
 
+const SimKeysScript := preload("res://scripts/systems/sim_keys.gd")
+
 ## Authoritative, compartment-keyed, persist-until-extinguished fire model (ADR-0041).
 ## Fire is a SYMPTOM of unrepaired system damage: a compartment ignites only when its
 ## mapped system is damaged AND it has oxygen, and re-ignites until repaired or vented.
@@ -162,13 +164,13 @@ func tick(delta: float, context: Dictionary) -> bool:
 	if delta <= 0.0:
 		return false
 	var changed: bool = false
-	var breached: Dictionary = _to_set(context.get("breached_compartments", []))
-	var damaged: Dictionary = _to_set(context.get("damaged_compartments", []))
-	var ship_oxygen: bool = bool(context.get("ship_oxygen_present", true))
-	var powered_ratio: float = float(context.get("powered_ratio", 0.0))
-	var arc_arcing: bool = bool(context.get("arc_arcing", false))
+	var breached: Dictionary = _to_set(context.get(SimKeysScript.BREACHED_COMPARTMENTS, []))
+	var damaged: Dictionary = _to_set(context.get(SimKeysScript.DAMAGED_COMPARTMENTS, []))
+	var ship_oxygen: bool = bool(context.get(SimKeysScript.SHIP_OXYGEN_PRESENT, true))
+	var powered_ratio: float = float(context.get(SimKeysScript.POWERED_RATIO, 0.0))
+	var arc_arcing: bool = bool(context.get(SimKeysScript.ARC_ARCING, false))
 	# Optional per-tick closed-link override (merges onto model closed_links).
-	var ctx_closed: Dictionary = _to_set(context.get("closed_links", []))
+	var ctx_closed: Dictionary = _to_set(context.get(SimKeysScript.CLOSED_LINKS, []))
 
 	# 1. Vent / oxygen-loss extinguish (breach OR deliberate vent).
 	for cid in active_fires.keys():

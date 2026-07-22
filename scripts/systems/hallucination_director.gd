@@ -1,6 +1,8 @@
 extends RefCounted
 class_name HallucinationDirector
 
+const SimKeysScript := preload("res://scripts/systems/sim_keys.gd")
+
 ## Deterministic, pure-data scheduler for sanity-driven hallucinations (ADR-0042).
 ## Maps sanity to a tier (0..3) and schedules discrete manifestation events
 ## (ambient/hud/phantom) with NO RNG — selection is a seeded integer hash so the
@@ -46,9 +48,9 @@ func tick(delta: float, context: Dictionary) -> bool:
 	if delta <= 0.0:
 		return false
 	var changed: bool = false
-	var sanity: float = float(context.get("sanity", 100.0))
-	var in_safe_zone: bool = bool(context.get("in_safe_zone", false))
-	var anchors: Array = context.get("anchor_positions", []) if context.get("anchor_positions", []) is Array else []
+	var sanity: float = float(context.get(SimKeysScript.SANITY, 100.0))
+	var in_safe_zone: bool = bool(context.get(SimKeysScript.IN_SAFE_ZONE, false))
+	var anchors: Array = context.get(SimKeysScript.ANCHOR_POSITIONS, []) if context.get(SimKeysScript.ANCHOR_POSITIONS, []) is Array else []
 	_current_tier = _tier_for(sanity)
 
 	# A safe zone is a refuge: force tier 0 so NO manifestations OR teeth/FX apply while
