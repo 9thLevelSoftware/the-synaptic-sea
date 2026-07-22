@@ -6100,103 +6100,28 @@ func _process(delta: float) -> void:
 	world_time += delta  # Live Persistent Ships Phase 1: advance before any branch/return
 	if playable_started and not slice_complete:
 		run_play_time_seconds += delta  # ADR-0046: before the branch split, so home AND away count
+	# PKG-A1c: both branches share present-ship + common sim helpers. Branch bodies
+	# only keep order-sensitive differences (O2 first on away, derelict recharge gate).
 	if away_from_start:
-		# Tranche 1 (audit): mirror the home branch's post-death guard — death
-		# away (end_run sets slice_complete) must stop the sim exactly like
-		# death at home; previously every system kept ticking on a corpse.
 		if not playable_started or slice_complete:
 			return
-		# Keep the vitals panel live on a boarded derelict: Heavy-Load, repair
-		# progress, and the repair_blocked message + its countdown still apply
-		# away from home. Personal O2 also ticks here (field_atmosphere) so
-		# suit pressure drains on the derelict — life-support atmosphere bite
-		# is hub-only by design; personal oxygen owns the field.
 		_refresh_oxygen_state(false, delta)
 		_tick_threat_runtime(delta)
-		# ADR-0042 (Codex PR #44): the derelict field run is the PRIMARY low-sanity context,
-		# but this branch returns before the home-path sanity/hallucination tick. Drive it here
-		# too: away is never a safe zone, so sanity drains, the director advances, phantoms /
-		# false-HUD / FX render, and the tier-3 health teeth feed into _tick_survival_attrition
-		# below (Domain 1 Task 6: shared helper now covers the full vitals + death cascade).
-		if sanity_state != null:
-			sanity_state.in_safe_zone = false
-			sanity_state.steady_multiplier = 0.5 if (status_effects_state != null and status_effects_state.has_effect("utility_flare")) else 1.0
-			sanity_state.tick(delta)
-			if hallucination_director != null:
-				hallucination_director.tick(delta, {
-					"sanity": sanity_state.sanity,
-					"in_safe_zone": false,
-					"anchor_positions": _distributed_room_positions(),
-				})
-				if hallucination_manager != null and is_instance_valid(hallucination_manager):
-					var ppos_away: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
-					hallucination_manager.render(delta, ppos_away)
-		# Derelict-side fire (wire BOTH branches): tick the active (derelict) fire model so
-		# it spreads, degrades derelict systems, and feeds the player-vitals teeth below.
-		# Fire is ticked here via _tick_active_fire on BOTH branches (home and away).
-		# Live Persistent Ships Phase 3: _advance_ship (hub + boarded derelict) +
-		# _recompute_expanded_ship_systems run in the block below.
+		_tick_sanity_and_hallucinations(delta, false)
 		_tick_active_fire(delta)
-		# Domain 1: survival attrition + stakes on the derelict branch (shared
-		# helper). Runs radiation/body-temp/status + the vitals cascade + death,
-		# so the away path is no longer starved past the 4808 early-return.
 		_tick_survival_attrition(delta)
 		_refresh_player_vitals(delta)
-		# Tranche 1 (audit): home gets per-frame tracker status lines through
-		# _refresh_oxygen_state; the away branch skipped them, so Power/Reactor/
-		# Threats lines froze for the whole boarding run.
 		_refresh_tracker_system_status_lines()
-		# ADR-0038 (superseded by Domain 4): field crafting completes away from home.
-		# Powered-station crafting is NO LONGER paused away — the hub recompute runs on
-		# both branches now (live sim), so powered stations stay live on a derelict too.
-		if field_crafting_state != null and field_crafting_state.tick(delta):
-			_on_field_craft_completed()
-		# Timed autosave still advances on a derelict — a long boarding run is
-		# exactly the data-loss case it protects (the checkpoint save also runs away).
-		_tick_autosave_policy(delta)
-		# REQ-AU-001 (Codex PR #43): refresh + tick audio on the derelict path too, else
-		# COMBAT music / engagement flags go stale during actual away-from-start combat
-		# (this branch returns before the home-path audio tick below).
-		if is_instance_valid(audio_manager) and audio_manager.has_method("tick"):
-			audio_manager.tick(delta)
-			_refresh_audio_state(false, delta)
-		# Live Persistent Ships Phase 3: _advance_ship ticks BOTH present ships on the
-		# away branch — the hub (always co-present) and the boarded derelict (guarded so
-		# the hub is never advanced twice if current_ship == home_ship). Fire stays on
-		# _tick_active_fire above; _recompute_expanded_ship_systems follows for hub power.
-		_advance_ship(home_ship, delta)
-		if current_ship != null and current_ship != home_ship:
-			_advance_ship(current_ship, delta)
-		_recompute_expanded_ship_systems(delta)
-		# Recharge port is power-gated on the DERELICT's own power system (engineering gate):
-		# present but dead until the player restores derelict power. This MUST run AFTER
-		# _recompute_expanded_ship_systems (which sets the port to hub power_grid state),
-		# so the derelict-based gate takes final precedence on the away branch.
+		_tick_field_craft_and_autosave(delta)
+		_tick_audio_runtime(delta)
+		_tick_present_ships(delta)
+		# Away-only: derelict power gate must win over hub stations power from recompute.
 		if is_instance_valid(extinguisher_recharge_port):
 			var _dmgr = _active_systems_manager()
 			extinguisher_recharge_port.set_powered(_dmgr != null and _dmgr.is_operational("power"))
-		# Domain 3 + Phase 3: food spoilage + production advance on the derelict branch too (see
-		# _tick_food_runtime). Powered station crafting also advances on both branches
-		# via _recompute_expanded_ship_systems called above (ADR-0038 superseded).
 		_tick_food_runtime(delta)
-		# Domain 5: tick the reload timer on the away branch (derelict = primary combat context).
-		if ammo_state != null and not ammo_state.tick(delta).is_empty():
-			_refresh_weapon_hotbar()
-		# REQ-013 / Tranche 1 (audit): the electrical-arc hazard cycles on the
-		# derelict too — this was the #42/#43/#44 regression class (system
-		# ticked on the home branch only, dead in the primary field context).
-		if electrical_arc_state != null:
-			electrical_arc_state.tick(delta, {})
-			_refresh_arc_state(false)
-		# Domain 5: stimulant buff timers + addiction withdrawal/tolerance decay advance
-		# on the derelict branch too (item USE already worked away; only per-frame decay
-		# was home-only). Shared with the home block at the bottom of _process.
-		if stimulant_state != null:
-			stimulant_state.tick(delta, addiction_state, _consumable_pipeline_context())
-		if addiction_state != null:
-			addiction_state.tick(delta, status_effects_state)
-		# Domain 10 (ADR-0045): proximity tooltip focus on the away branch too --
-		# the derelict field run is the PRIMARY exploration context.
+		_tick_ammo_and_consumable_decay(delta)
+		_tick_electrical_arc(delta)
 		_refresh_tooltip_focus()
 		return
 	if not playable_started or slice_complete:
@@ -6205,59 +6130,73 @@ func _process(delta: float) -> void:
 		return
 	_tick_autosave_policy(delta)
 	_tick_threat_runtime(delta)
-	_advance_ship(home_ship, delta)
-	_recompute_expanded_ship_systems(delta)
+	_tick_present_ships(delta)
 	_tick_active_fire(delta)
 	if field_crafting_state != null and field_crafting_state.tick(delta):
 		_on_field_craft_completed()
 	_refresh_oxygen_state(false, delta)
-	# M7-B Task 7: the authoritative fire model is ticked via _tick_active_fire(delta)
-	# (called directly on BOTH branches, NOT inside _recompute_expanded_ship_systems).
-	# Passable fire zones are refreshed when the burning set changes.
-	# REQ-013: tick the electrical-arc model with the same per-frame
-	# delta so its phase / passability advance in lock-step with fire.
-	# electrical_arc_state.tick ignores the second arg (no per-frame
-	# context is needed; oxygen is the only Alpha hazard that uses it).
-	if electrical_arc_state != null:
-		electrical_arc_state.tick(delta, {})
-		_refresh_arc_state(false)
+	_tick_electrical_arc(delta)
+	_tick_ammo_and_consumable_decay(delta)
+	_tick_survival_attrition(delta)
+	var in_safe: bool = not away_from_start and (oxygen_state == null or not oxygen_state.get_summary().get("breach_open", false))
+	_tick_sanity_and_hallucinations(delta, in_safe)
+	_tick_food_runtime(delta)
+	_tick_audio_runtime(delta)
+	_refresh_tooltip_focus()
+
+
+## PKG-A1c: advance all present ships via ShipRuntime + hub expanded recompute.
+func _tick_present_ships(delta: float) -> void:
+	_advance_ship(home_ship, delta)
+	if away_from_start and current_ship != null and current_ship != home_ship:
+		_advance_ship(current_ship, delta)
+	_recompute_expanded_ship_systems(delta)
+
+
+func _tick_sanity_and_hallucinations(delta: float, in_safe: bool) -> void:
+	if sanity_state == null:
+		return
+	sanity_state.in_safe_zone = in_safe
+	sanity_state.steady_multiplier = 0.5 if (status_effects_state != null and status_effects_state.has_effect("utility_flare")) else 1.0
+	sanity_state.tick(delta)
+	if hallucination_director == null:
+		return
+	hallucination_director.tick(delta, {
+		"sanity": sanity_state.sanity,
+		"in_safe_zone": in_safe,
+		"anchor_positions": _distributed_room_positions(),
+	})
+	if hallucination_manager != null and is_instance_valid(hallucination_manager):
+		var ppos: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
+		hallucination_manager.render(delta, ppos)
+
+
+func _tick_electrical_arc(delta: float) -> void:
+	if electrical_arc_state == null:
+		return
+	electrical_arc_state.tick(delta, {})
+	_refresh_arc_state(false)
+
+
+func _tick_ammo_and_consumable_decay(delta: float) -> void:
+	if ammo_state != null and not ammo_state.tick(delta).is_empty():
+		_refresh_weapon_hotbar()
 	if stimulant_state != null:
 		stimulant_state.tick(delta, addiction_state, _consumable_pipeline_context())
 	if addiction_state != null:
 		addiction_state.tick(delta, status_effects_state)
-	# Domain 5: tick the reload timer on the home branch too (symmetry with away branch).
-	if ammo_state != null and not ammo_state.tick(delta).is_empty():
-		_refresh_weapon_hotbar()
-	# REQ-SV / Domain 1: survival attrition + stakes (shared by both branches).
-	_tick_survival_attrition(delta)
-	if sanity_state != null:
-		# Synaptic Sea field = not in a safe zone (away_from_start or breach open)
-		var in_safe: bool = not away_from_start and (oxygen_state == null or not oxygen_state.get_summary().get("breach_open", false))
-		sanity_state.in_safe_zone = in_safe
-		sanity_state.steady_multiplier = 0.5 if (status_effects_state != null and status_effects_state.has_effect("utility_flare")) else 1.0
-		sanity_state.tick(delta)
-		# ADR-0042: drive sanity hallucinations from the post-tick sanity value.
-		if hallucination_director != null:
-			var hctx := {
-				"sanity": sanity_state.sanity,
-				"in_safe_zone": in_safe,
-				"anchor_positions": _distributed_room_positions(),
-			}
-			hallucination_director.tick(delta, hctx)
-			if hallucination_manager != null and is_instance_valid(hallucination_manager):
-				var ppos: Vector3 = (player as Node3D).global_position if player != null and player is Node3D else Vector3.ZERO
-				hallucination_manager.render(delta, ppos)
-	# ADR-0034 / Domain 3: tick food spoilage + production (shared by BOTH _process branches).
-	_tick_food_runtime(delta)
-	# REQ-AU-001..010: tick the audio manager. The manager advances the
-	# ambient crossfade, music layer crossfade, sfx cooldowns + captions,
-	# and the meta-event scheduler. Tick before any HUD caption drain so
-	# the audio summary the HUD reads is at most one frame stale.
+
+
+func _tick_field_craft_and_autosave(delta: float) -> void:
+	if field_crafting_state != null and field_crafting_state.tick(delta):
+		_on_field_craft_completed()
+	_tick_autosave_policy(delta)
+
+
+func _tick_audio_runtime(delta: float) -> void:
 	if is_instance_valid(audio_manager) and audio_manager.has_method("tick"):
 		audio_manager.tick(delta)
 		_refresh_audio_state(false, delta)
-	# Domain 10 (ADR-0045): proximity tooltip focus on the home branch too.
-	_refresh_tooltip_focus()
 
 ## Domain 1 (survival_vitals): the single survival-attrition tick, called from
 ## BOTH _process branches so radiation / body-temperature / status / the vitals
