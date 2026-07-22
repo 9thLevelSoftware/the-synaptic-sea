@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved (pre-implementation)
+In implementation (B2.3a population pure model landed)
 
 ## Design pillar alignment
 
