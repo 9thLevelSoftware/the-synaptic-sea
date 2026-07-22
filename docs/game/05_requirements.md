@@ -1291,3 +1291,15 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Verification:
   - Home-ship interaction verification smoke/playtest (when implemented)
 
+## REQ-ARCH-003: ShipRuntime owns per-ship advance and catch-up
+
+- Source: \eatures/ship_runtime.md\, pre-polish PKG-A1a
+- Type: technical
+- Priority: must
+- Status: Implemented
+- Acceptance criteria:
+  - Per-ship systems manager advance and web→hull damage run through \ShipRuntime\.
+  - Absent derelicts catch up in capped sub-steps; home ships skip catch-up.
+  - Coordinator wrappers preserve existing catch-up smoke contracts.
+- Verification:
+  - \ship_runtime_smoke.gd  - \SHIP RUNTIME PASS  - \ship_catchup_smoke.gd  - \SHIP CATCHUP PASS

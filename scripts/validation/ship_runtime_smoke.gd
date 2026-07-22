@@ -1,13 +1,10 @@
 extends SceneTree
 
-## PKG-A1a: pure-ish ShipRuntime advance/catch-up contract.
+## PKG-A1a: ShipRuntime advance/catch-up contract (REQ-ARCH-003).
 ## Marker: SHIP RUNTIME PASS advance=true catchup=true idempotent=true hub_skip=true
 
 const ShipRuntimeScript := preload("res://scripts/systems/ship_runtime.gd")
 const ShipInstanceScript := preload("res://scripts/systems/ship_instance.gd")
-const HullIntegrityStateScript := preload("res://scripts/systems/hull_integrity_state.gd")
-const WebInfestationStateScript := preload("res://scripts/systems/web_infestation_state.gd")
-const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
 
 
 func _initialize() -> void:
@@ -16,47 +13,63 @@ func _initialize() -> void:
 		_fail("ShipInstance.create failed")
 		return
 
-	# Seed minimal hull/web like coordinator _seed_ship_models
 	var hull = inst.get_hull()
 	var web = inst.get_web()
-	hull.configure({})
-	web.configure({})
+	# Seed non-empty compartments so web damage can change integrity.
+	hull.configure({
+		"compartments": [
+			{"compartment_id": "bridge", "health": 1.0, "breach_open": false},
+			{"compartment_id": "engineering", "health": 1.0, "breach_open": false},
+		]
+	})
+	web.configure({"attached_to_web": true, "seed_coverage": 0.0, "growth_rate": 0.05, "damage_rate": 0.1})
 	inst.last_sim_time = 0.0
 
 	var rt = ShipRuntimeScript.new()
 	rt.configure(inst, {"is_home": false})
 
-	# --- advance stamps clock and grows web when attached ---
-	web.attached_to_web = true
-	var cov0: float = web.coverage
-	var integ0: float = hull.average_integrity()
-	rt.advance(10.0, 10.0)
-	if inst.last_sim_time != 10.0:
+	# --- advance must move web coverage OR hull integrity ---
+	var cov0: float = float(web.coverage)
+	var integ0: float = float(hull.average_integrity())
+	rt.advance(5.0, 5.0)
+	if absf(float(inst.last_sim_time) - 5.0) > 0.0001:
 		_fail("advance should stamp last_sim_time to world_time")
 		return
-	if web.coverage < cov0:
-		_fail("web coverage should not shrink on advance")
+	var cov1: float = float(web.coverage)
+	var integ1: float = float(hull.average_integrity())
+	var advanced: bool = (cov1 > cov0 + 0.0001) or (integ1 < integ0 - 0.0001)
+	if not advanced:
+		_fail("advance must change web coverage or hull integrity (cov %s->%s integ %s->%s)" % [
+			str(cov0), str(cov1), str(integ0), str(integ1)
+		])
 		return
-	var advanced: bool = web.coverage > cov0 or hull.average_integrity() <= integ0
 
-	# --- catch_up over a gap ---
-	inst.last_sim_time = 10.0
-	var world_time: float = 110.0
-	var cov_before: float = web.coverage
-	var integ_before: float = hull.average_integrity()
+	# --- catch_up over a gap must further change models (leave headroom below caps) ---
+	web.coverage = 0.2
+	hull.compartments["bridge"] = {"health": 1.0, "breach_open": false, "isolation_rating": 0.5}
+	hull.compartments["engineering"] = {"health": 1.0, "breach_open": false, "isolation_rating": 0.5}
+	inst.last_sim_time = 5.0
+	var world_time: float = 65.0
+	var cov_before: float = float(web.coverage)
+	var integ_before: float = float(hull.average_integrity())
 	rt.catch_up(world_time)
-	if inst.last_sim_time != world_time:
+	if absf(float(inst.last_sim_time) - world_time) > 0.0001:
 		_fail("catch_up should stamp last_sim_time")
 		return
-	var cov_after: float = web.coverage
-	var integ_after: float = hull.average_integrity()
-	var catchup_ok: bool = cov_after >= cov_before and integ_after <= integ_before
+	var cov_after: float = float(web.coverage)
+	var integ_after: float = float(hull.average_integrity())
+	var catchup_ok: bool = (cov_after > cov_before + 0.0001) or (integ_after < integ_before - 0.0001)
+	if not catchup_ok:
+		_fail("catch_up must change web or hull (cov %s->%s integ %s->%s)" % [
+			str(cov_before), str(cov_after), str(integ_before), str(integ_after)
+		])
+		return
 
 	# --- idempotent catch_up ---
-	var cov_mid: float = web.coverage
-	var integ_mid: float = hull.average_integrity()
+	var cov_mid: float = float(web.coverage)
+	var integ_mid: float = float(hull.average_integrity())
 	rt.catch_up(world_time)
-	if absf(web.coverage - cov_mid) > 0.0001 or absf(hull.average_integrity() - integ_mid) > 0.0001:
+	if absf(float(web.coverage) - cov_mid) > 0.0001 or absf(float(hull.average_integrity()) - integ_mid) > 0.0001:
 		_fail("idempotent catch_up should be a no-op")
 		return
 
@@ -68,20 +81,13 @@ func _initialize() -> void:
 	var home_rt = ShipRuntimeScript.new()
 	home_rt.configure(home, {"is_home": true})
 	home_rt.catch_up(500.0)
-	if home.last_sim_time != 0.0:
+	if absf(float(home.last_sim_time) - 0.0) > 0.0001:
 		_fail("home catch_up should skip")
 		return
 
-	# --- snapshot extension point ---
 	var snap: Dictionary = rt.to_snapshot()
 	if str(snap.get("ship_id", "")) != "runtime_test":
 		_fail("to_snapshot ship_id")
-		return
-
-	if not advanced or not catchup_ok:
-		_fail("advance/catchup did not move models (advance=%s catchup=%s cov %s->%s integ %s->%s)" % [
-			str(advanced), str(catchup_ok), str(cov_before), str(cov_after), str(integ_before), str(integ_after)
-		])
 		return
 
 	print("SHIP RUNTIME PASS advance=true catchup=true idempotent=true hub_skip=true")

@@ -5,51 +5,65 @@ class_name ShipRuntime
 ##
 ## Owns the advance / catch-up seam formerly inlined on PlayableGeneratedShip.
 ## The coordinator still owns scene tree, player, UI, and hub-expanded recompute;
-## this class is the pure-ish per-ship systems + web/hull tick entry point.
+## this class is the per-ship systems + web/hull tick entry point.
 ##
 ## Hub ships may inject coordinator-owned hull/web models via configure() because
 ## the home ship historically keeps those on the coordinator, not ShipInstance.
+##
+## Types: ShipInstance / HullIntegrityState / WebInfestationState are loaded by
+## script path (class_name globals are unreliable under headless --script).
 
 const CATCHUP_SUBSTEP_SECONDS: float = 5.0
 const MAX_CATCHUP_SECONDS: float = 1800.0
 
-var ship = null
+const ShipInstanceScript: GDScript = preload("res://scripts/systems/ship_instance.gd")
+const HullIntegrityStateScript: GDScript = preload("res://scripts/systems/hull_integrity_state.gd")
+const WebInfestationStateScript: GDScript = preload("res://scripts/systems/web_infestation_state.gd")
+
+## ShipInstance (typed as RefCounted for headless class_name safety).
+var ship: RefCounted = null
 var is_home: bool = false
-var hull_override = null
-var web_override = null
+## HullIntegrityState override for hub; null → ship.get_hull().
+var hull_override: RefCounted = null
+## WebInfestationState override for hub; null → ship.get_web().
+var web_override: RefCounted = null
 ## Callable() -> bool: contact boost for hub web growth (attached derelict docked).
 var contact_boost_provider: Callable = Callable()
 
 
-func configure(ship_inst, opts: Dictionary = {}) -> void:
+func configure(ship_inst: RefCounted, opts: Dictionary = {}) -> void:
 	ship = ship_inst
 	is_home = bool(opts.get("is_home", false))
-	hull_override = opts.get("hull_override", null)
-	web_override = opts.get("web_override", null)
+	var hull_opt: Variant = opts.get("hull_override", null)
+	hull_override = hull_opt as RefCounted if hull_opt is RefCounted else null
+	var web_opt: Variant = opts.get("web_override", null)
+	web_override = web_opt as RefCounted if web_opt is RefCounted else null
 	var provider: Variant = opts.get("contact_boost_provider", Callable())
 	if provider is Callable:
-		contact_boost_provider = provider
+		contact_boost_provider = provider as Callable
 	else:
 		contact_boost_provider = Callable()
 
 
-func get_ship():
+func get_ship() -> RefCounted:
 	return ship
 
 
-func _resolve_hull():
+func _resolve_hull() -> RefCounted:
 	if hull_override != null:
 		return hull_override
 	if ship != null and ship.has_method("get_hull"):
-		return ship.get_hull()
+		var h: Variant = ship.call("get_hull")
+		return h as RefCounted if h is RefCounted else null
 	return null
 
 
-func _resolve_web():
+func _resolve_web() -> RefCounted:
 	if web_override != null:
 		return web_override
 	if ship != null and ship.has_method("get_web"):
-		return ship.get_web()
+		var w: Variant = ship.call("get_web")
+		return w as RefCounted if w is RefCounted else null
 	return null
 
 
@@ -66,21 +80,25 @@ func _contact_boost() -> bool:
 func advance(delta: float, world_time: float) -> void:
 	if ship == null or delta < 0.0:
 		return
-	ship.last_sim_time = world_time
-	if ship.systems_manager != null and ship.systems_manager.has_method("advance"):
-		ship.systems_manager.advance(delta)
-	var web = _resolve_web()
-	var hull = _resolve_hull()
+	ship.set("last_sim_time", world_time)
+	var systems_manager: Variant = ship.get("systems_manager")
+	if systems_manager != null and systems_manager is Object and (systems_manager as Object).has_method("advance"):
+		(systems_manager as Object).call("advance", delta)
+	var web: RefCounted = _resolve_web()
+	var hull: RefCounted = _resolve_hull()
 	if web == null or hull == null:
 		return
+	if not web.has_method("tick") or not hull.has_method("damage_compartment"):
+		return
 	var contact: bool = _contact_boost()
-	var dmg: float = web.tick(delta, contact)
+	var dmg: float = float(web.call("tick", delta, contact))
 	if dmg <= 0.0:
 		return
-	if hull.compartments == null:
+	var compartments: Variant = hull.get("compartments")
+	if typeof(compartments) != TYPE_DICTIONARY:
 		return
-	for cid in hull.compartments.keys():
-		hull.damage_compartment(str(cid), dmg)
+	for cid in (compartments as Dictionary).keys():
+		hull.call("damage_compartment", str(cid), dmg)
 
 
 ## Fast-forward an absent ship by world_time - last_sim_time in capped sub-steps.
@@ -88,10 +106,11 @@ func advance(delta: float, world_time: float) -> void:
 func catch_up(world_time: float) -> void:
 	if ship == null or is_home:
 		return
-	var dt: float = minf(world_time - ship.last_sim_time, MAX_CATCHUP_SECONDS)
+	var last: float = float(ship.get("last_sim_time"))
+	var dt: float = minf(world_time - last, MAX_CATCHUP_SECONDS)
 	if dt <= 0.0:
 		return
-	ship.last_sim_time = world_time
+	ship.set("last_sim_time", world_time)
 	while dt > 0.0:
 		var step: float = minf(CATCHUP_SUBSTEP_SECONDS, dt)
 		advance(step, world_time)
@@ -102,12 +121,14 @@ func catch_up(world_time: float) -> void:
 func to_snapshot() -> Dictionary:
 	if ship == null:
 		return {}
+	var ship_id: String = str(ship.get("ship_id"))
+	var last_sim_time: float = float(ship.get("last_sim_time"))
 	var out: Dictionary = {
-		"ship_id": str(ship.ship_id) if "ship_id" in ship else "",
-		"last_sim_time": float(ship.last_sim_time) if "last_sim_time" in ship else 0.0,
+		"ship_id": ship_id,
+		"last_sim_time": last_sim_time,
 	}
 	if ship.has_method("get_summary"):
-		out["ship_summary"] = ship.get_summary()
+		out["ship_summary"] = ship.call("get_summary")
 	return out
 
 
@@ -115,4 +136,4 @@ func from_snapshot(data: Dictionary) -> void:
 	if ship == null or data.is_empty():
 		return
 	if data.has("last_sim_time"):
-		ship.last_sim_time = float(data.get("last_sim_time", ship.last_sim_time))
+		ship.set("last_sim_time", float(data.get("last_sim_time", ship.get("last_sim_time"))))
