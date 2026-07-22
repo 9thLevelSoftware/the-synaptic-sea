@@ -1134,7 +1134,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Source: `features/module_integrity.md`, ADR-0051
 - Type: gameplay / technical
 - Priority: must
-- Status: Approved
+- Status: Implemented
 - Acceptance criteria:
   - Structural modules own integrity state `intact|damaged|breached|destroyed`.
   - Only touched modules serialize as sparse deltas from pristine.

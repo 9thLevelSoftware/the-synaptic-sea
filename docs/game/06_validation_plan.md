@@ -406,7 +406,8 @@ run_clean 'TuningCatalog shell smoke' 'TUNING CATALOG PASS shell=true dir_loaded
 # --- Pre-polish PKG-A1a: ShipRuntime advance/catch-up ---
 run_clean 'ShipRuntime shell smoke' 'SHIP RUNTIME PASS advance=true catchup=true idempotent=true hub_skip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_runtime_smoke.gd
 run_clean 'Tick bands smoke' 'TICK BANDS PASS frame=true slow=true lazy=true catchup_lazy=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tick_bands_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=226 clean_output=true'
+run_clean 'Module integrity pure smoke' 'MODULE INTEGRITY PASS fsm=true sparse=true determinism=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/module_integrity_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=227 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
