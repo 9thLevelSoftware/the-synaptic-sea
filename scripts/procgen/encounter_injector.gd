@@ -23,19 +23,17 @@ class_name EncounterInjector
 #                             same marker; also lets combat look up
 #                             the per-marker RNG stream)
 #
-# Critical-path rooms are NEVER spawned into (see REQ-PG-007 +
-# RISK-011). The critical path is read from layout.critical_path
-# which LayoutSerializer._build_critical_path() populates; if the
-# field is missing, the injector computes it via
-# TemplateCTraversal.critical_path().
+# Critical-path rooms are NEVER used as *spawn camps* (REQ-PG-007 +
+# RISK-011). Markers may still sit on branch rooms that *patrol across*
+# the critical path (flagged patrol_crosses_critical). The critical path
+# is read from layout.critical_path which LayoutSerializer populates.
 #
-# Density model:
-#   - For every non-critical room, compute base probability p_base
-#     per room role from ENCOUNTER_BASE_PROBABILITY.
-#   - Multiply by DifficultyProfile.combined_modifier(
-#       biome, difficulty, "encounter_density_modifier").
-#   - Clamp to [0.0, 1.0]. Roll against p_final.
-#   - If rolled, emit one marker; record count = 1.
+# Density model (PKG-C5.3 tension budget):
+#   - Walk non-critical rooms with graph progress + branch depth.
+#   - Entry quiet (low progress), escalate toward objective, branch depth
+#     scales risk/reward, density dial multiplies p_base.
+#   - One authored spike slot near the objective when density is high.
+#   - Clamp per-room p to [0.0, 1.0]; roll; emit marker.
 
 const DIAL_HAZARD: String = "hazard_modifier"
 const DIAL_ENCOUNTER: String = "encounter_density_modifier"
@@ -171,24 +169,51 @@ func inject(
 	if rng.seed == 0:
 		rng.seed = 1
 
+	# PKG-C5.3: graph metrics for tension pacing.
+	var adjacency: Dictionary = _build_room_adjacency(layout, rooms)
+	var start_id: String = _resolve_start_room_id(layout, rooms, critical_set)
+	var goal_id: String = _resolve_goal_room_id(layout, rooms, critical_set)
+	var dist_from_start: Dictionary = _bfs_distances(adjacency, start_id)
+	var branch_depth: Dictionary = _branch_depths(adjacency, critical_set)
+	var max_progress: float = 1.0
+	for rid_key in dist_from_start.keys():
+		max_progress = maxf(max_progress, float(dist_from_start[rid_key]))
+
 	var marker_index: int = 0
+	var spiked_room: String = ""
+	var candidates: Array = []  # non-critical rooms eligible for rolls
 	for room in rooms:
 		if not (room is Dictionary):
 			continue
 		var rid: String = str(room.get("id", ""))
-		if rid.is_empty():
+		if rid.is_empty() or critical_set.has(rid):
 			continue
-		if critical_set.has(rid):
-			continue
+		candidates.append(room)
 
+	# Prefer a high-progress branch room for the authored spike slot.
+	var spike_target: String = _pick_spike_room(candidates, dist_from_start, goal_id, max_progress)
+
+	for room in candidates:
+		var rid: String = str(room.get("id", ""))
 		var role: String = str(room.get("room_role", room.get("role", "")))
 		var p_base: float = float(ENCOUNTER_BASE_PROBABILITY.get(role, DEFAULT_BASE_PROBABILITY))
-		var p_final: float = clamp(p_base * density, 0.0, 1.0)
-		if p_final <= 0.0:
+		var progress: float = float(dist_from_start.get(rid, 0))
+		var progress_ratio: float = clampf(progress / max_progress, 0.0, 1.0)
+		# Entry quiet, escalate toward objective.
+		var tension: float = lerpf(0.35, 1.45, progress_ratio)
+		if progress_ratio <= 0.15:
+			tension *= 0.25  # guaranteed quieter near entry
+		var depth: int = int(branch_depth.get(rid, 0))
+		var depth_mult: float = 1.0 + 0.22 * float(mini(depth, 4))
+		var p_final: float = clampf(p_base * density * tension * depth_mult, 0.0, 1.0)
+		var force_spike: bool = (rid == spike_target and density >= 1.0 and p_final > 0.05)
+		if p_final <= 0.0 and not force_spike:
 			continue
 		var roll: float = rng.randf()
-		if roll >= p_final:
+		if not force_spike and roll >= p_final:
 			continue
+		if force_spike:
+			spiked_room = rid
 
 		var encounter_kind: String
 		var marker_count: int = 1
@@ -202,21 +227,16 @@ func inject(
 		if encounter_kind.is_empty():
 			continue
 
-		# Serialized rooms (LayoutSerializer / golden layouts) carry their
-		# floor cells as structural_placements, NOT a `cells` array — the old
-		# `room.get("cells")` read only ever matched hand-built test fixtures
-		# and every real marker fell back to cell [0, 0]. Derive from either.
 		var entries: Array = floor_cell_entries(room, cell_size)
 		var cell_entry: Array = [0, 0]
 		var local_position: Array = [0.0, 0.0, 0.0]
 		if not entries.is_empty():
-			# Deterministic pick: middle floor cell (no extra rng draw, so
-			# per-seed marker replay is unchanged).
-			var pick: Dictionary = entries[entries.size() >> 1]
-			cell_entry = pick["cell"]
-			local_position = pick["local_position"]
+			var cell_pick: Dictionary = entries[entries.size() >> 1]
+			cell_entry = cell_pick["cell"]
+			local_position = cell_pick["local_position"]
 
 		marker_index += 1
+		var patrol_cross: bool = _adjacent_to_critical(rid, adjacency, critical_set)
 		var marker: Dictionary = {
 			"id": "enc_%s_%d" % [rid, marker_index],
 			"room_id": rid,
@@ -228,11 +248,148 @@ func inject(
 			"difficulty_tier": difficulty_id,
 			"encounter_table_id": encounter_table_id,
 			"seed_offset": marker_index,
+			"tension_progress": progress_ratio,
+			"branch_depth": depth,
+			"patrol_crosses_critical": patrol_cross,
+			"spike": force_spike,
 		}
 		markers.append(marker)
 
 	layout["encounters"] = markers
+	layout["encounter_pacing"] = {
+		"model": "tension_budget_v1",
+		"spike_room": spiked_room,
+		"max_progress": max_progress,
+		"density": density,
+	}
 	return layout
+
+
+func _build_room_adjacency(layout: Dictionary, rooms: Array) -> Dictionary:
+	var adj: Dictionary = {}
+	for room in rooms:
+		if room is Dictionary:
+			var rid: String = str(room.get("id", ""))
+			if not rid.is_empty():
+				adj[rid] = []
+	var links: Variant = layout.get("room_links", layout.get("adjacencies", []))
+	if links is Array:
+		for link in links:
+			if not (link is Dictionary):
+				continue
+			var a: String = str(link.get("from_room", ""))
+			var b: String = str(link.get("to_room", ""))
+			if a.is_empty() or b.is_empty():
+				continue
+			if not adj.has(a):
+				adj[a] = []
+			if not adj.has(b):
+				adj[b] = []
+			(adj[a] as Array).append(b)
+			(adj[b] as Array).append(a)
+	return adj
+
+
+func _bfs_distances(adjacency: Dictionary, start_id: String) -> Dictionary:
+	var dist: Dictionary = {}
+	if start_id.is_empty() or not adjacency.has(start_id):
+		for rid in adjacency.keys():
+			dist[str(rid)] = 0
+		return dist
+	var q: Array = [start_id]
+	dist[start_id] = 0
+	var head: int = 0
+	while head < q.size():
+		var cur: String = str(q[head])
+		head += 1
+		var neighbors: Array = adjacency.get(cur, [])
+		for n in neighbors:
+			var nid: String = str(n)
+			if dist.has(nid):
+				continue
+			dist[nid] = int(dist[cur]) + 1
+			q.append(nid)
+	for rid in adjacency.keys():
+		if not dist.has(str(rid)):
+			dist[str(rid)] = 0
+	return dist
+
+
+func _branch_depths(adjacency: Dictionary, critical_set: Dictionary) -> Dictionary:
+	# Distance to nearest critical-path room (0 if on critical path).
+	var dist: Dictionary = {}
+	var q: Array = []
+	for rid in critical_set.keys():
+		var sid: String = str(rid)
+		dist[sid] = 0
+		q.append(sid)
+	var head: int = 0
+	while head < q.size():
+		var cur: String = str(q[head])
+		head += 1
+		var neighbors: Array = adjacency.get(cur, [])
+		for n in neighbors:
+			var nid: String = str(n)
+			if dist.has(nid):
+				continue
+			dist[nid] = int(dist[cur]) + 1
+			q.append(nid)
+	for rid in adjacency.keys():
+		if not dist.has(str(rid)):
+			dist[str(rid)] = 0
+	return dist
+
+
+func _resolve_start_room_id(layout: Dictionary, rooms: Array, critical_set: Dictionary) -> String:
+	var proto: Variant = layout.get("prototype", {})
+	if proto is Dictionary and not str(proto.get("start_room", "")).is_empty():
+		return str(proto.get("start_room", ""))
+	var cp: Variant = layout.get("critical_path", [])
+	if cp is Array and (cp as Array).size() > 0:
+		return str((cp as Array)[0])
+	if rooms.size() > 0 and rooms[0] is Dictionary:
+		return str(rooms[0].get("id", ""))
+	return ""
+
+
+func _resolve_goal_room_id(layout: Dictionary, rooms: Array, critical_set: Dictionary) -> String:
+	var proto: Variant = layout.get("prototype", {})
+	if proto is Dictionary and not str(proto.get("goal_room", "")).is_empty():
+		return str(proto.get("goal_room", ""))
+	var cp: Variant = layout.get("critical_path", [])
+	if cp is Array and (cp as Array).size() > 0:
+		return str((cp as Array)[(cp as Array).size() - 1])
+	if rooms.size() > 0 and rooms[rooms.size() - 1] is Dictionary:
+		return str(rooms[rooms.size() - 1].get("id", ""))
+	return ""
+
+
+func _pick_spike_room(candidates: Array, dist_from_start: Dictionary, goal_id: String, max_progress: float) -> String:
+	var best_id: String = ""
+	var best_score: float = -1.0
+	for room in candidates:
+		if not (room is Dictionary):
+			continue
+		var rid: String = str(room.get("id", ""))
+		var progress: float = float(dist_from_start.get(rid, 0))
+		var score: float = progress
+		if rid == goal_id:
+			score += 2.0
+		# Prefer late-ship rooms (progress >= 60% of max).
+		if progress < max_progress * 0.55:
+			continue
+		if score > best_score:
+			best_score = score
+			best_id = rid
+	return best_id
+
+
+func _adjacent_to_critical(rid: String, adjacency: Dictionary, critical_set: Dictionary) -> bool:
+	var neighbors: Array = adjacency.get(rid, [])
+	for n in neighbors:
+		if critical_set.has(str(n)):
+			return true
+	return false
 
 
 # Validates the encounter markers embedded in `layout`. Returns a

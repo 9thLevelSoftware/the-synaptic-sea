@@ -1373,3 +1373,17 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - Loader instantiates deterministic DressingVisuals lights (and fog markers when density > 0).
 - Verification:
   - \dressing_consumption_smoke.gd  - \DRESSING CONSUMPTION PASS
+
+## REQ-PG-PACING-001: Encounter tension budget pacing
+
+- Source: pre-polish PKG-C5.3 / \ncounter_injector.gd- Type: gameplay / technical
+- Priority: must
+- Status: Implemented
+- Acceptance criteria:
+  - Critical-path rooms remain non-spawn camps (REQ-PG-007).
+  - Entry rooms are quieter; probability escalates with graph progress toward the objective.
+  - Branch depth scales encounter chance (risk/reward).
+  - Density-high runs may force one authored spike near the objective.
+  - Markers adjacent to critical path flag \patrol_crosses_critical\.
+- Verification:
+  - \ncounter_injector_smoke.gd  - \ENCOUNTER INJECTOR PASS

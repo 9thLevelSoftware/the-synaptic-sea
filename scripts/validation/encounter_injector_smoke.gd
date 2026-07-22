@@ -160,6 +160,61 @@ func _initialize() -> void:
 		quit(1)
 		return
 
+	# --- Case 7a (PKG-C5.3): tension pacing — entry quiet vs late spike ---
+	# Side rooms only (odd ids) can spawn; room_09 is deepest branch near goal.
+	var pace_rooms: Array = []
+	var pace_links: Array = []
+	var pace_cp: Array = []
+	for i in range(12):
+		pace_rooms.append({
+			"id": "p_%02d" % i,
+			"room_role": "cargo" if i % 2 == 1 else "corridor",
+			"deck": 0,
+			"cells": [Vector2i(i, 0)],
+		})
+		if i < 11:
+			pace_links.append({
+				"from_room": "p_%02d" % i,
+				"to_room": "p_%02d" % (i + 1),
+				"from_cell": Vector2i(i, 0),
+				"to_cell": Vector2i(i + 1, 0),
+			})
+	for i in range(0, 12, 2):
+		pace_cp.append("p_%02d" % i)
+	var layout_pace: Dictionary = {
+		"schema_version": "1.2.0",
+		"document_kind": "ship_layout",
+		"rooms": pace_rooms,
+		"room_links": pace_links,
+		"critical_path": pace_cp,
+		"prototype": {"start_room": "p_00", "goal_room": "p_11"},
+	}
+	var biome_pace = BiomeProfileScript.from_dict({
+		"id": "breach_field", "encounter_density_modifier": 1.4
+	})
+	var diff_pace = DifficultyProfileScript.from_dict({
+		"id": "deep_dive", "encounter_density_modifier": 1.6
+	})
+	injector_std.inject(layout_pace, biome_pace, diff_pace, 99)
+	if not layout_pace.has("encounter_pacing"):
+		push_error("ENCOUNTER INJECTOR FAIL missing encounter_pacing metadata")
+		quit(1)
+		return
+	if str(layout_pace["encounter_pacing"].get("model", "")) != "tension_budget_v1":
+		push_error("ENCOUNTER INJECTOR FAIL pacing model tag")
+		quit(1)
+		return
+	for marker in layout_pace["encounters"]:
+		var mrid: String = str(marker.get("room_id", ""))
+		if mrid in pace_cp:
+			push_error("ENCOUNTER INJECTOR FAIL pacing still camps critical path: %s" % mrid)
+			quit(1)
+			return
+		if not marker.has("patrol_crosses_critical"):
+			push_error("ENCOUNTER INJECTOR FAIL marker missing patrol_crosses_critical")
+			quit(1)
+			return
+
 	# --- Case 7: deep_dive on breach_field produces >= 1 marker ---
 	# Build a layout where rooms alternate between critical path
 	# and side branches — only critical-path rooms are skipped.
