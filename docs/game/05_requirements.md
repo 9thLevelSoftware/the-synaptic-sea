@@ -1361,3 +1361,15 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Verification:
   - 	ick_bands_smoke.gd — TICK BANDS PASS
   - ship_catchup_smoke.gd remains green
+
+## REQ-PG-DRESS-001: Room variant dressing drives visual presets
+
+- Source: pre-polish PKG-B5.1 / oom_variant_selector.gd- Type: gameplay / technical
+- Priority: should
+- Status: Implemented
+- Acceptance criteria:
+  - Each dressing id has fog/tint/light/prop_density preset data.
+  - GeneratedShipLoader expands room_variant_descriptors with preset fields.
+  - Loader instantiates deterministic DressingVisuals lights (and fog markers when density > 0).
+- Verification:
+  - \dressing_consumption_smoke.gd  - \DRESSING CONSUMPTION PASS

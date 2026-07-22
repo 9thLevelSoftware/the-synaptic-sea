@@ -136,6 +136,98 @@ func effects_for(variant: String) -> Dictionary:
 	return {}
 
 
+## PKG-B5.1: visual/atmosphere preset per dressing id (fog density, tint, light, prop density).
+## Pure data — loader applies consequences; no art dependency.
+const DRESSING_PRESETS: Dictionary = {
+	"scorch": {
+		"fog_density": 0.035,
+		"tint": [0.55, 0.22, 0.12, 1.0],
+		"light_energy": 0.55,
+		"light_color": [1.0, 0.45, 0.25, 1.0],
+		"prop_density": 0.65,
+	},
+	"sparks": {
+		"fog_density": 0.02,
+		"tint": [0.45, 0.40, 0.20, 1.0],
+		"light_energy": 0.85,
+		"light_color": [1.0, 0.85, 0.40, 1.0],
+		"prop_density": 0.80,
+	},
+	"vacuum": {
+		"fog_density": 0.0,
+		"tint": [0.15, 0.18, 0.28, 1.0],
+		"light_energy": 0.25,
+		"light_color": [0.55, 0.65, 1.0, 1.0],
+		"prop_density": 0.40,
+	},
+	"rubble": {
+		"fog_density": 0.04,
+		"tint": [0.35, 0.32, 0.28, 1.0],
+		"light_energy": 0.40,
+		"light_color": [0.70, 0.65, 0.55, 1.0],
+		"prop_density": 1.20,
+	},
+	"frost": {
+		"fog_density": 0.025,
+		"tint": [0.55, 0.72, 0.90, 1.0],
+		"light_energy": 0.50,
+		"light_color": [0.70, 0.85, 1.0, 1.0],
+		"prop_density": 0.75,
+	},
+	"locked": {
+		"fog_density": 0.01,
+		"tint": [0.30, 0.30, 0.35, 1.0],
+		"light_energy": 0.45,
+		"light_color": [0.85, 0.80, 0.55, 1.0],
+		"prop_density": 0.90,
+	},
+	"medical": {
+		"fog_density": 0.015,
+		"tint": [0.70, 0.85, 0.80, 1.0],
+		"light_energy": 0.70,
+		"light_color": [0.75, 1.0, 0.90, 1.0],
+		"prop_density": 0.85,
+	},
+	"water_plane": {
+		"fog_density": 0.05,
+		"tint": [0.20, 0.35, 0.50, 1.0],
+		"light_energy": 0.35,
+		"light_color": [0.40, 0.60, 0.85, 1.0],
+		"prop_density": 0.55,
+	},
+	"biomatter": {
+		"fog_density": 0.045,
+		"tint": [0.35, 0.15, 0.20, 1.0],
+		"light_energy": 0.45,
+		"light_color": [0.90, 0.25, 0.35, 1.0],
+		"prop_density": 1.10,
+	},
+	"haze": {
+		"fog_density": 0.03,
+		"tint": [0.45, 0.50, 0.35, 1.0],
+		"light_energy": 0.40,
+		"light_color": [0.70, 0.75, 0.45, 1.0],
+		"prop_density": 0.70,
+	},
+}
+
+
+func dressing_preset(dressing_id: String) -> Dictionary:
+	if dressing_id.is_empty():
+		return {}
+	var raw: Variant = DRESSING_PRESETS.get(dressing_id, {})
+	if raw is Dictionary:
+		return (raw as Dictionary).duplicate(true)
+	return {}
+
+
+func known_dressing_ids() -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	for k in DRESSING_PRESETS.keys():
+		out.append(str(k))
+	out.sort()
+	return out
+
 # Returns a variant string for `role` at `room_index` under the
 # supplied `seed_value`. When `biome` is non-empty, biome-preferred
 # variants (E2) are weighted higher via a biased pick.
