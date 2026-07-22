@@ -34,11 +34,15 @@ func configure(config: Dictionary) -> void:
 func plant(crop_config: Dictionary, skill_level: int, available_water: float, available_power: float) -> Dictionary:
 	if state != State.IDLE:
 		return {"ok": false, "reason": "not_idle"}
-	if skill_level < required_skill_level:
+	# Validate against the *incoming* crop, not stale prior-tray fields (crop picker / sequential plants).
+	var need_skill: int = int(crop_config.get("required_skill_level", 0))
+	var need_water: float = float(crop_config.get("water_cost", 2.0))
+	var need_power: float = float(crop_config.get("power_cost", 3.0))
+	if skill_level < need_skill:
 		return {"ok": false, "reason": "insufficient_skill"}
-	if available_water < water_cost:
+	if available_water < need_water:
 		return {"ok": false, "reason": "insufficient_water"}
-	if available_power < power_cost:
+	if available_power < need_power:
 		return {"ok": false, "reason": "insufficient_power"}
 	configure(crop_config)
 	state = State.PLANTED

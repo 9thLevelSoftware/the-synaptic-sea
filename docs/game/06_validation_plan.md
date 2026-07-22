@@ -193,6 +193,8 @@ run_clean 'REQ-CS-016 recipe picker panel smoke' 'RECIPE PICKER PANEL PASS rows=
 run_clean 'REQ-CS-016 main playable recipe picker smoke' 'MAIN PLAYABLE RECIPE PICKER PASS station=fabricator' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_recipe_picker_smoke.gd
 run_clean 'REQ-CS-017 salvage list smoke' 'SALVAGE LIST PASS ready=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/salvage_list_smoke.gd
 run_clean 'REQ-CS-017 main playable salvage picker smoke' 'MAIN PLAYABLE SALVAGE PICKER PASS target=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_salvage_picker_smoke.gd
+run_clean 'REQ-CS-018 hydroponics crop list smoke' 'HYDROPONICS CROP LIST PASS crops=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hydroponics_crop_list_smoke.gd
+run_clean 'REQ-CS-018 main playable hydro crop picker smoke' 'MAIN PLAYABLE HYDRO CROP PICKER PASS crop=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_hydro_crop_picker_smoke.gd
 run_clean 'Bucket 3 meta-screen reachability smoke' 'MAIN PLAYABLE META SCREENS PASS screens=10 reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_meta_screens_smoke.gd
 run_clean 'AutosavePolicy reachability smoke' 'MAIN PLAYABLE META AUTOSAVE PASS slot_rotated=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_meta_autosave_smoke.gd
 run_clean 'KitCatalog lifeboat biome-skin reachability smoke' 'MAIN PLAYABLE LIFEBOAT BIOME SKIN PASS biomes=3 live_match=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_lifeboat_biome_skin_smoke.gd
@@ -697,6 +699,7 @@ membership changes).
 | `hangar_control_smoke` | promotion-candidate |
 | `hangar_persistence_smoke` | promotion-candidate |
 | `hangar_port_smoke` | promotion-candidate |
+| `hydroponics_crop_list_smoke` | promotion-candidate |
 | `hydroponics_state_smoke` | promotion-candidate |
 | `inventory_panel_smoke` | promotion-candidate |
 | `inventory_selection_model_smoke` | promotion-candidate |
@@ -724,6 +727,7 @@ membership changes).
 | `main_playable_slice_crafting_smoke` | promotion-candidate |
 | `main_playable_slice_recipe_picker_smoke` | promotion-candidate |
 | `main_playable_slice_salvage_picker_smoke` | promotion-candidate |
+| `main_playable_slice_hydro_crop_picker_smoke` | promotion-candidate |
 | `main_playable_slice_inventory_ui_smoke` | promotion-candidate |
 | `main_playable_slice_loot_ecosystem_smoke` | promotion-candidate |
 | `main_playable_slice_multislot_save_smoke` | promotion-candidate |

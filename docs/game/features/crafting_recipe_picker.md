@@ -27,6 +27,7 @@ At a fabricator, kitchen, medbay, workbench, or synthesizer the player browses w
 6. Cancel / close restores player control.
 7. KEY_C opens the same picker for `field_crafting` portable recipes (skill-ungated start; skill still affects quality).
 8. **REQ-CS-017:** salvage station opens the same panel with deconstruction recipes + inventory junk targets (`junk:<item_id>`); confirm runs `try_salvage_target` (instant).
+9. **REQ-CS-018:** hydroponics IDLE interact opens the same panel for crop choice; confirm runs `try_plant_crop` (harvest/in-progress unchanged).
 
 ## Inputs
 
@@ -56,7 +57,7 @@ At a fabricator, kitchen, medbay, workbench, or synthesizer the player browses w
 - Multi-queue parallel crafts
 - Final art / themed chrome (text list is sufficient)
 - Recipe JSON schema changes
-- Hydroponics crop picker (production station residual; separate card)
+
 
 ## Technical design
 

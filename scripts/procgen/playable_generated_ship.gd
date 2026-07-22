@@ -3592,6 +3592,8 @@ func _build_production_stations() -> void:
 			st.production_harvested.connect(_on_production_harvested)
 		if not st.production_blocked.is_connected(_on_production_blocked):
 			st.production_blocked.connect(_on_production_blocked)
+		if st.has_signal("crop_picker_requested") and not st.crop_picker_requested.is_connected(_on_crop_picker_requested):
+			st.crop_picker_requested.connect(_on_crop_picker_requested)
 		home_ship.scene_root.add_child(st)
 		production_stations.append(st)
 
@@ -4015,6 +4017,19 @@ func open_recipe_picker_for_validation(station_kind: String) -> bool:
 		recipe_picker_panel.open_for_station("field_crafting")
 		_freeze_player_for_panel()
 		return recipe_picker_panel.is_open()
+	if station_kind == "hydroponics":
+		for pst in production_stations:
+			if is_instance_valid(pst) and pst.station_kind == "hydroponics":
+				if player.has_method("teleport_to"):
+					player.teleport_to(pst.global_position)
+				pst.set_validation_player_in_range(player)
+				pst.try_interact(player)
+				if recipe_picker_panel.is_open():
+					return true
+				recipe_picker_panel.open_for_station("hydroponics")
+				_freeze_player_for_panel()
+				return recipe_picker_panel.is_open()
+		return false
 	for st in crafting_stations:
 		if is_instance_valid(st) and st.station_kind == station_kind:
 			if player.has_method("teleport_to"):
@@ -4034,10 +4049,9 @@ func open_recipe_picker_for_validation(station_kind: String) -> bool:
 	return false
 
 ## Domain 3 validation seam (mirrors craft_at_station_for_validation): teleport the player
-## onto a production station and interact. The station infers start-vs-harvest from its own
-## model state, so a first call starts production and a later call harvests. `_harvest` is an
-## intentionally-unused call-site readability label (false=start, true=collect); the
-## underscore marks it as accepted-but-not-branched-on.
+## onto a production station and interact. Harvest path uses try_interact; hydro plant path
+## uses first-ready try_plant_crop (REQ-CS-018) so food smokes stay UI-free.
+## `_harvest` is a call-site readability label (false=start, true=collect).
 func produce_at_station_for_validation(station_kind: String, _harvest: bool) -> bool:
 	if not is_instance_valid(player):
 		return false
@@ -4046,6 +4060,13 @@ func produce_at_station_for_validation(station_kind: String, _harvest: bool) -> 
 			if player.has_method("teleport_to"):
 				player.teleport_to(st.global_position)
 			st.set_validation_player_in_range(player)
+			# Hydro plant: first-ready crop without opening the picker.
+			if station_kind == "hydroponics" and st.model != null \
+					and int(st.model.state) == HydroponicsStateScript.State.IDLE:
+				var cid: String = st.first_ready_crop_id() if st.has_method("first_ready_crop_id") else ""
+				if cid.is_empty():
+					return false
+				return st.try_plant_crop(cid)
 			return st.try_interact(player)
 	return false
 
@@ -4742,6 +4763,13 @@ func _on_recipe_picker_panel_closed() -> void:
 
 ## REQ-CS-016: station requested the recipe picker (live interact path).
 func _on_recipe_picker_requested(station_kind: String) -> void:
+	_open_shared_recipe_picker(station_kind)
+
+## REQ-CS-018: hydroponics crop picker (same panel as craft/salvage).
+func _on_crop_picker_requested(station_kind: String) -> void:
+	_open_shared_recipe_picker(station_kind)
+
+func _open_shared_recipe_picker(station_kind: String) -> void:
 	if not is_instance_valid(recipe_picker_panel):
 		return
 	if is_instance_valid(scanner_panel) and scanner_panel.is_open():
@@ -4756,7 +4784,7 @@ func _on_recipe_picker_requested(station_kind: String) -> void:
 	recipe_picker_panel.open_for_station(station_kind)
 	_freeze_player_for_panel()
 
-## REQ-CS-016 / REQ-CS-017: pure listing seam used by RecipePickerPanel + smokes.
+## REQ-CS-016 / 017 / 018: pure listing seam used by RecipePickerPanel + smokes.
 func list_station_recipe_entries(station_kind: String) -> Array:
 	if inventory_state == null:
 		return []
@@ -4768,6 +4796,11 @@ func list_station_recipe_entries(station_kind: String) -> Array:
 		if deconstruction_resolver == null:
 			return []
 		return deconstruction_resolver.list_salvage_entries(inventory_state)
+	if station_kind == "hydroponics":
+		for st in production_stations:
+			if is_instance_valid(st) and st.station_kind == "hydroponics":
+				return st.list_crop_entries() if st.has_method("list_crop_entries") else []
+		return []
 	if crafting_state == null:
 		return []
 	var skill: int = 0
@@ -4775,8 +4808,7 @@ func list_station_recipe_entries(station_kind: String) -> Array:
 		skill = int(player_progression.get_skill_level("fabrication"))
 	return crafting_state.list_recipe_entries(station_kind, inventory_state, skill)
 
-## REQ-CS-016 / REQ-CS-017: panel confirm handler. Station crafts use the station
-## node; portable field crafts use FieldCraftingState; salvage uses try_salvage_target.
+## REQ-CS-016 / 017 / 018: panel confirm handler.
 func begin_craft_from_picker(station_kind: String, recipe_id: String) -> Dictionary:
 	if recipe_id.is_empty() or station_kind.is_empty():
 		return {"ok": false, "reason": "bad_args", "recipe_id": recipe_id}
@@ -4792,6 +4824,13 @@ func begin_craft_from_picker(station_kind: String, recipe_id: String) -> Diction
 				if st.try_salvage_target(recipe_id):
 					return {"ok": true, "reason": "salvaged", "recipe_id": recipe_id}
 				return {"ok": false, "reason": "salvage_failed", "recipe_id": recipe_id}
+		return {"ok": false, "reason": "station_missing", "recipe_id": recipe_id}
+	if station_kind == "hydroponics":
+		for st in production_stations:
+			if is_instance_valid(st) and st.station_kind == "hydroponics":
+				if st.try_plant_crop(recipe_id):
+					return {"ok": true, "reason": "planted", "recipe_id": recipe_id}
+				return {"ok": false, "reason": "plant_failed", "recipe_id": recipe_id}
 		return {"ok": false, "reason": "station_missing", "recipe_id": recipe_id}
 	if crafting_state != null and crafting_state.is_crafting():
 		return {"ok": false, "reason": "busy", "recipe_id": recipe_id}
