@@ -25,12 +25,20 @@ Per-ship advance/catch-up logic lived only on the coordinator, blocking clean mu
 - Hub injects coordinator-owned hull/web; derelicts use `ShipInstance` models.
 - Coordinator keeps thin wrappers (`_advance_ship` / `_catch_up_ship`) for existing smokes.
 
-## Non-goals (A1a)
+## Core behavior (A1b)
+
+- `to_snapshot()` / `from_snapshot()` round-trip `last_sim_time` + `ShipInstance` summary.
+- Extension slots `module_integrity` / `component_manifest` reserved (empty until pillar).
+- `compose_runtime_snapshots()` bundles multiple runtimes without coordinator branches.
+- Second independent `ShipRuntime` advances without mutating the first.
+
+## Non-goals (A1a/A1b)
 
 - Full coordinator shrink to <3k lines
 - Tick bands (A3)
 - Module integrity / components (pillar)
 - Moving hub expanded recompute into ShipRuntime
+- Changing RunSnapshot schema (still ADR-gated; composition unit is ShipRuntime only)
 
 ## Acceptance criteria
 

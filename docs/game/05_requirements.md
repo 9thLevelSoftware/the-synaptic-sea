@@ -1303,3 +1303,16 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - Coordinator wrappers preserve existing catch-up smoke contracts.
 - Verification:
   - \ship_runtime_smoke.gd  - \SHIP RUNTIME PASS  - \ship_catchup_smoke.gd  - \SHIP CATCHUP PASS
+
+## REQ-ARCH-004: ShipRuntime snapshots compose multi-ship state
+
+- Source: \eatures/ship_runtime.md\, pre-polish PKG-A1b
+- Type: technical
+- Priority: must
+- Status: Implemented
+- Acceptance criteria:
+  - ShipRuntime to_snapshot/from_snapshot round-trips last_sim_time and ship summary.
+  - Two independent ShipRuntimes advance without cross-mutation.
+  - compose_runtime_snapshots bundles multiple runtimes under a stable schema.
+- Verification:
+  - \ship_runtime_smoke.gd  - \SHIP RUNTIME PASS\ with \snapshot=true multi=true

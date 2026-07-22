@@ -89,8 +89,57 @@ func _initialize() -> void:
 	if str(snap.get("ship_id", "")) != "runtime_test":
 		_fail("to_snapshot ship_id")
 		return
+	if str(snap.get("schema", "")) != "ship_runtime_v1":
+		_fail("to_snapshot schema")
+		return
 
-	print("SHIP RUNTIME PASS advance=true catchup=true idempotent=true hub_skip=true")
+	# --- PKG-A1b: snapshot round-trip preserves last_sim_time + ship summary fields ---
+	var inst2 = ShipInstanceScript.create("runtime_test", "rt:1", null, null, null)
+	inst2.get_hull().configure({
+		"compartments": [
+			{"compartment_id": "bridge", "health": 1.0, "breach_open": false},
+			{"compartment_id": "engineering", "health": 1.0, "breach_open": false},
+		]
+	})
+	inst2.get_web().configure({"attached_to_web": true, "seed_coverage": 0.0})
+	var rt2 = ShipRuntimeScript.new()
+	rt2.configure(inst2, {"is_home": false})
+	rt2.from_snapshot(snap)
+	if absf(float(inst2.last_sim_time) - float(snap.get("last_sim_time", -1.0))) > 0.0001:
+		_fail("from_snapshot last_sim_time")
+		return
+
+	# --- PKG-A1b: second independent runtime advances without coordinator branches ---
+	var other = ShipInstanceScript.create("runtime_other", "rt:2", null, null, null)
+	other.get_hull().configure({
+		"compartments": [{"compartment_id": "cargo", "health": 1.0, "breach_open": false}]
+	})
+	other.get_web().configure({"attached_to_web": true, "seed_coverage": 0.0, "growth_rate": 0.05})
+	other.last_sim_time = 0.0
+	var rt_other = ShipRuntimeScript.new()
+	rt_other.configure(other, {"is_home": false})
+	var o_cov0: float = float(other.get_web().coverage)
+	rt_other.advance(8.0, 8.0)
+	if float(other.get_web().coverage) <= o_cov0 + 0.0001:
+		_fail("second runtime must advance independently")
+		return
+	# First runtime unchanged by second's advance
+	var first_cov: float = float(web.coverage)
+	rt_other.advance(5.0, 13.0)
+	if absf(float(web.coverage) - first_cov) > 0.0001:
+		_fail("second runtime must not mutate first ship's web")
+		return
+
+	var bundle: Dictionary = ShipRuntimeScript.compose_runtime_snapshots([rt, rt_other])
+	if str(bundle.get("schema", "")) != "ship_runtime_bundle_v1":
+		_fail("compose schema")
+		return
+	var ships: Array = bundle.get("ships", [])
+	if ships.size() != 2:
+		_fail("compose should include both runtimes")
+		return
+
+	print("SHIP RUNTIME PASS advance=true catchup=true idempotent=true hub_skip=true snapshot=true multi=true")
 	quit(0)
 
 
