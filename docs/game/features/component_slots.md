@@ -2,7 +2,8 @@
 
 ## Status
 
-In implementation (B2.3a population pure model landed)
+In implementation — B2.3a population + B2.3b mount/dismount pure WorkActions landed;
+scene interactables / home reinstall UI still open.
 
 ## Design pillar alignment
 

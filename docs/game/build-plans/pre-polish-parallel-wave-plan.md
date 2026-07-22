@@ -38,7 +38,7 @@ Module integrity is the unit of destruction. **No voxels.** See `docs/game/adr/0
 | PKG-A3 | Tick bands FRAME/SLOW/LAZY | Pending |
 | PKG-B2.1a–b | Module integrity | Pending |
 | PKG-B2.2a–b | WorkActions | Pending |
-| PKG-B2.3a–b | Component slots | Pending |
+| PKG-B2.3a–b | Component slots | **Done** (a #91, b pending merge) |
 | PKG-B2.4a–b | Crafting depth | Pending |
 | PKG-B2.5 | Repair unification | **Done** (PR pending) |
 | PKG-B5.1 | Dressing consumption | Pending |

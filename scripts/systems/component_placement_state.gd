@@ -222,3 +222,168 @@ func fingerprint() -> String:
 			int(e.get("slot_index", 0)),
 		])
 	return "|".join(parts)
+
+
+## --- PKG-B2.3b: mount / dismount pure ops (WorkAction resolve targets) ---
+
+func find_index(instance_id: String) -> int:
+	for i in range(placed.size()):
+		if typeof(placed[i]) != TYPE_DICTIONARY:
+			continue
+		if str((placed[i] as Dictionary).get("component_instance_id", "")) == instance_id:
+			return i
+	return -1
+
+
+func get_entry(instance_id: String) -> Dictionary:
+	var idx: int = find_index(instance_id)
+	if idx < 0:
+		return {}
+	return (placed[idx] as Dictionary).duplicate(true)
+
+
+func is_mounted(instance_id: String) -> bool:
+	var e: Dictionary = get_entry(instance_id)
+	if e.is_empty():
+		return false
+	return bool(e.get("mounted", true))
+
+
+## Dismount a placed component: marks mounted=false and returns yield payload.
+## Does not mutate inventory (caller / resolver applies yields).
+func dismount(instance_id: String) -> Dictionary:
+	var out: Dictionary = {
+		"ok": false,
+		"reason": "",
+		"item_form": "",
+		"mass": 0.0,
+		"qty": 0,
+		"component_id": "",
+		"instance_id": instance_id,
+	}
+	var idx: int = find_index(instance_id)
+	if idx < 0:
+		out["reason"] = "not_found"
+		return out
+	var e: Dictionary = placed[idx]
+	if not bool(e.get("mounted", true)):
+		out["reason"] = "already_dismounted"
+		return out
+	var item_form: String = str(e.get("item_form", e.get("component_id", "")))
+	if item_form.is_empty():
+		out["reason"] = "no_item_form"
+		return out
+	e["mounted"] = false
+	placed[idx] = e
+	out["ok"] = true
+	out["item_form"] = item_form
+	out["mass"] = float(e.get("mass", 10.0))
+	out["qty"] = 1
+	out["component_id"] = str(e.get("component_id", ""))
+	out["linked_system"] = str(e.get("linked_system", ""))
+	out["linked_subcomponent"] = str(e.get("linked_subcomponent", ""))
+	return out
+
+
+## Remount into a free or previously emptied slot. Consumes one item_form from inventory dict.
+## inventory is item_id -> qty. Mutates inventory on success.
+func mount(
+		item_form: String,
+		room_id: String,
+		slot_kind: String,
+		slot_index: int,
+		inventory: Dictionary,
+		catalog: RefCounted = null) -> Dictionary:
+	var out: Dictionary = {
+		"ok": false,
+		"reason": "",
+		"instance_id": "",
+		"item_form": item_form,
+	}
+	if item_form.is_empty():
+		out["reason"] = "no_item"
+		return out
+	if int(inventory.get(item_form, 0)) < 1:
+		out["reason"] = "missing_item"
+		return out
+	# Prefer remounting an existing dismounted entry in this slot.
+	var target_idx: int = -1
+	for i in range(placed.size()):
+		if typeof(placed[i]) != TYPE_DICTIONARY:
+			continue
+		var e: Dictionary = placed[i]
+		if str(e.get("room_id", "")) != room_id:
+			continue
+		if str(e.get("slot_kind", "")) != slot_kind:
+			continue
+		if int(e.get("slot_index", -1)) != slot_index:
+			continue
+		target_idx = i
+		break
+	if target_idx >= 0:
+		var existing: Dictionary = placed[target_idx]
+		if bool(existing.get("mounted", true)):
+			out["reason"] = "slot_occupied"
+			return out
+		# Must match the item form that was removed (or catalog-compatible).
+		var want: String = str(existing.get("item_form", existing.get("component_id", "")))
+		if want != item_form:
+			out["reason"] = "wrong_item"
+			return out
+		existing["mounted"] = true
+		placed[target_idx] = existing
+		inventory[item_form] = int(inventory.get(item_form, 0)) - 1
+		if int(inventory[item_form]) <= 0:
+			inventory.erase(item_form)
+		out["ok"] = true
+		out["instance_id"] = str(existing.get("component_instance_id", ""))
+		return out
+	# Fresh mount into empty slot — require catalog to resolve component_id from item_form.
+	if catalog == null or not catalog.has_method("component_id_for_item_form"):
+		out["reason"] = "slot_empty_needs_catalog"
+		return out
+	var component_id: String = str(catalog.call("component_id_for_item_form", item_form))
+	if component_id.is_empty():
+		out["reason"] = "unknown_item_form"
+		return out
+	var def: Dictionary = catalog.call("get_component", component_id)
+	var entry: Dictionary = {
+		"component_instance_id": "%s_%s_%d" % [room_id, slot_kind, slot_index],
+		"component_id": component_id,
+		"room_id": room_id,
+		"slot_kind": slot_kind,
+		"slot_index": slot_index,
+		"cell": "",
+		"against_wall": slot_kind == "wall",
+		"condition": float(def.get("condition_default", 1.0)),
+		"item_form": item_form,
+		"mass": float(def.get("mass", 10.0)),
+		"linked_system": str(def.get("linked_system", "")),
+		"linked_subcomponent": str(def.get("linked_subcomponent", "")),
+		"mounted": true,
+	}
+	# Collision check
+	if occupancy_keys().has("%s|%s|%d" % [room_id, slot_kind, slot_index]):
+		out["reason"] = "slot_occupied"
+		return out
+	placed.append(entry)
+	inventory[item_form] = int(inventory.get(item_form, 0)) - 1
+	if int(inventory[item_form]) <= 0:
+		inventory.erase(item_form)
+	out["ok"] = true
+	out["instance_id"] = str(entry["component_instance_id"])
+	return out
+
+
+func mounted_count() -> int:
+	var n: int = 0
+	for entry in placed:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		if bool((entry as Dictionary).get("mounted", true)):
+			n += 1
+	return n
+
+
+func dismounted_count() -> int:
+	return placed.size() - mounted_count()
