@@ -1210,7 +1210,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Source: \eatures/module_integrity.md\, ADR-0051
 - Type: gameplay / technical
 - Priority: must
-- Status: Approved
+- Status: Implemented
 - Acceptance criteria:
   - Damaged/breached/destroyed states update mesh, collision, and nav as authored.
   - Breached walls couple to atmosphere/hull breach accounting.

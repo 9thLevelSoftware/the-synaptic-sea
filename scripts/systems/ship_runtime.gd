@@ -33,6 +33,8 @@ var hull_override: RefCounted = null
 var web_override: RefCounted = null
 ## Callable() -> bool: contact boost for hub web growth (attached derelict docked).
 var contact_boost_provider: Callable = Callable()
+## PKG-B2.1b: optional ModuleIntegrityMap owned by this runtime.
+var module_integrity: RefCounted = null
 
 var _slow_acc: float = 0.0
 var _lazy_acc: float = 0.0
@@ -54,6 +56,8 @@ func configure(ship_inst: RefCounted, opts: Dictionary = {}) -> void:
 		contact_boost_provider = provider as Callable
 	else:
 		contact_boost_provider = Callable()
+	var mi: Variant = opts.get("module_integrity", null)
+	module_integrity = mi as RefCounted if mi is RefCounted else null
 	_slow_acc = 0.0
 	_lazy_acc = 0.0
 	frame_band_fires = 0
@@ -179,12 +183,13 @@ func to_snapshot() -> Dictionary:
 		"ship_id": ship_id,
 		"last_sim_time": last_sim_time,
 		"is_home": is_home,
-		# Extension points for pillar packages (empty until those land).
 		"module_integrity": {},
 		"component_manifest": {},
 	}
 	if ship.has_method("get_summary"):
 		out["ship_summary"] = ship.call("get_summary")
+	if module_integrity != null and module_integrity.has_method("get_summary"):
+		out["module_integrity"] = module_integrity.call("get_summary")
 	return out
 
 
@@ -197,6 +202,10 @@ func from_snapshot(data: Dictionary) -> void:
 		var summary: Variant = data.get("ship_summary", {})
 		if typeof(summary) == TYPE_DICTIONARY and not (summary as Dictionary).is_empty():
 			ship.call("apply_summary", summary)
+	if data.has("module_integrity") and module_integrity != null and module_integrity.has_method("apply_summary"):
+		var mi: Variant = data.get("module_integrity", {})
+		if typeof(mi) == TYPE_DICTIONARY:
+			module_integrity.call("apply_summary", mi)
 
 
 ## Compose multiple runtimes into one dictionary for multi-ship persistence tests.

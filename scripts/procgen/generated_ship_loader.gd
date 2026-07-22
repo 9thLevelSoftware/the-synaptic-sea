@@ -508,7 +508,13 @@ func _instance_structural_wrappers(layout_doc: Dictionary, module_to_scene: Dict
 			var wrapper: Node3D = instance as Node3D
 			wrapper.position = Vector3(float(placement_pos[0]), float(placement_pos[1]), float(placement_pos[2]))
 			wrapper.rotation_degrees.y = float(placement.get("yaw_degrees", 0.0))
-			wrapper.name = "%s_%s" % [room_id, str(placement.get("name", module_id))]
+			var pname: String = str(placement.get("name", module_id))
+			wrapper.name = "%s_%s" % [room_id, pname]
+			# PKG-B2.1b: identity for ModuleIntegrityMap keys room_id/name
+			wrapper.set_meta("module_kind", module_id)
+			wrapper.set_meta("module_key", "%s/%s" % [room_id, pname])
+			wrapper.set_meta("room_id", room_id)
+			wrapper.set_meta("integrity_state", "intact")
 			ship_root.add_child(wrapper)
 			count += 1
 	return count
