@@ -1282,11 +1282,11 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 - Source: \eatures/component_slots.md- Type: gameplay
 - Priority: must
-- Status: Approved
+- Status: Implemented (PKG-B2.3b)
 - Acceptance criteria:
   - Dismount yields a heavy inventory item; remount restores placed component.
 - Verification:
-  - Mount/dismount smoke (when implemented)
+  - `scripts/validation/component_mount_dismount_smoke.gd` marker `COMPONENT MOUNT DISMOUNT PASS dismount=true mount=true work=true mass=true round_trip=true`
 
 ## REQ-SMOD-002: Installs respect power budget constraints
 

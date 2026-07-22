@@ -67,3 +67,17 @@ func systems_for_role(role: String) -> Array:
 	if typeof(raw) != TYPE_ARRAY:
 		return []
 	return (raw as Array).duplicate(true)
+
+
+## PKG-B2.3b: reverse lookup for remount / inventory item_form → component_id.
+func component_id_for_item_form(item_form: String) -> String:
+	if item_form.is_empty():
+		return ""
+	for cid in _components.keys():
+		var def: Dictionary = _components[cid]
+		if typeof(def) != TYPE_DICTIONARY:
+			continue
+		var form: String = str((def as Dictionary).get("item_form", cid))
+		if form == item_form or str(cid) == item_form:
+			return str(cid)
+	return ""

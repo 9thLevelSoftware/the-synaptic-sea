@@ -106,6 +106,34 @@
       "xp_event": "repair",
       "interruptible": true,
       "notes": "PKG-B2.5: FireSuppressionPoint wrapper owns extinguisher/charge gates; charge consume on complete"
+    },
+    "dismount_component": {
+      "verb": "unbolt",
+      "target_kind": "component",
+      "tool_class": "wrench",
+      "min_skill": "salvage",
+      "min_skill_level": 0,
+      "duration": 6.0,
+      "materials_consumed": {},
+      "materials_yielded": {},
+      "noise": 0.15,
+      "xp_event": "salvage",
+      "interruptible": true,
+      "notes": "PKG-B2.3b: yield item_form comes from ComponentPlacementState on resolve"
+    },
+    "mount_component": {
+      "verb": "mount",
+      "target_kind": "component",
+      "tool_class": "wrench",
+      "min_skill": "salvage",
+      "min_skill_level": 0,
+      "duration": 5.0,
+      "materials_consumed": {},
+      "materials_yielded": {},
+      "noise": 0.20,
+      "xp_event": "repair",
+      "interruptible": true,
+      "notes": "PKG-B2.3b: consumes item_form from inventory; restores mounted placement"
     }
   }
 }
