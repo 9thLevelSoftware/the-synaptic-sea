@@ -5020,7 +5020,10 @@ func _on_salvage_completed(item_id: String, yields: Dictionary) -> void:
 	_recompute_player_encumbrance()
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.SFX_WORK_UNBOLT)
+	# Stream D: salvage station trains scavenging.
 	var source_junk: String = str(yields.get("source_junk", ""))
+	var xp_target: String = source_junk if not source_junk.is_empty() else item_id
+	emit_training_event("scavenge_container", xp_target)
 	if not source_junk.is_empty():
 		print("SALVAGE COMPLETED junk=%s primary=%s qty=%d multi=%s" % [
 			source_junk, item_id, int(yields.get("quantity", 0)),
