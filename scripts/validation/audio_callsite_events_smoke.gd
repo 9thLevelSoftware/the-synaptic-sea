@@ -11,20 +11,18 @@ extends SceneTree
 ##   UI_INVENTORY_CLOSE — _on_inventory_panel_closed() via panel_closed signal
 ##   UI_OBJECTIVE_ADVANCE — _on_interactable_completed() after sequence ++
 ##   UI_SAVE           — request_save() on success
+##   SFX_DROP_ITEM     — cart-overload floor WorkYieldDrop spawn
+##   SFX_DOOR_OPEN     — sealed hatch bypass (_on_hatch_bypassed)
+##   SFX_DOCK_LAND     — play_dock_land_sfx_for_validation / travel attach
 ##
-## Events skipped (no genuine call site found):
-##   SFX_DOOR_OPEN / SFX_DOOR_CLOSE — portals are pure data; no open/close node
+## Events still skipped:
 ##   SFX_FOOTSTEP                    — PlayerController has no step event
-##   SFX_DROP_ITEM                   — no ground-drop mechanic; zone_drop is
-##                                     inter-pane transfer, not a floor drop
-##   SFX_DOCK_LAND                   — call site wired at _attach_derelict_active
-##                                     but requires live travel_to; not reachable
-##                                     in a pure headless boot
+##   SFX_DOOR_CLOSE                  — no re-seal door node yet
 ##   UI_LOAD                         — request_load() resets the entire runtime;
 ##                                     too destructive to run mid-smoke
 ##
 ## Pass marker:
-##   AUDIO CALLSITE EVENTS PASS door=skip footstep=skip drop=skip tool=true inv_toggle=true objective=true save=true dock=skip load=skip
+##   AUDIO CALLSITE EVENTS PASS door=true footstep=skip drop=true tool=true inv_toggle=true objective=true save=true dock=true load=skip
 ##
 ## Headless:
 ##   <GODOT> --headless --path "C:/Users/dasbl/Documents/The Synaptic Sea"
@@ -139,10 +137,46 @@ func _validate() -> void:
 		return
 
 	# -----------------------------------------------------------------
+	# 5. SFX_DROP_ITEM — cart-overload floor WorkYieldDrop spawn.
+	# -----------------------------------------------------------------
+	mgr.sfx_router.configure({})
+	var drop_before: int = int(mgr.sfx_router.get_routed_count(&"sfx.drop.item"))
+	playable._spawn_work_yield_drop({"scrap_metal": 1})
+	var drop_after: int = int(mgr.sfx_router.get_routed_count(&"sfx.drop.item"))
+	var drop_ok: bool = drop_after > drop_before
+	if not drop_ok:
+		_fail("SFX_DROP_ITEM not routed after _spawn_work_yield_drop (before=%d after=%d)" % [drop_before, drop_after])
+		return
+
+	# -----------------------------------------------------------------
+	# 6. SFX_DOOR_OPEN — sealed hatch bypass call site.
+	# -----------------------------------------------------------------
+	mgr.sfx_router.configure({})
+	var door_before: int = int(mgr.sfx_router.get_routed_count(&"sfx.door.open"))
+	playable._on_hatch_bypassed("callsite_hatch", "mechanical")
+	var door_after: int = int(mgr.sfx_router.get_routed_count(&"sfx.door.open"))
+	var door_ok: bool = door_after > door_before
+	if not door_ok:
+		_fail("SFX_DOOR_OPEN not routed after hatch bypass (before=%d after=%d)" % [door_before, door_after])
+		return
+
+	# -----------------------------------------------------------------
+	# 7. SFX_DOCK_LAND — validation seam for dock success cue.
+	# -----------------------------------------------------------------
+	mgr.sfx_router.configure({})
+	var dock_before: int = int(mgr.sfx_router.get_routed_count(&"sfx.dock.land"))
+	playable.play_dock_land_sfx_for_validation()
+	var dock_after: int = int(mgr.sfx_router.get_routed_count(&"sfx.dock.land"))
+	var dock_ok: bool = dock_after > dock_before
+	if not dock_ok:
+		_fail("SFX_DOCK_LAND not routed after play_dock_land_sfx_for_validation (before=%d after=%d)" % [dock_before, dock_after])
+		return
+
+	# -----------------------------------------------------------------
 	# All assertions passed.  Skipped events logged in marker.
 	# -----------------------------------------------------------------
 	finished = true
-	print("AUDIO CALLSITE EVENTS PASS door=skip footstep=skip drop=skip tool=%s inv_toggle=%s objective=%s save=%s dock=skip load=skip" % [
+	print("AUDIO CALLSITE EVENTS PASS door=true footstep=skip drop=true tool=%s inv_toggle=%s objective=%s save=%s dock=true load=skip" % [
 		str(tool_ok).to_lower(),
 		str(inv_open_ok and inv_close_ok).to_lower(),
 		str(obj_ok).to_lower(),
