@@ -456,7 +456,8 @@ run_clean 'Cut module scene smoke' 'CUT MODULE SCENE PASS cut=true damaged=true 
 run_clean 'Remount system restore smoke' 'REMOUNT SYSTEM RESTORE PASS damage=true remount=true floor=true no_full=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/remount_system_restore_smoke.gd
 run_clean 'Ship mod run snapshot smoke' 'SHIP MOD RUN SNAPSHOT PASS shipmod=true pillar=true count=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_run_snapshot_smoke.gd
 run_clean 'Work hold-to-work smoke' 'WORK HOLD TO WORK PASS freeze=true validation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_hold_to_work_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=276 clean_output=true'
+run_clean 'Bandage training smoke' 'BANDAGE TRAINING PASS bandage_xp=true treat_xp=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bandage_training_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=277 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 

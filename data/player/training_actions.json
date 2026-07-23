@@ -8,6 +8,8 @@
     {"event_id": "fabricate_part",             "target_skill": "fabrication",  "base_xp": 80,  "category": "technical"},
     {"event_id": "first_aid_self",             "target_skill": "first_aid",    "base_xp": 30,  "category": "medical"},
     {"event_id": "first_aid_ally",             "target_skill": "first_aid",    "base_xp": 60,  "category": "medical"},
+    {"event_id": "bandage_wound",              "target_skill": "first_aid",    "base_xp": 25,  "category": "medical"},
+    {"event_id": "treat_wound",                "target_skill": "first_aid",    "base_xp": 45,  "category": "medical"},
     {"event_id": "perform_surgery",            "target_skill": "surgery",      "base_xp": 150, "category": "medical"},
     {"event_id": "compound_stimulant",         "target_skill": "pharmacology", "base_xp": 80,  "category": "medical"},
     {"event_id": "decontaminate_zone",         "target_skill": "quarantine",   "base_xp": 60,  "category": "medical"},
