@@ -23,6 +23,11 @@ var pending_yields: Dictionary = {}
 var cart_mass: float = 0.0
 var cart_capacity: float = 100.0
 var overloaded: bool = false
+## Progress-noise accumulator (loud strip verbs pulse while working).
+var _progress_noise_acc: float = 0.0
+var last_progress_noise: float = 0.0
+const PROGRESS_NOISE_INTERVAL: float = 1.0
+const PROGRESS_NOISE_FRACTION: float = 0.35  # fraction of verb noise per pulse
 
 
 func configure(config: Dictionary = {}) -> void:
@@ -38,6 +43,8 @@ func configure(config: Dictionary = {}) -> void:
 	cart_mass = float(config.get("cart_mass", 0.0))
 	cart_capacity = maxf(1.0, float(config.get("cart_capacity", 100.0)))
 	overloaded = cart_mass > cart_capacity
+	_progress_noise_acc = 0.0
+	last_progress_noise = 0.0
 
 
 func is_working() -> bool:
@@ -94,6 +101,8 @@ func start_action(action_id: String, target_id: String, context: Dictionary = {}
 	last_noise_pulse = 0.0
 	last_xp_event = ""
 	pending_yields = {}
+	_progress_noise_acc = 0.0
+	last_progress_noise = 0.0
 	if catalog == null or not catalog.has_action(action_id):
 		return false
 	var def: Dictionary = catalog.get_action(action_id)
@@ -119,10 +128,30 @@ func start_action(action_id: String, target_id: String, context: Dictionary = {}
 
 
 ## Tick active work. Returns status string.
+## Loud strip verbs (cut/pry/unbolt) also accumulate progress noise pulses so
+## dismantling under threat pressure has continuous detection teeth.
 func tick(delta: float, context: Dictionary = {}) -> String:
+	last_progress_noise = 0.0
 	if work == null:
 		return WorkActionStateScript.STATUS_IDLE
 	var st: String = str(work.call("tick", delta, context))
+	if st == WorkActionStateScript.STATUS_ACTIVE and delta > 0.0:
+		var verb: String = ""
+		var noise: float = 0.0
+		if work.has_method("noise"):
+			noise = float(work.call("noise"))
+		if work.has_method("get_summary"):
+			var sum: Dictionary = work.call("get_summary")
+			var def: Dictionary = sum.get("definition", {}) if typeof(sum.get("definition", {})) == TYPE_DICTIONARY else {}
+			verb = str(def.get("verb", ""))
+			if noise <= 0.0:
+				noise = float(def.get("noise", 0.0))
+		if (verb == "cut" or verb == "pry" or verb == "unbolt") and noise > 0.05:
+			_progress_noise_acc += delta
+			if _progress_noise_acc >= PROGRESS_NOISE_INTERVAL:
+				_progress_noise_acc = 0.0
+				last_progress_noise = noise * PROGRESS_NOISE_FRACTION
+				last_noise_pulse = maxf(last_noise_pulse, last_progress_noise)
 	if st == WorkActionStateScript.STATUS_COMPLETED:
 		# Auto-resolve is opt-in via complete() so scene can choose module_map.
 		pass
@@ -204,10 +233,15 @@ func reset() -> void:
 func apply_noise_to_detection(detection_or_manager) -> float:
 	if last_noise_pulse <= 0.0 or detection_or_manager == null:
 		return 0.0
+	# Dict-shaped test doubles (and some managers) expose player_noise as a property.
+	if typeof(detection_or_manager) == TYPE_DICTIONARY:
+		var d: Dictionary = detection_or_manager
+		d["player_noise"] = maxf(float(d.get("player_noise", 0.0)), last_noise_pulse)
+		return last_noise_pulse
 	if detection_or_manager.get("player_noise") != null:
 		detection_or_manager.player_noise = maxf(
 			float(detection_or_manager.player_noise), last_noise_pulse)
-	if detection_or_manager.has_method("set_player_signals"):
+	if detection_or_manager is Object and (detection_or_manager as Object).has_method("set_player_signals"):
 		# ThreatManager: boost noise channel
 		var n: float = last_noise_pulse
 		detection_or_manager.set_player_signals(
