@@ -102,13 +102,46 @@ func _fill_slots(
 func _extract_slots(room: Dictionary, slot_key: String) -> Array:
 	# Slots may live on room root or under zones (serializer variants).
 	var direct: Variant = room.get(slot_key, null)
-	if direct is Array:
+	if direct is Array and not (direct as Array).is_empty():
 		return direct as Array
 	var zones: Variant = room.get("zones", {})
 	if zones is Dictionary:
 		var z: Variant = (zones as Dictionary).get(slot_key, [])
-		if z is Array:
+		if z is Array and not (z as Array).is_empty():
 			return z as Array
+	# Golden/hub layouts often only stamp floor structural_placements — synthesize
+	# wall/center slots from floor cells so component population still runs.
+	return _synthesize_slots_from_structure(room, slot_key)
+
+
+## Derive wall_slots / center_slots from floor structural placements (max 3 wall, 1 center).
+func _synthesize_slots_from_structure(room: Dictionary, slot_key: String) -> Array:
+	var floors: Array = []
+	var placements_v: Variant = room.get("structural_placements", [])
+	if typeof(placements_v) != TYPE_ARRAY:
+		return []
+	for p_v in (placements_v as Array):
+		if typeof(p_v) != TYPE_DICTIONARY:
+			continue
+		var p: Dictionary = p_v
+		var kind: String = str(p.get("module_id", p.get("module", ""))).to_lower()
+		if not (kind.begins_with("floor") or kind.find("floor") >= 0):
+			continue
+		var cell: String = str(p.get("name", p.get("cell", "")))
+		var pos_v: Variant = p.get("world_position", null)
+		floors.append({"cell": cell, "world_position": pos_v, "against_wall": slot_key == "wall_slots"})
+	if floors.is_empty():
+		return []
+	if slot_key == "center_slots":
+		return [floors[0]]
+	if slot_key == "wall_slots":
+		var out: Array = []
+		var n: int = mini(3, floors.size())
+		for i in range(n):
+			var row: Dictionary = (floors[i] as Dictionary).duplicate(true)
+			row["against_wall"] = true
+			out.append(row)
+		return out
 	return []
 
 
