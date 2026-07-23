@@ -5785,6 +5785,8 @@ func _emit_objective_training(objective_type: String, room_id: String, objective
 	# Stream F: restoring ship systems / stabilizing the reactor is leadership.
 	if objective_type == "restore_systems" or objective_type == "stabilize_reactor":
 		emit_training_event("inspire_crew", objective_type)
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_OBJECTIVE_ADVANCE)
 
 ## Validation seam: complete a derelict objective by sequence through the real
 ## interaction path (bypassing proximity via set_validation_player_in_range).
@@ -8916,6 +8918,8 @@ func _consume_junction_calibrator_if_eligible(sequence: int) -> void:
 	# shot per slice run regardless of the order of consume vs pickup).
 	if junction_calibrator_pickup != null:
 		junction_calibrator_pickup.set_marker_visible(false)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 	_refresh_tracker_system_status_lines()
 	var progress: Dictionary = objective_progress_state.get_step_progress(sequence)
 	print("JUNCTION CALIBRATOR APPLIED sequence=%d required_steps=%d completed_steps=%d" % [
