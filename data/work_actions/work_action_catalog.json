@@ -11,7 +11,7 @@
       "materials_consumed": {},
       "materials_yielded": { "scrap_metal": 2 },
       "noise": 0.85,
-      "xp_event": "weld",
+      "xp_event": "salvage",
       "interruptible": true
     },
     "unbolt_component": {
@@ -37,7 +37,7 @@
       "materials_consumed": { "hull_plate": 1 },
       "materials_yielded": {},
       "noise": 0.55,
-      "xp_event": "weld",
+      "xp_event": "weld_panel",
       "interruptible": true
     },
     "patch_breach": {
