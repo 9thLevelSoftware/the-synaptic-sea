@@ -55,6 +55,7 @@ const SynapticSeaWorldScript := preload("res://scripts/systems/synaptic_sea_worl
 const ScannerStateScript := preload("res://scripts/systems/scanner_state.gd")
 const TravelControllerScript := preload("res://scripts/systems/travel_controller.gd")
 const LootContainerScript := preload("res://scripts/tools/loot_container.gd")
+const WorkYieldDropScript := preload("res://scripts/tools/work_yield_drop.gd")
 const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
 const LootDistributionScript := preload("res://scripts/systems/loot_distribution.gd")
 const UniqueItemStateScript := preload("res://scripts/systems/unique_item_state.gd")
@@ -295,6 +296,7 @@ var derelict_interactables: Array = []
 # Sub-project #3: scattered loot containers for the active derelict.
 var loot_container_root: Node3D = null
 var loot_containers: Array = []
+var work_yield_drops: Array = []  # WorkYieldDrop nodes (cart-overload floor piles)
 # Domain 5: sealed hatches on the active derelict (locked passages the player bypasses
 # with utility flags: lockpick for mechanical, hack_chip for electronic).
 var sealed_hatches: Array = []
@@ -3500,9 +3502,37 @@ func open_wounds_panel_for_validation() -> bool:
 func open_ship_modification_panel_for_validation() -> bool:
 	if ship_modification_panel == null or ship_modification_state == null:
 		return false
-	ship_modification_panel.bind(ship_modification_state, {})
+	ship_modification_panel.bind(ship_modification_state, _inventory_qty_dict_for_work())
+	if not ship_modification_panel.install_requested.is_connected(_on_ship_mod_install_requested):
+		ship_modification_panel.install_requested.connect(_on_ship_mod_install_requested)
+	if not ship_modification_panel.uninstall_requested.is_connected(_on_ship_mod_uninstall_requested):
+		ship_modification_panel.uninstall_requested.connect(_on_ship_mod_uninstall_requested)
 	ship_modification_panel.open()
 	return ship_modification_panel.is_open()
+
+
+## Sync panel bag → InventoryState after install (item_form already removed from bag).
+func _on_ship_mod_install_requested(_slot_id: String, _component_id: String, item_form: String) -> void:
+	if inventory_state == null or item_form.is_empty():
+		return
+	# Panel bag already decremented; mirror into InventoryState if it still holds the item.
+	if inventory_state.get_quantity(item_form) > 0:
+		inventory_state.remove_item(item_form, 1)
+	ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
+
+
+## Sync panel bag → InventoryState after uninstall (item_form returned to bag).
+func _on_ship_mod_uninstall_requested(_slot_id: String) -> void:
+	if inventory_state == null or ship_modification_panel == null:
+		return
+	var bag: Dictionary = ship_modification_panel.get_inventory_bag()
+	# Any bag qty higher than live inventory is a return from uninstall — add delta.
+	for item_id in bag.keys():
+		var bag_q: int = int(bag[item_id])
+		var live_q: int = int(inventory_state.get_quantity(str(item_id)))
+		if bag_q > live_q:
+			inventory_state.add_item(str(item_id), bag_q - live_q)
+	ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
 
 
 ## PKG-B2.2b: start nearest-module WorkAction via live interact path (validation).
@@ -3890,11 +3920,19 @@ func _tick_work_action(delta: float) -> void:
 
 
 ## Mirror pure-dict WorkAction yields into live InventoryState (REQ-WA-002).
+## Cart overload (yields_applied=false) spawns a floor WorkYieldDrop instead.
 func _apply_work_yields_to_inventory_state(res: Dictionary) -> void:
 	if inventory_state == null or res.is_empty():
 		return
 	if not bool(res.get("yields_applied", true)):
-		return  # cart overload left pending_yields
+		var pending: Dictionary = {}
+		if work_action_driver != null and not work_action_driver.pending_yields.is_empty():
+			pending = work_action_driver.pending_yields.duplicate(true)
+		elif typeof(res.get("yields", {})) == TYPE_DICTIONARY:
+			pending = (res.get("yields", {}) as Dictionary).duplicate(true)
+		if not pending.is_empty():
+			_spawn_work_yield_drop(pending)
+		return
 	var yields: Variant = res.get("yields", {})
 	if typeof(yields) != TYPE_DICTIONARY:
 		return
@@ -3909,6 +3947,39 @@ func _apply_work_yields_to_inventory_state(res: Dictionary) -> void:
 			var need: int = int((consumed as Dictionary)[cid])
 			if need > 0:
 				inventory_state.remove_item(str(cid), need)
+
+
+func _spawn_work_yield_drop(items: Dictionary) -> void:
+	if items.is_empty() or player == null or not (player is Node3D):
+		return
+	var drop_id: String = "work_yield_%d" % int(Time.get_ticks_msec())
+	var drop = WorkYieldDropScript.new()
+	var pos: Vector3 = (player as Node3D).global_position + Vector3(0.6, 0.0, 0.4)
+	# Parent under current ship root when away so drops leave with the ship.
+	var parent: Node = self
+	if away_from_start and current_ship != null and is_instance_valid(current_ship.scene_root):
+		parent = current_ship.scene_root
+		pos = (current_ship.scene_root as Node3D).global_transform.affine_inverse() * pos
+	drop.configure(drop_id, items, inventory_state, pos, 1.8)
+	parent.add_child(drop)
+	work_yield_drops.append(drop)
+	if drop.has_signal("scooped") and not drop.scooped.is_connected(_on_work_yield_scooped):
+		drop.scooped.connect(_on_work_yield_scooped)
+	if work_action_driver != null:
+		work_action_driver.pending_yields.clear()
+		work_action_driver.overloaded = false
+
+
+func _on_work_yield_scooped(drop_id: String, _granted: Dictionary) -> void:
+	var kept: Array = []
+	for d in work_yield_drops:
+		if is_instance_valid(d) and str(d.drop_id) != drop_id:
+			kept.append(d)
+	work_yield_drops = kept
+
+
+func get_work_yield_drops_for_validation() -> Array:
+	return work_yield_drops.duplicate()
 
 
 ## PKG-C4.1b: update engaged LOS via physics raycast when space state available.
@@ -6588,6 +6659,8 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 			return
 		if _try_cart_interact(player_body):
 			return
+		if _try_work_yield_drop_interact(player_body):
+			return
 		# PKG-B2.2b: nearest wall module cut/pry when nothing else claimed interact.
 		if _try_work_action_interact(player_body):
 			return
@@ -6644,9 +6717,18 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		return
 	if _try_cart_interact(player_body):
 		return
+	if _try_work_yield_drop_interact(player_body):
+		return
 	# PKG-B2.2b: nearest wall module cut/pry when nothing else claimed interact.
 	if _try_work_action_interact(player_body):
 		return
+
+## Scoop cart-overload floor piles from WorkAction yields.
+func _try_work_yield_drop_interact(player_body) -> bool:
+	for d in work_yield_drops:
+		if is_instance_valid(d) and d.has_method("try_interact") and d.try_interact(player_body):
+			return true
+	return false
 
 ## Walk-up cargo deposit: deposits all haulable salvage into the hold of whichever
 ## cargo control the player is standing at (strict in-range gate). Returns true iff a
@@ -9927,9 +10009,7 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 			return
 		if event.is_action_pressed("toggle_ship_mod") and _menus_are_closed():
-			var inv_bag: Dictionary = _inventory_qty_dict_for_work()
-			ship_modification_panel.bind(ship_modification_state, inv_bag)
-			ship_modification_panel.open()
+			open_ship_modification_panel_for_validation()
 			get_viewport().set_input_as_handled()
 			return
 	# PKG-D9d: wounds treatment panel.
