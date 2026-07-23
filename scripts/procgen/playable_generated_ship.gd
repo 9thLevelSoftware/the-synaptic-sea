@@ -483,6 +483,8 @@ var _biomatter_pulse_cooldown: float = 0.0
 var _footstep_acc: float = 0.0
 const FOOTSTEP_INTERVAL_WALK: float = 0.40
 const FOOTSTEP_INTERVAL_CROUCH: float = 0.55
+## Rising-edge flag for Heavy Load / overload SFX (load_ratio > 1.0).
+var _prev_encumbrance_overloaded: bool = false
 var arc_root: Node3D
 var arc_zone_node: StaticBody3D
 var arc_zone_label: Label3D
@@ -2564,8 +2566,15 @@ func _recompute_player_encumbrance() -> void:
 			inventory_state.get_total_weight(), equipment_state.get_container_reductions())
 	inventory_state.bonus_capacity = bonus
 	inventory_state.weight_reduction = saved
+	var load_ratio: float = float(inventory_state.get_load_ratio())
+	var overloaded: bool = load_ratio > 1.0
+	if overloaded and not _prev_encumbrance_overloaded:
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_VITALS_LOW)
+		_set_hazard_feedback_line("Heavy Load — movement slowed")
+	_prev_encumbrance_overloaded = overloaded
 	if is_instance_valid(player):
-		var mult: float = EncumbranceScript.move_speed_multiplier(inventory_state.get_load_ratio())
+		var mult: float = EncumbranceScript.move_speed_multiplier(load_ratio)
 		player.move_speed = float(player.DEFAULT_MOVE_SPEED) * mult * _cart_push_multiplier()
 
 ## Equip item_id from the player inventory into its slot. Honors the both-hands
