@@ -29,7 +29,9 @@
       "item_form": "machinery_block",
       "mass": 25.0,
       "slot": "center",
-      "condition_default": 0.75
+      "condition_default": 0.75,
+      "station_tier_bonus": 1,
+      "station_affinity": "fabricator"
     },
     "reactor_console": {
       "item_form": "reactor_console",
@@ -37,7 +39,9 @@
       "slot": "wall",
       "linked_system": "power",
       "linked_subcomponent": "power_distribution",
-      "condition_default": 0.6
+      "condition_default": 0.6,
+      "station_tier_bonus": 2,
+      "station_affinity": "fabricator"
     },
     "air_recycler_unit": {
       "item_form": "air_recycler_unit",

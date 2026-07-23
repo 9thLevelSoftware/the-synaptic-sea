@@ -72,11 +72,15 @@ func has_recipe(recipe_id: String) -> bool:
 
 ## Returns true if the inventory has enough of every ingredient.
 ## PKG-B2.4a: optional knowledge gate — pass knowledge state as third arg.
-func can_craft(recipe_id: String, inventory, knowledge = null) -> bool:
+## PKG-B2.4b: optional station_tier gate (4th arg); defaults to 0 (base stations).
+func can_craft(recipe_id: String, inventory, knowledge = null, station_tier: int = 0) -> bool:
 	var recipe: Dictionary = get_recipe(recipe_id)
 	if recipe.is_empty():
 		return false
 	if knowledge != null and knowledge.has_method("is_known") and not bool(knowledge.call("is_known", recipe_id)):
+		return false
+	var need_tier: int = int(recipe.get("station_tier_min", 0))
+	if station_tier < need_tier:
 		return false
 	var ingredients: Variant = recipe.get("ingredients", {})
 	if not (ingredients is Dictionary):
@@ -130,14 +134,55 @@ func get_craft_time(recipe_id: String) -> float:
 func get_power_cost(recipe_id: String) -> float:
 	return float(get_recipe(recipe_id).get("power_cost", 0.0))
 
+
+## PKG-B2.4b schema accessors
+func get_station_tier_min(recipe_id: String) -> int:
+	return int(get_recipe(recipe_id).get("station_tier_min", 0))
+
+
+func get_knowledge_source(recipe_id: String) -> String:
+	return str(get_recipe(recipe_id).get("knowledge_source", "starter"))
+
+
+func get_work_verb(recipe_id: String) -> String:
+	return str(get_recipe(recipe_id).get("work_verb", "craft"))
+
+
+## PKG-B2.4b: derive station tier from placed components that declare station_tier_bonus
+## and optional station_kind affinity.
+static func derive_tier_from_components(station_kind: String, placed: Array, catalog: RefCounted = null) -> int:
+	var best: int = 0
+	for entry in placed:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var e: Dictionary = entry
+		if not bool(e.get("mounted", true)):
+			continue
+		var bonus: int = int(e.get("station_tier_bonus", 0))
+		var affinity: String = str(e.get("station_affinity", ""))
+		if bonus <= 0 and catalog != null and catalog.has_method("get_component"):
+			var def: Dictionary = catalog.call("get_component", str(e.get("component_id", "")))
+			bonus = int(def.get("station_tier_bonus", 0))
+			if affinity.is_empty():
+				affinity = str(def.get("station_affinity", ""))
+		if bonus <= 0:
+			continue
+		if not affinity.is_empty() and affinity != station_kind and affinity != "any":
+			continue
+		if bonus > best:
+			best = bonus
+	return best
+
 ## Headless listing for the station recipe picker (REQ-CS-016).
 ## Returns Array[Dictionary] sorted by recipe_id. Excludes deconstruction recipes
 ## (those belong to the salvage bench / DeconstructionResolver).
 ## Each entry:
 ##   recipe_id, display_name, category, required_skill_level, ingredients, produces,
-##   craft_time_seconds, status ("ready"|"missing_ingredients"|"insufficient_skill"|"output_full"),
+##   craft_time_seconds, station_tier_min, work_verb, knowledge_source,
+##   status ("ready"|"missing_ingredients"|"insufficient_skill"|"insufficient_tier"|"output_full"),
 ##   craftable:bool
-func list_recipe_entries(station_kind: String, inventory, player_skill_level: int) -> Array:
+## station_tier optional (default 0) for PKG-B2.4b tier gating.
+func list_recipe_entries(station_kind: String, inventory, player_skill_level: int, station_tier: int = 0) -> Array:
 	var out: Array = []
 	var recipes: Array = get_recipes_for_station(station_kind)
 	recipes.sort_custom(func(a, b): return str(a.get("recipe_id", "")) < str(b.get("recipe_id", "")))
@@ -150,6 +195,7 @@ func list_recipe_entries(station_kind: String, inventory, player_skill_level: in
 		if str(recipe.get("category", "")) == "deconstruction":
 			continue
 		var required_skill: int = int(recipe.get("required_skill_level", 0))
+		var tier_min: int = int(recipe.get("station_tier_min", 0))
 		var produces: Dictionary = {}
 		var produces_raw: Variant = recipe.get("produces", {})
 		if produces_raw is Dictionary:
@@ -161,7 +207,9 @@ func list_recipe_entries(station_kind: String, inventory, player_skill_level: in
 		var status: String = "ready"
 		if player_skill_level < required_skill:
 			status = "insufficient_skill"
-		elif not can_craft(rid, inventory):
+		elif station_tier < tier_min:
+			status = "insufficient_tier"
+		elif not can_craft(rid, inventory, null, station_tier):
 			status = "missing_ingredients"
 		elif inventory != null and inventory.has_method("can_accept"):
 			var out_id: String = str(produces.get("item_id", ""))
@@ -173,6 +221,9 @@ func list_recipe_entries(station_kind: String, inventory, player_skill_level: in
 			"display_name": str(recipe.get("display_name", rid)),
 			"category": str(recipe.get("category", "")),
 			"required_skill_level": required_skill,
+			"station_tier_min": tier_min,
+			"work_verb": str(recipe.get("work_verb", "craft")),
+			"knowledge_source": str(recipe.get("knowledge_source", "starter")),
 			"ingredients": ingredients,
 			"produces": produces,
 			"craft_time_seconds": float(recipe.get("craft_time_seconds", 0.0)),
@@ -206,7 +257,12 @@ func begin_craft(recipe_id: String, inventory, material_state, player_skill_leve
 	var recipe: Dictionary = get_recipe(recipe_id)
 	if recipe.is_empty():
 		return false
-	if not can_craft(recipe_id, inventory):
+	var station_kind: String = str(recipe.get("station_kind", ""))
+	if station_kind.is_empty():
+		return false
+	var station = get_or_create_station(station_kind)
+	var st_tier: int = int(station.effective_tier()) if station.has_method("effective_tier") else int(station.get("level"))
+	if not can_craft(recipe_id, inventory, null, st_tier):
 		return false
 	# Enforce the recipe's skill gate (previously required_skill_level only affected quality,
 	# leaving the "mid/late-game" progression gate decorative — Codex PR #45). Station crafting
@@ -214,10 +270,6 @@ func begin_craft(recipe_id: String, inventory, material_state, player_skill_leve
 	# ungated by design.
 	if player_skill_level < get_required_skill_level(recipe_id):
 		return false
-	var station_kind: String = str(recipe.get("station_kind", ""))
-	if station_kind.is_empty():
-		return false
-	var station = get_or_create_station(station_kind)
 	var craft_time: float = float(recipe.get("craft_time_seconds", 0.0))
 	if craft_time <= 0.0:
 		return false
@@ -237,6 +289,36 @@ func begin_craft(recipe_id: String, inventory, material_state, player_skill_leve
 	}
 	station.start_recipe(recipe_id, craft_time)
 	return true
+
+
+## PKG-B2.4b: queue a recipe (or batch) on its station without starting craft.
+## Returns accepted queue count (0 if full / invalid).
+func enqueue_craft(recipe_id: String, count: int = 1) -> int:
+	var recipe: Dictionary = get_recipe(recipe_id)
+	if recipe.is_empty() or count <= 0:
+		return 0
+	var station_kind: String = str(recipe.get("station_kind", ""))
+	if station_kind.is_empty():
+		return 0
+	var station = get_or_create_station(station_kind)
+	if station.has_method("enqueue_batch"):
+		return int(station.enqueue_batch(recipe_id, count))
+	var n: int = 0
+	for _i in range(count):
+		if station.has_method("enqueue") and bool(station.enqueue(recipe_id)):
+			n += 1
+		else:
+			break
+	return n
+
+
+## Refresh station tier from a component placement array + optional catalog.
+func refresh_station_tier(station_kind: String, placed: Array, catalog: RefCounted = null) -> int:
+	var station = get_or_create_station(station_kind)
+	var derived: int = derive_tier_from_components(station_kind, placed, catalog)
+	if station.has_method("apply_component_tier"):
+		station.apply_component_tier(derived)
+	return int(station.effective_tier()) if station.has_method("effective_tier") else derived
 
 ## Ticks the active station. Returns true when the craft completes.
 func tick(delta_seconds: float) -> bool:
