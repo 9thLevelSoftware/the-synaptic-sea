@@ -562,6 +562,7 @@ run_clean 'Component mount XP live smoke' 'COMPONENT MOUNT XP LIVE PASS dismount
 run_clean 'Sanity hallucination SFX smoke' 'SANITY HALLUCINATION SFX PASS phantom=true hud=true ambient=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sanity_hallucination_sfx_smoke.gd
 run_clean 'Sanity hallucination away smoke' 'SANITY HALLUCINATION AWAY PASS away=true phantom=true hud=true ambient=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sanity_hallucination_away_smoke.gd
 run_clean 'Meta hull groan SFX smoke' 'META HULL GROAN SFX PASS breach=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_hull_groan_sfx_smoke.gd
+run_clean 'Meta hull groan away smoke' 'META HULL GROAN AWAY PASS away=true breach=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_hull_groan_away_smoke.gd
 run_clean 'Meta biomatter reactor SFX smoke' 'META BIOMATTER REACTOR SFX PASS pulse=true reactor=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_biomatter_reactor_sfx_smoke.gd
 run_clean 'Dock land SFX smoke' 'DOCK LAND SFX PASS dock=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dock_land_sfx_smoke.gd
 run_clean 'Work splice XP live smoke' 'WORK SPLICE XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_splice_xp_live_smoke.gd
@@ -604,6 +605,7 @@ run_clean 'Player attack away smoke' 'PLAYER ATTACK AWAY PASS away=true attack=t
 run_clean 'Dry fire SFX smoke' 'DRY FIRE SFX PASS dry=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dry_fire_sfx_smoke.gd
 run_clean 'Dry fire away smoke' 'DRY FIRE AWAY PASS away=true dry=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dry_fire_away_smoke.gd
 run_clean 'Achievement unlock SFX smoke' 'ACHIEVEMENT UNLOCK SFX PASS unlock=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/achievement_unlock_sfx_smoke.gd
+run_clean 'Achievement unlock away smoke' 'ACHIEVEMENT UNLOCK AWAY PASS away=true unlock=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/achievement_unlock_away_smoke.gd
 run_clean 'Tool pickup SFX smoke' 'TOOL PICKUP SFX PASS pickup=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tool_pickup_sfx_smoke.gd
 run_clean 'Tool pickup away smoke' 'TOOL PICKUP AWAY PASS away=true pickup=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tool_pickup_away_smoke.gd
 run_clean 'Craft blocked SFX smoke' 'CRAFT BLOCKED SFX PASS blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_blocked_sfx_smoke.gd
@@ -633,6 +635,7 @@ run_clean 'Cargo bulk transfer SFX smoke' 'CARGO BULK TRANSFER SFX PASS deposit=
 run_clean 'Cargo bulk transfer away smoke' 'CARGO BULK TRANSFER AWAY PASS away=true deposit=true withdraw=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cargo_bulk_transfer_away_smoke.gd
 run_clean 'UI load SFX smoke' 'UI LOAD SFX PASS save=true load=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_load_sfx_smoke.gd
 run_clean 'Inspire crew SFX smoke' 'INSPIRE CREW SFX PASS inspire=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inspire_crew_sfx_smoke.gd
+run_clean 'Inspire crew away smoke' 'INSPIRE CREW AWAY PASS away=true inspire=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inspire_crew_away_smoke.gd
 run_clean 'Junction calibrator SFX smoke' 'JUNCTION CALIBRATOR SFX PASS applied=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/junction_calibrator_sfx_smoke.gd
 run_clean 'First aid ally XP smoke' 'FIRST AID ALLY XP PASS ally=true surgery=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/first_aid_ally_xp_smoke.gd
 run_clean 'Extract data SFX smoke' 'EXTRACT DATA SFX PASS extract=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/extract_data_sfx_smoke.gd
@@ -692,7 +695,8 @@ run_clean 'Cart grab denied away smoke' 'CART GRAB DENIED AWAY PASS away=true de
 run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_sfx_smoke.gd
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=512 clean_output=true'
+run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=516 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
