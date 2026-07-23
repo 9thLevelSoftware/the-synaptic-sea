@@ -244,6 +244,7 @@ Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remain
 - Dock barrier open + bridge login/deny SFX; stamina interrupt shares cancel cue
 - Field craft begin failure paths route deny SFX
 - Heavy Load rising-edge encumbrance SFX (UI_VITALS_LOW)
+- Ship-mod install/uninstall fail routes deny SFX
 - Regression marker contract commands=396 in 06_validation_plan.md
 
 **Still content/polish (not mechanical pre-polish blockers):**
