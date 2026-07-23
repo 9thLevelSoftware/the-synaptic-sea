@@ -4055,7 +4055,14 @@ func _tick_work_action(delta: float) -> void:
 	if wound_state != null and wound_state.has_method("work_speed_multiplier"):
 		speed = float(wound_state.call("work_speed_multiplier"))
 	# REQ-WA: hold-to-work drains stamina; low stamina slows the job.
+	# Exhausted stamina interrupts active work (no free perpetual strip).
 	if vitals_state != null:
+		if float(vitals_state.stamina) <= 0.001:
+			if work_action_driver.work != null and work_action_driver.work.has_method("interrupt"):
+				work_action_driver.work.call("interrupt")
+			_work_requires_hold = false
+			_refresh_work_action_hud()
+			return
 		var max_s: float = maxf(1.0, float(vitals_state.max_stamina))
 		var s_ratio: float = clampf(float(vitals_state.stamina) / max_s, 0.0, 1.0)
 		speed *= clampf(0.35 + s_ratio * 0.65, 0.35, 1.0)
