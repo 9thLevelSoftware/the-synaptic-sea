@@ -3960,6 +3960,16 @@ func _tick_work_action(delta: float) -> void:
 					var form2: String = str(res.get("item_form", ""))
 					if not form2.is_empty() and inventory_state.has_method("remove_item"):
 						inventory_state.remove_item(form2, 1)
+				# Reconnect linked subcomponent to operational threshold floor (not full repair).
+				var iid: String = str(res.get("instance_id", ""))
+				if component_placement_state != null and not iid.is_empty():
+					var entry: Dictionary = component_placement_state.get_entry(iid)
+					var rsys: String = str(entry.get("linked_system", ""))
+					var rsub: String = str(entry.get("linked_subcomponent", ""))
+					if not rsys.is_empty() and not rsub.is_empty():
+						var rmgr = _active_systems_manager()
+						if rmgr != null and rmgr.has_method("restore_subcomponent_on_remount"):
+							rmgr.call("restore_subcomponent_on_remount", rsys, rsub, 0.55)
 				_rebuild_component_markers()
 		else:
 			res = work_action_driver.complete(module_integrity_map, inv)
