@@ -5778,6 +5778,8 @@ func _emit_objective_training(objective_type: String, room_id: String, objective
 		if not discovered_room_ids.has(disc_key):
 			discovered_room_ids[disc_key] = true
 			emit_training_event("discover_room", disc_key)
+			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+				audio_manager.play_sfx(AudioEventSeamScript.UI_OBJECTIVE_ADVANCE)
 	if objective_type == "download_logs":
 		emit_training_event("extract_data", objective_id if not objective_id.is_empty() else "download_logs")
 	# Stream F: restoring ship systems / stabilizing the reactor is leadership.
@@ -10894,6 +10896,8 @@ func cargo_deposit_for_validation(ship_id: String) -> int:
 		return 0
 	var moved: int = int(CargoTransferScript.deposit_all(inventory_state, inst.get_inventory()).get("total_moved", 0))
 	_recompute_player_encumbrance()
+	if moved > 0 and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_DROP_ITEM)
 	return moved
 
 func cargo_withdraw_for_validation(ship_id: String, category: String) -> int:
@@ -10902,6 +10906,8 @@ func cargo_withdraw_for_validation(ship_id: String, category: String) -> int:
 		return 0
 	var moved: int = int(CargoTransferScript.withdraw_category(inst.get_inventory(), inventory_state, category).get("total_moved", 0))
 	_recompute_player_encumbrance()
+	if moved > 0 and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
 	return moved
 
 func inventory_panel_is_open_for_validation() -> bool:
@@ -11095,13 +11101,19 @@ func cart_load_for_validation(cart_id: String) -> int:
 	var hit: Dictionary = _find_cart_by_id(cart_id)
 	if hit.is_empty() or inventory_state == null:
 		return 0
-	return int(CargoTransferScript.deposit_all(inventory_state, hit["cart"].get_hold()).get("total_moved", 0))
+	var moved: int = int(CargoTransferScript.deposit_all(inventory_state, hit["cart"].get_hold()).get("total_moved", 0))
+	if moved > 0 and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_DROP_ITEM)
+	return moved
 
 func cart_unload_for_validation(cart_id: String, category: String) -> int:
 	var hit: Dictionary = _find_cart_by_id(cart_id)
 	if hit.is_empty() or inventory_state == null:
 		return 0
-	return int(CargoTransferScript.withdraw_category(hit["cart"].get_hold(), inventory_state, category).get("total_moved", 0))
+	var moved: int = int(CargoTransferScript.withdraw_category(hit["cart"].get_hold(), inventory_state, category).get("total_moved", 0))
+	if moved > 0 and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
+	return moved
 
 func cart_is_grabbed_for_validation() -> bool:
 	return _is_cart_grabbed()
