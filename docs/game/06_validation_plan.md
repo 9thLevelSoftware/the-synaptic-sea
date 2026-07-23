@@ -598,6 +598,11 @@ run_clean 'Work splice XP live away smoke' 'WORK SPLICE XP LIVE AWAY PASS away=t
 run_clean 'Work suppress XP live away smoke' 'WORK SUPPRESS XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_suppress_xp_live_away_smoke.gd
 run_clean 'Work harvest XP live away smoke' 'WORK HARVEST XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_harvest_xp_live_away_smoke.gd
 run_clean 'Work plant XP live away smoke' 'WORK PLANT XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_plant_xp_live_away_smoke.gd
+run_clean 'Component mount XP live away smoke' 'COMPONENT MOUNT XP LIVE AWAY PASS away=true dismount=true remount=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_xp_live_away_smoke.gd
+run_clean 'Component mount SFX live away smoke' 'COMPONENT MOUNT SFX LIVE AWAY PASS away=true dismount=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_sfx_live_away_smoke.gd
+run_clean 'Component remount SFX live away smoke' 'COMPONENT REMOUNT SFX LIVE AWAY PASS away=true remount=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_remount_sfx_live_away_smoke.gd
+run_clean 'Work complete SFX live away smoke' 'WORK COMPLETE SFX LIVE AWAY PASS away=true complete=true audio=true route=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_complete_sfx_live_away_smoke.gd
+run_clean 'Work suppress SFX live away smoke' 'WORK SUPPRESS SFX LIVE AWAY PASS away=true complete=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_suppress_sfx_live_away_smoke.gd
 run_clean 'Work yield drop SFX smoke' 'WORK YIELD DROP SFX PASS drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_sfx_smoke.gd
 run_clean 'Work yield drop away smoke' 'WORK YIELD DROP AWAY PASS away=true drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_away_smoke.gd
 run_clean 'Hatch door open SFX smoke' 'HATCH DOOR OPEN SFX PASS hatch=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_open_sfx_smoke.gd
@@ -765,7 +770,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=585 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=590 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
