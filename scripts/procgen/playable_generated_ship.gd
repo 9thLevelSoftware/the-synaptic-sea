@@ -4896,6 +4896,8 @@ func _on_repair_completed(system_id: String, subcomponent_id: String) -> void:
 	# Stream D: each subcomponent channel trains `repair` (repair_subcomponent).
 	# Full-system operational still emits repair_full_system separately (objective path).
 	emit_training_event("repair_subcomponent", "%s.%s" % [system_id, subcomponent_id])
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_REPAIR_COMPLETE)
 	var mgr = _active_systems_manager()
 	var operational: bool = mgr != null and mgr.is_operational(system_id)
 	print("REPAIR COMPLETED system=%s sub=%s operational=%s" % [

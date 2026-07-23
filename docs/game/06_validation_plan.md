@@ -480,7 +480,8 @@ run_clean 'Work progress UI SFX smoke' 'WORK PROGRESS UI SFX PASS seam=true rout
 run_clean 'Wounds panel open SFX smoke' 'WOUNDS PANEL OPEN SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_panel_open_sfx_smoke.gd
 run_clean 'Treat wound SFX smoke' 'TREAT WOUND SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/treat_wound_sfx_smoke.gd
 run_clean 'Craft complete SFX smoke' 'CRAFT COMPLETE SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_complete_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=300 clean_output=true'
+run_clean 'Repair complete SFX smoke' 'REPAIR COMPLETE SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_complete_sfx_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=301 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
