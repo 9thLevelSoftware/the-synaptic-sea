@@ -4948,6 +4948,8 @@ func _on_craft_completed() -> void:
 		_register_food_for_spoilage(item_id)
 	_refresh_inventory_hud()
 	_recompute_player_encumbrance()
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_CRAFT_COMPLETE)
 	print("CRAFT COMPLETED item=%s qty=%d quality=%s" % [
 		item_id, qty, str(result.get("quality_tier", "standard"))])
 	# Stream D/E: station crafts train the matching skill.
