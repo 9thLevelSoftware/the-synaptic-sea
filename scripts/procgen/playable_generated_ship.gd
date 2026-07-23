@@ -478,6 +478,11 @@ var _prev_vitals_critical: bool = false
 var _prev_combat_engaged: bool = false
 # Cooldown for META_BIOMATTER_PULSE while web coverage grows.
 var _biomatter_pulse_cooldown: float = 0.0
+# REQ-AU-001: cadence accumulator for SFX_FOOTSTEP while player is moving.
+# Interval slows slightly when crouching (quieter gait).
+var _footstep_acc: float = 0.0
+const FOOTSTEP_INTERVAL_WALK: float = 0.40
+const FOOTSTEP_INTERVAL_CROUCH: float = 0.55
 var arc_root: Node3D
 var arc_zone_node: StaticBody3D
 var arc_zone_label: Label3D
@@ -7685,6 +7690,37 @@ func _tick_audio_runtime(delta: float) -> void:
 	if is_instance_valid(audio_manager) and audio_manager.has_method("tick"):
 		audio_manager.tick(delta)
 		_refresh_audio_state(false, delta)
+	_tick_footstep_sfx(delta)
+
+
+## Live footstep call site (both _process branches via _tick_audio_runtime).
+## Routes SFX_FOOTSTEP while the player has planar velocity; resets when idle.
+func _tick_footstep_sfx(delta: float) -> void:
+	var moving: bool = is_instance_valid(player) and player.has_method("is_moving") and player.is_moving()
+	if not moving:
+		_footstep_acc = 0.0
+		return
+	var interval: float = FOOTSTEP_INTERVAL_WALK
+	if player.has_method("is_crouching") and player.is_crouching():
+		interval = FOOTSTEP_INTERVAL_CROUCH
+	_footstep_acc += maxf(0.0, delta)
+	if _footstep_acc < interval:
+		return
+	_footstep_acc = 0.0
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		if player is Node3D:
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_FOOTSTEP, (player as Node3D).global_position)
+		else:
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_FOOTSTEP)
+
+
+## Validation seam: force planar velocity and tick past one footstep interval.
+func play_footstep_sfx_for_validation(delta: float = -1.0) -> void:
+	if is_instance_valid(player):
+		player.velocity = Vector3(3.0, 0.0, 0.0)
+	_footstep_acc = 0.0
+	var dt: float = delta if delta > 0.0 else (FOOTSTEP_INTERVAL_WALK + 0.05)
+	_tick_footstep_sfx(dt)
 
 ## Domain 1 (survival_vitals): the single survival-attrition tick, called from
 ## BOTH _process branches so radiation / body-temperature / status / the vitals

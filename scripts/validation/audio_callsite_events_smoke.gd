@@ -14,15 +14,15 @@ extends SceneTree
 ##   SFX_DROP_ITEM     — cart-overload floor WorkYieldDrop spawn
 ##   SFX_DOOR_OPEN     — sealed hatch bypass (_on_hatch_bypassed)
 ##   SFX_DOCK_LAND     — play_dock_land_sfx_for_validation / travel attach
+##   SFX_FOOTSTEP      — play_footstep_sfx_for_validation / _tick_footstep_sfx
 ##
 ## Events still skipped:
-##   SFX_FOOTSTEP                    — PlayerController has no step event
 ##   SFX_DOOR_CLOSE                  — no re-seal door node yet
 ##   UI_LOAD                         — request_load() resets the entire runtime;
 ##                                     too destructive to run mid-smoke
 ##
 ## Pass marker:
-##   AUDIO CALLSITE EVENTS PASS door=true footstep=skip drop=true tool=true inv_toggle=true objective=true save=true dock=true load=skip
+##   AUDIO CALLSITE EVENTS PASS door=true footstep=true drop=true tool=true inv_toggle=true objective=true save=true dock=true load=skip
 ##
 ## Headless:
 ##   <GODOT> --headless --path "C:/Users/dasbl/Documents/The Synaptic Sea"
@@ -173,10 +173,22 @@ func _validate() -> void:
 		return
 
 	# -----------------------------------------------------------------
+	# 8. SFX_FOOTSTEP — live movement cadence seam.
+	# -----------------------------------------------------------------
+	mgr.sfx_router.configure({})
+	var step_before: int = int(mgr.sfx_router.get_routed_count(&"sfx.footstep"))
+	playable.play_footstep_sfx_for_validation()
+	var step_after: int = int(mgr.sfx_router.get_routed_count(&"sfx.footstep"))
+	var footstep_ok: bool = step_after > step_before
+	if not footstep_ok:
+		_fail("SFX_FOOTSTEP not routed after play_footstep_sfx_for_validation (before=%d after=%d)" % [step_before, step_after])
+		return
+
+	# -----------------------------------------------------------------
 	# All assertions passed.  Skipped events logged in marker.
 	# -----------------------------------------------------------------
 	finished = true
-	print("AUDIO CALLSITE EVENTS PASS door=true footstep=skip drop=true tool=%s inv_toggle=%s objective=%s save=%s dock=true load=skip" % [
+	print("AUDIO CALLSITE EVENTS PASS door=true footstep=true drop=true tool=%s inv_toggle=%s objective=%s save=%s dock=true load=skip" % [
 		str(tool_ok).to_lower(),
 		str(inv_open_ok and inv_close_ok).to_lower(),
 		str(obj_ok).to_lower(),
