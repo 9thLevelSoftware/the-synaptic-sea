@@ -1636,9 +1636,18 @@ func force_hull_breach_for_validation(compartment_id: String, amount: float = 0.
 	if hull_integrity_state == null:
 		return false
 	var ok: bool = hull_integrity_state.damage_compartment(compartment_id, amount, true)
+	if ok:
+		_emit_meta_hull_groan()
 	_recompute_expanded_ship_systems(0.0)
 	_refresh_tracker_system_status_lines()
 	return ok
+
+
+## META bus cue when hull takes a breach-level hit (catalog META_HULL_GROAN).
+## Uses play_sfx so SfxEventRouter routed_count tracks the event for smokes/UI captions.
+func _emit_meta_hull_groan() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.META_HULL_GROAN)
 
 func seal_hull_breach_for_validation(compartment_id: String, amount: float = 1.0) -> bool:
 	if hull_integrity_state == null:
@@ -3157,9 +3166,13 @@ func _seed_derelict_breaches() -> void:
 	var hull = current_ship.get_hull()
 	if hull == null:
 		return
+	var seeded_any: bool = false
 	for cid in _variant_hazard_compartments("breach"):
 		if hull.compartments.has(str(cid)):
 			hull.damage_compartment(str(cid), 1.0, true)
+			seeded_any = true
+	if seeded_any:
+		_emit_meta_hull_groan()
 
 ## Builds the per-frame context the authoritative fire model ticks against.
 func _build_fire_context() -> Dictionary:
@@ -4590,6 +4603,7 @@ func _on_compartment_vented(compartment_id: String) -> void:
 	var hull = _active_hull()
 	if hull != null and hull.compartments.has(compartment_id):
 		hull.damage_compartment(compartment_id, 0.0, true)
+		_emit_meta_hull_groan()
 	_apply_decompression_module_damage(compartment_id)
 	_refresh_fire_zones()
 	_refresh_oxygen_state(false, 0.0)
