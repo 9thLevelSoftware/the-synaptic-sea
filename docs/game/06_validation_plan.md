@@ -540,7 +540,8 @@ run_clean 'Codex open SFX smoke' 'CODEX OPEN SFX PASS open=true sfx=true' "$GODO
 run_clean 'Pause menu open SFX smoke' 'PAUSE MENU OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pause_menu_open_sfx_smoke.gd
 run_clean 'Pause menu close SFX smoke' 'PAUSE MENU CLOSE SFX PASS close=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pause_menu_close_sfx_smoke.gd
 run_clean 'Menu confirm resume SFX smoke' 'MENU CONFIRM RESUME SFX PASS resume=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_confirm_resume_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=360 clean_output=true'
+run_clean 'Settings menu open SFX smoke' 'SETTINGS MENU OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_menu_open_sfx_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=361 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
