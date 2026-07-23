@@ -3648,6 +3648,19 @@ func open_wounds_panel_for_validation() -> bool:
 	return wounds_panel.is_open()
 
 
+## Live toggle key: open if closed, close if open (validation open stays open-only).
+func toggle_wounds_panel_from_input() -> bool:
+	if wounds_panel == null:
+		return false
+	if wounds_panel.is_open():
+		if wounds_panel.has_method("close"):
+			wounds_panel.close()
+		else:
+			wounds_panel.visible = false
+		return false
+	return open_wounds_panel_for_validation()
+
+
 const BANDAGE_ITEM_IDS: Array[String] = ["bandage_kit", "bandage", "field_dressing"]
 const TREAT_ITEM_IDS: Array[String] = ["medkit", "stim_pack", "antibiotic"]
 
@@ -10983,7 +10996,7 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 			return
 		if event.is_action_pressed("toggle_wounds") and _menus_are_closed():
-			open_wounds_panel_for_validation()
+			toggle_wounds_panel_from_input()
 			get_viewport().set_input_as_handled()
 			return
 	if is_instance_valid(menu_coordinator):
