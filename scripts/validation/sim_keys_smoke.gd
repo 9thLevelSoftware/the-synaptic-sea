@@ -10,8 +10,8 @@ const VitalsStateScript := preload("res://scripts/systems/vitals_state.gd")
 
 func _initialize() -> void:
 	var hot: PackedStringArray = SimKeysScript.vitals_hot_path_keys()
-	if hot.size() != 9:
-		_fail("vitals hot-path key count expected 9, got %d" % hot.size())
+	if hot.size() != 12:
+		_fail("vitals hot-path key count expected 12, got %d" % hot.size())
 		return
 
 	# Wire-name stability (do not rename without a migration plan).
@@ -23,6 +23,9 @@ func _initialize() -> void:
 		"sanity_health_drain": true,
 		"encumbrance_health_drain": true,
 		"temperature_thirst_mult": true,
+		"temperature_hunger_mult": true,
+		"wound_thirst_mult": true,
+		"wound_health_drain": true,
 		"status_stamina_recovery_mult": true,
 		"sanity_stamina_recovery_mult": true,
 	}

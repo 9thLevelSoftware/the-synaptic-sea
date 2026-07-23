@@ -3,6 +3,8 @@ class_name BodyTemperatureState
 
 ## Pure model for body temperature.  Per REQ-SV-004.
 
+const VitalsStateScript := preload("res://scripts/systems/vitals_state.gd")
+
 const DEFAULT_TEMPERATURE: float = 22.0
 const DEFAULT_SAFE_MIN: float = 18.0
 const DEFAULT_SAFE_MAX: float = 32.0
@@ -50,10 +52,23 @@ func is_safe() -> bool:
 	return temperature >= safe_min and temperature <= safe_max
 
 ## Returns thirst-drain multiplier when temperature is outside safe range.
+## PKG-C3.1b: continuous curve (not a 1.0/1.5 cliff).
 func get_thirst_multiplier() -> float:
 	if is_safe():
 		return 1.0
-	return 1.5
+	var over: float = 0.0
+	if temperature < safe_min:
+		over = clampf((safe_min - temperature) / 10.0, 0.0, 1.0)
+	elif temperature > safe_max:
+		over = clampf((temperature - safe_max) / 10.0, 0.0, 1.0)
+	# smooth 1.0 → 1.8
+	var t: float = over * over * (3.0 - 2.0 * over)
+	return 1.0 + 0.8 * t
+
+
+## PKG-C3.1b: cold raises hunger drain; heat does not.
+func get_hunger_multiplier() -> float:
+	return VitalsStateScript.cold_hunger_curve(temperature, safe_min)
 
 func adjust_temperature(amount: float) -> float:
 	temperature += amount
@@ -69,6 +84,7 @@ func get_summary() -> Dictionary:
 		"in_extreme_zone": in_extreme_zone,
 		"is_safe": is_safe(),
 		"thirst_multiplier": get_thirst_multiplier(),
+		"hunger_multiplier": get_hunger_multiplier(),
 	}
 
 func apply_summary(summary: Dictionary) -> bool:

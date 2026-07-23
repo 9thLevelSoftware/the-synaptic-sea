@@ -3,6 +3,7 @@ class_name VitalsState
 
 ## Pure model for player core vitals: health, stamina, hunger, thirst.
 ## Per REQ-SV-001.  No scene-tree access.
+## PKG-C3.1b: response curves (not cliffs) + cross-coupling (each stat feeds ≥2 others).
 
 const SimKeysScript := preload("res://scripts/systems/sim_keys.gd")
 
@@ -16,6 +17,7 @@ const DEFAULT_HUNGER_DRAIN: float = 0.5
 const DEFAULT_THIRST_DRAIN: float = 0.8
 const DEFAULT_STAMINA_RECOVERY: float = 5.0
 const DEFAULT_HEALTH_RECOVERY: float = 0.0
+## Soft UI warning thresholds (not hard gameplay cliffs).
 const HUNGER_STAMINA_CASCADE_THRESHOLD: float = 30.0
 const THIRST_VISION_WARNING_THRESHOLD: float = 20.0
 const EXHAUSTION_STAMINA_THRESHOLD: float = 15.0
@@ -52,6 +54,76 @@ func configure(config: Dictionary) -> void:
 	hunger = clampf(_f(config, "hunger", hunger), 0.0, max_hunger)
 	thirst = clampf(_f(config, "thirst", thirst), 0.0, max_thirst)
 
+## Hermite smoothstep t in [0,1] → [0,1].
+static func smoothstep01(t: float) -> float:
+	var x: float = clampf(t, 0.0, 1.0)
+	return x * x * (3.0 - 2.0 * x)
+
+
+## Hunger → stamina recovery mult. Full recovery above 50% hunger; smooth down to 0.25 at empty.
+static func hunger_stamina_recovery_curve(hunger_value: float, max_h: float) -> float:
+	if max_h <= 0.0:
+		return 1.0
+	var r: float = clampf(hunger_value / max_h, 0.0, 1.0)
+	if r >= 0.5:
+		return 1.0
+	var t: float = r / 0.5
+	return 0.25 + 0.75 * smoothstep01(t)
+
+
+## Thirst → vision clarity mult (1.0 clear → 0.35 at empty). Continuous, not a cliff.
+static func thirst_vision_curve(thirst_value: float, max_t: float) -> float:
+	if max_t <= 0.0:
+		return 1.0
+	var r: float = clampf(thirst_value / max_t, 0.0, 1.0)
+	if r >= 0.35:
+		return 1.0
+	var t: float = r / 0.35
+	return 0.35 + 0.65 * smoothstep01(t)
+
+
+## Thirst → stamina drain mult when dehydrated (1.0 full → 1.75 empty).
+static func thirst_stamina_drain_curve(thirst_value: float, max_t: float) -> float:
+	if max_t <= 0.0:
+		return 1.0
+	var r: float = clampf(thirst_value / max_t, 0.0, 1.0)
+	if r >= 0.4:
+		return 1.0
+	var deficit: float = 1.0 - (r / 0.4)
+	return 1.0 + 0.75 * smoothstep01(deficit)
+
+
+## Hunger → passive health drain when starving (0 at 25%+, up to 2.0/s scale at 0).
+static func hunger_health_drain_curve(hunger_value: float, max_h: float) -> float:
+	if max_h <= 0.0:
+		return 0.0
+	var r: float = clampf(hunger_value / max_h, 0.0, 1.0)
+	if r >= 0.25:
+		return 0.0
+	var deficit: float = 1.0 - (r / 0.25)
+	return 2.0 * smoothstep01(deficit)
+
+
+## Stamina → movement mult. Full speed above 30%; smooth down to 0.35 at empty.
+static func stamina_move_curve(stamina_value: float, max_s: float) -> float:
+	if max_s <= 0.0:
+		return 1.0
+	var r: float = clampf(stamina_value / max_s, 0.0, 1.0)
+	if r >= 0.3:
+		return 1.0
+	var t: float = r / 0.3
+	return 0.35 + 0.65 * smoothstep01(t)
+
+
+## Cold (below safe) raises hunger drain. Returns mult ≥ 1.
+## delta_c below safe_min; 0 inside band.
+static func cold_hunger_curve(temperature: float, safe_min: float) -> float:
+	if temperature >= safe_min:
+		return 1.0
+	var deficit: float = clampf((safe_min - temperature) / 10.0, 0.0, 1.0)
+	return 1.0 + 0.8 * smoothstep01(deficit)
+
+
 ## tick updates all four vitals.  context keys (SimKeys / historical wire names):
 ##   SimKeys.RADIATION_HEALTH_DRAIN -> float
 ##   SimKeys.ATMOSPHERE_HEALTH_DRAIN -> float
@@ -59,6 +131,9 @@ func configure(config: Dictionary) -> void:
 ##   SimKeys.SANITY_HEALTH_DRAIN -> float
 ##   SimKeys.ENCUMBRANCE_HEALTH_DRAIN -> float (inventory load_ratio > 1)
 ##   SimKeys.TEMPERATURE_THIRST_MULT -> float
+##   SimKeys.TEMPERATURE_HUNGER_MULT -> float (PKG-C3.1b cold→hunger)
+##   SimKeys.WOUND_THIRST_MULT -> float (PKG-C3.1b wounds→thirst)
+##   SimKeys.WOUND_HEALTH_DRAIN -> float (PKG-C3.1b bleed)
 ##   SimKeys.STATUS_STAMINA_RECOVERY_MULT -> float
 ##   SimKeys.SANITY_STAMINA_RECOVERY_MULT -> float
 ##   SimKeys.MOVING -> bool (when false stamina recovers instead of draining)
@@ -66,18 +141,18 @@ func tick(delta_seconds: float, context: Dictionary = {}) -> bool:
 	if delta_seconds <= 0.0:
 		return false
 	var changed: bool = false
-	# Hunger cascade: below threshold stamina recovery is halved.
-	var stamina_recovery_mult: float = 1.0
-	if hunger < HUNGER_STAMINA_CASCADE_THRESHOLD:
-		stamina_recovery_mult = 0.5
+	# Hunger → stamina recovery (curve, not cliff).
+	var stamina_recovery_mult: float = hunger_stamina_recovery_curve(hunger, max_hunger)
 	if context.has(SimKeysScript.STATUS_STAMINA_RECOVERY_MULT):
 		stamina_recovery_mult *= float(context.get(SimKeysScript.STATUS_STAMINA_RECOVERY_MULT, 1.0))
 	if context.has(SimKeysScript.SANITY_STAMINA_RECOVERY_MULT):
 		stamina_recovery_mult *= float(context.get(SimKeysScript.SANITY_STAMINA_RECOVERY_MULT, 1.0))
+	# Thirst → stamina drain when moving
+	var stamina_drain_mult: float = thirst_stamina_drain_curve(thirst, max_thirst)
 	# Stamina
 	var moving: bool = bool(context.get(SimKeysScript.MOVING, true))
 	if moving:
-		var s_drain: float = stamina_drain_rate * delta_seconds
+		var s_drain: float = stamina_drain_rate * stamina_drain_mult * delta_seconds
 		if s_drain > 0.0 and stamina > 0.0:
 			stamina = maxf(0.0, stamina - s_drain)
 			changed = true
@@ -86,8 +161,9 @@ func tick(delta_seconds: float, context: Dictionary = {}) -> bool:
 		if s_recover > 0.0 and stamina < max_stamina:
 			stamina = minf(max_stamina, stamina + s_recover)
 			changed = true
-	# Health (passive drain + optional radiation drain + optional atmosphere drain)
+	# Health (passive + hazards + wound bleed + starvation curve)
 	var h_drain: float = health_drain_rate * delta_seconds
+	h_drain += hunger_health_drain_curve(hunger, max_hunger) * delta_seconds
 	if context.has(SimKeysScript.RADIATION_HEALTH_DRAIN):
 		h_drain += float(context.get(SimKeysScript.RADIATION_HEALTH_DRAIN, 0.0)) * delta_seconds
 	if context.has(SimKeysScript.ATMOSPHERE_HEALTH_DRAIN):
@@ -98,6 +174,8 @@ func tick(delta_seconds: float, context: Dictionary = {}) -> bool:
 		h_drain += float(context.get(SimKeysScript.SANITY_HEALTH_DRAIN, 0.0)) * delta_seconds
 	if context.has(SimKeysScript.ENCUMBRANCE_HEALTH_DRAIN):
 		h_drain += float(context.get(SimKeysScript.ENCUMBRANCE_HEALTH_DRAIN, 0.0)) * delta_seconds
+	if context.has(SimKeysScript.WOUND_HEALTH_DRAIN):
+		h_drain += float(context.get(SimKeysScript.WOUND_HEALTH_DRAIN, 0.0)) * delta_seconds
 	if h_drain > 0.0 and health > 0.0:
 		health = maxf(0.0, health - h_drain)
 		changed = true
@@ -105,14 +183,16 @@ func tick(delta_seconds: float, context: Dictionary = {}) -> bool:
 		var h_recover: float = health_recovery_rate * delta_seconds
 		health = minf(max_health, health + h_recover)
 		changed = true
-	# Hunger
-	var hgr_drain: float = hunger_drain_rate * delta_seconds
+	# Hunger (cold cascade via temperature_hunger_mult)
+	var hgr_mult: float = float(context.get(SimKeysScript.TEMPERATURE_HUNGER_MULT, 1.0))
+	var hgr_drain: float = hunger_drain_rate * maxf(0.0, hgr_mult) * delta_seconds
 	if hgr_drain > 0.0 and hunger > 0.0:
 		hunger = maxf(0.0, hunger - hgr_drain)
 		changed = true
-	# Thirst (temperature cascade)
+	# Thirst (temperature + wounds)
 	var t_mult: float = float(context.get(SimKeysScript.TEMPERATURE_THIRST_MULT, 1.0))
-	var t_drain: float = thirst_drain_rate * t_mult * delta_seconds
+	var wound_t: float = float(context.get(SimKeysScript.WOUND_THIRST_MULT, 1.0))
+	var t_drain: float = thirst_drain_rate * maxf(0.0, t_mult) * maxf(0.0, wound_t) * delta_seconds
 	if t_drain > 0.0 and thirst > 0.0:
 		thirst = maxf(0.0, thirst - t_drain)
 		changed = true
@@ -130,15 +210,21 @@ func apply_delta(delta: Dictionary) -> Dictionary:
 func is_incapacitated() -> bool:
 	return health <= 0.0
 
-## Domain 1: low-vitals action-gating expressed as a movement-speed multiplier.
-## 0.0 when incapacitated (movement locked at death), 0.5 when stamina is
-## exhausted (attrition slows the player BEFORE death), else 1.0.
+## Domain 1: low-vitals action-gating as continuous movement-speed multiplier (PKG-C3.1b curve).
 func get_movement_speed_multiplier() -> float:
 	if is_incapacitated():
 		return 0.0
-	if stamina <= EXHAUSTION_STAMINA_THRESHOLD:
-		return 0.5
-	return 1.0
+	return stamina_move_curve(stamina, max_stamina)
+
+
+## PKG-C3.1b: continuous vision clarity from thirst (for HUD / post FX later).
+func get_vision_multiplier() -> float:
+	return thirst_vision_curve(thirst, max_thirst)
+
+
+## PKG-C3.1b: current hunger→stamina recovery mult (for smokes / HUD).
+func get_hunger_stamina_recovery_mult() -> float:
+	return hunger_stamina_recovery_curve(hunger, max_hunger)
 
 func get_summary() -> Dictionary:
 	return {
@@ -158,6 +244,11 @@ func get_summary() -> Dictionary:
 		"health_recovery_rate": health_recovery_rate,
 		"hunger_stamina_cascade_active": hunger < HUNGER_STAMINA_CASCADE_THRESHOLD,
 		"thirst_vision_warning_active": thirst < THIRST_VISION_WARNING_THRESHOLD,
+		"hunger_stamina_recovery_mult": get_hunger_stamina_recovery_mult(),
+		"vision_mult": get_vision_multiplier(),
+		"move_mult": get_movement_speed_multiplier(),
+		"thirst_stamina_drain_mult": thirst_stamina_drain_curve(thirst, max_thirst),
+		"starvation_health_drain": hunger_health_drain_curve(hunger, max_hunger),
 	}
 
 func apply_summary(summary: Dictionary) -> bool:
@@ -194,9 +285,9 @@ func get_status_lines() -> PackedStringArray:
 	lines.append(_vital_line("Hunger", hunger, max_hunger, 15.0))
 	lines.append(_vital_line("Thirst", thirst, max_thirst, 15.0))
 	if hunger < HUNGER_STAMINA_CASCADE_THRESHOLD:
-		lines.append("HUNGER LOW -> stamina recovery halved")
+		lines.append("HUNGER LOW -> stamina recovery ×%.2f" % get_hunger_stamina_recovery_mult())
 	if thirst < THIRST_VISION_WARNING_THRESHOLD:
-		lines.append("THIRST LOW -> vision impaired")
+		lines.append("THIRST LOW -> vision impaired (×%.2f)" % get_vision_multiplier())
 	return lines
 
 func _vital_line(name: String, value: float, maxv: float, critical: float) -> String:
