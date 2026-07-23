@@ -3589,6 +3589,8 @@ func _on_ship_mod_install_requested(_slot_id: String, component_id: String, item
 	_apply_ship_mod_system_link(component_id, true)
 	_refresh_station_tiers_from_ship_mod()
 	emit_training_event("ship_mod_install", component_id)
+	if is_instance_valid(audio_manager):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_SHIP_MOD_INSTALL)
 
 
 ## Sync panel bag → InventoryState after uninstall (item_form returned to bag).
@@ -3606,6 +3608,8 @@ func _on_ship_mod_uninstall_requested(_slot_id: String, component_id: String = "
 	_apply_ship_mod_system_link(component_id, false)
 	_refresh_station_tiers_from_ship_mod()
 	emit_training_event("ship_mod_uninstall", component_id)
+	if is_instance_valid(audio_manager):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_SHIP_MOD_UNINSTALL)
 
 
 ## REQ-SMOD-001: install restores linked sub to operational floor; uninstall damages it.
