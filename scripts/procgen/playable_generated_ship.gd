@@ -1891,9 +1891,30 @@ func _on_login_requested(ship_id: String) -> void:
 	if inst == null:
 		return
 	if not inst.is_working_vessel():
-		return   # silent: refusing a login on an unrepaired vessel is an expected player action
+		# Soft deny on unrepaired / non-working vessel login attempt.
+		_emit_bridge_login_denied_sfx()
+		return
 	inst.get_access().claim(PLAYER_LOCAL_ID)
 	set_piloted_ship(inst)
+	_emit_bridge_login_sfx()
+
+
+func _emit_bridge_login_sfx() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_OPEN)
+
+
+func _emit_bridge_login_denied_sfx() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+
+
+func play_bridge_login_sfx_for_validation() -> void:
+	_emit_bridge_login_sfx()
+
+
+func play_bridge_login_denied_sfx_for_validation() -> void:
+	_emit_bridge_login_denied_sfx()
 
 ## Re-points piloted_ship to `inst` (the player's active ride). Gated on the local
 ## player having access. Recomputes occupancy. Returns {success, reason}.
@@ -2284,6 +2305,8 @@ func _clear_dock_barriers() -> void:
 func _on_dock_barrier_opened(_marker_id: String) -> void:
 	# Boarding the derelict is now possible; occupancy flips as the player crosses.
 	recompute_occupancy()
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_DOOR_OPEN)
 
 ## Ship-local center of `inst`'s bridge room (role == "bridge"), or Vector3.INF if the
 ## ship has NO bridge room. Derived from inst.built_layout via DockPorts so it works
@@ -4200,10 +4223,8 @@ func _tick_work_action(delta: float) -> void:
 	# Exhausted stamina interrupts active work (no free perpetual strip).
 	if vitals_state != null:
 		if float(vitals_state.stamina) <= 0.001:
-			if work_action_driver.work != null and work_action_driver.work.has_method("interrupt"):
-				work_action_driver.work.call("interrupt")
+			_interrupt_work_on_damage()
 			_work_requires_hold = false
-			_refresh_work_action_hud()
 			return
 		var max_s: float = maxf(1.0, float(vitals_state.max_stamina))
 		var s_ratio: float = clampf(float(vitals_state.stamina) / max_s, 0.0, 1.0)
