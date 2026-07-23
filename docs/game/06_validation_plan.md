@@ -565,7 +565,8 @@ run_clean 'Cargo bulk transfer SFX smoke' 'CARGO BULK TRANSFER SFX PASS deposit=
 run_clean 'UI load SFX smoke' 'UI LOAD SFX PASS save=true load=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_load_sfx_smoke.gd
 run_clean 'Inspire crew SFX smoke' 'INSPIRE CREW SFX PASS inspire=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inspire_crew_sfx_smoke.gd
 run_clean 'Junction calibrator SFX smoke' 'JUNCTION CALIBRATOR SFX PASS applied=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/junction_calibrator_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=385 clean_output=true'
+run_clean 'First aid ally XP smoke' 'FIRST AID ALLY XP PASS ally=true surgery=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/first_aid_ally_xp_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=386 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
