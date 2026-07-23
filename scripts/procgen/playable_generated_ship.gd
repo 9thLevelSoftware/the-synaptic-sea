@@ -6488,6 +6488,10 @@ func _on_inventory_use_requested(item_id: String, use_all: bool) -> void:
 func _open_inventory_self() -> void:
 	if not is_instance_valid(inventory_panel) or inventory_state == null:
 		return
+	# Toggle: re-press inventory key while self-inventory is open closes it.
+	if inventory_panel.is_open() and str(inventory_panel.get_mode()) == "self":
+		inventory_panel.close()
+		return
 	inventory_panel.open_self(inventory_state, equipment_state)
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.UI_INVENTORY_OPEN)
