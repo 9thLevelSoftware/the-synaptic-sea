@@ -592,7 +592,8 @@ run_clean 'Unequip empty SFX smoke' 'UNEQUIP EMPTY SFX PASS deny=true sfx=true' 
 run_clean 'Reload denied SFX smoke' 'RELOAD DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/reload_denied_sfx_smoke.gd
 run_clean 'Interact miss SFX smoke' 'INTERACT MISS SFX PASS miss=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interact_miss_sfx_smoke.gd
 run_clean 'Craft from picker deny SFX smoke' 'CRAFT FROM PICKER DENY SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_from_picker_deny_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=412 clean_output=true'
+run_clean 'Load denied SFX smoke' 'LOAD DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/load_denied_sfx_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=413 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
