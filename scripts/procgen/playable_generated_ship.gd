@@ -3988,7 +3988,9 @@ func _try_work_action_interact(player_body) -> bool:
 				action_id = "pry_panel"
 				tool_class = "prybar"
 			else:
-				return false
+				# In range of a workable wall but missing cut/pry tools — soft deny.
+				_emit_work_tool_missing_sfx()
+				return true
 
 	if action_id.is_empty() or target_id.is_empty():
 		return false
@@ -4020,6 +4022,15 @@ func _try_work_action_interact(player_body) -> bool:
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 	return true
+
+
+func _emit_work_tool_missing_sfx() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+
+
+func play_work_tool_missing_sfx_for_validation() -> void:
+	_emit_work_tool_missing_sfx()
 
 
 ## Nearest mounted component; uses room floor center as approximate world position.
