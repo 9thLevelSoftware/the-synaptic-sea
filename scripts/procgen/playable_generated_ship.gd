@@ -4263,6 +4263,9 @@ func _spawn_work_yield_drop(items: Dictionary) -> void:
 	work_yield_drops.append(drop)
 	if drop.has_signal("scooped") and not drop.scooped.is_connected(_on_work_yield_scooped):
 		drop.scooped.connect(_on_work_yield_scooped)
+	# Cart-overload floor pile is the real ground-drop call site for SFX_DROP_ITEM.
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_DROP_ITEM, (player as Node3D).global_position)
 	if work_action_driver != null:
 		work_action_driver.pending_yields.clear()
 		work_action_driver.overloaded = false
@@ -5414,6 +5417,9 @@ func _on_hatch_bypassed(hatch_id: String, lock_kind: String) -> void:
 		current_ship.bypassed_hatch_ids.append(hatch_id)
 	# Stream F: forcing a sealed bulkhead is field construction (build_shelter).
 	emit_training_event("build_shelter", hatch_id)
+	# Sealed hatches are the live door-open call site (portals remain pure data).
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_DOOR_OPEN)
 	# Fire B2: opening this hatch clears only its bulkhead pair (context rebuild
 	# also drops it from closed_links on the next fire tick).
 	for h in sealed_hatches:

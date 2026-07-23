@@ -505,7 +505,9 @@ run_clean 'Cook meal XP smoke' 'COOK MEAL XP PASS emit=true catalog=true' "$GODO
 run_clean 'Perform surgery XP smoke' 'PERFORM SURGERY XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/perform_surgery_xp_smoke.gd
 run_clean 'Training catalog coverage smoke' 'TRAINING CATALOG COVERAGE PASS count=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/training_catalog_coverage_smoke.gd
 run_clean 'Repair subcomponent XP smoke' 'REPAIR SUBCOMPONENT XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_subcomponent_xp_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=325 clean_output=true'
+run_clean 'Work yield drop SFX smoke' 'WORK YIELD DROP SFX PASS drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_sfx_smoke.gd
+run_clean 'Hatch door open SFX smoke' 'HATCH DOOR OPEN SFX PASS hatch=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_open_sfx_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=327 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
