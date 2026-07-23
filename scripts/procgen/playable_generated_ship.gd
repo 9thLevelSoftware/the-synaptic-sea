@@ -1584,6 +1584,10 @@ func _recompute_expanded_ship_systems(delta: float) -> void:
 	# the _process away-branch for emergency crafts started before travel).
 	if crafting_state != null:
 		var stations_powered: bool = power_grid_state.get_allocation_ratio("stations") > 0.0
+		# REQ-SMOD-002: over-budget ship-mod installs kill hub station power.
+		if ship_modification_state != null and ship_modification_state.has_method("is_power_budget_ok"):
+			if not bool(ship_modification_state.call("is_power_budget_ok")):
+				stations_powered = false
 		for kind in CRAFTING_STATION_KINDS:
 			crafting_state.get_or_create_station(kind).set_power(stations_powered)
 		for st in crafting_stations:
