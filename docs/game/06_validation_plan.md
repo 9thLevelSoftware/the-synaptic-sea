@@ -440,7 +440,8 @@ run_clean 'Component placement runtime smoke' 'COMPONENT PLACEMENT RUNTIME PASS 
 run_clean 'Component dismount interact smoke' 'COMPONENT DISMOUNT INTERACT PASS start=true tick=true stripped=true yield=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_dismount_interact_smoke.gd
 run_clean 'Component mount interact smoke' 'COMPONENT MOUNT INTERACT PASS dismount=true remount=true mounted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_interact_smoke.gd
 run_clean 'Component markers smoke' 'COMPONENT MARKERS PASS wired=true count=true rebuild=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_markers_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=260 clean_output=true'
+run_clean 'Component system link smoke' 'COMPONENT SYSTEM LINK PASS catalog_links=true soft_fill=true coverage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_system_link_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=261 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
