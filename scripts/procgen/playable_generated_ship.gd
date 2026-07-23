@@ -6798,7 +6798,10 @@ func _begin_weapon_reload() -> void:
 	var weapon: Dictionary = threat_manager.weapon_definitions.get(weapon_id, {}) if threat_manager.weapon_definitions.get(weapon_id, {}) is Dictionary else {}
 	var ammo_item_id: String = str(weapon.get("ammo_item_id", ""))
 	if ammo_item_id.is_empty():
-		return  # melee: no reload (silent)
+		# Melee / non-mag weapons: soft deny (same cue as empty-mag refuse).
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+		return
 	var mag_size: int = int(weapon.get("magazine_size", 0))
 	var reserve: int = inventory_state.get_quantity(ammo_item_id) if inventory_state != null else 0
 	if ammo_state.begin_reload(weapon_id, mag_size, reserve):
