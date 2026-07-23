@@ -111,6 +111,13 @@ var web = null                           # WebInfestationState | null
 # (world_time - last_sim_time). Persisted only when nonzero (additive).
 var last_sim_time: float = 0.0
 
+# PKG-D6.1: sparse pillar deltas that must survive leave/revisit (geometry
+# regenerates from seed; these re-apply onto the fresh map/placement).
+# module_integrity_summary: ModuleIntegrityMap.get_summary() shape (schema + deltas).
+# component_placement_summary: ComponentPlacementState.get_summary() shape.
+var module_integrity_summary: Dictionary = {}
+var component_placement_summary: Dictionary = {}
+
 # Static factory via load() self-reference (class_name globals unreliable under
 # --headless --script).
 static func create(p_ship_id: String, p_marker_id: String, p_blueprint, p_systems_manager, p_scene_root) -> ShipInstance:
@@ -171,6 +178,10 @@ func get_summary() -> Dictionary:
 		result["web"] = web.get_summary()
 	if last_sim_time != 0.0:
 		result["last_sim_time"] = last_sim_time
+	if not module_integrity_summary.is_empty():
+		result["module_integrity"] = module_integrity_summary.duplicate(true)
+	if not component_placement_summary.is_empty():
+		result["component_placement"] = component_placement_summary.duplicate(true)
 	return result
 
 func apply_summary(summary) -> bool:
@@ -245,6 +256,13 @@ func apply_summary(summary) -> bool:
 	elif summary.has("web_attached"):
 		get_web().attached_to_web = bool(summary.get("web_attached", true))
 	last_sim_time = float(summary.get("last_sim_time", 0.0))
+	# PKG-D6.1: pillar sparse packs (empty/missing = pristine regenerate-from-seed).
+	var mi_variant: Variant = summary.get("module_integrity", null)
+	if typeof(mi_variant) == TYPE_DICTIONARY:
+		module_integrity_summary = (mi_variant as Dictionary).duplicate(true)
+	var cp_variant: Variant = summary.get("component_placement", null)
+	if typeof(cp_variant) == TYPE_DICTIONARY:
+		component_placement_summary = (cp_variant as Dictionary).duplicate(true)
 	return true
 
 ## Returns this ship's DerelictObjectiveController, creating it on first access.

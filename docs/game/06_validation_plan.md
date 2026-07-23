@@ -433,7 +433,8 @@ run_clean 'Audio event coverage smoke' 'AUDIO EVENT COVERAGE PASS verbs=true sea
 run_clean 'Ship modification smoke' 'SHIP MODIFICATION PASS install=true power=true uninstall=true plating=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_modification_smoke.gd
 run_clean 'Work action integration smoke' 'WORK ACTION INTEGRATION PASS driver=true hud=true wounds=true shipmod=true cut=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_integration_smoke.gd
 run_clean 'Hub explorable verify smoke' 'HUB EXPLORABLE VERIFY PASS home=true stations=true repair=true walk=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hub_explorable_verify_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=253 clean_output=true'
+run_clean 'Pillar revisit persistence smoke' 'PILLAR REVISIT PERSISTENCE PASS integrity=true components=true ship=true runtime=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pillar_revisit_persistence_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=254 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
