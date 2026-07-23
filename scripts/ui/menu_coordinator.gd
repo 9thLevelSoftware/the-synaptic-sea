@@ -1162,13 +1162,22 @@ func _on_menu_changed(new_menu_id: String, previous_menu_id: String) -> void:
 
 func _on_tutorial_triggered(_tutorial_id: String, title: String, body: String) -> void:
 	tutorial_overlay_panel.show_tutorial(title, body)
+	if is_instance_valid(_audio_manager) and _audio_manager.has_method("play_sfx"):
+		var AudioEventSeamScript = load("res://scripts/audio/audio_event_seam.gd")
+		_audio_manager.play_sfx(AudioEventSeamScript.UI_OBJECTIVE_ADVANCE)
 	_refresh_codex()
 
 func _on_tutorial_dismissed(_tutorial_id: String) -> void:
+	if is_instance_valid(_audio_manager) and _audio_manager.has_method("play_sfx"):
+		var AudioEventSeamScript = load("res://scripts/audio/audio_event_seam.gd")
+		_audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 	_refresh_tutorial()
 	_refresh_codex()
 
 func _on_codex_unlocked(_codex_entry_id: String) -> void:
+	if is_instance_valid(_audio_manager) and _audio_manager.has_method("play_sfx"):
+		var AudioEventSeamScript = load("res://scripts/audio/audio_event_seam.gd")
+		_audio_manager.play_sfx(AudioEventSeamScript.UI_OBJECTIVE_ADVANCE)
 	_refresh_codex()
 
 func _on_payload_changed(payload) -> void:
