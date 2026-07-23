@@ -5134,6 +5134,8 @@ func _on_salvage_completed(item_id: String, yields: Dictionary) -> void:
 
 func _on_craft_blocked(station_kind: String, reason: String) -> void:
 	print("CRAFT BLOCKED station=%s reason=%s" % [station_kind, reason])
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 
 ## Domain 3: signal handlers for persistent production stations (hydroponics/water_recycler).
 func _on_production_started(station_kind: String, input_id: String) -> void:
