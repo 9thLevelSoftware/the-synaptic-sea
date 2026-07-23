@@ -517,6 +517,7 @@ run_clean 'Work weld XP live smoke' 'WORK WELD XP LIVE PASS start=true complete=
 run_clean 'Ship mod overbudget power smoke' 'SHIP MOD OVERBUDGET POWER PASS over=true unpowered=true ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_overbudget_power_smoke.gd
 run_clean 'Work progress UI SFX smoke' 'WORK PROGRESS UI SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_progress_ui_sfx_smoke.gd
 run_clean 'Wounds panel open SFX smoke' 'WOUNDS PANEL OPEN SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_panel_open_sfx_smoke.gd
+run_clean 'Wounds panel open away smoke' 'WOUNDS PANEL OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_panel_open_away_smoke.gd
 run_clean 'Treat wound SFX smoke' 'TREAT WOUND SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/treat_wound_sfx_smoke.gd
 run_clean 'Craft complete SFX smoke' 'CRAFT COMPLETE SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_complete_sfx_smoke.gd
 run_clean 'Repair complete SFX smoke' 'REPAIR COMPLETE SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_complete_sfx_smoke.gd
@@ -556,6 +557,7 @@ run_clean 'Work pry XP live smoke' 'WORK PRY XP LIVE PASS start=true complete=tr
 run_clean 'Work yield scoop SFX smoke' 'WORK YIELD SCOOP SFX PASS scoop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_scoop_sfx_smoke.gd
 run_clean 'Work yield scoop away smoke' 'WORK YIELD SCOOP AWAY PASS away=true scoop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_scoop_away_smoke.gd
 run_clean 'Chart route SFX smoke' 'CHART ROUTE SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/chart_route_sfx_smoke.gd
+run_clean 'Chart route away smoke' 'CHART ROUTE AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/chart_route_away_smoke.gd
 run_clean 'Component mount XP live smoke' 'COMPONENT MOUNT XP LIVE PASS dismount=true remount=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_xp_live_smoke.gd
 run_clean 'Sanity hallucination SFX smoke' 'SANITY HALLUCINATION SFX PASS phantom=true hud=true ambient=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sanity_hallucination_sfx_smoke.gd
 run_clean 'Sanity hallucination away smoke' 'SANITY HALLUCINATION AWAY PASS away=true phantom=true hud=true ambient=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sanity_hallucination_away_smoke.gd
@@ -653,7 +655,9 @@ run_clean 'Save denied SFX smoke' 'SAVE DENIED SFX PASS denied=true sfx=true' "$
 run_clean 'Tutorial SFX smoke' 'TUTORIAL SFX PASS trigger=true dismiss=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tutorial_sfx_smoke.gd
 run_clean 'Chart denied SFX smoke' 'CHART DENIED SFX PASS denied=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/chart_denied_sfx_smoke.gd
 run_clean 'Scanner confirm deny SFX smoke' 'SCANNER CONFIRM DENY SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_confirm_deny_sfx_smoke.gd
+run_clean 'Scanner confirm deny away smoke' 'SCANNER CONFIRM DENY AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_confirm_deny_away_smoke.gd
 run_clean 'Recipe picker deny SFX smoke' 'RECIPE PICKER DENY SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recipe_picker_deny_sfx_smoke.gd
+run_clean 'Recipe picker deny away smoke' 'RECIPE PICKER DENY AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recipe_picker_deny_away_smoke.gd
 run_clean 'Wounds treat deny SFX smoke' 'WOUNDS TREAT DENY SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_treat_deny_sfx_smoke.gd
 run_clean 'Wounds treat deny away smoke' 'WOUNDS TREAT DENY AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_treat_deny_away_smoke.gd
 run_clean 'Transfer denied SFX smoke' 'TRANSFER DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/transfer_denied_sfx_smoke.gd
@@ -672,7 +676,7 @@ run_clean 'Cart grab denied SFX smoke' 'CART GRAB DENIED SFX PASS deny=true sfx=
 run_clean 'Cart grab denied away smoke' 'CART GRAB DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_grab_denied_away_smoke.gd
 run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=492 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=496 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
