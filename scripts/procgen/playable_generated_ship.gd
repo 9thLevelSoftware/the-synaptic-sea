@@ -6766,6 +6766,10 @@ func _attack_with_equipped_weapon() -> Dictionary:
 		# Dry-fire / blocked shot click.
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
+	elif not bool(result.get("ok", false)):
+		# Cooldown / out of range / other soft fails — deny cue (not silent).
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 	# ADR-0042: a swing also dissipates a phantom within reach. On an empty magazine
 	# the shot is a dry-fire click (no round spent) but the swing still counts as the
 	# wasted-action teeth.
