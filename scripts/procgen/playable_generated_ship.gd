@@ -8649,6 +8649,8 @@ func _resolve_tool_pickup_world_position() -> Vector3:
 func _on_tool_pickup_acquired(p_tool_id: String) -> void:
 	_refresh_tracker_system_status_lines()
 	print("PLAYABLE TOOL ACQUIRED tool_id=%s" % p_tool_id)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
 	_recompute_player_encumbrance()
 	_ensure_consumable_hotbar_assignments()
 	_refresh_consumable_ui()
