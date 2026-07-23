@@ -493,7 +493,8 @@ run_clean 'Consumable training XP smoke' 'CONSUMABLE TRAINING XP PASS medicine=t
 run_clean 'Scanner open XP smoke' 'SCANNER OPEN XP PASS open=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_open_xp_smoke.gd
 run_clean 'Travel training XP smoke' 'TRAVEL TRAINING XP PASS plot=true astrogation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_training_xp_smoke.gd
 run_clean 'Threat kill XP smoke' 'THREAT KILL XP PASS kill=true melee=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_kill_xp_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=313 clean_output=true'
+run_clean 'Discover room XP smoke' 'DISCOVER ROOM XP PASS discover=true extract=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/discover_room_xp_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=314 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
