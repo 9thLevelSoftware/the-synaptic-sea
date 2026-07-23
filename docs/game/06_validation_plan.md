@@ -424,7 +424,8 @@ run_clean 'Manifestation pool schema smoke' 'MANIFESTATION POOL PASS schema=true
 run_clean 'Sea graph pure smoke' 'SEA GRAPH PASS nodes=true route=true cost=true biomes=true extract=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sea_graph_smoke.gd
 run_clean 'Templates wreck mutator smoke' 'TEMPLATES WRECK MUTATOR PASS catalog=true load=true zone=true branch=true wreck=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/templates_wreck_mutator_smoke.gd
 run_clean 'Food sustenance closure smoke' 'FOOD CLOSURE PASS spoil_eat=true harvest=true travel=true loop=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/food_closure_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=244 clean_output=true'
+run_clean 'Skill effects consumers smoke' 'SKILL EFFECTS PASS audit=true work=true craft=true heal=true travel=true class_kit=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/skill_effects_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=245 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
