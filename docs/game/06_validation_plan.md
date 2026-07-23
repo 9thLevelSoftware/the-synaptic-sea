@@ -520,6 +520,7 @@ run_clean 'Wounds panel open SFX smoke' 'WOUNDS PANEL OPEN SFX PASS seam=true ro
 run_clean 'Wounds panel open away smoke' 'WOUNDS PANEL OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_panel_open_away_smoke.gd
 run_clean 'Treat wound SFX smoke' 'TREAT WOUND SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/treat_wound_sfx_smoke.gd
 run_clean 'Craft complete SFX smoke' 'CRAFT COMPLETE SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_complete_sfx_smoke.gd
+run_clean 'Craft complete away smoke' 'CRAFT COMPLETE AWAY PASS away=true complete=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_complete_away_smoke.gd
 run_clean 'Repair complete SFX smoke' 'REPAIR COMPLETE SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_complete_sfx_smoke.gd
 run_clean 'Work complete SFX live smoke' 'WORK COMPLETE SFX LIVE PASS complete=true audio=true route=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_complete_sfx_live_smoke.gd
 run_clean 'Salvage scavenge XP smoke' 'SALVAGE SCAVENGE XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/salvage_scavenge_xp_smoke.gd
@@ -598,9 +599,12 @@ run_clean 'Codex open SFX smoke' 'CODEX OPEN SFX PASS open=true sfx=true' "$GODO
 run_clean 'Pause menu open SFX smoke' 'PAUSE MENU OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pause_menu_open_sfx_smoke.gd
 run_clean 'Pause menu open away smoke' 'PAUSE MENU OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pause_menu_open_away_smoke.gd
 run_clean 'Pause menu close SFX smoke' 'PAUSE MENU CLOSE SFX PASS close=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pause_menu_close_sfx_smoke.gd
+run_clean 'Pause menu close away smoke' 'PAUSE MENU CLOSE AWAY PASS away=true close=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pause_menu_close_away_smoke.gd
 run_clean 'Menu confirm resume SFX smoke' 'MENU CONFIRM RESUME SFX PASS resume=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_confirm_resume_sfx_smoke.gd
 run_clean 'Settings menu open SFX smoke' 'SETTINGS MENU OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_menu_open_sfx_smoke.gd
+run_clean 'Settings menu open away smoke' 'SETTINGS MENU OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_menu_open_away_smoke.gd
 run_clean 'Records menu open SFX smoke' 'RECORDS MENU OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/records_menu_open_sfx_smoke.gd
+run_clean 'Records menu open away smoke' 'RECORDS MENU OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/records_menu_open_away_smoke.gd
 run_clean 'Settings menu back SFX smoke' 'SETTINGS MENU BACK SFX PASS back=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_menu_back_sfx_smoke.gd
 run_clean 'Records menu back SFX smoke' 'RECORDS MENU BACK SFX PASS back=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/records_menu_back_sfx_smoke.gd
 run_clean 'Weapon reload SFX smoke' 'WEAPON RELOAD SFX PASS reload=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/weapon_reload_sfx_smoke.gd
@@ -704,7 +708,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=524 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=528 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
