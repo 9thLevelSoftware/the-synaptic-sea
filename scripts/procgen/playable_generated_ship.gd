@@ -4172,6 +4172,8 @@ func _tick_work_action(delta: float) -> void:
 				work_action_driver.work, component_placement_state, inv
 			)
 			if bool(res.get("ok", false)):
+				# Stamp verb SFX so emit_completion_sfx routes (resolver is pure).
+				res["audio_event"] = String(AudioEventSeamScript.sfx_for_work_verb(str(res.get("verb", "unbolt"))))
 				work_action_driver.last_resolve = res.duplicate(true)
 				work_action_driver.last_noise_pulse = float(res.get("noise", 0.0))
 				work_action_driver.last_xp_event = str(res.get("xp_event", "salvage"))
@@ -4193,6 +4195,7 @@ func _tick_work_action(delta: float) -> void:
 				work_action_driver.work, component_placement_state, inv, component_catalog, {}
 			)
 			if bool(res.get("ok", false)):
+				res["audio_event"] = String(AudioEventSeamScript.sfx_for_work_verb(str(res.get("verb", "mount"))))
 				work_action_driver.last_resolve = res.duplicate(true)
 				work_action_driver.last_noise_pulse = float(res.get("noise", 0.0))
 				work_action_driver.last_xp_event = str(res.get("xp_event", "repair"))

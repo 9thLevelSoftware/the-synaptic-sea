@@ -526,7 +526,8 @@ run_clean 'Work harvest XP live smoke' 'WORK HARVEST XP LIVE PASS start=true com
 run_clean 'Work verb SFX multi smoke' 'WORK VERB SFX MULTI PASS weld=true pry=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_verb_sfx_multi_smoke.gd
 run_clean 'Work verb SFX patch splice smoke' 'WORK VERB SFX PATCH SPLICE PASS patch=true splice=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_verb_sfx_patch_splice_smoke.gd
 run_clean 'Work verb SFX plant harvest smoke' 'WORK VERB SFX PLANT HARVEST PASS plant=true harvest=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_verb_sfx_plant_harvest_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=346 clean_output=true'
+run_clean 'Component mount SFX live smoke' 'COMPONENT MOUNT SFX LIVE PASS dismount=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_sfx_live_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=347 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
