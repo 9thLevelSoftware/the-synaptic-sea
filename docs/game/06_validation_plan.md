@@ -543,7 +543,9 @@ run_clean 'Perform surgery XP smoke' 'PERFORM SURGERY XP PASS emit=true catalog=
 run_clean 'Training catalog coverage smoke' 'TRAINING CATALOG COVERAGE PASS count=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/training_catalog_coverage_smoke.gd
 run_clean 'Repair subcomponent XP smoke' 'REPAIR SUBCOMPONENT XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_subcomponent_xp_smoke.gd
 run_clean 'Work yield drop SFX smoke' 'WORK YIELD DROP SFX PASS drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_sfx_smoke.gd
+run_clean 'Work yield drop away smoke' 'WORK YIELD DROP AWAY PASS away=true drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_away_smoke.gd
 run_clean 'Hatch door open SFX smoke' 'HATCH DOOR OPEN SFX PASS hatch=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_open_sfx_smoke.gd
+run_clean 'Hatch door open away smoke' 'HATCH DOOR OPEN AWAY PASS away=true hatch=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_open_away_smoke.gd
 run_clean 'Combat hit SFX smoke' 'COMBAT HIT SFX PASS hit=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_hit_sfx_smoke.gd
 run_clean 'Combat hit away smoke' 'COMBAT HIT AWAY PASS away=true hit=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_hit_away_smoke.gd
 run_clean 'Threat alert SFX smoke' 'THREAT ALERT SFX PASS engage=true edge=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_alert_sfx_smoke.gd
@@ -593,11 +595,13 @@ run_clean 'Dry fire SFX smoke' 'DRY FIRE SFX PASS dry=true sfx=true' "$GODOT" --
 run_clean 'Dry fire away smoke' 'DRY FIRE AWAY PASS away=true dry=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dry_fire_away_smoke.gd
 run_clean 'Achievement unlock SFX smoke' 'ACHIEVEMENT UNLOCK SFX PASS unlock=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/achievement_unlock_sfx_smoke.gd
 run_clean 'Tool pickup SFX smoke' 'TOOL PICKUP SFX PASS pickup=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tool_pickup_sfx_smoke.gd
+run_clean 'Tool pickup away smoke' 'TOOL PICKUP AWAY PASS away=true pickup=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tool_pickup_away_smoke.gd
 run_clean 'Craft blocked SFX smoke' 'CRAFT BLOCKED SFX PASS blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_blocked_sfx_smoke.gd
 run_clean 'Production start SFX smoke' 'PRODUCTION START SFX PASS start=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_start_sfx_smoke.gd
 run_clean 'Footstep SFX smoke' 'FOOTSTEP SFX PASS moving=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/footstep_sfx_smoke.gd
 run_clean 'Footstep away smoke' 'FOOTSTEP AWAY PASS away=true moving=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/footstep_away_smoke.gd
 run_clean 'Hatch door close SFX smoke' 'HATCH DOOR CLOSE SFX PASS reseal=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_close_sfx_smoke.gd
+run_clean 'Hatch door close away smoke' 'HATCH DOOR CLOSE AWAY PASS away=true reseal=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_close_away_smoke.gd
 run_clean 'Production blocked SFX smoke' 'PRODUCTION BLOCKED SFX PASS blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_blocked_sfx_smoke.gd
 run_clean 'End run SFX smoke' 'END RUN SFX PASS death=true complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/end_run_sfx_smoke.gd
 run_clean 'Craft start SFX smoke' 'CRAFT START SFX PASS start=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_start_sfx_smoke.gd
@@ -652,7 +656,7 @@ run_clean 'Load denied SFX smoke' 'LOAD DENIED SFX PASS deny=true sfx=true' "$GO
 run_clean 'Cart grab denied SFX smoke' 'CART GRAB DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_grab_denied_sfx_smoke.gd
 run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=472 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=476 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
