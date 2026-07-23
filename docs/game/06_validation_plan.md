@@ -625,6 +625,9 @@ run_clean 'Work verb SFX plant harvest away smoke' 'WORK VERB SFX PLANT HARVEST 
 run_clean 'Work action integration away smoke' 'WORK ACTION INTEGRATION AWAY PASS away=true driver=true hud=true wounds=true shipmod=true cut=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_integration_away_smoke.gd
 run_clean 'Hull plating catalog away smoke' 'HULL PLATING CATALOG AWAY PASS away=true catalog=true install=true bonus=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hull_plating_catalog_away_smoke.gd
 run_clean 'Repair validation channeling away smoke' 'REPAIR VALIDATION CHANNELING AWAY PASS away=true start=true soft_block_false=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_validation_channeling_away_smoke.gd
+run_clean 'Work yield inventory away smoke' 'WORK YIELD INVENTORY AWAY PASS away=true cut=true scrap=true qty=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_inventory_away_smoke.gd
+run_clean 'Production station wiring away smoke' 'PRODUCTION WIRING AWAY PASS away=true hydro=true recycler=true spoilage_registered=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_station_wiring_away_smoke.gd
+run_clean 'Wound bandage inventory away smoke' 'WOUND BANDAGE INVENTORY AWAY PASS away=true wound=true bandage=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wound_bandage_inventory_away_smoke.gd
 run_clean 'Work yield drop SFX smoke' 'WORK YIELD DROP SFX PASS drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_sfx_smoke.gd
 run_clean 'Work yield drop away smoke' 'WORK YIELD DROP AWAY PASS away=true drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_away_smoke.gd
 run_clean 'Hatch door open SFX smoke' 'HATCH DOOR OPEN SFX PASS hatch=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_open_sfx_smoke.gd
@@ -792,7 +795,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=612 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=615 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
