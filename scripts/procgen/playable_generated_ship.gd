@@ -3585,6 +3585,7 @@ func _on_ship_mod_install_requested(_slot_id: String, component_id: String, item
 	if ship_modification_panel != null:
 		ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
 	_apply_ship_mod_system_link(component_id, true)
+	_refresh_station_tiers_from_ship_mod()
 
 
 ## Sync panel bag → InventoryState after uninstall (item_form returned to bag).
@@ -3600,6 +3601,7 @@ func _on_ship_mod_uninstall_requested(_slot_id: String, component_id: String = "
 				inventory_state.add_item(str(item_id), bag_q - live_q)
 		ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
 	_apply_ship_mod_system_link(component_id, false)
+	_refresh_station_tiers_from_ship_mod()
 
 
 ## REQ-SMOD-001: install restores linked sub to operational floor; uninstall damages it.
@@ -3622,6 +3624,29 @@ func _apply_ship_mod_system_link(component_id: String, installing: bool) -> void
 		if ship_systems_manager.has_method("damage_subcomponent"):
 			# Drop below operational threshold so uninstall has mechanical teeth.
 			ship_systems_manager.call("damage_subcomponent", sys_id, sub_id, 0.6)
+
+
+## REQ-SMOD-001: ship-mod installs with station_tier_bonus raise hub station tiers.
+## Combines ship-mod manifest + physical component_placement for derive_tier.
+func _refresh_station_tiers_from_ship_mod() -> void:
+	if crafting_state == null or not crafting_state.has_method("refresh_station_tier"):
+		return
+	var placed: Array = []
+	if ship_modification_state != null:
+		for e in ship_modification_state.installed:
+			if typeof(e) != TYPE_DICTIONARY:
+				continue
+			var row: Dictionary = (e as Dictionary).duplicate(true)
+			row["mounted"] = true
+			placed.append(row)
+	if component_placement_state != null:
+		for e in component_placement_state.placed:
+			if typeof(e) == TYPE_DICTIONARY:
+				placed.append((e as Dictionary).duplicate(true))
+	for kind in CRAFTING_STATION_KINDS:
+		if str(kind) == "salvage":
+			continue
+		crafting_state.refresh_station_tier(str(kind), placed, component_catalog)
 
 
 ## PKG-B2.2b: start nearest-module WorkAction via live interact path (validation).

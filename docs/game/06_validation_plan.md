@@ -459,7 +459,8 @@ run_clean 'Work hold-to-work smoke' 'WORK HOLD TO WORK PASS freeze=true validati
 run_clean 'Bandage training smoke' 'BANDAGE TRAINING PASS bandage_xp=true treat_xp=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bandage_training_smoke.gd
 run_clean 'Ship mod install key smoke' 'SHIP MOD INSTALL KEY PASS install=true catalog=true uninstall=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_key_smoke.gd
 run_clean 'Ship mod system effect smoke' 'SHIP MOD SYSTEM EFFECT PASS restore=true power=true uninstall_damage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_system_effect_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=279 clean_output=true'
+run_clean 'Ship mod station tier smoke' 'SHIP MOD STATION TIER PASS install=true tier=true uninstall=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_station_tier_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=280 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 

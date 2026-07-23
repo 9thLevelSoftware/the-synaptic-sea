@@ -132,7 +132,7 @@ Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remain
 - **Integration seams:** WorkAction/wounds/ship-mod/sea_graph wired on playable; integrity leave/revisit flush; dual-branch work tick + threat LOS
 
 **Regression contract:** `docs/game/06_validation_plan.md` bundle ends with
-`SYNAPTIC_SEA REGRESSION PASS commands=279 clean_output=true` (marker-based; set `GODOT`/`ROOT` on Windows).
+`SYNAPTIC_SEA REGRESSION PASS commands=280 clean_output=true` (marker-based; set `GODOT`/`ROOT` on Windows).
 
 **Post-INT hardening (PRs #112–#143+):**
 - D6.1 pillar revisit sparse packs on ShipInstance + leave/revisit flush
@@ -146,7 +146,8 @@ Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remain
 - Synthetic wall slots; hub components populated
 - Ship-mod + pillar fields on RunSnapshot; hold-to-work interact; bandage/treat first_aid XP
 - Ship-mod panel Enter install_from_inventory / uninstall; catalog `power_draw` + install restores linked hub subs
-- Regression marker contract commands=279 in 06_validation_plan.md
+- Ship-mod installs with `station_tier_bonus` raise hub station tiers (fabricator etc.)
+- Regression marker contract commands=280 in 06_validation_plan.md
 
 **Still content/polish (not mechanical pre-polish blockers):**
 - Final damaged/breached kit art; audio *asset* library; narrative/balance authoring
