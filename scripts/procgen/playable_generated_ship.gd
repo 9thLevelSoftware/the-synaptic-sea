@@ -8667,6 +8667,8 @@ func _try_unlock_achievement(trigger_event: String, trigger_target: String) -> v
 	var unlocked_id: String = str(achievement_state.unlock_for_trigger(trigger_event, trigger_target))
 	if not unlocked_id.is_empty():
 		print("ACHIEVEMENT UNLOCKED trigger=%s target=%s id=%s" % [trigger_event, trigger_target, unlocked_id])
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_OBJECTIVE_ADVANCE)
 
 # --- REQ-014: junction_calibrator pickup -------------------------------------
 # A second ToolPickup configured with tool_id = "junction_calibrator".
