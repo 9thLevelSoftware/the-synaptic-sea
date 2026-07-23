@@ -4716,6 +4716,9 @@ func _interrupt_work_on_damage() -> void:
 		return
 	if work_action_driver.work != null and work_action_driver.work.has_method("interrupt"):
 		work_action_driver.work.call("interrupt")
+	# Soft cancel cue distinct from combat hit (combat path also plays SFX_COMBAT_HIT).
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 	_refresh_work_action_hud()
 
 
@@ -6006,6 +6009,7 @@ func travel_home() -> bool:
 	_spawn_dock_barrier(home_ship)
 	current_occupancy = piloted_ship if piloted_ship != null else home_ship
 	recompute_occupancy()
+	_emit_dock_land_sfx()
 	return true
 
 ## Re-applies the home objective loop's completion state to the ObjectiveTracker
