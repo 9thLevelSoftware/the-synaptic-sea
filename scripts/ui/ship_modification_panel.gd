@@ -160,6 +160,50 @@ func install_into_selected(
 	return true
 
 
+## Install using the first inventory bag item that matches a known component form.
+## catalog: ComponentCatalog with get_component / components dict optional.
+func install_from_inventory(
+		catalog = null,
+		preferred_forms: PackedStringArray = PackedStringArray([
+			"console_unit", "reactor_console", "nav_console", "pump_assembly",
+			"conduit_segment", "plating_plate", "air_recycler_unit", "thruster_control", "sensor_rack",
+		])) -> bool:
+	if _inventory.is_empty():
+		_status = "empty inventory"
+		_render()
+		return false
+	var form: String = ""
+	for f in preferred_forms:
+		if int(_inventory.get(str(f), 0)) > 0:
+			form = str(f)
+			break
+	if form.is_empty():
+		# Any stackable item as last resort
+		for k in _inventory.keys():
+			if int(_inventory[k]) > 0:
+				form = str(k)
+				break
+	if form.is_empty():
+		_status = "no installable item"
+		_render()
+		return false
+	var component_id: String = form
+	var power_draw: float = 5.0
+	var mass: float = 10.0
+	var plating: bool = form.find("plating") >= 0 or form.find("plate") >= 0
+	if catalog != null:
+		if catalog.has_method("component_id_for_item_form"):
+			var cid: String = str(catalog.call("component_id_for_item_form", form))
+			if not cid.is_empty():
+				component_id = cid
+		if catalog.has_method("get_component"):
+			var def: Dictionary = catalog.call("get_component", component_id)
+			if not def.is_empty():
+				power_draw = float(def.get("power_draw", power_draw))
+				mass = float(def.get("mass", mass))
+	return install_into_selected(component_id, form, power_draw, mass, plating)
+
+
 func get_status_lines() -> PackedStringArray:
 	var lines := PackedStringArray()
 	if _mod_state == null:
