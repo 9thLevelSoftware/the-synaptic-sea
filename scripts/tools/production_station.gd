@@ -203,8 +203,9 @@ func _interact_recycler() -> bool:
 		var out: Dictionary = model.collect_output()
 		return _deposit(str(out.get("item_id", "")), int(out.get("quantity", 0)))
 	if model.state == RecyclerStateScript.State.RECYCLING:
+		# Recycling in progress — soft block + consume interact.
 		emit_signal("production_blocked", station_kind, "in_progress")
-		return false
+		return true
 	# IDLE -> load contaminated_water.
 	var qty: int = inventory_state.get_quantity("contaminated_water")
 	if qty <= 0:
