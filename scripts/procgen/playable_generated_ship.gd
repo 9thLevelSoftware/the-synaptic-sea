@@ -4092,6 +4092,9 @@ func _tick_work_action(delta: float) -> void:
 	# Continuous strip noise while working (detection tension).
 	if work_action_driver.last_progress_noise > 0.0 and threat_manager != null:
 		work_action_driver.apply_noise_to_detection(threat_manager)
+	# UI feedback pulse when progress noise fires (or every ~1s of active work).
+	if work_action_driver.last_progress_noise > 0.0 and is_instance_valid(audio_manager):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_WORK_PROGRESS)
 	if work_action_driver.get_status() == "completed" or (
 		work_action_driver.work != null and str(work_action_driver.work.get("status")) == "completed"
 	):
