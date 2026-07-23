@@ -3576,27 +3576,52 @@ func open_ship_modification_panel_for_validation() -> bool:
 
 
 ## Sync panel bag → InventoryState after install (item_form already removed from bag).
-func _on_ship_mod_install_requested(_slot_id: String, _component_id: String, item_form: String) -> void:
-	if inventory_state == null or item_form.is_empty():
-		return
-	# Panel bag already decremented; mirror into InventoryState if it still holds the item.
-	if inventory_state.get_quantity(item_form) > 0:
-		inventory_state.remove_item(item_form, 1)
-	ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
+## REQ-SMOD-001: linked catalog components restore hub ship-system sub floor.
+func _on_ship_mod_install_requested(_slot_id: String, component_id: String, item_form: String) -> void:
+	if inventory_state != null and not item_form.is_empty():
+		# Panel bag already decremented; mirror into InventoryState if it still holds the item.
+		if inventory_state.get_quantity(item_form) > 0:
+			inventory_state.remove_item(item_form, 1)
+	if ship_modification_panel != null:
+		ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
+	_apply_ship_mod_system_link(component_id, true)
 
 
 ## Sync panel bag → InventoryState after uninstall (item_form returned to bag).
-func _on_ship_mod_uninstall_requested(_slot_id: String) -> void:
-	if inventory_state == null or ship_modification_panel == null:
+## Uninstall strips linked hub subcomponent capacity (mirror of component dismount).
+func _on_ship_mod_uninstall_requested(_slot_id: String, component_id: String = "", _item_form: String = "") -> void:
+	if inventory_state != null and ship_modification_panel != null:
+		var bag: Dictionary = ship_modification_panel.get_inventory_bag()
+		# Any bag qty higher than live inventory is a return from uninstall — add delta.
+		for item_id in bag.keys():
+			var bag_q: int = int(bag[item_id])
+			var live_q: int = int(inventory_state.get_quantity(str(item_id)))
+			if bag_q > live_q:
+				inventory_state.add_item(str(item_id), bag_q - live_q)
+		ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
+	_apply_ship_mod_system_link(component_id, false)
+
+
+## REQ-SMOD-001: install restores linked sub to operational floor; uninstall damages it.
+func _apply_ship_mod_system_link(component_id: String, installing: bool) -> void:
+	if component_id.is_empty() or component_catalog == null or ship_systems_manager == null:
 		return
-	var bag: Dictionary = ship_modification_panel.get_inventory_bag()
-	# Any bag qty higher than live inventory is a return from uninstall — add delta.
-	for item_id in bag.keys():
-		var bag_q: int = int(bag[item_id])
-		var live_q: int = int(inventory_state.get_quantity(str(item_id)))
-		if bag_q > live_q:
-			inventory_state.add_item(str(item_id), bag_q - live_q)
-	ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
+	if not component_catalog.has_method("get_component"):
+		return
+	var def: Dictionary = component_catalog.call("get_component", component_id)
+	if def.is_empty():
+		return
+	var sys_id: String = str(def.get("linked_system", ""))
+	var sub_id: String = str(def.get("linked_subcomponent", ""))
+	if sys_id.is_empty() or sub_id.is_empty():
+		return
+	if installing:
+		if ship_systems_manager.has_method("restore_subcomponent_on_remount"):
+			ship_systems_manager.call("restore_subcomponent_on_remount", sys_id, sub_id, 0.55)
+	else:
+		if ship_systems_manager.has_method("damage_subcomponent"):
+			# Drop below operational threshold so uninstall has mechanical teeth.
+			ship_systems_manager.call("damage_subcomponent", sys_id, sub_id, 0.6)
 
 
 ## PKG-B2.2b: start nearest-module WorkAction via live interact path (validation).

@@ -7,7 +7,7 @@ class_name ShipModificationPanel
 
 signal panel_closed
 signal install_requested(slot_id: String, component_id: String, item_form: String)
-signal uninstall_requested(slot_id: String)
+signal uninstall_requested(slot_id: String, component_id: String, item_form: String)
 
 var _mod_state                    # ShipModificationState
 var _inventory: Dictionary = {}   # item_form -> qty (presentation bag for panel actions)
@@ -112,6 +112,8 @@ func uninstall_selected() -> bool:
 		_status = "empty slot"
 		_render()
 		return false
+	var component_id: String = str(row.get("component_id", ""))
+	var item_form: String = str(row.get("item_form", ""))
 	if not _mod_state.has_method("uninstall"):
 		return false
 	var res: Dictionary = _mod_state.call("uninstall", slot_id, _inventory)
@@ -119,8 +121,10 @@ func uninstall_selected() -> bool:
 		_status = "uninstall failed: %s" % str(res.get("reason", ""))
 		_render()
 		return false
+	if item_form.is_empty():
+		item_form = str(res.get("item_form", ""))
 	_status = "uninstalled %s" % slot_id
-	uninstall_requested.emit(slot_id)
+	uninstall_requested.emit(slot_id, component_id, item_form)
 	_render()
 	return true
 
