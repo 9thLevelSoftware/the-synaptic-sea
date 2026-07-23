@@ -259,6 +259,7 @@ Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remain
 - Reload refuse routes deny SFX
 - Empty interact miss SFX on both process branches
 - Craft-from-picker failure paths route deny SFX
+- Load refuse (no compatible save) routes deny SFX
 - Regression marker contract commands=413 in 06_validation_plan.md
 
 **Still content/polish (not mechanical pre-polish blockers):**
