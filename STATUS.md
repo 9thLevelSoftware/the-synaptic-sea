@@ -116,13 +116,13 @@ table role coverage; `hazard_source=runtime` (ADR-0050). Bundle **commands=222**
 With integration gaps closed, remaining work is content/polish (audio assets, art,
 cloud, hub scene, deeper kit art) — not reachability.
 
-## Pre-polish program (started 2026-07-22; mechanical packages through #356)
+## Pre-polish program (started 2026-07-22; mechanical packages through #358)
 
 Source plan: system-by-system path to content-capable state (module integrity, not voxels).
 Parallel decomposition: `docs/game/build-plans/pre-polish-parallel-wave-plan.md`.
 Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remaining work is authoring/polish, not core engineering.
 
-**Landed (PRs #78–#356, 2026-07-22 → 2026-07-23):**
+**Landed (PRs #78–#358, 2026-07-22 → 2026-07-23):**
 - **A0 / SPEC / A2 / A4:** ADR-0051, pillar feature specs, `SimKeys`, `TuningCatalog`
 - **A1a–c / A3:** `ShipRuntime` advance/catch-up/snapshots; shared present-ship tick helpers; FRAME/SLOW/LAZY bands
 - **B2.1–B2.5:** Module integrity + scene consequences; WorkAction catalog/state/resolve/driver; component slots + mount/dismount; craft quality/knowledge; repair unification
@@ -132,9 +132,9 @@ Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remain
 - **Integration seams:** WorkAction/wounds/ship-mod/sea_graph wired on playable; integrity leave/revisit flush; dual-branch work tick + threat LOS
 
 **Regression contract:** `docs/game/06_validation_plan.md` bundle ends with
-`SYNAPTIC_SEA REGRESSION PASS commands=410 clean_output=true` (marker-based; set `GODOT`/`ROOT` on Windows).
+`SYNAPTIC_SEA REGRESSION PASS commands=411 clean_output=true` (marker-based; set `GODOT`/`ROOT` on Windows).
 
-**Post-INT hardening (PRs #112–#356):**
+**Post-INT hardening (PRs #112–#358):**
 - D6.1 pillar revisit sparse packs on ShipInstance + leave/revisit flush
 - D9b ship-mod panel; dual-branch WorkAction tick + training XP on complete
 - Nearest-module WorkAction interact (cut/pry); component dismount/remount interact
@@ -257,7 +257,8 @@ Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remain
 - Manual equip fail routes deny SFX
 - Empty-slot unequip routes deny SFX
 - Reload refuse routes deny SFX
-- Regression marker contract commands=410 in 06_validation_plan.md
+- Empty interact miss SFX on both process branches
+- Regression marker contract commands=411 in 06_validation_plan.md
 
 **Still content/polish (not mechanical pre-polish blockers):**
 - Final damaged/breached kit art; audio *asset* library; narrative/balance authoring
