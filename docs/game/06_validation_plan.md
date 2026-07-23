@@ -516,7 +516,9 @@ run_clean 'Component mount XP live smoke' 'COMPONENT MOUNT XP LIVE PASS dismount
 run_clean 'Sanity hallucination SFX smoke' 'SANITY HALLUCINATION SFX PASS phantom=true hud=true ambient=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sanity_hallucination_sfx_smoke.gd
 run_clean 'Meta hull groan SFX smoke' 'META HULL GROAN SFX PASS breach=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_hull_groan_sfx_smoke.gd
 run_clean 'Meta biomatter reactor SFX smoke' 'META BIOMATTER REACTOR SFX PASS pulse=true reactor=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_biomatter_reactor_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=336 clean_output=true'
+run_clean 'Dock land SFX smoke' 'DOCK LAND SFX PASS dock=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dock_land_sfx_smoke.gd
+run_clean 'Work splice XP live smoke' 'WORK SPLICE XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_splice_xp_live_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=338 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
