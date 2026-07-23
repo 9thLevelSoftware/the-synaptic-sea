@@ -3714,22 +3714,41 @@ func _try_work_action_interact(player_body) -> bool:
 			module_integrity_map = ModuleIntegrityMapScript.new()
 		if module_integrity_map.size() == 0:
 			ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
-		var nearest: Dictionary = _nearest_workable_wall_module(layout, player_pos, WORK_ACTION_INTERACT_RANGE)
-		if nearest.is_empty():
-			return false
-		target_id = str(nearest.get("module_id", ""))
-		if target_id.is_empty():
-			return false
-		var kind: String = str(nearest.get("kind", "wall_straight_1x1"))
-		module_integrity_map.ensure_module(target_id, kind, {}, target_id.get_slice("/", 0))
-		if int(inv.get("welding_lance", 0)) > 0 or int(inv.get("tool_welding_lance", 0)) > 0:
-			action_id = "cut_wall"
-			tool_class = "welding_lance"
-		elif int(inv.get("prybar", 0)) > 0 or int(inv.get("tool_prybar", 0)) > 0:
-			action_id = "pry_panel"
-			tool_class = "prybar"
-		else:
-			return false
+		var has_lance: bool = int(inv.get("welding_lance", 0)) > 0 or int(inv.get("tool_welding_lance", 0)) > 0
+		var has_plate: bool = int(inv.get("hull_plate", 0)) > 0 or int(inv.get("plating_plate", 0)) > 0 or int(inv.get("hull_plate_kit", 0)) > 0
+		# REQ-SMOD / WA: weld damaged/breached modules when lance + plate available.
+		if has_lance and has_plate:
+			var damaged: Dictionary = _nearest_damaged_wall_module(layout, player_pos, WORK_ACTION_INTERACT_RANGE)
+			if not damaged.is_empty():
+				target_id = str(damaged.get("module_id", ""))
+				var dkind: String = str(damaged.get("kind", "wall_straight_1x1"))
+				if not target_id.is_empty():
+					module_integrity_map.ensure_module(target_id, dkind, {}, target_id.get_slice("/", 0))
+					action_id = "weld_patch"
+					tool_class = "welding_lance"
+					# Catalog consumes hull_plate — alias salvage forms into that key for the gate.
+					if int(inv.get("hull_plate", 0)) < 1:
+						if int(inv.get("plating_plate", 0)) > 0:
+							inv["hull_plate"] = int(inv.get("plating_plate", 0))
+						elif int(inv.get("hull_plate_kit", 0)) > 0:
+							inv["hull_plate"] = int(inv.get("hull_plate_kit", 0))
+		if action_id.is_empty():
+			var nearest: Dictionary = _nearest_workable_wall_module(layout, player_pos, WORK_ACTION_INTERACT_RANGE)
+			if nearest.is_empty():
+				return false
+			target_id = str(nearest.get("module_id", ""))
+			if target_id.is_empty():
+				return false
+			var kind: String = str(nearest.get("kind", "wall_straight_1x1"))
+			module_integrity_map.ensure_module(target_id, kind, {}, target_id.get_slice("/", 0))
+			if has_lance:
+				action_id = "cut_wall"
+				tool_class = "welding_lance"
+			elif int(inv.get("prybar", 0)) > 0 or int(inv.get("tool_prybar", 0)) > 0:
+				action_id = "pry_panel"
+				tool_class = "prybar"
+			else:
+				return false
 
 	if action_id.is_empty() or target_id.is_empty():
 		return false
@@ -3872,6 +3891,42 @@ func _inventory_qty_dict_for_work() -> Dictionary:
 		if typeof(items) == TYPE_DICTIONARY:
 			return (items as Dictionary).duplicate(true)
 	return inv
+
+
+## Nearest damaged/breached (repairable) wall module for weld_patch interact.
+func _nearest_damaged_wall_module(layout: Dictionary, player_pos: Vector3, max_range: float) -> Dictionary:
+	var cand: Dictionary = _nearest_workable_wall_module(layout, player_pos, max_range)
+	if cand.is_empty() or module_integrity_map == null:
+		return {}
+	var mid: String = str(cand.get("module_id", ""))
+	if mid.is_empty():
+		return {}
+	var st: String = str(module_integrity_map.get_state(mid))
+	if st in ["damaged", "breached"]:
+		return cand
+	# Scan all modules for a damaged one in range (nearest workable may be intact).
+	var best: Dictionary = {}
+	var best_d: float = max_range
+	if module_integrity_map.has_method("module_ids"):
+		var room_centers: Dictionary = _room_world_centers(layout)
+		for mid_v in module_integrity_map.call("module_ids"):
+			var id: String = str(mid_v)
+			var st2: String = str(module_integrity_map.get_state(id))
+			if st2 not in ["damaged", "breached"]:
+				continue
+			var rid: String = id.get_slice("/", 0)
+			var pos: Vector3 = room_centers.get(rid, Vector3.ZERO) as Vector3
+			if room_centers.has(rid):
+				pos = room_centers[rid] as Vector3
+			else:
+				continue
+			var d: float = player_pos.distance_to(pos)
+			if d <= best_d:
+				best_d = d
+				var m = module_integrity_map.call("get_module", id) if module_integrity_map.has_method("get_module") else null
+				var kind: String = str(m.get("kind")) if m != null else "wall"
+				best = {"module_id": id, "kind": kind, "distance": d}
+	return best
 
 
 ## Returns {module_id, kind, distance} for nearest workable structural module.
@@ -4096,8 +4151,17 @@ func _apply_work_yields_to_inventory_state(res: Dictionary) -> void:
 	if typeof(consumed) == TYPE_DICTIONARY and inventory_state.has_method("remove_item"):
 		for cid in (consumed as Dictionary).keys():
 			var need: int = int((consumed as Dictionary)[cid])
-			if need > 0:
-				inventory_state.remove_item(str(cid), need)
+			if need <= 0:
+				continue
+			var key: String = str(cid)
+			if inventory_state.get_quantity(key) >= need:
+				inventory_state.remove_item(key, need)
+			elif key == "hull_plate":
+				# Alias salvage plate forms used by ship-mod / loot tables.
+				for alt in ["plating_plate", "hull_plate_kit"]:
+					if inventory_state.get_quantity(str(alt)) >= need:
+						inventory_state.remove_item(str(alt), need)
+						break
 
 
 func _spawn_work_yield_drop(items: Dictionary) -> void:
