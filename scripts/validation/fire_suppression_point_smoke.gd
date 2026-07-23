@@ -27,14 +27,18 @@ func _run() -> void:
 	get_root().add_child(point)
 	await process_frame
 
-	# gated: not burning yet -> try_start fails.
-	if point.try_start(player):
-		_fail("try_start should fail when compartment is not burning"); return
+	# gated: not burning yet -> soft-block consume (true) but no channel.
+	if not point.try_start(player):
+		_fail("try_start should consume when not burning"); return
+	if point.channeling:
+		_fail("try_start must not channel when compartment is not burning"); return
 
 	fire.ignite("engineering", 1.0)
 	var charge_before: float = ext.charge
 	if not point.try_start(player):
 		_fail("try_start should succeed: burning, in range, tool + charge present"); return
+	if not point.channeling:
+		_fail("try_start should channel when burning with tool + charge"); return
 	point.advance_channel(10.0)
 	if fire.is_burning("engineering"):
 		_fail("fire should be extinguished after the channel completes"); return
