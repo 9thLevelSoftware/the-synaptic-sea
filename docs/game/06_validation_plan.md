@@ -310,6 +310,7 @@ run_clean 'Domain 10 UI polish end-to-end smoke' 'UI POLISH PASS' "$GODOT" --hea
 run_clean 'menu signal wiring smoke' 'MENU SIGNAL WIRING PASS language=true enabled_render=true credits=true metadata=true ready=true progress=true run_outcome=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_signal_wiring_smoke.gd
 run_clean 'world migration smoke' 'SAVE MIGRATION WORLD PASS unknown_version_passthrough=true legacy_home_ship_migrated=true current_world_home_ship_migrated=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_migration_world_smoke.gd
 run_clean 'slot metadata smoke' 'SLOT METADATA PASS location=home play_time_real=true seed_real=true roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/slot_metadata_smoke.gd
+run_clean 'save slot metadata UI smoke' 'SAVE SLOT METADATA UI PASS location=true play_time=true seed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_slot_metadata_ui_smoke.gd
 # --- Tranche 3 (2026-07-06): orphaned-smoke promotion — pure-model batch ---
 run_clean 'Tranche 3 sanity state model smoke' 'SANITY STATE PASS drain=35.0 recovery=35.0 pressure=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sanity_state_smoke.gd
 run_clean 'Tranche 3 radiation state model smoke' 'RADIATION STATE PASS accumulation=true drain=true decay=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/radiation_state_smoke.gd
@@ -597,7 +598,7 @@ run_clean 'Load denied SFX smoke' 'LOAD DENIED SFX PASS deny=true sfx=true' "$GO
 run_clean 'Cart grab denied SFX smoke' 'CART GRAB DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_grab_denied_sfx_smoke.gd
 run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=417 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=418 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 

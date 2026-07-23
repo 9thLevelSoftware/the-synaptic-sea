@@ -694,7 +694,25 @@ func _save_load_row_line(row, index: int) -> String:
 	# one on save), but guard against an empty one from another writer by falling back
 	# to the slot_id rather than rendering "slot_03 | ".
 	var shown_name: String = display_name if not display_name.is_empty() else slot_id
-	return "%s | %s%s" % [slot_id, shown_name, verb_text]
+	# ADR-0046 slot metadata: surface location + accumulated play time + world seed
+	# so the list is scannable without opening the payload.
+	var loc: String = String(row.current_location)
+	if loc.is_empty():
+		loc = "?"
+	var time_txt: String = _format_play_time_seconds(float(row.play_time_seconds))
+	var seed_n: int = int(row.synaptic_sea_seed)
+	return "%s | %s | %s | %s | seed=%d%s" % [slot_id, shown_name, loc, time_txt, seed_n, verb_text]
+
+
+## Human-readable accumulated play clock for save-slot rows (not wall-clock epoch).
+func _format_play_time_seconds(seconds: float) -> String:
+	var total: int = maxi(0, int(floor(seconds)))
+	var h: int = int(total / 3600)
+	var m: int = int((total % 3600) / 60)
+	var s: int = int(total % 60)
+	if h > 0:
+		return "%dh%02dm" % [h, m]
+	return "%dm%02ds" % [m, s]
 
 ## True when a row came from SaveLoadMenu.refresh() (a real on-disk slot)
 ## rather than being one of this coordinator's synthesized empty-manual
