@@ -5282,14 +5282,17 @@ func begin_field_craft_recipe(recipe_id: String) -> bool:
 	if recipe_id.is_empty() or field_crafting_state == null or inventory_state == null:
 		return false
 	if field_crafting_state.is_crafting():
+		_on_craft_blocked("field_crafting", "busy")
 		return false
 	if not field_crafting_state.can_craft(recipe_id, inventory_state):
+		_on_craft_blocked("field_crafting", "cannot_craft")
 		return false
 	var produces: Dictionary = {}
 	if crafting_state != null:
 		produces = crafting_state.get_produces(recipe_id)
 	if not produces.is_empty() and not inventory_state.can_accept(
 			str(produces.get("item_id", "")), int(produces.get("quantity", 0))):
+		_on_craft_blocked("field_crafting", "inventory_full")
 		return false
 	var skill: int = 0
 	if player_progression != null and player_progression.has_method("get_skill_level"):
@@ -5301,6 +5304,7 @@ func begin_field_craft_recipe(recipe_id: String) -> bool:
 			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 		print("FIELD CRAFT STARTED recipe=%s" % recipe_id)
 		return true
+	_on_craft_blocked("field_crafting", "begin_failed")
 	return false
 
 ## Validation seam: first ready field recipe without UI (station craft smoke).
