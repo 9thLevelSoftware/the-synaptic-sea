@@ -5108,10 +5108,16 @@ func try_medbay_surgery(_player_body: Node) -> bool:
 	if vitals_state == null:
 		return false
 	if float(vitals_state.health) >= SURGERY_HEALTH_THRESHOLD:
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return false
 	if inventory_state == null or inventory_state.get_quantity("medical_gauze") <= 0:
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return false
 	if inventory_state.remove_item("medical_gauze", 1) != 1:
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return false
 	vitals_state.health = minf(100.0, float(vitals_state.health) + SURGERY_HEAL_AMOUNT)
 	emit_training_event("perform_surgery", "medbay")
