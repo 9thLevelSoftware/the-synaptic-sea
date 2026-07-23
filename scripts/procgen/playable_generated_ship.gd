@@ -10,7 +10,13 @@ const ObjectiveTrackerScript := preload("res://scripts/ui/objective_tracker.gd")
 const ScannerPanelScript := preload("res://scripts/ui/scanner_panel.gd")
 const RecipePickerPanelScript := preload("res://scripts/ui/recipe_picker_panel.gd")
 const ChartPanelScript := preload("res://scripts/ui/chart_panel.gd")
+const WorkActionHudPanelScript := preload("res://scripts/ui/work_action_hud_panel.gd")
+const WoundsPanelScript := preload("res://scripts/ui/wounds_panel.gd")
 const WebChartStateScript := preload("res://scripts/systems/web_chart_state.gd")
+const WorkActionDriverScript := preload("res://scripts/systems/work_action_driver.gd")
+const WoundStateScript := preload("res://scripts/systems/wound_state.gd")
+const ShipModificationStateScript := preload("res://scripts/systems/ship_modification_state.gd")
+const SeaGraphScript := preload("res://scripts/systems/sea_graph.gd")
 const InventoryPanelScript := preload("res://scripts/ui/inventory_panel.gd")
 const AccessibilitySettingsScript := preload("res://scripts/ui/accessibility_settings.gd")
 const MenuCoordinatorScript := preload("res://scripts/ui/menu_coordinator.gd")
@@ -193,7 +199,13 @@ var hud_layer: CanvasLayer
 var scanner_panel   # ScannerPanel
 var recipe_picker_panel  # RecipePickerPanel (REQ-CS-016)
 var chart_panel      # ChartPanel
+var work_action_hud  # WorkActionHudPanel (PKG-D9a)
+var wounds_panel     # WoundsPanel (PKG-D9d)
 var web_chart_state = WebChartStateScript.new()
+var work_action_driver  # WorkActionDriver (PKG-B2.2b)
+var wound_state  # WoundState (PKG-C3.1a)
+var ship_modification_state  # ShipModificationState (PKG-D2.6)
+var sea_graph  # SeaGraph (PKG-D6.2 / D9c)
 var inventory_panel
 var tracker
 var vitals_model            # PlayerVitalsModel
@@ -3277,6 +3289,143 @@ func get_module_integrity_map_for_validation():
 	return module_integrity_map
 
 
+## PKG-B2.2b / D9: headless WorkAction driver seams.
+func get_work_action_driver_for_validation():
+	return work_action_driver
+
+
+func get_work_action_hud_for_validation():
+	return work_action_hud
+
+
+func get_wound_state_for_validation():
+	return wound_state
+
+
+func get_wounds_panel_for_validation():
+	return wounds_panel
+
+
+func get_ship_modification_state_for_validation():
+	return ship_modification_state
+
+
+func get_sea_graph_for_validation():
+	return sea_graph
+
+
+## Start and complete a catalog WorkAction against the live module integrity map.
+## Returns resolve dict (ok/reason/yields/noise/audio_event).
+func run_work_action_for_validation(action_id: String, target_id: String, inventory_override: Dictionary = {}) -> Dictionary:
+	if work_action_driver == null:
+		work_action_driver = WorkActionDriverScript.new()
+		work_action_driver.configure({})
+	var inv: Dictionary = inventory_override
+	if inv.is_empty() and inventory_state != null:
+		# Build a simple qty dict from inventory for pure driver path.
+		inv = {}
+		if inventory_state.has_method("get_all_quantities"):
+			var allq = inventory_state.call("get_all_quantities")
+			if typeof(allq) == TYPE_DICTIONARY:
+				inv = (allq as Dictionary).duplicate(true)
+	var ctx: Dictionary = {
+		"tool_class": "",
+		"skill_id": "salvage",
+		"skill_level": 0,
+		"inventory": inv.duplicate(true),
+	}
+	# Fill tool_class from catalog action so gates pass when inventory has tools.
+	if work_action_driver.catalog != null and work_action_driver.catalog.has_action(action_id):
+		var def: Dictionary = work_action_driver.catalog.get_action(action_id)
+		ctx["tool_class"] = str(def.get("tool_class", ""))
+		ctx["skill_id"] = str(def.get("min_skill", "salvage"))
+		if ctx["skill_id"].is_empty():
+			ctx["skill_id"] = "salvage"
+		if player_progression != null and player_progression.has_method("get_skill_level"):
+			ctx["skill_level"] = int(player_progression.get_skill_level(ctx["skill_id"]))
+		# Ensure required materials present in inv dict for can_start.
+		var mats: Variant = def.get("materials_consumed", {})
+		if typeof(mats) == TYPE_DICTIONARY:
+			for mid in (mats as Dictionary).keys():
+				if int(inv.get(str(mid), 0)) < int((mats as Dictionary)[mid]):
+					inv[str(mid)] = int((mats as Dictionary)[mid])
+		ctx["inventory"] = inv.duplicate(true)
+	if not work_action_driver.start_action(action_id, target_id, ctx):
+		return {"ok": false, "reason": "start_failed"}
+	work_action_driver.tick(999.0, {"work_speed_mult": float(ctx.get("work_speed_mult", 1.0))})
+	var res: Dictionary = work_action_driver.complete(module_integrity_map, inv)
+	_refresh_work_action_hud()
+	if bool(res.get("ok", false)) and work_action_driver.last_noise_pulse > 0.0:
+		if threat_manager != null:
+			work_action_driver.apply_noise_to_detection(threat_manager)
+		if audio_manager != null and res.has("audio_event") and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(StringName(str(res.get("audio_event", ""))))
+	return res
+
+
+func _refresh_work_action_hud() -> void:
+	if work_action_hud == null or work_action_driver == null:
+		return
+	var st: String = work_action_driver.get_status()
+	var action_id: String = ""
+	var target_id: String = ""
+	var verb: String = ""
+	var noise: float = work_action_driver.last_noise_pulse
+	if work_action_driver.work != null:
+		action_id = str(work_action_driver.work.get("action_id"))
+		target_id = str(work_action_driver.work.get("target_id"))
+		if work_action_driver.work.has_method("get_summary"):
+			var sum: Dictionary = work_action_driver.work.call("get_summary")
+			var def: Dictionary = sum.get("definition", {}) if typeof(sum.get("definition", {})) == TYPE_DICTIONARY else {}
+			verb = str(def.get("verb", ""))
+	work_action_hud.set_work_state({
+		"action_id": action_id,
+		"target_id": target_id,
+		"verb": verb,
+		"progress": work_action_driver.progress_ratio(),
+		"status": st,
+		"noise": noise,
+	})
+
+
+func open_wounds_panel_for_validation() -> bool:
+	if wounds_panel == null:
+		return false
+	wounds_panel.open()
+	return wounds_panel.is_open()
+
+
+func _on_wounds_panel_closed() -> void:
+	pass
+
+
+## PKG-C4.1b: update engaged LOS via physics raycast when space state available.
+func update_threat_engaged_los() -> void:
+	if threat_manager == null or player == null or not (player is Node3D):
+		return
+	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state if is_inside_tree() else null
+	if space == null:
+		return
+	var from: Vector3 = (player as Node3D).global_position + Vector3(0, 1.2, 0)
+	for threat in threat_manager.threats:
+		if threat == null:
+			continue
+		var tid: String = str(threat.instance_id)
+		if tid.is_empty() or threat.world_position.size() < 3:
+			continue
+		var to: Vector3 = Vector3(float(threat.world_position[0]), float(threat.world_position[1]) + 1.0, float(threat.world_position[2]))
+		var query := PhysicsRayQueryParameters3D.create(from, to)
+		query.collide_with_areas = false
+		query.collide_with_bodies = true
+		var hit: Dictionary = space.intersect_ray(query)
+		# Empty hit = clear LOS; hit too close to threat still counts as LOS.
+		var has_los: bool = hit.is_empty()
+		if not has_los:
+			var hp: Vector3 = hit.get("position", to)
+			has_los = hp.distance_to(to) < 1.5
+		threat_manager.set_engaged_los(tid, has_los)
+
+
 func get_derived_breach_count_for_validation() -> int:
 	return _derived_breach_count()
 
@@ -4784,6 +4933,32 @@ func _build_hud_layer() -> void:
 	# Restore player control on every panel close path via the signal, not just
 	# the toggle-close path wired into _input.
 	chart_panel.panel_closed.connect(_on_chart_panel_closed)
+	# PKG-D9a / B2.2b: WorkAction progress HUD + pure driver (validation + future interact).
+	work_action_driver = WorkActionDriverScript.new()
+	work_action_driver.configure({})
+	work_action_hud = WorkActionHudPanelScript.new()
+	work_action_hud.name = "WorkActionHudPanel"
+	work_action_hud.visible = false
+	hud_layer.add_child(work_action_hud)
+	# PKG-C3.1a / D9d: wounds model + treatment panel.
+	wound_state = WoundStateScript.new()
+	wound_state.configure({})
+	wounds_panel = WoundsPanelScript.new()
+	wounds_panel.name = "WoundsPanel"
+	wounds_panel.visible = false
+	hud_layer.add_child(wounds_panel)
+	wounds_panel.bind(wound_state)
+	wounds_panel.panel_closed.connect(_on_wounds_panel_closed)
+	# PKG-D2.6 / D6.2: hub install manifest + strategic sea graph for chart routes.
+	ship_modification_state = ShipModificationStateScript.new()
+	ship_modification_state.configure({})
+	sea_graph = SeaGraphScript.new()
+	var ws: int = 0
+	if synaptic_sea_world != null:
+		ws = int(synaptic_sea_world.world_seed)
+	sea_graph.configure({"world_seed": ws})
+	if chart_panel != null and chart_panel.has_method("bind_sea_graph"):
+		chart_panel.bind_sea_graph(sea_graph)
 	inventory_panel = InventoryPanelScript.new()
 	inventory_panel.name = "InventoryPanel"
 	inventory_panel.visible = false
@@ -5222,6 +5397,8 @@ func _tick_threat_runtime(delta: float) -> void:
 		crouching,                          # crouch reduces emitted noise + visibility in DetectionState
 		"",
 	)
+	# PKG-C4.1b: one FRAME raycast pass for engaged LOS flags before AI tick.
+	update_threat_engaged_los()
 	_refresh_threat_nav_costs()
 	threat_manager.tick_threats(delta, vitals_state, status_effects_state, _player_armor_profile(), player_pos)
 	_sync_current_ship_combat_summary()
@@ -6217,6 +6394,7 @@ func _process(delta: float) -> void:
 		_tick_food_runtime(delta)
 		_tick_ammo_and_consumable_decay(delta)
 		_tick_electrical_arc(delta)
+		_refresh_work_action_hud()
 		_refresh_tooltip_focus()
 		return
 	if not playable_started or slice_complete:
@@ -6237,6 +6415,7 @@ func _process(delta: float) -> void:
 	_tick_sanity_and_hallucinations(delta, in_safe)
 	_tick_food_runtime(delta)
 	_tick_audio_runtime(delta)
+	_refresh_work_action_hud()
 	_refresh_tooltip_focus()
 
 

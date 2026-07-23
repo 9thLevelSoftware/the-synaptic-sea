@@ -430,7 +430,10 @@ run_clean 'WorkAction driver smoke' 'WORK ACTION DRIVER PASS cut=true noise=true
 run_clean 'Threat LOS perception smoke' 'THREAT LOS PERCEPTION PASS room_los=true closed_hatch=true raycast=true distance=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_los_perception_smoke.gd
 run_clean 'UI consumers D9 smoke' 'UI CONSUMERS D9 PASS work_hud=true wounds=true chart_route=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_consumers_d9_smoke.gd
 run_clean 'Audio event coverage smoke' 'AUDIO EVENT COVERAGE PASS verbs=true seam=true router=true work_driver=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_event_coverage_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=250 clean_output=true'
+run_clean 'Ship modification smoke' 'SHIP MODIFICATION PASS install=true power=true uninstall=true plating=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_modification_smoke.gd
+run_clean 'Work action integration smoke' 'WORK ACTION INTEGRATION PASS driver=true hud=true wounds=true shipmod=true cut=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_integration_smoke.gd
+run_clean 'Hub explorable verify smoke' 'HUB EXPLORABLE VERIFY PASS home=true stations=true repair=true walk=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hub_explorable_verify_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=253 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
