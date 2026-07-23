@@ -245,6 +245,10 @@ func get_summary() -> Dictionary:
 func apply_summary(summary: Dictionary) -> bool:
 	if summary == null or summary.is_empty():
 		return false
+	# PKG-D8 / C3.3: ensure kind schedule is loaded before restoring spawn_timers
+	# (apply_summary may run without a prior configure() on a fresh director).
+	if _kind_config.is_empty():
+		_load_pool(true)
 	rng_seed = int(summary.get("seed", rng_seed))
 	step = int(summary.get("step", step))
 	health_drain_per_second = maxf(0.0, float(summary.get("health_drain_per_second", health_drain_per_second)))
