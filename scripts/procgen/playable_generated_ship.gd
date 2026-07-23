@@ -2130,8 +2130,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 			push_error("PlayableGeneratedShip: travel dock failed (%s) — re-docking piloted ship to home" % str(dock_res.get("reason", "?")))
 			_dock_piloted_to(home_ship)
 		else:
-			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-				audio_manager.play_sfx(AudioEventSeamScript.SFX_DOCK_LAND)
+			_emit_dock_land_sfx()
 		_apply_player_carry(carry)
 		_reposition_subtree(child_carry)
 	_spawn_dock_barrier(inst)
@@ -7586,6 +7585,16 @@ func _maybe_emit_biomatter_pulse() -> void:
 func emit_meta_reactor_hum_for_validation() -> void:
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.META_REACTOR_HUM)
+
+
+## Dock/land success cue (travel attach path + validation).
+func _emit_dock_land_sfx() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_DOCK_LAND)
+
+
+func play_dock_land_sfx_for_validation() -> void:
+	_emit_dock_land_sfx()
 
 
 func _tick_sanity_and_hallucinations(delta: float, in_safe: bool) -> void:
