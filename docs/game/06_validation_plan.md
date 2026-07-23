@@ -568,7 +568,9 @@ run_clean 'Junction calibrator SFX smoke' 'JUNCTION CALIBRATOR SFX PASS applied=
 run_clean 'First aid ally XP smoke' 'FIRST AID ALLY XP PASS ally=true surgery=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/first_aid_ally_xp_smoke.gd
 run_clean 'Extract data SFX smoke' 'EXTRACT DATA SFX PASS extract=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/extract_data_sfx_smoke.gd
 run_clean 'Field craft blocked live SFX smoke' 'FIELD CRAFT BLOCKED LIVE SFX PASS busy=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/field_craft_blocked_live_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=388 clean_output=true'
+run_clean 'Work interrupt SFX smoke' 'WORK INTERRUPT SFX PASS interrupt=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_interrupt_sfx_smoke.gd
+run_clean 'Travel home SFX smoke' 'TRAVEL HOME SFX PASS home=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_home_sfx_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=390 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
