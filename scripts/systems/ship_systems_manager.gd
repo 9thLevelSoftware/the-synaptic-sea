@@ -190,6 +190,18 @@ func damage_system(system_id: String, amount: float) -> bool:
 		sub.health = maxf(0.0, sub.health - amount)
 	return true
 
+
+## REQ-CMP-002: damage one named subcomponent (e.g. when its physical component is stripped).
+## Returns false if system/sub unknown.
+func damage_subcomponent(system_id: String, subcomponent_id: String, amount: float = 1.0) -> bool:
+	if not systems.has(system_id) or amount <= 0.0 or subcomponent_id.is_empty():
+		return false
+	var sub = systems[system_id].get_subcomponent(subcomponent_id)
+	if sub == null:
+		return false
+	sub.health = maxf(0.0, float(sub.health) - amount)
+	return true
+
 ## Returns a lightweight {system_id: {operational, health}} dict for HUD/diagnostics.
 func get_status_summary() -> Dictionary:
 	var out: Dictionary = {}
