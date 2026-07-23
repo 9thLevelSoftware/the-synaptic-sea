@@ -6487,6 +6487,8 @@ func _attack_with_equipped_weapon() -> Dictionary:
 		_refresh_inventory_hud()
 		_refresh_player_vitals(0.0)
 		_sync_current_ship_combat_summary()
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_COMBAT_HIT)
 	# ADR-0042: a swing also dissipates a phantom within reach. On an empty magazine
 	# the shot is a dry-fire click (no round spent) but the swing still counts as the
 	# wasted-action teeth.
@@ -6495,6 +6497,8 @@ func _attack_with_equipped_weapon() -> Dictionary:
 		if hallucination_manager.dissipate_phantom_in_range(ppos):
 			result["phantom_dissipated"] = true
 			result["ok"] = true
+			if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+				audio_manager.play_sfx(AudioEventSeamScript.SFX_COMBAT_HIT)
 			_refresh_inventory_hud()
 	_refresh_weapon_hotbar()
 	return result
