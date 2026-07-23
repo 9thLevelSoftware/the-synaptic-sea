@@ -590,6 +590,14 @@ run_clean 'Ship mod uninstall XP away smoke' 'SHIP MOD UNINSTALL XP AWAY PASS aw
 run_clean 'Weld panel XP away smoke' 'WELD PANEL XP AWAY PASS away=true weld_panel=true weld=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/weld_panel_xp_away_smoke.gd
 run_clean 'Defeat enemy XP away smoke' 'DEFEAT ENEMY XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/defeat_enemy_xp_away_smoke.gd
 run_clean 'Cooking work XP away smoke' 'COOKING WORK XP AWAY PASS away=true cooking=true salvage=true repair=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cooking_work_xp_away_smoke.gd
+run_clean 'Work pry XP live away smoke' 'WORK PRY XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_pry_xp_live_away_smoke.gd
+run_clean 'Work weld XP live away smoke' 'WORK WELD XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_weld_xp_live_away_smoke.gd
+run_clean 'Work cut XP live away smoke' 'WORK CUT XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_cut_xp_live_away_smoke.gd
+run_clean 'Work patch XP live away smoke' 'WORK PATCH XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_patch_xp_live_away_smoke.gd
+run_clean 'Work splice XP live away smoke' 'WORK SPLICE XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_splice_xp_live_away_smoke.gd
+run_clean 'Work suppress XP live away smoke' 'WORK SUPPRESS XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_suppress_xp_live_away_smoke.gd
+run_clean 'Work harvest XP live away smoke' 'WORK HARVEST XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_harvest_xp_live_away_smoke.gd
+run_clean 'Work plant XP live away smoke' 'WORK PLANT XP LIVE AWAY PASS away=true start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_plant_xp_live_away_smoke.gd
 run_clean 'Work yield drop SFX smoke' 'WORK YIELD DROP SFX PASS drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_sfx_smoke.gd
 run_clean 'Work yield drop away smoke' 'WORK YIELD DROP AWAY PASS away=true drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_away_smoke.gd
 run_clean 'Hatch door open SFX smoke' 'HATCH DOOR OPEN SFX PASS hatch=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_open_sfx_smoke.gd
@@ -757,7 +765,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=577 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=585 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
