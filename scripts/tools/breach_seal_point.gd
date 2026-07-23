@@ -88,10 +88,10 @@ func try_start(player_body: Node) -> bool:
 		return false
 	if not bool((hull_state.compartments[compartment_id] as Dictionary).get("breach_open", false)):
 		emit_signal("seal_blocked", compartment_id, "not_breached")
-		return false
+		return true  # consume; seal not started
 	if not _has_required_item():
 		emit_signal("seal_blocked", compartment_id, "missing_sealant")
-		return false
+		return true
 	var sealant_qty: int = 0
 	if inventory_state != null:
 		sealant_qty = int(inventory_state.get_quantity(required_item))
@@ -104,7 +104,7 @@ func try_start(player_body: Node) -> bool:
 	var channel = WorkActionChannelScript.new()
 	if not channel.begin(WORK_ACTION_ID, compartment_id, seal_seconds, ctx):
 		emit_signal("seal_blocked", compartment_id, "work_action")
-		return false
+		return true
 	_work_channel = channel
 	_channel_player = player_body
 	channeling = true
