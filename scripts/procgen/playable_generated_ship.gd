@@ -4550,10 +4550,14 @@ func _clear_fire_suppression_points() -> void:
 			fp.queue_free()
 	fire_suppression_points.clear()
 
-func _on_fire_extinguished(_compartment_id: String) -> void:
+func _on_fire_extinguished(compartment_id: String) -> void:
 	# _refresh_fire_zones() already rebuilds suppression points when the burning
 	# set changes (Task 9), so no second explicit _build_fire_suppression_points().
 	_refresh_fire_zones()
+	# Stream E: successful extinguish is the live decontaminate_zone action.
+	emit_training_event("decontaminate_zone", compartment_id)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 
 ## Fire B2: deliberate vent extinguished the fire via vacuum. Surface feedback
 ## and apply decompression teeth (force-open the matching hull compartment).
