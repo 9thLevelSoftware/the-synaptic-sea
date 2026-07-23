@@ -2584,18 +2584,26 @@ func _equip_from_inventory(item_id: String, auto: bool) -> bool:
 	if equipment_state == null or inventory_state == null:
 		return false
 	if not equipment_state.can_equip(item_id):
+		if not auto:
+			_emit_equip_denied_sfx()
 		return false
 	var slot: String = ItemDefsScript.equip_slot(_definitions_for_equip(), item_id)
 	if (slot == "primary_hand" or slot == "secondary_hand") and _is_cart_grabbed():
+		if not auto:
+			_emit_equip_denied_sfx()
 		return false   # both hands occupied by a grabbed cart
 	if auto and equipment_state.is_slot_occupied(slot):
 		return false   # auto-equip never swaps a filled slot
 	if inventory_state.get_quantity(item_id) <= 0:
+		if not auto:
+			_emit_equip_denied_sfx()
 		return false
 	inventory_state.remove_item(item_id, 1)
 	var res: Dictionary = equipment_state.equip(item_id)
 	if not bool(res.get("ok", false)):
 		inventory_state.add_item(item_id, 1)   # equip failed -> put it back
+		if not auto:
+			_emit_equip_denied_sfx()
 		return false
 	var displaced: String = str(res.get("displaced", ""))
 	if displaced != "":
@@ -2604,6 +2612,15 @@ func _equip_from_inventory(item_id: String, auto: bool) -> bool:
 		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
 	_recompute_player_encumbrance()
 	return true
+
+
+func _emit_equip_denied_sfx() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+
+
+func play_equip_denied_sfx_for_validation() -> void:
+	_emit_equip_denied_sfx()
 
 ## Unequip a slot back into the player inventory. Returns the unequipped id ("" if empty).
 func _unequip_to_inventory(slot: String) -> String:
