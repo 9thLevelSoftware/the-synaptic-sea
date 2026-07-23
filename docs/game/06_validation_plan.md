@@ -613,6 +613,12 @@ run_clean 'Ship mod install key away smoke' 'SHIP MOD INSTALL KEY AWAY PASS away
 run_clean 'Ship mod inventory sync away smoke' 'SHIP MOD INVENTORY SYNC AWAY PASS away=true install=true uninstall=true inv=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_inventory_sync_away_smoke.gd
 run_clean 'Ship mod plating repair away smoke' 'SHIP MOD PLATING REPAIR AWAY PASS away=true install=true repair=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_plating_repair_away_smoke.gd
 run_clean 'Component placement runtime away smoke' 'COMPONENT PLACEMENT RUNTIME AWAY PASS away=true wired=true populate_or_empty=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_placement_runtime_away_smoke.gd
+run_clean 'Ship mod overbudget power away smoke' 'SHIP MOD OVERBUDGET POWER AWAY PASS away=true over=true unpowered=true ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_overbudget_power_away_smoke.gd
+run_clean 'Ship mod panel input away smoke' 'SHIP MOD PANEL INPUT AWAY PASS away=true open=true select=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_panel_input_away_smoke.gd
+run_clean 'Ship mod power budget scene away smoke' 'SHIP MOD POWER BUDGET SCENE AWAY PASS away=true fill=true reject=true inventory=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_power_budget_scene_away_smoke.gd
+run_clean 'Ship mod restore effects away smoke' 'SHIP MOD RESTORE EFFECTS AWAY PASS away=true restore=true tier=true system=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_restore_effects_away_smoke.gd
+run_clean 'Ship mod station tier away smoke' 'SHIP MOD STATION TIER AWAY PASS away=true install=true tier=true uninstall=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_station_tier_away_smoke.gd
+run_clean 'Ship mod system effect away smoke' 'SHIP MOD SYSTEM EFFECT AWAY PASS away=true restore=true power=true uninstall_damage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_system_effect_away_smoke.gd
 run_clean 'Work yield drop SFX smoke' 'WORK YIELD DROP SFX PASS drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_sfx_smoke.gd
 run_clean 'Work yield drop away smoke' 'WORK YIELD DROP AWAY PASS away=true drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_away_smoke.gd
 run_clean 'Hatch door open SFX smoke' 'HATCH DOOR OPEN SFX PASS hatch=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_open_sfx_smoke.gd
@@ -780,7 +786,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=600 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=606 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
