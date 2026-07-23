@@ -630,12 +630,13 @@ run_clean 'Unequip empty SFX smoke' 'UNEQUIP EMPTY SFX PASS deny=true sfx=true' 
 run_clean 'Reload denied SFX smoke' 'RELOAD DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/reload_denied_sfx_smoke.gd
 run_clean 'Reload denied away smoke' 'RELOAD DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/reload_denied_away_smoke.gd
 run_clean 'Interact miss SFX smoke' 'INTERACT MISS SFX PASS miss=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interact_miss_sfx_smoke.gd
+run_clean 'Interact miss away smoke' 'INTERACT MISS AWAY PASS away=true miss=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interact_miss_away_smoke.gd
 run_clean 'Craft from picker deny SFX smoke' 'CRAFT FROM PICKER DENY SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_from_picker_deny_sfx_smoke.gd
 run_clean 'Load denied SFX smoke' 'LOAD DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/load_denied_sfx_smoke.gd
 run_clean 'Cart grab denied SFX smoke' 'CART GRAB DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_grab_denied_sfx_smoke.gd
 run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=455 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=456 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
