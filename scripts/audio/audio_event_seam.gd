@@ -26,8 +26,30 @@ const SFX_FOOTSTEP: StringName = &"sfx.footstep"
 const SFX_DROP_ITEM: StringName = &"sfx.drop.item"
 const SFX_DOCK_LAND: StringName = &"sfx.dock.land"
 const SFX_HALLUCINATION_WHISPER: StringName = &"sfx.hallucination.whisper"
+## PKG-D10: pillar / combat / work verbs (placeholder clips OK).
+const SFX_WORK_CUT: StringName = &"sfx.work.cut"
+const SFX_WORK_WELD: StringName = &"sfx.work.weld"
+const SFX_WORK_PATCH: StringName = &"sfx.work.patch"
+const SFX_WORK_UNBOLT: StringName = &"sfx.work.unbolt"
+const SFX_WORK_PRY: StringName = &"sfx.work.pry"
+const SFX_WORK_SPLICE: StringName = &"sfx.work.splice"
+const SFX_WORK_HARVEST: StringName = &"sfx.work.harvest"
+const SFX_WORK_PLANT: StringName = &"sfx.work.plant"
+const SFX_WORK_MOUNT: StringName = &"sfx.work.mount"
+const SFX_COMBAT_HIT: StringName = &"sfx.combat.hit"
+const SFX_COMBAT_THREAT_ALERT: StringName = &"sfx.combat.threat_alert"
+const SFX_WOUND_BANDAGE: StringName = &"sfx.wound.bandage"
+const SFX_WOUND_TREAT: StringName = &"sfx.wound.treat"
+const SFX_CRAFT_COMPLETE: StringName = &"sfx.craft.complete"
+const SFX_REPAIR_COMPLETE: StringName = &"sfx.repair.complete"
+const SFX_SANITY_AMBIENT: StringName = &"sfx.sanity.ambient"
+const SFX_SANITY_HUD: StringName = &"sfx.sanity.hud_glitch"
+const SFX_SANITY_PHANTOM: StringName = &"sfx.sanity.phantom"
 
 const UI_INVENTORY_OPEN: StringName = &"ui.inventory.open"
+const UI_WORK_PROGRESS: StringName = &"ui.work.progress"
+const UI_WOUNDS_OPEN: StringName = &"ui.wounds.open"
+const UI_CHART_ROUTE: StringName = &"ui.chart.route"
 const UI_INVENTORY_CLOSE: StringName = &"ui.inventory.close"
 const UI_OBJECTIVE_ADVANCE: StringName = &"ui.objective.advance"
 const UI_SAVE: StringName = &"ui.save"
@@ -51,11 +73,41 @@ const AMB_DOCKING: StringName = &"amb.docking"
 const ALL_SFX_IDS: Array[StringName] = [
 	SFX_TOOL_PICKUP, SFX_TOOL_USE, SFX_SUIT_BREATH, SFX_DOOR_OPEN, SFX_DOOR_CLOSE,
 	SFX_FIRE_CRACKLE, SFX_ARC_ZAP, SFX_FOOTSTEP, SFX_DROP_ITEM, SFX_DOCK_LAND,
+	SFX_HALLUCINATION_WHISPER,
+	SFX_WORK_CUT, SFX_WORK_WELD, SFX_WORK_PATCH, SFX_WORK_UNBOLT, SFX_WORK_PRY,
+	SFX_WORK_SPLICE, SFX_WORK_HARVEST, SFX_WORK_PLANT, SFX_WORK_MOUNT,
+	SFX_COMBAT_HIT, SFX_COMBAT_THREAT_ALERT,
+	SFX_WOUND_BANDAGE, SFX_WOUND_TREAT,
+	SFX_CRAFT_COMPLETE, SFX_REPAIR_COMPLETE,
+	SFX_SANITY_AMBIENT, SFX_SANITY_HUD, SFX_SANITY_PHANTOM,
 ]
 const ALL_UI_IDS: Array[StringName] = [
 	UI_INVENTORY_OPEN, UI_INVENTORY_CLOSE, UI_OBJECTIVE_ADVANCE,
 	UI_SAVE, UI_LOAD, UI_VITALS_LOW,
+	UI_WORK_PROGRESS, UI_WOUNDS_OPEN, UI_CHART_ROUTE,
 ]
+
+## Verb string (WorkAction definition.verb) -> event id for PKG-D10 coverage.
+const WORK_VERB_TO_SFX: Dictionary = {
+	"cut": SFX_WORK_CUT,
+	"weld": SFX_WORK_WELD,
+	"patch": SFX_WORK_PATCH,
+	"unbolt": SFX_WORK_UNBOLT,
+	"pry": SFX_WORK_PRY,
+	"splice": SFX_WORK_SPLICE,
+	"harvest": SFX_WORK_HARVEST,
+	"plant": SFX_WORK_PLANT,
+	"mount": SFX_WORK_MOUNT,
+	"suppress": SFX_TOOL_USE,
+	"craft": SFX_CRAFT_COMPLETE,
+}
+
+
+static func sfx_for_work_verb(verb: String) -> StringName:
+	var key: String = verb.to_lower()
+	if WORK_VERB_TO_SFX.has(key):
+		return WORK_VERB_TO_SFX[key]
+	return SFX_TOOL_USE
 const ALL_META_IDS: Array[StringName] = [
 	META_BEACON_DISTRESS, META_BIOMATTER_PULSE, META_HULL_GROAN, META_REACTOR_HUM,
 ]

@@ -11,6 +11,7 @@ const WorkActionStateScript := preload("res://scripts/systems/work_action_state.
 const WorkActionResolverScript := preload("res://scripts/systems/work_action_resolver.gd")
 const SkillEffectsResolverScript := preload("res://scripts/systems/skill_effects_resolver.gd")
 const PillarPersistenceScript := preload("res://scripts/systems/pillar_persistence.gd")
+const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
 
 var catalog: RefCounted = null
 var skill_effects: RefCounted = null
@@ -166,7 +167,23 @@ func complete(module_map: RefCounted = null, inventory: Dictionary = {}) -> Dict
 	last_noise_pulse = float(res.get("noise", 0.0))
 	last_xp_event = str(res.get("xp_event", ""))
 	last_resolve = res.duplicate(true)
+	# PKG-D10: stamp audio event id for scene/SfxEventRouter consumers.
+	var verb: String = str(res.get("verb", ""))
+	res["audio_event"] = String(AudioEventSeamScript.sfx_for_work_verb(verb))
+	last_resolve["audio_event"] = res["audio_event"]
 	return res
+
+
+## Route completion SFX through an optional SfxEventRouter. Returns routed bus or "".
+func emit_completion_sfx(sfx_router) -> String:
+	var eid: String = str(last_resolve.get("audio_event", ""))
+	if eid.is_empty() or sfx_router == null:
+		return ""
+	if sfx_router.has_method("route"):
+		var routed: Variant = sfx_router.call("route", StringName(eid), false)
+		if routed is Dictionary:
+			return str((routed as Dictionary).get("bus", ""))
+	return ""
 
 
 func interrupt() -> void:
