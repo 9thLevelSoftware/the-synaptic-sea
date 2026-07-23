@@ -555,7 +555,11 @@ run_clean 'Footstep SFX smoke' 'FOOTSTEP SFX PASS moving=true sfx=true' "$GODOT"
 run_clean 'Hatch door close SFX smoke' 'HATCH DOOR CLOSE SFX PASS reseal=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_close_sfx_smoke.gd
 run_clean 'Production blocked SFX smoke' 'PRODUCTION BLOCKED SFX PASS blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_blocked_sfx_smoke.gd
 run_clean 'End run SFX smoke' 'END RUN SFX PASS death=true complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/end_run_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=375 clean_output=true'
+run_clean 'Craft start SFX smoke' 'CRAFT START SFX PASS start=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_start_sfx_smoke.gd
+run_clean 'Field craft start SFX smoke' 'FIELD CRAFT START SFX PASS start=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/field_craft_start_sfx_smoke.gd
+run_clean 'Inventory transfer SFX smoke' 'INVENTORY TRANSFER SFX PASS transfer=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_transfer_sfx_smoke.gd
+run_clean 'Hazard blocked SFX smoke' 'HAZARD BLOCKED SFX PASS repair=true extinguish=true seal=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_blocked_sfx_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=379 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
