@@ -3495,8 +3495,69 @@ func _refresh_work_action_hud() -> void:
 func open_wounds_panel_for_validation() -> bool:
 	if wounds_panel == null:
 		return false
+	if not wounds_panel.treatment_applied.is_connected(_on_wound_treatment_applied):
+		wounds_panel.treatment_applied.connect(_on_wound_treatment_applied)
 	wounds_panel.open()
 	return wounds_panel.is_open()
+
+
+const BANDAGE_ITEM_IDS: Array[String] = ["bandage_kit", "bandage", "field_dressing"]
+const TREAT_ITEM_IDS: Array[String] = ["medkit", "stim_pack", "antibiotic"]
+
+
+## Bandage selected wound if inventory has a bandage item; consumes 1.
+func _try_bandage_selected_wound() -> bool:
+	if wounds_panel == null or inventory_state == null:
+		return false
+	var item_id: String = _first_inventory_item(BANDAGE_ITEM_IDS)
+	if item_id.is_empty():
+		return false
+	if not wounds_panel.bandage_selected():
+		return false
+	inventory_state.remove_item(item_id, 1)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_WOUND_BANDAGE)
+	return true
+
+
+## Treat selected wound if inventory has a medical item; consumes 1.
+func _try_treat_selected_wound() -> bool:
+	if wounds_panel == null or inventory_state == null:
+		return false
+	var item_id: String = _first_inventory_item(TREAT_ITEM_IDS)
+	if item_id.is_empty():
+		return false
+	if not wounds_panel.treat_selected(0.35):
+		return false
+	inventory_state.remove_item(item_id, 1)
+	return true
+
+
+func _first_inventory_item(item_ids: Array) -> String:
+	if inventory_state == null:
+		return ""
+	for id_v in item_ids:
+		var id: String = str(id_v)
+		if inventory_state.get_quantity(id) > 0:
+			return id
+	return ""
+
+
+func _on_wound_treatment_applied(_wound_id: String, _kind: String) -> void:
+	# Hook for smokes / future training events; inventory consume happens in try_*.
+	pass
+
+
+## Validation: bandage with inventory consume (returns {ok, item_id}).
+func bandage_wound_with_inventory_for_validation() -> Dictionary:
+	var item_id: String = _first_inventory_item(BANDAGE_ITEM_IDS)
+	if item_id.is_empty():
+		return {"ok": false, "reason": "no_bandage"}
+	if not open_wounds_panel_for_validation():
+		return {"ok": false, "reason": "panel"}
+	if not _try_bandage_selected_wound():
+		return {"ok": false, "reason": "bandage_failed", "item_id": item_id}
+	return {"ok": true, "item_id": item_id}
 
 
 func open_ship_modification_panel_for_validation() -> bool:
@@ -10026,6 +10087,12 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 			elif event.is_action_pressed("ui_up"):
 				wounds_panel.move_selection(-1)
+				get_viewport().set_input_as_handled()
+			elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_B:
+				_try_bandage_selected_wound()
+				get_viewport().set_input_as_handled()
+			elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_T:
+				_try_treat_selected_wound()
 				get_viewport().set_input_as_handled()
 			return
 		if event.is_action_pressed("toggle_wounds") and _menus_are_closed():

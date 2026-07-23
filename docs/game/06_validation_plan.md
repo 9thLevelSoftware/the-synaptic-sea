@@ -451,7 +451,8 @@ run_clean 'Work yield inventory smoke' 'WORK YIELD INVENTORY PASS cut=true scrap
 run_clean 'Ship mod inventory sync smoke' 'SHIP MOD INVENTORY SYNC PASS install=true uninstall=true inv=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_inventory_sync_smoke.gd
 run_clean 'Work yield drop smoke' 'WORK YIELD DROP PASS overload=true drop=true scoop=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_smoke.gd
 run_clean 'Work progress noise smoke' 'WORK PROGRESS NOISE PASS cut=true pulse=true detection=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_progress_noise_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=271 clean_output=true'
+run_clean 'Wound bandage inventory smoke' 'WOUND BANDAGE INVENTORY PASS wound=true bandage=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wound_bandage_inventory_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=272 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
