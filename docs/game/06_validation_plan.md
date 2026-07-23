@@ -415,7 +415,8 @@ run_clean 'Component slot population smoke' 'COMPONENT SLOT POPULATION PASS cata
 run_clean 'Crafting quality knowledge smoke' 'CRAFTING QUALITY KNOWLEDGE PASS quality=true knowledge=true reverse=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/crafting_quality_knowledge_smoke.gd
 run_clean 'Repair unification smoke' 'REPAIR UNIFICATION PASS repair=true seal=true suppress=true interrupt=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_unification_smoke.gd
 run_clean 'Component mount/dismount smoke' 'COMPONENT MOUNT DISMOUNT PASS dismount=true mount=true work=true mass=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_dismount_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=235 clean_output=true'
+run_clean 'Station tiers batch smoke' 'STATION TIERS BATCH PASS tier=true queue=true gate=true schema=true batch=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/station_tiers_batch_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=236 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
