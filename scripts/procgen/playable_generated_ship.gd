@@ -4458,12 +4458,17 @@ func _spawn_work_yield_drop(items: Dictionary) -> void:
 
 
 func _on_work_yield_scooped(drop_id: String, _granted: Dictionary) -> void:
+	# Untrack only when the pile is fully scooped (scooped_flag). Partial scoops
+	# keep the residual drop in work_yield_drops so a later interact can finish it.
 	var kept: Array = []
 	for d in work_yield_drops:
-		if is_instance_valid(d) and str(d.drop_id) != drop_id:
-			kept.append(d)
+		if not is_instance_valid(d):
+			continue
+		if str(d.drop_id) == drop_id and bool(d.scooped_flag):
+			continue
+		kept.append(d)
 	work_yield_drops = kept
-	# Floor pile scooped into inventory — reuse tool-pickup bus cue.
+	# Floor pile scooped into inventory — reuse tool-pickup bus cue (full or partial).
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
 

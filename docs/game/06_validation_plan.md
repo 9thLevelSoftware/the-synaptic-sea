@@ -450,6 +450,7 @@ run_clean 'Tendril structure damage smoke' 'TENDRIL STRUCTURE DAMAGE PASS archet
 run_clean 'Work yield inventory smoke' 'WORK YIELD INVENTORY PASS cut=true scrap=true qty=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_inventory_smoke.gd
 run_clean 'Ship mod inventory sync smoke' 'SHIP MOD INVENTORY SYNC PASS install=true uninstall=true inv=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_inventory_sync_smoke.gd
 run_clean 'Work yield drop smoke' 'WORK YIELD DROP PASS overload=true drop=true scoop=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_smoke.gd
+run_clean 'Work yield partial scoop smoke' 'WORK YIELD PARTIAL SCOOP PASS deny=true partial=true residual=true finish=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_partial_scoop_smoke.gd
 run_clean 'Work progress noise smoke' 'WORK PROGRESS NOISE PASS cut=true pulse=true detection=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_progress_noise_smoke.gd
 run_clean 'Wound bandage inventory smoke' 'WOUND BANDAGE INVENTORY PASS wound=true bandage=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wound_bandage_inventory_smoke.gd
 run_clean 'Cut module scene smoke' 'CUT MODULE SCENE PASS cut=true damaged=true sparse=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cut_module_scene_smoke.gd
@@ -596,7 +597,7 @@ run_clean 'Load denied SFX smoke' 'LOAD DENIED SFX PASS deny=true sfx=true' "$GO
 run_clean 'Cart grab denied SFX smoke' 'CART GRAB DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_grab_denied_sfx_smoke.gd
 run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=416 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=417 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
