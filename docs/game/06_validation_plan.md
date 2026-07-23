@@ -216,7 +216,7 @@ run_clean 'threat placeholder renderer smoke' 'THREAT PLACEHOLDER RENDERER PASS 
 run_clean 'main hallucination loop smoke' 'MAIN PLAYABLE HALLUCINATION PASS manifest=true phantom_no_damage=true attack_dissipates=true no_respawn=true teeth=true away_ticks=true clears=true hud=true fx=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_hallucination_smoke.gd
 run_clean 'biome loot_quality_modifier wired into rarity rolls' 'LOOT QUALITY MODIFIER PASS high_gt_base=true mid_between=true default_noop=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/loot_quality_modifier_smoke.gd
 run_clean 'REQ-AU-001 coordinator audio event coupling smoke' 'AUDIO COORDINATOR EVENTS PASS fire=true arc=true breath=true vitals_low_edge=true combat_music=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_coordinator_events_smoke.gd
-run_clean 'REQ-AU-001 callsite audio event coupling smoke' 'AUDIO CALLSITE EVENTS PASS door=true footstep=true drop=true tool=true inv_toggle=true objective=true save=true dock=true load=skip' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_callsite_events_smoke.gd
+run_clean 'REQ-AU-001 callsite audio event coupling smoke' 'AUDIO CALLSITE EVENTS PASS door=true door_close=true footstep=true drop=true tool=true inv_toggle=true objective=true save=true dock=true load=skip' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_callsite_events_smoke.gd
 run_clean 'audio bus config model smoke' 'AUDIO BUS CONFIG PASS buses=7 default=true summary_round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_bus_config_smoke.gd
 run_clean 'ambient zone state model smoke' 'AMBIENT ZONE STATE PASS roles_changed=2 crossfades_completed=1 threat_applied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ambient_zone_state_smoke.gd
 run_clean 'sfx event router model smoke' 'SFX EVENT ROUTER PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sfx_event_router_smoke.gd
@@ -552,7 +552,8 @@ run_clean 'Tool pickup SFX smoke' 'TOOL PICKUP SFX PASS pickup=true sfx=true' "$
 run_clean 'Craft blocked SFX smoke' 'CRAFT BLOCKED SFX PASS blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_blocked_sfx_smoke.gd
 run_clean 'Production start SFX smoke' 'PRODUCTION START SFX PASS start=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_start_sfx_smoke.gd
 run_clean 'Footstep SFX smoke' 'FOOTSTEP SFX PASS moving=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/footstep_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=372 clean_output=true'
+run_clean 'Hatch door close SFX smoke' 'HATCH DOOR CLOSE SFX PASS reseal=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_close_sfx_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=373 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
