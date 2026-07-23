@@ -79,7 +79,7 @@ func try_interact(player_body: Object) -> bool:
 	if station_kind == "water_recycler":
 		return _interact_recycler()
 	emit_signal("production_blocked", station_kind, "unknown_kind")
-	return false
+	return true  # consume — misconfigured station should not fall through
 
 func _interact_hydro() -> bool:
 	if model.state == HydroStateScript.State.HARVESTABLE:
