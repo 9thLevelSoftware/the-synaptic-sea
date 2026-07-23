@@ -477,8 +477,11 @@ run_clean 'Ship mod toggle away smoke' 'SHIP MOD TOGGLE AWAY PASS away=true open
 run_clean 'Wounds toggle smoke' 'WOUNDS TOGGLE PASS open=true close=true validation_stays=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_toggle_smoke.gd
 run_clean 'Wounds toggle away smoke' 'WOUNDS TOGGLE AWAY PASS away=true open=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_toggle_away_smoke.gd
 run_clean 'Dock barrier channel consume smoke' 'DOCK BARRIER CHANNEL CONSUME PASS start=true channeling=true second=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dock_barrier_channel_consume_smoke.gd
+run_clean 'Dock barrier channel consume away smoke' 'DOCK BARRIER CHANNEL CONSUME AWAY PASS away=true start=true channeling=true second=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dock_barrier_channel_consume_away_smoke.gd
 run_clean 'Hazard channel consume smoke' 'HAZARD CHANNEL CONSUME PASS repair=true breach=true fire=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_channel_consume_smoke.gd
+run_clean 'Hazard channel consume away smoke' 'HAZARD CHANNEL CONSUME AWAY PASS away=true repair=true breach=true fire=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_channel_consume_away_smoke.gd
 run_clean 'Station busy consume smoke' 'STATION BUSY CONSUME PASS craft=true hydro=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/station_busy_consume_smoke.gd
+run_clean 'Station busy consume away smoke' 'STATION BUSY CONSUME AWAY PASS away=true craft=true hydro=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/station_busy_consume_away_smoke.gd
 run_clean 'Recycler busy consume smoke' 'RECYCLER BUSY CONSUME PASS recycling=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recycler_busy_consume_smoke.gd
 run_clean 'Production output full consume smoke' 'PRODUCTION OUTPUT FULL CONSUME PASS hydro=true recycler=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_output_full_consume_smoke.gd
 run_clean 'Recycler no input consume smoke' 'RECYCLER NO INPUT CONSUME PASS no_input=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recycler_no_input_consume_smoke.gd
@@ -488,6 +491,7 @@ run_clean 'Melee reload denied away smoke' 'MELEE RELOAD DENIED AWAY PASS away=t
 run_clean 'Attack soft fail SFX smoke' 'ATTACK SOFT FAIL SFX PASS soft_fail=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/attack_soft_fail_sfx_smoke.gd
 run_clean 'Attack soft fail away smoke' 'ATTACK SOFT FAIL AWAY PASS away=true soft_fail=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/attack_soft_fail_away_smoke.gd
 run_clean 'Repair blocked consume smoke' 'REPAIR BLOCKED CONSUME PASS blocked=true consume=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_blocked_consume_smoke.gd
+run_clean 'Repair blocked consume away smoke' 'REPAIR BLOCKED CONSUME AWAY PASS away=true blocked=true consume=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_blocked_consume_away_smoke.gd
 run_clean 'Repair validation channeling smoke' 'REPAIR VALIDATION CHANNELING PASS start=true soft_block_false=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_validation_channeling_smoke.gd
 run_clean 'Work progress noise smoke' 'WORK PROGRESS NOISE PASS cut=true pulse=true detection=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_progress_noise_smoke.gd
 run_clean 'Wound bandage inventory smoke' 'WOUND BANDAGE INVENTORY PASS wound=true bandage=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wound_bandage_inventory_smoke.gd
@@ -717,7 +721,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=537 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=541 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
