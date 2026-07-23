@@ -11144,8 +11144,11 @@ func cargo_deposit_for_validation(ship_id: String) -> int:
 		return 0
 	var moved: int = int(CargoTransferScript.deposit_all(inventory_state, inst.get_inventory()).get("total_moved", 0))
 	_recompute_player_encumbrance()
-	if moved > 0 and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx(AudioEventSeamScript.SFX_DROP_ITEM)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		if moved > 0:
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_DROP_ITEM)
+		else:
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 	return moved
 
 func cargo_withdraw_for_validation(ship_id: String, category: String) -> int:
@@ -11154,8 +11157,11 @@ func cargo_withdraw_for_validation(ship_id: String, category: String) -> int:
 		return 0
 	var moved: int = int(CargoTransferScript.withdraw_category(inst.get_inventory(), inventory_state, category).get("total_moved", 0))
 	_recompute_player_encumbrance()
-	if moved > 0 and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		if moved > 0:
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
+		else:
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 	return moved
 
 func inventory_panel_is_open_for_validation() -> bool:
@@ -11350,8 +11356,11 @@ func cart_load_for_validation(cart_id: String) -> int:
 	if hit.is_empty() or inventory_state == null:
 		return 0
 	var moved: int = int(CargoTransferScript.deposit_all(inventory_state, hit["cart"].get_hold()).get("total_moved", 0))
-	if moved > 0 and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx(AudioEventSeamScript.SFX_DROP_ITEM)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		if moved > 0:
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_DROP_ITEM)
+		else:
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 	return moved
 
 func cart_unload_for_validation(cart_id: String, category: String) -> int:
@@ -11359,8 +11368,11 @@ func cart_unload_for_validation(cart_id: String, category: String) -> int:
 	if hit.is_empty() or inventory_state == null:
 		return 0
 	var moved: int = int(CargoTransferScript.withdraw_category(hit["cart"].get_hold(), inventory_state, category).get("total_moved", 0))
-	if moved > 0 and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
-		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		if moved > 0:
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
+		else:
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 	return moved
 
 func cart_is_grabbed_for_validation() -> bool:

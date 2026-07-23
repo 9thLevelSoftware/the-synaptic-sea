@@ -514,6 +514,9 @@ func deposit_all_to_container() -> int:
 	var moved: int = int(CargoTransferScript.deposit_all(_player_inv, _container).get("total_moved", 0))
 	if moved > 0:
 		_after_mutation()
+	else:
+		# Nothing haulable to dump — soft deny (matches empty transfer_selected).
+		_emit_transfer_denied_sfx()
 	return moved
 
 # --- drag payload (kept: smokes call this directly) ---
