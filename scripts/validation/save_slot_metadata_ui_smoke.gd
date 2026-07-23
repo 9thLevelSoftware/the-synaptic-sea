@@ -1,7 +1,7 @@
 extends SceneTree
 
-## Save/load slot rows render ADR-0046 metadata (location, play time, seed).
-## Marker: SAVE SLOT METADATA UI PASS location=true play_time=true seed=true
+## Save/load slot rows render ADR-0046 metadata (location, class, obj, play time, seed).
+## Marker: SAVE SLOT METADATA UI PASS location=true class=true obj=true play_time=true seed=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const TIMEOUT_FRAMES: int = 600
@@ -65,6 +65,14 @@ func _validate() -> void:
 		loc = "?"
 	if not line.contains(loc):
 		_fail("line missing location '%s': %s" % [loc, line]); return
+	var cls: String = str(row.player_class)
+	if cls.is_empty():
+		cls = "?"
+	if not line.contains(cls):
+		_fail("line missing class '%s': %s" % [cls, line]); return
+	var obj_token: String = "obj=%d" % int(row.objective_sequence)
+	if not line.contains(obj_token):
+		_fail("line missing %s: %s" % [obj_token, line]); return
 	if float(row.play_time_seconds) <= 0.0:
 		_fail("row play_time_seconds not accumulated: %s" % str(row.play_time_seconds)); return
 	var time_txt: String = coord._format_play_time_seconds(float(row.play_time_seconds))
@@ -79,7 +87,7 @@ func _validate() -> void:
 	if coord._format_play_time_seconds(3661.0) != "1h01m":
 		_fail("format 3661s expected 1h01m got %s" % coord._format_play_time_seconds(3661.0)); return
 
-	print("SAVE SLOT METADATA UI PASS location=true play_time=true seed=true")
+	print("SAVE SLOT METADATA UI PASS location=true class=true obj=true play_time=true seed=true")
 	quit(0)
 
 
