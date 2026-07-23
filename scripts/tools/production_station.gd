@@ -210,18 +210,18 @@ func _interact_recycler() -> bool:
 	var qty: int = inventory_state.get_quantity("contaminated_water")
 	if qty <= 0:
 		emit_signal("production_blocked", station_kind, "no_input")
-		return false
+		return true  # consume — soft deny at the station
 	var power := _avail_power()
 	if power < model.power_cost:
 		emit_signal("production_blocked", station_kind, "insufficient_power")
-		return false
+		return true
 	var res: Dictionary = model.load_input("contaminated_water", qty, power)
 	if res.get("ok", false):
 		inventory_state.remove_item("contaminated_water", qty)
 		emit_signal("production_started", station_kind, "contaminated_water")
 		return true
 	emit_signal("production_blocked", station_kind, str(res.get("reason", "load_failed")))
-	return false
+	return true
 
 func _deposit(item_id: String, qty: int) -> bool:
 	if item_id.is_empty() or qty <= 0:
