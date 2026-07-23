@@ -212,6 +212,7 @@ var wound_state  # WoundState (PKG-C3.1a)
 var ship_modification_state  # ShipModificationState (PKG-D2.6)
 var component_placement_state  # ComponentPlacementState (PKG-B2.3 / D6.1)
 var component_catalog  # ComponentCatalog
+var component_markers: Array = []  # Node3D placeholders for mounted components
 var sea_graph  # SeaGraph (PKG-D6.2 / D9c)
 var inventory_panel
 var tracker
@@ -3328,8 +3329,75 @@ func get_component_placement_state_for_validation():
 	return component_placement_state
 
 
+func get_component_markers_for_validation() -> Array:
+	return component_markers.duplicate()
+
+
 func get_sea_graph_for_validation():
 	return sea_graph
+
+
+## PKG-B2.3: placeholder meshes for mounted components (kit art deferred).
+func _rebuild_component_markers() -> void:
+	_clear_component_markers()
+	if component_placement_state == null:
+		return
+	var parent: Node3D = null
+	if current_ship != null and is_instance_valid(current_ship.scene_root) and current_ship.scene_root is Node3D:
+		parent = current_ship.scene_root as Node3D
+	elif is_instance_valid(affordance_root) and affordance_root is Node3D:
+		parent = affordance_root as Node3D
+	if parent == null:
+		return
+	var layout: Dictionary = _active_layout_for_work()
+	var centers: Dictionary = _room_world_centers(layout)
+	var placed: Array = component_placement_state.get("placed") as Array if typeof(component_placement_state.get("placed")) == TYPE_ARRAY else []
+	var i: int = 0
+	for entry_v in placed:
+		if typeof(entry_v) != TYPE_DICTIONARY:
+			continue
+		var e: Dictionary = entry_v
+		if not bool(e.get("mounted", true)):
+			continue
+		var rid: String = str(e.get("room_id", ""))
+		var pos: Vector3 = centers.get(rid, Vector3(float(i) * 0.5, 0.5, 0.0)) as Vector3 if centers.has(rid) else Vector3(float(i) * 0.5, 0.5, 0.0)
+		# Offset wall slots slightly so markers do not stack.
+		var slot_i: int = int(e.get("slot_index", 0))
+		pos += Vector3(0.4 * float(slot_i % 3), 0.6, 0.25 * float(slot_i % 2))
+		# Convert world → parent-local if parent is offset.
+		var local_pos: Vector3 = pos
+		if parent.is_inside_tree():
+			local_pos = parent.global_transform.affine_inverse() * pos
+		var marker := Node3D.new()
+		marker.name = "ComponentMarker_%s" % str(e.get("component_instance_id", i))
+		marker.set_meta("component_instance_id", str(e.get("component_instance_id", "")))
+		marker.set_meta("component_id", str(e.get("component_id", "")))
+		marker.set_meta("mounted", true)
+		var mesh_i := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(0.45, 0.9, 0.35)
+		mesh_i.mesh = box
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.55, 0.75, 0.95, 0.85)
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mesh_i.material_override = mat
+		mesh_i.position = Vector3(0, 0.45, 0)
+		marker.add_child(mesh_i)
+		marker.position = local_pos
+		parent.add_child(marker)
+		component_markers.append(marker)
+		i += 1
+
+
+func _clear_component_markers() -> void:
+	for m in component_markers:
+		if is_instance_valid(m):
+			var p: Node = (m as Node).get_parent()
+			if p != null:
+				p.remove_child(m)
+			(m as Node).queue_free()
+	component_markers.clear()
 
 
 ## Start and complete a catalog WorkAction against the live module integrity map.
@@ -5724,14 +5792,17 @@ func _restore_or_populate_component_placement_for_current_ship() -> void:
 	if current_ship != null and not current_ship.component_placement_summary.is_empty():
 		if component_placement_state.has_method("apply_summary"):
 			component_placement_state.apply_summary(current_ship.component_placement_summary)
+		_rebuild_component_markers()
 		return
 	var layout: Dictionary = _active_layout_for_work()
 	if layout.is_empty():
+		_clear_component_markers()
 		return
 	var seed_v: int = _component_placement_seed_for_current_ship()
 	component_placement_state.populate(layout, component_catalog, seed_v)
 	if current_ship != null and component_placement_state.placed.size() > 0:
 		current_ship.component_placement_summary = component_placement_state.get_summary()
+	_rebuild_component_markers()
 
 
 func _component_placement_seed_for_current_ship() -> int:
