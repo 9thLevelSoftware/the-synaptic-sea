@@ -134,6 +134,12 @@ Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remain
 **Regression contract:** `docs/game/06_validation_plan.md` bundle ends with
 `SYNAPTIC_SEA REGRESSION PASS commands=255 clean_output=true` (marker-based; set `GODOT`/`ROOT` on Windows).
 
+**Post-INT hardening (PRs #112–#116):**
+- D6.1 pillar revisit sparse packs on ShipInstance + leave/revisit flush
+- D9b ship-mod panel; dual-branch WorkAction tick
+- Nearest-module WorkAction interact (cut/pry)
+- ComponentPlacementState populate/restore on attach
+
 **Still content/polish (not mechanical pre-polish blockers):**
 - Live player hold-to-work interact targeting (validation + HUD + tick seams exist; nearest-module interact UX polish)
 - Final damaged/breached kit art; audio *asset* library; narrative/balance authoring
