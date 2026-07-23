@@ -41,6 +41,10 @@ func _on_frame() -> void:
 func _start() -> void:
 	if playable.inventory_state == null or playable.player == null:
 		_fail("inventory/player missing"); return
+	# Combat hits interrupt WorkActions (REQ-WA-003); clear hostiles so this
+	# smoke isolates the structure-work complete path.
+	if playable.threat_manager != null:
+		playable.threat_manager.threats.clear()
 	playable.inventory_state.add_item("welding_lance", 1)
 	var layout: Dictionary = playable._active_layout_for_work()
 	if layout.is_empty():

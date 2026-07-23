@@ -1309,6 +1309,9 @@ func _build_runtime_nodes() -> void:
 	threat_manager = ThreatManagerScript.new()
 	threat_manager.name = "ThreatManager"
 	add_child(threat_manager)
+	# REQ-WA-003: after _ready configures the pipeline, hook combat → work interrupt.
+	if threat_manager.damage_pipeline != null:
+		threat_manager.damage_pipeline.on_player_damaged = Callable(self, "_on_player_combat_damaged")
 	if not threat_manager.threat_killed.is_connected(_on_threat_killed):
 		threat_manager.threat_killed.connect(_on_threat_killed)
 	# REQ-AU-001..010: build the AudioManager service. The manager owns
@@ -4205,6 +4208,12 @@ func _interrupt_work_on_damage() -> void:
 	if work_action_driver.work != null and work_action_driver.work.has_method("interrupt"):
 		work_action_driver.work.call("interrupt")
 	_refresh_work_action_hud()
+
+
+## Combat damage callback (DamagePipeline.on_player_damaged) — REQ-WA-003.
+func _on_player_combat_damaged(damage: float, _event: Dictionary = {}) -> void:
+	if damage > 0.0:
+		_interrupt_work_on_damage()
 
 func _build_extinguisher_recharge_port() -> void:
 	_clear_extinguisher_recharge_port()
