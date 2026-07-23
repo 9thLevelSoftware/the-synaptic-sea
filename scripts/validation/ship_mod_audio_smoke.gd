@@ -1,6 +1,6 @@
 extends SceneTree
 
-## Ship-mod install/uninstall UI SFX ids exist in seam + router and route.
+## Ship-mod open/install/uninstall UI SFX ids exist in seam + router and route.
 ## Marker: SHIP MOD AUDIO PASS seam=true router=true route=true
 
 const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
@@ -8,20 +8,21 @@ const SfxEventRouterScript := preload("res://scripts/systems/sfx_event_router.gd
 
 
 func _initialize() -> void:
-	var install_id: String = String(AudioEventSeamScript.UI_SHIP_MOD_INSTALL)
-	var uninstall_id: String = String(AudioEventSeamScript.UI_SHIP_MOD_UNINSTALL)
-	if install_id.is_empty() or uninstall_id.is_empty():
-		_fail("seam constants"); return
-	if not SfxEventRouterScript.EVENT_CATALOG.has(install_id):
-		_fail("router missing install"); return
-	if not SfxEventRouterScript.EVENT_CATALOG.has(uninstall_id):
-		_fail("router missing uninstall"); return
+	var ids: Array[StringName] = [
+		AudioEventSeamScript.UI_SHIP_MOD_OPEN,
+		AudioEventSeamScript.UI_SHIP_MOD_INSTALL,
+		AudioEventSeamScript.UI_SHIP_MOD_UNINSTALL,
+	]
 	var router = SfxEventRouterScript.new()
 	router.configure({})
-	if router.route(AudioEventSeamScript.UI_SHIP_MOD_INSTALL, false) == null:
-		_fail("install not routable"); return
-	if router.route(AudioEventSeamScript.UI_SHIP_MOD_UNINSTALL, false) == null:
-		_fail("uninstall not routable"); return
+	for sn in ids:
+		var key: String = String(sn)
+		if key.is_empty():
+			_fail("empty seam constant"); return
+		if not SfxEventRouterScript.EVENT_CATALOG.has(key):
+			_fail("router missing %s" % key); return
+		if router.route(sn, false) == null:
+			_fail("not routable %s" % key); return
 	print("SHIP MOD AUDIO PASS seam=true router=true route=true")
 	quit(0)
 
