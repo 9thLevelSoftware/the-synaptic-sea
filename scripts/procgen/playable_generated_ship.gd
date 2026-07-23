@@ -9569,6 +9569,8 @@ func request_load() -> bool:
 	var ws = save_load_service.load_world()
 	if ws == null:
 		push_warning("PlayableGeneratedShip: no compatible world save to load")
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return false
 	var loaded: bool = _apply_world_snapshot(ws)
 	if loaded:
@@ -9587,6 +9589,9 @@ func request_load() -> bool:
 			audio_manager.play_sfx(AudioEventSeamScript.UI_LOAD)
 		if is_instance_valid(menu_coordinator):
 			menu_coordinator.set_load_available(true)
+	else:
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 	return loaded
 
 ## Reconstructs the slice through the normal load path, then applies
