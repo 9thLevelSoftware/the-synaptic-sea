@@ -6226,6 +6226,8 @@ func _open_transfer_panel_for_ship(ship_id: String) -> void:
 	if inst == null:
 		return
 	inventory_panel.open_transfer(inventory_state, inst.get_inventory(), "HOLD", equipment_state)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_OPEN)
 	_freeze_player_for_panel()
 
 func _open_transfer_panel_for_cart(cart_id: String) -> void:
@@ -6235,6 +6237,8 @@ func _open_transfer_panel_for_cart(cart_id: String) -> void:
 	if hit.is_empty():
 		return
 	inventory_panel.open_transfer(inventory_state, hit["cart"].get_hold(), "CART", equipment_state)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_OPEN)
 	_freeze_player_for_panel()
 
 func _build_ui_bindings_table() -> Dictionary:
