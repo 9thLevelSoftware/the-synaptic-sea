@@ -2,7 +2,7 @@ extends SceneTree
 
 ## Domain 3 Task 2: ProductionStation drives a stateful production model via interact.
 ## - IDLE interact starts production (consumes input from inventory).
-## - interact while RUNNING is a no-op (production_blocked "in_progress").
+## - interact while RUNNING emits production_blocked "in_progress" and consumes (returns true).
 ## - interact while READY harvests/collects into inventory.
 ## Validated against BOTH a HydroponicsState and a WaterRecyclerState with a fake inventory.
 ## Marker: PRODUCTION STATION PASS hydro_harvest=true recycler_collect=true blocked_in_progress=true
@@ -50,16 +50,22 @@ func _test_hydro() -> bool:
 	_st_hydro = ProductionStationScript.new()
 	_st_hydro.configure("hydroponics", model, inv, func(): return 999.0, func(): return 5, crops, Vector3.ZERO, 1.8)
 	_st_hydro.set_validation_player_in_range(self)  # bypass spatial gate in headless
-	# IDLE -> start
+	# IDLE interact opens crop picker (REQ-CS-018); plant via explicit try_plant_crop.
 	if not _st_hydro.try_interact(self):
+		return false
+	if model.state != HydroStateScript.State.IDLE:
+		return false  # picker open must not auto-plant
+	if not _st_hydro.try_plant_crop("hydroponic_greens"):
 		return false
 	if model.state != HydroStateScript.State.PLANTED:
 		return false
 	if inv.get_quantity("purified_water") != 3:  # 5 - water_cost(2)
 		return false
-	# RUNNING -> no-op
-	if _st_hydro.try_interact(self):
-		return false  # should return false while growing
+	# RUNNING -> soft block + consume (still planted)
+	if not _st_hydro.try_interact(self):
+		return false  # must consume interact while growing
+	if model.state != HydroStateScript.State.PLANTED:
+		return false
 	# tick to HARVESTABLE
 	model.tick(2.0)
 	if model.state != HydroStateScript.State.HARVESTABLE:
@@ -119,14 +125,15 @@ func _test_output_full() -> bool:
 		if reason == "output_full":
 			got_block["v"] = true)
 	_st_full.set_validation_player_in_range(self)
-	if not _st_full.try_interact(self):  # IDLE -> plant
+	if not _st_full.try_plant_crop("hydroponic_greens"):  # explicit plant (REQ-CS-018)
 		return false
 	model.tick(2.0)
 	if model.state != HydroStateScript.State.HARVESTABLE:
 		return false
 	# Harvest attempt with a full stack: must be refused, model preserved, nothing lost.
-	if _st_full.try_interact(self):
-		return false  # try_interact must return false (blocked)
+	# try_interact returns true (consume) while still emitting production_blocked.
+	if not _st_full.try_interact(self):
+		return false  # must consume interact on output_full
 	if model.state != HydroStateScript.State.HARVESTABLE:
 		return false  # model must NOT have been reset by harvest()
 	if inv.get_quantity("hydroponic_greens") != 15:
