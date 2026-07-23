@@ -3753,11 +3753,25 @@ func try_work_action_interact_for_validation() -> bool:
 
 
 func _on_wounds_panel_closed() -> void:
-	pass
+	_emit_panel_close_sfx()
+	_unfreeze_player_after_panel()
 
 
 func _on_ship_modification_panel_closed() -> void:
-	pass
+	_emit_panel_close_sfx()
+	_unfreeze_player_after_panel()
+
+
+func _emit_panel_close_sfx() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+
+
+func _unfreeze_player_after_panel() -> void:
+	if is_instance_valid(player):
+		player.set_physics_process(true)
+		player.set_process_input(true)
+		player.set_process_unhandled_input(true)
 
 
 const WORK_ACTION_INTERACT_RANGE: float = 3.5
@@ -6069,16 +6083,12 @@ func _build_hud_layer() -> void:
 	menu_coordinator.open_main_menu()
 
 func _on_scanner_panel_closed() -> void:
-	if is_instance_valid(player):
-		player.set_physics_process(true)
-		player.set_process_input(true)
-		player.set_process_unhandled_input(true)
+	_emit_panel_close_sfx()
+	_unfreeze_player_after_panel()
 
 func _on_recipe_picker_panel_closed() -> void:
-	if is_instance_valid(player):
-		player.set_physics_process(true)
-		player.set_process_input(true)
-		player.set_process_unhandled_input(true)
+	_emit_panel_close_sfx()
+	_unfreeze_player_after_panel()
 
 ## REQ-CS-016: station requested the recipe picker (live interact path).
 func _on_recipe_picker_requested(station_kind: String) -> void:
@@ -6161,10 +6171,8 @@ func begin_craft_from_picker(station_kind: String, recipe_id: String) -> Diction
 	return {"ok": false, "reason": "station_missing", "recipe_id": recipe_id}
 
 func _on_chart_panel_closed() -> void:
-	if is_instance_valid(player):
-		player.set_physics_process(true)
-		player.set_process_input(true)
-		player.set_process_unhandled_input(true)
+	_emit_panel_close_sfx()
+	_unfreeze_player_after_panel()
 
 func _freeze_player_for_panel() -> void:
 	if is_instance_valid(player):
