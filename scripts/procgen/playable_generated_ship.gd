@@ -4161,6 +4161,11 @@ func _tick_work_action(delta: float) -> void:
 		if bool(res.get("ok", false)):
 			if work_action_driver.last_noise_pulse > 0.0 and threat_manager != null:
 				work_action_driver.apply_noise_to_detection(threat_manager)
+			# PKG-D10: verb completion SFX (cut/weld/pry/…) via seam + router.
+			if is_instance_valid(audio_manager) and audio_manager.sfx_router != null:
+				work_action_driver.emit_completion_sfx(audio_manager.sfx_router)
+			elif is_instance_valid(audio_manager) and not str(res.get("audio_event", "")).is_empty():
+				audio_manager.play_sfx(StringName(str(res.get("audio_event", ""))))
 			var xp_ev: String = str(work_action_driver.last_xp_event)
 			if xp_ev.is_empty():
 				xp_ev = str(res.get("xp_event", ""))
