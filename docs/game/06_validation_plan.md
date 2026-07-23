@@ -504,6 +504,7 @@ run_clean 'Cut module scene smoke' 'CUT MODULE SCENE PASS cut=true damaged=true 
 run_clean 'Remount system restore smoke' 'REMOUNT SYSTEM RESTORE PASS damage=true remount=true floor=true no_full=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/remount_system_restore_smoke.gd
 run_clean 'Ship mod run snapshot smoke' 'SHIP MOD RUN SNAPSHOT PASS shipmod=true pillar=true count=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_run_snapshot_smoke.gd
 run_clean 'Work hold-to-work smoke' 'WORK HOLD TO WORK PASS freeze=true validation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_hold_to_work_smoke.gd
+run_clean 'Work hold-to-work away smoke' 'WORK HOLD TO WORK AWAY PASS away=true freeze=true validation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_hold_to_work_away_smoke.gd
 run_clean 'Bandage training smoke' 'BANDAGE TRAINING PASS bandage_xp=true treat_xp=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bandage_training_smoke.gd
 run_clean 'Ship mod install key smoke' 'SHIP MOD INSTALL KEY PASS install=true catalog=true uninstall=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_key_smoke.gd
 run_clean 'Ship mod system effect smoke' 'SHIP MOD SYSTEM EFFECT PASS restore=true power=true uninstall_damage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_system_effect_smoke.gd
@@ -514,11 +515,13 @@ run_clean 'Work weld damaged smoke' 'WORK WELD DAMAGED PASS start=true repair=tr
 run_clean 'Ship mod restore effects smoke' 'SHIP MOD RESTORE EFFECTS PASS restore=true tier=true system=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_restore_effects_smoke.gd
 run_clean 'Fire plating resist smoke' 'FIRE PLATING RESIST PASS resist=true reduced=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/fire_plating_resist_smoke.gd
 run_clean 'Work stamina interrupt smoke' 'WORK STAMINA INTERRUPT PASS start=true exhaust=true interrupted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_stamina_interrupt_smoke.gd
+run_clean 'Work stamina interrupt away smoke' 'WORK STAMINA INTERRUPT AWAY PASS away=true start=true exhaust=true interrupted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_stamina_interrupt_away_smoke.gd
 run_clean 'Work weld skill context smoke' 'WORK WELD SKILL CONTEXT PASS skill=true start=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_weld_skill_context_smoke.gd
 run_clean 'Ship mod install XP smoke' 'SHIP MOD INSTALL XP PASS install_xp=true uninstall_xp=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_xp_smoke.gd
 run_clean 'Ship mod audio smoke' 'SHIP MOD AUDIO PASS seam=true router=true route=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_audio_smoke.gd
 run_clean 'Hull plating catalog smoke' 'HULL PLATING CATALOG PASS catalog=true install=true bonus=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hull_plating_catalog_smoke.gd
 run_clean 'Work block zero stamina smoke' 'WORK BLOCK ZERO STAMINA PASS block=true start_ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_block_zero_stamina_smoke.gd
+run_clean 'Work block zero stamina away smoke' 'WORK BLOCK ZERO STAMINA AWAY PASS away=true block=true start_ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_block_zero_stamina_away_smoke.gd
 run_clean 'Ship mod power budget scene smoke' 'SHIP MOD POWER BUDGET SCENE PASS fill=true reject=true inventory=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_power_budget_scene_smoke.gd
 run_clean 'Work action XP catalog smoke' 'WORK ACTION XP CATALOG PASS cut=true weld=true salvage=true repair=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_xp_catalog_smoke.gd
 run_clean 'Work cut XP live smoke' 'WORK CUT XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_cut_xp_live_smoke.gd
@@ -726,7 +729,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=546 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=549 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
