@@ -608,10 +608,12 @@ run_clean 'Hatch door close SFX smoke' 'HATCH DOOR CLOSE SFX PASS reseal=true sf
 run_clean 'Hatch door close away smoke' 'HATCH DOOR CLOSE AWAY PASS away=true reseal=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_close_away_smoke.gd
 run_clean 'Production blocked SFX smoke' 'PRODUCTION BLOCKED SFX PASS blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_blocked_sfx_smoke.gd
 run_clean 'End run SFX smoke' 'END RUN SFX PASS death=true complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/end_run_sfx_smoke.gd
+run_clean 'End run away smoke' 'END RUN AWAY PASS away=true death=true complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/end_run_away_smoke.gd
 run_clean 'Craft start SFX smoke' 'CRAFT START SFX PASS start=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_start_sfx_smoke.gd
 run_clean 'Field craft start SFX smoke' 'FIELD CRAFT START SFX PASS start=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/field_craft_start_sfx_smoke.gd
 run_clean 'Field craft start away smoke' 'FIELD CRAFT START AWAY PASS away=true start=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/field_craft_start_away_smoke.gd
 run_clean 'Inventory transfer SFX smoke' 'INVENTORY TRANSFER SFX PASS transfer=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_transfer_sfx_smoke.gd
+run_clean 'Inventory transfer away smoke' 'INVENTORY TRANSFER AWAY PASS away=true transfer=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_transfer_away_smoke.gd
 run_clean 'Hazard blocked SFX smoke' 'HAZARD BLOCKED SFX PASS repair=true extinguish=true seal=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_blocked_sfx_smoke.gd
 run_clean 'Hazard blocked away smoke' 'HAZARD BLOCKED AWAY PASS away=true repair=true extinguish=true seal=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hazard_blocked_away_smoke.gd
 run_clean 'Hangar dock launch SFX smoke' 'HANGAR DOCK LAUNCH SFX PASS dock=true launch=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_dock_launch_sfx_smoke.gd
@@ -633,12 +635,14 @@ run_clean 'Travel denied SFX smoke' 'TRAVEL DENIED SFX PASS denied=true sfx=true
 run_clean 'Dock barrier SFX smoke' 'DOCK BARRIER SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dock_barrier_sfx_smoke.gd
 run_clean 'Bridge login SFX smoke' 'BRIDGE LOGIN SFX PASS login=true deny=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bridge_login_sfx_smoke.gd
 run_clean 'Field craft begin blocked SFX smoke' 'FIELD CRAFT BEGIN BLOCKED SFX PASS blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/field_craft_begin_blocked_sfx_smoke.gd
+run_clean 'Field craft begin blocked away smoke' 'FIELD CRAFT BEGIN BLOCKED AWAY PASS away=true blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/field_craft_begin_blocked_away_smoke.gd
 run_clean 'Encumbrance overload SFX smoke' 'ENCUMBRANCE OVERLOAD SFX PASS overload=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encumbrance_overload_sfx_smoke.gd
 run_clean 'Encumbrance overload away smoke' 'ENCUMBRANCE OVERLOAD AWAY PASS away=true overload=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encumbrance_overload_away_smoke.gd
 run_clean 'Ship mod install fail SFX smoke' 'SHIP MOD INSTALL FAIL SFX PASS fail=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_fail_sfx_smoke.gd
 run_clean 'Consumable use SFX smoke' 'CONSUMABLE USE SFX PASS ok=true fail=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/consumable_use_sfx_smoke.gd
 run_clean 'Consumable use away smoke' 'CONSUMABLE USE AWAY PASS away=true ok=true fail=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/consumable_use_away_smoke.gd
 run_clean 'Work start SFX smoke' 'WORK START SFX PASS start=true blocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_start_sfx_smoke.gd
+run_clean 'Work start away smoke' 'WORK START AWAY PASS away=true start=true blocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_start_away_smoke.gd
 run_clean 'Quicksave denied SFX smoke' 'QUICKSAVE DENIED SFX PASS deny=true save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/quicksave_denied_sfx_smoke.gd
 run_clean 'Autosave SFX smoke' 'AUTOSAVE SFX PASS save=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/autosave_sfx_smoke.gd
 run_clean 'Save denied SFX smoke' 'SAVE DENIED SFX PASS denied=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_denied_sfx_smoke.gd
@@ -664,7 +668,7 @@ run_clean 'Cart grab denied SFX smoke' 'CART GRAB DENIED SFX PASS deny=true sfx=
 run_clean 'Cart grab denied away smoke' 'CART GRAB DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_grab_denied_away_smoke.gd
 run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=484 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=488 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
