@@ -3984,6 +3984,13 @@ func _tick_work_action(delta: float) -> void:
 	var speed: float = 1.0
 	if wound_state != null and wound_state.has_method("work_speed_multiplier"):
 		speed = float(wound_state.call("work_speed_multiplier"))
+	# REQ-WA: hold-to-work drains stamina; low stamina slows the job.
+	if vitals_state != null:
+		var max_s: float = maxf(1.0, float(vitals_state.max_stamina))
+		var s_ratio: float = clampf(float(vitals_state.stamina) / max_s, 0.0, 1.0)
+		speed *= clampf(0.35 + s_ratio * 0.65, 0.35, 1.0)
+		if vitals_state.has_method("apply_delta"):
+			vitals_state.apply_delta({"stamina": -8.0 * delta})
 	work_action_driver.tick(delta, {"work_speed_mult": speed})
 	# Continuous strip noise while working (detection tension).
 	if work_action_driver.last_progress_noise > 0.0 and threat_manager != null:
@@ -4016,6 +4023,7 @@ func _tick_work_action(delta: float) -> void:
 					if mgr != null and mgr.has_method("damage_subcomponent"):
 						mgr.call("damage_subcomponent", lsys, lsub, 1.0)
 				_rebuild_component_markers()
+				_refresh_station_tiers_from_ship_mod()
 		elif action_id == "mount_component":
 			res = ComponentMountResolverScript.resolve_mount(
 				work_action_driver.work, component_placement_state, inv, component_catalog, {}
@@ -4039,6 +4047,7 @@ func _tick_work_action(delta: float) -> void:
 						if rmgr != null and rmgr.has_method("restore_subcomponent_on_remount"):
 							rmgr.call("restore_subcomponent_on_remount", rsys, rsub, 0.55)
 				_rebuild_component_markers()
+				_refresh_station_tiers_from_ship_mod()
 		else:
 			res = work_action_driver.complete(module_integrity_map, inv)
 			if bool(res.get("ok", false)):
@@ -4412,6 +4421,15 @@ func _on_compartment_vented(compartment_id: String) -> void:
 	_refresh_oxygen_state(false, 0.0)
 
 
+func _hub_structure_damage_resist() -> float:
+	# Plating only protects the home hub (ship-mod installs live on start ship).
+	if away_from_start:
+		return 0.0
+	if ship_modification_state != null and ship_modification_state.has_method("structure_damage_resist"):
+		return float(ship_modification_state.call("structure_damage_resist"))
+	return 0.0
+
+
 func _apply_decompression_module_damage(compartment_id: String) -> void:
 	if module_integrity_map == null or compartment_id.is_empty():
 		return
@@ -4420,8 +4438,10 @@ func _apply_decompression_module_damage(compartment_id: String) -> void:
 		return
 	if module_integrity_map.size() == 0 and not layout.is_empty():
 		ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
+	var resist: float = _hub_structure_damage_resist()
+	var amount: float = ModuleDamageRouterScript.DEFAULT_DECOMPRESSION_AMOUNT * (1.0 - resist)
 	var changed: Array = ModuleDamageRouterScript.apply_decompression_to_compartment(
-		module_integrity_map, layout, compartment_id, COMPARTMENT_FOR_ROLE
+		module_integrity_map, layout, compartment_id, COMPARTMENT_FOR_ROLE, amount
 	)
 	if not changed.is_empty():
 		_apply_module_integrity_scene(changed)
@@ -4432,7 +4452,7 @@ func apply_threat_structure_damage_for_validation(module_id: String, amount: flo
 	if module_integrity_map == null:
 		module_integrity_map = ModuleIntegrityMapScript.new()
 	var res: Dictionary = ModuleDamageRouterScript.apply_threat_structure_hit(
-		module_integrity_map, module_id, amount
+		module_integrity_map, module_id, amount, "", _hub_structure_damage_resist()
 	)
 	if bool(res.get("ok", false)):
 		_apply_module_integrity_scene([module_id])

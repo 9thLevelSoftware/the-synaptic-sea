@@ -152,6 +152,11 @@ func is_power_budget_ok() -> bool:
 	return total_power_draw() <= power_supply + 0.001
 
 
+## REQ-SMOD-001: plating installs reduce hub structure damage (cap 50%).
+func structure_damage_resist() -> float:
+	return clampf(hull_plating_bonus * 2.0, 0.0, 0.5)
+
+
 func get_summary() -> Dictionary:
 	return {
 		"schema": "ship_modification_v1",
