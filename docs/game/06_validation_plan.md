@@ -468,6 +468,7 @@ run_clean 'Hatch bypass denied away smoke' 'HATCH BYPASS DENIED AWAY PASS away=t
 run_clean 'Work tool missing SFX smoke' 'WORK TOOL MISSING SFX PASS near=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_tool_missing_sfx_smoke.gd
 run_clean 'Work tool missing away smoke' 'WORK TOOL MISSING AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_tool_missing_away_smoke.gd
 run_clean 'Production unknown kind consume smoke' 'PRODUCTION UNKNOWN KIND CONSUME PASS blocked=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_unknown_kind_consume_smoke.gd
+run_clean 'Production unknown kind consume away smoke' 'PRODUCTION UNKNOWN KIND CONSUME AWAY PASS away=true blocked=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_unknown_kind_consume_away_smoke.gd
 run_clean 'Inventory toggle smoke' 'INVENTORY TOGGLE PASS open=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_toggle_smoke.gd
 run_clean 'Inventory toggle away smoke' 'INVENTORY TOGGLE AWAY PASS away=true open=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_toggle_away_smoke.gd
 run_clean 'Chart toggle smoke' 'CHART TOGGLE PASS open=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/chart_toggle_smoke.gd
@@ -725,7 +726,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=545 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=546 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
