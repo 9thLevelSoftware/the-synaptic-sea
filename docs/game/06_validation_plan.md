@@ -478,6 +478,7 @@ run_clean 'Recycler no input consume smoke' 'RECYCLER NO INPUT CONSUME PASS no_i
 run_clean 'Plant crop blocked consume smoke' 'PLANT CROP BLOCKED CONSUME PASS busy=true missing=true blocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/plant_crop_blocked_consume_smoke.gd
 run_clean 'Melee reload denied SFX smoke' 'MELEE RELOAD DENIED SFX PASS melee=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/melee_reload_denied_sfx_smoke.gd
 run_clean 'Attack soft fail SFX smoke' 'ATTACK SOFT FAIL SFX PASS soft_fail=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/attack_soft_fail_sfx_smoke.gd
+run_clean 'Attack soft fail away smoke' 'ATTACK SOFT FAIL AWAY PASS away=true soft_fail=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/attack_soft_fail_away_smoke.gd
 run_clean 'Repair blocked consume smoke' 'REPAIR BLOCKED CONSUME PASS blocked=true consume=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_blocked_consume_smoke.gd
 run_clean 'Repair validation channeling smoke' 'REPAIR VALIDATION CHANNELING PASS start=true soft_block_false=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_validation_channeling_smoke.gd
 run_clean 'Work progress noise smoke' 'WORK PROGRESS NOISE PASS cut=true pulse=true detection=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_progress_noise_smoke.gd
@@ -626,7 +627,7 @@ run_clean 'Load denied SFX smoke' 'LOAD DENIED SFX PASS deny=true sfx=true' "$GO
 run_clean 'Cart grab denied SFX smoke' 'CART GRAB DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_grab_denied_sfx_smoke.gd
 run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=446 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=447 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
