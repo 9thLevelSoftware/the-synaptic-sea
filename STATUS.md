@@ -132,7 +132,7 @@ Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remain
 - **Integration seams:** WorkAction/wounds/ship-mod/sea_graph wired on playable; integrity leave/revisit flush; dual-branch work tick + threat LOS
 
 **Regression contract:** `docs/game/06_validation_plan.md` bundle ends with
-`SYNAPTIC_SEA REGRESSION PASS commands=284 clean_output=true` (marker-based; set `GODOT`/`ROOT` on Windows).
+`SYNAPTIC_SEA REGRESSION PASS commands=285 clean_output=true` (marker-based; set `GODOT`/`ROOT` on Windows).
 
 **Post-INT hardening (PRs #112–#143+):**
 - D6.1 pillar revisit sparse packs on ShipInstance + leave/revisit flush
@@ -150,7 +150,8 @@ Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remain
 - Hull plating resist on hub structure damage; work stamina drain + speed mult; mount/dismount refreshes tiers
 - Weld/patch damaged modules when lance + plate; plate form aliases for consume
 - Ship-mod snapshot restore re-applies linked system floor + station tiers
-- Regression marker contract commands=284 in 06_validation_plan.md
+- Hub plating also reduces fire→module damage rate
+- Regression marker contract commands=285 in 06_validation_plan.md
 
 **Still content/polish (not mechanical pre-polish blockers):**
 - Final damaged/breached kit art; audio *asset* library; narrative/balance authoring

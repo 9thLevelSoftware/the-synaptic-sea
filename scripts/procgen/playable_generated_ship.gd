@@ -3281,8 +3281,10 @@ func _apply_fire_module_integrity(delta: float) -> void:
 		return
 	if module_integrity_map.size() == 0:
 		ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
+	var resist: float = _hub_structure_damage_resist()
+	var rate: float = ModuleIntegrityConsequencesScript.FIRE_MODULE_DAMAGE_PER_INTENSITY * (1.0 - resist)
 	var changed: Array = ModuleIntegrityConsequencesScript.apply_fire_damage(
-		module_integrity_map, layout, burning, COMPARTMENT_FOR_ROLE, delta
+		module_integrity_map, layout, burning, COMPARTMENT_FOR_ROLE, delta, rate
 	)
 	if changed.is_empty():
 		return

@@ -464,7 +464,8 @@ run_clean 'Hull plating resist smoke' 'HULL PLATING RESIST PASS resist=true redu
 run_clean 'Work stamina drain smoke' 'WORK STAMINA DRAIN PASS start=true drain=true speed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_stamina_drain_smoke.gd
 run_clean 'Work weld damaged smoke' 'WORK WELD DAMAGED PASS start=true repair=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_weld_damaged_smoke.gd
 run_clean 'Ship mod restore effects smoke' 'SHIP MOD RESTORE EFFECTS PASS restore=true tier=true system=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_restore_effects_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=284 clean_output=true'
+run_clean 'Fire plating resist smoke' 'FIRE PLATING RESIST PASS resist=true reduced=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/fire_plating_resist_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=285 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
