@@ -205,6 +205,8 @@ func install_from_inventory(
 			if not def.is_empty():
 				power_draw = float(def.get("power_draw", power_draw))
 				mass = float(def.get("mass", mass))
+				if def.has("plating"):
+					plating = bool(def.get("plating", plating))
 	return install_into_selected(component_id, form, power_draw, mass, plating)
 
 
