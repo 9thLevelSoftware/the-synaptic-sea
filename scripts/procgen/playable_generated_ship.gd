@@ -2534,6 +2534,13 @@ func _find_cart_by_id(cart_id: String) -> Dictionary:
 func _on_cart_grab_requested(cart_id: String) -> void:
 	var hit: Dictionary = _find_cart_by_id(cart_id)
 	if hit.is_empty():
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+		return
+	if grabbed_cart != null:
+		# Already pushing a cart — soft deny second grab.
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return
 	grabbed_cart = hit["cart"]
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
