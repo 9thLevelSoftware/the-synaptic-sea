@@ -3856,6 +3856,9 @@ func _tick_work_action(delta: float) -> void:
 	if wound_state != null and wound_state.has_method("work_speed_multiplier"):
 		speed = float(wound_state.call("work_speed_multiplier"))
 	work_action_driver.tick(delta, {"work_speed_mult": speed})
+	# Continuous strip noise while working (detection tension).
+	if work_action_driver.last_progress_noise > 0.0 and threat_manager != null:
+		work_action_driver.apply_noise_to_detection(threat_manager)
 	if work_action_driver.get_status() == "completed" or (
 		work_action_driver.work != null and str(work_action_driver.work.get("status")) == "completed"
 	):
