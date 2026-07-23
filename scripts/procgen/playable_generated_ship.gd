@@ -3449,6 +3449,7 @@ func run_work_action_for_validation(action_id: String, target_id: String, invent
 		ctx["inventory"] = inv.duplicate(true)
 	if not work_action_driver.start_action(action_id, target_id, ctx):
 		return {"ok": false, "reason": "start_failed"}
+	_work_requires_hold = false
 	work_action_driver.tick(999.0, {"work_speed_mult": float(ctx.get("work_speed_mult", 1.0))})
 	var res: Dictionary = work_action_driver.complete(module_integrity_map, inv)
 	_refresh_work_action_hud()
@@ -3597,10 +3598,14 @@ func _on_ship_mod_uninstall_requested(_slot_id: String) -> void:
 
 
 ## PKG-B2.2b: start nearest-module WorkAction via live interact path (validation).
+## Disables hold-to-work so headless ticks can complete the job.
 func try_work_action_interact_for_validation() -> bool:
 	if player == null:
 		return false
-	return _try_work_action_interact(player)
+	var ok: bool = _try_work_action_interact(player)
+	if ok:
+		_work_requires_hold = false
+	return ok
 
 
 func _on_wounds_panel_closed() -> void:
@@ -3612,6 +3617,9 @@ func _on_ship_modification_panel_closed() -> void:
 
 
 const WORK_ACTION_INTERACT_RANGE: float = 3.5
+## Hold-to-work: player-started work only advances while interact is held.
+## Validation / restored mid-work sets this false so headless ticks continue.
+var _work_requires_hold: bool = false
 
 
 ## Lowest-priority interact: dismount nearest component (wrench) or cut/pry structure.
@@ -3622,6 +3630,7 @@ func _try_work_action_interact(player_body) -> bool:
 		# Second press cancels in-progress strip work.
 		if work_action_driver.work != null and work_action_driver.work.has_method("interrupt"):
 			work_action_driver.work.call("interrupt")
+		_work_requires_hold = false
 		_refresh_work_action_hud()
 		return true
 	var layout: Dictionary = _active_layout_for_work()
@@ -3683,6 +3692,8 @@ func _try_work_action_interact(player_body) -> bool:
 	}
 	if not work_action_driver.start_action(action_id, target_id, ctx):
 		return false
+	# Player-started work requires hold-to-progress (design hold-to-work).
+	_work_requires_hold = true
 	_refresh_work_action_hud()
 	return true
 
@@ -3908,10 +3919,15 @@ func _scan_work_targets_in_tree(node: Node, player_pos: Vector3, max_range: floa
 
 
 ## PKG-B2.2b: advance in-progress WorkAction on both process branches.
+## Hold-to-work: player-started jobs only tick while interact is held (progress freezes on release).
 func _tick_work_action(delta: float) -> void:
 	if work_action_driver == null or delta <= 0.0:
 		return
 	if not work_action_driver.is_working():
+		return
+	if _work_requires_hold and not Input.is_action_pressed("interact"):
+		# Freeze progress while not holding; HUD still refreshes.
+		_refresh_work_action_hud()
 		return
 	var speed: float = 1.0
 	if wound_state != null and wound_state.has_method("work_speed_multiplier"):
@@ -8619,6 +8635,26 @@ func _build_run_snapshot(use_home_arc_summary: bool = false) -> RunSnapshot:
 		snapshot.ammo_summary = ammo_state.get_summary()
 	if utility_item_state != null:
 		snapshot.utility_summary = utility_item_state.get_summary()
+	# PKG-D6.1 / D8: pillar models on the home run slice.
+	_sync_current_ship_pillar_summaries()
+	if module_integrity_map != null and module_integrity_map.has_method("get_summary"):
+		snapshot.module_integrity_summary = module_integrity_map.get_summary()
+	elif current_ship != null and not current_ship.module_integrity_summary.is_empty():
+		snapshot.module_integrity_summary = current_ship.module_integrity_summary.duplicate(true)
+	if component_placement_state != null and component_placement_state.has_method("get_summary"):
+		snapshot.component_placement_summary = component_placement_state.get_summary()
+	elif current_ship != null and not current_ship.component_placement_summary.is_empty():
+		snapshot.component_placement_summary = current_ship.component_placement_summary.duplicate(true)
+	if work_action_driver != null and work_action_driver.work != null and work_action_driver.work.has_method("get_summary"):
+		var wst: String = work_action_driver.get_status()
+		if wst == "active" or wst == "interrupted":
+			snapshot.work_action_summary = {
+				"schema": "work_action_v1",
+				"active": true,
+				"summary": work_action_driver.work.call("get_summary"),
+			}
+	if ship_modification_state != null and ship_modification_state.has_method("get_summary"):
+		snapshot.ship_modification_summary = ship_modification_state.get_summary()
 	# ADR-0046: real slot metadata — accumulated play time, the active
 	# ship's location (marker id, or "home" for the hub), and the Synaptic
 	# Sea world seed. _index_run_slot reads these instead of placeholders.
@@ -9043,6 +9079,27 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 		ammo_state.apply_summary(snapshot.ammo_summary)
 	if utility_item_state != null and not snapshot.utility_summary.is_empty():
 		utility_item_state.apply_summary(snapshot.utility_summary)
+	# PKG-D6.1 / D2.6 / D8: restore pillar + ship-mod models after reload rebuild.
+	if module_integrity_map != null and not snapshot.module_integrity_summary.is_empty():
+		module_integrity_map.apply_summary(snapshot.module_integrity_summary)
+		_apply_module_integrity_state_to_scene()
+		if current_ship != null:
+			current_ship.module_integrity_summary = snapshot.module_integrity_summary.duplicate(true)
+	if component_placement_state != null and not snapshot.component_placement_summary.is_empty():
+		component_placement_state.apply_summary(snapshot.component_placement_summary)
+		if current_ship != null:
+			current_ship.component_placement_summary = snapshot.component_placement_summary.duplicate(true)
+		_rebuild_component_markers()
+	if work_action_driver != null and not snapshot.work_action_summary.is_empty():
+		var wa_pack: Dictionary = snapshot.work_action_summary
+		if bool(wa_pack.get("active", false)) and typeof(wa_pack.get("summary", {})) == TYPE_DICTIONARY:
+			var WorkActionStateScript := load("res://scripts/systems/work_action_state.gd")
+			if WorkActionStateScript != null:
+				work_action_driver.work = WorkActionStateScript.new()
+				work_action_driver.work.apply_summary(wa_pack.get("summary", {}))
+				_work_requires_hold = false  # restored mid-work continues without re-hold
+	if ship_modification_state != null and not snapshot.ship_modification_summary.is_empty():
+		ship_modification_state.apply_summary(snapshot.ship_modification_summary)
 	_ensure_consumable_hotbar_assignments()
 	_refresh_consumable_ui()
 	# REQ-014: reconcile the junction_calibrator pickup marker visibility

@@ -193,8 +193,8 @@ func _initialize() -> void:
 	if loaded.current_objective_sequence != original.current_objective_sequence:
 		_fail("current_objective_sequence mismatch")
 		return
-	if loaded.get_summary_count() != 31:
-		_fail("summary_count=%d expected 31" % loaded.get_summary_count())
+	if loaded.get_summary_count() != 32:
+		_fail("summary_count=%d expected 32" % loaded.get_summary_count())
 		return
 	if not loaded.ship_systems_summary.has("systems") or not loaded.ship_systems_summary.has("system_order"):
 		_fail("ship_systems_summary missing manager keys after round-trip")
@@ -549,7 +549,7 @@ func _initialize() -> void:
 	service.delete_slot("slot_01")
 	service.set_active_run_id("")
 
-	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=31 survival_roundtrip=true")
+	print("SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=32 survival_roundtrip=true")
 	quit(0)
 
 func _make_spoilage_summary_for_smoke() -> Dictionary:

@@ -66,6 +66,8 @@ var hallucination_summary: Dictionary = {}
 var module_integrity_summary: Dictionary = {}
 var component_placement_summary: Dictionary = {}
 var work_action_summary: Dictionary = {}
+# PKG-D2.6: hub ship modification install manifest (power budget / plating).
+var ship_modification_summary: Dictionary = {}
 
 # ADR-0046: real slot metadata. play_time_seconds is the coordinator's
 # accumulated in-run play time (ticked every _process frame on BOTH the
@@ -133,6 +135,7 @@ const SUMMARY_FIELDS: Array = [
 	"module_integrity_summary",
 	"component_placement_summary",
 	"work_action_summary",
+	"ship_modification_summary",
 ]
 
 func get_summary_count() -> int:
@@ -176,6 +179,7 @@ func to_dict() -> Dictionary:
 		"module_integrity_summary": module_integrity_summary.duplicate(true),
 		"component_placement_summary": component_placement_summary.duplicate(true),
 		"work_action_summary": work_action_summary.duplicate(true),
+		"ship_modification_summary": ship_modification_summary.duplicate(true),
 		"play_time_seconds": play_time_seconds,
 		"current_location": current_location,
 		"world_seed": world_seed,
@@ -245,6 +249,7 @@ static func from_dict(data: Variant, expected_slice_version: String, expected_go
 	snapshot.module_integrity_summary = _deep_copy_dict(dict.get("module_integrity_summary", {}))
 	snapshot.component_placement_summary = _deep_copy_dict(dict.get("component_placement_summary", {}))
 	snapshot.work_action_summary = _deep_copy_dict(dict.get("work_action_summary", {}))
+	snapshot.ship_modification_summary = _deep_copy_dict(dict.get("ship_modification_summary", {}))
 	snapshot.play_time_seconds = float(dict.get("play_time_seconds", 0.0))
 	snapshot.current_location = str(dict.get("current_location", ""))
 	snapshot.world_seed = int(dict.get("world_seed", 0))
