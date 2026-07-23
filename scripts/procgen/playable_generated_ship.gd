@@ -2712,16 +2712,21 @@ func _place_in_slot(carrier, mobile, slot_index: int) -> void:
 func _on_bay_dock_requested(carrier_id: String, slot_index: int) -> void:
 	var carrier = _find_ship_by_id(carrier_id)
 	if carrier == null:
+		_emit_hangar_denied_sfx()
 		return
 	var bay = carrier.get_hangar()
 	if bay.slot_count <= 0:
+		_emit_hangar_denied_sfx()
 		return
 	var candidate = _bay_dock_candidate(carrier)
 	if candidate == null:
-		return   # silent: not_co_present / no_free_slot / incompatible_size
+		# not_co_present / no_free_slot / incompatible_size
+		_emit_hangar_denied_sfx()
+		return
 	var size_class: int = _ship_dock_size_class(candidate)
 	var idx: int = bay.dock(String(candidate.ship_id), size_class)
 	if idx == -1:
+		_emit_hangar_denied_sfx()
 		return
 	# Transition the candidate from airlock-docked to slot-bayed: drop its airlock
 	# alignment, keep it a dock child of the carrier, and re-peg it to the slot anchor.
@@ -2741,18 +2746,22 @@ func _on_bay_dock_requested(carrier_id: String, slot_index: int) -> void:
 func _on_bay_launch_requested(carrier_id: String, slot_index: int) -> void:
 	var carrier = _find_ship_by_id(carrier_id)
 	if carrier == null:
+		_emit_hangar_denied_sfx()
 		return
 	var bay = carrier.get_hangar()
 	var idx := slot_index
 	if idx < 0:
 		idx = _first_occupied_slot(bay)
 	if idx < 0:
+		_emit_hangar_denied_sfx()
 		return
 	var ship_id: String = bay.launch(idx)
 	if ship_id == "":
+		_emit_hangar_denied_sfx()
 		return
 	var launched = _find_ship_by_id(ship_id)
 	if launched == null:
+		_emit_hangar_denied_sfx()
 		return
 	launched.parent_ship = null
 	carrier.docked_ships.erase(launched)
@@ -2776,6 +2785,11 @@ func _emit_hangar_launch_sfx() -> void:
 		audio_manager.play_sfx(AudioEventSeamScript.SFX_DOOR_OPEN)
 
 
+func _emit_hangar_denied_sfx() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+
+
 ## Validation seams for hangar dock/launch SFX (live handlers call the same helpers).
 func play_hangar_dock_sfx_for_validation() -> void:
 	_emit_hangar_dock_sfx()
@@ -2783,6 +2797,10 @@ func play_hangar_dock_sfx_for_validation() -> void:
 
 func play_hangar_launch_sfx_for_validation() -> void:
 	_emit_hangar_launch_sfx()
+
+
+func play_hangar_denied_sfx_for_validation() -> void:
+	_emit_hangar_denied_sfx()
 
 ## Clears `inst`'s hangar slot in its parent's bay BEFORE the ship leaves via a
 ## non-launch path (the travel undock of a bayed piloted ship). Without this, a ship
