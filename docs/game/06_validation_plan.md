@@ -422,7 +422,8 @@ run_clean 'Vitals curves cross-coupling smoke' 'VITALS CURVES PASS curves=true c
 run_clean 'Archetype behavior modifiers smoke' 'ARCHETYPE BEHAVIOR PASS ambush=true stalk=true swarm=true anchored=true telegraph=true verbs=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/archetype_behavior_smoke.gd
 run_clean 'Manifestation pool schema smoke' 'MANIFESTATION POOL PASS schema=true kinds=true force_room=true force_log=true no_code_entry=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/manifestation_pool_smoke.gd
 run_clean 'Sea graph pure smoke' 'SEA GRAPH PASS nodes=true route=true cost=true biomes=true extract=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sea_graph_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=242 clean_output=true'
+run_clean 'Templates wreck mutator smoke' 'TEMPLATES WRECK MUTATOR PASS catalog=true load=true zone=true branch=true wreck=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/templates_wreck_mutator_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=243 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
