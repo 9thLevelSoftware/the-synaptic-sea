@@ -30,6 +30,10 @@
     {"event_id": "discover_room",              "target_skill": "astrogation",  "base_xp": 30,  "category": "navigation"},
     {"event_id": "threat_killed",              "target_skill": "scavenging",   "base_xp": 10,  "category": "combat"},
     {"event_id": "ship_mod_install",           "target_skill": "construction", "base_xp": 40,  "category": "technical"},
-    {"event_id": "ship_mod_uninstall",         "target_skill": "construction", "base_xp": 20,  "category": "technical"}
+    {"event_id": "ship_mod_uninstall",         "target_skill": "construction", "base_xp": 20,  "category": "technical"},
+    {"event_id": "weld",                       "target_skill": "welding",      "base_xp": 40,  "category": "technical"},
+    {"event_id": "salvage",                    "target_skill": "scavenging",   "base_xp": 35,  "category": "survival"},
+    {"event_id": "repair",                     "target_skill": "repair",       "base_xp": 45,  "category": "technical"},
+    {"event_id": "cooking",                    "target_skill": "cooking",      "base_xp": 40,  "category": "survival"}
   ]
 }
