@@ -4867,6 +4867,8 @@ func _on_repair_started(system_id: String, subcomponent_id: String) -> void:
 ## Stream F: play a voice log → signal analysis training (decode_signal).
 func _on_voice_log_played(entry_id: String) -> void:
 	emit_training_event("decode_signal", entry_id)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.VOICE_LOG_PLAY)
 
 ## Stream F: medbay field surgery when health is critical. Called by CraftingStation
 ## before crafts. Requires medical_gauze (survival economy); heals + trains surgery.
