@@ -6797,6 +6797,9 @@ func _use_consumable_item(item_id: String, use_all: bool = false) -> Dictionary:
 		_refresh_player_vitals(0.0)
 		_refresh_consumable_ui()
 		_emit_consumable_training(item_id)
+	else:
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 	return result
 
 func _use_consumable_hotbar_slot(slot_index: int) -> Dictionary:
@@ -6808,6 +6811,8 @@ func _use_consumable_hotbar_slot(slot_index: int) -> Dictionary:
 		used_id = str(consumable_state.hotbar_slots[slot_index])
 	var result: Dictionary = consumable_state.use_hotbar_slot(slot_index, inventory_state, _consumable_pipeline_context())
 	if bool(result.get("ok", false)):
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 		_ensure_consumable_hotbar_assignments()
 		_recompute_player_encumbrance()
 		_refresh_oxygen_state(false, 0.0)
@@ -6816,6 +6821,9 @@ func _use_consumable_hotbar_slot(slot_index: int) -> Dictionary:
 		var train_id: String = str(result.get("item_id", used_id))
 		if not train_id.is_empty():
 			_emit_consumable_training(train_id)
+	else:
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 	return result
 
 ## Stream D/E: medicine → first_aid_self; food/drink → ration_supplies.
