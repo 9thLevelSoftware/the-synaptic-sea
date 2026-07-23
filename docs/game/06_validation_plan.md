@@ -545,7 +545,8 @@ run_clean 'Records menu open SFX smoke' 'RECORDS MENU OPEN SFX PASS open=true sf
 run_clean 'Settings menu back SFX smoke' 'SETTINGS MENU BACK SFX PASS back=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_menu_back_sfx_smoke.gd
 run_clean 'Records menu back SFX smoke' 'RECORDS MENU BACK SFX PASS back=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/records_menu_back_sfx_smoke.gd
 run_clean 'Weapon reload SFX smoke' 'WEAPON RELOAD SFX PASS reload=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/weapon_reload_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=365 clean_output=true'
+run_clean 'Player attack SFX smoke' 'PLAYER ATTACK SFX PASS attack=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_attack_sfx_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=366 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
