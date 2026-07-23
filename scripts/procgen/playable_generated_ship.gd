@@ -2632,6 +2632,9 @@ func _unequip_to_inventory(slot: String) -> String:
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.SFX_DROP_ITEM)
 		_recompute_player_encumbrance()
+	else:
+		# Empty slot unequip attempt — soft deny.
+		_emit_equip_denied_sfx()
 	return item_id
 
 func _definitions_for_equip() -> Dictionary:
