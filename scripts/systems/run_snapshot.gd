@@ -62,6 +62,10 @@ var status_effects_summary: Dictionary = {}
 # teeth — was never persisted, so saving mid-hallucination silently reset
 # the director on load.
 var hallucination_summary: Dictionary = {}
+# PKG-D8: pre-polish pillar models (empty defaults for historical fixtures).
+var module_integrity_summary: Dictionary = {}
+var component_placement_summary: Dictionary = {}
+var work_action_summary: Dictionary = {}
 
 # ADR-0046: real slot metadata. play_time_seconds is the coordinator's
 # accumulated in-run play time (ticked every _process frame on BOTH the
@@ -126,6 +130,9 @@ const SUMMARY_FIELDS: Array = [
 	"temperature_summary",
 	"status_effects_summary",
 	"hallucination_summary",
+	"module_integrity_summary",
+	"component_placement_summary",
+	"work_action_summary",
 ]
 
 func get_summary_count() -> int:
@@ -166,6 +173,9 @@ func to_dict() -> Dictionary:
 		"temperature_summary": temperature_summary.duplicate(true),
 		"status_effects_summary": status_effects_summary.duplicate(true),
 		"hallucination_summary": hallucination_summary.duplicate(true),
+		"module_integrity_summary": module_integrity_summary.duplicate(true),
+		"component_placement_summary": component_placement_summary.duplicate(true),
+		"work_action_summary": work_action_summary.duplicate(true),
 		"play_time_seconds": play_time_seconds,
 		"current_location": current_location,
 		"world_seed": world_seed,
@@ -232,6 +242,9 @@ static func from_dict(data: Variant, expected_slice_version: String, expected_go
 	snapshot.temperature_summary = _deep_copy_dict(dict.get("temperature_summary", {}))
 	snapshot.status_effects_summary = _deep_copy_dict(dict.get("status_effects_summary", {}))
 	snapshot.hallucination_summary = _deep_copy_dict(dict.get("hallucination_summary", {}))
+	snapshot.module_integrity_summary = _deep_copy_dict(dict.get("module_integrity_summary", {}))
+	snapshot.component_placement_summary = _deep_copy_dict(dict.get("component_placement_summary", {}))
+	snapshot.work_action_summary = _deep_copy_dict(dict.get("work_action_summary", {}))
 	snapshot.play_time_seconds = float(dict.get("play_time_seconds", 0.0))
 	snapshot.current_location = str(dict.get("current_location", ""))
 	snapshot.world_seed = int(dict.get("world_seed", 0))
