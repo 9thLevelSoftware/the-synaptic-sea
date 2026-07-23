@@ -3051,9 +3051,13 @@ func _set_hazard_feedback_line(text: String) -> void:
 
 func _on_extinguish_blocked(compartment_id: String, reason: String) -> void:
 	_set_hazard_feedback_line("Extinguish blocked (%s): %s" % [compartment_id, _hazard_block_reason_text(reason)])
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 
 func _on_seal_blocked(compartment_id: String, reason: String) -> void:
 	_set_hazard_feedback_line("Seal blocked (%s): %s" % [compartment_id, _hazard_block_reason_text(reason)])
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 
 func _hazard_block_reason_text(reason: String) -> String:
 	match reason:
@@ -5025,12 +5029,20 @@ func _on_repair_completed(system_id: String, subcomponent_id: String) -> void:
 func _on_repair_blocked(_system_id: String, _subcomponent_id: String, reason: String) -> void:
 	if vitals_model != null:
 		vitals_model.notify_repair_blocked(reason)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+	var block_msg: String = "Repair blocked"
+	if not reason.is_empty():
+		block_msg = "Repair blocked: %s" % reason
+	_set_hazard_feedback_line(block_msg)
 
 ## ADR-0038: a station began a timed craft (ingredients already consumed by begin_craft).
 ## The craft advances in _recompute_expanded_ship_systems and deposits via _on_craft_completed.
 func _on_craft_started(station_kind: String, recipe_id: String) -> void:
 	_refresh_inventory_hud()
 	_recompute_player_encumbrance()
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 	print("CRAFT STARTED station=%s recipe=%s" % [station_kind, recipe_id])
 
 ## ADR-0038: a global craft (station or field) finished. Collects the product and deposits
@@ -5232,6 +5244,8 @@ func begin_field_craft_recipe(recipe_id: String) -> bool:
 	if field_crafting_state.begin_craft(recipe_id, inventory_state, material_state, skill):
 		_refresh_inventory_hud()
 		_recompute_player_encumbrance()
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 		print("FIELD CRAFT STARTED recipe=%s" % recipe_id)
 		return true
 	return false
@@ -6262,6 +6276,8 @@ func _on_inventory_transfer_completed() -> void:
 	_refresh_oxygen_state(false, 0.0)
 	_refresh_consumable_ui()
 	_refresh_weapon_hotbar()
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
 
 func _on_inventory_use_requested(item_id: String, use_all: bool) -> void:
 	_use_consumable_item(item_id, use_all)
