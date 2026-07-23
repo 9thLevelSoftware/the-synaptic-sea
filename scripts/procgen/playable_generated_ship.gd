@@ -5678,17 +5678,36 @@ func _on_hatch_bypassed(hatch_id: String, lock_kind: String) -> void:
 	_refresh_inventory_hud()
 
 ## Domain 5: attempts to bypass the nearest unblocked sealed hatch using the player's
-## active utility flags. Returns true iff a hatch was opened.
+## active utility flags. Returns true iff a hatch was opened OR an in-range locked
+## hatch consumed interact with a soft deny cue (missing lockpick/hack_chip).
 func _try_bypass_nearest_hatch() -> bool:
 	if not is_instance_valid(player):
 		return false
+	var flags: Dictionary = utility_item_state.active_flags if utility_item_state != null else {}
+	var denied_in_range: bool = false
 	for h in sealed_hatches:
 		if not is_instance_valid(h) or h.bypassed:
 			continue
-		var res: Dictionary = h.try_bypass(player, utility_item_state.active_flags if utility_item_state != null else {})
+		var res: Dictionary = h.try_bypass(player, flags)
 		if bool(res.get("ok", false)):
 			return true
+		# In-range but locked / already open — soft deny and consume interact.
+		var reason: String = str(res.get("reason", ""))
+		if reason == "locked" or reason == "already_open":
+			denied_in_range = true
+	if denied_in_range:
+		_emit_hatch_bypass_denied_sfx()
+		return true
 	return false
+
+
+func _emit_hatch_bypass_denied_sfx() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+
+
+func play_hatch_bypass_denied_sfx_for_validation() -> void:
+	_emit_hatch_bypass_denied_sfx()
 
 
 ## Domain 5 / Fire B2: re-close nearest bypassed hatch in range (no utility flag).
