@@ -498,7 +498,8 @@ run_clean 'Ship mod plating repair smoke' 'SHIP MOD PLATING REPAIR PASS install=
 run_clean 'Build shelter XP smoke' 'BUILD SHELTER XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/build_shelter_xp_smoke.gd
 run_clean 'Decontaminate zone XP smoke' 'DECONTAMINATE ZONE XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/decontaminate_zone_xp_smoke.gd
 run_clean 'Breach seal XP smoke' 'BREACH SEAL XP PASS weld=true shelter=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/breach_seal_xp_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=318 clean_output=true'
+run_clean 'Repair full system XP smoke' 'REPAIR FULL SYSTEM XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_full_system_xp_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=319 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
