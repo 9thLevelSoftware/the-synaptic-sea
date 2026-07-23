@@ -483,9 +483,13 @@ run_clean 'Hazard channel consume away smoke' 'HAZARD CHANNEL CONSUME AWAY PASS 
 run_clean 'Station busy consume smoke' 'STATION BUSY CONSUME PASS craft=true hydro=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/station_busy_consume_smoke.gd
 run_clean 'Station busy consume away smoke' 'STATION BUSY CONSUME AWAY PASS away=true craft=true hydro=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/station_busy_consume_away_smoke.gd
 run_clean 'Recycler busy consume smoke' 'RECYCLER BUSY CONSUME PASS recycling=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recycler_busy_consume_smoke.gd
+run_clean 'Recycler busy consume away smoke' 'RECYCLER BUSY CONSUME AWAY PASS away=true recycling=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recycler_busy_consume_away_smoke.gd
 run_clean 'Production output full consume smoke' 'PRODUCTION OUTPUT FULL CONSUME PASS hydro=true recycler=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_output_full_consume_smoke.gd
+run_clean 'Production output full consume away smoke' 'PRODUCTION OUTPUT FULL CONSUME AWAY PASS away=true hydro=true recycler=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_output_full_consume_away_smoke.gd
 run_clean 'Recycler no input consume smoke' 'RECYCLER NO INPUT CONSUME PASS no_input=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recycler_no_input_consume_smoke.gd
+run_clean 'Recycler no input consume away smoke' 'RECYCLER NO INPUT CONSUME AWAY PASS away=true no_input=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recycler_no_input_consume_away_smoke.gd
 run_clean 'Plant crop blocked consume smoke' 'PLANT CROP BLOCKED CONSUME PASS busy=true missing=true blocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/plant_crop_blocked_consume_smoke.gd
+run_clean 'Plant crop blocked consume away smoke' 'PLANT CROP BLOCKED CONSUME AWAY PASS away=true busy=true missing=true blocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/plant_crop_blocked_consume_away_smoke.gd
 run_clean 'Melee reload denied SFX smoke' 'MELEE RELOAD DENIED SFX PASS melee=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/melee_reload_denied_sfx_smoke.gd
 run_clean 'Melee reload denied away smoke' 'MELEE RELOAD DENIED AWAY PASS away=true melee=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/melee_reload_denied_away_smoke.gd
 run_clean 'Attack soft fail SFX smoke' 'ATTACK SOFT FAIL SFX PASS soft_fail=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/attack_soft_fail_sfx_smoke.gd
@@ -721,7 +725,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=541 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=545 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
