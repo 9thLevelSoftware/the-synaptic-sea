@@ -19,6 +19,7 @@ const WoundStateScript := preload("res://scripts/systems/wound_state.gd")
 const ShipModificationStateScript := preload("res://scripts/systems/ship_modification_state.gd")
 const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
 const ComponentCatalogScript := preload("res://scripts/systems/component_catalog.gd")
+const ComponentMountResolverScript := preload("res://scripts/systems/component_mount_resolver.gd")
 const SeaGraphScript := preload("res://scripts/systems/sea_graph.gd")
 const InventoryPanelScript := preload("res://scripts/ui/inventory_panel.gd")
 const AccessibilitySettingsScript := preload("res://scripts/ui/accessibility_settings.gd")
@@ -3438,8 +3439,7 @@ func _on_ship_modification_panel_closed() -> void:
 const WORK_ACTION_INTERACT_RANGE: float = 3.5
 
 
-## Lowest-priority interact: cut/pry the nearest non-destroyed wall module.
-## Requires a tool in inventory (welding_lance → cut_wall, prybar → pry_panel).
+## Lowest-priority interact: dismount nearest component (wrench) or cut/pry structure.
 func _try_work_action_interact(player_body) -> bool:
 	if player_body == null or work_action_driver == null:
 		return false
@@ -3452,30 +3452,43 @@ func _try_work_action_interact(player_body) -> bool:
 	var layout: Dictionary = _active_layout_for_work()
 	if layout.is_empty():
 		return false
-	if module_integrity_map == null:
-		module_integrity_map = ModuleIntegrityMapScript.new()
-	if module_integrity_map.size() == 0:
-		ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
 	var player_pos: Vector3 = (player_body as Node3D).global_position if player_body is Node3D else Vector3.ZERO
-	var nearest: Dictionary = _nearest_workable_wall_module(layout, player_pos, WORK_ACTION_INTERACT_RANGE)
-	if nearest.is_empty():
-		return false
-	var target_id: String = str(nearest.get("module_id", ""))
-	if target_id.is_empty():
-		return false
-	# Ensure target exists on integrity map (layout seed may skip floors; scene targets need register).
-	var kind: String = str(nearest.get("kind", "wall_straight_1x1"))
-	module_integrity_map.ensure_module(target_id, kind, {}, target_id.get_slice("/", 0))
 	var inv: Dictionary = _inventory_qty_dict_for_work()
 	var action_id: String = ""
 	var tool_class: String = ""
-	if int(inv.get("welding_lance", 0)) > 0 or int(inv.get("tool_welding_lance", 0)) > 0:
-		action_id = "cut_wall"
-		tool_class = "welding_lance"
-	elif int(inv.get("prybar", 0)) > 0 or int(inv.get("tool_prybar", 0)) > 0:
-		action_id = "pry_panel"
-		tool_class = "prybar"
-	else:
+	var target_id: String = ""
+
+	var has_wrench: bool = int(inv.get("wrench", 0)) > 0 or int(inv.get("tool_wrench", 0)) > 0
+	if has_wrench and component_placement_state != null:
+		var comp: Dictionary = _nearest_mounted_component(layout, player_pos, WORK_ACTION_INTERACT_RANGE)
+		if not comp.is_empty():
+			action_id = "dismount_component"
+			tool_class = "wrench"
+			target_id = str(comp.get("component_instance_id", ""))
+
+	if action_id.is_empty():
+		if module_integrity_map == null:
+			module_integrity_map = ModuleIntegrityMapScript.new()
+		if module_integrity_map.size() == 0:
+			ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
+		var nearest: Dictionary = _nearest_workable_wall_module(layout, player_pos, WORK_ACTION_INTERACT_RANGE)
+		if nearest.is_empty():
+			return false
+		target_id = str(nearest.get("module_id", ""))
+		if target_id.is_empty():
+			return false
+		var kind: String = str(nearest.get("kind", "wall_straight_1x1"))
+		module_integrity_map.ensure_module(target_id, kind, {}, target_id.get_slice("/", 0))
+		if int(inv.get("welding_lance", 0)) > 0 or int(inv.get("tool_welding_lance", 0)) > 0:
+			action_id = "cut_wall"
+			tool_class = "welding_lance"
+		elif int(inv.get("prybar", 0)) > 0 or int(inv.get("tool_prybar", 0)) > 0:
+			action_id = "pry_panel"
+			tool_class = "prybar"
+		else:
+			return false
+
+	if action_id.is_empty() or target_id.is_empty():
 		return false
 	var skill_level: int = 0
 	if player_progression != null and player_progression.has_method("get_skill_level"):
@@ -3490,6 +3503,63 @@ func _try_work_action_interact(player_body) -> bool:
 		return false
 	_refresh_work_action_hud()
 	return true
+
+
+## Nearest mounted component; uses room floor center as approximate world position.
+func _nearest_mounted_component(layout: Dictionary, player_pos: Vector3, max_range: float) -> Dictionary:
+	var best: Dictionary = {}
+	var best_d: float = max_range
+	if component_placement_state == null:
+		return best
+	var placed: Array = component_placement_state.get("placed") as Array if typeof(component_placement_state.get("placed")) == TYPE_ARRAY else []
+	var room_centers: Dictionary = _room_world_centers(layout)
+	for entry_v in placed:
+		if typeof(entry_v) != TYPE_DICTIONARY:
+			continue
+		var e: Dictionary = entry_v
+		if not bool(e.get("mounted", true)):
+			continue
+		var rid: String = str(e.get("room_id", ""))
+		if not room_centers.has(rid):
+			continue
+		var pos: Vector3 = room_centers[rid] as Vector3
+		var d: float = player_pos.distance_to(pos)
+		if d <= best_d:
+			best_d = d
+			best = e.duplicate(true)
+			best["distance"] = d
+	return best
+
+
+func _room_world_centers(layout: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	var rooms_v: Variant = layout.get("rooms", [])
+	if typeof(rooms_v) != TYPE_ARRAY:
+		return out
+	for room_v in (rooms_v as Array):
+		if typeof(room_v) != TYPE_DICTIONARY:
+			continue
+		var room: Dictionary = room_v
+		var rid: String = str(room.get("id", ""))
+		if rid.is_empty():
+			continue
+		var acc := Vector3.ZERO
+		var n: int = 0
+		for p_v in room.get("structural_placements", []):
+			if typeof(p_v) != TYPE_DICTIONARY:
+				continue
+			var pos_v: Variant = (p_v as Dictionary).get("world_position", null)
+			if typeof(pos_v) == TYPE_ARRAY and (pos_v as Array).size() >= 3:
+				var a: Array = pos_v
+				acc += Vector3(float(a[0]), float(a[1]), float(a[2]))
+				n += 1
+		if n <= 0:
+			continue
+		var local: Vector3 = acc / float(n)
+		if current_ship != null and is_instance_valid(current_ship.scene_root) and current_ship.scene_root is Node3D:
+			local = (current_ship.scene_root as Node3D).global_transform * local
+		out[rid] = local
+	return out
 
 
 func _active_layout_for_work() -> Dictionary:
@@ -3626,12 +3696,27 @@ func _tick_work_action(delta: float) -> void:
 	if work_action_driver.get_status() == "completed" or (
 		work_action_driver.work != null and str(work_action_driver.work.get("status")) == "completed"
 	):
-		var inv: Dictionary = {}
-		if inventory_state != null and inventory_state.has_method("get_all_quantities"):
-			var allq = inventory_state.call("get_all_quantities")
-			if typeof(allq) == TYPE_DICTIONARY:
-				inv = (allq as Dictionary).duplicate(true)
-		var res: Dictionary = work_action_driver.complete(module_integrity_map, inv)
+		var inv: Dictionary = _inventory_qty_dict_for_work()
+		var res: Dictionary = {}
+		var action_id: String = ""
+		if work_action_driver.work != null:
+			action_id = str(work_action_driver.work.get("action_id"))
+		if action_id == "dismount_component" or action_id == "unbolt_component":
+			res = ComponentMountResolverScript.resolve_dismount(
+				work_action_driver.work, component_placement_state, inv
+			)
+			if bool(res.get("ok", false)):
+				work_action_driver.last_resolve = res.duplicate(true)
+				work_action_driver.last_noise_pulse = float(res.get("noise", 0.0))
+				# Mirror inventory bag back into InventoryState when possible.
+				if inventory_state != null:
+					var form: String = str(res.get("item_form", ""))
+					if not form.is_empty() and inventory_state.has_method("add_item"):
+						inventory_state.add_item(form, 1)
+				if work_action_driver.work != null and work_action_driver.work.has_method("reset"):
+					work_action_driver.work.call("reset")
+		else:
+			res = work_action_driver.complete(module_integrity_map, inv)
 		if bool(res.get("ok", false)) and work_action_driver.last_noise_pulse > 0.0:
 			if threat_manager != null:
 				work_action_driver.apply_noise_to_detection(threat_manager)
