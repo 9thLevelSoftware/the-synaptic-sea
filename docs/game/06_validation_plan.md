@@ -619,6 +619,12 @@ run_clean 'Ship mod power budget scene away smoke' 'SHIP MOD POWER BUDGET SCENE 
 run_clean 'Ship mod restore effects away smoke' 'SHIP MOD RESTORE EFFECTS AWAY PASS away=true restore=true tier=true system=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_restore_effects_away_smoke.gd
 run_clean 'Ship mod station tier away smoke' 'SHIP MOD STATION TIER AWAY PASS away=true install=true tier=true uninstall=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_station_tier_away_smoke.gd
 run_clean 'Ship mod system effect away smoke' 'SHIP MOD SYSTEM EFFECT AWAY PASS away=true restore=true power=true uninstall_damage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_system_effect_away_smoke.gd
+run_clean 'Work verb SFX multi away smoke' 'WORK VERB SFX MULTI AWAY PASS away=true weld=true pry=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_verb_sfx_multi_away_smoke.gd
+run_clean 'Work verb SFX patch splice away smoke' 'WORK VERB SFX PATCH SPLICE AWAY PASS away=true patch=true splice=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_verb_sfx_patch_splice_away_smoke.gd
+run_clean 'Work verb SFX plant harvest away smoke' 'WORK VERB SFX PLANT HARVEST AWAY PASS away=true plant=true harvest=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_verb_sfx_plant_harvest_away_smoke.gd
+run_clean 'Work action integration away smoke' 'WORK ACTION INTEGRATION AWAY PASS away=true driver=true hud=true wounds=true shipmod=true cut=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_integration_away_smoke.gd
+run_clean 'Hull plating catalog away smoke' 'HULL PLATING CATALOG AWAY PASS away=true catalog=true install=true bonus=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hull_plating_catalog_away_smoke.gd
+run_clean 'Repair validation channeling away smoke' 'REPAIR VALIDATION CHANNELING AWAY PASS away=true start=true soft_block_false=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_validation_channeling_away_smoke.gd
 run_clean 'Work yield drop SFX smoke' 'WORK YIELD DROP SFX PASS drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_sfx_smoke.gd
 run_clean 'Work yield drop away smoke' 'WORK YIELD DROP AWAY PASS away=true drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_away_smoke.gd
 run_clean 'Hatch door open SFX smoke' 'HATCH DOOR OPEN SFX PASS hatch=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_open_sfx_smoke.gd
@@ -786,7 +792,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=606 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=612 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
