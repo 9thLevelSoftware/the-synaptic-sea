@@ -7297,6 +7297,7 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 		# PKG-B2.2b: nearest wall module cut/pry when nothing else claimed interact.
 		if _try_work_action_interact(player_body):
 			return
+		_emit_interact_miss_sfx()
 		return
 	# Sub-project #4: try lifeboat repair points before pickups/objectives.
 	for rp in repair_points:
@@ -7355,6 +7356,17 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	# PKG-B2.2b: nearest wall module cut/pry when nothing else claimed interact.
 	if _try_work_action_interact(player_body):
 		return
+	# Nothing in range claimed the interact — soft miss cue.
+	_emit_interact_miss_sfx()
+
+
+func _emit_interact_miss_sfx() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+
+
+func play_interact_miss_sfx_for_validation() -> void:
+	_emit_interact_miss_sfx()
 
 ## Scoop cart-overload floor piles from WorkAction yields.
 func _try_work_yield_drop_interact(player_body) -> bool:
