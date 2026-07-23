@@ -3945,6 +3945,8 @@ func _try_work_action_interact(player_body) -> bool:
 		return false
 	# Exhausted players cannot start new strip/weld jobs.
 	if vitals_state != null and float(vitals_state.stamina) <= 0.001:
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return false
 	# Match catalog min_skill (weld/patch → repair; strip/cut/pry → salvage).
 	var skill_id: String = "salvage"
@@ -3960,10 +3962,14 @@ func _try_work_action_interact(player_body) -> bool:
 		"inventory": inv,
 	}
 	if not work_action_driver.start_action(action_id, target_id, ctx):
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return false
 	# Player-started work requires hold-to-progress (design hold-to-work).
 	_work_requires_hold = true
 	_refresh_work_action_hud()
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 	return true
 
 
