@@ -477,7 +477,8 @@ run_clean 'Work cut XP live smoke' 'WORK CUT XP LIVE PASS start=true complete=tr
 run_clean 'Work weld XP live smoke' 'WORK WELD XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_weld_xp_live_smoke.gd
 run_clean 'Ship mod overbudget power smoke' 'SHIP MOD OVERBUDGET POWER PASS over=true unpowered=true ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_overbudget_power_smoke.gd
 run_clean 'Work progress UI SFX smoke' 'WORK PROGRESS UI SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_progress_ui_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=297 clean_output=true'
+run_clean 'Wounds panel open SFX smoke' 'WOUNDS PANEL OPEN SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_panel_open_sfx_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=298 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
