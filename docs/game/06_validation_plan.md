@@ -516,6 +516,7 @@ run_clean 'Work cut XP live smoke' 'WORK CUT XP LIVE PASS start=true complete=tr
 run_clean 'Work weld XP live smoke' 'WORK WELD XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_weld_xp_live_smoke.gd
 run_clean 'Ship mod overbudget power smoke' 'SHIP MOD OVERBUDGET POWER PASS over=true unpowered=true ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_overbudget_power_smoke.gd
 run_clean 'Work progress UI SFX smoke' 'WORK PROGRESS UI SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_progress_ui_sfx_smoke.gd
+run_clean 'Work progress UI away smoke' 'WORK PROGRESS UI AWAY PASS away=true progress=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_progress_ui_away_smoke.gd
 run_clean 'Wounds panel open SFX smoke' 'WOUNDS PANEL OPEN SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_panel_open_sfx_smoke.gd
 run_clean 'Wounds panel open away smoke' 'WOUNDS PANEL OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_panel_open_away_smoke.gd
 run_clean 'Treat wound SFX smoke' 'TREAT WOUND SFX PASS seam=true router=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/treat_wound_sfx_smoke.gd
@@ -601,12 +602,15 @@ run_clean 'Pause menu open away smoke' 'PAUSE MENU OPEN AWAY PASS away=true open
 run_clean 'Pause menu close SFX smoke' 'PAUSE MENU CLOSE SFX PASS close=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pause_menu_close_sfx_smoke.gd
 run_clean 'Pause menu close away smoke' 'PAUSE MENU CLOSE AWAY PASS away=true close=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pause_menu_close_away_smoke.gd
 run_clean 'Menu confirm resume SFX smoke' 'MENU CONFIRM RESUME SFX PASS resume=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_confirm_resume_sfx_smoke.gd
+run_clean 'Menu confirm resume away smoke' 'MENU CONFIRM RESUME AWAY PASS away=true resume=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_confirm_resume_away_smoke.gd
 run_clean 'Settings menu open SFX smoke' 'SETTINGS MENU OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_menu_open_sfx_smoke.gd
 run_clean 'Settings menu open away smoke' 'SETTINGS MENU OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_menu_open_away_smoke.gd
 run_clean 'Records menu open SFX smoke' 'RECORDS MENU OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/records_menu_open_sfx_smoke.gd
 run_clean 'Records menu open away smoke' 'RECORDS MENU OPEN AWAY PASS away=true open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/records_menu_open_away_smoke.gd
 run_clean 'Settings menu back SFX smoke' 'SETTINGS MENU BACK SFX PASS back=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_menu_back_sfx_smoke.gd
+run_clean 'Settings menu back away smoke' 'SETTINGS MENU BACK AWAY PASS away=true back=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_menu_back_away_smoke.gd
 run_clean 'Records menu back SFX smoke' 'RECORDS MENU BACK SFX PASS back=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/records_menu_back_sfx_smoke.gd
+run_clean 'Records menu back away smoke' 'RECORDS MENU BACK AWAY PASS away=true back=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/records_menu_back_away_smoke.gd
 run_clean 'Weapon reload SFX smoke' 'WEAPON RELOAD SFX PASS reload=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/weapon_reload_sfx_smoke.gd
 run_clean 'Weapon reload away smoke' 'WEAPON RELOAD AWAY PASS away=true reload=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/weapon_reload_away_smoke.gd
 run_clean 'Player attack SFX smoke' 'PLAYER ATTACK SFX PASS attack=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_attack_sfx_smoke.gd
@@ -708,7 +712,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=528 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=532 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
