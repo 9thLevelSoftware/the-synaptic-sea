@@ -5823,11 +5823,13 @@ func travel_to(marker) -> Dictionary:
 	# case (current_ship is the host derelict, piloted is the separate lifeboat) still works:
 	# the host is freed and regenerated and the lifeboat re-docks, as in 5b.
 	if piloted_ship != null and current_ship == piloted_ship and String(marker.marker_id) == String(current_ship.marker_id):
+		_emit_travel_denied_sfx()
 		return {"success": false, "reason": "already_here", "ship": null}
 	# Phase 5b Task 5 precondition: the player must be aboard the piloted ship to
 	# travel — the ride physically takes them with it. Occupancy is authoritative.
 	recompute_occupancy()
 	if piloted_ship != null and current_occupancy != piloted_ship:
+		_emit_travel_denied_sfx()
 		return {"success": false, "reason": "not_aboard_ship", "ship": null}
 	# Capture the world state attempt_travel mutates on success (scanner position +
 	# generated mark) so the dock-compat check below can roll it back on rejection.
@@ -5843,9 +5845,11 @@ func travel_to(marker) -> Dictionary:
 	var result: Dictionary = travel_controller.attempt_travel(
 		marker, ops_t, synaptic_sea_world, ship_generator, scanner_state.range_radius)
 	if not bool(result.get("success", false)):
+		_emit_travel_denied_sfx()
 		return result
 	var new_root: Node3D = result.get("ship", null)
 	if new_root == null:
+		_emit_travel_denied_sfx()
 		return {"success": false, "reason": "generation_failed", "ship": null}
 
 	# Spec edge case: abort with dock_incompatible BEFORE freeing the current host,
@@ -5862,6 +5866,7 @@ func travel_to(marker) -> Dictionary:
 			synaptic_sea_world.set_player_position(prev_player_pos)
 			if not was_generated:
 				synaptic_sea_world.unmark_generated(String(marker.marker_id))
+			_emit_travel_denied_sfx()
 			return {"success": false, "reason": "dock_incompatible", "ship": null}
 
 	# Leaving the current ship.
@@ -7750,6 +7755,15 @@ func _emit_dock_land_sfx() -> void:
 
 func play_dock_land_sfx_for_validation() -> void:
 	_emit_dock_land_sfx()
+
+
+func _emit_travel_denied_sfx() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+
+
+func play_travel_denied_sfx_for_validation() -> void:
+	_emit_travel_denied_sfx()
 
 
 func _tick_sanity_and_hallucinations(delta: float, in_safe: bool) -> void:
