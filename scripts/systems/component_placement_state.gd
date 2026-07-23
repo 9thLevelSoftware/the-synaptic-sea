@@ -133,12 +133,30 @@ func _weighted_pick(choices: Array, rng: RandomNumberGenerator) -> String:
 
 
 ## Attach linked_system/subcomponent for catalog-linked pieces; fill gaps from systems.json-shaped data.
-func link_ship_systems(systems_doc: Dictionary, catalog: RefCounted) -> int:
+## PKG-REQ-CMP-002: map unlinked physical placements onto uncovered subcomponents so
+## each critical ship-system piece can exist as a strippable object when slots allow.
+func link_ship_systems(systems_doc: Dictionary, catalog: RefCounted = null) -> int:
 	var linked: int = 0
 	var systems_v: Variant = systems_doc.get("systems", [])
 	if typeof(systems_v) != TYPE_ARRAY:
 		return 0
-	# Index placed by linked_system for coverage check
+	# Re-stamp from catalog definitions when present (authoritative for named machines).
+	if catalog != null and catalog.has_method("get_component"):
+		for i in range(placed.size()):
+			if typeof(placed[i]) != TYPE_DICTIONARY:
+				continue
+			var e: Dictionary = placed[i]
+			var cid: String = str(e.get("component_id", ""))
+			if cid.is_empty() or not catalog.call("has_component", cid):
+				continue
+			var def: Dictionary = catalog.call("get_component", cid)
+			var ls: String = str(def.get("linked_system", ""))
+			var lsub: String = str(def.get("linked_subcomponent", ""))
+			if not ls.is_empty():
+				e["linked_system"] = ls
+				e["linked_subcomponent"] = lsub
+				placed[i] = e
+	# Index covered system.sub keys
 	var covered: Dictionary = {}  # system.sub -> true
 	for entry in placed:
 		if typeof(entry) != TYPE_DICTIONARY:
@@ -149,14 +167,45 @@ func link_ship_systems(systems_doc: Dictionary, catalog: RefCounted) -> int:
 		if not sys.is_empty() and not sub.is_empty():
 			covered["%s.%s" % [sys, sub]] = true
 			linked += 1
-	# Optionally stamp unlinked components that match role systems (soft link)
-	for entry2 in placed:
-		if typeof(entry2) != TYPE_DICTIONARY:
+	# Build uncovered subcomponent queue from systems_doc
+	var uncovered: Array = []
+	for sys_v in (systems_v as Array):
+		if typeof(sys_v) != TYPE_DICTIONARY:
 			continue
-		var e2: Dictionary = entry2
+		var sys_row: Dictionary = sys_v
+		var sid: String = str(sys_row.get("system_id", sys_row.get("id", "")))
+		if sid.is_empty():
+			continue
+		var subs_v: Variant = sys_row.get("subcomponents", [])
+		if typeof(subs_v) != TYPE_ARRAY:
+			continue
+		for sub_v in (subs_v as Array):
+			if typeof(sub_v) != TYPE_DICTIONARY:
+				continue
+			var sub_id: String = str((sub_v as Dictionary).get("subcomponent_id", ""))
+			if sub_id.is_empty():
+				continue
+			var key: String = "%s.%s" % [sid, sub_id]
+			if not covered.has(key):
+				uncovered.append({"system": sid, "sub": sub_id})
+	# Soft-link unlinked furniture placements onto uncovered subs (deterministic order).
+	var u: int = 0
+	for i2 in range(placed.size()):
+		if u >= uncovered.size():
+			break
+		if typeof(placed[i2]) != TYPE_DICTIONARY:
+			continue
+		var e2: Dictionary = placed[i2]
 		if not str(e2.get("linked_system", "")).is_empty():
 			continue
-		# leave unlinked generic furniture
+		var assign: Dictionary = uncovered[u]
+		u += 1
+		e2["linked_system"] = str(assign.get("system", ""))
+		e2["linked_subcomponent"] = str(assign.get("sub", ""))
+		e2["soft_linked"] = true
+		placed[i2] = e2
+		covered["%s.%s" % [e2["linked_system"], e2["linked_subcomponent"]]] = true
+		linked += 1
 	return linked
 
 

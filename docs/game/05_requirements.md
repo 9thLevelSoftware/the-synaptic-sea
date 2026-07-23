@@ -1271,13 +1271,15 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ## REQ-CMP-002: Components link to ship-system subcomponents
 
-- Source: \eatures/component_slots.md- Type: gameplay / technical
+- Source: features/component_slots.md
+- Type: gameplay / technical
 - Priority: must
-- Status: Approved
+- Status: Implemented
 - Acceptance criteria:
   - Where authored, systems.json subcomponents map onto placed physical components.
 - Verification:
-  - Component link smoke (when implemented)
+  - `scripts/validation/component_system_link_smoke.gd` marker `COMPONENT SYSTEM LINK PASS catalog_links=true soft_fill=true coverage=true`
+  - Coordinator calls `link_ship_systems` after component populate
 
 ## REQ-CMP-003: Components mount and dismount as WorkActions
 

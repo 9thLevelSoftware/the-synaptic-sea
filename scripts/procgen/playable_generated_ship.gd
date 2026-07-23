@@ -5819,6 +5819,10 @@ func _restore_or_populate_component_placement_for_current_ship() -> void:
 		return
 	var seed_v: int = _component_placement_seed_for_current_ship()
 	component_placement_state.populate(layout, component_catalog, seed_v)
+	# REQ-CMP-002: map systems.json subcomponents onto physical placements.
+	var systems_doc: Dictionary = _load_json_dict("res://data/ship_systems/systems.json")
+	if not systems_doc.is_empty():
+		component_placement_state.link_ship_systems(systems_doc, component_catalog)
 	if current_ship != null and component_placement_state.placed.size() > 0:
 		current_ship.component_placement_summary = component_placement_state.get_summary()
 	_rebuild_component_markers()
