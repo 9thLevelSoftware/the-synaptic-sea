@@ -3465,6 +3465,13 @@ func _try_work_action_interact(player_body) -> bool:
 			action_id = "dismount_component"
 			tool_class = "wrench"
 			target_id = str(comp.get("component_instance_id", ""))
+		else:
+			# Remount: empty slot in range + inventory holds matching item_form.
+			var remount: Dictionary = _nearest_remount_target(layout, player_pos, inv, WORK_ACTION_INTERACT_RANGE)
+			if not remount.is_empty():
+				action_id = "mount_component"
+				tool_class = "wrench"
+				target_id = str(remount.get("target_id", ""))
 
 	if action_id.is_empty():
 		if module_integrity_map == null:
@@ -3528,6 +3535,48 @@ func _nearest_mounted_component(layout: Dictionary, player_pos: Vector3, max_ran
 			best_d = d
 			best = e.duplicate(true)
 			best["distance"] = d
+	return best
+
+
+## Find dismounted placement whose item_form is in inventory and room is in range.
+func _nearest_remount_target(
+		layout: Dictionary,
+		player_pos: Vector3,
+		inventory: Dictionary,
+		max_range: float) -> Dictionary:
+	var best: Dictionary = {}
+	var best_d: float = max_range
+	if component_placement_state == null:
+		return best
+	var placed: Array = component_placement_state.get("placed") as Array if typeof(component_placement_state.get("placed")) == TYPE_ARRAY else []
+	var room_centers: Dictionary = _room_world_centers(layout)
+	for entry_v in placed:
+		if typeof(entry_v) != TYPE_DICTIONARY:
+			continue
+		var e: Dictionary = entry_v
+		if bool(e.get("mounted", true)):
+			continue
+		var form: String = str(e.get("item_form", e.get("component_id", "")))
+		if form.is_empty() or int(inventory.get(form, 0)) < 1:
+			continue
+		var rid: String = str(e.get("room_id", ""))
+		if not room_centers.has(rid):
+			continue
+		var pos: Vector3 = room_centers[rid] as Vector3
+		var d: float = player_pos.distance_to(pos)
+		if d > best_d:
+			continue
+		best_d = d
+		best = {
+			"target_id": "%s|%s|%d|%s" % [
+				rid,
+				str(e.get("slot_kind", "wall")),
+				int(e.get("slot_index", 0)),
+				form,
+			],
+			"distance": d,
+			"item_form": form,
+		}
 	return best
 
 
@@ -3708,11 +3757,23 @@ func _tick_work_action(delta: float) -> void:
 			if bool(res.get("ok", false)):
 				work_action_driver.last_resolve = res.duplicate(true)
 				work_action_driver.last_noise_pulse = float(res.get("noise", 0.0))
-				# Mirror inventory bag back into InventoryState when possible.
 				if inventory_state != null:
 					var form: String = str(res.get("item_form", ""))
 					if not form.is_empty() and inventory_state.has_method("add_item"):
 						inventory_state.add_item(form, 1)
+				if work_action_driver.work != null and work_action_driver.work.has_method("reset"):
+					work_action_driver.work.call("reset")
+		elif action_id == "mount_component":
+			res = ComponentMountResolverScript.resolve_mount(
+				work_action_driver.work, component_placement_state, inv, component_catalog, {}
+			)
+			if bool(res.get("ok", false)):
+				work_action_driver.last_resolve = res.duplicate(true)
+				work_action_driver.last_noise_pulse = float(res.get("noise", 0.0))
+				if inventory_state != null:
+					var form2: String = str(res.get("item_form", ""))
+					if not form2.is_empty() and inventory_state.has_method("remove_item"):
+						inventory_state.remove_item(form2, 1)
 				if work_action_driver.work != null and work_action_driver.work.has_method("reset"):
 					work_action_driver.work.call("reset")
 		else:
