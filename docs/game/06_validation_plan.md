@@ -448,7 +448,9 @@ run_clean 'Ship mod panel input smoke' 'SHIP MOD PANEL INPUT PASS open=true sele
 run_clean 'Combat work interrupt smoke' 'COMBAT WORK INTERRUPT PASS start=true hit=true interrupted=true no_yield=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/combat_work_interrupt_smoke.gd
 run_clean 'Tendril structure damage smoke' 'TENDRIL STRUCTURE DAMAGE PASS archetype=true hit=true damaged=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tendril_structure_damage_smoke.gd
 run_clean 'Work yield inventory smoke' 'WORK YIELD INVENTORY PASS cut=true scrap=true qty=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_inventory_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=268 clean_output=true'
+run_clean 'Ship mod inventory sync smoke' 'SHIP MOD INVENTORY SYNC PASS install=true uninstall=true inv=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_inventory_sync_smoke.gd
+run_clean 'Work yield drop smoke' 'WORK YIELD DROP PASS overload=true drop=true scoop=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=270 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
