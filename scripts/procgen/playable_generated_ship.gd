@@ -6341,34 +6341,44 @@ func list_station_recipe_entries(station_kind: String) -> Array:
 ## REQ-CS-016 / 017 / 018: panel confirm handler.
 func begin_craft_from_picker(station_kind: String, recipe_id: String) -> Dictionary:
 	if recipe_id.is_empty() or station_kind.is_empty():
+		_on_craft_blocked(station_kind if not station_kind.is_empty() else "unknown", "bad_args")
 		return {"ok": false, "reason": "bad_args", "recipe_id": recipe_id}
 	if station_kind == "field_crafting":
 		if field_crafting_state != null and field_crafting_state.is_crafting():
+			_on_craft_blocked(station_kind, "busy")
 			return {"ok": false, "reason": "busy", "recipe_id": recipe_id}
 		if begin_field_craft_recipe(recipe_id):
 			return {"ok": true, "reason": "started", "recipe_id": recipe_id}
+		# begin_field_craft_recipe already emits deny SFX on failure.
 		return {"ok": false, "reason": "begin_failed", "recipe_id": recipe_id}
 	if station_kind == "salvage":
 		for st in crafting_stations:
 			if is_instance_valid(st) and st.station_kind == "salvage":
 				if st.try_salvage_target(recipe_id):
 					return {"ok": true, "reason": "salvaged", "recipe_id": recipe_id}
+				_on_craft_blocked(station_kind, "salvage_failed")
 				return {"ok": false, "reason": "salvage_failed", "recipe_id": recipe_id}
+		_on_craft_blocked(station_kind, "station_missing")
 		return {"ok": false, "reason": "station_missing", "recipe_id": recipe_id}
 	if station_kind == "hydroponics":
 		for st in production_stations:
 			if is_instance_valid(st) and st.station_kind == "hydroponics":
 				if st.try_plant_crop(recipe_id):
 					return {"ok": true, "reason": "planted", "recipe_id": recipe_id}
+				_on_craft_blocked(station_kind, "plant_failed")
 				return {"ok": false, "reason": "plant_failed", "recipe_id": recipe_id}
+		_on_craft_blocked(station_kind, "station_missing")
 		return {"ok": false, "reason": "station_missing", "recipe_id": recipe_id}
 	if crafting_state != null and crafting_state.is_crafting():
+		_on_craft_blocked(station_kind, "busy")
 		return {"ok": false, "reason": "busy", "recipe_id": recipe_id}
 	for st in crafting_stations:
 		if is_instance_valid(st) and st.station_kind == station_kind:
 			if st.try_craft_recipe(recipe_id):
 				return {"ok": true, "reason": "started", "recipe_id": recipe_id}
+			_on_craft_blocked(station_kind, "begin_failed")
 			return {"ok": false, "reason": "begin_failed", "recipe_id": recipe_id}
+	_on_craft_blocked(station_kind, "station_missing")
 	return {"ok": false, "reason": "station_missing", "recipe_id": recipe_id}
 
 func _on_chart_panel_closed() -> void:
