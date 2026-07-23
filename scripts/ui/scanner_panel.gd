@@ -56,6 +56,12 @@ func open() -> void:
 	# reopening is a player choice rather than a per-frame farm.
 	if _coordinator != null and _coordinator.has_method("emit_training_event"):
 		_coordinator.emit_training_event("scan_derelict", "scanner_panel")
+	# UI open cue via coordinator audio if available.
+	if _coordinator != null and _coordinator.get("audio_manager") != null:
+		var am = _coordinator.audio_manager
+		if is_instance_valid(am) and am.has_method("play_sfx"):
+			var AudioEventSeamScript = load("res://scripts/audio/audio_event_seam.gd")
+			am.play_sfx(AudioEventSeamScript.UI_PANEL_OPEN)
 
 func close() -> void:
 	_open = false
