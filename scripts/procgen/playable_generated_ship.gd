@@ -1741,6 +1741,12 @@ func end_run(reason: String = "extraction") -> int:
 		return 0
 	slice_complete = true
 	tracker.mark_run_complete()
+	# Terminal cue: death plays vitals-critical audio; successful ends use objective advance.
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		if reason == "death":
+			audio_manager.play_sfx(AudioEventSeamScript.UI_VITALS_LOW)
+		else:
+			audio_manager.play_sfx(AudioEventSeamScript.UI_OBJECTIVE_ADVANCE)
 	# REQ-RL-003: extracted achievement only for successful ends — never for
 	# death (catalog text requires completing a full run and returning home).
 	if reason != "death":
@@ -5171,6 +5177,10 @@ func _on_production_harvested(station_kind: String, item_id: String, qty: int) -
 	print("PRODUCTION HARVESTED station=%s item=%s qty=%d" % [station_kind, item_id, qty])
 
 func _on_production_blocked(station_kind: String, reason: String) -> void:
+	# Mirror craft-blocked feedback: soft deny cue (UI_PANEL_CLOSE).
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+	_set_hazard_feedback_line("Production blocked (%s): %s" % [station_kind, reason])
 	print("PRODUCTION BLOCKED station=%s reason=%s" % [station_kind, reason])
 
 ## ADR-0038 / REQ-CS-016: KEY_C opens the portable recipe picker (field_crafting)
