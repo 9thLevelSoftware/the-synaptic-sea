@@ -2500,6 +2500,8 @@ func _on_cart_grab_requested(cart_id: String) -> void:
 	if hit.is_empty():
 		return
 	grabbed_cart = hit["cart"]
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
 	_recompute_player_encumbrance()      # applies the push penalty
 
 func _on_cart_load_requested(cart_id: String) -> void:
