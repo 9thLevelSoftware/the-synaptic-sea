@@ -1,7 +1,7 @@
 extends SceneTree
 
-## try_plant_crop soft-fails consume (busy / missing water) with production_blocked.
-## Marker: PLANT CROP BLOCKED CONSUME PASS busy=true missing=true
+## try_plant_crop soft-fails return false but emit production_blocked (success/fail API).
+## Marker: PLANT CROP BLOCKED CONSUME PASS busy=true missing=true blocked=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const ProductionStationScript := preload("res://scripts/tools/production_station.gd")
@@ -12,6 +12,7 @@ var main_node: Node
 var playable
 var frame_count: int = 0
 var finished: bool = false
+var blocked_reasons: Array = []
 
 
 func _initialize() -> void:
@@ -42,23 +43,29 @@ func _validate() -> void:
 	st.station_kind = "hydroponics"
 	st.inventory_state = playable.inventory_state
 	st.config = {"crops": [{"crop_id": "test_crop", "water_cost": 1.0, "power_cost": 0.0, "required_skill_level": 0}]}
+	st.production_blocked.connect(func(_k, reason): blocked_reasons.append(str(reason)))
 	var model = HydroStateScript.new()
 	model.state = HydroStateScript.State.PLANTED
 	st.model = model
-	if not st.try_plant_crop("test_crop"):
-		_fail("busy plant should return true (consume)"); return
+	# Soft-fail API: false means plant did not start.
+	if st.try_plant_crop("test_crop"):
+		_fail("busy plant should return false"); return
+	if not blocked_reasons.has("in_progress"):
+		_fail("expected production_blocked in_progress got %s" % str(blocked_reasons)); return
 
 	model.state = HydroStateScript.State.IDLE
-	# No purified water.
 	var q: int = int(playable.inventory_state.get_quantity("purified_water"))
 	if q > 0:
 		playable.inventory_state.remove_item("purified_water", q)
-	if not st.try_plant_crop("test_crop"):
-		_fail("missing water plant should return true (consume)"); return
+	blocked_reasons.clear()
+	if st.try_plant_crop("test_crop"):
+		_fail("missing water plant should return false"); return
+	if not blocked_reasons.has("missing_ingredients"):
+		_fail("expected missing_ingredients got %s" % str(blocked_reasons)); return
 	if model.state != HydroStateScript.State.IDLE:
 		_fail("idle model mutated on blocked plant"); return
 
-	print("PLANT CROP BLOCKED CONSUME PASS busy=true missing=true")
+	print("PLANT CROP BLOCKED CONSUME PASS busy=true missing=true blocked=true")
 	quit(0)
 
 

@@ -168,30 +168,30 @@ func try_plant_crop(crop_id: String) -> bool:
 		return false
 	if model.state != HydroStateScript.State.IDLE:
 		emit_signal("production_blocked", station_kind, "in_progress" if model.state == HydroStateScript.State.PLANTED else "busy")
-		return true  # consume picker confirm — soft deny
+		return false  # false = plant did not start (callers treat as success/fail)
 	var c: Dictionary = _find_crop_config(crop_id)
 	if c.is_empty():
 		emit_signal("production_blocked", station_kind, "unknown_crop")
-		return true
+		return false
 	var water_cost: float = float(c.get("water_cost", 0.0))
 	var skill: int = _skill()
 	var power: float = _avail_power()
 	if int(c.get("required_skill_level", 0)) > skill:
 		emit_signal("production_blocked", station_kind, "insufficient_skill")
-		return true
+		return false
 	if float(inventory_state.get_quantity("purified_water")) < water_cost:
 		emit_signal("production_blocked", station_kind, "missing_ingredients")
-		return true
+		return false
 	if power < float(c.get("power_cost", 0.0)):
 		emit_signal("production_blocked", station_kind, "insufficient_power")
-		return true
+		return false
 	var res: Dictionary = model.plant(c, skill, float(inventory_state.get_quantity("purified_water")), power)
 	if res.get("ok", false):
 		inventory_state.remove_item("purified_water", int(ceil(water_cost)))
 		emit_signal("production_started", station_kind, crop_id)
 		return true
 	emit_signal("production_blocked", station_kind, str(res.get("reason", "plant_failed")))
-	return true
+	return false
 
 func _interact_recycler() -> bool:
 	if model.output_ready > 0:
