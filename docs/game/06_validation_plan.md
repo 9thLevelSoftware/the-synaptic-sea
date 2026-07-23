@@ -567,6 +567,7 @@ run_clean 'Component mount SFX live smoke' 'COMPONENT MOUNT SFX LIVE PASS dismou
 run_clean 'Work suppress SFX live smoke' 'WORK SUPPRESS SFX LIVE PASS complete=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_suppress_sfx_live_smoke.gd
 run_clean 'Component remount SFX live smoke' 'COMPONENT REMOUNT SFX LIVE PASS remount=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_remount_sfx_live_smoke.gd
 run_clean 'Loot search SFX smoke' 'LOOT SEARCH SFX PASS search=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/loot_search_sfx_smoke.gd
+run_clean 'Loot search away smoke' 'LOOT SEARCH AWAY PASS away=true search=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/loot_search_away_smoke.gd
 run_clean 'Panel close SFX smoke' 'PANEL CLOSE SFX PASS wounds=true shipmod=true chart=true scanner=true recipe=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/panel_close_sfx_smoke.gd
 run_clean 'Equip unequip SFX smoke' 'EQUIP UNEQUIP SFX PASS equip=true unequip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/equip_unequip_sfx_smoke.gd
 run_clean 'Recipe picker open SFX smoke' 'RECIPE PICKER OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recipe_picker_open_sfx_smoke.gd
@@ -633,7 +634,7 @@ run_clean 'Load denied SFX smoke' 'LOAD DENIED SFX PASS deny=true sfx=true' "$GO
 run_clean 'Cart grab denied SFX smoke' 'CART GRAB DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_grab_denied_sfx_smoke.gd
 run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=453 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=454 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
