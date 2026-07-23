@@ -32,14 +32,18 @@ func _initialize() -> void:
 		_fail("stamina did not recover while idle")
 		return
 
-	# Hunger cascade: set hunger below 30%, recover stamina -> should be halved
+	# Hunger cascade (PKG-C3.1b curve): low hunger reduces stamina recovery continuously
 	v.hunger = 20.0
 	v.stamina = 50.0
 	var s_before: float = v.stamina
+	var expected_mult: float = VitalsStateScript.hunger_stamina_recovery_curve(20.0, 100.0)
 	v.tick(1.0, {"moving": false})
-	var expected_recovery: float = v.stamina_recovery_rate * 0.5 * 1.0
-	if absf(v.stamina - (s_before + expected_recovery)) > 0.1:
-		_fail("hunger cascade did not halve stamina recovery")
+	var expected_recovery: float = v.stamina_recovery_rate * expected_mult * 1.0
+	if absf(v.stamina - (s_before + expected_recovery)) > 0.15:
+		_fail("hunger curve stamina recovery mismatch (mult=%s)" % str(expected_mult))
+		return
+	if expected_mult >= 0.95 or expected_mult <= 0.25:
+		_fail("hunger@20 should be mid curve, got %s" % str(expected_mult))
 		return
 
 	# Thirst vision warning
@@ -146,8 +150,12 @@ func _initialize() -> void:
 		_fail("healthy vitals should give full movement multiplier")
 		return
 	vm.stamina = VitalsStateScript.EXHAUSTION_STAMINA_THRESHOLD - 1.0
-	if absf(vm.get_movement_speed_multiplier() - 0.5) > 0.001:
-		_fail("exhausted vitals should halve movement multiplier")
+	var expected_move: float = VitalsStateScript.stamina_move_curve(vm.stamina, vm.max_stamina)
+	if absf(vm.get_movement_speed_multiplier() - expected_move) > 0.001:
+		_fail("exhausted vitals movement curve mismatch")
+		return
+	if vm.get_movement_speed_multiplier() >= 0.95:
+		_fail("exhausted vitals should slow movement")
 		return
 	vm.stamina = 100.0
 	vm.health = 0.0

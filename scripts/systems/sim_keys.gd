@@ -19,6 +19,9 @@ const FIRE_HEALTH_DRAIN: String = "fire_health_drain"
 const SANITY_HEALTH_DRAIN: String = "sanity_health_drain"
 const ENCUMBRANCE_HEALTH_DRAIN: String = "encumbrance_health_drain"
 const TEMPERATURE_THIRST_MULT: String = "temperature_thirst_mult"
+const TEMPERATURE_HUNGER_MULT: String = "temperature_hunger_mult"  # PKG-C3.1b cold→hunger
+const WOUND_THIRST_MULT: String = "wound_thirst_mult"              # PKG-C3.1b wounds→thirst
+const WOUND_HEALTH_DRAIN: String = "wound_health_drain"            # PKG-C3.1b bleed→health
 const STATUS_STAMINA_RECOVERY_MULT: String = "status_stamina_recovery_mult"
 const SANITY_STAMINA_RECOVERY_MULT: String = "sanity_stamina_recovery_mult"
 
@@ -90,6 +93,9 @@ static func vitals_hot_path_keys() -> PackedStringArray:
 		SANITY_HEALTH_DRAIN,
 		ENCUMBRANCE_HEALTH_DRAIN,
 		TEMPERATURE_THIRST_MULT,
+		TEMPERATURE_HUNGER_MULT,
+		WOUND_THIRST_MULT,
+		WOUND_HEALTH_DRAIN,
 		STATUS_STAMINA_RECOVERY_MULT,
 		SANITY_STAMINA_RECOVERY_MULT,
 	])
@@ -100,6 +106,7 @@ static func all_keys() -> PackedStringArray:
 	return PackedStringArray([
 		MOVING, RADIATION_HEALTH_DRAIN, ATMOSPHERE_HEALTH_DRAIN, FIRE_HEALTH_DRAIN,
 		SANITY_HEALTH_DRAIN, ENCUMBRANCE_HEALTH_DRAIN, TEMPERATURE_THIRST_MULT,
+		TEMPERATURE_HUNGER_MULT, WOUND_THIRST_MULT, WOUND_HEALTH_DRAIN,
 		STATUS_STAMINA_RECOVERY_MULT, SANITY_STAMINA_RECOVERY_MULT,
 		NOISE_LEVEL, LIGHT_LEVEL, SIGHT_LEVEL, CROUCHING, SAME_ROOM, DETECT_THRESHOLD,
 		ROOM_ID, PLAYER_POSITION,
