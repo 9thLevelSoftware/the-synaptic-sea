@@ -7,6 +7,7 @@ const STATE_IDLE: String = "idle"
 const STATE_INVESTIGATE: String = "investigate"
 const STATE_HUNT: String = "hunt"
 const STATE_ATTACK: String = "attack"
+const STATE_TELEGRAPH: String = "telegraph"  # PKG-C4.2 windup before strike
 const STATE_FLEE: String = "flee"
 const STATE_STUN: String = "stun"
 const STATE_DEAD: String = "dead"
@@ -46,6 +47,14 @@ var investigate_speed_mult: float = 0.7
 var attack_range: float = 1.4
 ## Last known player world position for INVESTIGATE (optional; room_id still used).
 var last_known_position: Array = []
+## PKG-C4.2 data-driven FSM modifiers (one FSM, per-archetype behavior).
+var ambush_hold: bool = false
+var stalk_range: float = 0.0          # metres; 0 = attack immediately when same room
+var swarm_split: bool = false
+var anchored: bool = false
+var telegraph_seconds: float = 0.0
+var telegraph_remaining: float = 0.0
+var player_verb: String = "fight"     # distinct player response verb
 
 func configure(config: Dictionary = {}) -> void:
 	instance_id = str(config.get("instance_id", instance_id))
@@ -89,6 +98,20 @@ func configure(config: Dictionary = {}) -> void:
 	var lkp: Variant = config.get("last_known_position", last_known_position)
 	if lkp is Array and (lkp as Array).size() >= 3:
 		last_known_position = [float(lkp[0]), float(lkp[1]), float(lkp[2])]
+	# PKG-C4.2 behavior modifiers (top-level or nested "behavior")
+	var beh: Dictionary = {}
+	var beh_raw: Variant = config.get("behavior", {})
+	if beh_raw is Dictionary:
+		beh = beh_raw as Dictionary
+	ambush_hold = bool(config.get("ambush_hold", beh.get("ambush_hold", ambush_hold)))
+	stalk_range = maxf(0.0, float(config.get("stalk_range", beh.get("stalk_range", stalk_range))))
+	swarm_split = bool(config.get("swarm_split", beh.get("swarm_split", swarm_split)))
+	anchored = bool(config.get("anchored", beh.get("anchored", anchored)))
+	telegraph_seconds = maxf(0.0, float(config.get("telegraph_seconds", beh.get("telegraph_seconds", telegraph_seconds))))
+	telegraph_remaining = maxf(0.0, float(config.get("telegraph_remaining", telegraph_remaining)))
+	player_verb = str(config.get("player_verb", beh.get("player_verb", player_verb)))
+	if player_verb.is_empty():
+		player_verb = "fight"
 
 func tick(delta: float, context: Dictionary = {}) -> bool:
 	if delta < 0.0:
@@ -103,6 +126,12 @@ func tick(delta: float, context: Dictionary = {}) -> bool:
 		memory_remaining = maxf(memory_remaining, delta)
 		_change_state(STATE_STUN)
 		return true
+	# Telegraph windup resolves into attack
+	if state == STATE_TELEGRAPH:
+		telegraph_remaining = maxf(0.0, telegraph_remaining - delta)
+		if telegraph_remaining <= 0.0:
+			_change_state(STATE_ATTACK)
+		return true
 	awareness_score = clampf(
 		float(context.get(SimKeysScript.NOISE_LEVEL, 0.0)) * noise_sensitivity +
 		float(context.get(SimKeysScript.LIGHT_LEVEL, 0.0)) * light_sensitivity +
@@ -112,8 +141,12 @@ func tick(delta: float, context: Dictionary = {}) -> bool:
 	)
 	var crouch_mult: float = 0.65 if bool(context.get(SimKeysScript.CROUCHING, false)) else 1.0
 	awareness_score *= crouch_mult
+	# Swarm split: low HP spikes awareness / commitment
+	if swarm_split and health / max_health <= 0.55:
+		awareness_score = minf(3.0, awareness_score + 0.35)
 	var same_room: bool = bool(context.get(SimKeysScript.SAME_ROOM, true))
 	var detection_threshold: float = float(context.get(SimKeysScript.DETECT_THRESHOLD, 0.85))
+	var player_distance: float = float(context.get("player_distance", 0.0))
 	if awareness_score >= detection_threshold:
 		memory_remaining = memory_seconds
 		last_known_room = str(context.get(SimKeysScript.ROOM_ID, room_id))
@@ -123,19 +156,41 @@ func tick(delta: float, context: Dictionary = {}) -> bool:
 		elif ppos is Array and (ppos as Array).size() >= 3:
 			last_known_position = [float(ppos[0]), float(ppos[1]), float(ppos[2])]
 		if same_room:
-			_change_state(STATE_ATTACK)
+			_resolve_engagement(player_distance)
 		else:
 			_change_state(STATE_HUNT)
+	elif ambush_hold and state == STATE_IDLE and awareness_score < detection_threshold:
+		# Stay hidden until committed detection
+		_change_state(STATE_IDLE)
 	elif memory_remaining > 0.0:
 		memory_remaining = maxf(0.0, memory_remaining - delta)
 		_change_state(STATE_HUNT if memory_remaining > memory_seconds * 0.4 else STATE_INVESTIGATE)
 	elif awareness_score > 0.35:
-		_change_state(STATE_INVESTIGATE)
+		if ambush_hold:
+			_change_state(STATE_IDLE)  # hold until full detect
+		else:
+			_change_state(STATE_INVESTIGATE)
 	else:
 		_change_state(STATE_IDLE)
-	if health / max_health <= flee_threshold and health > 0.0:
+	if health / max_health <= flee_threshold and health > 0.0 and not anchored:
 		_change_state(STATE_FLEE)
 	return true
+
+
+func _resolve_engagement(player_distance: float) -> void:
+	# Stalk: keep hunting until within stalk_range (or attack_range if stalk unset).
+	if stalk_range > 0.0 and player_distance > stalk_range:
+		_change_state(STATE_HUNT)
+		return
+	_enter_attack_pipeline()
+
+
+func _enter_attack_pipeline() -> void:
+	if telegraph_seconds > 0.0 and state != STATE_ATTACK and state != STATE_TELEGRAPH:
+		telegraph_remaining = telegraph_seconds
+		_change_state(STATE_TELEGRAPH)
+	else:
+		_change_state(STATE_ATTACK)
 
 func can_attack() -> bool:
 	return state == STATE_ATTACK and attack_cooldown <= 0.0 and health > 0.0
@@ -155,8 +210,12 @@ func apply_damage(payload: Dictionary) -> Dictionary:
 		_change_state(STATE_DEAD)
 	elif stun_seconds > 0.0:
 		_change_state(STATE_STUN)
-	elif health / max_health <= flee_threshold:
+	elif health / max_health <= flee_threshold and not anchored:
 		_change_state(STATE_FLEE)
+	elif swarm_split and health > 0.0 and health / max_health <= 0.55:
+		# Swarm under pressure disperses (flee) unless anchored
+		if not anchored:
+			_change_state(STATE_FLEE)
 	return get_summary()
 
 func get_summary() -> Dictionary:
@@ -194,18 +253,32 @@ func get_summary() -> Dictionary:
 		"investigate_speed_mult": investigate_speed_mult,
 		"attack_range": attack_range,
 		"last_known_position": last_known_position.duplicate(true),
+		"ambush_hold": ambush_hold,
+		"stalk_range": stalk_range,
+		"swarm_split": swarm_split,
+		"anchored": anchored,
+		"telegraph_seconds": telegraph_seconds,
+		"telegraph_remaining": telegraph_remaining,
+		"player_verb": player_verb,
 	}
 
 func effective_move_speed() -> float:
+	if anchored and state != STATE_ATTACK and state != STATE_TELEGRAPH:
+		return 0.0
 	match state:
 		STATE_FLEE:
 			return move_speed * flee_speed_mult
 		STATE_INVESTIGATE:
 			return move_speed * investigate_speed_mult
-		STATE_HUNT, STATE_ATTACK:
+		STATE_HUNT, STATE_ATTACK, STATE_TELEGRAPH:
 			return move_speed * hunt_speed_mult
 		_:
 			return 0.0
+
+
+## PKG-C4.2: player-facing response verb for this archetype (distinct per role).
+func get_player_verb() -> String:
+	return player_verb
 
 func last_known_world_position() -> Vector3:
 	if last_known_position.size() >= 3:
