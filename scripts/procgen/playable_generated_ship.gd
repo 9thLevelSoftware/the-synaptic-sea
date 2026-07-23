@@ -5141,6 +5141,8 @@ func _on_craft_blocked(station_kind: String, reason: String) -> void:
 func _on_production_started(station_kind: String, input_id: String) -> void:
 	_refresh_inventory_hud()
 	_recompute_player_encumbrance()
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 	print("PRODUCTION STARTED station=%s input=%s" % [station_kind, input_id])
 
 func _on_production_harvested(station_kind: String, item_id: String, qty: int) -> void:
