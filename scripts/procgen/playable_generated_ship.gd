@@ -3504,7 +3504,10 @@ func open_wounds_panel_for_validation() -> bool:
 		return false
 	if not wounds_panel.treatment_applied.is_connected(_on_wound_treatment_applied):
 		wounds_panel.treatment_applied.connect(_on_wound_treatment_applied)
+	var was_open: bool = wounds_panel.is_open()
 	wounds_panel.open()
+	if not was_open and is_instance_valid(audio_manager):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_WOUNDS_OPEN)
 	return wounds_panel.is_open()
 
 
@@ -10361,7 +10364,7 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 			return
 		if event.is_action_pressed("toggle_wounds") and _menus_are_closed():
-			wounds_panel.open()
+			open_wounds_panel_for_validation()
 			get_viewport().set_input_as_handled()
 			return
 	if is_instance_valid(menu_coordinator):
