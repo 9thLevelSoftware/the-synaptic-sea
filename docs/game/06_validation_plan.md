@@ -419,7 +419,8 @@ run_clean 'Station tiers batch smoke' 'STATION TIERS BATCH PASS tier=true queue=
 run_clean 'Wound state pure smoke' 'WOUND STATE PASS kinds=true bleed=true infection=true work_speed=true treat=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wound_state_smoke.gd
 run_clean 'Spatial perception pure smoke' 'SPATIAL PERCEPTION PASS los=true muffle=true blocked=true open=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/spatial_perception_smoke.gd
 run_clean 'Vitals curves cross-coupling smoke' 'VITALS CURVES PASS curves=true cross=true wounds=true cold=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/vitals_curves_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=239 clean_output=true'
+run_clean 'Archetype behavior modifiers smoke' 'ARCHETYPE BEHAVIOR PASS ambush=true stalk=true swarm=true anchored=true telegraph=true verbs=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/archetype_behavior_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=240 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
