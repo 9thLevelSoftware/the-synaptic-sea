@@ -116,13 +116,13 @@ table role coverage; `hazard_source=runtime` (ADR-0050). Bundle **commands=222**
 With integration gaps closed, remaining work is content/polish (audio assets, art,
 cloud, hub scene, deeper kit art) — not reachability.
 
-## Pre-polish program (started 2026-07-22; mechanical packages through #380)
+## Pre-polish program (started 2026-07-22; mechanical packages through #382)
 
 Source plan: system-by-system path to content-capable state (module integrity, not voxels).
 Parallel decomposition: `docs/game/build-plans/pre-polish-parallel-wave-plan.md`.
 Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remaining work is authoring/polish, not core engineering.
 
-**Landed (PRs #78–#380, 2026-07-22 → 2026-07-23):**
+**Landed (PRs #78–#382, 2026-07-22 → 2026-07-23):**
 - **A0 / SPEC / A2 / A4:** ADR-0051, pillar feature specs, `SimKeys`, `TuningCatalog`
 - **A1a–c / A3:** `ShipRuntime` advance/catch-up/snapshots; shared present-ship tick helpers; FRAME/SLOW/LAZY bands
 - **B2.1–B2.5:** Module integrity + scene consequences; WorkAction catalog/state/resolve/driver; component slots + mount/dismount; craft quality/knowledge; repair unification
@@ -134,7 +134,7 @@ Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remain
 **Regression contract:** `docs/game/06_validation_plan.md` bundle ends with
 `SYNAPTIC_SEA REGRESSION PASS commands=421 clean_output=true` (marker-based; set `GODOT`/`ROOT` on Windows).
 
-**Post-INT hardening (PRs #112–#380):**
+**Post-INT hardening (PRs #112–#382):**
 - D6.1 pillar revisit sparse packs on ShipInstance + leave/revisit flush
 - D9b ship-mod panel; dual-branch WorkAction tick + training XP on complete
 - Nearest-module WorkAction interact (cut/pry); component dismount/remount interact
@@ -268,6 +268,7 @@ Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remain
 - Work-yield stack-full scoop deny routes SFX and keeps residual pile
 - Empty loot grants route deny SFX (not success tool-use)
 - Already-owned tool pickup routes deny SFX
+- Save slot rows also show class + objective sequence
 - Regression marker contract commands=421 in 06_validation_plan.md
 
 **Still content/polish (not mechanical pre-polish blockers):**
