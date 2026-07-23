@@ -3541,6 +3541,8 @@ func _try_treat_selected_wound() -> bool:
 	if not wounds_panel.treat_selected(0.35):
 		return false
 	inventory_state.remove_item(item_id, 1)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_WOUND_TREAT)
 	emit_training_event("treat_wound", wounds_panel.get_selected_wound_id())
 	return true
 
