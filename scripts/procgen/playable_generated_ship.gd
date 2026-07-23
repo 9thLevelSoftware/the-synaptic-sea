@@ -3727,6 +3727,7 @@ func open_ship_modification_panel_for_validation() -> bool:
 
 
 ## Open web chart panel (requires web_chart in inventory) and route UI SFX.
+## Re-press while open toggles closed.
 func open_chart_panel_for_validation() -> bool:
 	if not is_instance_valid(chart_panel):
 		return false
@@ -3735,6 +3736,12 @@ func open_chart_panel_for_validation() -> bool:
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		_set_hazard_feedback_line("No web chart")
+		return false
+	if chart_panel.is_open():
+		if chart_panel.has_method("close"):
+			chart_panel.close()
+		else:
+			chart_panel.visible = false
 		return false
 	var was_open: bool = chart_panel.is_open()
 	chart_panel.open()
