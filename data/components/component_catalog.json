@@ -4,30 +4,35 @@
     "console_generic": {
       "item_form": "console_unit",
       "mass": 12.0,
+      "power_draw": 4.0,
       "slot": "wall",
       "condition_default": 1.0
     },
     "conduit_run": {
       "item_form": "conduit_segment",
       "mass": 6.0,
+      "power_draw": 2.0,
       "slot": "wall",
       "condition_default": 1.0
     },
     "pump_assembly": {
       "item_form": "pump_assembly",
       "mass": 18.0,
+      "power_draw": 8.0,
       "slot": "center",
       "condition_default": 0.85
     },
     "locker_wall": {
       "item_form": "wall_locker",
       "mass": 8.0,
+      "power_draw": 0.0,
       "slot": "wall",
       "condition_default": 1.0
     },
     "machinery_block": {
       "item_form": "machinery_block",
       "mass": 25.0,
+      "power_draw": 12.0,
       "slot": "center",
       "condition_default": 0.75,
       "station_tier_bonus": 1,
@@ -36,6 +41,7 @@
     "reactor_console": {
       "item_form": "reactor_console",
       "mass": 15.0,
+      "power_draw": 6.0,
       "slot": "wall",
       "linked_system": "power",
       "linked_subcomponent": "power_distribution",
@@ -46,6 +52,7 @@
     "air_recycler_unit": {
       "item_form": "air_recycler_unit",
       "mass": 22.0,
+      "power_draw": 10.0,
       "slot": "center",
       "linked_system": "life_support",
       "linked_subcomponent": "air_recycler",
@@ -54,6 +61,7 @@
     "nav_console": {
       "item_form": "nav_console",
       "mass": 14.0,
+      "power_draw": 5.0,
       "slot": "wall",
       "linked_system": "navigation",
       "linked_subcomponent": "nav_computer",
@@ -62,6 +70,7 @@
     "thruster_control": {
       "item_form": "thruster_control",
       "mass": 16.0,
+      "power_draw": 7.0,
       "slot": "wall",
       "linked_system": "propulsion",
       "linked_subcomponent": "nav_linkage",
@@ -70,6 +79,7 @@
     "sensor_rack": {
       "item_form": "sensor_rack",
       "mass": 11.0,
+      "power_draw": 5.0,
       "slot": "wall",
       "linked_system": "scanners",
       "linked_subcomponent": "signal_processor",

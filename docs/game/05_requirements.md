@@ -1172,12 +1172,15 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Source: `features/ship_modification.md`
 - Type: gameplay / technical
 - Priority: must
-- Status: Approved
+- Status: Implemented
 - Acceptance criteria:
   - Salvaged components install into ship slots under power budget constraints.
   - Hub growth is physical (components/modules), not a separate hub scene.
+  - Catalog-linked installs restore hub ship-system sub floor; uninstall damages the sub.
 - Verification:
-  - `ship_modification_smoke.gd` (when implemented)
+  - `scripts/validation/ship_modification_smoke.gd`
+  - `scripts/validation/ship_mod_install_key_smoke.gd` marker `SHIP MOD INSTALL KEY PASS`
+  - `scripts/validation/ship_mod_system_effect_smoke.gd` marker `SHIP MOD SYSTEM EFFECT PASS restore=true power=true uninstall_damage=true`
 
 ## REQ-ARCH-001: SimKeys contract for tick context
 
@@ -1297,13 +1300,16 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ## REQ-SMOD-002: Installs respect power budget constraints
 
-- Source: \eatures/ship_modification.md- Type: gameplay
+- Source: eatures/ship_modification.md
+- Type: gameplay
 - Priority: must
-- Status: Approved
+- Status: Implemented
 - Acceptance criteria:
   - Over-budget installs are rejected or force authored degradation; better components draw more power.
+  - Component catalog authors per-component power_draw consumed on install.
 - Verification:
-  - \ship_modification_smoke.gd\ power_budget path (implemented)
+  - scripts/validation/ship_modification_smoke.gd power_budget path
+  - scripts/validation/ship_mod_system_effect_smoke.gd power=true
 
 ## REQ-SMOD-003: Hub growth is the walkable home ship
 
