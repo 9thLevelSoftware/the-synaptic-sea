@@ -3829,6 +3829,7 @@ func _tick_work_action(delta: float) -> void:
 					var form: String = str(res.get("item_form", ""))
 					if not form.is_empty() and inventory_state.has_method("add_item"):
 						inventory_state.add_item(form, 1)
+				_rebuild_component_markers()
 				if work_action_driver.work != null and work_action_driver.work.has_method("reset"):
 					work_action_driver.work.call("reset")
 		elif action_id == "mount_component":
@@ -3842,10 +3843,13 @@ func _tick_work_action(delta: float) -> void:
 					var form2: String = str(res.get("item_form", ""))
 					if not form2.is_empty() and inventory_state.has_method("remove_item"):
 						inventory_state.remove_item(form2, 1)
+				_rebuild_component_markers()
 				if work_action_driver.work != null and work_action_driver.work.has_method("reset"):
 					work_action_driver.work.call("reset")
 		else:
 			res = work_action_driver.complete(module_integrity_map, inv)
+			if bool(res.get("ok", false)):
+				_apply_module_integrity_state_to_scene()
 		if bool(res.get("ok", false)) and work_action_driver.last_noise_pulse > 0.0:
 			if threat_manager != null:
 				work_action_driver.apply_noise_to_detection(threat_manager)
