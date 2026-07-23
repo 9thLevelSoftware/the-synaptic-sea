@@ -202,6 +202,23 @@ func damage_subcomponent(system_id: String, subcomponent_id: String, amount: flo
 	sub.health = maxf(0.0, float(sub.health) - amount)
 	return true
 
+
+## REQ-CMP-002: remounting a physical component reconnects the linked sub at partial health.
+## Does not full-repair (that remains a WorkAction / repair_point); sets health to at least min_health.
+func restore_subcomponent_on_remount(
+		system_id: String,
+		subcomponent_id: String,
+		min_health: float = 0.55) -> bool:
+	if not systems.has(system_id) or subcomponent_id.is_empty():
+		return false
+	var sub = systems[system_id].get_subcomponent(subcomponent_id)
+	if sub == null:
+		return false
+	var target: float = clampf(min_health, 0.0, 1.0)
+	if float(sub.health) < target:
+		sub.health = target
+	return true
+
 ## Returns a lightweight {system_id: {operational, health}} dict for HUD/diagnostics.
 func get_status_summary() -> Dictionary:
 	var out: Dictionary = {}
