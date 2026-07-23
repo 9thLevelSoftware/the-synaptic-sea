@@ -117,16 +117,19 @@ func confirm_selection() -> Dictionary:
 	if _entries.is_empty():
 		_status = "no recipes"
 		_render()
+		_play_deny_sfx()
 		return {"ok": false, "reason": "no_recipes", "recipe_id": ""}
 	var entry: Dictionary = _entries[_selected] as Dictionary
 	var rid: String = str(entry.get("recipe_id", ""))
 	if not bool(entry.get("craftable", false)):
 		_status = "blocked: %s" % str(entry.get("status", "unknown"))
 		_render()
+		_play_deny_sfx()
 		return {"ok": false, "reason": str(entry.get("status", "blocked")), "recipe_id": rid}
 	if _coordinator == null or not _coordinator.has_method("begin_craft_from_picker"):
 		_status = "no craft handler"
 		_render()
+		_play_deny_sfx()
 		return {"ok": false, "reason": "not_ready", "recipe_id": rid}
 	var result: Dictionary = _coordinator.begin_craft_from_picker(_station_kind, rid)
 	if bool(result.get("ok", false)):
@@ -134,9 +137,19 @@ func confirm_selection() -> Dictionary:
 		return result
 	_status = str(result.get("reason", "rejected"))
 	_render()
+	_play_deny_sfx()
 	# Refresh so ingredient state after a partial failure is accurate.
 	refresh()
 	return result
+
+
+func _play_deny_sfx() -> void:
+	if _coordinator == null or _coordinator.get("audio_manager") == null:
+		return
+	var am = _coordinator.audio_manager
+	if is_instance_valid(am) and am.has_method("play_sfx"):
+		var AudioEventSeamScript = load("res://scripts/audio/audio_event_seam.gd")
+		am.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 
 func _refresh_entries() -> void:
 	_entries = []

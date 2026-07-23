@@ -89,17 +89,28 @@ func move_selection(delta: int) -> void:
 	_render()
 
 
+## Optional audio manager (set by coordinator) for deny/success cues.
+var _audio_manager: Node = null
+
+
+func set_audio_manager(am: Node) -> void:
+	_audio_manager = am
+
+
 func bandage_selected() -> bool:
 	var wid: String = get_selected_wound_id()
 	if wid.is_empty() or _wound_state == null:
 		_status = "no wound"
 		_render()
+		_play_deny_sfx()
 		return false
 	if not _wound_state.has_method("bandage"):
+		_play_deny_sfx()
 		return false
 	if not bool(_wound_state.call("bandage", wid)):
 		_status = "bandage failed"
 		_render()
+		_play_deny_sfx()
 		return false
 	_status = "bandaged %s" % wid
 	treatment_applied.emit(wid, "bandage")
@@ -112,17 +123,26 @@ func treat_selected(severity_reduce: float = 0.35) -> bool:
 	if wid.is_empty() or _wound_state == null:
 		_status = "no wound"
 		_render()
+		_play_deny_sfx()
 		return false
 	if not _wound_state.has_method("treat"):
+		_play_deny_sfx()
 		return false
 	if not bool(_wound_state.call("treat", wid, severity_reduce)):
 		_status = "treat failed"
 		_render()
+		_play_deny_sfx()
 		return false
 	_status = "treated %s" % wid
 	treatment_applied.emit(wid, "treat")
 	_render()
 	return true
+
+
+func _play_deny_sfx() -> void:
+	if is_instance_valid(_audio_manager) and _audio_manager.has_method("play_sfx"):
+		var AudioEventSeamScript = load("res://scripts/audio/audio_event_seam.gd")
+		_audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 
 
 func get_status() -> String:
