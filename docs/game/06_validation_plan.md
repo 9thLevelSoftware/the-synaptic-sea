@@ -417,7 +417,8 @@ run_clean 'Repair unification smoke' 'REPAIR UNIFICATION PASS repair=true seal=t
 run_clean 'Component mount/dismount smoke' 'COMPONENT MOUNT DISMOUNT PASS dismount=true mount=true work=true mass=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_dismount_smoke.gd
 run_clean 'Station tiers batch smoke' 'STATION TIERS BATCH PASS tier=true queue=true gate=true schema=true batch=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/station_tiers_batch_smoke.gd
 run_clean 'Wound state pure smoke' 'WOUND STATE PASS kinds=true bleed=true infection=true work_speed=true treat=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wound_state_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=237 clean_output=true'
+run_clean 'Spatial perception pure smoke' 'SPATIAL PERCEPTION PASS los=true muffle=true blocked=true open=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/spatial_perception_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=238 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
