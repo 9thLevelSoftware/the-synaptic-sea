@@ -23,6 +23,8 @@ var previous_state: String = STATE_IDLE
 var max_health: float = 20.0
 var health: float = 20.0
 var attack_damage: float = 5.0
+## REQ-MI-004: optional structure damage applied to ModuleIntegrityMap (hull tendril).
+var structure_damage: float = 0.0
 var attack_type: String = "physical"
 var attack_noise: float = 0.4
 var attack_interval: float = 1.4
@@ -72,6 +74,7 @@ func configure(config: Dictionary = {}) -> void:
 	max_health = maxf(1.0, float(config.get("max_health", max_health)))
 	health = clampf(float(config.get("health", max_health)), 0.0, max_health)
 	attack_damage = maxf(0.0, float(config.get("attack_damage", attack_damage)))
+	structure_damage = maxf(0.0, float(config.get("structure_damage", structure_damage)))
 	attack_type = str(config.get("attack_type", attack_type))
 	attack_noise = maxf(0.0, float(config.get("attack_noise", attack_noise)))
 	attack_interval = maxf(0.1, float(config.get("attack_interval", attack_interval)))

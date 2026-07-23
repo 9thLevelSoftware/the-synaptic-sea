@@ -43,6 +43,8 @@ var _path_runtime: Dictionary = {}
 var spatial_perception = null
 ## Optional engaged LOS flags: threat.instance_id -> bool (physics raycast result from scene).
 var engaged_los: Dictionary = {}
+## REQ-MI-004: Callable(threat, amount) when threat applies structure_damage (hull tendril).
+var on_structure_attack: Callable = Callable()
 
 func _ready() -> void:
 	threat_archetypes = _load_json_dict(THREAT_ARCHETYPE_PATH)
@@ -176,6 +178,12 @@ func tick_threats(delta: float, vitals_state = null, status_effects_state = null
 				"status_effect_id": threat.status_on_hit,
 				"source_id": threat.instance_id,
 			})
+			# Hull tendril / structure-breaker archetypes also damage modules.
+			var struct_amt: float = 0.0
+			if "structure_damage" in threat:
+				struct_amt = float(threat.structure_damage)
+			if struct_amt > 0.0 and on_structure_attack.is_valid():
+				on_structure_attack.call(threat, struct_amt)
 			threat.consume_attack()
 			combat_engaged = true
 		_advance_threat_motion(threat, delta, player_position)

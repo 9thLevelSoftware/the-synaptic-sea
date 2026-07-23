@@ -139,6 +139,7 @@
     "display_name": "Hull Tendril",
     "max_health": 48.0,
     "attack_damage": 8.0,
+    "structure_damage": 0.4,
     "attack_type": "electric",
     "attack_noise": 0.4,
     "attack_interval": 1.8,
