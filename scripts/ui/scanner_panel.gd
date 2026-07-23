@@ -105,10 +105,12 @@ func confirm_selection() -> Dictionary:
 	if _markers.is_empty():
 		_status = "no target"
 		_render()
+		_play_deny_sfx()
 		return {"success": false, "reason": "no_target", "ship": null}
 	if _coordinator == null or not _coordinator.has_method("travel_to_marker_id"):
 		_status = "no travel"
 		_render()
+		_play_deny_sfx()
 		return {"success": false, "reason": "not_ready", "ship": null}
 	var marker_id: String = String((_markers[_selected] as Dictionary).get("marker_id", ""))
 	var result: Dictionary = _coordinator.travel_to_marker_id(marker_id)
@@ -117,7 +119,17 @@ func confirm_selection() -> Dictionary:
 	else:
 		_status = String(result.get("reason", "rejected"))
 		_render()
+		# travel_to already emits deny SFX for most reasons; keep panel status.
 	return result
+
+
+func _play_deny_sfx() -> void:
+	if _coordinator == null or _coordinator.get("audio_manager") == null:
+		return
+	var am = _coordinator.audio_manager
+	if is_instance_valid(am) and am.has_method("play_sfx"):
+		var AudioEventSeamScript = load("res://scripts/audio/audio_event_seam.gd")
+		am.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 
 func get_row_texts() -> Array:
 	var out: Array = []
