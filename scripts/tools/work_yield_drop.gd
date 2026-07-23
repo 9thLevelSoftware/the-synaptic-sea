@@ -64,13 +64,28 @@ func try_interact(player_body: Node) -> bool:
 			added = int(inventory_state.call("add_item", str(item_id), qty))
 		if added > 0:
 			granted[str(item_id)] = added
-	scooped_flag = true
-	scooped.emit(drop_id, granted)
-	if marker != null:
-		marker.visible = false
-	if collision_shape != null:
-		collision_shape.disabled = true
-	queue_free()
+			items[item_id] = qty - added
+	if granted.is_empty():
+		# Inventory full / cannot accept — leave drop in place for later scoop.
+		return false
+	# Clear fully taken stacks; keep residual for partial scoops.
+	var remaining: Dictionary = {}
+	for item_id2 in items.keys():
+		var left: int = int(items[item_id2])
+		if left > 0:
+			remaining[str(item_id2)] = left
+	items = remaining
+	if remaining.is_empty():
+		scooped_flag = true
+		scooped.emit(drop_id, granted)
+		if marker != null:
+			marker.visible = false
+		if collision_shape != null:
+			collision_shape.disabled = true
+		queue_free()
+	else:
+		# Partial scoop: keep the pile, emit granted portion.
+		scooped.emit(drop_id, granted)
 	return true
 
 
