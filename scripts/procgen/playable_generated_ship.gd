@@ -1312,6 +1312,8 @@ func _build_runtime_nodes() -> void:
 	# REQ-WA-003: after _ready configures the pipeline, hook combat → work interrupt.
 	if threat_manager.damage_pipeline != null:
 		threat_manager.damage_pipeline.on_player_damaged = Callable(self, "_on_player_combat_damaged")
+	# REQ-MI-004: hull tendril structure strikes → ModuleIntegrityMap.
+	threat_manager.on_structure_attack = Callable(self, "_on_threat_structure_attack")
 	if not threat_manager.threat_killed.is_connected(_on_threat_killed):
 		threat_manager.threat_killed.connect(_on_threat_killed)
 	# REQ-AU-001..010: build the AudioManager service. The manager owns
@@ -4214,6 +4216,26 @@ func _interrupt_work_on_damage() -> void:
 func _on_player_combat_damaged(damage: float, _event: Dictionary = {}) -> void:
 	if damage > 0.0:
 		_interrupt_work_on_damage()
+
+
+## Hull tendril (etc.) structure strike — damage nearest wall module to the threat.
+func _on_threat_structure_attack(threat, amount: float) -> void:
+	if threat == null or amount <= 0.0 or module_integrity_map == null:
+		return
+	var pos := Vector3.ZERO
+	if threat.world_position is Array and (threat.world_position as Array).size() >= 3:
+		var wp: Array = threat.world_position
+		pos = Vector3(float(wp[0]), float(wp[1]), float(wp[2]))
+	var layout: Dictionary = _active_layout_for_work()
+	var nearest: Dictionary = _nearest_workable_wall_module(layout, pos, 6.0)
+	var mid: String = str(nearest.get("module_id", ""))
+	if mid.is_empty():
+		# Fall back: first registered module.
+		var ids: PackedStringArray = module_integrity_map.module_ids()
+		if ids.is_empty():
+			return
+		mid = ids[0]
+	apply_threat_structure_damage_for_validation(mid, amount)
 
 func _build_extinguisher_recharge_port() -> void:
 	_clear_extinguisher_recharge_port()
