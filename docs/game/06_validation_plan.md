@@ -500,7 +500,8 @@ run_clean 'Decontaminate zone XP smoke' 'DECONTAMINATE ZONE XP PASS emit=true ca
 run_clean 'Breach seal XP smoke' 'BREACH SEAL XP PASS weld=true shelter=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/breach_seal_xp_smoke.gd
 run_clean 'Repair full system XP smoke' 'REPAIR FULL SYSTEM XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_full_system_xp_smoke.gd
 run_clean 'Fabricate part XP smoke' 'FABRICATE PART XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/fabricate_part_xp_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=320 clean_output=true'
+run_clean 'Compound stim XP smoke' 'COMPOUND STIM XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/compound_stim_xp_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=321 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
