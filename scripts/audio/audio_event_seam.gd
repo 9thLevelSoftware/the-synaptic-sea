@@ -50,6 +50,8 @@ const UI_INVENTORY_OPEN: StringName = &"ui.inventory.open"
 const UI_WORK_PROGRESS: StringName = &"ui.work.progress"
 const UI_WOUNDS_OPEN: StringName = &"ui.wounds.open"
 const UI_CHART_ROUTE: StringName = &"ui.chart.route"
+const UI_SHIP_MOD_INSTALL: StringName = &"ui.ship_mod.install"
+const UI_SHIP_MOD_UNINSTALL: StringName = &"ui.ship_mod.uninstall"
 const UI_INVENTORY_CLOSE: StringName = &"ui.inventory.close"
 const UI_OBJECTIVE_ADVANCE: StringName = &"ui.objective.advance"
 const UI_SAVE: StringName = &"ui.save"
@@ -85,6 +87,7 @@ const ALL_UI_IDS: Array[StringName] = [
 	UI_INVENTORY_OPEN, UI_INVENTORY_CLOSE, UI_OBJECTIVE_ADVANCE,
 	UI_SAVE, UI_LOAD, UI_VITALS_LOW,
 	UI_WORK_PROGRESS, UI_WOUNDS_OPEN, UI_CHART_ROUTE,
+	UI_SHIP_MOD_INSTALL, UI_SHIP_MOD_UNINSTALL,
 ]
 
 ## Verb string (WorkAction definition.verb) -> event id for PKG-D10 coverage.

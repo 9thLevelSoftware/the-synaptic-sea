@@ -468,7 +468,8 @@ run_clean 'Fire plating resist smoke' 'FIRE PLATING RESIST PASS resist=true redu
 run_clean 'Work stamina interrupt smoke' 'WORK STAMINA INTERRUPT PASS start=true exhaust=true interrupted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_stamina_interrupt_smoke.gd
 run_clean 'Work weld skill context smoke' 'WORK WELD SKILL CONTEXT PASS skill=true start=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_weld_skill_context_smoke.gd
 run_clean 'Ship mod install XP smoke' 'SHIP MOD INSTALL XP PASS install_xp=true uninstall_xp=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_xp_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=288 clean_output=true'
+run_clean 'Ship mod audio smoke' 'SHIP MOD AUDIO PASS seam=true router=true route=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_audio_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=289 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 

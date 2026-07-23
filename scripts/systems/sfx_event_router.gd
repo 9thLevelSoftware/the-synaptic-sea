@@ -65,6 +65,8 @@ static var EVENT_CATALOG: Dictionary = {
 	String(AudioEventSeam.UI_WORK_PROGRESS): {"bus": AudioEventSeam.BUS_UI, "volume_db": -10.0, "cooldown": 0.5, "caption": ""},
 	String(AudioEventSeam.UI_WOUNDS_OPEN): {"bus": AudioEventSeam.BUS_UI, "volume_db": -8.0, "cooldown": 0.15, "caption": ""},
 	String(AudioEventSeam.UI_CHART_ROUTE): {"bus": AudioEventSeam.BUS_UI, "volume_db": -8.0, "cooldown": 0.20, "caption": "Route plotted"},
+	String(AudioEventSeam.UI_SHIP_MOD_INSTALL): {"bus": AudioEventSeam.BUS_UI, "volume_db": -6.0, "cooldown": 0.15, "caption": "Component installed"},
+	String(AudioEventSeam.UI_SHIP_MOD_UNINSTALL): {"bus": AudioEventSeam.BUS_UI, "volume_db": -6.0, "cooldown": 0.15, "caption": "Component removed"},
 
 	String(AudioEventSeam.META_BEACON_DISTRESS): {"bus": AudioEventSeam.BUS_META, "volume_db": -6.0, "cooldown": 0.0, "caption": "Distress signal received"},
 	String(AudioEventSeam.META_BIOMATTER_PULSE): {"bus": AudioEventSeam.BUS_META, "volume_db": -6.0, "cooldown": 0.0, "caption": ""},
