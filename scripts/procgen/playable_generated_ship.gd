@@ -9306,6 +9306,8 @@ func _tick_autosave_policy(delta: float) -> void:
 	if save_load_service.save_to_slot(slot_id, snap, SaveSlotStateScript.SLOT_KIND_AUTO, false, "Autosave"):
 		last_saved_snapshot = snap
 		_last_autosave_result = r
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_SAVE)
 
 ## Validation seam: the live AutosavePolicy instance (null before runtime build).
 func get_autosave_policy_for_validation():
