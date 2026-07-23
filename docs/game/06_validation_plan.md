@@ -548,6 +548,7 @@ run_clean 'Combat hit SFX smoke' 'COMBAT HIT SFX PASS hit=true sfx=true' "$GODOT
 run_clean 'Threat alert SFX smoke' 'THREAT ALERT SFX PASS engage=true edge=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_alert_sfx_smoke.gd
 run_clean 'Work pry XP live smoke' 'WORK PRY XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_pry_xp_live_smoke.gd
 run_clean 'Work yield scoop SFX smoke' 'WORK YIELD SCOOP SFX PASS scoop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_scoop_sfx_smoke.gd
+run_clean 'Work yield scoop away smoke' 'WORK YIELD SCOOP AWAY PASS away=true scoop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_scoop_away_smoke.gd
 run_clean 'Chart route SFX smoke' 'CHART ROUTE SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/chart_route_sfx_smoke.gd
 run_clean 'Component mount XP live smoke' 'COMPONENT MOUNT XP LIVE PASS dismount=true remount=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_xp_live_smoke.gd
 run_clean 'Sanity hallucination SFX smoke' 'SANITY HALLUCINATION SFX PASS phantom=true hud=true ambient=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sanity_hallucination_sfx_smoke.gd
@@ -585,6 +586,7 @@ run_clean 'Records menu back SFX smoke' 'RECORDS MENU BACK SFX PASS back=true sf
 run_clean 'Weapon reload SFX smoke' 'WEAPON RELOAD SFX PASS reload=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/weapon_reload_sfx_smoke.gd
 run_clean 'Player attack SFX smoke' 'PLAYER ATTACK SFX PASS attack=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_attack_sfx_smoke.gd
 run_clean 'Dry fire SFX smoke' 'DRY FIRE SFX PASS dry=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dry_fire_sfx_smoke.gd
+run_clean 'Dry fire away smoke' 'DRY FIRE AWAY PASS away=true dry=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dry_fire_away_smoke.gd
 run_clean 'Achievement unlock SFX smoke' 'ACHIEVEMENT UNLOCK SFX PASS unlock=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/achievement_unlock_sfx_smoke.gd
 run_clean 'Tool pickup SFX smoke' 'TOOL PICKUP SFX PASS pickup=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tool_pickup_sfx_smoke.gd
 run_clean 'Craft blocked SFX smoke' 'CRAFT BLOCKED SFX PASS blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_blocked_sfx_smoke.gd
@@ -615,6 +617,7 @@ run_clean 'Field craft begin blocked SFX smoke' 'FIELD CRAFT BEGIN BLOCKED SFX P
 run_clean 'Encumbrance overload SFX smoke' 'ENCUMBRANCE OVERLOAD SFX PASS overload=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encumbrance_overload_sfx_smoke.gd
 run_clean 'Ship mod install fail SFX smoke' 'SHIP MOD INSTALL FAIL SFX PASS fail=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_fail_sfx_smoke.gd
 run_clean 'Consumable use SFX smoke' 'CONSUMABLE USE SFX PASS ok=true fail=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/consumable_use_sfx_smoke.gd
+run_clean 'Consumable use away smoke' 'CONSUMABLE USE AWAY PASS away=true ok=true fail=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/consumable_use_away_smoke.gd
 run_clean 'Work start SFX smoke' 'WORK START SFX PASS start=true blocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_start_sfx_smoke.gd
 run_clean 'Quicksave denied SFX smoke' 'QUICKSAVE DENIED SFX PASS deny=true save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/quicksave_denied_sfx_smoke.gd
 run_clean 'Autosave SFX smoke' 'AUTOSAVE SFX PASS save=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/autosave_sfx_smoke.gd
@@ -626,6 +629,7 @@ run_clean 'Recipe picker deny SFX smoke' 'RECIPE PICKER DENY SFX PASS deny=true 
 run_clean 'Wounds treat deny SFX smoke' 'WOUNDS TREAT DENY SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_treat_deny_sfx_smoke.gd
 run_clean 'Transfer denied SFX smoke' 'TRANSFER DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/transfer_denied_sfx_smoke.gd
 run_clean 'Equip denied SFX smoke' 'EQUIP DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/equip_denied_sfx_smoke.gd
+run_clean 'Equip denied away smoke' 'EQUIP DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/equip_denied_away_smoke.gd
 run_clean 'Unequip empty SFX smoke' 'UNEQUIP EMPTY SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/unequip_empty_sfx_smoke.gd
 run_clean 'Reload denied SFX smoke' 'RELOAD DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/reload_denied_sfx_smoke.gd
 run_clean 'Reload denied away smoke' 'RELOAD DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/reload_denied_away_smoke.gd
@@ -636,7 +640,7 @@ run_clean 'Load denied SFX smoke' 'LOAD DENIED SFX PASS deny=true sfx=true' "$GO
 run_clean 'Cart grab denied SFX smoke' 'CART GRAB DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_grab_denied_sfx_smoke.gd
 run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=456 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=460 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
