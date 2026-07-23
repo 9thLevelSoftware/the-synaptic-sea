@@ -12,11 +12,14 @@ class_name ChartPanel
 signal panel_closed
 
 var _chart_state   # WebChartState
+var _sea_graph     # SeaGraph (PKG-D9c optional)
+var _route_summary: Dictionary = {}
 var _open: bool = false
 
 var _title_label: Label
 var _list_label: Label
 var _status_label: Label
+var _route_label: Label
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_TOP_LEFT)
@@ -31,12 +34,60 @@ func _ready() -> void:
 		_status_label = Label.new()
 		_status_label.position = Vector2(24, 320)
 		add_child(_status_label)
+		_route_label = Label.new()
+		_route_label.position = Vector2(24, 360)
+		_route_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_route_label.custom_minimum_size = Vector2(400, 0)
+		add_child(_route_label)
 	visible = _open
 	_render()
 
 func bind(chart_state) -> void:
 	assert(chart_state != null, "ChartPanel.bind: chart_state must not be null")
 	_chart_state = chart_state
+
+
+## PKG-D9c: optional strategic SeaGraph for extraction route display.
+func bind_sea_graph(sea_graph) -> void:
+	_sea_graph = sea_graph
+	_render()
+
+
+## Push a route dict from SeaGraph.find_route / route_to_extraction.
+func set_route_summary(route: Dictionary) -> void:
+	_route_summary = route.duplicate(true) if route != null else {}
+	_render()
+
+
+func refresh_extraction_route() -> void:
+	if _sea_graph == null or not _sea_graph.has_method("route_to_extraction"):
+		_route_summary = {}
+		_render()
+		return
+	_route_summary = _sea_graph.call("route_to_extraction")
+	_render()
+
+
+func get_route_lines() -> PackedStringArray:
+	var lines := PackedStringArray()
+	if _route_summary.is_empty():
+		return lines
+	if not bool(_route_summary.get("ok", false)):
+		lines.append("Route: unavailable (%s)" % str(_route_summary.get("reason", "?")))
+		return lines
+	var path: Array = _route_summary.get("path", [])
+	lines.append("Route to extraction (%d hops)" % maxi(0, path.size() - 1))
+	lines.append("  fuel=%.1f food=%.1f dist=%.1f" % [
+		float(_route_summary.get("fuel", 0.0)),
+		float(_route_summary.get("food", 0.0)),
+		float(_route_summary.get("distance", 0.0)),
+	])
+	if not path.is_empty():
+		var via: PackedStringArray = PackedStringArray()
+		for n in path:
+			via.append(str(n))
+		lines.append("  %s" % " -> ".join(via))
+	return lines
 
 func is_open() -> bool:
 	return _open
@@ -64,7 +115,10 @@ func get_status() -> String:
 	if _chart_state == null:
 		return "no chart"
 	var count: int = int(_chart_state.get_known_count())
-	return "no markers recorded" if count == 0 else "%d marker(s) recorded" % count
+	var base: String = "no markers recorded" if count == 0 else "%d marker(s) recorded" % count
+	if bool(_route_summary.get("ok", false)):
+		base += " · route ready"
+	return base
 
 func get_row_texts() -> Array:
 	var out: Array = []
@@ -94,3 +148,6 @@ func _render() -> void:
 	_list_label.text = "\n".join(rows) if not rows.is_empty() else "(no markers recorded)"
 	if _status_label != null:
 		_status_label.text = get_status()
+	if _route_label != null:
+		var rlines: PackedStringArray = get_route_lines()
+		_route_label.text = "\n".join(rlines) if not rlines.is_empty() else ""
