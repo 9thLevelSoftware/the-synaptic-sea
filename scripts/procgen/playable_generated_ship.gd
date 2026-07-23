@@ -5225,6 +5225,7 @@ func _on_player_field_craft_requested(_player_body) -> void:
 	if field_crafting_state == null or inventory_state == null:
 		return
 	if field_crafting_state.is_crafting():
+		_on_craft_blocked("field_crafting", "busy")
 		print("FIELD CRAFT BLOCKED reason=busy")
 		return
 	# Do NOT block on crafting_state.is_crafting() — FieldCraftingState and
@@ -5234,15 +5235,19 @@ func _on_player_field_craft_requested(_player_body) -> void:
 	if is_instance_valid(recipe_picker_panel) and recipe_picker_panel.is_open():
 		return
 	if is_instance_valid(scanner_panel) and scanner_panel.is_open():
+		_on_craft_blocked("field_crafting", "ui_busy")
 		print("FIELD CRAFT BLOCKED reason=ui_busy")
 		return
 	if is_instance_valid(inventory_panel) and inventory_panel.is_open():
+		_on_craft_blocked("field_crafting", "ui_busy")
 		print("FIELD CRAFT BLOCKED reason=ui_busy")
 		return
 	if not _menus_are_closed():
+		_on_craft_blocked("field_crafting", "menu_open")
 		print("FIELD CRAFT BLOCKED reason=menu_open")
 		return
 	if not is_instance_valid(recipe_picker_panel):
+		_on_craft_blocked("field_crafting", "no_panel")
 		print("FIELD CRAFT BLOCKED reason=no_panel")
 		return
 	recipe_picker_panel.open_for_station("field_crafting")
