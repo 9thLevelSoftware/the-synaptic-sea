@@ -217,14 +217,16 @@ func tick(delta_seconds: float) -> Array:
 	_apply_music_layer_gains()
 	var due: Array = meta_event_state.tick(delta_seconds)
 	for ev in due:
-		# Each fired meta-event is routed through SfxEventRouter so the
-		# caption queue + bus routing go through the same path as a normal
-		# SFX. AudioManager.play_sfx handles unknown ids (the catalog maps
-		# meta events to the meta bus).
+		# Route scheduled meta events through SfxEventRouter via play_sfx so
+		# captions + routed_count match live META_* catalog ids (beacon/pulse/groan).
 		var id_str: String = String(ev.get("id", ""))
-		var bus_id: String = _bus_for_meta_event_id(id_str)
-		var vol: float = float(ev.get("volume_db", -6.0))
-		_play_via_bus(bus_id, vol)
+		var catalog_id: StringName = _catalog_id_for_meta_schedule(id_str)
+		if not String(catalog_id).is_empty():
+			play_sfx(catalog_id)
+		else:
+			var bus_id: String = _bus_for_meta_event_id(id_str)
+			var vol: float = float(ev.get("volume_db", -6.0))
+			_play_via_bus(bus_id, vol)
 		var voice_log_id: String = String(ev.get("voice_log_id", ""))
 		if not voice_log_id.is_empty():
 			play_voice_log(StringName(voice_log_id))
@@ -493,6 +495,23 @@ func _apply_music_layer_gains() -> void:
 	# Combined in [0, 1] -> dB mapping: -24 dB at 0.0 -> 0 dB at 1.0.
 	player.volume_db = -24.0 + combined * 24.0
 
+## Map MetaEventState schedule ids (beacon_distress / biomatter_pulse / hull_groan)
+## onto the AudioEventSeam META_* catalog constants used by SfxEventRouter.
+func _catalog_id_for_meta_schedule(id_str: String) -> StringName:
+	if id_str == String(AudioEventSeamScript.META_EVENT_BEACON) \
+			or id_str == String(AudioEventSeamScript.META_BEACON_DISTRESS):
+		return AudioEventSeamScript.META_BEACON_DISTRESS
+	if id_str == String(AudioEventSeamScript.META_EVENT_PULSE) \
+			or id_str == String(AudioEventSeamScript.META_BIOMATTER_PULSE):
+		return AudioEventSeamScript.META_BIOMATTER_PULSE
+	if id_str == String(AudioEventSeamScript.META_EVENT_GROAN) \
+			or id_str == String(AudioEventSeamScript.META_HULL_GROAN):
+		return AudioEventSeamScript.META_HULL_GROAN
+	if id_str == String(AudioEventSeamScript.META_REACTOR_HUM):
+		return AudioEventSeamScript.META_REACTOR_HUM
+	return &""
+
+
 ## Internal: route a meta-event id to its bus.
 func _bus_for_meta_event_id(id_str: String) -> String:
 	if id_str == String(AudioEventSeamScript.META_BEACON_DISTRESS):
@@ -502,5 +521,10 @@ func _bus_for_meta_event_id(id_str: String) -> String:
 	if id_str == String(AudioEventSeamScript.META_HULL_GROAN):
 		return String(AudioEventSeamScript.BUS_META)
 	if id_str == String(AudioEventSeamScript.META_REACTOR_HUM):
+		return String(AudioEventSeamScript.BUS_META)
+	# Schedule short ids also land on meta bus.
+	if id_str == String(AudioEventSeamScript.META_EVENT_BEACON) \
+			or id_str == String(AudioEventSeamScript.META_EVENT_PULSE) \
+			or id_str == String(AudioEventSeamScript.META_EVENT_GROAN):
 		return String(AudioEventSeamScript.BUS_META)
 	return String(AudioEventSeamScript.BUS_SFX)
