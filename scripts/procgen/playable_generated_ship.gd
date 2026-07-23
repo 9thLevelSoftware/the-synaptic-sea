@@ -5785,6 +5785,8 @@ func _emit_objective_training(objective_type: String, room_id: String, objective
 				audio_manager.play_sfx(AudioEventSeamScript.UI_OBJECTIVE_ADVANCE)
 	if objective_type == "download_logs":
 		emit_training_event("extract_data", objective_id if not objective_id.is_empty() else "download_logs")
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 	# Stream F: restoring ship systems / stabilizing the reactor is leadership.
 	if objective_type == "restore_systems" or objective_type == "stabilize_reactor":
 		emit_training_event("inspire_crew", objective_type)
