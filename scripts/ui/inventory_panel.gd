@@ -31,6 +31,8 @@ var _container_label: String = ""
 # panel a Callable at bind time rather than the panel reaching for a
 # MenuCoordinator reference directly.
 var tooltip_query_push: Callable = Callable()
+## Optional audio manager for transfer deny cues (set by coordinator).
+var _audio_manager: Node = null
 
 # Selection models, one per visible list. "self"/"you" share the player list model.
 var _sel_self := InventorySelectionModelScript.new()
@@ -477,7 +479,20 @@ func transfer_selected(from_pane: String) -> int:
 	var moved: int = CargoTransferScript.move_items(src, dst, id_to_qty)
 	if moved > 0:
 		_after_mutation()
+	else:
+		# No items moved (empty selection / full destination) — soft deny.
+		_emit_transfer_denied_sfx()
 	return moved
+
+
+func set_audio_manager(am: Node) -> void:
+	_audio_manager = am
+
+
+func _emit_transfer_denied_sfx() -> void:
+	if is_instance_valid(_audio_manager) and _audio_manager.has_method("play_sfx"):
+		var AudioEventSeamScript = load("res://scripts/audio/audio_event_seam.gd")
+		_audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 
 ## Split: move exactly qty of one id from from_pane to the other pane.
 func transfer_quantity(from_pane: String, item_id: String, qty: int) -> int:
