@@ -169,7 +169,7 @@ run_clean 'readability smoke' 'MAIN PLAYABLE SLICE READABILITY PASS objective_pr
 run_clean 'main objective variation smoke' 'MAIN PLAYABLE OBJECTIVE VARIATION PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_objective_variation_smoke.gd
 run_clean 'objective progress state smoke' 'OBJECTIVE PROGRESS STATE PASS sequence=2 required=2 completed=2 applied_once=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/objective_progress_state_smoke.gd
 run_clean 'objective progress hud label smoke' 'OBJECTIVE PROGRESS HUD LABEL PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/objective_progress_hud_label_smoke.gd
-run_clean 'save/load service smoke' 'SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=31 survival_roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_load_service_smoke.gd
+run_clean 'save/load service smoke' 'SAVE LOAD SERVICE PASS round_trip=true version_match=true summaries=32 survival_roundtrip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/save_load_service_smoke.gd
 run_clean 'main save/load smoke' 'MAIN PLAYABLE SAVE LOAD PASS saved_sequence=2 loaded_sequence=2 position_match=true supplies=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_save_load_smoke.gd
 run_clean 'REQ-012 auto-save sequence smoke' 'REQ012 AUTOSAVE SEQUENCE CHECK PASS live=2 snapshot=2 file=2 has_save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/req012_autosave_sequence_smoke.gd
 run_clean 'template C stacked layout main scenario smoke' 'TEMPLATE C MAIN SCENARIO PASS objectives=5 current_sequence=6 run_complete=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_c_main_scenario_smoke.gd
@@ -454,7 +454,9 @@ run_clean 'Work progress noise smoke' 'WORK PROGRESS NOISE PASS cut=true pulse=t
 run_clean 'Wound bandage inventory smoke' 'WOUND BANDAGE INVENTORY PASS wound=true bandage=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wound_bandage_inventory_smoke.gd
 run_clean 'Cut module scene smoke' 'CUT MODULE SCENE PASS cut=true damaged=true sparse=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cut_module_scene_smoke.gd
 run_clean 'Remount system restore smoke' 'REMOUNT SYSTEM RESTORE PASS damage=true remount=true floor=true no_full=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/remount_system_restore_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=274 clean_output=true'
+run_clean 'Ship mod run snapshot smoke' 'SHIP MOD RUN SNAPSHOT PASS shipmod=true pillar=true count=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_run_snapshot_smoke.gd
+run_clean 'Work hold-to-work smoke' 'WORK HOLD TO WORK PASS freeze=true validation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_hold_to_work_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=276 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 

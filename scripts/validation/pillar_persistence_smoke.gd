@@ -98,8 +98,8 @@ func _initialize() -> void:
 	var loaded = RunSnapshotScript.from_dict(d, "gate2-current-run-4", "4.6.2")
 	if loaded == null:
 		_fail("from_dict failed"); return
-	if loaded.get_summary_count() < 31:
-		_fail("SUMMARY_FIELDS should include pillar (got %d)" % loaded.get_summary_count()); return
+	if loaded.get_summary_count() < 32:
+		_fail("SUMMARY_FIELDS should include pillar+shipmod (got %d)" % loaded.get_summary_count()); return
 	var unp: Dictionary = PillarPersistenceScript.unpack_all({
 		"module_integrity": loaded.module_integrity_summary,
 		"component_placement": loaded.component_placement_summary,

@@ -109,8 +109,15 @@ static func sanitize_historical(raw: Dictionary) -> Dictionary:
 		out["component_placement_summary"] = {}
 	if not out.has("work_action_summary"):
 		out["work_action_summary"] = {}
+	if not out.has("ship_modification_summary"):
+		out["ship_modification_summary"] = {}
 	# Drop garbage non-dict values
-	for k in ["module_integrity_summary", "component_placement_summary", "work_action_summary"]:
+	for k in [
+		"module_integrity_summary",
+		"component_placement_summary",
+		"work_action_summary",
+		"ship_modification_summary",
+	]:
 		if typeof(out.get(k, null)) != TYPE_DICTIONARY:
 			out[k] = {}
 	return out
