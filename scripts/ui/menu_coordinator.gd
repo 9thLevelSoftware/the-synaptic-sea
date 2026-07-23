@@ -694,14 +694,19 @@ func _save_load_row_line(row, index: int) -> String:
 	# one on save), but guard against an empty one from another writer by falling back
 	# to the slot_id rather than rendering "slot_03 | ".
 	var shown_name: String = display_name if not display_name.is_empty() else slot_id
-	# ADR-0046 slot metadata: surface location + accumulated play time + world seed
-	# so the list is scannable without opening the payload.
+	# ADR-0046 slot metadata: surface location, class, objective, play time, and
+	# world seed so the list is scannable without opening the payload.
 	var loc: String = String(row.current_location)
 	if loc.is_empty():
 		loc = "?"
+	var cls: String = String(row.player_class)
+	if cls.is_empty():
+		cls = "?"
+	var obj_seq: int = int(row.objective_sequence)
 	var time_txt: String = _format_play_time_seconds(float(row.play_time_seconds))
 	var seed_n: int = int(row.synaptic_sea_seed)
-	return "%s | %s | %s | %s | seed=%d%s" % [slot_id, shown_name, loc, time_txt, seed_n, verb_text]
+	return "%s | %s | %s | %s | obj=%d | %s | seed=%d%s" % [
+		slot_id, shown_name, loc, cls, obj_seq, time_txt, seed_n, verb_text]
 
 
 ## Human-readable accumulated play clock for save-slot rows (not wall-clock epoch).
