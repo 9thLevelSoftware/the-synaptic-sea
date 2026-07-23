@@ -3626,6 +3626,19 @@ func _apply_ship_mod_system_link(component_id: String, installing: bool) -> void
 			ship_systems_manager.call("damage_subcomponent", sys_id, sub_id, 0.6)
 
 
+## After save/load: restore linked hub subs + station tiers from ship-mod manifest.
+func _reapply_ship_mod_runtime_effects() -> void:
+	if ship_modification_state == null:
+		return
+	for e in ship_modification_state.installed:
+		if typeof(e) != TYPE_DICTIONARY:
+			continue
+		var cid: String = str((e as Dictionary).get("component_id", ""))
+		if not cid.is_empty():
+			_apply_ship_mod_system_link(cid, true)
+	_refresh_station_tiers_from_ship_mod()
+
+
 ## REQ-SMOD-001: ship-mod installs with station_tier_bonus raise hub station tiers.
 ## Combines ship-mod manifest + physical component_placement for derive_tier.
 func _refresh_station_tiers_from_ship_mod() -> void:
@@ -9236,6 +9249,8 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 				_work_requires_hold = false  # restored mid-work continues without re-hold
 	if ship_modification_state != null and not snapshot.ship_modification_summary.is_empty():
 		ship_modification_state.apply_summary(snapshot.ship_modification_summary)
+		# Re-apply mechanical effects of installed components after load.
+		_reapply_ship_mod_runtime_effects()
 	_ensure_consumable_hotbar_assignments()
 	_refresh_consumable_ui()
 	# REQ-014: reconcile the junction_calibrator pickup marker visibility
