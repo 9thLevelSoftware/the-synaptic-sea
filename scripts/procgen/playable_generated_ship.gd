@@ -5051,6 +5051,11 @@ func _on_production_harvested(station_kind: String, item_id: String, qty: int) -
 	_register_food_for_spoilage(item_id)
 	_refresh_inventory_hud()
 	_recompute_player_encumbrance()
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_WORK_HARVEST)
+	# Hydroponics harvest trains cooking; recycler is industrial (no cook XP).
+	if station_kind == "hydroponics":
+		emit_training_event("cook_meal", item_id)
 	print("PRODUCTION HARVESTED station=%s item=%s qty=%d" % [station_kind, item_id, qty])
 
 func _on_production_blocked(station_kind: String, reason: String) -> void:
