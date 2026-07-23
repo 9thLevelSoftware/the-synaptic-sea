@@ -61,6 +61,7 @@ var hub_upgrade_panel
 var class_panel
 var audio_log_panel
 var audio_settings_panel
+var _audio_manager = null  # AudioManager for UI open SFX (codex/pause)
 var language_selector
 var release_badge_overlay
 var credits_screen
@@ -169,14 +170,13 @@ func handle_ui_input(event: InputEvent) -> bool:
 	if event.is_action_pressed("ui_pause"):
 		if menu_state.is_in_play():
 			menu_state.open_menu("pause_menu")
+			_emit_menu_open_sfx()
 		else:
 			menu_state.close_all()
 		return true
 	if event.is_action_pressed("ui_open_codex"):
-		if menu_state.is_in_play():
-			menu_state.open_menu("codex")
-		else:
-			menu_state.open_menu("codex")
+		menu_state.open_menu("codex")
+		_emit_menu_open_sfx()
 		return true
 	if menu_state.is_in_play():
 		return false
@@ -278,6 +278,13 @@ func dismiss_latest_tutorial() -> bool:
 func open_main_menu() -> void:
 	menu_state.open_menu("main_menu")
 	_refresh_all()
+
+
+func _emit_menu_open_sfx() -> void:
+	if is_instance_valid(_audio_manager) and _audio_manager.has_method("play_sfx"):
+		var AudioEventSeamScript = load("res://scripts/audio/audio_event_seam.gd")
+		_audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_OPEN)
+
 
 ## ADR-0043 title handoff seam: dismisses the in-scene boot-time main_menu
 ## _build_runtime_nodes() parks open via open_main_menu(). The title screen
@@ -489,6 +496,7 @@ func _build_meta_screens() -> void:
 func bind_meta_screens(p_achievement_state, p_audio_manager, p_skill_tree_state, p_player_progression, p_hub_upgrade_state, p_meta_progression_state, p_localization_catalog, p_build_metadata_state, p_save_load_menu, p_a11y, p_unlock_registry = null, p_snapshot_builder: Callable = Callable(), p_demo_scope_gate = null, p_demo_save_refused: Callable = Callable()) -> void:
 	assert(p_achievement_state != null, "p_achievement_state dependency is missing")
 	assert(p_audio_manager != null, "p_audio_manager dependency is missing")
+	_audio_manager = p_audio_manager
 	assert(p_skill_tree_state != null, "p_skill_tree_state dependency is missing")
 	assert(p_player_progression != null, "p_player_progression dependency is missing")
 	assert(p_hub_upgrade_state != null, "p_hub_upgrade_state dependency is missing")
