@@ -1,0 +1,76 @@
+extends SceneTree
+
+## end_run death routes UI_VITALS_LOW; non-death routes UI_OBJECTIVE_ADVANCE.
+## Marker: END RUN SFX PASS death=true complete=true
+
+const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
+const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
+const TIMEOUT_FRAMES: int = 240
+
+var main_node: Node
+var playable
+var frame_count: int = 0
+var finished: bool = false
+
+
+func _initialize() -> void:
+	main_node = MAIN_SCENE.instantiate()
+	get_root().add_child(main_node)
+	process_frame.connect(_on_frame)
+
+
+func _on_frame() -> void:
+	if finished:
+		return
+	frame_count += 1
+	if playable == null:
+		playable = _find_playable(main_node)
+	if playable == null or not playable.playable_started:
+		if frame_count > TIMEOUT_FRAMES:
+			_fail("playable not ready")
+		return
+	_validate()
+
+
+func _validate() -> void:
+	finished = true
+	if playable.audio_manager == null or playable.audio_manager.sfx_router == null:
+		_fail("audio"); return
+	var mgr: Node = playable.audio_manager
+
+	# Death path (slice_complete freezes further end_run calls).
+	mgr.sfx_router.configure({})
+	var death_before: int = int(mgr.sfx_router.get_routed_count(AudioEventSeamScript.UI_VITALS_LOW))
+	playable.slice_complete = false
+	playable.end_run("death")
+	var death_after: int = int(mgr.sfx_router.get_routed_count(AudioEventSeamScript.UI_VITALS_LOW))
+	if death_after <= death_before:
+		_fail("death UI_VITALS_LOW not routed before=%d after=%d" % [death_before, death_after]); return
+
+	# Successful end on a fresh slice flag.
+	mgr.sfx_router.configure({})
+	playable.slice_complete = false
+	var complete_before: int = int(mgr.sfx_router.get_routed_count(AudioEventSeamScript.UI_OBJECTIVE_ADVANCE))
+	playable.end_run("completion")
+	var complete_after: int = int(mgr.sfx_router.get_routed_count(AudioEventSeamScript.UI_OBJECTIVE_ADVANCE))
+	if complete_after <= complete_before:
+		_fail("completion UI_OBJECTIVE_ADVANCE not routed before=%d after=%d" % [complete_before, complete_after]); return
+
+	print("END RUN SFX PASS death=true complete=true")
+	quit(0)
+
+
+func _find_playable(n: Node):
+	if n is PlayableGeneratedShip:
+		return n
+	for c in n.get_children():
+		var f = _find_playable(c)
+		if f != null:
+			return f
+	return null
+
+
+func _fail(msg: String) -> void:
+	print("END RUN SFX FAIL: %s" % msg)
+	finished = true
+	quit(1)
