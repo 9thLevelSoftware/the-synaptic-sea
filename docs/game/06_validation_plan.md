@@ -465,7 +465,7 @@ run_clean 'Station busy consume smoke' 'STATION BUSY CONSUME PASS craft=true hyd
 run_clean 'Recycler busy consume smoke' 'RECYCLER BUSY CONSUME PASS recycling=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recycler_busy_consume_smoke.gd
 run_clean 'Production output full consume smoke' 'PRODUCTION OUTPUT FULL CONSUME PASS hydro=true recycler=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_output_full_consume_smoke.gd
 run_clean 'Recycler no input consume smoke' 'RECYCLER NO INPUT CONSUME PASS no_input=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recycler_no_input_consume_smoke.gd
-run_clean 'Plant crop blocked consume smoke' 'PLANT CROP BLOCKED CONSUME PASS busy=true missing=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/plant_crop_blocked_consume_smoke.gd
+run_clean 'Plant crop blocked consume smoke' 'PLANT CROP BLOCKED CONSUME PASS busy=true missing=true blocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/plant_crop_blocked_consume_smoke.gd
 run_clean 'Work progress noise smoke' 'WORK PROGRESS NOISE PASS cut=true pulse=true detection=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_progress_noise_smoke.gd
 run_clean 'Wound bandage inventory smoke' 'WOUND BANDAGE INVENTORY PASS wound=true bandage=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wound_bandage_inventory_smoke.gd
 run_clean 'Cut module scene smoke' 'CUT MODULE SCENE PASS cut=true damaged=true sparse=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cut_module_scene_smoke.gd
