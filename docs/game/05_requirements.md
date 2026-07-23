@@ -1231,33 +1231,37 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ## REQ-MI-004: Structure damage sources route through module integrity
 
-- Source: \eatures/module_integrity.md- Type: gameplay
+- Source: features/module_integrity.md
+- Type: gameplay
 - Priority: must
-- Status: Approved
+- Status: Implemented
 - Acceptance criteria:
   - Fire, decompression, threat structure attacks, and player tools can damage modules.
 - Verification:
-  - Multi-source damage smoke (when implemented)
+  - `scripts/validation/multi_source_module_damage_smoke.gd` marker `MULTI SOURCE MODULE DAMAGE PASS fire=true decomp=true threat=true tool=true interrupt=true`
+  - `ModuleDamageRouter`; vent path + threat validation seam on playable
 
 ## REQ-WA-002: WorkActions emit noise, XP, and inventory yields
 
-- Source: \eatures/work_actions.md- Type: gameplay
+- Source: features/work_actions.md
+- Type: gameplay
 - Priority: must
-- Status: Approved
+- Status: Implemented
 - Acceptance criteria:
   - Completed work emits noise into threat detection, XP via TrainingEventBus, and yields into inventory/encumbrance.
 - Verification:
-  - WorkAction scene smoke (when implemented)
+  - WorkAction driver/integration/interact smokes; `emit_training_event` on complete
 
 ## REQ-WA-003: WorkActions interrupt on damage without double-consume
 
-- Source: \eatures/work_actions.md- Type: gameplay
+- Source: features/work_actions.md
+- Type: gameplay
 - Priority: must
-- Status: Approved
+- Status: Implemented
 - Acceptance criteria:
   - Mid-work damage interrupts progress; materials are not double-consumed.
 - Verification:
-  - WorkAction interrupt pure smoke (when implemented)
+  - Multi-source smoke interrupt case; vitals health drop calls `_interrupt_work_on_damage`
 
 ## REQ-WA-004: Repair/seal/suppress unify onto WorkActions
 

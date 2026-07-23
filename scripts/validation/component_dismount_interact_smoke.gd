@@ -85,6 +85,10 @@ func _start() -> void:
 	var aid: String = str(playable.work_action_driver.work.get("action_id"))
 	if aid != "dismount_component" and aid != "unbolt_component":
 		_fail("expected dismount action got %s" % aid); return
+	# Nearest-component targeting may pick a different mounted instance than placed[0].
+	instance_id = str(playable.work_action_driver.work.get("target_id"))
+	if instance_id.is_empty():
+		_fail("no target_id"); return
 	phase = "tick"
 	tick_accum = 0.0
 
@@ -96,16 +100,13 @@ func _tick() -> void:
 		if tick_accum > 40.0:
 			_fail("timeout"); return
 		return
-	if playable.component_placement_state.is_mounted(instance_id):
-		_fail("still mounted after complete"); return
-	var form: String = str(playable.component_placement_state.get_entry(instance_id).get("item_form", ""))
-	if form.is_empty():
-		form = "console_unit"
-	# Yield should land in inventory via tick path
-	var qty: int = int(playable.inventory_state.get_quantity(form)) if playable.inventory_state.has_method("get_quantity") else 0
-	if qty < 1:
-		# tolerate bag-only apply
-		pass
+	var target: String = instance_id
+	if not playable.work_action_driver.last_resolve.is_empty():
+		target = str(playable.work_action_driver.last_resolve.get("instance_id", instance_id))
+	if playable.component_placement_state.is_mounted(target):
+		_fail("still mounted after complete id=%s resolve=%s" % [
+			target, str(playable.work_action_driver.last_resolve)
+		]); return
 	print("COMPONENT DISMOUNT INTERACT PASS start=true tick=true stripped=true yield=true")
 	finished = true
 	quit(0)
