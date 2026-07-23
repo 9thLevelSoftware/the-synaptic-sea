@@ -552,11 +552,14 @@ run_clean 'Decode signal XP away smoke' 'DECODE SIGNAL XP AWAY PASS away=true em
 run_clean 'Diagnose fault XP smoke' 'DIAGNOSE FAULT XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/diagnose_fault_xp_smoke.gd
 run_clean 'Diagnose fault XP away smoke' 'DIAGNOSE FAULT XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/diagnose_fault_xp_away_smoke.gd
 run_clean 'Social training XP smoke' 'SOCIAL TRAINING XP PASS inspire=true negotiate=true intimidate=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/social_training_xp_smoke.gd
+run_clean 'Social training XP away smoke' 'SOCIAL TRAINING XP AWAY PASS away=true inspire=true negotiate=true intimidate=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/social_training_xp_away_smoke.gd
 run_clean 'Stream D/E training XP smoke' 'STREAM DE TRAINING XP PASS discover=true extract=true plot=true ration=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/stream_de_training_xp_smoke.gd
 run_clean 'Consumable training XP smoke' 'CONSUMABLE TRAINING XP PASS medicine=true food=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/consumable_training_xp_smoke.gd
+run_clean 'Consumable training XP away smoke' 'CONSUMABLE TRAINING XP AWAY PASS away=true medicine=true food=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/consumable_training_xp_away_smoke.gd
 run_clean 'Scanner open XP smoke' 'SCANNER OPEN XP PASS open=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_open_xp_smoke.gd
 run_clean 'Scanner open XP away smoke' 'SCANNER OPEN XP AWAY PASS away=true open=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/scanner_open_xp_away_smoke.gd
 run_clean 'Travel training XP smoke' 'TRAVEL TRAINING XP PASS plot=true astrogation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_training_xp_smoke.gd
+run_clean 'Travel training XP away smoke' 'TRAVEL TRAINING XP AWAY PASS away=true plot=true astrogation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/travel_training_xp_away_smoke.gd
 run_clean 'Threat kill XP smoke' 'THREAT KILL XP PASS kill=true melee=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_kill_xp_smoke.gd
 run_clean 'Threat kill XP away smoke' 'THREAT KILL XP AWAY PASS away=true kill=true melee=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_kill_xp_away_smoke.gd
 run_clean 'Discover room XP smoke' 'DISCOVER ROOM XP PASS discover=true extract=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/discover_room_xp_smoke.gd
@@ -576,6 +579,7 @@ run_clean 'Perform surgery XP smoke' 'PERFORM SURGERY XP PASS emit=true catalog=
 run_clean 'Perform surgery XP away smoke' 'PERFORM SURGERY XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/perform_surgery_xp_away_smoke.gd
 run_clean 'Training catalog coverage smoke' 'TRAINING CATALOG COVERAGE PASS count=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/training_catalog_coverage_smoke.gd
 run_clean 'Repair subcomponent XP smoke' 'REPAIR SUBCOMPONENT XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_subcomponent_xp_smoke.gd
+run_clean 'Repair subcomponent XP away smoke' 'REPAIR SUBCOMPONENT XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_subcomponent_xp_away_smoke.gd
 run_clean 'Work yield drop SFX smoke' 'WORK YIELD DROP SFX PASS drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_sfx_smoke.gd
 run_clean 'Work yield drop away smoke' 'WORK YIELD DROP AWAY PASS away=true drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_away_smoke.gd
 run_clean 'Hatch door open SFX smoke' 'HATCH DOOR OPEN SFX PASS hatch=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_open_sfx_smoke.gd
@@ -743,7 +747,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=563 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=567 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
