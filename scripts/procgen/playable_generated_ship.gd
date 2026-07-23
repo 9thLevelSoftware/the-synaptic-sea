@@ -4863,6 +4863,8 @@ func _on_repair_started(system_id: String, subcomponent_id: String) -> void:
 	# Stream E: starting a repair channel is the live diagnose_fault action —
 	# the player has identified the broken subcomponent and committed to work.
 	emit_training_event("diagnose_fault", "%s.%s" % [system_id, subcomponent_id])
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 
 ## Stream F: play a voice log → signal analysis training (decode_signal).
 func _on_voice_log_played(entry_id: String) -> void:
