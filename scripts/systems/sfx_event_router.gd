@@ -58,6 +58,7 @@ static var EVENT_CATALOG: Dictionary = {
 
 	String(AudioEventSeam.UI_INVENTORY_OPEN): {"bus": AudioEventSeam.BUS_UI, "volume_db": -6.0, "cooldown": 0.10, "caption": ""},
 	String(AudioEventSeam.UI_INVENTORY_CLOSE): {"bus": AudioEventSeam.BUS_UI, "volume_db": -6.0, "cooldown": 0.10, "caption": ""},
+	String(AudioEventSeam.UI_PANEL_OPEN): {"bus": AudioEventSeam.BUS_UI, "volume_db": -8.0, "cooldown": 0.10, "caption": ""},
 	String(AudioEventSeam.UI_PANEL_CLOSE): {"bus": AudioEventSeam.BUS_UI, "volume_db": -8.0, "cooldown": 0.08, "caption": ""},
 	String(AudioEventSeam.UI_OBJECTIVE_ADVANCE): {"bus": AudioEventSeam.BUS_UI, "volume_db": -6.0, "cooldown": 0.10, "caption": "Objective updated"},
 	String(AudioEventSeam.UI_SAVE): {"bus": AudioEventSeam.BUS_UI, "volume_db": -6.0, "cooldown": 0.10, "caption": ""},
