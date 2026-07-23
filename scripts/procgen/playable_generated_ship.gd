@@ -6705,15 +6705,21 @@ func _attack_with_equipped_weapon() -> Dictionary:
 ## reload_target rounds from inventory immediately; AmmoState credits the magazine on
 ## completion (after RELOAD_SECONDS). Melee weapons (no ammo_item_id) are no-ops.
 func _begin_weapon_reload() -> void:
-	if ammo_state == null or ammo_state.is_reloading() or threat_manager == null:
+	if ammo_state == null or threat_manager == null:
+		return
+	if ammo_state.is_reloading():
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return
 	var weapon_id: String = _equipped_primary_weapon_id()
 	if weapon_id.is_empty():
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return
 	var weapon: Dictionary = threat_manager.weapon_definitions.get(weapon_id, {}) if threat_manager.weapon_definitions.get(weapon_id, {}) is Dictionary else {}
 	var ammo_item_id: String = str(weapon.get("ammo_item_id", ""))
 	if ammo_item_id.is_empty():
-		return  # melee: no reload
+		return  # melee: no reload (silent)
 	var mag_size: int = int(weapon.get("magazine_size", 0))
 	var reserve: int = inventory_state.get_quantity(ammo_item_id) if inventory_state != null else 0
 	if ammo_state.begin_reload(weapon_id, mag_size, reserve):
@@ -6723,6 +6729,10 @@ func _begin_weapon_reload() -> void:
 			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 		_refresh_inventory_hud()
 		_refresh_weapon_hotbar()
+	else:
+		# Full mag / no reserve ammo — soft deny.
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 
 ## Domain 2 (BP2): a derived "is the player in a lit area" signal. A powered ship is
 ## lit (player more visible); an unpowered/derelict ship is dark (stealthier). Uses
