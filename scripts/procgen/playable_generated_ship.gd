@@ -3767,12 +3767,16 @@ func _try_work_action_interact(player_body) -> bool:
 
 	if action_id.is_empty() or target_id.is_empty():
 		return false
+	# Match catalog min_skill (weld/patch → repair; strip/cut/pry → salvage).
+	var skill_id: String = "salvage"
+	if action_id in ["weld_patch", "patch_breach", "splice_conduit"]:
+		skill_id = "repair"
 	var skill_level: int = 0
 	if player_progression != null and player_progression.has_method("get_skill_level"):
-		skill_level = int(player_progression.call("get_skill_level", "salvage"))
+		skill_level = int(player_progression.call("get_skill_level", skill_id))
 	var ctx: Dictionary = {
 		"tool_class": tool_class,
-		"skill_id": "salvage",
+		"skill_id": skill_id,
 		"skill_level": skill_level,
 		"inventory": inv,
 	}
