@@ -579,7 +579,8 @@ run_clean 'Ship mod install fail SFX smoke' 'SHIP MOD INSTALL FAIL SFX PASS fail
 run_clean 'Consumable use SFX smoke' 'CONSUMABLE USE SFX PASS ok=true fail=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/consumable_use_sfx_smoke.gd
 run_clean 'Work start SFX smoke' 'WORK START SFX PASS start=true blocked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_start_sfx_smoke.gd
 run_clean 'Quicksave denied SFX smoke' 'QUICKSAVE DENIED SFX PASS deny=true save=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/quicksave_denied_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=399 clean_output=true'
+run_clean 'Autosave SFX smoke' 'AUTOSAVE SFX PASS save=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/autosave_sfx_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=400 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
