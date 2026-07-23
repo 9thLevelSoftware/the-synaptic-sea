@@ -173,6 +173,7 @@ func handle_ui_input(event: InputEvent) -> bool:
 			_emit_menu_open_sfx()
 		else:
 			menu_state.close_all()
+			_emit_menu_close_sfx()
 		return true
 	if event.is_action_pressed("ui_open_codex"):
 		menu_state.open_menu("codex")
@@ -284,6 +285,12 @@ func _emit_menu_open_sfx() -> void:
 	if is_instance_valid(_audio_manager) and _audio_manager.has_method("play_sfx"):
 		var AudioEventSeamScript = load("res://scripts/audio/audio_event_seam.gd")
 		_audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_OPEN)
+
+
+func _emit_menu_close_sfx() -> void:
+	if is_instance_valid(_audio_manager) and _audio_manager.has_method("play_sfx"):
+		var AudioEventSeamScript = load("res://scripts/audio/audio_event_seam.gd")
+		_audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 
 
 ## ADR-0043 title handoff seam: dismisses the in-scene boot-time main_menu
