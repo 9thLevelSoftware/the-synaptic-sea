@@ -549,7 +549,8 @@ run_clean 'Player attack SFX smoke' 'PLAYER ATTACK SFX PASS attack=true sfx=true
 run_clean 'Dry fire SFX smoke' 'DRY FIRE SFX PASS dry=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dry_fire_sfx_smoke.gd
 run_clean 'Achievement unlock SFX smoke' 'ACHIEVEMENT UNLOCK SFX PASS unlock=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/achievement_unlock_sfx_smoke.gd
 run_clean 'Tool pickup SFX smoke' 'TOOL PICKUP SFX PASS pickup=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tool_pickup_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=369 clean_output=true'
+run_clean 'Craft blocked SFX smoke' 'CRAFT BLOCKED SFX PASS blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/craft_blocked_sfx_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=370 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
