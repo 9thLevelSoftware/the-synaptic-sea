@@ -18,12 +18,14 @@ const DEFAULT_TOOL_AMOUNT: float = 1.0
 
 ## Apply damage from a named source. Returns:
 ## { ok, source, module_id, amount, state_before, state_after, reason }
+## resist: 0..1 fraction reduced before apply (e.g. hub hull_plating_bonus).
 static func apply(
 		module_map: RefCounted,
 		module_id: String,
 		source: String,
 		amount: float = -1.0,
-		kind: String = "") -> Dictionary:
+		kind: String = "",
+		resist: float = 0.0) -> Dictionary:
 	var out: Dictionary = {
 		"ok": false,
 		"source": source,
@@ -42,6 +44,9 @@ static func apply(
 	var dmg: float = amount
 	if dmg < 0.0:
 		dmg = _default_amount(source)
+	var r: float = clampf(resist, 0.0, 0.9)
+	if r > 0.0:
+		dmg *= (1.0 - r)
 	if dmg <= 0.0:
 		out["reason"] = "zero_damage"
 		return out
@@ -112,8 +117,9 @@ static func apply_threat_structure_hit(
 		module_map: RefCounted,
 		module_id: String,
 		amount: float = DEFAULT_THREAT_AMOUNT,
-		kind: String = "") -> Dictionary:
-	return apply(module_map, module_id, SOURCE_THREAT, amount, kind)
+		kind: String = "",
+		resist: float = 0.0) -> Dictionary:
+	return apply(module_map, module_id, SOURCE_THREAT, amount, kind, resist)
 
 
 ## Player tool damage (WorkAction cut/pry already uses map.apply_damage; this
@@ -122,8 +128,9 @@ static func apply_tool_damage(
 		module_map: RefCounted,
 		module_id: String,
 		amount: float = DEFAULT_TOOL_AMOUNT,
-		kind: String = "") -> Dictionary:
-	return apply(module_map, module_id, SOURCE_TOOL, amount, kind)
+		kind: String = "",
+		resist: float = 0.0) -> Dictionary:
+	return apply(module_map, module_id, SOURCE_TOOL, amount, kind, resist)
 
 
 static func _is_known_source(source: String) -> bool:
