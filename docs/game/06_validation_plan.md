@@ -606,6 +606,13 @@ run_clean 'Work suppress SFX live away smoke' 'WORK SUPPRESS SFX LIVE AWAY PASS 
 run_clean 'Component mount interact away smoke' 'COMPONENT MOUNT INTERACT AWAY PASS away=true dismount=true remount=true mounted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_interact_away_smoke.gd
 run_clean 'Component dismount interact away smoke' 'COMPONENT DISMOUNT INTERACT AWAY PASS away=true start=true tick=true stripped=true yield=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_dismount_interact_away_smoke.gd
 run_clean 'Work action interact away smoke' 'WORK ACTION INTERACT AWAY PASS away=true start=true tick=true complete=true nearest=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_interact_away_smoke.gd
+run_clean 'Work weld damaged away smoke' 'WORK WELD DAMAGED AWAY PASS away=true start=true repair=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_weld_damaged_away_smoke.gd
+run_clean 'Work weld skill context away smoke' 'WORK WELD SKILL CONTEXT AWAY PASS away=true skill=true start=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_weld_skill_context_away_smoke.gd
+run_clean 'Cut module scene away smoke' 'CUT MODULE SCENE AWAY PASS away=true cut=true damaged=true sparse=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cut_module_scene_away_smoke.gd
+run_clean 'Ship mod install key away smoke' 'SHIP MOD INSTALL KEY AWAY PASS away=true install=true catalog=true uninstall=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_key_away_smoke.gd
+run_clean 'Ship mod inventory sync away smoke' 'SHIP MOD INVENTORY SYNC AWAY PASS away=true install=true uninstall=true inv=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_inventory_sync_away_smoke.gd
+run_clean 'Ship mod plating repair away smoke' 'SHIP MOD PLATING REPAIR AWAY PASS away=true install=true repair=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_plating_repair_away_smoke.gd
+run_clean 'Component placement runtime away smoke' 'COMPONENT PLACEMENT RUNTIME AWAY PASS away=true wired=true populate_or_empty=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_placement_runtime_away_smoke.gd
 run_clean 'Work yield drop SFX smoke' 'WORK YIELD DROP SFX PASS drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_sfx_smoke.gd
 run_clean 'Work yield drop away smoke' 'WORK YIELD DROP AWAY PASS away=true drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_away_smoke.gd
 run_clean 'Hatch door open SFX smoke' 'HATCH DOOR OPEN SFX PASS hatch=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_open_sfx_smoke.gd
@@ -773,7 +780,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=593 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=600 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
