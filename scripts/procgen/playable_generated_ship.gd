@@ -2555,6 +2555,8 @@ func _equip_from_inventory(item_id: String, auto: bool) -> bool:
 	var displaced: String = str(res.get("displaced", ""))
 	if displaced != "":
 		inventory_state.add_item(displaced, 1)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
 	_recompute_player_encumbrance()
 	return true
 
@@ -2565,6 +2567,8 @@ func _unequip_to_inventory(slot: String) -> String:
 	var item_id: String = equipment_state.unequip(slot)
 	if item_id != "":
 		inventory_state.add_item(item_id, 1)
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_DROP_ITEM)
 		_recompute_player_encumbrance()
 	return item_id
 
