@@ -505,6 +505,8 @@ func transfer_quantity(from_pane: String, item_id: String, qty: int) -> int:
 	var moved: int = CargoTransferScript.move_item(src, dst, item_id, qty)
 	if moved > 0:
 		_after_mutation()
+	else:
+		_emit_transfer_denied_sfx()
 	return moved
 
 ## "A" convenience: bulk deposit part+supply (tools excluded) into the container.
