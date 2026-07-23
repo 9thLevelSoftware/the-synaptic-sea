@@ -5003,6 +5003,8 @@ func _on_field_craft_completed() -> void:
 		_register_food_for_spoilage(item_id)
 	_refresh_inventory_hud()
 	_recompute_player_encumbrance()
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_CRAFT_COMPLETE)
 	print("FIELD CRAFT COMPLETED item=%s qty=%d quality=%s" % [
 		item_id, qty, str(result.get("quality_tier", "standard"))])
 	# Domain 6 (WI-2): field fabrication trains the tree-gated `fabrication` skill
@@ -5016,6 +5018,8 @@ func _on_field_craft_completed() -> void:
 func _on_salvage_completed(item_id: String, yields: Dictionary) -> void:
 	_refresh_inventory_hud()
 	_recompute_player_encumbrance()
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_WORK_UNBOLT)
 	var source_junk: String = str(yields.get("source_junk", ""))
 	if not source_junk.is_empty():
 		print("SALVAGE COMPLETED junk=%s primary=%s qty=%d multi=%s" % [
