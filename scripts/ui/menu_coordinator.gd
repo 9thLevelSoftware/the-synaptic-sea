@@ -345,27 +345,41 @@ func _confirm_current_item() -> void:
 	match current_menu:
 		"main_menu":
 			match item_id:
-				"start": menu_state.close_all()
+				"start":
+					menu_state.close_all()
+					_emit_menu_close_sfx()
 				"continue": load_requested.emit()
-				"settings": menu_state.open_menu("settings_menu")
+				"settings":
+					menu_state.open_menu("settings_menu")
+					_emit_menu_open_sfx()
 				"quit": quit_requested.emit()
 		"pause_menu":
 			match item_id:
-				"resume": menu_state.close_all()
-				"settings": menu_state.open_menu("settings_menu")
-				"codex": menu_state.open_menu("codex")
-				"records": menu_state.open_menu("records_menu")
+				"resume":
+					menu_state.close_all()
+					_emit_menu_close_sfx()
+				"settings":
+					menu_state.open_menu("settings_menu")
+					_emit_menu_open_sfx()
+				"codex":
+					menu_state.open_menu("codex")
+					_emit_menu_open_sfx()
+				"records":
+					menu_state.open_menu("records_menu")
+					_emit_menu_open_sfx()
 				"save": save_requested.emit()
 				"save_and_exit": save_and_exit_requested.emit()
 				"quit_main": quit_requested.emit()
 		"records_menu":
 			if item_id == "back":
 				menu_state.close_top()
+				_emit_menu_close_sfx()
 			else:
 				_open_meta_screen(item_id)
 		"settings_menu":
 			if item_id == "back":
 				menu_state.close_top()
+				_emit_menu_close_sfx()
 			else:
 				_cycle_setting(1)
 		"codex":
