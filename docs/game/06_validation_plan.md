@@ -580,6 +580,10 @@ run_clean 'Perform surgery XP away smoke' 'PERFORM SURGERY XP AWAY PASS away=tru
 run_clean 'Training catalog coverage smoke' 'TRAINING CATALOG COVERAGE PASS count=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/training_catalog_coverage_smoke.gd
 run_clean 'Repair subcomponent XP smoke' 'REPAIR SUBCOMPONENT XP PASS emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_subcomponent_xp_smoke.gd
 run_clean 'Repair subcomponent XP away smoke' 'REPAIR SUBCOMPONENT XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/repair_subcomponent_xp_away_smoke.gd
+run_clean 'Discover room XP away smoke' 'DISCOVER ROOM XP AWAY PASS away=true discover=true extract=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/discover_room_xp_away_smoke.gd
+run_clean 'Build shelter XP away smoke' 'BUILD SHELTER XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/build_shelter_xp_away_smoke.gd
+run_clean 'Compound stim XP away smoke' 'COMPOUND STIM XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/compound_stim_xp_away_smoke.gd
+run_clean 'First aid ally XP away smoke' 'FIRST AID ALLY XP AWAY PASS away=true ally=true surgery=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/first_aid_ally_xp_away_smoke.gd
 run_clean 'Work yield drop SFX smoke' 'WORK YIELD DROP SFX PASS drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_sfx_smoke.gd
 run_clean 'Work yield drop away smoke' 'WORK YIELD DROP AWAY PASS away=true drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_away_smoke.gd
 run_clean 'Hatch door open SFX smoke' 'HATCH DOOR OPEN SFX PASS hatch=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_open_sfx_smoke.gd
@@ -747,7 +751,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=567 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=571 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
