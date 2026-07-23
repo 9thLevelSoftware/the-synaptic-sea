@@ -3600,6 +3600,7 @@ func _on_ship_mod_install_requested(_slot_id: String, component_id: String, item
 		ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
 	_apply_ship_mod_system_link(component_id, true)
 	_refresh_station_tiers_from_ship_mod()
+	_apply_ship_mod_plating_repair(component_id)
 	emit_training_event("ship_mod_install", component_id)
 	if is_instance_valid(audio_manager):
 		audio_manager.play_sfx(AudioEventSeamScript.UI_SHIP_MOD_INSTALL)
@@ -3644,6 +3645,33 @@ func _apply_ship_mod_system_link(component_id: String, installing: bool) -> void
 		if ship_systems_manager.has_method("damage_subcomponent"):
 			# Drop below operational threshold so uninstall has mechanical teeth.
 			ship_systems_manager.call("damage_subcomponent", sys_id, sub_id, 0.6)
+
+
+## REQ-SMOD-001: plating installs patch one damaged/breached hub module slightly.
+func _apply_ship_mod_plating_repair(component_id: String) -> void:
+	if component_id.is_empty() or component_catalog == null or module_integrity_map == null:
+		return
+	var is_plating: bool = false
+	if component_catalog.has_method("get_component"):
+		var def: Dictionary = component_catalog.call("get_component", component_id)
+		is_plating = bool(def.get("plating", false))
+	if not is_plating:
+		var form_hint: String = component_id.to_lower()
+		is_plating = form_hint.find("plating") >= 0 or form_hint.find("plate") >= 0
+	if not is_plating:
+		return
+	if not module_integrity_map.has_method("module_ids"):
+		return
+	for mid_v in module_integrity_map.call("module_ids"):
+		var mid: String = str(mid_v)
+		var st: String = str(module_integrity_map.get_state(mid))
+		if st not in ["damaged", "breached"]:
+			continue
+		var m = module_integrity_map.call("get_module", mid) if module_integrity_map.has_method("get_module") else null
+		if m != null and m.has_method("repair"):
+			m.call("repair", 0.15)
+			_apply_module_integrity_scene([mid])
+			return
 
 
 ## After save/load: restore linked hub subs + station tiers from ship-mod manifest.
