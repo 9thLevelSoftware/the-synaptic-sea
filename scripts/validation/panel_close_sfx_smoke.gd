@@ -1,7 +1,7 @@
 extends SceneTree
 
-## Closing wounds / ship-mod / chart / scanner panels routes UI_PANEL_CLOSE.
-## Marker: PANEL CLOSE SFX PASS wounds=true shipmod=true chart=true scanner=true
+## Closing wounds / ship-mod / chart / scanner / recipe panels routes UI_PANEL_CLOSE.
+## Marker: PANEL CLOSE SFX PASS wounds=true shipmod=true chart=true scanner=true recipe=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const AudioEventSeamScript := preload("res://scripts/audio/audio_event_seam.gd")
@@ -42,6 +42,7 @@ func _validate() -> void:
 		["shipmod", Callable(playable, "_on_ship_modification_panel_closed")],
 		["chart", Callable(playable, "_on_chart_panel_closed")],
 		["scanner", Callable(playable, "_on_scanner_panel_closed")],
+		["recipe", Callable(playable, "_on_recipe_picker_panel_closed")],
 	]
 	var flags: Dictionary = {}
 	for pair in checks:
@@ -54,11 +55,12 @@ func _validate() -> void:
 		if after <= before:
 			_fail("%s close sfx not routed" % key); return
 		flags[key] = true
-	print("PANEL CLOSE SFX PASS wounds=%s shipmod=%s chart=%s scanner=%s" % [
+	print("PANEL CLOSE SFX PASS wounds=%s shipmod=%s chart=%s scanner=%s recipe=%s" % [
 		str(flags.get("wounds", false)).to_lower(),
 		str(flags.get("shipmod", false)).to_lower(),
 		str(flags.get("chart", false)).to_lower(),
 		str(flags.get("scanner", false)).to_lower(),
+		str(flags.get("recipe", false)).to_lower(),
 	])
 	quit(0)
 
