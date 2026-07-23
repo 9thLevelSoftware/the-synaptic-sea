@@ -6175,6 +6175,8 @@ func _build_hud_layer() -> void:
 	wounds_panel.visible = false
 	hud_layer.add_child(wounds_panel)
 	wounds_panel.bind(wound_state)
+	if wounds_panel.has_method("set_audio_manager"):
+		wounds_panel.set_audio_manager(audio_manager)
 	wounds_panel.panel_closed.connect(_on_wounds_panel_closed)
 	# PKG-D2.6 / D6.2 / D9b: hub install manifest + panel + strategic sea graph.
 	ship_modification_state = ShipModificationStateScript.new()
