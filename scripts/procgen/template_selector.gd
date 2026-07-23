@@ -17,12 +17,15 @@ const TopologyTemplateScript := preload("res://scripts/procgen/topology_template
 
 const TEMPLATE_DIR: String = "res://data/procgen/templates/"
 const AVAILABLE_TEMPLATES: Array[String] = ["spine", "bifurcated", "stacked"]
+## PKG-D5.4: full catalog toward 12–15 templates (legacy three preserved).
 const EXTENDED_TEMPLATES: Array[String] = [
 	"spine", "bifurcated", "stacked",
 	"stacked_v2", "compact", "dispersed",
 	"derelict_a", "derelict_b",
+	"ring", "radial", "double_spine", "hangar_wing", "vault",
 ]
 const DERELICT_TEMPLATES: Array[String] = ["derelict_a", "derelict_b"]
+const WRECK_TEMPLATES: Array[String] = ["derelict_a", "derelict_b", "vault"]
 
 
 func select(blueprint: RefCounted, archetype: Dictionary) -> RefCounted:
@@ -81,6 +84,16 @@ func available_templates(include_derelict: bool = false, extended: bool = false)
 			if not pool.has(t):
 				pool.append(t)
 	return pool
+
+
+## PKG-D5.4: count of JSON templates on disk under TEMPLATE_DIR.
+func catalog_size_on_disk() -> int:
+	var n: int = 0
+	for tid in EXTENDED_TEMPLATES:
+		var path: String = TEMPLATE_DIR + tid + ".json"
+		if FileAccess.file_exists(ProjectSettings.globalize_path(path)):
+			n += 1
+	return n
 
 
 func _load_template(template_id: String) -> RefCounted:
