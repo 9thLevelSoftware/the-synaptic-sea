@@ -3461,6 +3461,7 @@ func run_work_action_for_validation(action_id: String, target_id: String, invent
 		if not xp_ev.is_empty():
 			emit_training_event(xp_ev, target_id)
 		_apply_module_integrity_state_to_scene()
+		_apply_work_yields_to_inventory_state(res)
 	return res
 
 
@@ -3870,6 +3871,7 @@ func _tick_work_action(delta: float) -> void:
 			res = work_action_driver.complete(module_integrity_map, inv)
 			if bool(res.get("ok", false)):
 				_apply_module_integrity_state_to_scene()
+				_apply_work_yields_to_inventory_state(res)
 		if bool(res.get("ok", false)):
 			if work_action_driver.last_noise_pulse > 0.0 and threat_manager != null:
 				work_action_driver.apply_noise_to_detection(threat_manager)
@@ -3885,6 +3887,28 @@ func _tick_work_action(delta: float) -> void:
 			if work_action_driver.work != null and work_action_driver.work.has_method("reset"):
 				work_action_driver.work.call("reset")
 	_refresh_work_action_hud()
+
+
+## Mirror pure-dict WorkAction yields into live InventoryState (REQ-WA-002).
+func _apply_work_yields_to_inventory_state(res: Dictionary) -> void:
+	if inventory_state == null or res.is_empty():
+		return
+	if not bool(res.get("yields_applied", true)):
+		return  # cart overload left pending_yields
+	var yields: Variant = res.get("yields", {})
+	if typeof(yields) != TYPE_DICTIONARY:
+		return
+	for item_id in (yields as Dictionary).keys():
+		var qty: int = int((yields as Dictionary)[item_id])
+		if qty > 0 and inventory_state.has_method("add_item"):
+			inventory_state.add_item(str(item_id), qty)
+	# Materials consumed from pure dict also need InventoryState mirror.
+	var consumed: Variant = res.get("consumed", {})
+	if typeof(consumed) == TYPE_DICTIONARY and inventory_state.has_method("remove_item"):
+		for cid in (consumed as Dictionary).keys():
+			var need: int = int((consumed as Dictionary)[cid])
+			if need > 0:
+				inventory_state.remove_item(str(cid), need)
 
 
 ## PKG-C4.1b: update engaged LOS via physics raycast when space state available.
