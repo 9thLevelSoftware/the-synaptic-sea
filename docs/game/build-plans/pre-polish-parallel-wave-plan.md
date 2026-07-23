@@ -50,7 +50,7 @@ Module integrity is the unit of destruction. **No voxels.** See `docs/game/adr/0
 | PKG-C5.3 | Encounter pacing | **Done** (earlier) |
 | PKG-D2.6 | Ship modification | Pending |
 | PKG-D5.4 | Templates + wreck mutator | Pending |
-| PKG-D6.1–3 | Persistence verify / sea graph / hub verify | Pending |
+| PKG-D6.1–3 | Persistence verify / sea graph / hub verify | **Done** (D6.2 #102; D6.3 #111; D6.1 pillar revisit) |
 | PKG-D7–D10 | Progress / save fuzz / UI / audio | Pending |
 | PKG-INT | Integration closeout | Pending |
 

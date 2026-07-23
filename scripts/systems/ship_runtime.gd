@@ -35,6 +35,8 @@ var web_override: RefCounted = null
 var contact_boost_provider: Callable = Callable()
 ## PKG-B2.1b: optional ModuleIntegrityMap owned by this runtime.
 var module_integrity: RefCounted = null
+## PKG-D6.1: optional ComponentPlacementState owned by this runtime.
+var component_placement: RefCounted = null
 
 var _slow_acc: float = 0.0
 var _lazy_acc: float = 0.0
@@ -58,6 +60,8 @@ func configure(ship_inst: RefCounted, opts: Dictionary = {}) -> void:
 		contact_boost_provider = Callable()
 	var mi: Variant = opts.get("module_integrity", null)
 	module_integrity = mi as RefCounted if mi is RefCounted else null
+	var cp: Variant = opts.get("component_placement", null)
+	component_placement = cp as RefCounted if cp is RefCounted else null
 	_slow_acc = 0.0
 	_lazy_acc = 0.0
 	frame_band_fires = 0
@@ -190,6 +194,16 @@ func to_snapshot() -> Dictionary:
 		out["ship_summary"] = ship.call("get_summary")
 	if module_integrity != null and module_integrity.has_method("get_summary"):
 		out["module_integrity"] = module_integrity.call("get_summary")
+	elif ship != null:
+		var ship_mi: Variant = ship.get("module_integrity_summary")
+		if typeof(ship_mi) == TYPE_DICTIONARY and not (ship_mi as Dictionary).is_empty():
+			out["module_integrity"] = (ship_mi as Dictionary).duplicate(true)
+	if component_placement != null and component_placement.has_method("get_summary"):
+		out["component_manifest"] = component_placement.call("get_summary")
+	elif ship != null:
+		var ship_cp: Variant = ship.get("component_placement_summary")
+		if typeof(ship_cp) == TYPE_DICTIONARY and not (ship_cp as Dictionary).is_empty():
+			out["component_manifest"] = (ship_cp as Dictionary).duplicate(true)
 	return out
 
 
@@ -202,10 +216,21 @@ func from_snapshot(data: Dictionary) -> void:
 		var summary: Variant = data.get("ship_summary", {})
 		if typeof(summary) == TYPE_DICTIONARY and not (summary as Dictionary).is_empty():
 			ship.call("apply_summary", summary)
-	if data.has("module_integrity") and module_integrity != null and module_integrity.has_method("apply_summary"):
+	if data.has("module_integrity"):
 		var mi: Variant = data.get("module_integrity", {})
 		if typeof(mi) == TYPE_DICTIONARY:
-			module_integrity.call("apply_summary", mi)
+			var mi_dict: Dictionary = mi as Dictionary
+			if module_integrity != null and module_integrity.has_method("apply_summary"):
+				module_integrity.call("apply_summary", mi_dict)
+			# PKG-D6.1: always mirror onto ShipInstance sparse pack for revisit.
+			ship.set("module_integrity_summary", mi_dict.duplicate(true))
+	if data.has("component_manifest"):
+		var cp: Variant = data.get("component_manifest", {})
+		if typeof(cp) == TYPE_DICTIONARY:
+			var cp_dict: Dictionary = cp as Dictionary
+			if component_placement != null and component_placement.has_method("apply_summary"):
+				component_placement.call("apply_summary", cp_dict)
+			ship.set("component_placement_summary", cp_dict.duplicate(true))
 
 
 ## Compose multiple runtimes into one dictionary for multi-ship persistence tests.

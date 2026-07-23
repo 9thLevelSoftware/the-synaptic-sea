@@ -1219,14 +1219,15 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ## REQ-MI-003: Module integrity persists as sparse deltas
 
-- Source: \eatures/module_integrity.md\, ADR-0051
+- Source: \features/module_integrity.md\, ADR-0051
 - Type: technical
 - Priority: must
-- Status: Approved
+- Status: Implemented (PKG-D6.1)
 - Acceptance criteria:
   - Save/load and revisit restore only touched modules over regenerate-from-seed geometry.
 - Verification:
-  - Integrity snapshot round-trip smoke (when implemented)
+  - `scripts/validation/pillar_revisit_persistence_smoke.gd` marker `PILLAR REVISIT PERSISTENCE PASS integrity=true components=true ship=true runtime=true`
+  - ShipInstance `module_integrity` / `component_placement` sparse packs; coordinator leave/revisit flush via `_sync_current_ship_pillar_summaries`
 
 ## REQ-MI-004: Structure damage sources route through module integrity
 

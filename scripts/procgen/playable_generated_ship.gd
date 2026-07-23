@@ -2139,6 +2139,8 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 		_build_arc_zone()
 		_last_derelict_hazards_seeded.append("arc")
 	_restore_arc_summary_for_current_ship()
+	# PKG-D6.1: re-apply sparse integrity after geometry rebuild (revisit path).
+	_restore_module_integrity_for_current_ship()
 
 ## Captures the player's world pose relative to the piloted ship's scene_root so the
 ## player can be carried when the piloted ship is repositioned by a dock. Returns
@@ -4708,6 +4710,7 @@ func travel_to(marker) -> Dictionary:
 	# visited_ships but frees its scene_root (geometry regenerates from seed on revisit).
 	_sync_current_ship_combat_summary()
 	_sync_current_ship_arc_summary()
+	_sync_current_ship_pillar_summaries()
 	var leaving = current_ship
 	if String(leaving.marker_id) == "":
 		# Leaving home: record the player's position so travel_home can restore it.
@@ -4765,6 +4768,7 @@ func travel_home() -> bool:
 		return false
 	_sync_current_ship_combat_summary()
 	_sync_current_ship_arc_summary()
+	_sync_current_ship_pillar_summaries()
 	# Phase 5b Task 5: undock the piloted ship from the current derelict so the ride
 	# physically detaches before the host is freed (capture the player carry first so
 	# they ride the piloted ship back home rather than being left in the freed frame).
@@ -4787,6 +4791,7 @@ func travel_home() -> bool:
 	# Home hull stays in-tree — no re-add needed (co-presence).
 	current_ship = home_ship
 	away_from_start = false
+	_restore_module_integrity_for_current_ship()
 	_configure_threat_runtime_for_current_ship()
 	# Domain 10 Task 5 fix (finding 2): the proximity-tooltip focus cache is keyed
 	# only by subject_id, which repeats across derelicts (objective types are
@@ -5283,6 +5288,30 @@ func _sync_current_ship_arc_summary() -> void:
 	if current_ship == null or electrical_arc_state == null:
 		return
 	current_ship.arc_summary = electrical_arc_state.get_summary().duplicate(true)
+
+## PKG-D6.1: flush live module integrity (sparse deltas) onto the leaving ship so
+## regenerate-from-seed geometry can re-apply damage/strip state on revisit.
+func _sync_current_ship_pillar_summaries() -> void:
+	if current_ship == null:
+		return
+	if module_integrity_map != null and module_integrity_map.has_method("get_summary"):
+		var mi: Dictionary = module_integrity_map.get_summary()
+		var deltas: Array = mi.get("deltas", []) as Array if typeof(mi.get("deltas", [])) == TYPE_ARRAY else []
+		if deltas.is_empty():
+			current_ship.module_integrity_summary = {}
+		else:
+			current_ship.module_integrity_summary = mi.duplicate(true)
+
+## PKG-D6.1: restore per-ship integrity after attach/home return (empty = pristine).
+func _restore_module_integrity_for_current_ship() -> void:
+	module_integrity_map = ModuleIntegrityMapScript.new()
+	if current_ship == null:
+		return
+	var packed: Dictionary = current_ship.module_integrity_summary
+	if typeof(packed) == TYPE_DICTIONARY and not packed.is_empty():
+		if module_integrity_map.has_method("apply_summary"):
+			module_integrity_map.apply_summary(packed)
+	_apply_module_integrity_state_to_scene()
 
 func _restore_arc_summary_for_current_ship() -> void:
 	if current_ship == null or electrical_arc_state == null:
@@ -8337,6 +8366,7 @@ func _dispatch_save_load_confirm_result(result: Dictionary) -> void:
 func _build_world_snapshot():
 	_sync_current_ship_combat_summary()
 	_sync_current_ship_arc_summary()
+	_sync_current_ship_pillar_summaries()
 	var ws = WorldSnapshotScript.new()
 	if synaptic_sea_world != null:
 		ws.world_summary = synaptic_sea_world.get_summary()
