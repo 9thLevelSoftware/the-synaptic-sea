@@ -69,7 +69,10 @@ func set_validation_player_in_range(player_body: Node) -> void:
 	candidate_player = player_body
 
 func try_start(player_body: Node) -> bool:
-	if extinguished or channeling or not is_instance_valid(player_body) or fire_state == null:
+	if channeling:
+		# Already extinguishing — consume interact so lower-priority handlers do not fire.
+		return true
+	if extinguished or not is_instance_valid(player_body) or fire_state == null:
 		return false
 	if not _is_player_in_direct_range(player_body):
 		return false

@@ -77,7 +77,10 @@ func set_sealed(value: bool) -> void:
 
 ## Begins the channel if the player is in range and a dry-run would succeed.
 func try_start(player_body: Node) -> bool:
-	if sealed or channeling or not is_instance_valid(player_body) or hull_state == null:
+	if channeling:
+		# Already sealing — consume interact so lower-priority handlers do not fire.
+		return true
+	if sealed or not is_instance_valid(player_body) or hull_state == null:
 		return false
 	if not _is_player_in_direct_range(player_body):
 		return false

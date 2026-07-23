@@ -95,7 +95,10 @@ func _player_skill() -> int:
 ## Begins the channel if the player is in range and a dry-run of the gated repair
 ## would succeed (carries parts/tools, meets skill). Returns true if the channel started.
 func try_start(player_body: Node) -> bool:
-	if repaired or channeling or not is_instance_valid(player_body) or target_manager == null:
+	if channeling:
+		# Already repairing — consume interact so lower-priority handlers do not fire.
+		return true
+	if repaired or not is_instance_valid(player_body) or target_manager == null:
 		return false
 	# Pure range gate (no candidate_player bypass): the player must be at the point to
 	# start. The validation seam teleports the player here, so tests pass the same gate.
