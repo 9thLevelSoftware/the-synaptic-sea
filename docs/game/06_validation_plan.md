@@ -474,7 +474,8 @@ run_clean 'Work block zero stamina smoke' 'WORK BLOCK ZERO STAMINA PASS block=tr
 run_clean 'Ship mod power budget scene smoke' 'SHIP MOD POWER BUDGET SCENE PASS fill=true reject=true inventory=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_power_budget_scene_smoke.gd
 run_clean 'Work action XP catalog smoke' 'WORK ACTION XP CATALOG PASS cut=true weld=true salvage=true repair=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_xp_catalog_smoke.gd
 run_clean 'Work cut XP live smoke' 'WORK CUT XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_cut_xp_live_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=294 clean_output=true'
+run_clean 'Work weld XP live smoke' 'WORK WELD XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_weld_xp_live_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=295 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
