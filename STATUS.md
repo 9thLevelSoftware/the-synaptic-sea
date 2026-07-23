@@ -1,6 +1,6 @@
 # The Synaptic Sea — Project Status (source of truth)
 
-**Last updated:** 2026-07-22
+**Last updated:** 2026-07-23
 
 This file is the entry point for "what is actually built and what's left." It exists
 because the older roadmap docs were inaccurate and have been quarantined (see below).
@@ -116,21 +116,31 @@ table role coverage; `hazard_source=runtime` (ADR-0050). Bundle **commands=222**
 With integration gaps closed, remaining work is content/polish (audio assets, art,
 cloud, hub scene, deeper kit art) — not reachability.
 
-## Pre-polish program (started 2026-07-22)
+## Pre-polish program (started 2026-07-22; mechanical packages through #113)
 
 Source plan: system-by-system path to content-capable state (module integrity, not voxels).
 Parallel decomposition: `docs/game/build-plans/pre-polish-parallel-wave-plan.md`.
+Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remaining work is authoring/polish, not core engineering.
 
-**Wave 0 landed:**
-- ADR-0051 module integrity (not voxels)
-- Feature specs: `module_integrity`, `work_actions`, `component_slots`, `ship_modification`
-- `SimKeys` contract + pure-system hot-path consumers (`sim_keys_smoke`)
-- `TuningCatalog` shell + `data/balance/` (`tuning_catalog_smoke`)
+**Landed (PRs #78–#113, 2026-07-22 → 2026-07-23):**
+- **A0 / SPEC / A2 / A4:** ADR-0051, pillar feature specs, `SimKeys`, `TuningCatalog`
+- **A1a–c / A3:** `ShipRuntime` advance/catch-up/snapshots; shared present-ship tick helpers; FRAME/SLOW/LAZY bands
+- **B2.1–B2.5:** Module integrity + scene consequences; WorkAction catalog/state/resolve/driver; component slots + mount/dismount; craft quality/knowledge; repair unification
+- **B5.1 / C5.3 / C3–C4:** Dressing consumption; encounter pacing; wounds + vitals curves; food closure; sanity manifestation pool; spatial perception + threat LOS raycast; archetype behavior modifiers
+- **D2.6 / D5.4 / D6.1–3:** Ship modification pure model + **D9b panel**; templates/wreck mutator; pillar revisit persistence on `ShipInstance`; SeaGraph; hub explorable verify
+- **D7–D10:** Skill effect consumers; pillar persistence + historical fuzz; UI consumers (WorkAction HUD, wounds, chart routes, ship-mod panel); audio event coverage
+- **Integration seams:** WorkAction/wounds/ship-mod/sea_graph wired on playable; integrity leave/revisit flush; dual-branch work tick + threat LOS
 
-**Wave 1 in progress:**
-- PKG-A1a: `ShipRuntime` owns advance/catch-up; coordinator wrappers remain for smokes.
+**Regression contract:** `docs/game/06_validation_plan.md` bundle ends with
+`SYNAPTIC_SEA REGRESSION PASS commands=255 clean_output=true` (marker-based; set `GODOT`/`ROOT` on Windows).
 
-**Next critical path:** A1b snapshot composition → A1c away-branch collapse → A3 tick bands, then pillar packages.
+**Still content/polish (not mechanical pre-polish blockers):**
+- Live player hold-to-work interact targeting (validation + HUD + tick seams exist; nearest-module interact UX polish)
+- Final damaged/breached kit art; audio *asset* library; narrative/balance authoring
+- Full coordinator line-count strangler toward &lt;3k (ShipRuntime extract is in; file remains large)
+- Cloud saves / Steamworks (ADR-0032)
+
+**Next:** content/polish tracks + optional full-bundle CI run; inventory `--check` remains green (`systems=191`).
 
 ## Quarantined / do-not-trust docs
 
