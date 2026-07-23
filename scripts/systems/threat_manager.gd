@@ -6,6 +6,7 @@ const DetectionStateScript := preload("res://scripts/systems/detection_state.gd"
 const DamagePipelineScript := preload("res://scripts/systems/damage_pipeline.gd")
 const ShipNavGraphScript := preload("res://scripts/systems/ship_nav_graph.gd")
 const ThreatPathfinderScript := preload("res://scripts/systems/threat_pathfinder.gd")
+const SpatialPerceptionStateScript := preload("res://scripts/systems/spatial_perception_state.gd")
 const THREAT_ARCHETYPE_PATH: String = "res://data/combat/threat_archetypes.json"
 const WEAPON_DEFINITIONS_PATH: String = "res://data/combat/weapon_definitions.json"
 const AMMO_DEFINITIONS_PATH: String = "res://data/combat/ammo_definitions.json"
@@ -38,6 +39,10 @@ var _last_attack_weapon_id: String = ""  # Stream F: melee intimidate on kill
 var nav_graph = null
 ## instance_id -> {waypoints, index, target, repath_cooldown}
 var _path_runtime: Dictionary = {}
+## PKG-C4.1b: room-graph perception (LOS + noise muffling). Null = legacy same-room only.
+var spatial_perception = null
+## Optional engaged LOS flags: threat.instance_id -> bool (physics raycast result from scene).
+var engaged_los: Dictionary = {}
 
 func _ready() -> void:
 	threat_archetypes = _load_json_dict(THREAT_ARCHETYPE_PATH)
@@ -52,7 +57,27 @@ func configure_for_layout(layout: Dictionary, markers: Array = [], anchor: Vecto
 	if encounter_markers.is_empty():
 		encounter_markers = _fallback_markers_from_layout(layout)
 	configure_nav_graph(layout)
+	configure_spatial_perception(layout)
 	_spawn_from_markers(encounter_markers, fallback_anchor)
+
+
+## PKG-C4.1b: build SpatialPerceptionState from layout room_links / blocked_links.
+func configure_spatial_perception(layout: Dictionary) -> int:
+	spatial_perception = SpatialPerceptionStateScript.new()
+	var n: int = spatial_perception.configure_from_layout(layout if layout is Dictionary else {})
+	engaged_los.clear()
+	return n
+
+
+## Scene injects one raycast result per engaged threat (FRAME). Missing keys mean "unknown".
+func set_engaged_los(instance_id: String, has_los: bool) -> void:
+	if instance_id.is_empty():
+		return
+	engaged_los[instance_id] = has_los
+
+
+func clear_engaged_los() -> void:
+	engaged_los.clear()
 
 ## ADR-0049: (re)build the pure nav graph for the active ship layout.
 func configure_nav_graph(layout: Dictionary) -> int:
@@ -110,18 +135,40 @@ func tick_threats(delta: float, vitals_state = null, status_effects_state = null
 			continue
 		var same_room: bool = player_room_id.is_empty() or threat.room_id == player_room_id
 		var prox: float = _proximity_factor(threat, player_position)
+		var player_distance: float = 0.0
+		if threat.world_position.size() >= 3:
+			var tp: Vector3 = Vector3(float(threat.world_position[0]), float(threat.world_position[1]), float(threat.world_position[2]))
+			player_distance = player_position.distance_to(tp)
+		# PKG-C4.1b: room-graph LOS + optional physics raycast for engaged set.
+		var sight_mult: float = prox
+		var noise_at: float = float(profile["noise"])
+		var can_see: bool = same_room
+		if spatial_perception != null and not player_room_id.is_empty() and not str(threat.room_id).is_empty():
+			can_see = bool(spatial_perception.can_see(player_room_id, str(threat.room_id)))
+			noise_at = float(spatial_perception.attenuate_noise(player_room_id, str(threat.room_id), float(profile["noise"])))
+			if not can_see:
+				sight_mult = 0.0
+		# Engaged raycast overrides room LOS when provided (breaking LOS mid-room).
+		if engaged_los.has(threat.instance_id):
+			if not bool(engaged_los[threat.instance_id]):
+				can_see = false
+				sight_mult = 0.0
+			else:
+				can_see = true
+		var engage_same: bool = same_room and can_see
 		threat.tick(delta, {
-			"noise_level": float(profile["noise"]),
-			"light_level": float(profile["light"]),
-			"sight_level": float(profile["visibility"]) * prox,
+			"noise_level": noise_at,
+			"light_level": float(profile["light"]) * (1.0 if can_see else 0.35),
+			"sight_level": float(profile["visibility"]) * sight_mult,
 			"crouching": false,  # crouch already applied in the emitted profile (no double-count)
 			"room_id": player_room_id,
-			"same_room": same_room,
+			"same_room": engage_same,
 			"detect_threshold": detection_state.detect_threshold,
 			"player_position": player_position,
+			"player_distance": player_distance,
 		})
 		awareness_indicator = maxf(awareness_indicator, float(threat.awareness_score))
-		if same_room and threat.can_attack() and vitals_state != null:
+		if engage_same and threat.can_attack() and vitals_state != null:
 			last_attack_result = damage_pipeline.apply_to_vitals(vitals_state, status_effects_state, player_armor_profile, {
 				"damage_type": threat.attack_type,
 				"amount": threat.attack_damage,
