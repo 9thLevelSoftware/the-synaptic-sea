@@ -3588,6 +3588,7 @@ func _on_ship_mod_install_requested(_slot_id: String, component_id: String, item
 		ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
 	_apply_ship_mod_system_link(component_id, true)
 	_refresh_station_tiers_from_ship_mod()
+	emit_training_event("ship_mod_install", component_id)
 
 
 ## Sync panel bag → InventoryState after uninstall (item_form returned to bag).
@@ -3604,6 +3605,7 @@ func _on_ship_mod_uninstall_requested(_slot_id: String, component_id: String = "
 		ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
 	_apply_ship_mod_system_link(component_id, false)
 	_refresh_station_tiers_from_ship_mod()
+	emit_training_event("ship_mod_uninstall", component_id)
 
 
 ## REQ-SMOD-001: install restores linked sub to operational floor; uninstall damages it.
