@@ -7378,14 +7378,15 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 			return
 	# REQ-007: tool pickup is an interaction like any other. Try it first
 	# (before objective interactables) so the player can pick up the pump
-	# when standing in front of it.
-	if tool_pickup != null and tool_pickup.try_interact(player_body):
+	# when standing in front of it. Already-owned / max-stack deny consumes
+	# interact with a soft deny cue rather than falling through to miss.
+	if _try_tool_pickup_interact(tool_pickup, player_body):
 		return
 	# REQ-014: junction_calibrator pickup is a second pickup; the
 	# acquisition event is dispatched through the same shared ToolPickup
 	# signal as the oxygen pump so the coordinator can refresh the HUD
 	# via the same code path.
-	if junction_calibrator_pickup != null and junction_calibrator_pickup.try_interact(player_body):
+	if _try_tool_pickup_interact(junction_calibrator_pickup, player_body):
 		return
 	for interactable_variant in interactables:
 		var interactable = interactable_variant
@@ -7416,6 +7417,28 @@ func _emit_interact_miss_sfx() -> void:
 
 func play_interact_miss_sfx_for_validation() -> void:
 	_emit_interact_miss_sfx()
+
+
+## Try a ToolPickup: success acquires; in-range already-owned / full-stack deny
+## consumes interact with a soft deny cue (does not fall through to miss).
+func _try_tool_pickup_interact(pickup, player_body) -> bool:
+	if not is_instance_valid(pickup):
+		return false
+	if pickup.has_method("try_interact") and pickup.try_interact(player_body):
+		return true
+	if pickup.has_method("is_interact_candidate") and pickup.is_interact_candidate(player_body):
+		_emit_tool_pickup_denied_sfx()
+		return true
+	return false
+
+
+func _emit_tool_pickup_denied_sfx() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+
+
+func play_tool_pickup_denied_sfx_for_validation() -> void:
+	_emit_tool_pickup_denied_sfx()
 
 ## Scoop cart-overload floor piles from WorkAction yields.
 ## Stack-full / zero-grant deny still consumes interact and plays a soft deny cue

@@ -52,6 +52,13 @@ func set_marker_visible(is_visible: bool) -> void:
 	if marker != null:
 		marker.visible = marker_visible and not acquired
 
+## True when the player is in range of a still-live pickup (already-owned deny still counts).
+func is_interact_candidate(player_body: Node) -> bool:
+	if acquired or player_body == null:
+		return false
+	return _is_player_in_direct_range(player_body)
+
+
 func try_interact(player_body: Node) -> bool:
 	if acquired:
 		return false
