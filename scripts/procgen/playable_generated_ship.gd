@@ -9416,6 +9416,8 @@ func request_quicksave_for_validation() -> bool:
 ## started or after it has completed.
 func request_save() -> bool:
 	if not playable_started or slice_complete:
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return false
 	if save_load_service == null:
 		return false
@@ -9425,6 +9427,8 @@ func request_save() -> bool:
 	if _demo_save_refused():
 		# PR #68 review (Kilo): render the ACTUAL manifest cap, not a literal.
 		_last_loot_feedback_line = "Demo build: save limit reached (%d min)" % int(_demo_save_cap_seconds() / 60.0)
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return false
 	var ws = _build_world_snapshot()
 	if ws == null:
@@ -9437,6 +9441,9 @@ func request_save() -> bool:
 		if is_instance_valid(menu_coordinator):
 			menu_coordinator.trigger_tutorial("run_saved", "any")
 			menu_coordinator.set_load_available(true)
+	else:
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 	return result
 
 ## Tranche 6 (REQ-RL-006) demo-gate helpers. All three are permissive when the
