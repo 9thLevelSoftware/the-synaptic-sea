@@ -470,7 +470,8 @@ run_clean 'Work weld skill context smoke' 'WORK WELD SKILL CONTEXT PASS skill=tr
 run_clean 'Ship mod install XP smoke' 'SHIP MOD INSTALL XP PASS install_xp=true uninstall_xp=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_xp_smoke.gd
 run_clean 'Ship mod audio smoke' 'SHIP MOD AUDIO PASS seam=true router=true route=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_audio_smoke.gd
 run_clean 'Hull plating catalog smoke' 'HULL PLATING CATALOG PASS catalog=true install=true bonus=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hull_plating_catalog_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=290 clean_output=true'
+run_clean 'Work block zero stamina smoke' 'WORK BLOCK ZERO STAMINA PASS block=true start_ok=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_block_zero_stamina_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=291 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 

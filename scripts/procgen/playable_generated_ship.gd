@@ -3776,6 +3776,9 @@ func _try_work_action_interact(player_body) -> bool:
 
 	if action_id.is_empty() or target_id.is_empty():
 		return false
+	# Exhausted players cannot start new strip/weld jobs.
+	if vitals_state != null and float(vitals_state.stamina) <= 0.001:
+		return false
 	# Match catalog min_skill (weld/patch → repair; strip/cut/pry → salvage).
 	var skill_id: String = "salvage"
 	if action_id in ["weld_patch", "patch_breach", "splice_conduit"]:
