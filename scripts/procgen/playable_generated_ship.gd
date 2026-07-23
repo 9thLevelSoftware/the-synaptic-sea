@@ -114,6 +114,7 @@ const WebInfestationStateScript := preload("res://scripts/systems/web_infestatio
 const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
 const ModuleIntegrityMapScript := preload("res://scripts/systems/module_integrity_map.gd")
 const ModuleIntegrityConsequencesScript := preload("res://scripts/systems/module_integrity_consequences.gd")
+const ModuleDamageRouterScript := preload("res://scripts/systems/module_damage_router.gd")
 const ExtinguisherStateScript := preload("res://scripts/systems/extinguisher_state.gd")
 const FireSuppressionPointScript := preload("res://scripts/tools/fire_suppression_point.gd")
 const ExtinguisherRechargePortScript := preload("res://scripts/tools/extinguisher_recharge_port.gd")
@@ -554,6 +555,9 @@ func ensure_default_input_actions() -> void:
 	_ensure_key_action_set("load_run", DEFAULT_LOAD_RUN_BINDINGS)
 	_ensure_key_action_set("toggle_scanner", [KEY_TAB])
 	_ensure_key_action_set("toggle_inventory", [KEY_I])
+	# PKG-D9b / D9d: ship-mod + wounds panels (home/meta presentation).
+	_ensure_key_action_set("toggle_ship_mod", [KEY_U])
+	_ensure_key_action_set("toggle_wounds", [KEY_O])
 	_ensure_key_action_set("ui_up", [KEY_UP])
 	_ensure_key_action_set("ui_down", [KEY_DOWN])
 	_ensure_key_action_set("ui_left", [KEY_LEFT])
@@ -3534,18 +3538,18 @@ func _try_work_action_interact(player_body) -> bool:
 
 	var has_wrench: bool = int(inv.get("wrench", 0)) > 0 or int(inv.get("tool_wrench", 0)) > 0
 	if has_wrench and component_placement_state != null:
-		var comp: Dictionary = _nearest_mounted_component(layout, player_pos, WORK_ACTION_INTERACT_RANGE)
-		if not comp.is_empty():
-			action_id = "dismount_component"
+		# Prefer remount when inventory holds a stripped item_form (install intent).
+		var remount: Dictionary = _nearest_remount_target(layout, player_pos, inv, WORK_ACTION_INTERACT_RANGE)
+		if not remount.is_empty():
+			action_id = "mount_component"
 			tool_class = "wrench"
-			target_id = str(comp.get("component_instance_id", ""))
+			target_id = str(remount.get("target_id", ""))
 		else:
-			# Remount: empty slot in range + inventory holds matching item_form.
-			var remount: Dictionary = _nearest_remount_target(layout, player_pos, inv, WORK_ACTION_INTERACT_RANGE)
-			if not remount.is_empty():
-				action_id = "mount_component"
+			var comp: Dictionary = _nearest_mounted_component(layout, player_pos, WORK_ACTION_INTERACT_RANGE)
+			if not comp.is_empty():
+				action_id = "dismount_component"
 				tool_class = "wrench"
-				target_id = str(remount.get("target_id", ""))
+				target_id = str(comp.get("component_instance_id", ""))
 
 	if action_id.is_empty():
 		if module_integrity_map == null:
@@ -4155,13 +4159,52 @@ func _on_fire_extinguished(_compartment_id: String) -> void:
 
 ## Fire B2: deliberate vent extinguished the fire via vacuum. Surface feedback
 ## and apply decompression teeth (force-open the matching hull compartment).
+## REQ-MI-004: also route decompression into ModuleIntegrityMap wall modules.
 func _on_compartment_vented(compartment_id: String) -> void:
 	_set_hazard_feedback_line("Emergency vent: %s (decompression risk)" % compartment_id)
 	var hull = _active_hull()
 	if hull != null and hull.compartments.has(compartment_id):
 		hull.damage_compartment(compartment_id, 0.0, true)
+	_apply_decompression_module_damage(compartment_id)
 	_refresh_fire_zones()
 	_refresh_oxygen_state(false, 0.0)
+
+
+func _apply_decompression_module_damage(compartment_id: String) -> void:
+	if module_integrity_map == null or compartment_id.is_empty():
+		return
+	var layout: Dictionary = _active_layout_for_work()
+	if layout.is_empty() and module_integrity_map.size() == 0:
+		return
+	if module_integrity_map.size() == 0 and not layout.is_empty():
+		ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
+	var changed: Array = ModuleDamageRouterScript.apply_decompression_to_compartment(
+		module_integrity_map, layout, compartment_id, COMPARTMENT_FOR_ROLE
+	)
+	if not changed.is_empty():
+		_apply_module_integrity_scene(changed)
+
+
+## REQ-MI-004: threat structure strike (hull tendril fantasy) validation + runtime seam.
+func apply_threat_structure_damage_for_validation(module_id: String, amount: float = 0.35) -> Dictionary:
+	if module_integrity_map == null:
+		module_integrity_map = ModuleIntegrityMapScript.new()
+	var res: Dictionary = ModuleDamageRouterScript.apply_threat_structure_hit(
+		module_integrity_map, module_id, amount
+	)
+	if bool(res.get("ok", false)):
+		_apply_module_integrity_scene([module_id])
+		# Interrupt in-progress work when structure is hit.
+		_interrupt_work_on_damage()
+	return res
+
+
+func _interrupt_work_on_damage() -> void:
+	if work_action_driver == null or not work_action_driver.is_working():
+		return
+	if work_action_driver.work != null and work_action_driver.work.has_method("interrupt"):
+		work_action_driver.work.call("interrupt")
+	_refresh_work_action_hud()
 
 func _build_extinguisher_recharge_port() -> void:
 	_clear_extinguisher_recharge_port()
@@ -7112,6 +7155,8 @@ func _tick_survival_attrition(delta: float) -> void:
 		"encumbrance_health_drain": encumb_drain,
 		"moving": is_instance_valid(player) and player.has_method("is_moving") and player.is_moving(),
 	})
+	# REQ-WA-003 interrupt is event-driven (threat structure hit, combat, explicit
+	# damaged tick context) — not continuous vitals drain, which would cancel strip work.
 	# Stakes: penalize movement from low vitals, then end the run on incapacitation.
 	_apply_vitals_action_gating()
 	_check_vitals_death()
@@ -9811,6 +9856,42 @@ func _input(event: InputEvent) -> void:
 			return  # swallow other keys while the inventory panel is open (mouse drives it)
 		if event.is_action_pressed("toggle_inventory") and _menus_are_closed():
 			_open_inventory_self()
+			get_viewport().set_input_as_handled()
+			return
+	# PKG-D9b: ship modification slot panel.
+	if is_instance_valid(ship_modification_panel):
+		if ship_modification_panel.is_open():
+			if event.is_action_pressed("toggle_ship_mod") or event.is_action_pressed("ui_cancel"):
+				ship_modification_panel.close()
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_down"):
+				ship_modification_panel.move_selection(1)
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_up"):
+				ship_modification_panel.move_selection(-1)
+				get_viewport().set_input_as_handled()
+			return
+		if event.is_action_pressed("toggle_ship_mod") and _menus_are_closed():
+			var inv_bag: Dictionary = _inventory_qty_dict_for_work()
+			ship_modification_panel.bind(ship_modification_state, inv_bag)
+			ship_modification_panel.open()
+			get_viewport().set_input_as_handled()
+			return
+	# PKG-D9d: wounds treatment panel.
+	if is_instance_valid(wounds_panel):
+		if wounds_panel.is_open():
+			if event.is_action_pressed("toggle_wounds") or event.is_action_pressed("ui_cancel"):
+				wounds_panel.close()
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_down"):
+				wounds_panel.move_selection(1)
+				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_up"):
+				wounds_panel.move_selection(-1)
+				get_viewport().set_input_as_handled()
+			return
+		if event.is_action_pressed("toggle_wounds") and _menus_are_closed():
+			wounds_panel.open()
 			get_viewport().set_input_as_handled()
 			return
 	if is_instance_valid(menu_coordinator):

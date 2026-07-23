@@ -74,6 +74,9 @@ func _setup() -> void:
 		playable.player.teleport_to(Vector3(0.5, 0.0, 0.5))
 	if not playable.try_work_action_interact_for_validation():
 		_fail("dismount start"); return
+	instance_id = str(playable.work_action_driver.work.get("target_id"))
+	var entry0: Dictionary = playable.component_placement_state.get_entry(instance_id)
+	item_form = str(entry0.get("item_form", item_form))
 	phase = "dismount_tick"
 	tick_accum = 0.0
 
