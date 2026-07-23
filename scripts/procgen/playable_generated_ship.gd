@@ -2675,6 +2675,7 @@ func _on_bay_dock_requested(carrier_id: String, slot_index: int) -> void:
 	# Stream F: docking a co-present ship into a hangar bay is a peaceful
 	# logistics/truce action (negotiate_truce training).
 	emit_training_event("negotiate_truce", carrier_id)
+	_emit_hangar_dock_sfx()
 
 ## Launches a bayed ship of `carrier_id` back out to a co-present anchor near the
 ## carrier. slot_index -1 = first occupied. Silent refusal when nothing is bayed.
@@ -2703,6 +2704,26 @@ func _on_bay_launch_requested(carrier_id: String, slot_index: int) -> void:
 		(launched.scene_root as Node3D).global_transform = \
 			(carrier.scene_root as Node3D).global_transform * Transform3D(Basis(), Vector3(0.0, 0.0, -8.0))
 	recompute_occupancy()
+	_emit_hangar_launch_sfx()
+
+
+func _emit_hangar_dock_sfx() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_DOCK_LAND)
+
+
+func _emit_hangar_launch_sfx() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_DOOR_OPEN)
+
+
+## Validation seams for hangar dock/launch SFX (live handlers call the same helpers).
+func play_hangar_dock_sfx_for_validation() -> void:
+	_emit_hangar_dock_sfx()
+
+
+func play_hangar_launch_sfx_for_validation() -> void:
+	_emit_hangar_launch_sfx()
 
 ## Clears `inst`'s hangar slot in its parent's bay BEFORE the ship leaves via a
 ## non-launch path (the travel undock of a bayed piloted ship). Without this, a ship
