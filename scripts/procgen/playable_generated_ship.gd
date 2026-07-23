@@ -12,6 +12,7 @@ const RecipePickerPanelScript := preload("res://scripts/ui/recipe_picker_panel.g
 const ChartPanelScript := preload("res://scripts/ui/chart_panel.gd")
 const WorkActionHudPanelScript := preload("res://scripts/ui/work_action_hud_panel.gd")
 const WoundsPanelScript := preload("res://scripts/ui/wounds_panel.gd")
+const ShipModificationPanelScript := preload("res://scripts/ui/ship_modification_panel.gd")
 const WebChartStateScript := preload("res://scripts/systems/web_chart_state.gd")
 const WorkActionDriverScript := preload("res://scripts/systems/work_action_driver.gd")
 const WoundStateScript := preload("res://scripts/systems/wound_state.gd")
@@ -201,6 +202,7 @@ var recipe_picker_panel  # RecipePickerPanel (REQ-CS-016)
 var chart_panel      # ChartPanel
 var work_action_hud  # WorkActionHudPanel (PKG-D9a)
 var wounds_panel     # WoundsPanel (PKG-D9d)
+var ship_modification_panel  # ShipModificationPanel (PKG-D9b)
 var web_chart_state = WebChartStateScript.new()
 var work_action_driver  # WorkActionDriver (PKG-B2.2b)
 var wound_state  # WoundState (PKG-C3.1a)
@@ -3312,6 +3314,10 @@ func get_ship_modification_state_for_validation():
 	return ship_modification_state
 
 
+func get_ship_modification_panel_for_validation():
+	return ship_modification_panel
+
+
 func get_sea_graph_for_validation():
 	return sea_graph
 
@@ -3397,8 +3403,45 @@ func open_wounds_panel_for_validation() -> bool:
 	return wounds_panel.is_open()
 
 
+func open_ship_modification_panel_for_validation() -> bool:
+	if ship_modification_panel == null or ship_modification_state == null:
+		return false
+	ship_modification_panel.bind(ship_modification_state, {})
+	ship_modification_panel.open()
+	return ship_modification_panel.is_open()
+
+
 func _on_wounds_panel_closed() -> void:
 	pass
+
+
+func _on_ship_modification_panel_closed() -> void:
+	pass
+
+
+## PKG-B2.2b: advance in-progress WorkAction on both process branches.
+func _tick_work_action(delta: float) -> void:
+	if work_action_driver == null or delta <= 0.0:
+		return
+	if not work_action_driver.is_working():
+		return
+	var speed: float = 1.0
+	if wound_state != null and wound_state.has_method("work_speed_multiplier"):
+		speed = float(wound_state.call("work_speed_multiplier"))
+	work_action_driver.tick(delta, {"work_speed_mult": speed})
+	if work_action_driver.get_status() == "completed" or (
+		work_action_driver.work != null and str(work_action_driver.work.get("status")) == "completed"
+	):
+		var inv: Dictionary = {}
+		if inventory_state != null and inventory_state.has_method("get_all_quantities"):
+			var allq = inventory_state.call("get_all_quantities")
+			if typeof(allq) == TYPE_DICTIONARY:
+				inv = (allq as Dictionary).duplicate(true)
+		var res: Dictionary = work_action_driver.complete(module_integrity_map, inv)
+		if bool(res.get("ok", false)) and work_action_driver.last_noise_pulse > 0.0:
+			if threat_manager != null:
+				work_action_driver.apply_noise_to_detection(threat_manager)
+	_refresh_work_action_hud()
 
 
 ## PKG-C4.1b: update engaged LOS via physics raycast when space state available.
@@ -4954,9 +4997,15 @@ func _build_hud_layer() -> void:
 	hud_layer.add_child(wounds_panel)
 	wounds_panel.bind(wound_state)
 	wounds_panel.panel_closed.connect(_on_wounds_panel_closed)
-	# PKG-D2.6 / D6.2: hub install manifest + strategic sea graph for chart routes.
+	# PKG-D2.6 / D6.2 / D9b: hub install manifest + panel + strategic sea graph.
 	ship_modification_state = ShipModificationStateScript.new()
 	ship_modification_state.configure({})
+	ship_modification_panel = ShipModificationPanelScript.new()
+	ship_modification_panel.name = "ShipModificationPanel"
+	ship_modification_panel.visible = false
+	hud_layer.add_child(ship_modification_panel)
+	ship_modification_panel.bind(ship_modification_state, {})
+	ship_modification_panel.panel_closed.connect(_on_ship_modification_panel_closed)
 	sea_graph = SeaGraphScript.new()
 	var ws: int = 0
 	if synaptic_sea_world != null:
@@ -6423,6 +6472,7 @@ func _process(delta: float) -> void:
 		_tick_food_runtime(delta)
 		_tick_ammo_and_consumable_decay(delta)
 		_tick_electrical_arc(delta)
+		_tick_work_action(delta)
 		_refresh_work_action_hud()
 		_refresh_tooltip_focus()
 		return
@@ -6444,6 +6494,7 @@ func _process(delta: float) -> void:
 	_tick_sanity_and_hallucinations(delta, in_safe)
 	_tick_food_runtime(delta)
 	_tick_audio_runtime(delta)
+	_tick_work_action(delta)
 	_refresh_work_action_hud()
 	_refresh_tooltip_focus()
 
