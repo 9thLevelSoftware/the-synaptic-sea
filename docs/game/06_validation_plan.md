@@ -506,6 +506,7 @@ run_clean 'Ship mod run snapshot smoke' 'SHIP MOD RUN SNAPSHOT PASS shipmod=true
 run_clean 'Work hold-to-work smoke' 'WORK HOLD TO WORK PASS freeze=true validation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_hold_to_work_smoke.gd
 run_clean 'Work hold-to-work away smoke' 'WORK HOLD TO WORK AWAY PASS away=true freeze=true validation=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_hold_to_work_away_smoke.gd
 run_clean 'Bandage training smoke' 'BANDAGE TRAINING PASS bandage_xp=true treat_xp=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bandage_training_smoke.gd
+run_clean 'Bandage training away smoke' 'BANDAGE TRAINING AWAY PASS away=true bandage_xp=true treat_xp=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bandage_training_away_smoke.gd
 run_clean 'Ship mod install key smoke' 'SHIP MOD INSTALL KEY PASS install=true catalog=true uninstall=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_key_smoke.gd
 run_clean 'Ship mod system effect smoke' 'SHIP MOD SYSTEM EFFECT PASS restore=true power=true uninstall_damage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_system_effect_smoke.gd
 run_clean 'Ship mod station tier smoke' 'SHIP MOD STATION TIER PASS install=true tier=true uninstall=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_station_tier_smoke.gd
@@ -730,7 +731,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=550 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=551 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
