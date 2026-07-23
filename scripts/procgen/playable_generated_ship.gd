@@ -4881,6 +4881,8 @@ func try_medbay_surgery(_player_body: Node) -> bool:
 		return false
 	vitals_state.health = minf(100.0, float(vitals_state.health) + SURGERY_HEAL_AMOUNT)
 	emit_training_event("perform_surgery", "medbay")
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_WOUND_TREAT)
 	_refresh_player_vitals(0.0)
 	_refresh_inventory_hud()
 	print("MEDBAY SURGERY health=%.1f" % float(vitals_state.health))

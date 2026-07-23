@@ -132,7 +132,7 @@ Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remain
 - **Integration seams:** WorkAction/wounds/ship-mod/sea_graph wired on playable; integrity leave/revisit flush; dual-branch work tick + threat LOS
 
 **Regression contract:** `docs/game/06_validation_plan.md` bundle ends with
-`SYNAPTIC_SEA REGRESSION PASS commands=304 clean_output=true` (marker-based; set `GODOT`/`ROOT` on Windows).
+`SYNAPTIC_SEA REGRESSION PASS commands=305 clean_output=true` (marker-based; set `GODOT`/`ROOT` on Windows).
 
 **Post-INT hardening (PRs #112–#173):**
 - D6.1 pillar revisit sparse packs on ShipInstance + leave/revisit flush
@@ -162,7 +162,8 @@ Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remain
 - WorkAction complete emits verb SFX via SfxEventRouter (live cut path)
 - Salvage station completion emits scavenge_container training XP
 - Hydroponics harvest emits cook_meal XP + harvest SFX
-- Regression marker contract commands=304 in 06_validation_plan.md
+- Medbay surgery plays treat SFX + perform_surgery XP
+- Regression marker contract commands=305 in 06_validation_plan.md
 
 **Still content/polish (not mechanical pre-polish blockers):**
 - Final damaged/breached kit art; audio *asset* library; narrative/balance authoring
