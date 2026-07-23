@@ -3714,6 +3714,13 @@ func bandage_wound_with_inventory_for_validation() -> Dictionary:
 func open_ship_modification_panel_for_validation() -> bool:
 	if ship_modification_panel == null or ship_modification_state == null:
 		return false
+	# Toggle: re-press while open closes the panel.
+	if ship_modification_panel.is_open():
+		if ship_modification_panel.has_method("close"):
+			ship_modification_panel.close()
+		else:
+			ship_modification_panel.visible = false
+		return false
 	ship_modification_panel.bind(ship_modification_state, _inventory_qty_dict_for_work())
 	if not ship_modification_panel.install_requested.is_connected(_on_ship_mod_install_requested):
 		ship_modification_panel.install_requested.connect(_on_ship_mod_install_requested)
