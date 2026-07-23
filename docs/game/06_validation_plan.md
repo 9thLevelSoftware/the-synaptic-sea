@@ -537,7 +537,8 @@ run_clean 'Scanner open SFX smoke' 'SCANNER OPEN SFX PASS open=true sfx=true' "$
 run_clean 'Cart grab SFX smoke' 'CART GRAB SFX PASS grab=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_grab_sfx_smoke.gd
 run_clean 'Transfer panel open SFX smoke' 'TRANSFER PANEL OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/transfer_panel_open_sfx_smoke.gd
 run_clean 'Codex open SFX smoke' 'CODEX OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/codex_open_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=357 clean_output=true'
+run_clean 'Pause menu open SFX smoke' 'PAUSE MENU OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pause_menu_open_sfx_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=358 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
