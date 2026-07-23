@@ -6202,6 +6202,8 @@ func _build_hud_layer() -> void:
 	inventory_panel.name = "InventoryPanel"
 	inventory_panel.visible = false
 	hud_layer.add_child(inventory_panel)
+	if inventory_panel.has_method("set_audio_manager"):
+		inventory_panel.set_audio_manager(audio_manager)
 	inventory_panel.panel_closed.connect(_on_inventory_panel_closed)
 	inventory_panel.transfer_completed.connect(_on_inventory_transfer_completed)
 	inventory_panel.use_requested.connect(_on_inventory_use_requested)
