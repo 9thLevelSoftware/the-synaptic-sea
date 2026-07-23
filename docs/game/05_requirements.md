@@ -1215,7 +1215,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - Damaged/breached/destroyed states update mesh, collision, and nav as authored.
   - Breached walls couple to atmosphere/hull breach accounting.
 - Verification:
-  - Scene integrity smoke (when implemented)
+  - \module_integrity_consequences_smoke.gd\ (implemented)
 
 ## REQ-MI-003: Module integrity persists as sparse deltas
 
@@ -1303,7 +1303,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Acceptance criteria:
   - Over-budget installs are rejected or force authored degradation; better components draw more power.
 - Verification:
-  - Power budget install smoke (when implemented)
+  - \ship_modification_smoke.gd\ power_budget path (implemented)
 
 ## REQ-SMOD-003: Hub growth is the walkable home ship
 
@@ -1313,7 +1313,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Acceptance criteria:
   - Home ship stations/components/hydro support the explorable-hub fantasy without a separate hub scene.
 - Verification:
-  - Home-ship interaction verification smoke/playtest (when implemented)
+  - \hub_explorable_verify_smoke.gd\ (implemented)
 
 ## REQ-ARCH-003: ShipRuntime owns per-ship advance and catch-up
 
