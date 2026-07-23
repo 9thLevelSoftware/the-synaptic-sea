@@ -9382,9 +9382,14 @@ func request_quicksave() -> bool:
 	if slice_complete or save_load_service == null or autosave_policy == null:
 		return false
 	if _demo_save_refused():
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return false
 	var gate: Dictionary = autosave_policy.try_quicksave()
 	if not bool(gate.get("should_save", false)):
+		# Cooldown / policy refuse — soft deny cue.
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return false
 	var snap: RunSnapshot = _build_run_snapshot()
 	if snap == null:
