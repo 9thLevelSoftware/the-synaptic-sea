@@ -17,6 +17,8 @@ const WebChartStateScript := preload("res://scripts/systems/web_chart_state.gd")
 const WorkActionDriverScript := preload("res://scripts/systems/work_action_driver.gd")
 const WoundStateScript := preload("res://scripts/systems/wound_state.gd")
 const ShipModificationStateScript := preload("res://scripts/systems/ship_modification_state.gd")
+const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
+const ComponentCatalogScript := preload("res://scripts/systems/component_catalog.gd")
 const SeaGraphScript := preload("res://scripts/systems/sea_graph.gd")
 const InventoryPanelScript := preload("res://scripts/ui/inventory_panel.gd")
 const AccessibilitySettingsScript := preload("res://scripts/ui/accessibility_settings.gd")
@@ -207,6 +209,8 @@ var web_chart_state = WebChartStateScript.new()
 var work_action_driver  # WorkActionDriver (PKG-B2.2b)
 var wound_state  # WoundState (PKG-C3.1a)
 var ship_modification_state  # ShipModificationState (PKG-D2.6)
+var component_placement_state  # ComponentPlacementState (PKG-B2.3 / D6.1)
+var component_catalog  # ComponentCatalog
 var sea_graph  # SeaGraph (PKG-D6.2 / D9c)
 var inventory_panel
 var tracker
@@ -2143,6 +2147,7 @@ func _attach_derelict_active(inst, new_root: Node3D) -> void:
 	_restore_arc_summary_for_current_ship()
 	# PKG-D6.1: re-apply sparse integrity after geometry rebuild (revisit path).
 	_restore_module_integrity_for_current_ship()
+	_restore_or_populate_component_placement_for_current_ship()
 
 ## Captures the player's world pose relative to the piloted ship's scene_root so the
 ## player can be carried when the piloted ship is repositioned by a dock. Returns
@@ -3316,6 +3321,10 @@ func get_ship_modification_state_for_validation():
 
 func get_ship_modification_panel_for_validation():
 	return ship_modification_panel
+
+
+func get_component_placement_state_for_validation():
+	return component_placement_state
 
 
 func get_sea_graph_for_validation():
@@ -5020,6 +5029,7 @@ func travel_home() -> bool:
 	current_ship = home_ship
 	away_from_start = false
 	_restore_module_integrity_for_current_ship()
+	_restore_or_populate_component_placement_for_current_ship()
 	_configure_threat_runtime_for_current_ship()
 	# Domain 10 Task 5 fix (finding 2): the proximity-tooltip focus cache is keyed
 	# only by subject_id, which repeats across derelicts (objective types are
@@ -5191,6 +5201,10 @@ func _build_hud_layer() -> void:
 	hud_layer.add_child(ship_modification_panel)
 	ship_modification_panel.bind(ship_modification_state, {})
 	ship_modification_panel.panel_closed.connect(_on_ship_modification_panel_closed)
+	# PKG-B2.3 / D6.1: component placement for current ship (home at boot).
+	component_catalog = ComponentCatalogScript.new()
+	component_catalog.load_default()
+	_restore_or_populate_component_placement_for_current_ship()
 	sea_graph = SeaGraphScript.new()
 	var ws: int = 0
 	if synaptic_sea_world != null:
@@ -5523,8 +5537,8 @@ func _sync_current_ship_arc_summary() -> void:
 		return
 	current_ship.arc_summary = electrical_arc_state.get_summary().duplicate(true)
 
-## PKG-D6.1: flush live module integrity (sparse deltas) onto the leaving ship so
-## regenerate-from-seed geometry can re-apply damage/strip state on revisit.
+## PKG-D6.1: flush live module integrity + component placement onto the leaving ship
+## so regenerate-from-seed geometry can re-apply strip/damage state on revisit.
 func _sync_current_ship_pillar_summaries() -> void:
 	if current_ship == null:
 		return
@@ -5535,6 +5549,13 @@ func _sync_current_ship_pillar_summaries() -> void:
 			current_ship.module_integrity_summary = {}
 		else:
 			current_ship.module_integrity_summary = mi.duplicate(true)
+	if component_placement_state != null and component_placement_state.has_method("get_summary"):
+		var cp: Dictionary = component_placement_state.get_summary()
+		var placed: Array = cp.get("placed", []) as Array if typeof(cp.get("placed", [])) == TYPE_ARRAY else []
+		if placed.is_empty():
+			current_ship.component_placement_summary = {}
+		else:
+			current_ship.component_placement_summary = cp.duplicate(true)
 
 ## PKG-D6.1: restore per-ship integrity after attach/home return (empty = pristine).
 func _restore_module_integrity_for_current_ship() -> void:
@@ -5546,6 +5567,41 @@ func _restore_module_integrity_for_current_ship() -> void:
 		if module_integrity_map.has_method("apply_summary"):
 			module_integrity_map.apply_summary(packed)
 	_apply_module_integrity_state_to_scene()
+
+
+## PKG-B2.3 / D6.1: restore component placement or populate from layout slots.
+func _restore_or_populate_component_placement_for_current_ship() -> void:
+	if component_catalog == null:
+		component_catalog = ComponentCatalogScript.new()
+		component_catalog.load_default()
+	component_placement_state = ComponentPlacementStateScript.new()
+	if current_ship != null and not current_ship.component_placement_summary.is_empty():
+		if component_placement_state.has_method("apply_summary"):
+			component_placement_state.apply_summary(current_ship.component_placement_summary)
+		return
+	var layout: Dictionary = _active_layout_for_work()
+	if layout.is_empty():
+		return
+	var seed_v: int = _component_placement_seed_for_current_ship()
+	component_placement_state.populate(layout, component_catalog, seed_v)
+	if current_ship != null and component_placement_state.placed.size() > 0:
+		current_ship.component_placement_summary = component_placement_state.get_summary()
+
+
+func _component_placement_seed_for_current_ship() -> int:
+	if current_ship == null:
+		return 1
+	if current_ship.blueprint != null:
+		var bp = current_ship.blueprint
+		if bp.get("seed_value") != null:
+			var sv: int = int(bp.seed_value)
+			if sv != 0:
+				return sv
+	var mid: String = str(current_ship.marker_id)
+	if mid.is_empty():
+		return 17  # home ship stable seed
+	return int(hash(mid) & 0x7FFFFFFF)
+
 
 func _restore_arc_summary_for_current_ship() -> void:
 	if current_ship == null or electrical_arc_state == null:
