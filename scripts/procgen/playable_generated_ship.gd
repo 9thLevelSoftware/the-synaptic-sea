@@ -3836,6 +3836,13 @@ func _tick_work_action(delta: float) -> void:
 					var form: String = str(res.get("item_form", ""))
 					if not form.is_empty() and inventory_state.has_method("add_item"):
 						inventory_state.add_item(form, 1)
+				# Physical strip bites the linked ship-system subcomponent.
+				var lsys: String = str(res.get("linked_system", ""))
+				var lsub: String = str(res.get("linked_subcomponent", ""))
+				if not lsys.is_empty() and not lsub.is_empty():
+					var mgr = _active_systems_manager()
+					if mgr != null and mgr.has_method("damage_subcomponent"):
+						mgr.call("damage_subcomponent", lsys, lsub, 1.0)
 				_rebuild_component_markers()
 		elif action_id == "mount_component":
 			res = ComponentMountResolverScript.resolve_mount(
