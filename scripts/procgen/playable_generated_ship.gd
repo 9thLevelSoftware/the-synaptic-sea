@@ -7415,11 +7415,27 @@ func play_interact_miss_sfx_for_validation() -> void:
 	_emit_interact_miss_sfx()
 
 ## Scoop cart-overload floor piles from WorkAction yields.
+## Stack-full / zero-grant deny still consumes interact and plays a soft deny cue
+## so the pile is not silent when the cart cannot accept residual yield.
 func _try_work_yield_drop_interact(player_body) -> bool:
 	for d in work_yield_drops:
-		if is_instance_valid(d) and d.has_method("try_interact") and d.try_interact(player_body):
+		if not is_instance_valid(d):
+			continue
+		if d.has_method("try_interact") and d.try_interact(player_body):
+			return true
+		if d.has_method("is_interact_candidate") and d.is_interact_candidate(player_body):
+			_emit_work_yield_scoop_denied_sfx()
 			return true
 	return false
+
+
+func _emit_work_yield_scoop_denied_sfx() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+
+
+func play_work_yield_scoop_denied_sfx_for_validation() -> void:
+	_emit_work_yield_scoop_denied_sfx()
 
 ## Walk-up cargo deposit: deposits all haulable salvage into the hold of whichever
 ## cargo control the player is standing at (strict in-range gate). Returns true iff a

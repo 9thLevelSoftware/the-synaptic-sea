@@ -49,6 +49,13 @@ func set_validation_player_in_range(player_body: Node) -> void:
 	candidate_player = player_body
 
 
+## True when the player is in scoop range of a still-live pile (stack-full deny still counts).
+func is_interact_candidate(player_body: Node) -> bool:
+	if scooped_flag or not is_instance_valid(player_body):
+		return false
+	return candidate_player == player_body or _in_range(player_body)
+
+
 func try_interact(player_body: Node) -> bool:
 	if scooped_flag or inventory_state == null or not is_instance_valid(player_body):
 		return false
