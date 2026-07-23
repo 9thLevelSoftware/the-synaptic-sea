@@ -476,6 +476,8 @@ var audio_root: Node3D
 var _prev_vitals_critical: bool = false
 # Rising-edge flag for combat engagement -> SFX_COMBAT_THREAT_ALERT.
 var _prev_combat_engaged: bool = false
+# Cooldown for META_BIOMATTER_PULSE while web coverage grows.
+var _biomatter_pulse_cooldown: float = 0.0
 var arc_root: Node3D
 var arc_zone_node: StaticBody3D
 var arc_zone_label: Label3D
@@ -7201,6 +7203,8 @@ func _on_interactable_completed(interaction_id: String, objective_id: String, se
 	_try_unlock_achievement("objective_completed", objective_type)
 	if objective_type == "stabilize_reactor":
 		_try_unlock_achievement("reactor_stabilized", "reactor")
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.META_REACTOR_HUM)
 	if ship_systems_manager != null:
 		completed_objective_types[objective_type] = true
 		for pair in OBJECTIVE_REPAIR_MAP.get(objective_type, []):
@@ -7555,14 +7559,33 @@ func _process(delta: float) -> void:
 var _hub_slow_acc: float = 0.0
 
 func _tick_present_ships(delta: float) -> void:
+	var cov_before: float = 0.0
+	if hull_web_state != null:
+		cov_before = float(hull_web_state.coverage)
 	_advance_ship(home_ship, delta)
 	if away_from_start and current_ship != null and current_ship != home_ship:
 		_advance_ship(current_ship, delta)
+	_biomatter_pulse_cooldown = maxf(0.0, _biomatter_pulse_cooldown - delta)
+	if hull_web_state != null and float(hull_web_state.coverage) > cov_before + 0.0001:
+		_maybe_emit_biomatter_pulse()
 	_hub_slow_acc += delta
 	if _hub_slow_acc >= ShipRuntimeScript.SLOW_INTERVAL_SECONDS:
 		var slow_dt: float = _hub_slow_acc
 		_hub_slow_acc = 0.0
 		_recompute_expanded_ship_systems(slow_dt)
+
+
+func _maybe_emit_biomatter_pulse() -> void:
+	if _biomatter_pulse_cooldown > 0.0:
+		return
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.META_BIOMATTER_PULSE)
+	_biomatter_pulse_cooldown = 4.0
+
+
+func emit_meta_reactor_hum_for_validation() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.META_REACTOR_HUM)
 
 
 func _tick_sanity_and_hallucinations(delta: float, in_safe: bool) -> void:
