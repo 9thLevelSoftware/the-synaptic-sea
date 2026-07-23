@@ -435,7 +435,8 @@ run_clean 'Work action integration smoke' 'WORK ACTION INTEGRATION PASS driver=t
 run_clean 'Hub explorable verify smoke' 'HUB EXPLORABLE VERIFY PASS home=true stations=true repair=true walk=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hub_explorable_verify_smoke.gd
 run_clean 'Pillar revisit persistence smoke' 'PILLAR REVISIT PERSISTENCE PASS integrity=true components=true ship=true runtime=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pillar_revisit_persistence_smoke.gd
 run_clean 'Ship modification panel smoke' 'SHIP MOD PANEL PASS bind=true install=true uninstall=true power=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_modification_panel_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=255 clean_output=true'
+run_clean 'Work action interact smoke' 'WORK ACTION INTERACT PASS start=true tick=true complete=true nearest=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_interact_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=256 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 

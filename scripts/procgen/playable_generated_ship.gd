@@ -3411,12 +3411,197 @@ func open_ship_modification_panel_for_validation() -> bool:
 	return ship_modification_panel.is_open()
 
 
+## PKG-B2.2b: start nearest-module WorkAction via live interact path (validation).
+func try_work_action_interact_for_validation() -> bool:
+	if player == null:
+		return false
+	return _try_work_action_interact(player)
+
+
 func _on_wounds_panel_closed() -> void:
 	pass
 
 
 func _on_ship_modification_panel_closed() -> void:
 	pass
+
+
+const WORK_ACTION_INTERACT_RANGE: float = 3.5
+
+
+## Lowest-priority interact: cut/pry the nearest non-destroyed wall module.
+## Requires a tool in inventory (welding_lance → cut_wall, prybar → pry_panel).
+func _try_work_action_interact(player_body) -> bool:
+	if player_body == null or work_action_driver == null:
+		return false
+	if work_action_driver.is_working():
+		# Second press cancels in-progress strip work.
+		if work_action_driver.work != null and work_action_driver.work.has_method("interrupt"):
+			work_action_driver.work.call("interrupt")
+		_refresh_work_action_hud()
+		return true
+	var layout: Dictionary = _active_layout_for_work()
+	if layout.is_empty():
+		return false
+	if module_integrity_map == null:
+		module_integrity_map = ModuleIntegrityMapScript.new()
+	if module_integrity_map.size() == 0:
+		ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
+	var player_pos: Vector3 = (player_body as Node3D).global_position if player_body is Node3D else Vector3.ZERO
+	var nearest: Dictionary = _nearest_workable_wall_module(layout, player_pos, WORK_ACTION_INTERACT_RANGE)
+	if nearest.is_empty():
+		return false
+	var target_id: String = str(nearest.get("module_id", ""))
+	if target_id.is_empty():
+		return false
+	# Ensure target exists on integrity map (layout seed may skip floors; scene targets need register).
+	var kind: String = str(nearest.get("kind", "wall_straight_1x1"))
+	module_integrity_map.ensure_module(target_id, kind, {}, target_id.get_slice("/", 0))
+	var inv: Dictionary = _inventory_qty_dict_for_work()
+	var action_id: String = ""
+	var tool_class: String = ""
+	if int(inv.get("welding_lance", 0)) > 0 or int(inv.get("tool_welding_lance", 0)) > 0:
+		action_id = "cut_wall"
+		tool_class = "welding_lance"
+	elif int(inv.get("prybar", 0)) > 0 or int(inv.get("tool_prybar", 0)) > 0:
+		action_id = "pry_panel"
+		tool_class = "prybar"
+	else:
+		return false
+	var skill_level: int = 0
+	if player_progression != null and player_progression.has_method("get_skill_level"):
+		skill_level = int(player_progression.call("get_skill_level", "salvage"))
+	var ctx: Dictionary = {
+		"tool_class": tool_class,
+		"skill_id": "salvage",
+		"skill_level": skill_level,
+		"inventory": inv,
+	}
+	if not work_action_driver.start_action(action_id, target_id, ctx):
+		return false
+	_refresh_work_action_hud()
+	return true
+
+
+func _active_layout_for_work() -> Dictionary:
+	if current_ship != null and typeof(current_ship.built_layout) == TYPE_DICTIONARY and not (current_ship.built_layout as Dictionary).is_empty():
+		return current_ship.built_layout as Dictionary
+	if loader != null and loader.has_method("get_layout_copy"):
+		var lay: Variant = loader.call("get_layout_copy")
+		if typeof(lay) == TYPE_DICTIONARY:
+			return lay as Dictionary
+	return {}
+
+
+func _inventory_qty_dict_for_work() -> Dictionary:
+	var inv: Dictionary = {}
+	if inventory_state == null:
+		return inv
+	var raw: Variant = inventory_state.get("items")
+	if typeof(raw) == TYPE_DICTIONARY:
+		return (raw as Dictionary).duplicate(true)
+	if inventory_state.has_method("get_summary"):
+		var sum: Dictionary = inventory_state.call("get_summary")
+		var items: Variant = sum.get("items", {})
+		if typeof(items) == TYPE_DICTIONARY:
+			return (items as Dictionary).duplicate(true)
+	return inv
+
+
+## Returns {module_id, kind, distance} for nearest workable structural module.
+## Prefers wall kinds from layout placements; falls back to live scene wrappers
+## stamped with module_key meta (golden hub layouts are floor-heavy).
+func _nearest_workable_wall_module(layout: Dictionary, player_pos: Vector3, max_range: float) -> Dictionary:
+	var best: Dictionary = {}
+	var best_d: float = max_range
+	var best_rank: int = 99  # lower = better (0 wall, 1 other structure, 2 floor)
+	var rooms_v: Variant = layout.get("rooms", [])
+	if typeof(rooms_v) == TYPE_ARRAY:
+		for room_v in (rooms_v as Array):
+			if typeof(room_v) != TYPE_DICTIONARY:
+				continue
+			var room: Dictionary = room_v
+			var room_id: String = str(room.get("id", ""))
+			var placements_v: Variant = room.get("structural_placements", [])
+			if typeof(placements_v) != TYPE_ARRAY:
+				continue
+			for placement_v in (placements_v as Array):
+				if typeof(placement_v) != TYPE_DICTIONARY:
+					continue
+				var placement: Dictionary = placement_v
+				var kind: String = str(placement.get("module_id", placement.get("module", "")))
+				if kind.is_empty():
+					continue
+				var pname: String = str(placement.get("name", kind))
+				var mid: String = "%s/%s" % [room_id, pname]
+				var rank: int = _work_target_rank(kind)
+				if rank >= 2 and best_rank < 2:
+					continue
+				if module_integrity_map != null and str(module_integrity_map.get_state(mid)) == "destroyed":
+					continue
+				var pos_v: Variant = placement.get("world_position", placement.get("position", null))
+				var pos: Vector3 = Vector3.ZERO
+				if typeof(pos_v) == TYPE_VECTOR3:
+					pos = pos_v as Vector3
+				elif typeof(pos_v) == TYPE_ARRAY and (pos_v as Array).size() >= 3:
+					var arr: Array = pos_v as Array
+					pos = Vector3(float(arr[0]), float(arr[1]), float(arr[2]))
+				else:
+					continue
+				if current_ship != null and is_instance_valid(current_ship.scene_root) and current_ship.scene_root is Node3D:
+					pos = (current_ship.scene_root as Node3D).global_transform * pos
+				var d: float = player_pos.distance_to(pos)
+				if d > max_range:
+					continue
+				if rank < best_rank or (rank == best_rank and d <= best_d):
+					best_rank = rank
+					best_d = d
+					best = {"module_id": mid, "kind": kind, "distance": d}
+	# Scene wrappers (module_key meta) — catches kits that only stamp floors in layout.
+	var root: Node = null
+	if current_ship != null and is_instance_valid(current_ship.scene_root):
+		root = current_ship.scene_root
+	elif loader != null and loader.has_method("get_ship_root"):
+		root = loader.call("get_ship_root")
+	if root != null:
+		var acc: Dictionary = {
+			"best": best,
+			"best_d": best_d,
+			"best_rank": best_rank,
+		}
+		_scan_work_targets_in_tree(root, player_pos, max_range, acc)
+		best = acc.get("best", best) as Dictionary
+	return best
+
+
+func _work_target_rank(kind: String) -> int:
+	if ModuleIntegrityConsequencesScript.is_wall_kind(kind):
+		return 0
+	var k: String = kind.to_lower()
+	if k.begins_with("floor") or k.find("floor") >= 0 or k.begins_with("ramp"):
+		return 2
+	return 1
+
+
+func _scan_work_targets_in_tree(node: Node, player_pos: Vector3, max_range: float, acc: Dictionary) -> void:
+	if node == null:
+		return
+	var best_rank: int = int(acc.get("best_rank", 99))
+	var best_d: float = float(acc.get("best_d", max_range))
+	if node.has_meta("module_key") and node is Node3D:
+		var mid: String = str(node.get_meta("module_key"))
+		var kind: String = str(node.get_meta("module_kind", ""))
+		if not mid.is_empty():
+			var rank: int = _work_target_rank(kind)
+			if not (rank >= 2 and best_rank < 2):
+				if module_integrity_map == null or str(module_integrity_map.get_state(mid)) != "destroyed":
+					var d: float = player_pos.distance_to((node as Node3D).global_position)
+					if d <= max_range and (rank < best_rank or (rank == best_rank and d <= best_d)):
+						acc["best_rank"] = rank
+						acc["best_d"] = d
+						acc["best"] = {"module_id": mid, "kind": kind, "distance": d}
+	for child in node.get_children():
+		_scan_work_targets_in_tree(child, player_pos, max_range, acc)
 
 
 ## PKG-B2.2b: advance in-progress WorkAction on both process branches.
@@ -6002,6 +6187,9 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 			return
 		if _try_cart_interact(player_body):
 			return
+		# PKG-B2.2b: nearest wall module cut/pry when nothing else claimed interact.
+		if _try_work_action_interact(player_body):
+			return
 		return
 	# Sub-project #4: try lifeboat repair points before pickups/objectives.
 	for rp in repair_points:
@@ -6054,6 +6242,9 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 	if _try_cargo_deposit(player_body):
 		return
 	if _try_cart_interact(player_body):
+		return
+	# PKG-B2.2b: nearest wall module cut/pry when nothing else claimed interact.
+	if _try_work_action_interact(player_body):
 		return
 
 ## Walk-up cargo deposit: deposits all haulable salvage into the hold of whichever
