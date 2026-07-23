@@ -474,6 +474,8 @@ var audio_root: Node3D
 # one-shot emit. Set to false so the first transition into critical fires
 # the alert; reset to false when vitals recover.
 var _prev_vitals_critical: bool = false
+# Rising-edge flag for combat engagement -> SFX_COMBAT_THREAT_ALERT.
+var _prev_combat_engaged: bool = false
 var arc_root: Node3D
 var arc_zone_node: StaticBody3D
 var arc_zone_label: Label3D
@@ -4627,6 +4629,8 @@ func _interrupt_work_on_damage() -> void:
 func _on_player_combat_damaged(damage: float, _event: Dictionary = {}) -> void:
 	if damage > 0.0:
 		_interrupt_work_on_damage()
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_COMBAT_HIT)
 
 
 ## Hull tendril (etc.) structure strike — damage nearest wall module to the threat.
@@ -8356,7 +8360,11 @@ func _refresh_audio_state(force_initial: bool, _delta_seconds: float = 0.0) -> v
 		# Vitals-low UI alert — emit exactly once per rising edge into critical.
 		if vitals_critical and not _prev_vitals_critical:
 			audio_manager.play_sfx(AudioEventSeamScript.UI_VITALS_LOW)
+		# Threat alert — once per rising edge into combat engagement.
+		if engagement and not _prev_combat_engaged:
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_COMBAT_THREAT_ALERT)
 	_prev_vitals_critical = vitals_critical
+	_prev_combat_engaged = engagement
 	# Attach the AudioListener to the player when a player anchor exists.
 	if player != null and is_instance_valid(player) and player is Node3D:
 		audio_manager.attach_listener(player as Node3D)
