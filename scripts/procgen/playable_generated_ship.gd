@@ -3833,6 +3833,15 @@ func _on_wounds_panel_closed() -> void:
 	_unfreeze_player_after_panel()
 
 
+func _emit_ship_mod_action_failed_sfx() -> void:
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
+
+
+func play_ship_mod_action_failed_sfx_for_validation() -> void:
+	_emit_ship_mod_action_failed_sfx()
+
+
 func _on_ship_modification_panel_closed() -> void:
 	_emit_panel_close_sfx()
 	_unfreeze_player_after_panel()
@@ -10713,10 +10722,12 @@ func _input(event: InputEvent) -> void:
 							occupied = true
 							break
 				if occupied:
-					ship_modification_panel.uninstall_selected()
+					if not bool(ship_modification_panel.uninstall_selected()):
+						_emit_ship_mod_action_failed_sfx()
 				else:
 					ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
-					ship_modification_panel.install_from_inventory(component_catalog)
+					if not bool(ship_modification_panel.install_from_inventory(component_catalog)):
+						_emit_ship_mod_action_failed_sfx()
 				get_viewport().set_input_as_handled()
 			return
 		if event.is_action_pressed("toggle_ship_mod") and _menus_are_closed():

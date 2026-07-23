@@ -575,7 +575,8 @@ run_clean 'Dock barrier SFX smoke' 'DOCK BARRIER SFX PASS open=true sfx=true' "$
 run_clean 'Bridge login SFX smoke' 'BRIDGE LOGIN SFX PASS login=true deny=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/bridge_login_sfx_smoke.gd
 run_clean 'Field craft begin blocked SFX smoke' 'FIELD CRAFT BEGIN BLOCKED SFX PASS blocked=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/field_craft_begin_blocked_sfx_smoke.gd
 run_clean 'Encumbrance overload SFX smoke' 'ENCUMBRANCE OVERLOAD SFX PASS overload=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encumbrance_overload_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=395 clean_output=true'
+run_clean 'Ship mod install fail SFX smoke' 'SHIP MOD INSTALL FAIL SFX PASS fail=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_install_fail_sfx_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=396 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
