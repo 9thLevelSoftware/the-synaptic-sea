@@ -438,7 +438,8 @@ run_clean 'Ship modification panel smoke' 'SHIP MOD PANEL PASS bind=true install
 run_clean 'Work action interact smoke' 'WORK ACTION INTERACT PASS start=true tick=true complete=true nearest=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_action_interact_smoke.gd
 run_clean 'Component placement runtime smoke' 'COMPONENT PLACEMENT RUNTIME PASS wired=true populate_or_empty=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_placement_runtime_smoke.gd
 run_clean 'Component dismount interact smoke' 'COMPONENT DISMOUNT INTERACT PASS start=true tick=true stripped=true yield=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_dismount_interact_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=258 clean_output=true'
+run_clean 'Component mount interact smoke' 'COMPONENT MOUNT INTERACT PASS dismount=true remount=true mounted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_interact_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=259 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
