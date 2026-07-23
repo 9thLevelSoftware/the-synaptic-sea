@@ -7,6 +7,8 @@ class_name SealedHatch
 ## interaction shape (Area3D proximity + try_* + a signal). Domain 5.
 
 signal hatch_bypassed(hatch_id: String, lock_kind: String)
+## Re-seal after bypass: restores the bulkhead blocker (Fire B2 closed link).
+signal hatch_resealed(hatch_id: String, lock_kind: String)
 
 const MECHANICAL: String = "mechanical"
 const ELECTRONIC: String = "electronic"
@@ -57,6 +59,18 @@ func try_bypass(player_body: Node, active_flags: Dictionary) -> Dictionary:
 	set_bypassed(true)
 	emit_signal("hatch_bypassed", hatch_id, lock_kind)
 	return {"ok": true, "hatch_id": hatch_id, "lock_kind": lock_kind, "consumed_flag": flag}
+
+
+## Re-close a previously bypassed hatch (no utility flag cost). Restores the
+## bulkhead blocker so Fire B2 door-gated spread applies again.
+func try_reseal(player_body: Node) -> Dictionary:
+	if not bypassed:
+		return {"ok": false, "reason": "already_sealed", "hatch_id": hatch_id}
+	if not _is_player_in_range(player_body):
+		return {"ok": false, "reason": "out_of_range", "hatch_id": hatch_id}
+	set_bypassed(false)
+	emit_signal("hatch_resealed", hatch_id, lock_kind)
+	return {"ok": true, "hatch_id": hatch_id, "lock_kind": lock_kind}
 
 func _is_player_in_range(player_body: Node) -> bool:
 	if _player_in_range:

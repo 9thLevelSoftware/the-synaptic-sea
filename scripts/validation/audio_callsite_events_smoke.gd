@@ -13,16 +13,16 @@ extends SceneTree
 ##   UI_SAVE           — request_save() on success
 ##   SFX_DROP_ITEM     — cart-overload floor WorkYieldDrop spawn
 ##   SFX_DOOR_OPEN     — sealed hatch bypass (_on_hatch_bypassed)
+##   SFX_DOOR_CLOSE    — sealed hatch re-seal (_on_hatch_resealed)
 ##   SFX_DOCK_LAND     — play_dock_land_sfx_for_validation / travel attach
 ##   SFX_FOOTSTEP      — play_footstep_sfx_for_validation / _tick_footstep_sfx
 ##
 ## Events still skipped:
-##   SFX_DOOR_CLOSE                  — no re-seal door node yet
 ##   UI_LOAD                         — request_load() resets the entire runtime;
 ##                                     too destructive to run mid-smoke
 ##
 ## Pass marker:
-##   AUDIO CALLSITE EVENTS PASS door=true footstep=true drop=true tool=true inv_toggle=true objective=true save=true dock=true load=skip
+##   AUDIO CALLSITE EVENTS PASS door=true door_close=true footstep=true drop=true tool=true inv_toggle=true objective=true save=true dock=true load=skip
 ##
 ## Headless:
 ##   <GODOT> --headless --path "C:/Users/dasbl/Documents/The Synaptic Sea"
@@ -161,6 +161,18 @@ func _validate() -> void:
 		return
 
 	# -----------------------------------------------------------------
+	# 6b. SFX_DOOR_CLOSE — sealed hatch re-seal call site.
+	# -----------------------------------------------------------------
+	mgr.sfx_router.configure({})
+	var door_close_before: int = int(mgr.sfx_router.get_routed_count(&"sfx.door.close"))
+	playable._on_hatch_resealed("callsite_hatch_close", "mechanical")
+	var door_close_after: int = int(mgr.sfx_router.get_routed_count(&"sfx.door.close"))
+	var door_close_ok: bool = door_close_after > door_close_before
+	if not door_close_ok:
+		_fail("SFX_DOOR_CLOSE not routed after hatch reseal (before=%d after=%d)" % [door_close_before, door_close_after])
+		return
+
+	# -----------------------------------------------------------------
 	# 7. SFX_DOCK_LAND — validation seam for dock success cue.
 	# -----------------------------------------------------------------
 	mgr.sfx_router.configure({})
@@ -188,7 +200,7 @@ func _validate() -> void:
 	# All assertions passed.  Skipped events logged in marker.
 	# -----------------------------------------------------------------
 	finished = true
-	print("AUDIO CALLSITE EVENTS PASS door=true footstep=true drop=true tool=%s inv_toggle=%s objective=%s save=%s dock=true load=skip" % [
+	print("AUDIO CALLSITE EVENTS PASS door=true door_close=true footstep=true drop=true tool=%s inv_toggle=%s objective=%s save=%s dock=true load=skip" % [
 		str(tool_ok).to_lower(),
 		str(inv_open_ok and inv_close_ok).to_lower(),
 		str(obj_ok).to_lower(),

@@ -2890,6 +2890,8 @@ func _build_sealed_hatches() -> void:
 			hatch.set_bypassed(true)
 		if not hatch.hatch_bypassed.is_connected(_on_hatch_bypassed):
 			hatch.hatch_bypassed.connect(_on_hatch_bypassed)
+		if hatch.has_signal("hatch_resealed") and not hatch.hatch_resealed.is_connected(_on_hatch_resealed):
+			hatch.hatch_resealed.connect(_on_hatch_resealed)
 		if current_ship != null and is_instance_valid(current_ship.scene_root):
 			current_ship.scene_root.add_child(hatch)
 		sealed_hatches.append(hatch)
@@ -5520,6 +5522,42 @@ func _try_bypass_nearest_hatch() -> bool:
 			return true
 	return false
 
+
+## Domain 5 / Fire B2: re-close nearest bypassed hatch in range (no utility flag).
+func _try_reseal_nearest_hatch() -> bool:
+	if not is_instance_valid(player):
+		return false
+	for h in sealed_hatches:
+		if not is_instance_valid(h) or not h.bypassed:
+			continue
+		if not h.has_method("try_reseal"):
+			continue
+		var res: Dictionary = h.try_reseal(player)
+		if bool(res.get("ok", false)):
+			return true
+	return false
+
+
+## Domain 5: hatch re-sealed — restore persistence + Fire B2 closed link + door SFX.
+func _on_hatch_resealed(hatch_id: String, _lock_kind: String) -> void:
+	if current_ship != null and current_ship.bypassed_hatch_ids.has(hatch_id):
+		current_ship.bypassed_hatch_ids.erase(hatch_id)
+	# Manual hatch close is field construction (bulkhead re-seal).
+	emit_training_event("build_shelter", hatch_id)
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_DOOR_CLOSE)
+	_set_hazard_feedback_line("Hatch sealed: %s" % hatch_id)
+	for h in sealed_hatches:
+		if not is_instance_valid(h) or str(h.hatch_id) != hatch_id:
+			continue
+		var afs = _active_fire_state()
+		if afs != null and afs.has_method("set_link_closed") \
+				and not str(h.compartment_a).is_empty() and not str(h.compartment_b).is_empty():
+			afs.set_link_closed(str(h.compartment_a), str(h.compartment_b), true)
+		break
+	_refresh_inventory_hud()
+
+
 ## Domain 2 (BP3): a threat died — grant XP through the progression bus and spawn a
 ## lootable corpse container at its position (reusing the closed loot/interact path).
 ## Runs on BOTH _process branches (the signal fires from tick_threats, called on the
@@ -7072,6 +7110,9 @@ func _on_player_interact_requested(player_body: PlayerController) -> void:
 				return
 		# Domain 5: sealed hatch bypass (lockpick/hack_chip flag required).
 		if _try_bypass_nearest_hatch():
+			return
+		# Domain 5 / Fire B2: re-seal a previously opened hatch (no flag cost).
+		if _try_reseal_nearest_hatch():
 			return
 		# Sub-project #2: the boarded derelict has its own objective interactables.
 		for it in derelict_interactables:
