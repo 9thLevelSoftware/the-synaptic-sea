@@ -57,9 +57,13 @@ func _validate() -> void:
 	var fp = points[0]
 	# try_start checks DIRECT range (not the candidate seam) — teleport in.
 	playable.teleport_player_to_fire_suppression_point_for_validation(fp)
-	fp.try_start(playable.player)  # no extinguisher in inventory -> blocked
-	if not _feedback().begins_with("Extinguish blocked"):
-		_fail("extinguish_blocked produced no HUD feedback (line='%s')" % _feedback())
+	# Fire B2: no extinguisher while burning deliberately vents (decompression teeth)
+	# rather than a soft "missing extinguisher" block. Either vent HUD or extinguish_blocked
+	# proves the suppression interact path produced player-facing feedback.
+	fp.try_start(playable.player)  # no extinguisher -> deliberate vent OR blocked
+	var extinguish_line: String = _feedback()
+	if not (extinguish_line.begins_with("Extinguish blocked") or extinguish_line.begins_with("Emergency vent")):
+		_fail("extinguish interact produced no HUD feedback (line='%s')" % extinguish_line)
 		return
 	var extinguish_blocked_ok: bool = true
 

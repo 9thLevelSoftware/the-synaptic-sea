@@ -5412,6 +5412,7 @@ func field_craft_first_ready_for_validation() -> bool:
 	return begin_field_craft_recipe(rid)
 
 ## Validation seam: start a repair-point channel via the real path, by subcomponent.
+## try_start returns true on soft-block consume too — success is channeling.
 func repair_subcomponent_for_validation(system_id: String, subcomponent_id: String) -> bool:
 	if not is_instance_valid(player):
 		return false
@@ -5421,7 +5422,9 @@ func repair_subcomponent_for_validation(system_id: String, subcomponent_id: Stri
 			# candidate_player bypass) admits the channel — mirrors the loot smoke seam.
 			if player.has_method("teleport_to"):
 				player.teleport_to(rp.global_position)
-			return rp.try_start(player)
+			if not rp.try_start(player):
+				return false
+			return bool(rp.channeling)
 	return false
 
 ## Validation seam: pump all channeling repair points by delta (deterministic timed advance).

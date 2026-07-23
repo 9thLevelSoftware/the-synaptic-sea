@@ -78,7 +78,7 @@ func try_start(player_body: Node) -> bool:
 		return false
 	if not fire_state.is_burning(compartment_id):
 		emit_signal("extinguish_blocked", compartment_id, "not_burning")
-		return false
+		return true  # consume; extinguish not started
 	# Fire B2: no extinguisher / empty charge → deliberate vent (instant vacuum).
 	# Decompression danger is the trade-off for extinguishing without a tool.
 	if not _has_required_tool() or extinguisher_state == null or not extinguisher_state.has_charge_for_use():
@@ -86,7 +86,7 @@ func try_start(player_body: Node) -> bool:
 	var channel = WorkActionChannelScript.new()
 	if not channel.begin(WORK_ACTION_ID, compartment_id, extinguish_seconds, {}):
 		emit_signal("extinguish_blocked", compartment_id, "work_action")
-		return false
+		return true
 	_work_channel = channel
 	_channel_player = player_body
 	channeling = true
@@ -101,10 +101,10 @@ func try_vent(player_body: Node) -> bool:
 		return false
 	if fire_state.has_method("is_vented") and fire_state.is_vented(compartment_id):
 		emit_signal("extinguish_blocked", compartment_id, "already_vented")
-		return false
+		return true  # consume
 	if not fire_state.has_method("deliberate_vent") or not fire_state.deliberate_vent(compartment_id):
 		emit_signal("extinguish_blocked", compartment_id, "vent_failed")
-		return false
+		return true
 	extinguished = true
 	_set_extinguished_visual()
 	emit_signal("compartment_vented", compartment_id)

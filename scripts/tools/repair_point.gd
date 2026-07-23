@@ -110,19 +110,19 @@ func try_start(player_body: Node) -> bool:
 		return false
 	if sub.is_functional():
 		emit_signal("repair_blocked", system_id, subcomponent_id, "already_functional")
-		return false
+		return true  # consume interact (blocked SFX via signal); channel not started
 	var skill: int = _player_skill()
 	var reason: String = _precheck_reason(sub, skill)
 	if reason != "ok":
 		emit_signal("repair_blocked", system_id, subcomponent_id, reason)
-		return false
+		return true
 	var factor: float = 1.0 + 0.1 * float(maxi(0, skill - min_skill))
 	_scaled_seconds = maxf(0.01, repair_seconds / factor)
 	var channel = WorkActionChannelScript.new()
 	var target_key: String = "%s/%s" % [system_id, subcomponent_id]
 	if not channel.begin(WORK_ACTION_ID, target_key, _scaled_seconds, {}):
 		emit_signal("repair_blocked", system_id, subcomponent_id, "work_action")
-		return false
+		return true
 	_work_channel = channel
 	_channel_player = player_body
 	channeling = true
