@@ -6489,6 +6489,10 @@ func _attack_with_equipped_weapon() -> Dictionary:
 		_sync_current_ship_combat_summary()
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.SFX_COMBAT_HIT)
+	elif str(result.get("reason", "")) in ["empty_magazine", "no_ammo", "reloading"]:
+		# Dry-fire / blocked shot click.
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 	# ADR-0042: a swing also dissipates a phantom within reach. On an empty magazine
 	# the shot is a dry-fire click (no round spent) but the swing still counts as the
 	# wasted-action teeth.
