@@ -6517,6 +6517,8 @@ func _begin_weapon_reload() -> void:
 	if ammo_state.begin_reload(weapon_id, mag_size, reserve):
 		if inventory_state != null:
 			inventory_state.remove_item(ammo_item_id, ammo_state.reload_target)  # commit reserve
+		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 		_refresh_inventory_hud()
 		_refresh_weapon_hotbar()
 
