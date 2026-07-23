@@ -10,6 +10,8 @@ var processed_hits: int = 0
 var total_damage_applied: float = 0.0
 var total_noise_generated: float = 0.0
 var last_result: Dictionary = {}
+## REQ-WA-003: optional Callable(damage: float, event: Dictionary) after player vitals hit.
+var on_player_damaged: Callable = Callable()
 
 func configure(config: Dictionary = {}) -> void:
 	armor_resolver.configure(config.get("armor_profile", {}))
@@ -18,11 +20,19 @@ func configure(config: Dictionary = {}) -> void:
 	total_damage_applied = 0.0
 	total_noise_generated = 0.0
 	last_result = {}
+	var cb: Variant = config.get("on_player_damaged", null)
+	if cb is Callable:
+		on_player_damaged = cb as Callable
+	else:
+		on_player_damaged = Callable()
 
 func apply_to_vitals(vitals_state, status_effects_state, armor_profile: Dictionary, event: Dictionary) -> Dictionary:
 	var resolved: Dictionary = armor_resolver.resolve_damage(event, armor_profile)
-	_apply_vitals_damage(vitals_state, float(resolved.get("final_damage", 0.0)))
+	var dmg: float = float(resolved.get("final_damage", 0.0))
+	_apply_vitals_damage(vitals_state, dmg)
 	_apply_status(status_effects_state, str(event.get("status_effect_id", "")), float(event.get("status_duration", -1.0)))
+	if dmg > 0.0 and on_player_damaged.is_valid():
+		on_player_damaged.call(dmg, event)
 	return _finalize_result(event, resolved)
 
 func apply_to_threat(threat_state, event: Dictionary) -> Dictionary:

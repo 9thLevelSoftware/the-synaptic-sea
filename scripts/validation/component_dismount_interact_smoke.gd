@@ -40,6 +40,8 @@ func _on_frame() -> void:
 
 
 func _start() -> void:
+	if playable.threat_manager != null:
+		playable.threat_manager.threats.clear()
 	var cat = ComponentCatalogScript.new()
 	if not cat.load_default():
 		_fail("catalog"); return
