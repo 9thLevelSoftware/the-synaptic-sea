@@ -18,6 +18,7 @@ const PHANTOM_ARCHETYPE := "stalker"  # neutral phantom look; deterministic, no 
 var _audio_manager = null
 var _fx_overlay = null   # a CanvasItem/Node carrying a hallucination_intensity meta, or null
 var _ambient_cooldown: float = 0.0
+var _prev_hud_active: bool = false
 
 func configure(p_director) -> void:
 	director = p_director
@@ -54,6 +55,13 @@ func render(delta: float, player_position: Vector3) -> void:
 			node.set_meta("is_phantom", true)
 			add_child(node)
 			_phantom_nodes[id] = node
+			# New phantom spawn — prefer pool audio_event, else SFX_SANITY_PHANTOM.
+			if _audio_manager != null and _audio_manager.has_method("play_sfx"):
+				var ae: String = str(e.get("audio_event", ""))
+				if ae.is_empty():
+					_audio_manager.play_sfx(AudioEventSeamScript.SFX_SANITY_PHANTOM)
+				else:
+					_audio_manager.play_sfx(StringName(ae))
 	# Free phantom nodes whose event expired.
 	for id in _phantom_nodes.keys():
 		if not live_ids.has(id):
@@ -68,8 +76,16 @@ func render(delta: float, player_position: Vector3) -> void:
 	_ambient_cooldown = maxf(0.0, _ambient_cooldown - delta)
 	if _audio_manager != null and not director.get_active_events("ambient").is_empty() and _ambient_cooldown <= 0.0:
 		if _audio_manager.has_method("play_sfx"):
+			# Whisper (legacy ambient) + dedicated sanity ambient catalog id.
 			_audio_manager.play_sfx(_ambient_sfx_id())
+			_audio_manager.play_sfx(AudioEventSeamScript.SFX_SANITY_AMBIENT)
 		_ambient_cooldown = 2.0
+
+	# False-HUD glitch once per rising edge into active HUD hallucinations.
+	var hud_active: bool = not director.get_active_events("hud").is_empty()
+	if hud_active and not _prev_hud_active and _audio_manager != null and _audio_manager.has_method("play_sfx"):
+		_audio_manager.play_sfx(AudioEventSeamScript.SFX_SANITY_HUD)
+	_prev_hud_active = hud_active
 
 	# Screen FX intensity from tier.
 	if _fx_overlay != null and is_instance_valid(_fx_overlay):
