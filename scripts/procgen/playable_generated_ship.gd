@@ -6114,7 +6114,10 @@ func _open_shared_recipe_picker(station_kind: String) -> void:
 	if not _menus_are_closed():
 		_on_craft_blocked(station_kind, "menu_open")
 		return
+	var was_open: bool = recipe_picker_panel.is_open() if recipe_picker_panel.has_method("is_open") else false
 	recipe_picker_panel.open_for_station(station_kind)
+	if not was_open and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_OPEN)
 	_freeze_player_for_panel()
 
 ## REQ-CS-016 / 017 / 018: pure listing seam used by RecipePickerPanel + smokes.

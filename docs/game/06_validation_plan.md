@@ -532,7 +532,8 @@ run_clean 'Component remount SFX live smoke' 'COMPONENT REMOUNT SFX LIVE PASS re
 run_clean 'Loot search SFX smoke' 'LOOT SEARCH SFX PASS search=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/loot_search_sfx_smoke.gd
 run_clean 'Panel close SFX smoke' 'PANEL CLOSE SFX PASS wounds=true shipmod=true chart=true scanner=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/panel_close_sfx_smoke.gd
 run_clean 'Equip unequip SFX smoke' 'EQUIP UNEQUIP SFX PASS equip=true unequip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/equip_unequip_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=352 clean_output=true'
+run_clean 'Recipe picker open SFX smoke' 'RECIPE PICKER OPEN SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/recipe_picker_open_sfx_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=353 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
