@@ -84,93 +84,196 @@
       "linked_system": "scanners",
       "linked_subcomponent": "signal_processor",
       "condition_default": 0.7
+    },
+    "hull_plating": {
+      "item_form": "plating_plate",
+      "mass": 8.0,
+      "power_draw": 0.0,
+      "slot": "wall",
+      "condition_default": 1.0,
+      "plating": true,
+      "station_tier_bonus": 0
     }
   },
   "role_sets": {
     "engineering": {
       "wall": [
-        {"component_id": "reactor_console", "weight": 3},
-        {"component_id": "conduit_run", "weight": 2},
-        {"component_id": "console_generic", "weight": 1}
+        {
+          "component_id": "reactor_console",
+          "weight": 3
+        },
+        {
+          "component_id": "conduit_run",
+          "weight": 2
+        },
+        {
+          "component_id": "console_generic",
+          "weight": 1
+        }
       ],
       "center": [
-        {"component_id": "machinery_block", "weight": 2},
-        {"component_id": "pump_assembly", "weight": 1}
+        {
+          "component_id": "machinery_block",
+          "weight": 2
+        },
+        {
+          "component_id": "pump_assembly",
+          "weight": 1
+        }
       ]
     },
     "reactor": {
       "wall": [
-        {"component_id": "reactor_console", "weight": 4},
-        {"component_id": "conduit_run", "weight": 1}
+        {
+          "component_id": "reactor_console",
+          "weight": 4
+        },
+        {
+          "component_id": "conduit_run",
+          "weight": 1
+        }
       ],
       "center": [
-        {"component_id": "machinery_block", "weight": 3}
+        {
+          "component_id": "machinery_block",
+          "weight": 3
+        }
       ]
     },
     "bridge": {
       "wall": [
-        {"component_id": "nav_console", "weight": 3},
-        {"component_id": "console_generic", "weight": 2},
-        {"component_id": "sensor_rack", "weight": 1}
+        {
+          "component_id": "nav_console",
+          "weight": 3
+        },
+        {
+          "component_id": "console_generic",
+          "weight": 2
+        },
+        {
+          "component_id": "sensor_rack",
+          "weight": 1
+        }
       ],
       "center": [
-        {"component_id": "console_generic", "weight": 1}
+        {
+          "component_id": "console_generic",
+          "weight": 1
+        }
       ]
     },
     "cockpit": {
       "wall": [
-        {"component_id": "nav_console", "weight": 3},
-        {"component_id": "thruster_control", "weight": 2}
+        {
+          "component_id": "nav_console",
+          "weight": 3
+        },
+        {
+          "component_id": "thruster_control",
+          "weight": 2
+        }
       ],
       "center": []
     },
     "cargo": {
       "wall": [
-        {"component_id": "locker_wall", "weight": 3},
-        {"component_id": "console_generic", "weight": 1}
+        {
+          "component_id": "locker_wall",
+          "weight": 3
+        },
+        {
+          "component_id": "console_generic",
+          "weight": 1
+        }
       ],
       "center": [
-        {"component_id": "machinery_block", "weight": 1}
+        {
+          "component_id": "machinery_block",
+          "weight": 1
+        }
       ]
     },
     "medical": {
       "wall": [
-        {"component_id": "console_generic", "weight": 2},
-        {"component_id": "locker_wall", "weight": 2}
+        {
+          "component_id": "console_generic",
+          "weight": 2
+        },
+        {
+          "component_id": "locker_wall",
+          "weight": 2
+        }
       ],
       "center": [
-        {"component_id": "pump_assembly", "weight": 1}
+        {
+          "component_id": "pump_assembly",
+          "weight": 1
+        }
       ]
     },
     "airlock": {
       "wall": [
-        {"component_id": "locker_wall", "weight": 2},
-        {"component_id": "console_generic", "weight": 1}
+        {
+          "component_id": "locker_wall",
+          "weight": 2
+        },
+        {
+          "component_id": "console_generic",
+          "weight": 1
+        }
       ],
       "center": []
     },
     "corridor": {
       "wall": [
-        {"component_id": "conduit_run", "weight": 2},
-        {"component_id": "locker_wall", "weight": 1}
+        {
+          "component_id": "conduit_run",
+          "weight": 2
+        },
+        {
+          "component_id": "locker_wall",
+          "weight": 1
+        }
       ],
       "center": []
     },
     "default": {
       "wall": [
-        {"component_id": "console_generic", "weight": 2},
-        {"component_id": "conduit_run", "weight": 1}
+        {
+          "component_id": "console_generic",
+          "weight": 2
+        },
+        {
+          "component_id": "conduit_run",
+          "weight": 1
+        }
       ],
       "center": [
-        {"component_id": "machinery_block", "weight": 1}
+        {
+          "component_id": "machinery_block",
+          "weight": 1
+        }
       ]
     }
   },
   "role_system_links": {
-    "engineering": ["power", "propulsion"],
-    "reactor": ["power"],
-    "bridge": ["navigation", "scanners"],
-    "cockpit": ["navigation", "propulsion"],
-    "hydroponics": ["life_support"]
+    "engineering": [
+      "power",
+      "propulsion"
+    ],
+    "reactor": [
+      "power"
+    ],
+    "bridge": [
+      "navigation",
+      "scanners"
+    ],
+    "cockpit": [
+      "navigation",
+      "propulsion"
+    ],
+    "hydroponics": [
+      "life_support"
+    ]
   }
 }
