@@ -92,8 +92,9 @@ func _interact_hydro() -> bool:
 		var out: Dictionary = model.harvest()
 		return _deposit(str(out.get("item_id", "")), int(out.get("quantity", 0)))
 	if model.state == HydroStateScript.State.PLANTED:
+		# Growing crop — soft block + consume interact (no fall-through to other handlers).
 		emit_signal("production_blocked", station_kind, "in_progress")
-		return false
+		return true
 	# IDLE -> open crop picker (REQ-CS-018); no auto-plant.
 	emit_signal("crop_picker_requested", station_kind)
 	return true

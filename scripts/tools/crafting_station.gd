@@ -93,10 +93,10 @@ func try_interact(player_body: Node) -> bool:
 	if not _is_player_in_direct_range(player_body):
 		return false
 	# Single active craft (CraftingState holds one global _active_craft): if one is already
-	# running, this station no-ops rather than clobbering it.
+	# running, this station blocks with feedback and consumes interact (no fall-through).
 	if crafting_state.is_crafting():
 		emit_signal("craft_blocked", station_kind, "busy")
-		return false
+		return true
 	# Stream F: medbay field surgery when the patient is critical (before crafts).
 	if station_kind == "medbay" and surgery_provider != null \
 			and surgery_provider.has_method("try_medbay_surgery"):
