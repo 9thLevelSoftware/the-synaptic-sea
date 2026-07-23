@@ -121,6 +121,34 @@
       "interruptible": true,
       "notes": "PKG-B2.3b: yield item_form comes from ComponentPlacementState on resolve"
     },
+    "plant_crop": {
+      "verb": "plant",
+      "target_kind": "hydroponics",
+      "tool_class": "",
+      "min_skill": "cooking",
+      "min_skill_level": 0,
+      "duration": 2.0,
+      "materials_consumed": {},
+      "materials_yielded": {},
+      "noise": 0.05,
+      "xp_event": "cooking",
+      "interruptible": true,
+      "notes": "PKG-C3.2: HydroponicsState.plant owns water/power/skill gates"
+    },
+    "harvest_crop": {
+      "verb": "harvest",
+      "target_kind": "hydroponics",
+      "tool_class": "",
+      "min_skill": "cooking",
+      "min_skill_level": 0,
+      "duration": 3.0,
+      "materials_consumed": {},
+      "materials_yielded": {},
+      "noise": 0.10,
+      "xp_event": "cooking",
+      "interruptible": true,
+      "notes": "PKG-C3.2: yields produce_item_id from HydroponicsState.harvest"
+    },
     "mount_component": {
       "verb": "mount",
       "target_kind": "component",

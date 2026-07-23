@@ -53,6 +53,63 @@ func get_any_rotten() -> bool:
 			return true
 	return false
 
+
+## PKG-C3.2: eat path — apply spoilage-scaled restores, then drop tracking.
+## inventory is optional object with remove_item(id, qty); vitals optional with apply_delta.
+func eat(item_id: String, inventory = null, vitals = null, sanity_state = null) -> Dictionary:
+	var out: Dictionary = {
+		"ok": false,
+		"reason": "",
+		"hunger": 0.0,
+		"thirst": 0.0,
+		"sanity": 0.0,
+		"sickness_risk": 0.0,
+		"stage": -1,
+	}
+	if item_id.is_empty() or not foods.has(item_id):
+		out["reason"] = "not_tracked"
+		return out
+	if inventory != null and inventory.has_method("get_quantity"):
+		if int(inventory.get_quantity(item_id)) < 1:
+			out["reason"] = "missing_inventory"
+			return out
+	var fs = foods[item_id]
+	var effect: Dictionary = fs.consume()
+	out["hunger"] = float(effect.get("hunger", 0.0))
+	out["thirst"] = float(effect.get("thirst", 0.0))
+	out["sanity"] = float(effect.get("sanity", 0.0))
+	out["sickness_risk"] = float(effect.get("sickness_risk", 0.0))
+	out["stage"] = int(fs.stage)
+	if vitals != null and vitals.has_method("apply_delta"):
+		vitals.apply_delta({"hunger": out["hunger"], "thirst": out["thirst"]})
+	if sanity_state != null and sanity_state.has_method("adjust_sanity") and absf(out["sanity"]) > 0.0:
+		sanity_state.adjust_sanity(out["sanity"])
+	if inventory != null and inventory.has_method("remove_item"):
+		inventory.remove_item(item_id, 1)
+	# If inventory still has stacks, keep spoilage tracking; else remove.
+	if inventory != null and inventory.has_method("get_quantity") and int(inventory.get_quantity(item_id)) > 0:
+		pass
+	else:
+		remove_food(item_id)
+	out["ok"] = true
+	return out
+
+
+## PKG-C3.2: sum effective hunger restore across tracked foods (travel planning).
+func total_effective_hunger() -> float:
+	var total: float = 0.0
+	for item_id in foods:
+		var eff: Dictionary = foods[item_id].get_effective_restores()
+		total += float(eff.get("hunger", 0.0))
+	return total
+
+
+## Estimated travel-days of food at a fixed hunger drain per day (default 24*0.5 from VitalsState).
+func travel_range_days(hunger_drain_per_day: float = 12.0) -> float:
+	if hunger_drain_per_day <= 0.0:
+		return 0.0
+	return total_effective_hunger() / hunger_drain_per_day
+
 func get_summary() -> Dictionary:
 	var entries: Dictionary = {}
 	for item_id in foods:
