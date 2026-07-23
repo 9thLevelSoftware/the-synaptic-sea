@@ -28,6 +28,8 @@
     {"event_id": "defeat_enemy",               "target_skill": "intimidation", "base_xp": 100, "category": "social"},
     {"event_id": "extract_data",               "target_skill": "diagnostics",  "base_xp": 70,  "category": "technical"},
     {"event_id": "discover_room",              "target_skill": "astrogation",  "base_xp": 30,  "category": "navigation"},
-    {"event_id": "threat_killed",              "target_skill": "scavenging",   "base_xp": 10,  "category": "combat"}
+    {"event_id": "threat_killed",              "target_skill": "scavenging",   "base_xp": 10,  "category": "combat"},
+    {"event_id": "ship_mod_install",           "target_skill": "construction", "base_xp": 40,  "category": "technical"},
+    {"event_id": "ship_mod_uninstall",         "target_skill": "construction", "base_xp": 20,  "category": "technical"}
   ]
 }
