@@ -3441,11 +3441,17 @@ func run_work_action_for_validation(action_id: String, target_id: String, invent
 	work_action_driver.tick(999.0, {"work_speed_mult": float(ctx.get("work_speed_mult", 1.0))})
 	var res: Dictionary = work_action_driver.complete(module_integrity_map, inv)
 	_refresh_work_action_hud()
-	if bool(res.get("ok", false)) and work_action_driver.last_noise_pulse > 0.0:
-		if threat_manager != null:
+	if bool(res.get("ok", false)):
+		if work_action_driver.last_noise_pulse > 0.0 and threat_manager != null:
 			work_action_driver.apply_noise_to_detection(threat_manager)
 		if audio_manager != null and res.has("audio_event") and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(StringName(str(res.get("audio_event", ""))))
+		var xp_ev: String = str(work_action_driver.last_xp_event)
+		if xp_ev.is_empty():
+			xp_ev = str(res.get("xp_event", ""))
+		if not xp_ev.is_empty():
+			emit_training_event(xp_ev, target_id)
+		_apply_module_integrity_state_to_scene()
 	return res
 
 
@@ -3825,13 +3831,12 @@ func _tick_work_action(delta: float) -> void:
 			if bool(res.get("ok", false)):
 				work_action_driver.last_resolve = res.duplicate(true)
 				work_action_driver.last_noise_pulse = float(res.get("noise", 0.0))
+				work_action_driver.last_xp_event = str(res.get("xp_event", "salvage"))
 				if inventory_state != null:
 					var form: String = str(res.get("item_form", ""))
 					if not form.is_empty() and inventory_state.has_method("add_item"):
 						inventory_state.add_item(form, 1)
 				_rebuild_component_markers()
-				if work_action_driver.work != null and work_action_driver.work.has_method("reset"):
-					work_action_driver.work.call("reset")
 		elif action_id == "mount_component":
 			res = ComponentMountResolverScript.resolve_mount(
 				work_action_driver.work, component_placement_state, inv, component_catalog, {}
@@ -3839,20 +3844,30 @@ func _tick_work_action(delta: float) -> void:
 			if bool(res.get("ok", false)):
 				work_action_driver.last_resolve = res.duplicate(true)
 				work_action_driver.last_noise_pulse = float(res.get("noise", 0.0))
+				work_action_driver.last_xp_event = str(res.get("xp_event", "repair"))
 				if inventory_state != null:
 					var form2: String = str(res.get("item_form", ""))
 					if not form2.is_empty() and inventory_state.has_method("remove_item"):
 						inventory_state.remove_item(form2, 1)
 				_rebuild_component_markers()
-				if work_action_driver.work != null and work_action_driver.work.has_method("reset"):
-					work_action_driver.work.call("reset")
 		else:
 			res = work_action_driver.complete(module_integrity_map, inv)
 			if bool(res.get("ok", false)):
 				_apply_module_integrity_state_to_scene()
-		if bool(res.get("ok", false)) and work_action_driver.last_noise_pulse > 0.0:
-			if threat_manager != null:
+		if bool(res.get("ok", false)):
+			if work_action_driver.last_noise_pulse > 0.0 and threat_manager != null:
 				work_action_driver.apply_noise_to_detection(threat_manager)
+			var xp_ev: String = str(work_action_driver.last_xp_event)
+			if xp_ev.is_empty():
+				xp_ev = str(res.get("xp_event", ""))
+			var tid: String = ""
+			if work_action_driver.work != null:
+				tid = str(work_action_driver.work.get("target_id"))
+			if not xp_ev.is_empty():
+				emit_training_event(xp_ev, tid)
+			# Reset after XP so target_id is still available for the event.
+			if work_action_driver.work != null and work_action_driver.work.has_method("reset"):
+				work_action_driver.work.call("reset")
 	_refresh_work_action_hud()
 
 
