@@ -521,7 +521,8 @@ run_clean 'Work splice XP live smoke' 'WORK SPLICE XP LIVE PASS start=true compl
 run_clean 'Work patch XP live smoke' 'WORK PATCH XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_patch_xp_live_smoke.gd
 run_clean 'Meta schedule router smoke' 'META SCHEDULE ROUTER PASS beacon=true routed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/meta_schedule_router_smoke.gd
 run_clean 'Work suppress XP live smoke' 'WORK SUPPRESS XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_suppress_xp_live_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=341 clean_output=true'
+run_clean 'Work plant XP live smoke' 'WORK PLANT XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_plant_xp_live_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=342 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
