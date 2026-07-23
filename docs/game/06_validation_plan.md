@@ -462,6 +462,7 @@ run_clean 'Work tool missing SFX smoke' 'WORK TOOL MISSING SFX PASS near=true de
 run_clean 'Work tool missing away smoke' 'WORK TOOL MISSING AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_tool_missing_away_smoke.gd
 run_clean 'Production unknown kind consume smoke' 'PRODUCTION UNKNOWN KIND CONSUME PASS blocked=true consume=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/production_unknown_kind_consume_smoke.gd
 run_clean 'Inventory toggle smoke' 'INVENTORY TOGGLE PASS open=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_toggle_smoke.gd
+run_clean 'Inventory toggle away smoke' 'INVENTORY TOGGLE AWAY PASS away=true open=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/inventory_toggle_away_smoke.gd
 run_clean 'Chart toggle smoke' 'CHART TOGGLE PASS open=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/chart_toggle_smoke.gd
 run_clean 'Ship mod toggle smoke' 'SHIP MOD TOGGLE PASS open=true close=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_toggle_smoke.gd
 run_clean 'Wounds toggle smoke' 'WOUNDS TOGGLE PASS open=true close=true validation_stays=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wounds_toggle_smoke.gd
@@ -622,7 +623,7 @@ run_clean 'Load denied SFX smoke' 'LOAD DENIED SFX PASS deny=true sfx=true' "$GO
 run_clean 'Cart grab denied SFX smoke' 'CART GRAB DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cart_grab_denied_sfx_smoke.gd
 run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=442 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=443 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
