@@ -588,6 +588,8 @@ run_clean 'Repair full system XP away smoke' 'REPAIR FULL SYSTEM XP AWAY PASS aw
 run_clean 'Stream DE training XP away smoke' 'STREAM DE TRAINING XP AWAY PASS away=true ration=true scan=true transmit=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/stream_de_training_xp_away_smoke.gd
 run_clean 'Ship mod uninstall XP away smoke' 'SHIP MOD UNINSTALL XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_mod_uninstall_xp_away_smoke.gd
 run_clean 'Weld panel XP away smoke' 'WELD PANEL XP AWAY PASS away=true weld_panel=true weld=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/weld_panel_xp_away_smoke.gd
+run_clean 'Defeat enemy XP away smoke' 'DEFEAT ENEMY XP AWAY PASS away=true emit=true catalog=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/defeat_enemy_xp_away_smoke.gd
+run_clean 'Cooking work XP away smoke' 'COOKING WORK XP AWAY PASS away=true cooking=true salvage=true repair=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cooking_work_xp_away_smoke.gd
 run_clean 'Work yield drop SFX smoke' 'WORK YIELD DROP SFX PASS drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_sfx_smoke.gd
 run_clean 'Work yield drop away smoke' 'WORK YIELD DROP AWAY PASS away=true drop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_drop_away_smoke.gd
 run_clean 'Hatch door open SFX smoke' 'HATCH DOOR OPEN SFX PASS hatch=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hatch_door_open_sfx_smoke.gd
@@ -755,7 +757,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=575 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=577 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
