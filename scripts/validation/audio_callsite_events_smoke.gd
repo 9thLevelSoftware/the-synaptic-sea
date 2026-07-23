@@ -17,12 +17,8 @@ extends SceneTree
 ##   SFX_DOCK_LAND     — play_dock_land_sfx_for_validation / travel attach
 ##   SFX_FOOTSTEP      — play_footstep_sfx_for_validation / _tick_footstep_sfx
 ##
-## Events still skipped:
-##   UI_LOAD                         — request_load() resets the entire runtime;
-##                                     too destructive to run mid-smoke
-##
 ## Pass marker:
-##   AUDIO CALLSITE EVENTS PASS door=true door_close=true footstep=true drop=true tool=true inv_toggle=true objective=true save=true dock=true load=skip
+##   AUDIO CALLSITE EVENTS PASS door=true door_close=true footstep=true drop=true tool=true inv_toggle=true objective=true save=true dock=true load=true
 ##
 ## Headless:
 ##   <GODOT> --headless --path "C:/Users/dasbl/Documents/The Synaptic Sea"
@@ -197,10 +193,25 @@ func _validate() -> void:
 		return
 
 	# -----------------------------------------------------------------
-	# All assertions passed.  Skipped events logged in marker.
+	# 9. UI_LOAD — save then load (must run last; load rebuilds runtime).
+	# -----------------------------------------------------------------
+	if not playable.request_save():
+		_fail("request_save failed before UI_LOAD test")
+		return
+	mgr.sfx_router.configure({})
+	var load_before: int = int(mgr.sfx_router.get_routed_count(&"ui.load"))
+	var loaded: bool = playable.request_load()
+	var load_after: int = int(mgr.sfx_router.get_routed_count(&"ui.load"))
+	var load_ok: bool = loaded and load_after > load_before
+	if not load_ok:
+		_fail("UI_LOAD not routed after request_load (loaded=%s before=%d after=%d)" % [str(loaded), load_before, load_after])
+		return
+
+	# -----------------------------------------------------------------
+	# All assertions passed.
 	# -----------------------------------------------------------------
 	finished = true
-	print("AUDIO CALLSITE EVENTS PASS door=true door_close=true footstep=true drop=true tool=%s inv_toggle=%s objective=%s save=%s dock=true load=skip" % [
+	print("AUDIO CALLSITE EVENTS PASS door=true door_close=true footstep=true drop=true tool=%s inv_toggle=%s objective=%s save=%s dock=true load=true" % [
 		str(tool_ok).to_lower(),
 		str(inv_open_ok and inv_close_ok).to_lower(),
 		str(obj_ok).to_lower(),
