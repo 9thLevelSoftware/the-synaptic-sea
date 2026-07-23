@@ -3573,7 +3573,10 @@ func open_ship_modification_panel_for_validation() -> bool:
 		ship_modification_panel.install_requested.connect(_on_ship_mod_install_requested)
 	if not ship_modification_panel.uninstall_requested.is_connected(_on_ship_mod_uninstall_requested):
 		ship_modification_panel.uninstall_requested.connect(_on_ship_mod_uninstall_requested)
+	var was_open: bool = ship_modification_panel.is_open()
 	ship_modification_panel.open()
+	if not was_open and is_instance_valid(audio_manager):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_SHIP_MOD_OPEN)
 	return ship_modification_panel.is_open()
 
 

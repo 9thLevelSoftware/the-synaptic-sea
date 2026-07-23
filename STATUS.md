@@ -153,7 +153,7 @@ Definition of pre-polish: systems content-capable (not voxels; ADR-0051). Remain
 - Hub plating also reduces fire→module damage rate
 - Exhausted stamina interrupts active WorkActions
 - Work interact skill context: weld/patch/splice use repair progression skill
-- Ship-mod install/uninstall emit construction training XP + UI SFX events
+- Ship-mod install/uninstall emit construction training XP + UI SFX (open/install/uninstall)
 - Regression marker contract commands=289 in 06_validation_plan.md
 
 **Still content/polish (not mechanical pre-polish blockers):**
