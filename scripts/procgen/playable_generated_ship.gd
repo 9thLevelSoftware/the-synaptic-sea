@@ -10140,6 +10140,21 @@ func _input(event: InputEvent) -> void:
 			elif event.is_action_pressed("ui_up"):
 				ship_modification_panel.move_selection(-1)
 				get_viewport().set_input_as_handled()
+			elif event.is_action_pressed("ui_accept"):
+				# Enter: install from inventory or uninstall occupied slot.
+				var row_id: String = ship_modification_panel.get_selected_slot_id()
+				var occupied: bool = false
+				if ship_modification_state != null:
+					for e in ship_modification_state.installed:
+						if typeof(e) == TYPE_DICTIONARY and str((e as Dictionary).get("slot_id", "")) == row_id:
+							occupied = true
+							break
+				if occupied:
+					ship_modification_panel.uninstall_selected()
+				else:
+					ship_modification_panel.set_inventory(_inventory_qty_dict_for_work())
+					ship_modification_panel.install_from_inventory(component_catalog)
+				get_viewport().set_input_as_handled()
 			return
 		if event.is_action_pressed("toggle_ship_mod") and _menus_are_closed():
 			open_ship_modification_panel_for_validation()
