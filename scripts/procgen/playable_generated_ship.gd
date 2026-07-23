@@ -3591,6 +3591,21 @@ func open_ship_modification_panel_for_validation() -> bool:
 	return ship_modification_panel.is_open()
 
 
+## Open web chart panel (requires web_chart in inventory) and route UI SFX.
+func open_chart_panel_for_validation() -> bool:
+	if not is_instance_valid(chart_panel):
+		return false
+	if inventory_state == null or int(inventory_state.get_quantity("web_chart")) <= 0:
+		return false
+	var was_open: bool = chart_panel.is_open()
+	chart_panel.open()
+	if chart_panel.has_method("refresh_extraction_route"):
+		chart_panel.refresh_extraction_route()
+	if not was_open and is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.UI_CHART_ROUTE)
+	return chart_panel.is_open()
+
+
 ## Sync panel bag → InventoryState after install (item_form already removed from bag).
 ## REQ-SMOD-001: linked catalog components restore hub ship-system sub floor.
 func _on_ship_mod_install_requested(_slot_id: String, component_id: String, item_form: String) -> void:
@@ -10371,7 +10386,7 @@ func _input(event: InputEvent) -> void:
 		if event.is_action_pressed("ui_open_map") and _menus_are_closed() and (not is_instance_valid(inventory_panel) or not inventory_panel.is_open()):
 			var has_chart: bool = inventory_state != null and int(inventory_state.get_quantity("web_chart")) > 0
 			if has_chart:
-				chart_panel.open()
+				open_chart_panel_for_validation()
 				_freeze_player_for_panel()
 			else:
 				# Domain 10 (ADR-0045): no chart possessed -- surface a HUD feedback

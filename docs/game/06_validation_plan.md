@@ -511,7 +511,8 @@ run_clean 'Combat hit SFX smoke' 'COMBAT HIT SFX PASS hit=true sfx=true' "$GODOT
 run_clean 'Threat alert SFX smoke' 'THREAT ALERT SFX PASS engage=true edge=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_alert_sfx_smoke.gd
 run_clean 'Work pry XP live smoke' 'WORK PRY XP LIVE PASS start=true complete=true xp=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_pry_xp_live_smoke.gd
 run_clean 'Work yield scoop SFX smoke' 'WORK YIELD SCOOP SFX PASS scoop=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/work_yield_scoop_sfx_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=331 clean_output=true'
+run_clean 'Chart route SFX smoke' 'CHART ROUTE SFX PASS open=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/chart_route_sfx_smoke.gd
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=332 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
