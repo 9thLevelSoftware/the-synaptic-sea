@@ -5427,6 +5427,12 @@ func _on_loot_container_searched(container_id: String, granted: Array, source: N
 	emit_training_event("scavenge_container", container_id)
 	# REQ-RL-003: first_loot achievement (loot_searched / any).
 	_try_unlock_achievement("loot_searched", container_id)
+	# Scavenge feedback cue (tool-use bus; spatial when source has a world position).
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		if source != null and is_instance_valid(source) and source is Node3D:
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE, (source as Node3D).global_position)
+		else:
+			audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_USE)
 	_postprocess_loot_grants(granted, container_id, source)
 	_refresh_inventory_hud()
 	# Auto-equip granted containers into empty slots (Phase-7 deferral: no equip UI yet).
