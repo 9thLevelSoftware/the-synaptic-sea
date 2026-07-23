@@ -4279,6 +4279,9 @@ func _on_work_yield_scooped(drop_id: String, _granted: Dictionary) -> void:
 		if is_instance_valid(d) and str(d.drop_id) != drop_id:
 			kept.append(d)
 	work_yield_drops = kept
+	# Floor pile scooped into inventory — reuse tool-pickup bus cue.
+	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(AudioEventSeamScript.SFX_TOOL_PICKUP)
 
 
 func get_work_yield_drops_for_validation() -> Array:
