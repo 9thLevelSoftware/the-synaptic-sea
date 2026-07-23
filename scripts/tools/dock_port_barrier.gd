@@ -68,7 +68,8 @@ func try_start(player_body: Node) -> bool:
 		emit_signal("breach_opened", marker_id)
 		return true
 	if channeling:
-		return false
+		# Already breaching — consume interact so lower-priority handlers do not fire.
+		return true
 	_channel_player = player_body
 	channeling = true
 	progress = 0.0
