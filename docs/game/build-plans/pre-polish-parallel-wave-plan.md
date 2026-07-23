@@ -36,18 +36,18 @@ Module integrity is the unit of destruction. **No voxels.** See `docs/game/adr/0
 | PKG-A1b | ShipRuntime snapshots + multi-runtime | **Done** (PR #80) |
 | PKG-A1c | Collapse away-branch dup | Pending |
 | PKG-A3 | Tick bands FRAME/SLOW/LAZY | Pending |
-| PKG-B2.1a–b | Module integrity | Pending |
-| PKG-B2.2a–b | WorkActions | Pending |
-| PKG-B2.3a–b | Component slots | **Done** (a #91, b pending merge) |
-| PKG-B2.4a–b | Crafting depth | **Done** (a #92, b pending merge) |
-| PKG-B2.5 | Repair unification | **Done** (PR pending) |
-| PKG-B5.1 | Dressing consumption | Pending |
-| PKG-C3.1a–b | Wounds / vitals v2 | Pending |
+| PKG-B2.1a–b | Module integrity | **Done** (#84–#86) |
+| PKG-B2.2a–b | WorkActions | **Partial** (pure a/b #89–#90; scene driver open) |
+| PKG-B2.3a–b | Component slots | **Done** (a #91, b #94) |
+| PKG-B2.4a–b | Crafting depth | **Done** (a #92, b #95) |
+| PKG-B2.5 | Repair unification | **Done** (#93) |
+| PKG-B5.1 | Dressing consumption | **Done** (earlier) |
+| PKG-C3.1a–b | Wounds / vitals v2 | **Partial** (a pure #96; b open) |
 | PKG-C3.2 | Food closure | Pending |
 | PKG-C3.3 | Sanity schema hooks | Pending |
-| PKG-C4.1a–b | Perception | Pending |
+| PKG-C4.1a–b | Perception | **Partial** (a pure #97; b raycast open) |
 | PKG-C4.2 | Archetype modifiers | Pending |
-| PKG-C5.3 | Encounter pacing | Pending |
+| PKG-C5.3 | Encounter pacing | **Done** (earlier) |
 | PKG-D2.6 | Ship modification | Pending |
 | PKG-D5.4 | Templates + wreck mutator | Pending |
 | PKG-D6.1–3 | Persistence verify / sea graph / hub verify | Pending |
