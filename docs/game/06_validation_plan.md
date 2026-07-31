@@ -59,7 +59,7 @@ Task 1 baseline evidence, captured with `GODOT_BIN=/opt/homebrew/bin/godot`:
   intentionally pending Task 2; do not fix it in the documentation task.
 - `component_markers_smoke.gd` exited `0` and printed
   `COMPONENT MARKERS PASS wired=true count=true rebuild=true` followed by exactly
-  `WARNING: 2 ObjectDB instances were leaked at exit (run with --verbose for details).`
+  ``WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).``
   The warning is classified as pre-existing external baseline noise owned by `ship-core`;
   exactly two instances are permitted only for this component-marker baseline while blocked
   Kanban card `t_b9b4e4f9` (title: Investigate ObjectDB leak in component marker smoke) remains
@@ -100,7 +100,7 @@ GODOT="${GODOT:-/opt/homebrew/bin/godot}"
 BASELINE_ERROR="^ERROR: Capture not registered: 'gdaimcp'\\.$"
 # This exact-two exception is scoped to the component-marker baseline below; it is not
 # filtered by the general regression helper.
-BASELINE_WARNING='^WARNING: 2 ObjectDB instances were leaked at exit \(run with --verbose for details\)\.$'
+BASELINE_WARNING='^WARNING: 2 ObjectDB instances were leaked at exit \(run with `--verbose` for details\)\.$'
 REQ012_WARNING="^WARNING: SaveLoadService: save file rejected by from_dict \\(missing fields or version mismatch\\)\$"
 # The save/load service smoke deliberately writes a slot with an incompatible
 # (newer) slice_version to assert the migration-rejection path; that emits one
@@ -897,7 +897,7 @@ allowlist entry: it is filtered only by the component-marker baseline helper.
   `engine_debugger.cpp:62` when a registered message capture (the GDAI MCP
   capture, registered when the Synaptic Sea Godot editor session is live) is
   not active during a `--headless --script` run. Present in every smoke.
-- `WARNING: 2 ObjectDB instances were leaked at exit (run with --verbose for details).`
+- ``WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).``
   — the exact two-instance Godot cleanup-time warning from `object.cpp:2641`.
   It is permitted only for `component_markers_smoke.gd`, and only while blocked
   Kanban card `t_b9b4e4f9` (title: Investigate ObjectDB leak in component marker smoke)

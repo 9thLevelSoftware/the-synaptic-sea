@@ -99,7 +99,7 @@ Also run:
 "$GODOT_BIN" --headless --path . --script res://scripts/validation/component_markers_smoke.gd
 ```
 
-Current verified baseline: the smoke prints `COMPONENT MARKERS PASS wired=true count=true rebuild=true` and then `WARNING: 2 ObjectDB instances were leaked at exit`. Record that exact warning in the feature spec as an external baseline, name `ship-core` as owner, require its count to remain exactly two while this feature is implemented, and link its removal to blocked Kanban card `t_b9b4e4f9` (title: Investigate ObjectDB leak in component marker smoke). Any other warning or a count other than two fails this feature's validation.
+Current verified baseline: the smoke prints `COMPONENT MARKERS PASS wired=true count=true rebuild=true` and then ``WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).``. Record that exact warning in the feature spec as an external baseline, name `ship-core` as owner, require its count to remain exactly two while this feature is implemented, and link its removal to blocked Kanban card `t_b9b4e4f9` (title: Investigate ObjectDB leak in component marker smoke). Any other warning or a count other than two fails this feature's validation.
 
 - [ ] **Step 2: Write the feature spec**
 
@@ -792,7 +792,7 @@ python3 -m unittest -v \
 "$GODOT_BIN" --headless --path . --script res://scripts/validation/main_playable_slice_completion_smoke.gd
 ```
 
-Expected: every command exits zero, all pass markers appear, and 26 sidecars/index are fresh. Eight structural trios validate; components use imported visual bindings; supplied objectives use imported visual bindings; unsupported objective placement IDs retain fallbacks. The exact documented `WARNING: 2 ObjectDB instances were leaked at exit` baseline is the sole allowed warning from the component smoke; any other diagnostic or a warning count other than two fails the gate.
+Expected: every command exits zero, all pass markers appear, and 26 sidecars/index are fresh. Eight structural trios validate; components use imported visual bindings; supplied objectives use imported visual bindings; unsupported objective placement IDs retain fallbacks. The exact documented ``WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).`` baseline is the sole allowed warning from the component smoke; any other diagnostic or a warning count other than two fails the gate.
 
 - [ ] **Step 4: Restore generated engine state and verify repository scope**
 

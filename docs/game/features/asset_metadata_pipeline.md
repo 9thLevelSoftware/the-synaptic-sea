@@ -124,8 +124,7 @@ hand-authored binding, placement, and provenance data.
   key-sorted, compact, newline-terminated, and timestamp-free.
 - An explicit GLB-derived refresh updates hashes/bounds while preserving extensions and
   hand-authored binding, placement, and provenance fields.
-- The exact baseline `WARNING: 2 ObjectDB instances were leaked at exit (run with
-  --verbose for details).` is classified as pre-existing external baseline noise owned by
+- The exact baseline ``WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).`` is classified as pre-existing external baseline noise owned by
   `ship-core` only for the component-marker smoke. Exactly two instances are permitted
   only while blocked Kanban card `t_b9b4e4f9` (title: Investigate ObjectDB leak in component marker smoke)
   remains unresolved. Any other warning, or any count other than two, fails this feature
