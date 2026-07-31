@@ -207,6 +207,7 @@ Expected: `ASSET METADATA GOVERNANCE DOCS PASS` and one focused documentation co
 First run the real-directory red gate before any Task 2 code changes. The helper below captures the validator output and checks the complete diagnostic signature: exact exit status, exact count of lines beginning `ERROR:`, every such error containing the required marker, and zero lines beginning `WARNING:`.
 
 ```bash
+set -euo pipefail
 GODOT_BIN=/opt/homebrew/bin/godot
 
 expect_exact_error_signature() {
@@ -262,6 +263,7 @@ This direct-directory gate is intentionally distinct from the fixture harness be
 Create all four same-basename fixture triples by copying the three existing `corridor_floor_1x1` source files, then mutate only the copied `.tscn` in each triple. Do not write either copied companion JSON file:
 
 ```bash
+set -euo pipefail
 FIXTURE_ROOT=tests/fixtures/structural_variant_wrappers
 SOURCE_BASE=scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x1
 mkdir -p "$FIXTURE_ROOT"
@@ -635,13 +637,13 @@ The fixed `variant_names` order makes both the mixed-form and missing-variant di
 
 - [ ] **Step 4: Run the complete green validator, negative-fixture, smoke, and source-integrity bundle**
 
-Run the following as one shell block after defining the exact `expect_clean_accept`, `expect_exact_error_signature`, and `run_negative_fixture_green_suite` helpers from Step 1. The bundle snapshots all pre-existing generated state before the first Godot command, runs the green commands inside a subshell, and restores plus verifies the exact initial state from an `EXIT` trap. This is restoration of the initial state, not deletion of generated state: pre-existing tracked and ignored `.godot` content and tracked external `*.import` files are preserved.
+Run the following as one shell block after defining the exact `expect_clean_accept`, `expect_exact_error_signature`, and `run_negative_fixture_green_suite` helpers from Step 1. The bundle snapshots all pre-existing generated state before the first Godot command, runs the green commands inside a non-conditional subshell with effective `errexit`, captures that subshell's output by direct redirection, and restores plus verifies the exact initial state from an `EXIT` trap. This is restoration of the initial state, not deletion of generated state: pre-existing tracked and ignored `.godot` content and tracked external `*.import` files are preserved.
 
 ```bash
 set -euo pipefail
 BUNDLE_LOG=$(mktemp)
-
-if (
+set +e
+(
   set -euo pipefail
   GODOT_BIN=/opt/homebrew/bin/godot
   FIXTURE_ROOT=tests/fixtures/structural_variant_wrappers
@@ -949,25 +951,25 @@ PY
   # Exact eight-scene runtime wrapper smoke; this does not invoke the validator.
   run_clean "$GODOT_BIN" --headless --path . \
     --script res://scripts/validation/structural_variant_wrapper_smoke.gd \
-    | tee "$SMOKE_LOG"
+    >"$SMOKE_LOG" 2>&1
+  cat "$SMOKE_LOG"
   if ! grep -Fxq -- \
     'STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true' \
     "$SMOKE_LOG"; then
     printf 'missing exact structural wrapper smoke pass marker\n' >&2
     exit 1
   fi
-) 2>&1 | tee "$BUNDLE_LOG"; then
-  bundle_status=0
-else
-  pipeline_status=("${PIPESTATUS[@]}")
-  bundle_status="${pipeline_status[0]}"
-fi
+) >"$BUNDLE_LOG" 2>&1
+bundle_status=$?
+set -e
 
 # Preserve a primary bundle failure even if its cleanup marker is absent.
 if (( bundle_status != 0 )); then
+  cat "$BUNDLE_LOG" || true
   rm -f -- "$BUNDLE_LOG"
   exit "$bundle_status"
 fi
+cat "$BUNDLE_LOG"
 if ! grep -Fxq -- 'GENERATED STATE RESTORE VERIFIED' "$BUNDLE_LOG"; then
   printf 'missing exact generated-state restore marker\n' >&2
   rm -f -- "$BUNDLE_LOG"
@@ -988,7 +990,7 @@ fi
 printf 'GENERATED STATE RESTORE VERIFIED structural_sources=clean\n'
 ```
 
-`run_clean` captures and prints every command's output, propagates a nonzero command exit, and rejects any `ERROR:` or `WARNING:` diagnostic. The negative suite is the sole exception for intentional `ERROR:` output: each fixture must return status `1`, exactly one `ERROR:` line, zero `WARNING:` lines, and its exact marker through `expect_exact_error_signature`; the suite itself must return zero after all four exact rejections pass. The smoke's exact pass line is checked with `grep -Fxq`, while every other green command is enforced by exit status plus the diagnostic scan. `snapshot_generated_state` writes its canonical manifest and backups only below `STATE_ROOT`, records `.godot` existence plus every regular `.godot` file and every regular external `*.import` file outside `.godot` and `.git`, and stores deterministic relative POSIX paths, SHA-256 values, and modes. The `EXIT` trap is installed before the first Godot command. `restore_and_verify_generated_state` removes current `.godot`, restores the full backup only when it existed initially, removes external imports outside `.godot` and `.git`, restores the captured copies, re-collects the manifest, and fails on any path/hash/mode difference before deleting `STATE_ROOT`; failure cleanup is best-effort and cannot mask the primary status. `finish_bundle` preserves an original nonzero test status and returns restore/verification failure when tests otherwise passed, so an escaped or invalid temporary state makes an otherwise-green bundle nonzero. After the subshell, the exact `GENERATED STATE RESTORE VERIFIED` marker is required; the only broad status check covers structural wrappers and GLBs. Step 5's clean-index policy and exact 14-file commit scope remain unchanged.
+`run_clean` captures and prints every command's output, propagates a nonzero command exit, and rejects any `ERROR:` or `WARNING:` diagnostic. The negative suite is the sole exception for intentional `ERROR:` output: each fixture must return status `1`, exactly one `ERROR:` line, zero `WARNING:` lines, and its exact marker through `expect_exact_error_signature`; the suite itself must return zero after all four exact rejections pass. The smoke's exact pass line is checked with `grep -Fxq`, while every other green command is enforced by exit status plus the diagnostic scan. `snapshot_generated_state` writes its canonical manifest and backups only below `STATE_ROOT`, records `.godot` existence plus every regular `.godot` file and every regular external `*.import` file outside `.godot` and `.git`, and stores deterministic relative POSIX paths, SHA-256 values, and modes. The `EXIT` trap is installed before the first Godot command. `restore_and_verify_generated_state` removes current `.godot`, restores the full backup only when it existed initially, removes external imports outside `.godot` and `.git`, restores the captured copies, re-collects the manifest, and fails on any path/hash/mode difference before deleting `STATE_ROOT`; failure cleanup is best-effort and cannot mask the primary status. `finish_bundle` preserves an original nonzero test status and returns restore/verification failure when tests otherwise passed, so an escaped or invalid temporary state makes an otherwise-green bundle nonzero. The non-conditional subshell's output is captured by direct redirection, its status is captured immediately with outer `errexit` disabled and `set -e` restored immediately afterward, and the log is printed only after the subshell succeeds; every command inside the bundle therefore remains under effective `errexit`. Only then is the exact `GENERATED STATE RESTORE VERIFIED` marker required; the only broad status check covers structural wrappers and GLBs. Step 5's clean-index policy and exact 14-file commit scope remain unchanged.
 
 - [ ] **Step 5: Stage only Task 2 implementation artifacts and commit**
 
