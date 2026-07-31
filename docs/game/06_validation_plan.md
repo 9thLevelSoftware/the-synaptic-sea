@@ -898,7 +898,7 @@ allowlist entry: it is filtered only by the component-marker baseline helper.
   capture, registered when the Synaptic Sea Godot editor session is live) is
   not active during a `--headless --script` run. Present in every smoke.
 - ``WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).``
-  — the exact two-instance Godot cleanup-time warning from `object.cpp:2536`.
+  — the exact two-instance Godot cleanup-time warning from `core/object/object.cpp:2536`.
   It is permitted only for `component_markers_smoke.gd`, and only while blocked
   Kanban card `t_b9b4e4f9` (title: Investigate ObjectDB leak in component marker smoke)
   remains unresolved. Any other ObjectDB diagnostic, including any count other than two,
