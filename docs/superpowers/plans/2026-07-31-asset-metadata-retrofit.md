@@ -635,16 +635,24 @@ The fixed `variant_names` order makes both the mixed-form and missing-variant di
 
 - [ ] **Step 4: Run the complete green validator, negative-fixture, smoke, and source-integrity bundle**
 
-Run the following as one shell block after defining the exact `expect_clean_accept`, `expect_exact_error_signature`, and `run_negative_fixture_green_suite` helpers from Step 1. The green commands run inside a subshell so the `EXIT` trap can preserve a primary test failure while still making cleanup failure fail an otherwise successful bundle.
+Run the following as one shell block after defining the exact `expect_clean_accept`, `expect_exact_error_signature`, and `run_negative_fixture_green_suite` helpers from Step 1. The bundle snapshots all pre-existing generated state before the first Godot command, runs the green commands inside a subshell, and restores plus verifies the exact initial state from an `EXIT` trap. This is restoration of the initial state, not deletion of generated state: pre-existing tracked and ignored `.godot` content and tracked external `*.import` files are preserved.
 
 ```bash
 set -euo pipefail
+BUNDLE_LOG=$(mktemp)
 
 if (
   set -euo pipefail
   GODOT_BIN=/opt/homebrew/bin/godot
   FIXTURE_ROOT=tests/fixtures/structural_variant_wrappers
-  SMOKE_LOG=$(mktemp)
+  STATE_ROOT=''
+  SNAPSHOT_READY=0
+
+  if ! STATE_ROOT=$(mktemp -d); then
+    printf 'unable to create temporary generated-state snapshot root\n' >&2
+    exit 1
+  fi
+  SMOKE_LOG="$STATE_ROOT/smoke.log"
 
   run_clean() {
     if (( $# == 0 )); then
@@ -668,34 +676,261 @@ if (
     fi
   }
 
-  cleanup_generated_state() {
-    local cleanup_status=0
-    if ! git restore -- .godot; then
-      printf 'cleanup failed: git restore -- .godot\n' >&2
-      cleanup_status=1
+  snapshot_generated_state() {
+    python3 - "$STATE_ROOT" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import shutil
+import stat
+import sys
+from pathlib import Path
+
+root = Path.cwd().resolve()
+state_root = Path(sys.argv[1]).resolve()
+if state_root == root or root in state_root.parents:
+    raise SystemExit("STATE_ROOT must be outside the repository")
+state_root.mkdir(parents=True, exist_ok=True)
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+def regular_record(path: Path, relative: str) -> dict[str, object]:
+    if not path.is_file() or path.is_symlink():
+        raise RuntimeError(f"non-regular generated-state path: {relative}")
+    mode = stat.S_IMODE(path.stat().st_mode)
+    return {"mode": mode, "path": relative, "sha256": sha256_file(path)}
+
+def external_import_paths() -> list[Path]:
+    paths: list[Path] = []
+    for current, directories, filenames in os.walk(root, topdown=True, followlinks=False):
+        directories[:] = sorted(
+            name for name in directories if name not in {".godot", ".git"}
+        )
+        for name in sorted(filenames):
+            path = Path(current) / name
+            if name.endswith(".import") and path.is_file() and not path.is_symlink():
+                paths.append(path)
+    return sorted(paths, key=lambda path: path.relative_to(root).as_posix())
+
+godot_dir = root / ".godot"
+godot_exists = godot_dir.exists() or godot_dir.is_symlink()
+if godot_exists and (not godot_dir.is_dir() or godot_dir.is_symlink()):
+    raise RuntimeError(".godot exists but is not a real directory")
+
+records: list[dict[str, object]] = []
+if godot_exists:
+    for path in sorted(
+        (candidate for candidate in godot_dir.rglob("*") if candidate.is_file()),
+        key=lambda candidate: candidate.relative_to(root).as_posix(),
+    ):
+        relative = path.relative_to(root).as_posix()
+        records.append(regular_record(path, relative))
+
+imports_backup = state_root / "external_imports"
+for path in external_import_paths():
+    relative_path = path.relative_to(root)
+    relative = relative_path.as_posix()
+    records.append(regular_record(path, relative))
+    destination = imports_backup / relative_path
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(path, destination)
+
+if godot_exists:
+    shutil.copytree(root / ".godot", state_root / "godot_backup", symlinks=True)
+
+manifest = {
+    "files": sorted(records, key=lambda record: str(record["path"])),
+    "godot_exists": godot_exists,
+    "manifest_version": 1,
+}
+manifest_path = state_root / "manifest.json"
+manifest_path.write_text(
+    json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+    encoding="utf-8",
+)
+PY
+  }
+
+  restore_and_verify_generated_state() {
+    local restore_status=0
+    if [[ -z "$STATE_ROOT" || ! -d "$STATE_ROOT" ]]; then
+      printf 'generated-state snapshot root is missing or invalid\n' >&2
+      return 1
     fi
-    if ! git clean -fd -- '*.import'; then
-      printf "cleanup failed: git clean -fd -- '*.import'\n" >&2
-      cleanup_status=1
+    if ! python3 - "$STATE_ROOT" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import shutil
+import stat
+import sys
+from pathlib import Path
+
+root = Path.cwd().resolve()
+state_root = Path(sys.argv[1]).resolve()
+manifest_path = state_root / "manifest.json"
+if state_root == root or root in state_root.parents or not manifest_path.is_file():
+    raise SystemExit("invalid generated-state snapshot")
+
+manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+if not isinstance(manifest, dict) or manifest.get("manifest_version") != 1:
+    raise SystemExit("unsupported generated-state manifest")
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+def regular_record(path: Path, relative: str) -> dict[str, object]:
+    if not path.is_file() or path.is_symlink():
+        raise RuntimeError(f"non-regular generated-state path: {relative}")
+    return {
+        "mode": stat.S_IMODE(path.stat().st_mode),
+        "path": relative,
+        "sha256": sha256_file(path),
+    }
+
+def external_import_paths() -> list[Path]:
+    paths: list[Path] = []
+    for current, directories, filenames in os.walk(root, topdown=True, followlinks=False):
+        directories[:] = sorted(
+            name for name in directories if name not in {".godot", ".git"}
+        )
+        for name in sorted(filenames):
+            path = Path(current) / name
+            if name.endswith(".import") and path.is_file() and not path.is_symlink():
+                paths.append(path)
+    return sorted(paths, key=lambda path: path.relative_to(root).as_posix())
+
+def collect_manifest() -> dict[str, object]:
+    godot_dir = root / ".godot"
+    godot_exists = godot_dir.exists() or godot_dir.is_symlink()
+    if godot_exists and (not godot_dir.is_dir() or godot_dir.is_symlink()):
+        raise RuntimeError(".godot exists but is not a real directory")
+    records: list[dict[str, object]] = []
+    if godot_exists:
+        for path in sorted(
+            (candidate for candidate in godot_dir.rglob("*") if candidate.is_file()),
+            key=lambda candidate: candidate.relative_to(root).as_posix(),
+        ):
+            records.append(regular_record(path, path.relative_to(root).as_posix()))
+    for path in external_import_paths():
+        records.append(regular_record(path, path.relative_to(root).as_posix()))
+    return {
+        "files": sorted(records, key=lambda record: str(record["path"])),
+        "godot_exists": godot_exists,
+        "manifest_version": 1,
+    }
+
+def safe_relative_path(value: object) -> Path:
+    if not isinstance(value, str):
+        raise RuntimeError("manifest path is not a string")
+    relative = Path(*value.split("/"))
+    if relative.is_absolute() or not relative.parts or not value or ".." in relative.parts:
+        raise RuntimeError(f"unsafe manifest path: {value}")
+    if relative.parts[0] in {".godot", ".git"} or not value.endswith(".import"):
+        raise RuntimeError(f"manifest path outside external import scope: {value}")
+    cursor = root
+    for part in relative.parts[:-1]:
+        cursor /= part
+        if cursor.is_symlink():
+            raise RuntimeError(f"manifest parent is a symlink: {value}")
+    return relative
+
+def remove_path(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+
+godot_dir = root / ".godot"
+remove_path(godot_dir)
+if bool(manifest.get("godot_exists")):
+    backup = state_root / "godot_backup"
+    if not backup.is_dir():
+        raise RuntimeError("missing .godot snapshot backup")
+    shutil.copytree(backup, godot_dir, symlinks=True)
+
+for current, directories, filenames in os.walk(root, topdown=True, followlinks=False):
+    directories[:] = sorted(
+        name for name in directories if name not in {".godot", ".git"}
+    )
+    for name in sorted(filenames):
+        path = Path(current) / name
+        if name.endswith(".import") and (path.is_file() or path.is_symlink()):
+            path.unlink()
+
+for record in manifest.get("files", []):
+    if not isinstance(record, dict):
+        raise RuntimeError("manifest file record is not an object")
+    value = record.get("path")
+    if not isinstance(value, str):
+        raise RuntimeError("manifest path is not a string")
+    if value == ".godot" or value.startswith(".godot/"):
+        continue
+    relative = safe_relative_path(value)
+    source = state_root / "external_imports" / relative
+    destination = root / relative
+    if not source.is_file():
+        raise RuntimeError(f"missing external import snapshot: {relative.as_posix()}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+
+actual = collect_manifest()
+if actual != manifest:
+    raise RuntimeError(
+        "restored generated state differs from the initial manifest: "
+        + json.dumps({"expected": manifest, "actual": actual}, sort_keys=True)
+    )
+print("GENERATED STATE RESTORE VERIFIED")
+PY
+    then
+      printf 'generated-state restore/verify failed\n' >&2
+      restore_status=1
     fi
-    if ! rm -f "$SMOKE_LOG"; then
-      printf 'cleanup failed: rm -f %s\n' "$SMOKE_LOG" >&2
-      cleanup_status=1
+    if (( restore_status == 0 )); then
+      if ! rm -rf -- "$STATE_ROOT"; then
+        printf 'temporary generated-state snapshot cleanup failed\n' >&2
+        restore_status=1
+      fi
+    else
+      # Best-effort removal after a failed verifier must never replace its failure.
+      rm -rf -- "$STATE_ROOT" || printf 'best-effort snapshot cleanup failed\n' >&2
     fi
-    return "$cleanup_status"
+    return "$restore_status"
   }
 
   finish_bundle() {
     local original_status="$1"
     local cleanup_status=0
-    cleanup_generated_state || cleanup_status=$?
+    if (( SNAPSHOT_READY != 1 )); then
+      printf 'generated-state snapshot was not completed\n' >&2
+      cleanup_status=1
+      rm -rf -- "$STATE_ROOT" || printf 'best-effort snapshot cleanup failed\n' >&2
+    else
+      restore_and_verify_generated_state || cleanup_status=$?
+    fi
     if (( original_status != 0 )); then
       return "$original_status"
     fi
     return "$cleanup_status"
   }
 
+  # The trap is installed before snapshot use and before every Godot command.
   trap 'original_status=$?; finish_bundle "$original_status"; exit $?' EXIT
+  snapshot_generated_state
+  SNAPSHOT_READY=1
 
   # Import preflight: run_clean requires exit 0 and no ERROR:/WARNING: output.
   run_clean "$GODOT_BIN" --headless --editor --path . --quit
@@ -721,23 +956,26 @@ if (
     printf 'missing exact structural wrapper smoke pass marker\n' >&2
     exit 1
   fi
-); then
+) 2>&1 | tee "$BUNDLE_LOG"; then
   bundle_status=0
 else
-  bundle_status=$?
+  pipeline_status=("${PIPESTATUS[@]}")
+  bundle_status="${pipeline_status[0]}"
 fi
 
-# These checks run only after the subshell returned successfully, which proves
-# primary tests and cleanup both succeeded. They prove no generated state or
-# structural source files remain before Step 5 can touch the index.
-if (( bundle_status != 0 )); then
-  exit "$bundle_status"
-fi
-generated_status=$(git status --short -- .godot ':(glob)**/*.import')
-if [[ -n "$generated_status" ]]; then
-  printf 'generated Godot state remains after cleanup:\n%s\n' "$generated_status" >&2
+if ! grep -Fxq -- 'GENERATED STATE RESTORE VERIFIED' "$BUNDLE_LOG"; then
+  printf 'missing exact generated-state restore marker\n' >&2
+  rm -f -- "$BUNDLE_LOG"
   exit 1
 fi
+if (( bundle_status != 0 )); then
+  rm -f -- "$BUNDLE_LOG"
+  exit "$bundle_status"
+fi
+rm -f -- "$BUNDLE_LOG"
+
+# This broad status is intentionally limited to source wrappers/GLBs; the exact
+# generated-state proof is the snapshot restore verifier and its marker above.
 source_status=$(git status --short -- \
   scenes/wrappers/structural \
   assets/_processed \
@@ -746,14 +984,14 @@ if [[ -n "$source_status" ]]; then
   printf 'structural source files changed by validation:\n%s\n' "$source_status" >&2
   exit 1
 fi
-printf 'CLEANUP VERIFIED generated_state=empty structural_sources=clean\n'
+printf 'GENERATED STATE RESTORE VERIFIED structural_sources=clean\n'
 ```
 
-`run_clean` captures and prints every command's output, propagates a nonzero command exit, and rejects any `ERROR:` or `WARNING:` diagnostic. The negative suite is the sole exception for intentional `ERROR:` output: each fixture must return status `1`, exactly one `ERROR:` line, zero `WARNING:` lines, and its exact marker through `expect_exact_error_signature`; the suite itself must return zero after all four exact rejections pass. The smoke's exact pass line is checked with `grep -Fxq`, while every other green command is enforced by exit status plus the diagnostic scan. The `EXIT` trap is installed before the first Godot command. `finish_bundle` captures the primary status, attempts every cleanup operation, returns the primary status when tests failed, and returns cleanup status when tests otherwise passed; cleanup failure is therefore never silently masked. The post-subshell generated-state and broad structural-source checks must both be empty before Step 5.
+`run_clean` captures and prints every command's output, propagates a nonzero command exit, and rejects any `ERROR:` or `WARNING:` diagnostic. The negative suite is the sole exception for intentional `ERROR:` output: each fixture must return status `1`, exactly one `ERROR:` line, zero `WARNING:` lines, and its exact marker through `expect_exact_error_signature`; the suite itself must return zero after all four exact rejections pass. The smoke's exact pass line is checked with `grep -Fxq`, while every other green command is enforced by exit status plus the diagnostic scan. `snapshot_generated_state` writes its canonical manifest and backups only below `STATE_ROOT`, records `.godot` existence plus every regular `.godot` file and every regular external `*.import` file outside `.godot` and `.git`, and stores deterministic relative POSIX paths, SHA-256 values, and modes. The `EXIT` trap is installed before the first Godot command. `restore_and_verify_generated_state` removes current `.godot`, restores the full backup only when it existed initially, removes external imports outside `.godot` and `.git`, restores the captured copies, re-collects the manifest, and fails on any path/hash/mode difference before deleting `STATE_ROOT`; failure cleanup is best-effort and cannot mask the primary status. `finish_bundle` preserves an original nonzero test status and returns restore/verification failure when tests otherwise passed, so an escaped or invalid temporary state makes an otherwise-green bundle nonzero. After the subshell, the exact `GENERATED STATE RESTORE VERIFIED` marker is required; the only broad status check covers structural wrappers and GLBs. Step 5's clean-index policy and exact 14-file commit scope remain unchanged.
 
 - [ ] **Step 5: Stage only Task 2 implementation artifacts and commit**
 
-After the Step 4 shell block exits and its `cleanup_generated_state` `EXIT` trap has completed, stage only the validator, smoke, and all four fixture triples:
+After the Step 4 shell block exits and its `restore_and_verify_generated_state` `EXIT` trap has completed, stage only the validator, smoke, and all four fixture triples:
 
 ```bash
 set -euo pipefail
