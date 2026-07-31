@@ -72,6 +72,7 @@ The Python metadata module owns format parsing, hash/bounds measurement, canonic
 **Files:**
 - Create: `docs/game/features/asset_metadata_pipeline.md`
 - Create: `docs/game/adr/0052-asset-metadata-and-visual-binding-architecture.md`
+- Modify: `docs/game/adr/README.md`
 - Modify: `docs/game/05_requirements.md`
 - Modify: `docs/game/06_validation_plan.md`
 - Modify: `AGENTS.md`
@@ -168,6 +169,7 @@ PY
 git add AGENTS.md \
   docs/game/features/asset_metadata_pipeline.md \
   docs/game/adr/0052-asset-metadata-and-visual-binding-architecture.md \
+  docs/game/adr/README.md \
   docs/game/05_requirements.md \
   docs/game/06_validation_plan.md
 git commit -m "docs: define asset metadata retrofit architecture"
