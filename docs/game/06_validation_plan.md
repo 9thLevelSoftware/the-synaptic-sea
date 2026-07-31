@@ -29,11 +29,17 @@ ROOT=.
 # Import preflight (Task 1 baseline; currently present).
 "$GODOT_BIN" --headless --editor --path "$ROOT" --quit
 
+# Component-marker smoke (Task 1 baseline; the exact-two ObjectDB warning is allowed only here).
+"$GODOT_BIN" --headless --path "$ROOT" --script res://scripts/validation/component_markers_smoke.gd
+
 # Future Task 2+ command: the validator is not present in the Task 1 baseline.
 python3 tools/validate_prop_visual_bindings.py --project-root "$ROOT" --check-index
 
 # Future Task 2+ command: the structural audit validator is not present in the Task 1 baseline.
 python3 tools/validate_structural_variant_bindings.py --project-root "$ROOT"
+
+# Future Task 2+ command: the structural variant smoke is not present in the Task 1 baseline.
+"$GODOT_BIN" --headless --path "$ROOT" --script res://scripts/validation/structural_variant_wrapper_smoke.gd
 
 # Structural wrapper validator (Task 1 baseline; expected to fail until Task 2).
 "$GODOT_BIN" --headless --path "$ROOT" --script res://scripts/placement/validate_wrapper_scenes.gd -- scenes/wrappers/structural/ship_structural_v0
@@ -55,8 +61,12 @@ Task 1 baseline evidence, captured with `GODOT_BIN=/opt/homebrew/bin/godot`:
   `COMPONENT MARKERS PASS wired=true count=true rebuild=true` followed by exactly
   `WARNING: 2 ObjectDB instances were leaked at exit (run with --verbose for details).`
   The warning is classified as pre-existing external baseline noise owned by `ship-core`;
-  exactly two instances are permitted only pending a separate leak-remediation card. Any
-  other warning or count fails this feature gate.
+  exactly two instances are permitted only for this component-marker baseline while blocked
+  Kanban card `t_b9b4e4f9` (title: Investigate ObjectDB leak in component marker smoke) remains
+  unresolved. Any other warning or count fails this feature gate.
+- The future structural variant smoke command is registered as
+  `res://scripts/validation/structural_variant_wrapper_smoke.gd` and must print
+  `STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true`.
 - The future commands marked above are required gates once their scripts exist; a
   missing future script is not a passing result.
 
@@ -81,16 +91,16 @@ Expected markers:
 set -euo pipefail
 ROOT="${ROOT:-.}"
 GODOT="${GODOT:-/opt/homebrew/bin/godot}"
-# Known baseline Godot shutdown lines that appear identically in every
-# unchanged smoke (route-control, completion, input, readability, oxygen,
-# hazard, ship-systems) and are NOT introduced by the Synaptic Sea hazard code
-# or any other Gate 1 runtime system. They are filtered out of the strict
-# ERROR/WARNING check below; any other ERROR:/WARNING: line (parse errors,
-# GDScript runtime errors, validation markers pushed via push_error) still
-# fails the bundle. See "Baseline Godot teardown noise" below for the
-# audit trail and the exact evidence-gathering command.
+# The GDAI MCP capture error is a known baseline engine line that is not
+# introduced by the Synaptic Sea runtime and is filtered from the strict global
+# ERROR/WARNING check below. The exact-two ObjectDB exception is scoped to the
+# component-marker helper only; any other ERROR:/WARNING: line (including an
+# ObjectDB count other than two) fails the bundle. See "Baseline Godot teardown
+# noise" below for the audit trail and the exact evidence-gathering command.
 BASELINE_ERROR="^ERROR: Capture not registered: 'gdaimcp'\\.$"
-BASELINE_WARNING="^WARNING: ObjectDB instances leaked at exit \\(run with --verbose for details\\)\\.$"
+# This exact-two exception is scoped to the component-marker baseline below; it is not
+# filtered by the general regression helper.
+BASELINE_WARNING='^WARNING: 2 ObjectDB instances were leaked at exit \(run with --verbose for details\)\.$'
 REQ012_WARNING="^WARNING: SaveLoadService: save file rejected by from_dict \\(missing fields or version mismatch\\)\$"
 # The save/load service smoke deliberately writes a slot with an incompatible
 # (newer) slice_version to assert the migration-rejection path; that emits one
@@ -181,6 +191,21 @@ RELEASE_LEDGER_UNKNOWN_WARNING="^WARNING: ReleaseReadinessLedger: unknown check_
 RELEASE_LEDGER_STATUS_WARNING="^WARNING: ReleaseReadinessLedger: invalid status=WAT\$"
 RELEASE_LEDGER_EXTERNAL_WARNING="^WARNING: ReleaseReadinessLedger: external evidence rejected, evidence_path is required\$"
 run_clean() {
+  label="$1"
+  marker="$2"
+  shift 2
+  echo "=== $label ==="
+  OUT=$("$@" 2>&1)
+  printf '%s\n' "$OUT"
+  printf '%s\n' "$OUT" | grep -q "$marker"
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$CONNECTIVITY_SOFT_FAIL_WARNING|$BLUEPRINT_NULL_ERROR|$RELEASE_LEDGER_UNKNOWN_WARNING|$RELEASE_LEDGER_STATUS_WARNING|$RELEASE_LEDGER_EXTERNAL_WARNING" || true)
+  if [ -n "$FILTERED" ]; then
+    printf '%s\n' "$FILTERED"
+    echo "UNEXPECTED_ERROR_OR_WARNING in $label"
+    exit 1
+  fi
+}
+run_component_marker_clean() {
   label="$1"
   marker="$2"
   shift 2
@@ -491,7 +516,7 @@ run_clean 'Work action interact smoke' 'WORK ACTION INTERACT PASS start=true tic
 run_clean 'Component placement runtime smoke' 'COMPONENT PLACEMENT RUNTIME PASS wired=true populate_or_empty=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_placement_runtime_smoke.gd
 run_clean 'Component dismount interact smoke' 'COMPONENT DISMOUNT INTERACT PASS start=true tick=true stripped=true yield=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_dismount_interact_smoke.gd
 run_clean 'Component mount interact smoke' 'COMPONENT MOUNT INTERACT PASS dismount=true remount=true mounted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_interact_smoke.gd
-run_clean 'Component markers smoke' 'COMPONENT MARKERS PASS wired=true count=true rebuild=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_markers_smoke.gd
+run_component_marker_clean 'Component markers smoke' 'COMPONENT MARKERS PASS wired=true count=true rebuild=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_markers_smoke.gd
 run_clean 'Component system link smoke' 'COMPONENT SYSTEM LINK PASS catalog_links=true soft_fill=true coverage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_system_link_smoke.gd
 run_clean 'Dismount system damage smoke' 'DISMOUNT SYSTEM DAMAGE PASS link=true damage=true remount_no_autoheal=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dismount_system_damage_smoke.gd
 run_clean 'Synthetic wall slots smoke' 'SYNTHETIC WALL SLOTS PASS wall=true center=true placed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/synthetic_wall_slots_smoke.gd
@@ -864,20 +889,20 @@ echo 'SYNAPTIC_SEA REGRESSION PASS commands=627 clean_output=true'
 
 ## Baseline Godot teardown noise
 
-Two `ERROR:`/`WARNING:` lines are emitted on the engine teardown of every
-smoke run in this regression bundle, including in unchanged smokes that were
-already passing before the hazard feature was added. They are classified as
-baseline engine noise and filtered by the script above:
+The global regression bundle filters the known GDAI MCP `ERROR:` line and keeps
+all other diagnostics strict. The exact-two ObjectDB warning is not a global
+allowlist entry: it is filtered only by the component-marker baseline helper.
 
 - `ERROR: Capture not registered: 'gdaimcp'.` — emitted by Godot's
   `engine_debugger.cpp:62` when a registered message capture (the GDAI MCP
   capture, registered when the Synaptic Sea Godot editor session is live) is
   not active during a `--headless --script` run. Present in every smoke.
-- `WARNING: ObjectDB instances leaked at exit (run with --verbose for details).`
-  — generic Godot cleanup-time warning from `object.cpp:2641`. The ObjectDB
-  leak count is identical across every smoke; the smoke that runs first
-  reports a higher count because earlier `addons/gdai-mcp-plugin-godot/`
-  capture registrations are torn down once and not re-registered per run.
+- `WARNING: 2 ObjectDB instances were leaked at exit (run with --verbose for details).`
+  — the exact two-instance Godot cleanup-time warning from `object.cpp:2641`.
+  It is permitted only for `component_markers_smoke.gd`, and only while blocked
+  Kanban card `t_b9b4e4f9` (title: Investigate ObjectDB leak in component marker smoke)
+  remains unresolved. Any other ObjectDB diagnostic, including any count other than two,
+  is a failure; the general regression helper does not filter it.
 
 REQ-012 adds one additional expected `WARNING:` line that is part of the
 save/load service contract test (the smoke writes a snapshot with an

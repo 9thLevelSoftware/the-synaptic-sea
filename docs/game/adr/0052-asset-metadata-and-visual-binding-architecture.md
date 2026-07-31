@@ -1,4 +1,4 @@
-# ADR-0040: Asset Metadata and Visual Binding Architecture
+# ADR-0052: Asset Metadata and Visual Binding Architecture
 
 ## Status
 
@@ -54,6 +54,22 @@ remain stable when multiple objectives share a type.
    placement, and provenance fields survive byte-for-byte or semantically equivalent
    refresh output.
 
+## Canonical document contract
+
+- The canonical derived index path is `data/props/visual_bindings.generated.json`.
+- Each sidecar document is a same-basename `<name>.sidecar.json` adjacent to its source
+  `<name>.glb`, with `schema_version: "1.0.0"` and
+  `document_kind: "prop_visual_binding"`.
+- The index document at the canonical path has `schema_version: "1.0.0"` and
+  `document_kind: "prop_visual_binding_index"`.
+- Every GLB source hash is SHA-256 represented by exactly 64 lowercase hexadecimal
+  characters.
+- Visual bounds are meter-space `[x, y, z]` local min/max arrays, and every coordinate is
+  rounded to six decimal places.
+- Canonical JSON is lexicographically key-sorted, compact, newline-terminated, and
+  timestamp-free. The index is generated only from validated sidecars and their source
+  GLBs; it is never hand-authored or edited as a second authority.
+
 ## Ownership boundaries
 
 - Asset/content authors own sidecars, bindings, placement declarations, provenance, and
@@ -103,5 +119,6 @@ remain stable when multiple objectives share a type.
 - Structural wrapper baseline remains intentionally failing with eight missing
   `VisualInstance` errors until Task 2 supplies the required visual bindings.
 - The exact two-instance ObjectDB teardown warning is classified as pre-existing external
-  baseline noise owned by `ship-core`; any other diagnostic or count fails the feature
-  gate pending a separate leak-remediation card.
+  baseline noise owned by `ship-core` only for the component-marker smoke; any other
+  diagnostic or count fails the feature gate. Removal is tracked by blocked Kanban card
+  `t_b9b4e4f9` (title: Investigate ObjectDB leak in component marker smoke).

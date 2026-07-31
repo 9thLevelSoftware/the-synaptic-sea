@@ -1407,7 +1407,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ## REQ-AVB-001: Every governed prop has an adjacent `.sidecar.json`
 
-- Source: `features/asset_metadata_pipeline.md`, ADR-0040
+- Source: `features/asset_metadata_pipeline.md`, ADR-0052
 - Type: technical / content pipeline
 - Priority: must
 - Status: Approved (Task 1 contract)
@@ -1421,13 +1421,20 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ## REQ-AVB-002: Sidecars validate schema, path, hash, and bounds
 
-- Source: `features/asset_metadata_pipeline.md`, ADR-0040
+- Source: `features/asset_metadata_pipeline.md`, ADR-0052
 - Type: technical / content pipeline
 - Priority: must
 - Status: Approved (Task 1 contract)
 - Acceptance criteria:
-  - Each `.sidecar.json` has a supported schema version and resolves its named source GLB.
-  - The recorded source hash and visual bounds match the explicit GLB-derived refresh
+  - Each sidecar document has `schema_version: "1.0.0"` and
+    `document_kind: "prop_visual_binding"` and is the same-basename `.sidecar.json`
+    adjacent to its named source GLB.
+  - `source.sha256` is the SHA-256 digest represented by exactly 64 lowercase hexadecimal
+    characters.
+  - `bounds.local_min_m` and `bounds.local_max_m` are meter-space `[x, y, z]` local min/max
+    arrays, with every coordinate rounded to six decimal places.
+  - Canonical sidecar JSON is lexicographically key-sorted, compact, newline-terminated,
+    and timestamp-free; the recorded hash and bounds match the explicit GLB-derived refresh
     contract.
   - Direct prop records declare `collision_policy=none_visual_only`.
 - Verification:
@@ -1436,12 +1443,15 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ## REQ-AVB-003: Visual metadata does not duplicate gameplay state
 
-- Source: `features/asset_metadata_pipeline.md`, ADR-0040
+- Source: `features/asset_metadata_pipeline.md`, ADR-0052
 - Type: gameplay / technical boundary
 - Priority: must
 - Status: Approved (Task 1 contract)
 - Acceptance criteria:
-  - Sidecars and the derived index contain visual binding metadata only.
+  - Sidecars and the derived index may contain visual/content metadata only: source hash,
+    bounds, category, visual policy, provenance, bindings, placement, and extensions.
+  - Gameplay state is forbidden, including component lifecycle/state, ship-system state,
+    objective progression/volumes, collision, navigation, and structural integrity state.
   - Component lifecycle, ship-system state, objective progression, objective volumes,
     collision, navigation, and structural integrity remain owned by their existing
     gameplay/runtime systems.
@@ -1450,7 +1460,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ## REQ-AVB-004: Component bindings preserve lifecycle and system linkage
 
-- Source: `features/asset_metadata_pipeline.md`, `features/component_slots.md`, ADR-0040
+- Source: `features/asset_metadata_pipeline.md`, `features/component_slots.md`, ADR-0052
 - Type: gameplay / technical
 - Priority: must
 - Status: Approved (Task 1 contract)
@@ -1465,7 +1475,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ## REQ-AVB-005: Objective bindings use gameplay placement IDs
 
-- Source: `features/asset_metadata_pipeline.md`, `features/objective_variation.md`, ADR-0040
+- Source: `features/asset_metadata_pipeline.md`, `features/objective_variation.md`, ADR-0052
 - Type: gameplay / technical
 - Priority: must
 - Status: Approved (Task 1 contract)
@@ -1480,7 +1490,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ## REQ-AVB-006: Invalid bindings use explicit fallback
 
-- Source: `features/asset_metadata_pipeline.md`, ADR-0040
+- Source: `features/asset_metadata_pipeline.md`, ADR-0052
 - Type: gameplay / technical boundary
 - Priority: must
 - Status: Approved (Task 1 contract)
@@ -1497,7 +1507,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ## REQ-AVB-007: Structural variants preserve wrapper contracts
 
-- Source: `features/asset_metadata_pipeline.md`, ADR-0040
+- Source: `features/asset_metadata_pipeline.md`, ADR-0052
 - Type: technical / structural runtime
 - Priority: must
 - Status: Approved (Task 1 contract)
@@ -1512,30 +1522,38 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ## REQ-AVB-008: Derived index freshness is deterministic
 
-- Source: `features/asset_metadata_pipeline.md`, ADR-0040
+- Source: `features/asset_metadata_pipeline.md`, ADR-0052
 - Type: technical / content pipeline
 - Priority: must
 - Status: Approved (Task 1 contract)
 - Acceptance criteria:
-  - The runtime index is generated only from valid `.sidecar.json` files and source GLBs.
-  - Repeated generation from unchanged inputs produces deterministic equivalent output.
-  - A stale, hand-edited, or source-mismatched index fails the freshness gate.
+  - The only canonical derived index path is `data/props/visual_bindings.generated.json`.
+  - The index document has `schema_version: "1.0.0"` and
+    `document_kind: "prop_visual_binding_index"` and is generated only from valid
+    same-basename `.sidecar.json` files and source GLBs.
+  - Repeated generation from unchanged inputs produces byte-identical canonical JSON:
+    lexicographically key-sorted, compact, newline-terminated, and timestamp-free.
+  - A stale, hand-edited, or source-mismatched index fails the freshness gate, including
+    when any source hash or six-decimal local bounds value differs.
 - Verification:
   - Future prop validator with `--check-index`.
   - Future structural audit where structural records participate in the derived view.
 
 ## REQ-AVB-009: Explicit derived refresh preserves authored extensions
 
-- Source: `features/asset_metadata_pipeline.md`, ADR-0040
+- Source: `features/asset_metadata_pipeline.md`, ADR-0052
 - Type: technical / content pipeline
 - Priority: must
 - Status: Approved (Task 1 contract)
 - Acceptance criteria:
-  - An explicit GLB-derived refresh updates derived hash and bounds fields.
+  - An explicit GLB-derived refresh updates only the derived SHA-256 hash and six-decimal
+    meter-space local min/max bounds fields.
   - Hand-authored extensions, binding fields, placement fields, and provenance survive the
     refresh without semantic loss.
+  - The refreshed sidecar and regenerated index use lexicographically key-sorted, compact,
+    newline-terminated, timestamp-free canonical JSON.
   - A refresh is explicit and reproducible; importing or re-reading a GLB does not perform
-    a blind destructive rewrite.
+    a blind destructive rewrite or add a timestamp.
 - Verification:
   - Future prop validator refresh-preservation check.
   - Future prop visual binding smoke with an extension/provenance fixture.

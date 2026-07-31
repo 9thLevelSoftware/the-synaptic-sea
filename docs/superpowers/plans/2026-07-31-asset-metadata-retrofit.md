@@ -59,7 +59,7 @@ scripts/procgen/playable_generated_ship.gd
 scripts/interaction/interactable.gd
 
 docs/game/features/asset_metadata_pipeline.md
-docs/game/adr/0040-asset-metadata-and-visual-binding-architecture.md
+docs/game/adr/0052-asset-metadata-and-visual-binding-architecture.md
 docs/game/05_requirements.md
 docs/game/06_validation_plan.md
 AGENTS.md
@@ -71,14 +71,14 @@ The Python metadata module owns format parsing, hash/bounds measurement, canonic
 
 **Files:**
 - Create: `docs/game/features/asset_metadata_pipeline.md`
-- Create: `docs/game/adr/0040-asset-metadata-and-visual-binding-architecture.md`
+- Create: `docs/game/adr/0052-asset-metadata-and-visual-binding-architecture.md`
 - Modify: `docs/game/05_requirements.md`
 - Modify: `docs/game/06_validation_plan.md`
 - Modify: `AGENTS.md`
 
 **Interfaces:**
 - Produces requirement IDs `REQ-AVB-001` through `REQ-AVB-009` for all implementation cards.
-- Produces ADR-0040, which sets sidecar authority, derived-index policy, direct-GLB visual-only binding, structural ownership, and fallback rules.
+- Produces ADR-0052, which sets sidecar authority, derived-index policy, direct-GLB visual-only binding, structural ownership, and fallback rules.
 - Defines `GODOT_BIN=/opt/homebrew/bin/godot` as the validation command for this repository revision.
 
 - [ ] **Step 1: Write the failing baseline record and classify the known smoke warning**
@@ -99,7 +99,7 @@ Also run:
 "$GODOT_BIN" --headless --path . --script res://scripts/validation/component_markers_smoke.gd
 ```
 
-Current verified baseline: the smoke prints `COMPONENT MARKERS PASS wired=true count=true rebuild=true` and then `WARNING: 2 ObjectDB instances were leaked at exit`. Record that exact warning in the feature spec as an external baseline, name `ship-core` as owner, require its count to remain exactly two while this feature is implemented, and link its removal to a separate leak-remediation card. Any other warning or a count other than two fails this feature's validation.
+Current verified baseline: the smoke prints `COMPONENT MARKERS PASS wired=true count=true rebuild=true` and then `WARNING: 2 ObjectDB instances were leaked at exit`. Record that exact warning in the feature spec as an external baseline, name `ship-core` as owner, require its count to remain exactly two while this feature is implemented, and link its removal to blocked Kanban card `t_b9b4e4f9` (title: Investigate ObjectDB leak in component marker smoke). Any other warning or a count other than two fails this feature's validation.
 
 - [ ] **Step 2: Write the feature spec**
 
@@ -116,7 +116,7 @@ Write `docs/game/features/asset_metadata_pipeline.md` with these acceptance crit
 
 List non-goals explicitly: GLB re-export, procedural structural assembly, collision generation for props, new objective gameplay, and runtime dressing placement.
 
-- [ ] **Step 3: Write ADR-0040**
+- [ ] **Step 3: Write ADR-0052**
 
 Record these decisions:
 
@@ -158,7 +158,7 @@ python3 - <<'PY'
 from pathlib import Path
 paths = [
     Path('docs/game/features/asset_metadata_pipeline.md'),
-    Path('docs/game/adr/0040-asset-metadata-and-visual-binding-architecture.md'),
+    Path('docs/game/adr/0052-asset-metadata-and-visual-binding-architecture.md'),
 ]
 for path in paths:
     text = path.read_text()
@@ -167,7 +167,7 @@ print('ASSET METADATA GOVERNANCE DOCS PASS')
 PY
 git add AGENTS.md \
   docs/game/features/asset_metadata_pipeline.md \
-  docs/game/adr/0040-asset-metadata-and-visual-binding-architecture.md \
+  docs/game/adr/0052-asset-metadata-and-visual-binding-architecture.md \
   docs/game/05_requirements.md \
   docs/game/06_validation_plan.md
 git commit -m "docs: define asset metadata retrofit architecture"
@@ -817,7 +817,7 @@ git commit -m "test: audit structural variants and asset bindings"
 
 ## Final Acceptance Checklist
 
-- [ ] The documentation establishes ADR-0040 and `REQ-AVB-001` through `REQ-AVB-009`.
+- [ ] The documentation establishes ADR-0052 and `REQ-AVB-001` through `REQ-AVB-009`.
 - [ ] Godot validation imports before tests and uses the installed Godot 4.7.1 command.
 - [ ] Structural wrapper validation accepts both legacy and integrity-variant visual forms.
 - [ ] The eight structural variant trios validate without rewriting GLBs or duplicating sockets.

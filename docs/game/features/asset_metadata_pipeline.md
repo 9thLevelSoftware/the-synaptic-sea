@@ -58,6 +58,20 @@ Direct prop GLBs are visual-only. Their sidecars use
 integrity consequences remain in the owning runtime or structural wrapper. The source
 hash and bounds are derived evidence, not permission to fabricate gameplay state.
 
+### Canonical sidecar and index document contract
+
+The canonical derived index is `data/props/visual_bindings.generated.json`. Every sidecar
+is a same-basename `.sidecar.json` adjacent to its source GLB and is a document with
+`schema_version: "1.0.0"` and `document_kind: "prop_visual_binding"`. The index document
+at the canonical path has `schema_version: "1.0.0"` and
+`document_kind: "prop_visual_binding_index"`.
+
+Each source hash is SHA-256 encoded as exactly 64 lowercase hexadecimal characters.
+Bounds are meter-space `[x, y, z]` local min/max arrays rounded to six decimal places.
+Canonical JSON is lexicographically key-sorted, compact, newline-terminated, and
+timestamp-free. The index is generated only from valid sidecars and their GLBs and is
+never a hand-authored source of truth.
+
 ## Binding rules
 
 1. Component bindings resolve by the authored component ID. The resolver must preserve the
@@ -68,8 +82,10 @@ hash and bounds are derived evidence, not permission to fabricate gameplay state
    primitive fallback; the same failure in an objective binding retains the existing
    readability fallback. Both report `visual_source="fallback"`; neither silently chooses a
    different component, objective, or prop visual.
-4. Bindings are visual concerns only. A prop sidecar must not duplicate objective
-   progression, component state, collision, or structural integrity state.
+4. Bindings are visual concerns only. Sidecars and the derived index may contain visual/content
+   metadata—source hash, bounds, category, visual policy, provenance, bindings, placement,
+   and extensions—but gameplay state is forbidden. They must not duplicate objective
+   progression, component state, collision, navigation, or structural integrity state.
 5. A structural wrapper owns its connector and collision contract even when its visual
    child is replaced by intact, damaged, or breached art.
 
@@ -100,12 +116,20 @@ hand-authored binding, placement, and provenance data.
   connector/socket or collision drift.
 - The runtime index is deterministic, derived-only, and fresh with respect to valid
   sidecars and their GLBs; a stale or hand-edited index fails the gate.
+- The index is exactly `data/props/visual_bindings.generated.json` with
+  `schema_version: "1.0.0"` and `document_kind: "prop_visual_binding_index"`; each
+  sidecar has `schema_version: "1.0.0"` and `document_kind: "prop_visual_binding"`.
+- Source hashes are exactly 64 lowercase SHA-256 hex characters, bounds are six-decimal
+  meter-space `[x, y, z]` local min/max arrays, and canonical JSON is lexicographically
+  key-sorted, compact, newline-terminated, and timestamp-free.
 - An explicit GLB-derived refresh updates hashes/bounds while preserving extensions and
   hand-authored binding, placement, and provenance fields.
 - The exact baseline `WARNING: 2 ObjectDB instances were leaked at exit (run with
   --verbose for details).` is classified as pre-existing external baseline noise owned by
-  `ship-core`; exactly two instances are permitted only pending a separate leak-remediation
-  card. Any other warning, or any count other than two, fails this feature gate.
+  `ship-core` only for the component-marker smoke. Exactly two instances are permitted
+  only while blocked Kanban card `t_b9b4e4f9` (title: Investigate ObjectDB leak in component marker smoke)
+  remains unresolved. Any other warning, or any count other than two, fails this feature
+  gate.
 
 ## Non-goals
 
@@ -121,7 +145,7 @@ hand-authored binding, placement, and provenance data.
 ## Technical design
 
 - Feature contract: this document.
-- Architecture decision: `docs/game/adr/0040-asset-metadata-and-visual-binding-architecture.md`.
+- Architecture decision: `docs/game/adr/0052-asset-metadata-and-visual-binding-architecture.md`.
 - Requirements: `REQ-AVB-001` through `REQ-AVB-009` in `docs/game/05_requirements.md`.
 - Existing placement resource seam: `scripts/placement/modular_asset_spec.gd`.
 - Existing structural wrapper validator:
@@ -160,6 +184,6 @@ files are restored or removed before committing documentation.
 
 ## ADRs
 
-- `ADR-0040` governs portable records, derived index ownership, visual-only prop collision,
+- `ADR-0052` governs portable records, derived index ownership, visual-only prop collision,
   structural wrapper authority, placement-ID resolution, fallback behavior, and refresh
   preservation.
