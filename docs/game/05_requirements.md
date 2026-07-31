@@ -1400,3 +1400,142 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - Markers adjacent to critical path flag \patrol_crosses_critical\.
 - Verification:
   - \ncounter_injector_smoke.gd  - \ENCOUNTER INJECTOR PASS
+
+---
+
+# Asset metadata and visual binding requirements (Task 1)
+
+## REQ-AVB-001: Every governed prop has an adjacent `.sidecar.json`
+
+- Source: `features/asset_metadata_pipeline.md`, ADR-0040
+- Type: technical / content pipeline
+- Priority: must
+- Status: Approved (Task 1 contract)
+- Acceptance criteria:
+  - The 26 governed component, dressing, and supplied objective props each have exactly one
+    adjacent same-basename `.sidecar.json` file paired with its GLB.
+  - Missing, duplicate, or mismatched sidecars fail validation rather than being silently
+    omitted from the runtime view.
+- Verification:
+  - Future prop validator with `--check-index`, as listed in `docs/game/06_validation_plan.md`.
+
+## REQ-AVB-002: Sidecars validate schema, path, hash, and bounds
+
+- Source: `features/asset_metadata_pipeline.md`, ADR-0040
+- Type: technical / content pipeline
+- Priority: must
+- Status: Approved (Task 1 contract)
+- Acceptance criteria:
+  - Each `.sidecar.json` has a supported schema version and resolves its named source GLB.
+  - The recorded source hash and visual bounds match the explicit GLB-derived refresh
+    contract.
+  - Direct prop records declare `collision_policy=none_visual_only`.
+- Verification:
+  - Future prop validator with `--check-index`.
+  - Future structural audit for structural contracts.
+
+## REQ-AVB-003: Visual metadata does not duplicate gameplay state
+
+- Source: `features/asset_metadata_pipeline.md`, ADR-0040
+- Type: gameplay / technical boundary
+- Priority: must
+- Status: Approved (Task 1 contract)
+- Acceptance criteria:
+  - Sidecars and the derived index contain visual binding metadata only.
+  - Component lifecycle, ship-system state, objective progression, objective volumes,
+    collision, navigation, and structural integrity remain owned by their existing
+    gameplay/runtime systems.
+- Verification:
+  - Future prop and objective visual-binding smokes plus structural audit.
+
+## REQ-AVB-004: Component bindings preserve lifecycle and system linkage
+
+- Source: `features/asset_metadata_pipeline.md`, `features/component_slots.md`, ADR-0040
+- Type: gameplay / technical
+- Priority: must
+- Status: Approved (Task 1 contract)
+- Acceptance criteria:
+  - Every supplied component binding resolves by its authored component ID.
+  - Mount, dismount, rebuild, and component-marker placement remain owned by the component
+    runtime; component save/load ownership and restoration remain there as well, with
+    lifecycle ownership and ship-system subcomponent linkage intact after visual resolution.
+- Verification:
+  - Future prop visual binding smoke.
+  - Existing component marker and component-system-link smokes remain regression evidence.
+
+## REQ-AVB-005: Objective bindings use gameplay placement IDs
+
+- Source: `features/asset_metadata_pipeline.md`, `features/objective_variation.md`, ADR-0040
+- Type: gameplay / technical
+- Priority: must
+- Status: Approved (Task 1 contract)
+- Acceptance criteria:
+  - Every supported supplied objective visual binding resolves by gameplay-authored
+    `placement_id`.
+  - Objective type is never used as the identity key, and objective volume and progression
+    ownership remain in gameplay systems.
+- Verification:
+  - Future objective visual binding smoke.
+  - Existing objective variation and objective-progress smokes remain regression evidence.
+
+## REQ-AVB-006: Invalid bindings use explicit fallback
+
+- Source: `features/asset_metadata_pipeline.md`, ADR-0040
+- Type: gameplay / technical boundary
+- Priority: must
+- Status: Approved (Task 1 contract)
+- Acceptance criteria:
+  - A missing, malformed, stale, or unsupported component binding retains the existing
+    primitive fallback; the same failure in an objective binding retains the existing
+    readability fallback.
+  - Both resolved records report `visual_source="fallback"`.
+  - No unrelated component, objective, or prop visual is selected as a substitute by either
+    fallback.
+- Verification:
+  - Future prop visual binding smoke.
+  - Future objective visual binding smoke.
+
+## REQ-AVB-007: Structural variants preserve wrapper contracts
+
+- Source: `features/asset_metadata_pipeline.md`, ADR-0040
+- Type: technical / structural runtime
+- Priority: must
+- Status: Approved (Task 1 contract)
+- Acceptance criteria:
+  - Structural wrappers validate and switch intact, damaged, and breached visual variants.
+  - Connector/socket ownership, collision proxies, passability, and integrity ownership do
+    not drift when the visual state changes.
+- Verification:
+  - `scripts/placement/validate_wrapper_scenes.gd` against
+    `scenes/wrappers/structural/ship_structural_v0`.
+  - Future structural audit and structural variant smoke.
+
+## REQ-AVB-008: Derived index freshness is deterministic
+
+- Source: `features/asset_metadata_pipeline.md`, ADR-0040
+- Type: technical / content pipeline
+- Priority: must
+- Status: Approved (Task 1 contract)
+- Acceptance criteria:
+  - The runtime index is generated only from valid `.sidecar.json` files and source GLBs.
+  - Repeated generation from unchanged inputs produces deterministic equivalent output.
+  - A stale, hand-edited, or source-mismatched index fails the freshness gate.
+- Verification:
+  - Future prop validator with `--check-index`.
+  - Future structural audit where structural records participate in the derived view.
+
+## REQ-AVB-009: Explicit derived refresh preserves authored extensions
+
+- Source: `features/asset_metadata_pipeline.md`, ADR-0040
+- Type: technical / content pipeline
+- Priority: must
+- Status: Approved (Task 1 contract)
+- Acceptance criteria:
+  - An explicit GLB-derived refresh updates derived hash and bounds fields.
+  - Hand-authored extensions, binding fields, placement fields, and provenance survive the
+    refresh without semantic loss.
+  - A refresh is explicit and reproducible; importing or re-reading a GLB does not perform
+    a blind destructive rewrite.
+- Verification:
+  - Future prop validator refresh-preservation check.
+  - Future prop visual binding smoke with an extension/provenance fixture.

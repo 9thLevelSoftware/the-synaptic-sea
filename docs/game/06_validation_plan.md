@@ -6,17 +6,68 @@ No completion claim without fresh validation evidence.
 
 ## Godot binary
 
-`/Users/christopherwilloughby/.local/bin/godot-4.6.2`
+`/opt/homebrew/bin/godot` (Godot 4.7.1)
 
 ## Project root
 
-`/Users/christopherwilloughby/the-synaptic-sea-of-stars`
+`.` (run commands from the repository root)
+
+## Asset metadata retrofit validation
+
+All commands in this section are reproducible from the repository root. Set the binary
+explicitly so a different editor installation cannot silently change the evidence:
+
+Each governed prop's canonical portable record is one adjacent same-basename `.sidecar.json`
+file paired with its GLB (for example, `<name>.glb` and `<name>.sidecar.json`). This naming
+rule does not change the runtime-derived index convention.
+
+```bash
+GODOT_BIN=/opt/homebrew/bin/godot
+ROOT=.
+
+# Run each command independently; the wrapper validator is an expected Task 1 failure.
+# Import preflight (Task 1 baseline; currently present).
+"$GODOT_BIN" --headless --editor --path "$ROOT" --quit
+
+# Future Task 2+ command: the validator is not present in the Task 1 baseline.
+python3 tools/validate_prop_visual_bindings.py --project-root "$ROOT" --check-index
+
+# Future Task 2+ command: the structural audit validator is not present in the Task 1 baseline.
+python3 tools/validate_structural_variant_bindings.py --project-root "$ROOT"
+
+# Structural wrapper validator (Task 1 baseline; expected to fail until Task 2).
+"$GODOT_BIN" --headless --path "$ROOT" --script res://scripts/placement/validate_wrapper_scenes.gd -- scenes/wrappers/structural/ship_structural_v0
+
+# Future Task 2+ command: the prop visual binding smoke is not present in the Task 1 baseline.
+"$GODOT_BIN" --headless --path "$ROOT" --script res://scripts/validation/prop_visual_binding_smoke.gd
+
+# Future Task 2+ command: the objective visual binding smoke is not present in the Task 1 baseline.
+"$GODOT_BIN" --headless --path "$ROOT" --script res://scripts/validation/objective_visual_binding_smoke.gd
+```
+
+Task 1 baseline evidence, captured with `GODOT_BIN=/opt/homebrew/bin/godot`:
+
+- Import preflight exited `0` and reported Godot `4.7.1.stable.official`.
+- Structural wrapper validator exited `1` with exactly eight expected
+  `missing VisualInstance node for generated.visual_scene_path` errors. This remains
+  intentionally pending Task 2; do not fix it in the documentation task.
+- `component_markers_smoke.gd` exited `0` and printed
+  `COMPONENT MARKERS PASS wired=true count=true rebuild=true` followed by exactly
+  `WARNING: 2 ObjectDB instances were leaked at exit (run with --verbose for details).`
+  The warning is classified as pre-existing external baseline noise owned by `ship-core`;
+  exactly two instances are permitted only pending a separate leak-remediation card. Any
+  other warning or count fails this feature gate.
+- The future commands marked above are required gates once their scripts exist; a
+  missing future script is not a passing result.
+
+Generated `.godot` state and untracked `*.import` files must be restored or removed after
+any Godot command before staging documentation changes.
 
 ## Focused route-control validation
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/route_control_state_smoke.gd
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
+/opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/route_control_state_smoke.gd
+/opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
 ```
 
 Expected markers:
@@ -28,8 +79,8 @@ Expected markers:
 
 ```bash
 set -euo pipefail
-ROOT="${ROOT:-/Users/christopherwilloughby/the-synaptic-sea-of-stars}"
-GODOT="${GODOT:-/Users/christopherwilloughby/.local/bin/godot-4.6.2}"
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
 # Known baseline Godot shutdown lines that appear identically in every
 # unchanged smoke (route-control, completion, input, readability, oxygen,
 # hazard, ship-systems) and are NOT introduced by the Synaptic Sea hazard code
@@ -889,10 +940,10 @@ bundle; any unexpected `ERROR:`/`WARNING:` line that is not on the allowlist
 must block the change):
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
+ROOT=.
 for s in route_control_state_smoke main_playable_slice_route_control_smoke oxygen_state_smoke main_playable_slice_hazard_smoke fire_suppression_state_smoke extinguisher_state_smoke ship_systems_damage_smoke fire_suppression_point_smoke extinguisher_recharge_port_smoke main_playable_slice_fire_smoke main_playable_fire_loop_smoke main_playable_slice_ship_systems_smoke main_playable_slice_completion_smoke main_playable_slice_input_smoke main_playable_slice_readability_smoke save_load_service_smoke main_playable_slice_save_load_smoke objective_progress_state_smoke objective_progress_hud_label_smoke main_playable_slice_objective_variation_smoke req012_autosave_sequence_smoke main_playable_slice_text_scale_smoke electrical_arc_state_smoke main_playable_slice_arc_smoke main_playable_slice_junction_calibrator_save_load_smoke; do
   echo "=== $s ==="
-  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path "$ROOT" --script res://scripts/validation/$s.gd 2>&1 | grep -E '^(ERROR|WARNING):'
+  /opt/homebrew/bin/godot --headless --path "$ROOT" --script res://scripts/validation/$s.gd 2>&1 | grep -E '^(ERROR|WARNING):'
 done
 ```
 
@@ -905,7 +956,7 @@ section (and update the allowlist) before re-running.
 Use after gameplay-system milestones where the user asked to avoid proof churn:
 
 ```bash
-ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
+ROOT=.
 find "$ROOT/docs/superpowers/proofs" -maxdepth 1 -type f -newer "$ROOT/docs/game/00_vision.md" -print 2>/dev/null || true
 find "$ROOT/.superpowers" -type f \( -name '*.html' -o -name '*.png' \) -newer "$ROOT/docs/game/00_vision.md" -print 2>/dev/null || true
 ```
@@ -928,7 +979,7 @@ Gate 1 accepts two evidence paths:
 Automated Gate 1 command:
 
 ```bash
-/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/gate1_automated_playtest.gd
+/opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/gate1_automated_playtest.gd
 ```
 
 A Gate 1 Go decision requires the regression bundle plus either the automated protocol acceptance checklist or the human playtest protocol acceptance checklist to pass.

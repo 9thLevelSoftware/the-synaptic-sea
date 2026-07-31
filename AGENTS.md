@@ -37,7 +37,7 @@ Do not make ad-hoc implementation decisions when a feature spec, requirement, AD
 
 ## Godot technical rules
 
-- Godot version: 4.6.2 at `/Users/christopherwilloughby/.local/bin/godot-4.6.2`.
+- Godot version: 4.7.1 at `/opt/homebrew/bin/godot` (verified by the Task 1 headless baseline).
 - Keep pure gameplay state in `RefCounted` or `Resource` classes where practical.
 - Scene nodes apply scene consequences; pure models do not reach into the scene tree.
 - Use typed GDScript for new systems.
