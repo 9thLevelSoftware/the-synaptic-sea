@@ -963,14 +963,15 @@ else
   bundle_status="${pipeline_status[0]}"
 fi
 
+# Preserve a primary bundle failure even if its cleanup marker is absent.
+if (( bundle_status != 0 )); then
+  rm -f -- "$BUNDLE_LOG"
+  exit "$bundle_status"
+fi
 if ! grep -Fxq -- 'GENERATED STATE RESTORE VERIFIED' "$BUNDLE_LOG"; then
   printf 'missing exact generated-state restore marker\n' >&2
   rm -f -- "$BUNDLE_LOG"
   exit 1
-fi
-if (( bundle_status != 0 )); then
-  rm -f -- "$BUNDLE_LOG"
-  exit "$bundle_status"
 fi
 rm -f -- "$BUNDLE_LOG"
 
