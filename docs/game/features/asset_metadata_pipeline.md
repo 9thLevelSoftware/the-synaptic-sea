@@ -33,7 +33,7 @@ is changed by this task.
 | Surface | Authoritative owner | Asset-metadata responsibility |
 |---|---|---|
 | Same-basename GLB + adjacent `.sidecar.json` | Asset/content pipeline | Keep the portable record adjacent, schema-valid, path-addressable, and provenance-preserving. |
-| GLB-derived fields | Explicit refresh/generator | Derive source hash and visual bounds from the named GLB; do not overwrite hand-authored extensions, bindings, placement, or provenance. |
+| GLB-derived fields | Explicit refresh/generator | Derive the full GLB-derived source evidence—source SHA-256, `byte_size`, `mesh_count`, `gltf_version`, and visual bounds—from the named GLB; do not overwrite hand-authored extensions, binding, placement, or provenance. |
 | Runtime prop index | Generator and validator | Produce a deterministic derived view from valid sidecars; never hand-edit or treat it as gameplay authority. |
 | Component IDs and lifecycle | Component placement/catalog/runtime owners | Resolve authored component IDs and retain component lifecycle ownership and ship-system linkage. |
 | Objective placement IDs | Gameplay objective data/controller owners | Resolve supplied `placement_id` values from gameplay data; never infer identity from objective type. |
@@ -94,8 +94,9 @@ never a hand-authored source of truth.
 The pipeline validates adjacent sidecars, checks the referenced GLB and derived metadata,
 then generates a deterministic runtime index. Runtime consumers use the index to resolve
 visual bindings while their existing gameplay owners continue to own state transitions.
-An explicit GLB-derived refresh updates only derived fields and preserves extensions plus
-hand-authored binding, placement, and provenance data.
+An explicit GLB-derived refresh replaces the full GLB-derived source evidence—source
+SHA-256, `byte_size`, `mesh_count`, `gltf_version`, and visual bounds—while preserving only
+hand-authored extensions, binding, placement, and provenance data.
 
 ## Acceptance criteria
 
@@ -122,8 +123,10 @@ hand-authored binding, placement, and provenance data.
 - Source hashes are exactly 64 lowercase SHA-256 hex characters, bounds are six-decimal
   meter-space `[x, y, z]` local min/max arrays, and canonical JSON is lexicographically
   key-sorted, compact, newline-terminated, and timestamp-free.
-- An explicit GLB-derived refresh updates hashes/bounds while preserving extensions and
-  hand-authored binding, placement, and provenance fields.
+- An explicit GLB-derived refresh replaces the full GLB-derived source evidence—source
+  SHA-256, `byte_size`, `mesh_count`, `gltf_version`, and six-decimal meter-space local
+  min/max bounds—while preserving only hand-authored extensions, binding, placement, and
+  provenance fields.
 - The exact baseline ``WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).`` is classified as pre-existing external baseline noise owned by
   `ship-core` only for the component-marker smoke. Exactly two instances are permitted
   only while blocked Kanban card `t_b9b4e4f9` (title: Investigate ObjectDB leak in component marker smoke)

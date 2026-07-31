@@ -128,7 +128,7 @@ Record these decisions:
 4. Structural wrapper contracts remain connector/collision/integrity authorities.
 5. Objective resolution uses gameplay `placement_id`, never objective `type`.
 6. Missing binding behavior is an intentional visual fallback, never a substituted unrelated GLB.
-7. GLB-derived refreshes preserve sidecar `extensions` and all hand-authored binding/placement/provenance fields.
+7. GLB-derived refreshes replace the full GLB-derived source evidence (`sha256`, `byte_size`, `mesh_count`, `gltf_version`, and bounds) and preserve only sidecar `extensions` and hand-authored binding/placement/provenance fields.
 ```
 
 - [ ] **Step 4: Add requirement rows and validation commands**
@@ -139,6 +139,7 @@ Add these commands to `docs/game/06_validation_plan.md`:
 
 ```bash
 GODOT_BIN=/opt/homebrew/bin/godot
+ROOT="${ROOT:-.}"
 "$GODOT_BIN" --headless --editor --path "$ROOT" --quit
 python3 tools/validate_prop_visual_bindings.py --project-root "$ROOT" --check-index
 python3 tools/validate_structural_variant_bindings.py --project-root "$ROOT"
@@ -354,7 +355,7 @@ git commit -m "feat: add prop visual sidecar schema"
 
 **Interfaces:**
 - `generate_prop_sidecars.py --project-root . --write-missing --write-index` creates only missing sidecars and rebuilds the derived index.
-- `generate_prop_sidecars.py --project-root . --refresh-derived --asset-id <asset_id> --write-index` updates only `source` and `bounds` for one existing sidecar, preserves `binding`, `placement`, `provenance`, and `extensions`, and rebuilds the derived index.
+- `generate_prop_sidecars.py --project-root . --refresh-derived --asset-id <asset_id> --write-index` replaces the full GLB-derived source evidence (`sha256`, `byte_size`, `mesh_count`, `gltf_version`, and `bounds`) for one existing sidecar, preserves only authored `binding`, `placement`, `provenance`, and `extensions`, and rebuilds the derived index.
 - `generate_prop_sidecars.py --project-root . --check` returns nonzero when a canonical sidecar or derived index differs from disk.
 - `validate_prop_visual_bindings.py --project-root . --check-index` returns nonzero for any schema, GLB, hash, bounds, binding, count, path, or index mismatch.
 

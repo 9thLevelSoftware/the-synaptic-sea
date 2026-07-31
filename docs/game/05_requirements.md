@@ -1546,10 +1546,11 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Priority: must
 - Status: Approved (Task 1 contract)
 - Acceptance criteria:
-  - An explicit GLB-derived refresh updates only the derived SHA-256 hash and six-decimal
-    meter-space local min/max bounds fields.
-  - Hand-authored extensions, binding fields, placement fields, and provenance survive the
-    refresh without semantic loss.
+  - An explicit GLB-derived refresh replaces the full GLB-derived source evidence:
+    `source.sha256` (SHA-256), `source.byte_size`, `source.mesh_count`,
+    `source.gltf_version`, and six-decimal meter-space local min/max bounds.
+  - The refresh preserves only hand-authored extensions, binding fields, placement fields,
+    and provenance; those authored fields survive without semantic loss.
   - The refreshed sidecar and regenerated index use lexicographically key-sorted, compact,
     newline-terminated, timestamp-free canonical JSON.
   - A refresh is explicit and reproducible; importing or re-reading a GLB does not perform

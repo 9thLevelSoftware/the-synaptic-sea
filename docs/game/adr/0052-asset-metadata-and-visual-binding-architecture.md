@@ -49,10 +49,11 @@ remain stable when multiple objectives share a type.
    existing primitive fallback; the same failure in an objective binding retains the
    existing readability fallback. Both report `visual_source="fallback"`; neither silently
    borrows another component, objective, or prop visual.
-7. **An explicit GLB-derived refresh preserves extensions and hand-authored binding/placement/provenance.** The refresh may update only fields derived from the GLB,
-   such as source hash and visual bounds. Unknown extensions and authored binding,
-   placement, and provenance fields survive byte-for-byte or semantically equivalent
-   refresh output.
+7. **An explicit GLB-derived refresh replaces the full GLB-derived source evidence and preserves authored fields.** The refresh updates `source.sha256` (SHA-256),
+   `source.byte_size`, `source.mesh_count`, `source.gltf_version`, and visual bounds from
+   the named GLB. It preserves only authored `extensions`, binding, placement, and
+   provenance fields; unknown extensions and those authored fields survive byte-for-byte
+   or semantically equivalent refresh output.
 
 ## Canonical document contract
 
@@ -74,7 +75,8 @@ remain stable when multiple objectives share a type.
 
 - Asset/content authors own sidecars, bindings, placement declarations, provenance, and
   extensions.
-- The GLB refresh/generator owns derived hashes and bounds and emits the runtime index.
+- The GLB refresh/generator owns the full GLB-derived source evidence—SHA-256, byte size,
+  mesh count, glTF version, and visual bounds—and emits the runtime index.
 - Component placement/catalog/runtime owners retain component-marker placement, component
   save/load ownership, lifecycle, and ship-system linkage.
 - Gameplay objective volumes/controllers retain objective volume and progression state.
@@ -117,7 +119,9 @@ remain stable when multiple objectives share a type.
 - Reproducible commands and Task 1 baseline evidence:
   `docs/game/06_validation_plan.md`.
 - Structural wrapper baseline remains intentionally failing with eight missing
-  `VisualInstance` errors until Task 2 supplies the required visual bindings.
+  `VisualInstance` errors until Task 2 repairs the validator to accept the existing
+  variant-aware visual nodes and adds its validator smoke; Task 2 does not produce prop or
+  structural visual bindings and does not change wrapper scenes or GLBs.
 - The exact two-instance ObjectDB teardown warning is classified as pre-existing external
   baseline noise owned by `ship-core` only for the component-marker smoke; any other
   diagnostic or count fails the feature gate. Removal is tracked by blocked Kanban card
