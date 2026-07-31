@@ -204,15 +204,60 @@ Expected: `ASSET METADATA GOVERNANCE DOCS PASS` and one focused documentation co
 
 - [ ] **Step 1: Execute the validator red gate and construct fixture-based negative coverage**
 
-First run the real-directory red gate before any Task 2 code changes:
+First run the real-directory red gate before any Task 2 code changes. The helper below captures the validator output and checks the complete diagnostic signature: exact exit status, exact count of lines beginning `ERROR:`, every such error containing the required marker, and zero lines beginning `WARNING:`.
 
 ```bash
 GODOT_BIN=/opt/homebrew/bin/godot
+
+expect_exact_error_signature() {
+  local label="$1"
+  local expected_status="$2"
+  local expected_error_count="$3"
+  local marker="$4"
+  shift 4
+  local output status error_count warning_count unexpected_errors
+  if output=$("$@" 2>&1); then
+    status=0
+  else
+    status=$?
+  fi
+  printf '%s\n' "$output"
+
+  if (( status != expected_status )); then
+    printf '%s: expected exit %d, got %d\n' "$label" "$expected_status" "$status" >&2
+    return 1
+  fi
+  error_count=$(awk 'BEGIN { count = 0 } /^ERROR:/ { count += 1 } END { print count }' <<<"$output")
+  warning_count=$(awk 'BEGIN { count = 0 } /^WARNING:/ { count += 1 } END { print count }' <<<"$output")
+  if (( error_count != expected_error_count )); then
+    printf '%s: expected exactly %d ERROR: line(s), got %d\n' \
+      "$label" "$expected_error_count" "$error_count" >&2
+    return 1
+  fi
+  if (( warning_count != 0 )); then
+    printf '%s: expected zero WARNING: lines, got %d\n' "$label" "$warning_count" >&2
+    return 1
+  fi
+  unexpected_errors=$(awk -v marker="$marker" \
+    'index($0, "ERROR:") == 1 && index($0, marker) == 0 { print }' <<<"$output")
+  if [[ -n "$unexpected_errors" ]]; then
+    printf '%s: ERROR: line without required marker %s:\n%s\n' \
+      "$label" "$marker" "$unexpected_errors" >&2
+    return 1
+  fi
+}
+
 "$GODOT_BIN" --headless --editor --path . --quit
-"$GODOT_BIN" --headless --path . --script res://scripts/placement/validate_wrapper_scenes.gd -- scenes/wrappers/structural/ship_structural_v0
+expect_exact_error_signature \
+  "real structural directory baseline" 1 8 \
+  "missing VisualInstance node for generated.visual_scene_path" \
+  "$GODOT_BIN" --headless --path . \
+  --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+  scenes/wrappers/structural/ship_structural_v0
+printf 'STRUCTURAL VALIDATOR RED CONFIRMED errors=8\n'
 ```
 
-Expected: this **real-directory red gate** exits `1` with exactly eight errors containing `missing VisualInstance node for generated.visual_scene_path`, one for each existing variant-aware wrapper scene. Keep this gate distinct from the fixture harness below; Step 3 must make this same directory command exit `0` without changing structural scenes or GLBs.
+This direct-directory gate is intentionally distinct from the fixture harness below. It must prove the current validator exits `1` with exactly eight matching errors and no warnings for the existing variant-aware wrappers; Step 3 must make this same directory command exit `0` without changing structural scenes or GLBs.
 
 Create all four same-basename fixture triples by copying the three existing `corridor_floor_1x1` source files, then mutate only the copied `.tscn` in each triple. Do not write either copied companion JSON file:
 
@@ -272,61 +317,101 @@ replace_once(
 PY
 ```
 
-Run this concrete helper against individual `.tscn` arguments; it wraps the existing SceneTree validator, requires a nonzero exit, and requires an exact diagnostic substring:
+Run the exact baseline functions below against individual `.tscn` arguments. `expect_clean_accept` proves the mixed fixture is still accepted before the fix, while each `expect_exact_error_signature` call proves one and only one old missing-VisualInstance error with no warnings. The red harness succeeds only after proving this validator-under-test is currently red.
 
 ```bash
-expect_reject() {
-  local scene_path="$1"
-  local marker="$2"
-  local output status
-  if output=$("$GODOT_BIN" --headless --path . \
-      --script res://scripts/placement/validate_wrapper_scenes.gd -- "$scene_path" 2>&1); then
+set -euo pipefail
+
+expect_clean_accept() {
+  local label="$1"
+  shift
+  local output status error_count warning_count
+  if output=$("$@" 2>&1); then
     status=0
   else
     status=$?
   fi
   printf '%s\n' "$output"
-  if [[ "$status" -eq 0 ]]; then
-    printf 'expected rejection but validator accepted %s\n' "$scene_path" >&2
+  if (( status != 0 )); then
+    printf '%s: expected exit 0, got %d\n' "$label" "$status" >&2
     return 1
   fi
-  if ! grep -Fq -- "$marker" <<<"$output"; then
-    printf 'missing expected marker %s for %s\n' "$marker" "$scene_path" >&2
+  error_count=$(awk 'BEGIN { count = 0 } /^ERROR:/ { count += 1 } END { print count }' <<<"$output")
+  warning_count=$(awk 'BEGIN { count = 0 } /^WARNING:/ { count += 1 } END { print count }' <<<"$output")
+  if (( error_count != 0 || warning_count != 0 )); then
+    printf '%s: expected zero ERROR:/WARNING: lines, got errors=%d warnings=%d\n' \
+      "$label" "$error_count" "$warning_count" >&2
     return 1
   fi
-  if grep -Fq -- 'WARNING:' <<<"$output"; then
-    printf 'unexpected WARNING: diagnostic for %s\n' "$scene_path" >&2
+  if ! grep -Fxq -- 'Validated 1 wrapper scene bundle(s).' <<<"$output"; then
+    printf '%s: missing exact acceptance marker\n' "$label" >&2
     return 1
   fi
 }
 
-# The suite returns zero only when all four expected rejections pass; otherwise it
-# returns the count of failed expectations (1-4), preserving the failure status for
-# callers that need to assert the red or green state.
-run_negative_fixture_suite() {
-  local failures=0
-  expect_reject "$FIXTURE_ROOT/mixed_legacy_variant.tscn" \
-    "mixed visual forms are forbidden" || failures=$((failures + 1))
-  expect_reject "$FIXTURE_ROOT/partial_variant.tscn" \
-    "incomplete variant visual form; missing variants: VisualInstance_Breached" || failures=$((failures + 1))
-  expect_reject "$FIXTURE_ROOT/traversal_damaged_variant.tscn" \
-    "must use a canonical contained structural PackedScene path" || failures=$((failures + 1))
-  expect_reject "$FIXTURE_ROOT/missing_damaged_resource.tscn" \
-    "references missing PackedScene resource" || failures=$((failures + 1))
-  return "$failures"
+OLD_MISSING_VISUAL_MARKER='missing VisualInstance node for generated.visual_scene_path'
+
+run_negative_fixture_red_suite() {
+  expect_clean_accept \
+    "mixed_legacy_variant pre-fix baseline" \
+    "$GODOT_BIN" --headless --path . \
+    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+    "$FIXTURE_ROOT/mixed_legacy_variant.tscn"
+  expect_exact_error_signature \
+    "partial_variant pre-fix baseline" 1 1 "$OLD_MISSING_VISUAL_MARKER" \
+    "$GODOT_BIN" --headless --path . \
+    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+    "$FIXTURE_ROOT/partial_variant.tscn"
+  expect_exact_error_signature \
+    "traversal_damaged_variant pre-fix baseline" 1 1 "$OLD_MISSING_VISUAL_MARKER" \
+    "$GODOT_BIN" --headless --path . \
+    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+    "$FIXTURE_ROOT/traversal_damaged_variant.tscn"
+  expect_exact_error_signature \
+    "missing_damaged_resource pre-fix baseline" 1 1 "$OLD_MISSING_VISUAL_MARKER" \
+    "$GODOT_BIN" --headless --path . \
+    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+    "$FIXTURE_ROOT/missing_damaged_resource.tscn"
 }
 
-# NEGATIVE-FIXTURE RED HARNESS: the suite itself must be nonzero before Step 3;
-# this conditional asserts that nonzero result and then exits successfully only
-# after proving the expected red state.
-if run_negative_fixture_suite; then
-  printf 'negative fixture suite unexpectedly passed before Step 3\n' >&2
-  exit 1
-fi
-printf 'NEGATIVE FIXTURE RED CONFIRMED\n'
+# NEGATIVE-FIXTURE RED HARNESS: every baseline assertion is exact. Any setup,
+# Godot, path, or unexpected validator result stops this block with failure.
+run_negative_fixture_red_suite
+printf 'NEGATIVE FIXTURE RED CONFIRMED mixed=accepted legacy_missing=3\n'
+
+# This is intentionally separate from the pre-fix red harness. Step 4 invokes it
+# only after Step 3, under set -euo pipefail, and it accepts exactly the four new
+# deterministic diagnostics below.
+run_negative_fixture_green_suite() {
+  expect_exact_error_signature \
+    "mixed_legacy_variant post-fix rejection" 1 1 \
+    "mixed visual forms are forbidden" \
+    "$GODOT_BIN" --headless --path . \
+    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+    "$FIXTURE_ROOT/mixed_legacy_variant.tscn"
+  expect_exact_error_signature \
+    "partial_variant post-fix rejection" 1 1 \
+    "incomplete variant visual form; missing variants: VisualInstance_Breached" \
+    "$GODOT_BIN" --headless --path . \
+    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+    "$FIXTURE_ROOT/partial_variant.tscn"
+  expect_exact_error_signature \
+    "traversal_damaged_variant post-fix rejection" 1 1 \
+    "must use a canonical contained structural PackedScene path" \
+    "$GODOT_BIN" --headless --path . \
+    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+    "$FIXTURE_ROOT/traversal_damaged_variant.tscn"
+  expect_exact_error_signature \
+    "missing_damaged_resource post-fix rejection" 1 1 \
+    "references missing PackedScene resource" \
+    "$GODOT_BIN" --headless --path . \
+    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+    "$FIXTURE_ROOT/missing_damaged_resource.tscn"
+}
 ```
 
-Before Step 3, `run_negative_fixture_suite` must return nonzero because the current validator accepts `mixed_legacy_variant` and the other three fixtures do not yet emit their required deterministic markers. The surrounding red invocation intentionally treats that nonzero suite result as the expected condition: its `if` body runs only if the suite unexpectedly returns zero, while the final marker makes the red confirmation explicit and the command block exits successfully. After Step 3, Step 4 calls `run_negative_fixture_suite` directly under `set -euo pipefail`; all four `expect_reject` calls must then return zero, so the suite returns zero and the green bundle continues. This negative fixture evidence remains separate from the eight-error real-directory red gate.
+The red harness returns zero only by proving `mixed_legacy_variant` is accepted with the exact `Validated 1 wrapper scene bundle(s).` line and that the other three fixtures each produce exactly one old missing-VisualInstance error and no warnings; any different result fails the block. It therefore records the validator-under-test's pre-Step-3 red state rather than accepting an arbitrary failure. The separate `run_negative_fixture_green_suite` has no broad nonzero-only path: every post-Step-3 fixture must exit `1`, emit exactly one `ERROR:` line, emit zero `WARNING:` lines, and contain its listed marker. This negative-fixture evidence remains separate from the eight-error real-directory red gate.
+
 
 - [ ] **Step 2: Add a baseline-green eight-scene wrapper characterization smoke**
 
@@ -550,79 +635,121 @@ The fixed `variant_names` order makes both the mixed-form and missing-variant di
 
 - [ ] **Step 4: Run the complete green validator, negative-fixture, smoke, and source-integrity bundle**
 
-Run the following as one shell block after defining the exact `expect_reject` and `run_negative_fixture_suite` helpers from Step 1:
+Run the following as one shell block after defining the exact `expect_clean_accept`, `expect_exact_error_signature`, and `run_negative_fixture_green_suite` helpers from Step 1. The green commands run inside a subshell so the `EXIT` trap can preserve a primary test failure while still making cleanup failure fail an otherwise successful bundle.
 
 ```bash
 set -euo pipefail
-GODOT_BIN=/opt/homebrew/bin/godot
-FIXTURE_ROOT=tests/fixtures/structural_variant_wrappers
-SMOKE_LOG=$(mktemp)
 
-run_clean() {
-  if (( $# == 0 )); then
-    printf 'run_clean requires a command\n' >&2
-    return 2
+if (
+  set -euo pipefail
+  GODOT_BIN=/opt/homebrew/bin/godot
+  FIXTURE_ROOT=tests/fixtures/structural_variant_wrappers
+  SMOKE_LOG=$(mktemp)
+
+  run_clean() {
+    if (( $# == 0 )); then
+      printf 'run_clean requires a command\n' >&2
+      return 2
+    fi
+    local output status
+    if output=$("$@" 2>&1); then
+      status=0
+    else
+      status=$?
+    fi
+    printf '%s\n' "$output"
+    if (( status != 0 )); then
+      printf 'command failed with exit %d: %q\n' "$status" "$1" >&2
+      return "$status"
+    fi
+    if grep -Fq -- 'ERROR:' <<<"$output" || grep -Fq -- 'WARNING:' <<<"$output"; then
+      printf 'unexpected ERROR:/WARNING: diagnostic from command: %q\n' "$1" >&2
+      return 1
+    fi
+  }
+
+  cleanup_generated_state() {
+    local cleanup_status=0
+    if ! git restore -- .godot; then
+      printf 'cleanup failed: git restore -- .godot\n' >&2
+      cleanup_status=1
+    fi
+    if ! git clean -fd -- '*.import'; then
+      printf "cleanup failed: git clean -fd -- '*.import'\n" >&2
+      cleanup_status=1
+    fi
+    if ! rm -f "$SMOKE_LOG"; then
+      printf 'cleanup failed: rm -f %s\n' "$SMOKE_LOG" >&2
+      cleanup_status=1
+    fi
+    return "$cleanup_status"
+  }
+
+  finish_bundle() {
+    local original_status="$1"
+    local cleanup_status=0
+    cleanup_generated_state || cleanup_status=$?
+    if (( original_status != 0 )); then
+      return "$original_status"
+    fi
+    return "$cleanup_status"
+  }
+
+  trap 'original_status=$?; finish_bundle "$original_status"; exit $?' EXIT
+
+  # Import preflight: run_clean requires exit 0 and no ERROR:/WARNING: output.
+  run_clean "$GODOT_BIN" --headless --editor --path . --quit
+
+  # Real structural directory validator green gate.
+  run_clean "$GODOT_BIN" --headless --path . \
+    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+    scenes/wrappers/structural/ship_structural_v0
+
+  # Fixture-based negative gates: intentional ERROR: output is allowed only because
+  # the separate suite asserts status 1, exactly one ERROR:, zero WARNING:, and the
+  # exact marker for each fixture.
+  run_negative_fixture_green_suite
+  printf 'NEGATIVE FIXTURE GREEN CONFIRMED\n'
+
+  # Exact eight-scene runtime wrapper smoke; this does not invoke the validator.
+  run_clean "$GODOT_BIN" --headless --path . \
+    --script res://scripts/validation/structural_variant_wrapper_smoke.gd \
+    | tee "$SMOKE_LOG"
+  if ! grep -Fxq -- \
+    'STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true' \
+    "$SMOKE_LOG"; then
+    printf 'missing exact structural wrapper smoke pass marker\n' >&2
+    exit 1
   fi
-  local output status
-  if output=$("$@" 2>&1); then
-    status=0
-  else
-    status=$?
-  fi
-  printf '%s\n' "$output"
-  if (( status != 0 )); then
-    printf 'command failed with exit %d: %q\n' "$status" "$1" >&2
-    return "$status"
-  fi
-  if grep -Fq -- 'ERROR:' <<<"$output" || grep -Fq -- 'WARNING:' <<<"$output"; then
-    printf 'unexpected ERROR:/WARNING: diagnostic from command: %q\n' "$1" >&2
-    return 1
-  fi
-}
-
-cleanup_generated_state() {
-  git restore .godot || true
-  git clean -fd -- '*.import' || true
-  rm -f "${SMOKE_LOG:-}" || true
-}
-trap cleanup_generated_state EXIT
-
-# Import preflight: run_clean requires exit 0 and no ERROR:/WARNING: output.
-run_clean "$GODOT_BIN" --headless --editor --path . --quit
-
-# Real structural directory validator green gate.
-run_clean "$GODOT_BIN" --headless --path . \
-  --script res://scripts/placement/validate_wrapper_scenes.gd -- \
-  scenes/wrappers/structural/ship_structural_v0
-
-# Fixture-based negative gates: intentional ERROR: output is allowed only because
-# each expect_reject call asserts its exact marker and rejects any WARNING: output.
-run_negative_fixture_suite
-printf 'NEGATIVE FIXTURE GREEN CONFIRMED\n'
-
-# Exact eight-scene runtime wrapper smoke; this does not invoke the validator.
-run_clean "$GODOT_BIN" --headless --path . \
-  --script res://scripts/validation/structural_variant_wrapper_smoke.gd \
-  | tee "$SMOKE_LOG"
-if ! grep -Fxq -- \
-  'STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true' \
-  "$SMOKE_LOG"; then
-  printf 'missing exact structural wrapper smoke pass marker\n' >&2
-  exit 1
+); then
+  bundle_status=0
+else
+  bundle_status=$?
 fi
 
-# Godot must not modify source wrappers or structural source assets.
+# These checks run only after the subshell returned successfully, which proves
+# primary tests and cleanup both succeeded. They prove no generated state or
+# structural source files remain before Step 5 can touch the index.
+if (( bundle_status != 0 )); then
+  exit "$bundle_status"
+fi
+generated_status=$(git status --short -- .godot ':(glob)**/*.import')
+if [[ -n "$generated_status" ]]; then
+  printf 'generated Godot state remains after cleanup:\n%s\n' "$generated_status" >&2
+  exit 1
+fi
 source_status=$(git status --short -- \
-  scenes/wrappers/structural/ship_structural_v0 \
-  assets/_processed/ship_structural_v0 \
-  assets/imported/structural/ship_structural_v0)
+  scenes/wrappers/structural \
+  assets/_processed \
+  assets/imported/structural)
 if [[ -n "$source_status" ]]; then
-  printf '%s\n' "$source_status" >&2
+  printf 'structural source files changed by validation:\n%s\n' "$source_status" >&2
   exit 1
 fi
+printf 'CLEANUP VERIFIED generated_state=empty structural_sources=clean\n'
 ```
 
-`run_clean` captures and prints every command's output, propagates a nonzero command exit, and rejects any `ERROR:` or `WARNING:` diagnostic. The negative suite is the sole exception for intentional `ERROR:` output: each fixture must return nonzero and contain its exact marker through `expect_reject`; the suite itself must return zero after all four expected rejections pass. The smoke's exact pass line is checked with `grep -Fxq`, while every other green command is enforced by exit status plus the diagnostic scan. The `EXIT` trap is installed before the first Godot command; it best-effort restores `.godot` and removes `*.import` files without masking a primary failure. The trap completes before Step 5, and the post-Godot structural-source status check remains in the bundle. No unexpected `ERROR:` or `WARNING:` diagnostics are accepted.
+`run_clean` captures and prints every command's output, propagates a nonzero command exit, and rejects any `ERROR:` or `WARNING:` diagnostic. The negative suite is the sole exception for intentional `ERROR:` output: each fixture must return status `1`, exactly one `ERROR:` line, zero `WARNING:` lines, and its exact marker through `expect_exact_error_signature`; the suite itself must return zero after all four exact rejections pass. The smoke's exact pass line is checked with `grep -Fxq`, while every other green command is enforced by exit status plus the diagnostic scan. The `EXIT` trap is installed before the first Godot command. `finish_bundle` captures the primary status, attempts every cleanup operation, returns the primary status when tests failed, and returns cleanup status when tests otherwise passed; cleanup failure is therefore never silently masked. The post-subshell generated-state and broad structural-source checks must both be empty before Step 5.
 
 - [ ] **Step 5: Stage only Task 2 implementation artifacts and commit**
 
@@ -651,8 +778,14 @@ if (( ${#TASK2_PATHS[@]} != 14 )); then
   exit 1
 fi
 
-# Clear only the index; leave every working-tree change intact.
-git reset
+# Refuse to modify any pre-existing staged work. This protects concurrently staged
+# changes and leaves the index untouched when the precondition fails.
+if ! git diff --cached --quiet; then
+  printf 'pre-existing staged work detected; refusing to modify the index:\n' >&2
+  git diff --cached --name-only >&2
+  exit 1
+fi
+
 git add "${TASK2_PATHS[@]}"
 
 expected_paths=$(printf '%s\n' "${TASK2_PATHS[@]}" | LC_ALL=C sort)
@@ -681,7 +814,7 @@ fi
 git diff HEAD^ HEAD --check
 ```
 
-`git reset` clears only pre-existing index state, never unrelated working-tree files. The exact 14-element `TASK2_PATHS` array is the sole staging allowlist; the cached expected-vs-actual comparison fails with both sets on mismatch, so no Task 3+ files, source wrappers, GLBs, or generated Godot state can be staged. The staged whitespace check and added-line placeholder scan run before commit. After commit, `git diff-tree --no-commit-id --name-only -r HEAD | LC_ALL=C sort` must equal the same expected set, and `git diff HEAD^ HEAD --check` must pass. The commit therefore contains exactly the 14 Task 2 files and nothing else.
+The clean-index precondition uses `git diff --cached --quiet`; when it fails, the script prints the existing staged names and exits before any index mutation, protecting concurrently staged work. The exact 14-element `TASK2_PATHS` array is the sole staging allowlist; the cached expected-vs-actual comparison fails with both sets on mismatch, so no Task 3+ files, source wrappers, GLBs, or generated Godot state can be staged. The staged whitespace check and added-line placeholder scan run before commit. After commit, `git diff-tree --no-commit-id --name-only -r HEAD | LC_ALL=C sort` must equal the same expected set, and `git diff HEAD^ HEAD --check` must pass. The commit therefore contains exactly the 14 Task 2 files and nothing else.
 
 ### Task 3: Implement the pure prop-sidecar schema, GLB inspection, and canonical serialization layer
 
