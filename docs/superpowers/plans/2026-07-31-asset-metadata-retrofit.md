@@ -183,6 +183,18 @@ Expected: `ASSET METADATA GOVERNANCE DOCS PASS` and one focused documentation co
 **Files:**
 - Modify: `scripts/placement/validate_wrapper_scenes.gd:382-410`
 - Create: `scripts/validation/structural_variant_wrapper_smoke.gd`
+- Create: `tests/fixtures/structural_variant_wrappers/mixed_legacy_variant.tscn`
+- Create: `tests/fixtures/structural_variant_wrappers/mixed_legacy_variant.manifest.json`
+- Create: `tests/fixtures/structural_variant_wrappers/mixed_legacy_variant.input.json`
+- Create: `tests/fixtures/structural_variant_wrappers/partial_variant.tscn`
+- Create: `tests/fixtures/structural_variant_wrappers/partial_variant.manifest.json`
+- Create: `tests/fixtures/structural_variant_wrappers/partial_variant.input.json`
+- Create: `tests/fixtures/structural_variant_wrappers/traversal_damaged_variant.tscn`
+- Create: `tests/fixtures/structural_variant_wrappers/traversal_damaged_variant.manifest.json`
+- Create: `tests/fixtures/structural_variant_wrappers/traversal_damaged_variant.input.json`
+- Create: `tests/fixtures/structural_variant_wrappers/missing_damaged_resource.tscn`
+- Create: `tests/fixtures/structural_variant_wrappers/missing_damaged_resource.manifest.json`
+- Create: `tests/fixtures/structural_variant_wrappers/missing_damaged_resource.input.json`
 
 **Interfaces:**
 - Produces validator support for exactly two legal visual forms:
@@ -190,9 +202,9 @@ Expected: `ASSET METADATA GOVERNANCE DOCS PASS` and one focused documentation co
   - variant-aware: `Visual/VisualInstance_Intact`, `Visual/VisualInstance_Damaged`, `Visual/VisualInstance_Breached`
 - The intact child must instance `manifest.generated.visual_scene_path`; damaged/breached children must be `PackedScene` resources under `Visual`.
 
-- [ ] **Step 1: Execute the validator red gate**
+- [ ] **Step 1: Execute the validator red gate and construct fixture-based negative coverage**
 
-Run the exact validator command before any Task 2 code changes:
+First run the real-directory red gate before any Task 2 code changes:
 
 ```bash
 GODOT_BIN=/opt/homebrew/bin/godot
@@ -200,118 +212,389 @@ GODOT_BIN=/opt/homebrew/bin/godot
 "$GODOT_BIN" --headless --path . --script res://scripts/placement/validate_wrapper_scenes.gd -- scenes/wrappers/structural/ship_structural_v0
 ```
 
-Expected: the validator command exits `1` with exactly eight errors containing `missing VisualInstance node for generated.visual_scene_path`, one for each variant-aware wrapper scene. This is the executable red regression for the current validator defect; Step 3 must make this same command exit `0` without changing structural scenes or GLBs.
+Expected: this **real-directory red gate** exits `1` with exactly eight errors containing `missing VisualInstance node for generated.visual_scene_path`, one for each existing variant-aware wrapper scene. Keep this gate distinct from the fixture harness below; Step 3 must make this same directory command exit `0` without changing structural scenes or GLBs.
 
-- [ ] **Step 2: Add a baseline-green wrapper characterization smoke**
+Create all four same-basename fixture triples by copying the three existing `corridor_floor_1x1` source files, then mutate only the copied `.tscn` in each triple. Do not write either copied companion JSON file:
 
-Create `scripts/validation/structural_variant_wrapper_smoke.gd` as a characterization smoke for the already-existing runtime variants. It must load and instantiate each of the eight variant-aware wrapper scenes, assert `Visual/VisualInstance_Intact`, `Visual/VisualInstance_Damaged`, and `Visual/VisualInstance_Breached` exist as `Node3D`, and call `IntegrityVisualResolver.apply_visual_state(wrapper, state)` for `intact`, `damaged`, `breached`, and `destroyed`. After each call, assert that exactly the expected visual child is visible, or that all three variant children are hidden for `destroyed`. It prints:
+```bash
+FIXTURE_ROOT=tests/fixtures/structural_variant_wrappers
+SOURCE_BASE=scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x1
+mkdir -p "$FIXTURE_ROOT"
+for fixture in mixed_legacy_variant partial_variant traversal_damaged_variant missing_damaged_resource; do
+  for suffix in tscn manifest.json input.json; do
+    cp "$SOURCE_BASE.$suffix" "$FIXTURE_ROOT/$fixture.$suffix"
+  done
+done
 
-```gdscript
-print("STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true")
+python3 - "$FIXTURE_ROOT" <<'PY'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+
+def replace_once(path: Path, old: str, new: str) -> None:
+    text = path.read_text()
+    assert text.count(old) == 1, (path, old, text.count(old))
+    path.write_text(text.replace(old, new, 1))
+
+# Mixed form: add the legacy child under Visual, reusing the copied intact resource.
+mixed = root / "mixed_legacy_variant.tscn"
+replace_once(
+    mixed,
+    '[node name="Visual" type="Node3D" parent="."]\n',
+    '[node name="Visual" type="Node3D" parent="."]\n\n'
+    '[node name="VisualInstance" parent="Visual" instance=ExtResource("1_visual")]\n',
+)
+
+# Partial form: remove only the breached variant node and its visibility property.
+partial = root / "partial_variant.tscn"
+replace_once(
+    partial,
+    '[node name="VisualInstance_Breached" parent="Visual" instance=ExtResource("3_visual_breached")]\nvisible = false\n',
+    '',
+)
+
+# Traversal form: keep the text prefix but introduce a .. path component.
+traversal = root / "traversal_damaged_variant.tscn"
+replace_once(
+    traversal,
+    'path="res://assets/imported/structural/ship_structural_v0/corridor_floor_1x1/corridor_floor_1x1_damaged.glb"',
+    'path="res://assets/imported/structural/../ship_structural_v0/corridor_floor_1x1/corridor_floor_1x1_damaged.glb"',
+)
+
+# Missing form: use a canonical structural PackedScene path that does not exist.
+missing = root / "missing_damaged_resource.tscn"
+replace_once(
+    missing,
+    'path="res://assets/imported/structural/ship_structural_v0/corridor_floor_1x1/corridor_floor_1x1_damaged.glb"',
+    'path="res://assets/imported/structural/ship_structural_v0/missing_damaged_resource.tscn"',
+)
+PY
 ```
 
-Run this smoke once before Step 3 and once after Step 3. It is expected to be baseline-green and must print that marker both before and after Step 3. It does **not** invoke `validate_wrapper_scenes.gd`, does not exercise the validator, and is not the red test; it only guards existing variant scene node/state behavior.
+Run this concrete helper against individual `.tscn` arguments; it wraps the existing SceneTree validator, requires a nonzero exit, and requires an exact diagnostic substring:
 
-- [ ] **Step 3: Implement the smallest validator change**
+```bash
+expect_reject() {
+  local scene_path="$1"
+  local marker="$2"
+  local output status
+  if output=$("$GODOT_BIN" --headless --path . \
+      --script res://scripts/placement/validate_wrapper_scenes.gd -- "$scene_path" 2>&1); then
+    status=0
+  else
+    status=$?
+  fi
+  printf '%s\n' "$output"
+  if [[ "$status" -eq 0 ]]; then
+    printf 'expected rejection but validator accepted %s\n' "$scene_path" >&2
+    return 1
+  fi
+  if ! grep -Fq -- "$marker" <<<"$output"; then
+    printf 'missing expected marker %s for %s\n' "$marker" "$scene_path" >&2
+    return 1
+  fi
+}
 
-Replace the single hard-coded `VisualInstance` lookup with an explicit exactly-two-forms policy. Keep the existing `if not generated_visual_scene_path.is_empty():` guard around this block. Compute legacy presence and all/any variant presence, reject mixed and partial forms deterministically, and then retain the existing parent/resource/path checks for every accepted node:
+# NEGATIVE-FIXTURE RED HARNESS: this whole harness must fail before Step 3.
+negative_failures=0
+expect_reject "$FIXTURE_ROOT/mixed_legacy_variant.tscn" \
+  "mixed visual forms are forbidden" || negative_failures=$((negative_failures + 1))
+expect_reject "$FIXTURE_ROOT/partial_variant.tscn" \
+  "incomplete variant visual form; missing variants: VisualInstance_Breached" || negative_failures=$((negative_failures + 1))
+expect_reject "$FIXTURE_ROOT/traversal_damaged_variant.tscn" \
+  "must use a canonical contained structural PackedScene path" || negative_failures=$((negative_failures + 1))
+expect_reject "$FIXTURE_ROOT/missing_damaged_resource.tscn" \
+  "references missing PackedScene resource" || negative_failures=$((negative_failures + 1))
+if (( negative_failures == 0 )); then
+  printf 'negative fixture harness unexpectedly passed before Step 3\n' >&2
+  exit 1
+fi
+```
+
+Before Step 3 this **fixture-based red harness** must exit nonzero: the current validator accepts `mixed_legacy_variant`, and the other three fixtures do not yet emit their required deterministic markers. After Step 3 the same four calls must all pass and the harness must exit `0` with the exact marker substrings shown above. This negative harness is separate evidence from the eight-error real-directory red gate.
+
+- [ ] **Step 2: Add a baseline-green eight-scene wrapper characterization smoke**
+
+Create `scripts/validation/structural_variant_wrapper_smoke.gd` with this implementation-ready smoke skeleton. It loads and instantiates the eight existing variant wrappers, but it does **not** invoke `validate_wrapper_scenes.gd` and is not a validator test:
+
+```gdscript
+extends SceneTree
+
+const IntegrityVisualResolverScript: GDScript = preload("res://scripts/systems/integrity_visual_resolver.gd")
+const VARIANT_WRAPPER_PATHS: PackedStringArray = [
+	"res://scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x1.tscn",
+	"res://scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x2.tscn",
+	"res://scenes/wrappers/structural/ship_structural_v0/doorway_frame_open_1x1.tscn",
+	"res://scenes/wrappers/structural/ship_structural_v0/floor_1x1.tscn",
+	"res://scenes/wrappers/structural/ship_structural_v0/floor_2x1.tscn",
+	"res://scenes/wrappers/structural/ship_structural_v0/pillar_support_1x1.tscn",
+	"res://scenes/wrappers/structural/ship_structural_v0/ramp_up_1x2.tscn",
+	"res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn",
+]
+
+func _initialize() -> void:
+	var failures: int = 0
+	if not _expect(IntegrityVisualResolverScript != null, "resolver preload failed"):
+		failures += 1
+	var unique_paths: Dictionary = {}
+	for scene_path in VARIANT_WRAPPER_PATHS:
+		unique_paths[scene_path] = true
+	if not _expect(
+		VARIANT_WRAPPER_PATHS.size() == 8 and unique_paths.size() == 8,
+		"expected exactly 8 unique variant wrapper paths",
+	):
+		failures += 1
+	for scene_path in VARIANT_WRAPPER_PATHS:
+		failures += _check_wrapper(scene_path)
+	if failures != 0:
+		push_error("STRUCTURAL VARIANT WRAPPER FAILURES: %d" % failures)
+		quit(1)
+		return
+	print("STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true")
+	quit(0)
+
+
+func _check_wrapper(scene_path: String) -> int:
+	var failures: int = 0
+	var packed_scene: PackedScene = load(scene_path) as PackedScene
+	if not _expect(packed_scene != null, "%s did not load as PackedScene" % scene_path):
+		return 1
+	var instance: Node = packed_scene.instantiate()
+	if not _expect(instance != null and instance is Node3D, "%s did not instantiate Node3D" % scene_path):
+		if instance != null:
+			instance.free()
+		return 1
+	var wrapper: Node3D = instance as Node3D
+	get_root().add_child(wrapper)
+
+	var visual_group: Node3D = wrapper.get_node_or_null("Visual") as Node3D
+	if not _expect(visual_group != null, "%s missing Visual Node3D" % scene_path):
+		_detach(wrapper)
+		return 1
+	var intact: Node3D = visual_group.get_node_or_null("VisualInstance_Intact") as Node3D
+	var damaged: Node3D = visual_group.get_node_or_null("VisualInstance_Damaged") as Node3D
+	var breached: Node3D = visual_group.get_node_or_null("VisualInstance_Breached") as Node3D
+	if not _expect(intact != null, "%s missing intact Node3D" % scene_path):
+		failures += 1
+	if not _expect(damaged != null, "%s missing damaged Node3D" % scene_path):
+		failures += 1
+	if not _expect(breached != null, "%s missing breached Node3D" % scene_path):
+		failures += 1
+	if failures != 0:
+		_detach(wrapper)
+		return failures
+
+	for state in ["intact", "damaged", "breached", "destroyed"]:
+		var applied: bool = IntegrityVisualResolverScript.apply_visual_state(wrapper, state)
+		if not _expect(applied, "%s resolver returned false for state=%s" % [scene_path, state]):
+			failures += 1
+		failures += _expect_state(scene_path, state, intact, damaged, breached)
+	_detach(wrapper)
+	return failures
+
+
+func _expect_state(
+	scene_path: String,
+	state: String,
+	intact: Node3D,
+	damaged: Node3D,
+	breached: Node3D,
+) -> int:
+	var expected_name: String = ""
+	match state:
+		"intact":
+			expected_name = "VisualInstance_Intact"
+		"damaged":
+			expected_name = "VisualInstance_Damaged"
+		"breached":
+			expected_name = "VisualInstance_Breached"
+		"destroyed":
+			expected_name = ""
+	var failures: int = 0
+	for child in [intact, damaged, breached]:
+		var should_be_visible: bool = state != "destroyed" and child.name == expected_name
+		if not _expect(
+			child.visible == should_be_visible,
+			"%s state=%s visibility mismatch for %s" % [scene_path, state, child.name],
+		):
+			failures += 1
+	return failures
+
+
+func _detach(wrapper: Node3D) -> void:
+	get_root().remove_child(wrapper)
+	wrapper.free()
+
+
+func _expect(condition: bool, message: String) -> bool:
+	if condition:
+		return true
+	push_error("STRUCTURAL VARIANT WRAPPER FAILURE: %s" % message)
+	return false
+```
+
+Run this smoke once before Step 3 and once after Step 3. It must be baseline-green both times and print:
+
+```text
+STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true
+```
+
+The smoke is deliberately separate from validator coverage: it only proves that all eight existing `PackedScene` wrappers load, instantiate, expose `Visual` plus all three `Node3D` variant children, and return `true` from `IntegrityVisualResolver.apply_visual_state(...)` for `intact`, `damaged`, `breached`, and `destroyed`, with exact visibility (one matching child visible for the first three states and all three hidden for `destroyed`).
+
+- [ ] **Step 3: Implement the smallest validator change with deterministic form and resource gates**
+
+Replace the single hard-coded `VisualInstance` lookup with an explicit exactly-two-forms policy. Keep the existing `if not generated_visual_scene_path.is_empty():` guard around this block. Add `const STRUCTURAL_SCENE_PREFIX: String = "res://assets/imported/structural/"` with the other validator constants, then use this logic:
 
 ```gdscript
 var variant_names: Array[String] = [
-    "VisualInstance_Intact",
-    "VisualInstance_Damaged",
-    "VisualInstance_Breached",
+	"VisualInstance_Intact",
+	"VisualInstance_Damaged",
+	"VisualInstance_Breached",
 ]
 var visual_names: Array[String] = []
 var has_legacy: bool = nodes_by_name.has("VisualInstance")
 var present_variants: Array[String] = []
 for variant_name in variant_names:
-    if nodes_by_name.has(variant_name):
-        present_variants.append(variant_name)
+	if nodes_by_name.has(variant_name):
+		present_variants.append(variant_name)
 var has_any_variant: bool = not present_variants.is_empty()
 var has_all_variants: bool = present_variants.size() == variant_names.size()
 
 if has_legacy and has_any_variant:
-    errors.append(
-        "%s: mixed visual forms are forbidden: VisualInstance plus %s" %
-        [scene_path, ", ".join(PackedStringArray(present_variants))]
-    )
+	errors.append(
+		"%s: mixed visual forms are forbidden: VisualInstance plus %s" %
+		[scene_path, ", ".join(PackedStringArray(present_variants))]
+	)
 elif has_legacy:
-    visual_names = ["VisualInstance"]
+	visual_names = ["VisualInstance"]
 elif has_all_variants:
-    visual_names = variant_names.duplicate()
+	visual_names = variant_names.duplicate()
 elif has_any_variant:
-    var missing_variants: Array[String] = []
-    for variant_name in variant_names:
-        if not nodes_by_name.has(variant_name):
-            missing_variants.append(variant_name)
-    errors.append(
-        "%s: incomplete variant visual form; missing variants: %s" %
-        [scene_path, ", ".join(PackedStringArray(missing_variants))]
-    )
+	var missing_variants: Array[String] = []
+	for variant_name in variant_names:
+		if not nodes_by_name.has(variant_name):
+			missing_variants.append(variant_name)
+	errors.append(
+		"%s: incomplete variant visual form; missing variants: %s" %
+		[scene_path, ", ".join(PackedStringArray(missing_variants))]
+	)
 else:
-    errors.append(
-        "%s: missing VisualInstance or variant visual nodes for generated.visual_scene_path" %
-        scene_path
-    )
+	errors.append(
+		"%s: missing VisualInstance or variant visual nodes for generated.visual_scene_path" %
+		scene_path
+	)
 
 for visual_name in visual_names:
-    var visual_instance: Dictionary = nodes_by_name[visual_name]
-    if str(visual_instance.get("parent", "")) != "Visual":
-        errors.append("%s: %s must be parented to Visual" % [scene_path, visual_name])
+	var visual_instance: Dictionary = nodes_by_name[visual_name]
+	if str(visual_instance.get("parent", "")) != "Visual":
+		errors.append("%s: %s must be parented to Visual" % [scene_path, visual_name])
 
-    var visual_instance_ref: String = str(visual_instance.get("instance", ""))
-    if visual_instance_ref.is_empty():
-        errors.append("%s: %s must instance the generated visual scene" % [scene_path, visual_name])
-        continue
+	var visual_instance_ref: String = str(visual_instance.get("instance", ""))
+	if visual_instance_ref.is_empty():
+		errors.append("%s: %s must instance the generated visual scene" % [scene_path, visual_name])
+		continue
 
-    var instance_start: int = visual_instance_ref.find("\"")
-    var instance_finish: int = visual_instance_ref.find("\"", instance_start + 1)
-    if instance_start == -1 or instance_finish == -1:
-        errors.append("%s: %s has malformed ext_resource reference" % [scene_path, visual_name])
-        continue
+	var instance_start: int = visual_instance_ref.find("\"")
+	var instance_finish: int = visual_instance_ref.find("\"", instance_start + 1)
+	if instance_start == -1 or instance_finish == -1:
+		errors.append("%s: %s has malformed ext_resource reference" % [scene_path, visual_name])
+		continue
 
-    var resource_id: String = visual_instance_ref.substr(
-        instance_start + 1,
-        instance_finish - instance_start - 1
-    )
-    var visual_resource: Dictionary = extresources.get(resource_id, {})
-    if visual_resource.is_empty():
-        errors.append("%s: %s references missing ext_resource %s" % [scene_path, visual_name, resource_id])
-        continue
-    if str(visual_resource.get("type", "")) != "PackedScene":
-        errors.append("%s: %s ext_resource must be a PackedScene" % [scene_path, visual_name])
-        continue
+	var resource_id: String = visual_instance_ref.substr(
+		instance_start + 1,
+		instance_finish - instance_start - 1
+	)
+	var visual_resource: Dictionary = extresources.get(resource_id, {})
+	if visual_resource.is_empty():
+		errors.append("%s: %s references missing ext_resource %s" % [scene_path, visual_name, resource_id])
+		continue
+	if str(visual_resource.get("type", "")) != "PackedScene":
+		errors.append("%s: %s ext_resource must be a PackedScene" % [scene_path, visual_name])
+		continue
 
-    var resource_path: String = str(visual_resource.get("path", ""))
-    if visual_name == "VisualInstance" or visual_name == "VisualInstance_Intact":
-        if resource_path != generated_visual_scene_path:
-            errors.append("%s: %s ext_resource path does not match manifest.generated.visual_scene_path" % [scene_path, visual_name])
-    elif resource_path.is_empty() or not resource_path.begins_with("res://assets/imported/structural/"):
-        errors.append("%s: %s ext_resource path must be a non-empty structural PackedScene path" % [scene_path, visual_name])
+	var resource_path: String = str(visual_resource.get("path", ""))
+	if visual_name == "VisualInstance" or visual_name == "VisualInstance_Intact":
+		# Preserve the existing intact contract: parent, PackedScene type, and exact manifest path.
+		if resource_path != generated_visual_scene_path:
+			errors.append("%s: %s ext_resource path does not match manifest.generated.visual_scene_path" % [scene_path, visual_name])
+	else:
+		# Damaged and breached references are text-checked before touching the loader.
+		var canonical_contained_path: bool = (
+			resource_path.begins_with(STRUCTURAL_SCENE_PREFIX)
+			and not resource_path.split("/").has("..")
+			and resource_path.simplify_path() == resource_path
+		)
+		if not canonical_contained_path:
+			errors.append("%s: %s must use a canonical contained structural PackedScene path" % [scene_path, visual_name])
+			continue
+		if not ResourceLoader.exists(resource_path, "PackedScene"):
+			errors.append("%s: %s references missing PackedScene resource" % [scene_path, visual_name])
 ```
 
-The fixed `variant_names` order makes mixed-form and missing-variant diagnostics deterministic. Legacy is accepted only when no variant node is present; variant-aware form is accepted only when all three named nodes are present; any partial variant set is rejected. Do not edit structural scenes or GLBs; this step changes only the validator logic.
+The fixed `variant_names` order makes both the mixed-form and missing-variant diagnostics deterministic. Legacy is accepted only when no variant node is present; variant-aware form is accepted only when all three named nodes are present; any partial variant set is rejected. The four negative fixtures must therefore produce the exact substrings `mixed visual forms are forbidden`, `incomplete variant visual form; missing variants: VisualInstance_Breached`, `must use a canonical contained structural PackedScene path`, and `references missing PackedScene resource`. Do not edit structural scenes, source wrapper scenes, or GLBs; this step changes only validator logic.
 
-- [ ] **Step 4: Run the green validator gate and characterization smoke**
+- [ ] **Step 4: Run the complete green validator, negative-fixture, smoke, and source-integrity bundle**
 
-Run:
+Run the following as one shell block after defining the exact `expect_reject` helper from Step 1:
 
 ```bash
 GODOT_BIN=/opt/homebrew/bin/godot
+FIXTURE_ROOT=tests/fixtures/structural_variant_wrappers
+
+# Import preflight.
 "$GODOT_BIN" --headless --editor --path . --quit
+
+# Real structural directory validator green gate.
 "$GODOT_BIN" --headless --path . --script res://scripts/placement/validate_wrapper_scenes.gd -- scenes/wrappers/structural/ship_structural_v0
+
+# Fixture-based negative gates: each must reject with its exact marker.
+expect_reject "$FIXTURE_ROOT/mixed_legacy_variant.tscn" \
+  "mixed visual forms are forbidden"
+expect_reject "$FIXTURE_ROOT/partial_variant.tscn" \
+  "incomplete variant visual form; missing variants: VisualInstance_Breached"
+expect_reject "$FIXTURE_ROOT/traversal_damaged_variant.tscn" \
+  "must use a canonical contained structural PackedScene path"
+expect_reject "$FIXTURE_ROOT/missing_damaged_resource.tscn" \
+  "references missing PackedScene resource"
+
+# Exact eight-scene runtime wrapper smoke; this does not invoke the validator.
 "$GODOT_BIN" --headless --path . --script res://scripts/validation/structural_variant_wrapper_smoke.gd
+
+# Godot must not modify source wrappers or structural source assets.
+source_status=$(git status --short -- scenes/wrappers/structural/ship_structural_v0 assets/_processed/ship_structural_v0 assets/imported/structural/ship_structural_v0)
+if [[ -n "$source_status" ]]; then
+  printf '%s\n' "$source_status" >&2
+  exit 1
+fi
 ```
 
-Expected: no `ERROR:`/`WARNING:` lines; the validator command exits `0`; and the wrapper smoke prints `STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true`. The validator's red-to-green transition from Step 1 to this step is the behavior proving the Task 2 repair. The smoke remains a baseline-green characterization guard for existing runtime variants, not evidence that the validator defect was red or fixed.
+Expected: import preflight exits `0`; the real structural directory validator exits `0`; all four fixture `expect_reject` gates exit `0` with the exact mixed, partial, traversal, and missing-resource markers; the exact eight-scene smoke prints `STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true`; and the post-Godot `git status --short -- scenes/wrappers/structural/ship_structural_v0 assets/_processed/ship_structural_v0 assets/imported/structural/ship_structural_v0` check is empty. No unexpected `ERROR:` or `WARNING:` diagnostics are present in the bundle output. This bundle proves the validator repair while proving source wrapper scenes and structural GLBs remain untouched.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Stage only Task 2 implementation artifacts and commit**
+
+After the green bundle passes, stage the validator, smoke, and all four fixture triples explicitly:
 
 ```bash
-git add scripts/placement/validate_wrapper_scenes.gd scripts/validation/structural_variant_wrapper_smoke.gd
+git add \
+  scripts/placement/validate_wrapper_scenes.gd \
+  scripts/validation/structural_variant_wrapper_smoke.gd \
+  tests/fixtures/structural_variant_wrappers/mixed_legacy_variant.tscn \
+  tests/fixtures/structural_variant_wrappers/mixed_legacy_variant.manifest.json \
+  tests/fixtures/structural_variant_wrappers/mixed_legacy_variant.input.json \
+  tests/fixtures/structural_variant_wrappers/partial_variant.tscn \
+  tests/fixtures/structural_variant_wrappers/partial_variant.manifest.json \
+  tests/fixtures/structural_variant_wrappers/partial_variant.input.json \
+  tests/fixtures/structural_variant_wrappers/traversal_damaged_variant.tscn \
+  tests/fixtures/structural_variant_wrappers/traversal_damaged_variant.manifest.json \
+  tests/fixtures/structural_variant_wrappers/traversal_damaged_variant.input.json \
+  tests/fixtures/structural_variant_wrappers/missing_damaged_resource.tscn \
+  tests/fixtures/structural_variant_wrappers/missing_damaged_resource.manifest.json \
+  tests/fixtures/structural_variant_wrappers/missing_damaged_resource.input.json
 git commit -m "fix: validate structural visual variants"
 ```
+
+The Task 2 commit must contain no Task 3 or later files, no source wrapper scene changes, and no GLB changes.
 
 ### Task 3: Implement the pure prop-sidecar schema, GLB inspection, and canonical serialization layer
 
