@@ -190,41 +190,110 @@ Expected: `ASSET METADATA GOVERNANCE DOCS PASS` and one focused documentation co
   - variant-aware: `Visual/VisualInstance_Intact`, `Visual/VisualInstance_Damaged`, `Visual/VisualInstance_Breached`
 - The intact child must instance `manifest.generated.visual_scene_path`; damaged/breached children must be `PackedScene` resources under `Visual`.
 
-- [ ] **Step 1: Capture the red case**
+- [ ] **Step 1: Execute the validator red gate**
 
-Run the Task 1 baseline command and save its eight `missing VisualInstance` errors in the task log. Do not alter the structural scenes or GLBs.
+Run the exact validator command before any Task 2 code changes:
 
-- [ ] **Step 2: Add a failing scene-parser smoke**
+```bash
+GODOT_BIN=/opt/homebrew/bin/godot
+"$GODOT_BIN" --headless --editor --path . --quit
+"$GODOT_BIN" --headless --path . --script res://scripts/placement/validate_wrapper_scenes.gd -- scenes/wrappers/structural/ship_structural_v0
+```
 
-Create `scripts/validation/structural_variant_wrapper_smoke.gd` that loads and instantiates each of the eight variant-aware wrapper scenes, asserts `Visual/VisualInstance_Intact`, `Visual/VisualInstance_Damaged`, and `Visual/VisualInstance_Breached` exist as `Node3D`, and calls `IntegrityVisualResolver.apply_visual_state(wrapper, state)` for `intact`, `damaged`, `breached`, and `destroyed`. After each call it must assert that exactly the expected visual child is visible, or that all three are hidden for `destroyed`. It prints the marker:
+Expected: the validator command exits `1` with exactly eight errors containing `missing VisualInstance node for generated.visual_scene_path`, one for each variant-aware wrapper scene. This is the executable red regression for the current validator defect; Step 3 must make this same command exit `0` without changing structural scenes or GLBs.
+
+- [ ] **Step 2: Add a baseline-green wrapper characterization smoke**
+
+Create `scripts/validation/structural_variant_wrapper_smoke.gd` as a characterization smoke for the already-existing runtime variants. It must load and instantiate each of the eight variant-aware wrapper scenes, assert `Visual/VisualInstance_Intact`, `Visual/VisualInstance_Damaged`, and `Visual/VisualInstance_Breached` exist as `Node3D`, and call `IntegrityVisualResolver.apply_visual_state(wrapper, state)` for `intact`, `damaged`, `breached`, and `destroyed`. After each call, assert that exactly the expected visual child is visible, or that all three variant children are hidden for `destroyed`. It prints:
 
 ```gdscript
 print("STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true")
 ```
 
-Before implementation, it must not print that marker.
+Run this smoke once before Step 3 and once after Step 3. It is expected to be baseline-green and must print that marker both before and after Step 3. It does **not** invoke `validate_wrapper_scenes.gd`, does not exercise the validator, and is not the red test; it only guards existing variant scene node/state behavior.
 
 - [ ] **Step 3: Implement the smallest validator change**
 
-Replace the single hard-coded `VisualInstance` lookup with this policy:
+Replace the single hard-coded `VisualInstance` lookup with an explicit exactly-two-forms policy. Keep the existing `if not generated_visual_scene_path.is_empty():` guard around this block. Compute legacy presence and all/any variant presence, reject mixed and partial forms deterministically, and then retain the existing parent/resource/path checks for every accepted node:
 
 ```gdscript
+var variant_names: Array[String] = [
+    "VisualInstance_Intact",
+    "VisualInstance_Damaged",
+    "VisualInstance_Breached",
+]
 var visual_names: Array[String] = []
-if nodes_by_name.has("VisualInstance"):
+var has_legacy: bool = nodes_by_name.has("VisualInstance")
+var present_variants: Array[String] = []
+for variant_name in variant_names:
+    if nodes_by_name.has(variant_name):
+        present_variants.append(variant_name)
+var has_any_variant: bool = not present_variants.is_empty()
+var has_all_variants: bool = present_variants.size() == variant_names.size()
+
+if has_legacy and has_any_variant:
+    errors.append(
+        "%s: mixed visual forms are forbidden: VisualInstance plus %s" %
+        [scene_path, ", ".join(PackedStringArray(present_variants))]
+    )
+elif has_legacy:
     visual_names = ["VisualInstance"]
-elif nodes_by_name.has("VisualInstance_Intact"):
-    visual_names = [
-        "VisualInstance_Intact",
-        "VisualInstance_Damaged",
-        "VisualInstance_Breached",
-    ]
+elif has_all_variants:
+    visual_names = variant_names.duplicate()
+elif has_any_variant:
+    var missing_variants: Array[String] = []
+    for variant_name in variant_names:
+        if not nodes_by_name.has(variant_name):
+            missing_variants.append(variant_name)
+    errors.append(
+        "%s: incomplete variant visual form; missing variants: %s" %
+        [scene_path, ", ".join(PackedStringArray(missing_variants))]
+    )
 else:
-    errors.append("%s: missing VisualInstance or VisualInstance_Intact node for generated.visual_scene_path" % scene_path)
+    errors.append(
+        "%s: missing VisualInstance or variant visual nodes for generated.visual_scene_path" %
+        scene_path
+    )
+
+for visual_name in visual_names:
+    var visual_instance: Dictionary = nodes_by_name[visual_name]
+    if str(visual_instance.get("parent", "")) != "Visual":
+        errors.append("%s: %s must be parented to Visual" % [scene_path, visual_name])
+
+    var visual_instance_ref: String = str(visual_instance.get("instance", ""))
+    if visual_instance_ref.is_empty():
+        errors.append("%s: %s must instance the generated visual scene" % [scene_path, visual_name])
+        continue
+
+    var instance_start: int = visual_instance_ref.find("\"")
+    var instance_finish: int = visual_instance_ref.find("\"", instance_start + 1)
+    if instance_start == -1 or instance_finish == -1:
+        errors.append("%s: %s has malformed ext_resource reference" % [scene_path, visual_name])
+        continue
+
+    var resource_id: String = visual_instance_ref.substr(
+        instance_start + 1,
+        instance_finish - instance_start - 1
+    )
+    var visual_resource: Dictionary = extresources.get(resource_id, {})
+    if visual_resource.is_empty():
+        errors.append("%s: %s references missing ext_resource %s" % [scene_path, visual_name, resource_id])
+        continue
+    if str(visual_resource.get("type", "")) != "PackedScene":
+        errors.append("%s: %s ext_resource must be a PackedScene" % [scene_path, visual_name])
+        continue
+
+    var resource_path: String = str(visual_resource.get("path", ""))
+    if visual_name == "VisualInstance" or visual_name == "VisualInstance_Intact":
+        if resource_path != generated_visual_scene_path:
+            errors.append("%s: %s ext_resource path does not match manifest.generated.visual_scene_path" % [scene_path, visual_name])
+    elif resource_path.is_empty() or not resource_path.begins_with("res://assets/imported/structural/"):
+        errors.append("%s: %s ext_resource path must be a non-empty structural PackedScene path" % [scene_path, visual_name])
 ```
 
-For every listed node, require parent `Visual`, a populated `instance` reference, and an ext-resource of type `PackedScene`. For the legacy node and `VisualInstance_Intact`, require that ext-resource path to equal `generated.visual_scene_path`. For damaged/breached nodes, require a non-empty `res://assets/imported/structural/` path but do not compare it to the intact path.
+The fixed `variant_names` order makes mixed-form and missing-variant diagnostics deterministic. Legacy is accepted only when no variant node is present; variant-aware form is accepted only when all three named nodes are present; any partial variant set is rejected. Do not edit structural scenes or GLBs; this step changes only the validator logic.
 
-- [ ] **Step 4: Run green validation**
+- [ ] **Step 4: Run the green validator gate and characterization smoke**
 
 Run:
 
@@ -235,7 +304,7 @@ GODOT_BIN=/opt/homebrew/bin/godot
 "$GODOT_BIN" --headless --path . --script res://scripts/validation/structural_variant_wrapper_smoke.gd
 ```
 
-Expected: no `ERROR:`/`WARNING:` lines, validator exit `0`, and `STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true`.
+Expected: no `ERROR:`/`WARNING:` lines; the validator command exits `0`; and the wrapper smoke prints `STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true`. The validator's red-to-green transition from Step 1 to this step is the behavior proving the Task 2 repair. The smoke remains a baseline-green characterization guard for existing runtime variants, not evidence that the validator defect was red or fixed.
 
 - [ ] **Step 5: Commit**
 
