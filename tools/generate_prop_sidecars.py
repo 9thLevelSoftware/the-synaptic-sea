@@ -17,6 +17,7 @@ from tools.prop_visual_metadata import read_glb_metadata, validate_sidecar, writ
 
 
 PROP_GROUPS = ("components", "dressing", "objectives")
+EXPECTED_ASSET_COUNTS = {"component": 11, "dressing": 11, "objective": 4}
 DRESSING_SURFACES = {
     "cable_tray": "wall",
     "emergency_wall": "wall",
@@ -113,6 +114,30 @@ def _iter_glbs(project_root: Path) -> list[tuple[str, Path]]:
             _ensure_contained(project_root, glb_path)
             result.append((kind_by_group[prop_kind], glb_path))
     return result
+
+
+def _validate_complete_inventory(
+    glbs: list[tuple[str, Path]],
+    expected_asset_ids: dict[str, set[str]],
+) -> None:
+    actual_asset_ids: dict[str, set[str]] = {"component": set(), "dressing": set(), "objective": set()}
+    for prop_kind, glb_path in glbs:
+        actual_asset_ids[prop_kind].add(glb_path.stem)
+
+    diagnostics: list[str] = []
+    for prop_kind in ("component", "dressing", "objective"):
+        expected = expected_asset_ids[prop_kind]
+        if len(expected) != EXPECTED_ASSET_COUNTS[prop_kind]:
+            diagnostics.append(
+                f"invalid governed {prop_kind} asset inventory: expected {EXPECTED_ASSET_COUNTS[prop_kind]} assets, found {len(expected)}"
+            )
+        for asset_id in sorted(expected - actual_asset_ids[prop_kind]):
+            diagnostics.append(f"missing {prop_kind} asset: {asset_id}")
+        for asset_id in sorted(actual_asset_ids[prop_kind] - expected):
+            diagnostics.append(f"unexpected {prop_kind} asset: {asset_id}")
+
+    if diagnostics:
+        raise ValueError("; ".join(diagnostics))
 
 
 def _sidecar_path(glb_path: Path) -> Path:
@@ -232,8 +257,13 @@ def build_index(project_root: Path) -> dict[str, Any]:
     groups: dict[str, dict[str, Any]] = {"components": {}, "objectives": {}, "dressing": {}}
     component_ids = _load_component_ids(project_root)
     objective_ids = _load_objective_ids(project_root)
+    glbs = _iter_glbs(project_root)
+    _validate_complete_inventory(
+        glbs,
+        {"component": component_ids, "dressing": set(DRESSING_SURFACES), "objective": set(OBJECTIVE_IDS)},
+    )
     owned_component_ids: set[str] = set()
-    for prop_kind, glb_path in _iter_glbs(project_root):
+    for prop_kind, glb_path in glbs:
         sidecar_path = _sidecar_path(glb_path)
         _ensure_contained(project_root, sidecar_path)
         if not sidecar_path.is_file():

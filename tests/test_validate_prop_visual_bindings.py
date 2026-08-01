@@ -76,6 +76,14 @@ def copied_project_with_sidecar_value(asset_id: str, path: list[str], value: obj
 
 
 @contextlib.contextmanager
+def copied_project_without_asset(group: str, asset_id: str) -> Iterator[Path]:
+    with copied_project() as root:
+        (root / PROPS_ROOT / group / f"{asset_id}.glb").unlink()
+        (root / PROPS_ROOT / group / f"{asset_id}.sidecar.json").unlink()
+        yield root
+
+
+@contextlib.contextmanager
 def copied_project_with_objective_alias(asset_id: str, alias: str) -> Iterator[Path]:
     with copied_project() as root:
         sidecar_path, sidecar = _load_sidecar(root, asset_id)
@@ -194,6 +202,15 @@ class ValidatePropVisualBindingsTests(unittest.TestCase):
             result = run_generator(project_root, "--write-index")
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("unknown component_id: unknown_component", result.stderr)
+            self.assertEqual(index_path.read_bytes(), original_index)
+
+    def test_generator_rejects_missing_governed_asset_before_writing_index(self) -> None:
+        with copied_project_without_asset("dressing", "cable_tray") as project_root:
+            index_path = project_root / "data/props/visual_bindings.generated.json"
+            original_index = index_path.read_bytes()
+            result = run_generator(project_root, "--write-index")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("missing dressing asset: cable_tray", result.stderr)
             self.assertEqual(index_path.read_bytes(), original_index)
 
     def test_validator_rejects_noncanonical_generated_index_bytes(self) -> None:
