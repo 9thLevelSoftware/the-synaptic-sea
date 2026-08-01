@@ -78,7 +78,7 @@ _NAMESPACE_BY_KIND = {
 }
 _ALLOWED_ORIGINS = ("scene_origin", "marker_anchor")
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
-_SEMVER_PATTERN = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
+_SEMVER_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 
 
 def _finite_number(value: Any) -> Optional[float]:
@@ -101,6 +101,10 @@ def _finite_vector(value: Any, size: int = 3) -> Optional[list[float]]:
             return None
         result.append(converted)
     return result
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON constant: {value}")
 
 
 def _read_glb_chunks(data: bytes) -> tuple[dict[str, Any], Optional[bytes]]:
@@ -159,6 +163,7 @@ def _read_glb_chunks(data: bytes) -> tuple[dict[str, Any], Optional[bytes]]:
         document, end = json.JSONDecoder().raw_decode(text, start)
         if any(character != " " for character in text[end:]):
             raise ValueError("illegal JSON chunk padding")
+        document = json.loads(text[start:end], parse_constant=_reject_json_constant)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("malformed GLB JSON chunk") from exc
     except ValueError as exc:
@@ -166,6 +171,24 @@ def _read_glb_chunks(data: bytes) -> tuple[dict[str, Any], Optional[bytes]]:
     if not isinstance(document, dict):
         raise ValueError("malformed GLB JSON chunk: document is not an object")
     return document, binary_chunk
+
+
+def _validate_bin_payload(document: dict[str, Any], binary_chunk: Optional[bytes]) -> None:
+    if binary_chunk is None:
+        return
+    buffers = document.get("buffers")
+    if not isinstance(buffers, list) or not buffers or not isinstance(buffers[0], dict):
+        return
+    buffer_length = buffers[0].get("byteLength")
+    if isinstance(buffer_length, bool) or not isinstance(buffer_length, int) or buffer_length < 0:
+        raise ValueError("GLB BIN buffer has invalid byteLength")
+    if len(binary_chunk) < buffer_length:
+        raise ValueError("GLB BIN buffer is shorter than declared")
+    extra_length = len(binary_chunk) - buffer_length
+    if extra_length > 3:
+        raise ValueError("GLB BIN buffer has too much padding")
+    if any(binary_chunk[buffer_length:]):
+        raise ValueError("GLB BIN buffer padding must be zero")
 
 
 def _accessor_vector(value: Any, label: str) -> list[float]:
@@ -192,19 +215,12 @@ def _round_bound(value: float) -> float:
     return 0.0 if rounded == 0 else rounded
 
 
-def _scan_position_accessor(
+def _position_data_range(
     accessor: dict[str, Any],
     buffer_views: list[Any],
     buffers: list[Any],
     binary_chunk: Optional[bytes],
-) -> tuple[list[float], list[float]]:
-    if binary_chunk is None:
-        raise ValueError("POSITION accessor has no min/max and GLB has no BIN chunk")
-    if accessor.get("type") != "VEC3" or accessor.get("componentType") != 5126:
-        raise ValueError("POSITION accessor must be a FLOAT VEC3")
-    count = accessor.get("count")
-    if isinstance(count, bool) or not isinstance(count, int) or count <= 0:
-        raise ValueError("POSITION accessor has an invalid count")
+) -> tuple[int, int, int]:
     view_index = accessor.get("bufferView")
     if isinstance(view_index, bool) or not isinstance(view_index, int):
         raise ValueError("POSITION accessor has no valid bufferView")
@@ -212,7 +228,9 @@ def _scan_position_accessor(
         raise ValueError("POSITION accessor bufferView is out of range")
     view = buffer_views[view_index]
     buffer_index = view.get("buffer", 0)
-    if buffer_index != 0 or not buffers or not isinstance(buffers[0], dict):
+    if isinstance(buffer_index, bool) or not isinstance(buffer_index, int) or buffer_index != 0:
+        raise ValueError("POSITION accessor does not reference the GLB BIN buffer")
+    if not buffers or not isinstance(buffers[0], dict):
         raise ValueError("POSITION accessor does not reference the GLB BIN buffer")
 
     view_offset = view.get("byteOffset", 0)
@@ -223,20 +241,44 @@ def _scan_position_accessor(
         raise ValueError("POSITION accessor has invalid byte offsets")
     if isinstance(view_length, bool) or not isinstance(view_length, int) or view_length < 0:
         raise ValueError("POSITION accessor has invalid bufferView length")
-    if isinstance(stride, bool) or not isinstance(stride, int) or stride < 12:
+    if (
+        isinstance(stride, bool)
+        or not isinstance(stride, int)
+        or stride < 12
+        or stride > 252
+        or stride % 4 != 0
+    ):
         raise ValueError("POSITION accessor has invalid byte stride")
+    if view_offset % 4 != 0 or accessor_offset % 4 != 0:
+        raise ValueError("POSITION accessor has invalid byte offsets")
 
     buffer_length = buffers[0].get("byteLength")
     if isinstance(buffer_length, bool) or not isinstance(buffer_length, int) or buffer_length < 0:
         raise ValueError("GLB BIN buffer has invalid byteLength")
+    if binary_chunk is None:
+        raise ValueError("POSITION accessor has no GLB BIN buffer")
     if buffer_length > len(binary_chunk):
         raise ValueError("GLB BIN buffer is shorter than declared")
 
+    count = accessor["count"]
     start = view_offset + accessor_offset
     end = start + (count - 1) * stride + 12
     view_end = view_offset + view_length
-    if start < view_offset or end > view_end or end > buffer_length or end > len(binary_chunk):
+    if view_end > buffer_length or start < view_offset or end > view_end or end > buffer_length or end > len(binary_chunk):
         raise ValueError("POSITION accessor exceeds its GLB bufferView")
+    return start, end, stride
+
+
+def _scan_position_accessor(
+    accessor: dict[str, Any],
+    buffer_views: list[Any],
+    buffers: list[Any],
+    binary_chunk: Optional[bytes],
+) -> tuple[list[float], list[float]]:
+    if binary_chunk is None:
+        raise ValueError("POSITION accessor has no min/max and GLB has no BIN chunk")
+    start, _end, stride = _position_data_range(accessor, buffer_views, buffers, binary_chunk)
+    count = accessor["count"]
 
     minimum = [math.inf, math.inf, math.inf]
     maximum = [-math.inf, -math.inf, -math.inf]
@@ -256,6 +298,7 @@ def read_glb_metadata(path: Path) -> dict[str, Any]:
     path = Path(path)
     data = path.read_bytes()
     document, binary_chunk = _read_glb_chunks(data)
+    _validate_bin_payload(document, binary_chunk)
 
     asset = document.get("asset")
     if not isinstance(asset, dict) or asset.get("version") != "2.0":
@@ -291,6 +334,8 @@ def read_glb_metadata(path: Path) -> dict[str, Any]:
             accessor = accessors[accessor_index]
             _validate_position_accessor(accessor)
             if "min" in accessor and "max" in accessor:
+                if "bufferView" in accessor:
+                    _position_data_range(accessor, buffer_views, buffers, binary_chunk)
                 lower = _accessor_vector(accessor["min"], "POSITION min")
                 upper = _accessor_vector(accessor["max"], "POSITION max")
             else:
@@ -392,13 +437,13 @@ def validate_sidecar(sidecar: dict, glb_path: Path, project_root: Path) -> list[
 
     glb_path = Path(glb_path)
     project_root = Path(project_root).resolve()
-    try:
-        expected_glb = glb_path.resolve()
+    expected_glb = glb_path.resolve()
+    if expected_glb != project_root and project_root not in expected_glb.parents:
+        errors.append("GLB path must be contained in project root")
+        expected_res_path = f"res://{expected_glb.as_posix().lstrip('/')}"
+    else:
         expected_relative = expected_glb.relative_to(project_root).as_posix()
         expected_res_path = f"res://{expected_relative}"
-    except ValueError:
-        expected_glb = glb_path.resolve()
-        expected_res_path = ""
 
     asset_id = sidecar.get("asset_id")
     if not isinstance(asset_id, str) or not asset_id or re.fullmatch(r"[a-z0-9][a-z0-9_-]*", asset_id) is None:
@@ -423,7 +468,7 @@ def validate_sidecar(sidecar: dict, glb_path: Path, project_root: Path) -> list[
             visual_candidate = (project_root / Path(*parts)).resolve()
             if visual_candidate != project_root and project_root not in visual_candidate.parents:
                 errors.append("path must be a contained res:// path")
-            elif expected_res_path and visual_candidate != expected_glb:
+            elif visual_candidate != expected_glb:
                 errors.append(f"visual_scene_path must match GLB path: {expected_res_path}")
 
     binding = _require_dict(errors, sidecar, "binding")
@@ -437,8 +482,15 @@ def validate_sidecar(sidecar: dict, glb_path: Path, project_root: Path) -> list[
         ids = binding.get("ids")
         if not isinstance(ids, list) or not ids or any(not isinstance(item, str) or not item for item in ids):
             errors.append("binding.ids must be a non-empty array of strings")
-        elif len(set(ids)) != len(ids):
-            for identifier in sorted({item for item in ids if ids.count(item) > 1}):
+        else:
+            seen_ids: set[str] = set()
+            duplicate_ids: set[str] = set()
+            for identifier in ids:
+                if identifier in seen_ids:
+                    duplicate_ids.add(identifier)
+                else:
+                    seen_ids.add(identifier)
+            for identifier in sorted(duplicate_ids):
                 errors.append(f"duplicate binding id: {identifier}")
 
     placement = _require_dict(errors, sidecar, "placement")

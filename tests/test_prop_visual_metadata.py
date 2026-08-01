@@ -47,6 +47,38 @@ def make_raw_glb(chunks: list[tuple[bytes, bytes]]) -> bytes:
     return struct.pack("<4sII", b"glTF", 2, 12 + len(body)) + body
 
 
+def position_document(
+    *,
+    count: int = 1,
+    buffer_length: int = 12,
+    view_offset: int = 0,
+    view_length: int = 12,
+    accessor_offset: int = 0,
+    stride: int | None = None,
+    with_min_max: bool = False,
+) -> dict:
+    accessor = {
+        "bufferView": 0,
+        "byteOffset": accessor_offset,
+        "componentType": 5126,
+        "count": count,
+        "type": "VEC3",
+    }
+    if with_min_max:
+        accessor["min"] = [-1, -2, -3]
+        accessor["max"] = [4, 5, 6]
+    view = {"buffer": 0, "byteOffset": view_offset, "byteLength": view_length}
+    if stride is not None:
+        view["byteStride"] = stride
+    return {
+        "asset": {"version": "2.0"},
+        "buffers": [{"byteLength": buffer_length}],
+        "bufferViews": [view],
+        "accessors": [accessor],
+        "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+    }
+
+
 def valid_sidecar(*, kind: str = "component", path: str | None = None) -> dict:
     visual_path = path or "res://assets/imported/props/components/reactor_console.glb"
     return {
@@ -146,6 +178,12 @@ class PropVisualMetadataTests(unittest.TestCase):
         errors = validate_sidecar(load_fixture("invalid_parent_path.sidecar.json"), REACTOR_GLB, PROJECT_ROOT)
         self.assertIn("path must be a contained res:// path", "\n".join(errors))
 
+    def test_sidecar_rejects_glb_outside_project_root_and_still_compares_visual_path(self) -> None:
+        outside_glb = Path(tempfile.gettempdir()) / "reactor_console.glb"
+        errors = validate_sidecar(valid_sidecar(), outside_glb, PROJECT_ROOT)
+        self.assertIn("GLB path must be contained in project root", errors)
+        self.assertTrue(any(error.startswith("visual_scene_path must match GLB path:") for error in errors))
+
     def test_sidecar_rejects_component_gameplay_fields(self) -> None:
         errors = validate_sidecar(load_fixture("invalid_gameplay_field.sidecar.json"), REACTOR_GLB, PROJECT_ROOT)
         self.assertIn("forbidden gameplay field: mass", errors)
@@ -170,6 +208,26 @@ class PropVisualMetadataTests(unittest.TestCase):
                 "duplicate binding id: reactor_console",
                 "unknown root field: unexpected",
             ],
+        )
+
+    def test_sidecar_semver_rejects_leading_zero_segments_in_validator_and_schema(self) -> None:
+        schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+        matcher = re.compile(schema["properties"]["schema_version"]["pattern"])
+        for version in ("01.0.0", "1.01.0", "1.0.01"):
+            with self.subTest(version=version):
+                self.assertIsNone(matcher.fullmatch(version))
+                sidecar = valid_sidecar()
+                sidecar["schema_version"] = version
+                self.assertEqual(validate_sidecar(sidecar, REACTOR_GLB, PROJECT_ROOT), [
+                    "schema_version must use major.minor.patch",
+                ])
+
+    def test_sidecar_duplicate_binding_ids_are_reported_in_sorted_order(self) -> None:
+        sidecar = valid_sidecar()
+        sidecar["binding"]["ids"] = ["zeta", "alpha", "zeta", "alpha"]
+        self.assertEqual(
+            validate_sidecar(sidecar, REACTOR_GLB, PROJECT_ROOT),
+            ["duplicate binding id: alpha", "duplicate binding id: zeta"],
         )
 
     def test_sidecar_rejects_absolute_path_and_basename_mismatch(self) -> None:
@@ -242,6 +300,58 @@ class PropVisualMetadataTests(unittest.TestCase):
         self.assertEqual(record["local_min_m"], [-2.0, -3.0, -4.0])
         self.assertEqual(record["local_max_m"], [5.0, 6.0, 7.0])
 
+    def test_glb_enforces_declared_bin_length_and_zero_padding(self) -> None:
+        document = {
+            "asset": {"version": "2.0"},
+            "buffers": [{"byteLength": 4}],
+            "accessors": [{
+                "componentType": 5126,
+                "count": 1,
+                "type": "VEC3",
+                "min": [-1, -2, -3],
+                "max": [4, 5, 6],
+            }],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+        }
+        cases = {
+            "short": (5, b"\0" * 4, True),
+            "too_much_padding": (0, b"\0" * 4, True),
+            "nonzero_padding": (3, b"\0\0\0\x01", True),
+            "one_zero_padding_byte": (3, b"\0" * 4, False),
+            "exact_length": (4, b"\0" * 4, False),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name, (declared_length, binary, invalid) in cases.items():
+                with self.subTest(name=name):
+                    case_document = {**document, "buffers": [{"byteLength": declared_length}]}
+                    path = root / f"{name}.glb"
+                    path.write_bytes(make_glb(case_document, binary))
+                    if invalid:
+                        with self.assertRaises(ValueError):
+                            read_glb_metadata(path)
+                    else:
+                        self.assertEqual(read_glb_metadata(path)["mesh_count"], 1)
+
+    def test_glb_rejects_nonstandard_json_constants(self) -> None:
+        base = (
+            b'{"asset":{"version":"2.0"},"extras":'
+            + b"TOKEN"
+            + b',"accessors":[{"componentType":5126,"count":1,"type":"VEC3",'
+            b'"min":[-1,-2,-3],"max":[4,5,6]}],"meshes":[{"primitives":['
+            b'{"attributes":{"POSITION":0}}]}]}'
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for token in (b"NaN", b"Infinity", b"-Infinity"):
+                with self.subTest(token=token):
+                    payload = base.replace(b"TOKEN", token)
+                    payload += b" " * ((-len(payload)) % 4)
+                    path = root / f"{token.decode('ascii').replace('-', 'negative_')}.glb"
+                    path.write_bytes(make_raw_glb([(b"JSON", payload)]))
+                    with self.assertRaises(ValueError):
+                        read_glb_metadata(path)
+
     def test_glb_rejects_non_2_0_asset_version(self) -> None:
         document = {
             "asset": {"version": "1.0"},
@@ -306,6 +416,31 @@ class PropVisualMetadataTests(unittest.TestCase):
             scan_path.write_bytes(make_glb(scan_document, struct.pack("<3f", 1, 2, 3)))
             with self.assertRaises(ValueError):
                 read_glb_metadata(scan_path)
+
+    def test_glb_rejects_position_layouts_outside_declared_buffer_or_with_invalid_stride(self) -> None:
+        cases = {
+            "view_extends_declared_buffer": (position_document(buffer_length=12, view_length=16), b"\0" * 12),
+            "unaligned_view_offset": (position_document(buffer_length=16, view_offset=1), b"\0" * 16),
+            "unaligned_accessor_offset": (position_document(buffer_length=16, view_length=16, accessor_offset=2), b"\0" * 16),
+            "unaligned_stride": (position_document(count=2, buffer_length=28, view_length=28, stride=13), b"\0" * 28),
+            "too_large_stride": (position_document(count=2, buffer_length=268, view_length=268, stride=256), b"\0" * 268),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name, (document, binary) in cases.items():
+                with self.subTest(name=name):
+                    path = root / f"{name}.glb"
+                    path.write_bytes(make_glb(document, binary))
+                    with self.assertRaises(ValueError):
+                        read_glb_metadata(path)
+
+    def test_glb_validates_layout_even_when_position_bounds_are_declared(self) -> None:
+        document = position_document(buffer_length=12, view_length=16, with_min_max=True)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invalid_declared_bounds_layout.glb"
+            path.write_bytes(make_glb(document, b"\0" * 12))
+            with self.assertRaises(ValueError):
+                read_glb_metadata(path)
 
     def test_glb_rejects_overflowing_accessor_bounds_as_value_error(self) -> None:
         huge = 10**4000
