@@ -52,6 +52,24 @@ static func create_objective_visual(binding: Dictionary) -> Node3D:
 	return _create_imported_visual(binding)
 
 
+static func _instantiate_visual_scene(path: String) -> Node:
+	if not FileAccess.file_exists(path):
+		return null
+	# Prefer Godot's imported PackedScene when the editor/import preflight has
+	# populated the current state. Protected state-isolated smokes may not retain
+	# that generated cache between invocations, so load the canonical GLB directly
+	# as the deterministic fallback instead of treating a valid asset as missing.
+	if ResourceLoader.exists(path, "PackedScene"):
+		var packed: PackedScene = ResourceLoader.load(path, "PackedScene") as PackedScene
+		if packed != null:
+			return packed.instantiate()
+	var document := GLTFDocument.new()
+	var state := GLTFState.new()
+	if document.append_from_file(ProjectSettings.globalize_path(path), state) != OK:
+		return null
+	return document.generate_scene(state)
+
+
 static func clear_imported_visuals(root: Node) -> void:
 	if root == null:
 		return
@@ -89,14 +107,7 @@ static func _create_imported_visual(binding: Dictionary) -> Node3D:
 	if not _is_safe_binding(binding):
 		return null
 	var path: String = str(binding["visual_scene_path"])
-	if not FileAccess.file_exists(path):
-		return null
-	if not ResourceLoader.exists(path, "PackedScene"):
-		return null
-	var packed: PackedScene = ResourceLoader.load(path, "PackedScene") as PackedScene
-	if packed == null:
-		return null
-	var instance: Node = packed.instantiate()
+	var instance: Node = _instantiate_visual_scene(path)
 	if instance == null:
 		return null
 	var visual: Node3D = instance as Node3D
