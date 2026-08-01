@@ -205,7 +205,7 @@ Expected: `ASSET METADATA GOVERNANCE DOCS PASS` and one focused documentation co
 
 - [ ] **Step 0: Establish the pre-mutation worktree guard and one isolated Godot state runner**
 
-Run this once, before any Task 2 fixture/code mutation and before the first Task 2 Godot command. It is the only setup helper: it writes one executable Python standard-library runner outside the repository at a deterministic path derived from the SHA-256 of `$PWD`. The runner creates and removes one temporary per-invocation snapshot directory below that external directory; it never writes a helper or snapshot into the repository. The clean precondition covers all 14 owned paths, including staged, unstaged, and untracked changes, plus the broad structural source paths. Do not replace these checks with `git restore`, `git clean`, or a generated-state `git status` check.
+Run this once, before any Task 2 fixture/code mutation and before the first Task 2 Godot command. It is the only setup helper: it writes one executable Python standard-library runner outside the repository at a deterministic path derived from the SHA-256 of `$PWD`. The runner creates and removes one temporary per-invocation snapshot directory below that external directory; it never writes a helper or snapshot into the repository. The clean precondition covers all 14 owned paths, including staged, unstaged, untracked, and ignored changes, plus the broad structural source paths and their ignored artifacts. The precondition and every later runner fence reject a symlink/nonregular/stale `STATE_RUNNER` without unlinking it. Do not replace these checks with `git restore`, `git clean`, or a generated-state `git status` check.
 
 ```bash
 set -euo pipefail
@@ -236,13 +236,17 @@ if (( ${#TASK2_PATHS[@]} != 14 )); then
   exit 1
 fi
 owned_status=$(git status --porcelain=v1 --untracked-files=all -- "${TASK2_PATHS[@]}")
-if [[ -n "$owned_status" ]]; then
-  printf 'Task 2 owned paths are not clean before work begins:\n%s\n' "$owned_status" >&2
+owned_ignored=$(git ls-files --others --ignored --exclude-standard -- "${TASK2_PATHS[@]}")
+if [[ -n "$owned_status" || -n "$owned_ignored" ]]; then
+  printf 'Task 2 owned paths are not clean before work begins. Porcelain:\n%s\nIgnored owned paths:\n%s\n' \
+    "$owned_status" "$owned_ignored" >&2
   exit 1
 fi
 source_status=$(git status --porcelain=v1 --untracked-files=all -- "${STRUCTURAL_SOURCE_PATHS[@]}")
-if [[ -n "$source_status" ]]; then
-  printf 'structural source paths are not clean before work begins:\n%s\n' "$source_status" >&2
+source_ignored=$(git ls-files --others --ignored --exclude-standard -- "${STRUCTURAL_SOURCE_PATHS[@]}")
+if [[ -n "$source_status" || -n "$source_ignored" ]]; then
+  printf 'structural source paths are not clean before work begins. Porcelain:\n%s\nIgnored source paths:\n%s\n' \
+    "$source_status" "$source_ignored" >&2
   exit 1
 fi
 
@@ -269,6 +273,10 @@ print(candidate)
 PY
 )
 STATE_HOME="$TEMP_BASE/synaptic-sea-task2-${WORKTREE_DIGEST}"
+if [[ -L "$STATE_HOME" || ( -e "$STATE_HOME" && ! -d "$STATE_HOME" ) ]]; then
+  printf 'STATE_HOME must not be a symlink or non-directory: %s\n' "$STATE_HOME" >&2
+  exit 1
+fi
 STATE_HOME=$(python3 - "$STATE_HOME" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
@@ -292,6 +300,19 @@ PY
 )
 STATE_RUNNER="$STATE_HOME/state_runner.py"
 PRECONDITION_RECORD="$STATE_HOME/step0-precondition.txt"
+# Never follow or replace a stale state path. The real-directory and absent-path
+# checks are intentionally fail-closed; no unlink/rm is allowed here.
+if [[ ! -d "$STATE_HOME" || -L "$STATE_HOME" ]]; then
+  printf 'STATE_HOME must already be a real directory: %s\n' "$STATE_HOME" >&2
+  exit 1
+fi
+if [[ -e "$STATE_RUNNER" || -L "$STATE_RUNNER" ]]; then
+  printf 'refusing to overwrite pre-existing STATE_RUNNER: %s\n' "$STATE_RUNNER" >&2
+  exit 1
+fi
+# Keep the explicit predicate above and make the write itself no-clobber so a
+# stale path created between the check and redirection also fails closed.
+set -o noclobber
 cat >"$STATE_RUNNER" <<'PY'
 #!/usr/bin/env python3
 from __future__ import annotations
@@ -439,6 +460,7 @@ def snapshot(root: Path, snapshot_root: Path) -> dict[str, object]:
         shutil.copy2(source, destination)
     if bool(generated["godot_exists"]):
         shutil.copytree(root / ".godot", snapshot_root / "godot", symlinks=True)
+    maybe_test_signal(root, "STATE_RUNNER_SYNTHETIC_GENERATED_SIGNAL", "generated")
     return generated
 
 
@@ -447,7 +469,7 @@ def launch_child(
     root: Path,
     child_slot: list[subprocess.Popen | None],
 ) -> subprocess.Popen:
-    launched = subprocess.Popen(command, cwd=root)
+    launched = subprocess.Popen(command, cwd=root, start_new_session=True)
     # Publish the handle before the synthetic launch-boundary hook can raise.
     child_slot[0] = launched
     maybe_test_signal(root, "STATE_RUNNER_SYNTHETIC_LAUNCH_SIGNAL", "launch")
@@ -477,32 +499,39 @@ def restore_and_verify(root: Path, snapshot_root: Path, generated: dict[str, obj
         raise RuntimeError("restored generated state differs from the initial path/hash/mode manifest")
 
 
-class RunnerInterrupted(Exception):
-    def __init__(self, signum: int):
-        self.signum = signum
-        super().__init__(f"interrupted by signal {signum}")
-
-
 def interruption_status(signum: int) -> int:
     if signum == signal.SIGTERM:
         return 143
     return 130
 
 
-def request_interrupt(signum: int, _frame: object) -> None:
-    raise RunnerInterrupted(signum)
-
-
 def terminate_and_reap(process: subprocess.Popen) -> None:
-    if process.poll() is None:
-        process.terminate()
+    """Terminate the published process group, then reap the leader."""
+    process_group = process.pid
+    try:
         try:
-            process.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            process.kill()
-    # wait() is also required when the child already exited, so the handle is
-    # always reaped rather than merely observed with poll().
-    process.wait()
+            os.killpg(process_group, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        deadline = time.monotonic() + 2.0
+        while process.poll() is None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            try:
+                process.wait(timeout=min(0.1, remaining))
+            except subprocess.TimeoutExpired:
+                pass
+        # The leader may have exited while a descendant remains. Always issue
+        # the group fallback before restoration, not only while the leader runs.
+        try:
+            os.killpg(process_group, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    finally:
+        # wait() is required even after poll() so the published leader is
+        # reaped rather than merely observed.
+        process.wait()
 
 
 def main(argv: list[str]) -> int:
@@ -517,7 +546,13 @@ def main(argv: list[str]) -> int:
 
     watched_signals = (signal.SIGINT, signal.SIGTERM)
     previous_handlers = {signum: signal.getsignal(signum) for signum in watched_signals}
+    pending_signal: list[int | None] = [None]
     for signum in watched_signals:
+        # The handler must never raise: a signal can arrive during Popen before
+        # its return value is assigned. Record it and let the lifecycle map it.
+        def request_interrupt(received: int, _frame: object) -> None:
+            if pending_signal[0] is None:
+                pending_signal[0] = received
         signal.signal(signum, request_interrupt)
 
     primary_status = 0
@@ -533,23 +568,30 @@ def main(argv: list[str]) -> int:
     cleanup_status = 0
     restore_completed = False
 
-    def remember_interrupt(exc: BaseException) -> None:
+    def remember_keyboard_interrupt() -> None:
         nonlocal primary_status
-        if isinstance(exc, RunnerInterrupted):
-            status = interruption_status(exc.signum)
-        elif isinstance(exc, KeyboardInterrupt):
-            status = 130
-        else:
-            return
         if primary_status == 0:
-            primary_status = status
-        print(f"STATE RUNNER: {exc}", file=sys.stderr)
+            primary_status = 130
+        print("STATE RUNNER: KeyboardInterrupt", file=sys.stderr)
+
+    def check_pending_signal(phase: str) -> bool:
+        nonlocal primary_status
+        signum = pending_signal[0]
+        if signum is None:
+            return False
+        pending_signal[0] = None
+        if primary_status == 0:
+            primary_status = interruption_status(signum)
+        print(f"STATE RUNNER: pending signal {signum} during {phase}", file=sys.stderr)
+        return True
 
     try:
         try:
             initial_sources = collect_sources(root)
-        except (RunnerInterrupted, KeyboardInterrupt) as exc:
-            remember_interrupt(exc)
+            maybe_test_signal(root, "STATE_RUNNER_SYNTHETIC_SOURCE_SIGNAL", "source")
+            check_pending_signal("after source baseline")
+        except KeyboardInterrupt:
+            remember_keyboard_interrupt()
         except Exception as exc:
             print(f"STATE RUNNER: source baseline failed: {exc}", file=sys.stderr)
             source_status = 1
@@ -560,8 +602,9 @@ def main(argv: list[str]) -> int:
                 state_root.mkdir(parents=True, exist_ok=True)
                 snapshot_root = Path(tempfile.mkdtemp(prefix="invocation-", dir=state_root))
                 snapshot_state = snapshot(root, snapshot_root)
-            except (RunnerInterrupted, KeyboardInterrupt) as exc:
-                remember_interrupt(exc)
+                check_pending_signal("after generated snapshot")
+            except KeyboardInterrupt:
+                remember_keyboard_interrupt()
             except Exception as exc:
                 print(f"STATE RUNNER: snapshot failed: {exc}", file=sys.stderr)
                 snapshot_status = 1
@@ -570,42 +613,72 @@ def main(argv: list[str]) -> int:
         if primary_status == 0 and snapshot_state is not None:
             try:
                 child = launch_child(argv[2:], root, child_slot)
-                primary_status = child.wait()
-                child_reaped = True
-            except (RunnerInterrupted, KeyboardInterrupt) as exc:
-                remember_interrupt(exc)
+                # Popen has returned and the handle is published before this
+                # check, so an intervening signal cannot orphan the group.
+                check_pending_signal("after Popen handle publication")
+                while child.poll() is None and primary_status == 0:
+                    check_pending_signal("child wait loop")
+                    if primary_status != 0:
+                        break
+                    try:
+                        child.wait(timeout=0.1)
+                    except subprocess.TimeoutExpired:
+                        continue
+                if primary_status == 0:
+                    child_status = child.wait()
+                    # Check before publishing child_reaped: a signal that lands
+                    # as the leader exits must still trigger group teardown.
+                    check_pending_signal("after child wait")
+                    if primary_status == 0:
+                        primary_status = child_status
+                        child_reaped = True
+                else:
+                    check_pending_signal("after child wait")
+            except KeyboardInterrupt:
+                remember_keyboard_interrupt()
             except OSError as exc:
                 print(f"STATE RUNNER: command launch failed: {exc}", file=sys.stderr)
                 primary_status = 127
             except Exception as exc:
                 print(f"STATE RUNNER: command execution failed: {exc}", file=sys.stderr)
                 primary_status = 1
+    except KeyboardInterrupt:
+        remember_keyboard_interrupt()
+    except Exception as exc:
+        print(f"STATE RUNNER: lifecycle failed: {exc}", file=sys.stderr)
+        if primary_status == 0:
+            primary_status = 1
     finally:
-        # SIGINT/SIGTERM are caught through snapshot, launch, and wait, then
-        # ignored during teardown/restore so a second signal cannot strand the
-        # child or replace the original command/signal status.
-        for signum in watched_signals:
-            signal.signal(signum, signal.SIG_IGN)
-
+        # Keep the recording handler installed through teardown. Each phase is
+        # checked below, so a signal during restore/verification suppresses the
+        # marker and maps to 130/143 instead of jumping into a nested finally.
         if child is None:
             child = child_slot[0]
-        if child is not None and not child_reaped:
+        if child is not None and (
+            not child_reaped or primary_status != 0 or pending_signal[0] is not None
+        ):
             try:
                 terminate_and_reap(child)
                 child_reaped = True
-            except BaseException as exc:
-                remember_interrupt(exc)
+            except KeyboardInterrupt:
+                remember_keyboard_interrupt()
+                cleanup_status = 1
+            except Exception as exc:
                 print(f"STATE RUNNER: child teardown failed: {exc}", file=sys.stderr)
                 cleanup_status = 1
+        check_pending_signal("after child group teardown")
 
         if snapshot_state is not None and snapshot_root is not None:
             try:
                 restore_and_verify(root, snapshot_root, snapshot_state)
                 restore_completed = True
-            except BaseException as exc:
-                remember_interrupt(exc)
+            except KeyboardInterrupt:
+                remember_keyboard_interrupt()
+                restore_status = 1
+            except Exception as exc:
                 print(f"STATE RUNNER: generated-state restore failed: {exc}", file=sys.stderr)
                 restore_status = 1
+        check_pending_signal("after generated-state restore")
 
         # Source verification is deliberately unconditional: source integrity
         # is independent of whether snapshot_state was completed.
@@ -616,21 +689,39 @@ def main(argv: list[str]) -> int:
             if current_sources != initial_sources:
                 print("STATE RUNNER: structural source paths changed during invocation", file=sys.stderr)
                 source_status = 1
-        except BaseException as exc:
-            remember_interrupt(exc)
+        except KeyboardInterrupt:
+            remember_keyboard_interrupt()
+            source_status = 1
+        except Exception as exc:
             print(f"STATE RUNNER: structural source inspection failed: {exc}", file=sys.stderr)
             source_status = 1
+        check_pending_signal("after unconditional source verification")
 
         if snapshot_root is not None:
             try:
                 shutil.rmtree(snapshot_root)
-            except BaseException as exc:
-                remember_interrupt(exc)
+            except KeyboardInterrupt:
+                remember_keyboard_interrupt()
+                cleanup_status = 1
+            except Exception as exc:
                 print(f"STATE RUNNER: temporary snapshot cleanup failed: {exc}", file=sys.stderr)
                 cleanup_status = 1
+        check_pending_signal("after temporary snapshot cleanup")
 
+        # The synthetic teardown hook runs after restore/verification and proves
+        # that a late signal is still observed before marker eligibility.
+        if os.environ.get("STATE_RUNNER_SYNTHETIC_TEARDOWN_SIGNAL"):
+            maybe_test_signal(root, "STATE_RUNNER_SYNTHETIC_TEARDOWN_SIGNAL", "teardown")
+        check_pending_signal("before marker")
+        # Close the tiny post-check race: a signal delivered before this ignore
+        # remains pending and is checked below; signals after the lifecycle is
+        # complete cannot make a success marker retroactively invalid.
+        for signum in watched_signals:
+            signal.signal(signum, signal.SIG_IGN)
+        check_pending_signal("marker gate")
         if (
             primary_status == 0
+            and pending_signal[0] is None
             and snapshot_state is not None
             and restore_completed
             and snapshot_status == 0
@@ -651,9 +742,10 @@ def main(argv: list[str]) -> int:
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))
 PY
+set +o noclobber
 chmod 700 "$STATE_RUNNER"
-if [[ ! -x "$STATE_RUNNER" ]]; then
-  printf 'state runner was not created executable\n' >&2
+if [[ ! -f "$STATE_RUNNER" || -L "$STATE_RUNNER" || ! -x "$STATE_RUNNER" ]]; then
+  printf 'state runner was not created as a non-symlink executable regular file\n' >&2
   exit 1
 fi
 python3 - "$STATE_RUNNER" <<'PY'
@@ -668,9 +760,22 @@ from pathlib import Path
 
 RUNNER = Path(sys.argv[1])
 MARKER = "GENERATED STATE RESTORE VERIFIED"
-MUTATE = """
+DESCENDANT_MUTATOR = """
+from pathlib import Path
+import signal
+import time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+time.sleep(0.25)
+(Path.cwd() / ".godot" / "descendant-mutated-after-restore.txt").write_text("mutated")
+while True:
+    time.sleep(30)
+"""
+MUTATE = f"""
 from pathlib import Path
 import os
+import signal
+import subprocess
+import sys
 import time
 root = Path.cwd()
 (root / ".godot").mkdir(exist_ok=True)
@@ -679,6 +784,10 @@ root = Path.cwd()
 pid_file = os.environ.get("SYN_CHILD_PID_FILE")
 if pid_file:
     Path(pid_file).write_text(str(os.getpid()))
+descendant = subprocess.Popen([sys.executable, "-c", {DESCENDANT_MUTATOR!r}])
+descendant_pid_file = os.environ.get("SYN_DESCENDANT_PID_FILE")
+if descendant_pid_file:
+    Path(descendant_pid_file).write_text(str(descendant.pid))
 if os.environ.get("SYN_CHILD_SOURCE_FAIL") == "1":
     (root / "scenes" / "wrappers" / "structural" / "child-changed.txt").write_text("changed")
 (root / ".godot" / "started").write_text("ready")
@@ -740,6 +849,7 @@ def invoke(
     environment = os.environ.copy()
     environment["SYN_STATE_HOME"] = str(state_home)
     environment["SYN_CHILD_PID_FILE"] = str(state_home / "child.pid")
+    environment["SYN_DESCENDANT_PID_FILE"] = str(state_home / "descendant.pid")
     environment["SYN_CHILD_READY_FILE"] = str(state_home / "child.ready")
     environment["STATE_RUNNER_SYNTHETIC_READY_FILE"] = str(state_home / "child.ready")
     if environment_overrides:
@@ -812,6 +922,96 @@ def assert_reaped(state_home):
     raise AssertionError(f"child {pid} remains after runner exit")
 
 
+def assert_group_gone(state_home, repository):
+    descendant_pid = int((state_home / "descendant.pid").read_text())
+    time.sleep(0.5)
+    try:
+        os.kill(descendant_pid, 0)
+    except ProcessLookupError:
+        pass
+    else:
+        raise AssertionError(f"descendant {descendant_pid} remains after group teardown")
+    assert not (repository / ".godot" / "descendant-mutated-after-restore.txt").exists()
+
+
+def accepts_step0_runner_path(state_home, runner):
+    return state_home.is_dir() and not state_home.is_symlink() and not runner.exists() and not runner.is_symlink()
+
+
+def accepts_fence_runner_path(runner):
+    return runner.is_file() and not runner.is_symlink() and os.access(runner, os.X_OK)
+
+
+def assert_path_guards():
+    with tempfile.TemporaryDirectory() as temporary_name:
+        root = Path(temporary_name)
+        real_home = root / "real-home"
+        real_home.mkdir()
+        absent_runner = real_home / "state_runner.py"
+        assert accepts_step0_runner_path(real_home, absent_runner)
+
+        symlink_target = root / "symlink-target"
+        symlink_target.write_text("must survive")
+        stale_link = real_home / "state_runner-link.py"
+        stale_link.symlink_to(symlink_target)
+        assert not accepts_step0_runner_path(real_home, stale_link)
+        assert stale_link.is_symlink() and symlink_target.read_text() == "must survive"
+
+        stale_directory = real_home / "state_runner-dir.py"
+        stale_directory.mkdir()
+        assert not accepts_step0_runner_path(real_home, stale_directory)
+        assert stale_directory.is_dir()
+
+        real_runner = real_home / "state_runner-real.py"
+        real_runner.write_text("#!/usr/bin/env python3\n")
+        real_runner.chmod(0o700)
+        assert accepts_fence_runner_path(real_runner)
+        assert not accepts_fence_runner_path(stale_link)
+        assert not accepts_fence_runner_path(stale_directory)
+
+        home_link = root / "home-link"
+        home_link.symlink_to(real_home, target_is_directory=True)
+        assert not accepts_step0_runner_path(home_link, home_link / "new.py")
+
+
+assert_path_guards()
+
+
+def assert_ignored_owned_precondition():
+    with tempfile.TemporaryDirectory() as temporary_name:
+        repository = Path(temporary_name) / "repo"
+        repository.mkdir()
+        subprocess.run(["git", "init", "-q", str(repository)], check=True)
+        owned = Path("tests/fixtures/structural_variant_wrappers/ignored-owner.tscn")
+        (repository / ".gitignore").write_text(owned.as_posix() + "\n")
+        ignored_path = repository / owned
+        ignored_path.parent.mkdir(parents=True)
+        ignored_path.write_text("must be rejected before adoption")
+        porcelain = subprocess.run(
+            ["git", "-C", str(repository), "status", "--porcelain=v1", "--untracked-files=all", "--", owned.as_posix()],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        ignored = subprocess.run(
+            ["git", "-C", str(repository), "ls-files", "--others", "--ignored", "--exclude-standard", "--", owned.as_posix()],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        assert porcelain == ""
+        assert ignored.splitlines() == [owned.as_posix()]
+        assert porcelain or ignored, "combined owned precondition failed to detect ignored artifact"
+
+
+assert_ignored_owned_precondition()
+
+runner_source = RUNNER.read_text()
+assert ("class Runner" + "Interrupted") not in runner_source
+assert ("raise Runner" + "Interrupted") not in runner_source
+assert "start_new_session=True" in runner_source
+assert "os.killpg(process.pid" in runner_source or "os.killpg(process_group" in runner_source
+
 # A relative TMPDIR and a symlink resolving into a repository are both rejected
 # by the same canonical root/containment rule used by Step 0.
 with tempfile.TemporaryDirectory() as temporary_name:
@@ -883,8 +1083,8 @@ for primary_status in (0, 7):
     finally:
         temporary.cleanup()
 
-# SIGINT during snapshot: no snapshot_state exists, but the broad source
-# check still runs and the interrupted path cannot emit the success marker.
+# SIGINT after the source baseline: no generated snapshot exists, but the
+# unconditional source check still runs and the interrupted path cannot emit a marker.
 temporary, repository, state_home, runner = make_fixture(True)
 try:
     status, _stdout, stderr = invoke(
@@ -894,18 +1094,38 @@ try:
         "pass",
         environment_overrides={
             "STATE_RUNNER_SYNTHETIC_HOOK": "1",
-            "STATE_RUNNER_SYNTHETIC_SNAPSHOT_SIGNAL": str(signal.SIGINT.value),
-            "STATE_RUNNER_SYNTHETIC_MUTATE_SOURCE": "snapshot",
+            "STATE_RUNNER_SYNTHETIC_SOURCE_SIGNAL": str(signal.SIGINT.value),
         },
     )
     assert status == 130, (status, stderr)
+    assert_interrupted(stderr, status, source_check=False)
+    assert_state(repository, True)
+finally:
+    temporary.cleanup()
+
+# SIGTERM after the generated snapshot: restoration still runs, source changes
+# are detected, and the pending signal wins over the would-be marker.
+temporary, repository, state_home, runner = make_fixture(True)
+try:
+    status, _stdout, stderr = invoke(
+        repository,
+        state_home,
+        runner,
+        "pass",
+        environment_overrides={
+            "STATE_RUNNER_SYNTHETIC_HOOK": "1",
+            "STATE_RUNNER_SYNTHETIC_GENERATED_SIGNAL": str(signal.SIGTERM.value),
+            "STATE_RUNNER_SYNTHETIC_MUTATE_SOURCE": "generated",
+        },
+    )
+    assert status == 143, (status, stderr)
     assert_interrupted(stderr, status)
     assert_state(repository, True)
 finally:
     temporary.cleanup()
 
 # SIGTERM immediately after Popen: the handle is published before the hook,
-# so finally must terminate and reap the child before restoring the snapshot.
+# so finally must terminate and reap the complete process group before restore.
 temporary, repository, state_home, runner = make_fixture(True)
 try:
     status, _stdout, stderr = invoke(
@@ -922,13 +1142,14 @@ try:
     assert status == 143, (status, stderr)
     assert_interrupted(stderr, status)
     assert_reaped(state_home)
+    assert_group_gone(state_home, repository)
     assert_state(repository, True)
 finally:
     temporary.cleanup()
 
-# Signals during wait cover both conventional interruption statuses. The child
-# changes a protected source path before the parent signal, proving the source
-# check is independent of the generated-state snapshot/restore branch.
+# Signals during the child wait loop cover both conventional interruption
+# statuses. The child changes a protected source path before the parent signal,
+# proving source verification is independent of snapshot restoration.
 for signum, expected_status in ((signal.SIGINT, 130), (signal.SIGTERM, 143)):
     temporary, repository, state_home, runner = make_fixture(True)
     try:
@@ -944,9 +1165,30 @@ for signum, expected_status in ((signal.SIGINT, 130), (signal.SIGTERM, 143)):
         assert status == expected_status, (signum, status, stderr)
         assert_interrupted(stderr, status)
         assert_reaped(state_home)
+        assert_group_gone(state_home, repository)
         assert_state(repository, True)
     finally:
         temporary.cleanup()
+
+# A signal injected during teardown/restore is recorded by the non-raising
+# handler and checked before marker eligibility.
+temporary, repository, state_home, runner = make_fixture(True)
+try:
+    status, _stdout, stderr = invoke(
+        repository,
+        state_home,
+        runner,
+        "pass",
+        environment_overrides={
+            "STATE_RUNNER_SYNTHETIC_HOOK": "1",
+            "STATE_RUNNER_SYNTHETIC_TEARDOWN_SIGNAL": str(signal.SIGINT.value),
+        },
+    )
+    assert status == 130, (status, stderr)
+    assert_interrupted(stderr, status, source_check=False)
+    assert_state(repository, True)
+finally:
+    temporary.cleanup()
 
 print("STATE RUNNER SYNTHETIC PASS")
 PY
@@ -954,7 +1196,7 @@ printf '%s\n%s\n' "$PWD" "$(git rev-parse HEAD)" >"$PRECONDITION_RECORD"
 printf 'TASK2 STEP0 READY state_runner=%s paths=14 source_guard=3\n' "$STATE_RUNNER"
 ```
 
-The runner snapshots, for each invocation independently, every regular file below `.godot` (including tracked and ignored content) and every regular external `*.import` file outside `.godot` and `.git`, with deterministic relative POSIX paths, SHA-256 digests, modes, and full temporary copies. It fingerprints every entry below `scenes/wrappers/structural`, `assets/_processed`, and `assets/imported/structural` before the generated-state snapshot and verifies those source fingerprints unconditionally in `finally`, even when snapshot creation did not complete. It installs SIGINT/SIGTERM handlers before snapshot setup, covers snapshot, `Popen(...)` launch, `wait()`, and teardown, terminates and reaps any published child handle with timeout/kill fallback, and maps SIGINT, SIGTERM, and `KeyboardInterrupt` to conventional primary statuses `130` and `143`. A snapshot-complete invocation always attempts generated-state restoration and manifest comparison after command failure or interruption; a primary command/signal/snapshot/launch error wins over restore, source, or cleanup errors, while those cleanup errors control the status only when primary execution was otherwise successful. Cleanup temporarily ignores a second SIGINT/SIGTERM so it cannot strand the child or replace the original status, then restores the prior handlers. The only runner-generated success line is exactly one plain `GENERATED STATE RESTORE VERIFIED` line on stderr when `primary_status == 0`, snapshot state exists, restoration completed and compared, broad source verification passed, and temporary-snapshot removal succeeded; no command failure, interruption, launch/snapshot error, restore/source error, or cleanup error can emit it. All runner diagnostics are prefixed `STATE RUNNER:` and none begins with `ERROR:` or `WARNING:`. The executable synthetic test above covers present and absent state, ordinary command failure without a marker, restore/source failures with primary-status preservation, canonical relative/symlinked TMPDIR rejection, SIGINT during snapshot, SIGTERM at the post-`Popen` launch boundary, SIGINT/SIGTERM during wait, source verification on every interrupted phase, restoration after completed snapshots, and child reaping.
+The runner snapshots, for each invocation independently, every regular file below `.godot` (including tracked and ignored content) and every regular external `*.import` file outside `.godot` and `.git`, with deterministic relative POSIX paths, SHA-256 digests, modes, and full temporary copies. It fingerprints every entry below `scenes/wrappers/structural`, `assets/_processed`, and `assets/imported/structural` before the generated-state snapshot and verifies those source fingerprints unconditionally in `finally`, even when snapshot creation did not complete. It installs non-raising SIGINT/SIGTERM handlers before source setup, covers source baseline, generated snapshot, `Popen(..., start_new_session=True)` publication, polling/wait, and teardown, and maps pending SIGINT, pending SIGTERM, and `KeyboardInterrupt` to conventional primary statuses `130` and `143`. `check_pending_signal()` runs after the source baseline, after the generated snapshot, immediately after the published Popen handle, in the child wait loop, and after every teardown/verification phase; the non-raising handler prevents an orphan if a signal lands before Popen returns. A snapshot-complete invocation always attempts generated-state restoration and manifest comparison after command failure or interruption; a primary command/signal/snapshot/launch error wins over restore, source, or cleanup errors, while those cleanup errors control the status only when primary execution was otherwise successful. Teardown uses `os.killpg(process.pid, SIGTERM)`, waits boundedly, sends `SIGKILL` to the same group even if the leader already exited, and then reaps the leader, so descendants cannot mutate state after restoration. The success marker is gated only after the final pending-signal check and is exactly one plain `GENERATED STATE RESTORE VERIFIED` line on stderr when `primary_status == 0`, snapshot state exists, restoration completed and compared, broad source verification passed, and temporary-snapshot removal succeeded; no command failure, interruption, launch/snapshot error, restore/source error, or cleanup error can emit it. All runner diagnostics are prefixed `STATE RUNNER:` and none begins with `ERROR:` or `WARNING:`. The synthetic test above covers present and absent state, ordinary command failure without a marker, restore/source failures with primary-status preservation, canonical root/containment checks, source and generated-snapshot signals, launch-boundary and wait-loop SIGINT/SIGTERM, teardown-time signal, a child-launched delayed descendant that ignores SIGTERM, full process-group cleanup, no post-restore descendant mutation, and exactly one marker only for a clean invocation. It also statically rejects `RunnerInterrupted`/raising handlers and verifies `start_new_session=True` plus `os.killpg`.
 
 - [ ] **Step 1: Execute the validator red gate and construct fixture-based negative coverage**
 
@@ -988,6 +1230,10 @@ print(candidate)
 PY
 )
   local state_home="$TEMP_BASE/synaptic-sea-task2-${WORKTREE_DIGEST}"
+  if [[ -L "$state_home" || ( -e "$state_home" && ! -d "$state_home" ) ]]; then
+    printf 'STATE_HOME must not be a symlink or non-directory: %s\n' "$state_home" >&2
+    exit 1
+  fi
   STATE_HOME=$(python3 - "$state_home" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
@@ -999,6 +1245,10 @@ print(candidate)
 PY
 )
   mkdir -p "$STATE_HOME"
+  [[ -d "$STATE_HOME" && ! -L "$STATE_HOME" ]] || {
+    printf 'STATE_HOME must be a real non-symlink directory: %s\n' "$STATE_HOME" >&2
+    exit 1
+  }
   STATE_HOME=$(python3 - "$STATE_HOME" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
@@ -1009,7 +1259,12 @@ if candidate == Path(candidate.anchor) or candidate == repository or repository 
 print(candidate)
 PY
 )
-  STATE_RUNNER=$(python3 - "$STATE_HOME/state_runner.py" "$REPOSITORY_ROOT" <<'PY'
+  runner_path="$STATE_HOME/state_runner.py"
+  [[ -f "$runner_path" && ! -L "$runner_path" && -x "$runner_path" ]] || {
+    printf 'STATE_RUNNER must be a non-symlink executable regular file: %s\n' "$runner_path" >&2
+    exit 1
+  }
+  STATE_RUNNER=$(python3 - "$runner_path" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
 repository = Path(sys.argv[2]).expanduser().resolve()
@@ -1021,7 +1276,7 @@ PY
 )
 }
 derive_checked_state_runner
-[[ -x "$STATE_RUNNER" ]] || {
+[[ -f "$STATE_RUNNER" && ! -L "$STATE_RUNNER" && -x "$STATE_RUNNER" ]] || {
   printf 'missing executable STATE_RUNNER: %s\n' "$STATE_RUNNER" >&2
   exit 1
 }
@@ -1233,6 +1488,10 @@ print(candidate)
 PY
 )
   local state_home="$TEMP_BASE/synaptic-sea-task2-${WORKTREE_DIGEST}"
+  if [[ -L "$state_home" || ( -e "$state_home" && ! -d "$state_home" ) ]]; then
+    printf 'STATE_HOME must not be a symlink or non-directory: %s\n' "$state_home" >&2
+    exit 1
+  fi
   STATE_HOME=$(python3 - "$state_home" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
@@ -1244,6 +1503,10 @@ print(candidate)
 PY
 )
   mkdir -p "$STATE_HOME"
+  [[ -d "$STATE_HOME" && ! -L "$STATE_HOME" ]] || {
+    printf 'STATE_HOME must be a real non-symlink directory: %s\n' "$STATE_HOME" >&2
+    exit 1
+  }
   STATE_HOME=$(python3 - "$STATE_HOME" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
@@ -1254,7 +1517,12 @@ if candidate == Path(candidate.anchor) or candidate == repository or repository 
 print(candidate)
 PY
 )
-  STATE_RUNNER=$(python3 - "$STATE_HOME/state_runner.py" "$REPOSITORY_ROOT" <<'PY'
+  runner_path="$STATE_HOME/state_runner.py"
+  [[ -f "$runner_path" && ! -L "$runner_path" && -x "$runner_path" ]] || {
+    printf 'STATE_RUNNER must be a non-symlink executable regular file: %s\n' "$runner_path" >&2
+    exit 1
+  }
+  STATE_RUNNER=$(python3 - "$runner_path" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
 repository = Path(sys.argv[2]).expanduser().resolve()
@@ -1266,7 +1534,7 @@ PY
 )
 }
 derive_checked_state_runner
-[[ -x "$STATE_RUNNER" ]] || {
+[[ -f "$STATE_RUNNER" && ! -L "$STATE_RUNNER" && -x "$STATE_RUNNER" ]] || {
   printf 'missing executable STATE_RUNNER: %s\n' "$STATE_RUNNER" >&2
   exit 1
 }
@@ -1563,6 +1831,10 @@ print(candidate)
 PY
 )
   local state_home="$TEMP_BASE/synaptic-sea-task2-${WORKTREE_DIGEST}"
+  if [[ -L "$state_home" || ( -e "$state_home" && ! -d "$state_home" ) ]]; then
+    printf 'STATE_HOME must not be a symlink or non-directory: %s\n' "$state_home" >&2
+    exit 1
+  fi
   STATE_HOME=$(python3 - "$state_home" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
@@ -1574,6 +1846,10 @@ print(candidate)
 PY
 )
   mkdir -p "$STATE_HOME"
+  [[ -d "$STATE_HOME" && ! -L "$STATE_HOME" ]] || {
+    printf 'STATE_HOME must be a real non-symlink directory: %s\n' "$STATE_HOME" >&2
+    exit 1
+  }
   STATE_HOME=$(python3 - "$STATE_HOME" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
@@ -1584,7 +1860,12 @@ if candidate == Path(candidate.anchor) or candidate == repository or repository 
 print(candidate)
 PY
 )
-  STATE_RUNNER=$(python3 - "$STATE_HOME/state_runner.py" "$REPOSITORY_ROOT" <<'PY'
+  runner_path="$STATE_HOME/state_runner.py"
+  [[ -f "$runner_path" && ! -L "$runner_path" && -x "$runner_path" ]] || {
+    printf 'STATE_RUNNER must be a non-symlink executable regular file: %s\n' "$runner_path" >&2
+    exit 1
+  }
+  STATE_RUNNER=$(python3 - "$runner_path" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
 repository = Path(sys.argv[2]).expanduser().resolve()
@@ -1596,7 +1877,7 @@ PY
 )
 }
 derive_checked_state_runner
-[[ -x "$STATE_RUNNER" ]] || {
+[[ -f "$STATE_RUNNER" && ! -L "$STATE_RUNNER" && -x "$STATE_RUNNER" ]] || {
   printf 'missing executable STATE_RUNNER: %s\n' "$STATE_RUNNER" >&2
   exit 1
 }
@@ -1664,92 +1945,93 @@ The smoke must be baseline-green and print exactly `STRUCTURAL VARIANT WRAPPER P
 
 - [ ] **Step 3: Implement the smallest validator change with deterministic form and resource gates**
 
-Replace the single hard-coded `VisualInstance` lookup with an explicit exactly-two-forms policy. Keep the existing `if not generated_visual_scene_path.is_empty():` guard around this block. Add `const STRUCTURAL_SCENE_PREFIX: String = "res://assets/imported/structural/"` with the other validator constants, then use this logic:
+Replace the single hard-coded `VisualInstance` lookup with an explicit exactly-two-forms policy. Replace **only the body inside** the retained `if not generated_visual_scene_path.is_empty():` guard; the surrounding guard is shown below so the nesting is unambiguous. Every nonblank line inside that guard must have one additional tab of indentation exactly as shown; do not paste this block at function scope. Add `const STRUCTURAL_SCENE_PREFIX: String = "res://assets/imported/structural/"` with the other validator constants. The first validator invocation in Step 4 is the required Godot parser/compile check for this replacement; stop on any parse or type error. Use this logic:
 
 ```gdscript
-var variant_names: Array[String] = [
-	"VisualInstance_Intact",
-	"VisualInstance_Damaged",
-	"VisualInstance_Breached",
-]
-var visual_names: Array[String] = []
-var has_legacy: bool = nodes_by_name.has("VisualInstance")
-var present_variants: Array[String] = []
-for variant_name in variant_names:
-	if nodes_by_name.has(variant_name):
-		present_variants.append(variant_name)
-var has_any_variant: bool = not present_variants.is_empty()
-var has_all_variants: bool = present_variants.size() == variant_names.size()
-
-if has_legacy and has_any_variant:
-	errors.append(
-		"%s: mixed visual forms are forbidden: VisualInstance plus %s" %
-		[scene_path, ", ".join(PackedStringArray(present_variants))]
-	)
-elif has_legacy:
-	visual_names = ["VisualInstance"]
-elif has_all_variants:
-	visual_names = variant_names.duplicate()
-elif has_any_variant:
-	var missing_variants: Array[String] = []
+if not generated_visual_scene_path.is_empty():
+	var variant_names: Array[String] = [
+		"VisualInstance_Intact",
+		"VisualInstance_Damaged",
+		"VisualInstance_Breached",
+	]
+	var visual_names: Array[String] = []
+	var has_legacy: bool = nodes_by_name.has("VisualInstance")
+	var present_variants: Array[String] = []
 	for variant_name in variant_names:
-		if not nodes_by_name.has(variant_name):
-			missing_variants.append(variant_name)
-	errors.append(
-		"%s: incomplete variant visual form; missing variants: %s" %
-		[scene_path, ", ".join(PackedStringArray(missing_variants))]
-	)
-else:
-	errors.append(
-		"%s: missing VisualInstance or variant visual nodes for generated.visual_scene_path" %
-		scene_path
-	)
+		if nodes_by_name.has(variant_name):
+			present_variants.append(variant_name)
+	var has_any_variant: bool = not present_variants.is_empty()
+	var has_all_variants: bool = present_variants.size() == variant_names.size()
 
-for visual_name in visual_names:
-	var visual_instance: Dictionary = nodes_by_name[visual_name]
-	if str(visual_instance.get("parent", "")) != "Visual":
-		errors.append("%s: %s must be parented to Visual" % [scene_path, visual_name])
-
-	var visual_instance_ref: String = str(visual_instance.get("instance", ""))
-	if visual_instance_ref.is_empty():
-		errors.append("%s: %s must instance the generated visual scene" % [scene_path, visual_name])
-		continue
-
-	var instance_start: int = visual_instance_ref.find("\"")
-	var instance_finish: int = visual_instance_ref.find("\"", instance_start + 1)
-	if instance_start == -1 or instance_finish == -1:
-		errors.append("%s: %s has malformed ext_resource reference" % [scene_path, visual_name])
-		continue
-
-	var resource_id: String = visual_instance_ref.substr(
-		instance_start + 1,
-		instance_finish - instance_start - 1
-	)
-	var visual_resource: Dictionary = extresources.get(resource_id, {})
-	if visual_resource.is_empty():
-		errors.append("%s: %s references missing ext_resource %s" % [scene_path, visual_name, resource_id])
-		continue
-	if str(visual_resource.get("type", "")) != "PackedScene":
-		errors.append("%s: %s ext_resource must be a PackedScene" % [scene_path, visual_name])
-		continue
-
-	var resource_path: String = str(visual_resource.get("path", ""))
-	if visual_name == "VisualInstance" or visual_name == "VisualInstance_Intact":
-		# Preserve the existing intact contract: parent, PackedScene type, and exact manifest path.
-		if resource_path != generated_visual_scene_path:
-			errors.append("%s: %s ext_resource path does not match manifest.generated.visual_scene_path" % [scene_path, visual_name])
-	else:
-		# Damaged and breached references are text-checked before touching the loader.
-		var canonical_contained_path: bool = (
-			resource_path.begins_with(STRUCTURAL_SCENE_PREFIX)
-			and not resource_path.split("/").has("..")
-			and resource_path.simplify_path() == resource_path
+	if has_legacy and has_any_variant:
+		errors.append(
+			"%s: mixed visual forms are forbidden: VisualInstance plus %s" %
+			[scene_path, ", ".join(PackedStringArray(present_variants))]
 		)
-		if not canonical_contained_path:
-			errors.append("%s: %s must use a canonical contained structural PackedScene path" % [scene_path, visual_name])
+	elif has_legacy:
+		visual_names = ["VisualInstance"]
+	elif has_all_variants:
+		visual_names = variant_names.duplicate()
+	elif has_any_variant:
+		var missing_variants: Array[String] = []
+		for variant_name in variant_names:
+			if not nodes_by_name.has(variant_name):
+				missing_variants.append(variant_name)
+		errors.append(
+			"%s: incomplete variant visual form; missing variants: %s" %
+			[scene_path, ", ".join(PackedStringArray(missing_variants))]
+		)
+	else:
+		errors.append(
+			"%s: missing VisualInstance or variant visual nodes for generated.visual_scene_path" %
+			scene_path
+		)
+
+	for visual_name in visual_names:
+		var visual_instance: Dictionary = nodes_by_name[visual_name]
+		if str(visual_instance.get("parent", "")) != "Visual":
+			errors.append("%s: %s must be parented to Visual" % [scene_path, visual_name])
+
+		var visual_instance_ref: String = str(visual_instance.get("instance", ""))
+		if visual_instance_ref.is_empty():
+			errors.append("%s: %s must instance the generated visual scene" % [scene_path, visual_name])
 			continue
-		if not ResourceLoader.exists(resource_path, "PackedScene"):
-			errors.append("%s: %s references missing PackedScene resource" % [scene_path, visual_name])
+
+		var instance_start: int = visual_instance_ref.find("\"")
+		var instance_finish: int = visual_instance_ref.find("\"", instance_start + 1)
+		if instance_start == -1 or instance_finish == -1:
+			errors.append("%s: %s has malformed ext_resource reference" % [scene_path, visual_name])
+			continue
+
+		var resource_id: String = visual_instance_ref.substr(
+			instance_start + 1,
+			instance_finish - instance_start - 1
+		)
+		var visual_resource: Dictionary = extresources.get(resource_id, {})
+		if visual_resource.is_empty():
+			errors.append("%s: %s references missing ext_resource %s" % [scene_path, visual_name, resource_id])
+			continue
+		if str(visual_resource.get("type", "")) != "PackedScene":
+			errors.append("%s: %s ext_resource must be a PackedScene" % [scene_path, visual_name])
+			continue
+
+		var resource_path: String = str(visual_resource.get("path", ""))
+		if visual_name == "VisualInstance" or visual_name == "VisualInstance_Intact":
+			# Preserve the existing intact contract: parent, PackedScene type, and exact manifest path.
+			if resource_path != generated_visual_scene_path:
+				errors.append("%s: %s ext_resource path does not match manifest.generated.visual_scene_path" % [scene_path, visual_name])
+		else:
+			# Damaged and breached references are text-checked before touching the loader.
+			var canonical_contained_path: bool = (
+				resource_path.begins_with(STRUCTURAL_SCENE_PREFIX)
+				and not resource_path.split("/").has("..")
+				and resource_path.simplify_path() == resource_path
+			)
+			if not canonical_contained_path:
+				errors.append("%s: %s must use a canonical contained structural PackedScene path" % [scene_path, visual_name])
+				continue
+			if not ResourceLoader.exists(resource_path, "PackedScene"):
+				errors.append("%s: %s references missing PackedScene resource" % [scene_path, visual_name])
 ```
 
 The fixed `variant_names` order makes both the mixed-form and missing-variant diagnostics deterministic. Legacy is accepted only when no variant node is present; variant-aware form is accepted only when all three named nodes are present; any partial variant set is rejected. The four negative fixtures must therefore produce the exact substrings `mixed visual forms are forbidden`, `incomplete variant visual form; missing variants: VisualInstance_Breached`, `must use a canonical contained structural PackedScene path`, and `references missing PackedScene resource`. Do not edit structural scenes, source wrapper scenes, or GLBs; this step changes only validator logic.
@@ -1789,6 +2071,10 @@ print(candidate)
 PY
 )
   local state_home="$TEMP_BASE/synaptic-sea-task2-${WORKTREE_DIGEST}"
+  if [[ -L "$state_home" || ( -e "$state_home" && ! -d "$state_home" ) ]]; then
+    printf 'STATE_HOME must not be a symlink or non-directory: %s\n' "$state_home" >&2
+    exit 1
+  fi
   STATE_HOME=$(python3 - "$state_home" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
@@ -1800,6 +2086,10 @@ print(candidate)
 PY
 )
   mkdir -p "$STATE_HOME"
+  [[ -d "$STATE_HOME" && ! -L "$STATE_HOME" ]] || {
+    printf 'STATE_HOME must be a real non-symlink directory: %s\n' "$STATE_HOME" >&2
+    exit 1
+  }
   STATE_HOME=$(python3 - "$STATE_HOME" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
@@ -1810,7 +2100,12 @@ if candidate == Path(candidate.anchor) or candidate == repository or repository 
 print(candidate)
 PY
 )
-  STATE_RUNNER=$(python3 - "$STATE_HOME/state_runner.py" "$REPOSITORY_ROOT" <<'PY'
+  runner_path="$STATE_HOME/state_runner.py"
+  [[ -f "$runner_path" && ! -L "$runner_path" && -x "$runner_path" ]] || {
+    printf 'STATE_RUNNER must be a non-symlink executable regular file: %s\n' "$runner_path" >&2
+    exit 1
+  }
+  STATE_RUNNER=$(python3 - "$runner_path" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
 repository = Path(sys.argv[2]).expanduser().resolve()
@@ -1822,7 +2117,7 @@ PY
 )
 }
 derive_checked_state_runner
-[[ -x "$STATE_RUNNER" ]] || {
+[[ -f "$STATE_RUNNER" && ! -L "$STATE_RUNNER" && -x "$STATE_RUNNER" ]] || {
   printf 'missing executable STATE_RUNNER: %s\n' "$STATE_RUNNER" >&2
   exit 1
 }
@@ -1989,7 +2284,7 @@ printf 'STRUCTURAL SOURCE GUARD PASS paths=3 per_invocation=true\n'
 
 - [ ] **Step 5: Stage only Task 2 implementation artifacts and commit**
 
-Step 0's pre-mutation clean-worktree check is the required protection against pre-existing staged, unstaged, and untracked changes. This fence independently re-derives the external state directory and verifies Step 0's record still names this worktree and the same starting `HEAD`; it intentionally does not repeat the obsolete whole-index stage-only precondition. Retain the exact 14-path staging and commit-scope proofs below. Never use `git reset`.
+Step 0's pre-mutation clean-worktree check is the required protection against pre-existing staged, unstaged, untracked, and ignored changes in owned paths and structural source roots. This fence independently re-derives the external state directory and verifies Step 0's record still names this worktree and the same starting `HEAD`; it intentionally does not repeat the obsolete whole-index stage-only precondition. Retain the exact 14-path staging and commit-scope proofs below. Never use `git reset`.
 
 ```bash
 set -euo pipefail
@@ -2037,6 +2332,10 @@ print(candidate)
 PY
 )
   local state_home="$TEMP_BASE/synaptic-sea-task2-${WORKTREE_DIGEST}"
+  if [[ -L "$state_home" || ( -e "$state_home" && ! -d "$state_home" ) ]]; then
+    printf 'STATE_HOME must not be a symlink or non-directory: %s\n' "$state_home" >&2
+    exit 1
+  fi
   STATE_HOME=$(python3 - "$state_home" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
@@ -2048,6 +2347,10 @@ print(candidate)
 PY
 )
   mkdir -p "$STATE_HOME"
+  [[ -d "$STATE_HOME" && ! -L "$STATE_HOME" ]] || {
+    printf 'STATE_HOME must be a real non-symlink directory: %s\n' "$STATE_HOME" >&2
+    exit 1
+  }
   STATE_HOME=$(python3 - "$STATE_HOME" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
@@ -2058,7 +2361,12 @@ if candidate == Path(candidate.anchor) or candidate == repository or repository 
 print(candidate)
 PY
 )
-  STATE_RUNNER=$(python3 - "$STATE_HOME/state_runner.py" "$REPOSITORY_ROOT" <<'PY'
+  runner_path="$STATE_HOME/state_runner.py"
+  [[ -f "$runner_path" && ! -L "$runner_path" && -x "$runner_path" ]] || {
+    printf 'STATE_RUNNER must be a non-symlink executable regular file: %s\n' "$runner_path" >&2
+    exit 1
+  }
+  STATE_RUNNER=$(python3 - "$runner_path" "$REPOSITORY_ROOT" <<'PY'
 from pathlib import Path
 import sys
 repository = Path(sys.argv[2]).expanduser().resolve()
@@ -2070,7 +2378,7 @@ PY
 )
 }
 derive_checked_state_runner
-[[ -x "$STATE_RUNNER" ]] || {
+[[ -f "$STATE_RUNNER" && ! -L "$STATE_RUNNER" && -x "$STATE_RUNNER" ]] || {
   printf 'missing executable STATE_RUNNER: %s\n' "$STATE_RUNNER" >&2
   exit 1
 }
