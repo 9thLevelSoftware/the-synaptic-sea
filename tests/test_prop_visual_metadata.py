@@ -19,6 +19,7 @@ from tools.prop_visual_metadata import (
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REACTOR_GLB = PROJECT_ROOT / "assets/imported/props/components/reactor_console.glb"
 FIXTURE_ROOT = PROJECT_ROOT / "tests/fixtures/prop_visual_metadata"
+SCHEMA_PATH = PROJECT_ROOT / "data/placement/schemas/prop_visual_binding_v1.schema.json"
 
 
 def load_fixture(name: str) -> dict:
@@ -37,6 +38,11 @@ def make_glb(document: dict, binary: bytes = b"") -> bytes:
         binary = binary + b"\0" * ((-len(binary)) % 4)
         chunks.append(struct.pack("<I4s", len(binary), b"BIN\0") + binary)
     body = b"".join(chunks)
+    return struct.pack("<4sII", b"glTF", 2, 12 + len(body)) + body
+
+
+def make_raw_glb(chunks: list[tuple[bytes, bytes]]) -> bytes:
+    body = b"".join(struct.pack("<I4s", len(payload), chunk_type) + payload for chunk_type, payload in chunks)
     return struct.pack("<4sII", b"glTF", 2, 12 + len(body)) + body
 
 
@@ -70,6 +76,27 @@ def valid_sidecar(*, kind: str = "component", path: str | None = None) -> dict:
 
 
 class PropVisualMetadataTests(unittest.TestCase):
+    def test_schema_tuple_vectors_require_exactly_three_items(self) -> None:
+        schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+        placement_properties = schema["properties"]["placement"]["properties"]
+        bounds_properties = schema["properties"]["bounds"]["properties"]
+        for field in ("offset_m", "rotation_degrees"):
+            self.assertEqual(placement_properties[field].get("minItems"), 3, field)
+        for field in ("local_min_m", "local_max_m"):
+            self.assertEqual(bounds_properties[field].get("minItems"), 3, field)
+
+    def test_sidecar_rejects_invalid_origin_and_duplicate_numeric_yaw(self) -> None:
+        sidecar = valid_sidecar()
+        sidecar["placement"]["origin"] = "unsupported_origin"
+        sidecar["placement"]["allowed_yaw_deg"] = [0, 0.0, 90]
+        self.assertEqual(
+            validate_sidecar(sidecar, REACTOR_GLB, PROJECT_ROOT),
+            [
+                "placement.origin must be one of: marker_anchor, scene_origin",
+                "duplicate placement.allowed_yaw_deg: 0",
+            ],
+        )
+
     def test_reactor_console_glb_has_stable_hash_and_ordered_bounds(self) -> None:
         record = read_glb_metadata(REACTOR_GLB)
         self.assertEqual(len(record["sha256"]), 64)
@@ -183,6 +210,56 @@ class PropVisualMetadataTests(unittest.TestCase):
             record = read_glb_metadata(path)
         self.assertEqual(record["local_min_m"], [-2.0, -3.0, -4.0])
         self.assertEqual(record["local_max_m"], [5.0, 6.0, 7.0])
+
+    def test_glb_rejects_unaligned_chunks_and_illegal_chunk_sequences(self) -> None:
+        document = {
+            "asset": {"version": "2.0"},
+            "accessors": [{
+                "componentType": 5126,
+                "count": 3,
+                "type": "VEC3",
+                "min": [-1, -2, -3],
+                "max": [4, 5, 6],
+            }],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+        }
+        json_chunk = aligned_json_bytes(document)
+        misaligned_json_chunk = json_chunk[:-1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cases = {
+                "misaligned_json": [(b"JSON", misaligned_json_chunk)],
+                "bin_before_json": [(b"BIN\0", b"\0\0\0\0"), (b"JSON", json_chunk)],
+                "junk_before_json": [(b"JUNK", b"\0\0\0\0"), (b"JSON", json_chunk)],
+                "junk_after_json": [(b"JSON", json_chunk), (b"JUNK", b"\0\0\0\0")],
+                "json_absent": [(b"BIN\0", b"\0\0\0\0")],
+            }
+            for name, chunks in cases.items():
+                with self.subTest(name=name):
+                    path = root / f"{name}.glb"
+                    path.write_bytes(make_raw_glb(chunks))
+                    with self.assertRaises(ValueError):
+                        read_glb_metadata(path)
+
+    def test_glb_bounds_are_rounded_to_six_decimals_without_negative_zero(self) -> None:
+        document = {
+            "asset": {"version": "2.0"},
+            "accessors": [{
+                "componentType": 5126,
+                "count": 3,
+                "type": "VEC3",
+                "min": [-1.23456789, 2.34567891, -0.0000004],
+                "max": [3.14159265, 2.3456794, 9.87654321],
+            }],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "precision.glb"
+            path.write_bytes(make_glb(document))
+            record = read_glb_metadata(path)
+        self.assertEqual(record["local_min_m"], [-1.234568, 2.345679, 0.0])
+        self.assertEqual(record["local_max_m"], [3.141593, 2.345679, 9.876543])
+        self.assertEqual(math.copysign(1.0, record["local_min_m"][2]), 1.0)
 
     def test_glb_rejects_malformed_header_json_meshes_and_nonfinite_bounds(self) -> None:
         invalid_documents = [

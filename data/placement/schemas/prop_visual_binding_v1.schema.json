@@ -72,6 +72,7 @@
         },
         "offset_m": {
           "type": "array",
+          "minItems": 3,
           "prefixItems": [
             {"type": "number"},
             {"type": "number"},
@@ -81,6 +82,7 @@
         },
         "rotation_degrees": {
           "type": "array",
+          "minItems": 3,
           "prefixItems": [
             {"type": "number"},
             {"type": "number"},
@@ -132,6 +134,7 @@
       "properties": {
         "local_min_m": {
           "type": "array",
+          "minItems": 3,
           "prefixItems": [
             {"type": "number"},
             {"type": "number"},
@@ -141,6 +144,7 @@
         },
         "local_max_m": {
           "type": "array",
+          "minItems": 3,
           "prefixItems": [
             {"type": "number"},
             {"type": "number"},

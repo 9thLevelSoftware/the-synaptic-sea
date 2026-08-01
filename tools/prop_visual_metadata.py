@@ -76,6 +76,7 @@ _NAMESPACE_BY_KIND = {
     "dressing": "visual_prop_id",
     "objective": "gameplay_placement_id",
 }
+_ALLOWED_ORIGINS = ("scene_origin", "marker_anchor")
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _SEMVER_PATTERN = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 
@@ -104,19 +105,30 @@ def _read_glb_chunks(data: bytes) -> tuple[dict[str, Any], Optional[bytes]]:
         raise ValueError(f"unsupported GLB version: {version}")
     if declared_length < 12 or declared_length != len(data):
         raise ValueError("malformed GLB header: invalid total length")
+    if declared_length % 4 != 0:
+        raise ValueError("malformed GLB header: total length is not 4-byte aligned")
 
     offset = 12
     json_chunk: Optional[bytes] = None
     binary_chunk: Optional[bytes] = None
+    chunk_index = 0
     while offset < declared_length:
         if declared_length - offset < 8:
             raise ValueError("malformed GLB chunk header")
         chunk_length, chunk_type = struct.unpack_from("<I4s", data, offset)
+        if chunk_length % 4 != 0:
+            raise ValueError("malformed GLB chunk length: not 4-byte aligned")
         chunk_start = offset + 8
         chunk_end = chunk_start + chunk_length
         if chunk_end > declared_length:
             raise ValueError("malformed GLB chunk length")
         chunk = data[chunk_start:chunk_end]
+        if chunk_index == 0 and chunk_type != b"JSON":
+            raise ValueError("malformed GLB: first chunk must be JSON")
+        if chunk_index > 1:
+            raise ValueError("malformed GLB: illegal chunk sequence")
+        if chunk_index == 1 and chunk_type != b"BIN\x00":
+            raise ValueError("malformed GLB: illegal chunk sequence")
         if chunk_type == b"JSON":
             if json_chunk is not None:
                 raise ValueError("malformed GLB: duplicate JSON chunk")
@@ -125,7 +137,10 @@ def _read_glb_chunks(data: bytes) -> tuple[dict[str, Any], Optional[bytes]]:
             if binary_chunk is not None:
                 raise ValueError("malformed GLB: duplicate BIN chunk")
             binary_chunk = chunk
+        else:
+            raise ValueError("malformed GLB: unsupported chunk type")
         offset = chunk_end
+        chunk_index += 1
 
     if offset != declared_length or json_chunk is None:
         raise ValueError("malformed GLB: missing JSON chunk")
@@ -143,6 +158,11 @@ def _accessor_vector(value: Any, label: str) -> list[float]:
     if vector is None:
         raise ValueError(f"invalid non-finite or non-3D {label}")
     return vector
+
+
+def _round_bound(value: float) -> float:
+    rounded = round(value, 6)
+    return 0.0 if rounded == 0 else rounded
 
 
 def _scan_position_accessor(
@@ -258,6 +278,9 @@ def read_glb_metadata(path: Path) -> dict[str, Any]:
         raise ValueError("GLB contains no POSITION accessors")
     if not all(math.isfinite(value) for value in minimum + maximum):
         raise ValueError("GLB contains non-finite bounds")
+
+    minimum = [_round_bound(value) for value in minimum]
+    maximum = [_round_bound(value) for value in maximum]
 
     return {
         "sha256": hashlib.sha256(data).hexdigest(),
@@ -395,8 +418,12 @@ def validate_sidecar(sidecar: dict, glb_path: Path, project_root: Path) -> list[
         for key in ("origin", "offset_m", "rotation_degrees", "allowed_yaw_deg", "scale"):
             if key not in placement:
                 errors.append(f"missing placement field: {key}")
-        if "origin" in placement and not isinstance(placement.get("origin"), str):
-            errors.append("placement.origin must be a string")
+        if "origin" in placement:
+            origin = placement.get("origin")
+            if not isinstance(origin, str):
+                errors.append("placement.origin must be a string")
+            elif origin not in _ALLOWED_ORIGINS:
+                errors.append("placement.origin must be one of: marker_anchor, scene_origin")
         _validate_vector_field(errors, placement.get("offset_m"), "placement.offset_m")
         _validate_vector_field(errors, placement.get("rotation_degrees"), "placement.rotation_degrees")
         yaw = placement.get("allowed_yaw_deg")
@@ -404,6 +431,10 @@ def validate_sidecar(sidecar: dict, glb_path: Path, project_root: Path) -> list[
             errors.append("placement.allowed_yaw_deg must be a non-empty array")
         elif any(isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)) for value in yaw):
             errors.append("placement.allowed_yaw_deg must contain finite numbers")
+        else:
+            duplicate_yaw = sorted({float(value) for value in yaw if yaw.count(value) > 1})
+            for value in duplicate_yaw:
+                errors.append(f"duplicate placement.allowed_yaw_deg: {value:g}")
         if "scale" not in placement:
             pass
         elif isinstance(placement.get("scale"), bool) or not isinstance(placement.get("scale"), (int, float)) or not math.isfinite(float(placement["scale"])) or placement["scale"] <= 0:
