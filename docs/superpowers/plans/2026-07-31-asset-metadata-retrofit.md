@@ -181,7 +181,7 @@ Expected: `ASSET METADATA GOVERNANCE DOCS PASS` and one focused documentation co
 ### Task 2: Repair variant-aware structural wrapper validation before adding new gates
 
 **Files:**
-- Modify: `scripts/placement/validate_wrapper_scenes.gd:382-410`
+- Modify: `scripts/placement/validate_wrapper_scenes.gd`
 - Create: `scripts/validation/structural_variant_wrapper_smoke.gd`
 - Create: `tests/fixtures/structural_variant_wrappers/mixed_legacy_variant.tscn`
 - Create: `tests/fixtures/structural_variant_wrappers/mixed_legacy_variant.manifest.json`
@@ -201,14 +201,324 @@ Expected: `ASSET METADATA GOVERNANCE DOCS PASS` and one focused documentation co
   - legacy: `Visual/VisualInstance`
   - variant-aware: `Visual/VisualInstance_Intact`, `Visual/VisualInstance_Damaged`, `Visual/VisualInstance_Breached`
 - The intact child must instance `manifest.generated.visual_scene_path`; damaged/breached children must be `PackedScene` resources under `Visual`.
+- Every shell fence below starts from the repository root. A fence that invokes Godot defines `GODOT_BIN`, re-derives `STATE_RUNNER`, checks it is executable, and invokes Godot only through `$STATE_RUNNER -- "$GODOT_BIN" ...`; no fence relies on variables exported by an earlier fence.
+
+- [ ] **Step 0: Establish the pre-mutation worktree guard and one isolated Godot state runner**
+
+Run this once, before any Task 2 fixture/code mutation and before the first Task 2 Godot command. It is the only setup helper: it writes one executable Python standard-library runner outside the repository at a deterministic path derived from the SHA-256 of `$PWD`. The runner creates and removes one temporary per-invocation snapshot directory below that external directory; it never writes a helper or snapshot into the repository. The clean precondition covers all 14 owned paths, including staged, unstaged, and untracked changes, plus the broad structural source paths. Do not replace these checks with `git restore`, `git clean`, or a generated-state `git status` check.
+
+```bash
+set -euo pipefail
+
+TASK2_PATHS=(
+  scripts/placement/validate_wrapper_scenes.gd
+  scripts/validation/structural_variant_wrapper_smoke.gd
+  tests/fixtures/structural_variant_wrappers/mixed_legacy_variant.tscn
+  tests/fixtures/structural_variant_wrappers/mixed_legacy_variant.manifest.json
+  tests/fixtures/structural_variant_wrappers/mixed_legacy_variant.input.json
+  tests/fixtures/structural_variant_wrappers/partial_variant.tscn
+  tests/fixtures/structural_variant_wrappers/partial_variant.manifest.json
+  tests/fixtures/structural_variant_wrappers/partial_variant.input.json
+  tests/fixtures/structural_variant_wrappers/traversal_damaged_variant.tscn
+  tests/fixtures/structural_variant_wrappers/traversal_damaged_variant.manifest.json
+  tests/fixtures/structural_variant_wrappers/traversal_damaged_variant.input.json
+  tests/fixtures/structural_variant_wrappers/missing_damaged_resource.tscn
+  tests/fixtures/structural_variant_wrappers/missing_damaged_resource.manifest.json
+  tests/fixtures/structural_variant_wrappers/missing_damaged_resource.input.json
+)
+STRUCTURAL_SOURCE_PATHS=(
+  scenes/wrappers/structural
+  assets/_processed
+  assets/imported/structural
+)
+if (( ${#TASK2_PATHS[@]} != 14 )); then
+  printf 'expected exactly 14 Task 2 paths, got %d\n' "${#TASK2_PATHS[@]}" >&2
+  exit 1
+fi
+owned_status=$(git status --porcelain=v1 --untracked-files=all -- "${TASK2_PATHS[@]}")
+if [[ -n "$owned_status" ]]; then
+  printf 'Task 2 owned paths are not clean before work begins:\n%s\n' "$owned_status" >&2
+  exit 1
+fi
+source_status=$(git status --porcelain=v1 --untracked-files=all -- "${STRUCTURAL_SOURCE_PATHS[@]}")
+if [[ -n "$source_status" ]]; then
+  printf 'structural source paths are not clean before work begins:\n%s\n' "$source_status" >&2
+  exit 1
+fi
+
+WORKTREE_DIGEST=$(python3 - "$PWD" <<'PY'
+import hashlib
+import sys
+print(hashlib.sha256(sys.argv[1].encode('utf-8')).hexdigest())
+PY
+)
+STATE_HOME="${TMPDIR:-/tmp}/synaptic-sea-task2-${WORKTREE_DIGEST}"
+STATE_RUNNER="$STATE_HOME/state_runner.py"
+PRECONDITION_RECORD="$STATE_HOME/step0-precondition.txt"
+case "$STATE_HOME" in
+  "$PWD"|"$PWD"/*)
+    printf 'deterministic state directory must be outside the repository\n' >&2
+    exit 1
+    ;;
+esac
+mkdir -p "$STATE_HOME"
+cat >"$STATE_RUNNER" <<'PY'
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import hashlib
+import os
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+MARKER = "GENERATED STATE RESTORE VERIFIED"
+SOURCE_ROOTS = (
+    Path("scenes/wrappers/structural"),
+    Path("assets/_processed"),
+    Path("assets/imported/structural"),
+)
+
+def exists(path: Path) -> bool:
+    return path.exists() or path.is_symlink()
+
+def digest(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+def regular_record(root: Path, path: Path) -> dict[str, object]:
+    if path.is_symlink() or not path.is_file():
+        raise RuntimeError(f"non-regular generated-state path: {path}")
+    return {
+        "mode": stat.S_IMODE(path.stat().st_mode),
+        "path": path.relative_to(root).as_posix(),
+        "sha256": digest(path),
+    }
+
+def external_import_paths(root: Path) -> list[Path]:
+    found: list[Path] = []
+    for current, directories, filenames in os.walk(root, topdown=True, followlinks=False):
+        directories[:] = sorted(name for name in directories if name not in {".godot", ".git"})
+        for name in sorted(filenames):
+            path = Path(current) / name
+            if not name.endswith(".import"):
+                continue
+            if path.is_symlink():
+                raise RuntimeError(f"external import symlink is unsupported: {path}")
+            if path.is_file():
+                found.append(path)
+    return sorted(found, key=lambda item: item.relative_to(root).as_posix())
+
+def collect_generated(root: Path) -> dict[str, object]:
+    godot = root / ".godot"
+    godot_exists = exists(godot)
+    if godot_exists and (godot.is_symlink() or not godot.is_dir()):
+        raise RuntimeError(".godot exists but is not a real directory")
+    records: list[dict[str, object]] = []
+    if godot_exists:
+        files = (item for item in godot.rglob("*") if item.is_file() and not item.is_symlink())
+        records.extend(regular_record(root, item) for item in files)
+    records.extend(regular_record(root, item) for item in external_import_paths(root))
+    records.sort(key=lambda item: str(item["path"]))
+    return {"files": records, "godot_exists": godot_exists}
+
+def entry_record(root: Path, path: Path) -> dict[str, object]:
+    relative = path.relative_to(root).as_posix()
+    mode = stat.S_IMODE(path.lstat().st_mode)
+    if path.is_symlink():
+        return {"kind": "symlink", "path": relative, "target": os.readlink(path)}
+    if path.is_dir():
+        return {"kind": "directory", "mode": mode, "path": relative}
+    if path.is_file():
+        return {"kind": "file", "mode": mode, "path": relative, "sha256": digest(path)}
+    return {"kind": "other", "mode": mode, "path": relative}
+
+def collect_sources(root: Path) -> list[dict[str, object]]:
+    records: list[dict[str, object]] = []
+    for relative_root in SOURCE_ROOTS:
+        source_root = root / relative_root
+        if not exists(source_root):
+            records.append({"kind": "missing", "path": relative_root.as_posix()})
+            continue
+        if source_root.is_symlink() or not source_root.is_dir():
+            records.append(entry_record(root, source_root))
+            continue
+        records.append(entry_record(root, source_root))
+        for current, directories, filenames in os.walk(source_root, topdown=True, followlinks=False):
+            current_path = Path(current)
+            kept_directories: list[str] = []
+            for name in sorted(directories):
+                child = current_path / name
+                records.append(entry_record(root, child))
+                if not child.is_symlink():
+                    kept_directories.append(name)
+            directories[:] = kept_directories
+            for name in sorted(filenames):
+                records.append(entry_record(root, current_path / name))
+    return sorted(records, key=lambda item: str(item["path"]))
+
+def remove_path(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+
+def snapshot(root: Path, snapshot_root: Path) -> tuple[dict[str, object], list[dict[str, object]]]:
+    generated = collect_generated(root)
+    imports_backup = snapshot_root / "external-imports"
+    for record in generated["files"]:
+        relative = Path(*str(record["path"]).split("/"))
+        if relative.parts and relative.parts[0] == ".godot":
+            continue
+        source = root / relative
+        destination = imports_backup / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+    if bool(generated["godot_exists"]):
+        shutil.copytree(root / ".godot", snapshot_root / "godot", symlinks=True)
+    return generated, collect_sources(root)
+
+def restore(root: Path, snapshot_root: Path, generated: dict[str, object]) -> None:
+    godot = root / ".godot"
+    remove_path(godot)
+    if bool(generated["godot_exists"]):
+        shutil.copytree(snapshot_root / "godot", godot, symlinks=True)
+    for path in external_import_paths(root):
+        path.unlink()
+    for record in generated["files"]:
+        value = str(record["path"])
+        if value == ".godot" or value.startswith(".godot/"):
+            continue
+        relative = Path(*value.split("/"))
+        source = snapshot_root / "external-imports" / relative
+        destination = root / relative
+        if not source.is_file():
+            raise RuntimeError(f"missing external import snapshot: {value}")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+    actual = collect_generated(root)
+    if actual != generated:
+        raise RuntimeError("restored generated state differs from the initial path/hash/mode manifest")
+
+def main(argv: list[str]) -> int:
+    if len(argv) < 3 or argv[1] != "--":
+        print("STATE RUNNER: usage: state_runner.py -- COMMAND [ARGS...]", file=sys.stderr)
+        return 2
+    root = Path.cwd().resolve()
+    state_root = Path(__file__).resolve().parent
+    if state_root == root or root in state_root.parents:
+        print("STATE RUNNER: temporary state directory is inside the repository", file=sys.stderr)
+        return 2
+    state_root.mkdir(parents=True, exist_ok=True)
+    snapshot_root = Path(tempfile.mkdtemp(prefix="invocation-", dir=state_root))
+    command_status = 0
+    restore_status = 0
+    source_status = 0
+    cleanup_status = 0
+    exit_status = 2
+    try:
+        try:
+            generated, initial_sources = snapshot(root, snapshot_root)
+        except Exception as exc:
+            print(f"STATE RUNNER: snapshot failed: {exc}", file=sys.stderr)
+        else:
+            try:
+                completed = subprocess.run(argv[2:], cwd=root)
+                command_status = completed.returncode
+            except OSError as exc:
+                print(f"STATE RUNNER: command launch failed: {exc}", file=sys.stderr)
+                command_status = 127
+            try:
+                restore(root, snapshot_root, generated)
+            except Exception as exc:
+                print(f"STATE RUNNER: generated-state restore failed: {exc}", file=sys.stderr)
+                restore_status = 1
+            try:
+                if collect_sources(root) != initial_sources:
+                    print("STATE RUNNER: structural source paths changed during invocation", file=sys.stderr)
+                    source_status = 1
+            except Exception as exc:
+                print(f"STATE RUNNER: structural source inspection failed: {exc}", file=sys.stderr)
+                source_status = 1
+            if restore_status == 0:
+                print(MARKER, file=sys.stderr)
+            if command_status != 0:
+                exit_status = command_status
+            elif restore_status or source_status:
+                exit_status = 1
+            else:
+                exit_status = 0
+    finally:
+        try:
+            shutil.rmtree(snapshot_root)
+        except Exception as exc:
+            print(f"STATE RUNNER: temporary snapshot cleanup failed: {exc}", file=sys.stderr)
+            cleanup_status = 1
+        if cleanup_status and command_status == 0 and exit_status == 0:
+            exit_status = 1
+    return exit_status
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))
+PY
+chmod 700 "$STATE_RUNNER"
+if [[ ! -x "$STATE_RUNNER" ]]; then
+  printf 'state runner was not created executable\n' >&2
+  exit 1
+fi
+printf '%s\n%s\n' "$PWD" "$(git rev-parse HEAD)" >"$PRECONDITION_RECORD"
+printf 'TASK2 STEP0 READY state_runner=%s paths=14 source_guard=3\n' "$STATE_RUNNER"
+```
+
+The runner snapshots, for each invocation independently, every regular file below `.godot` (including tracked and ignored content) and every regular external `*.import` file outside `.godot` and `.git`, with deterministic relative POSIX paths, SHA-256 digests, modes, and full temporary copies. It also fingerprints every entry below `scenes/wrappers/structural`, `assets/_processed`, and `assets/imported/structural`. It forwards the child command's output and status, restores the exact initial generated tree/files, re-collects the path/hash/mode manifest, and then checks the broad source fingerprint even when the command or restoration failed. A failed Godot command remains the runner's primary status; a successful command becomes nonzero for restore, source, or cleanup failure. It never uses Git to decide generated-state cleanliness. The only runner-generated success line is the exact `GENERATED STATE RESTORE VERIFIED` marker on stderr after generated-state restoration/hash comparison succeeds; all runner diagnostics are prefixed `STATE RUNNER:` and none begins with `ERROR:` or `WARNING:`. The marker is filtered by the shell helpers below before validator output is counted, so exact Godot diagnostic assertions remain viable. The `finally` cleanup is best effort and cannot replace a nonzero child status.
 
 - [ ] **Step 1: Execute the validator red gate and construct fixture-based negative coverage**
 
-First run the real-directory red gate before any Task 2 code changes. The helper below captures the validator output and checks the complete diagnostic signature: exact exit status, exact count of lines beginning `ERROR:`, every such error containing the required marker, and zero lines beginning `WARNING:`.
+First run the real-directory red gate before any Task 2 code changes. The runner is already installed by Step 0, and this fence independently derives and checks it before the first Godot call. The helper captures validator output, removes only the runner's documented restore marker, and checks the complete diagnostic signature: exact exit status, exact count of lines beginning `ERROR:`, every such error containing the required marker, and zero lines beginning `WARNING:`.
 
 ```bash
 set -euo pipefail
 GODOT_BIN=/opt/homebrew/bin/godot
+RUNNER_MARKER='GENERATED STATE RESTORE VERIFIED'
+WORKTREE_DIGEST=$(python3 - "$PWD" <<'PY'
+import hashlib
+import sys
+print(hashlib.sha256(sys.argv[1].encode('utf-8')).hexdigest())
+PY
+)
+STATE_RUNNER="${TMPDIR:-/tmp}/synaptic-sea-task2-${WORKTREE_DIGEST}/state_runner.py"
+[[ -x "$STATE_RUNNER" ]] || { printf 'missing executable STATE_RUNNER: %s\n' "$STATE_RUNNER" >&2; exit 1; }
+
+strip_runner_marker() {
+  awk -v marker="$RUNNER_MARKER" '$0 != marker'
+}
+
+run_clean() {
+  local label="$1"
+  shift
+  local raw filtered status
+  if raw=$("$@" 2>&1); then
+    status=0
+  else
+    status=$?
+  fi
+  filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
+  printf '%s\n' "$filtered"
+  if (( status != 0 )); then
+    printf '%s: expected exit 0, got %d\n' "$label" "$status" >&2
+    return 1
+  fi
+  if grep -Eq '^(ERROR|WARNING):' <<<"$filtered"; then
+    printf '%s: unexpected ERROR:/WARNING: diagnostic\n' "$label" >&2
+    return 1
+  fi
+}
 
 expect_exact_error_signature() {
   local label="$1"
@@ -216,49 +526,47 @@ expect_exact_error_signature() {
   local expected_error_count="$3"
   local marker="$4"
   shift 4
-  local output status error_count warning_count unexpected_errors
-  if output=$("$@" 2>&1); then
+  local raw filtered status error_count warning_count unexpected_errors
+  if raw=$("$@" 2>&1); then
     status=0
   else
     status=$?
   fi
-  printf '%s\n' "$output"
-
+  filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
+  printf '%s\n' "$filtered"
   if (( status != expected_status )); then
     printf '%s: expected exit %d, got %d\n' "$label" "$expected_status" "$status" >&2
     return 1
   fi
-  error_count=$(awk 'BEGIN { count = 0 } /^ERROR:/ { count += 1 } END { print count }' <<<"$output")
-  warning_count=$(awk 'BEGIN { count = 0 } /^WARNING:/ { count += 1 } END { print count }' <<<"$output")
+  error_count=$(awk 'BEGIN { count = 0 } /^ERROR:/ { count += 1 } END { print count }' <<<"$filtered")
+  warning_count=$(awk 'BEGIN { count = 0 } /^WARNING:/ { count += 1 } END { print count }' <<<"$filtered")
   if (( error_count != expected_error_count )); then
-    printf '%s: expected exactly %d ERROR: line(s), got %d\n' \
-      "$label" "$expected_error_count" "$error_count" >&2
+    printf '%s: expected exactly %d ERROR: line(s), got %d\n' "$label" "$expected_error_count" "$error_count" >&2
     return 1
   fi
   if (( warning_count != 0 )); then
     printf '%s: expected zero WARNING: lines, got %d\n' "$label" "$warning_count" >&2
     return 1
   fi
-  unexpected_errors=$(awk -v marker="$marker" \
-    'index($0, "ERROR:") == 1 && index($0, marker) == 0 { print }' <<<"$output")
+  unexpected_errors=$(awk -v marker="$marker" 'index($0, "ERROR:") == 1 && index($0, marker) == 0 { print }' <<<"$filtered")
   if [[ -n "$unexpected_errors" ]]; then
-    printf '%s: ERROR: line without required marker %s:\n%s\n' \
-      "$label" "$marker" "$unexpected_errors" >&2
+    printf '%s: ERROR: line without required marker %s:\n%s\n' "$label" "$marker" "$unexpected_errors" >&2
     return 1
   fi
 }
 
-"$GODOT_BIN" --headless --editor --path . --quit
+run_clean "editor import preflight" \
+  "$STATE_RUNNER" -- "$GODOT_BIN" --headless --editor --path . --quit
 expect_exact_error_signature \
   "real structural directory baseline" 1 8 \
   "missing VisualInstance node for generated.visual_scene_path" \
-  "$GODOT_BIN" --headless --path . \
+  "$STATE_RUNNER" -- "$GODOT_BIN" --headless --path . \
   --script res://scripts/placement/validate_wrapper_scenes.gd -- \
   scenes/wrappers/structural/ship_structural_v0
 printf 'STRUCTURAL VALIDATOR RED CONFIRMED errors=8\n'
 ```
 
-This direct-directory gate is intentionally distinct from the fixture harness below. It must prove the current validator exits `1` with exactly eight matching errors and no warnings for the existing variant-aware wrappers; Step 3 must make this same directory command exit `0` without changing structural scenes or GLBs.
+This direct-directory gate is intentionally distinct from the fixture harness below. It proves the current validator exits `1` with exactly eight matching errors and no warnings for the existing variant-aware wrappers, while the runner restores generated state even if this early red gate or the import preflight fails. Step 3 must make this same directory command exit `0` without changing structural scenes or GLBs.
 
 Create all four same-basename fixture triples by copying the three existing `corridor_floor_1x1` source files, then mutate only the copied `.tscn` in each triple. Do not write either copied companion JSON file:
 
@@ -319,101 +627,107 @@ replace_once(
 PY
 ```
 
-Run the exact baseline functions below against individual `.tscn` arguments. `expect_clean_accept` proves the mixed fixture is still accepted before the fix, while each `expect_exact_error_signature` call proves one and only one old missing-VisualInstance error with no warnings. The red harness succeeds only after proving this validator-under-test is currently red.
+Run the exact baseline functions below against individual `.tscn` arguments. `expect_clean_accept` takes an exact expected success marker and proves the mixed fixture is still accepted before the fix; each `expect_exact_error_signature` call proves one and only one old missing-VisualInstance error with no warnings. This fence independently defines all variables and checks the same `STATE_RUNNER`; every validator call is isolated separately, so a failed fixture command still restores state and runs the structural source guard.
 
 ```bash
 set -euo pipefail
+GODOT_BIN=/opt/homebrew/bin/godot
+FIXTURE_ROOT=tests/fixtures/structural_variant_wrappers
+RUNNER_MARKER='GENERATED STATE RESTORE VERIFIED'
+WORKTREE_DIGEST=$(python3 - "$PWD" <<'PY'
+import hashlib
+import sys
+print(hashlib.sha256(sys.argv[1].encode('utf-8')).hexdigest())
+PY
+)
+STATE_RUNNER="${TMPDIR:-/tmp}/synaptic-sea-task2-${WORKTREE_DIGEST}/state_runner.py"
+[[ -x "$STATE_RUNNER" ]] || { printf 'missing executable STATE_RUNNER: %s\n' "$STATE_RUNNER" >&2; exit 1; }
+
+strip_runner_marker() { awk -v marker="$RUNNER_MARKER" '$0 != marker'; }
 
 expect_clean_accept() {
   local label="$1"
-  shift
-  local output status error_count warning_count
-  if output=$("$@" 2>&1); then
+  local expected_marker="$2"
+  shift 2
+  local raw filtered status error_count warning_count marker_count
+  if raw=$("$@" 2>&1); then
     status=0
   else
     status=$?
   fi
-  printf '%s\n' "$output"
+  filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
+  printf '%s\n' "$filtered"
   if (( status != 0 )); then
     printf '%s: expected exit 0, got %d\n' "$label" "$status" >&2
     return 1
   fi
-  error_count=$(awk 'BEGIN { count = 0 } /^ERROR:/ { count += 1 } END { print count }' <<<"$output")
-  warning_count=$(awk 'BEGIN { count = 0 } /^WARNING:/ { count += 1 } END { print count }' <<<"$output")
-  if (( error_count != 0 || warning_count != 0 )); then
-    printf '%s: expected zero ERROR:/WARNING: lines, got errors=%d warnings=%d\n' \
-      "$label" "$error_count" "$warning_count" >&2
+  error_count=$(awk 'BEGIN { count = 0 } /^ERROR:/ { count += 1 } END { print count }' <<<"$filtered")
+  warning_count=$(awk 'BEGIN { count = 0 } /^WARNING:/ { count += 1 } END { print count }' <<<"$filtered")
+  marker_count=$(awk -v expected="$expected_marker" '$0 == expected { count += 1 } END { print count + 0 }' <<<"$filtered")
+  if (( error_count != 0 || warning_count != 0 || marker_count != 1 )); then
+    printf '%s: expected exit 0, zero ERROR:/WARNING:, and exactly one %s; got errors=%d warnings=%d marker_count=%d\n' \
+      "$label" "$expected_marker" "$error_count" "$warning_count" "$marker_count" >&2
     return 1
   fi
-  if ! grep -Fxq -- 'Validated 1 wrapper scene bundle(s).' <<<"$output"; then
-    printf '%s: missing exact acceptance marker\n' "$label" >&2
+}
+
+expect_exact_error_signature() {
+  local label="$1"
+  local expected_status="$2"
+  local expected_error_count="$3"
+  local marker="$4"
+  shift 4
+  local raw filtered status error_count warning_count unexpected_errors
+  if raw=$("$@" 2>&1); then
+    status=0
+  else
+    status=$?
+  fi
+  filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
+  printf '%s\n' "$filtered"
+  if (( status != expected_status )); then
+    printf '%s: expected exit %d, got %d\n' "$label" "$expected_status" "$status" >&2
+    return 1
+  fi
+  error_count=$(awk 'BEGIN { count = 0 } /^ERROR:/ { count += 1 } END { print count }' <<<"$filtered")
+  warning_count=$(awk 'BEGIN { count = 0 } /^WARNING:/ { count += 1 } END { print count }' <<<"$filtered")
+  if (( error_count != expected_error_count || warning_count != 0 )); then
+    printf '%s: expected errors=%d warnings=0, got errors=%d warnings=%d\n' "$label" "$expected_error_count" "$error_count" "$warning_count" >&2
+    return 1
+  fi
+  unexpected_errors=$(awk -v marker="$marker" 'index($0, "ERROR:") == 1 && index($0, marker) == 0 { print }' <<<"$filtered")
+  if [[ -n "$unexpected_errors" ]]; then
+    printf '%s: ERROR: line without required marker %s:\n%s\n' "$label" "$marker" "$unexpected_errors" >&2
     return 1
   fi
 }
 
 OLD_MISSING_VISUAL_MARKER='missing VisualInstance node for generated.visual_scene_path'
-
-run_negative_fixture_red_suite() {
-  expect_clean_accept \
-    "mixed_legacy_variant pre-fix baseline" \
-    "$GODOT_BIN" --headless --path . \
-    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
-    "$FIXTURE_ROOT/mixed_legacy_variant.tscn"
-  expect_exact_error_signature \
-    "partial_variant pre-fix baseline" 1 1 "$OLD_MISSING_VISUAL_MARKER" \
-    "$GODOT_BIN" --headless --path . \
-    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
-    "$FIXTURE_ROOT/partial_variant.tscn"
-  expect_exact_error_signature \
-    "traversal_damaged_variant pre-fix baseline" 1 1 "$OLD_MISSING_VISUAL_MARKER" \
-    "$GODOT_BIN" --headless --path . \
-    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
-    "$FIXTURE_ROOT/traversal_damaged_variant.tscn"
-  expect_exact_error_signature \
-    "missing_damaged_resource pre-fix baseline" 1 1 "$OLD_MISSING_VISUAL_MARKER" \
-    "$GODOT_BIN" --headless --path . \
-    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
-    "$FIXTURE_ROOT/missing_damaged_resource.tscn"
-}
-
-# NEGATIVE-FIXTURE RED HARNESS: every baseline assertion is exact. Any setup,
-# Godot, path, or unexpected validator result stops this block with failure.
-run_negative_fixture_red_suite
+expect_clean_accept \
+  "mixed_legacy_variant pre-fix baseline" \
+  'Validated 1 wrapper scene bundle(s).' \
+  "$STATE_RUNNER" -- "$GODOT_BIN" --headless --path . \
+  --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+  "$FIXTURE_ROOT/mixed_legacy_variant.tscn"
+expect_exact_error_signature \
+  "partial_variant pre-fix baseline" 1 1 "$OLD_MISSING_VISUAL_MARKER" \
+  "$STATE_RUNNER" -- "$GODOT_BIN" --headless --path . \
+  --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+  "$FIXTURE_ROOT/partial_variant.tscn"
+expect_exact_error_signature \
+  "traversal_damaged_variant pre-fix baseline" 1 1 "$OLD_MISSING_VISUAL_MARKER" \
+  "$STATE_RUNNER" -- "$GODOT_BIN" --headless --path . \
+  --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+  "$FIXTURE_ROOT/traversal_damaged_variant.tscn"
+expect_exact_error_signature \
+  "missing_damaged_resource pre-fix baseline" 1 1 "$OLD_MISSING_VISUAL_MARKER" \
+  "$STATE_RUNNER" -- "$GODOT_BIN" --headless --path . \
+  --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+  "$FIXTURE_ROOT/missing_damaged_resource.tscn"
 printf 'NEGATIVE FIXTURE RED CONFIRMED mixed=accepted legacy_missing=3\n'
-
-# This is intentionally separate from the pre-fix red harness. Step 4 invokes it
-# only after Step 3, under set -euo pipefail, and it accepts exactly the four new
-# deterministic diagnostics below.
-run_negative_fixture_green_suite() {
-  expect_exact_error_signature \
-    "mixed_legacy_variant post-fix rejection" 1 1 \
-    "mixed visual forms are forbidden" \
-    "$GODOT_BIN" --headless --path . \
-    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
-    "$FIXTURE_ROOT/mixed_legacy_variant.tscn"
-  expect_exact_error_signature \
-    "partial_variant post-fix rejection" 1 1 \
-    "incomplete variant visual form; missing variants: VisualInstance_Breached" \
-    "$GODOT_BIN" --headless --path . \
-    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
-    "$FIXTURE_ROOT/partial_variant.tscn"
-  expect_exact_error_signature \
-    "traversal_damaged_variant post-fix rejection" 1 1 \
-    "must use a canonical contained structural PackedScene path" \
-    "$GODOT_BIN" --headless --path . \
-    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
-    "$FIXTURE_ROOT/traversal_damaged_variant.tscn"
-  expect_exact_error_signature \
-    "missing_damaged_resource post-fix rejection" 1 1 \
-    "references missing PackedScene resource" \
-    "$GODOT_BIN" --headless --path . \
-    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
-    "$FIXTURE_ROOT/missing_damaged_resource.tscn"
-}
 ```
 
-The red harness returns zero only by proving `mixed_legacy_variant` is accepted with the exact `Validated 1 wrapper scene bundle(s).` line and that the other three fixtures each produce exactly one old missing-VisualInstance error and no warnings; any different result fails the block. It therefore records the validator-under-test's pre-Step-3 red state rather than accepting an arbitrary failure. The separate `run_negative_fixture_green_suite` has no broad nonzero-only path: every post-Step-3 fixture must exit `1`, emit exactly one `ERROR:` line, emit zero `WARNING:` lines, and contain its listed marker. This negative-fixture evidence remains separate from the eight-error real-directory red gate.
-
+The red harness returns zero only by proving `mixed_legacy_variant` is accepted with the exact `Validated 1 wrapper scene bundle(s).` line and that the other three fixtures each produce exactly one old missing-VisualInstance error and no warnings; any different result fails the block. The runner's marker is removed before these checks and is the only non-Godot line intentionally tolerated by the capture path. The post-fix helper used in Step 4 has no broad nonzero-only path: every fixture must exit `1`, emit exactly one `ERROR:` line, emit zero `WARNING:` lines, and contain its listed marker. This negative-fixture evidence remains separate from the eight-error real-directory red gate.
 
 - [ ] **Step 2: Add a baseline-green eight-scene wrapper characterization smoke**
 
@@ -543,6 +857,47 @@ STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=tru
 
 The smoke is deliberately separate from validator coverage: it only proves that all eight existing `PackedScene` wrappers load, instantiate, expose `Visual` plus all three `Node3D` variant children, and return `true` from `IntegrityVisualResolver.apply_visual_state(...)` for `intact`, `damaged`, `breached`, and `destroyed`, with exact visibility (one matching child visible for the first three states and all three hidden for `destroyed`).
 
+
+
+Run the baseline-green smoke once before Step 3. This fence is independent of the creation and red-gate fences and routes the smoke through the same runner:
+
+```bash
+set -euo pipefail
+GODOT_BIN=/opt/homebrew/bin/godot
+RUNNER_MARKER='GENERATED STATE RESTORE VERIFIED'
+WORKTREE_DIGEST=$(python3 - "$PWD" <<'PY'
+import hashlib
+import sys
+print(hashlib.sha256(sys.argv[1].encode('utf-8')).hexdigest())
+PY
+)
+STATE_RUNNER="${TMPDIR:-/tmp}/synaptic-sea-task2-${WORKTREE_DIGEST}/state_runner.py"
+[[ -x "$STATE_RUNNER" ]] || { printf 'missing executable STATE_RUNNER: %s\n' "$STATE_RUNNER" >&2; exit 1; }
+strip_runner_marker() { awk -v marker="$RUNNER_MARKER" '$0 != marker'; }
+expect_clean_accept() {
+  local label="$1" expected_marker="$2"
+  shift 2
+  local raw filtered status error_count warning_count marker_count
+  if raw=$("$@" 2>&1); then status=0; else status=$?; fi
+  filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
+  printf '%s\n' "$filtered"
+  error_count=$(awk 'BEGIN { count = 0 } /^ERROR:/ { count += 1 } END { print count }' <<<"$filtered")
+  warning_count=$(awk 'BEGIN { count = 0 } /^WARNING:/ { count += 1 } END { print count }' <<<"$filtered")
+  marker_count=$(awk -v expected="$expected_marker" '$0 == expected { count += 1 } END { print count + 0 }' <<<"$filtered")
+  if (( status != 0 || error_count != 0 || warning_count != 0 || marker_count != 1 )); then
+    printf '%s: expected exit 0, zero ERROR:/WARNING:, and exactly one %s\n' "$label" "$expected_marker" >&2
+    return 1
+  fi
+}
+expect_clean_accept \
+  "eight-scene structural variant wrapper smoke" \
+  'STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true' \
+  "$STATE_RUNNER" -- "$GODOT_BIN" --headless --path . \
+  --script res://scripts/validation/structural_variant_wrapper_smoke.gd
+```
+
+The smoke must be baseline-green and print exactly `STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true`. It is not validator coverage; it only proves that all eight existing `PackedScene` wrappers load, instantiate, expose `Visual` plus all three `Node3D` variant children, and return `true` from `IntegrityVisualResolver.apply_visual_state(...)` for `intact`, `damaged`, `breached`, and `destroyed`, with exact visibility (one matching child visible for the first three states and all three hidden for `destroyed`).
+
 - [ ] **Step 3: Implement the smallest validator change with deterministic form and resource gates**
 
 Replace the single hard-coded `VisualInstance` lookup with an explicit exactly-two-forms policy. Keep the existing `if not generated_visual_scene_path.is_empty():` guard around this block. Add `const STRUCTURAL_SCENE_PREFIX: String = "res://assets/imported/structural/"` with the other validator constants, then use this logic:
@@ -635,366 +990,140 @@ for visual_name in visual_names:
 
 The fixed `variant_names` order makes both the mixed-form and missing-variant diagnostics deterministic. Legacy is accepted only when no variant node is present; variant-aware form is accepted only when all three named nodes are present; any partial variant set is rejected. The four negative fixtures must therefore produce the exact substrings `mixed visual forms are forbidden`, `incomplete variant visual form; missing variants: VisualInstance_Breached`, `must use a canonical contained structural PackedScene path`, and `references missing PackedScene resource`. Do not edit structural scenes, source wrapper scenes, or GLBs; this step changes only validator logic.
 
+
+
 - [ ] **Step 4: Run the complete green validator, negative-fixture, smoke, and source-integrity bundle**
 
-Run the following as one shell block after defining the exact `expect_clean_accept`, `expect_exact_error_signature`, and `run_negative_fixture_green_suite` helpers from Step 1. The bundle snapshots all pre-existing generated state before the first Godot command, runs the green commands inside a non-conditional subshell with effective `errexit`, captures that subshell's output by direct redirection, and restores plus verifies the exact initial state from an `EXIT` trap. This is restoration of the initial state, not deletion of generated state: pre-existing tracked and ignored `.godot` content and tracked external `*.import` files are preserved.
+Run this as an independent shell block after Step 3. It does not define or use an outer snapshot/trap: every Godot invocation is a separate `$STATE_RUNNER -- "$GODOT_BIN" ...` call, and the runner performs snapshot, command execution, generated-state restoration, broad source verification, and temporary-snapshot cleanup for that one invocation before returning. Thus an early import, validator, fixture, or smoke failure cannot skip its own source/state guard, and the runner preserves that command's primary nonzero status if cleanup also fails.
 
 ```bash
 set -euo pipefail
-BUNDLE_LOG=$(mktemp)
-set +e
-(
-  set -euo pipefail
-  GODOT_BIN=/opt/homebrew/bin/godot
-  FIXTURE_ROOT=tests/fixtures/structural_variant_wrappers
-  STATE_ROOT=''
-  SNAPSHOT_READY=0
-
-  if ! STATE_ROOT=$(mktemp -d); then
-    printf 'unable to create temporary generated-state snapshot root\n' >&2
-    exit 1
-  fi
-  SMOKE_LOG="$STATE_ROOT/smoke.log"
-
-  run_clean() {
-    if (( $# == 0 )); then
-      printf 'run_clean requires a command\n' >&2
-      return 2
-    fi
-    local output status
-    if output=$("$@" 2>&1); then
-      status=0
-    else
-      status=$?
-    fi
-    printf '%s\n' "$output"
-    if (( status != 0 )); then
-      printf 'command failed with exit %d: %q\n' "$status" "$1" >&2
-      return "$status"
-    fi
-    if grep -Fq -- 'ERROR:' <<<"$output" || grep -Fq -- 'WARNING:' <<<"$output"; then
-      printf 'unexpected ERROR:/WARNING: diagnostic from command: %q\n' "$1" >&2
-      return 1
-    fi
-  }
-
-  snapshot_generated_state() {
-    python3 - "$STATE_ROOT" <<'PY'
-from __future__ import annotations
-
+GODOT_BIN=/opt/homebrew/bin/godot
+FIXTURE_ROOT=tests/fixtures/structural_variant_wrappers
+RUNNER_MARKER='GENERATED STATE RESTORE VERIFIED'
+WORKTREE_DIGEST=$(python3 - "$PWD" <<'PY'
 import hashlib
-import json
-import os
-import shutil
-import stat
 import sys
-from pathlib import Path
-
-root = Path.cwd().resolve()
-state_root = Path(sys.argv[1]).resolve()
-if state_root == root or root in state_root.parents:
-    raise SystemExit("STATE_ROOT must be outside the repository")
-state_root.mkdir(parents=True, exist_ok=True)
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-def regular_record(path: Path, relative: str) -> dict[str, object]:
-    if not path.is_file() or path.is_symlink():
-        raise RuntimeError(f"non-regular generated-state path: {relative}")
-    mode = stat.S_IMODE(path.stat().st_mode)
-    return {"mode": mode, "path": relative, "sha256": sha256_file(path)}
-
-def external_import_paths() -> list[Path]:
-    paths: list[Path] = []
-    for current, directories, filenames in os.walk(root, topdown=True, followlinks=False):
-        directories[:] = sorted(
-            name for name in directories if name not in {".godot", ".git"}
-        )
-        for name in sorted(filenames):
-            path = Path(current) / name
-            if name.endswith(".import") and path.is_file() and not path.is_symlink():
-                paths.append(path)
-    return sorted(paths, key=lambda path: path.relative_to(root).as_posix())
-
-godot_dir = root / ".godot"
-godot_exists = godot_dir.exists() or godot_dir.is_symlink()
-if godot_exists and (not godot_dir.is_dir() or godot_dir.is_symlink()):
-    raise RuntimeError(".godot exists but is not a real directory")
-
-records: list[dict[str, object]] = []
-if godot_exists:
-    for path in sorted(
-        (candidate for candidate in godot_dir.rglob("*") if candidate.is_file()),
-        key=lambda candidate: candidate.relative_to(root).as_posix(),
-    ):
-        relative = path.relative_to(root).as_posix()
-        records.append(regular_record(path, relative))
-
-imports_backup = state_root / "external_imports"
-for path in external_import_paths():
-    relative_path = path.relative_to(root)
-    relative = relative_path.as_posix()
-    records.append(regular_record(path, relative))
-    destination = imports_backup / relative_path
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(path, destination)
-
-if godot_exists:
-    shutil.copytree(root / ".godot", state_root / "godot_backup", symlinks=True)
-
-manifest = {
-    "files": sorted(records, key=lambda record: str(record["path"])),
-    "godot_exists": godot_exists,
-    "manifest_version": 1,
-}
-manifest_path = state_root / "manifest.json"
-manifest_path.write_text(
-    json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
-    encoding="utf-8",
+print(hashlib.sha256(sys.argv[1].encode('utf-8')).hexdigest())
+PY
 )
-PY
-  }
+STATE_RUNNER="${TMPDIR:-/tmp}/synaptic-sea-task2-${WORKTREE_DIGEST}/state_runner.py"
+[[ -x "$STATE_RUNNER" ]] || { printf 'missing executable STATE_RUNNER: %s\n' "$STATE_RUNNER" >&2; exit 1; }
 
-  restore_and_verify_generated_state() {
-    local restore_status=0
-    if [[ -z "$STATE_ROOT" || ! -d "$STATE_ROOT" ]]; then
-      printf 'generated-state snapshot root is missing or invalid\n' >&2
-      return 1
-    fi
-    if ! python3 - "$STATE_ROOT" <<'PY'
-from __future__ import annotations
+strip_runner_marker() { awk -v marker="$RUNNER_MARKER" '$0 != marker'; }
 
-import hashlib
-import json
-import os
-import shutil
-import stat
-import sys
-from pathlib import Path
-
-root = Path.cwd().resolve()
-state_root = Path(sys.argv[1]).resolve()
-manifest_path = state_root / "manifest.json"
-if state_root == root or root in state_root.parents or not manifest_path.is_file():
-    raise SystemExit("invalid generated-state snapshot")
-
-manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-if not isinstance(manifest, dict) or manifest.get("manifest_version") != 1:
-    raise SystemExit("unsupported generated-state manifest")
-
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-def regular_record(path: Path, relative: str) -> dict[str, object]:
-    if not path.is_file() or path.is_symlink():
-        raise RuntimeError(f"non-regular generated-state path: {relative}")
-    return {
-        "mode": stat.S_IMODE(path.stat().st_mode),
-        "path": relative,
-        "sha256": sha256_file(path),
-    }
-
-def external_import_paths() -> list[Path]:
-    paths: list[Path] = []
-    for current, directories, filenames in os.walk(root, topdown=True, followlinks=False):
-        directories[:] = sorted(
-            name for name in directories if name not in {".godot", ".git"}
-        )
-        for name in sorted(filenames):
-            path = Path(current) / name
-            if name.endswith(".import") and path.is_file() and not path.is_symlink():
-                paths.append(path)
-    return sorted(paths, key=lambda path: path.relative_to(root).as_posix())
-
-def collect_manifest() -> dict[str, object]:
-    godot_dir = root / ".godot"
-    godot_exists = godot_dir.exists() or godot_dir.is_symlink()
-    if godot_exists and (not godot_dir.is_dir() or godot_dir.is_symlink()):
-        raise RuntimeError(".godot exists but is not a real directory")
-    records: list[dict[str, object]] = []
-    if godot_exists:
-        for path in sorted(
-            (candidate for candidate in godot_dir.rglob("*") if candidate.is_file()),
-            key=lambda candidate: candidate.relative_to(root).as_posix(),
-        ):
-            records.append(regular_record(path, path.relative_to(root).as_posix()))
-    for path in external_import_paths():
-        records.append(regular_record(path, path.relative_to(root).as_posix()))
-    return {
-        "files": sorted(records, key=lambda record: str(record["path"])),
-        "godot_exists": godot_exists,
-        "manifest_version": 1,
-    }
-
-def safe_relative_path(value: object) -> Path:
-    if not isinstance(value, str):
-        raise RuntimeError("manifest path is not a string")
-    relative = Path(*value.split("/"))
-    if relative.is_absolute() or not relative.parts or not value or ".." in relative.parts:
-        raise RuntimeError(f"unsafe manifest path: {value}")
-    if relative.parts[0] in {".godot", ".git"} or not value.endswith(".import"):
-        raise RuntimeError(f"manifest path outside external import scope: {value}")
-    cursor = root
-    for part in relative.parts[:-1]:
-        cursor /= part
-        if cursor.is_symlink():
-            raise RuntimeError(f"manifest parent is a symlink: {value}")
-    return relative
-
-def remove_path(path: Path) -> None:
-    if path.is_symlink() or path.is_file():
-        path.unlink()
-    elif path.is_dir():
-        shutil.rmtree(path)
-
-godot_dir = root / ".godot"
-remove_path(godot_dir)
-if bool(manifest.get("godot_exists")):
-    backup = state_root / "godot_backup"
-    if not backup.is_dir():
-        raise RuntimeError("missing .godot snapshot backup")
-    shutil.copytree(backup, godot_dir, symlinks=True)
-
-for current, directories, filenames in os.walk(root, topdown=True, followlinks=False):
-    directories[:] = sorted(
-        name for name in directories if name not in {".godot", ".git"}
-    )
-    for name in sorted(filenames):
-        path = Path(current) / name
-        if name.endswith(".import") and (path.is_file() or path.is_symlink()):
-            path.unlink()
-
-for record in manifest.get("files", []):
-    if not isinstance(record, dict):
-        raise RuntimeError("manifest file record is not an object")
-    value = record.get("path")
-    if not isinstance(value, str):
-        raise RuntimeError("manifest path is not a string")
-    if value == ".godot" or value.startswith(".godot/"):
-        continue
-    relative = safe_relative_path(value)
-    source = state_root / "external_imports" / relative
-    destination = root / relative
-    if not source.is_file():
-        raise RuntimeError(f"missing external import snapshot: {relative.as_posix()}")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
-
-actual = collect_manifest()
-if actual != manifest:
-    raise RuntimeError(
-        "restored generated state differs from the initial manifest: "
-        + json.dumps({"expected": manifest, "actual": actual}, sort_keys=True)
-    )
-print("GENERATED STATE RESTORE VERIFIED")
-PY
-    then
-      printf 'generated-state restore/verify failed\n' >&2
-      restore_status=1
-    fi
-    if (( restore_status == 0 )); then
-      if ! rm -rf -- "$STATE_ROOT"; then
-        printf 'temporary generated-state snapshot cleanup failed\n' >&2
-        restore_status=1
-      fi
-    else
-      # Best-effort removal after a failed verifier must never replace its failure.
-      rm -rf -- "$STATE_ROOT" || printf 'best-effort snapshot cleanup failed\n' >&2
-    fi
-    return "$restore_status"
-  }
-
-  finish_bundle() {
-    local original_status="$1"
-    local cleanup_status=0
-    if (( SNAPSHOT_READY != 1 )); then
-      printf 'generated-state snapshot was not completed\n' >&2
-      cleanup_status=1
-      rm -rf -- "$STATE_ROOT" || printf 'best-effort snapshot cleanup failed\n' >&2
-    else
-      restore_and_verify_generated_state || cleanup_status=$?
-    fi
-    if (( original_status != 0 )); then
-      return "$original_status"
-    fi
-    return "$cleanup_status"
-  }
-
-  # The trap is installed before snapshot use and before every Godot command.
-  trap 'original_status=$?; finish_bundle "$original_status"; exit $?' EXIT
-  snapshot_generated_state
-  SNAPSHOT_READY=1
-
-  # Import preflight: run_clean requires exit 0 and no ERROR:/WARNING: output.
-  run_clean "$GODOT_BIN" --headless --editor --path . --quit
-
-  # Real structural directory validator green gate.
-  run_clean "$GODOT_BIN" --headless --path . \
-    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
-    scenes/wrappers/structural/ship_structural_v0
-
-  # Fixture-based negative gates: intentional ERROR: output is allowed only because
-  # the separate suite asserts status 1, exactly one ERROR:, zero WARNING:, and the
-  # exact marker for each fixture.
-  run_negative_fixture_green_suite
-  printf 'NEGATIVE FIXTURE GREEN CONFIRMED\n'
-
-  # Exact eight-scene runtime wrapper smoke; this does not invoke the validator.
-  run_clean "$GODOT_BIN" --headless --path . \
-    --script res://scripts/validation/structural_variant_wrapper_smoke.gd \
-    >"$SMOKE_LOG" 2>&1
-  cat "$SMOKE_LOG"
-  if ! grep -Fxq -- \
-    'STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true' \
-    "$SMOKE_LOG"; then
-    printf 'missing exact structural wrapper smoke pass marker\n' >&2
-    exit 1
+run_clean() {
+  local label="$1"
+  shift
+  local raw filtered status error_count warning_count
+  if raw=$("$@" 2>&1); then status=0; else status=$?; fi
+  filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
+  printf '%s\n' "$filtered"
+  error_count=$(awk 'BEGIN { count = 0 } /^ERROR:/ { count += 1 } END { print count }' <<<"$filtered")
+  warning_count=$(awk 'BEGIN { count = 0 } /^WARNING:/ { count += 1 } END { print count }' <<<"$filtered")
+  if (( status != 0 || error_count != 0 || warning_count != 0 )); then
+    printf '%s: expected exit 0 with zero ERROR:/WARNING: lines\n' "$label" >&2
+    return 1
   fi
-) >"$BUNDLE_LOG" 2>&1
-bundle_status=$?
-set -e
+}
 
-# Preserve a primary bundle failure even if its cleanup marker is absent.
-if (( bundle_status != 0 )); then
-  cat "$BUNDLE_LOG" || true
-  rm -f -- "$BUNDLE_LOG"
-  exit "$bundle_status"
-fi
-cat "$BUNDLE_LOG"
-if ! grep -Fxq -- 'GENERATED STATE RESTORE VERIFIED' "$BUNDLE_LOG"; then
-  printf 'missing exact generated-state restore marker\n' >&2
-  rm -f -- "$BUNDLE_LOG"
-  exit 1
-fi
-rm -f -- "$BUNDLE_LOG"
+expect_clean_accept() {
+  local label="$1"
+  local expected_marker="$2"
+  shift 2
+  local raw filtered status error_count warning_count marker_count
+  if raw=$("$@" 2>&1); then status=0; else status=$?; fi
+  filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
+  printf '%s\n' "$filtered"
+  error_count=$(awk 'BEGIN { count = 0 } /^ERROR:/ { count += 1 } END { print count }' <<<"$filtered")
+  warning_count=$(awk 'BEGIN { count = 0 } /^WARNING:/ { count += 1 } END { print count }' <<<"$filtered")
+  marker_count=$(awk -v expected="$expected_marker" '$0 == expected { count += 1 } END { print count + 0 }' <<<"$filtered")
+  if (( status != 0 || error_count != 0 || warning_count != 0 || marker_count != 1 )); then
+    printf '%s: expected exit 0, zero ERROR:/WARNING:, and exactly one %s; got errors=%d warnings=%d marker_count=%d\n' \
+      "$label" "$expected_marker" "$error_count" "$warning_count" "$marker_count" >&2
+    return 1
+  fi
+}
 
-# This broad status is intentionally limited to source wrappers/GLBs; the exact
-# generated-state proof is the snapshot restore verifier and its marker above.
-source_status=$(git status --short -- \
-  scenes/wrappers/structural \
-  assets/_processed \
-  assets/imported/structural)
-if [[ -n "$source_status" ]]; then
-  printf 'structural source files changed by validation:\n%s\n' "$source_status" >&2
-  exit 1
-fi
-printf 'GENERATED STATE RESTORE VERIFIED structural_sources=clean\n'
+expect_exact_error_signature() {
+  local label="$1"
+  local expected_status="$2"
+  local expected_error_count="$3"
+  local marker="$4"
+  shift 4
+  local raw filtered status error_count warning_count unexpected_errors
+  if raw=$("$@" 2>&1); then status=0; else status=$?; fi
+  filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
+  printf '%s\n' "$filtered"
+  if (( status != expected_status )); then
+    printf '%s: expected exit %d, got %d\n' "$label" "$expected_status" "$status" >&2
+    return 1
+  fi
+  error_count=$(awk 'BEGIN { count = 0 } /^ERROR:/ { count += 1 } END { print count }' <<<"$filtered")
+  warning_count=$(awk 'BEGIN { count = 0 } /^WARNING:/ { count += 1 } END { print count }' <<<"$filtered")
+  if (( error_count != expected_error_count || warning_count != 0 )); then
+    printf '%s: expected errors=%d warnings=0, got errors=%d warnings=%d\n' "$label" "$expected_error_count" "$error_count" "$warning_count" >&2
+    return 1
+  fi
+  unexpected_errors=$(awk -v marker="$marker" 'index($0, "ERROR:") == 1 && index($0, marker) == 0 { print }' <<<"$filtered")
+  if [[ -n "$unexpected_errors" ]]; then
+    printf '%s: ERROR: line without required marker %s:\n%s\n' "$label" "$marker" "$unexpected_errors" >&2
+    return 1
+  fi
+}
+
+run_negative_fixture_green_suite() {
+  expect_exact_error_signature \
+    "mixed_legacy_variant post-fix rejection" 1 1 \
+    "mixed visual forms are forbidden" \
+    "$STATE_RUNNER" -- "$GODOT_BIN" --headless --path . \
+    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+    "$FIXTURE_ROOT/mixed_legacy_variant.tscn"
+  expect_exact_error_signature \
+    "partial_variant post-fix rejection" 1 1 \
+    "incomplete variant visual form; missing variants: VisualInstance_Breached" \
+    "$STATE_RUNNER" -- "$GODOT_BIN" --headless --path . \
+    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+    "$FIXTURE_ROOT/partial_variant.tscn"
+  expect_exact_error_signature \
+    "traversal_damaged_variant post-fix rejection" 1 1 \
+    "must use a canonical contained structural PackedScene path" \
+    "$STATE_RUNNER" -- "$GODOT_BIN" --headless --path . \
+    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+    "$FIXTURE_ROOT/traversal_damaged_variant.tscn"
+  expect_exact_error_signature \
+    "missing_damaged_resource post-fix rejection" 1 1 \
+    "references missing PackedScene resource" \
+    "$STATE_RUNNER" -- "$GODOT_BIN" --headless --path . \
+    --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+    "$FIXTURE_ROOT/missing_damaged_resource.tscn"
+}
+
+# Every command below is isolated independently. The exact real-directory gate
+# is 15 bundles, not merely a zero exit status.
+run_clean "editor import preflight" \
+  "$STATE_RUNNER" -- "$GODOT_BIN" --headless --editor --path . --quit
+expect_clean_accept \
+  "real structural directory post-fix" \
+  'Validated 15 wrapper scene bundle(s).' \
+  "$STATE_RUNNER" -- "$GODOT_BIN" --headless --path . \
+  --script res://scripts/placement/validate_wrapper_scenes.gd -- \
+  scenes/wrappers/structural/ship_structural_v0
+run_negative_fixture_green_suite
+printf 'NEGATIVE FIXTURE GREEN CONFIRMED\n'
+expect_clean_accept \
+  "eight-scene structural variant wrapper smoke" \
+  'STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true' \
+  "$STATE_RUNNER" -- "$GODOT_BIN" --headless --path . \
+  --script res://scripts/validation/structural_variant_wrapper_smoke.gd
+printf 'STRUCTURAL SOURCE GUARD PASS paths=3 per_invocation=true\n'
 ```
 
-`run_clean` captures and prints every command's output, propagates a nonzero command exit, and rejects any `ERROR:` or `WARNING:` diagnostic. The negative suite is the sole exception for intentional `ERROR:` output: each fixture must return status `1`, exactly one `ERROR:` line, zero `WARNING:` lines, and its exact marker through `expect_exact_error_signature`; the suite itself must return zero after all four exact rejections pass. The smoke's exact pass line is checked with `grep -Fxq`, while every other green command is enforced by exit status plus the diagnostic scan. `snapshot_generated_state` writes its canonical manifest and backups only below `STATE_ROOT`, records `.godot` existence plus every regular `.godot` file and every regular external `*.import` file outside `.godot` and `.git`, and stores deterministic relative POSIX paths, SHA-256 values, and modes. The `EXIT` trap is installed before the first Godot command. `restore_and_verify_generated_state` removes current `.godot`, restores the full backup only when it existed initially, removes external imports outside `.godot` and `.git`, restores the captured copies, re-collects the manifest, and fails on any path/hash/mode difference before deleting `STATE_ROOT`; failure cleanup is best-effort and cannot mask the primary status. `finish_bundle` preserves an original nonzero test status and returns restore/verification failure when tests otherwise passed, so an escaped or invalid temporary state makes an otherwise-green bundle nonzero. The non-conditional subshell's output is captured by direct redirection, its status is captured immediately with outer `errexit` disabled and `set -e` restored immediately afterward, and the log is printed only after the subshell succeeds; every command inside the bundle therefore remains under effective `errexit`. Only then is the exact `GENERATED STATE RESTORE VERIFIED` marker required; the only broad status check covers structural wrappers and GLBs. Step 5's clean-index policy and exact 14-file commit scope remain unchanged.
+`expect_clean_accept` mechanically requires exit `0`, zero lines beginning `ERROR:` or `WARNING:`, and exactly one exact success marker. It is used for both the mixed fixture's `Validated 1 wrapper scene bundle(s).` acceptance in the red gate and the post-fix real directory's exact `Validated 15 wrapper scene bundle(s).` acceptance above. The negative suite is the sole intentional `ERROR:` exception and requires status `1`, exactly one error, zero warnings, and its exact diagnostic marker for each fixture. Every capture removes only the runner's exact stderr restore marker before counting. The runner's per-invocation `finally` path always performs generated-state restoration and the broad source fingerprint check, including on early command failure; a source/state failure cannot replace a failed Godot status. No outer Step 4 snapshot, `STATE_ROOT`, or `EXIT` trap remains to duplicate the runner.
 
 - [ ] **Step 5: Stage only Task 2 implementation artifacts and commit**
 
-After the Step 4 shell block exits and its `restore_and_verify_generated_state` `EXIT` trap has completed, stage only the validator, smoke, and all four fixture triples:
+Step 0's pre-mutation clean-worktree check is the required protection against pre-existing staged, unstaged, and untracked changes. This fence independently re-derives the external state directory and verifies Step 0's record still names this worktree and the same starting `HEAD`; it intentionally does not repeat the obsolete whole-index stage-only precondition. Retain the exact 14-path staging and commit-scope proofs below. Never use `git reset`.
 
 ```bash
 set -euo pipefail
@@ -1018,17 +1147,26 @@ if (( ${#TASK2_PATHS[@]} != 14 )); then
   printf 'expected exactly 14 Task 2 paths, got %d\n' "${#TASK2_PATHS[@]}" >&2
   exit 1
 fi
+WORKTREE_DIGEST=$(python3 - "$PWD" <<'PY'
+import hashlib
+import sys
+print(hashlib.sha256(sys.argv[1].encode('utf-8')).hexdigest())
+PY
+)
+STATE_HOME="${TMPDIR:-/tmp}/synaptic-sea-task2-${WORKTREE_DIGEST}"
+PRECONDITION_RECORD="$STATE_HOME/step0-precondition.txt"
+[[ -f "$PRECONDITION_RECORD" ]] || { printf 'missing Step 0 precondition record\n' >&2; exit 1; }
+python3 - "$PRECONDITION_RECORD" "$PWD" "$(git rev-parse HEAD)" <<'PY'
+from pathlib import Path
+import sys
+lines = Path(sys.argv[1]).read_text().splitlines()
+if lines != [sys.argv[2], sys.argv[3]]:
+    raise SystemExit("Step 0 precondition record does not match this worktree and starting HEAD")
+PY
 
-# Refuse to modify any pre-existing staged work. This protects concurrently staged
-# changes and leaves the index untouched when the precondition fails.
-if ! git diff --cached --quiet; then
-  printf 'pre-existing staged work detected; refusing to modify the index:\n' >&2
-  git diff --cached --name-only >&2
-  exit 1
-fi
-
+# Step 0's clean precondition was satisfied before any Task 2 mutation. The
+# exact allowlist below is the only set that may enter the index or commit.
 git add "${TASK2_PATHS[@]}"
-
 expected_paths=$(printf '%s\n' "${TASK2_PATHS[@]}" | LC_ALL=C sort)
 actual_paths=$(git diff --cached --name-only | LC_ALL=C sort)
 if [[ "$actual_paths" != "$expected_paths" ]]; then
@@ -1055,7 +1193,7 @@ fi
 git diff HEAD^ HEAD --check
 ```
 
-The clean-index precondition uses `git diff --cached --quiet`; when it fails, the script prints the existing staged names and exits before any index mutation, protecting concurrently staged work. The exact 14-element `TASK2_PATHS` array is the sole staging allowlist; the cached expected-vs-actual comparison fails with both sets on mismatch, so no Task 3+ files, source wrappers, GLBs, or generated Godot state can be staged. The staged whitespace check and added-line placeholder scan run before commit. After commit, `git diff-tree --no-commit-id --name-only -r HEAD | LC_ALL=C sort` must equal the same expected set, and `git diff HEAD^ HEAD --check` must pass. The commit therefore contains exactly the 14 Task 2 files and nothing else.
+The exact 14-element `TASK2_PATHS` array is the sole staging allowlist; the cached expected-vs-actual comparison fails with both sets on mismatch, so no Task 3+ files, source wrappers, GLBs, or generated Godot state can be staged. The staged whitespace check and added-line placeholder scan run before commit. After commit, `git diff-tree --no-commit-id --name-only -r HEAD | LC_ALL=C sort` must equal the same expected set, and `git diff HEAD^ HEAD --check` must pass. Step 0's clean check is deliberately not replaced by a stage-only check, so pre-existing changes in an owned path are blocked before work begins rather than silently included by `git add`.
 
 ### Task 3: Implement the pure prop-sidecar schema, GLB inspection, and canonical serialization layer
 
