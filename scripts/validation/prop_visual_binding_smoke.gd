@@ -149,6 +149,7 @@ func _initialize() -> void:
 	var scripted_root: Node3D = Node3D.new()
 	var scripted_node: Node3D = Node3D.new()
 	scripted_node.set_script(ProcgenDebugRunnerScript)
+	scripted_node.set_meta("gltf_imported", true)
 	scripted_root.add_child(scripted_node)
 	failures += _expect(
 		not RuntimePropVisualBinderScript.validate_visual_tree(scripted_root),
@@ -159,6 +160,19 @@ func _initialize() -> void:
 	failures += _expect(
 		not RuntimePropVisualBinderScript.validate_visual_tree(interaction_root),
 		"interaction visual is rejected",
+	)
+
+	var benign_import_root: Node3D = Node3D.new()
+	var benign_import_script: GDScript = GDScript.new()
+	benign_import_script.source_code = "extends Node3D\n"
+	var benign_import_reload: Error = benign_import_script.reload()
+	failures += _expect(benign_import_reload == OK, "benign importer script fixture compiles")
+	if benign_import_reload == OK:
+		benign_import_root.set_script(benign_import_script)
+		benign_import_root.set_meta("gltf_imported", true)
+	failures += _expect(
+		RuntimePropVisualBinderScript.validate_visual_tree(benign_import_root),
+		"benign Godot importer script is accepted",
 	)
 
 	var unrelated_direct: Node3D = Node3D.new()
@@ -212,6 +226,7 @@ func _initialize() -> void:
 	area_root.free()
 	scripted_root.free()
 	interaction_root.free()
+	benign_import_root.free()
 	get_root().remove_child(marker)
 	marker.free()
 	get_root().remove_child(missing_marker)
