@@ -17,6 +17,7 @@ from tools.generate_prop_sidecars import (  # noqa: E402
     DRESSING_SURFACES,
     OBJECTIVE_IDS,
     PROP_GROUPS,
+    _ensure_contained,
     build_index,
 )
 from tools.prop_visual_metadata import read_glb_metadata, validate_sidecar  # noqa: E402
@@ -27,11 +28,24 @@ KIND_BY_GROUP = {"components": "component", "dressing": "dressing", "objectives"
 
 
 def _relative(project_root: Path, path: Path) -> str:
-    return path.resolve().relative_to(project_root.resolve()).as_posix()
+    return path.relative_to(project_root).as_posix()
+
+
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        value[key] = item
+    return value
 
 
 def _load_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_reject_duplicate_keys)
+
+
+def _canonical_text(document: dict[str, Any]) -> str:
+    return json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n"
 
 
 def _load_component_ids(project_root: Path, errors: list[str]) -> set[str]:
@@ -90,12 +104,27 @@ def _validate_inventory(project_root: Path, errors: list[str]) -> list[tuple[str
         if len(sidecars) != expected_count:
             errors.append(f"expected {expected_count} {group} sidecars, found {len(sidecars)}")
         glb_names = {path.stem for path in glbs}
+        unsafe_sidecars: set[Path] = set()
         for sidecar_path in sidecars:
             asset_id = sidecar_path.name.removesuffix(".sidecar.json")
             if asset_id not in glb_names:
                 errors.append(f"sidecar has no matching GLB: {_relative(project_root, sidecar_path)}")
+            try:
+                _ensure_contained(project_root, sidecar_path)
+            except ValueError as exc:
+                errors.append(str(exc))
+                unsafe_sidecars.add(sidecar_path)
         for glb_path in glbs:
+            try:
+                _ensure_contained(project_root, glb_path)
+            except ValueError as exc:
+                errors.append(str(exc))
+                inventory.append((group, glb_path, glb_path.with_name(f"{glb_path.stem}.sidecar.json"), None))
+                continue
             sidecar_path = glb_path.with_name(f"{glb_path.stem}.sidecar.json")
+            if sidecar_path in unsafe_sidecars:
+                inventory.append((group, glb_path, sidecar_path, None))
+                continue
             if not sidecar_path.is_file():
                 errors.append(f"missing sidecar: {_relative(project_root, sidecar_path)}")
                 inventory.append((group, glb_path, sidecar_path, None))
@@ -191,9 +220,14 @@ def validate_project(project_root: Path, check_index: bool = False) -> list[str]
     inventory = _validate_inventory(project_root, errors)
     _validate_mappings(inventory, project_root, errors)
     if check_index:
+        index_path = project_root / "data/props/visual_bindings.generated.json"
+        try:
+            _ensure_contained(project_root, index_path)
+        except ValueError as exc:
+            errors.append(str(exc))
+            return errors
         try:
             expected = build_index(project_root)
-            index_path = project_root / "data/props/visual_bindings.generated.json"
             if not index_path.is_file():
                 errors.append("missing generated index: data/props/visual_bindings.generated.json")
             else:
@@ -202,7 +236,7 @@ def validate_project(project_root: Path, check_index: bool = False) -> list[str]
                 except (OSError, ValueError) as exc:
                     errors.append(f"invalid generated index: {exc}")
                 else:
-                    if actual != expected:
+                    if actual != expected or index_path.read_bytes() != _canonical_text(expected).encode("utf-8"):
                         errors.append("generated index differs from sidecars")
         except (OSError, ValueError, KeyError) as exc:
             errors.append(str(exc))

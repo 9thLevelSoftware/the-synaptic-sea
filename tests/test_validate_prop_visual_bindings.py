@@ -141,6 +141,22 @@ def refresh_derived(project_root: Path, asset_id: str) -> None:
         raise AssertionError(f"refresh failed ({result.returncode}): {result.stdout}\n{result.stderr}")
 
 
+def run_generator(project_root: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            sys.executable,
+            str(project_root / "tools/generate_prop_sidecars.py"),
+            "--project-root",
+            str(project_root),
+            *arguments,
+        ],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
 class ValidatePropVisualBindingsTests(unittest.TestCase):
     def test_validator_rejects_missing_sidecar(self) -> None:
         with copied_project_without("assets/imported/props/components/reactor_console.sidecar.json") as project_root:
@@ -161,6 +177,76 @@ class ValidatePropVisualBindingsTests(unittest.TestCase):
     def test_validator_rejects_stale_generated_index(self) -> None:
         with copied_project_with_stale_index("components", "reactor_console") as project_root:
             self.assertIn("generated index differs from sidecars", run_validator(project_root))
+
+    def test_generator_rejects_invalid_sidecar_before_writing_index(self) -> None:
+        with copied_project_with_sidecar_value("reactor_console", ["source", "sha256"], "0" * 64) as project_root:
+            index_path = project_root / "data/props/visual_bindings.generated.json"
+            original_index = index_path.read_bytes()
+            result = run_generator(project_root, "--write-index")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("reactor_console.sidecar.json", result.stderr)
+            self.assertEqual(index_path.read_bytes(), original_index)
+
+    def test_generator_rejects_unknown_authoritative_mapping_before_writing_index(self) -> None:
+        with copied_project_with_sidecar_value("reactor_console", ["binding", "ids"], ["unknown_component"]) as project_root:
+            index_path = project_root / "data/props/visual_bindings.generated.json"
+            original_index = index_path.read_bytes()
+            result = run_generator(project_root, "--write-index")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("unknown component_id: unknown_component", result.stderr)
+            self.assertEqual(index_path.read_bytes(), original_index)
+
+    def test_validator_rejects_noncanonical_generated_index_bytes(self) -> None:
+        with copied_project() as project_root:
+            index_path = project_root / "data/props/visual_bindings.generated.json"
+            document = json.loads(index_path.read_text(encoding="utf-8"))
+            pretty = json.dumps(document, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+            index_path.write_text(pretty, encoding="utf-8")
+            self.assertIn("generated index differs from sidecars", run_validator(project_root))
+
+    def test_validator_rejects_trailing_whitespace_in_generated_index(self) -> None:
+        with copied_project() as project_root:
+            index_path = project_root / "data/props/visual_bindings.generated.json"
+            index_path.write_bytes(index_path.read_bytes() + b"\n")
+            self.assertIn("generated index differs from sidecars", run_validator(project_root))
+
+    def test_validator_rejects_duplicate_keys_in_generated_index(self) -> None:
+        with copied_project() as project_root:
+            index_path = project_root / "data/props/visual_bindings.generated.json"
+            canonical = index_path.read_text(encoding="utf-8")
+            duplicate = canonical.replace(
+                '"schema_version":"1.0.0",',
+                '"schema_version":"1.0.0","schema_version":"1.0.0",',
+                1,
+            )
+            index_path.write_text(duplicate, encoding="utf-8")
+            self.assertIn("invalid generated index", run_validator(project_root))
+
+    def test_validator_rejects_sidecar_symlink_escape_without_traceback(self) -> None:
+        with copied_project() as project_root:
+            sidecar_path, _sidecar = _load_sidecar(project_root, "reactor_console")
+            outside_path = project_root.parent / "outside-reactor-console.sidecar.json"
+            outside_path.write_bytes(sidecar_path.read_bytes())
+            sidecar_path.unlink()
+            sidecar_path.symlink_to(outside_path)
+            output = run_validator(project_root)
+            self.assertIn("path escapes project root via symlink", output)
+            self.assertNotIn("Traceback", output)
+
+    def test_generator_rejects_index_symlink_escape_without_writing_outside(self) -> None:
+        with copied_project() as project_root:
+            index_path = project_root / "data/props/visual_bindings.generated.json"
+            outside_path = project_root.parent / "outside-visual-bindings.generated.json"
+            outside_path.write_bytes(index_path.read_bytes())
+            original_outside = outside_path.read_bytes()
+            index_path.unlink()
+            index_path.symlink_to(outside_path)
+            result = run_generator(project_root, "--write-index")
+            output = "\n".join(part for part in (result.stdout, result.stderr) if part)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("path escapes project root via symlink", output)
+            self.assertNotIn("Traceback", output)
+            self.assertEqual(outside_path.read_bytes(), original_outside)
 
     def test_refresh_preserves_extensions_and_hand_authored_fields(self) -> None:
         with copied_project_with_extension("reactor_console", {"studio": {"review_state": "approved"}}) as project_root:

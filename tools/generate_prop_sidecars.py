@@ -13,7 +13,7 @@ from typing import Any
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tools.prop_visual_metadata import read_glb_metadata, write_canonical_json
+from tools.prop_visual_metadata import read_glb_metadata, validate_sidecar, write_canonical_json
 
 
 PROP_GROUPS = ("components", "dressing", "objectives")
@@ -38,8 +38,24 @@ OBJECTIVE_IDS = {
 }
 
 
+def _relative(project_root: Path, path: Path) -> str:
+    return path.relative_to(project_root).as_posix()
+
+
+def _ensure_contained(project_root: Path, path: Path) -> None:
+    root = project_root.resolve()
+    resolved = path.resolve(strict=False)
+    if resolved != root and root not in resolved.parents:
+        try:
+            relative = path.relative_to(project_root).as_posix()
+        except ValueError:
+            relative = path.as_posix()
+        raise ValueError(f"path escapes project root via symlink: {relative}")
+
+
 def _res_path(project_root: Path, path: Path) -> str:
-    return f"res://{path.resolve().relative_to(project_root.resolve()).as_posix()}"
+    _ensure_contained(project_root, path)
+    return f"res://{_relative(project_root, path)}"
 
 
 def _binding(prop_kind: str, asset_id: str) -> dict[str, Any]:
@@ -92,7 +108,9 @@ def _iter_glbs(project_root: Path) -> list[tuple[str, Path]]:
     result: list[tuple[str, Path]] = []
     for prop_kind in PROP_GROUPS:
         group = prop_root / prop_kind
+        _ensure_contained(project_root, group)
         for glb_path in sorted(group.glob("*.glb"), key=lambda path: path.name):
+            _ensure_contained(project_root, glb_path)
             result.append((kind_by_group[prop_kind], glb_path))
     return result
 
@@ -101,8 +119,17 @@ def _sidecar_path(glb_path: Path) -> Path:
     return glb_path.with_name(f"{glb_path.stem}.sidecar.json")
 
 
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        value[key] = item
+    return value
+
+
 def _load_json(path: Path) -> dict[str, Any]:
-    value = json.loads(path.read_text(encoding="utf-8"))
+    value = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_reject_duplicate_keys)
     if not isinstance(value, dict):
         raise ValueError(f"JSON document must be an object: {path}")
     return value
@@ -115,23 +142,126 @@ def _index_record(sidecar: dict[str, Any]) -> dict[str, Any]:
     return copy.deepcopy(sidecar)
 
 
+def _walk_placement_ids(value: Any, found: set[str]) -> None:
+    if isinstance(value, dict):
+        placement_id = value.get("placement_id")
+        if isinstance(placement_id, str) and placement_id:
+            found.add(placement_id)
+        for child in value.values():
+            _walk_placement_ids(child, found)
+    elif isinstance(value, list):
+        for child in value:
+            _walk_placement_ids(child, found)
+
+
+def _load_component_ids(project_root: Path) -> set[str]:
+    path = project_root / "data/components/component_catalog.json"
+    document = _load_json(path)
+    components = document.get("components")
+    if not isinstance(components, dict):
+        raise ValueError("component catalog has no components object")
+    return {key for key in components if isinstance(key, str)}
+
+
+def _load_objective_ids(project_root: Path) -> set[str]:
+    found: set[str] = set()
+    for path in sorted((project_root / "data/procgen").rglob("gameplay_slice.json")):
+        _walk_placement_ids(_load_json(path), found)
+    return found
+
+
+def _expected_binding_ids(prop_kind: str, asset_id: str) -> list[str]:
+    if prop_kind in ("component", "dressing"):
+        return [asset_id]
+    return OBJECTIVE_IDS.get(asset_id, [])
+
+
+def _validate_index_sidecar(
+    project_root: Path,
+    prop_kind: str,
+    glb_path: Path,
+    sidecar_path: Path,
+    sidecar: dict[str, Any],
+    component_ids: set[str],
+    objective_ids: set[str],
+) -> None:
+    diagnostics = validate_sidecar(sidecar, glb_path, project_root)
+    if sidecar.get("prop_kind") != prop_kind:
+        diagnostics.append(f"prop_kind mismatch: {_relative(project_root, sidecar_path)}")
+
+    try:
+        metadata = read_glb_metadata(glb_path)
+    except (OSError, ValueError) as exc:
+        diagnostics.append(f"GLB metadata error: {exc}")
+    else:
+        source = sidecar.get("source")
+        if isinstance(source, dict):
+            for field in ("sha256", "byte_size", "mesh_count", "gltf_version"):
+                if source.get(field) != metadata[field]:
+                    diagnostics.append(f"{field} mismatch")
+        bounds = sidecar.get("bounds")
+        if isinstance(bounds, dict):
+            if bounds.get("local_min_m") != metadata["local_min_m"] or bounds.get("local_max_m") != metadata["local_max_m"]:
+                diagnostics.append("bounds mismatch")
+
+    binding = sidecar.get("binding")
+    ids = binding.get("ids", []) if isinstance(binding, dict) else []
+    expected_ids = _expected_binding_ids(prop_kind, glb_path.stem)
+    if isinstance(ids, list) and expected_ids and ids != expected_ids:
+        diagnostics.append("binding ids mismatch")
+    if isinstance(ids, list):
+        if prop_kind == "component":
+            for identifier in ids:
+                if identifier not in component_ids:
+                    diagnostics.append(f"unknown component_id: {identifier}")
+        elif prop_kind == "dressing":
+            for identifier in ids:
+                if identifier not in DRESSING_SURFACES:
+                    diagnostics.append(f"unknown visual_prop_id: {identifier}")
+        elif prop_kind == "objective":
+            for identifier in ids:
+                if identifier not in objective_ids:
+                    diagnostics.append(f"unknown gameplay_placement_id: {identifier}")
+
+    if diagnostics:
+        relative = _relative(project_root, sidecar_path)
+        raise ValueError(f"invalid sidecar {relative}: {'; '.join(diagnostics)}")
+
+
 def build_index(project_root: Path) -> dict[str, Any]:
     groups: dict[str, dict[str, Any]] = {"components": {}, "objectives": {}, "dressing": {}}
+    component_ids = _load_component_ids(project_root)
+    objective_ids = _load_objective_ids(project_root)
+    owned_component_ids: set[str] = set()
     for prop_kind, glb_path in _iter_glbs(project_root):
         sidecar_path = _sidecar_path(glb_path)
+        _ensure_contained(project_root, sidecar_path)
         if not sidecar_path.is_file():
-            raise FileNotFoundError(f"missing sidecar: {sidecar_path.relative_to(project_root).as_posix()}")
+            raise FileNotFoundError(f"missing sidecar: {_relative(project_root, sidecar_path)}")
         sidecar = _load_json(sidecar_path)
-        binding = sidecar.get("binding")
+        _validate_index_sidecar(
+            project_root,
+            prop_kind,
+            glb_path,
+            sidecar_path,
+            sidecar,
+            component_ids,
+            objective_ids,
+        )
+        binding = sidecar["binding"]
         if not isinstance(binding, dict) or not isinstance(binding.get("ids"), list):
-            raise ValueError(f"sidecar has no binding ids: {sidecar_path.relative_to(project_root).as_posix()}")
+            raise ValueError(f"sidecar has no binding ids: {_relative(project_root, sidecar_path)}")
         index_group = {"component": "components", "dressing": "dressing", "objective": "objectives"}[prop_kind]
         for binding_id in binding["ids"]:
             if not isinstance(binding_id, str) or not binding_id:
-                raise ValueError(f"sidecar has invalid binding id: {sidecar_path.relative_to(project_root).as_posix()}")
+                raise ValueError(f"sidecar has invalid binding id: {_relative(project_root, sidecar_path)}")
             if binding_id in groups[index_group]:
                 raise ValueError(f"duplicate binding id: {binding_id}")
             groups[index_group][binding_id] = _index_record(sidecar)
+            if prop_kind == "component":
+                owned_component_ids.add(binding_id)
+    for identifier in sorted(component_ids - owned_component_ids):
+        raise ValueError(f"missing component_id: {identifier}")
     return {
         "schema_version": "1.0.0",
         "document_kind": "prop_visual_binding_index",
@@ -149,6 +279,7 @@ def _write_missing(project_root: Path) -> list[str]:
     changes: list[str] = []
     for prop_kind, glb_path in _iter_glbs(project_root):
         sidecar_path = _sidecar_path(glb_path)
+        _ensure_contained(project_root, sidecar_path)
         if sidecar_path.exists():
             continue
         sidecar = _canonical_sidecar(project_root, glb_path, prop_kind)
@@ -163,8 +294,9 @@ def _refresh_derived(project_root: Path, asset_id: str) -> str:
         raise ValueError(f"expected one GLB for asset_id {asset_id}, found {len(matches)}")
     prop_kind, glb_path = matches[0]
     sidecar_path = _sidecar_path(glb_path)
+    _ensure_contained(project_root, sidecar_path)
     if not sidecar_path.is_file():
-        raise FileNotFoundError(f"missing sidecar: {sidecar_path.relative_to(project_root).as_posix()}")
+        raise FileNotFoundError(f"missing sidecar: {_relative(project_root, sidecar_path)}")
     existing = _load_json(sidecar_path)
     refreshed = _canonical_sidecar(project_root, glb_path, prop_kind)
     for field in ("binding", "placement", "provenance", "extensions"):
@@ -178,7 +310,8 @@ def _check_sidecars(project_root: Path) -> list[str]:
     errors: list[str] = []
     for prop_kind, glb_path in _iter_glbs(project_root):
         sidecar_path = _sidecar_path(glb_path)
-        relative = sidecar_path.relative_to(project_root).as_posix()
+        _ensure_contained(project_root, sidecar_path)
+        relative = _relative(project_root, sidecar_path)
         if not sidecar_path.is_file():
             errors.append(f"missing sidecar: {relative}")
             continue
@@ -207,6 +340,7 @@ def _check_sidecars(project_root: Path) -> list[str]:
 def _check_index(project_root: Path) -> list[str]:
     path = project_root / "data/props/visual_bindings.generated.json"
     try:
+        _ensure_contained(project_root, path)
         expected = build_index(project_root)
     except (OSError, ValueError, KeyError) as exc:
         return [str(exc)]
@@ -245,8 +379,9 @@ def main(argv: list[str] | None = None) -> int:
             diagnostics.append(_refresh_derived(project_root, args.asset_id))
         if args.write_index:
             index_path = project_root / "data/props/visual_bindings.generated.json"
+            _ensure_contained(project_root, index_path)
             write_canonical_json(index_path, build_index(project_root))
-            diagnostics.append(f"wrote generated index: {index_path.relative_to(project_root).as_posix()}")
+            diagnostics.append(f"wrote generated index: {_relative(project_root, index_path)}")
         if args.check:
             diagnostics.extend(_check_sidecars(project_root))
             diagnostics.extend(_check_index(project_root))
@@ -255,7 +390,12 @@ def main(argv: list[str] | None = None) -> int:
         had_error = True
 
     for diagnostic in diagnostics:
-        print(diagnostic, file=sys.stderr if (args.check and not diagnostic.startswith(("created ", "refreshed ", "wrote "))) else sys.stdout)
+        print(
+            diagnostic,
+            file=sys.stderr
+            if had_error or (args.check and not diagnostic.startswith(("created ", "refreshed ", "wrote ")))
+            else sys.stdout,
+        )
     if had_error or (args.check and any(diagnostic for diagnostic in diagnostics)):
         return 1
     return 0
