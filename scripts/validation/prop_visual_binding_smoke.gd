@@ -1,8 +1,11 @@
 extends SceneTree
 
+const PropVisualBindingCatalogScript := preload("res://scripts/systems/prop_visual_binding_catalog.gd")
+const RuntimePropVisualBinderScript := preload("res://scripts/procgen/runtime_prop_visual_binder.gd")
+
 func _initialize() -> void:
 	var failures: int = 0
-	var catalog := PropVisualBindingCatalog.new()
+	var catalog = PropVisualBindingCatalogScript.new()
 	failures += _expect(catalog.load_from_path(), "catalog loads generated index")
 	var component_binding: Dictionary = catalog.get_component_binding("reactor_console")
 	var objective_binding: Dictionary = catalog.get_objective_binding("reactor_control_panel")
@@ -14,7 +17,7 @@ func _initialize() -> void:
 
 	var marker: Node3D = Node3D.new()
 	get_root().add_child(marker)
-	var mounted: bool = RuntimePropVisualBinder.mount_component_visual(marker, component_binding)
+	var mounted: bool = RuntimePropVisualBinderScript.mount_component_visual(marker, component_binding)
 	failures += _expect(mounted, "component visual mounts")
 	var imported_component: Node3D = marker.get_node_or_null("ImportedVisual") as Node3D
 	failures += _expect(imported_component != null, "component ImportedVisual child exists")
@@ -25,7 +28,7 @@ func _initialize() -> void:
 		)
 		failures += _expect(_is_visual_only(imported_component), "component visual is visual-only")
 
-	var detached_objective: Node3D = RuntimePropVisualBinder.create_objective_visual(objective_binding)
+	var detached_objective: Node3D = RuntimePropVisualBinderScript.create_objective_visual(objective_binding)
 	failures += _expect(detached_objective != null, "objective visual creates")
 	if detached_objective != null:
 		failures += _expect(detached_objective.get_parent() == null, "objective visual is detached")
@@ -42,7 +45,7 @@ func _initialize() -> void:
 	placement["rotation_degrees"] = [4.0, 5.0, 6.0]
 	placement["scale"] = 2.0
 	transformed_binding["placement"] = placement
-	var transformed: Node3D = RuntimePropVisualBinder.create_objective_visual(transformed_binding)
+	var transformed: Node3D = RuntimePropVisualBinderScript.create_objective_visual(transformed_binding)
 	failures += _expect(transformed != null, "finite transforms are accepted")
 	if transformed != null:
 		failures += _expect(transformed.position == Vector3(1.0, 2.0, 3.0), "offset transform applied")
@@ -54,18 +57,18 @@ func _initialize() -> void:
 	invalid_placement["offset_m"] = [0.0, 0.0]
 	invalid_binding["placement"] = invalid_placement
 	failures += _expect(
-		RuntimePropVisualBinder.create_objective_visual(invalid_binding) == null,
+		RuntimePropVisualBinderScript.create_objective_visual(invalid_binding) == null,
 		"invalid transform array is rejected",
 	)
 
 	var missing_marker: Node3D = Node3D.new()
 	get_root().add_child(missing_marker)
 	failures += _expect(
-		not RuntimePropVisualBinder.mount_component_visual(missing_marker, {}),
+		not RuntimePropVisualBinderScript.mount_component_visual(missing_marker, {}),
 		"missing binding falls back without imported visual",
 	)
 	failures += _expect(missing_marker.get_child_count() == 0, "fallback marker has no imported visual")
-	RuntimePropVisualBinder.clear_imported_visuals(marker)
+	RuntimePropVisualBinderScript.clear_imported_visuals(marker)
 	failures += _expect(marker.get_node_or_null("ImportedVisual") == null, "imported visual clears")
 
 	if detached_objective != null:
