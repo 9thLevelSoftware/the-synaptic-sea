@@ -8,7 +8,7 @@ import math
 import re
 import struct
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Optional
 
 
 FORBIDDEN_GAMEPLAY_FIELDS = {
@@ -81,15 +81,23 @@ _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _SEMVER_PATTERN = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 
 
+def _finite_number(value: Any) -> Optional[float]:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        converted = float(value)
+    except (OverflowError, TypeError, ValueError):
+        return None
+    return converted if math.isfinite(converted) else None
+
+
 def _finite_vector(value: Any, size: int = 3) -> Optional[list[float]]:
     if not isinstance(value, (list, tuple)) or len(value) != size:
         return None
     result: list[float] = []
     for item in value:
-        if isinstance(item, bool) or not isinstance(item, (int, float)):
-            return None
-        converted = float(item)
-        if not math.isfinite(converted):
+        converted = _finite_number(item)
+        if converted is None:
             return None
         result.append(converted)
     return result
@@ -111,7 +119,7 @@ def _read_glb_chunks(data: bytes) -> tuple[dict[str, Any], Optional[bytes]]:
     offset = 12
     json_chunk: Optional[bytes] = None
     binary_chunk: Optional[bytes] = None
-    chunk_index = 0
+    unknown_chunk_seen = False
     while offset < declared_length:
         if declared_length - offset < 8:
             raise ValueError("malformed GLB chunk header")
@@ -123,30 +131,37 @@ def _read_glb_chunks(data: bytes) -> tuple[dict[str, Any], Optional[bytes]]:
         if chunk_end > declared_length:
             raise ValueError("malformed GLB chunk length")
         chunk = data[chunk_start:chunk_end]
-        if chunk_index == 0 and chunk_type != b"JSON":
-            raise ValueError("malformed GLB: first chunk must be JSON")
-        if chunk_index > 1:
-            raise ValueError("malformed GLB: illegal chunk sequence")
-        if chunk_index == 1 and chunk_type != b"BIN\x00":
-            raise ValueError("malformed GLB: illegal chunk sequence")
-        if chunk_type == b"JSON":
+        if json_chunk is None:
+            if chunk_type != b"JSON":
+                raise ValueError("malformed GLB: first chunk must be JSON")
+            json_chunk = chunk
+        elif chunk_type == b"JSON":
             if json_chunk is not None:
                 raise ValueError("malformed GLB: duplicate JSON chunk")
             json_chunk = chunk
         elif chunk_type == b"BIN\x00":
             if binary_chunk is not None:
                 raise ValueError("malformed GLB: duplicate BIN chunk")
+            if unknown_chunk_seen:
+                raise ValueError("malformed GLB: illegal chunk sequence")
             binary_chunk = chunk
         else:
-            raise ValueError("malformed GLB: unsupported chunk type")
+            unknown_chunk_seen = True
         offset = chunk_end
-        chunk_index += 1
 
     if offset != declared_length or json_chunk is None:
         raise ValueError("malformed GLB: missing JSON chunk")
     try:
-        document = json.loads(json_chunk.rstrip(b" \t\r\n\x00").decode("utf-8"))
+        text = json_chunk.decode("utf-8")
+        start = 0
+        while start < len(text) and text[start] in " \t\r\n":
+            start += 1
+        document, end = json.JSONDecoder().raw_decode(text, start)
+        if any(character != " " for character in text[end:]):
+            raise ValueError("illegal JSON chunk padding")
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("malformed GLB JSON chunk") from exc
+    except ValueError as exc:
         raise ValueError("malformed GLB JSON chunk") from exc
     if not isinstance(document, dict):
         raise ValueError("malformed GLB JSON chunk: document is not an object")
@@ -158,6 +173,18 @@ def _accessor_vector(value: Any, label: str) -> list[float]:
     if vector is None:
         raise ValueError(f"invalid non-finite or non-3D {label}")
     return vector
+
+
+def _validate_position_accessor(accessor: dict[str, Any]) -> None:
+    if accessor.get("componentType") != 5126 or accessor.get("type") != "VEC3":
+        raise ValueError("POSITION accessor must be a FLOAT VEC3")
+    count = accessor.get("count")
+    if isinstance(count, bool) or not isinstance(count, int) or count <= 0:
+        raise ValueError("POSITION accessor has an invalid count")
+    if "sparse" in accessor:
+        raise ValueError("sparse POSITION accessors are unsupported")
+    if ("min" in accessor) != ("max" in accessor):
+        raise ValueError("POSITION accessor must provide both min and max")
 
 
 def _round_bound(value: float) -> float:
@@ -231,7 +258,7 @@ def read_glb_metadata(path: Path) -> dict[str, Any]:
     document, binary_chunk = _read_glb_chunks(data)
 
     asset = document.get("asset")
-    if not isinstance(asset, dict) or not isinstance(asset.get("version"), str):
+    if not isinstance(asset, dict) or asset.get("version") != "2.0":
         raise ValueError("GLB JSON has no valid asset.version")
     gltf_version = asset["version"]
 
@@ -262,6 +289,7 @@ def read_glb_metadata(path: Path) -> dict[str, Any]:
             if accessor_index < 0 or accessor_index >= len(accessors) or not isinstance(accessors[accessor_index], dict):
                 raise ValueError("GLB POSITION accessor index is out of range")
             accessor = accessors[accessor_index]
+            _validate_position_accessor(accessor)
             if "min" in accessor and "max" in accessor:
                 lower = _accessor_vector(accessor["min"], "POSITION min")
                 upper = _accessor_vector(accessor["max"], "POSITION max")
@@ -329,7 +357,8 @@ def _validate_vector_field(errors: list[str], value: Any, label: str) -> None:
 
 
 def _validate_nonnegative_number(errors: list[str], value: Any, label: str) -> None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)) or value < 0:
+    converted = _finite_number(value)
+    if converted is None or converted < 0:
         errors.append(f"{label} must be a finite non-negative number")
 
 
@@ -429,15 +458,26 @@ def validate_sidecar(sidecar: dict, glb_path: Path, project_root: Path) -> list[
         yaw = placement.get("allowed_yaw_deg")
         if not isinstance(yaw, list) or not yaw:
             errors.append("placement.allowed_yaw_deg must be a non-empty array")
-        elif any(isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)) for value in yaw):
-            errors.append("placement.allowed_yaw_deg must contain finite numbers")
         else:
-            duplicate_yaw = sorted({float(value) for value in yaw if yaw.count(value) > 1})
-            for value in duplicate_yaw:
-                errors.append(f"duplicate placement.allowed_yaw_deg: {value:g}")
+            invalid_yaw = False
+            seen_yaw: set[int | float] = set()
+            duplicate_yaw: set[int | float] = set()
+            for value in yaw:
+                if _finite_number(value) is None:
+                    invalid_yaw = True
+                    continue
+                if value in seen_yaw:
+                    duplicate_yaw.add(value)
+                else:
+                    seen_yaw.add(value)
+            if invalid_yaw:
+                errors.append("placement.allowed_yaw_deg must contain finite numbers")
+            else:
+                for value in sorted(duplicate_yaw, key=float):
+                    errors.append(f"duplicate placement.allowed_yaw_deg: {float(value):g}")
         if "scale" not in placement:
             pass
-        elif isinstance(placement.get("scale"), bool) or not isinstance(placement.get("scale"), (int, float)) or not math.isfinite(float(placement["scale"])) or placement["scale"] <= 0:
+        elif (scale := _finite_number(placement["scale"])) is None or scale <= 0:
             errors.append("placement.scale must be a finite positive number")
         if "surface" in placement:
             if prop_kind not in ("dressing", "objective"):

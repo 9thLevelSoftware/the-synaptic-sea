@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import struct
 import tempfile
 import unittest
@@ -85,6 +86,19 @@ class PropVisualMetadataTests(unittest.TestCase):
         for field in ("local_min_m", "local_max_m"):
             self.assertEqual(bounds_properties[field].get("minItems"), 3, field)
 
+    def test_schema_visual_scene_path_pattern_rejects_parent_components(self) -> None:
+        schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+        pattern = schema["properties"]["visual_scene_path"]["pattern"]
+        matcher = re.compile(pattern)
+        self.assertIsNotNone(matcher.fullmatch("res://assets/imported/props/reactor_console.glb"))
+        for path in (
+            "res://../reactor_console.glb",
+            "res://assets/../reactor_console.glb",
+            "res://assets/props/../reactor_console.glb",
+        ):
+            with self.subTest(path=path):
+                self.assertIsNone(matcher.fullmatch(path))
+
     def test_sidecar_rejects_invalid_origin_and_duplicate_numeric_yaw(self) -> None:
         sidecar = valid_sidecar()
         sidecar["placement"]["origin"] = "unsupported_origin"
@@ -94,6 +108,23 @@ class PropVisualMetadataTests(unittest.TestCase):
             [
                 "placement.origin must be one of: marker_anchor, scene_origin",
                 "duplicate placement.allowed_yaw_deg: 0",
+            ],
+        )
+
+    def test_sidecar_huge_numbers_return_deterministic_errors(self) -> None:
+        huge = 10**4000
+        sidecar = valid_sidecar()
+        sidecar["placement"]["offset_m"] = [huge, 0, 0]
+        sidecar["placement"]["allowed_yaw_deg"] = [huge]
+        sidecar["placement"]["scale"] = huge
+        sidecar["source"]["byte_size"] = huge
+        self.assertEqual(
+            validate_sidecar(sidecar, REACTOR_GLB, PROJECT_ROOT),
+            [
+                "placement.offset_m must be a finite 3-vector",
+                "placement.allowed_yaw_deg must contain finite numbers",
+                "placement.scale must be a finite positive number",
+                "source.byte_size must be a finite non-negative number",
             ],
         )
 
@@ -211,6 +242,90 @@ class PropVisualMetadataTests(unittest.TestCase):
         self.assertEqual(record["local_min_m"], [-2.0, -3.0, -4.0])
         self.assertEqual(record["local_max_m"], [5.0, 6.0, 7.0])
 
+    def test_glb_rejects_non_2_0_asset_version(self) -> None:
+        document = {
+            "asset": {"version": "1.0"},
+            "accessors": [{
+                "componentType": 5126,
+                "count": 3,
+                "type": "VEC3",
+                "min": [-1, -2, -3],
+                "max": [4, 5, 6],
+            }],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "gltf_1.glb"
+            path.write_bytes(make_glb(document))
+            with self.assertRaises(ValueError):
+                read_glb_metadata(path)
+
+    def test_glb_position_accessors_require_strict_structure(self) -> None:
+        base_accessor = {
+            "componentType": 5126,
+            "count": 3,
+            "type": "VEC3",
+            "min": [-1, -2, -3],
+            "max": [4, 5, 6],
+        }
+        invalid_accessors = {
+            "component_type": {**base_accessor, "componentType": 5123},
+            "accessor_type": {**base_accessor, "type": "SCALAR"},
+            "count_zero": {**base_accessor, "count": 0},
+            "count_float": {**base_accessor, "count": 3.0},
+            "sparse_with_bounds": {**base_accessor, "sparse": {}},
+            "partial_min": {key: value for key, value in base_accessor.items() if key != "max"},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name, accessor in invalid_accessors.items():
+                with self.subTest(name=name):
+                    document = {
+                        "asset": {"version": "2.0"},
+                        "accessors": [accessor],
+                        "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+                    }
+                    path = root / f"{name}.glb"
+                    path.write_bytes(make_glb(document))
+                    with self.assertRaises(ValueError):
+                        read_glb_metadata(path)
+
+            scan_document = {
+                "asset": {"version": "2.0"},
+                "buffers": [{"byteLength": 12}],
+                "bufferViews": [{"buffer": 0, "byteLength": 12}],
+                "accessors": [{
+                    "componentType": 5126,
+                    "count": 1,
+                    "type": "VEC3",
+                    "sparse": {},
+                }],
+                "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+            }
+            scan_path = root / "sparse_scan.glb"
+            scan_path.write_bytes(make_glb(scan_document, struct.pack("<3f", 1, 2, 3)))
+            with self.assertRaises(ValueError):
+                read_glb_metadata(scan_path)
+
+    def test_glb_rejects_overflowing_accessor_bounds_as_value_error(self) -> None:
+        huge = 10**4000
+        document = {
+            "asset": {"version": "2.0"},
+            "accessors": [{
+                "componentType": 5126,
+                "count": 1,
+                "type": "VEC3",
+                "min": [huge, 0, 0],
+                "max": [huge, 1, 1],
+            }],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "overflow.glb"
+            path.write_bytes(make_glb(document))
+            with self.assertRaises(ValueError):
+                read_glb_metadata(path)
+
     def test_glb_rejects_unaligned_chunks_and_illegal_chunk_sequences(self) -> None:
         document = {
             "asset": {"version": "2.0"},
@@ -225,13 +340,19 @@ class PropVisualMetadataTests(unittest.TestCase):
         }
         json_chunk = aligned_json_bytes(document)
         misaligned_json_chunk = json_chunk[:-1]
+        nul_padded_json_chunk = json_chunk[:-1] + b"\0"
+        tab_padded_json_chunk = json_chunk[:-1] + b"\t"
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             cases = {
                 "misaligned_json": [(b"JSON", misaligned_json_chunk)],
+                "nul_padded_json": [(b"JSON", nul_padded_json_chunk)],
+                "tab_padded_json": [(b"JSON", tab_padded_json_chunk)],
                 "bin_before_json": [(b"BIN\0", b"\0\0\0\0"), (b"JSON", json_chunk)],
                 "junk_before_json": [(b"JUNK", b"\0\0\0\0"), (b"JSON", json_chunk)],
-                "junk_after_json": [(b"JSON", json_chunk), (b"JUNK", b"\0\0\0\0")],
+                "unknown_then_bin": [(b"JSON", json_chunk), (b"JUNK", b"\0\0\0\0"), (b"BIN\0", b"\0\0\0\0")],
+                "duplicate_json": [(b"JSON", json_chunk), (b"JSON", json_chunk)],
+                "duplicate_bin": [(b"JSON", json_chunk), (b"BIN\0", b"\0\0\0\0"), (b"BIN\0", b"\0\0\0\0")],
                 "json_absent": [(b"BIN\0", b"\0\0\0\0")],
             }
             for name, chunks in cases.items():
@@ -240,6 +361,32 @@ class PropVisualMetadataTests(unittest.TestCase):
                     path.write_bytes(make_raw_glb(chunks))
                     with self.assertRaises(ValueError):
                         read_glb_metadata(path)
+
+    def test_glb_accepts_unknown_chunks_after_json_and_bin(self) -> None:
+        document = {
+            "asset": {"version": "2.0"},
+            "accessors": [{
+                "componentType": 5126,
+                "count": 3,
+                "type": "VEC3",
+                "min": [-1, -2, -3],
+                "max": [4, 5, 6],
+            }],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+        }
+        json_chunk = aligned_json_bytes(document)
+        unknown_chunk = (b"JUNK", b"\0\0\0\0")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            after_json = root / "unknown_after_json.glb"
+            after_json.write_bytes(make_raw_glb([(b"JSON", json_chunk), unknown_chunk]))
+            after_json_record = read_glb_metadata(after_json)
+
+            after_bin = root / "unknown_after_bin.glb"
+            after_bin.write_bytes(make_raw_glb([(b"JSON", json_chunk), (b"BIN\0", b"\0\0\0\0"), unknown_chunk]))
+            after_bin_record = read_glb_metadata(after_bin)
+        self.assertEqual(after_json_record["local_min_m"], [-1.0, -2.0, -3.0])
+        self.assertEqual(after_bin_record["local_max_m"], [4.0, 5.0, 6.0])
 
     def test_glb_bounds_are_rounded_to_six_decimals_without_negative_zero(self) -> None:
         document = {
