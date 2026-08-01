@@ -20,6 +20,7 @@ const SHAPE_BY_PROXY := {
 	"convex-hull": "BoxShape3D",
 	"none": "",
 }
+const STRUCTURAL_SCENE_PREFIX: String = "res://assets/imported/structural/"
 
 func _initialize() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
@@ -384,30 +385,89 @@ func _validate_bundle(scene_path: String, errors: Array[String]) -> void:
 	if typeof(generated_visual_scene_path_variant) == TYPE_STRING:
 		generated_visual_scene_path = str(generated_visual_scene_path_variant)
 	if not generated_visual_scene_path.is_empty():
-		var visual_instance: Dictionary = nodes_by_name.get("VisualInstance", {})
-		if visual_instance.is_empty():
-			errors.append("%s: missing VisualInstance node for generated.visual_scene_path" % scene_path)
+		var variant_names: Array[String] = [
+			"VisualInstance_Intact",
+			"VisualInstance_Damaged",
+			"VisualInstance_Breached",
+		]
+		var visual_names: Array[String] = []
+		var has_legacy: bool = nodes_by_name.has("VisualInstance")
+		var present_variants: Array[String] = []
+		for variant_name in variant_names:
+			if nodes_by_name.has(variant_name):
+				present_variants.append(variant_name)
+		var has_any_variant: bool = not present_variants.is_empty()
+		var has_all_variants: bool = present_variants.size() == variant_names.size()
+
+		if has_legacy and has_any_variant:
+			errors.append(
+				"%s: mixed visual forms are forbidden: VisualInstance plus %s" %
+				[scene_path, ", ".join(PackedStringArray(present_variants))]
+			)
+		elif has_legacy:
+			visual_names = ["VisualInstance"]
+		elif has_all_variants:
+			visual_names = variant_names.duplicate()
+		elif has_any_variant:
+			var missing_variants: Array[String] = []
+			for variant_name in variant_names:
+				if not nodes_by_name.has(variant_name):
+					missing_variants.append(variant_name)
+			errors.append(
+				"%s: incomplete variant visual form; missing variants: %s" %
+				[scene_path, ", ".join(PackedStringArray(missing_variants))]
+			)
 		else:
+			errors.append(
+				"%s: missing VisualInstance or variant visual nodes for generated.visual_scene_path" %
+				scene_path
+			)
+
+		for visual_name in visual_names:
+			var visual_instance: Dictionary = nodes_by_name[visual_name]
 			if str(visual_instance.get("parent", "")) != "Visual":
-				errors.append("%s: VisualInstance must be parented to Visual" % scene_path)
+				errors.append("%s: %s must be parented to Visual" % [scene_path, visual_name])
+
 			var visual_instance_ref: String = str(visual_instance.get("instance", ""))
 			if visual_instance_ref.is_empty():
-				errors.append("%s: VisualInstance must instance the generated visual scene" % scene_path)
+				errors.append("%s: %s must instance the generated visual scene" % [scene_path, visual_name])
+				continue
+
+			var instance_start: int = visual_instance_ref.find("\"")
+			var instance_finish: int = visual_instance_ref.find("\"", instance_start + 1)
+			if instance_start == -1 or instance_finish == -1:
+				errors.append("%s: %s has malformed ext_resource reference" % [scene_path, visual_name])
+				continue
+
+			var resource_id: String = visual_instance_ref.substr(
+				instance_start + 1,
+				instance_finish - instance_start - 1
+			)
+			var visual_resource: Dictionary = extresources.get(resource_id, {})
+			if visual_resource.is_empty():
+				errors.append("%s: %s references missing ext_resource %s" % [scene_path, visual_name, resource_id])
+				continue
+			if str(visual_resource.get("type", "")) != "PackedScene":
+				errors.append("%s: %s ext_resource must be a PackedScene" % [scene_path, visual_name])
+				continue
+
+			var resource_path: String = str(visual_resource.get("path", ""))
+			if visual_name == "VisualInstance" or visual_name == "VisualInstance_Intact":
+				# Preserve the existing intact contract: parent, PackedScene type, and exact manifest path.
+				if resource_path != generated_visual_scene_path:
+					errors.append("%s: %s ext_resource path does not match manifest.generated.visual_scene_path" % [scene_path, visual_name])
 			else:
-				var instance_start: int = visual_instance_ref.find("\"")
-				var instance_finish: int = visual_instance_ref.find("\"", instance_start + 1)
-				if instance_start == -1 or instance_finish == -1:
-					errors.append("%s: VisualInstance has malformed ext_resource reference" % scene_path)
-				else:
-					var visual_instance_resource_id: String = visual_instance_ref.substr(instance_start + 1, instance_finish - instance_start - 1)
-					var visual_instance_resource: Dictionary = extresources.get(visual_instance_resource_id, {})
-					if visual_instance_resource.is_empty():
-						errors.append("%s: VisualInstance references missing ext_resource %s" % [scene_path, visual_instance_resource_id])
-					else:
-						if str(visual_instance_resource.get("type", "")) != "PackedScene":
-							errors.append("%s: VisualInstance ext_resource must be a PackedScene" % scene_path)
-						if str(visual_instance_resource.get("path", "")) != generated_visual_scene_path:
-							errors.append("%s: VisualInstance ext_resource path does not match manifest.generated.visual_scene_path" % scene_path)
+				# Damaged and breached references are text-checked before touching the loader.
+				var canonical_contained_path: bool = (
+					resource_path.begins_with(STRUCTURAL_SCENE_PREFIX)
+					and not resource_path.split("/").has("..")
+					and resource_path.simplify_path() == resource_path
+				)
+				if not canonical_contained_path:
+					errors.append("%s: %s must use a canonical contained structural PackedScene path" % [scene_path, visual_name])
+					continue
+				if not ResourceLoader.exists(resource_path, "PackedScene"):
+					errors.append("%s: %s references missing PackedScene resource" % [scene_path, visual_name])
 
 	var collision_root: Dictionary = nodes_by_name.get("CollisionRoot", {})
 	var collision_shape: Dictionary = nodes_by_name.get("CollisionShape3D", {})
