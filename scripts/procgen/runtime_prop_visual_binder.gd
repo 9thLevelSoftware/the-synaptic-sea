@@ -5,6 +5,17 @@ const SCENE_PATH_PREFIX: String = "res://assets/imported/props/"
 const IMPORTED_VISUAL_NAME: String = "ImportedVisual"
 const BINDING_DOCUMENT_KIND: String = "prop_visual_binding"
 const COLLISION_POLICY: String = "none_visual_only"
+const BINDING_FIELDS: Array[String] = [
+	"asset_id", "binding", "bounds", "collision_policy", "document_kind", "extensions",
+	"placement", "prop_kind", "provenance", "schema_version", "source", "visual_scene_path",
+]
+const BINDING_META_FIELDS: Array[String] = ["namespace", "ids"]
+const PLACEMENT_FIELDS: Array[String] = ["origin", "offset_m", "rotation_degrees", "allowed_yaw_deg", "scale"]
+const SOURCE_FIELDS: Array[String] = ["sha256", "byte_size", "mesh_count", "gltf_version"]
+const BOUNDS_FIELDS: Array[String] = ["local_min_m", "local_max_m"]
+const PROVENANCE_FIELDS: Array[String] = ["license_state", "source_platform"]
+const ALLOWED_ORIGINS: Array[String] = ["scene_origin", "marker_anchor"]
+const ALLOWED_SURFACES: Array[String] = ["floor", "wall", "ceiling"]
 const INTERACTABLE_SCRIPT: Script = preload("res://scripts/interaction/interactable.gd")
 const OBJECTIVE_VOLUME_SCRIPT: Script = preload("res://scripts/procgen/gameplay_objective_volume.gd")
 const FORBIDDEN_SCRIPT_PATHS: Array[String] = [
@@ -134,11 +145,17 @@ static func _create_imported_visual(binding: Dictionary) -> Node3D:
 
 
 static func _is_safe_binding(binding: Dictionary, expected_prop_kind: String) -> bool:
+	if not _has_exact_fields(binding, BINDING_FIELDS):
+		return false
+	if not _is_exact_schema_version(binding.get("schema_version")):
+		return false
 	if binding.get("document_kind", "") != BINDING_DOCUMENT_KIND:
 		return false
 	if binding.get("collision_policy", "") != COLLISION_POLICY:
 		return false
 	if binding.get("prop_kind", "") != expected_prop_kind:
+		return false
+	if not _is_asset_id(binding.get("asset_id")):
 		return false
 	var expected_namespace: String = {
 		"component": "component_id",
@@ -147,7 +164,7 @@ static func _is_safe_binding(binding: Dictionary, expected_prop_kind: String) ->
 	if expected_namespace.is_empty():
 		return false
 	var binding_meta: Variant = binding.get("binding")
-	if not (binding_meta is Dictionary):
+	if not _has_exact_fields(binding_meta, BINDING_META_FIELDS):
 		return false
 	var binding_dictionary: Dictionary = binding_meta as Dictionary
 	if binding_dictionary.get("namespace", "") != expected_namespace:
@@ -173,7 +190,15 @@ static func _is_safe_binding(binding: Dictionary, expected_prop_kind: String) ->
 		return false
 	if str(scene_path).get_file().trim_suffix(".glb") != str(binding.get("asset_id", "")):
 		return false
-	return _is_valid_placement(binding.get("placement"))
+	if not _is_valid_placement(binding.get("placement"), expected_prop_kind):
+		return false
+	if not _is_valid_source(binding.get("source")):
+		return false
+	if not _is_valid_bounds(binding.get("bounds")):
+		return false
+	if not _is_valid_provenance(binding.get("provenance")):
+		return false
+	return binding.get("extensions") is Dictionary
 
 
 static func _is_canonical_scene_path(value: Variant, expected_group: String = "") -> bool:
@@ -193,10 +218,27 @@ static func _is_canonical_scene_path(value: Variant, expected_group: String = ""
 	return not parts.has("") and not parts.has(".") and not parts.has("..")
 
 
-static func _is_valid_placement(placement_value: Variant) -> bool:
+static func _is_valid_placement(placement_value: Variant, expected_prop_kind: String) -> bool:
 	if not (placement_value is Dictionary):
 		return false
 	var placement: Dictionary = placement_value as Dictionary
+	var expected_fields: Array[String] = PLACEMENT_FIELDS.duplicate()
+	if expected_prop_kind == "objective":
+		expected_fields.append("surface")
+	for key in placement.keys():
+		if not expected_fields.has(str(key)):
+			return false
+	if expected_prop_kind == "component" and placement.has("surface"):
+		return false
+	if placement.size() < PLACEMENT_FIELDS.size() or placement.size() > expected_fields.size():
+		return false
+	for field_name in PLACEMENT_FIELDS:
+		if not placement.has(field_name):
+			return false
+	if placement.has("surface") and not ALLOWED_SURFACES.has(placement.get("surface")):
+		return false
+	if not ALLOWED_ORIGINS.has(placement.get("origin")):
+		return false
 	if not placement.has("offset_m") or not placement.has("rotation_degrees") or not placement.has("scale"):
 		return false
 	if not _is_finite_vector(placement["offset_m"]):
@@ -205,12 +247,136 @@ static func _is_valid_placement(placement_value: Variant) -> bool:
 		return false
 	if not _is_finite_number(placement["scale"]) or float(placement["scale"]) <= 0.0:
 		return false
+	var yaw_values: Variant = placement["allowed_yaw_deg"]
+	if not (yaw_values is Array) or (yaw_values as Array).is_empty():
+		return false
+	var seen_yaws: Dictionary = {}
+	for yaw in yaw_values as Array:
+		if not _is_finite_number(yaw):
+			return false
+		var yaw_number: float = float(yaw)
+		if seen_yaws.has(yaw_number):
+			return false
+		seen_yaws[yaw_number] = true
 	return true
+
+
+static func _is_valid_source(source_value: Variant) -> bool:
+	if not _has_exact_fields(source_value, SOURCE_FIELDS):
+		return false
+	var source: Dictionary = source_value as Dictionary
+	if not _is_sha256(source.get("sha256")):
+		return false
+	if not _is_nonnegative_integer_value(source.get("byte_size")):
+		return false
+	if not _is_positive_integer_value(source.get("mesh_count")):
+		return false
+	return source.get("gltf_version") == "2.0"
+
+
+static func _is_valid_bounds(bounds_value: Variant) -> bool:
+	if not _has_exact_fields(bounds_value, BOUNDS_FIELDS):
+		return false
+	var bounds: Dictionary = bounds_value as Dictionary
+	var local_min: Variant = bounds.get("local_min_m")
+	var local_max: Variant = bounds.get("local_max_m")
+	if not _is_finite_vector(local_min) or not _is_finite_vector(local_max):
+		return false
+	var min_values: Array = local_min as Array
+	var max_values: Array = local_max as Array
+	for index in 3:
+		if float(min_values[index]) > float(max_values[index]):
+			return false
+	return true
+
+
+static func _is_valid_provenance(provenance_value: Variant) -> bool:
+	if not _has_exact_fields(provenance_value, PROVENANCE_FIELDS):
+		return false
+	var provenance: Dictionary = provenance_value as Dictionary
+	return _is_nonempty_string(provenance.get("license_state")) \
+		and _is_nonempty_string(provenance.get("source_platform"))
+
+
+static func _has_exact_fields(value: Variant, expected_fields: Array[String]) -> bool:
+	if not (value is Dictionary):
+		return false
+	var object_value: Dictionary = value as Dictionary
+	if object_value.size() != expected_fields.size():
+		return false
+	for key in object_value.keys():
+		if not expected_fields.has(str(key)):
+			return false
+	for field_name in expected_fields:
+		if not object_value.has(field_name):
+			return false
+	return true
+
+
+static func _is_exact_schema_version(value: Variant) -> bool:
+	if typeof(value) != TYPE_STRING:
+		return false
+	var parts: PackedStringArray = str(value).split(".")
+	return parts.size() == 3 and parts[0] == "1" \
+		and _is_semver_number(parts[1]) and _is_semver_number(parts[2])
+
+
+static func _is_semver_number(value: String) -> bool:
+	if value.is_empty() or (value.length() > 1 and value.begins_with("0")):
+		return false
+	for index in value.length():
+		var code: int = value.unicode_at(index)
+		if code < 48 or code > 57:
+			return false
+	return true
+
+
+static func _is_asset_id(value: Variant) -> bool:
+	if not _is_nonempty_string(value):
+		return false
+	var identifier: String = str(value)
+	for index in identifier.length():
+		var code: int = identifier.unicode_at(index)
+		var is_lowercase_letter: bool = code >= 97 and code <= 122
+		var is_digit: bool = code >= 48 and code <= 57
+		if index == 0 and not is_lowercase_letter and not is_digit:
+			return false
+		if not is_lowercase_letter and not is_digit and code != 95 and code != 45:
+			return false
+	return true
+
+
+static func _is_nonempty_string(value: Variant) -> bool:
+	return typeof(value) == TYPE_STRING and not str(value).strip_edges().is_empty()
+
+
+static func _is_sha256(value: Variant) -> bool:
+	if typeof(value) != TYPE_STRING or str(value).length() != 64 or str(value) == "0".repeat(64):
+		return false
+	for index in str(value).length():
+		var code: int = str(value).unicode_at(index)
+		if not ((code >= 48 and code <= 57) or (code >= 97 and code <= 102)):
+			return false
+	return true
+
+
+static func _is_nonnegative_integer_value(value: Variant) -> bool:
+	if not _is_finite_number(value):
+		return false
+	var number: float = float(value)
+	return number >= 0.0 and is_equal_approx(number, round(number))
+
+
+static func _is_positive_integer_value(value: Variant) -> bool:
+	if not _is_finite_number(value):
+		return false
+	var number: float = float(value)
+	return number >= 1.0 and is_equal_approx(number, round(number))
 
 
 static func _apply_transform(visual: Node3D, binding: Dictionary) -> bool:
 	var placement_value: Variant = binding.get("placement")
-	if not _is_valid_placement(placement_value):
+	if not _is_valid_placement(placement_value, str(binding.get("prop_kind", ""))):
 		return false
 	var placement: Dictionary = placement_value as Dictionary
 	var offset_result: Dictionary = _read_finite_vector(placement["offset_m"])

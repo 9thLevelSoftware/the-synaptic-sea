@@ -25,6 +25,28 @@ func _initialize() -> void:
 	failures += _expect(catalog.get_dressing_binding("missing_dressing").is_empty(), "unknown dressing is empty")
 
 	var valid_document: Dictionary = _catalog_document(component_binding, objective_binding, dressing_binding)
+	var marker_anchor_document: Dictionary = valid_document.duplicate(true)
+	var marker_anchor_objective: Dictionary = objective_binding.duplicate(true)
+	var marker_anchor_placement: Dictionary = (marker_anchor_objective["placement"] as Dictionary).duplicate(true)
+	marker_anchor_placement["origin"] = "marker_anchor"
+	marker_anchor_objective["placement"] = marker_anchor_placement
+	(marker_anchor_document["objectives"] as Dictionary)["reactor_control_panel"] = marker_anchor_objective
+	failures += _expect_catalog_accepted(
+		marker_anchor_document,
+		"user://task5-marker-anchor.json",
+		"schema-supported marker_anchor origin is accepted",
+	)
+	var invalid_surface_document: Dictionary = valid_document.duplicate(true)
+	var invalid_surface_dressing: Dictionary = dressing_binding.duplicate(true)
+	var invalid_surface_placement: Dictionary = (invalid_surface_dressing["placement"] as Dictionary).duplicate(true)
+	invalid_surface_placement["surface"] = "deck"
+	invalid_surface_dressing["placement"] = invalid_surface_placement
+	(invalid_surface_document["dressing"] as Dictionary)["cable_tray"] = invalid_surface_dressing
+	failures += _expect_catalog_rejected(
+		invalid_surface_document,
+		"user://task5-invalid-surface.json",
+		"dressing surface is restricted to floor wall or ceiling",
+	)
 	var extra_root: Dictionary = valid_document.duplicate(true)
 	extra_root["unexpected_root_field"] = true
 	failures += _expect_catalog_rejected(extra_root, "user://task5-extra-root.json", "extra catalog root field is rejected")
@@ -62,6 +84,13 @@ func _initialize() -> void:
 	malformed_hash_component["source"] = malformed_hash_source
 	(malformed_hash["components"] as Dictionary)["reactor_console"] = malformed_hash_component
 	failures += _expect_catalog_rejected(malformed_hash, "user://task5-malformed-hash.json", "invalid source hash is rejected")
+	var zero_hash: Dictionary = valid_document.duplicate(true)
+	var zero_hash_component: Dictionary = component_binding.duplicate(true)
+	var zero_hash_source: Dictionary = (zero_hash_component["source"] as Dictionary).duplicate(true)
+	zero_hash_source["sha256"] = "0".repeat(64)
+	zero_hash_component["source"] = zero_hash_source
+	(zero_hash["components"] as Dictionary)["reactor_console"] = zero_hash_component
+	failures += _expect_catalog_rejected(zero_hash, "user://task5-zero-hash.json", "all-zero source hash is rejected")
 
 	var malformed_bounds: Dictionary = valid_document.duplicate(true)
 	var malformed_bounds_component: Dictionary = component_binding.duplicate(true)
@@ -180,16 +209,83 @@ func _initialize() -> void:
 	)
 
 	var missing_binding: Dictionary = component_binding.duplicate(true)
-	missing_binding["visual_scene_path"] = "res://assets/imported/props/components/missing_task5_visual.glb"
+	missing_binding = objective_binding.duplicate(true)
+	missing_binding["asset_id"] = "missing_task5_visual"
+	missing_binding["visual_scene_path"] = "res://assets/imported/props/objectives/missing_task5_visual.glb"
 	failures += _expect(
 		RuntimePropVisualBinderScript.create_objective_visual(missing_binding) == null,
 		"missing resource is rejected without loading",
 	)
-	var traversal_binding: Dictionary = component_binding.duplicate(true)
-	traversal_binding["visual_scene_path"] = "res://assets/imported/props/components/../reactor_console.glb"
+	var traversal_binding: Dictionary = objective_binding.duplicate(true)
+	traversal_binding["asset_id"] = "reactor_console"
+	traversal_binding["visual_scene_path"] = "res://assets/imported/props/objectives/../reactor_console.glb"
 	failures += _expect(
 		RuntimePropVisualBinderScript.create_objective_visual(traversal_binding) == null,
 		"noncanonical binder path is rejected before loading",
+	)
+	var malformed_binding_root: Dictionary = objective_binding.duplicate(true)
+	malformed_binding_root["unexpected_root_field"] = true
+	failures += _expect(
+		RuntimePropVisualBinderScript.create_objective_visual(malformed_binding_root) == null,
+		"unexpected binding root field is rejected independently",
+	)
+	var missing_binding_root: Dictionary = objective_binding.duplicate(true)
+	missing_binding_root.erase("source")
+	failures += _expect(
+		RuntimePropVisualBinderScript.create_objective_visual(missing_binding_root) == null,
+		"missing binding root field is rejected independently",
+	)
+	var malformed_binding_schema: Dictionary = objective_binding.duplicate(true)
+	malformed_binding_schema["schema_version"] = "1.0"
+	failures += _expect(
+		RuntimePropVisualBinderScript.create_objective_visual(malformed_binding_schema) == null,
+		"malformed binding schema version is rejected independently",
+	)
+	var malformed_binding_source: Dictionary = objective_binding.duplicate(true)
+	var malformed_binding_source_meta: Dictionary = (malformed_binding_source["source"] as Dictionary).duplicate(true)
+	malformed_binding_source_meta["byte_size"] = "stale"
+	malformed_binding_source["source"] = malformed_binding_source_meta
+	failures += _expect(
+		RuntimePropVisualBinderScript.create_objective_visual(malformed_binding_source) == null,
+		"malformed binding source metadata is rejected independently",
+	)
+	var malformed_binding_bounds: Dictionary = objective_binding.duplicate(true)
+	var malformed_binding_bounds_meta: Dictionary = (malformed_binding_bounds["bounds"] as Dictionary).duplicate(true)
+	malformed_binding_bounds_meta["local_max_m"] = [0.0, 0.0]
+	malformed_binding_bounds["bounds"] = malformed_binding_bounds_meta
+	failures += _expect(
+		RuntimePropVisualBinderScript.create_objective_visual(malformed_binding_bounds) == null,
+		"malformed binding bounds are rejected independently",
+	)
+	var malformed_binding_collision: Dictionary = objective_binding.duplicate(true)
+	malformed_binding_collision["collision_policy"] = "generated_collision"
+	failures += _expect(
+		RuntimePropVisualBinderScript.create_objective_visual(malformed_binding_collision) == null,
+		"non-visual collision policy is rejected independently",
+	)
+	var malformed_binding_namespace: Dictionary = objective_binding.duplicate(true)
+	var malformed_binding_meta: Dictionary = (malformed_binding_namespace["binding"] as Dictionary).duplicate(true)
+	malformed_binding_meta["namespace"] = "component_id"
+	malformed_binding_namespace["binding"] = malformed_binding_meta
+	failures += _expect(
+		RuntimePropVisualBinderScript.create_objective_visual(malformed_binding_namespace) == null,
+		"binding namespace mismatch is rejected independently",
+	)
+	var zero_binding_hash: Dictionary = objective_binding.duplicate(true)
+	var zero_binding_source: Dictionary = (zero_binding_hash["source"] as Dictionary).duplicate(true)
+	zero_binding_source["sha256"] = "0".repeat(64)
+	zero_binding_hash["source"] = zero_binding_source
+	failures += _expect(
+		RuntimePropVisualBinderScript.create_objective_visual(zero_binding_hash) == null,
+		"all-zero binding source hash is rejected independently",
+	)
+	var duplicate_binding_yaw: Dictionary = objective_binding.duplicate(true)
+	var duplicate_binding_placement: Dictionary = (duplicate_binding_yaw["placement"] as Dictionary).duplicate(true)
+	duplicate_binding_placement["allowed_yaw_deg"] = [0.0, 90.0, 90.0]
+	duplicate_binding_yaw["placement"] = duplicate_binding_placement
+	failures += _expect(
+		RuntimePropVisualBinderScript.create_objective_visual(duplicate_binding_yaw) == null,
+		"duplicate binding yaw is rejected independently",
 	)
 
 	var collision_root: Node3D = Node3D.new()
@@ -306,9 +402,12 @@ func _initialize() -> void:
 		"user://task5-malformed-schema.json",
 		"user://task5-malformed-kind.json",
 		"user://task5-malformed-path.json",
+		"user://task5-marker-anchor.json",
+		"user://task5-invalid-surface.json",
 		"user://task5-malformed-namespace.json",
 		"user://task5-malformed-source.json",
 		"user://task5-malformed-hash.json",
+		"user://task5-zero-hash.json",
 		"user://task5-malformed-bounds.json",
 		"user://task5-duplicate-yaw.json",
 		"user://task5-duplicate-json-key.json",
@@ -355,6 +454,15 @@ func _expect_catalog_rejected(document: Dictionary, path: String, message: Strin
 	var rejected: bool = not loaded and not probe.get_errors().is_empty()
 	_remove_user_file(path)
 	return _expect(rejected, message)
+
+
+func _expect_catalog_accepted(document: Dictionary, path: String, message: String) -> int:
+	if not _write_json(path, document):
+		return _expect(false, "%s (fixture write failed)" % message)
+	var probe = PropVisualBindingCatalogScript.new()
+	var loaded: bool = probe.load_from_path(path)
+	_remove_user_file(path)
+	return _expect(loaded, message)
 
 
 func _expect_catalog_raw_rejected(document: String, path: String, message: String) -> int:

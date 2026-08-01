@@ -385,7 +385,7 @@ func _validate_placement(placement: Dictionary, group_name: String, binding_id: 
 			valid = false
 	if placement.size() != expected_fields.size():
 		valid = false
-	if placement.get("origin", "") != "scene_origin":
+	if not ["scene_origin", "marker_anchor"].has(placement.get("origin", "")):
 		_errors.append("catalog binding %s/%s placement origin is invalid" % [group_name, binding_id])
 		valid = false
 	if not _is_finite_vector(placement.get("offset_m")):
@@ -415,8 +415,8 @@ func _validate_placement(placement: Dictionary, group_name: String, binding_id: 
 				_errors.append("catalog binding %s/%s allowed_yaw_deg contains duplicate yaw" % [group_name, binding_id])
 				valid = false
 			seen_yaws.append(yaw_number)
-	if group_name == "dressing" and not _is_nonempty_string(placement.get("surface")):
-		_errors.append("catalog binding %s/%s dressing surface must be a nonempty string" % [group_name, binding_id])
+	if group_name == "dressing" and not ["floor", "wall", "ceiling"].has(placement.get("surface", "")):
+		_errors.append("catalog binding %s/%s dressing surface must be floor, wall, or ceiling" % [group_name, binding_id])
 		valid = false
 	return valid
 
@@ -496,6 +496,8 @@ func _validate_exact_object_fields(value: Variant, expected_fields: Array, neste
 
 func _is_sha256(value: Variant) -> bool:
 	if typeof(value) != TYPE_STRING or str(value).length() != 64:
+		return false
+	if str(value) == "0".repeat(64):
 		return false
 	for index in str(value).length():
 		var code: int = str(value).unicode_at(index)
