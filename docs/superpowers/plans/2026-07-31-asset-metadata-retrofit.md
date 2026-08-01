@@ -252,16 +252,46 @@ import sys
 print(hashlib.sha256(sys.argv[1].encode('utf-8')).hexdigest())
 PY
 )
-STATE_HOME="${TMPDIR:-/tmp}/synaptic-sea-task2-${WORKTREE_DIGEST}"
+REPOSITORY_ROOT=$(python3 - "$PWD" <<'PY'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).expanduser().resolve())
+PY
+)
+TEMP_BASE=$(python3 - "${TMPDIR:-/tmp}" "$REPOSITORY_ROOT" <<'PY'
+from pathlib import Path
+import sys
+repository = Path(sys.argv[2]).expanduser().resolve()
+candidate = Path(sys.argv[1]).expanduser().resolve()
+if candidate == Path(candidate.anchor) or candidate == repository or repository in candidate.parents:
+    raise SystemExit("TMPDIR must resolve to an external non-root directory")
+print(candidate)
+PY
+)
+STATE_HOME="$TEMP_BASE/synaptic-sea-task2-${WORKTREE_DIGEST}"
+STATE_HOME=$(python3 - "$STATE_HOME" "$REPOSITORY_ROOT" <<'PY'
+from pathlib import Path
+import sys
+repository = Path(sys.argv[2]).expanduser().resolve()
+candidate = Path(sys.argv[1]).expanduser().resolve()
+if candidate == Path(candidate.anchor) or candidate == repository or repository in candidate.parents:
+    raise SystemExit("STATE_HOME must resolve to an external non-root directory")
+print(candidate)
+PY
+)
+mkdir -p "$STATE_HOME"
+STATE_HOME=$(python3 - "$STATE_HOME" "$REPOSITORY_ROOT" <<'PY'
+from pathlib import Path
+import sys
+repository = Path(sys.argv[2]).expanduser().resolve()
+candidate = Path(sys.argv[1]).expanduser().resolve()
+if candidate == Path(candidate.anchor) or candidate == repository or repository in candidate.parents:
+    raise SystemExit("STATE_HOME resolved inside the repository after mkdir")
+print(candidate)
+PY
+)
 STATE_RUNNER="$STATE_HOME/state_runner.py"
 PRECONDITION_RECORD="$STATE_HOME/step0-precondition.txt"
-case "$STATE_HOME" in
-  "$PWD"|"$PWD"/*)
-    printf 'deterministic state directory must be outside the repository\n' >&2
-    exit 1
-    ;;
-esac
-mkdir -p "$STATE_HOME"
 cat >"$STATE_RUNNER" <<'PY'
 #!/usr/bin/env python3
 from __future__ import annotations
@@ -269,6 +299,7 @@ from __future__ import annotations
 import hashlib
 import os
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -384,7 +415,7 @@ def snapshot(root: Path, snapshot_root: Path) -> tuple[dict[str, object], list[d
         shutil.copytree(root / ".godot", snapshot_root / "godot", symlinks=True)
     return generated, collect_sources(root)
 
-def restore(root: Path, snapshot_root: Path, generated: dict[str, object]) -> None:
+def restore_and_verify(root: Path, snapshot_root: Path, generated: dict[str, object]) -> None:
     godot = root / ".godot"
     remove_path(godot)
     if bool(generated["godot_exists"]):
@@ -406,6 +437,30 @@ def restore(root: Path, snapshot_root: Path, generated: dict[str, object]) -> No
     if actual != generated:
         raise RuntimeError("restored generated state differs from the initial path/hash/mode manifest")
 
+class RunnerInterrupted(Exception):
+    def __init__(self, signum: int):
+        self.signum = signum
+        super().__init__(f"interrupted by signal {signum}")
+
+
+def interruption_status(signum: int) -> int:
+    if signum == signal.SIGTERM:
+        return 143
+    return 130
+
+
+def terminate_and_reap(process: subprocess.Popen) -> None:
+    if process.poll() is not None:
+        process.wait()
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
 def main(argv: list[str]) -> int:
     if len(argv) < 3 or argv[1] != "--":
         print("STATE RUNNER: usage: state_runner.py -- COMMAND [ARGS...]", file=sys.stderr)
@@ -417,52 +472,97 @@ def main(argv: list[str]) -> int:
         return 2
     state_root.mkdir(parents=True, exist_ok=True)
     snapshot_root = Path(tempfile.mkdtemp(prefix="invocation-", dir=state_root))
-    command_status = 0
+    watched_signals = (signal.SIGINT, signal.SIGTERM)
+    previous_handlers = {signum: signal.getsignal(signum) for signum in watched_signals}
+    generated: dict[str, object] | None = None
+    initial_sources: list[dict[str, object]] | None = None
+    process: subprocess.Popen | None = None
+    primary_status = 0
+    snapshot_status = 0
     restore_status = 0
     source_status = 0
     cleanup_status = 0
-    exit_status = 2
+    interruption = 0
+
+    def request_interrupt(signum: int, _frame: object) -> None:
+        raise RunnerInterrupted(signum)
+
+    def remember_interrupt(exc: BaseException) -> None:
+        nonlocal interruption, primary_status
+        if isinstance(exc, RunnerInterrupted):
+            interruption = interruption_status(exc.signum)
+        elif isinstance(exc, KeyboardInterrupt):
+            interruption = 130
+        if interruption and primary_status == 0:
+            primary_status = interruption
+
     try:
+        for signum in watched_signals:
+            signal.signal(signum, request_interrupt)
         try:
             generated, initial_sources = snapshot(root, snapshot_root)
         except Exception as exc:
             print(f"STATE RUNNER: snapshot failed: {exc}", file=sys.stderr)
+            snapshot_status = 1
+            primary_status = 1
         else:
             try:
-                completed = subprocess.run(argv[2:], cwd=root)
-                command_status = completed.returncode
+                process = subprocess.Popen(argv[2:], cwd=root)
+                try:
+                    primary_status = process.wait()
+                except (RunnerInterrupted, KeyboardInterrupt) as exc:
+                    remember_interrupt(exc)
+                    try:
+                        terminate_and_reap(process)
+                    except (RunnerInterrupted, KeyboardInterrupt) as reap_exc:
+                        remember_interrupt(reap_exc)
+                        process.kill()
+                        process.wait()
             except OSError as exc:
                 print(f"STATE RUNNER: command launch failed: {exc}", file=sys.stderr)
-                command_status = 127
+                primary_status = 127
+    finally:
+        # Once an interruption has been recorded, ignore another signal while
+        # restoration and cleanup make the repository safe again.
+        for signum in watched_signals:
+            signal.signal(signum, signal.SIG_IGN)
+        if generated is not None and initial_sources is not None:
             try:
-                restore(root, snapshot_root, generated)
-            except Exception as exc:
+                restore_and_verify(root, snapshot_root, generated)
+            except BaseException as exc:
+                remember_interrupt(exc)
                 print(f"STATE RUNNER: generated-state restore failed: {exc}", file=sys.stderr)
                 restore_status = 1
             try:
                 if collect_sources(root) != initial_sources:
                     print("STATE RUNNER: structural source paths changed during invocation", file=sys.stderr)
                     source_status = 1
-            except Exception as exc:
+            except BaseException as exc:
+                remember_interrupt(exc)
                 print(f"STATE RUNNER: structural source inspection failed: {exc}", file=sys.stderr)
                 source_status = 1
-            if restore_status == 0:
-                print(MARKER, file=sys.stderr)
-            if command_status != 0:
-                exit_status = command_status
-            elif restore_status or source_status:
-                exit_status = 1
-            else:
-                exit_status = 0
-    finally:
         try:
             shutil.rmtree(snapshot_root)
-        except Exception as exc:
+        except BaseException as exc:
+            remember_interrupt(exc)
             print(f"STATE RUNNER: temporary snapshot cleanup failed: {exc}", file=sys.stderr)
             cleanup_status = 1
-        if cleanup_status and command_status == 0 and exit_status == 0:
-            exit_status = 1
-    return exit_status
+        if (
+            generated is not None
+            and snapshot_status == 0
+            and restore_status == 0
+            and source_status == 0
+            and cleanup_status == 0
+        ):
+            print(MARKER, file=sys.stderr)
+        for signum, handler in previous_handlers.items():
+            signal.signal(signum, handler)
+
+    if primary_status != 0:
+        return primary_status
+    if snapshot_status or restore_status or source_status or cleanup_status:
+        return 1
+    return 0
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))
@@ -472,15 +572,208 @@ if [[ ! -x "$STATE_RUNNER" ]]; then
   printf 'state runner was not created executable\n' >&2
   exit 1
 fi
+python3 - "$STATE_RUNNER" <<'PY'
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+RUNNER = Path(sys.argv[1])
+MARKER = "GENERATED STATE RESTORE VERIFIED"
+MUTATE = """
+from pathlib import Path
+import time
+root = Path.cwd()
+(root / ".godot").mkdir(exist_ok=True)
+(root / ".godot" / "cache.txt").write_text("mutated")
+(root / "asset.import").write_text("mutated")
+(root / ".godot" / "started").write_text("ready")
+time.sleep(30)
+"""
+RESTORE_FAIL = """
+from pathlib import Path
+import os
+import shutil
+import time
+state_home = Path(os.environ["SYN_STATE_HOME"])
+for _ in range(500):
+    snapshots = sorted(state_home.glob("invocation-*"))
+    if snapshots:
+        break
+    time.sleep(0.01)
+else:
+    raise SystemExit("runner snapshot did not appear")
+shutil.rmtree(snapshots[0] / "godot")
+"""
+SOURCE_FAIL = """
+from pathlib import Path
+(Path.cwd() / "scenes" / "wrappers" / "structural" / "changed.txt").write_text("changed")
+"""
+
+
+def make_fixture(present):
+    temporary = tempfile.TemporaryDirectory()
+    base = Path(temporary.name)
+    repository = base / "repo"
+    state_home = base / "state-home"
+    repository.mkdir()
+    state_home.mkdir()
+    runner = state_home / "state_runner.py"
+    shutil.copy2(RUNNER, runner)
+    runner.chmod(0o700)
+    source_root = repository / "scenes" / "wrappers" / "structural"
+    source_root.mkdir(parents=True)
+    (source_root / "original.txt").write_text("original")
+    if present:
+        (repository / ".godot").mkdir()
+        (repository / ".godot" / "cache.txt").write_text("initial")
+        (repository / "asset.import").write_text("initial")
+    return temporary, repository, state_home, runner
+
+
+def invoke(repository, state_home, runner, code, signum=None, wait_for_started=False):
+    environment = os.environ.copy()
+    environment["SYN_STATE_HOME"] = str(state_home)
+    process = subprocess.Popen(
+        [str(runner), "--", sys.executable, "-c", code],
+        cwd=repository,
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if wait_for_started:
+        started = repository / ".godot" / "started"
+        for _ in range(500):
+            if started.exists():
+                break
+            time.sleep(0.01)
+        else:
+            process.kill()
+            process.communicate(timeout=5)
+            raise AssertionError("synthetic child did not reach its mutation")
+    if signum is not None:
+        process.send_signal(signum)
+    stdout, stderr = process.communicate(timeout=10)
+    return process.returncode, stdout, stderr
+
+
+def assert_state(repository, present):
+    if present:
+        assert (repository / ".godot" / "cache.txt").read_text() == "initial"
+        assert (repository / "asset.import").read_text() == "initial"
+    else:
+        assert not (repository / ".godot").exists()
+        assert not (repository / "asset.import").exists()
+    assert not (repository / ".godot" / "started").exists()
+
+
+def assert_success(stderr):
+    assert stderr.splitlines().count(MARKER) == 1, stderr
+    assert "STATE RUNNER:" not in stderr, stderr
+
+
+def assert_runner_failure(stderr):
+    assert MARKER not in stderr, stderr
+    assert "STATE RUNNER:" in stderr, stderr
+
+
+# A relative TMPDIR and a symlink resolving into a repository are both rejected
+# by the same canonical root/containment rule used by Step 0.
+with tempfile.TemporaryDirectory() as temporary_name:
+    temporary_root = Path(temporary_name)
+    temporary_repository = temporary_root / "repo"
+    temporary_repository.mkdir()
+    symlinked_tmp = temporary_root / "tmp-link"
+    symlinked_tmp.symlink_to(temporary_repository, target_is_directory=True)
+
+    def rejected(raw, repository):
+        candidate = Path(raw).expanduser().resolve()
+        repository = repository.expanduser().resolve()
+        return (
+            candidate == Path(candidate.anchor)
+            or candidate == repository
+            or repository in candidate.parents
+        )
+
+    assert rejected(".", Path.cwd()), "relative TMPDIR inside repository was accepted"
+    assert rejected(symlinked_tmp, temporary_repository), "symlinked TMPDIR inside repository was accepted"
+
+for present in (False, True):
+    temporary, repository, state_home, runner = make_fixture(present)
+    try:
+        status, _stdout, stderr = invoke(repository, state_home, runner, "pass")
+        assert status == 0, (status, stderr)
+        assert_success(stderr)
+        assert_state(repository, present)
+    finally:
+        temporary.cleanup()
+
+temporary, repository, state_home, runner = make_fixture(True)
+try:
+    status, _stdout, stderr = invoke(
+        repository,
+        state_home,
+        runner,
+        MUTATE.replace("time.sleep(30)", "") + "\nraise SystemExit(1)",
+    )
+    assert status == 1, (status, stderr)
+    assert_success(stderr)
+    assert_state(repository, True)
+finally:
+    temporary.cleanup()
+
+temporary, repository, state_home, runner = make_fixture(True)
+try:
+    status, _stdout, stderr = invoke(repository, state_home, runner, SOURCE_FAIL)
+    assert status != 0 and status == 1, (status, stderr)
+    assert_runner_failure(stderr)
+finally:
+    temporary.cleanup()
+
+for primary_status in (0, 7):
+    temporary, repository, state_home, runner = make_fixture(True)
+    try:
+        suffix = "" if primary_status == 0 else f"\nraise SystemExit({primary_status})"
+        status, _stdout, stderr = invoke(repository, state_home, runner, RESTORE_FAIL + suffix)
+        expected = 1 if primary_status == 0 else primary_status
+        assert status == expected, (primary_status, status, stderr)
+        assert_runner_failure(stderr)
+    finally:
+        temporary.cleanup()
+
+for signum, expected_status in ((signal.SIGINT, 130), (signal.SIGTERM, 143)):
+    temporary, repository, state_home, runner = make_fixture(True)
+    try:
+        status, _stdout, stderr = invoke(
+            repository,
+            state_home,
+            runner,
+            MUTATE,
+            signum=signum,
+            wait_for_started=True,
+        )
+        assert status == expected_status, (signum, status, stderr)
+        assert_success(stderr)
+        assert_state(repository, True)
+    finally:
+        temporary.cleanup()
+
+print("STATE RUNNER SYNTHETIC PASS")
+PY
 printf '%s\n%s\n' "$PWD" "$(git rev-parse HEAD)" >"$PRECONDITION_RECORD"
 printf 'TASK2 STEP0 READY state_runner=%s paths=14 source_guard=3\n' "$STATE_RUNNER"
 ```
 
-The runner snapshots, for each invocation independently, every regular file below `.godot` (including tracked and ignored content) and every regular external `*.import` file outside `.godot` and `.git`, with deterministic relative POSIX paths, SHA-256 digests, modes, and full temporary copies. It also fingerprints every entry below `scenes/wrappers/structural`, `assets/_processed`, and `assets/imported/structural`. It forwards the child command's output and status, restores the exact initial generated tree/files, re-collects the path/hash/mode manifest, and then checks the broad source fingerprint even when the command or restoration failed. A failed Godot command remains the runner's primary status; a successful command becomes nonzero for restore, source, or cleanup failure. It never uses Git to decide generated-state cleanliness. The only runner-generated success line is the exact `GENERATED STATE RESTORE VERIFIED` marker on stderr after generated-state restoration/hash comparison succeeds; all runner diagnostics are prefixed `STATE RUNNER:` and none begins with `ERROR:` or `WARNING:`. The marker is filtered by the shell helpers below before validator output is counted, so exact Godot diagnostic assertions remain viable. The `finally` cleanup is best effort and cannot replace a nonzero child status.
+The runner snapshots, for each invocation independently, every regular file below `.godot` (including tracked and ignored content) and every regular external `*.import` file outside `.godot` and `.git`, with deterministic relative POSIX paths, SHA-256 digests, modes, and full temporary copies. It also fingerprints every entry below `scenes/wrappers/structural`, `assets/_processed`, and `assets/imported/structural`. It forwards the child command's output and status through `subprocess.Popen(...).wait()`, installs SIGINT/SIGTERM handlers, terminates and reaps an active child on SIGINT, SIGTERM, or `KeyboardInterrupt`, and maps those interruptions to conventional statuses `130` and `143`. An outer `finally` path always attempts generated-state restoration, post-restore manifest verification, the broad source fingerprint check, and temporary-snapshot cleanup. A failed command or interruption remains the primary status; a successful primary status becomes nonzero for snapshot, restore, source, or cleanup failure. It never uses Git to decide generated-state cleanliness. The only runner-generated success line is exactly one plain `GENERATED STATE RESTORE VERIFIED` line on stderr after restoration, source verification, and temporary cleanup all succeed; all runner diagnostics are prefixed `STATE RUNNER:` and none begins with `ERROR:` or `WARNING:`. The executable synthetic test above covers present and absent state, expected exit `1`, restore/source failures with primary-status preservation, canonical relative/symlinked TMPDIR rejection, and SIGINT/SIGTERM restoration. Each shell helper validates exactly one marker and rejects `STATE RUNNER:` before stripping the marker, so expected Godot diagnostic assertions cannot be masked by runner failure.
 
 - [ ] **Step 1: Execute the validator red gate and construct fixture-based negative coverage**
 
-First run the real-directory red gate before any Task 2 code changes. The runner is already installed by Step 0, and this fence independently derives and checks it before the first Godot call. The helper captures validator output, removes only the runner's documented restore marker, and checks the complete diagnostic signature: exact exit status, exact count of lines beginning `ERROR:`, every such error containing the required marker, and zero lines beginning `WARNING:`.
+First run the real-directory red gate before any Task 2 code changes. The runner is already installed by Step 0, and this fence independently derives and checks it before the first Godot call. Each helper captures the complete combined output, requires exactly one plain `GENERATED STATE RESTORE VERIFIED` line, rejects every `STATE RUNNER:` diagnostic before stripping the marker, and then checks the complete validator signature: exact exit status, exact count of lines beginning `ERROR:`, every such error containing the required marker, and zero lines beginning `WARNING:`.
 
 ```bash
 set -euo pipefail
@@ -492,11 +785,40 @@ import sys
 print(hashlib.sha256(sys.argv[1].encode('utf-8')).hexdigest())
 PY
 )
-STATE_RUNNER="${TMPDIR:-/tmp}/synaptic-sea-task2-${WORKTREE_DIGEST}/state_runner.py"
+TEMP_BASE=$(python3 - "${TMPDIR:-/tmp}" <<'PY'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).expanduser().resolve())
+PY
+)
+STATE_HOME="$TEMP_BASE/synaptic-sea-task2-${WORKTREE_DIGEST}"
+STATE_HOME=$(python3 - "$STATE_HOME" <<'PY'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).expanduser().resolve())
+PY
+)
+STATE_RUNNER="$STATE_HOME/state_runner.py"
 [[ -x "$STATE_RUNNER" ]] || { printf 'missing executable STATE_RUNNER: %s\n' "$STATE_RUNNER" >&2; exit 1; }
 
 strip_runner_marker() {
   awk -v marker="$RUNNER_MARKER" '$0 != marker'
+}
+
+require_runner_success() {
+  local label="$1"
+  local raw="$2"
+  local marker_count runner_diagnostics
+  marker_count=$(awk -v marker="$RUNNER_MARKER" '$0 == marker { count += 1 } END { print count + 0 }' <<<"$raw")
+  runner_diagnostics=$(awk '/^STATE RUNNER:/ { print }' <<<"$raw")
+  if (( marker_count != 1 )); then
+    printf '%s: expected exactly one %s, got %d\n' "$label" "$RUNNER_MARKER" "$marker_count" >&2
+    return 1
+  fi
+  if [[ -n "$runner_diagnostics" ]]; then
+    printf '%s: unexpected STATE RUNNER: diagnostic:\n%s\n' "$label" "$runner_diagnostics" >&2
+    return 1
+  fi
 }
 
 run_clean() {
@@ -507,6 +829,9 @@ run_clean() {
     status=0
   else
     status=$?
+  fi
+  if ! require_runner_success "$label" "$raw"; then
+    return 1
   fi
   filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
   printf '%s\n' "$filtered"
@@ -531,6 +856,9 @@ expect_exact_error_signature() {
     status=0
   else
     status=$?
+  fi
+  if ! require_runner_success "$label" "$raw"; then
+    return 1
   fi
   filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
   printf '%s\n' "$filtered"
@@ -640,10 +968,41 @@ import sys
 print(hashlib.sha256(sys.argv[1].encode('utf-8')).hexdigest())
 PY
 )
-STATE_RUNNER="${TMPDIR:-/tmp}/synaptic-sea-task2-${WORKTREE_DIGEST}/state_runner.py"
+TEMP_BASE=$(python3 - "${TMPDIR:-/tmp}" <<'PY'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).expanduser().resolve())
+PY
+)
+STATE_HOME="$TEMP_BASE/synaptic-sea-task2-${WORKTREE_DIGEST}"
+STATE_HOME=$(python3 - "$STATE_HOME" <<'PY'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).expanduser().resolve())
+PY
+)
+STATE_RUNNER="$STATE_HOME/state_runner.py"
 [[ -x "$STATE_RUNNER" ]] || { printf 'missing executable STATE_RUNNER: %s\n' "$STATE_RUNNER" >&2; exit 1; }
 
-strip_runner_marker() { awk -v marker="$RUNNER_MARKER" '$0 != marker'; }
+strip_runner_marker() {
+  awk -v marker="$RUNNER_MARKER" '$0 != marker'
+}
+
+require_runner_success() {
+  local label="$1"
+  local raw="$2"
+  local marker_count runner_diagnostics
+  marker_count=$(awk -v marker="$RUNNER_MARKER" '$0 == marker { count += 1 } END { print count + 0 }' <<<"$raw")
+  runner_diagnostics=$(awk '/^STATE RUNNER:/ { print }' <<<"$raw")
+  if (( marker_count != 1 )); then
+    printf '%s: expected exactly one %s, got %d\n' "$label" "$RUNNER_MARKER" "$marker_count" >&2
+    return 1
+  fi
+  if [[ -n "$runner_diagnostics" ]]; then
+    printf '%s: unexpected STATE RUNNER: diagnostic:\n%s\n' "$label" "$runner_diagnostics" >&2
+    return 1
+  fi
+}
 
 expect_clean_accept() {
   local label="$1"
@@ -654,6 +1013,9 @@ expect_clean_accept() {
     status=0
   else
     status=$?
+  fi
+  if ! require_runner_success "$label" "$raw"; then
+    return 1
   fi
   filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
   printf '%s\n' "$filtered"
@@ -682,6 +1044,9 @@ expect_exact_error_signature() {
     status=0
   else
     status=$?
+  fi
+  if ! require_runner_success "$label" "$raw"; then
+    return 1
   fi
   filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
   printf '%s\n' "$filtered"
@@ -727,7 +1092,7 @@ expect_exact_error_signature \
 printf 'NEGATIVE FIXTURE RED CONFIRMED mixed=accepted legacy_missing=3\n'
 ```
 
-The red harness returns zero only by proving `mixed_legacy_variant` is accepted with the exact `Validated 1 wrapper scene bundle(s).` line and that the other three fixtures each produce exactly one old missing-VisualInstance error and no warnings; any different result fails the block. The runner's marker is removed before these checks and is the only non-Godot line intentionally tolerated by the capture path. The post-fix helper used in Step 4 has no broad nonzero-only path: every fixture must exit `1`, emit exactly one `ERROR:` line, emit zero `WARNING:` lines, and contain its listed marker. This negative-fixture evidence remains separate from the eight-error real-directory red gate.
+The red harness returns zero only by proving `mixed_legacy_variant` is accepted with the exact `Validated 1 wrapper scene bundle(s).` line and that the other three fixtures each produce exactly one old missing-VisualInstance error and no warnings; any different result fails the block. Every capture first requires exactly one runner success marker and rejects any `STATE RUNNER:` line; only then is the marker removed before Godot diagnostics are counted. The marker is the only non-Godot runner line intentionally tolerated by the capture path. The post-fix helper used in Step 4 has no broad nonzero-only path: every fixture must exit `1`, emit exactly one `ERROR:` line, emit zero `WARNING:` lines, and contain its listed marker. This negative-fixture evidence remains separate from the eight-error real-directory red gate.
 
 - [ ] **Step 2: Add a baseline-green eight-scene wrapper characterization smoke**
 
@@ -871,14 +1236,48 @@ import sys
 print(hashlib.sha256(sys.argv[1].encode('utf-8')).hexdigest())
 PY
 )
-STATE_RUNNER="${TMPDIR:-/tmp}/synaptic-sea-task2-${WORKTREE_DIGEST}/state_runner.py"
+TEMP_BASE=$(python3 - "${TMPDIR:-/tmp}" <<'PY'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).expanduser().resolve())
+PY
+)
+STATE_HOME="$TEMP_BASE/synaptic-sea-task2-${WORKTREE_DIGEST}"
+STATE_HOME=$(python3 - "$STATE_HOME" <<'PY'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).expanduser().resolve())
+PY
+)
+STATE_RUNNER="$STATE_HOME/state_runner.py"
 [[ -x "$STATE_RUNNER" ]] || { printf 'missing executable STATE_RUNNER: %s\n' "$STATE_RUNNER" >&2; exit 1; }
-strip_runner_marker() { awk -v marker="$RUNNER_MARKER" '$0 != marker'; }
+strip_runner_marker() {
+  awk -v marker="$RUNNER_MARKER" '$0 != marker'
+}
+
+require_runner_success() {
+  local label="$1"
+  local raw="$2"
+  local marker_count runner_diagnostics
+  marker_count=$(awk -v marker="$RUNNER_MARKER" '$0 == marker { count += 1 } END { print count + 0 }' <<<"$raw")
+  runner_diagnostics=$(awk '/^STATE RUNNER:/ { print }' <<<"$raw")
+  if (( marker_count != 1 )); then
+    printf '%s: expected exactly one %s, got %d\n' "$label" "$RUNNER_MARKER" "$marker_count" >&2
+    return 1
+  fi
+  if [[ -n "$runner_diagnostics" ]]; then
+    printf '%s: unexpected STATE RUNNER: diagnostic:\n%s\n' "$label" "$runner_diagnostics" >&2
+    return 1
+  fi
+}
 expect_clean_accept() {
   local label="$1" expected_marker="$2"
   shift 2
   local raw filtered status error_count warning_count marker_count
   if raw=$("$@" 2>&1); then status=0; else status=$?; fi
+  if ! require_runner_success "$label" "$raw"; then
+    return 1
+  fi
   filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
   printf '%s\n' "$filtered"
   error_count=$(awk 'BEGIN { count = 0 } /^ERROR:/ { count += 1 } END { print count }' <<<"$filtered")
@@ -1007,16 +1406,50 @@ import sys
 print(hashlib.sha256(sys.argv[1].encode('utf-8')).hexdigest())
 PY
 )
-STATE_RUNNER="${TMPDIR:-/tmp}/synaptic-sea-task2-${WORKTREE_DIGEST}/state_runner.py"
+TEMP_BASE=$(python3 - "${TMPDIR:-/tmp}" <<'PY'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).expanduser().resolve())
+PY
+)
+STATE_HOME="$TEMP_BASE/synaptic-sea-task2-${WORKTREE_DIGEST}"
+STATE_HOME=$(python3 - "$STATE_HOME" <<'PY'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).expanduser().resolve())
+PY
+)
+STATE_RUNNER="$STATE_HOME/state_runner.py"
 [[ -x "$STATE_RUNNER" ]] || { printf 'missing executable STATE_RUNNER: %s\n' "$STATE_RUNNER" >&2; exit 1; }
 
-strip_runner_marker() { awk -v marker="$RUNNER_MARKER" '$0 != marker'; }
+strip_runner_marker() {
+  awk -v marker="$RUNNER_MARKER" '$0 != marker'
+}
+
+require_runner_success() {
+  local label="$1"
+  local raw="$2"
+  local marker_count runner_diagnostics
+  marker_count=$(awk -v marker="$RUNNER_MARKER" '$0 == marker { count += 1 } END { print count + 0 }' <<<"$raw")
+  runner_diagnostics=$(awk '/^STATE RUNNER:/ { print }' <<<"$raw")
+  if (( marker_count != 1 )); then
+    printf '%s: expected exactly one %s, got %d\n' "$label" "$RUNNER_MARKER" "$marker_count" >&2
+    return 1
+  fi
+  if [[ -n "$runner_diagnostics" ]]; then
+    printf '%s: unexpected STATE RUNNER: diagnostic:\n%s\n' "$label" "$runner_diagnostics" >&2
+    return 1
+  fi
+}
 
 run_clean() {
   local label="$1"
   shift
   local raw filtered status error_count warning_count
   if raw=$("$@" 2>&1); then status=0; else status=$?; fi
+  if ! require_runner_success "$label" "$raw"; then
+    return 1
+  fi
   filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
   printf '%s\n' "$filtered"
   error_count=$(awk 'BEGIN { count = 0 } /^ERROR:/ { count += 1 } END { print count }' <<<"$filtered")
@@ -1033,6 +1466,9 @@ expect_clean_accept() {
   shift 2
   local raw filtered status error_count warning_count marker_count
   if raw=$("$@" 2>&1); then status=0; else status=$?; fi
+  if ! require_runner_success "$label" "$raw"; then
+    return 1
+  fi
   filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
   printf '%s\n' "$filtered"
   error_count=$(awk 'BEGIN { count = 0 } /^ERROR:/ { count += 1 } END { print count }' <<<"$filtered")
@@ -1053,6 +1489,9 @@ expect_exact_error_signature() {
   shift 4
   local raw filtered status error_count warning_count unexpected_errors
   if raw=$("$@" 2>&1); then status=0; else status=$?; fi
+  if ! require_runner_success "$label" "$raw"; then
+    return 1
+  fi
   filtered=$(printf '%s\n' "$raw" | strip_runner_marker)
   printf '%s\n' "$filtered"
   if (( status != expected_status )); then
@@ -1119,7 +1558,7 @@ expect_clean_accept \
 printf 'STRUCTURAL SOURCE GUARD PASS paths=3 per_invocation=true\n'
 ```
 
-`expect_clean_accept` mechanically requires exit `0`, zero lines beginning `ERROR:` or `WARNING:`, and exactly one exact success marker. It is used for both the mixed fixture's `Validated 1 wrapper scene bundle(s).` acceptance in the red gate and the post-fix real directory's exact `Validated 15 wrapper scene bundle(s).` acceptance above. The negative suite is the sole intentional `ERROR:` exception and requires status `1`, exactly one error, zero warnings, and its exact diagnostic marker for each fixture. Every capture removes only the runner's exact stderr restore marker before counting. The runner's per-invocation `finally` path always performs generated-state restoration and the broad source fingerprint check, including on early command failure; a source/state failure cannot replace a failed Godot status. No outer Step 4 snapshot, `STATE_ROOT`, or `EXIT` trap remains to duplicate the runner.
+`expect_clean_accept` mechanically requires exit `0`, exactly one runner success marker, no `STATE RUNNER:` line, zero lines beginning `ERROR:` or `WARNING:`, and exactly one expected validator success marker. It is used for the mixed fixture's `Validated 1 wrapper scene bundle(s).` acceptance in the red gate and the post-fix real directory's exact `Validated 15 wrapper scene bundle(s).` acceptance above. `run_clean` applies the same runner-marker and runner-diagnostic checks to the editor preflight and every clean smoke/green run. The negative suite is the sole intentional `ERROR:` exception and requires status `1`, exactly one error, zero warnings, one runner success marker, no `STATE RUNNER:` diagnostics, and its exact validator diagnostic marker for each fixture. Every capture validates the runner line before removing only its exact stderr restore marker. The runner's per-invocation signal-aware `finally` path always performs generated-state restoration, the broad source fingerprint check, and temporary cleanup, including on early command interruption; a source/state failure cannot replace a failed Godot status. No outer Step 4 snapshot, `STATE_ROOT`, or `EXIT` trap remains to duplicate the runner.
 
 - [ ] **Step 5: Stage only Task 2 implementation artifacts and commit**
 
@@ -1153,7 +1592,19 @@ import sys
 print(hashlib.sha256(sys.argv[1].encode('utf-8')).hexdigest())
 PY
 )
-STATE_HOME="${TMPDIR:-/tmp}/synaptic-sea-task2-${WORKTREE_DIGEST}"
+TEMP_BASE=$(python3 - "${TMPDIR:-/tmp}" <<'PY'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).expanduser().resolve())
+PY
+)
+STATE_HOME="$TEMP_BASE/synaptic-sea-task2-${WORKTREE_DIGEST}"
+STATE_HOME=$(python3 - "$STATE_HOME" <<'PY'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).expanduser().resolve())
+PY
+)
 PRECONDITION_RECORD="$STATE_HOME/step0-precondition.txt"
 [[ -f "$PRECONDITION_RECORD" ]] || { printf 'missing Step 0 precondition record\n' >&2; exit 1; }
 python3 - "$PRECONDITION_RECORD" "$PWD" "$(git rev-parse HEAD)" <<'PY'
