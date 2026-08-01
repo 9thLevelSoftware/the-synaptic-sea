@@ -47,6 +47,70 @@ func _initialize() -> void:
 	(malformed_namespace["dressing"] as Dictionary)["cable_tray"] = malformed_dressing
 	failures += _expect_catalog_rejected(malformed_namespace, "user://task5-malformed-namespace.json", "namespace/map mismatch is rejected")
 
+	var malformed_source: Dictionary = valid_document.duplicate(true)
+	var malformed_source_component: Dictionary = component_binding.duplicate(true)
+	var malformed_source_meta: Dictionary = (malformed_source_component["source"] as Dictionary).duplicate(true)
+	malformed_source_meta["byte_size"] = "not-an-integer"
+	malformed_source_component["source"] = malformed_source_meta
+	(malformed_source["components"] as Dictionary)["reactor_console"] = malformed_source_component
+	failures += _expect_catalog_rejected(malformed_source, "user://task5-malformed-source.json", "invalid source metadata is rejected")
+
+	var malformed_hash: Dictionary = valid_document.duplicate(true)
+	var malformed_hash_component: Dictionary = component_binding.duplicate(true)
+	var malformed_hash_source: Dictionary = (malformed_hash_component["source"] as Dictionary).duplicate(true)
+	malformed_hash_source["sha256"] = "not-a-sha256"
+	malformed_hash_component["source"] = malformed_hash_source
+	(malformed_hash["components"] as Dictionary)["reactor_console"] = malformed_hash_component
+	failures += _expect_catalog_rejected(malformed_hash, "user://task5-malformed-hash.json", "invalid source hash is rejected")
+
+	var malformed_bounds: Dictionary = valid_document.duplicate(true)
+	var malformed_bounds_component: Dictionary = component_binding.duplicate(true)
+	var malformed_bounds_meta: Dictionary = (malformed_bounds_component["bounds"] as Dictionary).duplicate(true)
+	malformed_bounds_meta["local_min_m"] = [0.0, 0.0]
+	malformed_bounds_component["bounds"] = malformed_bounds_meta
+	(malformed_bounds["components"] as Dictionary)["reactor_console"] = malformed_bounds_component
+	failures += _expect_catalog_rejected(malformed_bounds, "user://task5-malformed-bounds.json", "invalid bounds metadata is rejected")
+
+	var duplicate_yaw: Dictionary = valid_document.duplicate(true)
+	var duplicate_yaw_component: Dictionary = component_binding.duplicate(true)
+	var duplicate_yaw_placement: Dictionary = (duplicate_yaw_component["placement"] as Dictionary).duplicate(true)
+	duplicate_yaw_placement["allowed_yaw_deg"] = [0.0, 90.0, 90.0]
+	duplicate_yaw_component["placement"] = duplicate_yaw_placement
+	(duplicate_yaw["components"] as Dictionary)["reactor_console"] = duplicate_yaw_component
+	failures += _expect_catalog_rejected(duplicate_yaw, "user://task5-duplicate-yaw.json", "duplicate allowed yaw is rejected")
+
+	var serialized_valid: String = JSON.stringify(valid_document)
+	var duplicate_key_token: String = "\"schema_version\":\"1.0.0\","
+	var duplicate_key_offset: int = serialized_valid.find(duplicate_key_token)
+	var duplicate_key_document: String = serialized_valid
+	if duplicate_key_offset >= 0:
+		duplicate_key_document = serialized_valid.substr(0, duplicate_key_offset) \
+			+ duplicate_key_token + serialized_valid.substr(duplicate_key_offset)
+	failures += _expect_catalog_raw_rejected(
+		duplicate_key_document,
+		"user://task5-duplicate-json-key.json",
+		"duplicate JSON object key is rejected",
+	)
+
+	var cross_kind_marker: Node3D = Node3D.new()
+	get_root().add_child(cross_kind_marker)
+	failures += _expect(
+		not RuntimePropVisualBinderScript.mount_component_visual(cross_kind_marker, objective_binding),
+		"objective binding cannot mount as component visual",
+	)
+	failures += _expect(
+		RuntimePropVisualBinderScript.create_objective_visual(component_binding) == null,
+		"component binding cannot create objective visual",
+	)
+	failures += _expect(
+		RuntimePropVisualBinderScript.mount_component_visual(cross_kind_marker, dressing_binding) == false,
+		"dressing binding cannot mount as component visual",
+	)
+	failures += _expect(
+		RuntimePropVisualBinderScript.create_objective_visual(dressing_binding) == null,
+		"dressing binding cannot create objective visual",
+	)
+
 	var marker: Node3D = Node3D.new()
 	get_root().add_child(marker)
 	var mounted: bool = RuntimePropVisualBinderScript.mount_component_visual(marker, component_binding)
@@ -146,6 +210,28 @@ func _initialize() -> void:
 		not RuntimePropVisualBinderScript.validate_visual_tree(area_root),
 		"Area3D visual is rejected",
 	)
+	var physics_query_types: Array = [
+		CollisionPolygon3D.new(),
+		NavigationRegion3D.new(),
+		NavigationObstacle3D.new(),
+		NavigationAgent3D.new(),
+		NavigationLink3D.new(),
+		RayCast3D.new(),
+		ShapeCast3D.new(),
+		SpringArm3D.new(),
+		HingeJoint3D.new(),
+	]
+	for physics_query_node_variant in physics_query_types:
+		var physics_query_node: Node = physics_query_node_variant as Node
+		var physics_query_root: Node3D = Node3D.new()
+		var nested_physics_parent: Node3D = Node3D.new()
+		physics_query_root.add_child(nested_physics_parent)
+		nested_physics_parent.add_child(physics_query_node)
+		failures += _expect(
+			not RuntimePropVisualBinderScript.validate_visual_tree(physics_query_root),
+			"%s visual is rejected recursively" % physics_query_node.get_class(),
+		)
+		physics_query_root.free()
 	var scripted_root: Node3D = Node3D.new()
 	var scripted_node: Node3D = Node3D.new()
 	scripted_node.set_script(ProcgenDebugRunnerScript)
@@ -173,6 +259,12 @@ func _initialize() -> void:
 	failures += _expect(
 		RuntimePropVisualBinderScript.validate_visual_tree(benign_import_root),
 		"benign Godot importer script is accepted",
+	)
+	var benign_mesh_root: Node3D = Node3D.new()
+	benign_mesh_root.add_child(MeshInstance3D.new())
+	failures += _expect(
+		RuntimePropVisualBinderScript.validate_visual_tree(benign_mesh_root),
+		"ordinary mesh visual remains accepted",
 	)
 
 	var unrelated_direct: Node3D = Node3D.new()
@@ -215,6 +307,11 @@ func _initialize() -> void:
 		"user://task5-malformed-kind.json",
 		"user://task5-malformed-path.json",
 		"user://task5-malformed-namespace.json",
+		"user://task5-malformed-source.json",
+		"user://task5-malformed-hash.json",
+		"user://task5-malformed-bounds.json",
+		"user://task5-duplicate-yaw.json",
+		"user://task5-duplicate-json-key.json",
 	]:
 		_remove_user_file(temporary_path)
 	if detached_objective != null:
@@ -227,6 +324,9 @@ func _initialize() -> void:
 	scripted_root.free()
 	interaction_root.free()
 	benign_import_root.free()
+	benign_mesh_root.free()
+	get_root().remove_child(cross_kind_marker)
+	cross_kind_marker.free()
 	get_root().remove_child(marker)
 	marker.free()
 	get_root().remove_child(missing_marker)
@@ -257,6 +357,17 @@ func _expect_catalog_rejected(document: Dictionary, path: String, message: Strin
 	return _expect(rejected, message)
 
 
+func _expect_catalog_raw_rejected(document: String, path: String, message: String) -> int:
+	if not _write_raw_json(path, document):
+		return _expect(false, "%s (fixture write failed)" % message)
+	var probe = PropVisualBindingCatalogScript.new()
+	var loaded: bool = probe.load_from_path(path)
+	var errors: Array[String] = probe.get_errors()
+	var rejected: bool = not loaded and errors.any(func(error: String) -> bool: return error.contains("duplicate JSON object key"))
+	_remove_user_file(path)
+	return _expect(rejected, message)
+
+
 func _catalog_document(component: Dictionary, objective: Dictionary, dressing: Dictionary) -> Dictionary:
 	return {
 		"schema_version": "1.0.0",
@@ -272,6 +383,15 @@ func _write_json(path: String, document: Dictionary) -> bool:
 	if file == null:
 		return false
 	file.store_string(JSON.stringify(document))
+	file.close()
+	return true
+
+
+func _write_raw_json(path: String, document: String) -> bool:
+	var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(document)
 	file.close()
 	return true
 

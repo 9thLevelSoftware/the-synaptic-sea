@@ -16,6 +16,9 @@ var _component_bindings: Dictionary = {}
 var _objective_bindings: Dictionary = {}
 var _dressing_bindings: Dictionary = {}
 var _errors: Array[String] = []
+var _json_scan_text: String = ""
+var _json_scan_index: int = 0
+var _duplicate_json_key_found: bool = false
 
 
 func load_from_path(path: String = DEFAULT_INDEX_PATH) -> bool:
@@ -29,8 +32,13 @@ func load_from_path(path: String = DEFAULT_INDEX_PATH) -> bool:
 		_errors.append("cannot open catalog: %s" % path)
 		return false
 
+	var raw_document: String = file.get_as_text()
+	file.close()
+	if _contains_duplicate_json_key(raw_document):
+		_errors.append("catalog JSON contains duplicate JSON object key")
+		return false
 	var parser := JSON.new()
-	var parse_error: Error = parser.parse(file.get_as_text())
+	var parse_error: Error = parser.parse(raw_document)
 	if parse_error != OK:
 		_errors.append("catalog JSON parse failed: %s" % parser.get_error_message())
 		return false
@@ -76,6 +84,134 @@ func get_dressing_binding(visual_prop_id: String) -> Dictionary:
 
 func get_errors() -> Array[String]:
 	return _errors.duplicate()
+
+
+func _contains_duplicate_json_key(text: String) -> bool:
+	_json_scan_text = text
+	_json_scan_index = 0
+	_duplicate_json_key_found = false
+	var scan_valid: bool = _scan_json_value()
+	_skip_json_whitespace()
+	return scan_valid and _json_scan_index == _json_scan_text.length() and _duplicate_json_key_found
+
+
+func _scan_json_value() -> bool:
+	_skip_json_whitespace()
+	if _json_scan_index >= _json_scan_text.length():
+		return false
+	var character: String = _json_scan_text.substr(_json_scan_index, 1)
+	if character == "{":
+		return _scan_json_object()
+	if character == "[":
+		return _scan_json_array()
+	if character == "\"":
+		return _scan_json_string_token() != null
+	if character == "t" and _scan_json_literal("true"):
+		return true
+	if character == "f" and _scan_json_literal("false"):
+		return true
+	if character == "n" and _scan_json_literal("null"):
+		return true
+	return _scan_json_number()
+
+
+func _scan_json_object() -> bool:
+	_json_scan_index += 1
+	_skip_json_whitespace()
+	var seen_keys: Dictionary = {}
+	if _json_scan_index < _json_scan_text.length() and _json_scan_text.substr(_json_scan_index, 1) == "}":
+		_json_scan_index += 1
+		return true
+	while _json_scan_index < _json_scan_text.length():
+		_skip_json_whitespace()
+		var key_value: Variant = _scan_json_string_token()
+		if key_value == null:
+			return false
+		var key: String = str(key_value)
+		if seen_keys.has(key):
+			_duplicate_json_key_found = true
+		seen_keys[key] = true
+		_skip_json_whitespace()
+		if _json_scan_index >= _json_scan_text.length() or _json_scan_text.substr(_json_scan_index, 1) != ":":
+			return false
+		_json_scan_index += 1
+		if not _scan_json_value():
+			return false
+		_skip_json_whitespace()
+		if _json_scan_index >= _json_scan_text.length():
+			return false
+		var delimiter: String = _json_scan_text.substr(_json_scan_index, 1)
+		if delimiter == "}":
+			_json_scan_index += 1
+			return true
+		if delimiter != ",":
+			return false
+		_json_scan_index += 1
+	return false
+
+
+func _scan_json_array() -> bool:
+	_json_scan_index += 1
+	_skip_json_whitespace()
+	if _json_scan_index < _json_scan_text.length() and _json_scan_text.substr(_json_scan_index, 1) == "]":
+		_json_scan_index += 1
+		return true
+	while _json_scan_index < _json_scan_text.length():
+		if not _scan_json_value():
+			return false
+		_skip_json_whitespace()
+		if _json_scan_index >= _json_scan_text.length():
+			return false
+		var delimiter: String = _json_scan_text.substr(_json_scan_index, 1)
+		if delimiter == "]":
+			_json_scan_index += 1
+			return true
+		if delimiter != ",":
+			return false
+		_json_scan_index += 1
+	return false
+
+
+func _scan_json_string_token() -> Variant:
+	if _json_scan_index >= _json_scan_text.length() or _json_scan_text.substr(_json_scan_index, 1) != "\"":
+		return null
+	var start: int = _json_scan_index
+	_json_scan_index += 1
+	while _json_scan_index < _json_scan_text.length():
+		var character: String = _json_scan_text.substr(_json_scan_index, 1)
+		if character == "\\":
+			_json_scan_index += 2
+			continue
+		_json_scan_index += 1
+		if character == "\"":
+			var raw_string: String = _json_scan_text.substr(start, _json_scan_index - start)
+			var decoded: Variant = JSON.parse_string(raw_string)
+			return decoded if typeof(decoded) == TYPE_STRING else null
+	return null
+
+
+func _scan_json_literal(literal: String) -> bool:
+	if _json_scan_text.substr(_json_scan_index, literal.length()) != literal:
+		return false
+	_json_scan_index += literal.length()
+	return true
+
+
+func _scan_json_number() -> bool:
+	var start: int = _json_scan_index
+	while _json_scan_index < _json_scan_text.length():
+		var character: String = _json_scan_text.substr(_json_scan_index, 1)
+		if "{}[],: \t\r\n".contains(character):
+			break
+		_json_scan_index += 1
+	return _json_scan_index > start
+
+
+func _skip_json_whitespace() -> void:
+	while _json_scan_index < _json_scan_text.length():
+		if not " \t\r\n".contains(_json_scan_text.substr(_json_scan_index, 1)):
+			return
+		_json_scan_index += 1
 
 
 func _clear_state() -> void:
@@ -194,10 +330,12 @@ func _validate_binding(binding: Dictionary, group_name: String, binding_id: Stri
 	else:
 		valid = _validate_placement(placement as Dictionary, group_name, binding_id) and valid
 
-	for nested_field in ["bounds", "source", "provenance", "extensions"]:
-		if not (binding.get(nested_field) is Dictionary):
-			_errors.append("catalog binding %s/%s %s must be an object" % [group_name, binding_id, nested_field])
-			valid = false
+	valid = _validate_source(binding.get("source"), group_name, binding_id) and valid
+	valid = _validate_bounds(binding.get("bounds"), group_name, binding_id) and valid
+	valid = _validate_provenance(binding.get("provenance"), group_name, binding_id) and valid
+	if not (binding.get("extensions") is Dictionary):
+		_errors.append("catalog binding %s/%s extensions must be an object" % [group_name, binding_id])
+		valid = false
 	return valid
 
 
@@ -266,14 +404,118 @@ func _validate_placement(placement: Dictionary, group_name: String, binding_id: 
 		valid = false
 	else:
 		var yaws: Array = yaw_values as Array
+		var seen_yaws: Array = []
 		for yaw in yaws:
 			if not _is_finite_number(yaw):
 				_errors.append("catalog binding %s/%s allowed_yaw_deg must be finite" % [group_name, binding_id])
 				valid = false
+				continue
+			var yaw_number: float = float(yaw)
+			if seen_yaws.has(yaw_number):
+				_errors.append("catalog binding %s/%s allowed_yaw_deg contains duplicate yaw" % [group_name, binding_id])
+				valid = false
+			seen_yaws.append(yaw_number)
 	if group_name == "dressing" and not _is_nonempty_string(placement.get("surface")):
 		_errors.append("catalog binding %s/%s dressing surface must be a nonempty string" % [group_name, binding_id])
 		valid = false
 	return valid
+
+
+func _validate_source(value: Variant, group_name: String, binding_id: String) -> bool:
+	var valid: bool = _validate_exact_object_fields(value, ["sha256", "byte_size", "mesh_count", "gltf_version"], "source", group_name, binding_id)
+	if not (value is Dictionary):
+		return false
+	var source: Dictionary = value as Dictionary
+	var sha256: Variant = source.get("sha256")
+	if not _is_sha256(sha256):
+		_errors.append("catalog binding %s/%s source sha256 must be 64 lowercase hex characters" % [group_name, binding_id])
+		valid = false
+	var byte_size: Variant = source.get("byte_size")
+	if not _is_nonnegative_integer_value(byte_size):
+		_errors.append("catalog binding %s/%s source byte_size must be a nonnegative integer" % [group_name, binding_id])
+		valid = false
+	var mesh_count: Variant = source.get("mesh_count")
+	if not _is_positive_integer_value(mesh_count):
+		_errors.append("catalog binding %s/%s source mesh_count must be a positive integer" % [group_name, binding_id])
+		valid = false
+	if source.get("gltf_version", "") != "2.0":
+		_errors.append("catalog binding %s/%s source gltf_version must be 2.0" % [group_name, binding_id])
+		valid = false
+	return valid
+
+
+func _validate_bounds(value: Variant, group_name: String, binding_id: String) -> bool:
+	var valid: bool = _validate_exact_object_fields(value, ["local_min_m", "local_max_m"], "bounds", group_name, binding_id)
+	if not (value is Dictionary):
+		return false
+	var bounds: Dictionary = value as Dictionary
+	var local_min: Variant = bounds.get("local_min_m")
+	var local_max: Variant = bounds.get("local_max_m")
+	if not _is_finite_vector(local_min) or not _is_finite_vector(local_max):
+		_errors.append("catalog binding %s/%s bounds must contain finite 3-vectors" % [group_name, binding_id])
+		return false
+	var min_values: Array = local_min as Array
+	var max_values: Array = local_max as Array
+	for index in 3:
+		if float(min_values[index]) > float(max_values[index]):
+			_errors.append("catalog binding %s/%s bounds local_min_m must not exceed local_max_m" % [group_name, binding_id])
+			return false
+	return valid
+
+
+func _validate_provenance(value: Variant, group_name: String, binding_id: String) -> bool:
+	var valid: bool = _validate_exact_object_fields(value, ["license_state", "source_platform"], "provenance", group_name, binding_id)
+	if not (value is Dictionary):
+		return false
+	var provenance: Dictionary = value as Dictionary
+	for field_name in ["license_state", "source_platform"]:
+		if not _is_nonempty_string(provenance.get(field_name)):
+			_errors.append("catalog binding %s/%s provenance %s must be a nonempty string" % [group_name, binding_id, field_name])
+			valid = false
+	return valid
+
+
+func _validate_exact_object_fields(value: Variant, expected_fields: Array, nested_name: String, group_name: String, binding_id: String) -> bool:
+	if not (value is Dictionary):
+		_errors.append("catalog binding %s/%s %s must be an object" % [group_name, binding_id, nested_name])
+		return false
+	var valid: bool = true
+	var object_value: Dictionary = value as Dictionary
+	for key in object_value.keys():
+		if not expected_fields.has(str(key)):
+			_errors.append("catalog binding %s/%s %s has unexpected field: %s" % [group_name, binding_id, nested_name, key])
+			valid = false
+	for field_name in expected_fields:
+		if not object_value.has(field_name):
+			_errors.append("catalog binding %s/%s %s is missing field: %s" % [group_name, binding_id, nested_name, field_name])
+			valid = false
+	if object_value.size() != expected_fields.size():
+		valid = false
+	return valid
+
+
+func _is_sha256(value: Variant) -> bool:
+	if typeof(value) != TYPE_STRING or str(value).length() != 64:
+		return false
+	for index in str(value).length():
+		var code: int = str(value).unicode_at(index)
+		if not ((code >= 48 and code <= 57) or (code >= 97 and code <= 102)):
+			return false
+	return true
+
+
+func _is_nonnegative_integer_value(value: Variant) -> bool:
+	if not _is_finite_number(value):
+		return false
+	var number: float = float(value)
+	return number >= 0.0 and is_equal_approx(number, round(number))
+
+
+func _is_positive_integer_value(value: Variant) -> bool:
+	if not _is_finite_number(value):
+		return false
+	var number: float = float(value)
+	return number >= 1.0 and is_equal_approx(number, round(number))
 
 
 func _is_canonical_scene_path(value: Variant, group_name: String) -> bool:

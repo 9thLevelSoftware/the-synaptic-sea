@@ -37,6 +37,8 @@ const IMPORTER_SCRIPT_PREFIXES: Array[String] = [
 static func mount_component_visual(marker: Node3D, binding: Dictionary) -> bool:
 	if marker == null or binding.is_empty():
 		return false
+	if not _is_safe_binding(binding, "component"):
+		return false
 	if _has_imported_visual(marker):
 		return false
 	var visual: Node3D = _create_imported_visual(binding)
@@ -48,6 +50,8 @@ static func mount_component_visual(marker: Node3D, binding: Dictionary) -> bool:
 
 static func create_objective_visual(binding: Dictionary) -> Node3D:
 	if binding.is_empty():
+		return null
+	if not _is_safe_binding(binding, "objective"):
 		return null
 	return _create_imported_visual(binding)
 
@@ -91,7 +95,7 @@ static func validate_visual_tree(root: Node) -> bool:
 static func _validate_visual_tree(root: Node, inherited_import_provenance: bool) -> bool:
 	if root == null:
 		return false
-	if root is CollisionObject3D or root is CollisionShape3D or root is Area3D:
+	if _is_forbidden_visual_node(root):
 		return false
 	var imported_provenance: bool = inherited_import_provenance or _has_import_provenance(root)
 	if _has_forbidden_visual_behavior(root, imported_provenance):
@@ -104,7 +108,7 @@ static func _validate_visual_tree(root: Node, inherited_import_provenance: bool)
 
 
 static func _create_imported_visual(binding: Dictionary) -> Node3D:
-	if not _is_safe_binding(binding):
+	if not _is_safe_binding(binding, str(binding.get("prop_kind", ""))):
 		return null
 	var path: String = str(binding["visual_scene_path"])
 	var instance: Node = _instantiate_visual_scene(path)
@@ -129,18 +133,50 @@ static func _create_imported_visual(binding: Dictionary) -> Node3D:
 	return visual
 
 
-static func _is_safe_binding(binding: Dictionary) -> bool:
+static func _is_safe_binding(binding: Dictionary, expected_prop_kind: String) -> bool:
 	if binding.get("document_kind", "") != BINDING_DOCUMENT_KIND:
 		return false
 	if binding.get("collision_policy", "") != COLLISION_POLICY:
 		return false
+	if binding.get("prop_kind", "") != expected_prop_kind:
+		return false
+	var expected_namespace: String = {
+		"component": "component_id",
+		"objective": "gameplay_placement_id",
+	}.get(expected_prop_kind, "")
+	if expected_namespace.is_empty():
+		return false
+	var binding_meta: Variant = binding.get("binding")
+	if not (binding_meta is Dictionary):
+		return false
+	var binding_dictionary: Dictionary = binding_meta as Dictionary
+	if binding_dictionary.get("namespace", "") != expected_namespace:
+		return false
+	var ids_value: Variant = binding_dictionary.get("ids")
+	if not (ids_value is Array) or (ids_value as Array).is_empty():
+		return false
+	var ids: Array = ids_value as Array
+	var seen_ids: Dictionary = {}
+	for id_value in ids:
+		if typeof(id_value) != TYPE_STRING or str(id_value).strip_edges().is_empty():
+			return false
+		var id: String = str(id_value)
+		if seen_ids.has(id):
+			return false
+		seen_ids[id] = true
+	if expected_prop_kind == "component":
+		var asset_id: Variant = binding.get("asset_id")
+		if typeof(asset_id) != TYPE_STRING or ids.size() != 1 or ids[0] != asset_id:
+			return false
 	var scene_path: Variant = binding.get("visual_scene_path", "")
-	if not _is_canonical_scene_path(scene_path):
+	if not _is_canonical_scene_path(scene_path, expected_prop_kind + "s"):
+		return false
+	if str(scene_path).get_file().trim_suffix(".glb") != str(binding.get("asset_id", "")):
 		return false
 	return _is_valid_placement(binding.get("placement"))
 
 
-static func _is_canonical_scene_path(value: Variant) -> bool:
+static func _is_canonical_scene_path(value: Variant, expected_group: String = "") -> bool:
 	if typeof(value) != TYPE_STRING or str(value).is_empty():
 		return false
 	var path: String = str(value)
@@ -149,6 +185,8 @@ static func _is_canonical_scene_path(value: Variant) -> bool:
 	var relative: String = path.substr(SCENE_PATH_PREFIX.length())
 	var parts: PackedStringArray = relative.split("/")
 	if parts.size() != 2 or not ["components", "objectives", "dressing"].has(parts[0]):
+		return false
+	if not expected_group.is_empty() and parts[0] != expected_group:
 		return false
 	if parts[1].is_empty() or parts[1] == ".glb" or not parts[1].ends_with(".glb"):
 		return false
@@ -209,6 +247,21 @@ static func _is_finite_number(value: Variant) -> bool:
 	if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
 		return false
 	return is_finite(float(value))
+
+
+static func _is_forbidden_visual_node(node: Node) -> bool:
+	return node is CollisionObject3D \
+		or node is CollisionShape3D \
+		or node is CollisionPolygon3D \
+		or node is Area3D \
+		or node is NavigationRegion3D \
+		or node is NavigationObstacle3D \
+		or node is NavigationAgent3D \
+		or node is NavigationLink3D \
+		or node is RayCast3D \
+		or node is ShapeCast3D \
+		or node is SpringArm3D \
+		or node is Joint3D
 
 
 static func _has_forbidden_visual_behavior(node: Node, imported_provenance: bool) -> bool:
