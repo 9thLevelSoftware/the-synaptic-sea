@@ -205,7 +205,7 @@ Expected: `ASSET METADATA GOVERNANCE DOCS PASS` and one focused documentation co
 
 - [ ] **Step 0: Establish the pre-mutation worktree guard and one isolated Godot state runner**
 
-Run this once, before any Task 2 fixture/code mutation and before the first Task 2 Godot command. It is the only setup helper: it writes one executable Python standard-library runner outside the repository at a deterministic path derived from the SHA-256 of `$PWD`. The runner creates and removes one temporary per-invocation snapshot directory below that external directory; it never writes a helper or snapshot into the repository. The clean precondition covers all 14 owned paths, including staged, unstaged, untracked, and ignored changes, plus the broad structural source paths and their ignored artifacts. The precondition and every later runner fence reject a symlink/nonregular/stale `STATE_RUNNER` without unlinking it. Do not replace these checks with `git restore`, `git clean`, or a generated-state `git status` check.
+Run this once, before any Task 2 fixture/code mutation and before the first Task 2 Godot command. It is the only setup helper: it writes one executable Python standard-library runner outside the repository at a deterministic path derived from the SHA-256 of canonical `REPOSITORY_ROOT = Path($PWD).resolve()`. The runner creates and removes one temporary per-invocation snapshot directory below that external directory; it never writes a helper or snapshot into the repository. The clean precondition covers all 14 owned paths, including staged, unstaged, untracked, and ignored changes, plus the broad structural source paths and their ignored artifacts. The precondition and every later runner fence reject a symlink/nonregular/stale `STATE_RUNNER` without unlinking it. Do not replace these checks with `git restore`, `git clean`, or a generated-state `git status` check.
 
 ```bash
 set -euo pipefail
@@ -250,16 +250,18 @@ if [[ -n "$source_status" || -n "$source_ignored" ]]; then
   exit 1
 fi
 
-WORKTREE_DIGEST=$(python3 - "$PWD" <<'PY'
-import hashlib
-import sys
-print(hashlib.sha256(sys.argv[1].encode('utf-8')).hexdigest())
-PY
-)
 REPOSITORY_ROOT=$(python3 - "$PWD" <<'PY'
 from pathlib import Path
 import sys
 print(Path(sys.argv[1]).expanduser().resolve())
+PY
+)
+# Canonicalize once, then use this exact identity for every digest, state path,
+# record, and later fence. Never hash or record the raw $PWD spelling.
+WORKTREE_DIGEST=$(python3 - "$REPOSITORY_ROOT" <<'PY'
+import hashlib
+import sys
+print(hashlib.sha256(sys.argv[1].encode('utf-8')).hexdigest())
 PY
 )
 TEMP_BASE=$(python3 - "${TMPDIR:-/tmp}" "$REPOSITORY_ROOT" <<'PY'
@@ -433,7 +435,7 @@ def maybe_test_signal(root: Path, environment_name: str, phase: str) -> None:
         target = root / SOURCE_ROOTS[0] / f"synthetic-{phase}.txt"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text("changed", encoding="utf-8")
-    if phase == "launch":
+    if phase in {"postlaunch", "wait"}:
         ready_name = os.environ.get("STATE_RUNNER_SYNTHETIC_READY_FILE")
         if ready_name:
             ready = Path(ready_name)
@@ -447,7 +449,6 @@ def maybe_test_signal(root: Path, environment_name: str, phase: str) -> None:
 
 
 def snapshot(root: Path, snapshot_root: Path) -> dict[str, object]:
-    maybe_test_signal(root, "STATE_RUNNER_SYNTHETIC_SNAPSHOT_SIGNAL", "snapshot")
     generated = collect_generated(root)
     imports_backup = snapshot_root / "external-imports"
     for record in generated["files"]:
@@ -460,7 +461,6 @@ def snapshot(root: Path, snapshot_root: Path) -> dict[str, object]:
         shutil.copy2(source, destination)
     if bool(generated["godot_exists"]):
         shutil.copytree(root / ".godot", snapshot_root / "godot", symlinks=True)
-    maybe_test_signal(root, "STATE_RUNNER_SYNTHETIC_GENERATED_SIGNAL", "generated")
     return generated
 
 
@@ -470,11 +470,10 @@ def launch_child(
     child_slot: list[subprocess.Popen | None],
 ) -> subprocess.Popen:
     launched = subprocess.Popen(command, cwd=root, start_new_session=True)
-    # Publish the handle before the synthetic launch-boundary hook can raise.
+    # Publish the handle before the post-launch boundary hook can signal.
     child_slot[0] = launched
-    maybe_test_signal(root, "STATE_RUNNER_SYNTHETIC_LAUNCH_SIGNAL", "launch")
+    maybe_test_signal(root, "STATE_RUNNER_SYNTHETIC_POSTLAUNCH_SIGNAL", "postlaunch")
     return launched
-
 
 def restore_and_verify(root: Path, snapshot_root: Path, generated: dict[str, object]) -> None:
     godot = root / ".godot"
@@ -505,33 +504,70 @@ def interruption_status(signum: int) -> int:
     return 130
 
 
-def terminate_and_reap(process: subprocess.Popen) -> None:
-    """Terminate the published process group, then reap the leader."""
-    process_group = process.pid
+GROUP_TERM_TIMEOUT_SECONDS = 2.0
+GROUP_KILL_TIMEOUT_SECONDS = 2.0
+GROUP_POLL_INTERVAL_SECONDS = 0.02
+
+
+def process_group_exists(process_group: int) -> bool:
     try:
-        try:
-            os.killpg(process_group, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-        deadline = time.monotonic() + 2.0
-        while process.poll() is None:
+        os.killpg(process_group, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # An inaccessible group is still alive; fail closed rather than
+        # claiming that cleanup completed.
+        return True
+    return True
+
+
+def wait_for_group_gone(process: subprocess.Popen, deadline: float) -> None:
+    """Reap the leader and prove that its complete process group disappeared."""
+    while True:
+        if process.poll() is None:
             remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                break
-            try:
-                process.wait(timeout=min(0.1, remaining))
-            except subprocess.TimeoutExpired:
-                pass
-        # The leader may have exited while a descendant remains. Always issue
-        # the group fallback before restoration, not only while the leader runs.
+            if remaining > 0:
+                try:
+                    process.wait(timeout=min(GROUP_POLL_INTERVAL_SECONDS, remaining))
+                except subprocess.TimeoutExpired:
+                    pass
+        else:
+            # A successful leader can be gone while a descendant still owns
+            # the process group, so poll() alone is never sufficient.
+            process.wait()
+        if not process_group_exists(process.pid):
+            process.wait()
+            return
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise RuntimeError(f"process group {process.pid} remained alive past bounded deadline")
+        time.sleep(min(GROUP_POLL_INTERVAL_SECONDS, remaining))
+
+
+def close_process_group(process: subprocess.Popen) -> None:
+    """Always close and verify the start_new_session process group."""
+    process_group = process.pid
+    if not process_group_exists(process_group):
+        # The group may already be gone after a normal leader exit; still reap
+        # the published leader so the runner never leaves a zombie.
+        process.wait()
+        return
+
+    try:
+        os.killpg(process_group, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    try:
+        wait_for_group_gone(process, time.monotonic() + GROUP_TERM_TIMEOUT_SECONDS)
+        return
+    except RuntimeError:
+        # A descendant may ignore SIGTERM. Escalate only after the bounded
+        # grace period, then independently verify that the group is empty.
         try:
             os.killpg(process_group, signal.SIGKILL)
         except ProcessLookupError:
             pass
-    finally:
-        # wait() is required even after poll() so the published leader is
-        # reaped rather than merely observed.
-        process.wait()
+        wait_for_group_gone(process, time.monotonic() + GROUP_KILL_TIMEOUT_SECONDS)
 
 
 def main(argv: list[str]) -> int:
@@ -547,9 +583,11 @@ def main(argv: list[str]) -> int:
     watched_signals = (signal.SIGINT, signal.SIGTERM)
     previous_handlers = {signum: signal.getsignal(signum) for signum in watched_signals}
     pending_signal: list[int | None] = [None]
+    reported_signal_phases: set[str] = set()
     for signum in watched_signals:
         # The handler must never raise: a signal can arrive during Popen before
-        # its return value is assigned. Record it and let the lifecycle map it.
+        # its return value is assigned. Record only the earliest signal and let
+        # the lifecycle map it after every cleanup boundary.
         def request_interrupt(received: int, _frame: object) -> None:
             if pending_signal[0] is None:
                 pending_signal[0] = received
@@ -579,10 +617,13 @@ def main(argv: list[str]) -> int:
         signum = pending_signal[0]
         if signum is None:
             return False
-        pending_signal[0] = None
         if primary_status == 0:
             primary_status = interruption_status(signum)
-        print(f"STATE RUNNER: pending signal {signum} during {phase}", file=sys.stderr)
+        if phase not in reported_signal_phases:
+            print(f"STATE RUNNER: pending signal {signum} during {phase}", file=sys.stderr)
+            reported_signal_phases.add(phase)
+        # Keep the earliest signal recorded until the marker decision. This
+        # prevents a teardown signal from being cleared before restore finishes.
         return True
 
     try:
@@ -602,6 +643,7 @@ def main(argv: list[str]) -> int:
                 state_root.mkdir(parents=True, exist_ok=True)
                 snapshot_root = Path(tempfile.mkdtemp(prefix="invocation-", dir=state_root))
                 snapshot_state = snapshot(root, snapshot_root)
+                maybe_test_signal(root, "STATE_RUNNER_SYNTHETIC_SNAPSHOT_SIGNAL", "snapshot")
                 check_pending_signal("after generated snapshot")
             except KeyboardInterrupt:
                 remember_keyboard_interrupt()
@@ -612,28 +654,37 @@ def main(argv: list[str]) -> int:
 
         if primary_status == 0 and snapshot_state is not None:
             try:
-                child = launch_child(argv[2:], root, child_slot)
-                # Popen has returned and the handle is published before this
-                # check, so an intervening signal cannot orphan the group.
-                check_pending_signal("after Popen handle publication")
-                while child.poll() is None and primary_status == 0:
-                    check_pending_signal("child wait loop")
-                    if primary_status != 0:
-                        break
-                    try:
-                        child.wait(timeout=0.1)
-                    except subprocess.TimeoutExpired:
-                        continue
+                # This hook is before Popen, so a pending signal prevents
+                # launch entirely and there is no unowned process group.
+                maybe_test_signal(root, "STATE_RUNNER_SYNTHETIC_PRELAUNCH_SIGNAL", "prelaunch")
+                check_pending_signal("prelaunch before Popen")
                 if primary_status == 0:
-                    child_status = child.wait()
-                    # Check before publishing child_reaped: a signal that lands
-                    # as the leader exits must still trigger group teardown.
-                    check_pending_signal("after child wait")
+                    child = launch_child(argv[2:], root, child_slot)
+                    # Popen has returned and the handle is published before
+                    # this check, so an intervening signal cannot orphan group.
+                    check_pending_signal("after Popen handle publication")
+                    wait_hook_fired = False
+                    while child.poll() is None and primary_status == 0:
+                        if not wait_hook_fired:
+                            maybe_test_signal(root, "STATE_RUNNER_SYNTHETIC_WAIT_SIGNAL", "wait")
+                            wait_hook_fired = True
+                        check_pending_signal("child wait loop")
+                        if primary_status != 0:
+                            break
+                        try:
+                            child.wait(timeout=0.1)
+                        except subprocess.TimeoutExpired:
+                            continue
                     if primary_status == 0:
-                        primary_status = child_status
-                        child_reaped = True
-                else:
-                    check_pending_signal("after child wait")
+                        child_status = child.wait()
+                        # Check before publishing child_reaped: a signal that
+                        # lands as the leader exits still requires group close.
+                        check_pending_signal("after child wait")
+                        if primary_status == 0:
+                            primary_status = child_status
+                            child_reaped = True
+                    else:
+                        check_pending_signal("after child wait")
             except KeyboardInterrupt:
                 remember_keyboard_interrupt()
             except OSError as exc:
@@ -649,16 +700,14 @@ def main(argv: list[str]) -> int:
         if primary_status == 0:
             primary_status = 1
     finally:
-        # Keep the recording handler installed through teardown. Each phase is
-        # checked below, so a signal during restore/verification suppresses the
-        # marker and maps to 130/143 instead of jumping into a nested finally.
+        # Keep the recording handler installed through every cleanup phase. The
+        # group close is unconditional: even a successfully reaped leader may
+        # have a living descendant in its start_new_session process group.
         if child is None:
             child = child_slot[0]
-        if child is not None and (
-            not child_reaped or primary_status != 0 or pending_signal[0] is not None
-        ):
+        if child is not None:
             try:
-                terminate_and_reap(child)
+                close_process_group(child)
                 child_reaped = True
             except KeyboardInterrupt:
                 remember_keyboard_interrupt()
@@ -666,6 +715,10 @@ def main(argv: list[str]) -> int:
             except Exception as exc:
                 print(f"STATE RUNNER: child teardown failed: {exc}", file=sys.stderr)
                 cleanup_status = 1
+        # A teardown signal is deliberately injected after group closure but
+        # before restoration; the non-raising handler records it and cleanup
+        # continues, then the marker gate suppresses success.
+        maybe_test_signal(root, "STATE_RUNNER_SYNTHETIC_TEARDOWN_SIGNAL", "teardown")
         check_pending_signal("after child group teardown")
 
         if snapshot_state is not None and snapshot_root is not None:
@@ -678,6 +731,8 @@ def main(argv: list[str]) -> int:
             except Exception as exc:
                 print(f"STATE RUNNER: generated-state restore failed: {exc}", file=sys.stderr)
                 restore_status = 1
+            finally:
+                maybe_test_signal(root, "STATE_RUNNER_SYNTHETIC_RESTORE_SIGNAL", "restore")
         check_pending_signal("after generated-state restore")
 
         # Source verification is deliberately unconditional: source integrity
@@ -708,16 +763,9 @@ def main(argv: list[str]) -> int:
                 cleanup_status = 1
         check_pending_signal("after temporary snapshot cleanup")
 
-        # The synthetic teardown hook runs after restore/verification and proves
-        # that a late signal is still observed before marker eligibility.
-        if os.environ.get("STATE_RUNNER_SYNTHETIC_TEARDOWN_SIGNAL"):
-            maybe_test_signal(root, "STATE_RUNNER_SYNTHETIC_TEARDOWN_SIGNAL", "teardown")
+        # Do not install SIG_IGN during teardown or verification. The earliest
+        # recorded signal remains visible through the final marker checks.
         check_pending_signal("before marker")
-        # Close the tiny post-check race: a signal delivered before this ignore
-        # remains pending and is checked below; signals after the lifecycle is
-        # complete cannot make a success marker retroactively invalid.
-        for signum in watched_signals:
-            signal.signal(signum, signal.SIG_IGN)
         check_pending_signal("marker gate")
         if (
             primary_status == 0
@@ -765,6 +813,8 @@ from pathlib import Path
 import signal
 import time
 signal.signal(signal.SIGTERM, signal.SIG_IGN)
+# The delayed write is possible only while this descendant remains alive; a
+# correct group close kills it before it can mutate restored state afterward.
 time.sleep(0.25)
 (Path.cwd() / ".godot" / "descendant-mutated-after-restore.txt").write_text("mutated")
 while True:
@@ -794,6 +844,8 @@ if os.environ.get("SYN_CHILD_SOURCE_FAIL") == "1":
 ready_file = os.environ.get("SYN_CHILD_READY_FILE")
 if ready_file:
     Path(ready_file).write_text("ready")
+if os.environ.get("SYN_EXIT_SUCCESS") == "1":
+    raise SystemExit(0)
 time.sleep(30)
 """
 RESTORE_FAIL = """
@@ -922,16 +974,55 @@ def assert_reaped(state_home):
     raise AssertionError(f"child {pid} remains after runner exit")
 
 
-def assert_group_gone(state_home, repository):
-    descendant_pid = int((state_home / "descendant.pid").read_text())
-    time.sleep(0.5)
+def process_exists(pid):
     try:
-        os.kill(descendant_pid, 0)
+        os.kill(pid, 0)
     except ProcessLookupError:
-        pass
-    else:
-        raise AssertionError(f"descendant {descendant_pid} remains after group teardown")
-    assert not (repository / ".godot" / "descendant-mutated-after-restore.txt").exists()
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def group_exists(pgid):
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def restoration_signature(repository):
+    paths = [
+        repository / ".godot" / "cache.txt",
+        repository / "asset.import",
+        repository / ".godot" / "started",
+        repository / ".godot" / "descendant-mutated-after-restore.txt",
+    ]
+    return tuple(
+        (path.relative_to(repository).as_posix(), path.exists(), path.read_bytes() if path.is_file() else None)
+        for path in paths
+    )
+
+
+def assert_group_gone(state_home, repository, timeout_seconds=2.0):
+    child_pid = int((state_home / "child.pid").read_text())
+    descendant_pid = int((state_home / "descendant.pid").read_text())
+    expected_state = restoration_signature(repository)
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        if group_exists(child_pid):
+            raise AssertionError(f"process group {child_pid} remains after group teardown")
+        if process_exists(descendant_pid):
+            raise AssertionError(f"descendant {descendant_pid} remains after group teardown")
+        if restoration_signature(repository) != expected_state:
+            raise AssertionError("restored state changed after the runner returned")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return
+        time.sleep(min(0.02, remaining))
 
 
 def accepts_step0_runner_path(state_home, runner):
@@ -1010,7 +1101,15 @@ runner_source = RUNNER.read_text()
 assert ("class Runner" + "Interrupted") not in runner_source
 assert ("raise Runner" + "Interrupted") not in runner_source
 assert "start_new_session=True" in runner_source
-assert "os.killpg(process.pid" in runner_source or "os.killpg(process_group" in runner_source
+assert "def close_process_group" in runner_source
+assert "os.killpg(process_group, 0)" in runner_source
+assert "os.killpg(process_group" in runner_source
+assert "pending_signal[0] = None" not in runner_source
+assert "STATE_RUNNER_SYNTHETIC_PRELAUNCH_SIGNAL" in runner_source
+assert "STATE_RUNNER_SYNTHETIC_POSTLAUNCH_SIGNAL" in runner_source
+assert "STATE_RUNNER_SYNTHETIC_WAIT_SIGNAL" in runner_source
+assert "STATE_RUNNER_SYNTHETIC_RESTORE_SIGNAL" in runner_source
+assert "STATE_RUNNER_SYNTHETIC_TEARDOWN_SIGNAL" in runner_source
 
 # A relative TMPDIR and a symlink resolving into a repository are both rejected
 # by the same canonical root/containment rule used by Step 0.
@@ -1083,8 +1182,9 @@ for primary_status in (0, 7):
     finally:
         temporary.cleanup()
 
-# SIGINT after the source baseline: no generated snapshot exists, but the
-# unconditional source check still runs and the interrupted path cannot emit a marker.
+# SIGINT after the source baseline: the hook mutates a protected structural
+# source path, so unconditional source verification reports the structural
+# diagnostic even though snapshot creation never begins.
 temporary, repository, state_home, runner = make_fixture(True)
 try:
     status, _stdout, stderr = invoke(
@@ -1095,15 +1195,16 @@ try:
         environment_overrides={
             "STATE_RUNNER_SYNTHETIC_HOOK": "1",
             "STATE_RUNNER_SYNTHETIC_SOURCE_SIGNAL": str(signal.SIGINT.value),
+            "STATE_RUNNER_SYNTHETIC_MUTATE_SOURCE": "source",
         },
     )
     assert status == 130, (status, stderr)
-    assert_interrupted(stderr, status, source_check=False)
+    assert_interrupted(stderr, status, source_check=True)
     assert_state(repository, True)
 finally:
     temporary.cleanup()
 
-# SIGTERM after the generated snapshot: restoration still runs, source changes
+# SIGTERM after the completed snapshot: restoration still runs, source changes
 # are detected, and the pending signal wins over the would-be marker.
 temporary, repository, state_home, runner = make_fixture(True)
 try:
@@ -1114,64 +1215,18 @@ try:
         "pass",
         environment_overrides={
             "STATE_RUNNER_SYNTHETIC_HOOK": "1",
-            "STATE_RUNNER_SYNTHETIC_GENERATED_SIGNAL": str(signal.SIGTERM.value),
-            "STATE_RUNNER_SYNTHETIC_MUTATE_SOURCE": "generated",
+            "STATE_RUNNER_SYNTHETIC_SNAPSHOT_SIGNAL": str(signal.SIGTERM.value),
+            "STATE_RUNNER_SYNTHETIC_MUTATE_SOURCE": "snapshot",
         },
     )
     assert status == 143, (status, stderr)
-    assert_interrupted(stderr, status)
+    assert_interrupted(stderr, status, source_check=True)
     assert_state(repository, True)
 finally:
     temporary.cleanup()
 
-# SIGTERM immediately after Popen: the handle is published before the hook,
-# so finally must terminate and reap the complete process group before restore.
-temporary, repository, state_home, runner = make_fixture(True)
-try:
-    status, _stdout, stderr = invoke(
-        repository,
-        state_home,
-        runner,
-        MUTATE,
-        environment_overrides={
-            "STATE_RUNNER_SYNTHETIC_HOOK": "1",
-            "STATE_RUNNER_SYNTHETIC_LAUNCH_SIGNAL": str(signal.SIGTERM.value),
-            "STATE_RUNNER_SYNTHETIC_MUTATE_SOURCE": "launch",
-        },
-    )
-    assert status == 143, (status, stderr)
-    assert_interrupted(stderr, status)
-    assert_reaped(state_home)
-    assert_group_gone(state_home, repository)
-    assert_state(repository, True)
-finally:
-    temporary.cleanup()
-
-# Signals during the child wait loop cover both conventional interruption
-# statuses. The child changes a protected source path before the parent signal,
-# proving source verification is independent of snapshot restoration.
-for signum, expected_status in ((signal.SIGINT, 130), (signal.SIGTERM, 143)):
-    temporary, repository, state_home, runner = make_fixture(True)
-    try:
-        status, _stdout, stderr = invoke(
-            repository,
-            state_home,
-            runner,
-            MUTATE,
-            signum=signum,
-            wait_for_started=True,
-            environment_overrides={"SYN_CHILD_SOURCE_FAIL": "1"},
-        )
-        assert status == expected_status, (signum, status, stderr)
-        assert_interrupted(stderr, status)
-        assert_reaped(state_home)
-        assert_group_gone(state_home, repository)
-        assert_state(repository, True)
-    finally:
-        temporary.cleanup()
-
-# A signal injected during teardown/restore is recorded by the non-raising
-# handler and checked before marker eligibility.
+# A pre-launch signal is checked before Popen, so no child PID or process group
+# is ever published and generated state is still restored without a marker.
 temporary, repository, state_home, runner = make_fixture(True)
 try:
     status, _stdout, stderr = invoke(
@@ -1181,7 +1236,100 @@ try:
         "pass",
         environment_overrides={
             "STATE_RUNNER_SYNTHETIC_HOOK": "1",
-            "STATE_RUNNER_SYNTHETIC_TEARDOWN_SIGNAL": str(signal.SIGINT.value),
+            "STATE_RUNNER_SYNTHETIC_PRELAUNCH_SIGNAL": str(signal.SIGINT.value),
+        },
+    )
+    assert status == 130, (status, stderr)
+    assert_interrupted(stderr, status, source_check=False)
+    assert not (state_home / "child.pid").exists()
+    assert_state(repository, True)
+finally:
+    temporary.cleanup()
+
+# A successful leader can exit while its descendant remains in the published
+# process group. The runner must close and verify that group before restoring;
+# the bounded post-restore probe catches the old escape even though the leader
+# returned zero and would otherwise qualify for a success marker.
+temporary, repository, state_home, runner = make_fixture(True)
+try:
+    status, _stdout, stderr = invoke(
+        repository,
+        state_home,
+        runner,
+        MUTATE,
+        wait_for_started=True,
+        environment_overrides={"SYN_EXIT_SUCCESS": "1"},
+    )
+    assert status == 0, (status, stderr)
+    assert_success(stderr)
+    assert_reaped(state_home)
+    assert_group_gone(state_home, repository)
+    assert_state(repository, True)
+finally:
+    temporary.cleanup()
+
+# SIGTERM immediately after Popen: the handle is published before the hook,
+# so finally must close and reap the complete process group before restore.
+temporary, repository, state_home, runner = make_fixture(True)
+try:
+    status, _stdout, stderr = invoke(
+        repository,
+        state_home,
+        runner,
+        MUTATE,
+        environment_overrides={
+            "STATE_RUNNER_SYNTHETIC_HOOK": "1",
+            "STATE_RUNNER_SYNTHETIC_POSTLAUNCH_SIGNAL": str(signal.SIGTERM.value),
+            "STATE_RUNNER_SYNTHETIC_MUTATE_SOURCE": "postlaunch",
+        },
+    )
+    assert status == 143, (status, stderr)
+    assert_interrupted(stderr, status, source_check=True)
+    assert_reaped(state_home)
+    assert_group_gone(state_home, repository)
+    assert_state(repository, True)
+finally:
+    temporary.cleanup()
+
+# Signals injected at the child wait boundary cover both conventional
+# interruption statuses. The hook waits for the child readiness marker before
+# sending the signal, and it mutates a protected source path so source
+# verification remains independent of snapshot restoration.
+for signum, expected_status in ((signal.SIGINT, 130), (signal.SIGTERM, 143)):
+    temporary, repository, state_home, runner = make_fixture(True)
+    try:
+        status, _stdout, stderr = invoke(
+            repository,
+            state_home,
+            runner,
+            MUTATE,
+            environment_overrides={
+                "STATE_RUNNER_SYNTHETIC_HOOK": "1",
+                "STATE_RUNNER_SYNTHETIC_WAIT_SIGNAL": str(signum.value),
+                "STATE_RUNNER_SYNTHETIC_MUTATE_SOURCE": "wait",
+            },
+        )
+        assert status == expected_status, (signum, status, stderr)
+        assert_interrupted(stderr, status, source_check=True)
+        assert_reaped(state_home)
+        assert_group_gone(state_home, repository)
+        assert_state(repository, True)
+    finally:
+        temporary.cleanup()
+
+# A signal during generated-state restore is recorded by the non-raising
+# handler, deferred through the remaining source/temporary cleanup, and
+# returned as 130 without a marker.
+temporary, repository, state_home, runner = make_fixture(True)
+try:
+    status, _stdout, stderr = invoke(
+        repository,
+        state_home,
+        runner,
+        "pass",
+        environment_overrides={
+            "STATE_RUNNER_SYNTHETIC_HOOK": "1",
+            "STATE_RUNNER_SYNTHETIC_RESTORE_SIGNAL": str(signal.SIGINT.value),
         },
     )
     assert status == 130, (status, stderr)
@@ -1190,13 +1338,40 @@ try:
 finally:
     temporary.cleanup()
 
+# A teardown signal arrives after unconditional group closure but before
+# restore. It must not be ignored or clear the earliest signal; cleanup still
+# completes, the status is 143, and no marker is emitted.
+temporary, repository, state_home, runner = make_fixture(True)
+try:
+    status, _stdout, stderr = invoke(
+        repository,
+        state_home,
+        runner,
+        MUTATE,
+        wait_for_started=True,
+        environment_overrides={
+            "STATE_RUNNER_SYNTHETIC_HOOK": "1",
+            "STATE_RUNNER_SYNTHETIC_TEARDOWN_SIGNAL": str(signal.SIGTERM.value),
+            "SYN_EXIT_SUCCESS": "1",
+        },
+    )
+    assert status == 143, (status, stderr)
+    assert_interrupted(stderr, status, source_check=False)
+    assert_reaped(state_home)
+    assert_group_gone(state_home, repository)
+    assert_state(repository, True)
+finally:
+    temporary.cleanup()
+
 print("STATE RUNNER SYNTHETIC PASS")
 PY
-printf '%s\n%s\n' "$PWD" "$(git rev-parse HEAD)" >"$PRECONDITION_RECORD"
+printf '%s\n%s\n' "$REPOSITORY_ROOT" "$(git rev-parse HEAD)" >"$PRECONDITION_RECORD"
 printf 'TASK2 STEP0 READY state_runner=%s paths=14 source_guard=3\n' "$STATE_RUNNER"
 ```
 
-The runner snapshots, for each invocation independently, every regular file below `.godot` (including tracked and ignored content) and every regular external `*.import` file outside `.godot` and `.git`, with deterministic relative POSIX paths, SHA-256 digests, modes, and full temporary copies. It fingerprints every entry below `scenes/wrappers/structural`, `assets/_processed`, and `assets/imported/structural` before the generated-state snapshot and verifies those source fingerprints unconditionally in `finally`, even when snapshot creation did not complete. It installs non-raising SIGINT/SIGTERM handlers before source setup, covers source baseline, generated snapshot, `Popen(..., start_new_session=True)` publication, polling/wait, and teardown, and maps pending SIGINT, pending SIGTERM, and `KeyboardInterrupt` to conventional primary statuses `130` and `143`. `check_pending_signal()` runs after the source baseline, after the generated snapshot, immediately after the published Popen handle, in the child wait loop, and after every teardown/verification phase; the non-raising handler prevents an orphan if a signal lands before Popen returns. A snapshot-complete invocation always attempts generated-state restoration and manifest comparison after command failure or interruption; a primary command/signal/snapshot/launch error wins over restore, source, or cleanup errors, while those cleanup errors control the status only when primary execution was otherwise successful. Teardown uses `os.killpg(process.pid, SIGTERM)`, waits boundedly, sends `SIGKILL` to the same group even if the leader already exited, and then reaps the leader, so descendants cannot mutate state after restoration. The success marker is gated only after the final pending-signal check and is exactly one plain `GENERATED STATE RESTORE VERIFIED` line on stderr when `primary_status == 0`, snapshot state exists, restoration completed and compared, broad source verification passed, and temporary-snapshot removal succeeded; no command failure, interruption, launch/snapshot error, restore/source error, or cleanup error can emit it. All runner diagnostics are prefixed `STATE RUNNER:` and none begins with `ERROR:` or `WARNING:`. The synthetic test above covers present and absent state, ordinary command failure without a marker, restore/source failures with primary-status preservation, canonical root/containment checks, source and generated-snapshot signals, launch-boundary and wait-loop SIGINT/SIGTERM, teardown-time signal, a child-launched delayed descendant that ignores SIGTERM, full process-group cleanup, no post-restore descendant mutation, and exactly one marker only for a clean invocation. It also statically rejects `RunnerInterrupted`/raising handlers and verifies `start_new_session=True` plus `os.killpg`.
+The runner snapshots, for each invocation independently, every regular file below `.godot` (including tracked and ignored content) and every regular external `*.import` file outside `.godot` and `.git`, with deterministic relative POSIX paths, SHA-256 digests, modes, and full temporary copies. It fingerprints every entry below `scenes/wrappers/structural`, `assets/_processed`, and `assets/imported/structural` before the generated-state snapshot and verifies those source fingerprints unconditionally in `finally`, even when snapshot creation did not complete. It installs non-raising SIGINT/SIGTERM handlers before source setup, covers source baseline, generated snapshot, `Popen(..., start_new_session=True)` publication, polling/wait, and teardown, and maps pending SIGINT, pending SIGTERM, and `KeyboardInterrupt` to conventional primary statuses `130` and `143`. `check_pending_signal()` runs after the source baseline, after the generated snapshot, immediately after the published Popen handle, in the child wait loop, and after every teardown/verification phase; the non-raising handler prevents an orphan if a signal lands before Popen returns. A snapshot-complete invocation always attempts generated-state restoration and manifest comparison after command failure or interruption; a primary command/signal/snapshot/launch error wins over restore, source, or cleanup errors, while those cleanup errors control the status only when primary execution was otherwise successful. The unconditional `close_process_group` path probes the group, sends bounded SIGTERM, falls back to SIGKILL only after the deadline, verifies the group is empty, and reaps the leader before restoration, so descendants cannot mutate state after restoration. The success marker is gated only after the final pending-signal check and is exactly one plain `GENERATED STATE RESTORE VERIFIED` line on stderr when `primary_status == 0`, snapshot state exists, restoration completed and compared, broad source verification passed, and temporary-snapshot removal succeeded; no command failure, interruption, launch/snapshot error, restore/source error, or cleanup error can emit it. All runner diagnostics are prefixed `STATE RUNNER:` and none begins with `ERROR:` or `WARNING:`. The synthetic test above covers present and absent state, ordinary command failure without a marker, restore/source failures with primary-status preservation, canonical root/containment checks, source and snapshot signals, launch-boundary and wait-loop SIGINT/SIGTERM, teardown-time signal, a child-launched delayed descendant that ignores SIGTERM, full process-group cleanup, no post-restore descendant mutation, and exactly one marker only for a clean invocation. It also statically rejects `RunnerInterrupted`/raising handlers and verifies `start_new_session=True` plus `os.killpg`.
+
+The lifecycle contract is strict: Step 0 assigns `REPOSITORY_ROOT = Path($PWD).resolve()` before `WORKTREE_DIGEST`, hashes only that canonical string, writes that same canonical root into `step0-precondition.txt`, and every later fence derives `STATE_HOME`/`STATE_RUNNER` and validates the record from the same identity. `close_process_group(child)` is called unconditionally in `finally`, including after a successful leader `wait()`, and before any restore. It probes `os.killpg(child.pid, 0)`, sends bounded SIGTERM when any member remains, polls monotonic deadlines while reaping the leader, escalates to SIGKILL, and independently verifies an empty group; a cleanup exception turns an otherwise-successful run into status 1 and never replaces an existing nonzero primary status. The signal handler records only the earliest SIGINT/SIGTERM and never raises or installs `SIG_IGN` during teardown; checks occur after source baseline, snapshot, prelaunch, postlaunch, wait, group closure, restore, source verification, temporary cleanup, and immediately before marker eligibility. A signal at prelaunch prevents Popen; postlaunch/wait signals close and reap the group; restore/teardown signals remain recorded through cleanup and return 130/143 without a marker. The successful-leader synthetic fixture exits the leader with status 0 while a delayed descendant can mutate `.godot` only while alive; `assert_group_gone` uses monotonic bounded polling to prove the group and descendant are gone and the restored signature remains stable through the deadline, with no fixed sleep or one-shot `kill(pid, 0)` proof.
 
 - [ ] **Step 1: Execute the validator red gate and construct fixture-based negative coverage**
 
@@ -2384,7 +2559,7 @@ derive_checked_state_runner
 }
 PRECONDITION_RECORD="$STATE_HOME/step0-precondition.txt"
 [[ -f "$PRECONDITION_RECORD" ]] || { printf 'missing Step 0 precondition record\n' >&2; exit 1; }
-python3 - "$PRECONDITION_RECORD" "$PWD" "$(git rev-parse HEAD)" <<'PY'
+python3 - "$PRECONDITION_RECORD" "$REPOSITORY_ROOT" "$(git rev-parse HEAD)" <<'PY'
 from pathlib import Path
 import sys
 lines = Path(sys.argv[1]).read_text().splitlines()
