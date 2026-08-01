@@ -286,7 +286,7 @@ func _validate_binding(binding: Dictionary, group_name: String, binding_id: Stri
 	if not _is_exact_schema_version(binding.get("schema_version")):
 		_errors.append("catalog binding %s/%s has unsupported schema_version" % [group_name, binding_id])
 		valid = false
-	if not _is_nonempty_string(binding.get("asset_id")):
+	if not _is_asset_id(binding.get("asset_id")):
 		_errors.append("catalog binding %s/%s has an invalid asset_id" % [group_name, binding_id])
 		valid = false
 	if binding.get("prop_kind", "") != _expected_prop_kind(group_name):
@@ -565,6 +565,21 @@ func _is_semver_number(value: String) -> bool:
 	for index in value.length():
 		var code: int = value.unicode_at(index)
 		if code < 48 or code > 57:
+			return false
+	return true
+
+
+func _is_asset_id(value: Variant) -> bool:
+	if not _is_nonempty_string(value):
+		return false
+	var identifier: String = str(value)
+	for index in identifier.length():
+		var code: int = identifier.unicode_at(index)
+		var is_lowercase_letter: bool = code >= 97 and code <= 122
+		var is_digit: bool = code >= 48 and code <= 57
+		if index == 0 and not is_lowercase_letter and not is_digit:
+			return false
+		if not is_lowercase_letter and not is_digit and code != 95 and code != 45:
 			return false
 	return true
 

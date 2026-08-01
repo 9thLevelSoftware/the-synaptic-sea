@@ -47,6 +47,34 @@ func _initialize() -> void:
 		"user://task5-invalid-surface.json",
 		"dressing surface is restricted to floor wall or ceiling",
 	)
+	var invalid_objective_surface_document: Dictionary = valid_document.duplicate(true)
+	var invalid_objective_surface: Dictionary = objective_binding.duplicate(true)
+	var invalid_objective_placement: Dictionary = (invalid_objective_surface["placement"] as Dictionary).duplicate(true)
+	invalid_objective_placement["surface"] = "floor"
+	invalid_objective_surface["placement"] = invalid_objective_placement
+	(invalid_objective_surface_document["objectives"] as Dictionary)["reactor_control_panel"] = invalid_objective_surface
+	failures += _expect_catalog_rejected(
+		invalid_objective_surface_document,
+		"user://task5-invalid-objective-surface.json",
+		"objective surface is rejected",
+	)
+	failures += _expect(
+		RuntimePropVisualBinderScript.create_objective_visual(invalid_objective_surface) == null,
+		"objective surface is rejected by binder",
+	)
+	var invalid_asset_document: Dictionary = valid_document.duplicate(true)
+	var invalid_asset_component: Dictionary = component_binding.duplicate(true)
+	invalid_asset_component["asset_id"] = "ReactorConsole"
+	invalid_asset_component["visual_scene_path"] = "res://assets/imported/props/components/ReactorConsole.glb"
+	var invalid_asset_meta: Dictionary = (invalid_asset_component["binding"] as Dictionary).duplicate(true)
+	invalid_asset_meta["ids"] = ["ReactorConsole"]
+	invalid_asset_component["binding"] = invalid_asset_meta
+	(invalid_asset_document["components"] as Dictionary)["ReactorConsole"] = invalid_asset_component
+	failures += _expect_catalog_rejected(
+		invalid_asset_document,
+		"user://task5-invalid-asset-id.json",
+		"asset_id must match the canonical lowercase identifier grammar",
+	)
 	var extra_root: Dictionary = valid_document.duplicate(true)
 	extra_root["unexpected_root_field"] = true
 	failures += _expect_catalog_rejected(extra_root, "user://task5-extra-root.json", "extra catalog root field is rejected")
@@ -139,6 +167,16 @@ func _initialize() -> void:
 		RuntimePropVisualBinderScript.create_objective_visual(dressing_binding) == null,
 		"dressing binding cannot create objective visual",
 	)
+	var invalid_asset_binding_runtime: Dictionary = component_binding.duplicate(true)
+	invalid_asset_binding_runtime["asset_id"] = "ReactorConsole"
+	invalid_asset_binding_runtime["visual_scene_path"] = "res://assets/imported/props/components/ReactorConsole.glb"
+	var invalid_asset_runtime_meta: Dictionary = (invalid_asset_binding_runtime["binding"] as Dictionary).duplicate(true)
+	invalid_asset_runtime_meta["ids"] = ["ReactorConsole"]
+	invalid_asset_binding_runtime["binding"] = invalid_asset_runtime_meta
+	failures += _expect(
+		not RuntimePropVisualBinderScript.mount_component_visual(cross_kind_marker, invalid_asset_binding_runtime),
+		"binder rejects asset_id outside the canonical lowercase identifier grammar",
+	)
 
 	var marker: Node3D = Node3D.new()
 	get_root().add_child(marker)
@@ -208,8 +246,7 @@ func _initialize() -> void:
 		"nonnumeric scale is rejected",
 	)
 
-	var missing_binding: Dictionary = component_binding.duplicate(true)
-	missing_binding = objective_binding.duplicate(true)
+	var missing_binding: Dictionary = objective_binding.duplicate(true)
 	missing_binding["asset_id"] = "missing_task5_visual"
 	missing_binding["visual_scene_path"] = "res://assets/imported/props/objectives/missing_task5_visual.glb"
 	failures += _expect(
@@ -404,6 +441,8 @@ func _initialize() -> void:
 		"user://task5-malformed-path.json",
 		"user://task5-marker-anchor.json",
 		"user://task5-invalid-surface.json",
+		"user://task5-invalid-objective-surface.json",
+		"user://task5-invalid-asset-id.json",
 		"user://task5-malformed-namespace.json",
 		"user://task5-malformed-source.json",
 		"user://task5-malformed-hash.json",

@@ -223,12 +223,12 @@ static func _is_valid_placement(placement_value: Variant, expected_prop_kind: St
 		return false
 	var placement: Dictionary = placement_value as Dictionary
 	var expected_fields: Array[String] = PLACEMENT_FIELDS.duplicate()
-	if expected_prop_kind == "objective":
+	if expected_prop_kind == "dressing":
 		expected_fields.append("surface")
 	for key in placement.keys():
 		if not expected_fields.has(str(key)):
 			return false
-	if expected_prop_kind == "component" and placement.has("surface"):
+	if expected_prop_kind != "dressing" and placement.has("surface"):
 		return false
 	if placement.size() < PLACEMENT_FIELDS.size() or placement.size() > expected_fields.size():
 		return false
