@@ -79,6 +79,7 @@ _NAMESPACE_BY_KIND = {
 _ALLOWED_ORIGINS = ("scene_origin", "marker_anchor")
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _SEMVER_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
+_GLTF_VERSION_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 
 
 def _finite_number(value: Any) -> Optional[float]:
@@ -164,7 +165,7 @@ def _read_glb_chunks(data: bytes) -> tuple[dict[str, Any], Optional[bytes]]:
         if any(character != " " for character in text[end:]):
             raise ValueError("illegal JSON chunk padding")
         document = json.loads(text[start:end], parse_constant=_reject_json_constant)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (RecursionError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ValueError("malformed GLB JSON chunk") from exc
     except ValueError as exc:
         raise ValueError("malformed GLB JSON chunk") from exc
@@ -178,8 +179,11 @@ def _validate_bin_payload(document: dict[str, Any], binary_chunk: Optional[bytes
         return
     buffers = document.get("buffers")
     if not isinstance(buffers, list) or not buffers or not isinstance(buffers[0], dict):
-        return
-    buffer_length = buffers[0].get("byteLength")
+        raise ValueError("GLB BIN chunk has no buffer[0] linkage")
+    buffer = buffers[0]
+    if "uri" in buffer:
+        raise ValueError("GLB BIN chunk cannot be linked to an external buffer")
+    buffer_length = buffer.get("byteLength")
     if isinstance(buffer_length, bool) or not isinstance(buffer_length, int) or buffer_length < 0:
         raise ValueError("GLB BIN buffer has invalid byteLength")
     if len(binary_chunk) < buffer_length:
@@ -208,6 +212,8 @@ def _validate_position_accessor(accessor: dict[str, Any]) -> None:
         raise ValueError("sparse POSITION accessors are unsupported")
     if ("min" in accessor) != ("max" in accessor):
         raise ValueError("POSITION accessor must provide both min and max")
+    if "byteOffset" in accessor and "bufferView" not in accessor:
+        raise ValueError("POSITION accessor byteOffset requires a bufferView")
 
 
 def _round_bound(value: float) -> float:
@@ -227,11 +233,13 @@ def _position_data_range(
     if view_index < 0 or view_index >= len(buffer_views) or not isinstance(buffer_views[view_index], dict):
         raise ValueError("POSITION accessor bufferView is out of range")
     view = buffer_views[view_index]
-    buffer_index = view.get("buffer", 0)
+    buffer_index = view.get("buffer")
     if isinstance(buffer_index, bool) or not isinstance(buffer_index, int) or buffer_index != 0:
         raise ValueError("POSITION accessor does not reference the GLB BIN buffer")
     if not buffers or not isinstance(buffers[0], dict):
         raise ValueError("POSITION accessor does not reference the GLB BIN buffer")
+    if "uri" in buffers[0]:
+        raise ValueError("POSITION accessor references an external buffer")
 
     view_offset = view.get("byteOffset", 0)
     accessor_offset = accessor.get("byteOffset", 0)
@@ -303,6 +311,11 @@ def read_glb_metadata(path: Path) -> dict[str, Any]:
     asset = document.get("asset")
     if not isinstance(asset, dict) or asset.get("version") != "2.0":
         raise ValueError("GLB JSON has no valid asset.version")
+    if "minVersion" in asset:
+        min_version = asset["minVersion"]
+        match = _GLTF_VERSION_PATTERN.fullmatch(min_version) if isinstance(min_version, str) else None
+        if match is None or (int(match.group(1)), int(match.group(2))) > (2, 0):
+            raise ValueError("GLB JSON has an incompatible asset.minVersion")
     gltf_version = asset["version"]
 
     meshes = document.get("meshes")
@@ -334,8 +347,7 @@ def read_glb_metadata(path: Path) -> dict[str, Any]:
             accessor = accessors[accessor_index]
             _validate_position_accessor(accessor)
             if "min" in accessor and "max" in accessor:
-                if "bufferView" in accessor:
-                    _position_data_range(accessor, buffer_views, buffers, binary_chunk)
+                _position_data_range(accessor, buffer_views, buffers, binary_chunk)
                 lower = _accessor_vector(accessor["min"], "POSITION min")
                 upper = _accessor_vector(accessor["max"], "POSITION max")
             else:
@@ -462,7 +474,7 @@ def validate_sidecar(sidecar: dict, glb_path: Path, project_root: Path) -> list[
     else:
         raw_relative = visual_scene_path[6:]
         parts = raw_relative.split("/")
-        if not raw_relative or raw_relative.startswith("/") or ".." in parts:
+        if not raw_relative or raw_relative.startswith("/") or any(part in {".", ".."} for part in parts):
             errors.append("path must be a contained res:// path")
         else:
             visual_candidate = (project_root / Path(*parts)).resolve()

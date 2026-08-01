@@ -127,6 +127,8 @@ class PropVisualMetadataTests(unittest.TestCase):
             "res://../reactor_console.glb",
             "res://assets/../reactor_console.glb",
             "res://assets/props/../reactor_console.glb",
+            "res://assets/./reactor_console.glb",
+            "res://assets/imported/props/reactor_console.glb/.",
         ):
             with self.subTest(path=path):
                 self.assertIsNone(matcher.fullmatch(path))
@@ -177,6 +179,15 @@ class PropVisualMetadataTests(unittest.TestCase):
     def test_sidecar_rejects_parent_path(self) -> None:
         errors = validate_sidecar(load_fixture("invalid_parent_path.sidecar.json"), REACTOR_GLB, PROJECT_ROOT)
         self.assertIn("path must be a contained res:// path", "\n".join(errors))
+
+    def test_sidecar_rejects_dot_path_components_that_resolve_to_the_glb(self) -> None:
+        for path in (
+            "res://assets/imported/props/components/./reactor_console.glb",
+            "res://assets/imported/props/components/reactor_console.glb/.",
+        ):
+            with self.subTest(path=path):
+                errors = validate_sidecar(valid_sidecar(path=path), REACTOR_GLB, PROJECT_ROOT)
+                self.assertIn("path must be a contained res:// path", errors)
 
     def test_sidecar_rejects_glb_outside_project_root_and_still_compares_visual_path(self) -> None:
         outside_glb = Path(tempfile.gettempdir()) / "reactor_console.glb"
@@ -281,7 +292,7 @@ class PropVisualMetadataTests(unittest.TestCase):
         self.assertEqual(record["local_min_m"], [-1.5, -5.0, 3.25])
         self.assertEqual(record["local_max_m"], [4.0, 2.0, 6.5])
 
-    def test_glb_uses_accessor_min_max_without_binary_chunk(self) -> None:
+    def test_glb_rejects_position_min_max_without_readable_accessor_payload(self) -> None:
         document = {
             "asset": {"version": "2.0"},
             "accessors": [{
@@ -296,14 +307,31 @@ class PropVisualMetadataTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "minmax.glb"
             path.write_bytes(make_glb(document))
-            record = read_glb_metadata(path)
-        self.assertEqual(record["local_min_m"], [-2.0, -3.0, -4.0])
-        self.assertEqual(record["local_max_m"], [5.0, 6.0, 7.0])
+            with self.assertRaises(ValueError):
+                read_glb_metadata(path)
 
-    def test_glb_enforces_declared_bin_length_and_zero_padding(self) -> None:
+    def test_glb_rejects_position_byte_offset_without_buffer_view(self) -> None:
         document = {
             "asset": {"version": "2.0"},
-            "buffers": [{"byteLength": 4}],
+            "accessors": [{
+                "byteOffset": 0,
+                "componentType": 5126,
+                "count": 1,
+                "type": "VEC3",
+                "min": [-1, -2, -3],
+                "max": [4, 5, 6],
+            }],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "offset_without_view.glb"
+            path.write_bytes(make_glb(document))
+            with self.assertRaises(ValueError):
+                read_glb_metadata(path)
+
+    def test_glb_rejects_orphan_bin_and_external_buffer_bin_linkage(self) -> None:
+        orphan_bin = {
+            "asset": {"version": "2.0"},
             "accessors": [{
                 "componentType": 5126,
                 "count": 1,
@@ -313,12 +341,27 @@ class PropVisualMetadataTests(unittest.TestCase):
             }],
             "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
         }
+        external_bin = position_document(with_min_max=True)
+        external_bin["buffers"][0]["uri"] = "external.bin"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            orphan_path = root / "orphan_bin.glb"
+            orphan_path.write_bytes(make_glb(orphan_bin, b"\0" * 4))
+            external_path = root / "external_bin.glb"
+            external_path.write_bytes(make_glb(external_bin, b"\0" * 12))
+            for path in (orphan_path, external_path):
+                with self.subTest(path=path.name):
+                    with self.assertRaises(ValueError):
+                        read_glb_metadata(path)
+
+    def test_glb_enforces_declared_bin_length_and_zero_padding(self) -> None:
+        document = position_document(with_min_max=True)
         cases = {
-            "short": (5, b"\0" * 4, True),
-            "too_much_padding": (0, b"\0" * 4, True),
-            "nonzero_padding": (3, b"\0\0\0\x01", True),
-            "one_zero_padding_byte": (3, b"\0" * 4, False),
-            "exact_length": (4, b"\0" * 4, False),
+            "short": (13, b"\0" * 12, True),
+            "too_much_padding": (8, b"\0" * 12, True),
+            "nonzero_padding": (11, b"\0" * 11 + b"\x01", True),
+            "one_zero_padding_byte": (13, b"\0" * 13, False),
+            "exact_length": (12, b"\0" * 12, False),
         }
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -367,6 +410,32 @@ class PropVisualMetadataTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "gltf_1.glb"
             path.write_bytes(make_glb(document))
+            with self.assertRaises(ValueError):
+                read_glb_metadata(path)
+
+    def test_glb_rejects_incompatible_or_malformed_asset_min_version(self) -> None:
+        base = position_document(with_min_max=True)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for version in ("2.1", "3.0", "2", "2.0.0"):
+                with self.subTest(version=version):
+                    document = {**base, "asset": {"version": "2.0", "minVersion": version}}
+                    path = root / f"min_version_{version.replace('.', '_')}.glb"
+                    path.write_bytes(make_glb(document))
+                    with self.assertRaises(ValueError):
+                        read_glb_metadata(path)
+
+            compatible = {**base, "asset": {"version": "2.0", "minVersion": "1.0"}}
+            compatible_path = root / "compatible_min_version.glb"
+            compatible_path.write_bytes(make_glb(compatible, b"\0" * 12))
+            self.assertEqual(read_glb_metadata(compatible_path)["gltf_version"], "2.0")
+
+    def test_glb_wraps_json_recursion_errors_as_value_error(self) -> None:
+        nested_json = (b"[" * 3000) + (b"]" * 3000)
+        nested_json += b" " * ((-len(nested_json)) % 4)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "recursive_json.glb"
+            path.write_bytes(make_raw_glb([(b"JSON", nested_json)]))
             with self.assertRaises(ValueError):
                 read_glb_metadata(path)
 
@@ -497,47 +566,27 @@ class PropVisualMetadataTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         read_glb_metadata(path)
 
-    def test_glb_accepts_unknown_chunks_after_json_and_bin(self) -> None:
-        document = {
-            "asset": {"version": "2.0"},
-            "accessors": [{
-                "componentType": 5126,
-                "count": 3,
-                "type": "VEC3",
-                "min": [-1, -2, -3],
-                "max": [4, 5, 6],
-            }],
-            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
-        }
+    def test_glb_accepts_unknown_chunks_after_bin(self) -> None:
+        document = position_document(with_min_max=True)
         json_chunk = aligned_json_bytes(document)
         unknown_chunk = (b"JUNK", b"\0\0\0\0")
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            after_json = root / "unknown_after_json.glb"
-            after_json.write_bytes(make_raw_glb([(b"JSON", json_chunk), unknown_chunk]))
-            after_json_record = read_glb_metadata(after_json)
-
-            after_bin = root / "unknown_after_bin.glb"
-            after_bin.write_bytes(make_raw_glb([(b"JSON", json_chunk), (b"BIN\0", b"\0\0\0\0"), unknown_chunk]))
-            after_bin_record = read_glb_metadata(after_bin)
-        self.assertEqual(after_json_record["local_min_m"], [-1.0, -2.0, -3.0])
-        self.assertEqual(after_bin_record["local_max_m"], [4.0, 5.0, 6.0])
+            path = Path(directory) / "unknown_after_bin.glb"
+            path.write_bytes(make_raw_glb([
+                (b"JSON", json_chunk),
+                (b"BIN\0", b"\0" * 12),
+                unknown_chunk,
+            ]))
+            record = read_glb_metadata(path)
+        self.assertEqual(record["local_max_m"], [4.0, 5.0, 6.0])
 
     def test_glb_bounds_are_rounded_to_six_decimals_without_negative_zero(self) -> None:
-        document = {
-            "asset": {"version": "2.0"},
-            "accessors": [{
-                "componentType": 5126,
-                "count": 3,
-                "type": "VEC3",
-                "min": [-1.23456789, 2.34567891, -0.0000004],
-                "max": [3.14159265, 2.3456794, 9.87654321],
-            }],
-            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
-        }
+        document = position_document(with_min_max=True)
+        document["accessors"][0]["min"] = [-1.23456789, 2.34567891, -0.0000004]
+        document["accessors"][0]["max"] = [3.14159265, 2.3456794, 9.87654321]
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "precision.glb"
-            path.write_bytes(make_glb(document))
+            path.write_bytes(make_glb(document, b"\0" * 12))
             record = read_glb_metadata(path)
         self.assertEqual(record["local_min_m"], [-1.234568, 2.345679, 0.0])
         self.assertEqual(record["local_max_m"], [3.141593, 2.345679, 9.876543])
