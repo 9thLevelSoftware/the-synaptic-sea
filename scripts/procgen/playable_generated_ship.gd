@@ -20,6 +20,8 @@ const ShipModificationStateScript := preload("res://scripts/systems/ship_modific
 const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
 const ComponentCatalogScript := preload("res://scripts/systems/component_catalog.gd")
 const ComponentMountResolverScript := preload("res://scripts/systems/component_mount_resolver.gd")
+const PropVisualBindingCatalogScript := preload("res://scripts/systems/prop_visual_binding_catalog.gd")
+const RuntimePropVisualBinderScript := preload("res://scripts/procgen/runtime_prop_visual_binder.gd")
 const SeaGraphScript := preload("res://scripts/systems/sea_graph.gd")
 const InventoryPanelScript := preload("res://scripts/ui/inventory_panel.gd")
 const AccessibilitySettingsScript := preload("res://scripts/ui/accessibility_settings.gd")
@@ -3503,6 +3505,8 @@ func _rebuild_component_markers() -> void:
 		parent = affordance_root as Node3D
 	if parent == null:
 		return
+	var prop_visual_catalog = PropVisualBindingCatalogScript.new()
+	var prop_visual_catalog_loaded: bool = prop_visual_catalog.load_from_path()
 	var layout: Dictionary = _active_layout_for_work()
 	var centers: Dictionary = _room_world_centers(layout)
 	var placed: Array = component_placement_state.get("placed") as Array if typeof(component_placement_state.get("placed")) == TYPE_ARRAY else []
@@ -3527,17 +3531,24 @@ func _rebuild_component_markers() -> void:
 		marker.set_meta("component_instance_id", str(e.get("component_instance_id", "")))
 		marker.set_meta("component_id", str(e.get("component_id", "")))
 		marker.set_meta("mounted", true)
-		var mesh_i := MeshInstance3D.new()
-		var box := BoxMesh.new()
-		box.size = Vector3(0.45, 0.9, 0.35)
-		mesh_i.mesh = box
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color(0.55, 0.75, 0.95, 0.85)
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mesh_i.material_override = mat
-		mesh_i.position = Vector3(0, 0.45, 0)
-		marker.add_child(mesh_i)
+		var component_binding: Dictionary = {}
+		if prop_visual_catalog_loaded:
+			component_binding = prop_visual_catalog.get_component_binding(str(e.get("component_id", "")))
+		if RuntimePropVisualBinderScript.mount_component_visual(marker, component_binding):
+			marker.set_meta("visual_source", "imported")
+		else:
+			marker.set_meta("visual_source", "fallback")
+			var mesh_i := MeshInstance3D.new()
+			var box := BoxMesh.new()
+			box.size = Vector3(0.45, 0.9, 0.35)
+			mesh_i.mesh = box
+			var mat := StandardMaterial3D.new()
+			mat.albedo_color = Color(0.55, 0.75, 0.95, 0.85)
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			mesh_i.material_override = mat
+			mesh_i.position = Vector3(0, 0.45, 0)
+			marker.add_child(mesh_i)
 		marker.position = local_pos
 		parent.add_child(marker)
 		component_markers.append(marker)
