@@ -3493,7 +3493,7 @@ func get_sea_graph_for_validation():
 	return sea_graph
 
 
-## PKG-B2.3: placeholder meshes for mounted components (kit art deferred).
+## PKG-B2.3: mounted components prefer imported prop visuals and retain primitive fallback.
 func _rebuild_component_markers() -> void:
 	_clear_component_markers()
 	if component_placement_state == null:
