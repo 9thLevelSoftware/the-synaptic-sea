@@ -75,10 +75,38 @@ var _loaded_streams: Dictionary = {}
 ## missing asset doesn't spam push_warning every frame it's requested).
 var _warned_missing_paths: Dictionary = {}
 
+## Headless runs retain playback objects in AudioServer until process exit.
+## Keep routing and stream assignment testable, but do not start playback.
+var _headless: bool = false
+
 func _ready() -> void:
+	_headless = DisplayServer.get_name() == "headless"
 	_build_stream_players()
 	_apply_bus_volumes()
 	_initialize_sub_models()
+
+## Release audio resources on teardown.
+func _exit_tree() -> void:
+	_loaded_streams.clear()
+	for bus_id in _bus_players:
+		var player: AudioStreamPlayer = _bus_players[bus_id]
+		if player != null and is_instance_valid(player):
+			player.stop()
+			player.stream = null
+	_bus_players.clear()
+	for key in _spatial_pool:
+		var pool: Array = _spatial_pool[key]
+		for player in pool:
+			if player != null and is_instance_valid(player):
+				player.stop()
+				player.stream = null
+	_spatial_pool.clear()
+	music_state = null
+	ambient_zone_state = null
+	sfx_router = null
+	spatial_resolver = null
+	meta_event_state = null
+	bus_config = null
 
 ## Call configure() on each of the six pure models with a baseline
 ## dictionary. Per ADR-0029, AudioManager owns the model instances;
@@ -422,7 +450,8 @@ func _play_via_bus(bus_id: String, volume_db: float, event_id: StringName = &"",
 		if stream != null:
 			if player.stream != stream:
 				player.stream = stream
-			player.play()
+			if not _headless:
+				player.play()
 
 ## Internal: play through a spatial AudioStreamPlayer3D pool entry. Stream
 ## assignment mirrors _play_via_bus exactly (ADR-0044): a STREAM_CATALOG
@@ -452,7 +481,8 @@ func _play_spatial(event_id: StringName, position: Vector3, bus_id: String, volu
 		if stream != null:
 			if player.stream != stream:
 				player.stream = stream
-			player.play()
+			if not _headless:
+				player.play()
 
 ## Internal: deterministic "is this emitter occluded" check. Real LOS
 ## raycasts are out of scope; we report true when the emitter sits in a
@@ -485,7 +515,8 @@ func _apply_music_layer_gains() -> void:
 				if stream is AudioStreamWAV:
 					(stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
 				player.stream = stream
-				player.play()
+				if not _headless:
+					player.play()
 	var gains: Dictionary = music_state.get_layer_gains()
 	# Combined layer gain is the maximum across the four layers (they
 	# stack rather than average so exploration always has audible base).

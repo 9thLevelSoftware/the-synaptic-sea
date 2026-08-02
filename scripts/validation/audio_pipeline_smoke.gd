@@ -5,9 +5,10 @@ extends SceneTree
 # 1. AudioBusLayout registration: AudioServer.bus_count == 7; "Master" +
 #    the six lowercase children resolve via AudioManager._engine_bus_name;
 #    per-bus volume agrees with AudioBusConfig.make_default().
-# 2. Stream proof: play_sfx(&"sfx.tool.pickup") leaves the sfx player with
-#    stream != null and playing == true; the music player (base layer,
-#    always-on) also has stream != null and playing == true.
+# 2. Stream proof: play_sfx(&"sfx.tool.pickup") assigns a non-null stream to
+#    the sfx player; headed runs also require playing == true. The music base
+#    layer follows the same contract. Headless runs intentionally skip play()
+#    because AudioServer retains playback resources until process exit.
 # 3. Caption pump: after driving the away branch for 30 manual _process
 #    ticks, get_last_caption_line() is non-empty (the tool-pickup caption
 #    reached the HUD seam through _refresh_audio_state, which both
@@ -105,7 +106,8 @@ func _validate_and_drive() -> void:
 	if sfx_player == null or sfx_player.stream == null:
 		_fail("sfx player has no stream assigned after play_sfx")
 		return
-	if not sfx_player.playing:
+	var headless: bool = DisplayServer.get_name() == "headless"
+	if not headless and not sfx_player.playing:
 		_fail("sfx player is not playing after play_sfx")
 		return
 	# Drive one manual tick so _apply_music_layer_gains (which lazily assigns
@@ -115,7 +117,7 @@ func _validate_and_drive() -> void:
 	if music_player == null or music_player.stream == null:
 		_fail("music player has no stream assigned")
 		return
-	if not music_player.playing:
+	if not headless and not music_player.playing:
 		_fail("music player is not playing")
 		return
 	var stream_playing_ok: bool = true

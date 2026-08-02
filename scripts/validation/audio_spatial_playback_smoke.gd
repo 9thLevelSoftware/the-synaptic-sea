@@ -4,8 +4,9 @@ extends SceneTree
 # Proves the AudioStreamPlayer3D spatial path actually EMITS audio, contract-
 # consistent with the non-spatial _play_via_bus path:
 # 1. Catalogued spatial proof: play_sfx(&"sfx.tool.pickup", P1) leaves the
-#    event's pooled AudioStreamPlayer3D with stream != null, playing == true,
-#    global_position == P1, bus == "sfx".
+#    event's pooled AudioStreamPlayer3D with stream != null, global_position
+#    == P1, bus == "sfx"; headed runs also require playing == true. Headless
+#    runs intentionally skip play() to avoid AudioServer teardown leaks.
 # 2. Honest fallback (ADR-0044): play_sfx(&"sfx.door.open", ...) — an
 #    UNcatalogued event — creates/positions its spatial player but assigns no
 #    stream and does not play (volume-push-only, identical to _play_via_bus's
@@ -87,7 +88,8 @@ func _validate() -> void:
 	if sp.stream == null:
 		_fail("catalogued spatial player has no stream assigned")
 		return
-	if not sp.playing:
+	var headless: bool = DisplayServer.get_name() == "headless"
+	if not headless and not sp.playing:
 		_fail("catalogued spatial player is not playing")
 		return
 	if String(sp.bus) != "sfx":
@@ -145,7 +147,7 @@ func _validate() -> void:
 			_fail("production pickup did not reposition spatial player: at %s, expected %s (tries=%d)" % [str(sp.global_position), str(pos), tries])
 			return
 		position_tracked_ok = true
-		if sp.stream == null or not sp.playing:
+		if sp.stream == null or (not headless and not sp.playing):
 			_fail("production pickup spatial player not streaming/playing (tries=%d)" % tries)
 			return
 		production_ok = true
