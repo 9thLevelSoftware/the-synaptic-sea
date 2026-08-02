@@ -372,18 +372,20 @@ func _validate_binding_meta(binding_meta: Dictionary, group_name: String, bindin
 
 func _validate_placement(placement: Dictionary, group_name: String, binding_id: String) -> bool:
 	var valid: bool = true
-	var expected_fields: Array[String] = ["origin", "offset_m", "rotation_degrees", "allowed_yaw_deg", "scale"]
-	if group_name == "dressing":
-		expected_fields.append("surface")
+	var required_fields: Array[String] = ["origin", "offset_m", "rotation_degrees", "allowed_yaw_deg", "scale"]
+	var surface_allowed: bool = group_name == "dressing" or group_name == "objectives"
+	var allowed_fields: Array[String] = required_fields.duplicate()
+	if surface_allowed:
+		allowed_fields.append("surface")
 	for key in placement.keys():
-		if not expected_fields.has(str(key)):
+		if not allowed_fields.has(str(key)):
 			_errors.append("catalog binding %s/%s placement has unexpected field: %s" % [group_name, binding_id, key])
 			valid = false
-	for field_name in expected_fields:
+	for field_name in required_fields:
 		if not placement.has(field_name):
 			_errors.append("catalog binding %s/%s placement is missing field: %s" % [group_name, binding_id, field_name])
 			valid = false
-	if placement.size() != expected_fields.size():
+	if placement.size() < required_fields.size() or placement.size() > allowed_fields.size():
 		valid = false
 	if not ["scene_origin", "marker_anchor"].has(placement.get("origin", "")):
 		_errors.append("catalog binding %s/%s placement origin is invalid" % [group_name, binding_id])
@@ -415,8 +417,8 @@ func _validate_placement(placement: Dictionary, group_name: String, binding_id: 
 				_errors.append("catalog binding %s/%s allowed_yaw_deg contains duplicate yaw" % [group_name, binding_id])
 				valid = false
 			seen_yaws.append(yaw_number)
-	if group_name == "dressing" and not ["floor", "wall", "ceiling"].has(placement.get("surface", "")):
-		_errors.append("catalog binding %s/%s dressing surface must be floor, wall, or ceiling" % [group_name, binding_id])
+	if placement.has("surface") and not ["floor", "wall", "ceiling"].has(placement.get("surface", "")):
+		_errors.append("catalog binding %s/%s surface must be floor, wall, or ceiling" % [group_name, binding_id])
 		valid = false
 	return valid
 

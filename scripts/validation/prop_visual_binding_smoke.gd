@@ -25,6 +25,33 @@ func _initialize() -> void:
 	failures += _expect(catalog.get_dressing_binding("missing_dressing").is_empty(), "unknown dressing is empty")
 
 	var valid_document: Dictionary = _catalog_document(component_binding, objective_binding, dressing_binding)
+	var objective_surface_document: Dictionary = valid_document.duplicate(true)
+	var objective_surface_binding: Dictionary = objective_binding.duplicate(true)
+	var objective_surface_placement: Dictionary = (objective_surface_binding["placement"] as Dictionary).duplicate(true)
+	objective_surface_placement["surface"] = "floor"
+	objective_surface_binding["placement"] = objective_surface_placement
+	(objective_surface_document["objectives"] as Dictionary)["reactor_control_panel"] = objective_surface_binding
+	failures += _expect_catalog_accepted(
+		objective_surface_document,
+		"user://task5-objective-valid-surface.json",
+		"objective surface is optional and valid enum is accepted",
+	)
+	var objective_surface_visual: Node3D = RuntimePropVisualBinderScript.create_objective_visual(objective_surface_binding)
+	failures += _expect(
+		objective_surface_visual != null,
+		"binder accepts objective binding with valid surface",
+	)
+	var dressing_without_surface_document: Dictionary = valid_document.duplicate(true)
+	var dressing_without_surface_binding: Dictionary = dressing_binding.duplicate(true)
+	var dressing_without_surface_placement: Dictionary = (dressing_without_surface_binding["placement"] as Dictionary).duplicate(true)
+	dressing_without_surface_placement.erase("surface")
+	dressing_without_surface_binding["placement"] = dressing_without_surface_placement
+	(dressing_without_surface_document["dressing"] as Dictionary)["cable_tray"] = dressing_without_surface_binding
+	failures += _expect_catalog_accepted(
+		dressing_without_surface_document,
+		"user://task5-dressing-no-surface.json",
+		"dressing surface is optional",
+	)
 	var marker_anchor_document: Dictionary = valid_document.duplicate(true)
 	var marker_anchor_objective: Dictionary = objective_binding.duplicate(true)
 	var marker_anchor_placement: Dictionary = (marker_anchor_objective["placement"] as Dictionary).duplicate(true)
@@ -50,17 +77,17 @@ func _initialize() -> void:
 	var invalid_objective_surface_document: Dictionary = valid_document.duplicate(true)
 	var invalid_objective_surface: Dictionary = objective_binding.duplicate(true)
 	var invalid_objective_placement: Dictionary = (invalid_objective_surface["placement"] as Dictionary).duplicate(true)
-	invalid_objective_placement["surface"] = "floor"
+	invalid_objective_placement["surface"] = "deck"
 	invalid_objective_surface["placement"] = invalid_objective_placement
 	(invalid_objective_surface_document["objectives"] as Dictionary)["reactor_control_panel"] = invalid_objective_surface
 	failures += _expect_catalog_rejected(
 		invalid_objective_surface_document,
 		"user://task5-invalid-objective-surface.json",
-		"objective surface is rejected",
+		"objective surface is restricted to floor wall or ceiling",
 	)
 	failures += _expect(
 		RuntimePropVisualBinderScript.create_objective_visual(invalid_objective_surface) == null,
-		"objective surface is rejected by binder",
+		"binder rejects objective binding with invalid surface",
 	)
 	var invalid_asset_document: Dictionary = valid_document.duplicate(true)
 	var invalid_asset_component: Dictionary = component_binding.duplicate(true)
@@ -440,6 +467,8 @@ func _initialize() -> void:
 		"user://task5-malformed-kind.json",
 		"user://task5-malformed-path.json",
 		"user://task5-marker-anchor.json",
+		"user://task5-objective-valid-surface.json",
+		"user://task5-dressing-no-surface.json",
 		"user://task5-invalid-surface.json",
 		"user://task5-invalid-objective-surface.json",
 		"user://task5-invalid-asset-id.json",
@@ -452,6 +481,8 @@ func _initialize() -> void:
 		"user://task5-duplicate-json-key.json",
 	]:
 		_remove_user_file(temporary_path)
+	if objective_surface_visual != null:
+		objective_surface_visual.free()
 	if detached_objective != null:
 		detached_objective.free()
 	if transformed != null:

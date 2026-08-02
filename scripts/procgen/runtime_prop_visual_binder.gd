@@ -222,17 +222,17 @@ static func _is_valid_placement(placement_value: Variant, expected_prop_kind: St
 	if not (placement_value is Dictionary):
 		return false
 	var placement: Dictionary = placement_value as Dictionary
-	var expected_fields: Array[String] = PLACEMENT_FIELDS.duplicate()
-	if expected_prop_kind == "dressing":
-		expected_fields.append("surface")
+	var required_fields: Array[String] = PLACEMENT_FIELDS.duplicate()
+	var surface_allowed: bool = expected_prop_kind == "dressing" or expected_prop_kind == "objective"
+	var allowed_fields: Array[String] = required_fields.duplicate()
+	if surface_allowed:
+		allowed_fields.append("surface")
 	for key in placement.keys():
-		if not expected_fields.has(str(key)):
+		if not allowed_fields.has(str(key)):
 			return false
-	if expected_prop_kind != "dressing" and placement.has("surface"):
+	if placement.size() < required_fields.size() or placement.size() > allowed_fields.size():
 		return false
-	if placement.size() < PLACEMENT_FIELDS.size() or placement.size() > expected_fields.size():
-		return false
-	for field_name in PLACEMENT_FIELDS:
+	for field_name in required_fields:
 		if not placement.has(field_name):
 			return false
 	if placement.has("surface") and not ALLOWED_SURFACES.has(placement.get("surface")):
