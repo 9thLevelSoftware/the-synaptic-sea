@@ -53,6 +53,11 @@ func _validate() -> void:
 		bindings.get_component_binding("missing_component").is_empty(),
 		"missing component binding is empty",
 	)
+	var reactor_console_definition: Dictionary = catalog.get_component("reactor_console")
+	failures += _expect(
+		catalog.has_component("reactor_console") and not reactor_console_definition.is_empty(),
+		"reactor console is authoritative/loadable from component catalog",
+	)
 
 	var live: Dictionary = playable._active_layout_for_work()
 	if live.is_empty():
