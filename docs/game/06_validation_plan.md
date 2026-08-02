@@ -21,6 +21,24 @@ Each governed prop's canonical portable record is one adjacent same-basename `.s
 file paired with its GLB (for example, `<name>.glb` and `<name>.sidecar.json`). This naming
 rule does not change the runtime-derived index convention.
 
+### Read-only structural variant audit
+
+Task 8 audits exactly these eight `ship_structural_v0` integrity families:
+
+```text
+floor_1x1, floor_2x1, corridor_floor_1x1, corridor_floor_1x2,
+wall_straight_1x1, doorway_frame_open_1x1, pillar_support_1x1, ramp_up_1x2
+```
+
+The audit reads the intact, `_damaged`, and `_breached` GLBs, wrapper scenes, wrapper
+manifests/inputs, and `IntegrityVisualResolver`. It computes a SHA-256 for every GLB,
+requires the wrapper's three exact `res://` references, checks `Anchor_FloorCenter` and
+the manifest/input `Anchor_SOCK_*` set, requires all three `VisualInstance_*` nodes to be
+direct children of `Visual`, and verifies that the resolver names those scene nodes.
+The validator is strictly read-only: it never rewrites GLBs, scenes, manifests, contracts,
+or generated engine state. A zero exit status means all eight trios pass; diagnostics are
+printed as `ERROR:` lines.
+
 ```bash
 GODOT_BIN=/opt/homebrew/bin/godot
 ROOT=.
@@ -32,10 +50,10 @@ ROOT=.
 # Component-marker smoke (Task 1 baseline; the exact-two ObjectDB warning is allowed only here).
 "$GODOT_BIN" --headless --path "$ROOT" --script res://scripts/validation/component_markers_smoke.gd
 
-# Future Task 2+ command: the validator is not present in the Task 1 baseline.
+# Task 2+ command: the prop metadata validator is present after the metadata retrofit.
 python3 tools/validate_prop_visual_bindings.py --project-root "$ROOT" --check-index
 
-# Future Task 2+ command: the structural audit validator is not present in the Task 1 baseline.
+# Task 8 read-only gate: validates the eight structural integrity trios.
 python3 tools/validate_structural_variant_bindings.py --project-root "$ROOT"
 
 # Future Task 2+ command: the structural variant smoke is not present in the Task 1 baseline.

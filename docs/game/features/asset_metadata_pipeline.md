@@ -2,7 +2,8 @@
 
 ## Status
 
-Approved for Task 1 contract; implementation begins in Task 2.
+Approved for the asset-metadata retrofit. The host-side structural variant audit is
+implemented for Task 8; pending runtime smoke gates remain tracked separately.
 
 ## Design pillar alignment
 
@@ -38,7 +39,7 @@ is changed by this task.
 | Component IDs and lifecycle | Component placement/catalog/runtime owners | Resolve authored component IDs and retain component lifecycle ownership and ship-system linkage. |
 | Objective placement IDs | Gameplay objective data/controller owners | Resolve supplied `placement_id` values from gameplay data; never infer identity from objective type. |
 | Fallback visual | Binding resolver/runtime owner | Make a missing or invalid binding explicit with `visual_source="fallback"`; never silently select an unrelated asset. |
-| Structural wrappers | Structural placement and integrity owners | Own connector sockets, collision proxies, and intact/damaged/breached integrity variants. Prop metadata may not weaken or duplicate these contracts. |
+| Structural wrappers | Structural placement and integrity owners | Own connector sockets, collision proxies, and intact/damaged/breached integrity variants. The Task 8 read-only audit checks the eight governed trios without changing this authority. Prop metadata may not weaken or duplicate these contracts. |
 | Sidecar extensions | Sidecar author/content owner | Preserve unknown or hand-authored extension data across an explicit GLB-derived refresh. |
 
 ## Portable asset record
@@ -115,6 +116,13 @@ hand-authored extensions, binding, placement, and provenance data.
   changes must not alter those existing runtime flows.
 - Structural wrappers validate and switch intact, damaged, and breached variants without
   connector/socket or collision drift.
+- The Task 8 audit validates exactly these eight trios: `floor_1x1`, `floor_2x1`,
+  `corridor_floor_1x1`, `corridor_floor_1x2`, `wall_straight_1x1`,
+  `doorway_frame_open_1x1`, `pillar_support_1x1`, and `ramp_up_1x2`. Every trio has
+  readable GLBs with SHA-256 evidence, exact wrapper references, stable manifest/input
+  anchors, direct `Visual` children, and resolver names matching the wrapper nodes.
+- The structural audit is read-only and reports diagnostics without rewriting GLBs, scenes,
+  manifests, contracts, or generated engine state.
 - The runtime index is deterministic, derived-only, and fresh with respect to valid
   sidecars and their GLBs; a stale or hand-edited index fails the gate.
 - The index is exactly `data/props/visual_bindings.generated.json` with
@@ -152,11 +160,32 @@ hand-authored extensions, binding, placement, and provenance data.
 - Existing placement resource seam: `scripts/placement/modular_asset_spec.gd`.
 - Existing structural wrapper validator:
   `scripts/placement/validate_wrapper_scenes.gd`.
-- Future prop metadata validator, structural audit, and visual-binding smokes are named
-  in `docs/game/06_validation_plan.md` and remain explicitly future until their scripts
-  exist.
+- Host-side metadata and structural-audit validators:
+  `tools/validate_prop_visual_bindings.py` and
+  `tools/validate_structural_variant_bindings.py`. The structural audit is read-only and
+  covers the eight integrity trios described in the validation plan; runtime visual-binding
+  smokes remain separate gates.
 
 ## Validation
+
+### Task 8 structural audit
+
+Run the host-side read-only audit and focused tests from the repository root:
+
+```bash
+python3 tools/validate_structural_variant_bindings.py --project-root .
+python3 -m unittest -v tests.test_validate_structural_variant_bindings
+```
+
+The audit must exit `0` for all eight named trios. It computes a lowercase 64-character
+SHA-256 for each intact, damaged, and breached GLB; checks exact wrapper references,
+manifest/input anchor currency, direct `Visual` children, and the
+`IntegrityVisualResolver` node names. The tests exercise missing GLBs, wrong wrapper refs,
+missing socket anchors, nested visual nodes, resolver-name drift, and the rule that a
+non-variant wrapper with no integrity triplet is ignored. These checks are deliberately
+independent of the pending Godot runtime smoke tasks and do not write project files.
+
+### Godot baseline and runtime gates
 
 Task 1 records the reproducible Godot 4.7.1 baseline from the repository root:
 
