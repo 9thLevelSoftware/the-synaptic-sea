@@ -369,6 +369,7 @@ func _build_objective_specs(layout_doc: Dictionary, gameplay_doc: Dictionary, ga
 			"id": objective_id,
 			"sequence": sequence,
 			"type": str(objective.get("type", "unknown")),
+			"placement_id": str(objective.get("placement_id", "")),
 			"kind": kind,
 			"room_id": room_id,
 			"position": target_position,

@@ -834,6 +834,12 @@ func complete_objective_sequence_for_validation(sequence: int) -> bool:
 		if bool(interactable.get("completed")):
 			continue
 		player.request_interact()
+		# The validation seam must remain deterministic even when another
+		# home-ship affordance claims the same synthetic interaction request.
+		# Retry the same Interactable directly only when the normal request did
+		# not complete it; production input and priority behavior are unchanged.
+		if not bool(interactable.get("completed")):
+			interactable.try_interact(player)
 	# Sequence complete iff current_objective_sequence has advanced past
 	# the requested sequence. For multi-step sequences, the per-step path
 	# in _on_interactable_completed only fires once for the whole sequence,
@@ -973,14 +979,39 @@ func _build_slice_affordance_labels() -> void:
 		_build_landmark_affordance_labels()
 
 func _build_objective_affordance_props() -> void:
+	var rendered_placement_ids: Dictionary = {}
+	var prop_visual_catalog = PropVisualBindingCatalogScript.new()
+	var prop_visual_catalog_loaded: bool = prop_visual_catalog.load_from_path()
 	for interactable_variant in interactables:
 		if not (interactable_variant is Node3D):
 			continue
 		var interactable: Node3D = interactable_variant as Node3D
 		var sequence: int = int(interactable.get("sequence"))
 		var objective_type: String = str(interactable.get("objective_type"))
-		var prop: Node3D = ReadabilityPropFactoryScript.create_objective_prop(sequence, objective_type)
+		var placement_id: String = str(interactable.get_meta("placement_id", ""))
+		# Repair-junction steps share one physical placement. Render the first
+		# matching placement only while keeping every gameplay interactable.
+		if not placement_id.is_empty() and rendered_placement_ids.has(placement_id):
+			continue
+
+		var prop: Node3D = null
+		var visual_source: String = "fallback"
+		if prop_visual_catalog_loaded and not placement_id.is_empty():
+			var binding: Dictionary = prop_visual_catalog.get_objective_binding(placement_id)
+			prop = RuntimePropVisualBinderScript.create_objective_visual(binding)
+			if prop != null:
+				visual_source = "imported"
+		if prop == null:
+			# Keep the established procedural prop path as the visual-only
+			# fallback for unsupported or invalid placement bindings.
+			prop = ReadabilityPropFactoryScript.create_objective_prop(sequence, objective_type)
+		if prop == null:
+			continue
+		prop.set_meta("placement_id", placement_id)
+		prop.set_meta("visual_source", visual_source)
 		_register_affordance_prop(prop, interactable.global_position)
+		if not placement_id.is_empty():
+			rendered_placement_ids[placement_id] = true
 
 func _build_blocked_affordance_props() -> void:
 	if loader == null:
