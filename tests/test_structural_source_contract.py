@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -23,6 +24,16 @@ CONTRACT_RELATIVE = Path(
 GLB_RELATIVE = Path(
     "assets/imported/structural/ship_structural_v0/floor_1x1/floor_1x1.glb"
 )
+
+
+def _write_floor_fixture(tmp_path: Path, document: dict) -> None:
+    contract_path = tmp_path / CONTRACT_RELATIVE
+    contract_path.parent.mkdir(parents=True)
+    contract_path.write_text(json.dumps(document), encoding="utf-8")
+
+    glb_path = tmp_path / GLB_RELATIVE
+    glb_path.parent.mkdir(parents=True)
+    glb_path.write_bytes((PROJECT_ROOT / GLB_RELATIVE).read_bytes())
 
 
 def test_contract_coordinates_convert_y_up_to_blender_z_up() -> None:
@@ -95,6 +106,25 @@ def test_source_record_is_canonical_and_has_no_clock_field(tmp_path: Path) -> No
     )
 
 
+def test_contract_sha256_is_raw_file_hash() -> None:
+    spec = load_source_spec(PROJECT_ROOT, "floor_1x1")
+    raw = spec.contract_path.read_bytes()
+
+    assert spec.contract_sha256 == hashlib.sha256(raw).hexdigest()
+
+
+def test_socket_z_up_positions_match_contract_after_conversion() -> None:
+    spec = load_source_spec(PROJECT_ROOT, "floor_1x1")
+
+    for socket in spec.sockets:
+        assert socket.position_z_up == y_up_to_z_up(socket.position_y_up)
+
+
+def test_canonical_json_rejects_non_finite_values() -> None:
+    with pytest.raises(ValueError):
+        canonical_json({"x": float("nan")})
+
+
 def test_source_output_paths_containment_rejects_path_traversal(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="unsupported structural source module"):
         source_output_paths(tmp_path, "../evil")
@@ -110,6 +140,62 @@ def test_mismatched_module_contract_is_rejected(tmp_path: Path) -> None:
     glb_path.write_bytes((PROJECT_ROOT / GLB_RELATIVE).read_bytes())
 
     with pytest.raises(ValueError, match="contract module_id mismatch"):
+        load_source_spec(tmp_path, "floor_1x1")
+
+
+def test_invalid_schema_version_is_rejected(tmp_path: Path) -> None:
+    document = json.loads((FIXTURE_ROOT / "floor_1x1_contract.json").read_text())
+    document["schema_version"] = "2.0.0"
+    _write_floor_fixture(tmp_path, document)
+
+    with pytest.raises(ValueError, match="schema_version"):
+        load_source_spec(tmp_path, "floor_1x1")
+
+
+def test_mismatched_asset_id_is_rejected(tmp_path: Path) -> None:
+    document = json.loads((FIXTURE_ROOT / "floor_1x1_contract.json").read_text())
+    document["asset_id"] = "floor_2x1"
+    _write_floor_fixture(tmp_path, document)
+
+    with pytest.raises(ValueError, match="asset_id mismatch"):
+        load_source_spec(tmp_path, "floor_1x1")
+
+
+def test_inverted_bounds_are_rejected(tmp_path: Path) -> None:
+    document = json.loads((FIXTURE_ROOT / "floor_1x1_contract.json").read_text())
+    document["bounds"]["local_min_m"][0] = 3.0
+    _write_floor_fixture(tmp_path, document)
+
+    with pytest.raises(ValueError, match="bounds"):
+        load_source_spec(tmp_path, "floor_1x1")
+
+
+def test_oversized_integer_is_rejected_as_invalid_float(tmp_path: Path) -> None:
+    document = json.loads((FIXTURE_ROOT / "floor_1x1_contract.json").read_text())
+    document["grid_step_m"] = 10**1000
+    _write_floor_fixture(tmp_path, document)
+
+    with pytest.raises(ValueError, match="grid_step_m"):
+        load_source_spec(tmp_path, "floor_1x1")
+
+
+@pytest.mark.parametrize("relative_path", [CONTRACT_RELATIVE, GLB_RELATIVE])
+def test_source_input_symlink_escape_is_rejected(
+    tmp_path: Path, relative_path: Path
+) -> None:
+    real_path = PROJECT_ROOT / relative_path
+    linked_path = tmp_path / relative_path
+    linked_path.parent.mkdir(parents=True)
+
+    if relative_path == CONTRACT_RELATIVE:
+        linked_path.symlink_to(real_path)
+    else:
+        contract_path = tmp_path / CONTRACT_RELATIVE
+        contract_path.parent.mkdir(parents=True)
+        contract_path.write_bytes((PROJECT_ROOT / CONTRACT_RELATIVE).read_bytes())
+        linked_path.symlink_to(real_path)
+
+    with pytest.raises((ValueError, OSError)):
         load_source_spec(tmp_path, "floor_1x1")
 
 

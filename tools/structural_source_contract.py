@@ -85,13 +85,16 @@ def _validate_module_id(module_id: str) -> None:
 def _nonempty_string(value: object, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"invalid structural contract {field_name}")
-    return value
+    return value.strip()
 
 
 def _finite_float(value: object, field_name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"invalid structural contract {field_name}")
-    result = float(value)
+    try:
+        result = float(value)
+    except (ValueError, OverflowError) as exc:
+        raise ValueError(f"invalid structural contract {field_name}") from exc
     if not math.isfinite(result):
         raise ValueError(f"invalid structural contract {field_name}")
     return result
@@ -114,7 +117,7 @@ def _footprint_tuple(value: object) -> tuple[int, int]:
         or any(isinstance(item, bool) or not isinstance(item, int) for item in value)
     ):
         raise ValueError("invalid structural contract footprint_cells")
-    return (value[0], value[1])  # type: ignore[index,return-value]
+    return (int(value[0]), int(value[1]))
 
 
 def _parse_socket(document: object, index: int) -> SocketSpec:
@@ -151,6 +154,13 @@ def load_source_spec(project_root: Path, module_id: str) -> StructuralSourceSpec
     contract_path = root / _CONTRACT_ROOT / f"{module_id}_contract.json"
     source_glb_path = root / _SOURCE_GLB_ROOT / module_id / f"{module_id}.glb"
 
+    resolved_contract_path = contract_path.resolve(strict=False)
+    if resolved_contract_path == root or root not in resolved_contract_path.parents:
+        raise ValueError(f"structural contract path escapes project root: {module_id}")
+    resolved_source_glb_path = source_glb_path.resolve(strict=False)
+    if resolved_source_glb_path == root or root not in resolved_source_glb_path.parents:
+        raise ValueError(f"source GLB path escapes project root: {module_id}")
+
     try:
         contract_bytes = contract_path.read_bytes()
     except OSError as exc:
@@ -166,6 +176,10 @@ def load_source_spec(project_root: Path, module_id: str) -> StructuralSourceSpec
         raise ValueError(f"invalid structural contract kind: {module_id}")
     if document.get("module_id") != module_id:
         raise ValueError(f"contract module_id mismatch: {module_id}")
+    if document.get("schema_version") != "1.0.0":
+        raise ValueError(f"invalid structural contract schema_version: {module_id}")
+    if document.get("asset_id") != module_id:
+        raise ValueError(f"contract asset_id mismatch: {module_id}")
 
     kit_id = _nonempty_string(document.get("kit_id"), "kit_id")
     module_family = _nonempty_string(document.get("module_family"), "module_family")
@@ -178,6 +192,11 @@ def load_source_spec(project_root: Path, module_id: str) -> StructuralSourceSpec
         raise ValueError(f"invalid structural contract bounds: {module_id}")
     bounds_min_y_up = _coordinate_tuple(bounds.get("local_min_m"), "bounds.local_min_m")
     bounds_max_y_up = _coordinate_tuple(bounds.get("local_max_m"), "bounds.local_max_m")
+    if any(
+        minimum > maximum
+        for minimum, maximum in zip(bounds_min_y_up, bounds_max_y_up, strict=True)
+    ):
+        raise ValueError(f"invalid structural contract bounds: {module_id}")
     placement_origin = _nonempty_string(bounds.get("placement_origin"), "bounds.placement_origin")
 
     footprint_cells = _footprint_tuple(document.get("footprint_cells"))
@@ -278,5 +297,12 @@ def canonical_json(document: dict[str, Any]) -> bytes:
     """Serialize a document as sorted compact UTF-8 JSON with one newline."""
 
     return (
-        json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
+        json.dumps(
+            document,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+        + "\n"
     ).encode("utf-8")
