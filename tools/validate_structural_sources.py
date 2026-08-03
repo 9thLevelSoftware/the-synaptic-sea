@@ -55,7 +55,8 @@ def validate_report(spec: StructuralSourceSpec, report: dict[str, Any]) -> list[
     expected_root_name = f"ModuleRoot_{module_id}"
 
     if not isinstance(report, dict):
-        return [f"source inspector report is not an object: {module_id}"]
+        errors.append(f"source inspector report is not an object: {module_id}")
+        return sorted(errors)
 
     if report.get("module_id") != module_id:
         errors.append(f"source report module_id does not match contract: {module_id}")
@@ -149,7 +150,37 @@ def validate_report(spec: StructuralSourceSpec, report: dict[str, Any]) -> list[
                 f"socket Blender location does not match {socket.socket_id}: {module_id}"
             )
 
-    return errors
+    return sorted(errors)
+
+
+def _validate_source_record(
+    spec: StructuralSourceSpec, source_record: object
+) -> list[str]:
+    """Return provenance diagnostics for one recovered source record."""
+
+    module_id = spec.module_id
+    if not isinstance(source_record, dict):
+        return [f"source record is not an object: {module_id}"]
+
+    errors: list[str] = []
+    if source_record.get("document_kind") != "structural_blender_source":
+        errors.append(f"source record document_kind does not match contract: {module_id}")
+    if source_record.get("schema_version") != "1.0.0":
+        errors.append(f"source record schema_version does not match contract: {module_id}")
+    if source_record.get("module_id") != module_id:
+        errors.append(f"source record module_id does not match contract: {module_id}")
+
+    contract = source_record.get("contract")
+    if not isinstance(contract, dict) or contract.get("sha256") != spec.contract_sha256:
+        errors.append(f"source record contract.sha256 does not match contract: {module_id}")
+
+    source_glb = source_record.get("source_glb")
+    if not isinstance(source_glb, dict) or source_glb.get("sha256") != spec.source_glb_sha256:
+        errors.append(
+            f"source record source_glb.sha256 does not match contract: {module_id}"
+        )
+
+    return sorted(errors)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -232,6 +263,7 @@ def _run_inspector(
     command = [
         blender,
         "--background",
+        "--factory-startup",
         str(blend_path),
         "--python",
         str(inspector_path),
@@ -271,7 +303,7 @@ def validate_sources(args: argparse.Namespace) -> list[str]:
     for module_id in _selected_module_ids(args):
         try:
             spec = load_source_spec(project_root, module_id)
-            blend_path, _record_path = source_output_paths(source_root, module_id)
+            blend_path, record_path = source_output_paths(source_root, module_id)
         except (OSError, ValueError) as exc:
             errors.append(f"{module_id}: {exc}")
             continue
@@ -293,6 +325,16 @@ def validate_sources(args: argparse.Namespace) -> list[str]:
             continue
         errors.extend(validate_report(spec, report or {}))
 
+        try:
+            source_record = json.loads(record_path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            errors.append(f"cannot read source record for {module_id}: {exc}")
+            continue
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            errors.append(f"source record is invalid JSON for {module_id}: {exc}")
+            continue
+        errors.extend(_validate_source_record(spec, source_record))
+
     return errors
 
 
@@ -300,7 +342,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     errors = validate_sources(args)
     if errors:
-        for error in errors:
+        for error in sorted(errors):
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
     module_count = len(_selected_module_ids(args))
