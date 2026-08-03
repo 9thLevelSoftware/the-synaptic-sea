@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "modular_asset_spec",
+  "asset_id": "floor_1x1",
+  "module_id": "floor_1x1",
+  "category": "structural",
+  "kit_id": "ship_structural_v0",
+  "module_family": "floor",
+  "grid_step_m": 4.0,
+  "bounds": {
+    "local_min_m": [-2.0, 0.0, -2.0],
+    "local_max_m": [2.0, 0.25, 2.0],
+    "placement_origin": "cell-center-floor"
+  },
+  "footprint_cells": [1, 1],
+  "sockets": [
+    {
+      "id": "floor_edge_north_01",
+      "kind": "floor_edge",
+      "position_m": [0.0, 2.0, 0.0],
+      "compatible_kinds": ["floor_edge", "corridor_edge"]
+    },
+    {
+      "id": "floor_edge_south_01",
+      "kind": "floor_edge",
+      "position_m": [0.0, -2.0, 0.0],
+      "compatible_kinds": ["floor_edge", "corridor_edge"]
+    },
+    {
+      "id": "floor_edge_east_01",
+      "kind": "floor_edge",
+      "position_m": [2.0, 0.0, 0.0],
+      "compatible_kinds": ["floor_edge", "corridor_edge"]
+    },
+    {
+      "id": "floor_edge_west_01",
+      "kind": "floor_edge",
+      "position_m": [-2.0, 0.0, 0.0],
+      "compatible_kinds": ["floor_edge", "corridor_edge"]
+    }
+  ],
+  "collision": {
+    "proxy_shape": "box",
+    "nav_blocker": false
+  }
+}
