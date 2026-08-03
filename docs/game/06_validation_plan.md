@@ -1288,3 +1288,25 @@ membership changes).
 | `travel_integration_smoke` | promotion-candidate |
 | `unique_item_state_smoke` | promotion-candidate |
 | `windowed_fps_capture` | legacy-capture |
+
+## Blender Structural Source Recovery
+
+The following commands verify the external Blender source library against authoritative contracts.
+These tests use Python 3.11 and Blender; they do not invoke Godot.
+
+### Unit tests
+/opt/homebrew/bin/python3.11 -m pytest -q \
+  tests/test_structural_source_contract.py \
+  tests/test_recover_modules_cli.py \
+  tests/test_validate_structural_sources.py
+
+### Source validation
+ROOT=/Volumes/Untitled/SynapticSeaAssets/worktrees/the-synaptic-sea-asset-metadata-retrofit
+SOURCE_ROOT=/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0
+/opt/homebrew/bin/python3.11 tools/validate_structural_sources.py \
+  --project-root "$ROOT" --source-root "$SOURCE_ROOT" --all
+
+### Runtime structural audit
+python3 tools/validate_structural_variant_bindings.py --project-root "$ROOT"
+
+Godot smoke tests still require the frozen external state runner; Blender recovery itself must not invoke Godot or cause generated-state cleanup.
