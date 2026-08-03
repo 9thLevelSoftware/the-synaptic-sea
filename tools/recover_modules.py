@@ -475,8 +475,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     # This is intentionally after parse_args and the allowlist check: invalid
     # module requests must work under Python 3.11 without Blender installed.
     _require_bpy()
-    for module_id in module_ids:
-        recover_one(args, module_id)
+    try:
+        for module_id in module_ids:
+            recover_one(args, module_id)
+    except (FileExistsError, ValueError, FileNotFoundError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     return 0
 
 
