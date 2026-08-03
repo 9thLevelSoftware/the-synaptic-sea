@@ -111,7 +111,7 @@ def _footprint_tuple(value: object) -> tuple[int, int]:
     if (
         not isinstance(value, (list, tuple))
         or len(value) != 2
-        or any(isinstance(item, bool) or not isinstance(item, int) or item <= 0 for item in value)
+        or any(isinstance(item, bool) or not isinstance(item, int) for item in value)
     ):
         raise ValueError("invalid structural contract footprint_cells")
     return (value[0], value[1])  # type: ignore[index,return-value]
@@ -178,9 +178,7 @@ def load_source_spec(project_root: Path, module_id: str) -> StructuralSourceSpec
         raise ValueError(f"invalid structural contract bounds: {module_id}")
     bounds_min_y_up = _coordinate_tuple(bounds.get("local_min_m"), "bounds.local_min_m")
     bounds_max_y_up = _coordinate_tuple(bounds.get("local_max_m"), "bounds.local_max_m")
-    placement_origin = bounds.get("placement_origin")
-    if placement_origin != "cell-center-floor":
-        raise ValueError(f"invalid structural contract placement_origin: {module_id}")
+    placement_origin = _nonempty_string(bounds.get("placement_origin"), "bounds.placement_origin")
 
     footprint_cells = _footprint_tuple(document.get("footprint_cells"))
 

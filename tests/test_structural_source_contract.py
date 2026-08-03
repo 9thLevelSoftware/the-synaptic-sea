@@ -59,6 +59,25 @@ def test_source_recovery_allowlist_is_exactly_the_eight_integrity_families() -> 
     )
 
 
+@pytest.mark.parametrize("module_id", [
+    "floor_1x1",
+    "floor_2x1",
+    "corridor_floor_1x1",
+    "corridor_floor_1x2",
+    "wall_straight_1x1",
+    "doorway_frame_open_1x1",
+    "pillar_support_1x1",
+    "ramp_up_1x2",
+])
+def test_all_eight_modules_load_from_live_contracts(module_id: str) -> None:
+    spec = load_source_spec(PROJECT_ROOT, module_id)
+    assert spec.module_id == module_id
+    assert spec.kit_id == "ship_structural_v0"
+    assert len(spec.sockets) > 0
+    assert spec.contract_sha256
+    assert spec.source_glb_sha256
+
+
 def test_source_record_is_canonical_and_has_no_clock_field(tmp_path: Path) -> None:
     spec = load_source_spec(PROJECT_ROOT, "floor_1x1")
     blend_path, _record_path = source_output_paths(tmp_path, spec.module_id)
