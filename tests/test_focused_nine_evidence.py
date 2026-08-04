@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -310,6 +311,121 @@ def test_inspector_output_timeout_terminates_child_and_is_deterministic(
     with pytest.raises(ValueError, match="timed out"):
         evidence._run_blender_inspector(tmp_path / "fixture.glb", Path("blender"))
     assert time.monotonic() - started < 1.0
+
+
+@pytest.mark.skipif(os.name != "posix", reason="process groups are POSIX-specific")
+def test_inspector_timeout_kills_descendant_process_group_without_leak(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    marker = tmp_path / "descendant.pid"
+    child_code = "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(60)"
+    parent_code = (
+        "import pathlib,subprocess,sys,time; "
+        f"child=subprocess.Popen([{sys.executable!r}, '-c', {child_code!r}]); "
+        f"pathlib.Path({str(marker)!r}).write_text(str(child.pid)); "
+        "time.sleep(60)"
+    )
+    real_popen = evidence.subprocess.Popen
+    calls: list[dict[str, object]] = []
+    processes: list[subprocess.Popen[bytes]] = []
+
+    def process_tree_popen(_command: list[str], **kwargs: object) -> object:
+        calls.append(kwargs)
+        process = real_popen([sys.executable, "-c", parent_code], **kwargs)
+        processes.append(process)
+        return process
+
+    monkeypatch.setattr(evidence.subprocess, "Popen", process_tree_popen)
+    monkeypatch.setattr(evidence, "_BLENDER_INSPECTOR_TIMEOUT_SECONDS", 0.2)
+
+    with pytest.raises(ValueError, match="timed out"):
+        evidence._run_blender_inspector(tmp_path / "fixture.glb", Path("blender"))
+
+    assert calls and calls[0]["start_new_session"] is True
+    assert processes and processes[0].returncode is not None
+    descendant_pid = int(marker.read_text(encoding="utf-8"))
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        try:
+            os.kill(descendant_pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.01)
+    else:
+        pytest.fail(f"descendant process {descendant_pid} survived process-group cleanup")
+
+
+@pytest.mark.skipif(os.name != "posix", reason="process groups are POSIX-specific")
+def test_inspector_fails_closed_when_process_group_cleanup_is_unavailable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(evidence.os, "killpg", None)
+
+    with pytest.raises(ValueError, match="process-group"):
+        evidence._run_blender_inspector(tmp_path / "fixture.glb", Path("blender"))
+
+
+def test_inspect_rejects_regular_directory_rebind_after_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _project, glb, _target = staged_fixture(tmp_path)
+    original_validate = evidence._validate_staged_glb
+    original_directory = glb.parent
+    moved_directory = glb.parent.with_name("props-real")
+
+    def replace_with_regular_directory(path: Path) -> tuple[Path, Path, Path]:
+        result = original_validate(path)
+        original_directory.rename(moved_directory)
+        original_directory.mkdir()
+        (original_directory / glb.name).write_bytes(KNOWN_GLB.read_bytes())
+        return result
+
+    monkeypatch.setattr(evidence, "_validate_staged_glb", replace_with_regular_directory)
+    monkeypatch.setattr(
+        evidence,
+        "_run_blender_inspector",
+        lambda *_args: {
+            "triangle_count": 472,
+            "material_names": ["MAT_PaintedAlloyGray"],
+            "blender_reimport_passed": True,
+        },
+    )
+    try:
+        with pytest.raises(ValueError, match="identity|rebind"):
+            evidence.inspect_staged_glb(glb, BLENDER)
+    finally:
+        shutil.rmtree(original_directory)
+        moved_directory.rename(original_directory)
+
+    assert glb.read_bytes() == KNOWN_GLB.read_bytes()
+
+
+def test_publisher_rejects_regular_directory_rebind_after_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _project, _glb, target = staged_fixture(tmp_path)
+    previous = b'{"old":true}\n'
+    target.write_bytes(previous)
+    original_validate = evidence._validate_json_target
+    original_directory = target.parent
+    moved_directory = target.parent.with_name("evidence-real")
+
+    def replace_with_regular_directory(path: Path, expected_stage: Path) -> tuple[Path, Path]:
+        result = original_validate(path, expected_stage)
+        original_directory.rename(moved_directory)
+        original_directory.mkdir()
+        (original_directory / target.name).write_bytes(b"attacker\n")
+        return result
+
+    monkeypatch.setattr(evidence, "_validate_json_target", replace_with_regular_directory)
+    try:
+        with pytest.raises(ValueError, match="identity|rebind"):
+            evidence.publish_json_atomically(target, minimal_record())
+    finally:
+        shutil.rmtree(original_directory)
+        moved_directory.rename(original_directory)
+
+    assert target.read_bytes() == previous
 
 
 def test_inspect_merges_only_authenticated_inspector_fields(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

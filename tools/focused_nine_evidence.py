@@ -15,11 +15,13 @@ import math
 import os
 import secrets
 import selectors
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -324,6 +326,117 @@ def _path_from_parts(parts: tuple[str, ...], end: int) -> Path:
     return result
 
 
+@dataclass(frozen=True)
+class _PathIdentitySnapshot:
+    """Immutable identities captured before a descriptor-pinned operation."""
+
+    entries: tuple[tuple[tuple[str, ...], tuple[int, int]], ...]
+
+    def expected(self, parts: tuple[str, ...]) -> tuple[int, int] | None:
+        for component_parts, identity in self.entries:
+            if component_parts == parts:
+                return identity
+        return None
+
+
+@dataclass(frozen=True)
+class _ValidatedStagedGLB:
+    lexical: Path
+    stage_lexical: Path
+    stage_resolved: Path
+    resolved: Path
+    identities: _PathIdentitySnapshot
+
+    def __iter__(self):
+        """Keep the historical three-value unpacking API for callers/tests."""
+
+        yield self.lexical
+        yield self.stage_lexical
+        yield self.stage_resolved
+
+
+@dataclass(frozen=True)
+class _ValidatedJsonTarget:
+    lexical: Path
+    resolved_stage: Path
+    identities: _PathIdentitySnapshot
+
+    def __iter__(self):
+        """Keep the historical two-value unpacking API for callers/tests."""
+
+        yield self.lexical
+        yield self.resolved_stage
+
+
+def _snapshot_path_identities(path: Path, label: str) -> _PathIdentitySnapshot:
+    """Capture no-follow ``(st_dev, st_ino)`` identities for existing prefixes."""
+
+    if not path.is_absolute() or path.anchor != os.sep:
+        raise ValueError(f"{label} requires an absolute POSIX path")
+    entries: list[tuple[tuple[str, ...], tuple[int, int]]] = []
+    for end in range(1, len(path.parts) + 1):
+        component_parts = path.parts[:end]
+        component = _path_from_parts(path.parts, end)
+        try:
+            info = os.lstat(component)
+        except FileNotFoundError:
+            break
+        except OSError as exc:
+            raise ValueError(f"{label} identity snapshot failed: {exc}") from exc
+        if stat.S_ISLNK(info.st_mode):
+            raise ValueError(f"{label} contains a symlink component")
+        entries.append((component_parts, (info.st_dev, info.st_ino)))
+    return _PathIdentitySnapshot(tuple(entries))
+
+
+def _validated_staged_glb(result: object) -> _ValidatedStagedGLB:
+    if isinstance(result, _ValidatedStagedGLB):
+        return result
+    try:
+        lexical, stage_lexical, stage_resolved = result  # type: ignore[misc]
+    except (TypeError, ValueError) as exc:
+        raise ValueError("GLB validation returned an invalid result") from exc
+    identities = _snapshot_path_identities(lexical, "GLB path")
+    return _ValidatedStagedGLB(
+        lexical,
+        stage_lexical,
+        stage_resolved,
+        lexical.resolve(strict=False),
+        identities,
+    )
+
+
+def _validated_json_target(result: object) -> _ValidatedJsonTarget:
+    if isinstance(result, _ValidatedJsonTarget):
+        return result
+    try:
+        lexical, resolved_stage = result  # type: ignore[misc]
+    except (TypeError, ValueError) as exc:
+        raise ValueError("json-out validation returned an invalid result") from exc
+    return _ValidatedJsonTarget(
+        lexical,
+        resolved_stage,
+        _snapshot_path_identities(lexical, "json-out"),
+    )
+
+
+def _check_fd_identity(
+    descriptor: int,
+    expected: tuple[int, int] | None,
+    label: str,
+    *,
+    required: bool,
+) -> None:
+    if expected is None:
+        if required:
+            raise ValueError(f"{label} identity snapshot is missing")
+        return
+    actual_stat = os.fstat(descriptor)
+    actual = (actual_stat.st_dev, actual_stat.st_ino)
+    if actual != expected:
+        raise ValueError(f"{label} identity changed after validation")
+
+
 def _stage_roots(path: Path, label: str) -> tuple[Path, Path, Path, Path]:
     lexical = _raw_absolute_path(path, label)
     indexes = _marker_indexes(lexical.parts, _STAGE_MARKER)
@@ -351,7 +464,7 @@ def _has_symlink_component(path: Path) -> bool:
     return False
 
 
-def _validate_staged_glb(glb_path: Path) -> tuple[Path, Path, Path]:
+def _validate_staged_glb(glb_path: Path) -> _ValidatedStagedGLB:
     lexical, stage_lexical, stage_resolved, resolved = _stage_roots(glb_path, "GLB path")
     if _marker_indexes(lexical.parts, _IMPORTED_MARKER):
         raise ValueError("GLB path must not use assets/imported; caller must provide staged GLB")
@@ -370,7 +483,16 @@ def _validate_staged_glb(glb_path: Path) -> tuple[Path, Path, Path]:
         raise ValueError("GLB path must not use a symlink alias in focused-nine staging")
     if lexical.is_symlink():
         raise ValueError("GLB path must not be a symlink alias")
-    return lexical, stage_lexical, stage_resolved
+    identities = _snapshot_path_identities(lexical, "GLB path")
+    if identities.expected(lexical.parts) is None:
+        raise ValueError("GLB path must exist")
+    return _ValidatedStagedGLB(
+        lexical,
+        stage_lexical,
+        stage_resolved,
+        resolved,
+        identities,
+    )
 
 
 def _pinned_input_open_flags() -> tuple[int, int]:
@@ -388,19 +510,37 @@ def _pinned_input_open_flags() -> tuple[int, int]:
     return directory_flags, file_flags
 
 
-def _open_pinned_input_fd(path: Path) -> int:
+def _open_pinned_input_fd(
+    path: Path, identities: _PathIdentitySnapshot | None = None
+) -> int:
     directory_flags, file_flags = _pinned_input_open_flags()
     if not path.is_absolute() or path.anchor != os.sep or not path.name:
         raise OSError("staged GLB inspection requires an absolute POSIX path")
+    if identities is not None and identities.expected(path.parts) is None:
+        raise OSError("staged GLB final identity snapshot is missing")
 
     current_fd: int | None = os.open(os.sep, directory_flags)
     try:
-        for component in path.parts[1:-1]:
+        if identities is not None:
+            _check_fd_identity(
+                current_fd,
+                identities.expected(path.parts[:1]),
+                "staged GLB root",
+                required=True,
+            )
+        for index, component in enumerate(path.parts[1:-1], start=2):
             if component in {"", ".", ".."}:
                 raise OSError("staged GLB path contains an unsafe component")
             child_fd: int | None = None
             try:
                 child_fd = os.open(component, directory_flags, dir_fd=current_fd)
+                if identities is not None:
+                    _check_fd_identity(
+                        child_fd,
+                        identities.expected(path.parts[:index]),
+                        f"staged GLB component {component}",
+                        required=True,
+                    )
                 previous_fd = current_fd
                 current_fd = child_fd
                 child_fd = None
@@ -414,6 +554,13 @@ def _open_pinned_input_fd(path: Path) -> int:
         try:
             if not stat.S_ISREG(os.fstat(descriptor).st_mode):
                 raise OSError("staged GLB must be a regular file")
+            if identities is not None:
+                _check_fd_identity(
+                    descriptor,
+                    identities.expected(path.parts),
+                    "staged GLB final file",
+                    required=True,
+                )
         except BaseException:
             os.close(descriptor)
             raise
@@ -423,11 +570,15 @@ def _open_pinned_input_fd(path: Path) -> int:
             os.close(current_fd)
 
 
-def _copy_pinned_staged_glb(path: Path, temporary_directory: Path) -> Path:
+def _copy_pinned_staged_glb(
+    path: Path, temporary_directory: Path, identities: _PathIdentitySnapshot | None = None
+) -> Path:
     source_fd: int | None = None
     temporary_path: Path | None = None
     try:
-        source_fd = _open_pinned_input_fd(path)
+        source_fd = _open_pinned_input_fd(path, identities)
+        # After this identity check, all input reads use source_fd.  A later
+        # pathname rename cannot redirect the descriptor to another object.
         with tempfile.NamedTemporaryFile(
             mode="wb",
             prefix="staged-input-",
@@ -457,7 +608,7 @@ def _copy_pinned_staged_glb(path: Path, temporary_directory: Path) -> Path:
             os.close(source_fd)
 
 
-def _validate_json_target(target: Path, expected_stage: Path) -> tuple[Path, Path]:
+def _validate_json_target(target: Path, expected_stage: Path) -> _ValidatedJsonTarget:
     lexical, stage_lexical, stage_resolved, resolved = _stage_roots(target, "json-out")
     if _marker_indexes(lexical.parts, _IMPORTED_MARKER):
         raise ValueError("json-out must not target assets/imported or runtime surfaces")
@@ -480,7 +631,11 @@ def _validate_json_target(target: Path, expected_stage: Path) -> tuple[Path, Pat
         raise ValueError("json-out must not be a symlink")
     if lexical.exists() and not lexical.is_file():
         raise ValueError("json-out must be a regular file")
-    return lexical, stage_resolved
+    return _ValidatedJsonTarget(
+        lexical,
+        stage_resolved,
+        _snapshot_path_identities(lexical, "json-out"),
+    )
 
 
 def _reject_json_constant(value: str) -> None:
@@ -537,22 +692,64 @@ def _parse_inspector_output(output: bytes | str) -> dict[str, Any]:
     return _validate_inspector_record(result)
 
 
-def _terminate_and_drain_process(process: Any, selector: selectors.BaseSelector) -> None:
+def _require_process_group_support() -> None:
+    if os.name != "posix" or any(
+        not callable(getattr(os, name, None)) for name in ("getpgid", "killpg")
+    ):
+        raise ValueError("Blender inspector requires POSIX process-group support")
+    if not all(hasattr(signal, name) for name in ("SIGTERM", "SIGKILL")):
+        raise ValueError("Blender inspector requires POSIX process-group signals")
+
+
+def _isolated_process_group_id(process: Any) -> int:
+    pid = getattr(process, "pid", None)
+    if type(pid) is not int or pid <= 1:
+        raise OSError("Blender inspector process has no safe PID")
     try:
-        process.terminate()
-    except (OSError, ProcessLookupError):
+        process_group = os.getpgid(pid)
+    except ProcessLookupError:
+        # The session leader can exit before its descendants.  Its PID is
+        # still the only safe group identifier established by Popen.
+        process_group = pid
+    except OSError as exc:
+        raise OSError(f"could not verify Blender inspector process group: {exc}") from exc
+    if process_group != pid:
+        raise OSError("Blender inspector process is not an isolated session leader")
+    return process_group
+
+
+def _signal_process_group(signal_number: int, process_group: int) -> None:
+    try:
+        os.killpg(process_group, signal_number)
+    except ProcessLookupError:
         pass
+
+
+def _terminate_and_drain_process(process: Any, selector: selectors.BaseSelector) -> None:
+    _require_process_group_support()
+    process_group = _isolated_process_group_id(process)
+    signal_error: OSError | None = None
+    try:
+        _signal_process_group(signal.SIGTERM, process_group)
+    except OSError as exc:
+        signal_error = exc
     try:
         process.wait(timeout=0.1)
     except (subprocess.TimeoutExpired, OSError):
-        try:
-            process.kill()
-        except (OSError, ProcessLookupError):
-            pass
-        try:
-            process.wait(timeout=0.1)
-        except (subprocess.TimeoutExpired, OSError):
-            pass
+        pass
+    try:
+        # Always send SIGKILL after the grace period: the session leader may
+        # have exited while a descendant inherited the inspector's pipes.
+        _signal_process_group(signal.SIGKILL, process_group)
+    except OSError as exc:
+        if signal_error is None:
+            signal_error = exc
+    try:
+        process.wait(timeout=0.1)
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+    if signal_error is not None:
+        raise signal_error
 
     deadline = time.monotonic() + _BLENDER_INSPECTOR_DRAIN_SECONDS
     while selector.get_map() and time.monotonic() < deadline:
@@ -639,6 +836,7 @@ def _collect_bounded_process_output(process: Any) -> tuple[bytes, bytes, int, st
 
 
 def _run_blender_inspector(glb_path: Path, blender: Path) -> dict[str, Any]:
+    _require_process_group_support()
     with tempfile.TemporaryDirectory(prefix="focused-nine-inspector-") as temporary:
         script = Path(temporary) / "inspect_glb.py"
         script.write_text(_BLENDER_INSPECTOR, encoding="utf-8")
@@ -658,6 +856,7 @@ def _run_blender_inspector(glb_path: Path, blender: Path) -> dict[str, Any]:
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                start_new_session=True,
             )
         except OSError as exc:
             raise ValueError(f"could not invoke Blender inspector: {exc}") from exc
@@ -673,10 +872,15 @@ def _run_blender_inspector(glb_path: Path, blender: Path) -> dict[str, Any]:
 def inspect_staged_glb(glb_path: Path, blender: Path) -> dict:
     """Read static GLB metadata, then inspect a clean Blender re-import."""
 
-    staged_glb, _stage_lexical, _stage_resolved = _validate_staged_glb(Path(glb_path))
+    validated = _validated_staged_glb(_validate_staged_glb(Path(glb_path)))
+    staged_glb = validated.lexical
     with tempfile.TemporaryDirectory(prefix="focused-nine-input-") as temporary:
         try:
-            immutable_glb = _copy_pinned_staged_glb(staged_glb, Path(temporary))
+            immutable_glb = _copy_pinned_staged_glb(
+                staged_glb,
+                Path(temporary),
+                validated.identities,
+            )
         except OSError as exc:
             raise ValueError(f"could not securely copy staged GLB: {exc}") from exc
 
@@ -728,23 +932,51 @@ def _pinned_directory_open_flags() -> int:
     return os.O_RDONLY | directory_flag | nofollow_flag
 
 
-def _open_pinned_parent_directory(path: Path, directory_flags: int) -> int:
+def _open_pinned_parent_directory(
+    path: Path,
+    directory_flags: int,
+    identities: _PathIdentitySnapshot | None = None,
+) -> int:
     if not path.is_absolute() or path.anchor != os.sep:
         raise OSError("evidence publication requires an absolute POSIX path")
+    parent_parts = path.parent.parts
     current_fd: int | None = os.open(os.sep, directory_flags)
     try:
-        for component in path.parent.parts[1:]:
+        if identities is not None:
+            _check_fd_identity(
+                current_fd,
+                identities.expected(path.parts[:1]),
+                "json-out root",
+                required=True,
+            )
+        created_prefix = False
+        for index, component in enumerate(parent_parts[1:], start=2):
             child_fd: int | None = None
+            created_here = False
             try:
                 try:
                     child_fd = os.open(component, directory_flags, dir_fd=current_fd)
                 except FileNotFoundError:
-                    os.mkdir(component, mode=0o700, dir_fd=current_fd)
+                    try:
+                        os.mkdir(component, mode=0o700, dir_fd=current_fd)
+                    except FileExistsError as exc:
+                        raise OSError(
+                            f"json-out component {component} appeared during validation"
+                        ) from exc
+                    created_here = True
                     child_fd = os.open(component, directory_flags, dir_fd=current_fd)
+                if identities is not None and not (created_prefix or created_here):
+                    _check_fd_identity(
+                        child_fd,
+                        identities.expected(parent_parts[:index]),
+                        f"json-out component {component}",
+                        required=True,
+                    )
                 previous_fd = current_fd
                 current_fd = child_fd
                 child_fd = None
                 os.close(previous_fd)
+                created_prefix = created_prefix or created_here
             finally:
                 if child_fd is not None:
                     os.close(child_fd)
@@ -756,6 +988,32 @@ def _open_pinned_parent_directory(path: Path, directory_flags: int) -> int:
     finally:
         if current_fd is not None:
             os.close(current_fd)
+
+
+def _validate_existing_json_leaf(
+    directory_fd: int, path: Path, identities: _PathIdentitySnapshot | None
+) -> None:
+    nofollow_flag = getattr(os, "O_NOFOLLOW", None)
+    if nofollow_flag is None:
+        raise OSError("evidence publication requires O_NOFOLLOW")
+    flags = os.O_RDONLY | nofollow_flag
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    expected = identities.expected(path.parts) if identities is not None else None
+    try:
+        descriptor = os.open(path.name, flags, dir_fd=directory_fd)
+    except FileNotFoundError:
+        if expected is not None:
+            raise OSError("json-out target disappeared after validation") from None
+        return
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise OSError("json-out target must be a regular file")
+        if expected is None:
+            raise OSError("json-out target appeared after validation")
+        _check_fd_identity(descriptor, expected, "json-out target", required=True)
+    finally:
+        os.close(descriptor)
 
 
 def _create_sibling_temp(directory_fd: int, target_name: str) -> tuple[int, str]:
@@ -770,7 +1028,15 @@ def _create_sibling_temp(directory_fd: int, target_name: str) -> tuple[int, str]
     raise OSError("could not allocate an evidence temporary file")
 
 
-def _publish_bytes_atomically(path: Path, payload: bytes) -> None:
+def _publish_bytes_atomically(
+    path: Path | _ValidatedJsonTarget, payload: bytes
+) -> None:
+    if isinstance(path, _ValidatedJsonTarget):
+        target = path.lexical
+        identities = path.identities
+    else:
+        target = path
+        identities = None
     directory_flags = _pinned_directory_open_flags()
     directory_fd: int | None = None
     temporary_fd: int | None = None
@@ -778,9 +1044,10 @@ def _publish_bytes_atomically(path: Path, payload: bytes) -> None:
     primary_error: BaseException | None = None
     primary_traceback = None
     try:
-        directory_fd = _open_pinned_parent_directory(path, directory_flags)
+        directory_fd = _open_pinned_parent_directory(target, directory_flags, identities)
         os.fsync(directory_fd)
-        temporary_fd, temporary_name = _create_sibling_temp(directory_fd, path.name)
+        _validate_existing_json_leaf(directory_fd, target, identities)
+        temporary_fd, temporary_name = _create_sibling_temp(directory_fd, target.name)
         handle = os.fdopen(temporary_fd, "wb")
         try:
             handle.write(payload)
@@ -789,9 +1056,12 @@ def _publish_bytes_atomically(path: Path, payload: bytes) -> None:
         finally:
             handle.close()
             temporary_fd = None
+        # POSIX does not let us prevent a rename after the final checks.  This
+        # replace is nevertheless relative to the already-pinned directory fd
+        # and never follows a pathname through a newly-resolved ancestor.
         os.replace(
             temporary_name,
-            path.name,
+            target.name,
             src_dir_fd=directory_fd,
             dst_dir_fd=directory_fd,
         )
@@ -843,7 +1113,9 @@ def publish_json_atomically(target: Path, record: dict) -> None:
     _lexical_target, stage_lexical, _stage_resolved, _resolved_target = _stage_roots(
         lexical_target, "json-out"
     )
-    validated_target, _resolved_stage = _validate_json_target(lexical_target, stage_lexical)
+    validated_target = _validated_json_target(
+        _validate_json_target(lexical_target, stage_lexical)
+    )
     _publish_bytes_atomically(validated_target, payload)
 
 
