@@ -4,6 +4,16 @@
 This tool intentionally accepts only caller-provided GLBs physically beneath an
 ``assets/_staging/focused_nine`` subtree.  It never imports or writes a runtime
 asset and publishes JSON through a pinned, no-follow parent directory.
+
+Security boundary (``trusted_workspace``): before the tool takes its initial
+filesystem observation and pins descriptors, the project and staging tree must
+not be concurrently renamed or rebound by a same-permission actor.  That
+pre-observation threat is intentionally outside this boundary; it is not
+claimed to be prevented.  After validation, staged reads and evidence
+publication use no-follow, descriptor-relative operations plus ``(st_dev,
+st_ino)`` identity checks.  Direct runtime and ``assets/imported`` paths remain
+denied.  Emitted evidence contains asset metrics and hashes only; it does not
+include host paths, usernames, or other personal-data provenance.
 """
 
 from __future__ import annotations
@@ -38,6 +48,16 @@ DEFAULT_TRIANGLE_BUDGETS: dict[str, tuple[int, int]] = {
     "structural": (350, 1500),
     "prop": (300, 1200),
 }
+SECURITY_BOUNDARY = "trusted_workspace"
+TRUST_BOUNDARY_DOCUMENTATION = (
+    "trusted_workspace: before initial filesystem observation and descriptor pinning, "
+    "the caller must prevent same-permission concurrent rename or rebind of the project "
+    "and staging tree; that pre-observation threat is intentionally outside this boundary "
+    "and is not claimed to be prevented. Thereafter, FD-relative no-follow operations "
+    "and (st_dev, st_ino) identity checks pin staged reads and evidence publication; direct "
+    "runtime and assets/imported paths remain denied. Emitted evidence contains asset "
+    "metrics and hashes only, without host paths, usernames, or other personal-data provenance."
+)
 _STAGE_MARKER = ("assets", "_staging", "focused_nine")
 _IMPORTED_MARKER = ("assets", "imported")
 _CORE_FIELDS = ("triangle_count", "mesh_count", "material_names", "blender_reimport_passed")
@@ -870,7 +890,12 @@ def _run_blender_inspector(glb_path: Path, blender: Path) -> dict[str, Any]:
 
 
 def inspect_staged_glb(glb_path: Path, blender: Path) -> dict:
-    """Read static GLB metadata, then inspect a clean Blender re-import."""
+    """Read static GLB metadata, then inspect a clean Blender re-import.
+
+    The caller supplies the ``trusted_workspace`` pre-observation boundary;
+    after validation this function pins the staged input through FD-relative
+    no-follow opens and identity checks before any GLB bytes are consumed.
+    """
 
     validated = _validated_staged_glb(_validate_staged_glb(Path(glb_path)))
     staged_glb = validated.lexical
@@ -1103,7 +1128,12 @@ def _publish_bytes_atomically(
 
 
 def publish_json_atomically(target: Path, record: dict) -> None:
-    """Validate, canonicalize, and durably replace evidence JSON in staging."""
+    """Validate, canonicalize, and durably replace evidence JSON in staging.
+
+    The caller supplies the ``trusted_workspace`` pre-observation boundary;
+    after validation, the publisher pins the parent directory and rejects
+    post-validation inode/device rebinds before its FD-relative replacement.
+    """
 
     shape_errors = _record_shape_errors(record)
     if shape_errors:
@@ -1120,7 +1150,7 @@ def publish_json_atomically(target: Path, record: dict) -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, epilog=TRUST_BOUNDARY_DOCUMENTATION)
     parser.add_argument("--glb", type=Path, required=True)
     parser.add_argument("--kind", choices=tuple(DEFAULT_TRIANGLE_BUDGETS), required=True)
     parser.add_argument("--min-triangles", type=int)
@@ -1159,6 +1189,8 @@ if __name__ == "__main__":
 
 __all__ = [
     "DEFAULT_TRIANGLE_BUDGETS",
+    "SECURITY_BOUNDARY",
+    "TRUST_BOUNDARY_DOCUMENTATION",
     "inspect_staged_glb",
     "publish_json_atomically",
     "validate_evidence",

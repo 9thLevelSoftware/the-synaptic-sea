@@ -41,6 +41,24 @@ def minimal_record(*, triangles: int = 472) -> dict:
     }
 
 
+def test_trusted_workspace_boundary_explicitly_scopes_pre_observation_rebinds() -> None:
+    expected = (
+        "trusted_workspace: before initial filesystem observation and descriptor pinning, "
+        "the caller must prevent same-permission concurrent rename or rebind of the project "
+        "and staging tree; that pre-observation threat is intentionally outside this boundary "
+        "and is not claimed to be prevented. Thereafter, FD-relative no-follow operations "
+        "and (st_dev, st_ino) identity checks pin staged reads and evidence publication; direct "
+        "runtime and assets/imported paths remain denied. Emitted evidence contains asset "
+        "metrics and hashes only, without host paths, usernames, or other personal-data provenance."
+    )
+
+    assert evidence.SECURITY_BOUNDARY == "trusted_workspace"
+    assert evidence.TRUST_BOUNDARY_DOCUMENTATION == expected
+    assert "trusted_workspace" in (evidence.__doc__ or "")
+    assert "outside this boundary" in evidence.TRUST_BOUNDARY_DOCUMENTATION
+    assert "not claimed to be prevented" in evidence.TRUST_BOUNDARY_DOCUMENTATION
+
+
 def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(MODULE), *args],
@@ -373,7 +391,7 @@ def test_inspect_rejects_regular_directory_rebind_after_validation(
     original_directory = glb.parent
     moved_directory = glb.parent.with_name("props-real")
 
-    def replace_with_regular_directory(path: Path) -> tuple[Path, Path, Path]:
+    def replace_with_regular_directory(path: Path) -> object:
         result = original_validate(path)
         original_directory.rename(moved_directory)
         original_directory.mkdir()
@@ -391,7 +409,9 @@ def test_inspect_rejects_regular_directory_rebind_after_validation(
         },
     )
     try:
-        with pytest.raises(ValueError, match="identity|rebind"):
+        # This is a post-validation rebind and must be rejected by the pinned
+        # descriptor/inode checks; the pre-observation case is documented above.
+        with pytest.raises(ValueError, match="identity changed after validation"):
             evidence.inspect_staged_glb(glb, BLENDER)
     finally:
         shutil.rmtree(original_directory)
@@ -410,7 +430,7 @@ def test_publisher_rejects_regular_directory_rebind_after_validation(
     original_directory = target.parent
     moved_directory = target.parent.with_name("evidence-real")
 
-    def replace_with_regular_directory(path: Path, expected_stage: Path) -> tuple[Path, Path]:
+    def replace_with_regular_directory(path: Path, expected_stage: Path) -> object:
         result = original_validate(path, expected_stage)
         original_directory.rename(moved_directory)
         original_directory.mkdir()
@@ -419,7 +439,9 @@ def test_publisher_rejects_regular_directory_rebind_after_validation(
 
     monkeypatch.setattr(evidence, "_validate_json_target", replace_with_regular_directory)
     try:
-        with pytest.raises(ValueError, match="identity|rebind"):
+        # This is a post-validation rebind and must be rejected before the
+        # pinned directory-relative replacement can reach the attacker path.
+        with pytest.raises(ValueError, match="identity changed after validation"):
             evidence.publish_json_atomically(target, minimal_record())
     finally:
         shutil.rmtree(original_directory)
