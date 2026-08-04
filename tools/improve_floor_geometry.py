@@ -20,13 +20,24 @@ except ModuleNotFoundError:
     from tools.focused_nine_blender_recipes import main as focused_nine_main
 
 
+def _argv_from_blender(
+    argv: Sequence[str] | None, parser: argparse.ArgumentParser
+) -> list[str]:
+    if argv is not None:
+        return list(argv)
+    raw = list(sys.argv[1:])
+    if "--" not in raw:
+        parser.error("Blender invocation requires '--' before compatibility arguments")
+    return raw[raw.index("--") + 1 :]
+
+
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", type=Path, required=True)
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--module", default="floor_1x1")
     parser.add_argument("--overwrite", action="store_true")
-    args = parser.parse_args(list(argv) if argv is not None else None)
+    args = parser.parse_args(_argv_from_blender(argv, parser))
     if args.module != "floor_1x1":
         parser.error("compatibility driver only delegates floor_1x1")
     if not args.overwrite:

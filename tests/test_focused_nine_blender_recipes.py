@@ -18,6 +18,12 @@ SOURCE_FIXTURE = Path(
 MATERIAL_FIXTURE = Path(
     "/Volumes/Untitled/SynapticSeaAssets/meshes/source/materials/salvage_industrial.blend"
 )
+CONTRACT_FIXTURE = PROJECT_ROOT / (
+    "data/placement/contracts/structural/ship_structural_v0/floor_1x1_contract.json"
+)
+SOURCE_GLB_FIXTURE = PROJECT_ROOT / (
+    "assets/imported/structural/ship_structural_v0/floor_1x1/floor_1x1.glb"
+)
 
 
 def test_registry_is_reused_without_a_second_asset_allowlist() -> None:
@@ -101,6 +107,43 @@ def test_compatibility_wrapper_delegates_without_scene_wide_or_boolean_operation
     assert "bpy.ops.object.delete" not in wrapper
 
 
+def test_compatibility_parser_preserves_python_args_and_rejects_missing_separator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tools.improve_floor_geometry import parse_args
+
+    explicit = parse_args(
+        [
+            "--project-root",
+            "/project",
+            "--source-root",
+            "/structural",
+            "--module",
+            "floor_1x1",
+            "--overwrite",
+        ]
+    )
+    assert explicit.project_root == Path("/project")
+    assert explicit.source_root == Path("/structural")
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "improve_floor_geometry.py",
+            "--project-root",
+            "/project",
+            "--source-root",
+            "/structural",
+            "--module",
+            "floor_1x1",
+            "--overwrite",
+        ],
+    )
+    with pytest.raises(SystemExit):
+        parse_args()
+
+
 def _report_from_stdout(stdout: str) -> tuple[dict, str]:
     reports = []
     for line in stdout.splitlines():
@@ -175,3 +218,79 @@ def test_blender_floor_recipe_is_idempotent_and_source_scoped(tmp_path: Path) ->
     assert first_report["boolean_modifiers"] == []
     assert "BOOLEAN" not in first_report["modifier_types"]
     assert SOURCE_FIXTURE.read_bytes() == source_fixture_bytes
+
+
+def test_blender_compatibility_wrapper_normalizes_blender_arguments(tmp_path: Path) -> None:
+    if not BLENDER.is_file():
+        pytest.fail(f"Blender 5.2 executable missing: {BLENDER}")
+    if not SOURCE_FIXTURE.is_file():
+        pytest.fail(f"source fixture missing: {SOURCE_FIXTURE}")
+    if not MATERIAL_FIXTURE.is_file():
+        pytest.fail(f"material fixture missing: {MATERIAL_FIXTURE}")
+    if not CONTRACT_FIXTURE.is_file():
+        pytest.fail(f"contract fixture missing: {CONTRACT_FIXTURE}")
+    if not SOURCE_GLB_FIXTURE.is_file():
+        pytest.fail(f"source GLB fixture missing: {SOURCE_GLB_FIXTURE}")
+
+    project_root = tmp_path / "project"
+    contract_copy = project_root / (
+        "data/placement/contracts/structural/ship_structural_v0/floor_1x1_contract.json"
+    )
+    glb_copy = project_root / (
+        "assets/imported/structural/ship_structural_v0/floor_1x1/floor_1x1.glb"
+    )
+    contract_copy.parent.mkdir(parents=True)
+    glb_copy.parent.mkdir(parents=True)
+    shutil.copy2(CONTRACT_FIXTURE, contract_copy)
+    shutil.copy2(SOURCE_GLB_FIXTURE, glb_copy)
+    contract_fixture_bytes = CONTRACT_FIXTURE.read_bytes()
+    source_glb_fixture_bytes = SOURCE_GLB_FIXTURE.read_bytes()
+
+    structural_root = tmp_path / "structural"
+    source_dir = structural_root / "floor_1x1"
+    source_dir.mkdir(parents=True)
+    source_blend = source_dir / "floor_1x1.blend"
+    shutil.copy2(SOURCE_FIXTURE, source_blend)
+    material_dir = tmp_path / "materials"
+    material_dir.mkdir()
+    material_copy = material_dir / "salvage_industrial.blend"
+    shutil.copy2(MATERIAL_FIXTURE, material_copy)
+
+    source_fixture_bytes = SOURCE_FIXTURE.read_bytes()
+    material_fixture_bytes = MATERIAL_FIXTURE.read_bytes()
+    command = [
+        str(BLENDER),
+        "--background",
+        "--factory-startup",
+        "--python",
+        str(PROJECT_ROOT / "tools/improve_floor_geometry.py"),
+        "--",
+        "--project-root",
+        str(project_root),
+        "--source-root",
+        str(structural_root),
+        "--module",
+        "floor_1x1",
+        "--overwrite",
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    report, report_line = _report_from_stdout(result.stdout)
+    assert report_line.startswith("FOCUSED_NINE_REPORT ")
+    assert report["asset_id"] == "floor_1x1"
+    assert report["generated_object_names"]
+    assert all(
+        name.startswith("FocusedNine_floor_1x1_")
+        for name in report["generated_object_names"]
+    )
+    assert report["generated_count"] == len(report["generated_object_names"])
+    assert report["triangle_count"] > 0
+    assert report["boolean_modifiers"] == []
+    assert "BOOLEAN" not in report["modifier_types"]
+    assert SOURCE_FIXTURE.read_bytes() == source_fixture_bytes
+    assert MATERIAL_FIXTURE.read_bytes() == material_fixture_bytes
+    assert CONTRACT_FIXTURE.read_bytes() == contract_fixture_bytes
+    assert SOURCE_GLB_FIXTURE.read_bytes() == source_glb_fixture_bytes
+    assert source_blend.is_file()
+    assert material_copy.read_bytes() == material_fixture_bytes
