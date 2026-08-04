@@ -3,9 +3,10 @@
 
 The batch is deliberately a no-promotion workflow.  Blender edits only the
 approved external source roots, candidate GLBs and staged metadata are built in
-an isolated temporary staging workspace, and one asset is published only after
-its recipe, export, evidence, and wrapper/sidecar gates pass.  Runtime surfaces
-are never copied to or written by this module.
+an isolated temporary staging workspace, and requested assets are published
+only after the batch's recipe, export, evidence, wrapper/sidecar, capture, and
+validator gates pass.  Runtime surfaces are never copied to or written by this
+module.
 
 Trusted-workspace boundary: Blender and Godot use path-based APIs.  After the
 initial path observations, same-user concurrent rename or rebind of the source,
@@ -20,11 +21,14 @@ import argparse
 import hashlib
 import json
 import os
+import selectors
+import signal
 import shutil
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
@@ -33,15 +37,13 @@ try:
     from tools import focused_nine_contract as contract
     from tools import focused_nine_evidence as evidence
     from tools import focused_nine_staged_props as staged_props
-    from tools import focused_nine_staged_structural as staged_structural
-    from tools.focused_nine_blender_recipes import source_blend_path
+    from tools.focused_nine_blender_recipes import resolve_source_path, source_blend_path
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from tools import focused_nine_contract as contract
     from tools import focused_nine_evidence as evidence
     from tools import focused_nine_staged_props as staged_props
-    from tools import focused_nine_staged_structural as staged_structural
-    from tools.focused_nine_blender_recipes import source_blend_path
+    from tools.focused_nine_blender_recipes import resolve_source_path, source_blend_path
 
 
 ORDERED_ASSET_IDS: tuple[str, ...] = contract.STRUCTURAL_IDS + contract.PROP_IDS
@@ -54,6 +56,14 @@ PROOF_RELATIVE = Path("docs/superpowers/proofs/focused-nine-comparison.md")
 _CAPTURE_SCENE = "res://scenes/validation/focused_nine_comparison_harness.tscn"
 _CAPTURE_SCRIPT = "res://scripts/validation/focused_nine_comparison_capture.gd"
 CAPTURE_TIMEOUT_SECONDS = 120
+SOURCE_TIMEOUT_SECONDS = 120
+RECIPE_TIMEOUT_SECONDS = 300
+STRUCTURAL_EXPORT_TIMEOUT_SECONDS = 180
+PROP_EXPORT_TIMEOUT_SECONDS = 180
+PRESSURE_OVERLAY_TIMEOUT_SECONDS = 180
+STRUCTURAL_VALIDATOR_TIMEOUT_SECONDS = 300
+PROP_VALIDATOR_TIMEOUT_SECONDS = 180
+MAX_CAPTURED_OUTPUT_BYTES = 64 * 1024
 _CAPTURE_DIAGNOSTIC_MARKERS = ("WARNING:", "ERROR:", "SCRIPT ERROR:")
 _CAPTURE_DIAGNOSTIC_BLOCKER = "comparison capture blocker: Godot emitted diagnostics"
 
@@ -84,8 +94,8 @@ def _canonical_res_path(project_root: Path, path: Path) -> str:
         return f"res://{candidate.relative_to(root).as_posix()}"
     except ValueError:
         # The report contract intentionally permits only project-relative
-        # source references.  The actual external source path is retained in
-        # the improved evidence map and the proof document.
+        # logical source references; external source paths never enter report
+        # or proof artifacts.
         return f"res://assets/_staging/focused_nine/source_refs/{path.stem}.blend"
 
 
@@ -171,6 +181,7 @@ def _canonical_json(document: object) -> bytes:
 def _atomic_write_bytes(path: Path, payload: bytes) -> None:
     """Publish bytes with a same-directory temporary file and replace."""
 
+    _reject_static_symlink_components(path, f"output path {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
     try:
@@ -190,12 +201,36 @@ def _atomic_write_bytes(path: Path, payload: bytes) -> None:
         raise
 
 
+def _reject_static_symlink_components(path: Path, label: str) -> None:
+    """Reject existing symlink components without resolving caller aliases."""
+
+    absolute = _absolute(path)
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        try:
+            mode = current.lstat().st_mode
+        except FileNotFoundError:
+            # A missing component means all later components are missing too.
+            break
+        except OSError as exc:
+            raise ValueError(f"cannot inspect {label}: {path}") from exc
+        if stat.S_ISLNK(mode) and current not in (Path("/var"), Path("/tmp")):
+            # macOS exposes temporary directories through /var and /tmp;
+            # these system aliases are not caller-controlled workspace aliases.
+            raise ValueError(f"{label} contains symlink component: {current}")
+
+
 def _validate_output_paths(project_root: Path, report: Path, preview_dir: Path) -> tuple[Path, Path, Path]:
     root = project_root.resolve(strict=False)
     report_abs = _absolute(report)
     preview_abs = _absolute(preview_dir)
     stage = _stage_root(root)
     approved_preview = root / "artifacts/validation-previews/focused-nine"
+    _reject_static_symlink_components(stage, "stage root")
+    _reject_static_symlink_components(report_abs, "report path")
+    _reject_static_symlink_components(approved_preview, "preview root")
+    _reject_static_symlink_components(preview_abs, "preview path")
     if not _contained(root, report_abs) or not _contained(stage, report_abs):
         raise ValueError("report must be under assets/_staging/focused_nine in the project")
     if not _contained(root, preview_abs) or not _contained(approved_preview, preview_abs):
@@ -239,26 +274,153 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return args
 
 
+def _read_process_output(
+    process: subprocess.Popen[bytes], timeout: float | None
+) -> tuple[bytes, bytes]:
+    selector = selectors.DefaultSelector()
+    streams = (process.stdout, process.stderr)
+    for index, stream in enumerate(streams):
+        if stream is not None:
+            selector.register(stream, selectors.EVENT_READ, index)
+    buffers = [bytearray(), bytearray()]
+    captured = 0
+    deadline = time.monotonic() + timeout if timeout is not None else None
+    try:
+        while selector.get_map():
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                raise subprocess.TimeoutExpired(
+                    process.args,
+                    timeout if timeout is not None else 0.0,
+                    output=bytes(buffers[0]),
+                    stderr=bytes(buffers[1]),
+                )
+            events = selector.select(remaining)
+            if not events:
+                raise subprocess.TimeoutExpired(
+                    process.args,
+                    timeout if timeout is not None else 0.0,
+                    output=bytes(buffers[0]),
+                    stderr=bytes(buffers[1]),
+                )
+            for key, _mask in events:
+                chunk = os.read(key.fd, 8192)
+                if not chunk:
+                    selector.unregister(key.fileobj)
+                    continue
+                remaining_budget = max(0, MAX_CAPTURED_OUTPUT_BYTES - captured)
+                if remaining_budget:
+                    accepted = chunk[:remaining_budget]
+                    buffers[key.data].extend(accepted)
+                    captured += len(accepted)
+    finally:
+        selector.close()
+    process.wait()
+    return bytes(buffers[0]), bytes(buffers[1])
+
+
 def _run(
     command: Sequence[str], *, cwd: Path | None = None, timeout: float | None = None
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    """Run one bounded process in a fresh session and reap its process group."""
+
+    process = subprocess.Popen(
         list(command),
         cwd=str(cwd) if cwd else None,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=timeout,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=False,
+        start_new_session=True,
     )
+    try:
+        stdout, stderr = _read_process_output(process, timeout)
+    except subprocess.TimeoutExpired as exc:
+        partial_stdout = _as_bytes(exc.stdout)
+        partial_stderr = _as_bytes(exc.stderr)
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            process.kill()
+        drained_stdout, drained_stderr = _read_process_output(process, None)
+        stdout = partial_stdout + drained_stdout
+        stderr = partial_stderr + drained_stderr
+        bounded_stdout, bounded_stderr = _bounded_output_pair(stdout, stderr)
+        setattr(exc, "stdout", bounded_stdout)
+        setattr(exc, "stderr", bounded_stderr)
+        setattr(exc, "output", bounded_stdout)
+        raise
+    bounded_stdout, bounded_stderr = _bounded_output_pair(stdout, stderr)
+    return subprocess.CompletedProcess(list(command), process.returncode, bounded_stdout, bounded_stderr)
 
 
-def _failure_output(result: subprocess.CompletedProcess[str]) -> str:
-    output = "\n".join(part for part in (result.stdout, result.stderr) if part)
+def _as_text(value: object) -> str:
+    if isinstance(value, bytes):
+        return value.decode(errors="replace")
+    return str(value) if value else ""
+
+
+def _as_bytes(value: object) -> bytes:
+    if isinstance(value, bytes):
+        return value
+    if value is None:
+        return b""
+    return str(value).encode("utf-8", errors="replace")
+
+
+def _bounded_output_pair(stdout: object, stderr: object) -> tuple[str, str]:
+    """Cap combined captured output while retaining deterministic prefixes."""
+
+    marker = "\n[output truncated]"
+    output_limit = MAX_CAPTURED_OUTPUT_BYTES
+    values = [_as_text(stdout), _as_text(stderr)]
+    encoded_lengths = [len(value.encode("utf-8")) for value in values]
+    if sum(encoded_lengths) <= output_limit:
+        return values[0], values[1]
+
+    bounded: list[str] = []
+    remaining = output_limit
+    for value in values:
+        raw = value.encode("utf-8")
+        if remaining <= 0:
+            bounded_value = ""
+        elif len(raw) <= remaining:
+            bounded_value = value
+        else:
+            marker_bytes = marker.encode("utf-8")
+            if remaining < len(marker_bytes):
+                bounded_value = marker_bytes[:remaining].decode("utf-8", errors="ignore")
+            else:
+                prefix_length = remaining - len(marker_bytes)
+                bounded_value = raw[:prefix_length].decode("utf-8", errors="replace") + marker
+        bounded.append(bounded_value)
+        remaining = max(0, remaining - len(bounded_value.encode("utf-8")))
+    return bounded[0], bounded[1]
+
+
+def _failure_output(result: object) -> str:
+    output = "\n".join(
+        part for part in (_as_text(getattr(result, "stdout", None)), _as_text(getattr(result, "stderr", None))) if part
+    )
     lines = [line.strip() for line in output.splitlines() if line.strip()]
     for line in lines:
         if line.startswith(("ERROR:", "Traceback", "Exception", "Error:")):
             return line
-    return lines[0] if lines else f"exit {result.returncode}"
+    return lines[0] if lines else f"exit {getattr(result, 'returncode', 'unknown')}"
+
+
+def _run_step(
+    command: Sequence[str],
+    *,
+    cwd: Path | None = None,
+    timeout: float,
+    label: str,
+) -> subprocess.CompletedProcess[str]:
+    try:
+        return _run(command, cwd=cwd, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        detail = _failure_output(exc)
+        suffix = f": {detail}" if detail and detail != "exit unknown" else ""
+        raise RuntimeError(f"{label} timed out after {timeout} seconds{suffix}") from exc
 
 
 def _copy_source_with_blender(seed: Path, destination: Path) -> None:
@@ -270,7 +432,11 @@ def _copy_source_with_blender(seed: Path, destination: Path) -> None:
         f"result=bpy.ops.wm.save_as_mainfile(filepath={str(destination)!r}); "
         "assert 'FINISHED' in result, 'source seed save failed'"
     )
-    result = _run([str(BLENDER), "--background", "--factory-startup", "--python-expr", expression])
+    result = _run_step(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", expression],
+        timeout=SOURCE_TIMEOUT_SECONDS,
+        label="source Blender copy",
+    )
     if result.returncode != 0 or not destination.is_file():
         raise RuntimeError(
             f"required source blend missing and could not be created: {destination}: {_failure_output(result)}"
@@ -285,7 +451,11 @@ def _create_empty_source_with_blender(destination: Path) -> None:
         f"result=bpy.ops.wm.save_as_mainfile(filepath={str(destination)!r}); "
         "assert 'FINISHED' in result, 'empty source save failed'"
     )
-    result = _run([str(BLENDER), "--background", "--factory-startup", "--python-expr", expression])
+    result = _run_step(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", expression],
+        timeout=SOURCE_TIMEOUT_SECONDS,
+        label="source Blender creation",
+    )
     if result.returncode != 0 or not destination.is_file():
         raise RuntimeError(
             f"required source blend missing and could not be created: {destination}: {_failure_output(result)}"
@@ -303,8 +473,38 @@ def _choose_seed(root: Path, destination: Path, preferred: Sequence[Path] = ()) 
 
 
 def _ensure_source(args: argparse.Namespace, asset_id: str) -> Path:
-    source = source_blend_path(args.structural_source_root, args.props_source_root, asset_id).resolve(strict=False)
-    if source.is_file():
+    candidate = source_blend_path(args.structural_source_root, args.props_source_root, asset_id)
+    source_root = (
+        args.structural_source_root
+        if asset_id in contract.STRUCTURAL_IDS
+        else args.props_source_root
+    )
+    root_abs = _absolute(source_root)
+    candidate_abs = _absolute(candidate)
+    _reject_static_symlink_components(root_abs, "source root")
+    _reject_static_symlink_components(candidate_abs, "source path")
+    try:
+        candidate_abs.relative_to(root_abs)
+    except ValueError as exc:
+        raise ValueError(f"source path is not beneath its explicit source root: {candidate}") from exc
+
+    # Validate the complete candidate and every protected runtime/staging
+    # surface before creating a missing source file.  This helper also rejects
+    # hardlinks into those surfaces.
+    source = resolve_source_path(
+        args.project_root,
+        args.structural_source_root,
+        args.props_source_root,
+        asset_id,
+    )
+    try:
+        source.relative_to(root_abs.resolve(strict=False))
+    except ValueError as exc:
+        raise ValueError(f"source path is not physically beneath its explicit source root: {candidate}") from exc
+    if candidate_abs.exists():
+        mode = candidate_abs.lstat().st_mode
+        if not stat.S_ISREG(mode):
+            raise ValueError(f"focused-nine source is not a regular file: {candidate}")
         return source
     # A fresh empty source is deliberate: copying another focused source can
     # carry a namespaced helper collection with a different module_id and is
@@ -314,7 +514,7 @@ def _ensure_source(args: argparse.Namespace, asset_id: str) -> Path:
 
 
 def _run_recipe(args: argparse.Namespace, asset_id: str) -> None:
-    result = _run(
+    result = _run_step(
         [
             str(BLENDER),
             "--background",
@@ -331,7 +531,9 @@ def _run_recipe(args: argparse.Namespace, asset_id: str) -> None:
             "--asset-id",
             asset_id,
             "--overwrite-generated-only",
-        ]
+        ],
+        timeout=RECIPE_TIMEOUT_SECONDS,
+        label=f"focused-nine recipe for {asset_id}",
     )
     if result.returncode != 0:
         raise RuntimeError(f"focused-nine recipe failed for {asset_id}: {_failure_output(result)}")
@@ -339,7 +541,7 @@ def _run_recipe(args: argparse.Namespace, asset_id: str) -> None:
 
 def _run_structural_export(source: Path, asset_id: str, destination: Path) -> tuple[Path, ...]:
     destination.mkdir(parents=True, exist_ok=True)
-    result = _run(
+    result = _run_step(
         [
             str(BLENDER),
             "--background",
@@ -353,7 +555,9 @@ def _run_structural_export(source: Path, asset_id: str, destination: Path) -> tu
             str(destination),
             "--module",
             asset_id,
-        ]
+        ],
+        timeout=STRUCTURAL_EXPORT_TIMEOUT_SECONDS,
+        label=f"focused-nine export for {asset_id}",
     )
     if result.returncode != 0:
         raise RuntimeError(f"focused-nine export failed for {asset_id}: {_failure_output(result)}")
@@ -385,14 +589,16 @@ def _props_export_expression(source: Path, collection_name: str, output: Path) -
 def _run_prop_export(source: Path, asset_id: str, destination: Path) -> tuple[Path, ...]:
     destination.mkdir(parents=True, exist_ok=True)
     output = destination / f".{asset_id}.tmp.glb"
-    result = _run(
+    result = _run_step(
         [
             str(BLENDER),
             "--background",
             "--factory-startup",
             "--python-expr",
             _props_export_expression(source, f"FocusedNine_{asset_id}_Generated", output),
-        ]
+        ],
+        timeout=PROP_EXPORT_TIMEOUT_SECONDS,
+        label=f"focused-nine prop export for {asset_id}",
     )
     if result.returncode != 0 or not output.is_file() or output.stat().st_size <= 0:
         raise RuntimeError(f"focused-nine prop export failed for {asset_id}: {_failure_output(result)}")
@@ -455,6 +661,20 @@ def _asset_record(
     role_metrics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind = "structural" if asset_id in contract.STRUCTURAL_IDS else "prop"
+    def safe_error(value: str | None) -> str | None:
+        if value is None:
+            return None
+        safe = value
+        for root in (args.structural_source_root, args.props_source_root):
+            replacement = _source_reference(asset_id)
+            for spelling in {_absolute(root), Path(root).resolve(strict=False)}:
+                safe = safe.replace(str(spelling), replacement)
+        project_spellings = {_absolute(project_root), project_root.resolve(strict=False)}
+        for spelling in project_spellings:
+            safe = safe.replace(str(spelling), "res://")
+        return safe
+
+    safe_validations = [safe_error(validation) or "" for validation in validations]
     # Use the contract helper for exact role spelling, never a filesystem glob.
     staged_glbs = [
         f"res://{contract.asset_stage_glb(project_root, asset_id, role).relative_to(project_root.resolve()).as_posix()}"
@@ -470,26 +690,75 @@ def _asset_record(
         "source_path": _source_reference(asset_id) if source is None else _source_reference(asset_id),
         "staged_glbs": staged_glbs,
         "metrics": metrics,
-        "validation": list(validations),
+        "validation": safe_validations,
         "pass": passed,
-        "first_error": first_error,
+        "first_error": safe_error(first_error),
     }
 
 
-def _publish_structural_asset(private: Path, final: Path) -> None:
-    final.parent.mkdir(parents=True, exist_ok=True)
-    backup: Path | None = None
-    if final.exists() or final.is_symlink():
-        backup = final.with_name(f".{final.name}.previous-{next(tempfile._get_candidate_names())}")
-        os.replace(final, backup)
+def _structural_backup_path(final: Path) -> Path:
+    return final.with_name(f".{final.name}.previous")
+
+
+def _recover_structural_backup(final: Path) -> None:
+    """Recover one exact local backup left by an interrupted transaction."""
+
+    backup = _structural_backup_path(final)
+    if not _path_exists_without_following(backup):
+        return
+    _reject_static_symlink_components(final, "structural publication target")
+    _reject_static_symlink_components(backup, "structural publication backup")
+    quarantine: Path | None = None
+    if _path_exists_without_following(final):
+        quarantine = final.with_name(f".{final.name}.recovery-{next(tempfile._get_candidate_names())}")
+        os.replace(final, quarantine)
     try:
-        os.replace(private, final)
+        os.replace(backup, final)
     except BaseException:
-        if backup is not None and not final.exists():
-            os.replace(backup, final)
+        if quarantine is not None and not _path_exists_without_following(final):
+            os.replace(quarantine, final)
         raise
-    if backup is not None:
-        shutil.rmtree(backup, ignore_errors=True)
+    if quarantine is not None:
+        _discard_path_without_unlinking_target(quarantine)
+
+
+def _publish_structural_asset(private: Path, final: Path) -> None:
+    """Replace one structural package with exact-name rollback recovery.
+
+    A same-user crash between the two renames and backup cleanup can leave the
+    exact backup marker behind; the next invocation recovers that marker before
+    publishing.  This is recoverable, not a claim of power-loss atomicity.
+    """
+
+    _reject_static_symlink_components(final, "structural publication target")
+    final.parent.mkdir(parents=True, exist_ok=True)
+    _recover_structural_backup(final)
+    backup = _structural_backup_path(final)
+    if _path_exists_without_following(backup):
+        raise RuntimeError(f"structural publication backup was not recovered: {backup}")
+    had_final = _path_exists_without_following(final)
+    try:
+        if had_final:
+            os.replace(final, backup)
+        os.replace(private, final)
+    except BaseException as exc:
+        rollback_error: BaseException | None = None
+        try:
+            if _path_exists_without_following(backup):
+                if _path_exists_without_following(final):
+                    _discard_path_without_unlinking_target(final)
+                os.replace(backup, final)
+            elif not had_final and _path_exists_without_following(final):
+                _discard_path_without_unlinking_target(final)
+        except BaseException as recovery_exc:
+            rollback_error = recovery_exc
+        if rollback_error is not None:
+            raise RuntimeError(
+                f"structural publication failed and rollback failed for {final}: {rollback_error}"
+            ) from exc
+        raise
+    if _path_exists_without_following(backup):
+        _discard_path_without_unlinking_target(backup)
 
 
 def _path_exists_without_following(path: Path) -> bool:
@@ -599,7 +868,26 @@ def _process_asset(args: argparse.Namespace, asset_id: str, private_root: Path) 
 
 
 def _run_pressure_overlay(project_root: Path, private_root: Path) -> list[str]:
-    return staged_structural.validate_pressure_door_overlay(project_root, private_root, GODOT)
+    command = [
+        sys.executable,
+        str(Path(__file__).with_name("focused_nine_staged_structural.py")),
+        "--project-root",
+        str(project_root),
+        "--staging-root",
+        str(private_root),
+        "--godot",
+        str(GODOT),
+    ]
+    try:
+        result = _run(command, cwd=project_root, timeout=PRESSURE_OVERLAY_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        return [
+            f"timed out after {PRESSURE_OVERLAY_TIMEOUT_SECONDS} seconds"
+            + (f": {_failure_output(exc)}" if _failure_output(exc) != "exit unknown" else "")
+        ]
+    if result.returncode != 0:
+        return [_failure_output(result)]
+    return []
 
 
 def _preview_relative(project_root: Path, preview_dir: Path) -> str:
@@ -686,34 +974,55 @@ def _run_capture(project_root: Path, preview_dir: Path) -> tuple[bool, str | Non
 
 
 def _run_live_validators(args: argparse.Namespace) -> tuple[list[str], list[str]]:
-    structural = _run(
-        [
-            sys.executable,
-            str(Path(__file__).with_name("validate_structural_sources.py")),
-            "--project-root",
-            str(args.project_root),
-            "--source-root",
-            str(args.structural_source_root),
-            "--all",
-            "--blender",
-            str(BLENDER),
-        ],
-        cwd=args.project_root,
-    )
-    props = _run(
-        [
-            sys.executable,
-            str(Path(__file__).with_name("validate_prop_visual_bindings.py")),
-            "--project-root",
-            str(args.project_root),
-            "--check-index",
-        ],
-        cwd=args.project_root,
-    )
-    return (
-        [] if structural.returncode == 0 else [f"live structural source validator: {_failure_output(structural)}"],
-        [] if props.returncode == 0 else [f"live prop index validator: {_failure_output(props)}"],
-    )
+    structural_command = [
+        sys.executable,
+        str(Path(__file__).with_name("validate_structural_sources.py")),
+        "--project-root",
+        str(args.project_root),
+        "--source-root",
+        str(args.structural_source_root),
+        "--all",
+        "--blender",
+        str(BLENDER),
+    ]
+    props_command = [
+        sys.executable,
+        str(Path(__file__).with_name("validate_prop_visual_bindings.py")),
+        "--project-root",
+        str(args.project_root),
+        "--check-index",
+    ]
+    try:
+        structural = _run(
+            structural_command,
+            cwd=args.project_root,
+            timeout=STRUCTURAL_VALIDATOR_TIMEOUT_SECONDS,
+        )
+        structural_errors = (
+            []
+            if structural.returncode == 0
+            else [f"live structural source validator: {_failure_output(structural)}"]
+        )
+    except subprocess.TimeoutExpired:
+        structural_errors = [
+            "live structural source validator: "
+            f"timed out after {STRUCTURAL_VALIDATOR_TIMEOUT_SECONDS} seconds"
+        ]
+    try:
+        props = _run(
+            props_command,
+            cwd=args.project_root,
+            timeout=PROP_VALIDATOR_TIMEOUT_SECONDS,
+        )
+        prop_errors = (
+            [] if props.returncode == 0 else [f"live prop index validator: {_failure_output(props)}"]
+        )
+    except subprocess.TimeoutExpired:
+        prop_errors = [
+            "live prop index validator: "
+            f"timed out after {PROP_VALIDATOR_TIMEOUT_SECONDS} seconds"
+        ]
+    return structural_errors, prop_errors
 
 
 def _build_report(
@@ -821,7 +1130,7 @@ def _write_proof(
             (
                 f"### `{asset_id}`",
                 "",
-                f"- Source: `{source_paths[asset_id]}`",
+                f"- Source: `{_source_reference(asset_id)}`",
                 "- Validation result: `PASS`",
                 "",
                 "| Role | Validation | Path | SHA-256 | Bytes | Triangles | Meshes | Materials |",
@@ -851,6 +1160,31 @@ def _write_proof(
     _atomic_write_bytes(project_root / PROOF_RELATIVE, "\n".join(lines).encode("utf-8"))
 
 
+def _run_capture_for_private_stage(
+    project_root: Path, private_root: Path, preview_dir: Path
+) -> tuple[bool, str | None, str]:
+    """Run capture against a disposable project containing the private stage."""
+
+    with tempfile.TemporaryDirectory(prefix="focused-nine-capture-overlay-") as temporary:
+        overlay = Path(temporary) / "project"
+        shutil.copytree(
+            project_root,
+            overlay,
+            symlinks=True,
+            ignore=shutil.ignore_patterns(".git", ".godot"),
+        )
+        overlay_stage = overlay / "assets/_staging/focused_nine"
+        if _path_exists_without_following(overlay_stage):
+            _discard_path_without_unlinking_target(overlay_stage)
+        shutil.copytree(private_root, overlay_stage, symlinks=False)
+        overlay_preview = overlay / "artifacts/validation-previews/focused-nine"
+        captured, blocker, output = _run_capture(overlay, overlay_preview)
+        if captured:
+            candidate = private_root / ".focused-nine-comparison.png"
+            shutil.copy2(overlay_preview / "focused-nine-comparison.png", candidate)
+        return captured, blocker, output
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     try:
         args = parse_args(argv)
@@ -864,41 +1198,108 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         stage_root = _stage_root(project_root)
         stage_root.mkdir(parents=True, exist_ok=True)
-        records: list[dict[str, Any]] = []
+        requested_records: list[dict[str, Any]] = []
         source_paths: dict[str, str] = {}
         role_metrics: dict[str, dict[str, Any]] = {}
-        published_assets: list[tuple[str, Path]] = []
+        full_batch = args.assets == ORDERED_ASSET_IDS
+        pressure_requested = "pressure_door_1x1" in args.assets
+        capture_blocker: str | None = None
+        validator_errors: list[str] = []
+        capture_attempted = False
+        private_capture: Path | None = None
 
-        for asset_id in args.assets:
-            with tempfile.TemporaryDirectory(prefix=f".focused-nine-{asset_id}-", dir=str(stage_root)) as temporary:
-                private_root = Path(temporary)
+        # Keep every candidate, wrapper resource, and capture inside one private
+        # workspace.  No stage target is touched until every requested gate has
+        # passed.
+        with tempfile.TemporaryDirectory(prefix="focused-nine-batch-") as temporary:
+            private_root = Path(temporary)
+            for asset_id in args.assets:
                 try:
                     record, source, roles = _process_asset(args, asset_id, private_root)
-                    records.append(record)
+                    requested_records.append(record)
                     if source is not None:
-                        source_paths[asset_id] = str(source)
+                        source_paths[asset_id] = _source_reference(asset_id)
                     role_metrics[asset_id] = roles
-                    if record["pass"]:
+                except BaseException as exc:
+                    message = str(exc) or f"{type(exc).__name__}"
+                    requested_records.append(
+                        _asset_record(
+                            project_root,
+                            args,
+                            asset_id,
+                            None,
+                            (),
+                            _empty_metrics(),
+                            [message],
+                            False,
+                            message,
+                        )
+                    )
+
+            requested_pass = (
+                len(requested_records) == len(args.assets)
+                and all(record["pass"] for record in requested_records)
+            )
+            if requested_pass and pressure_requested:
+                try:
+                    overlay_errors = _run_pressure_overlay(project_root, private_root)
+                except BaseException as exc:
+                    overlay_errors = [str(exc) or f"{type(exc).__name__}"]
+                if overlay_errors:
+                    capture_blocker = "pressure-door overlay blocker: " + "; ".join(overlay_errors)
+
+            if requested_pass and full_batch:
+                if capture_blocker is None:
+                    capture_attempted = True
+                    try:
+                        captured, capture_blocker, _capture_output = _run_capture_for_private_stage(
+                            project_root, private_root, preview_dir
+                        )
+                    except BaseException as exc:
+                        captured = False
+                        capture_blocker = f"comparison capture blocker: {str(exc) or type(exc).__name__}"
+                    if not captured and capture_blocker is None:
+                        capture_blocker = "comparison capture blocker: capture did not complete"
+                structural_errors, prop_errors = _run_live_validators(args)
+                validator_errors.extend(structural_errors)
+                validator_errors.extend(prop_errors)
+
+            gates_passed = requested_pass and capture_blocker is None and not validator_errors
+            if gates_passed:
+                for asset_id in args.assets:
+                    try:
                         if asset_id in contract.STRUCTURAL_IDS:
-                            private_asset = private_root / "structural" / asset_id
-                            _publish_structural_asset(private_asset, contract.asset_stage_dir(project_root, asset_id))
+                            _publish_structural_asset(
+                                private_root / "structural" / asset_id,
+                                contract.asset_stage_dir(project_root, asset_id),
+                            )
                         else:
+                            final_glb = contract.asset_stage_glb(project_root, asset_id)
                             _publish_prop_asset(
                                 private_root / "props" / f"{asset_id}.glb",
                                 private_root / "props" / f"{asset_id}.sidecar.json",
-                                contract.asset_stage_glb(project_root, asset_id),
-                                contract.asset_stage_glb(project_root, asset_id).with_name(f"{asset_id}.sidecar.json"),
+                                final_glb,
+                                final_glb.with_name(f"{asset_id}.sidecar.json"),
                             )
-                        published_assets.append((asset_id, contract.asset_stage_dir(project_root, asset_id)))
-                    else:
-                        continue
-                except BaseException as exc:
-                    message = str(exc) or f"{type(exc).__name__}"
-                    records.append(
-                        _asset_record(project_root, args, asset_id, None, (), _empty_metrics(), [message], False, message)
-                    )
+                    except BaseException as exc:
+                        message = str(exc) or f"{type(exc).__name__}"
+                        validator_errors.append(f"publication blocker: {message}")
+                        for record in requested_records:
+                            if record["asset_id"] == asset_id:
+                                record["pass"] = False
+                                record["validation"] = [message]
+                                record["first_error"] = message
+                                break
+                        gates_passed = False
+                        break
 
-        report_records: dict[str, dict[str, Any]] = {record["asset_id"]: record for record in records}
+            private_capture = private_root / ".focused-nine-comparison.png"
+            if gates_passed and private_capture.is_file():
+                _atomic_write_bytes(preview_dir / "focused-nine-comparison.png", private_capture.read_bytes())
+
+        report_records: dict[str, dict[str, Any]] = {
+            record["asset_id"]: record for record in requested_records
+        }
         for asset_id in ORDERED_ASSET_IDS:
             if asset_id not in report_records:
                 error = f"asset not requested by subset CLI: {asset_id}"
@@ -915,31 +1316,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
         records = [report_records[asset_id] for asset_id in ORDERED_ASSET_IDS]
 
-        full_batch = args.assets == ORDERED_ASSET_IDS
-        capture_blocker: str | None = None
-        validator_errors: list[str] = []
-        if full_batch and all(record["pass"] for record in records) and len(records) == 9:
-            # Wrapper validation consumes the temporary staged package.  Rebuild
-            # a disposable root from the published candidate only for this gate.
-            with tempfile.TemporaryDirectory(prefix="focused-nine-pressure-gate-", dir=str(stage_root)) as temporary:
-                gate_root = Path(temporary)
-                gate_pressure = gate_root / "structural/pressure_door_1x1"
-                gate_pressure.mkdir(parents=True, exist_ok=True)
-                for path in (contract.asset_stage_glb(project_root, "pressure_door_1x1", role) for role in ("intact", "damaged", "breached")):
-                    shutil.copy2(path, gate_pressure / path.name)
-                _copy_pressure_package(gate_root, project_root)
-                overlay_errors = _run_pressure_overlay(project_root, gate_root)
-                if overlay_errors:
-                    capture_blocker = "pressure-door overlay blocker: " + "; ".join(overlay_errors)
-            if capture_blocker is None:
-                captured, capture_blocker, _capture_output = _run_capture(project_root, preview_dir)
-                if not captured and capture_blocker is None:
-                    capture_blocker = "comparison capture blocker: capture did not complete"
-        if full_batch:
-            structural_errors, prop_errors = _run_live_validators(args)
-            validator_errors.extend(structural_errors)
-            validator_errors.extend(prop_errors)
-
         after_runtime = snapshot_runtime_surfaces(project_root)
         runtime_unchanged = before_runtime == after_runtime
         report = _build_report(
@@ -950,7 +1326,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             source_paths,
             role_metrics,
             runtime_unchanged=runtime_unchanged,
-            capture_attempted=full_batch and all(record["pass"] for record in records) and len(records) == 9,
+            capture_attempted=capture_attempted,
             capture_blocker=capture_blocker,
             validator_errors=validator_errors,
         )
@@ -965,7 +1341,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         print(f"FOCUSED_NINE_REPORT path={report_path}")
         for record in records:
-            if record["pass"]:
+            if record["pass"] and record["asset_id"] in args.assets:
                 print(f"FOCUSED_NINE_STAGED asset={record['asset_id']}")
         return 1
     except (OSError, RuntimeError, TypeError, ValueError) as exc:

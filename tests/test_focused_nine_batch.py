@@ -521,3 +521,224 @@ def test_prop_pair_publication_restores_both_prior_targets_without_touching_unre
     assert final_sidecar.read_bytes() == b"old sidecar"
     assert unrelated.read_bytes() == b"unrelated"
     assert not list(final_glb.parent.glob(".*previous-*"))
+
+
+def test_proof_uses_logical_source_reference_instead_of_external_absolute_path(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    report = project / "assets/_staging/focused_nine/report.json"
+    preview = project / "artifacts/validation-previews/focused-nine"
+    source_paths: dict[str, str] = {}
+    records: list[dict] = []
+    role_metrics: dict[str, dict[str, dict[str, object]]] = {}
+
+    for index, asset_id in enumerate(ASSETS):
+        metrics = _valid_metrics(chr(ord("a") + index))
+        record = batch._asset_record(project, object(), asset_id, None, (), metrics, (), True, None)
+        records.append(record)
+        source_paths[asset_id] = f"/external/untrusted/{asset_id}.blend"
+        role_metrics[asset_id] = {
+            role: {
+                **_valid_metrics(chr(ord("a") + index + role_index)),
+                "path": record["staged_glbs"][role_index],
+                "validation": "PASS",
+            }
+            for role_index, role in enumerate(batch.contract.VARIANT_ROLES.get(asset_id, ("intact",)))
+        }
+
+    batch._write_proof(project, records, source_paths, report, preview, role_metrics)
+
+    proof = (project / batch.PROOF_RELATIVE).read_text(encoding="utf-8")
+    assert "/external/untrusted/" not in proof
+    assert f"Source: `res://assets/_staging/focused_nine/source_refs/{ASSETS[0]}.blend`" in proof
+
+
+def test_ensure_source_rejects_runtime_alias_before_creating_blend(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = tmp_path / "project"
+    malicious_root = project / "assets/imported"
+    props_root = tmp_path / "props"
+    project.mkdir()
+    malicious_root.mkdir(parents=True)
+    props_root.mkdir()
+    args = type("Args", (), {
+        "project_root": project,
+        "structural_source_root": malicious_root,
+        "props_source_root": props_root,
+    })()
+    created = False
+
+    def fail_if_called(destination: Path) -> None:
+        nonlocal created
+        created = True
+
+    monkeypatch.setattr(batch, "_create_empty_source_with_blender", fail_if_called)
+
+    with pytest.raises(ValueError, match="runtime surface"):
+        batch._ensure_source(args, "floor_1x1")
+
+    assert created is False
+    assert not (malicious_root / "floor_1x1/floor_1x1.blend").exists()
+
+
+@pytest.mark.parametrize("scope", ["stage", "preview"])
+def test_output_path_rejects_static_symlink_alias_before_writing(
+    tmp_path: Path, scope: str
+) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    stage = project / "assets/_staging/focused_nine"
+    preview = project / "artifacts/validation-previews/focused-nine"
+    if scope == "stage":
+        stage.parent.mkdir(parents=True)
+        stage.symlink_to(outside, target_is_directory=True)
+    else:
+        preview.parent.mkdir(parents=True)
+        preview.symlink_to(outside, target_is_directory=True)
+
+    report = stage / "report.json"
+    with pytest.raises(ValueError, match="symlink"):
+        batch._validate_output_paths(project, report, preview)
+
+    assert not (outside / "report.json").exists()
+    assert not (outside / "focused-nine-comparison.png").exists()
+
+
+def test_recipe_timeout_is_bounded_and_reported_deterministically(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    args = type("Args", (), {
+        "project_root": tmp_path / "project",
+        "structural_source_root": tmp_path / "structural",
+        "props_source_root": tmp_path / "props",
+    })()
+    command = ["blender", "--background"]
+
+    def timeout_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        raise subprocess.TimeoutExpired(command, batch.RECIPE_TIMEOUT_SECONDS, output="partial")
+
+    monkeypatch.setattr(batch, "_run", timeout_run)
+
+    with pytest.raises(RuntimeError, match="timed out after"):
+        batch._run_recipe(args, "floor_1x1")
+
+
+def test_structural_publication_rolls_back_after_replace_failure_without_old_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    private = tmp_path / "private" / "floor_1x1"
+    final = tmp_path / "stage" / "floor_1x1"
+    private.mkdir(parents=True)
+    (private / "floor_1x1.glb").write_bytes(b"new")
+    real_replace = batch.os.replace
+
+    def replace_then_fail(source: str | bytes, destination: str | bytes, *args: object, **kwargs: object) -> None:
+        if Path(source) == private:
+            real_replace(source, destination, *args, **kwargs)
+            raise OSError("injected structural publication failure")
+        real_replace(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(batch.os, "replace", replace_then_fail)
+
+    with pytest.raises(OSError, match="injected structural publication failure"):
+        batch._publish_structural_asset(private, final)
+
+    assert not final.exists()
+    assert not final.is_symlink()
+    assert not list(final.parent.glob(".*previous*"))
+
+
+def test_structural_publication_rolls_back_after_replace_failure_with_old_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    private = tmp_path / "private" / "floor_1x1"
+    final = tmp_path / "stage" / "floor_1x1"
+    private.mkdir(parents=True)
+    final.mkdir(parents=True)
+    (private / "floor_1x1.glb").write_bytes(b"new")
+    (final / "floor_1x1.glb").write_bytes(b"old")
+    real_replace = batch.os.replace
+
+    def replace_then_fail(source: str | bytes, destination: str | bytes, *args: object, **kwargs: object) -> None:
+        if Path(source) == private:
+            real_replace(source, destination, *args, **kwargs)
+            raise OSError("injected structural publication failure")
+        real_replace(source, destination, *args, **kwargs)
+
+    monkeypatch.setattr(batch.os, "replace", replace_then_fail)
+
+    with pytest.raises(OSError, match="injected structural publication failure"):
+        batch._publish_structural_asset(private, final)
+
+    assert (final / "floor_1x1.glb").read_bytes() == b"old"
+    assert not list(final.parent.glob(".*previous*"))
+
+
+def test_structural_publication_recovers_exact_local_backup_before_replacing(
+    tmp_path: Path,
+) -> None:
+    private = tmp_path / "private" / "floor_1x1"
+    final = tmp_path / "stage" / "floor_1x1"
+    backup = final.with_name(f".{final.name}.previous")
+    private.mkdir(parents=True)
+    backup.mkdir(parents=True)
+    (backup / "floor_1x1.glb").write_bytes(b"old")
+    (private / "floor_1x1.glb").write_bytes(b"new")
+
+    batch._publish_structural_asset(private, final)
+
+    assert (final / "floor_1x1.glb").read_bytes() == b"new"
+    assert not backup.exists()
+
+
+@pytest.mark.parametrize("requested", [ASSETS, ("pressure_door_1x1",)])
+def test_pressure_overlay_failure_publishes_no_candidate_and_reports_blocker(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    requested: tuple[str, ...],
+) -> None:
+    project = tmp_path / "project"
+    structural = tmp_path / "structural"
+    props = tmp_path / "props"
+    report = project / "assets/_staging/focused_nine/report.json"
+    preview = project / "artifacts/validation-previews/focused-nine"
+    project.mkdir()
+    structural.mkdir()
+    props.mkdir()
+    stage = project / "assets/_staging/focused_nine"
+    prior = stage / "structural/floor_1x1/floor_1x1.glb"
+    prior.parent.mkdir(parents=True)
+    prior.write_bytes(b"prior")
+
+    def fake_process(args: object, asset_id: str, private_root: Path) -> tuple[dict, Path, dict]:
+        record = batch._asset_record(project, args, asset_id, None, (), _valid_metrics(), (), True, None)
+        return record, project / "sources" / f"{asset_id}.blend", {}
+
+    def fake_publish(private: Path, final: Path) -> None:
+        final.mkdir(parents=True, exist_ok=True)
+        batch.contract.asset_stage_glb(project, "pressure_door_1x1").write_bytes(b"candidate")
+
+    monkeypatch.setattr(batch, "_process_asset", fake_process)
+    monkeypatch.setattr(batch, "_publish_structural_asset", fake_publish)
+    monkeypatch.setattr(batch, "_publish_prop_asset", lambda *args: None)
+    monkeypatch.setattr(
+        batch,
+        "_run_pressure_overlay",
+        lambda project_root, private_root: ["injected wrapper failure"],
+    )
+    monkeypatch.setattr(batch, "_run_live_validators", lambda args: ([], []))
+
+    result = batch.main([*_args(project, structural, props, report, preview), *sum((["--asset", asset] for asset in requested), [])])
+
+    assert result == 1
+    assert prior.read_bytes() == b"prior"
+    candidate = stage / "structural/pressure_door_1x1/pressure_door_1x1.glb"
+    assert not candidate.exists()
+    document = json.loads(report.read_text(encoding="utf-8"))
+    assert document["overall_pass"] is False
+    pressure = next(item for item in document["assets"] if item["asset_id"] == "pressure_door_1x1")
+    assert pressure["pass"] is False
+    assert "injected wrapper failure" in pressure["first_error"]
