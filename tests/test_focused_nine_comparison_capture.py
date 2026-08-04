@@ -58,6 +58,20 @@ def test_capture_script_has_exact_cli_and_capture_contract() -> None:
     assert "--write-movie" not in source
 
 
+def test_capture_publishes_fixed_leaves_via_verified_atomic_temporary_files() -> None:
+    source = _source(CAPTURE_SCRIPT)
+
+    assert 'const TEST_COMMAND := "/bin/test"' in source
+    assert '_native_test_flag("-L", path)' in source
+    assert '_native_test_flag("-e", path)' in source
+    assert "PackedStringArray([flag, path])" in source
+    assert "rename_absolute" in source
+    assert "_validate_publication_leaf" in source
+    assert "_temporary" in source
+    assert "save_png(first_frame_path)" not in source
+    assert "copy_absolute(first_frame_path, stable_path)" not in source
+
+
 def test_capture_rejects_headless_and_out_of_project_output_dirs() -> None:
     source = _source(CAPTURE_SCRIPT)
 
@@ -158,9 +172,14 @@ func _expect(condition: bool, reason: String) -> void:
     quit(1)
 
 
+func _expect_no_temporary_files(directory: String, reason: String) -> void:
+    for name: String in DirAccess.get_files_at(directory):
+        _expect(not name.begins_with(".focused-nine-comparison"), reason)
+
+
 func _init() -> void:
     var args: PackedStringArray = OS.get_cmdline_user_args()
-    _expect(args.size() == 7, "probe arguments")
+    _expect(args.size() == 10, "probe arguments")
     var capture = CaptureScript.new()
 
     var valid: Dictionary = capture.call(
@@ -180,14 +199,30 @@ func _init() -> void:
     _expect(duplicate.has("error") and str(duplicate["error"]).contains("duplicate"), "duplicate option")
     var unknown: Dictionary = capture.call("_parse_user_args", PackedStringArray(["--unknown", "value"]))
     _expect(unknown.has("error") and str(unknown["error"]).contains("unknown argument"), "unknown option")
+    var end_marker: Dictionary = capture.call(
+        "_parse_user_args",
+        PackedStringArray(["--output-dir", "res://artifacts/validation-previews/focused-nine/probe", "--"]),
+    )
+    _expect(end_marker.has("error") and str(end_marker["error"]).contains("unexpected argument --"), "unexpected end marker")
+    var option_after_end_marker: Dictionary = capture.call(
+        "_parse_user_args",
+        PackedStringArray(["--", "--output-dir", "res://artifacts/validation-previews/focused-nine/probe"]),
+    )
+    _expect(
+        option_after_end_marker.has("error") and str(option_after_end_marker["error"]).contains("unexpected argument --"),
+        "option after unexpected end marker",
+    )
 
     var valid_path: String = str(args[0])
     var outside_path: String = str(args[1])
     var traversal_path: String = str(args[2])
     var symlink_path: String = str(args[3])
     var outside_escape_path: String = str(args[4])
-    var copy_source: String = str(args[5])
-    var copy_target: String = str(args[6])
+    var outside_first_leaf: String = str(args[5])
+    var outside_stable_leaf: String = str(args[6])
+    var first_leaf: String = str(args[7])
+    var stable_leaf: String = str(args[8])
+    var normal_path: String = str(args[9])
 
     var resolved_valid: String = str(capture.call("_resolve_output_dir", "res://artifacts/validation-previews/focused-nine/probe"))
     _expect(resolved_valid == valid_path, "valid intended output path")
@@ -200,10 +235,45 @@ func _init() -> void:
     var prepared_valid: String = str(capture.call("_prepare_output_dir", valid_path))
     _expect(not prepared_valid.is_empty(), "valid output preparation")
     _expect(DirAccess.dir_exists_absolute(valid_path), "valid output directory created")
-    var copied_ok: bool = capture.call("_copy_stable_frame", copy_source, copy_target)
-    _expect(copied_ok, "stable copy")
-    _expect(FileAccess.get_file_as_bytes(copy_source) == FileAccess.get_file_as_bytes(copy_target), "stable copy bytes")
     capture.free()
+
+    var image: Image = Image.create(4, 4, false, Image.FORMAT_RGBA8)
+    image.fill(Color(0.25, 0.5, 0.75, 1.0))
+    var outside_first_before: PackedByteArray = FileAccess.get_file_as_bytes(outside_first_leaf)
+    var outside_stable_before: PackedByteArray = FileAccess.get_file_as_bytes(outside_stable_leaf)
+
+    var symlink_capture = CaptureScript.new()
+    symlink_capture.set("_output_dir_global", prepared_valid)
+    var symlink_publish_ok: bool = symlink_capture.call("_publish_capture_files", image)
+    _expect(not symlink_publish_ok, "fixed symlink leaves rejected before publication")
+    _expect(FileAccess.get_file_as_bytes(outside_first_leaf) == outside_first_before, "first symlink target changed")
+    _expect(FileAccess.get_file_as_bytes(outside_stable_leaf) == outside_stable_before, "stable symlink target changed")
+    _expect(FileAccess.file_exists(first_leaf) and FileAccess.file_exists(stable_leaf), "symlink leaves disappeared")
+    _expect(
+        FileAccess.get_file_as_bytes(first_leaf) == outside_first_before and FileAccess.get_file_as_bytes(stable_leaf) == outside_stable_before,
+        "symlink leaves were written through",
+    )
+    _expect_no_temporary_files(prepared_valid, "temporary file leakage after rejection")
+    symlink_capture.free()
+
+    var normal_capture = CaptureScript.new()
+    var prepared_normal: String = str(normal_capture.call("_prepare_output_dir", normal_path))
+    _expect(not prepared_normal.is_empty(), "normal output preparation")
+    normal_capture.set("_output_dir_global", prepared_normal)
+    var old_first: FileAccess = FileAccess.open(prepared_normal.path_join("focused-nine-comparison00000000.png"), FileAccess.WRITE)
+    var old_stable: FileAccess = FileAccess.open(prepared_normal.path_join("focused-nine-comparison.png"), FileAccess.WRITE)
+    _expect(old_first != null and old_stable != null, "regular replacement leaves")
+    old_first.store_buffer(PackedByteArray([1, 2, 3]))
+    old_stable.store_buffer(PackedByteArray([4, 5, 6]))
+    old_first = null
+    old_stable = null
+    var published_ok: bool = normal_capture.call("_publish_capture_files", image)
+    _expect(published_ok, "normal temp-to-rename publication")
+    var first_bytes: PackedByteArray = FileAccess.get_file_as_bytes(prepared_normal.path_join("focused-nine-comparison00000000.png"))
+    var stable_bytes: PackedByteArray = FileAccess.get_file_as_bytes(prepared_normal.path_join("focused-nine-comparison.png"))
+    _expect(not first_bytes.is_empty() and first_bytes == stable_bytes, "published bytes")
+    _expect_no_temporary_files(prepared_normal, "temporary file leakage after publication")
+    normal_capture.free()
 
     print(PASS_MARKER)
     quit(0)
@@ -233,9 +303,14 @@ def test_capture_behavioral_probe_exercises_parser_containment_and_stable_copy()
         traversal_path = approved / ".." / "traversal-escape"
         symlink_path = escape / "new-output"
         outside_escape_path = outside_root / "new-output"
-        copy_source = root / "first-frame.bin"
-        copy_target = root / "stable-frame.bin"
-        copy_source.write_bytes(b"stable-frame-probe")
+        outside_first_leaf = outside_root / "outside-first.png"
+        outside_stable_leaf = outside_root / "outside-stable.png"
+        outside_first_leaf.write_bytes(b"outside-first-original")
+        outside_stable_leaf.write_bytes(b"outside-stable-original")
+        valid_path.mkdir(parents=True)
+        (valid_path / "focused-nine-comparison00000000.png").symlink_to(outside_first_leaf)
+        (valid_path / "focused-nine-comparison.png").symlink_to(outside_stable_leaf)
+        normal_path = approved / "normal"
 
         result = subprocess.run(
             [
@@ -251,8 +326,11 @@ def test_capture_behavioral_probe_exercises_parser_containment_and_stable_copy()
                 str(traversal_path),
                 str(symlink_path),
                 str(outside_escape_path),
-                str(copy_source),
-                str(copy_target),
+                str(outside_first_leaf),
+                str(outside_stable_leaf),
+                str(valid_path / "focused-nine-comparison00000000.png"),
+                str(valid_path / "focused-nine-comparison.png"),
+                str(normal_path),
             ],
             cwd=PROJECT_ROOT,
             capture_output=True,
@@ -265,3 +343,6 @@ def test_capture_behavioral_probe_exercises_parser_containment_and_stable_copy()
         assert "TASK7_CAPTURE_BEHAVIORAL_PROBE PASS" in output
         assert not re.search(r"\b(?:SCRIPT ERROR|ERROR|WARNING)\b", output), output
         assert not outside_escape_path.exists()
+        assert outside_first_leaf.read_bytes() == b"outside-first-original"
+        assert outside_stable_leaf.read_bytes() == b"outside-stable-original"
+        assert not list(normal_path.glob(".focused-nine-comparison*"))

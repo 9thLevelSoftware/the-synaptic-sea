@@ -7,8 +7,11 @@ const STAGED_ROOT := "res://assets/_staging/focused_nine/"
 const CURRENT_RUNTIME_ROOT := "res://assets/imported/structural/ship_structural_v0/"
 const APPROVED_OUTPUT_ROOT := "res://artifacts/validation-previews/focused-nine"
 const REALPATH_COMMAND := "/bin/realpath"
+const TEST_COMMAND := "/bin/test"
+const MKTEMP_COMMAND := "/usr/bin/mktemp"
 const FIRST_FRAME_NAME := "focused-nine-comparison00000000.png"
 const STABLE_OUTPUT_NAME := "focused-nine-comparison.png"
+const TEMPORARY_FILE_PREFIX := ".focused-nine-comparison"
 const ReadabilityPropFactoryScript: GDScript = preload("res://scripts/procgen/readability_prop_factory.gd")
 
 const BASELINE_GLB_PATHS: Array[String] = [
@@ -57,6 +60,7 @@ var _finished: bool = false
 var _output_dir_global: String = ""
 var _baseline_label: String = "Baseline"
 var _improved_label: String = "Improved"
+var _temporary_sequence: int = 0
 
 
 func _ready() -> void:
@@ -105,8 +109,7 @@ func _parse_user_args(args: PackedStringArray) -> Dictionary:
 	while index < args.size():
 		var token: String = str(args[index])
 		if token == "--":
-			index += 1
-			continue
+			return {"error": "unexpected argument --"}
 		if token == "--output-dir" or token == "--baseline-label" or token == "--improved-label":
 			if seen_options.has(token):
 				return {"error": "duplicate option %s" % token}
@@ -331,41 +334,287 @@ func _capture_first_frame() -> void:
 		_fail("capture resolution must be 1600x900")
 		return
 
-	var first_frame_path: String = _output_dir_global.path_join(FIRST_FRAME_NAME)
-	var save_error: Error = image.save_png(first_frame_path)
-	if save_error != OK:
-		_fail("could not save first frame error=%d" % save_error)
+	if not _publish_capture_files(image):
 		return
-	var frame_bytes: PackedByteArray = FileAccess.get_file_as_bytes(first_frame_path)
-	if frame_bytes.is_empty():
-		_fail("first frame is empty")
-		return
-
-	var stable_path: String = _output_dir_global.path_join(STABLE_OUTPUT_NAME)
-	if not _copy_stable_frame(first_frame_path, stable_path):
-		return
-	print("FOCUSED_NINE_COMPARISON_CAPTURE PASS output=%s" % stable_path)
+	print("FOCUSED_NINE_COMPARISON_CAPTURE PASS output=%s" % _output_dir_global.path_join(STABLE_OUTPUT_NAME))
 	_finished = true
 	get_tree().quit(0)
 
 
+func _publish_capture_files(image: Image) -> bool:
+	if _output_dir_global.is_empty():
+		_fail("output directory is unavailable for publication")
+		return false
+	var first_frame_path: String = _output_dir_global.path_join(FIRST_FRAME_NAME)
+	var stable_path: String = _output_dir_global.path_join(STABLE_OUTPUT_NAME)
+	# Preflight both fixed names so a rejected leaf cannot cause any publication.
+	var first_leaf_safe: bool = _validate_publication_leaf(first_frame_path)
+	var stable_leaf_safe: bool = _validate_publication_leaf(stable_path)
+	if not first_leaf_safe or not stable_leaf_safe:
+		return false
+	if not _publish_image_to_leaf(image, first_frame_path):
+		return false
+	return _copy_stable_frame(first_frame_path, stable_path)
+
+
+func _publish_image_to_leaf(image: Image, leaf_path: String) -> bool:
+	var temporary_path: String = _allocate_temporary_path(leaf_path.get_file())
+	if temporary_path.is_empty():
+		return false
+	var save_error: Error = image.save_png(temporary_path)
+	if save_error != OK:
+		_cleanup_temporary_file(temporary_path)
+		_fail("could not save temporary first frame error=%d" % save_error)
+		return false
+	if not _validate_temporary_file(temporary_path):
+		_cleanup_temporary_file(temporary_path)
+		return false
+	# Recheck immediately before rename; POSIX rename replaces a destination symlink entry,
+	# rather than following it, but the destination must still pass the leaf contract.
+	if not _validate_publication_leaf(leaf_path):
+		_cleanup_temporary_file(temporary_path)
+		return false
+	var rename_error: Error = DirAccess.rename_absolute(temporary_path, leaf_path)
+	if rename_error != OK:
+		_cleanup_temporary_file(temporary_path)
+		_fail("could not atomically publish first frame error=%d" % rename_error)
+		return false
+	return _verify_published_leaf(leaf_path, "first frame")
+
+
 func _copy_stable_frame(first_frame_path: String, stable_path: String) -> bool:
-	var copy_error: Error = DirAccess.copy_absolute(first_frame_path, stable_path)
-	if copy_error != OK:
-		_fail("could not copy stable comparison frame error=%d" % copy_error)
+	if not _validate_physical_output_file(first_frame_path, "first frame"):
 		return false
 	var frame_bytes: PackedByteArray = FileAccess.get_file_as_bytes(first_frame_path)
 	if frame_bytes.is_empty():
-		_fail("first frame is empty after copy")
+		_fail("first frame is empty before stable publication")
+		return false
+	var temporary_path: String = _allocate_temporary_path(stable_path.get_file())
+	if temporary_path.is_empty():
+		return false
+	var copy_error: Error = DirAccess.copy_absolute(first_frame_path, temporary_path)
+	if copy_error != OK:
+		_cleanup_temporary_file(temporary_path)
+		_fail("could not copy stable comparison frame to temporary file error=%d" % copy_error)
+		return false
+	if not _validate_temporary_file(temporary_path):
+		_cleanup_temporary_file(temporary_path)
+		return false
+	# Recheck immediately before rename so an existing stable symlink is never followed.
+	if not _validate_publication_leaf(stable_path):
+		_cleanup_temporary_file(temporary_path)
+		return false
+	var rename_error: Error = DirAccess.rename_absolute(temporary_path, stable_path)
+	if rename_error != OK:
+		_cleanup_temporary_file(temporary_path)
+		_fail("could not atomically publish stable comparison frame error=%d" % rename_error)
+		return false
+	if not _verify_published_leaf(stable_path, "stable comparison frame"):
 		return false
 	var stable_bytes: PackedByteArray = FileAccess.get_file_as_bytes(stable_path)
-	if stable_bytes.is_empty():
-		_fail("stable comparison frame is empty")
-		return false
 	if stable_bytes != frame_bytes:
 		_fail("stable comparison frame differs from first frame")
 		return false
 	return true
+
+
+func _validate_publication_leaf(leaf_path: String) -> bool:
+	var output_dir: String = _publication_output_dir()
+	if output_dir.is_empty():
+		return false
+	var normalized_leaf: String = leaf_path.simplify_path()
+	var leaf_name: String = normalized_leaf.get_file()
+	if leaf_name != FIRST_FRAME_NAME and leaf_name != STABLE_OUTPUT_NAME:
+		_fail("unexpected fixed publication leaf %s" % leaf_name)
+		return false
+	var expected_leaf: String = output_dir.path_join(leaf_name).simplify_path()
+	if normalized_leaf != expected_leaf or not _is_path_within(normalized_leaf, output_dir):
+		_fail("fixed publication leaf is not the exact output directory leaf")
+		return false
+	var entry_kind: String = _path_entry_kind(normalized_leaf)
+	if entry_kind == "error":
+		return false
+	if entry_kind == "missing":
+		return true
+	if entry_kind == "symlink":
+		_fail("fixed publication leaf is a symlink")
+		return false
+	if entry_kind == "directory":
+		_fail("fixed publication leaf is a directory")
+		return false
+	if entry_kind != "regular":
+		_fail("fixed publication leaf is not a regular file")
+		return false
+	var canonical_leaf: String = _canonicalize_path(normalized_leaf)
+	if canonical_leaf.is_empty():
+		return false
+	if canonical_leaf != expected_leaf:
+		_fail("fixed publication leaf has an unexpected physical target")
+		return false
+	return true
+
+
+func _validate_physical_output_file(path: String, description: String) -> bool:
+	var output_dir: String = _publication_output_dir()
+	if output_dir.is_empty():
+		return false
+	var normalized_path: String = path.simplify_path()
+	if not _is_path_within(normalized_path, output_dir):
+		_fail("%s is outside canonical output directory" % description)
+		return false
+	var entry_kind: String = _path_entry_kind(normalized_path)
+	if entry_kind == "error":
+		return false
+	if entry_kind == "symlink":
+		_fail("%s is a symlink" % description)
+		return false
+	if entry_kind != "regular":
+		_fail("%s is not a regular file" % description)
+		return false
+	var canonical_path: String = _canonicalize_path(normalized_path)
+	if canonical_path.is_empty():
+		return false
+	if canonical_path != normalized_path:
+		_fail("%s has an unexpected physical target" % description)
+		return false
+	return true
+
+
+func _validate_temporary_file(path: String) -> bool:
+	var output_dir: String = _publication_output_dir()
+	if output_dir.is_empty():
+		return false
+	var normalized_path: String = path.simplify_path()
+	if not _is_path_within(normalized_path, output_dir) or not normalized_path.get_file().begins_with(TEMPORARY_FILE_PREFIX):
+		_fail("temporary publication file is outside approved output directory")
+		return false
+	if _path_entry_kind(normalized_path) != "regular":
+		_fail("temporary publication file is not a regular non-symlink file")
+		return false
+	var canonical_path: String = _canonicalize_path(normalized_path)
+	if canonical_path.is_empty():
+		return false
+	if canonical_path != normalized_path:
+		_fail("temporary publication file has an unexpected physical target")
+		return false
+	if FileAccess.get_file_as_bytes(normalized_path).is_empty():
+		_fail("temporary publication file is empty")
+		return false
+	return true
+
+
+func _verify_published_leaf(path: String, description: String) -> bool:
+	if not _validate_publication_leaf(path):
+		return false
+	var bytes: PackedByteArray = FileAccess.get_file_as_bytes(path)
+	if bytes.is_empty():
+		_fail("%s is empty" % description)
+		return false
+	return true
+
+
+func _publication_output_dir() -> String:
+	if _output_dir_global.is_empty():
+		_fail("output directory is unavailable")
+		return ""
+	var resolved_output_dir: String = _resolve_output_dir(_output_dir_global)
+	if resolved_output_dir.is_empty():
+		return ""
+	if resolved_output_dir != _output_dir_global.simplify_path():
+		_fail("output directory changed physical location")
+		return ""
+	return resolved_output_dir
+
+
+func _allocate_temporary_path(published_name: String) -> String:
+	var output_dir: String = _publication_output_dir()
+	if output_dir.is_empty():
+		return ""
+	if not FileAccess.file_exists(MKTEMP_COMMAND):
+		_fail("temporary file command is unavailable")
+		return ""
+	_temporary_sequence += 1
+	var template_name: String = "%s.%s.%d.XXXXXX" % [TEMPORARY_FILE_PREFIX, published_name, _temporary_sequence]
+	var template_path: String = output_dir.path_join(template_name).simplify_path()
+	if not _is_path_within(template_path, output_dir):
+		_fail("temporary publication file escaped output directory")
+		return ""
+	var command_output: Array[String] = []
+	var command_status: int = OS.execute(
+		MKTEMP_COMMAND,
+		PackedStringArray(["-q", template_path]),
+		command_output,
+		true,
+		false,
+	)
+	if command_status != OK or command_output.size() != 1:
+		_fail("could not allocate unique temporary publication file")
+		return ""
+	var temporary_path: String = command_output[0].strip_edges().simplify_path()
+	if not _is_path_within(temporary_path, output_dir) or not temporary_path.get_file().begins_with(TEMPORARY_FILE_PREFIX):
+		_cleanup_temporary_file(temporary_path)
+		_fail("temporary publication file escaped output directory")
+		return ""
+	if _path_entry_kind(temporary_path) != "regular":
+		_cleanup_temporary_file(temporary_path)
+		_fail("temporary publication file was not atomically reserved")
+		return ""
+	var canonical_path: String = _canonicalize_path(temporary_path)
+	if canonical_path.is_empty() or canonical_path != temporary_path:
+		_cleanup_temporary_file(temporary_path)
+		_fail("temporary publication file has an unexpected physical target")
+		return ""
+	return temporary_path
+
+
+func _path_entry_kind(path: String) -> String:
+	var symlink_status: int = _native_test_flag("-L", path)
+	if symlink_status < 0:
+		return "error"
+	if symlink_status == OK:
+		return "symlink"
+	var exists_status: int = _native_test_flag("-e", path)
+	if exists_status < 0:
+		return "error"
+	if exists_status != OK:
+		return "missing"
+	var directory_status: int = _native_test_flag("-d", path)
+	if directory_status < 0:
+		return "error"
+	if directory_status == OK:
+		return "directory"
+	var regular_status: int = _native_test_flag("-f", path)
+	if regular_status < 0:
+		return "error"
+	if regular_status == OK:
+		return "regular"
+	return "non_regular"
+
+
+func _native_test_flag(flag: String, path: String) -> int:
+	if not FileAccess.file_exists(TEST_COMMAND):
+		_fail("native path test command is unavailable")
+		return -1
+	var command_output: Array[String] = []
+	var command_status: int = OS.execute(
+		TEST_COMMAND,
+		PackedStringArray([flag, path]),
+		command_output,
+		true,
+		false,
+	)
+	if command_status != OK and command_status != 1:
+		_fail("native path test failed flag=%s error=%d" % [flag, command_status])
+		return -1
+	return command_status
+
+
+func _cleanup_temporary_file(path: String) -> void:
+	if path.is_empty():
+		return
+	var remove_error: Error = DirAccess.remove_absolute(path)
+	if remove_error != OK and _path_entry_kind(path) != "missing":
+		_fail("could not remove temporary publication file error=%d" % remove_error)
 
 
 func _fail(reason: String) -> void:
