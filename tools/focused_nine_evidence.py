@@ -14,9 +14,12 @@ import json
 import math
 import os
 import secrets
+import selectors
+import stat
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -45,7 +48,23 @@ _METADATA_FIELDS = (
     "local_max_m",
 )
 _OPTIONAL_INSPECTOR_FIELDS = ("blender_version", "inspector_version")
+_INSPECTOR_FIELDS = frozenset(("triangle_count", "material_names", "blender_reimport_passed"))
 _INSPECTOR_MARKER = "FOCUSED_NINE_EVIDENCE_V1:"
+_BLENDER_INSPECTOR_TIMEOUT_SECONDS = 120.0
+_BLENDER_INSPECTOR_OUTPUT_LIMIT = 64 * 1024
+_BLENDER_INSPECTOR_READ_CHUNK = 8192
+_BLENDER_INSPECTOR_DRAIN_SECONDS = 0.25
+_DIR_FD_SUPPORT = frozenset(getattr(os, "supports_dir_fd", ()))
+_DIR_FD_OPERATIONS_SUPPORTED = all(
+    function in _DIR_FD_SUPPORT for function in (os.open, os.mkdir, os.unlink)
+)
+_REPLACE_DIR_FD_SUPPORTED = (
+    os.replace in _DIR_FD_SUPPORT
+    or all(
+        parameter in inspect.signature(os.replace).parameters
+        for parameter in ("src_dir_fd", "dst_dir_fd")
+    )
+)
 
 
 _BLENDER_INSPECTOR = r'''import bpy
@@ -130,13 +149,24 @@ def _finite_vector(value: object) -> bool:
     )
 
 
+def _safe_nested_label(label: str, key: object) -> str:
+    if type(key) is not str or len(key) > 128:
+        return f"{label}.<key>"
+    return f"{label}.{key}"
+
+
 def _append_nonfinite(value: object, label: str, errors: list[str]) -> None:
     """Find non-finite values without assuming a well-formed JSON-like value."""
 
     stack: list[tuple[object, str]] = [(value, label)]
     seen: set[int] = set()
+    inspected = 0
     while stack:
         current, current_label = stack.pop()
+        inspected += 1
+        if inspected > 10_000:
+            errors.append("record contains too many nested values")
+            return
         if isinstance(current, float):
             if not math.isfinite(current):
                 errors.append(f"{current_label} contains non-finite value")
@@ -146,19 +176,34 @@ def _append_nonfinite(value: object, label: str, errors: list[str]) -> None:
             if identity in seen:
                 continue
             seen.add(identity)
-            for key in sorted((key for key in current if isinstance(key, str)), reverse=True):
-                stack.append((current[key], f"{current_label}.{key}"))
             for key in current:
                 if not isinstance(key, str):
                     errors.append(f"{current_label} contains a non-string object key")
+                    continue
+                try:
+                    child = current[key]
+                except BaseException:
+                    errors.append(f"{current_label} contains an unreadable mapping value")
+                    continue
+                stack.append((child, _safe_nested_label(current_label, key)))
             continue
         if isinstance(current, (list, tuple)):
             identity = id(current)
             if identity in seen:
                 continue
             seen.add(identity)
-            for index in range(len(current) - 1, -1, -1):
-                stack.append((current[index], f"{current_label}[{index}]"))
+            try:
+                length = len(current)
+            except BaseException:
+                errors.append(f"{current_label} contains an unreadable sequence")
+                continue
+            for index in range(length - 1, -1, -1):
+                try:
+                    child = current[index]
+                except BaseException:
+                    errors.append(f"{current_label} contains an unreadable sequence")
+                    break
+                stack.append((child, f"{current_label}[{index}]"))
 
 
 def _record_shape_errors(record: object) -> list[str]:
@@ -325,11 +370,91 @@ def _validate_staged_glb(glb_path: Path) -> tuple[Path, Path, Path]:
         raise ValueError("GLB path must not use a symlink alias in focused-nine staging")
     if lexical.is_symlink():
         raise ValueError("GLB path must not be a symlink alias")
-    if not lexical.exists():
-        raise ValueError(f"staged GLB does not exist: {lexical}")
-    if not lexical.is_file():
-        raise ValueError("staged GLB must be a regular file")
     return lexical, stage_lexical, stage_resolved
+
+
+def _pinned_input_open_flags() -> tuple[int, int]:
+    directory_flag = getattr(os, "O_DIRECTORY", None)
+    nofollow_flag = getattr(os, "O_NOFOLLOW", None)
+    if directory_flag is None or nofollow_flag is None:
+        raise OSError("staged GLB inspection requires O_DIRECTORY and O_NOFOLLOW")
+    if os.open not in _DIR_FD_SUPPORT:
+        raise OSError("staged GLB inspection requires directory-fd open operations")
+    directory_flags = os.O_RDONLY | directory_flag | nofollow_flag
+    file_flags = os.O_RDONLY | nofollow_flag
+    if hasattr(os, "O_CLOEXEC"):
+        directory_flags |= os.O_CLOEXEC
+        file_flags |= os.O_CLOEXEC
+    return directory_flags, file_flags
+
+
+def _open_pinned_input_fd(path: Path) -> int:
+    directory_flags, file_flags = _pinned_input_open_flags()
+    if not path.is_absolute() or path.anchor != os.sep or not path.name:
+        raise OSError("staged GLB inspection requires an absolute POSIX path")
+
+    current_fd: int | None = os.open(os.sep, directory_flags)
+    try:
+        for component in path.parts[1:-1]:
+            if component in {"", ".", ".."}:
+                raise OSError("staged GLB path contains an unsafe component")
+            child_fd: int | None = None
+            try:
+                child_fd = os.open(component, directory_flags, dir_fd=current_fd)
+                previous_fd = current_fd
+                current_fd = child_fd
+                child_fd = None
+                os.close(previous_fd)
+            finally:
+                if child_fd is not None:
+                    os.close(child_fd)
+        if current_fd is None:
+            raise OSError("staged GLB inspection lost its parent directory fd")
+        descriptor = os.open(path.name, file_flags, dir_fd=current_fd)
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise OSError("staged GLB must be a regular file")
+        except BaseException:
+            os.close(descriptor)
+            raise
+        return descriptor
+    finally:
+        if current_fd is not None:
+            os.close(current_fd)
+
+
+def _copy_pinned_staged_glb(path: Path, temporary_directory: Path) -> Path:
+    source_fd: int | None = None
+    temporary_path: Path | None = None
+    try:
+        source_fd = _open_pinned_input_fd(path)
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            prefix="staged-input-",
+            suffix=".glb",
+            dir=temporary_directory,
+            delete=False,
+        ) as destination:
+            temporary_path = Path(destination.name)
+            while True:
+                chunk = os.read(source_fd, 1024 * 1024)
+                if not chunk:
+                    break
+                destination.write(chunk)
+            destination.flush()
+            os.fsync(destination.fileno())
+        os.chmod(temporary_path, 0o400)
+        return temporary_path
+    except (OSError, ValueError):
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink()
+            except OSError:
+                pass
+        raise
+    finally:
+        if source_fd is not None:
+            os.close(source_fd)
 
 
 def _validate_json_target(target: Path, expected_stage: Path) -> tuple[Path, Path]:
@@ -358,6 +483,161 @@ def _validate_json_target(target: Path, expected_stage: Path) -> tuple[Path, Pat
     return lexical, stage_resolved
 
 
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON constant: {value}")
+
+
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("inspector evidence contains duplicate object keys")
+        result[key] = value
+    return result
+
+
+def _validate_inspector_record(record: object) -> dict[str, Any]:
+    if not isinstance(record, dict):
+        raise ValueError("Blender inspector returned a non-object evidence record")
+    if set(record) != _INSPECTOR_FIELDS:
+        raise ValueError("Blender inspector returned unexpected inspector fields")
+
+    triangle_count = record.get("triangle_count")
+    if not _is_positive_int(triangle_count):
+        raise ValueError("Blender inspector returned an invalid triangle_count")
+    material_names = record.get("material_names")
+    if (
+        not isinstance(material_names, list)
+        or not material_names
+        or not all(type(name) is str and bool(name) for name in material_names)
+        or material_names != sorted(set(material_names))
+    ):
+        raise ValueError("Blender inspector returned invalid material_names")
+    if record.get("blender_reimport_passed") is not True:
+        raise ValueError("Blender inspector did not confirm clean reimport")
+    return record
+
+
+def _parse_inspector_output(output: bytes | str) -> dict[str, Any]:
+    try:
+        text = output.decode("utf-8") if isinstance(output, bytes) else output
+        result_lines = [line for line in text.splitlines() if line.startswith(_INSPECTOR_MARKER)]
+    except (UnicodeDecodeError, AttributeError, TypeError):
+        raise ValueError("Blender inspector returned malformed evidence") from None
+    if len(result_lines) != 1:
+        raise ValueError("Blender inspector returned no deterministic evidence record")
+    try:
+        result = json.loads(
+            result_lines[0][len(_INSPECTOR_MARKER) :],
+            object_pairs_hook=_reject_duplicate_json_keys,
+            parse_constant=_reject_json_constant,
+        )
+    except (json.JSONDecodeError, RecursionError, TypeError, ValueError):
+        raise ValueError("Blender inspector returned malformed evidence") from None
+    return _validate_inspector_record(result)
+
+
+def _terminate_and_drain_process(process: Any, selector: selectors.BaseSelector) -> None:
+    try:
+        process.terminate()
+    except (OSError, ProcessLookupError):
+        pass
+    try:
+        process.wait(timeout=0.1)
+    except (subprocess.TimeoutExpired, OSError):
+        try:
+            process.kill()
+        except (OSError, ProcessLookupError):
+            pass
+        try:
+            process.wait(timeout=0.1)
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+
+    deadline = time.monotonic() + _BLENDER_INSPECTOR_DRAIN_SECONDS
+    while selector.get_map() and time.monotonic() < deadline:
+        events = selector.select(max(0.0, deadline - time.monotonic()))
+        if not events:
+            break
+        for key, _mask in events:
+            try:
+                chunk = os.read(key.fd, _BLENDER_INSPECTOR_READ_CHUNK)
+            except OSError:
+                chunk = b""
+            if not chunk:
+                try:
+                    selector.unregister(key.fileobj)
+                except (KeyError, ValueError):
+                    pass
+
+
+def _collect_bounded_process_output(process: Any) -> tuple[bytes, bytes, int, str | None]:
+    selector = selectors.DefaultSelector()
+    captured = {"stdout": bytearray(), "stderr": bytearray()}
+    total = 0
+    reason: str | None = None
+    streams = (("stdout", process.stdout), ("stderr", process.stderr))
+    try:
+        for label, stream in streams:
+            if stream is not None:
+                selector.register(stream, selectors.EVENT_READ, label)
+        deadline = time.monotonic() + _BLENDER_INSPECTOR_TIMEOUT_SECONDS
+        while selector.get_map():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                reason = "Blender inspector timed out"
+                break
+            events = selector.select(remaining)
+            if not events:
+                reason = "Blender inspector timed out"
+                break
+            for key, _mask in events:
+                try:
+                    chunk = os.read(key.fd, _BLENDER_INSPECTOR_READ_CHUNK)
+                except OSError as exc:
+                    reason = f"Blender inspector output read failed: {exc}"
+                    break
+                if not chunk:
+                    try:
+                        selector.unregister(key.fileobj)
+                    except (KeyError, ValueError):
+                        pass
+                    continue
+                total += len(chunk)
+                if total > _BLENDER_INSPECTOR_OUTPUT_LIMIT:
+                    reason = "Blender inspector output exceeded cap"
+                    break
+                captured[key.data].extend(chunk)
+            if reason is not None:
+                break
+
+        if reason is None:
+            while process.poll() is None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    reason = "Blender inspector timed out"
+                    break
+                time.sleep(min(0.01, remaining))
+        if reason is not None:
+            _terminate_and_drain_process(process, selector)
+
+        if reason is None:
+            try:
+                returncode = process.wait(timeout=max(0.0, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                reason = "Blender inspector timed out"
+                _terminate_and_drain_process(process, selector)
+                returncode = process.returncode if process.returncode is not None else -1
+        else:
+            returncode = process.returncode if process.returncode is not None else -1
+        return bytes(captured["stdout"]), bytes(captured["stderr"]), returncode, reason
+    finally:
+        selector.close()
+        for _label, stream in streams:
+            if stream is not None:
+                stream.close()
+
+
 def _run_blender_inspector(glb_path: Path, blender: Path) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="focused-nine-inspector-") as temporary:
         script = Path(temporary) / "inspect_glb.py"
@@ -372,55 +652,54 @@ def _run_blender_inspector(glb_path: Path, blender: Path) -> dict[str, Any]:
             os.fspath(glb_path),
         ]
         try:
-            completed = subprocess.run(
+            process = subprocess.Popen(
                 command,
                 cwd=temporary,
-                capture_output=True,
-                text=True,
-                check=False,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
         except OSError as exc:
             raise ValueError(f"could not invoke Blender inspector: {exc}") from exc
 
-        stdout = completed.stdout or ""
-        result_lines = [line for line in stdout.splitlines() if line.startswith(_INSPECTOR_MARKER)]
-        if completed.returncode != 0:
-            raise ValueError(f"Blender inspector failed with exit code {completed.returncode}")
-        if len(result_lines) != 1:
-            raise ValueError("Blender inspector returned no deterministic evidence record")
-        try:
-            result = json.loads(result_lines[0][len(_INSPECTOR_MARKER) :])
-        except (json.JSONDecodeError, TypeError, ValueError) as exc:
-            raise ValueError("Blender inspector returned malformed evidence") from exc
-        if not isinstance(result, dict):
-            raise ValueError("Blender inspector returned a non-object evidence record")
-        return result
+        stdout, _stderr, returncode, reason = _collect_bounded_process_output(process)
+        if reason is not None:
+            raise ValueError(reason)
+        if returncode != 0:
+            raise ValueError(f"Blender inspector failed with exit code {returncode}")
+        return _parse_inspector_output(stdout)
 
 
 def inspect_staged_glb(glb_path: Path, blender: Path) -> dict:
     """Read static GLB metadata, then inspect a clean Blender re-import."""
 
     staged_glb, _stage_lexical, _stage_resolved = _validate_staged_glb(Path(glb_path))
-    magic_errors = validate_glb_magic(staged_glb)
-    if magic_errors:
-        raise ValueError("; ".join(magic_errors))
-    try:
-        metadata = read_glb_metadata(staged_glb)
-    except (OSError, RuntimeError, TypeError, ValueError) as exc:
-        raise ValueError(f"GLB metadata validation failed: {exc}") from exc
-    blender_record = _run_blender_inspector(staged_glb, Path(blender))
-    result = dict(metadata)
-    result.update(blender_record)
-    material_names = result.get("material_names")
-    if not isinstance(material_names, list) or not material_names:
-        raise ValueError("Blender inspection found no materials")
-    result["material_names"] = sorted(set(material_names))
-    result["material_count"] = len(result["material_names"])
-    if not _is_positive_int(result.get("triangle_count")):
-        raise ValueError("Blender inspection found no triangles")
-    if result.get("blender_reimport_passed") is not True:
-        raise ValueError("Blender clean reimport did not pass")
-    return result
+    with tempfile.TemporaryDirectory(prefix="focused-nine-input-") as temporary:
+        try:
+            immutable_glb = _copy_pinned_staged_glb(staged_glb, Path(temporary))
+        except OSError as exc:
+            raise ValueError(f"could not securely copy staged GLB: {exc}") from exc
+
+        magic_errors = validate_glb_magic(immutable_glb)
+        if magic_errors:
+            raise ValueError("; ".join(magic_errors))
+        try:
+            metadata = read_glb_metadata(immutable_glb)
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
+            raise ValueError(f"GLB metadata validation failed: {exc}") from exc
+
+        blender_record = _validate_inspector_record(
+            _run_blender_inspector(immutable_glb, Path(blender))
+        )
+        try:
+            result = {field: metadata[field] for field in _METADATA_FIELDS}
+        except (KeyError, TypeError) as exc:
+            raise ValueError("GLB metadata validation returned incomplete static evidence") from exc
+        result["triangle_count"] = blender_record["triangle_count"]
+        result["material_names"] = list(blender_record["material_names"])
+        result["material_count"] = len(result["material_names"])
+        result["blender_reimport_passed"] = blender_record["blender_reimport_passed"]
+        return result
 
 
 def _canonical_json_bytes(record: dict) -> bytes:
@@ -440,18 +719,11 @@ def _canonical_json_bytes(record: dict) -> bytes:
 def _pinned_directory_open_flags() -> int:
     directory_flag = getattr(os, "O_DIRECTORY", None)
     nofollow_flag = getattr(os, "O_NOFOLLOW", None)
-    supports_dir_fd = getattr(os, "supports_dir_fd", ())
     if directory_flag is None or nofollow_flag is None:
         raise OSError("evidence publication requires O_DIRECTORY and O_NOFOLLOW")
-    if not all(function in supports_dir_fd for function in (os.open, os.mkdir, os.unlink)):
+    if not _DIR_FD_OPERATIONS_SUPPORTED:
         raise OSError("evidence publication requires directory-fd operations")
-    replace_supported = os.replace in supports_dir_fd
-    if not replace_supported and os.rename in supports_dir_fd:
-        parameters = inspect.signature(os.replace).parameters
-        replace_supported = all(
-            parameter in parameters for parameter in ("src_dir_fd", "dst_dir_fd")
-        )
-    if not replace_supported:
+    if not _REPLACE_DIR_FD_SUPPORTED:
         raise OSError("evidence publication requires directory-fd replace operations")
     return os.O_RDONLY | directory_flag | nofollow_flag
 

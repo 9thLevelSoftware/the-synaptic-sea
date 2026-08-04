@@ -5,6 +5,7 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -97,6 +98,29 @@ def test_budget_validator_checks_material_count_and_reimport_contract() -> None:
     assert "blender_reimport_passed must be true" in errors
 
 
+def test_budget_validator_is_total_for_cyclic_deep_hostile_and_oversized_values() -> None:
+    cyclic = minimal_record()
+    cyclic["cyclic"] = cyclic
+    deep: object = minimal_record()
+    for _ in range(2500):
+        deep = [deep]
+
+    class HostileMapping(dict):
+        def get(self, *_args: object, **_kwargs: object) -> object:
+            raise RuntimeError("hostile mapping")
+
+    hostile = HostileMapping(minimal_record())
+    oversized = minimal_record()
+    oversized["x" * 100_000] = object()
+
+    for record in (cyclic, deep, hostile, oversized):
+        first = evidence.validate_evidence(record, 300, 1200)
+        second = evidence.validate_evidence(record, 300, 1200)
+        assert first == second
+        assert first == sorted(first)
+        assert all(len(error) < 1000 for error in first)
+
+
 def test_atomic_json_publish_preserves_previous_evidence_on_validation_failure(
     tmp_path: Path,
 ) -> None:
@@ -129,6 +153,62 @@ def test_atomic_json_publish_preserves_previous_evidence_on_serialization_failur
     assert not list(target.parent.glob(".*.tmp"))
 
 
+def test_atomic_json_publish_replace_failure_preserves_target_and_cleans_temp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _project, _glb, target = staged_fixture(tmp_path)
+    previous = b'{"old":true}\n'
+    target.write_bytes(previous)
+
+    def fail_replace(*_args: object, **_kwargs: object) -> None:
+        raise OSError("injected replace failure")
+
+    monkeypatch.setattr(evidence.os, "replace", fail_replace)
+    with pytest.raises(OSError, match="injected replace failure"):
+        evidence.publish_json_atomically(target, minimal_record())
+
+    assert target.read_bytes() == previous
+    assert not list(target.parent.glob(".*.tmp"))
+
+
+def test_atomic_json_publish_preserves_primary_replace_error_if_cleanup_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _project, _glb, target = staged_fixture(tmp_path)
+    previous = b'{"old":true}\n'
+    target.write_bytes(previous)
+
+    def fail_replace(*_args: object, **_kwargs: object) -> None:
+        raise OSError("primary replace failure")
+
+    def fail_unlink(*_args: object, **_kwargs: object) -> None:
+        raise OSError("secondary cleanup failure")
+
+    monkeypatch.setattr(evidence.os, "replace", fail_replace)
+    monkeypatch.setattr(evidence.os, "unlink", fail_unlink)
+    with pytest.raises(OSError, match="primary replace failure"):
+        evidence.publish_json_atomically(target, minimal_record())
+
+    assert target.read_bytes() == previous
+
+
+def test_atomic_json_publish_writes_canonical_json_bytes_after_success(tmp_path: Path) -> None:
+    _project, _glb, target = staged_fixture(tmp_path)
+    record = {
+        "blender_reimport_passed": True,
+        "material_names": ["MAT_PaintedAlloyGray"],
+        "mesh_count": 1,
+        "triangle_count": 472,
+    }
+
+    evidence.publish_json_atomically(target, record)
+
+    assert target.read_bytes() == (
+        b'{"blender_reimport_passed":true,"material_names":["MAT_PaintedAlloyGray"],'
+        b'"mesh_count":1,"triangle_count":472}\n'
+    )
+
+
 @pytest.mark.skipif(not BLENDER.is_file(), reason="Blender 5.2 is not installed")
 def test_inspect_staged_glb_uses_clean_blender_reimport_and_metadata_hash(
     tmp_path: Path,
@@ -158,7 +238,167 @@ def test_inspect_staged_glb_uses_clean_blender_reimport_and_metadata_hash(
     assert record["material_names"]
     assert record["material_count"] == len(record["material_names"])
     assert record["blender_reimport_passed"] is True
-    assert target.parent.exists()
+
+
+def test_inspector_marker_parser_rejects_duplicate_constants_and_shape_attacks() -> None:
+    valid = (
+        '{"triangle_count":472,"material_names":["MAT_PaintedAlloyGray"],'
+        '"blender_reimport_passed":true}'
+    )
+    assert evidence._parse_inspector_output(
+        evidence._INSPECTOR_MARKER + valid + "\n"
+    ) == {
+        "triangle_count": 472,
+        "material_names": ["MAT_PaintedAlloyGray"],
+        "blender_reimport_passed": True,
+    }
+
+    rejected = (
+        '{"triangle_count":472,"triangle_count":473,"material_names":["MAT_PaintedAlloyGray"],'
+        '"blender_reimport_passed":true}'
+    )
+    for payload in (
+        rejected,
+        '{"triangle_count":NaN,"material_names":["MAT_PaintedAlloyGray"],"blender_reimport_passed":true}',
+        '{"triangle_count":472,"material_names":["MAT_PaintedAlloyGray"],"blender_reimport_passed":true,"sha256":"f"}',
+        '{"triangle_count":472,"material_names":[],"blender_reimport_passed":true}',
+        '{"triangle_count":472,"material_names":["zeta","alpha"],"blender_reimport_passed":true}',
+        '{"triangle_count":472,"material_names":["MAT_PaintedAlloyGray"]}',
+    ):
+        with pytest.raises(ValueError):
+            evidence._parse_inspector_output(evidence._INSPECTOR_MARKER + payload + "\n")
+
+
+def test_inspector_output_is_bounded_and_has_a_finite_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_popen = evidence.subprocess.Popen
+    calls: list[dict[str, object]] = []
+
+    def noisy_popen(command: list[str], **kwargs: object) -> object:
+        calls.append(kwargs)
+        return real_popen(
+            [sys.executable, "-c", "import sys; sys.stdout.write('x' * 10000); sys.stdout.flush()"],
+            **kwargs,
+        )
+
+    monkeypatch.setattr(evidence.subprocess, "Popen", noisy_popen)
+    monkeypatch.setattr(evidence, "_BLENDER_INSPECTOR_OUTPUT_LIMIT", 128)
+    with pytest.raises(ValueError, match="output exceeded cap"):
+        evidence._run_blender_inspector(tmp_path / "fixture.glb", Path("blender"))
+
+    assert calls
+    assert calls[0]["stdout"] is evidence.subprocess.PIPE
+    assert calls[0]["stderr"] is evidence.subprocess.PIPE
+    assert evidence._BLENDER_INSPECTOR_TIMEOUT_SECONDS > 0
+
+
+def test_inspector_output_timeout_terminates_child_and_is_deterministic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_popen = evidence.subprocess.Popen
+
+    def sleeping_popen(command: list[str], **kwargs: object) -> object:
+        return real_popen(
+            [sys.executable, "-c", "import time; time.sleep(2)"],
+            **kwargs,
+        )
+
+    monkeypatch.setattr(evidence.subprocess, "Popen", sleeping_popen)
+    monkeypatch.setattr(evidence, "_BLENDER_INSPECTOR_TIMEOUT_SECONDS", 0.05)
+    started = time.monotonic()
+    with pytest.raises(ValueError, match="timed out"):
+        evidence._run_blender_inspector(tmp_path / "fixture.glb", Path("blender"))
+    assert time.monotonic() - started < 1.0
+
+
+def test_inspect_merges_only_authenticated_inspector_fields(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _project, glb, _target = staged_fixture(tmp_path)
+    static = read_glb_metadata(glb)
+    monkeypatch.setattr(evidence, "_run_blender_inspector", lambda *_args: {
+        "triangle_count": 472,
+        "material_names": ["MAT_PaintedAlloyGray"],
+        "blender_reimport_passed": True,
+        "sha256": "f" * 64,
+        "mesh_count": 999,
+        "local_min_m": [99, 99, 99],
+    })
+
+    with pytest.raises(ValueError, match="unexpected inspector field"):
+        evidence.inspect_staged_glb(glb, BLENDER)
+
+    monkeypatch.setattr(evidence, "_run_blender_inspector", lambda *_args: {
+        "triangle_count": 472,
+        "material_names": ["MAT_PaintedAlloyGray"],
+        "blender_reimport_passed": True,
+    })
+    record = evidence.inspect_staged_glb(glb, BLENDER)
+    assert record["sha256"] == static["sha256"]
+    assert record["mesh_count"] == static["mesh_count"]
+    assert record["local_min_m"] == static["local_min_m"]
+
+
+def test_inspect_pins_input_copy_and_rejects_ancestor_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _project, glb, _target = staged_fixture(tmp_path)
+    original_validate = evidence._validate_staged_glb
+    original_directory = glb.parent
+    moved_directory = glb.parent.with_name("props-real")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / glb.name).write_bytes(glb.read_bytes())
+
+    def replace_after_lexical_check(path: Path) -> tuple[Path, Path, Path]:
+        result = original_validate(path)
+        original_directory.rename(moved_directory)
+        try:
+            original_directory.symlink_to(outside, target_is_directory=True)
+        except OSError as exc:
+            moved_directory.rename(original_directory)
+            pytest.skip(f"symlink replacement unavailable: {exc}")
+        return result
+
+    monkeypatch.setattr(evidence, "_validate_staged_glb", replace_after_lexical_check)
+    with pytest.raises(ValueError, match="secure|NOFOLLOW|staging"):
+        evidence.inspect_staged_glb(glb, BLENDER)
+
+    original_directory.unlink()
+    moved_directory.rename(original_directory)
+    assert glb.read_bytes() == KNOWN_GLB.read_bytes()
+
+
+def test_inspect_uses_immutable_temp_copy_for_all_glb_reads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _project, glb, _target = staged_fixture(tmp_path)
+    paths: list[Path] = []
+
+    def record_magic(path: Path) -> list[str]:
+        paths.append(Path(path))
+        return []
+
+    def record_metadata(path: Path) -> dict[str, object]:
+        paths.append(Path(path))
+        return read_glb_metadata(path)
+
+    def record_blender(path: Path, _blender: Path) -> dict[str, object]:
+        paths.append(Path(path))
+        return {
+            "triangle_count": 472,
+            "material_names": ["MAT_PaintedAlloyGray"],
+            "blender_reimport_passed": True,
+        }
+
+    monkeypatch.setattr(evidence, "validate_glb_magic", record_magic)
+    monkeypatch.setattr(evidence, "read_glb_metadata", record_metadata)
+    monkeypatch.setattr(evidence, "_run_blender_inspector", record_blender)
+    record = evidence.inspect_staged_glb(glb, BLENDER)
+
+    assert record["sha256"] == hashlib.sha256(glb.read_bytes()).hexdigest()
+    assert len(paths) == 3
+    assert all(path != glb and path.name.endswith(".glb") for path in paths)
+    assert len({path.parent for path in paths}) == 1
 
 
 def test_inspect_rejects_imported_input_and_bad_magic_before_blender(
