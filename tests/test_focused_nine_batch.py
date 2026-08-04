@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import subprocess
+import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -9,7 +13,6 @@ import pytest
 from tools import focused_nine_batch as batch
 from tools import validate_structural_sources as structural_validator
 from tools.structural_source_contract import load_source_spec
-
 
 ASSETS = (
     "floor_1x1",
@@ -107,7 +110,7 @@ def test_parallel_source_root_creates_fresh_source_and_reports_logical_reference
     def create_empty(destination: Path) -> None:
         created.append(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(b"fresh empty source")
+        destination.write_bytes(b"BLENDER-v999")
 
     monkeypatch.setattr(batch, "_create_empty_source_with_blender", create_empty)
 
@@ -127,7 +130,7 @@ def test_parallel_source_root_creates_fresh_source_and_reports_logical_reference
     expected = parallel_root / "floor_1x1/floor_1x1.blend"
     assert created == [expected.resolve()]
     assert source == expected.resolve()
-    assert expected.read_bytes() == b"fresh empty source"
+    assert expected.read_bytes() == b"BLENDER-v999"
     assert not (original_root / "floor_1x1/floor_1x1.blend").exists()
     assert record["source_path"] == "res://assets/_staging/focused_nine/source_refs/floor_1x1.blend"
     assert str(parallel_root) not in json.dumps(record)
@@ -154,7 +157,7 @@ def test_parallel_source_root_creates_a_contract_valid_source_record(
 
     def create_empty(destination: Path) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(b"fresh source")
+        destination.write_bytes(b"BLENDER-v999")
 
     monkeypatch.setattr(batch, "_create_empty_source_with_blender", create_empty)
 
@@ -801,7 +804,7 @@ def test_prop_pair_publication_restores_both_prior_targets_without_touching_unre
 
     monkeypatch.setattr(batch.os, "replace", fail_sidecar)
 
-    with pytest.raises(OSError, match="injected sidecar publication failure"):
+    with pytest.raises(ValueError, match="symlink"):
         batch._publish_prop_asset(private_glb, private_sidecar, final_glb, final_sidecar)
 
     assert final_glb.is_symlink()
@@ -1020,7 +1023,8 @@ def test_pressure_overlay_failure_publishes_no_candidate_and_reports_blocker(
     )
     monkeypatch.setattr(batch, "_run_live_validators", lambda args: ([], []))
 
-    result = batch.main([*_args(project, structural, props, report, preview), *sum((["--asset", asset] for asset in requested), [])])
+    asset_args = [part for asset in requested for part in ("--asset", asset)]
+    result = batch.main([*_args(project, structural, props, report, preview), *asset_args])
 
     assert result == 1
     assert prior.read_bytes() == b"prior"
@@ -1031,3 +1035,298 @@ def test_pressure_overlay_failure_publishes_no_candidate_and_reports_blocker(
     pressure = next(item for item in document["assets"] if item["asset_id"] == "pressure_door_1x1")
     assert pressure["pass"] is False
     assert "injected wrapper failure" in pressure["first_error"]
+
+
+def test_prop_publication_rejects_symlinked_props_child_before_any_write(tmp_path: Path) -> None:
+    private_glb = tmp_path / "private.glb"
+    private_sidecar = tmp_path / "private.sidecar.json"
+    outside = tmp_path / "outside"
+    final_glb = tmp_path / "stage/props/asset.glb"
+    final_sidecar = tmp_path / "stage/props/asset.sidecar.json"
+    private_glb.write_bytes(b"new glb")
+    private_sidecar.write_bytes(b"new sidecar")
+    outside.mkdir()
+    final_glb.parent.parent.mkdir()
+    final_glb.parent.symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="symlink"):
+        batch._publish_prop_asset(private_glb, private_sidecar, final_glb, final_sidecar)
+
+    assert private_glb.read_bytes() == b"new glb"
+    assert private_sidecar.read_bytes() == b"new sidecar"
+    assert not (outside / "asset.glb").exists()
+    assert not (outside / "asset.sidecar.json").exists()
+
+
+@pytest.mark.parametrize("which", ["glb", "sidecar"])
+def test_prop_publication_rejects_symlinked_final_component_before_pair_write(
+    tmp_path: Path, which: str
+) -> None:
+    private_glb = tmp_path / "private.glb"
+    private_sidecar = tmp_path / "private.sidecar.json"
+    final_glb = tmp_path / "stage/props/asset.glb"
+    final_sidecar = tmp_path / "stage/props/asset.sidecar.json"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    final_glb.parent.mkdir(parents=True)
+    private_glb.write_bytes(b"new glb")
+    private_sidecar.write_bytes(b"new sidecar")
+    (final_glb if which == "glb" else final_sidecar).symlink_to(
+        outside / ("glb-target" if which == "glb" else "sidecar-target")
+    )
+
+    with pytest.raises(ValueError, match="symlink"):
+        batch._publish_prop_asset(private_glb, private_sidecar, final_glb, final_sidecar)
+
+    assert not final_glb.exists()
+    assert not final_sidecar.exists()
+    assert private_glb.exists()
+    assert private_sidecar.exists()
+
+
+def test_structural_publication_rejects_symlinked_target_child_before_write(tmp_path: Path) -> None:
+    private = tmp_path / "private" / "floor_1x1"
+    outside = tmp_path / "outside"
+    final = tmp_path / "stage/structural/floor_1x1"
+    private.mkdir(parents=True)
+    outside.mkdir()
+    (private / "floor_1x1.glb").write_bytes(b"new")
+    final.parent.mkdir(parents=True)
+    final.symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="symlink"):
+        batch._publish_structural_asset(private, final)
+
+    assert private.is_dir()
+    assert not (outside / "floor_1x1.glb").exists()
+
+
+def test_structural_publication_rejects_symlinked_existing_glb_child_before_replace(
+    tmp_path: Path,
+) -> None:
+    private = tmp_path / "private" / "floor_1x1"
+    outside = tmp_path / "outside"
+    final = tmp_path / "stage/structural/floor_1x1"
+    private.mkdir(parents=True)
+    outside.mkdir()
+    (private / "floor_1x1.glb").write_bytes(b"new")
+    final.mkdir(parents=True)
+    (final / "floor_1x1.glb").symlink_to(outside / "floor_1x1.glb")
+
+    with pytest.raises(ValueError, match="symlink"):
+        batch._publish_structural_asset(private, final)
+
+    assert private.is_dir()
+    assert (final / "floor_1x1.glb").is_symlink()
+
+
+def test_run_timeout_does_not_wait_for_detached_descendant_holding_pipe(tmp_path: Path) -> None:
+    child_pid_file = tmp_path / "child.pid"
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "import os, pathlib, time; "
+            f"pid=os.fork(); "
+            f"pathlib.Path({str(child_pid_file)!r}).write_text(str(pid)) if pid > 0 else os.setsid(); "
+            "time.sleep(30)"
+        ),
+    ]
+    started = time.monotonic()
+    try:
+        with pytest.raises(subprocess.TimeoutExpired):
+            batch._run(command, timeout=0.05)
+    finally:
+        deadline = time.monotonic() + 1.0
+        while not child_pid_file.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        if child_pid_file.exists():
+            child_pid = int(child_pid_file.read_text())
+            try:
+                os.kill(child_pid, 9)
+            except ProcessLookupError:
+                pass
+    assert time.monotonic() - started < 2.0
+
+
+def test_batch_publication_failure_restores_every_requested_target_transactionally(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = tmp_path / "project"
+    structural = tmp_path / "structural"
+    props = tmp_path / "props"
+    report = project / "assets/_staging/focused_nine/report.json"
+    preview = project / "artifacts/validation-previews/focused-nine"
+    project.mkdir()
+    structural.mkdir()
+    props.mkdir()
+    requested = ("floor_1x1", "hull_breach_seal_point", "fire_suppression_station")
+    old_floor = project / "assets/_staging/focused_nine/structural/floor_1x1/floor_1x1.glb"
+    old_prop = project / "assets/_staging/focused_nine/props/hull_breach_seal_point.glb"
+    old_sidecar = project / "assets/_staging/focused_nine/props/hull_breach_seal_point.sidecar.json"
+    old_floor.parent.mkdir(parents=True)
+    old_prop.parent.mkdir(parents=True)
+    old_floor.write_bytes(b"old floor")
+    old_prop.write_bytes(b"old prop")
+    old_sidecar.write_bytes(b"old sidecar")
+
+    def fake_process(args: object, asset_id: str, private_root: Path) -> tuple[dict, Path, dict]:
+        metrics = _valid_metrics()
+        roles = {
+            role: {
+                **metrics,
+                "path": f"res://assets/_staging/focused_nine/{'props' if asset_id in batch.contract.PROP_IDS else 'structural/' + asset_id}/{asset_id}.glb",
+                "validation": "PASS",
+            }
+            for role in batch.contract.VARIANT_ROLES.get(asset_id, ("intact",))
+        }
+        return (
+            batch._asset_record(project, args, asset_id, project / "source" / f"{asset_id}.blend", (), metrics, (), True, None, roles),
+            project / "source" / f"{asset_id}.blend",
+            roles,
+        )
+
+    def fake_structural(private: Path, final: Path) -> None:
+        final.mkdir(parents=True, exist_ok=True)
+        (final / f"{private.name}.glb").write_bytes(b"new floor")
+
+    def fake_prop(private_glb: Path, private_sidecar: Path, final_glb: Path, final_sidecar: Path) -> None:
+        final_glb.parent.mkdir(parents=True, exist_ok=True)
+        final_glb.write_bytes(b"new prop")
+        final_sidecar.write_bytes(b"new sidecar")
+        if final_glb.name == "fire_suppression_station.glb":
+            raise OSError("forced late prop publication failure")
+
+    monkeypatch.setattr(batch, "_process_asset", fake_process)
+    monkeypatch.setattr(batch, "_publish_structural_asset", fake_structural)
+    monkeypatch.setattr(batch, "_publish_prop_asset", fake_prop)
+
+    asset_args = [part for asset in requested for part in ("--asset", asset)]
+    result = batch.main([*_args(project, structural, props, report, preview), *asset_args])
+
+    assert result == 1
+    assert old_floor.read_bytes() == b"old floor"
+    assert old_prop.read_bytes() == b"old prop"
+    assert old_sidecar.read_bytes() == b"old sidecar"
+    assert not (project / "assets/_staging/focused_nine/props/fire_suppression_station.glb").exists()
+    assert not list((project / "assets/_staging/focused_nine").rglob(".*previous*"))
+
+
+def test_create_empty_source_uses_atomic_validated_blend_temporary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    destination = tmp_path / "sources/floor_1x1/floor_1x1.blend"
+    seen_temporary: list[Path] = []
+
+    def fake_run_step(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        expression = command[-1]
+        match = re.search(r"save_as_mainfile\(filepath=(['\"])(.+?)\1\)", expression)
+        assert match is not None
+        temporary = Path(match.group(2))
+        seen_temporary.append(temporary)
+        temporary.write_bytes(b"BLENDER-v999")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(batch, "_run_step", fake_run_step)
+    batch._create_empty_source_with_blender(destination)
+
+    assert destination.read_bytes() == b"BLENDER-v999"
+    assert seen_temporary and seen_temporary[0].parent == destination.parent
+    assert not list(destination.parent.glob(f".{destination.name}.*.tmp"))
+
+
+def test_create_empty_source_failure_leaves_no_partial_target_or_temporary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    destination = tmp_path / "sources/floor_1x1/floor_1x1.blend"
+
+    def fake_run_step(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        expression = command[-1]
+        match = re.search(r"save_as_mainfile\(filepath=(['\"])(.+?)\1\)", expression)
+        assert match is not None
+        Path(match.group(2)).write_bytes(b"partial")
+        return subprocess.CompletedProcess(command, 1, "", "save failed")
+
+    monkeypatch.setattr(batch, "_run_step", fake_run_step)
+    with pytest.raises(RuntimeError, match="could not be created"):
+        batch._create_empty_source_with_blender(destination)
+
+    assert not destination.exists()
+    assert not list(destination.parent.glob(f".{destination.name}.*.tmp"))
+
+
+def test_ensure_source_rejects_arbitrary_regular_non_blender_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = tmp_path / "project"
+    structural = tmp_path / "structural"
+    props = tmp_path / "props"
+    source = structural / "floor_1x1/floor_1x1.blend"
+    project.mkdir()
+    structural.mkdir()
+    props.mkdir()
+    source.parent.mkdir()
+    source.write_bytes(b"arbitrary regular file")
+    args = type("Args", (), {"project_root": project, "structural_source_root": structural, "props_source_root": props})()
+    monkeypatch.setattr(batch, "_create_empty_source_with_blender", lambda _: pytest.fail("must not create"))
+
+    with pytest.raises(ValueError, match="valid Blender"):
+        batch._ensure_source(args, "floor_1x1")
+
+
+@pytest.mark.parametrize("filename", [
+    "pressure_door_1x1.manifest.json",
+    "pressure_door_1x1.input.json",
+    "pressure_door_1x1.tscn",
+])
+def test_copy_pressure_package_rejects_each_symlink_before_private_copy(
+    tmp_path: Path, filename: str
+) -> None:
+    project = tmp_path / "project"
+    source = project / batch.PRESSURE_PACKAGE
+    private = tmp_path / "private"
+    outside = tmp_path / "outside"
+    source.mkdir(parents=True)
+    outside.mkdir()
+    for name in ("pressure_door_1x1.manifest.json", "pressure_door_1x1.input.json", "pressure_door_1x1.tscn"):
+        (source / name).write_text(name, encoding="utf-8")
+    (source / filename).unlink()
+    (source / filename).symlink_to(outside / filename)
+
+    with pytest.raises(ValueError, match="symlink"):
+        batch._copy_pressure_package(private, project)
+
+    assert not (private / "structural/pressure_door_1x1").exists()
+
+
+def test_live_validator_runner_oserror_is_reported_as_failure() -> None:
+    args = type(
+        "Args",
+        (),
+        {
+            "project_root": Path("project"),
+            "structural_source_root": Path("sources"),
+            "validation_structural_source_root": Path("sources"),
+        },
+    )()
+
+    def fail_run(*_: object, **__: object) -> subprocess.CompletedProcess[str]:
+        raise OSError("runner unavailable")
+
+    original = batch._run
+    try:
+        batch._run = fail_run  # type: ignore[assignment]
+        structural_errors, prop_errors = batch._run_live_validators(args)
+    finally:
+        batch._run = original
+
+    assert structural_errors == ["live structural source validator: runner unavailable"]
+    assert prop_errors == ["live prop index validator: runner unavailable"]
+
+
+def test_staged_glb_input_size_is_capped_before_evidence_copy(tmp_path: Path) -> None:
+    path = tmp_path / "candidate.glb"
+    path.touch()
+    with path.open("wb") as handle:
+        handle.truncate(batch.MAX_STAGED_GLB_INPUT_BYTES + 1)
+
+    with pytest.raises(ValueError, match="size cap"):
+        batch._validate_staged_glb_input(path)

@@ -13,24 +13,30 @@ initial path observations, same-user concurrent rename or rebind of the source,
 project, and output paths is outside this workflow's boundary; the containment,
 no-follow validators, temporary workspaces, and atomic renames are defense in
 depth and are not claimed to provide descriptor-level race immunity.
+
+Publication recovery boundary: requested final artifacts are snapshotted before
+the first stage rename and restored on any later publication failure.  This is
+an all-or-nothing transaction for a trusted workspace, not crash recovery: a
+process or power loss during publication can still leave the exact structural
+backup marker for the next invocation's local recovery.
 """
 
 from __future__ import annotations
 
 import argparse
-from dataclasses import replace
 import hashlib
 import json
 import os
 import selectors
-import signal
 import shutil
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
 import time
 from collections.abc import Iterable, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -40,7 +46,10 @@ try:
     from tools import focused_nine_staged_props as staged_props
     from tools import structural_source_contract as source_contract
     from tools import validate_structural_sources as structural_validator
-    from tools.focused_nine_blender_recipes import resolve_source_path, source_blend_path
+    from tools.focused_nine_blender_recipes import (
+        resolve_source_path,
+        source_blend_path,
+    )
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from tools import focused_nine_contract as contract
@@ -48,7 +57,10 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
     from tools import focused_nine_staged_props as staged_props
     from tools import structural_source_contract as source_contract
     from tools import validate_structural_sources as structural_validator
-    from tools.focused_nine_blender_recipes import resolve_source_path, source_blend_path
+    from tools.focused_nine_blender_recipes import (
+        resolve_source_path,
+        source_blend_path,
+    )
 
 
 ORDERED_ASSET_IDS: tuple[str, ...] = contract.STRUCTURAL_IDS + contract.PROP_IDS
@@ -69,6 +81,12 @@ PRESSURE_OVERLAY_TIMEOUT_SECONDS = 180
 STRUCTURAL_VALIDATOR_TIMEOUT_SECONDS = 300
 PROP_VALIDATOR_TIMEOUT_SECONDS = 180
 MAX_CAPTURED_OUTPUT_BYTES = 64 * 1024
+# Evidence copies are intentionally capped at 256 MiB per staged GLB.  This is
+# large enough for the focused-nine candidates while bounding private temporary
+# storage and Blender re-import exposure before any evidence copy occurs.
+MAX_STAGED_GLB_INPUT_BYTES = 256 * 1024 * 1024
+_PROCESS_DRAIN_TIMEOUT_SECONDS = 0.25
+_PROCESS_REAP_TIMEOUT_SECONDS = 0.25
 _CAPTURE_DIAGNOSTIC_MARKERS = ("WARNING:", "ERROR:", "SCRIPT ERROR:")
 _CAPTURE_DIAGNOSTIC_BLOCKER = "comparison capture blocker: Godot emitted diagnostics"
 
@@ -397,6 +415,46 @@ def _read_process_output(
     return bytes(buffers[0]), bytes(buffers[1])
 
 
+def _close_process_pipes(process: subprocess.Popen[bytes]) -> None:
+    for stream in (process.stdout, process.stderr):
+        if stream is None:
+            continue
+        try:
+            stream.close()
+        except OSError:
+            continue
+
+
+def _reap_process_after_timeout(process: subprocess.Popen[bytes]) -> None:
+    try:
+        process.wait(timeout=_PROCESS_REAP_TIMEOUT_SECONDS)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    try:
+        process.kill()
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=_PROCESS_REAP_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        # The parent process has been killed and its pipe descriptors are
+        # closed below.  A hostile escaped descendant is outside this process
+        # object's waitable set; do not turn timeout reporting into another
+        # unbounded wait.
+        return
+
+
+def _bounded_timeout_drain(process: subprocess.Popen[bytes]) -> tuple[bytes, bytes]:
+    try:
+        return _read_process_output(process, _PROCESS_DRAIN_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        return _as_bytes(exc.stdout), _as_bytes(exc.stderr)
+    finally:
+        _close_process_pipes(process)
+        _reap_process_after_timeout(process)
+
+
 def _run(
     command: Sequence[str], *, cwd: Path | None = None, timeout: float | None = None
 ) -> subprocess.CompletedProcess[str]:
@@ -419,13 +477,13 @@ def _run(
             os.killpg(process.pid, signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
             process.kill()
-        drained_stdout, drained_stderr = _read_process_output(process, None)
+        drained_stdout, drained_stderr = _bounded_timeout_drain(process)
         stdout = partial_stdout + drained_stdout
         stderr = partial_stderr + drained_stderr
         bounded_stdout, bounded_stderr = _bounded_output_pair(stdout, stderr)
-        setattr(exc, "stdout", bounded_stdout)
-        setattr(exc, "stderr", bounded_stderr)
-        setattr(exc, "output", bounded_stdout)
+        exc.stdout = bounded_stdout
+        exc.stderr = bounded_stderr
+        exc.output = bounded_stdout
         raise
     bounded_stdout, bounded_stderr = _bounded_output_pair(stdout, stderr)
     return subprocess.CompletedProcess(list(command), process.returncode, bounded_stdout, bounded_stderr)
@@ -501,43 +559,106 @@ def _run_step(
         raise RuntimeError(f"{label} timed out after {timeout} seconds{suffix}") from exc
 
 
+def _validate_blender_file(path: Path) -> None:
+    """Reject arbitrary regular files where a Blender database is required."""
+
+    _reject_static_symlink_components(path, "Blender source path")
+    try:
+        mode = path.lstat().st_mode
+    except OSError as exc:
+        raise ValueError(f"cannot inspect Blender source: {path}") from exc
+    if not stat.S_ISREG(mode):
+        raise ValueError(f"Blender source must be a regular file: {path}")
+    try:
+        with path.open("rb") as handle:
+            header = handle.read(12)
+    except OSError as exc:
+        raise ValueError(f"cannot read Blender source: {path}") from exc
+    if (
+        len(header) != 12
+        or header[:7] != b"BLENDER"
+        or header[7:8] not in (b"-", b"_")
+        or header[8:9] not in (b"v", b"V")
+        or not header[9:12].isdigit()
+    ):
+        raise ValueError(f"source is not a valid Blender file: {path}")
+
+
 def _copy_source_with_blender(seed: Path, destination: Path) -> None:
+    seed = _absolute(seed)
+    destination = _absolute(destination)
+    _validate_blender_file(seed)
+    _reject_static_symlink_components(destination, "Blender source path")
     destination.parent.mkdir(parents=True, exist_ok=True)
+    _reject_static_symlink_components(destination.parent, "Blender source parent")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{destination.name}.", suffix=".tmp", dir=str(destination.parent)
+    )
+    os.close(descriptor)
+    temporary = Path(temporary_name)
     expression = (
         "import bpy; "
         f"result=bpy.ops.wm.open_mainfile(filepath={str(seed)!r}); "
         "assert 'FINISHED' in result, 'source seed open failed'; "
-        f"result=bpy.ops.wm.save_as_mainfile(filepath={str(destination)!r}); "
+        f"result=bpy.ops.wm.save_as_mainfile(filepath={str(temporary)!r}); "
         "assert 'FINISHED' in result, 'source seed save failed'"
     )
-    result = _run_step(
-        [str(BLENDER), "--background", "--factory-startup", "--python-expr", expression],
-        timeout=SOURCE_TIMEOUT_SECONDS,
-        label="source Blender copy",
-    )
-    if result.returncode != 0 or not destination.is_file():
-        raise RuntimeError(
-            f"required source blend missing and could not be created: {destination}: {_failure_output(result)}"
+    try:
+        result = _run_step(
+            [str(BLENDER), "--background", "--factory-startup", "--python-expr", expression],
+            timeout=SOURCE_TIMEOUT_SECONDS,
+            label="source Blender copy",
         )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"required source blend missing and could not be created: {destination}: "
+                f"{_failure_output(result)}"
+            )
+        _validate_blender_file(temporary)
+        os.replace(temporary, destination)
+    except BaseException:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+        raise
 
 
 def _create_empty_source_with_blender(destination: Path) -> None:
+    destination = _absolute(destination)
+    _reject_static_symlink_components(destination, "Blender source path")
     destination.parent.mkdir(parents=True, exist_ok=True)
+    _reject_static_symlink_components(destination.parent, "Blender source parent")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{destination.name}.", suffix=".tmp", dir=str(destination.parent)
+    )
+    os.close(descriptor)
+    temporary = Path(temporary_name)
     expression = (
         "import bpy; "
         "bpy.ops.wm.read_factory_settings(use_empty=True); "
-        f"result=bpy.ops.wm.save_as_mainfile(filepath={str(destination)!r}); "
+        f"result=bpy.ops.wm.save_as_mainfile(filepath={str(temporary)!r}); "
         "assert 'FINISHED' in result, 'empty source save failed'"
     )
-    result = _run_step(
-        [str(BLENDER), "--background", "--factory-startup", "--python-expr", expression],
-        timeout=SOURCE_TIMEOUT_SECONDS,
-        label="source Blender creation",
-    )
-    if result.returncode != 0 or not destination.is_file():
-        raise RuntimeError(
-            f"required source blend missing and could not be created: {destination}: {_failure_output(result)}"
+    try:
+        result = _run_step(
+            [str(BLENDER), "--background", "--factory-startup", "--python-expr", expression],
+            timeout=SOURCE_TIMEOUT_SECONDS,
+            label="source Blender creation",
         )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"required source blend missing and could not be created: {destination}: "
+                f"{_failure_output(result)}"
+            )
+        _validate_blender_file(temporary)
+        os.replace(temporary, destination)
+    except BaseException:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+        raise
 
 
 def _choose_seed(root: Path, destination: Path, preferred: Sequence[Path] = ()) -> Path:
@@ -584,11 +705,13 @@ def _ensure_source(args: argparse.Namespace, asset_id: str) -> Path:
         mode = candidate_abs.lstat().st_mode
         if not stat.S_ISREG(mode):
             raise ValueError(f"focused-nine source is not a regular file: {candidate}")
+        _validate_blender_file(candidate_abs)
         return source
     # A fresh empty source is deliberate: copying another focused source can
     # carry a namespaced helper collection with a different module_id and is
     # therefore not a valid seed for this asset.
     _create_empty_source_with_blender(source)
+    _validate_blender_file(source)
     return source
 
 
@@ -630,6 +753,7 @@ def _candidate_spec_for_private_glb(
         raise ValueError(f"cannot inspect private candidate source GLB: {private_glb}") from exc
     if not stat.S_ISREG(mode):
         raise ValueError(f"private candidate source GLB must be a regular file: {private_glb}")
+    _validate_staged_glb_input(private_path)
 
     project = _absolute(project_root)
     candidate_relative = Path(
@@ -815,6 +939,7 @@ def _run_prop_export(source: Path, asset_id: str, destination: Path) -> tuple[Pa
 def _gate_prop_sidecar(project_root: Path, glb_path: Path, asset_id: str, output: Path) -> dict[str, Any]:
     """Run Task 5's strict validator in a canonical disposable project."""
 
+    _validate_staged_glb_input(glb_path)
     with tempfile.TemporaryDirectory(prefix="focused-nine-sidecar-gate-") as temporary:
         gate_project = Path(temporary)
         gate_glb = gate_project / "assets/_staging/focused_nine/props" / f"{asset_id}.glb"
@@ -892,7 +1017,7 @@ def _asset_record(
     return {
         "asset_id": asset_id,
         "kind": "prop" if kind == "prop" else "structural",
-        "source_path": _source_reference(asset_id) if source is None else _source_reference(asset_id),
+        "source_path": _source_reference(asset_id),
         "staged_glbs": staged_glbs,
         "metrics": metrics,
         "validation": safe_validations,
@@ -935,8 +1060,18 @@ def _publish_structural_asset(private: Path, final: Path) -> None:
     publishing.  This is recoverable, not a claim of power-loss atomicity.
     """
 
-    _reject_static_symlink_components(final, "structural publication target")
+    _validate_publication_target(private, "private structural publication source")
+    _validate_publication_target(final.parent, "structural publication target parent")
+    _validate_publication_target(final, "structural publication target")
+    try:
+        if not stat.S_ISDIR(private.lstat().st_mode):
+            raise ValueError(f"private structural publication source must be a directory: {private}")
+    except FileNotFoundError as exc:
+        raise ValueError(f"private structural publication source is missing: {private}") from exc
     final.parent.mkdir(parents=True, exist_ok=True)
+    _validate_publication_target(final.parent, "structural publication target parent")
+    _validate_publication_target(final, "structural publication target")
+    _validate_publication_target_tree(final, "structural publication target")
     _recover_structural_backup(final)
     backup = _structural_backup_path(final)
     if _path_exists_without_following(backup):
@@ -955,7 +1090,7 @@ def _publish_structural_asset(private: Path, final: Path) -> None:
                 os.replace(backup, final)
             elif not had_final and _path_exists_without_following(final):
                 _discard_path_without_unlinking_target(final)
-        except BaseException as recovery_exc:
+        except BaseException as recovery_exc:  # noqa: BLE001 - preserve rollback diagnostics
             rollback_error = recovery_exc
         if rollback_error is not None:
             raise RuntimeError(
@@ -977,24 +1112,136 @@ def _discard_path_without_unlinking_target(path: Path) -> None:
         return
     tombstone = path.with_name(f".{path.name}.rollback-{next(tempfile._get_candidate_names())}")
     os.replace(path, tombstone)
+    mode = tombstone.lstat().st_mode
+    if stat.S_ISDIR(mode):
+        shutil.rmtree(tombstone)
+    else:
+        os.unlink(tombstone)
+
+
+def _validate_publication_target(path: Path, label: str) -> None:
+    """Pin the static no-follow namespace before any publication mkdir/rename."""
+
+    _reject_static_symlink_components(path, label)
     try:
-        mode = tombstone.lstat().st_mode
-        if stat.S_ISDIR(mode):
-            shutil.rmtree(tombstone)
+        mode = path.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise ValueError(f"cannot inspect {label}: {path}") from exc
+    if stat.S_ISLNK(mode.st_mode):
+        raise ValueError(f"{label} contains symlink component: {path}")
+
+
+def _validate_publication_target_tree(path: Path, label: str) -> None:
+    """Reject symlinked children before replacing a structural target tree."""
+
+    _validate_publication_target(path, label)
+    if not path.is_dir():
+        return
+    for current, dirnames, filenames in os.walk(path, topdown=True, followlinks=False):
+        current_path = Path(current)
+        for name in (*dirnames, *filenames):
+            _validate_publication_target(current_path / name, label)
+
+
+def _copy_path_without_following(source: Path, destination: Path) -> None:
+    """Copy one snapshot entry without dereferencing a symlink."""
+
+    mode = source.lstat().st_mode
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if stat.S_ISLNK(mode):
+        destination.symlink_to(os.readlink(source))
+    elif stat.S_ISDIR(mode):
+        shutil.copytree(source, destination, symlinks=True)
+    elif stat.S_ISREG(mode):
+        shutil.copy2(source, destination)
+    else:
+        raise ValueError(f"publication snapshot contains unsupported entry: {source}")
+
+
+def _publication_auxiliary_paths(target: Path) -> tuple[Path, ...]:
+    """Record only this target's known rollback-marker namespace."""
+
+    parent = target.parent
+    _validate_publication_target(parent, "publication target parent")
+    if not parent.is_dir():
+        return ()
+    prefixes = (f".{target.name}.previous", f".{target.name}.rollback-")
+    return tuple(
+        sorted(
+            path
+            for path in parent.iterdir()
+            if path.name.startswith(prefixes)
+        )
+    )
+
+
+def _snapshot_publication_targets(
+    targets: Sequence[Path], snapshot_root: Path
+) -> tuple[tuple[Path, Path | None, tuple[Path, ...]], ...]:
+    """Snapshot exact requested final entries before the first stage replace."""
+
+    snapshots: list[tuple[Path, Path | None, tuple[Path, ...]]] = []
+    snapshot_root.mkdir(parents=True, exist_ok=True)
+    for index, target in enumerate(targets):
+        _validate_publication_target(target, "publication target")
+        _validate_publication_target(target.parent, "publication target parent")
+        snapshot = snapshot_root / str(index)
+        if _path_exists_without_following(target):
+            _copy_path_without_following(target, snapshot)
+            snapshot_path: Path | None = snapshot
         else:
-            os.unlink(tombstone)
-    except BaseException:
-        # Do not attempt to unlink the caller-visible target.  The tombstone is
-        # deliberately private to this transaction and remains recoverable if
-        # cleanup itself is interrupted.
-        raise
+            snapshot_path = None
+        snapshots.append((target, snapshot_path, _publication_auxiliary_paths(target)))
+    return tuple(snapshots)
+
+
+def _restore_publication_targets(
+    snapshots: Sequence[tuple[Path, Path | None, tuple[Path, ...]]]
+) -> None:
+    """Restore only the snapshotted requested targets and their own markers."""
+
+    for target, snapshot, old_auxiliary in reversed(snapshots):
+        _validate_publication_target(target, "publication target")
+        _validate_publication_target(target.parent, "publication target parent")
+        if _path_exists_without_following(target):
+            _discard_path_without_unlinking_target(target)
+        if snapshot is not None:
+            _copy_path_without_following(snapshot, target)
+
+        current_auxiliary = _publication_auxiliary_paths(target)
+        old_set = set(old_auxiliary)
+        for auxiliary in current_auxiliary:
+            if auxiliary not in old_set:
+                _discard_path_without_unlinking_target(auxiliary)
 
 
 def _publish_prop_asset(private_glb: Path, private_sidecar: Path, final_glb: Path, final_sidecar: Path) -> None:
     """Publish a prop GLB and sidecar as one rollback-safe pair."""
 
+    for path, label in (
+        (final_glb.parent, "prop GLB publication parent"),
+        (final_sidecar.parent, "prop sidecar publication parent"),
+        (final_glb, "prop GLB publication target"),
+        (final_sidecar, "prop sidecar publication target"),
+    ):
+        _validate_publication_target(path, label)
+    for path, label in (
+        (private_glb, "private prop GLB"),
+        (private_sidecar, "private prop sidecar"),
+    ):
+        _validate_publication_target(path, label)
+        try:
+            if not stat.S_ISREG(path.lstat().st_mode):
+                raise ValueError(f"{label} must be a regular file: {path}")
+        except FileNotFoundError as exc:
+            raise ValueError(f"{label} is missing: {path}") from exc
+
     final_glb.parent.mkdir(parents=True, exist_ok=True)
     final_sidecar.parent.mkdir(parents=True, exist_ok=True)
+    _validate_publication_target(final_glb.parent, "prop GLB publication parent")
+    _validate_publication_target(final_sidecar.parent, "prop sidecar publication parent")
     transactions: list[tuple[Path, Path | None]] = []
     try:
         for source, target in ((private_glb, final_glb), (private_sidecar, final_sidecar)):
@@ -1019,11 +1266,54 @@ def _publish_prop_asset(private_glb: Path, private_sidecar: Path, final_glb: Pat
 def _copy_pressure_package(private_root: Path, project_root: Path) -> None:
     source = project_root / PRESSURE_PACKAGE
     target = private_root / "structural/pressure_door_1x1"
-    if not source.is_dir():
+    filenames = (
+        "pressure_door_1x1.manifest.json",
+        "pressure_door_1x1.input.json",
+        "pressure_door_1x1.tscn",
+    )
+    _validate_publication_target(source, "pressure-door source package")
+    _validate_publication_target(target, "private pressure-door package")
+    try:
+        source_mode = source.lstat().st_mode
+    except OSError as exc:
+        raise FileNotFoundError(f"pressure-door staged wrapper package is missing: {source}") from exc
+    if not stat.S_ISDIR(source_mode):
         raise FileNotFoundError(f"pressure-door staged wrapper package is missing: {source}")
+    source_files: list[Path] = []
+    for filename in filenames:
+        path = source / filename
+        _validate_publication_target(path, "pressure-door source package entry")
+        try:
+            mode = path.lstat().st_mode
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(f"pressure-door staged wrapper package is missing: {path}") from exc
+        if not stat.S_ISREG(mode):
+            raise ValueError(f"pressure-door package entry must be a regular file: {path}")
+        source_files.append(path)
+    destinations = [target / source_file.name for source_file in source_files]
+    for destination in destinations:
+        _validate_publication_target(destination, "private pressure-door package entry")
     target.mkdir(parents=True, exist_ok=True)
-    for filename in ("pressure_door_1x1.manifest.json", "pressure_door_1x1.input.json", "pressure_door_1x1.tscn"):
-        shutil.copy2(source / filename, target / filename)
+    _validate_publication_target(target, "private pressure-door package")
+    for source_file, destination in zip(source_files, destinations, strict=True):
+        _validate_publication_target(destination, "private pressure-door package entry")
+        shutil.copy2(source_file, destination)
+
+
+def _validate_staged_glb_input(path: Path) -> None:
+    """Validate the immutable GLB input before any evidence copy."""
+
+    _validate_publication_target(path, "staged GLB input")
+    try:
+        info = path.lstat()
+    except OSError as exc:
+        raise ValueError(f"cannot inspect staged GLB input: {path}") from exc
+    if not stat.S_ISREG(info.st_mode):
+        raise ValueError(f"staged GLB input must be a regular file: {path}")
+    if info.st_size > MAX_STAGED_GLB_INPUT_BYTES:
+        raise ValueError(
+            f"staged GLB input exceeds size cap of {MAX_STAGED_GLB_INPUT_BYTES} bytes: {path}"
+        )
 
 
 def _process_asset(args: argparse.Namespace, asset_id: str, private_root: Path) -> tuple[dict[str, Any], Path | None, dict[str, Any]]:
@@ -1043,12 +1333,14 @@ def _process_asset(args: argparse.Namespace, asset_id: str, private_root: Path) 
     else:
         destination = private_root / "props"
         staged = _run_prop_export(source, asset_id, destination)
+        _validate_staged_glb_input(staged[0])
         sidecar_path = destination / f"{asset_id}.sidecar.json"
         sidecar = _gate_prop_sidecar(args.project_root, staged[0], asset_id, sidecar_path)
         role_metrics["sidecar"] = sidecar
 
     evidence_records: dict[str, dict[str, Any]] = {}
     for path in staged:
+        _validate_staged_glb_input(path)
         record = evidence.inspect_staged_glb(path, BLENDER)
         errors = evidence.validate_evidence(
             record,
@@ -1094,6 +1386,8 @@ def _run_pressure_overlay(project_root: Path, private_root: Path) -> list[str]:
             f"timed out after {PRESSURE_OVERLAY_TIMEOUT_SECONDS} seconds"
             + (f": {_failure_output(exc)}" if _failure_output(exc) != "exit unknown" else "")
         ]
+    except OSError as exc:
+        return [f"runner failed: {exc}"]
     if result.returncode != 0:
         return [_failure_output(result)]
     return []
@@ -1163,6 +1457,8 @@ def _run_capture(project_root: Path, preview_dir: Path) -> tuple[bool, str | Non
             f"comparison capture blocker: timed out after {CAPTURE_TIMEOUT_SECONDS} seconds",
             _capture_output(exc),
         )
+    except OSError as exc:
+        return False, f"comparison capture blocker: runner failed: {exc}", ""
     output = _capture_output(result)
     marker = "FOCUSED_NINE_COMPARISON_CAPTURE PASS output="
     if result.returncode != 0:
@@ -1214,9 +1510,13 @@ def _run_live_validators(args: argparse.Namespace) -> tuple[list[str], list[str]
         )
     except subprocess.TimeoutExpired:
         structural_errors = [
-            "live structural source validator: "
-            f"timed out after {STRUCTURAL_VALIDATOR_TIMEOUT_SECONDS} seconds"
+            (
+                "live structural source validator: "
+                f"timed out after {STRUCTURAL_VALIDATOR_TIMEOUT_SECONDS} seconds"
+            )
         ]
+    except OSError as exc:
+        structural_errors = [f"live structural source validator: {exc}"]
     try:
         props = _run(
             props_command,
@@ -1228,9 +1528,13 @@ def _run_live_validators(args: argparse.Namespace) -> tuple[list[str], list[str]
         )
     except subprocess.TimeoutExpired:
         prop_errors = [
-            "live prop index validator: "
-            f"timed out after {PROP_VALIDATOR_TIMEOUT_SECONDS} seconds"
+            (
+                "live prop index validator: "
+                f"timed out after {PROP_VALIDATOR_TIMEOUT_SECONDS} seconds"
+            )
         ]
+    except OSError as exc:
+        prop_errors = [f"live prop index validator: {exc}"]
     return structural_errors, prop_errors
 
 
@@ -1400,6 +1704,46 @@ def _run_capture_for_private_stage(
         return captured, blocker, output
 
 
+def _publish_requested_assets(
+    project_root: Path, asset_ids: Sequence[str], private_root: Path
+) -> None:
+    """Publish a requested batch with exact-target rollback on late failure."""
+
+    targets: list[Path] = []
+    for asset_id in asset_ids:
+        if asset_id in contract.STRUCTURAL_IDS:
+            targets.append(contract.asset_stage_dir(project_root, asset_id))
+        else:
+            final_glb = contract.asset_stage_glb(project_root, asset_id)
+            targets.extend((final_glb, final_glb.with_name(f"{asset_id}.sidecar.json")))
+
+    snapshot_root = private_root / ".publication-snapshots"
+    snapshots = _snapshot_publication_targets(targets, snapshot_root)
+    try:
+        for asset_id in asset_ids:
+            if asset_id in contract.STRUCTURAL_IDS:
+                _publish_structural_asset(
+                    private_root / "structural" / asset_id,
+                    contract.asset_stage_dir(project_root, asset_id),
+                )
+            else:
+                final_glb = contract.asset_stage_glb(project_root, asset_id)
+                _publish_prop_asset(
+                    private_root / "props" / f"{asset_id}.glb",
+                    private_root / "props" / f"{asset_id}.sidecar.json",
+                    final_glb,
+                    final_glb.with_name(f"{asset_id}.sidecar.json"),
+                )
+    except BaseException as exc:
+        try:
+            _restore_publication_targets(snapshots)
+        except BaseException as recovery_exc:  # noqa: BLE001 - report rollback failure
+            raise RuntimeError(
+                f"publication failed and transaction rollback failed: {recovery_exc}"
+            ) from exc
+        raise
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     try:
         args = parse_args(argv)
@@ -1435,7 +1779,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     if source is not None:
                         source_paths[asset_id] = _source_reference(asset_id)
                     role_metrics[asset_id] = roles
-                except BaseException as exc:
+                except BaseException as exc:  # noqa: BLE001 - report every asset gate failure
                     message = str(exc) or f"{type(exc).__name__}"
                     requested_records.append(
                         _asset_record(
@@ -1458,7 +1802,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if requested_pass and pressure_requested:
                 try:
                     overlay_errors = _run_pressure_overlay(project_root, private_root)
-                except BaseException as exc:
+                except BaseException as exc:  # noqa: BLE001 - convert runner failures to blockers
                     overlay_errors = [str(exc) or f"{type(exc).__name__}"]
                 if overlay_errors:
                     capture_blocker = "pressure-door overlay blocker: " + "; ".join(overlay_errors)
@@ -1470,43 +1814,32 @@ def main(argv: Sequence[str] | None = None) -> int:
                         captured, capture_blocker, _capture_output = _run_capture_for_private_stage(
                             project_root, private_root, preview_dir
                         )
-                    except BaseException as exc:
+                    except BaseException as exc:  # noqa: BLE001 - convert capture failures to blockers
                         captured = False
                         capture_blocker = f"comparison capture blocker: {str(exc) or type(exc).__name__}"
                     if not captured and capture_blocker is None:
                         capture_blocker = "comparison capture blocker: capture did not complete"
-                structural_errors, prop_errors = _run_live_validators(args)
-                validator_errors.extend(structural_errors)
-                validator_errors.extend(prop_errors)
+                try:
+                    structural_errors, prop_errors = _run_live_validators(args)
+                except OSError as exc:
+                    validator_errors.append(f"live validators runner failed: {exc}")
+                else:
+                    validator_errors.extend(structural_errors)
+                    validator_errors.extend(prop_errors)
 
             gates_passed = requested_pass and capture_blocker is None and not validator_errors
             if gates_passed:
-                for asset_id in args.assets:
-                    try:
-                        if asset_id in contract.STRUCTURAL_IDS:
-                            _publish_structural_asset(
-                                private_root / "structural" / asset_id,
-                                contract.asset_stage_dir(project_root, asset_id),
-                            )
-                        else:
-                            final_glb = contract.asset_stage_glb(project_root, asset_id)
-                            _publish_prop_asset(
-                                private_root / "props" / f"{asset_id}.glb",
-                                private_root / "props" / f"{asset_id}.sidecar.json",
-                                final_glb,
-                                final_glb.with_name(f"{asset_id}.sidecar.json"),
-                            )
-                    except BaseException as exc:
-                        message = str(exc) or f"{type(exc).__name__}"
-                        validator_errors.append(f"publication blocker: {message}")
-                        for record in requested_records:
-                            if record["asset_id"] == asset_id:
-                                record["pass"] = False
-                                record["validation"] = [message]
-                                record["first_error"] = message
-                                break
-                        gates_passed = False
-                        break
+                try:
+                    _publish_requested_assets(project_root, args.assets, private_root)
+                except BaseException as exc:  # noqa: BLE001 - restore transaction before reporting
+                    message = str(exc) or f"{type(exc).__name__}"
+                    validator_errors.append(f"publication blocker: {message}")
+                    for record in requested_records:
+                        if record["asset_id"] in args.assets:
+                            record["pass"] = False
+                            record["validation"] = [message]
+                            record["first_error"] = message
+                    gates_passed = False
 
             private_capture = private_root / ".focused-nine-comparison.png"
             if gates_passed and private_capture.is_file():
