@@ -144,7 +144,7 @@ def _iter_real_regular_files(root: Path) -> Iterable[Path]:
     """Yield regular files under *root* without following symlink entries."""
 
     try:
-        root_stat = root.stat(follow_symlinks=False)
+        root_stat = os.stat(root, follow_symlinks=False)
     except FileNotFoundError:
         return
     except OSError as exc:
@@ -197,7 +197,7 @@ def _reject_hardlinked_runtime_source(
         seen_surfaces.add(surface_key)
         for runtime_file in _iter_real_regular_files(surface):
             try:
-                runtime_stat = runtime_file.stat(follow_symlinks=False)
+                runtime_stat = os.stat(runtime_file, follow_symlinks=False)
             except OSError as exc:
                 raise ValueError(
                     f"could not stat runtime mutation file: {runtime_file}"
@@ -316,17 +316,81 @@ def _material_library_candidates(
     return tuple(unique)
 
 
+def _material_source_name(material: Any) -> str | None:
+    source_name = material.get("focused_nine_source_name")
+    if isinstance(source_name, str) and source_name.startswith("focused-nine:"):
+        return source_name.removeprefix("focused-nine:")
+    return None
+
+
+def _material_is_verified_library(
+    material: Any, library_key: str, canonical_name: str
+) -> bool:
+    return (
+        material.get("focused_nine_source_library") == library_key
+        and _material_source_name(material) == canonical_name
+    )
+
+
+def _material_users(material: Any) -> Iterable[Any]:
+    """Yield mesh objects that actually use *material* in a material slot."""
+
+    bpy = _require_bpy()
+    for obj in getattr(bpy.data, "objects", ()):
+        if getattr(obj, "type", None) != "MESH":
+            continue
+        for slot in getattr(obj, "material_slots", ()):
+            if getattr(slot, "material", None) is material:
+                yield obj
+                break
+
+
+def _is_focused_generated_material_user(obj: Any) -> bool:
+    getter = getattr(obj, "get", None)
+    if not callable(getter):
+        return False
+    return (
+        getter("focused_nine_generated") is True
+        and getter("focused_nine_asset_id") in ALL_ASSET_IDS
+    )
+
+
+def _material_has_authored_marker(material: Any) -> bool:
+    getter = getattr(material, "get", None)
+    if not callable(getter):
+        return False
+    return getter("authored_marker") is not None or getter("focused_nine_authored") is True
+
+
+def _material_has_authored_user(material: Any) -> bool:
+    return _material_has_authored_marker(material) or any(
+        not _is_focused_generated_material_user(obj) for obj in _material_users(material)
+    )
+
+
+def _verified_material_remnants(materials: Iterable[Any], library_key: str, name: str) -> list[Any]:
+    return [
+        material
+        for material in materials
+        if material.name != name
+        and _material_is_verified_library(material, library_key, name)
+    ]
+
+
 def ensure_material_library(
     project_root: Path, structural_root: Path, props_root: Path
 ) -> dict[str, Any]:
-    """Load required materials and return a verified source-name mapping.
+    """Load exact canonical materials from the verified salvage library.
 
-    Existing same-name materials are never used as an implicit fallback.  A
-    collision is appended under Blender's unique datablock name, then tracked
-    with provenance properties so recipes can assign the verified object
-    directly on subsequent runs.
+    The canonical name is a hard namespace boundary.  A same-name material
+    without matching library provenance is never renamed, deleted, or used;
+    the recipe fails before any generated geometry mutation instead.  A
+    suffixed datablock is repaired only when its provenance is exact and every
+    object user is already an owned focused-nine generated object.
     """
 
+    global _VERIFIED_MATERIALS
+    _VERIFIED_MATERIALS = None
     bpy = _require_bpy()
     library_path = next(
         (
@@ -359,43 +423,93 @@ def ensure_material_library(
             + ", ".join(missing_from_library)
         )
 
-    materials: dict[str, Any] = {}
-    for material in bpy.data.materials:
-        if material.get("focused_nine_source_library") != library_key:
+    # Preflight every canonical slot before renaming or appending anything.
+    # This is what makes an authored collision a loud, source-safe failure.
+    plans: dict[str, tuple[str, Any | None]] = {}
+    for canonical_name in REQUIRED_MATERIAL_NAMES:
+        existing = bpy.data.materials.get(canonical_name)
+        if existing is not None:
+            if not _material_is_verified_library(existing, library_key, canonical_name):
+                raise RuntimeError(
+                    f"canonical material {canonical_name!r} is occupied by a non-owned "
+                    "material; refusing to rename, delete, or use it"
+                )
+            if _material_has_authored_user(existing):
+                raise RuntimeError(
+                    f"canonical material {canonical_name!r} has an authored user; "
+                    "refusing to use or remediate it"
+                )
+            plans[canonical_name] = ("existing", existing)
             continue
-        source_name = material.get("focused_nine_source_name")
-        if isinstance(source_name, str) and source_name.startswith("focused-nine:"):
-            source_name = source_name.removeprefix("focused-nine:")
-        if source_name in REQUIRED_MATERIAL_NAMES and source_name not in materials:
-            materials[source_name] = material
 
-    missing_materials = [name for name in REQUIRED_MATERIAL_NAMES if name not in materials]
-    if missing_materials:
-        requested_materials = tuple(missing_materials)
+        remnants = _verified_material_remnants(
+            bpy.data.materials, library_key, canonical_name
+        )
+        if len(remnants) > 1:
+            raise RuntimeError(
+                f"multiple verified focused-nine remnants compete for canonical material "
+                f"{canonical_name!r}; refusing to guess"
+            )
+        if remnants:
+            remnant = remnants[0]
+            if _material_has_authored_user(remnant):
+                raise RuntimeError(
+                    f"verified remnant {remnant.name!r} for canonical material "
+                    f"{canonical_name!r} has an authored user; refusing to rename it"
+                )
+            plans[canonical_name] = ("rename", remnant)
+        else:
+            plans[canonical_name] = ("load", None)
+
+    materials: dict[str, Any] = {}
+    for canonical_name, (action, material) in plans.items():
+        if action == "rename":
+            assert material is not None
+            material.name = canonical_name
+            if material.name != canonical_name:
+                raise RuntimeError(
+                    f"verified material remnant could not take canonical name {canonical_name!r}"
+                )
+            materials[canonical_name] = material
+        elif action == "existing":
+            assert material is not None
+            materials[canonical_name] = material
+
+    requested_materials = tuple(
+        name for name, (action, _material) in plans.items() if action == "load"
+    )
+    if requested_materials:
         with bpy.data.libraries.load(str(library_path), link=False) as (_data_from, data_to):
             data_to.materials = list(requested_materials)
         loaded_materials: list[Any] = list(data_to.materials)
-        if len(loaded_materials) != len(missing_materials) or any(
+        if len(loaded_materials) != len(requested_materials) or any(
             material is None for material in loaded_materials
         ):
             raise RuntimeError(
                 "required materials were not loaded from the configured library: "
-                + ", ".join(missing_materials)
+                + ", ".join(requested_materials)
             )
         for source_name, material in zip(requested_materials, loaded_materials, strict=True):
+            if material.name != source_name:
+                raise RuntimeError(
+                    f"material library load produced non-canonical name {material.name!r} "
+                    f"for {source_name!r}"
+                )
             material["focused_nine_source_library"] = library_key
             # Blender treats an IDProperty string equal to a datablock name as
-            # an ID pointer.  Prefixing it keeps provenance a stable string.
+            # an ID pointer. Prefixing it keeps provenance a stable string.
             material["focused_nine_source_name"] = f"focused-nine:{source_name}"
             materials[source_name] = material
 
-    if set(materials) != set(REQUIRED_MATERIAL_NAMES):
-        missing_after_load = sorted(set(REQUIRED_MATERIAL_NAMES) - set(materials))
+    if set(materials) != set(REQUIRED_MATERIAL_NAMES) or any(
+        material.name != name
+        or not _material_is_verified_library(material, library_key, name)
+        for name, material in materials.items()
+    ):
         raise RuntimeError(
-            "required materials were not verified from the configured library: "
-            + ", ".join(missing_after_load)
+            "required materials were not verified under exact canonical names from the "
+            f"configured library {library_path}"
         )
-    global _VERIFIED_MATERIALS
     _VERIFIED_MATERIALS = materials
     return {
         "library_path": library_key,
@@ -1062,6 +1176,22 @@ def _report(
             for modifier in getattr(obj, "modifiers", ())
         }
     )
+    material_names = sorted(
+        {
+            slot.material.name
+            for obj in generated
+            if getattr(obj, "type", None) == "MESH"
+            for slot in getattr(obj, "material_slots", ())
+            if getattr(slot, "material", None) is not None
+        }
+    )
+    if not material_names:
+        raise RuntimeError(f"generated recipe has no mesh materials for {asset_id}")
+    if not set(material_names).issubset(REQUIRED_MATERIAL_NAMES):
+        raise RuntimeError(
+            f"generated recipe emitted non-canonical materials for {asset_id}: "
+            + ", ".join(material_names)
+        )
     return {
         "asset_id": asset_id,
         "kind": kind,
@@ -1070,7 +1200,7 @@ def _report(
         "generated_count": len(names),
         "triangle_count": _triangle_count(generated),
         "helper_names": helper_names,
-        "material_names": list(material_info["material_names"]),
+        "material_names": material_names,
         "modifier_types": modifier_types,
         "boolean_modifiers": [
             obj.name

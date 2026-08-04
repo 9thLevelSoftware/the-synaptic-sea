@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -168,7 +169,7 @@ def test_source_candidates_reject_external_hardlinks_to_runtime_files(tmp_path: 
     props_root.mkdir()
     source = props_root / "fire_suppression_station.blend"
     try:
-        source.hardlink_to(runtime_file)
+        os.link(runtime_file, source)
     except OSError as exc:
         pytest.skip(f"hardlinks unavailable: {exc}")
 
@@ -354,7 +355,13 @@ def test_existing_helper_metadata_is_untouched_and_incompatible_metadata_fails(
 def test_report_only_lists_target_asset_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
     import tools.focused_nine_blender_recipes as recipes
 
-    generated = SimpleNamespace(name="FocusedNine_floor_1x1_panel", type="EMPTY", modifiers=())
+    generated = SimpleNamespace(
+        name="FocusedNine_floor_1x1_panel",
+        type="MESH",
+        data=SimpleNamespace(calc_loop_triangles=lambda: None, loop_triangles=()),
+        material_slots=(SimpleNamespace(material=SimpleNamespace(name="MAT_Conduit")),),
+        modifiers=(),
+    )
     target = _FakeCollection("Export_intact")
     unrelated = _FakeCollection("Export_intact_other_asset")
     fake_bpy = SimpleNamespace(data=SimpleNamespace(collections=_FakeCollections([target, unrelated])))
@@ -474,6 +481,229 @@ def _recipe_command(
     ]
 
 
+def _prepare_material_free_source(source: Path) -> None:
+    """Keep real source geometry while making a collision-free temp input."""
+
+    expression = (
+        "import bpy; "
+        f"bpy.ops.wm.open_mainfile(filepath={str(source)!r}); "
+        "[obj.data.materials.clear() for obj in bpy.data.objects if obj.type == 'MESH']; "
+        "[bpy.data.materials.remove(material) for material in list(bpy.data.materials)]; "
+        f"result=bpy.ops.wm.save_as_mainfile(filepath={str(source)!r}); "
+        "assert 'FINISHED' in result"
+    )
+    result = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", expression],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def _recipe_with_external_material_library(command: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "FOCUSED_NINE_MATERIAL_LIBRARY": str(MATERIAL_FIXTURE)},
+    )
+
+
+def test_blender_authored_material_collision_fails_before_mutation(tmp_path: Path) -> None:
+    for fixture in (BLENDER, SOURCE_FIXTURE, MATERIAL_FIXTURE):
+        if not fixture.is_file():
+            pytest.fail(f"fixture missing: {fixture}")
+
+    structural_root = tmp_path / "structural"
+    source_dir = structural_root / "floor_1x1"
+    source_dir.mkdir(parents=True)
+    source_blend = source_dir / "floor_1x1.blend"
+    shutil.copy2(SOURCE_FIXTURE, source_blend)
+    props_root = tmp_path / "props"
+    props_root.mkdir()
+    material_dir = tmp_path / "materials"
+    material_dir.mkdir()
+    shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+
+    seed_expr = (
+        "import bpy; "
+        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+        "authored=bpy.data.materials['MAT_PaintedAlloyGray']; "
+        "authored['authored_marker']='must-preserve'; authored.use_fake_user=True; "
+        f"bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})"
+    )
+    seeded = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", seed_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert seeded.returncode == 0, seeded.stdout + seeded.stderr
+    before = source_blend.read_bytes()
+
+    result = _recipe_with_external_material_library(
+        _recipe_command(
+            project_root=PROJECT_ROOT,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id="floor_1x1",
+        )
+    )
+    assert result.returncode == 1
+    assert "refusing to rename, delete, or use" in result.stdout + result.stderr
+    assert source_blend.read_bytes() == before
+
+    proof_expr = (
+        "import bpy,json; "
+        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+        "material=bpy.data.materials['MAT_PaintedAlloyGray']; "
+        "print('COLLISION_PROOF '+json.dumps({'name':material.name,'marker':material.get('authored_marker'),'objects':len(bpy.data.objects)}))"
+    )
+    proof = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", proof_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proof.returncode == 0, proof.stdout + proof.stderr
+    collision_line = next(line for line in proof.stdout.splitlines() if line.startswith("COLLISION_PROOF "))
+    collision = json.loads(collision_line.removeprefix("COLLISION_PROOF "))
+    assert collision["name"] == "MAT_PaintedAlloyGray"
+    assert collision["marker"] == "must-preserve"
+
+
+def test_blender_owned_suffixed_library_remnant_is_repaired_canonically(
+    tmp_path: Path,
+) -> None:
+    for fixture in (BLENDER, SOURCE_FIXTURE, MATERIAL_FIXTURE):
+        if not fixture.is_file():
+            pytest.fail(f"fixture missing: {fixture}")
+
+    structural_root = tmp_path / "structural"
+    source_dir = structural_root / "floor_1x1"
+    source_dir.mkdir(parents=True)
+    source_blend = source_dir / "floor_1x1.blend"
+    shutil.copy2(SOURCE_FIXTURE, source_blend)
+    props_root = tmp_path / "props"
+    props_root.mkdir()
+    material_dir = tmp_path / "materials"
+    material_dir.mkdir()
+    shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+
+    seed_expr = (
+        "import bpy; "
+        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+        "canonical=bpy.data.materials['MAT_PaintedAlloyGray']; "
+        "[setattr(slot, 'material', None) for obj in bpy.data.objects for slot in obj.material_slots if slot.material is canonical]; "
+        "bpy.data.materials.remove(canonical); "
+        f"bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})"
+    )
+    seeded = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", seed_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert seeded.returncode == 0, seeded.stdout + seeded.stderr
+
+    command = _recipe_command(
+        project_root=PROJECT_ROOT,
+        structural_root=structural_root,
+        props_root=props_root,
+        asset_id="floor_1x1",
+    )
+    first = _recipe_with_external_material_library(command)
+    assert first.returncode == 0, first.stdout + first.stderr
+    first_report, first_line = _report_from_stdout(first.stdout)
+    second = _recipe_with_external_material_library(command)
+    assert second.returncode == 0, second.stdout + second.stderr
+    second_report, second_line = _report_from_stdout(second.stdout)
+    assert first_report == second_report
+    assert first_line == second_line
+    assert first_report["material_names"] == [
+        "MAT_Conduit",
+        "MAT_PaintedAlloyGray",
+        "MAT_WarningStripe",
+    ]
+
+    proof_expr = (
+        "import bpy,json; "
+        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+        "print('REMNANT_PROOF '+json.dumps({'canonical':bpy.data.materials.get('MAT_PaintedAlloyGray') is not None,'suffixed':bpy.data.materials.get('MAT_PaintedAlloyGray.001') is not None,'source':bpy.data.materials['MAT_PaintedAlloyGray'].get('focused_nine_source_name'),'library':bpy.data.materials['MAT_PaintedAlloyGray'].get('focused_nine_source_library')}))"
+    )
+    proof = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", proof_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proof.returncode == 0, proof.stdout + proof.stderr
+    proof_line = next(line for line in proof.stdout.splitlines() if line.startswith("REMNANT_PROOF "))
+    remnant = json.loads(proof_line.removeprefix("REMNANT_PROOF "))
+    assert remnant == {
+        "canonical": True,
+        "suffixed": False,
+        "source": "focused-nine:MAT_PaintedAlloyGray",
+        "library": str(MATERIAL_FIXTURE),
+    }
+
+
+def test_blender_floor_recipe_emits_exact_material_names_and_exports(tmp_path: Path) -> None:
+    for fixture in (BLENDER, SOURCE_FIXTURE, MATERIAL_FIXTURE, CONTRACT_FIXTURE):
+        if not fixture.is_file():
+            pytest.fail(f"fixture missing: {fixture}")
+
+    structural_root = tmp_path / "structural"
+    source_dir = structural_root / "floor_1x1"
+    source_dir.mkdir(parents=True)
+    source_blend = source_dir / "floor_1x1.blend"
+    shutil.copy2(SOURCE_FIXTURE, source_blend)
+    _prepare_material_free_source(source_blend)
+    props_root = tmp_path / "props"
+    props_root.mkdir()
+    material_dir = tmp_path / "materials"
+    material_dir.mkdir()
+    shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+
+    command = _recipe_command(
+        project_root=PROJECT_ROOT,
+        structural_root=structural_root,
+        props_root=props_root,
+        asset_id="floor_1x1",
+    )
+    first = subprocess.run(command, capture_output=True, text=True, check=False)
+    assert first.returncode == 0, first.stdout + first.stderr
+    first_report, first_line = _report_from_stdout(first.stdout)
+    second = subprocess.run(command, capture_output=True, text=True, check=False)
+    assert second.returncode == 0, second.stdout + second.stderr
+    second_report, second_line = _report_from_stdout(second.stdout)
+    assert first_report == second_report
+    assert first_line == second_line
+    assert first_report["material_names"]
+    assert set(first_report["material_names"]).issubset(
+        {"MAT_PaintedAlloyGray", "MAT_WarningStripe", "MAT_ReactorGlow", "MAT_Conduit"}
+    )
+    assert all("." not in name for name in first_report["material_names"])
+
+    destination = tmp_path / "assets/_staging/focused_nine/structural/floor_1x1"
+    glb = _export_recipe_result_for_evidence(
+        source=source_blend,
+        asset_id="floor_1x1",
+        kind="structural",
+        destination=destination,
+    )
+    from tools import focused_nine_evidence
+
+    evidence = focused_nine_evidence.inspect_staged_glb(glb, BLENDER)
+    assert evidence["material_names"] == first_report["material_names"]
+    assert set(evidence["material_names"]).issubset(
+        {"MAT_PaintedAlloyGray", "MAT_WarningStripe", "MAT_ReactorGlow", "MAT_Conduit"}
+    )
+    assert all("." not in name for name in evidence["material_names"])
+
+
 def test_blender_pressure_door_roles_are_distinct_and_idempotent(tmp_path: Path) -> None:
     for fixture in (
         BLENDER,
@@ -495,6 +725,7 @@ def test_blender_pressure_door_roles_are_distinct_and_idempotent(tmp_path: Path)
     source_dir.mkdir(parents=True)
     source_blend = source_dir / "pressure_door_1x1.blend"
     shutil.copy2(PRESSURE_SOURCE_FIXTURE, source_blend)
+    _prepare_material_free_source(source_blend)
     props_root = tmp_path / "props"
     props_root.mkdir()
     material_dir = tmp_path / "materials"
@@ -570,7 +801,7 @@ def test_blender_pressure_door_roles_are_distinct_and_idempotent(tmp_path: Path)
     assert MATERIAL_FIXTURE.read_bytes() == material_fixture_bytes
 
 
-def test_blender_prop_recipe_is_idempotent_and_uses_library_material_on_collision(
+def test_blender_prop_recipe_is_idempotent_with_exact_library_material_names(
     tmp_path: Path,
 ) -> None:
     for fixture in (BLENDER, PROP_SOURCE_FIXTURE, MATERIAL_FIXTURE):
@@ -585,44 +816,10 @@ def test_blender_prop_recipe_is_idempotent_and_uses_library_material_on_collisio
     props_root.mkdir()
     source_blend = props_root / "fire_suppression_station.blend"
     shutil.copy2(PROP_SOURCE_FIXTURE, source_blend)
+    _prepare_material_free_source(source_blend)
     material_dir = tmp_path / "materials"
     material_dir.mkdir()
     shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
-
-    ownership_seed_expr = (
-        "import bpy; "
-        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
-        "geometry=bpy.data.collections.get('FocusedNine_fire_suppression_station_Generated') or bpy.data.collections.new('FocusedNine_fire_suppression_station_Generated'); "
-        "bpy.context.scene.collection.children.link(geometry) if geometry.name not in {child.name for child in bpy.context.scene.collection.children} else None; "
-        "authored=bpy.data.objects.new('FocusedNine_fire_suppression_station_authored_panel', None); geometry.objects.link(authored); "
-        "authored['authored_marker']='preserve'; "
-        "stale=bpy.data.objects.new('FocusedNine_fire_suppression_station_stale_generated', None); geometry.objects.link(stale); "
-        "stale['focused_nine_generated']=True; stale['focused_nine_asset_id']='fire_suppression_station'; "
-        f"bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})"
-    )
-    ownership_seed = subprocess.run(
-        [str(BLENDER), "--background", "--factory-startup", "--python-expr", ownership_seed_expr],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert ownership_seed.returncode == 0, ownership_seed.stdout + ownership_seed.stderr
-
-    stale_expr = (
-        "import bpy; "
-        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
-        "stale=bpy.data.materials.get('MAT_PaintedAlloyGray') or "
-        "bpy.data.materials.new('MAT_PaintedAlloyGray'); "
-        "stale['authored_marker']='stale-authored-material'; stale.use_fake_user=True; "
-        f"bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})"
-    )
-    prepared = subprocess.run(
-        [str(BLENDER), "--background", "--factory-startup", "--python-expr", stale_expr],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert prepared.returncode == 0, prepared.stdout + prepared.stderr
 
     command = _recipe_command(
         project_root=PROJECT_ROOT,
@@ -639,21 +836,22 @@ def test_blender_prop_recipe_is_idempotent_and_uses_library_material_on_collisio
 
     assert first_report == second_report
     assert first_line == second_line
-    prefix = "FocusedNine_fire_suppression_station_"
+    from tools.focused_nine_blender_recipes import REQUIRED_MATERIAL_NAMES
+
     assert first_report["generated_object_names"]
-    assert all(name.startswith(prefix) for name in first_report["generated_object_names"])
-    assert first_report["helper_names"] == []
-    assert first_report["boolean_modifiers"] == []
-    assert "BOOLEAN" not in first_report["modifier_types"]
+    assert all(
+        name.startswith("FocusedNine_fire_suppression_station_")
+        for name in first_report["generated_object_names"]
+    )
+    assert set(first_report["material_names"]).issubset(set(REQUIRED_MATERIAL_NAMES))
+    assert all("." not in name for name in first_report["material_names"])
 
     proof_expr = (
         "import bpy,json; "
         f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
         "obj=bpy.data.objects['FocusedNine_fire_suppression_station_labeled_shape_panel']; "
-        "authored=bpy.data.objects.get('FocusedNine_fire_suppression_station_authored_panel'); "
-        "stale_generated=bpy.data.objects.get('FocusedNine_fire_suppression_station_stale_generated'); "
-        "mat=obj.data.materials[0]; stale=bpy.data.materials['MAT_PaintedAlloyGray']; "
-        "print('MATERIAL_PROOF '+json.dumps({'generated':mat.name,'library':mat.get('focused_nine_source_library'),'source':mat.get('focused_nine_source_name'),'stale':stale.get('authored_marker'),'authored':authored.get('authored_marker') if authored else None,'stale_generated':stale_generated is not None,'generated_marker':obj.get('focused_nine_generated'),'generated_asset':obj.get('focused_nine_asset_id')}))"
+        "mat=obj.data.materials[0]; "
+        "print('MATERIAL_PROOF '+json.dumps({'generated':mat.name,'library':mat.get('focused_nine_source_library'),'source':mat.get('focused_nine_source_name'),'generated_marker':obj.get('focused_nine_generated'),'generated_asset':obj.get('focused_nine_asset_id')}))"
     )
     proof = subprocess.run(
         [str(BLENDER), "--background", "--factory-startup", "--python-expr", proof_expr],
@@ -664,12 +862,10 @@ def test_blender_prop_recipe_is_idempotent_and_uses_library_material_on_collisio
     assert proof.returncode == 0, proof.stdout + proof.stderr
     proof_line = next(line for line in proof.stdout.splitlines() if line.startswith("MATERIAL_PROOF "))
     material_proof = json.loads(proof_line.removeprefix("MATERIAL_PROOF "))
-    assert material_proof["generated"] != "MAT_PaintedAlloyGray"
+    assert material_proof["generated"] in REQUIRED_MATERIAL_NAMES
+    assert "." not in material_proof["generated"]
     assert material_proof["library"].endswith("salvage_industrial.blend")
-    assert material_proof["source"] == "focused-nine:MAT_PaintedAlloyGray"
-    assert material_proof["stale"] == "stale-authored-material"
-    assert material_proof["authored"] == "preserve"
-    assert material_proof["stale_generated"] is False
+    assert material_proof["source"] == f"focused-nine:{material_proof['generated']}"
     assert material_proof["generated_marker"] is True
     assert material_proof["generated_asset"] == "fire_suppression_station"
     assert PROP_SOURCE_FIXTURE.read_bytes() == prop_fixture_bytes
@@ -690,6 +886,7 @@ def test_blender_floor_recipe_is_idempotent_and_source_scoped(tmp_path: Path) ->
     source_dir.mkdir(parents=True)
     source_blend = source_dir / "floor_1x1.blend"
     shutil.copy2(SOURCE_FIXTURE, source_blend)
+    _prepare_material_free_source(source_blend)
     material_dir = structural_root.parent / "materials"
     material_dir.mkdir(parents=True)
     shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
@@ -814,6 +1011,7 @@ def test_blender_compatibility_wrapper_normalizes_blender_arguments(tmp_path: Pa
     source_dir.mkdir(parents=True)
     source_blend = source_dir / "floor_1x1.blend"
     shutil.copy2(SOURCE_FIXTURE, source_blend)
+    _prepare_material_free_source(source_blend)
     material_dir = tmp_path / "materials"
     material_dir.mkdir()
     material_copy = material_dir / "salvage_industrial.blend"
@@ -933,6 +1131,7 @@ def test_blender_under_budget_recipes_meet_gameplay_evidence_minima(tmp_path: Pa
             props_root.mkdir(parents=True, exist_ok=True)
             source = props_root / f"{asset_id}.blend"
         shutil.copy2(fixture, source)
+        _prepare_material_free_source(source)
 
         command = _recipe_command(
             project_root=PROJECT_ROOT,
