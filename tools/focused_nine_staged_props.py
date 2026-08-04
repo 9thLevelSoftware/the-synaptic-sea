@@ -8,9 +8,10 @@ prop inventory or the generated runtime visual-binding index.
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import secrets
 import sys
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +24,7 @@ from tools.focused_nine_contract import (
     asset_stage_glb,
     runtime_mutation_paths,
 )
-from tools.prop_visual_metadata import read_glb_metadata, validate_sidecar, write_canonical_json
+from tools.prop_visual_metadata import read_glb_metadata, validate_sidecar
 
 
 STAGED_ASSET_IDS = frozenset(PROP_IDS)
@@ -240,48 +241,112 @@ def validate_staged_sidecar(project_root: Path, glb_path: Path, sidecar: dict) -
     return _sorted_errors(errors)
 
 
+def _canonical_json_bytes(document: dict) -> bytes:
+    payload = json.dumps(
+        document,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+    return (payload + "\n").encode("utf-8")
+
+
+def _pinned_directory_open_flags() -> int:
+    directory_flag = getattr(os, "O_DIRECTORY", None)
+    nofollow_flag = getattr(os, "O_NOFOLLOW", None)
+    supports_dir_fd = getattr(os, "supports_dir_fd", ())
+    if directory_flag is None or nofollow_flag is None:
+        raise OSError("sidecar output requires O_DIRECTORY and O_NOFOLLOW")
+    if not all(function in supports_dir_fd for function in (os.open, os.unlink)):
+        raise OSError("sidecar output requires directory-fd operations")
+    return os.O_RDONLY | directory_flag | nofollow_flag
+
+
+def _create_sibling_temp(directory_fd: int, target_name: str) -> tuple[int, str]:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    nofollow_flag = getattr(os, "O_NOFOLLOW", None)
+    if nofollow_flag is not None:
+        flags |= nofollow_flag
+    for _attempt in range(32):
+        temporary_name = f".{target_name}.{secrets.token_hex(12)}.tmp"
+        try:
+            descriptor = os.open(
+                temporary_name,
+                flags,
+                0o600,
+                dir_fd=directory_fd,
+            )
+        except FileExistsError:
+            continue
+        return descriptor, temporary_name
+    raise OSError("could not allocate a unique sidecar temporary file")
+
+
 def _write_sidecar_atomically(path: Path, sidecar: dict) -> None:
-    """Write canonical JSON through a sibling temporary file and replace."""
+    """Publish canonical JSON through a pinned parent directory FD."""
     path = Path(path)
+    payload = _canonical_json_bytes(sidecar)
+    directory_flags = _pinned_directory_open_flags()
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path: Path | None = None
+
+    directory_fd: int | None = None
+    temporary_fd: int | None = None
+    temporary_name: str | None = None
     try:
-        descriptor, temporary_name = tempfile.mkstemp(
-            prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent)
+        directory_fd = os.open(path.parent, directory_flags)
+        # Probe directory fsync before creating a temporary file so platforms
+        # without durable directory publication fail closed without writing.
+        os.fsync(directory_fd)
+        temporary_fd, temporary_name = _create_sibling_temp(directory_fd, path.name)
+        with os.fdopen(temporary_fd, "wb") as handle:
+            temporary_fd = None
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(
+            temporary_name,
+            path.name,
+            src_dir_fd=directory_fd,
+            dst_dir_fd=directory_fd,
         )
-        os.close(descriptor)
-        temporary_path = Path(temporary_name)
-        write_canonical_json(temporary_path, sidecar)
-        os.replace(temporary_path, path)
-        temporary_path = None
+        temporary_name = None
+        os.fsync(directory_fd)
     finally:
-        if temporary_path is not None:
+        if temporary_fd is not None:
+            os.close(temporary_fd)
+        if temporary_name is not None and directory_fd is not None:
             try:
-                temporary_path.unlink()
+                os.unlink(temporary_name, dir_fd=directory_fd)
             except FileNotFoundError:
                 pass
+        if directory_fd is not None:
+            os.close(directory_fd)
 
 
-def _protected_output_error(project_root: Path, output_path: Path) -> str | None:
-    """Reject output paths that name or resolve into live runtime surfaces."""
-    output_lexical = _absolute_path(Path(output_path))
+def _protected_output_error(
+    project_root: Path, output_path: Path
+) -> tuple[Path, str | None]:
+    """Return one canonical output target and any live-surface rejection."""
     try:
-        output_resolved = output_lexical.resolve(strict=False)
+        # Resolve the original path directly.  In particular, do not normalize
+        # alias/../name before resolving symlinks: POSIX resolves the alias first.
+        output_resolved = Path(output_path).resolve(strict=False)
         protected_paths = runtime_mutation_paths(project_root)
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
         raise ValueError(f"sidecar output protection check failed: {exc}") from exc
 
     for protected_path in protected_paths:
-        protected_lexical = _absolute_path(protected_path)
         try:
-            protected_resolved = protected_lexical.resolve(strict=False)
+            protected_resolved = Path(protected_path).resolve(strict=False)
         except (OSError, RuntimeError, TypeError, ValueError) as exc:
             raise ValueError(f"sidecar output protection check failed: {exc}") from exc
-        if _contained(output_lexical, protected_lexical) or _contained(
-            output_resolved, protected_resolved
-        ):
-            return f"sidecar output must not target live runtime surface: {protected_path}"
-    return None
+        if _contained(output_resolved, protected_resolved):
+            return output_resolved, (
+                "sidecar output must not target live runtime surface: "
+                f"{protected_path}"
+            )
+    return output_resolved, None
 
 
 def _argument_parser() -> argparse.ArgumentParser:
@@ -300,10 +365,12 @@ def main(argv: list[str] | None = None) -> int:
         errors = validate_staged_sidecar(args.project_root, args.glb, sidecar)
         if errors:
             raise ValueError("; ".join(errors))
-        output_error = _protected_output_error(args.project_root, args.sidecar_out)
+        output_path, output_error = _protected_output_error(
+            args.project_root, args.sidecar_out
+        )
         if output_error:
             raise ValueError(output_error)
-        _write_sidecar_atomically(args.sidecar_out, sidecar)
+        _write_sidecar_atomically(output_path, sidecar)
     except (OSError, RuntimeError, TypeError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

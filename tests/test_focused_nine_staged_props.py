@@ -306,6 +306,37 @@ def test_cli_rejects_every_runtime_mutation_surface_and_symlink_alias(
             assert not list(output.parent.glob(f".{output.name}.*.tmp"))
 
 
+def test_cli_rejects_symlink_then_dotdot_protected_output(
+    staged_project: tuple[Path, dict[str, Path]],
+) -> None:
+    project_root, staged = staged_project
+    protected = runtime_mutation_paths(project_root)[1]
+    protected.parent.mkdir(parents=True, exist_ok=True)
+    protected.write_bytes(b"live generated props index must remain exact\n")
+    alias_target = protected.parent / "child"
+    alias_target.mkdir()
+    alias = project_root / "runtime_alias"
+    alias.symlink_to(alias_target, target_is_directory=True)
+    output = alias / ".." / protected.name
+
+    result = staged_props.main(
+        [
+            "--project-root",
+            str(project_root),
+            "--glb",
+            str(staged["hull_breach_seal_point"]),
+            "--asset-id",
+            "hull_breach_seal_point",
+            "--sidecar-out",
+            str(output),
+        ]
+    )
+
+    assert result == 1
+    assert protected.read_bytes() == b"live generated props index must remain exact\n"
+    assert not list(protected.parent.glob(f".{protected.name}.*.tmp"))
+
+
 def test_cli_rejects_protected_output_before_atomic_writer(
     staged_project: tuple[Path, dict[str, Path]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -368,6 +399,80 @@ def test_cli_writes_valid_sidecar_atomically(
         project_root, staged["hull_breach_seal_point"], sidecar
     ) == []
     assert output.read_text(encoding="utf-8").endswith("\n")
+
+
+def test_cli_passes_canonical_external_target_to_writer(
+    staged_project: tuple[Path, dict[str, Path]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_root, staged = staged_project
+    external_root = tmp_path / "external"
+    external_child = external_root / "child"
+    external_child.mkdir(parents=True)
+    alias = project_root / "external_alias"
+    alias.symlink_to(external_child, target_is_directory=True)
+    output = alias / ".." / "external.sidecar.json"
+    canonical_output = (external_root / "external.sidecar.json").resolve()
+    written_paths: list[Path] = []
+
+    monkeypatch.setattr(
+        staged_props,
+        "_write_sidecar_atomically",
+        lambda path, _sidecar: written_paths.append(path),
+    )
+    result = staged_props.main(
+        [
+            "--project-root",
+            str(project_root),
+            "--glb",
+            str(staged["hull_breach_seal_point"]),
+            "--asset-id",
+            "hull_breach_seal_point",
+            "--sidecar-out",
+            str(output),
+        ]
+    )
+
+    assert result == 0
+    assert written_paths == [canonical_output]
+
+
+def test_cli_cleans_temporary_after_atomic_writer_failure(
+    staged_project: tuple[Path, dict[str, Path]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_root, staged = staged_project
+    output = tmp_path / "out" / "failed.sidecar.json"
+    real_fsync = staged_props.os.fsync
+    fsync_calls = 0
+
+    def fail_during_temp_fsync(descriptor: int) -> None:
+        nonlocal fsync_calls
+        fsync_calls += 1
+        if fsync_calls == 2:
+            raise OSError("injected sidecar fsync failure")
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(staged_props.os, "fsync", fail_during_temp_fsync)
+    result = staged_props.main(
+        [
+            "--project-root",
+            str(project_root),
+            "--glb",
+            str(staged["hull_breach_seal_point"]),
+            "--asset-id",
+            "hull_breach_seal_point",
+            "--sidecar-out",
+            str(output),
+        ]
+    )
+
+    assert result == 1
+    assert fsync_calls == 2
+    assert not output.exists()
+    assert not list(output.parent.glob(f".{output.name}.*.tmp"))
 
 
 def test_cli_preserves_existing_output_when_validation_fails(
