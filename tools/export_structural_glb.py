@@ -17,12 +17,15 @@ Run it through Blender, for example::
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
+import re
 import sys
 from typing import Any, Sequence
 
 
 _ALLOWED_VARIANTS = frozenset(("intact", "damaged", "breached"))
+_MODULE_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]+")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -157,30 +160,78 @@ def _output_path(staging_dir: Path, module_id: str, variant: str) -> Path:
     return staging_dir / f"{module_id}{suffix}.glb"
 
 
+def _validate_module_id(module_id: str) -> str:
+    """Ensure the module ID can only name a file within the staging directory."""
+
+    if not _MODULE_ID_PATTERN.fullmatch(module_id):
+        raise ValueError(
+            f"invalid module id {module_id!r}; expected only alphanumeric, "
+            "underscore, or hyphen characters"
+        )
+    return module_id
+
+
+def _temporary_output_path(glb_path: Path) -> Path:
+    """Return a temporary sibling path for an atomic GLB export."""
+
+    return glb_path.with_name(f".{glb_path.stem}.tmp{glb_path.suffix}")
+
+
 def export_blend(args: argparse.Namespace, bpy: Any) -> list[Path]:
     """Open the source and export every selected variant collection."""
 
     bpy.ops.wm.open_mainfile(filepath=str(args.blend_path))
-    module_id = args.module or _detect_module_id(bpy)
-    args.staging_dir.mkdir(parents=True, exist_ok=True)
+    module_id = _validate_module_id(str(args.module or _detect_module_id(bpy)))
     collections = _collections_to_export(bpy)
 
-    exported: list[Path] = []
+    variants: list[tuple[Any, str]] = []
+    seen_variants: set[str] = set()
     for collection in collections:
-        variant = _variant_role(collection) if collection.name.startswith("Export_") else "intact"
-        glb_path = _output_path(args.staging_dir, module_id, variant)
-        _select_collection_objects(bpy, collection)
-        bpy.ops.export_scene.gltf(
-            filepath=str(glb_path),
-            export_format="GLB",
-            export_apply=True,
-            use_selection=True,
+        variant = (
+            _variant_role(collection)
+            if collection.name.startswith("Export_")
+            else "intact"
         )
-        if not glb_path.is_file():
-            raise FileNotFoundError(f"Blender did not create GLB output: {glb_path}")
-        byte_count = glb_path.stat().st_size
-        if byte_count <= 0:
-            raise ValueError(f"Blender created an empty GLB output: {glb_path}")
+        if variant in seen_variants:
+            raise ValueError(
+                f"duplicate variant_role {variant!r} on collection {collection.name!r}"
+            )
+        seen_variants.add(variant)
+        variants.append((collection, variant))
+
+    args.staging_dir.mkdir(parents=True, exist_ok=True)
+    exported: list[Path] = []
+    for collection, variant in variants:
+        glb_path = _output_path(args.staging_dir, module_id, variant)
+        temporary_path = _temporary_output_path(glb_path)
+        temporary_path.unlink(missing_ok=True)
+        _select_collection_objects(bpy, collection)
+        try:
+            result = bpy.ops.export_scene.gltf(
+                filepath=str(temporary_path),
+                export_format="GLB",
+                export_apply=True,
+                use_selection=True,
+            )
+            if result is not None and "CANCELLED" in result:
+                print(
+                    f"WARNING: Blender cancelled GLB export for module={module_id} "
+                    f"variant={variant}",
+                    file=sys.stderr,
+                )
+                continue
+            if not temporary_path.is_file():
+                raise FileNotFoundError(
+                    f"Blender did not create temporary GLB output: {temporary_path}"
+                )
+            byte_count = temporary_path.stat().st_size
+            if byte_count <= 0:
+                raise ValueError(
+                    f"Blender created an empty temporary GLB output: {temporary_path}"
+                )
+            os.replace(temporary_path, glb_path)
+        finally:
+            temporary_path.unlink(missing_ok=True)
         print(
             "STRUCTURAL_GLB_EXPORTED "
             f"module={module_id} variant={variant} "
