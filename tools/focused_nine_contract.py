@@ -9,7 +9,6 @@ from __future__ import annotations
 import math
 import re
 from pathlib import Path
-from typing import Any
 
 
 STRUCTURAL_IDS: tuple[str, ...] = (
@@ -66,10 +65,6 @@ _METRIC_FIELDS = (
     "bounds",
 )
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-
-
-class _InvalidReport(Exception):
-    """Internal marker used only to keep validation helpers small."""
 
 
 def _project_root(project_root: Path) -> Path:
@@ -168,27 +163,34 @@ def _append_missing_fields(
 
 
 def _append_nonfinite(value: object, label: str, errors: list[str], seen: set[int]) -> None:
-    """Collect non-finite floats anywhere in a JSON-like document."""
+    """Collect non-finite floats anywhere in a JSON-like document.
 
-    if isinstance(value, float):
-        if not math.isfinite(value):
-            errors.append(f"{label} contains non-finite value")
-        return
-    if isinstance(value, dict):
-        identity = id(value)
-        if identity in seen:
-            return
-        seen.add(identity)
-        for key in sorted(value, key=str):
-            _append_nonfinite(value[key], f"{label}.{key}", errors, seen)
-        return
-    if isinstance(value, (list, tuple)):
-        identity = id(value)
-        if identity in seen:
-            return
-        seen.add(identity)
-        for index, item in enumerate(value):
-            _append_nonfinite(item, f"{label}[{index}]", errors, seen)
+    The explicit stack keeps validation total for deeply nested payloads while
+    ``seen`` preserves cycle safety and shared-container traversal semantics.
+    """
+
+    stack: list[tuple[object, str]] = [(value, label)]
+    while stack:
+        current, current_label = stack.pop()
+        if isinstance(current, float):
+            if not math.isfinite(current):
+                errors.append(f"{current_label} contains non-finite value")
+            continue
+        if isinstance(current, dict):
+            identity = id(current)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            for key in reversed(sorted(current, key=str)):
+                stack.append((current[key], f"{current_label}.{key}"))
+            continue
+        if isinstance(current, (list, tuple)):
+            identity = id(current)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            for index in range(len(current) - 1, -1, -1):
+                stack.append((current[index], f"{current_label}[{index}]"))
 
 
 def _is_nonnegative_int(value: object) -> bool:
@@ -336,8 +338,23 @@ def _validate_asset(asset: object, index: int, errors: list[str]) -> None:
     if first_error is not None and not isinstance(first_error, str):
         errors.append(f"{label}.first_error must be a string or null")
 
+    passed = asset.get("pass")
+    if isinstance(passed, bool):
+        if passed:
+            if isinstance(validation, list) and validation:
+                errors.append(f"{label}.validation must be empty when pass is true")
+            if first_error is not None:
+                errors.append(f"{label}.first_error must be null when pass is true")
+        else:
+            if isinstance(validation, list) and not validation:
+                errors.append(f"{label}.validation must be non-empty when pass is false")
+            if not isinstance(first_error, str) or not first_error:
+                errors.append(
+                    f"{label}.first_error must be a non-empty string when pass is false"
+                )
 
-def validate_report(document: dict) -> list[str]:
+
+def validate_report(document: object) -> list[str]:
     """Return deterministic, sorted diagnostics for a comparison report.
 
     An empty list is the only valid result.  Validation is intentionally
@@ -380,6 +397,24 @@ def validate_report(document: dict) -> list[str]:
             errors.append(f"{field} must be an object")
     if "overall_pass" in document and not isinstance(document["overall_pass"], bool):
         errors.append("overall_pass must be a boolean")
+
+    assets = document.get("assets")
+    overall_pass = document.get("overall_pass")
+    if isinstance(assets, list) and isinstance(overall_pass, bool):
+        asset_passes = [
+            asset["pass"]
+            for asset in assets
+            if isinstance(asset, dict) and isinstance(asset.get("pass"), bool)
+        ]
+        if len(asset_passes) == len(assets):
+            expected_overall_pass = all(asset_passes)
+            if overall_pass != expected_overall_pass:
+                errors.append("overall_pass must equal all asset pass values")
+            if overall_pass and any(
+                isinstance(asset, dict) and asset.get("first_error") is not None
+                for asset in assets
+            ):
+                errors.append("overall_pass must be false when any asset has a failure error")
 
     _append_nonfinite(document, "report", errors, set())
     return sorted(errors)

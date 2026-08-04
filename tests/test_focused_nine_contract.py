@@ -315,3 +315,73 @@ def test_report_source_paths_must_be_normalized_project_relative_strings() -> No
 
     assert errors == sorted(errors)
     assert "asset[0].source_path must be a normalized project-relative path" in errors
+
+
+def test_report_nonfinite_scan_is_iterative_cycle_safe_and_deterministic() -> None:
+    document = _valid_report()
+    nested: dict[str, object] = {}
+    cursor = nested
+    for _ in range(1100):
+        child: dict[str, object] = {}
+        cursor["child"] = child
+        cursor = child
+    cursor["value"] = math.inf
+    preview = {"cycle": None, "nested": nested}
+    preview["cycle"] = preview
+    document["preview"] = preview
+
+    errors = contract.validate_report(document)
+    expected = f"report.preview.nested{'.child' * 1100}.value contains non-finite value"
+
+    assert errors == [expected]
+    assert errors == contract.validate_report(document)
+
+
+def test_report_rejects_pass_true_asset_failure_fields() -> None:
+    document = _valid_report()
+    asset = document["assets"][0]
+    asset["validation"] = ["unexpected warning"]
+    asset["first_error"] = "unexpected failure"
+
+    errors = contract.validate_report(document)
+
+    assert errors == sorted(errors)
+    assert "asset[0].validation must be empty when pass is true" in errors
+    assert "asset[0].first_error must be null when pass is true" in errors
+    assert "overall_pass must be false when any asset has a failure error" in errors
+
+
+def test_report_rejects_pass_false_asset_without_failure_details() -> None:
+    document = _valid_report()
+    asset = document["assets"][0]
+    asset["validation"] = []
+    asset["pass"] = False
+    asset["first_error"] = ""
+    document["overall_pass"] = False
+
+    errors = contract.validate_report(document)
+
+    assert errors == sorted(errors)
+    assert "asset[0].validation must be non-empty when pass is false" in errors
+    assert "asset[0].first_error must be a non-empty string when pass is false" in errors
+
+
+def test_report_overall_pass_must_equal_all_asset_pass_values() -> None:
+    document = _valid_report()
+    document["overall_pass"] = False
+
+    errors = contract.validate_report(document)
+
+    assert errors == sorted(errors)
+    assert "overall_pass must equal all asset pass values" in errors
+
+    document = _valid_report()
+    asset = document["assets"][0]
+    asset["validation"] = ["failed validation"]
+    asset["pass"] = False
+    asset["first_error"] = "failed validation"
+
+    errors = contract.validate_report(document)
+
+    assert errors == sorted(errors)
+    assert "overall_pass must equal all asset pass values" in errors
