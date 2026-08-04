@@ -345,13 +345,91 @@ def _material_users(material: Any) -> Iterable[Any]:
                 break
 
 
+def _object_parent_chain(obj: Any) -> Iterable[Any]:
+    current = getattr(obj, "parent", None)
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        yield current
+        current = getattr(current, "parent", None)
+
+
+def _collection_property(collection: Any, key: str, default: Any = None) -> Any:
+    getter = getattr(collection, "get", None)
+    if callable(getter):
+        return getter(key, default)
+    return default
+
+
+def _object_matches_focused_asset(obj: Any, asset_id: str) -> bool:
+    """Prove that a generated material user belongs to *asset_id*.
+
+    The generated marker and asset id are necessary but not sufficient: an
+    authored object can carry copied ID properties. Structural objects must
+    also descend from the exact module root (with matching ``module_id``) and
+    live in the known geometry/export namespace. Props must live in their
+    exact generated collection. This keeps a same-id object in another module
+    or collection on the authored/non-owned failure path.
+    """
+
+    if getattr(obj, "type", None) != "MESH":
+        return False
+    getter = getattr(obj, "get", None)
+    if not callable(getter):
+        return False
+    if getter("focused_nine_generated") is not True:
+        return False
+    if getter("focused_nine_asset_id") != asset_id:
+        return False
+
+    collections = tuple(getattr(obj, "users_collection", ()))
+    if asset_id in STRUCTURAL_ASSET_IDS:
+        expected_root_name = f"ModuleRoot_{asset_id}"
+        matching_roots = tuple(
+            parent
+            for parent in _object_parent_chain(obj)
+            if getattr(parent, "name", None) == expected_root_name
+        )
+        if not matching_roots:
+            return False
+        allowed_collections = {
+            "Geometry",
+            "Export_intact",
+            "Export_damaged",
+            "Export_breached",
+        }
+        return any(
+            getattr(collection, "name", None) in allowed_collections
+            and (
+                _collection_property(collection, "module_id") == asset_id
+                or (
+                    getattr(collection, "name", None) == "Geometry"
+                    and any(
+                        _collection_property(parent, "module_id") == asset_id
+                        for parent in matching_roots
+                    )
+                )
+            )
+            for collection in collections
+        )
+
+    expected_collection_name = f"FocusedNine_{asset_id}_Generated"
+    return any(
+        getattr(collection, "name", None) == expected_collection_name
+        and _collection_property(collection, "module_id", asset_id) == asset_id
+        for collection in collections
+    )
+
+
 def _is_focused_generated_material_user(obj: Any) -> bool:
     getter = getattr(obj, "get", None)
     if not callable(getter):
         return False
+    asset_id = getter("focused_nine_asset_id")
     return (
-        getter("focused_nine_generated") is True
-        and getter("focused_nine_asset_id") in ALL_ASSET_IDS
+        isinstance(asset_id, str)
+        and asset_id in ALL_ASSET_IDS
+        and _object_matches_focused_asset(obj, asset_id)
     )
 
 
@@ -377,16 +455,32 @@ def _verified_material_remnants(materials: Iterable[Any], library_key: str, name
     ]
 
 
+def _preserved_material_name(material: Any, canonical_name: str) -> str:
+    """Return a deterministic unused name for an owned legacy material."""
+
+    bpy = _require_bpy()
+    base = f"{canonical_name}.legacy"
+    candidate = base
+    index = 1
+    while True:
+        existing = bpy.data.materials.get(candidate)
+        if existing is None or existing is material:
+            return candidate
+        candidate = f"{base}.{index:03d}"
+        index += 1
+
+
 def ensure_material_library(
     project_root: Path, structural_root: Path, props_root: Path
 ) -> dict[str, Any]:
-    """Load exact canonical materials from the verified salvage library.
+    """Load or safely repair exact canonical materials from salvage library.
 
-    The canonical name is a hard namespace boundary.  A same-name material
-    without matching library provenance is never renamed, deleted, or used;
-    the recipe fails before any generated geometry mutation instead.  A
-    suffixed datablock is repaired only when its provenance is exact and every
-    object user is already an owned focused-nine generated object.
+    A non-owned/authored user is a hard stop before any source mutation. An
+    unproven canonical datablock is repairable only when every actual mesh user
+    is an owned focused-nine object in the exact module/collection namespace.
+    Repair appends the real material from the configured salvage library,
+    relinks only those generated users, and preserves the old datablock under a
+    fake-user legacy name rather than marking it as verified.
     """
 
     global _VERIFIED_MATERIALS
@@ -423,25 +517,11 @@ def ensure_material_library(
             + ", ".join(missing_from_library)
         )
 
-    # Preflight every canonical slot before renaming or appending anything.
-    # This is what makes an authored collision a loud, source-safe failure.
+    # Preflight every canonical slot before renaming, relinking, or appending.
+    # This makes authored collisions a loud, source-safe failure and ensures a
+    # later missing-library failure cannot leave an earlier material renamed.
     plans: dict[str, tuple[str, Any | None]] = {}
     for canonical_name in REQUIRED_MATERIAL_NAMES:
-        existing = bpy.data.materials.get(canonical_name)
-        if existing is not None:
-            if not _material_is_verified_library(existing, library_key, canonical_name):
-                raise RuntimeError(
-                    f"canonical material {canonical_name!r} is occupied by a non-owned "
-                    "material; refusing to rename, delete, or use it"
-                )
-            if _material_has_authored_user(existing):
-                raise RuntimeError(
-                    f"canonical material {canonical_name!r} has an authored user; "
-                    "refusing to use or remediate it"
-                )
-            plans[canonical_name] = ("existing", existing)
-            continue
-
         remnants = _verified_material_remnants(
             bpy.data.materials, library_key, canonical_name
         )
@@ -450,13 +530,36 @@ def ensure_material_library(
                 f"multiple verified focused-nine remnants compete for canonical material "
                 f"{canonical_name!r}; refusing to guess"
             )
-        if remnants:
-            remnant = remnants[0]
-            if _material_has_authored_user(remnant):
+        remnant = remnants[0] if remnants else None
+        if remnant is not None and _material_has_authored_user(remnant):
+            raise RuntimeError(
+                f"verified remnant {remnant.name!r} for canonical material "
+                f"{canonical_name!r} has an authored user; refusing to rename it; "
+                "one-time manual migration required"
+            )
+
+        existing = bpy.data.materials.get(canonical_name)
+        if existing is not None:
+            if _material_is_verified_library(existing, library_key, canonical_name):
+                if _material_has_authored_user(existing):
+                    raise RuntimeError(
+                        f"canonical material {canonical_name!r} has an authored user; "
+                        "refusing to use or remediate it; one-time manual migration "
+                        "required"
+                    )
+                plans[canonical_name] = ("existing", existing)
+                continue
+
+            if _material_has_authored_user(existing):
                 raise RuntimeError(
-                    f"verified remnant {remnant.name!r} for canonical material "
-                    f"{canonical_name!r} has an authored user; refusing to rename it"
+                    f"canonical material {canonical_name!r} is occupied by a non-owned "
+                    "material; refusing to rename, delete, or use it; one-time manual "
+                    "migration required"
                 )
+            plans[canonical_name] = ("remediate", existing)
+            continue
+
+        if remnant is not None:
             plans[canonical_name] = ("rename", remnant)
         else:
             plans[canonical_name] = ("load", None)
@@ -476,7 +579,9 @@ def ensure_material_library(
             materials[canonical_name] = material
 
     requested_materials = tuple(
-        name for name, (action, _material) in plans.items() if action == "load"
+        name
+        for name, (action, _material) in plans.items()
+        if action in {"load", "remediate"}
     )
     if requested_materials:
         with bpy.data.libraries.load(str(library_path), link=False) as (_data_from, data_to):
@@ -489,17 +594,27 @@ def ensure_material_library(
                 "required materials were not loaded from the configured library: "
                 + ", ".join(requested_materials)
             )
-        for source_name, material in zip(requested_materials, loaded_materials, strict=True):
-            if material.name != source_name:
+        for source_name, loaded in zip(requested_materials, loaded_materials, strict=True):
+            action, legacy = plans[source_name]
+            if action == "load" and loaded.name != source_name:
                 raise RuntimeError(
-                    f"material library load produced non-canonical name {material.name!r} "
+                    f"material library load produced non-canonical name {loaded.name!r} "
                     f"for {source_name!r}"
                 )
-            material["focused_nine_source_library"] = library_key
+            loaded["focused_nine_source_library"] = library_key
             # Blender treats an IDProperty string equal to a datablock name as
             # an ID pointer. Prefixing it keeps provenance a stable string.
-            material["focused_nine_source_name"] = f"focused-nine:{source_name}"
-            materials[source_name] = material
+            loaded["focused_nine_source_name"] = f"focused-nine:{source_name}"
+            if action == "remediate":
+                assert legacy is not None
+                for obj in bpy.data.objects:
+                    for slot in getattr(obj, "material_slots", ()):
+                        if getattr(slot, "material", None) is legacy:
+                            slot.material = loaded
+                legacy.name = _preserved_material_name(legacy, source_name)
+                legacy.use_fake_user = True
+                loaded.name = source_name
+            materials[source_name] = loaded
 
     if set(materials) != set(REQUIRED_MATERIAL_NAMES) or any(
         material.name != name

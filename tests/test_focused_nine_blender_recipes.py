@@ -527,20 +527,6 @@ def test_blender_authored_material_collision_fails_before_mutation(tmp_path: Pat
     material_dir.mkdir()
     shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
 
-    seed_expr = (
-        "import bpy; "
-        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
-        "authored=bpy.data.materials['MAT_PaintedAlloyGray']; "
-        "authored['authored_marker']='must-preserve'; authored.use_fake_user=True; "
-        f"bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})"
-    )
-    seeded = subprocess.run(
-        [str(BLENDER), "--background", "--factory-startup", "--python-expr", seed_expr],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert seeded.returncode == 0, seeded.stdout + seeded.stderr
     before = source_blend.read_bytes()
 
     result = _recipe_with_external_material_library(
@@ -553,6 +539,7 @@ def test_blender_authored_material_collision_fails_before_mutation(tmp_path: Pat
     )
     assert result.returncode == 1
     assert "refusing to rename, delete, or use" in result.stdout + result.stderr
+    assert "one-time manual migration required" in result.stdout + result.stderr
     assert source_blend.read_bytes() == before
 
     proof_expr = (
@@ -571,7 +558,7 @@ def test_blender_authored_material_collision_fails_before_mutation(tmp_path: Pat
     collision_line = next(line for line in proof.stdout.splitlines() if line.startswith("COLLISION_PROOF "))
     collision = json.loads(collision_line.removeprefix("COLLISION_PROOF "))
     assert collision["name"] == "MAT_PaintedAlloyGray"
-    assert collision["marker"] == "must-preserve"
+    assert collision["marker"] is None
 
 
 def test_blender_owned_suffixed_library_remnant_is_repaired_canonically(
@@ -647,6 +634,152 @@ def test_blender_owned_suffixed_library_remnant_is_repaired_canonically(
         "suffixed": False,
         "source": "focused-nine:MAT_PaintedAlloyGray",
         "library": str(MATERIAL_FIXTURE),
+    }
+
+    destination = tmp_path / "assets/_staging/focused_nine/structural/floor_1x1"
+    glb = _export_recipe_result_for_evidence(
+        source=source_blend,
+        asset_id="floor_1x1",
+        kind="structural",
+        destination=destination,
+    )
+    from tools import focused_nine_evidence
+
+    evidence = focused_nine_evidence.inspect_staged_glb(glb, BLENDER)
+    assert evidence["material_names"] == [
+        "MAT_Conduit",
+        "MAT_PaintedAlloyGray",
+        "MAT_WarningStripe",
+    ]
+
+
+def test_blender_verified_remnant_with_wrong_module_context_is_rejected(
+    tmp_path: Path,
+) -> None:
+    for fixture in (BLENDER, SOURCE_FIXTURE, MATERIAL_FIXTURE):
+        if not fixture.is_file():
+            pytest.fail(f"fixture missing: {fixture}")
+
+    structural_root = tmp_path / "structural"
+    source_dir = structural_root / "floor_1x1"
+    source_dir.mkdir(parents=True)
+    source_blend = source_dir / "floor_1x1.blend"
+    shutil.copy2(SOURCE_FIXTURE, source_blend)
+    props_root = tmp_path / "props"
+    props_root.mkdir()
+    material_dir = tmp_path / "materials"
+    material_dir.mkdir()
+    shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+
+    seed_expr = (
+        "import bpy; "
+        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+        "canonical=bpy.data.materials['MAT_PaintedAlloyGray']; "
+        "[setattr(slot, 'material', None) for obj in bpy.data.objects for slot in obj.material_slots if slot.material is canonical]; "
+        "bpy.data.materials.remove(canonical); "
+        "wrong_root=bpy.data.objects.new('ModuleRoot_wall_straight_1x1', None); "
+        "bpy.context.scene.collection.objects.link(wrong_root); "
+        "generated=bpy.data.objects['FocusedNine_floor_1x1_floor_panel']; generated.parent=wrong_root; "
+        f"bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})"
+    )
+    seeded = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", seed_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert seeded.returncode == 0, seeded.stdout + seeded.stderr
+    before = source_blend.read_bytes()
+
+    result = _recipe_with_external_material_library(
+        _recipe_command(
+            project_root=PROJECT_ROOT,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id="floor_1x1",
+        )
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "has an authored user" in result.stdout + result.stderr
+    assert source_blend.read_bytes() == before
+
+
+def test_blender_owned_canonical_legacy_material_is_repaired_from_library(
+    tmp_path: Path,
+) -> None:
+    for fixture in (BLENDER, SOURCE_FIXTURE, MATERIAL_FIXTURE):
+        if not fixture.is_file():
+            pytest.fail(f"fixture missing: {fixture}")
+
+    structural_root = tmp_path / "structural"
+    source_dir = structural_root / "floor_1x1"
+    source_dir.mkdir(parents=True)
+    source_blend = source_dir / "floor_1x1.blend"
+    shutil.copy2(SOURCE_FIXTURE, source_blend)
+    props_root = tmp_path / "props"
+    props_root.mkdir()
+    material_dir = tmp_path / "materials"
+    material_dir.mkdir()
+    shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+
+    seed_expr = (
+        "import bpy; "
+        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+        "canonical=bpy.data.materials['MAT_PaintedAlloyGray']; "
+        "[setattr(slot, 'material', None) for obj in bpy.data.objects for slot in obj.material_slots if slot.material is canonical]; "
+        "bpy.data.materials.remove(canonical); "
+        "legacy=bpy.data.materials['MAT_PaintedAlloyGray.001']; legacy.name='MAT_PaintedAlloyGray'; "
+        "[legacy.__delitem__(key) for key in ('focused_nine_source_library', 'focused_nine_source_name') if key in legacy]; "
+        f"bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})"
+    )
+    seeded = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", seed_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert seeded.returncode == 0, seeded.stdout + seeded.stderr
+
+    result = _recipe_with_external_material_library(
+        _recipe_command(
+            project_root=PROJECT_ROOT,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id="floor_1x1",
+        )
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    report, _report_line = _report_from_stdout(result.stdout)
+    assert report["material_names"] == [
+        "MAT_Conduit",
+        "MAT_PaintedAlloyGray",
+        "MAT_WarningStripe",
+    ]
+
+    proof_expr = (
+        "import bpy,json; "
+        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+        "generated=bpy.data.objects['FocusedNine_floor_1x1_floor_panel']; mat=generated.data.materials[0]; "
+        "legacy=bpy.data.materials.get('MAT_PaintedAlloyGray.legacy'); "
+        "print('CANONICAL_LEGACY_PROOF '+json.dumps({'generated':mat.name,'library':mat.get('focused_nine_source_library'),'source':mat.get('focused_nine_source_name'),'legacy_preserved':legacy is not None,'legacy_fake_user':legacy.use_fake_user if legacy else None,'legacy_users':legacy.users if legacy else None,'legacy_mesh_users':sum(1 for obj in bpy.data.objects if obj.type == 'MESH' for slot in obj.material_slots if slot.material is legacy)}))"
+    )
+    proof = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", proof_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proof.returncode == 0, proof.stdout + proof.stderr
+    proof_line = next(line for line in proof.stdout.splitlines() if line.startswith("CANONICAL_LEGACY_PROOF "))
+    canonical_legacy = json.loads(proof_line.removeprefix("CANONICAL_LEGACY_PROOF "))
+    assert canonical_legacy == {
+        "generated": "MAT_PaintedAlloyGray",
+        "library": str(MATERIAL_FIXTURE),
+        "source": "focused-nine:MAT_PaintedAlloyGray",
+        "legacy_preserved": True,
+        "legacy_fake_user": True,
+        "legacy_users": 1,
+        "legacy_mesh_users": 0,
     }
 
 
