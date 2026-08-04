@@ -19,15 +19,13 @@ import struct
 import subprocess
 import sys
 import tempfile
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
+from typing import NoReturn
 
 ASSET_ID = "pressure_door_1x1"
 _VARIANT_ROLES: tuple[str, ...] = ("intact", "damaged", "breached")
 _VARIANT_SUFFIXES = {"intact": "", "damaged": "_damaged", "breached": "_breached"}
-_STAGED_ASSET_RELATIVE = Path(
-    "assets/_staging/focused_nine/structural/pressure_door_1x1"
-)
 _CANONICAL_IMPORT_RELATIVE = Path(
     "assets/imported/structural/ship_structural_v0/pressure_door_1x1"
 )
@@ -216,13 +214,166 @@ def _staged_variant_paths(staging_root: Path) -> dict[str, Path]:
     return paths
 
 
+_GLB_COMPONENT_SIZES = {
+    5120: 1,
+    5121: 1,
+    5122: 2,
+    5123: 2,
+    5125: 4,
+    5126: 4,
+}
+_GLB_TYPE_COMPONENT_COUNTS = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}
+_GLB_INDEX_COMPONENT_TYPES = {5121, 5123, 5125}
+
+
+def _validate_glb_semantics(
+    document: dict[str, object], bin_payload: bytes | None, invalid: Callable[[str], NoReturn]
+) -> None:
+    """Reject GLB containers that do not reference bounded vertex geometry."""
+
+    meshes = document.get("meshes")
+    if not isinstance(meshes, list) or not meshes:
+        invalid("no meshes")
+        return
+
+    buffers = document.get("buffers")
+    buffer_views = document.get("bufferViews")
+    accessors = document.get("accessors")
+    if not isinstance(buffers, list) or not buffers:
+        invalid("missing buffers")
+    if not isinstance(buffer_views, list) or not buffer_views:
+        invalid("missing buffer views")
+    if not isinstance(accessors, list) or not accessors:
+        invalid("missing accessors")
+
+    def require_index(value: object, size: int, detail: str) -> int:
+        if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value < size:
+            invalid(detail)
+        return value
+
+    buffer_lengths: list[int] = []
+    for buffer_index, buffer in enumerate(buffers):
+        if not isinstance(buffer, dict):
+            invalid(f"buffer {buffer_index} is invalid")
+        byte_length = buffer.get("byteLength")
+        if not isinstance(byte_length, int) or isinstance(byte_length, bool) or byte_length < 0:
+            invalid(f"buffer {buffer_index} byteLength is invalid")
+        buffer_lengths.append(byte_length)
+    if bin_payload is None:
+        invalid("missing BIN chunk for buffers")
+    if buffer_lengths[0] > len(bin_payload or b""):
+        invalid("buffer 0 exceeds BIN chunk")
+
+    view_records: list[tuple[int, int, int, int | None]] = []
+    for view_index, view in enumerate(buffer_views):
+        if not isinstance(view, dict):
+            invalid(f"bufferView {view_index} is invalid")
+        buffer_index = require_index(
+            view.get("buffer"), len(buffer_lengths), f"bufferView {view_index} buffer reference"
+        )
+        if buffer_index != 0:
+            invalid(f"bufferView {view_index} references unavailable buffer")
+        byte_offset = view.get("byteOffset", 0)
+        byte_length = view.get("byteLength")
+        byte_stride = view.get("byteStride")
+        if not isinstance(byte_offset, int) or isinstance(byte_offset, bool) or byte_offset < 0:
+            invalid(f"bufferView {view_index} byteOffset is invalid")
+        if not isinstance(byte_length, int) or isinstance(byte_length, bool) or byte_length < 0:
+            invalid(f"bufferView {view_index} byteLength is invalid")
+        if byte_stride is not None and (
+            not isinstance(byte_stride, int)
+            or isinstance(byte_stride, bool)
+            or byte_stride < 4
+            or byte_stride > 252
+            or byte_stride % 4
+        ):
+            invalid(f"bufferView {view_index} byteStride is invalid")
+        if byte_offset + byte_length > buffer_lengths[buffer_index]:
+            invalid(f"bufferView {view_index} exceeds buffer bounds")
+        if buffer_index == 0 and byte_offset + byte_length > len(bin_payload or b""):
+            invalid(f"bufferView {view_index} exceeds BIN bounds")
+        view_records.append((buffer_index, byte_offset, byte_length, byte_stride))
+
+    def validate_accessor(
+        accessor_value: object,
+        expected_type: str,
+        label: str,
+        allowed_components: set[int] | None = None,
+    ) -> None:
+        accessor_index = require_index(accessor_value, len(accessors), f"{label} accessor reference")
+        accessor = accessors[accessor_index]
+        if not isinstance(accessor, dict):
+            invalid(f"{label} accessor is invalid")
+        buffer_view_index = require_index(
+            accessor.get("bufferView"), len(view_records), f"{label} bufferView reference"
+        )
+        component_type = accessor.get("componentType")
+        count = accessor.get("count")
+        accessor_type = accessor.get("type")
+        if not isinstance(component_type, int) or component_type not in _GLB_COMPONENT_SIZES:
+            invalid(f"{label} accessor component type is invalid")
+        if allowed_components is not None and (
+            not isinstance(component_type, int) or component_type not in allowed_components
+        ):
+            invalid(f"{label} accessor component type is invalid")
+        if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
+            invalid(f"{label} accessor count is invalid")
+        if accessor_type != expected_type:
+            invalid(f"{label} accessor type is invalid")
+        accessor_offset = accessor.get("byteOffset", 0)
+        if not isinstance(accessor_offset, int) or isinstance(accessor_offset, bool) or accessor_offset < 0:
+            invalid(f"{label} accessor byteOffset is invalid")
+
+        buffer_index, view_offset, view_length, byte_stride = view_records[buffer_view_index]
+        element_size = _GLB_COMPONENT_SIZES[component_type] * _GLB_TYPE_COMPONENT_COUNTS[expected_type]
+        stride = byte_stride or element_size
+        if stride < element_size:
+            invalid(f"{label} accessor stride is invalid")
+        referenced_length = (count - 1) * stride + element_size
+        if accessor_offset + referenced_length > view_length:
+            invalid(f"{label} accessor exceeds bufferView bounds")
+        absolute_end = view_offset + accessor_offset + referenced_length
+        if absolute_end > buffer_lengths[buffer_index]:
+            invalid(f"{label} accessor exceeds buffer bounds")
+        if buffer_index == 0 and absolute_end > len(bin_payload or b""):
+            invalid(f"{label} accessor exceeds BIN bounds")
+
+        if label == "POSITION" and component_type != 5126:
+            invalid("POSITION accessor component type is invalid")
+
+    for mesh_index, mesh in enumerate(meshes):
+        if not isinstance(mesh, dict):
+            invalid(f"mesh {mesh_index} is invalid")
+        primitives = mesh.get("primitives")
+        if not isinstance(primitives, list) or not primitives:
+            invalid(f"mesh {mesh_index} has no primitives")
+        for primitive_index, primitive in enumerate(primitives):
+            if not isinstance(primitive, dict):
+                invalid(f"primitive {mesh_index}:{primitive_index} is invalid")
+            attributes = primitive.get("attributes")
+            if not isinstance(attributes, dict) or "POSITION" not in attributes:
+                invalid(f"primitive {mesh_index}:{primitive_index} has no POSITION")
+            validate_accessor(
+                attributes["POSITION"],
+                "VEC3",
+                "POSITION",
+            )
+            if "indices" in primitive:
+                validate_accessor(
+                    primitive["indices"],
+                    "SCALAR",
+                    "indices",
+                    _GLB_INDEX_COMPONENT_TYPES,
+                )
+
+
 def _validate_glb(path: Path, role: str) -> None:
     try:
         payload = path.read_bytes()
     except OSError as exc:
         raise ValueError(f"cannot read staged variant {role}: {path}") from exc
 
-    def invalid(detail: str) -> None:
+    def invalid(detail: str) -> NoReturn:
         raise ValueError(f"invalid staged variant {role} GLB {detail}")
 
     if len(payload) < 12:
@@ -235,6 +386,7 @@ def _validate_glb(path: Path, role: str) -> None:
     json_document: object | None = None
     json_chunks = 0
     bin_chunks = 0
+    bin_payload: bytes | None = None
     chunk_index = 0
     while cursor < declared_length:
         if declared_length - cursor < 8:
@@ -263,6 +415,7 @@ def _validate_glb(path: Path, role: str) -> None:
             bin_chunks += 1
             if bin_chunks != 1:
                 invalid("contains more than one BIN chunk")
+            bin_payload = payload[cursor:chunk_end]
         else:
             invalid("unknown chunk type")
         cursor = chunk_end
@@ -276,19 +429,20 @@ def _validate_glb(path: Path, role: str) -> None:
             invalid("declares buffers without one BIN chunk")
     elif bin_chunks:
         invalid("contains BIN chunk without buffers")
+    _validate_glb_semantics(json_document, bin_payload, invalid)
 
 
 def _package_sources(project_root: Path, staging_root: Path, staged_package: Path) -> dict[str, Path]:
-    project_package = project_root / _STAGED_ASSET_RELATIVE
     sources: dict[str, Path] = {}
     for filename in _PACKAGE_FILENAMES:
         staged_candidate = staged_package / filename
-        project_candidate = project_package / filename
-        if staged_candidate.exists() or staged_candidate.is_symlink():
-            source = _contained(staging_root, staged_candidate, "staged wrapper resource")
-        else:
-            source = project_candidate
-        sources[filename] = _regular_file(source, f"staged wrapper resource {filename}")
+        source = _contained(staging_root, staged_candidate, "staged wrapper resource")
+        try:
+            sources[filename] = _regular_file(source, f"staged wrapper resource {filename}")
+        except ValueError as exc:
+            if not staged_candidate.exists() and not staged_candidate.is_symlink():
+                raise ValueError(f"missing staged wrapper resource {filename}") from exc
+            raise
     return sources
 
 
@@ -352,19 +506,36 @@ def _validate_scene_text(scene_text: str) -> None:
         r'(?=[^\]]*\binstance=ExtResource\("(?P<resource_id>[^"]+)"\))[^\]]*\]$'
     )
     visual_bindings: dict[str, str] = {}
-    for line in lines:
+    visual_visibility: dict[str, bool | None] = {}
+    for line_index, line in enumerate(lines):
         match = visual_node_re.match(line)
         if match:
             role = match.group("role").lower()
             if role in visual_bindings:
                 raise ValueError("duplicate staged wrapper visual binding")
             visual_bindings[role] = match.group("resource_id")
+            visible: bool | None = None
+            property_index = line_index + 1
+            while property_index < len(lines) and not lines[property_index].startswith("["):
+                property_line = lines[property_index]
+                if property_line.startswith("visible"):
+                    visible_match = re.fullmatch(r"visible\s*=\s*(true|false)", property_line)
+                    if visible_match is None:
+                        raise ValueError(f"invalid staged wrapper {role} visibility")
+                    visible = visible_match.group(1) == "true"
+                property_index += 1
+            visual_visibility[role] = visible
     if set(visual_bindings) != set(_VARIANT_ROLES):
         raise ValueError("invalid staged wrapper visual binding set")
     for role in _VARIANT_ROLES:
         resource_id = visual_bindings[role]
         if resource_bindings.get(resource_id) != expected_by_role[role]:
             raise ValueError(f"invalid staged wrapper visual binding for {role}")
+        visible = visual_visibility[role]
+        if (role == "intact" and visible is False) or (
+            role in ("damaged", "breached") and visible is not False
+        ):
+            raise ValueError(f"invalid staged wrapper {role} visibility")
 
     expected_anchors = {
         "Anchor_FloorCenter",

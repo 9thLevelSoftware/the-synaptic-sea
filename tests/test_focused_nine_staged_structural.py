@@ -83,6 +83,24 @@ def _tiny_glb() -> bytes:
     )
 
 
+def _empty_node_glb() -> bytes:
+    document = {
+        "asset": {"version": "2.0", "generator": "focused-nine-empty-node-test"},
+        "scene": 0,
+        "scenes": [{"nodes": [0]}],
+        "nodes": [{"name": "EmptyNode"}],
+    }
+    json_bytes = json.dumps(document, separators=(",", ":")).encode("utf-8")
+    json_bytes += b" " * ((-len(json_bytes)) % 4)
+    total_length = 12 + 8 + len(json_bytes)
+    return (
+        b"glTF"
+        + struct.pack("<II", 2, total_length)
+        + struct.pack("<I4s", len(json_bytes), b"JSON")
+        + json_bytes
+    )
+
+
 def _staging_fixture(tmp_path: Path) -> Path:
     package = tmp_path / "staging" / "structural" / ASSET_ID
     package.mkdir(parents=True)
@@ -144,6 +162,33 @@ def test_missing_breached_variant_is_isolated_and_reports_exact_error(tmp_path: 
     errors = validator.validate_pressure_door_overlay(PROJECT_ROOT, staging_root, Path("godot"))
 
     assert errors == ["missing staged variant breached"]
+    assert not (PROJECT_ROOT / CANONICAL_WRAPPER / f"{ASSET_ID}.tscn").exists()
+    assert not (PROJECT_ROOT / CANONICAL_IMPORT).exists()
+
+
+def test_incomplete_selected_staged_package_does_not_fallback_to_project_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    staging_root = _staging_fixture(tmp_path)
+    package = staging_root / "structural" / ASSET_ID
+    for filename in (
+        f"{ASSET_ID}.manifest.json",
+        f"{ASSET_ID}.input.json",
+        f"{ASSET_ID}.tscn",
+    ):
+        (package / filename).unlink()
+
+    calls: list[list[str]] = []
+
+    def fail_if_called(command: list[str], **kwargs: object) -> object:
+        calls.append(command)
+        raise AssertionError("Godot must not run for an incomplete staged package")
+
+    monkeypatch.setattr(validator.subprocess, "run", fail_if_called)
+    errors = validator.validate_pressure_door_overlay(PROJECT_ROOT, staging_root, Path("godot"))
+
+    assert errors == [f"missing staged wrapper resource {ASSET_ID}.manifest.json"]
+    assert calls == []
     assert not (PROJECT_ROOT / CANONICAL_WRAPPER / f"{ASSET_ID}.tscn").exists()
     assert not (PROJECT_ROOT / CANONICAL_IMPORT).exists()
 
@@ -224,6 +269,36 @@ def test_swapped_visual_ext_resource_bindings_are_rejected_before_godot(
     assert calls == []
 
 
+def test_swapped_visual_visibility_states_are_rejected_before_godot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    staging_root = _staging_fixture(tmp_path)
+    package = staging_root / "structural" / ASSET_ID
+    staged_scene = package / f"{ASSET_ID}.tscn"
+    scene = staged_scene.read_text(encoding="utf-8")
+    scene = scene.replace(
+        'name="VisualInstance_Intact" parent="Visual" instance=ExtResource("1_visual_intact")]\nvisible = true',
+        'name="VisualInstance_Intact" parent="Visual" instance=ExtResource("1_visual_intact")]\nvisible = false',
+    )
+    scene = scene.replace(
+        'name="VisualInstance_Damaged" parent="Visual" instance=ExtResource("2_visual_damaged")]\nvisible = false',
+        'name="VisualInstance_Damaged" parent="Visual" instance=ExtResource("2_visual_damaged")]\nvisible = true',
+    )
+    staged_scene.write_text(scene, encoding="utf-8")
+
+    calls: list[list[str]] = []
+
+    def fail_if_called(command: list[str], **kwargs: object) -> object:
+        calls.append(command)
+        raise AssertionError("Godot must not run for swapped wrapper visibility")
+
+    monkeypatch.setattr(validator.subprocess, "run", fail_if_called)
+    errors = validator.validate_pressure_door_overlay(PROJECT_ROOT, staging_root, Path("godot"))
+
+    assert any("visibility" in error for error in errors)
+    assert calls == []
+
+
 @pytest.mark.parametrize(
     ("resource", "mutate", "message"),
     [
@@ -292,6 +367,26 @@ def test_header_only_glb_is_rejected_before_godot(tmp_path: Path, monkeypatch: p
     errors = validator.validate_pressure_door_overlay(PROJECT_ROOT, staging_root, Path("godot"))
 
     assert any("chunk" in error for error in errors)
+    assert calls == []
+
+
+def test_semantically_empty_node_only_glb_is_rejected_before_godot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    staging_root = _staging_fixture(tmp_path)
+    package = staging_root / "structural" / ASSET_ID
+    for path in package.glob("*.glb"):
+        path.write_bytes(_empty_node_glb())
+    calls: list[list[str]] = []
+
+    def fail_if_called(command: list[str], **kwargs: object) -> object:
+        calls.append(command)
+        raise AssertionError("Godot must not run for a semantically empty GLB")
+
+    monkeypatch.setattr(validator.subprocess, "run", fail_if_called)
+    errors = validator.validate_pressure_door_overlay(PROJECT_ROOT, staging_root, Path("godot"))
+
+    assert errors == ["invalid staged variant intact GLB no meshes"]
     assert calls == []
 
 
@@ -374,5 +469,8 @@ def test_smoke_source_has_exact_marker_and_runtime_contract_assertions() -> None
     assert "VisualInstance_Intact" in smoke
     assert "VisualInstance_Damaged" in smoke
     assert "VisualInstance_Breached" in smoke
+    assert "intact.visible" in smoke
+    assert "damaged.visible" in smoke
+    assert "breached.visible" in smoke
     assert "Anchor_FloorCenter" in smoke
     assert "CollisionShape3D" in smoke

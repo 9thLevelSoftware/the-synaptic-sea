@@ -51,6 +51,16 @@ func _initialize() -> void:
         _fail("pressure-door visual variant set mismatch")
         return
 
+    var intact: Node3D = visual.get_node_or_null("VisualInstance_Intact") as Node3D
+    var damaged: Node3D = visual.get_node_or_null("VisualInstance_Damaged") as Node3D
+    var breached: Node3D = visual.get_node_or_null("VisualInstance_Breached") as Node3D
+    if intact == null or damaged == null or breached == null:
+        _fail("pressure-door visual variant nodes missing")
+        return
+    if not intact.visible or damaged.visible or breached.visible:
+        _fail("pressure-door visual default visibility mismatch")
+        return
+
     var collision_count: int = 0
     for child: Node in wrapper.get_children():
         if child is CollisionObject3D:
