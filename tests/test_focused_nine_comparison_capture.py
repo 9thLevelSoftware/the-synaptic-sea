@@ -80,3 +80,24 @@ def test_harness_has_fixed_camera_and_baseline_improved_roots() -> None:
     assert 'type="DirectionalLight3D"' in scene
     assert 'type="Label"' not in scene
     assert 'type="Label3D"' not in scene
+
+
+def test_capture_disables_local_lights_on_every_baseline_stand_in_recursively() -> None:
+    source = _source(CAPTURE_SCRIPT)
+    helper = re.search(
+        r"func _disable_local_lights\(node: Node\) -> void:(?P<body>.*?)(?=\n\nfunc |\Z)",
+        source,
+        flags=re.DOTALL,
+    )
+
+    assert helper is not None
+    helper_body = helper.group("body")
+    assert re.search(r"for\s+child(?::\s*Node)?\s+in\s+node\.get_children\(\)", helper_body)
+    assert "if child is Light3D" in helper_body
+    assert "child.visible = false" in helper_body
+    assert "_disable_local_lights(child)" in helper_body
+
+    for stand_in_name in ("stand_in_supply", "stand_in_breaker", "stand_in_blocked"):
+        stand_in_start = source.index(f"var {stand_in_name}: Node3D")
+        add_child = source.index(f"baseline.add_child({stand_in_name})", stand_in_start)
+        assert source.index(f"_disable_local_lights({stand_in_name})", stand_in_start) < add_child

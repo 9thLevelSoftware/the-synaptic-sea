@@ -150,12 +150,15 @@ func _populate_comparison(baseline: Node3D, improved: Node3D) -> bool:
 		baseline.add_child(baseline_visual)
 
 	var stand_in_supply: Node3D = ReadabilityPropFactoryScript.create_objective_prop(1, "recover_supplies")
+	_disable_local_lights(stand_in_supply)
 	stand_in_supply.position = Vector3(-3.0, 0.0, 3.0)
 	baseline.add_child(stand_in_supply)
 	var stand_in_breaker: Node3D = ReadabilityPropFactoryScript.create_objective_prop(2, "restore_systems")
+	_disable_local_lights(stand_in_breaker)
 	stand_in_breaker.position = Vector3(3.0, 0.0, 3.0)
 	baseline.add_child(stand_in_breaker)
 	var stand_in_blocked: Node3D = ReadabilityPropFactoryScript.create_blocked_biomatter()
+	_disable_local_lights(stand_in_blocked)
 	stand_in_blocked.position = Vector3(0.0, 0.0, -3.5)
 	baseline.add_child(stand_in_blocked)
 
@@ -167,6 +170,13 @@ func _populate_comparison(baseline: Node3D, improved: Node3D) -> bool:
 		improved_visual.position = IMPROVED_LAYOUT[index]
 		improved.add_child(improved_visual)
 	return true
+
+
+func _disable_local_lights(node: Node) -> void:
+	for child: Node in node.get_children():
+		if child is Light3D:
+			child.visible = false
+		_disable_local_lights(child)
 
 
 func _load_glb(path: String, staged: bool) -> Node3D:
