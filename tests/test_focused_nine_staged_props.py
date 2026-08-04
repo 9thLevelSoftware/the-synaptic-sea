@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from tools import focused_nine_staged_props as staged_props
+from tools.focused_nine_contract import runtime_mutation_paths
 from tools.prop_visual_metadata import validate_sidecar
 from tools.focused_nine_staged_props import (
     build_staged_sidecar,
@@ -146,6 +148,193 @@ def test_staged_validator_rejects_symlink_escape(
     assert any("symlink" in error for error in errors)
     with pytest.raises(ValueError, match="symlink"):
         build_staged_sidecar(project_root, escaped, "fire_suppression_station")
+
+
+def test_staged_validator_accepts_a_symlinked_project_root_ancestor(
+    staged_project: tuple[Path, dict[str, Path]],
+) -> None:
+    project_root, staged = staged_project
+    lexical_var = Path("/var")
+    resolved_var = lexical_var.resolve()
+    resolved_project = project_root.resolve()
+    if resolved_var == lexical_var:
+        pytest.skip("/var is not a symlink on this platform")
+    try:
+        relative_project = resolved_project.relative_to(resolved_var)
+    except ValueError:
+        pytest.skip("temporary project is not below the platform /var alias")
+        return
+
+    lexical_root = lexical_var / relative_project
+    lexical_glb = lexical_root / STAGING_RELATIVE / "hull_breach_seal_point.glb"
+    sidecar = build_staged_sidecar(project_root, staged["hull_breach_seal_point"], "hull_breach_seal_point")
+
+    assert lexical_root != resolved_project
+    assert validate_staged_sidecar(lexical_root, lexical_glb, sidecar) == []
+    assert build_staged_sidecar(lexical_root, lexical_glb, "hull_breach_seal_point") == sidecar
+
+
+def test_staged_validator_is_total_for_unhashable_asset_id(
+    staged_project: tuple[Path, dict[str, Path]],
+) -> None:
+    project_root, staged = staged_project
+    sidecar = build_staged_sidecar(project_root, staged["hull_breach_seal_point"], "hull_breach_seal_point")
+    sidecar["asset_id"] = []
+
+    errors = validate_staged_sidecar(
+        project_root, staged["hull_breach_seal_point"], sidecar
+    )
+
+    assert errors == sorted(errors)
+    assert any("asset_id" in error for error in errors)
+
+
+def _make_symlink_loop(project_root: Path) -> Path:
+    loop_root = project_root / "loop"
+    try:
+        loop_root.symlink_to(loop_root, target_is_directory=True)
+    except (NotImplementedError, OSError) as exc:
+        pytest.skip(f"platform cannot create a symlink loop: {exc}")
+    return loop_root / "hull_breach_seal_point.glb"
+
+
+def test_staged_validator_returns_sorted_diagnostics_for_a_symlink_loop(
+    staged_project: tuple[Path, dict[str, Path]],
+) -> None:
+    project_root, staged = staged_project
+    sidecar = build_staged_sidecar(project_root, staged["hull_breach_seal_point"], "hull_breach_seal_point")
+    loop_glb = _make_symlink_loop(project_root)
+
+    errors = validate_staged_sidecar(project_root, loop_glb, sidecar)
+
+    assert errors == sorted(errors)
+    assert any("could not be resolved" in error for error in errors)
+
+
+def test_staged_validator_returns_sorted_diagnostics_for_a_looping_project_root(
+    staged_project: tuple[Path, dict[str, Path]], tmp_path: Path
+) -> None:
+    project_root, staged = staged_project
+    sidecar = build_staged_sidecar(project_root, staged["hull_breach_seal_point"], "hull_breach_seal_point")
+    loop_root = tmp_path / "project_loop"
+    try:
+        loop_root.symlink_to(loop_root, target_is_directory=True)
+    except (NotImplementedError, OSError) as exc:
+        pytest.skip(f"platform cannot create a symlink loop: {exc}")
+    loop_glb = loop_root / STAGING_RELATIVE / "hull_breach_seal_point.glb"
+
+    errors = validate_staged_sidecar(loop_root, loop_glb, sidecar)
+
+    assert errors == sorted(errors)
+    assert any("could not be resolved" in error for error in errors)
+
+
+def test_cli_returns_one_and_preserves_target_when_loop_validation_raises(
+    staged_project: tuple[Path, dict[str, Path]], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_root, staged = staged_project
+    sidecar = build_staged_sidecar(project_root, staged["hull_breach_seal_point"], "hull_breach_seal_point")
+    loop_glb = _make_symlink_loop(project_root)
+    output = tmp_path / "existing.sidecar.json"
+    original = b"existing target must remain unchanged\n"
+    output.write_bytes(original)
+
+    monkeypatch.setattr(staged_props, "build_staged_sidecar", lambda *_args: sidecar)
+    result = staged_props.main(
+        [
+            "--project-root",
+            str(project_root),
+            "--glb",
+            str(loop_glb),
+            "--asset-id",
+            "hull_breach_seal_point",
+            "--sidecar-out",
+            str(output),
+        ]
+    )
+
+    assert result == 1
+    assert output.read_bytes() == original
+    assert not list(output.parent.glob(f".{output.name}.*.tmp"))
+
+
+def _snapshot_path(path: Path) -> tuple[object, ...]:
+    if path.is_dir():
+        return ("directory", tuple(sorted(item.relative_to(path).as_posix() for item in path.rglob("*"))))
+    return ("file", path.read_bytes())
+
+
+def test_cli_rejects_every_runtime_mutation_surface_and_symlink_alias(
+    staged_project: tuple[Path, dict[str, Path]],
+) -> None:
+    project_root, staged = staged_project
+    surfaces = runtime_mutation_paths(project_root)
+    snapshots: dict[Path, tuple[object, ...]] = {}
+    for index, surface in enumerate(surfaces):
+        if surface.name in {"imported", "ship_structural_v0"}:
+            surface.mkdir(parents=True, exist_ok=True)
+        else:
+            surface.parent.mkdir(parents=True, exist_ok=True)
+            surface.write_bytes(f"live surface {index}\n".encode())
+        snapshots[surface] = _snapshot_path(surface)
+
+    for index, surface in enumerate(surfaces):
+        for output in (
+            surface,
+            project_root / f"runtime_surface_alias_{index}",
+        ):
+            if output != surface:
+                output.symlink_to(surface, target_is_directory=surface.is_dir())
+
+            result = staged_props.main(
+                [
+                    "--project-root",
+                    str(project_root),
+                    "--glb",
+                    str(staged["hull_breach_seal_point"]),
+                    "--asset-id",
+                    "hull_breach_seal_point",
+                    "--sidecar-out",
+                    str(output),
+                ]
+            )
+
+            assert result == 1
+            assert _snapshot_path(surface) == snapshots[surface]
+            if output != surface:
+                assert output.is_symlink()
+            assert not list(output.parent.glob(f".{output.name}.*.tmp"))
+
+
+def test_cli_rejects_protected_output_before_atomic_writer(
+    staged_project: tuple[Path, dict[str, Path]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_root, staged = staged_project
+    protected = runtime_mutation_paths(project_root)[1]
+    protected.parent.mkdir(parents=True, exist_ok=True)
+    protected.write_bytes(b"live generated props index\n")
+    writes: list[Path] = []
+
+    def unexpected_write(path: Path, _sidecar: dict) -> None:
+        writes.append(path)
+
+    monkeypatch.setattr(staged_props, "_write_sidecar_atomically", unexpected_write)
+    result = staged_props.main(
+        [
+            "--project-root",
+            str(project_root),
+            "--glb",
+            str(staged["hull_breach_seal_point"]),
+            "--asset-id",
+            "hull_breach_seal_point",
+            "--sidecar-out",
+            str(protected),
+        ]
+    )
+
+    assert result == 1
+    assert writes == []
+    assert protected.read_bytes() == b"live generated props index\n"
 
 
 def test_cli_writes_valid_sidecar_atomically(
