@@ -44,7 +44,10 @@ def test_capture_script_has_exact_cli_and_capture_contract() -> None:
     for option in ("--output-dir", "--baseline-label", "--improved-label"):
         assert option in source
     assert 'FOCUSED_NINE_COMPARISON_CAPTURE PASS output=' in source
-    assert "get_root().get_texture().get_image()" in source
+    assert "var viewport: Viewport = get_viewport()" in source
+    assert "var root_texture: ViewportTexture = viewport.get_texture()" in source
+    assert "get_viewport().get_root()" not in source
+    assert "root_texture.get_image()" in source
     assert "get_tree().process_frame" in source
     assert re.search(r"for\s+[^\n]+\s+in\s+10", source)
     assert "1600" in source and "900" in source

@@ -333,11 +333,15 @@ func _capture_first_frame() -> void:
 	if DisplayServer.get_name() == "headless":
 		_fail("non_headless_capture_required")
 		return
-	var root_texture: ViewportTexture = get_viewport().get_root().get_texture()
+	var viewport: Viewport = get_viewport()
+	if viewport == null:
+		_fail("viewport is unavailable")
+		return
+	var root_texture: ViewportTexture = viewport.get_texture()
 	if root_texture == null:
 		_fail("viewport texture is unavailable")
 		return
-	var image: Image = get_viewport().get_root().get_texture().get_image()
+	var image: Image = root_texture.get_image()
 	if image == null or image.is_empty():
 		_fail("viewport image is empty")
 		return
