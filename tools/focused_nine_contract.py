@@ -65,6 +65,7 @@ _METRIC_FIELDS = (
     "bounds",
 )
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_NON_STRING_KEY_LABEL = "<non-string-key>"
 
 
 def _project_root(project_root: Path) -> Path:
@@ -145,8 +146,26 @@ def _append_unknown_fields(
 ) -> None:
     if not isinstance(document, dict):
         return
-    for field in sorted(set(document) - set(allowed), key=str):
-        errors.append(f"unknown {label} field: {field}")
+    for field in _safe_mapping_keys(document):
+        if isinstance(field, str):
+            if field not in allowed:
+                errors.append(f"unknown {label} field: {field}")
+        else:
+            errors.append(f"{label} contains a non-string object key")
+
+
+def _safe_mapping_keys(document: dict[object, object]) -> tuple[object, ...]:
+    """Return mapping keys without stringifying or comparing unknown objects."""
+
+    string_keys: list[str] = []
+    non_string_keys: list[object] = []
+    for key in document:
+        if isinstance(key, str):
+            string_keys.append(key)
+        else:
+            non_string_keys.append(key)
+    string_keys.sort()
+    return (*string_keys, *non_string_keys)
 
 
 def _append_missing_fields(
@@ -181,8 +200,13 @@ def _append_nonfinite(value: object, label: str, errors: list[str], seen: set[in
             if identity in seen:
                 continue
             seen.add(identity)
-            for key in reversed(sorted(current, key=str)):
-                stack.append((current[key], f"{current_label}.{key}"))
+            for key in reversed(_safe_mapping_keys(current)):
+                if isinstance(key, str):
+                    child_label = f"{current_label}.{key}"
+                else:
+                    errors.append(f"{current_label} contains a non-string object key")
+                    child_label = f"{current_label}.{_NON_STRING_KEY_LABEL}"
+                stack.append((current[key], child_label))
             continue
         if isinstance(current, (list, tuple)):
             identity = id(current)

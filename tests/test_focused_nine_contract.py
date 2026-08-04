@@ -8,9 +8,6 @@ import pytest
 from tools import focused_nine_contract as contract
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
-
 def _valid_asset(*, asset_id: str = "floor_1x1", kind: str = "structural") -> dict:
     staged_root = "res://assets/_staging/focused_nine"
     if asset_id == "pressure_door_1x1":
@@ -233,6 +230,54 @@ def test_report_huge_integer_values_return_deterministic_errors_without_raising(
 
     assert errors == sorted(errors)
     assert "asset[0].metrics.bounds.local_min_m/local_max_m minimum must not exceed maximum" in errors
+
+
+def test_report_huge_integer_keys_at_root_preview_and_nested_maps_never_raise() -> None:
+    document = _valid_report()
+    huge_key = 10**5000
+    document[huge_key] = math.nan
+    document["preview"][huge_key] = math.inf
+    document["baseline"]["nested"] = {huge_key: -math.inf}
+
+    errors = contract.validate_report(document)
+
+    assert errors == sorted(errors)
+    assert "root contains a non-string object key" in errors
+    assert "report contains a non-string object key" in errors
+    assert "report.<non-string-key> contains non-finite value" in errors
+    assert "report.preview contains a non-string object key" in errors
+    assert "report.preview.<non-string-key> contains non-finite value" in errors
+    assert "report.baseline.nested contains a non-string object key" in errors
+    assert "report.baseline.nested.<non-string-key> contains non-finite value" in errors
+
+
+class _HostileNonStringKey:
+    def __hash__(self) -> int:
+        return 1
+
+    def __str__(self) -> str:
+        raise AssertionError("hostile key was stringified")
+
+    def __repr__(self) -> str:
+        raise AssertionError("hostile key was represented")
+
+    def __lt__(self, other: object) -> bool:
+        raise AssertionError("hostile key was compared")
+
+
+def test_report_non_string_keys_are_generic_and_still_traverse_nested_values() -> None:
+    document = _valid_report()
+    hostile_key = _HostileNonStringKey()
+    document["assets"][0][hostile_key] = {"nested": math.inf}
+    document["preview"]["nested"] = {hostile_key: {"value": math.nan}}
+
+    errors = contract.validate_report(document)
+
+    assert errors == sorted(errors)
+    assert "asset[0] contains a non-string object key" in errors
+    assert "report.assets[0].<non-string-key>.nested contains non-finite value" in errors
+    assert "report.preview.nested contains a non-string object key" in errors
+    assert "report.preview.nested.<non-string-key>.value contains non-finite value" in errors
 
 
 def test_report_bounds_accept_only_canonical_glb_metadata_keys() -> None:
