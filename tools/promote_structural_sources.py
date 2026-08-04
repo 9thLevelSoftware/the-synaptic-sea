@@ -19,6 +19,10 @@ import tempfile
 from typing import Mapping, Sequence
 
 try:
+    from tools.backup_structural_sources import (
+        BackupError,
+        backup_sources,
+    )
     from tools.structural_source_contract import (
         STRUCTURAL_SOURCE_MODULE_IDS,
         load_source_spec,
@@ -27,6 +31,10 @@ try:
 except ModuleNotFoundError:
     # Allow ``python tools/promote_structural_sources.py`` from a checkout.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from tools.backup_structural_sources import (
+        BackupError,
+        backup_sources,
+    )
     from tools.structural_source_contract import (
         STRUCTURAL_SOURCE_MODULE_IDS,
         load_source_spec,
@@ -309,6 +317,8 @@ def promote_all(
     dry_run: bool = False,
     force: bool = False,
     skip_godot: bool = False,
+    backup: bool = False,
+    backup_target: str | Path | None = None,
 ) -> list[str]:
     """Export, hash, validate, and promote every requested module.
 
@@ -320,6 +330,24 @@ def promote_all(
     project_root = Path(project_root).expanduser().resolve()
     errors: list[str] = []
     all_promoted: list[str] = []
+
+    if backup:
+        if backup_target is None or not str(backup_target).strip():
+            raise PromotionError("--backup requires --backup-target")
+        try:
+            backup_result = backup_sources(
+                source_root,
+                backup_target,
+                dry_run=dry_run,
+            )
+        except (BackupError, OSError) as exc:
+            raise PromotionError(f"source backup failed: {exc}") from exc
+        print(
+            "STRUCTURAL_BACKUP "
+            f"target={getattr(backup_result, 'target', backup_target)} "
+            f"would_sync={backup_result.would_sync} "
+            f"uploaded={backup_result.uploaded}"
+        )
 
     for module_id in module_ids:
         try:
@@ -415,6 +443,15 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="skip the temporary Godot import smoke",
     )
+    parser.add_argument(
+        "--backup",
+        action="store_true",
+        help="sync source files to the backup target before promotion",
+    )
+    parser.add_argument(
+        "--backup-target",
+        help="local path, local:// URL, s3:// URL, or gs:// URL used with --backup",
+    )
     return parser
 
 
@@ -437,6 +474,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "unsupported structural source module(s): "
             + ", ".join(repr(module_id) for module_id in invalid)
         )
+    if args.backup and not args.backup_target:
+        parser.error("--backup requires --backup-target")
     return args
 
 
@@ -451,6 +490,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             dry_run=args.dry_run,
             force=args.force,
             skip_godot=args.skip_godot,
+            backup=args.backup,
+            backup_target=args.backup_target,
         )
     except PromotionError:
         return 1
