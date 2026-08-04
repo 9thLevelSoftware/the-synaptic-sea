@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
@@ -48,6 +49,7 @@ _MATERIAL_LIBRARY_NAME = "salvage_industrial.blend"
 
 # Blender is deliberately not imported at module import time.
 _BPY: Any | None = None
+_VERIFIED_MATERIALS: Mapping[str, Any] | None = None
 
 
 def _require_bpy() -> Any:
@@ -108,6 +110,62 @@ def prop_source_path(props_source_root: Path, asset_id: str) -> Path:
     if select_asset(asset_id) != "prop":
         raise ValueError(f"asset is not a prop: {asset_id!r}")
     return Path(props_source_root) / f"{asset_id}.blend"
+
+
+def _absolute_without_resolving_symlinks(path: Path) -> Path:
+    """Normalize ``..`` without erasing symlink aliases used for safety checks."""
+
+    return Path(os.path.abspath(os.fspath(Path(path).expanduser())))
+
+
+def _is_same_or_descendant(candidate: Path, parent: Path) -> bool:
+    try:
+        candidate.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
+def resolve_source_path(
+    project_root: Path,
+    structural_source_root: Path,
+    props_source_root: Path,
+    asset_id: str,
+) -> Path:
+    """Resolve one source blend while rejecting every live project surface.
+
+    The lexical and resolved forms are both checked.  The first catches a
+    source root named through a project-local symlink, while the second catches
+    an external alias that resolves back into the project runtime tree.
+    """
+
+    source = source_blend_path(structural_source_root, props_source_root, asset_id)
+    project_lexical = _absolute_without_resolving_symlinks(Path(project_root))
+    try:
+        project_resolved = project_lexical.resolve(strict=False)
+        source_lexical = _absolute_without_resolving_symlinks(source)
+        source_resolved = source_lexical.resolve(strict=False)
+        runtime_lexical = [
+            project_lexical / "assets/imported",
+            project_lexical / "assets/_staging",
+            *(_absolute_without_resolving_symlinks(path) for path in focused_nine_contract.runtime_mutation_paths(project_lexical)),
+        ]
+        runtime_resolved = [
+            project_resolved / "assets/imported",
+            project_resolved / "assets/_staging",
+            *(Path(path).resolve(strict=False) for path in focused_nine_contract.runtime_mutation_paths(project_resolved)),
+        ]
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise ValueError(f"could not resolve focused-nine source path: {source}") from exc
+
+    for runtime_surface in (*runtime_lexical, *runtime_resolved):
+        if _is_same_or_descendant(source_lexical, runtime_surface) or _is_same_or_descendant(
+            source_resolved, runtime_surface
+        ):
+            raise ValueError(
+                f"focused-nine source candidate is on a runtime surface: {source}"
+            )
+    return source_resolved
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -172,38 +230,89 @@ def _material_library_candidates(
 def ensure_material_library(
     project_root: Path, structural_root: Path, props_root: Path
 ) -> dict[str, Any]:
-    """Load and require all four exact Salvage Industrial materials.
+    """Load required materials and return a verified source-name mapping.
 
-    Existing exact-name datablocks are retained, but a configured library must
-    still contain every required name before any generated object is created.
-    There are intentionally no synthesized fallback materials.
+    Existing same-name materials are never used as an implicit fallback.  A
+    collision is appended under Blender's unique datablock name, then tracked
+    with provenance properties so recipes can assign the verified object
+    directly on subsequent runs.
     """
 
     bpy = _require_bpy()
-    existing = {name for name in REQUIRED_MATERIAL_NAMES if bpy.data.materials.get(name)}
     library_path = next(
-        (candidate for candidate in _material_library_candidates(project_root, structural_root, props_root) if candidate.is_file()),
+        (
+            candidate
+            for candidate in _material_library_candidates(
+                project_root, structural_root, props_root
+            )
+            if candidate.is_file()
+        ),
         None,
     )
     if library_path is None:
-        searched = ", ".join(str(path) for path in _material_library_candidates(project_root, structural_root, props_root))
-        raise RuntimeError(f"missing required material library {_MATERIAL_LIBRARY_NAME}; searched: {searched}")
-
-    with bpy.data.libraries.load(str(library_path), link=False) as (data_from, data_to):
-        available = set(data_from.materials)
-        missing = sorted(set(REQUIRED_MATERIAL_NAMES) - available)
-        if missing:
-            raise RuntimeError(
-                f"material library {library_path} is missing required materials: {', '.join(missing)}"
+        searched = ", ".join(
+            str(path)
+            for path in _material_library_candidates(
+                project_root, structural_root, props_root
             )
-        data_to.materials = [name for name in REQUIRED_MATERIAL_NAMES if name not in existing]
-
-    missing_after_load = [name for name in REQUIRED_MATERIAL_NAMES if bpy.data.materials.get(name) is None]
-    if missing_after_load:
-        raise RuntimeError(
-            "required materials were not loaded exactly: " + ", ".join(missing_after_load)
         )
-    return {"library_path": str(library_path), "material_names": list(REQUIRED_MATERIAL_NAMES)}
+        raise RuntimeError(
+            f"missing required material library {_MATERIAL_LIBRARY_NAME}; searched: {searched}"
+        )
+
+    library_key = str(library_path)
+    with bpy.data.libraries.load(str(library_path), link=False) as (data_from, _data_to):
+        available = set(data_from.materials)
+    missing_from_library = sorted(set(REQUIRED_MATERIAL_NAMES) - available)
+    if missing_from_library:
+        raise RuntimeError(
+            f"material library {library_path} is missing required materials: "
+            + ", ".join(missing_from_library)
+        )
+
+    materials: dict[str, Any] = {}
+    for material in bpy.data.materials:
+        if material.get("focused_nine_source_library") != library_key:
+            continue
+        source_name = material.get("focused_nine_source_name")
+        if isinstance(source_name, str) and source_name.startswith("focused-nine:"):
+            source_name = source_name.removeprefix("focused-nine:")
+        if source_name in REQUIRED_MATERIAL_NAMES and source_name not in materials:
+            materials[source_name] = material
+
+    missing_materials = [name for name in REQUIRED_MATERIAL_NAMES if name not in materials]
+    if missing_materials:
+        requested_materials = tuple(missing_materials)
+        with bpy.data.libraries.load(str(library_path), link=False) as (_data_from, data_to):
+            data_to.materials = list(requested_materials)
+        loaded_materials: list[Any] = list(data_to.materials)
+        if len(loaded_materials) != len(missing_materials) or any(
+            material is None for material in loaded_materials
+        ):
+            raise RuntimeError(
+                "required materials were not loaded from the configured library: "
+                + ", ".join(missing_materials)
+            )
+        for source_name, material in zip(requested_materials, loaded_materials, strict=True):
+            material["focused_nine_source_library"] = library_key
+            # Blender treats an IDProperty string equal to a datablock name as
+            # an ID pointer.  Prefixing it keeps provenance a stable string.
+            material["focused_nine_source_name"] = f"focused-nine:{source_name}"
+            materials[source_name] = material
+
+    if set(materials) != set(REQUIRED_MATERIAL_NAMES):
+        missing_after_load = sorted(set(REQUIRED_MATERIAL_NAMES) - set(materials))
+        raise RuntimeError(
+            "required materials were not verified from the configured library: "
+            + ", ".join(missing_after_load)
+        )
+    global _VERIFIED_MATERIALS
+    _VERIFIED_MATERIALS = materials
+    return {
+        "library_path": library_key,
+        "material_names": list(REQUIRED_MATERIAL_NAMES),
+        "materials": materials,
+    }
 
 
 def _link_object(obj: Any, collection: Any) -> None:
@@ -229,10 +338,11 @@ def _apply_transform(obj: Any, *, rotation: bool = True) -> None:
 
 
 def _assign_material(obj: Any, material_name: str) -> None:
-    bpy = _require_bpy()
-    material = bpy.data.materials.get(material_name)
+    if _VERIFIED_MATERIALS is None:
+        raise RuntimeError("verified material mapping is not initialized")
+    material = _VERIFIED_MATERIALS.get(material_name)
     if material is None:
-        raise RuntimeError(f"required material is unavailable: {material_name}")
+        raise RuntimeError(f"required verified material is unavailable: {material_name}")
     if obj.type == "MESH":
         if len(obj.data.materials) == 0:
             obj.data.materials.append(material)
@@ -519,48 +629,83 @@ def _ensure_empty(name: str, root: Any, helpers: Any, role: str) -> Any:
     return empty
 
 
-def ensure_structural_helpers(spec: Any, root: Any, helpers: Any) -> None:
-    """Preserve helpers and create only the allowed export-role collections."""
+def ensure_structural_helpers(spec: Any, root: Any, helpers: Any) -> dict[str, Any]:
+    """Return target helper collections without rewriting authored metadata."""
 
     module_id = getattr(spec, "module_id", "")
-    root_name = getattr(root, "name", "")
-    if root_name == "ModuleRoot_pressure_door_1x1":
+    if getattr(root, "name", "") == "ModuleRoot_pressure_door_1x1":
         module_id = "pressure_door_1x1"
-    roles = ("intact", "damaged", "breached") if module_id == "pressure_door_1x1" else ("intact",)
+    roles = (
+        ("intact", "damaged", "breached")
+        if module_id == "pressure_door_1x1"
+        else ("intact",)
+    )
+    visual_rules = {
+        "intact": "all pressure-door panels",
+        "damaged": "one cosmetic indicator panel omitted",
+        "breached": "central leaf omitted",
+    }
+    bpy = _require_bpy()
+    helper_collections: dict[str, Any] = {}
     for role in roles:
         name = f"Export_{role}"
-        bpy = _require_bpy()
-        collection = bpy.data.collections.get(name)
+        collection = next(
+            (child for child in helpers.children if child.name == name), None
+        )
+        created = False
         if collection is None:
+            existing_global = bpy.data.collections.get(name)
+            if existing_global is not None:
+                raise RuntimeError(
+                    f"helper collection {name} exists outside target AuthoringHelpers"
+                )
             collection = bpy.data.collections.new(name)
-        if collection.name not in {child.name for child in helpers.children}:
-            helpers.children.link(collection)
-        collection["variant_role"] = role
-        collection["module_id"] = "pressure_door_1x1" if module_id == "pressure_door_1x1" else module_id
+            if hasattr(helpers.children, "link"):
+                helpers.children.link(collection)
+            else:
+                helpers.children.append(collection)
+            created = True
+
+        expected = {
+            "variant_role": role,
+            "module_id": module_id,
+        }
         if module_id == "pressure_door_1x1":
-            collection["variant_visual_rule"] = {
-                "intact": "all pressure-door panels",
-                "damaged": "one cosmetic indicator panel omitted",
-                "breached": "central leaf omitted",
-            }[role]
+            expected["variant_visual_rule"] = visual_rules[role]
+        if created:
+            for key, value in expected.items():
+                collection[key] = value
+        else:
+            for key, value in expected.items():
+                if key in collection and collection[key] != value:
+                    raise RuntimeError(
+                        f"incompatible metadata on existing helper collection {name}: "
+                        f"{key}={collection[key]!r}, expected {value!r}"
+                    )
+        helper_collections[role] = collection
+    return helper_collections
 
 
 def replace_generated_visuals(root: Any, geometry: Any, asset_id: str) -> None:
-    """Remove only this asset's generated objects from its target collection."""
+    """Remove this asset's generated objects from the exact target collection."""
 
+    del root  # The caller supplies the target collection explicitly.
     select_asset(asset_id)
     prefix = _generated_name(asset_id, "")
     bpy = _require_bpy()
-    target_collections = [geometry]
-    target_collections.extend(
-        collection
-        for collection in bpy.data.collections
-        if collection.name.startswith("Export_")
-    )
-    for collection in target_collections:
-        for obj in list(collection.objects):
-            if obj.name.startswith(prefix):
-                bpy.data.objects.remove(obj, do_unlink=True)
+    for obj in list(geometry.objects):
+        if obj.name.startswith(prefix):
+            bpy.data.objects.remove(obj, do_unlink=True)
+
+
+def _replace_generated_collection(collection: Any, asset_id: str) -> None:
+    """Clear generated objects from one explicitly selected export collection."""
+
+    prefix = _generated_name(asset_id, "")
+    bpy = _require_bpy()
+    for obj in list(collection.objects):
+        if obj.name.startswith(prefix):
+            bpy.data.objects.remove(obj, do_unlink=True)
 
 
 def _parent_generated(root: Any, objects: Iterable[Any]) -> None:
@@ -635,7 +780,7 @@ def _report(
     kind: str,
     source_path: Path,
     generated: Sequence[Any],
-    helpers: Any | None,
+    helpers: Mapping[str, Any] | None,
     material_info: dict[str, Any],
 ) -> dict[str, Any]:
     names = sorted(obj.name for obj in generated)
@@ -643,12 +788,7 @@ def _report(
         raise RuntimeError(f"generated object escaped namespace for {asset_id}")
     helper_names = []
     if helpers is not None:
-        bpy = _require_bpy()
-        helper_names = sorted(
-            collection.name
-            for collection in bpy.data.collections
-            if collection.name.startswith("Export_")
-        )
+        helper_names = sorted(collection.name for collection in helpers.values())
     modifier_types = sorted(
         {
             modifier.type
@@ -680,7 +820,12 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
 
     # This path selection is deliberately before _require_bpy().
     kind = select_asset(args.asset_id)
-    source_path = source_blend_path(args.structural_source_root, args.props_source_root, args.asset_id)
+    source_path = resolve_source_path(
+        args.project_root,
+        args.structural_source_root,
+        args.props_source_root,
+        args.asset_id,
+    )
     if not source_path.is_file():
         raise FileNotFoundError(f"requested focused-nine source blend does not exist: {source_path}")
     spec = _structural_spec(args.project_root, args.asset_id) if kind == "structural" else None
@@ -691,6 +836,7 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
     material_info = ensure_material_library(args.project_root, args.structural_source_root, args.props_source_root)
 
     if kind == "structural":
+        helper_collections: Mapping[str, Any] | None = None
         root = bpy.data.objects.get(f"ModuleRoot_{args.asset_id}")
         if root is None:
             root = bpy.data.objects.new(f"ModuleRoot_{args.asset_id}", None)
@@ -698,25 +844,31 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         geometry = _ensure_collection("Geometry")
         helpers = _ensure_collection("AuthoringHelpers")
         replace_generated_visuals(root, geometry, args.asset_id)
-        ensure_structural_helpers(spec, root, helpers)
+        export_collections = ensure_structural_helpers(spec, root, helpers)
+        helper_collections = export_collections
         generated = build_structural_recipe(args.asset_id, spec, geometry)
         _parent_generated(root, generated)
-        export_collections = {
-            role: bpy.data.collections.get(f"Export_{role}")
-            for role in ("intact", "damaged", "breached")
-            if bpy.data.collections.get(f"Export_{role}") is not None
-        }
         if "intact" not in export_collections:
             raise RuntimeError(f"missing Export_intact collection for {args.asset_id}")
+        for collection in export_collections.values():
+            _replace_generated_collection(collection, args.asset_id)
         generated = _build_export_variants(args.asset_id, root, generated, export_collections)
     else:
         root = None
         helpers = None
+        helper_collections = None
         geometry = _ensure_collection(f"FocusedNine_{args.asset_id}_Generated")
         replace_generated_visuals(root, geometry, args.asset_id)
         generated = build_prop_recipe(args.asset_id, geometry)
 
-    report = _report(args.asset_id, kind, source_path, generated, helpers, material_info)
+    report = _report(
+        args.asset_id,
+        kind,
+        source_path,
+        generated,
+        helper_collections,
+        material_info,
+    )
     save_result = bpy.ops.wm.save_as_mainfile(filepath=str(source_path))
     if "FINISHED" not in save_result:
         raise RuntimeError(f"Blender could not save source blend: {source_path}")
