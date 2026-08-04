@@ -39,6 +39,25 @@ def staged_project(tmp_path: Path) -> tuple[Path, dict[str, Path]]:
     return project_root, staged
 
 
+def test_trusted_workspace_boundary_documents_pre_pin_scope_and_fd_publication() -> None:
+    expected = (
+        "trusted_workspace: before initial filesystem observation and descriptor-chain pinning, "
+        "the caller must ensure that the project root, staging paths, and output parent paths "
+        "are not concurrently renamed or rebound by a same-permission actor; that pre-pinning "
+        "namespace threat is intentionally outside this boundary, and this tool makes no claim "
+        "of total arbitrary local namespace immunity. After descriptor acquisition, all sidecar "
+        "publication is FD-relative and no-follow; protected runtime output paths remain denied, "
+        "including symlink aliases."
+    )
+
+    assert staged_props.SECURITY_BOUNDARY == "trusted_workspace"
+    assert staged_props.TRUST_BOUNDARY_DOCUMENTATION == expected
+    assert "trusted_workspace" in (staged_props.__doc__ or "")
+    assert "descriptor-chain pinning" in staged_props.TRUST_BOUNDARY_DOCUMENTATION
+    assert "FD-relative" in staged_props.TRUST_BOUNDARY_DOCUMENTATION
+    assert "protected runtime output paths remain denied" in staged_props.TRUST_BOUNDARY_DOCUMENTATION
+
+
 def test_build_staged_sidecar_is_visual_only_and_unbound_from_live_catalog(
     staged_project: tuple[Path, dict[str, Path]],
 ) -> None:

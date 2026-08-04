@@ -3,6 +3,15 @@
 
 These sidecars are deliberately staged-only.  They are not part of the live
 prop inventory or the generated runtime visual-binding index.
+
+Security boundary (``trusted_workspace``): before initial filesystem
+observation and descriptor-chain pinning, the caller must ensure that the
+project root, staging paths, and output parent paths are not concurrently
+renamed or rebound by a same-permission actor.  That pre-pinning namespace
+threat is intentionally outside this boundary, and this tool makes no claim
+of total arbitrary local namespace immunity.  After descriptor acquisition,
+all sidecar publication is FD-relative and no-follow; protected runtime output
+paths remain denied, including symlink aliases.
 """
 
 from __future__ import annotations
@@ -33,6 +42,16 @@ STAGED_EXTENSIONS = {
     "comparison_role": "objective_prop",
     "staged_visual_only": True,
 }
+SECURITY_BOUNDARY = "trusted_workspace"
+TRUST_BOUNDARY_DOCUMENTATION = (
+    "trusted_workspace: before initial filesystem observation and descriptor-chain pinning, "
+    "the caller must ensure that the project root, staging paths, and output parent paths "
+    "are not concurrently renamed or rebound by a same-permission actor; that pre-pinning "
+    "namespace threat is intentionally outside this boundary, and this tool makes no claim "
+    "of total arbitrary local namespace immunity. After descriptor acquisition, all sidecar "
+    "publication is FD-relative and no-follow; protected runtime output paths remain denied, "
+    "including symlink aliases."
+)
 
 
 def _sorted_errors(errors: list[str]) -> list[str]:
@@ -439,7 +458,10 @@ def _protected_output_error(
 
 
 def _argument_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        epilog=TRUST_BOUNDARY_DOCUMENTATION,
+    )
     parser.add_argument("--project-root", type=Path, required=True)
     parser.add_argument("--glb", type=Path, required=True)
     parser.add_argument("--asset-id", required=True)
@@ -468,3 +490,11 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+__all__ = [
+    "SECURITY_BOUNDARY",
+    "TRUST_BOUNDARY_DOCUMENTATION",
+    "build_staged_sidecar",
+    "validate_staged_sidecar",
+]
