@@ -59,6 +59,141 @@ def test_registry_is_exact_and_cli_rejects_duplicate_or_unknown_assets() -> None
         )
 
 
+def test_validation_structural_source_root_defaults_to_generation_root(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    structural = tmp_path / "parallel-structural"
+    props = tmp_path / "props"
+    project.mkdir()
+    structural.mkdir()
+    props.mkdir()
+    args = batch.parse_args(
+        _args(
+            project,
+            structural,
+            props,
+            project / "assets/_staging/focused_nine/report.json",
+            project / "artifacts/validation-previews/focused-nine",
+        )
+    )
+
+    assert args.validation_structural_source_root == structural
+
+
+def test_parallel_source_root_creates_fresh_source_and_reports_logical_reference(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = tmp_path / "project"
+    parallel_root = tmp_path / "meshes/source/ship_structural_v0_focused_nine"
+    original_root = tmp_path / "meshes/source/ship_structural_v0"
+    props = tmp_path / "props"
+    project.mkdir()
+    parallel_root.mkdir(parents=True)
+    original_root.mkdir(parents=True)
+    props.mkdir()
+    args = type(
+        "Args",
+        (),
+        {
+            "project_root": project,
+            "structural_source_root": parallel_root,
+            "validation_structural_source_root": original_root,
+            "props_source_root": props,
+        },
+    )()
+    created: list[Path] = []
+
+    def create_empty(destination: Path) -> None:
+        created.append(destination)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(b"fresh empty source")
+
+    monkeypatch.setattr(batch, "_create_empty_source_with_blender", create_empty)
+
+    source = batch._ensure_source(args, "floor_1x1")
+    record = batch._asset_record(
+        project,
+        args,
+        "floor_1x1",
+        source,
+        (),
+        _valid_metrics(),
+        (),
+        True,
+        None,
+    )
+
+    expected = parallel_root / "floor_1x1/floor_1x1.blend"
+    assert created == [expected.resolve()]
+    assert source == expected.resolve()
+    assert expected.read_bytes() == b"fresh empty source"
+    assert not (original_root / "floor_1x1/floor_1x1.blend").exists()
+    assert record["source_path"] == "res://assets/_staging/focused_nine/source_refs/floor_1x1.blend"
+    assert str(parallel_root) not in json.dumps(record)
+    assert str(original_root) not in json.dumps(record)
+
+
+def test_live_structural_validator_uses_optional_validation_root_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = tmp_path / "project"
+    parallel_root = tmp_path / "parallel"
+    original_root = tmp_path / "original"
+    project.mkdir()
+    parallel_root.mkdir()
+    original_root.mkdir()
+    args = type(
+        "Args",
+        (),
+        {
+            "project_root": project,
+            "structural_source_root": parallel_root,
+            "validation_structural_source_root": original_root,
+        },
+    )()
+    commands: list[list[str]] = []
+
+    def fake_run(
+        command: list[str], *, cwd: Path | None = None, timeout: float | None = None
+    ) -> subprocess.CompletedProcess[str]:
+        del cwd, timeout
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(batch, "_run", fake_run)
+
+    assert batch._run_live_validators(args) == ([], [])
+    structural_command = commands[0]
+    assert structural_command[structural_command.index("--source-root") + 1] == str(original_root)
+    assert str(parallel_root) not in structural_command
+
+
+def test_validation_structural_source_root_rejects_runtime_alias_before_work(
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    runtime_alias = project / "assets/imported"
+    runtime_alias.mkdir(parents=True)
+    structural = tmp_path / "parallel"
+    props = tmp_path / "props"
+    structural.mkdir()
+    props.mkdir()
+    report = project / "assets/_staging/focused_nine/report.json"
+    preview = project / "artifacts/validation-previews/focused-nine"
+
+    with pytest.raises(SystemExit):
+        batch.parse_args(
+            [
+                *_args(project, structural, props, report, preview),
+                "--validation-structural-source-root",
+                str(runtime_alias),
+            ]
+        )
+
+    assert not report.exists()
+    assert not (project / "assets/_staging/focused_nine").exists()
+
+
 def test_dry_run_is_side_effect_free(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     project = tmp_path / "project"
     structural = tmp_path / "structural"
@@ -408,6 +543,13 @@ def test_full_success_emits_each_staged_marker_once_before_report_and_pass(
     report_line = f"FOCUSED_NINE_REPORT path={report}"
     pass_line = "FOCUSED_NINE_BATCH PASS assets=9"
     assert lines.index(staged[-1]) < lines.index(report_line) < lines.index(pass_line)
+    document = json.loads(report.read_text(encoding="utf-8"))
+    assert document["improved"]["source_origin"] == "focused-nine-generated-source-root"
+    assert document["improved"]["source_reference_root"] == (
+        "res://assets/_staging/focused_nine/source_refs"
+    )
+    assert document["improved"]["no_original_source_replacement"] is True
+    assert document["baseline"]["no_original_source_replacement"] is True
 
 
 @pytest.mark.parametrize("diagnostic", ["WARNING: benign-looking warning", "ERROR: hidden error", "SCRIPT ERROR: hidden script error"])
@@ -483,6 +625,7 @@ def test_proof_contains_asset_validation_and_complete_role_metrics(
     assert "| `path` |" not in proof
     assert proof.count("SHA-256") >= 9
     assert "FOCUSED_NINE_BATCH PASS assets=9" in proof
+    assert "No original source replacement occurred." in proof
 
 
 def test_proof_refuses_to_write_before_all_assets_pass(tmp_path: Path) -> None:

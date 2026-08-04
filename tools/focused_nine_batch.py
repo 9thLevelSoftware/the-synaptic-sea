@@ -221,6 +221,66 @@ def _reject_static_symlink_components(path: Path, label: str) -> None:
             raise ValueError(f"{label} contains symlink component: {current}")
 
 
+def _validate_source_root(
+    project_root: Path,
+    source_root: Path,
+    label: str,
+    asset_id: str | None = None,
+) -> Path:
+    """Validate one external source root before any Blender or validator work."""
+
+    root = _absolute(source_root)
+    _reject_static_symlink_components(root, label)
+    try:
+        mode = root.lstat().st_mode
+    except FileNotFoundError:
+        mode = None
+    except OSError as exc:
+        raise ValueError(f"cannot inspect {label}: {source_root}") from exc
+    if mode is not None and not stat.S_ISDIR(mode):
+        raise ValueError(f"{label} must be a directory: {source_root}")
+
+    project = _absolute(project_root)
+    project_resolved = project.resolve(strict=False)
+    root_resolved = root.resolve(strict=False)
+    runtime_lexical = (
+        project / "assets/imported",
+        project / "assets/_staging",
+        *(_absolute(path) for path in contract.runtime_mutation_paths(project)),
+    )
+    runtime_resolved = (
+        project_resolved / "assets/imported",
+        project_resolved / "assets/_staging",
+        *(Path(path).resolve(strict=False) for path in contract.runtime_mutation_paths(project_resolved)),
+    )
+    for candidate in (root, root_resolved):
+        for runtime_surface in (*runtime_lexical, *runtime_resolved):
+            if candidate == runtime_surface or runtime_surface in candidate.parents:
+                raise ValueError(f"{label} is on a runtime surface: {source_root}")
+
+    checked_assets = (asset_id,) if asset_id is not None else contract.STRUCTURAL_IDS
+    for checked_asset in checked_assets:
+        candidate = source_blend_path(root, root, checked_asset)
+        _reject_static_symlink_components(candidate, f"{label} source path")
+        resolved_candidate = resolve_source_path(
+            project_root,
+            root,
+            root,
+            checked_asset,
+        )
+        try:
+            resolved_candidate.relative_to(root_resolved)
+        except ValueError as exc:
+            raise ValueError(
+                f"{label} source path is not physically beneath its root: {candidate}"
+            ) from exc
+    return root
+
+
+def _validation_source_root(args: argparse.Namespace) -> Path:
+    return getattr(args, "validation_structural_source_root", args.structural_source_root)
+
+
 def _validate_output_paths(project_root: Path, report: Path, preview_dir: Path) -> tuple[Path, Path, Path]:
     root = project_root.resolve(strict=False)
     report_abs = _absolute(report)
@@ -255,6 +315,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", type=Path, required=True)
     parser.add_argument("--structural-source-root", type=Path, required=True)
+    parser.add_argument(
+        "--validation-structural-source-root",
+        type=Path,
+        help="optional source root used only by live 15-module structural validation",
+    )
     parser.add_argument("--props-source-root", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--preview-dir", type=Path, required=True)
@@ -266,9 +331,17 @@ def build_parser() -> argparse.ArgumentParser:
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.validation_structural_source_root is None:
+        args.validation_structural_source_root = args.structural_source_root
     try:
         args.assets = _requested_assets(args.assets)
         _validate_output_paths(args.project_root, args.report, args.preview_dir)
+        _validate_source_root(args.project_root, args.structural_source_root, "structural source root")
+        _validate_source_root(
+            args.project_root,
+            args.validation_structural_source_root,
+            "validation structural source root",
+        )
     except ValueError as exc:
         parser.error(str(exc))
     return args
@@ -480,6 +553,7 @@ def _ensure_source(args: argparse.Namespace, asset_id: str) -> Path:
         else args.props_source_root
     )
     root_abs = _absolute(source_root)
+    _validate_source_root(args.project_root, root_abs, "source root", asset_id)
     candidate_abs = _absolute(candidate)
     _reject_static_symlink_components(root_abs, "source root")
     _reject_static_symlink_components(candidate_abs, "source path")
@@ -980,7 +1054,7 @@ def _run_live_validators(args: argparse.Namespace) -> tuple[list[str], list[str]
         "--project-root",
         str(args.project_root),
         "--source-root",
-        str(args.structural_source_root),
+        str(_validation_source_root(args)),
         "--all",
         "--blender",
         str(BLENDER),
@@ -1060,11 +1134,15 @@ def _build_report(
             "asset_count": len(records),
             "runtime_surfaces_unchanged": runtime_unchanged,
             "no_runtime_promotion": True,
+            "no_original_source_replacement": True,
         },
         "improved": {
             "label": "focused-nine-staged",
             "asset_count": len(records),
             "source_paths": source_paths,
+            "source_origin": "focused-nine-generated-source-root",
+            "source_reference_root": "res://assets/_staging/focused_nine/source_refs",
+            "no_original_source_replacement": True,
             "asset_role_metrics": role_metrics,
             "no_runtime_promotion": True,
         },
@@ -1115,6 +1193,8 @@ def _write_proof(
         "The focused-nine comparison batch passed its staging, evidence, pressure-door overlay, live-validator, and windowed-capture gates.",
         "",
         "**No runtime promotion occurred.** Runtime imported assets, generated catalogs, kit data, and live wrapper surfaces were not modified.",
+        "",
+        "**No original source replacement occurred.** Focused generated source references use the logical `res://assets/_staging/focused_nine/source_refs/` namespace; absolute source paths are intentionally omitted.",
         "",
         f"- Report: `{report_path.relative_to(project_root).as_posix()}`",
         f"- Preview: `{(preview_dir / 'focused-nine-comparison.png').relative_to(project_root).as_posix()}`",
