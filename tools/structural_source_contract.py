@@ -28,8 +28,14 @@ STRUCTURAL_SOURCE_MODULE_IDS: tuple[str, ...] = (
     "wall_t_junction",
 )
 
+FOCUSED_NINE_CANDIDATE_MODULE_IDS: tuple[str, ...] = ("pressure_door_1x1",)
+
 _CONTRACT_ROOT = Path("data/placement/contracts/structural/ship_structural_v0")
 _SOURCE_GLB_ROOT = Path("assets/imported/structural/ship_structural_v0")
+_CANDIDATE_SOURCE_ROOT = Path(
+    "assets/_staging/focused_nine/structural/pressure_door_1x1"
+)
+_CANDIDATE_GLB_NAME = "pressure_door_1x1.glb"
 _DEFAULT_COLLISION_PROXY_SHAPE = "box"
 _DEFAULT_NAV_BLOCKER = False
 _ORIENTATION_SOURCE = "socket-id-cardinal-convention"
@@ -153,15 +159,33 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def load_source_spec(project_root: Path, module_id: str) -> StructuralSourceSpec:
-    """Load and strictly validate one allowlisted structural source contract."""
+def _validate_glb_file(path: Path, module_id: str) -> None:
+    if path.suffix != ".glb":
+        raise ValueError(f"invalid source GLB extension: {module_id}")
+    try:
+        header = path.read_bytes()[:12]
+        file_size = path.stat().st_size
+    except OSError as exc:
+        raise ValueError(f"cannot read source GLB: {module_id}") from exc
+    if (
+        len(header) != 12
+        or header[:4] != b"glTF"
+        or int.from_bytes(header[4:8], "little") != 2
+        or int.from_bytes(header[8:12], "little") != file_size
+    ):
+        raise ValueError(f"invalid source GLB: {module_id}")
 
-    _validate_module_id(module_id)
-    root = Path(project_root).expanduser().resolve()
-    contract_path = root / _CONTRACT_ROOT / f"{module_id}_contract.json"
-    source_glb_path = root / _SOURCE_GLB_ROOT / module_id / f"{module_id}.glb"
 
+def _load_spec_from_paths(
+    root: Path,
+    module_id: str,
+    contract_path: Path,
+    source_glb_path: Path,
+    *,
+    missing_source_label: str = "missing source GLB",
+) -> StructuralSourceSpec:
     resolved_contract_path = contract_path.resolve(strict=False)
+
     if resolved_contract_path == root or root not in resolved_contract_path.parents:
         raise ValueError(f"structural contract path escapes project root: {module_id}")
     resolved_source_glb_path = source_glb_path.resolve(strict=False)
@@ -228,7 +252,8 @@ def load_source_spec(project_root: Path, module_id: str) -> StructuralSourceSpec
         raise ValueError(f"invalid structural contract collision.nav_blocker: {module_id}")
 
     if not source_glb_path.is_file():
-        raise ValueError(f"missing source GLB: {module_id}")
+        raise ValueError(f"{missing_source_label}: {module_id}")
+    _validate_glb_file(source_glb_path, module_id)
 
     return StructuralSourceSpec(
         module_id=module_id,
@@ -246,6 +271,70 @@ def load_source_spec(project_root: Path, module_id: str) -> StructuralSourceSpec
         contract_sha256=hashlib.sha256(contract_bytes).hexdigest(),
         source_glb_path=source_glb_path,
         source_glb_sha256=_sha256(source_glb_path),
+    )
+
+
+def load_source_spec(project_root: Path, module_id: str) -> StructuralSourceSpec:
+    """Load and strictly validate one allowlisted structural source contract."""
+
+    _validate_module_id(module_id)
+    root = Path(project_root).expanduser().resolve()
+    contract_path = root / _CONTRACT_ROOT / f"{module_id}_contract.json"
+    source_glb_path = root / _SOURCE_GLB_ROOT / module_id / f"{module_id}.glb"
+    return _load_spec_from_paths(root, module_id, contract_path, source_glb_path)
+
+
+def _reject_candidate_symlink_components(path: Path) -> None:
+    current = Path(path.anchor)
+    for part in path.parts:
+        if part == path.anchor:
+            continue
+        current /= part
+        try:
+            if current.is_symlink():
+                raise ValueError(f"candidate source GLB contains symlink: {path}")
+        except OSError as exc:
+            raise ValueError(f"cannot inspect candidate source GLB path: {path}") from exc
+
+
+def _candidate_source_path(project_root: Path, source_glb_path: Path) -> Path:
+    raw_path = Path(source_glb_path).expanduser()
+    if any(part == ".." for part in raw_path.parts):
+        raise ValueError(f"candidate source GLB path must not contain traversal: {raw_path}")
+
+    root = Path(project_root).expanduser().resolve()
+    candidate_path = raw_path if raw_path.is_absolute() else root / raw_path
+    _reject_candidate_symlink_components(candidate_path)
+    expected_path = root / _CANDIDATE_SOURCE_ROOT / _CANDIDATE_GLB_NAME
+    try:
+        resolved_candidate = candidate_path.resolve(strict=False)
+        resolved_expected = expected_path.resolve(strict=False)
+    except (OSError, RuntimeError) as exc:
+        raise ValueError(f"cannot resolve candidate source GLB path: {raw_path}") from exc
+    if candidate_path.suffix != ".glb" or resolved_candidate != resolved_expected:
+        raise ValueError(
+            "candidate source GLB must be the project-relative staged pressure-door GLB: "
+            f"{expected_path}"
+        )
+    return candidate_path
+
+
+def load_candidate_source_spec(
+    project_root: Path, module_id: str, source_glb_path: Path
+) -> StructuralSourceSpec:
+    """Load the isolated pressure-door contract from its contained staged GLB."""
+
+    if module_id not in FOCUSED_NINE_CANDIDATE_MODULE_IDS:
+        raise _unsupported_module(module_id)
+    root = Path(project_root).expanduser().resolve()
+    contract_path = root / _CONTRACT_ROOT / f"{module_id}_contract.json"
+    candidate_path = _candidate_source_path(root, source_glb_path)
+    return _load_spec_from_paths(
+        root,
+        module_id,
+        contract_path,
+        candidate_path,
+        missing_source_label="missing candidate source GLB",
     )
 
 

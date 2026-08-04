@@ -13,16 +13,20 @@ from typing import Any, Sequence
 
 try:
     from tools.structural_source_contract import (
+        FOCUSED_NINE_CANDIDATE_MODULE_IDS,
         STRUCTURAL_SOURCE_MODULE_IDS,
         StructuralSourceSpec,
+        load_candidate_source_spec,
         load_source_spec,
         source_output_paths,
     )
 except ModuleNotFoundError:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from tools.structural_source_contract import (
+        FOCUSED_NINE_CANDIDATE_MODULE_IDS,
         STRUCTURAL_SOURCE_MODULE_IDS,
         StructuralSourceSpec,
+        load_candidate_source_spec,
         load_source_spec,
         source_output_paths,
     )
@@ -171,14 +175,24 @@ def _validate_source_record(
         errors.append(f"source record module_id does not match contract: {module_id}")
 
     contract = source_record.get("contract")
-    if not isinstance(contract, dict) or contract.get("sha256") != spec.contract_sha256:
-        errors.append(f"source record contract.sha256 does not match contract: {module_id}")
+    if not isinstance(contract, dict):
+        errors.append(f"source record contract does not match contract: {module_id}")
+    else:
+        if contract.get("path") != str(spec.contract_path):
+            errors.append(f"source record contract.path does not match contract: {module_id}")
+        if contract.get("sha256") != spec.contract_sha256:
+            errors.append(f"source record contract.sha256 does not match contract: {module_id}")
 
     source_glb = source_record.get("source_glb")
-    if not isinstance(source_glb, dict) or source_glb.get("sha256") != spec.source_glb_sha256:
-        errors.append(
-            f"source record source_glb.sha256 does not match contract: {module_id}"
-        )
+    if not isinstance(source_glb, dict):
+        errors.append(f"source record source_glb does not match contract: {module_id}")
+    else:
+        if source_glb.get("path") != str(spec.source_glb_path):
+            errors.append(f"source record source_glb.path does not match contract: {module_id}")
+        if source_glb.get("sha256") != spec.source_glb_sha256:
+            errors.append(
+                f"source record source_glb.sha256 does not match contract: {module_id}"
+            )
 
     return sorted(errors)
 
@@ -197,7 +211,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="directory containing recovered module .blend files",
     )
-    selection = parser.add_mutually_exclusive_group(required=True)
+    selection = parser.add_mutually_exclusive_group(required=False)
     selection.add_argument(
         "--module",
         action="append",
@@ -210,6 +224,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="validate all allowlisted structural source modules",
     )
     parser.add_argument(
+        "--candidate-source-glb",
+        action="append",
+        metavar="MODULE_ID=RELATIVE_PATH.GLB",
+        help="validate a staged candidate source; repeat for candidates",
+    )
+    parser.add_argument(
         "--blender",
         default=os.environ.get("BLENDER", "blender"),
         help="Blender executable (default: BLENDER environment variable or blender)",
@@ -217,19 +237,57 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _selected_module_ids(args: argparse.Namespace) -> tuple[str, ...]:
+def _selected_live_module_ids(args: argparse.Namespace) -> tuple[str, ...]:
     if args.all:
         return STRUCTURAL_SOURCE_MODULE_IDS
-    return tuple(args.module)
+    return tuple(args.module or ())
+
+
+def _parse_candidate_assignments(
+    values: Sequence[str] | None, parser: argparse.ArgumentParser
+) -> tuple[tuple[str, Path], ...]:
+    assignments: list[tuple[str, Path]] = []
+    seen: set[str] = set()
+    for raw_value in values or ():
+        if raw_value.count("=") != 1:
+            parser.error(
+                "candidate source must use module_id=relative/path.glb syntax: "
+                f"{raw_value!r}"
+            )
+        module_id, raw_path = raw_value.split("=", 1)
+        if module_id not in FOCUSED_NINE_CANDIDATE_MODULE_IDS:
+            parser.error(f"unsupported candidate structural source module: {module_id!r}")
+        if module_id in seen:
+            parser.error(f"duplicate candidate module assignment: {module_id!r}")
+        candidate_path = Path(raw_path)
+        if not raw_path or candidate_path.is_absolute():
+            parser.error(
+                f"candidate source path must be project-relative: {raw_path!r}"
+            )
+        if any(part == ".." for part in candidate_path.parts):
+            parser.error(
+                f"candidate source path must not contain traversal: {raw_path!r}"
+            )
+        seen.add(module_id)
+        assignments.append((module_id, candidate_path))
+    return tuple(assignments)
+
+
+def _selected_module_ids(args: argparse.Namespace) -> tuple[str, ...]:
+    live_module_ids = _selected_live_module_ids(args)
+    candidate_module_ids = tuple(
+        module_id for module_id, _source_path in getattr(args, "_candidate_assignments", ())
+    )
+    return live_module_ids + candidate_module_ids
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = build_parser()
     args = parser.parse_args(argv)
-    module_ids = _selected_module_ids(args)
+    live_module_ids = _selected_live_module_ids(args)
     invalid = [
         module_id
-        for module_id in module_ids
+        for module_id in live_module_ids
         if module_id not in STRUCTURAL_SOURCE_MODULE_IDS
     ]
     if invalid:
@@ -237,6 +295,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "unsupported structural source module(s): "
             + ", ".join(repr(module_id) for module_id in invalid)
         )
+    if not args.all and not args.module and not args.candidate_source_glb:
+        parser.error("one of --module, --all, or --candidate-source-glb is required")
+    args._candidate_assignments = _parse_candidate_assignments(
+        args.candidate_source_glb, parser
+    )
     return args
 
 
@@ -292,15 +355,39 @@ def _run_inspector(
     return _parse_report(completed.stdout, module_id)
 
 
+def _candidate_output_paths(source_root: Path, module_id: str) -> tuple[Path, Path]:
+    if module_id not in FOCUSED_NINE_CANDIDATE_MODULE_IDS:
+        raise ValueError(f"unsupported candidate structural source module: {module_id!r}")
+    root = Path(source_root).expanduser()
+    resolved_root = root.resolve()
+    module_root = root / module_id
+    resolved_module_root = module_root.resolve(strict=False)
+    if resolved_module_root == resolved_root or resolved_root not in resolved_module_root.parents:
+        raise ValueError(f"candidate source output path escapes source root: {module_id}")
+    return (
+        module_root / f"{module_id}.blend",
+        module_root / f"{module_id}.source.json",
+    )
+
+
+def _read_source_record(record_path: Path, module_id: str) -> tuple[object | None, str | None]:
+    try:
+        return json.loads(record_path.read_text(encoding="utf-8")), None
+    except OSError as exc:
+        return None, f"cannot read source record for {module_id}: {exc}"
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return None, f"source record is invalid JSON for {module_id}: {exc}"
+
+
 def validate_sources(args: argparse.Namespace) -> list[str]:
-    """Run the Blender inspector and contract checks for selected modules."""
+    """Run source contract checks for live modules and staged candidates."""
 
     project_root = args.project_root.expanduser().resolve()
     source_root = args.source_root.expanduser()
     inspector_path = Path(__file__).resolve().with_name("inspect_structural_sources.py")
     errors: list[str] = []
 
-    for module_id in _selected_module_ids(args):
+    for module_id in _selected_live_module_ids(args):
         try:
             spec = load_source_spec(project_root, module_id)
             blend_path, record_path = source_output_paths(source_root, module_id)
@@ -325,13 +412,26 @@ def validate_sources(args: argparse.Namespace) -> list[str]:
             continue
         errors.extend(validate_report(spec, report or {}))
 
-        try:
-            source_record = json.loads(record_path.read_text(encoding="utf-8"))
-        except OSError as exc:
-            errors.append(f"cannot read source record for {module_id}: {exc}")
+        source_record, record_error = _read_source_record(record_path, module_id)
+        if record_error:
+            errors.append(record_error)
             continue
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            errors.append(f"source record is invalid JSON for {module_id}: {exc}")
+        errors.extend(_validate_source_record(spec, source_record))
+
+    for module_id, source_glb_path in getattr(args, "_candidate_assignments", ()):
+        try:
+            spec = load_candidate_source_spec(project_root, module_id, source_glb_path)
+            _blend_path, record_path = _candidate_output_paths(source_root, module_id)
+        except (OSError, ValueError) as exc:
+            errors.append(f"{module_id}: {exc}")
+            continue
+
+        # Candidate validation is intentionally source-only.  The Blender
+        # inspector remains runtime-allowlisted and no live wrapper or source
+        # Blender file is created by this staged task.
+        source_record, record_error = _read_source_record(record_path, module_id)
+        if record_error:
+            errors.append(record_error)
             continue
         errors.extend(_validate_source_record(spec, source_record))
 

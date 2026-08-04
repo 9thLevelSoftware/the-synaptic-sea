@@ -7,9 +7,11 @@ from pathlib import Path
 import pytest
 
 from tools.structural_source_contract import (
+    FOCUSED_NINE_CANDIDATE_MODULE_IDS,
     STRUCTURAL_SOURCE_MODULE_IDS,
     build_source_record,
     canonical_json,
+    load_candidate_source_spec,
     load_source_spec,
     source_output_paths,
     y_up_to_z_up,
@@ -221,3 +223,108 @@ def test_minimal_floor_fixture_contains_the_structural_contract_shape() -> None:
     assert document["document_kind"] == "modular_asset_spec"
     assert document["module_id"] == "floor_1x1"
     assert len(document["sockets"]) == 4
+
+
+CANDIDATE_CONTRACT_RELATIVE = Path(
+    "data/placement/contracts/structural/ship_structural_v0/pressure_door_1x1_contract.json"
+)
+CANDIDATE_GLB_RELATIVE = Path(
+    "assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1.glb"
+)
+
+
+def _write_pressure_door_fixture(tmp_path: Path, *, with_glb: bool = True) -> Path:
+    contract_path = tmp_path / CANDIDATE_CONTRACT_RELATIVE
+    contract_path.parent.mkdir(parents=True)
+    contract_path.write_bytes((PROJECT_ROOT / CANDIDATE_CONTRACT_RELATIVE).read_bytes())
+
+    staged_path = tmp_path / CANDIDATE_GLB_RELATIVE
+    if with_glb:
+        staged_path.parent.mkdir(parents=True)
+        staged_path.write_bytes((PROJECT_ROOT / GLB_RELATIVE).read_bytes())
+    return staged_path
+
+
+def test_focused_nine_candidate_allowlist_is_pressure_door_only() -> None:
+    assert FOCUSED_NINE_CANDIDATE_MODULE_IDS == ("pressure_door_1x1",)
+
+
+def test_pressure_door_candidate_reuses_doorway_contract_shape(tmp_path: Path) -> None:
+    staged_path = _write_pressure_door_fixture(tmp_path)
+
+    spec = load_candidate_source_spec(
+        tmp_path, "pressure_door_1x1", CANDIDATE_GLB_RELATIVE
+    )
+    doorway = load_source_spec(PROJECT_ROOT, "doorway_frame_open_1x1")
+
+    assert spec.module_id == "pressure_door_1x1"
+    assert spec.kit_id == doorway.kit_id
+    assert spec.module_family == doorway.module_family == "portal"
+    assert spec.grid_step_m == doorway.grid_step_m == 4.0
+    assert spec.footprint_cells == doorway.footprint_cells == (1, 0)
+    assert spec.bounds_min_y_up == doorway.bounds_min_y_up
+    assert spec.bounds_max_y_up == doorway.bounds_max_y_up
+    assert spec.nav_blocker is True
+    assert [(socket.socket_id, socket.compatible_kinds) for socket in spec.sockets] == [
+        (socket.socket_id, socket.compatible_kinds) for socket in doorway.sockets
+    ]
+    assert spec.source_glb_path == staged_path
+    assert spec.source_glb_sha256
+
+
+def test_pressure_door_candidate_rejects_missing_staged_glb(tmp_path: Path) -> None:
+    _write_pressure_door_fixture(tmp_path, with_glb=False)
+
+    with pytest.raises(ValueError, match="missing candidate source GLB"):
+        load_candidate_source_spec(tmp_path, "pressure_door_1x1", CANDIDATE_GLB_RELATIVE)
+
+
+@pytest.mark.parametrize(
+    "module_id,source_path",
+    [
+        ("doorway_frame_open_1x1", CANDIDATE_GLB_RELATIVE),
+        ("../../pressure_door_1x1", CANDIDATE_GLB_RELATIVE),
+        ("pressure_door_1x1", Path("assets/imported/structural/pressure_door_1x1.glb")),
+        ("pressure_door_1x1", Path("assets/_staging/focused_nine/structural/pressure_door_1x1/../pressure_door_1x1.glb")),
+        ("pressure_door_1x1", Path("assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1.txt")),
+    ],
+)
+def test_pressure_door_candidate_rejects_invalid_identity_or_path(
+    tmp_path: Path, module_id: str, source_path: Path
+) -> None:
+    _write_pressure_door_fixture(tmp_path)
+
+    with pytest.raises(ValueError):
+        load_candidate_source_spec(tmp_path, module_id, source_path)
+
+
+def test_pressure_door_candidate_rejects_absolute_external_path(tmp_path: Path) -> None:
+    _write_pressure_door_fixture(tmp_path)
+    external_path = tmp_path / "outside.glb"
+    external_path.write_bytes((PROJECT_ROOT / GLB_RELATIVE).read_bytes())
+
+    with pytest.raises(ValueError, match="candidate source GLB"):
+        load_candidate_source_spec(tmp_path, "pressure_door_1x1", external_path)
+
+
+def test_pressure_door_candidate_rejects_symlink_escape(tmp_path: Path) -> None:
+    staged_path = _write_pressure_door_fixture(tmp_path, with_glb=False)
+    external_path = tmp_path / "outside.glb"
+    external_path.write_bytes((PROJECT_ROOT / GLB_RELATIVE).read_bytes())
+    staged_path.parent.mkdir(parents=True, exist_ok=True)
+    staged_path.symlink_to(external_path)
+
+    with pytest.raises(ValueError, match="candidate source GLB"):
+        load_candidate_source_spec(tmp_path, "pressure_door_1x1", CANDIDATE_GLB_RELATIVE)
+
+
+def test_pressure_door_candidate_rejects_symlink_plus_traversal(tmp_path: Path) -> None:
+    _write_pressure_door_fixture(tmp_path)
+    outside_dir = tmp_path / "outside"
+    outside_dir.mkdir()
+    escape = tmp_path / CANDIDATE_GLB_RELATIVE.parent / "escape"
+    escape.symlink_to(outside_dir, target_is_directory=True)
+    source_path = CANDIDATE_GLB_RELATIVE.parent / "escape" / ".." / CANDIDATE_GLB_RELATIVE.name
+
+    with pytest.raises(ValueError, match="candidate source GLB"):
+        load_candidate_source_spec(tmp_path, "pressure_door_1x1", source_path)
