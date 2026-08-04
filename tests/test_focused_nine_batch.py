@@ -85,6 +85,50 @@ def test_dry_run_is_side_effect_free(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert not (project / "assets/_staging/focused_nine").exists()
 
 
+def test_private_batch_workspace_is_staged_for_evidence_and_cleaned_on_gate_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = tmp_path / "project"
+    structural = tmp_path / "structural"
+    props = tmp_path / "props"
+    report = project / "assets/_staging/focused_nine/report.json"
+    preview = project / "artifacts/validation-previews/focused-nine"
+    project.mkdir()
+    structural.mkdir()
+    props.mkdir()
+    stage = project / "assets/_staging/focused_nine"
+    observed: list[Path] = []
+
+    monkeypatch.setattr(batch, "_ensure_source", lambda args, asset_id: structural / f"{asset_id}.blend")
+    monkeypatch.setattr(batch, "_run_recipe", lambda args, asset_id: None)
+
+    def fake_export(source: Path, asset_id: str, destination: Path) -> tuple[Path, ...]:
+        output = destination / f"{asset_id}.glb"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"candidate")
+        return (output,)
+
+    def fake_inspect(path: Path, blender: Path) -> dict[str, object]:
+        observed.append(path)
+        path.resolve().relative_to(stage.resolve())
+        return _valid_metrics()
+
+    monkeypatch.setattr(batch, "_run_structural_export", fake_export)
+    monkeypatch.setattr(batch.evidence, "inspect_staged_glb", fake_inspect)
+    monkeypatch.setattr(
+        batch.evidence,
+        "validate_evidence",
+        lambda record, minimum, maximum: ["injected evidence gate failure"],
+    )
+
+    assert batch.main([*_args(project, structural, props, report, preview), "--asset", "floor_1x1"]) == 1
+
+    assert len(observed) == 1
+    assert observed[0].resolve().is_relative_to(stage.resolve())
+    assert not batch.contract.asset_stage_glb(project, "floor_1x1").exists()
+    assert not list(stage.glob("focused-nine-batch-*"))
+
+
 def test_failed_asset_preserves_previous_staging_and_reports_first_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

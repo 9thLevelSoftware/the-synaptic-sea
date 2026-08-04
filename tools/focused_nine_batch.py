@@ -1211,7 +1211,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Keep every candidate, wrapper resource, and capture inside one private
         # workspace.  No stage target is touched until every requested gate has
         # passed.
-        with tempfile.TemporaryDirectory(prefix="focused-nine-batch-") as temporary:
+        with tempfile.TemporaryDirectory(prefix="focused-nine-batch-", dir=str(stage_root)) as temporary:
             private_root = Path(temporary)
             for asset_id in args.assets:
                 try:
