@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -260,7 +263,26 @@ def test_cli_returns_one_and_preserves_target_when_loop_validation_raises(
 
 def _snapshot_path(path: Path) -> tuple[object, ...]:
     if path.is_dir():
-        return ("directory", tuple(sorted(item.relative_to(path).as_posix() for item in path.rglob("*"))))
+        entries: list[tuple[object, ...]] = []
+        for item in sorted(path.rglob("*"), key=lambda candidate: candidate.relative_to(path).as_posix()):
+            relative = item.relative_to(path).as_posix()
+            if item.is_symlink():
+                entries.append(("symlink", relative, os.readlink(item)))
+            elif item.is_dir():
+                entries.append(("directory", relative))
+            elif item.is_file():
+                contents = item.read_bytes()
+                entries.append(
+                    (
+                        "file",
+                        relative,
+                        hashlib.sha256(contents).hexdigest(),
+                        contents,
+                    )
+                )
+            else:
+                entries.append(("other", relative))
+        return ("directory", tuple(entries))
     return ("file", path.read_bytes())
 
 
@@ -335,6 +357,116 @@ def test_cli_rejects_symlink_then_dotdot_protected_output(
     assert result == 1
     assert protected.read_bytes() == b"live generated props index must remain exact\n"
     assert not list(protected.parent.glob(f".{protected.name}.*.tmp"))
+
+
+def test_cli_rejects_ancestor_swap_to_protected_runtime_after_validation(
+    staged_project: tuple[Path, dict[str, Path]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_root, staged = staged_project
+    output_root = project_root / "safe-output"
+    output_parent = output_root / "nested"
+    output_parent.mkdir(parents=True)
+    output = output_parent / "hull_breach_seal_point.sidecar.json"
+
+    protected_root = project_root / "assets/imported"
+    protected_parent = protected_root / "nested"
+    protected_parent.mkdir(parents=True)
+    protected_file = protected_parent / "existing.bin"
+    protected_file.write_bytes(b"protected runtime bytes\n")
+    protected_snapshot = _snapshot_path(protected_root)
+
+    real_protection_check = staged_props._protected_output_error
+    moved_output_root = project_root / "safe-output-before-race"
+
+    def validate_then_swap(
+        root: Path, output_path: Path
+    ) -> tuple[Path, str | None]:
+        result = real_protection_check(root, output_path)
+        output_root.rename(moved_output_root)
+        output_root.symlink_to(protected_root, target_is_directory=True)
+        return result
+
+    monkeypatch.setattr(staged_props, "_protected_output_error", validate_then_swap)
+    result = staged_props.main(
+        [
+            "--project-root",
+            str(project_root),
+            "--glb",
+            str(staged["hull_breach_seal_point"]),
+            "--asset-id",
+            "hull_breach_seal_point",
+            "--sidecar-out",
+            str(output),
+        ]
+    )
+
+    assert result != 0
+    assert _snapshot_path(protected_root) == protected_snapshot
+    assert not (protected_parent / output.name).exists()
+    assert not list(protected_parent.glob(f".{output.name}.*.tmp"))
+
+
+def test_cli_preserves_replace_failure_and_closes_fds_when_unlink_fails(
+    staged_project: tuple[Path, dict[str, Path]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    project_root, staged = staged_project
+    output = tmp_path / "out" / "failed-replace.sidecar.json"
+    opened_fds: list[int] = []
+    closed_fds: list[int] = []
+    real_open = staged_props.os.open
+    real_close = staged_props.os.close
+    real_flags = staged_props._pinned_directory_open_flags
+    verified_flags = real_flags()
+
+    def tracking_open(*args: Any, **kwargs: Any) -> int:
+        descriptor = real_open(*args, **kwargs)
+        opened_fds.append(descriptor)
+        return descriptor
+
+    def tracking_close(descriptor: int) -> None:
+        closed_fds.append(descriptor)
+        real_close(descriptor)
+
+    def fail_replace(*_args: object, **_kwargs: object) -> None:
+        raise OSError("injected sidecar replace failure")
+
+    def fail_unlink(*_args: object, **_kwargs: object) -> None:
+        raise PermissionError("injected sidecar cleanup denial")
+
+    def flags_then_deny_unlink() -> int:
+        monkeypatch.setattr(staged_props.os, "unlink", fail_unlink)
+        return verified_flags
+
+    monkeypatch.setattr(staged_props.os, "open", tracking_open)
+    monkeypatch.setattr(staged_props.os, "close", tracking_close)
+    monkeypatch.setattr(staged_props.os, "replace", fail_replace)
+    monkeypatch.setattr(staged_props, "_pinned_directory_open_flags", flags_then_deny_unlink)
+
+    result = staged_props.main(
+        [
+            "--project-root",
+            str(project_root),
+            "--glb",
+            str(staged["hull_breach_seal_point"]),
+            "--asset-id",
+            "hull_breach_seal_point",
+            "--sidecar-out",
+            str(output),
+        ]
+    )
+
+    assert result != 0
+    assert "injected sidecar replace failure" in capsys.readouterr().err
+    assert opened_fds
+    assert closed_fds
+    for descriptor in opened_fds:
+        with pytest.raises(OSError):
+            os.fstat(descriptor)
+    assert not output.exists()
 
 
 def test_cli_rejects_protected_output_before_atomic_writer(

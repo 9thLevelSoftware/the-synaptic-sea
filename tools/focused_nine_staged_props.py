@@ -8,6 +8,7 @@ prop inventory or the generated runtime visual-binding index.
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import os
 import secrets
@@ -258,8 +259,22 @@ def _pinned_directory_open_flags() -> int:
     supports_dir_fd = getattr(os, "supports_dir_fd", ())
     if directory_flag is None or nofollow_flag is None:
         raise OSError("sidecar output requires O_DIRECTORY and O_NOFOLLOW")
-    if not all(function in supports_dir_fd for function in (os.open, os.unlink)):
+    required_functions = (os.open, os.mkdir, os.unlink)
+    if not all(function in supports_dir_fd for function in required_functions):
         raise OSError("sidecar output requires directory-fd operations")
+    # CPython on macOS exposes os.replace's src_dir_fd/dst_dir_fd parameters,
+    # and the call works, but omits the alias from os.supports_dir_fd.  Require
+    # the dir-fd-capable os.rename entry as the platform capability marker and
+    # verify that replace still exposes both keyword parameters.
+    replace_support = os.replace in supports_dir_fd
+    if not replace_support and os.rename in supports_dir_fd:
+        replace_parameters = inspect.signature(os.replace).parameters
+        replace_support = all(
+            parameter in replace_parameters
+            for parameter in ("src_dir_fd", "dst_dir_fd")
+        )
+    if not replace_support:
+        raise OSError("sidecar output requires directory-fd replace operations")
     return os.O_RDONLY | directory_flag | nofollow_flag
 
 
@@ -283,27 +298,78 @@ def _create_sibling_temp(directory_fd: int, target_name: str) -> tuple[int, str]
     raise OSError("could not allocate a unique sidecar temporary file")
 
 
+def _open_pinned_parent_directory(path: Path, directory_flags: int) -> int:
+    """Open *path*'s parent by walking pinned, no-followed components."""
+    path = Path(path)
+    if not path.is_absolute() or path.anchor != os.sep:
+        raise OSError("sidecar output requires an absolute POSIX path")
+
+    current_fd: int | None = os.open(os.sep, directory_flags)
+    try:
+        for component in path.parent.parts[1:]:
+            child_fd: int | None = None
+            try:
+                try:
+                    child_fd = os.open(
+                        component,
+                        directory_flags,
+                        dir_fd=current_fd,
+                    )
+                except FileNotFoundError:
+                    os.mkdir(component, mode=0o700, dir_fd=current_fd)
+                    child_fd = os.open(
+                        component,
+                        directory_flags,
+                        dir_fd=current_fd,
+                    )
+
+                previous_fd = current_fd
+                current_fd = child_fd
+                child_fd = None
+                os.close(previous_fd)
+            finally:
+                if child_fd is not None:
+                    os.close(child_fd)
+
+        if current_fd is None:
+            raise OSError("sidecar output parent walk lost its directory fd")
+        result = current_fd
+        current_fd = None
+        return result
+    finally:
+        if current_fd is not None:
+            os.close(current_fd)
+
+
 def _write_sidecar_atomically(path: Path, sidecar: dict) -> None:
     """Publish canonical JSON through a pinned parent directory FD."""
     path = Path(path)
     payload = _canonical_json_bytes(sidecar)
     directory_flags = _pinned_directory_open_flags()
-    path.parent.mkdir(parents=True, exist_ok=True)
 
     directory_fd: int | None = None
     temporary_fd: int | None = None
     temporary_name: str | None = None
+    primary_error: BaseException | None = None
+    primary_traceback = None
     try:
-        directory_fd = os.open(path.parent, directory_flags)
+        directory_fd = _open_pinned_parent_directory(path, directory_flags)
         # Probe directory fsync before creating a temporary file so platforms
         # without durable directory publication fail closed without writing.
         os.fsync(directory_fd)
         temporary_fd, temporary_name = _create_sibling_temp(directory_fd, path.name)
-        with os.fdopen(temporary_fd, "wb") as handle:
-            temporary_fd = None
+        handle = os.fdopen(temporary_fd, "wb")
+        try:
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
+        finally:
+            try:
+                handle.close()
+            except BaseException:
+                raise
+            else:
+                temporary_fd = None
         os.replace(
             temporary_name,
             path.name,
@@ -312,16 +378,39 @@ def _write_sidecar_atomically(path: Path, sidecar: dict) -> None:
         )
         temporary_name = None
         os.fsync(directory_fd)
-    finally:
-        if temporary_fd is not None:
+    except BaseException as exc:
+        primary_error = exc
+        primary_traceback = exc.__traceback__
+
+    cleanup_error: BaseException | None = None
+    cleanup_traceback = None
+    if temporary_fd is not None:
+        try:
             os.close(temporary_fd)
-        if temporary_name is not None and directory_fd is not None:
-            try:
-                os.unlink(temporary_name, dir_fd=directory_fd)
-            except FileNotFoundError:
-                pass
-        if directory_fd is not None:
+        except BaseException as exc:
+            cleanup_error = exc
+            cleanup_traceback = exc.__traceback__
+    if temporary_name is not None and directory_fd is not None:
+        try:
+            os.unlink(temporary_name, dir_fd=directory_fd)
+        except FileNotFoundError:
+            pass
+        except BaseException as exc:
+            if cleanup_error is None:
+                cleanup_error = exc
+                cleanup_traceback = exc.__traceback__
+    if directory_fd is not None:
+        try:
             os.close(directory_fd)
+        except BaseException as exc:
+            if cleanup_error is None:
+                cleanup_error = exc
+                cleanup_traceback = exc.__traceback__
+
+    if primary_error is not None:
+        raise primary_error.with_traceback(primary_traceback)
+    if cleanup_error is not None:
+        raise cleanup_error.with_traceback(cleanup_traceback)
 
 
 def _protected_output_error(
