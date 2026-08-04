@@ -19,6 +19,13 @@ STRUCTURAL_SOURCE_MODULE_IDS: tuple[str, ...] = (
     "doorway_frame_open_1x1",
     "pillar_support_1x1",
     "ramp_up_1x2",
+    "bulkhead_portal_2x1",
+    "ceiling_cap_1x1",
+    "doorway_frame_blocked_1x1",
+    "wall_end_cap",
+    "wall_inner_corner",
+    "wall_outer_corner",
+    "wall_t_junction",
 )
 
 _CONTRACT_ROOT = Path("data/placement/contracts/structural/ship_structural_v0")

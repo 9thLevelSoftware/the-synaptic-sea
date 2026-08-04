@@ -57,7 +57,7 @@ def test_unknown_or_path_traversal_module_is_rejected() -> None:
             load_source_spec(PROJECT_ROOT, module_id)
 
 
-def test_source_recovery_allowlist_is_exactly_the_eight_integrity_families() -> None:
+def test_source_recovery_allowlist_is_exactly_the_fifteen_structural_families() -> None:
     assert STRUCTURAL_SOURCE_MODULE_IDS == (
         "floor_1x1",
         "floor_2x1",
@@ -67,6 +67,13 @@ def test_source_recovery_allowlist_is_exactly_the_eight_integrity_families() -> 
         "doorway_frame_open_1x1",
         "pillar_support_1x1",
         "ramp_up_1x2",
+        "bulkhead_portal_2x1",
+        "ceiling_cap_1x1",
+        "doorway_frame_blocked_1x1",
+        "wall_end_cap",
+        "wall_inner_corner",
+        "wall_outer_corner",
+        "wall_t_junction",
     )
 
 
@@ -79,8 +86,15 @@ def test_source_recovery_allowlist_is_exactly_the_eight_integrity_families() -> 
     "doorway_frame_open_1x1",
     "pillar_support_1x1",
     "ramp_up_1x2",
+    "bulkhead_portal_2x1",
+    "ceiling_cap_1x1",
+    "doorway_frame_blocked_1x1",
+    "wall_end_cap",
+    "wall_inner_corner",
+    "wall_outer_corner",
+    "wall_t_junction",
 ])
-def test_all_eight_modules_load_from_live_contracts(module_id: str) -> None:
+def test_all_fifteen_modules_load_from_live_contracts(module_id: str) -> None:
     spec = load_source_spec(PROJECT_ROOT, module_id)
     assert spec.module_id == module_id
     assert spec.kit_id == "ship_structural_v0"
