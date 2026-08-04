@@ -23,6 +23,9 @@ PRESSURE_SOURCE_FIXTURE = Path(
 PRESSURE_CONTRACT_FIXTURE = PROJECT_ROOT / (
     "data/placement/contracts/structural/ship_structural_v0/doorway_frame_open_1x1_contract.json"
 )
+PRESSURE_CANDIDATE_CONTRACT_FIXTURE = PROJECT_ROOT / (
+    "data/placement/contracts/structural/ship_structural_v0/pressure_door_1x1_contract.json"
+)
 PRESSURE_GLB_FIXTURE = PROJECT_ROOT / (
     "assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1.glb"
 )
@@ -32,6 +35,45 @@ PROP_SOURCE_FIXTURE = Path(
 MATERIAL_FIXTURE = Path(
     "/Volumes/Untitled/SynapticSeaAssets/meshes/source/materials/salvage_industrial.blend"
 )
+UNDER_BUDGET_FIXTURES: dict[str, tuple[str, Path, int]] = {
+    "wall_straight_1x1": (
+        "structural",
+        Path(
+            "/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/"
+            "wall_straight_1x1/wall_straight_1x1.blend"
+        ),
+        350,
+    ),
+    "doorway_frame_open_1x1": (
+        "structural",
+        Path(
+            "/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/"
+            "doorway_frame_open_1x1/doorway_frame_open_1x1.blend"
+        ),
+        350,
+    ),
+    "pillar_support_1x1": (
+        "structural",
+        Path(
+            "/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/"
+            "pillar_support_1x1/pillar_support_1x1.blend"
+        ),
+        350,
+    ),
+    "ceiling_cap_1x1": (
+        "structural",
+        Path(
+            "/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/"
+            "ceiling_cap_1x1/ceiling_cap_1x1.blend"
+        ),
+        350,
+    ),
+    "fire_suppression_station": (
+        "prop",
+        Path("/Volumes/Untitled/SynapticSeaAssets/meshes/source/props/fire_suppression_station.blend"),
+        300,
+    ),
+}
 CONTRACT_FIXTURE = PROJECT_ROOT / (
     "data/placement/contracts/structural/ship_structural_v0/floor_1x1_contract.json"
 )
@@ -437,6 +479,7 @@ def test_blender_pressure_door_roles_are_distinct_and_idempotent(tmp_path: Path)
         BLENDER,
         PRESSURE_SOURCE_FIXTURE,
         PRESSURE_CONTRACT_FIXTURE,
+        PRESSURE_CANDIDATE_CONTRACT_FIXTURE,
         PRESSURE_GLB_FIXTURE,
         MATERIAL_FIXTURE,
     ):
@@ -458,8 +501,36 @@ def test_blender_pressure_door_roles_are_distinct_and_idempotent(tmp_path: Path)
     material_dir.mkdir()
     shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
 
+    pressure_project = tmp_path / "pressure-project"
+    pressure_contract = pressure_project / (
+        "data/placement/contracts/structural/ship_structural_v0/pressure_door_1x1_contract.json"
+    )
+    pressure_glb = pressure_project / (
+        "assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1.glb"
+    )
+    pressure_contract.parent.mkdir(parents=True)
+    pressure_glb.parent.mkdir(parents=True)
+    shutil.copy2(PRESSURE_CANDIDATE_CONTRACT_FIXTURE, pressure_contract)
+    shutil.copy2(PRESSURE_GLB_FIXTURE, pressure_glb)
+    prepare_pressure_source_expr = (
+        "import bpy; "
+        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+        "root=bpy.data.objects.get('ModuleRoot_doorway_frame_open_1x1'); "
+        "assert root is not None; root.name='ModuleRoot_pressure_door_1x1'; "
+        "intact=bpy.data.collections.get('Export_intact'); "
+        "assert intact is not None; intact['module_id']='pressure_door_1x1'; "
+        f"bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})"
+    )
+    prepared = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", prepare_pressure_source_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert prepared.returncode == 0, prepared.stdout + prepared.stderr
+
     command = _recipe_command(
-        project_root=PROJECT_ROOT,
+        project_root=pressure_project,
         structural_root=structural_root,
         props_root=props_root,
         asset_id="pressure_door_1x1",
@@ -786,3 +857,108 @@ def test_blender_compatibility_wrapper_normalizes_blender_arguments(tmp_path: Pa
     assert SOURCE_GLB_FIXTURE.read_bytes() == source_glb_fixture_bytes
     assert source_blend.is_file()
     assert material_copy.read_bytes() == material_fixture_bytes
+
+
+def _export_recipe_result_for_evidence(
+    *, source: Path, asset_id: str, kind: str, destination: Path
+) -> Path:
+    destination.mkdir(parents=True, exist_ok=True)
+    if kind == "structural":
+        command = [
+            str(BLENDER),
+            "--background",
+            "--factory-startup",
+            "--python",
+            str(PROJECT_ROOT / "tools/export_structural_glb.py"),
+            "--",
+            "--blend-path",
+            str(source),
+            "--staging-dir",
+            str(destination),
+            "--module",
+            asset_id,
+        ]
+    else:
+        output = destination / f"{asset_id}.glb"
+        expression = (
+            "import bpy; "
+            f"result=bpy.ops.wm.open_mainfile(filepath={str(source)!r}); "
+            "assert 'FINISHED' in result, 'prop source open failed'; "
+            f"collection=bpy.data.collections.get({f'FocusedNine_{asset_id}_Generated'!r}); "
+            "assert collection is not None, 'generated prop collection missing'; "
+            "bpy.ops.object.select_all(action='DESELECT'); "
+            "objects=[obj for obj in collection.objects if obj.type == 'MESH']; "
+            "assert objects, 'generated prop collection has no mesh'; "
+            "[obj.select_set(True) for obj in objects]; "
+            "bpy.context.view_layer.objects.active=objects[0]; "
+            f"result=bpy.ops.export_scene.gltf(filepath={str(output)!r}, export_format='GLB', export_apply=True, use_selection=True); "
+            "assert 'CANCELLED' not in result, 'prop GLB export cancelled'"
+        )
+        command = [
+            str(BLENDER),
+            "--background",
+            "--factory-startup",
+            "--python-expr",
+            expression,
+        ]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stdout + result.stderr
+    output = destination / f"{asset_id}.glb"
+    assert output.is_file() and output.stat().st_size > 0
+    return output
+
+
+def test_blender_under_budget_recipes_meet_gameplay_evidence_minima(tmp_path: Path) -> None:
+    from tools import focused_nine_evidence
+
+    for fixture in (BLENDER, MATERIAL_FIXTURE, *(item[1] for item in UNDER_BUDGET_FIXTURES.values())):
+        if not fixture.is_file():
+            pytest.fail(f"fixture missing: {fixture}")
+
+    structural_root = tmp_path / "structural"
+    props_root = tmp_path / "props"
+    material_dir = tmp_path / "materials"
+    props_root.mkdir(parents=True)
+    material_dir.mkdir(parents=True)
+    shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+    fixture_bytes = {asset_id: fixture.read_bytes() for asset_id, (_, fixture, _) in UNDER_BUDGET_FIXTURES.items()}
+
+    measured: dict[str, int] = {}
+    for asset_id, (kind, fixture, minimum) in UNDER_BUDGET_FIXTURES.items():
+        if kind == "structural":
+            source_dir = structural_root / asset_id
+            source_dir.mkdir(parents=True)
+            source = source_dir / f"{asset_id}.blend"
+        else:
+            props_root.mkdir(parents=True, exist_ok=True)
+            source = props_root / f"{asset_id}.blend"
+        shutil.copy2(fixture, source)
+
+        command = _recipe_command(
+            project_root=PROJECT_ROOT,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id=asset_id,
+        )
+        recipe = subprocess.run(command, capture_output=True, text=True, check=False)
+        assert recipe.returncode == 0, recipe.stdout + recipe.stderr
+        report, _report_line = _report_from_stdout(recipe.stdout)
+        assert report["boolean_modifiers"] == []
+        assert "BOOLEAN" not in report["modifier_types"]
+        assert all(name.startswith(f"FocusedNine_{asset_id}_") for name in report["generated_object_names"])
+
+        stage = tmp_path / "assets/_staging/focused_nine" / kind / asset_id
+        glb = _export_recipe_result_for_evidence(
+            source=source,
+            asset_id=asset_id,
+            kind=kind,
+            destination=stage,
+        )
+        record = focused_nine_evidence.inspect_staged_glb(glb, BLENDER)
+        maximum = 1500 if kind == "structural" else 1200
+        assert focused_nine_evidence.validate_evidence(record, minimum, maximum) == []
+        measured[asset_id] = record["triangle_count"]
+
+    assert set(measured) == set(UNDER_BUDGET_FIXTURES)
+    for asset_id, (_, fixture, _) in UNDER_BUDGET_FIXTURES.items():
+        assert fixture.read_bytes() == fixture_bytes[asset_id]

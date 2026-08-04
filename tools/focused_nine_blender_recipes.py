@@ -568,6 +568,18 @@ def _add_wall_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
             _box(asset_id, "service_cover", collection, (0.46, 0.08, 0.38), (width / 2 - 0.42, -0.22, height * 0.3), "MAT_WarningStripe", bevel_width=0.015),
         )
     )
+    for panel_index, x in enumerate((-width * 0.22, width * 0.22)):
+        for seam_index, z in enumerate((height * 0.3, height * 0.68)):
+            objects.append(
+                _box(
+                    asset_id,
+                    f"panel_seam_{panel_index:02d}_{seam_index:02d}",
+                    collection,
+                    (width * 0.23, 0.028, 0.026),
+                    (x, -0.207, z),
+                    "MAT_Conduit",
+                )
+            )
     return objects
 
 
@@ -583,6 +595,29 @@ def _add_doorway_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
         _box(asset_id, "indicator_bay_right", collection, (0.12, 0.48, 0.26), (opening_width / 2 + 0.2, -0.26, jamb_height - 0.5), "MAT_ReactorGlow", bevel_width=0.015),
         _box(asset_id, "threshold", collection, (opening_width + 0.72, 0.65, 0.12), (0, 0, 0.06), "MAT_WarningStripe", bevel_width=0.02),
     ]
+    for side, x in (("left", -opening_width / 2 - 0.2), ("right", opening_width / 2 + 0.2)):
+        for segment_index, z in enumerate((jamb_height * 0.28, jamb_height * 0.5, jamb_height * 0.72)):
+            objects.append(
+                _box(
+                    asset_id,
+                    f"jamb_segment_{side}_{segment_index:02d}",
+                    collection,
+                    (0.38, 0.045, 0.075),
+                    (x, -0.238, z),
+                    "MAT_Conduit",
+                )
+            )
+    for index, x in enumerate((-opening_width * 0.28, opening_width * 0.28)):
+        objects.append(
+            _box(
+                asset_id,
+                f"lintel_seam_{index:02d}",
+                collection,
+                (0.34, 0.045, 0.08),
+                (x, -0.238, jamb_height - 0.17),
+                "MAT_Conduit",
+            )
+        )
     return objects
 
 
@@ -597,6 +632,25 @@ def _add_pillar_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
     ]
     for index, x in enumerate((-body * 0.58, body * 0.58)):
         objects.append(_box(asset_id, f"rib_{index:02d}", collection, (0.1, body * 0.98, max(1.8, height * 0.72)), (x, 0, max(1.8, height * 0.72) / 2 + 0.35), "MAT_Conduit", bevel_width=0.015))
+    bolt_positions = (
+        (-body * 0.45, -body * 0.45),
+        (body * 0.45, -body * 0.45),
+        (-body * 0.45, body * 0.45),
+        (body * 0.45, body * 0.45),
+    )
+    cap_z = max(2.8, height) - 0.18
+    for level, z in (("base", 0.255), ("cap", cap_z)):
+        for index, (x, y) in enumerate(bolt_positions):
+            objects.append(
+                _box(
+                    asset_id,
+                    f"{level}_bolt_{index:02d}",
+                    collection,
+                    (0.09, 0.09, 0.06),
+                    (x, y, z),
+                    "MAT_WarningStripe",
+                )
+            )
     return objects
 
 
@@ -625,6 +679,50 @@ def _add_ceiling_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
     ]
     for index, x in enumerate((-width * 0.25, -width * 0.08, width * 0.09, width * 0.26)):
         objects.append(_box(asset_id, f"vent_bar_{index:02d}", collection, (0.06, depth * 0.48, 0.08), (x, 0, 3.76), "MAT_WarningStripe"))
+    for index, x in enumerate((-width * 0.36, -width * 0.12, width * 0.12, width * 0.36)):
+        objects.append(
+            _box(
+                asset_id,
+                f"panel_seam_ns_{index:02d}",
+                collection,
+                (0.025, depth * 0.68, 0.026),
+                (x, 0, 3.80),
+                "MAT_Conduit",
+            )
+        )
+    for index, y in enumerate((-depth * 0.34, -depth * 0.11, depth * 0.11, depth * 0.34)):
+        objects.append(
+            _box(
+                asset_id,
+                f"panel_seam_ew_{index:02d}",
+                collection,
+                (width * 0.68, 0.025, 0.026),
+                (0, y, 3.80),
+                "MAT_Conduit",
+            )
+        )
+    for index, (x, y) in enumerate(
+        (
+            (-width * 0.39, -depth * 0.39),
+            (0, -depth * 0.39),
+            (width * 0.39, -depth * 0.39),
+            (-width * 0.39, 0),
+            (width * 0.39, 0),
+            (-width * 0.39, depth * 0.39),
+            (0, depth * 0.39),
+            (width * 0.39, depth * 0.39),
+        )
+    ):
+        objects.append(
+            _box(
+                asset_id,
+                f"service_bolt_{index:02d}",
+                collection,
+                (0.09, 0.09, 0.06),
+                (x, y, 3.80),
+                "MAT_WarningStripe",
+            )
+        )
     return objects
 
 
@@ -686,6 +784,27 @@ def _add_fire_station_prop(asset_id: str, collection: Any) -> list[Any]:
     ]
     objects[-1]["label_shape"] = "emergency_service_panel"
     objects[-1]["text_mesh"] = False
+    objects.extend(
+        (
+            _box(asset_id, "cabinet_seam_left", collection, (0.025, 0.045, 1.42), (-0.34, -0.235, 0.9), "MAT_Conduit"),
+            _box(asset_id, "cabinet_seam_right", collection, (0.025, 0.045, 1.42), (0.34, -0.235, 0.9), "MAT_Conduit"),
+            _box(asset_id, "cabinet_seam_upper", collection, (0.68, 0.045, 0.025), (0, -0.235, 1.35), "MAT_Conduit"),
+            _box(asset_id, "cabinet_seam_lower", collection, (0.68, 0.045, 0.025), (0, -0.235, 0.66), "MAT_Conduit"),
+            _box(asset_id, "vent_slot_upper", collection, (0.12, 0.045, 0.035), (-0.18, -0.235, 1.48), "MAT_WarningStripe"),
+            _box(asset_id, "vent_slot_lower", collection, (0.12, 0.045, 0.035), (0.18, -0.235, 1.48), "MAT_WarningStripe"),
+        )
+    )
+    for index, (x, z) in enumerate(((-0.43, 0.28), (0.43, 0.28), (-0.43, 1.52), (0.43, 1.52))):
+        objects.append(
+            _box(
+                asset_id,
+                f"cabinet_bolt_{index:02d}",
+                collection,
+                (0.075, 0.06, 0.075),
+                (x, -0.25, z),
+                "MAT_WarningStripe",
+            )
+        )
     return objects
 
 
