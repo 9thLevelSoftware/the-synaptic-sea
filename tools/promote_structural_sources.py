@@ -21,6 +21,7 @@ from typing import Mapping, Sequence
 try:
     from tools.structural_source_contract import (
         STRUCTURAL_SOURCE_MODULE_IDS,
+        load_source_spec,
         source_output_paths,
     )
 except ModuleNotFoundError:
@@ -28,6 +29,7 @@ except ModuleNotFoundError:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from tools.structural_source_contract import (
         STRUCTURAL_SOURCE_MODULE_IDS,
+        load_source_spec,
         source_output_paths,
     )
 
@@ -115,48 +117,62 @@ def export_module_to_staging(
     if not blend_path.is_file():
         raise FileNotFoundError(f"missing recovered Blender source: {blend_path}")
 
-    _clean_staging_glbs(staging_dir)
-    command = [
-        _blender_executable(),
-        "--background",
-        "--factory-startup",
-        "--python",
-        str(_EXPORT_SCRIPT),
-        "--",
-        "--blend-path",
-        str(blend_path),
-        "--staging-dir",
-        str(staging_dir),
-        "--module",
-        module_id,
-    ]
-    try:
-        completed = subprocess.run(
-            command,
-            cwd=str(project_root),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except OSError as exc:
-        raise PromotionError(f"cannot invoke Blender for {module_id}: {exc}") from exc
+    # Export into a private child directory.  The existing final staging GLBs
+    # are not touched until Blender has completed successfully and all output
+    # files have been checked.
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".tmp_export-", dir=str(staging_dir)) as temporary:
+        export_dir = Path(temporary)
+        command = [
+            _blender_executable(),
+            "--background",
+            "--factory-startup",
+            "--python",
+            str(_EXPORT_SCRIPT),
+            "--",
+            "--blend-path",
+            str(blend_path),
+            "--staging-dir",
+            str(export_dir),
+            "--module",
+            module_id,
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=str(project_root),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError as exc:
+            raise PromotionError(f"cannot invoke Blender for {module_id}: {exc}") from exc
 
-    if completed.returncode != 0:
-        detail = completed.stderr.strip() or completed.stdout.strip()
-        suffix = f": {detail}" if detail else f": exit {completed.returncode}"
-        raise PromotionError(f"Blender export failed for {module_id}{suffix}")
+        if completed.returncode != 0:
+            detail = completed.stderr.strip() or completed.stdout.strip()
+            suffix = f": {detail}" if detail else f": exit {completed.returncode}"
+            raise PromotionError(f"Blender export failed for {module_id}{suffix}")
 
-    exported: dict[str, Path] = {}
-    for variant, _suffix in _VARIANT_SUFFIXES:
-        path = _variant_glb_path(staging_dir, module_id, variant)
-        if path.is_file():
-            if path.stat().st_size <= 0:
-                raise PromotionError(f"Blender exported an empty GLB: {path}")
-            exported[variant] = path
+        exported: dict[str, Path] = {}
+        for variant, _suffix in _VARIANT_SUFFIXES:
+            path = _variant_glb_path(export_dir, module_id, variant)
+            if path.is_file():
+                if path.stat().st_size <= 0:
+                    raise PromotionError(f"Blender exported an empty GLB: {path}")
+                exported[variant] = path
 
-    if not exported:
-        raise PromotionError(f"Blender exported no GLBs for {module_id}")
-    return exported
+        if not exported:
+            raise PromotionError(f"Blender exported no GLBs for {module_id}")
+
+        # Commit only validated outputs.  Metadata and non-GLB files in the
+        # final staging directory remain untouched.
+        _clean_staging_glbs(staging_dir)
+        committed: dict[str, Path] = {}
+        for variant, source in exported.items():
+            destination = _variant_glb_path(staging_dir, module_id, variant)
+            shutil.move(str(source), destination)
+            committed[variant] = destination
+        return committed
 
 
 def _copy_atomic(source: Path, destination: Path) -> None:
@@ -217,6 +233,13 @@ def _run_godot_import_smoke(
 ) -> None:
     """Import staged GLBs in a temporary minimal Godot project overlay."""
 
+    for source in exported.values():
+        path = Path(source)
+        with path.open("rb") as handle:
+            magic = handle.read(5)
+        if not (magic.startswith(b"glTF") or magic.startswith(b"\x00glTF")):
+            raise PromotionError(f"invalid GLB magic for staged file: {path}")
+
     godot = os.environ.get("GODOT", "/opt/homebrew/bin/godot")
     with tempfile.TemporaryDirectory(prefix="structural-promotion-") as temporary:
         overlay = Path(temporary)
@@ -250,6 +273,33 @@ def _run_godot_import_smoke(
             raise PromotionError(f"Godot import smoke failed for {module_id}{suffix}")
 
 
+def _dry_run_module(
+    project_root: Path,
+    source_root: Path,
+    staging_root: Path,
+    module_id: str,
+) -> None:
+    """Validate one source and print the export plan without side effects."""
+
+    blend_path, _record_path = source_output_paths(
+        Path(source_root).expanduser(), module_id
+    )
+    blend_path = blend_path.expanduser().resolve()
+    if not blend_path.is_file():
+        raise FileNotFoundError(f"missing recovered Blender source: {blend_path}")
+    load_source_spec(project_root, module_id)
+    staging_dir = Path(staging_root).expanduser().resolve() / module_id
+    planned_glbs = ",".join(
+        str(_variant_glb_path(staging_dir, module_id, variant).name)
+        for variant, _suffix in _VARIANT_SUFFIXES
+    )
+    print(
+        "STRUCTURAL_PROMOTION_PLAN "
+        f"module={module_id} blend={blend_path} "
+        f"source_spec=loaded staging={staging_dir} glbs={planned_glbs}"
+    )
+
+
 def promote_all(
     project_root: Path,
     source_root: Path,
@@ -274,6 +324,9 @@ def promote_all(
     for module_id in module_ids:
         try:
             _validate_module_id(module_id)
+            if dry_run:
+                _dry_run_module(project_root, source_root, staging_root, module_id)
+                continue
             exported = export_module_to_staging(
                 project_root, source_root, staging_root, module_id
             )
@@ -350,7 +403,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="show promotions without changing runtime GLBs",
+        help="show export plans without invoking Blender or changing files",
     )
     parser.add_argument(
         "--force",
