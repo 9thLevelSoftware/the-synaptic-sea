@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 
 from tools import focused_nine_batch as batch
+from tools import validate_structural_sources as structural_validator
+from tools.structural_source_contract import load_source_spec
 
 
 ASSETS = (
@@ -132,6 +134,105 @@ def test_parallel_source_root_creates_fresh_source_and_reports_logical_reference
     assert str(original_root) not in json.dumps(record)
 
 
+def test_parallel_source_root_creates_a_contract_valid_source_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = Path(__file__).resolve().parents[1]
+    structural = tmp_path / "meshes/source/ship_structural_v0_focused_nine"
+    props = tmp_path / "props"
+    structural.mkdir(parents=True)
+    props.mkdir()
+    args = type(
+        "Args",
+        (),
+        {
+            "project_root": project,
+            "structural_source_root": structural,
+            "props_source_root": props,
+        },
+    )()
+
+    def create_empty(destination: Path) -> None:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(b"fresh source")
+
+    monkeypatch.setattr(batch, "_create_empty_source_with_blender", create_empty)
+
+    source = batch._ensure_source(args, "floor_1x1")
+    record_path = batch._write_structural_source_record(args, "floor_1x1", source)
+
+    assert source.is_file()
+    assert record_path == structural / "floor_1x1/floor_1x1.source.json"
+    spec = load_source_spec(project, "floor_1x1")
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    assert structural_validator._validate_source_record(spec, record, blend_path=source) == []
+
+
+def test_tampered_or_missing_parallel_source_record_fails_exact_candidate_validator(
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "project"
+    contract_relative = Path(
+        "data/placement/contracts/structural/ship_structural_v0/pressure_door_1x1_contract.json"
+    )
+    candidate_relative = Path(
+        "assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1.glb"
+    )
+    (project / contract_relative).parent.mkdir(parents=True)
+    (project / contract_relative).write_bytes(
+        (Path(__file__).resolve().parents[1] / contract_relative).read_bytes()
+    )
+    candidate = project / candidate_relative
+    candidate.parent.mkdir(parents=True)
+    candidate.write_bytes(
+        (
+            Path(__file__).resolve().parents[1]
+            / "assets/imported/structural/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1.glb"
+        ).read_bytes()
+    )
+    structural = tmp_path / "meshes/source/ship_structural_v0_focused_nine"
+    props = tmp_path / "props"
+    structural.mkdir(parents=True)
+    props.mkdir()
+    args = type(
+        "Args",
+        (),
+        {
+            "project_root": project,
+            "structural_source_root": structural,
+            "props_source_root": props,
+        },
+    )()
+    source = structural / "pressure_door_1x1/pressure_door_1x1.blend"
+    source.parent.mkdir()
+    source.write_bytes(b"pressure source")
+    record_path = batch._write_structural_source_record(
+        args, "pressure_door_1x1", source, candidate_glb=candidate
+    )
+    validator_args = structural_validator.parse_args(
+        [
+            "--project-root",
+            str(project),
+            "--source-root",
+            str(structural),
+            "--candidate-source-glb",
+            "pressure_door_1x1=" + str(candidate_relative),
+        ]
+    )
+
+    assert structural_validator.validate_sources(validator_args) == []
+    tampered = json.loads(record_path.read_text(encoding="utf-8"))
+    tampered["source_glb"]["sha256"] = "wrong-hash"
+    record_path.write_text(json.dumps(tampered), encoding="utf-8")
+    assert structural_validator.validate_sources(validator_args) == [
+        "source record source_glb.sha256 does not match contract: pressure_door_1x1"
+    ]
+    record_path.unlink()
+    assert structural_validator.validate_sources(validator_args) == [
+        f"missing candidate source record: {record_path}"
+    ]
+
+
 def test_live_structural_validator_uses_optional_validation_root_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -235,6 +336,7 @@ def test_private_batch_workspace_is_staged_for_evidence_and_cleaned_on_gate_erro
     observed: list[Path] = []
 
     monkeypatch.setattr(batch, "_ensure_source", lambda args, asset_id: structural / f"{asset_id}.blend")
+    monkeypatch.setattr(batch, "_write_structural_source_record", lambda *args, **kwargs: None)
     monkeypatch.setattr(batch, "_run_recipe", lambda args, asset_id: None)
 
     def fake_export(source: Path, asset_id: str, destination: Path) -> tuple[Path, ...]:

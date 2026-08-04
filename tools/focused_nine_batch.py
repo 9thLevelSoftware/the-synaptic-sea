@@ -18,6 +18,7 @@ depth and are not claimed to provide descriptor-level race immunity.
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 import hashlib
 import json
 import os
@@ -37,12 +38,16 @@ try:
     from tools import focused_nine_contract as contract
     from tools import focused_nine_evidence as evidence
     from tools import focused_nine_staged_props as staged_props
+    from tools import structural_source_contract as source_contract
+    from tools import validate_structural_sources as structural_validator
     from tools.focused_nine_blender_recipes import resolve_source_path, source_blend_path
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from tools import focused_nine_contract as contract
     from tools import focused_nine_evidence as evidence
     from tools import focused_nine_staged_props as staged_props
+    from tools import structural_source_contract as source_contract
+    from tools import validate_structural_sources as structural_validator
     from tools.focused_nine_blender_recipes import resolve_source_path, source_blend_path
 
 
@@ -587,6 +592,132 @@ def _ensure_source(args: argparse.Namespace, asset_id: str) -> Path:
     return source
 
 
+def _focused_source_record_paths(source_root: Path, asset_id: str) -> tuple[Path, Path]:
+    """Return one focused source's exact blend and provenance paths."""
+
+    if asset_id in source_contract.STRUCTURAL_SOURCE_MODULE_IDS:
+        return source_contract.source_output_paths(source_root, asset_id)
+    if asset_id not in source_contract.FOCUSED_NINE_CANDIDATE_MODULE_IDS:
+        raise ValueError(f"unsupported focused structural source record: {asset_id!r}")
+
+    root = Path(source_root).expanduser()
+    module_root = root / asset_id
+    if not _contained(root, module_root):
+        raise ValueError(f"focused source record path escapes source root: {asset_id}")
+    return module_root / f"{asset_id}.blend", module_root / f"{asset_id}.source.json"
+
+
+def _candidate_spec_for_private_glb(
+    project_root: Path, asset_id: str, private_glb: Path
+) -> source_contract.StructuralSourceSpec:
+    """Load the candidate contract while hashing a private, pre-publication GLB.
+
+    The candidate contract loader intentionally accepts only the canonical
+    staged pressure-door path.  During the batch that path may still contain a
+    previous candidate (or be absent), so load the same contract and the actual
+    private export in a disposable project, then restore the final project
+    paths on the immutable spec.  The resulting record can be checked before a
+    publication rename without trusting stale staging content.
+    """
+
+    if asset_id not in source_contract.FOCUSED_NINE_CANDIDATE_MODULE_IDS:
+        raise ValueError(f"unsupported focused candidate source: {asset_id!r}")
+    private_path = _absolute(private_glb)
+    _reject_static_symlink_components(private_path, "private candidate source GLB")
+    try:
+        mode = private_path.lstat().st_mode
+    except OSError as exc:
+        raise ValueError(f"cannot inspect private candidate source GLB: {private_glb}") from exc
+    if not stat.S_ISREG(mode):
+        raise ValueError(f"private candidate source GLB must be a regular file: {private_glb}")
+
+    project = _absolute(project_root)
+    candidate_relative = Path(
+        "assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1.glb"
+    )
+    contract_relative = Path(
+        "data/placement/contracts/structural/ship_structural_v0/pressure_door_1x1_contract.json"
+    )
+    final_candidate = project / candidate_relative
+    final_contract = project / contract_relative
+    with tempfile.TemporaryDirectory(prefix="focused-nine-candidate-contract-") as temporary:
+        disposable = Path(temporary)
+        disposable_candidate = disposable / candidate_relative
+        disposable_contract = disposable / contract_relative
+        disposable_candidate.parent.mkdir(parents=True, exist_ok=True)
+        disposable_contract.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(private_path, disposable_candidate)
+        shutil.copy2(final_contract, disposable_contract)
+        spec = source_contract.load_candidate_source_spec(
+            disposable, asset_id, candidate_relative
+        )
+    return replace(
+        spec,
+        contract_path=final_contract,
+        source_glb_path=final_candidate,
+    )
+
+
+def _write_structural_source_record(
+    args: argparse.Namespace,
+    asset_id: str,
+    source: Path,
+    *,
+    candidate_glb: Path | None = None,
+) -> Path:
+    """Write and immediately validate one focused structural source record.
+
+    Records are written only beside the source under the explicit structural
+    source root.  Representative records reference the checked-in structural
+    contract and imported source GLB; the pressure-door record references the
+    actual private staged GLB that will be published, not an older candidate.
+    """
+
+    if asset_id not in contract.STRUCTURAL_IDS:
+        raise ValueError(f"focused source record requested for non-structural asset: {asset_id}")
+    _validate_source_root(
+        args.project_root,
+        args.structural_source_root,
+        "structural source root",
+        asset_id,
+    )
+    record_root = Path(args.structural_source_root).expanduser()
+    blend_path, record_path = _focused_source_record_paths(record_root, asset_id)
+    _reject_static_symlink_components(blend_path, "focused structural source path")
+    _reject_static_symlink_components(record_path, "focused structural source record path")
+    source_abs = _absolute(source)
+    if source_abs != _absolute(blend_path):
+        raise ValueError(f"focused structural source path does not match its root: {source}")
+    try:
+        mode = source_abs.lstat().st_mode
+    except OSError as exc:
+        raise ValueError(f"cannot inspect focused structural source: {source}") from exc
+    if not stat.S_ISREG(mode):
+        raise ValueError(f"focused structural source must be a regular file: {source}")
+
+    if asset_id == "pressure_door_1x1":
+        if candidate_glb is None:
+            raise ValueError("pressure-door source record requires its private staged intact GLB")
+        spec = _candidate_spec_for_private_glb(args.project_root, asset_id, candidate_glb)
+    else:
+        if candidate_glb is not None:
+            raise ValueError(f"candidate GLB is only valid for pressure_door_1x1: {asset_id}")
+        spec = source_contract.load_source_spec(_absolute(args.project_root), asset_id)
+    record = source_contract.build_source_record(spec, blend_path)
+    errors = structural_validator._validate_source_record(spec, record, blend_path=blend_path)
+    if errors:
+        raise ValueError(f"focused structural source record validation failed for {asset_id}: {'; '.join(errors)}")
+    _atomic_write_bytes(record_path, source_contract.canonical_json(record))
+    try:
+        written = json.loads(record_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"focused structural source record could not be read back: {record_path}") from exc
+    errors = structural_validator._validate_source_record(spec, written, blend_path=blend_path)
+    if errors:
+        raise ValueError(f"focused structural source record validation failed for {asset_id}: {'; '.join(errors)}")
+    return record_path
+
+
 def _run_recipe(args: argparse.Namespace, asset_id: str) -> None:
     result = _run_step(
         [
@@ -905,6 +1036,8 @@ def _process_asset(args: argparse.Namespace, asset_id: str, private_root: Path) 
     kind = "structural" if asset_id in contract.STRUCTURAL_IDS else "prop"
     role_metrics: dict[str, Any] = {}
     if kind == "structural":
+        if asset_id != "pressure_door_1x1":
+            _write_structural_source_record(args, asset_id, source)
         destination = private_root / "structural" / asset_id
         staged = _run_structural_export(source, asset_id, destination)
     else:
@@ -925,6 +1058,8 @@ def _process_asset(args: argparse.Namespace, asset_id: str, private_root: Path) 
             raise ValueError(f"evidence validation failed for {asset_id}: {'; '.join(errors)}")
         role = "intact" if path.name == f"{asset_id}.glb" else path.stem.removeprefix(f"{asset_id}_")
         evidence_records[role] = record
+    if kind == "structural" and asset_id == "pressure_door_1x1":
+        _write_structural_source_record(args, asset_id, source, candidate_glb=staged[0])
     if kind == "structural" and asset_id == "pressure_door_1x1":
         _copy_pressure_package(private_root, args.project_root)
     intact = evidence_records["intact"]
