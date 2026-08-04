@@ -13,6 +13,8 @@ from typing import Any, Sequence
 
 try:
     from tools.structural_source_contract import (
+        _COORDINATE_CONVERSION,
+        _ORIENTATION_SOURCE,
         FOCUSED_NINE_CANDIDATE_MODULE_IDS,
         STRUCTURAL_SOURCE_MODULE_IDS,
         StructuralSourceSpec,
@@ -23,6 +25,8 @@ try:
 except ModuleNotFoundError:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from tools.structural_source_contract import (
+        _COORDINATE_CONVERSION,
+        _ORIENTATION_SOURCE,
         FOCUSED_NINE_CANDIDATE_MODULE_IDS,
         STRUCTURAL_SOURCE_MODULE_IDS,
         StructuralSourceSpec,
@@ -158,9 +162,12 @@ def validate_report(spec: StructuralSourceSpec, report: dict[str, Any]) -> list[
 
 
 def _validate_source_record(
-    spec: StructuralSourceSpec, source_record: object
+    spec: StructuralSourceSpec,
+    source_record: object,
+    *,
+    blend_path: Path,
 ) -> list[str]:
-    """Return provenance diagnostics for one recovered source record."""
+    """Return complete provenance diagnostics for one recovered source record."""
 
     module_id = spec.module_id
     if not isinstance(source_record, dict):
@@ -173,6 +180,16 @@ def _validate_source_record(
         errors.append(f"source record schema_version does not match contract: {module_id}")
     if source_record.get("module_id") != module_id:
         errors.append(f"source record module_id does not match contract: {module_id}")
+    if source_record.get("kit_id") != spec.kit_id:
+        errors.append(f"source record kit_id does not match contract: {module_id}")
+    if source_record.get("blend_path") != str(blend_path):
+        errors.append(f"source record blend_path does not match expected source: {module_id}")
+    if source_record.get("coordinate_conversion") != _COORDINATE_CONVERSION:
+        errors.append(
+            f"source record coordinate_conversion does not match contract: {module_id}"
+        )
+    if source_record.get("placement_origin") != spec.placement_origin:
+        errors.append(f"source record placement_origin does not match contract: {module_id}")
 
     contract = source_record.get("contract")
     if not isinstance(contract, dict):
@@ -193,6 +210,22 @@ def _validate_source_record(
             errors.append(
                 f"source record source_glb.sha256 does not match contract: {module_id}"
             )
+
+    expected_sockets = [
+        {
+            "id": socket.socket_id,
+            "anchor_name": socket.anchor_name,
+            "kind": socket.kind,
+            "compatible_kinds": list(socket.compatible_kinds),
+            "position_contract_y_up": list(socket.position_y_up),
+            "position_blender_z_up": list(socket.position_z_up),
+            "orientation_source": _ORIENTATION_SOURCE,
+        }
+        for socket in spec.sockets
+    ]
+    raw_sockets = source_record.get("sockets")
+    if not isinstance(raw_sockets, list) or raw_sockets != expected_sockets:
+        errors.append(f"source record socket metadata does not match contract: {module_id}")
 
     return sorted(errors)
 
@@ -355,13 +388,23 @@ def _run_inspector(
     return _parse_report(completed.stdout, module_id)
 
 
+def _resolved_path(path: Path, label: str) -> Path:
+    try:
+        return path.expanduser().resolve(strict=False)
+    except (OSError, RuntimeError, TypeError) as exc:
+        raise ValueError(f"cannot resolve {label}: {path}") from exc
+
+
 def _candidate_output_paths(source_root: Path, module_id: str) -> tuple[Path, Path]:
     if module_id not in FOCUSED_NINE_CANDIDATE_MODULE_IDS:
         raise ValueError(f"unsupported candidate structural source module: {module_id!r}")
-    root = Path(source_root).expanduser()
-    resolved_root = root.resolve()
+    try:
+        root = Path(source_root).expanduser()
+    except (OSError, RuntimeError, TypeError) as exc:
+        raise ValueError(f"cannot resolve candidate source output path: {source_root}") from exc
+    resolved_root = _resolved_path(root, "candidate source output path")
     module_root = root / module_id
-    resolved_module_root = module_root.resolve(strict=False)
+    resolved_module_root = _resolved_path(module_root, "candidate source output path")
     if resolved_module_root == resolved_root or resolved_root not in resolved_module_root.parents:
         raise ValueError(f"candidate source output path escapes source root: {module_id}")
     return (
@@ -370,10 +413,38 @@ def _candidate_output_paths(source_root: Path, module_id: str) -> tuple[Path, Pa
     )
 
 
+def _validate_physical_output_file(
+    path: Path, module_root: Path, module_id: str, label: str
+) -> tuple[Path | None, list[str]]:
+    try:
+        if path.is_symlink():
+            return None, [f"{label} must be a regular non-symlink file: {path}"]
+    except (OSError, RuntimeError, TypeError) as exc:
+        return None, [f"cannot inspect {label} path for {module_id}: {path}: {exc}"]
+
+    try:
+        resolved_module_root = _resolved_path(module_root, f"{label} directory")
+        resolved_path = _resolved_path(path, f"{label} path")
+    except ValueError as exc:
+        return None, [f"{module_id}: {exc}"]
+
+    if resolved_path.parent != resolved_module_root:
+        return None, [
+            f"{label} is not physically contained in the expected module directory: {path}"
+        ]
+    try:
+        is_file = path.is_file()
+    except (OSError, RuntimeError, TypeError) as exc:
+        return None, [f"cannot inspect {label} for {module_id}: {path}: {exc}"]
+    if not is_file:
+        return None, [f"missing {label}: {path}"]
+    return resolved_path, []
+
+
 def _read_source_record(record_path: Path, module_id: str) -> tuple[object | None, str | None]:
     try:
         return json.loads(record_path.read_text(encoding="utf-8")), None
-    except OSError as exc:
+    except (OSError, RuntimeError, TypeError) as exc:
         return None, f"cannot read source record for {module_id}: {exc}"
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         return None, f"source record is invalid JSON for {module_id}: {exc}"
@@ -382,65 +453,110 @@ def _read_source_record(record_path: Path, module_id: str) -> tuple[object | Non
 def validate_sources(args: argparse.Namespace) -> list[str]:
     """Run source contract checks for live modules and staged candidates."""
 
-    project_root = args.project_root.expanduser().resolve()
-    source_root = args.source_root.expanduser()
-    inspector_path = Path(__file__).resolve().with_name("inspect_structural_sources.py")
+    try:
+        project_root = _resolved_path(Path(args.project_root), "project root path")
+        source_root = Path(args.source_root).expanduser()
+        inspector_path = _resolved_path(
+            Path(__file__).with_name("inspect_structural_sources.py"),
+            "inspector path",
+        )
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        return [f"cannot resolve structural source validation path: {exc}"]
+
     errors: list[str] = []
 
     for module_id in _selected_live_module_ids(args):
         try:
             spec = load_source_spec(project_root, module_id)
             blend_path, record_path = source_output_paths(source_root, module_id)
-        except (OSError, ValueError) as exc:
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
             errors.append(f"{module_id}: {exc}")
             continue
 
-        blend_path = blend_path.expanduser().resolve()
-        if not blend_path.is_file():
-            errors.append(f"missing recovered Blender source: {blend_path}")
+        resolved_blend_path, output_errors = _validate_physical_output_file(
+            blend_path,
+            source_root / module_id,
+            module_id,
+            "recovered Blender source",
+        )
+        if output_errors:
+            errors.extend(output_errors)
             continue
+        assert resolved_blend_path is not None
 
         report, inspector_error = _run_inspector(
             args.blender,
             inspector_path,
             project_root,
             module_id,
-            blend_path,
+            resolved_blend_path,
         )
         if inspector_error:
             errors.append(inspector_error)
             continue
         errors.extend(validate_report(spec, report or {}))
 
+        _resolved_record_path, record_errors = _validate_physical_output_file(
+            record_path,
+            source_root / module_id,
+            module_id,
+            "source record",
+        )
+        if record_errors:
+            errors.extend(record_errors)
+            continue
         source_record, record_error = _read_source_record(record_path, module_id)
         if record_error:
             errors.append(record_error)
             continue
-        errors.extend(_validate_source_record(spec, source_record))
+        errors.extend(_validate_source_record(spec, source_record, blend_path=blend_path))
 
     for module_id, source_glb_path in getattr(args, "_candidate_assignments", ()):
         try:
             spec = load_candidate_source_spec(project_root, module_id, source_glb_path)
-            _blend_path, record_path = _candidate_output_paths(source_root, module_id)
-        except (OSError, ValueError) as exc:
+            blend_path, record_path = _candidate_output_paths(source_root, module_id)
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
             errors.append(f"{module_id}: {exc}")
             continue
 
-        # Candidate validation is intentionally source-only.  The Blender
-        # inspector remains runtime-allowlisted and no live wrapper or source
-        # Blender file is created by this staged task.
+        # Candidate validation is intentionally source-only.  Validate the
+        # staged .blend and sidecar physically, but do not invoke Blender.
+        resolved_blend_path, blend_errors = _validate_physical_output_file(
+            blend_path,
+            source_root / module_id,
+            module_id,
+            "candidate Blender source",
+        )
+        if blend_errors:
+            errors.extend(blend_errors)
+            continue
+        assert resolved_blend_path is not None
+
+        _resolved_record_path, record_errors = _validate_physical_output_file(
+            record_path,
+            source_root / module_id,
+            module_id,
+            "candidate source record",
+        )
+        if record_errors:
+            errors.extend(record_errors)
+            continue
         source_record, record_error = _read_source_record(record_path, module_id)
         if record_error:
             errors.append(record_error)
             continue
-        errors.extend(_validate_source_record(spec, source_record))
+        errors.extend(_validate_source_record(spec, source_record, blend_path=blend_path))
 
     return errors
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    errors = validate_sources(args)
+    try:
+        errors = validate_sources(args)
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        print(f"ERROR: structural source validation failed: {exc}", file=sys.stderr)
+        return 1
     if errors:
         for error in sorted(errors):
             print(f"ERROR: {error}", file=sys.stderr)

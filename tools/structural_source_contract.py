@@ -39,6 +39,7 @@ _CANDIDATE_GLB_NAME = "pressure_door_1x1.glb"
 _DEFAULT_COLLISION_PROXY_SHAPE = "box"
 _DEFAULT_NAV_BLOCKER = False
 _ORIENTATION_SOURCE = "socket-id-cardinal-convention"
+_COORDINATE_CONVERSION = "contract[x,y,z]->blender[x,z,y]"
 
 
 @dataclass(frozen=True)
@@ -155,6 +156,23 @@ def _parse_socket(document: object, index: int) -> SocketSpec:
     )
 
 
+def _path(value: object, label: str) -> Path:
+    try:
+        if not isinstance(value, (str, Path)):
+            raise TypeError(f"unsupported path value type: {type(value).__name__}")
+        return Path(value).expanduser()
+    except (OSError, RuntimeError, TypeError) as exc:
+        raise ValueError(f"cannot resolve {label}: {value}") from exc
+
+
+def _resolve_path(value: object, label: str) -> Path:
+    path = _path(value, label)
+    try:
+        return path.resolve(strict=False)
+    except (OSError, RuntimeError, TypeError) as exc:
+        raise ValueError(f"cannot resolve {label}: {path}") from exc
+
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -184,11 +202,11 @@ def _load_spec_from_paths(
     *,
     missing_source_label: str = "missing source GLB",
 ) -> StructuralSourceSpec:
-    resolved_contract_path = contract_path.resolve(strict=False)
+    resolved_contract_path = _resolve_path(contract_path, "structural contract path")
 
     if resolved_contract_path == root or root not in resolved_contract_path.parents:
         raise ValueError(f"structural contract path escapes project root: {module_id}")
-    resolved_source_glb_path = source_glb_path.resolve(strict=False)
+    resolved_source_glb_path = _resolve_path(source_glb_path, "source GLB path")
     if resolved_source_glb_path == root or root not in resolved_source_glb_path.parents:
         raise ValueError(f"source GLB path escapes project root: {module_id}")
 
@@ -278,7 +296,7 @@ def load_source_spec(project_root: Path, module_id: str) -> StructuralSourceSpec
     """Load and strictly validate one allowlisted structural source contract."""
 
     _validate_module_id(module_id)
-    root = Path(project_root).expanduser().resolve()
+    root = _resolve_path(project_root, "project root path")
     contract_path = root / _CONTRACT_ROOT / f"{module_id}_contract.json"
     source_glb_path = root / _SOURCE_GLB_ROOT / module_id / f"{module_id}.glb"
     return _load_spec_from_paths(root, module_id, contract_path, source_glb_path)
@@ -293,24 +311,21 @@ def _reject_candidate_symlink_components(path: Path) -> None:
         try:
             if current.is_symlink():
                 raise ValueError(f"candidate source GLB contains symlink: {path}")
-        except OSError as exc:
+        except (OSError, RuntimeError, TypeError) as exc:
             raise ValueError(f"cannot inspect candidate source GLB path: {path}") from exc
 
 
 def _candidate_source_path(project_root: Path, source_glb_path: Path) -> Path:
-    raw_path = Path(source_glb_path).expanduser()
+    raw_path = _path(source_glb_path, "candidate source GLB path")
     if any(part == ".." for part in raw_path.parts):
         raise ValueError(f"candidate source GLB path must not contain traversal: {raw_path}")
 
-    root = Path(project_root).expanduser().resolve()
+    root = _resolve_path(project_root, "project root path")
     candidate_path = raw_path if raw_path.is_absolute() else root / raw_path
     _reject_candidate_symlink_components(candidate_path)
     expected_path = root / _CANDIDATE_SOURCE_ROOT / _CANDIDATE_GLB_NAME
-    try:
-        resolved_candidate = candidate_path.resolve(strict=False)
-        resolved_expected = expected_path.resolve(strict=False)
-    except (OSError, RuntimeError) as exc:
-        raise ValueError(f"cannot resolve candidate source GLB path: {raw_path}") from exc
+    resolved_candidate = _resolve_path(candidate_path, "candidate source GLB path")
+    resolved_expected = _resolve_path(expected_path, "candidate source GLB path")
     if candidate_path.suffix != ".glb" or resolved_candidate != resolved_expected:
         raise ValueError(
             "candidate source GLB must be the project-relative staged pressure-door GLB: "
@@ -326,7 +341,7 @@ def load_candidate_source_spec(
 
     if module_id not in FOCUSED_NINE_CANDIDATE_MODULE_IDS:
         raise _unsupported_module(module_id)
-    root = Path(project_root).expanduser().resolve()
+    root = _resolve_path(project_root, "project root path")
     contract_path = root / _CONTRACT_ROOT / f"{module_id}_contract.json"
     candidate_path = _candidate_source_path(root, source_glb_path)
     return _load_spec_from_paths(
@@ -342,10 +357,10 @@ def source_output_paths(source_root: Path, module_id: str) -> tuple[Path, Path]:
     """Return safe `.blend` and canonical `.source.json` paths for a module."""
 
     _validate_module_id(module_id)
-    root = Path(source_root).expanduser()
-    resolved_root = root.resolve()
+    root = _path(source_root, "source output root path")
+    resolved_root = _resolve_path(root, "source output root path")
     module_root = root / module_id
-    resolved_module_root = module_root.resolve(strict=False)
+    resolved_module_root = _resolve_path(module_root, "source output module path")
     if resolved_module_root == resolved_root or resolved_root not in resolved_module_root.parents:
         raise ValueError(f"source output path escapes source root: {module_id}")
 
@@ -372,7 +387,7 @@ def build_source_record(spec: StructuralSourceSpec, blend_path: Path) -> dict[st
             "sha256": spec.source_glb_sha256,
         },
         "blend_path": str(Path(blend_path)),
-        "coordinate_conversion": "contract[x,y,z]->blender[x,z,y]",
+        "coordinate_conversion": _COORDINATE_CONVERSION,
         "placement_origin": spec.placement_origin,
         "sockets": [
             {

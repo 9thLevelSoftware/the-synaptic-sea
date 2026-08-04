@@ -215,6 +215,35 @@ def test_source_input_symlink_escape_is_rejected(
         load_source_spec(tmp_path, "floor_1x1")
 
 
+def test_contract_symlink_loop_is_reported_as_value_error(tmp_path: Path) -> None:
+    contract_path = tmp_path / CONTRACT_RELATIVE
+    contract_path.parent.mkdir(parents=True)
+    try:
+        contract_path.symlink_to(contract_path.name)
+    except OSError as exc:
+        pytest.skip(f"symlinks unavailable: {exc}")
+
+    glb_path = tmp_path / GLB_RELATIVE
+    glb_path.parent.mkdir(parents=True)
+    glb_path.write_bytes((PROJECT_ROOT / GLB_RELATIVE).read_bytes())
+
+    with pytest.raises(ValueError, match="cannot resolve structural contract path"):
+        load_source_spec(tmp_path, "floor_1x1")
+
+
+def test_source_output_module_symlink_loop_is_reported_as_value_error(
+    tmp_path: Path,
+) -> None:
+    loop_root = tmp_path / "loop-root"
+    try:
+        loop_root.symlink_to(loop_root.name, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"symlinks unavailable: {exc}")
+
+    with pytest.raises(ValueError, match="cannot resolve source output root path"):
+        source_output_paths(loop_root, "floor_1x1")
+
+
 def test_minimal_floor_fixture_contains_the_structural_contract_shape() -> None:
     document = json.loads(
         (FIXTURE_ROOT / "floor_1x1_contract.json").read_text(encoding="utf-8")
@@ -325,6 +354,39 @@ def test_pressure_door_candidate_rejects_symlink_plus_traversal(tmp_path: Path) 
     escape = tmp_path / CANDIDATE_GLB_RELATIVE.parent / "escape"
     escape.symlink_to(outside_dir, target_is_directory=True)
     source_path = CANDIDATE_GLB_RELATIVE.parent / "escape" / ".." / CANDIDATE_GLB_RELATIVE.name
+
+    with pytest.raises(ValueError, match="candidate source GLB"):
+        load_candidate_source_spec(tmp_path, "pressure_door_1x1", source_path)
+
+
+def test_pressure_door_candidate_rejects_source_glb_symlink_loop(
+    tmp_path: Path,
+) -> None:
+    staged_path = _write_pressure_door_fixture(tmp_path, with_glb=False)
+    staged_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        staged_path.symlink_to(staged_path.name)
+    except OSError as exc:
+        pytest.skip(f"symlinks unavailable: {exc}")
+
+    with pytest.raises(ValueError, match="candidate source GLB contains symlink"):
+        load_candidate_source_spec(tmp_path, "pressure_door_1x1", CANDIDATE_GLB_RELATIVE)
+
+
+def test_pressure_door_candidate_rejects_external_symlink_ancestor(
+    tmp_path: Path,
+) -> None:
+    staged_path = _write_pressure_door_fixture(tmp_path, with_glb=False)
+    outside_dir = tmp_path / "outside"
+    outside_dir.mkdir()
+    (outside_dir / staged_path.name).write_bytes((PROJECT_ROOT / GLB_RELATIVE).read_bytes())
+    alias = staged_path.parent.parent / "alias"
+    alias.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        alias.symlink_to(outside_dir, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"symlinks unavailable: {exc}")
+    source_path = alias / staged_path.name
 
     with pytest.raises(ValueError, match="candidate source GLB"):
         load_candidate_source_spec(tmp_path, "pressure_door_1x1", source_path)
