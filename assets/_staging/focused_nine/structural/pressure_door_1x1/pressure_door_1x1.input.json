@@ -10,11 +10,12 @@
   "asset": {
     "id": "pressure_door_1x1",
     "module_id": "pressure_door_1x1",
+    "category": "structural",
     "kit_id": "ship_structural_v0",
     "module_family": "portal",
     "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/pressure_door_1x1_contract.json",
     "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/pressure_door_1x1.tscn",
-    "source_asset_path": "assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1.glb",
+    "source_asset_path": "assets/imported/structural/ship_structural_v0/pressure_door_1x1/pressure_door_1x1.glb",
     "bounds": {
       "local_min_m": [-2.0, 0.0, 0.0],
       "local_max_m": [2.0, 3.2, 0.0],

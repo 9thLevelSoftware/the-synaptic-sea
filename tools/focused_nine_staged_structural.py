@@ -15,6 +15,7 @@ import os
 import re
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -58,6 +59,42 @@ _IGNORED_COPY_NAMES = frozenset(
 )
 _DIAGNOSTIC_MARKERS = ("ERROR:", "WARNING:", "SCRIPT ERROR:")
 _PASS_MARKER = "FOCUSED_NINE_PRESSURE_DOOR_PASS variants=3 anchors=4 collision=true"
+_KIT_ID = "ship_structural_v0"
+_MODULE_FAMILY = "portal"
+_CANONICAL_CONTRACT_PATH = f"res://{_CONTRACT_RELATIVE.as_posix()}"
+_CANONICAL_WRAPPER_PATH = f"res://{(_CANONICAL_WRAPPER_RELATIVE / f'{ASSET_ID}.tscn').as_posix()}"
+_CANONICAL_SOURCE_PATH = f"{_CANONICAL_IMPORT_RELATIVE.as_posix()}/{ASSET_ID}.glb"
+_EXPECTED_ANCHORS = (
+    {"name": "Anchor_FloorCenter", "kind": "floor-center", "surface": "floor"},
+    {
+        "name": "Anchor_SOCK_portal_edge_west_01",
+        "kind": "attachment",
+        "socket_id": "portal_edge_west_01",
+        "surface": "custom",
+    },
+    {
+        "name": "Anchor_SOCK_portal_edge_east_01",
+        "kind": "attachment",
+        "socket_id": "portal_edge_east_01",
+        "surface": "custom",
+    },
+    {
+        "name": "Anchor_SOCK_portal_center_internal_01",
+        "kind": "attachment",
+        "socket_id": "portal_center_internal_01",
+        "surface": "custom",
+    },
+)
+_EXPECTED_COLLISION = {
+    "kind": "static-body-proxy",
+    "proxy_shape": "box",
+    "nav_blocker": True,
+}
+_EXPECTED_BOUNDS = {
+    "local_min_m": [-2.0, 0.0, 0.0],
+    "local_max_m": [2.0, 3.2, 0.0],
+    "placement_origin": "edge-center",
+}
 
 
 def _raw_path(value: Path | str, label: str) -> Path:
@@ -65,6 +102,13 @@ def _raw_path(value: Path | str, label: str) -> Path:
     if ".." in path.parts:
         raise ValueError(f"{label} must not contain traversal: {path}")
     return path if path.is_absolute() else Path.cwd() / path
+
+
+def _resolve_path(path: Path, label: str) -> Path:
+    try:
+        return path.resolve(strict=False)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise ValueError(f"cannot resolve {label}: {path}") from exc
 
 
 def _symlink_components(path: Path) -> Iterable[Path]:
@@ -77,7 +121,7 @@ def _symlink_components(path: Path) -> Iterable[Path]:
                 # macOS exposes temporary directories through /var -> /private/var;
                 # that system alias is not a caller-controlled staging alias.
                 yield current
-        except OSError as exc:
+        except (OSError, RuntimeError, ValueError) as exc:
             raise ValueError(f"cannot inspect {path}") from exc
 
 
@@ -89,7 +133,7 @@ def _reject_symlink_alias(path: Path, label: str) -> None:
 
 def _project_root(value: Path | str) -> Path:
     path = _raw_path(value, "project root")
-    resolved = path.resolve(strict=False)
+    resolved = _resolve_path(path, "project root")
     if not resolved.is_dir():
         raise ValueError(f"project root is not a directory: {path}")
     return resolved
@@ -98,7 +142,7 @@ def _project_root(value: Path | str) -> Path:
 def _staging_root(value: Path | str) -> Path:
     path = _raw_path(value, "staging root")
     _reject_symlink_alias(path, "staging root")
-    resolved = path.resolve(strict=False)
+    resolved = _resolve_path(path, "staging root")
     if not resolved.is_dir():
         raise ValueError(f"staging root is not a directory: {path}")
     return resolved
@@ -106,7 +150,7 @@ def _staging_root(value: Path | str) -> Path:
 
 def _destination_path(value: Path | str, project_root: Path) -> Path:
     path = _raw_path(value, "destination")
-    resolved = path.resolve(strict=False)
+    resolved = _resolve_path(path, "destination")
     if resolved == project_root or project_root in resolved.parents:
         raise ValueError(f"destination is within project root: {path}")
     _reject_symlink_alias(path, "destination")
@@ -116,9 +160,9 @@ def _destination_path(value: Path | str, project_root: Path) -> Path:
 
 
 def _contained(root: Path, candidate: Path, label: str) -> Path:
-    resolved_root = root.resolve(strict=False)
+    resolved_root = _resolve_path(root, f"{label} root")
     _reject_symlink_alias(candidate, label)
-    resolved_candidate = candidate.resolve(strict=False)
+    resolved_candidate = _resolve_path(candidate, label)
     if resolved_candidate == resolved_root or resolved_root not in resolved_candidate.parents:
         raise ValueError(f"{label} escapes root: {candidate}")
     return resolved_candidate
@@ -174,14 +218,64 @@ def _staged_variant_paths(staging_root: Path) -> dict[str, Path]:
 
 def _validate_glb(path: Path, role: str) -> None:
     try:
-        header = path.read_bytes()[:12]
-        size = path.stat().st_size
+        payload = path.read_bytes()
     except OSError as exc:
         raise ValueError(f"cannot read staged variant {role}: {path}") from exc
-    if len(header) < 12 or header[:4] != b"glTF":
-        raise ValueError(f"invalid staged variant {role} GLB header")
-    if int.from_bytes(header[4:8], "little") != 2 or int.from_bytes(header[8:12], "little") != size:
-        raise ValueError(f"invalid staged variant {role} GLB header")
+
+    def invalid(detail: str) -> None:
+        raise ValueError(f"invalid staged variant {role} GLB {detail}")
+
+    if len(payload) < 12:
+        invalid("header")
+    magic, version, declared_length = struct.unpack_from("<4sII", payload, 0)
+    if magic != b"glTF" or version != 2 or declared_length != len(payload):
+        invalid("header")
+
+    cursor = 12
+    json_document: object | None = None
+    json_chunks = 0
+    bin_chunks = 0
+    chunk_index = 0
+    while cursor < declared_length:
+        if declared_length - cursor < 8:
+            invalid("chunk header")
+        chunk_length, chunk_type = struct.unpack_from("<I4s", payload, cursor)
+        cursor += 8
+        chunk_end = cursor + chunk_length
+        if chunk_end > declared_length or chunk_length % 4:
+            invalid("chunk bounds")
+        if chunk_index == 0 and chunk_type != b"JSON":
+            invalid("first chunk is not JSON")
+        if chunk_type == b"JSON":
+            json_chunks += 1
+            if json_chunks != 1:
+                invalid("contains more than one JSON chunk")
+            try:
+                json_document = json.loads(
+                    payload[cursor:chunk_end].rstrip(b" \t\r\n\x00").decode("utf-8")
+                )
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                invalid("JSON chunk")
+            asset = json_document.get("asset") if isinstance(json_document, dict) else None
+            if not isinstance(asset, dict) or asset.get("version") != "2.0":
+                invalid("JSON asset version")
+        elif chunk_type == b"BIN\x00":
+            bin_chunks += 1
+            if bin_chunks != 1:
+                invalid("contains more than one BIN chunk")
+        else:
+            invalid("unknown chunk type")
+        cursor = chunk_end
+        chunk_index += 1
+
+    if json_chunks != 1 or not isinstance(json_document, dict):
+        invalid("missing JSON chunk")
+    buffers = json_document.get("buffers")
+    if isinstance(buffers, list) and buffers:
+        if bin_chunks != 1:
+            invalid("declares buffers without one BIN chunk")
+    elif bin_chunks:
+        invalid("contains BIN chunk without buffers")
 
 
 def _package_sources(project_root: Path, staging_root: Path, staged_package: Path) -> dict[str, Path]:
@@ -205,21 +299,41 @@ def _canonical_variant_paths() -> set[str]:
     }
 
 
-def _parse_ext_resource_paths(scene_text: str) -> list[str]:
-    return re.findall(r'^\[ext_resource\b[^\n]*?path="([^"]+)"[^\n]*\]$', scene_text, re.MULTILINE)
+def _parse_ext_resource_bindings(scene_text: str) -> dict[str, str]:
+    bindings: dict[str, str] = {}
+    for line in scene_text.splitlines():
+        if not line.startswith("[ext_resource"):
+            continue
+        id_match = re.search(r'\bid="([^"]+)"', line)
+        path_match = re.search(r'\bpath="([^"]+)"', line)
+        if id_match is None or path_match is None:
+            raise ValueError("invalid staged wrapper ext_resource declaration")
+        resource_id = id_match.group(1)
+        if resource_id in bindings:
+            raise ValueError("duplicate staged wrapper ext_resource id")
+        bindings[resource_id] = path_match.group(1)
+    return bindings
+
+
+def _canonical_variant_path_by_role() -> dict[str, str]:
+    return {
+        role: f"res://{(_CANONICAL_IMPORT_RELATIVE / _variant_filename(role)).as_posix()}"
+        for role in _VARIANT_ROLES
+    }
 
 
 def _validate_scene_text(scene_text: str) -> None:
-    paths = _parse_ext_resource_paths(scene_text)
-    expected_paths = _canonical_variant_paths()
-    if len(paths) != 3 or set(paths) != expected_paths:
+    resource_bindings = _parse_ext_resource_bindings(scene_text)
+    expected_by_role = _canonical_variant_path_by_role()
+    expected_paths = set(expected_by_role.values())
+    if len(resource_bindings) != 3 or set(resource_bindings.values()) != expected_paths:
         raise ValueError("invalid staged wrapper ext_resource paths")
     if any(
         not path.startswith("res://")
         or ".." in Path(path.removeprefix("res://")).parts
         or "_staging" in path
         or "/Volumes/" in path
-        for path in paths
+        for path in resource_bindings.values()
     ):
         raise ValueError("invalid staged wrapper ext_resource path")
 
@@ -232,6 +346,26 @@ def _validate_scene_text(scene_text: str) -> None:
             node_records.append((match.group(1), match.group(2) or "", match.group(3) or ""))
     direct_root = {name: node_type for name, node_type, parent in node_records if parent in ("", ".")}
     direct_visual = {name for name, _node_type, parent in node_records if parent == "Visual"}
+    visual_node_re = re.compile(
+        r'^\[node\b(?=[^\]]*\bname="VisualInstance_(?P<role>Intact|Damaged|Breached)")'
+        r'(?=[^\]]*\bparent="Visual")'
+        r'(?=[^\]]*\binstance=ExtResource\("(?P<resource_id>[^"]+)"\))[^\]]*\]$'
+    )
+    visual_bindings: dict[str, str] = {}
+    for line in lines:
+        match = visual_node_re.match(line)
+        if match:
+            role = match.group("role").lower()
+            if role in visual_bindings:
+                raise ValueError("duplicate staged wrapper visual binding")
+            visual_bindings[role] = match.group("resource_id")
+    if set(visual_bindings) != set(_VARIANT_ROLES):
+        raise ValueError("invalid staged wrapper visual binding set")
+    for role in _VARIANT_ROLES:
+        resource_id = visual_bindings[role]
+        if resource_bindings.get(resource_id) != expected_by_role[role]:
+            raise ValueError(f"invalid staged wrapper visual binding for {role}")
+
     expected_anchors = {
         "Anchor_FloorCenter",
         "Anchor_SOCK_portal_edge_west_01",
@@ -257,37 +391,126 @@ def _validate_scene_text(scene_text: str) -> None:
         raise ValueError("invalid staged wrapper visual variant set")
 
 
+def _expected_asset_fields() -> dict[str, str]:
+    return {
+        "id": ASSET_ID,
+        "module_id": ASSET_ID,
+        "category": "structural",
+        "kit_id": _KIT_ID,
+        "module_family": _MODULE_FAMILY,
+        "contract_path": _CANONICAL_CONTRACT_PATH,
+        "wrapper_scene": _CANONICAL_WRAPPER_PATH,
+        "source_asset_path": _CANONICAL_SOURCE_PATH,
+    }
+
+
+def _validate_asset(asset: object, label: str, *, include_bounds: bool) -> dict[str, object]:
+    if not isinstance(asset, dict):
+        raise ValueError(f"{label} asset is invalid")  # noqa: TRY004
+    expected = _expected_asset_fields()
+    expected_keys = set(expected) | {"anchors", "collision"}
+    if include_bounds:
+        expected_keys.add("bounds")
+    if set(asset) != expected_keys:
+        raise ValueError(f"{label} asset schema is invalid")
+    for field, value in expected.items():
+        if asset.get(field) != value:
+            raise ValueError(f"{label} asset {field} mismatch")
+    anchors = {"policy": "required", "exposed": list(_EXPECTED_ANCHORS)}
+    if asset.get("anchors") != anchors:
+        raise ValueError(f"{label} asset anchors mismatch")
+    if asset.get("collision") != _EXPECTED_COLLISION:
+        raise ValueError(f"{label} asset collision mismatch")
+    if include_bounds and asset.get("bounds") != _EXPECTED_BOUNDS:
+        raise ValueError(f"{label} asset bounds mismatch")
+    return asset
+
+
+def _validate_promotion(document: object, label: str) -> None:
+    if not isinstance(document, dict) or document.get("status") != "staged_not_promoted":
+        raise ValueError(f"staged pressure-door {label} is not marked staged_not_promoted")
+    expected = {
+        "promoted": False,
+        "runtime_paths_modified": False,
+        "promotion_required": True,
+    }
+    if document.get("promotion") != expected:
+        raise ValueError(f"staged pressure-door {label} has invalid promotion status")
+
+
 def _validate_manifest(document: object) -> None:
     if not isinstance(document, dict):
         raise ValueError("invalid staged pressure-door manifest")  # noqa: TRY004
-    if document.get("status") != "staged_not_promoted":
-        raise ValueError("staged pressure-door manifest is not marked staged_not_promoted")
-    promotion = document.get("promotion")
-    if not isinstance(promotion, dict) or promotion.get("promoted") is not False:
-        raise ValueError("staged pressure-door manifest has invalid promotion status")
-    variants = document.get("variants")
-    if not isinstance(variants, list) or [entry.get("role") for entry in variants if isinstance(entry, dict)] != list(_VARIANT_ROLES):
-        raise ValueError("staged pressure-door manifest must declare intact/damaged/breached roles")
-    for entry in variants:
-        if not isinstance(entry, dict) or entry.get("sha256") is not None:
-            raise ValueError("staged pressure-door manifest hash slots must be unresolved")
-    slots = document.get("hash_slots")
-    if slots != {role: None for role in _VARIANT_ROLES}:
+    expected_keys = {
+        "schema_version",
+        "document_kind",
+        "status",
+        "promotion",
+        "asset",
+        "required_roles",
+        "variants",
+        "hash_slots",
+    }
+    if set(document) != expected_keys:
+        raise ValueError("staged pressure-door manifest schema is invalid")
+    if document.get("schema_version") != "1.0.0" or document.get("document_kind") != "staged_structural_wrapper_manifest":
+        raise ValueError("invalid staged pressure-door manifest schema")
+    _validate_promotion(document, "manifest")
+    _validate_asset(document.get("asset"), "manifest", include_bounds=False)
+    required_roles = list(_VARIANT_ROLES)
+    if document.get("required_roles") != required_roles:
+        raise ValueError("staged pressure-door manifest roles mismatch")
+    expected_variants = [
+        {
+            "role": role,
+            "path": f"res://{(_CANONICAL_IMPORT_RELATIVE / _variant_filename(role)).as_posix()}",
+            "sha256": None,
+        }
+        for role in _VARIANT_ROLES
+    ]
+    if document.get("variants") != expected_variants:
+        raise ValueError("staged pressure-door manifest variants/roles mismatch")
+    expected_slots = {role: None for role in _VARIANT_ROLES}
+    if document.get("hash_slots") != expected_slots:
         raise ValueError("staged pressure-door manifest hash slots are invalid")
 
 
 def _validate_input(document: object, manifest: object) -> None:
-    if not isinstance(document, dict) or document.get("status") != "staged_not_promoted":
-        raise ValueError("staged pressure-door input is not marked staged_not_promoted")
-    promotion = document.get("promotion")
-    if not isinstance(promotion, dict) or promotion.get("promoted") is not False:
-        raise ValueError("staged pressure-door input has invalid promotion status")
-    asset = document.get("asset")
-    if not isinstance(asset, dict) or asset.get("id") != ASSET_ID:
-        raise ValueError("staged pressure-door input has invalid asset")
+    if not isinstance(document, dict):
+        raise ValueError("invalid staged pressure-door input")  # noqa: TRY004
+    expected_keys = {
+        "schema_version",
+        "document_kind",
+        "status",
+        "promotion",
+        "asset",
+        "required_roles",
+        "hash_slots",
+    }
+    if set(document) != expected_keys:
+        raise ValueError("staged pressure-door input schema is invalid")
+    if document.get("schema_version") != "1.0.0" or document.get("document_kind") != "staged_structural_wrapper_input":
+        raise ValueError("invalid staged pressure-door input schema")
+    _validate_promotion(document, "input")
+    input_asset = _validate_asset(document.get("asset"), "input", include_bounds=True)
     manifest_asset = manifest.get("asset") if isinstance(manifest, dict) else None
-    if not isinstance(manifest_asset, dict) or asset.get("anchors") != manifest_asset.get("anchors"):
-        raise ValueError("staged pressure-door manifest/input anchors differ")
+    if not isinstance(manifest_asset, dict):
+        raise ValueError(  # noqa: TRY004
+            "staged pressure-door manifest/input asset cross-reference is invalid"
+        )
+    for field in (*_expected_asset_fields(), "anchors", "collision"):
+        if input_asset.get(field) != manifest_asset.get(field):
+            raise ValueError(f"staged pressure-door manifest/input {field} cross-reference differs")
+    if document.get("required_roles") != list(_VARIANT_ROLES):
+        raise ValueError("staged pressure-door input roles mismatch")
+    expected_slots = {role: None for role in _VARIANT_ROLES}
+    if document.get("hash_slots") != expected_slots:
+        raise ValueError("staged pressure-door input hash slots are invalid")
+    if isinstance(manifest, dict):
+        if manifest.get("required_roles") != document.get("required_roles"):
+            raise ValueError("staged pressure-door manifest/input roles differ")
+        if manifest.get("hash_slots") != document.get("hash_slots"):
+            raise ValueError("staged pressure-door manifest/input hash slots differ")
 
 
 def _validate_contract(project_root: Path) -> None:
@@ -422,17 +645,15 @@ def validate_pressure_door_overlay(
         for role, path in staged_variants.items():
             _validate_glb(path, role)
         _validate_staged_package(root, stage, staged_package)
-    except ValueError as exc:
-        message = str(exc)
-        if message.startswith("missing staged variant "):
-            return [message]
+    except (OSError, RuntimeError, ValueError) as exc:
+        message = str(exc) or "invalid pressure-door staging input"
         return [message]
 
     with tempfile.TemporaryDirectory(prefix="focused-nine-pressure-door-") as temporary:
         overlay_root = Path(temporary) / "project"
         try:
             build_overlay(root, stage, overlay_root)
-        except (OSError, ValueError) as exc:
+        except (OSError, RuntimeError, ValueError) as exc:
             return [f"cannot create pressure-door validation overlay: {exc}"]
 
         import_command = [str(godot), "--headless", "--import", "--path", str(overlay_root)]
@@ -460,7 +681,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    errors = validate_pressure_door_overlay(args.project_root, args.staging_root, args.godot)
+    try:
+        errors = validate_pressure_door_overlay(args.project_root, args.staging_root, args.godot)
+    except (OSError, RuntimeError, ValueError) as exc:
+        errors = [str(exc) or "invalid pressure-door staging input"]
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
