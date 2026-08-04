@@ -1,5 +1,16 @@
 extends Node3D
 
+# Capture CLI:
+#   godot --path . --editor --scene res://scenes/validation/focused_nine_comparison_harness.tscn -- \
+#     --output-dir DIR [--baseline-label LABEL] [--improved-label LABEL]
+# ``--output-dir`` is required; labels default to ``Baseline`` and ``Improved``.
+#
+# Trusted-workspace boundary for the full capture run: same-user concurrent
+# filesystem mutation/rebinding of project/output paths is outside this capture
+# boundary. The checks below are defense-in-depth only; Godot filesystem APIs
+# cannot pin the paths for the complete capture/publication window.
+const TRUST_BOUNDARY_DOCUMENTATION := "same-user concurrent filesystem mutation/rebinding of project/output paths is outside the capture's trusted-workspace boundary for its full run; staging/root path checks and leaf constraints remain defense-in-depth but cannot pin Godot filesystem operations."
+
 const CAMERA_SIZE := 18.0
 const CAPTURE_WIDTH: int = 1600
 const CAPTURE_HEIGHT: int = 900
@@ -347,7 +358,8 @@ func _publish_capture_files(image: Image) -> bool:
 		return false
 	var first_frame_path: String = _output_dir_global.path_join(FIRST_FRAME_NAME)
 	var stable_path: String = _output_dir_global.path_join(STABLE_OUTPUT_NAME)
-	# Preflight both fixed names so a rejected leaf cannot cause any publication.
+	# Defense-in-depth preflight of both fixed leaves; it does not cover a same-user
+	# filesystem rebind during a later Godot operation.
 	var first_leaf_safe: bool = _validate_publication_leaf(first_frame_path)
 	var stable_leaf_safe: bool = _validate_publication_leaf(stable_path)
 	if not first_leaf_safe or not stable_leaf_safe:
@@ -369,8 +381,9 @@ func _publish_image_to_leaf(image: Image, leaf_path: String) -> bool:
 	if not _validate_temporary_file(temporary_path):
 		_cleanup_temporary_file(temporary_path)
 		return false
-	# Recheck immediately before rename; POSIX rename replaces a destination symlink entry,
-	# rather than following it, but the destination must still pass the leaf contract.
+	# Defense-in-depth only: recheck immediately before rename. POSIX rename replaces
+	# a destination symlink entry rather than following it, but Godot's path-based
+	# operations still cannot close same-user rebind races outside the boundary.
 	if not _validate_publication_leaf(leaf_path):
 		_cleanup_temporary_file(temporary_path)
 		return false
@@ -400,7 +413,8 @@ func _copy_stable_frame(first_frame_path: String, stable_path: String) -> bool:
 	if not _validate_temporary_file(temporary_path):
 		_cleanup_temporary_file(temporary_path)
 		return false
-	# Recheck immediately before rename so an existing stable symlink is never followed.
+	# Defense-in-depth only: recheck the stable leaf immediately before rename;
+	# this remains within the same full-run trusted-workspace boundary.
 	if not _validate_publication_leaf(stable_path):
 		_cleanup_temporary_file(temporary_path)
 		return false

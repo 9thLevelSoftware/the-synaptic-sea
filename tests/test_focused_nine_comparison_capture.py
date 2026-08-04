@@ -58,6 +58,31 @@ def test_capture_script_has_exact_cli_and_capture_contract() -> None:
     assert "--write-movie" not in source
 
 
+def test_capture_documents_full_run_trusted_workspace_boundary_without_false_safe_publish_claims() -> None:
+    source = _source(CAPTURE_SCRIPT)
+    normalized = " ".join(source.split())
+
+    assert "const TRUST_BOUNDARY_DOCUMENTATION" in source
+    assert (
+        "same-user concurrent filesystem mutation/rebinding of project/output paths "
+        "is outside the capture's trusted-workspace boundary for its full run"
+    ) in normalized
+    assert "staging/root path checks and leaf constraints remain defense-in-depth" in normalized
+    assert "cannot pin Godot filesystem operations" in normalized
+    assert "CLI:" in source
+    for option in ("--output-dir DIR", "--baseline-label LABEL", "--improved-label LABEL"):
+        assert option in source
+
+    for false_claim in (
+        "descriptor-level path safety",
+        "descriptor-pinned",
+        "O_NOFOLLOW",
+        "TOCTOU-safe publication",
+        "safe publish",
+    ):
+        assert false_claim.lower() not in source.lower()
+
+
 def test_capture_publishes_fixed_leaves_via_verified_atomic_temporary_files() -> None:
     source = _source(CAPTURE_SCRIPT)
 
