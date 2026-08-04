@@ -41,6 +41,7 @@ const FLOOR_LAYOUT: Array[Vector3] = [
 var _finished: bool = false
 var _output_dir_global: String = ""
 var _temporary_sequence: int = 0
+var _last_failure_reason: String = ""
 
 
 func _ready() -> void:
@@ -206,21 +207,26 @@ func _populate_room(room: Node3D) -> bool:
 	# South entry: the open doorway and ramp point toward the viewer (+Z).
 	if not _add_room_asset(room, DOORWAY_GLB_PATH, "SouthDoorway", Vector3(0.0, 0.0, 4.0), 0.0):
 		return false
-	if not _add_room_asset(room, RAMP_GLB_PATH, "SouthRamp", Vector3(0.0, 0.0, 5.0), 0.0):
+	# GLTF probe: the ramp's local z bounds are -4..4 and its high end is at
+	# local -Z, so z=8 feeds the south doorway from z=4..12 without entering it.
+	if not _add_room_asset(room, RAMP_GLB_PATH, "SouthRamp", Vector3(0.0, 0.0, 8.0), 0.0):
 		return false
 
 	# North center pressure door; the intact face looks into the room (-Z).
 	if not _add_room_asset(room, PRESSURE_DOOR_GLB_PATH, "NorthPressureDoor", Vector3(0.0, 0.0, -4.0), PI):
 		return false
 
-	# Side walls and rear corners leave a readable front and roof cutaway.
+	# The wall GLTF spans local x=-2..2 and thin local z. North and south pairs
+	# leave centered pressure-door/entry cutaways; the last two are true side
+	# segments rotated onto the east/west perimeter at x=+/-6.
 	var wall_positions: Array[Vector3] = [
-		Vector3(-4.0, 0.0, -4.0), Vector3(4.0, 0.0, -4.0),
-		Vector3(-4.0, 0.0, 0.0), Vector3(4.0, 0.0, 0.0),
-		Vector3(-4.0, 0.0, 4.0), Vector3(4.0, 0.0, 4.0),
+		Vector3(-4.0, 0.0, -6.0), Vector3(4.0, 0.0, -6.0),
+		Vector3(-4.0, 0.0, 6.0), Vector3(4.0, 0.0, 6.0),
+		Vector3(-6.0, 0.0, 0.0), Vector3(6.0, 0.0, 0.0),
 	]
 	for index in wall_positions.size():
-		if not _add_room_asset(room, WALL_GLB_PATH, "Wall_%02d" % index, wall_positions[index], 0.0):
+		var wall_rotation: float = PI / 2.0 if index >= 4 else 0.0
+		if not _add_room_asset(room, WALL_GLB_PATH, "Wall_%02d" % index, wall_positions[index], wall_rotation):
 			return false
 
 	# Rear pillars frame the door and rear ceiling caps close only the back row.
@@ -228,8 +234,10 @@ func _populate_room(room: Node3D) -> bool:
 		return false
 	if not _add_room_asset(room, PILLAR_GLB_PATH, "RearPillarEast", Vector3(3.0, 0.0, -3.0), 0.0):
 		return false
+	# GLTF probe: ceiling local y=3.72..4.0, so y=0 keeps the cap around
+	# the wall's 3.5 m top; y=3 would place it at roughly y=6.7.
 	for index in 3:
-		if not _add_room_asset(room, CEILING_GLB_PATH, "RearCeilingCap_%02d" % index, Vector3(-4.0 + index * 4.0, 3.0, -4.0), 0.0):
+		if not _add_room_asset(room, CEILING_GLB_PATH, "RearCeilingCap_%02d" % index, Vector3(-4.0 + index * 4.0, 0.0, -4.0), 0.0):
 			return false
 
 	# Dressing: fire station beside the south entry and breach seal on east wall.
@@ -411,29 +419,37 @@ func _publish_capture_files(image: Image) -> bool:
 		_cleanup_temporary_file(first_temporary)
 		_cleanup_temporary_file(stable_temporary)
 		return false
-	var first_rename_error: Error = DirAccess.rename_absolute(first_temporary, first_frame_path)
+	var first_rename_error: Error = _rename_publication_leaf(first_temporary, first_frame_path)
 	if first_rename_error != OK:
 		_cleanup_temporary_file(first_temporary)
 		_cleanup_temporary_file(stable_temporary)
 		_fail("could not atomically publish first frame error=%d" % first_rename_error)
 		return false
-	var stable_rename_error: Error = DirAccess.rename_absolute(stable_temporary, stable_path)
+	var stable_rename_error: Error = _rename_publication_leaf(stable_temporary, stable_path)
 	if stable_rename_error != OK:
 		_cleanup_temporary_file(stable_temporary)
-		_restore_publication_leaf(first_frame_path, first_snapshot)
-		_fail("could not atomically publish stable frame error=%d; prior leaves restored" % stable_rename_error)
+		var first_restored: bool = _restore_publication_leaf(first_frame_path, first_snapshot)
+		var rollback_status: String = "prior leaves restored" if first_restored else "rollback failed restoring first frame leaf"
+		_fail("could not atomically publish stable frame error=%d; %s" % [stable_rename_error, rollback_status])
 		return false
 	if not _verify_published_leaf(first_frame_path, "first frame") or not _verify_published_leaf(stable_path, "stable frame"):
-		_restore_publication_leaf(first_frame_path, first_snapshot)
-		_restore_publication_leaf(stable_path, stable_snapshot)
+		var first_restored: bool = _restore_publication_leaf(first_frame_path, first_snapshot)
+		var stable_restored: bool = _restore_publication_leaf(stable_path, stable_snapshot)
+		if not first_restored or not stable_restored:
+			_fail("published leaf verification failed; rollback failed restoring prior leaves")
 		return false
 	var published_stable_bytes: PackedByteArray = FileAccess.get_file_as_bytes(stable_path)
 	if published_stable_bytes != frame_bytes:
-		_restore_publication_leaf(first_frame_path, first_snapshot)
-		_restore_publication_leaf(stable_path, stable_snapshot)
-		_fail("stable frame differs from first frame; prior leaves restored")
+		var first_restored: bool = _restore_publication_leaf(first_frame_path, first_snapshot)
+		var stable_restored: bool = _restore_publication_leaf(stable_path, stable_snapshot)
+		var rollback_status: String = "prior leaves restored" if first_restored and stable_restored else "rollback failed restoring prior leaves"
+		_fail("stable frame differs from first frame; %s" % rollback_status)
 		return false
 	return true
+
+
+func _rename_publication_leaf(source_path: String, destination_path: String) -> Error:
+	return DirAccess.rename_absolute(source_path, destination_path)
 
 
 func _snapshot_publication_leaf(path: String) -> Dictionary:
@@ -463,10 +479,10 @@ func _restore_publication_leaf(path: String, snapshot: Dictionary) -> bool:
 		return false
 	handle.store_buffer(snapshot["bytes"])
 	handle = null
-	if not _validate_temporary_file(temporary_path):
+	if not _validate_restoration_temporary_file(temporary_path):
 		_cleanup_temporary_file(temporary_path)
 		return false
-	var rename_error: Error = DirAccess.rename_absolute(temporary_path, path)
+	var rename_error: Error = _rename_publication_leaf(temporary_path, path)
 	if rename_error != OK:
 		_cleanup_temporary_file(temporary_path)
 		return false
@@ -510,6 +526,19 @@ func _validate_publication_leaf(leaf_path: String) -> bool:
 
 
 func _validate_temporary_file(path: String) -> bool:
+	if not _validate_temporary_path(path):
+		return false
+	if FileAccess.get_file_as_bytes(path).is_empty():
+		_fail("temporary publication file is empty")
+		return false
+	return true
+
+
+func _validate_restoration_temporary_file(path: String) -> bool:
+	return _validate_temporary_path(path)
+
+
+func _validate_temporary_path(path: String) -> bool:
 	var output_dir: String = _publication_output_dir()
 	if output_dir.is_empty():
 		return false
@@ -523,9 +552,6 @@ func _validate_temporary_file(path: String) -> bool:
 	var canonical_path: String = _canonicalize_path(normalized_path)
 	if canonical_path.is_empty() or canonical_path != normalized_path:
 		_fail("temporary publication file has an unexpected physical target")
-		return false
-	if FileAccess.get_file_as_bytes(normalized_path).is_empty():
-		_fail("temporary publication file is empty")
 		return false
 	return true
 
@@ -636,6 +662,7 @@ func _fail(reason: String) -> void:
 	if _finished:
 		return
 	_finished = true
+	_last_failure_reason = reason
 	print("FOCUSED_NINE_AIRLOCK_ROOM_CAPTURE FAIL reason=%s" % reason)
 	if is_inside_tree():
 		get_tree().quit(1)
