@@ -110,9 +110,10 @@ def test_parallel_source_root_creates_fresh_source_and_reports_logical_reference
     def create_empty(destination: Path) -> None:
         created.append(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(b"BLENDER-v999")
+        destination.write_bytes(b"\x28\xb5\x2f\xfdcompressed blend fixture")
 
     monkeypatch.setattr(batch, "_create_empty_source_with_blender", create_empty)
+    monkeypatch.setattr(batch, "_validate_blender_file", lambda _: None)
 
     source = batch._ensure_source(args, "floor_1x1")
     record = batch._asset_record(
@@ -130,7 +131,7 @@ def test_parallel_source_root_creates_fresh_source_and_reports_logical_reference
     expected = parallel_root / "floor_1x1/floor_1x1.blend"
     assert created == [expected.resolve()]
     assert source == expected.resolve()
-    assert expected.read_bytes() == b"BLENDER-v999"
+    assert expected.read_bytes() == b"\x28\xb5\x2f\xfdcompressed blend fixture"
     assert not (original_root / "floor_1x1/floor_1x1.blend").exists()
     assert record["source_path"] == "res://assets/_staging/focused_nine/source_refs/floor_1x1.blend"
     assert str(parallel_root) not in json.dumps(record)
@@ -157,9 +158,10 @@ def test_parallel_source_root_creates_a_contract_valid_source_record(
 
     def create_empty(destination: Path) -> None:
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(b"BLENDER-v999")
+        destination.write_bytes(b"\x28\xb5\x2f\xfdcompressed blend fixture")
 
     monkeypatch.setattr(batch, "_create_empty_source_with_blender", create_empty)
+    monkeypatch.setattr(batch, "_validate_blender_file", lambda _: None)
 
     source = batch._ensure_source(args, "floor_1x1")
     record_path = batch._write_structural_source_record(args, "floor_1x1", source)
@@ -1212,7 +1214,7 @@ def test_batch_publication_failure_restores_every_requested_target_transactional
     assert not list((project / "assets/_staging/focused_nine").rglob(".*previous*"))
 
 
-def test_create_empty_source_uses_atomic_validated_blend_temporary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_create_empty_source_uses_atomic_blend_temporary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     destination = tmp_path / "sources/floor_1x1/floor_1x1.blend"
     seen_temporary: list[Path] = []
 
@@ -1222,13 +1224,13 @@ def test_create_empty_source_uses_atomic_validated_blend_temporary(tmp_path: Pat
         assert match is not None
         temporary = Path(match.group(2))
         seen_temporary.append(temporary)
-        temporary.write_bytes(b"BLENDER-v999")
+        temporary.write_bytes(b"\x28\xb5\x2f\xfdcompressed blend fixture")
         return subprocess.CompletedProcess(command, 0, "", "")
 
     monkeypatch.setattr(batch, "_run_step", fake_run_step)
     batch._create_empty_source_with_blender(destination)
 
-    assert destination.read_bytes() == b"BLENDER-v999"
+    assert destination.read_bytes() == b"\x28\xb5\x2f\xfdcompressed blend fixture"
     assert seen_temporary and seen_temporary[0].parent == destination.parent
     assert not list(destination.parent.glob(f".{destination.name}.*.tmp"))
 
@@ -1268,8 +1270,48 @@ def test_ensure_source_rejects_arbitrary_regular_non_blender_file(
     args = type("Args", (), {"project_root": project, "structural_source_root": structural, "props_source_root": props})()
     monkeypatch.setattr(batch, "_create_empty_source_with_blender", lambda _: pytest.fail("must not create"))
 
+    def fake_run_step(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(command, 1, "", "Blender could not open source")
+
+    monkeypatch.setattr(batch, "_run_step", fake_run_step)
+
     with pytest.raises(ValueError, match="valid Blender"):
         batch._ensure_source(args, "floor_1x1")
+
+
+def test_ensure_source_validates_zstd_compressed_blend_with_bounded_non_mutating_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = tmp_path / "project"
+    structural = tmp_path / "structural"
+    props = tmp_path / "props"
+    source = structural / "floor_1x1/floor_1x1.blend"
+    project.mkdir()
+    structural.mkdir()
+    props.mkdir()
+    source.parent.mkdir()
+    source.write_bytes(b"\x28\xb5\x2f\xfdcompressed Blender 5 source")
+    args = type("Args", (), {"project_root": project, "structural_source_root": structural, "props_source_root": props})()
+    calls: list[tuple[list[str], float | None, str]] = []
+
+    def fake_run_step(
+        command: list[str], *, timeout: float, label: str, **_: object
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append((command, timeout, label))
+        expression = command[command.index("--python-expr") + 1]
+        assert f"bpy.ops.wm.open_mainfile(filepath={str(source.resolve())!r})" in expression
+        assert "save_as_mainfile" not in expression
+        assert "save_mainfile" not in expression
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(batch, "_run_step", fake_run_step)
+    monkeypatch.setattr(batch, "_create_empty_source_with_blender", lambda _: pytest.fail("must not create"))
+
+    assert batch._ensure_source(args, "floor_1x1") == source.resolve()
+    assert source.read_bytes() == b"\x28\xb5\x2f\xfdcompressed Blender 5 source"
+    assert len(calls) == 1
+    assert calls[0][1] == batch.SOURCE_TIMEOUT_SECONDS
+    assert "validation" in calls[0][2]
 
 
 @pytest.mark.parametrize("filename", [

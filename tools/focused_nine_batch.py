@@ -560,8 +560,9 @@ def _run_step(
 
 
 def _validate_blender_file(path: Path) -> None:
-    """Reject arbitrary regular files where a Blender database is required."""
+    """Open one existing source in Blender without mutating it."""
 
+    path = _absolute(path)
     _reject_static_symlink_components(path, "Blender source path")
     try:
         mode = path.lstat().st_mode
@@ -569,25 +570,28 @@ def _validate_blender_file(path: Path) -> None:
         raise ValueError(f"cannot inspect Blender source: {path}") from exc
     if not stat.S_ISREG(mode):
         raise ValueError(f"Blender source must be a regular file: {path}")
+    expression = (
+        "import bpy; "
+        f"result=bpy.ops.wm.open_mainfile(filepath={str(path)!r}); "
+        "assert 'FINISHED' in result, 'source open failed'"
+    )
     try:
-        with path.open("rb") as handle:
-            header = handle.read(12)
-    except OSError as exc:
-        raise ValueError(f"cannot read Blender source: {path}") from exc
-    if (
-        len(header) != 12
-        or header[:7] != b"BLENDER"
-        or header[7:8] not in (b"-", b"_")
-        or header[8:9] not in (b"v", b"V")
-        or not header[9:12].isdigit()
-    ):
-        raise ValueError(f"source is not a valid Blender file: {path}")
+        result = _run_step(
+            [str(BLENDER), "--background", "--factory-startup", "--python-expr", expression],
+            timeout=SOURCE_TIMEOUT_SECONDS,
+            label=f"Blender source validation for {path}",
+        )
+    except (OSError, RuntimeError) as exc:
+        raise ValueError(f"source is not a valid Blender file: {path}") from exc
+    if result.returncode != 0:
+        detail = _failure_output(result)
+        suffix = f": {detail}" if detail else ""
+        raise ValueError(f"source is not a valid Blender file: {path}{suffix}")
 
 
 def _copy_source_with_blender(seed: Path, destination: Path) -> None:
     seed = _absolute(seed)
     destination = _absolute(destination)
-    _validate_blender_file(seed)
     _reject_static_symlink_components(destination, "Blender source path")
     destination.parent.mkdir(parents=True, exist_ok=True)
     _reject_static_symlink_components(destination.parent, "Blender source parent")
@@ -614,7 +618,6 @@ def _copy_source_with_blender(seed: Path, destination: Path) -> None:
                 f"required source blend missing and could not be created: {destination}: "
                 f"{_failure_output(result)}"
             )
-        _validate_blender_file(temporary)
         os.replace(temporary, destination)
     except BaseException:
         try:
@@ -651,7 +654,6 @@ def _create_empty_source_with_blender(destination: Path) -> None:
                 f"required source blend missing and could not be created: {destination}: "
                 f"{_failure_output(result)}"
             )
-        _validate_blender_file(temporary)
         os.replace(temporary, destination)
     except BaseException:
         try:
