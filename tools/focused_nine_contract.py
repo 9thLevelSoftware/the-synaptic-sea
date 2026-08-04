@@ -25,6 +25,7 @@ PROP_IDS: tuple[str, ...] = (
     "hull_breach_seal_point",
     "fire_suppression_station",
 )
+_REGISTERED_ASSET_IDS: tuple[str, ...] = STRUCTURAL_IDS + PROP_IDS
 VARIANT_ROLES: dict[str, tuple[str, ...]] = {
     "pressure_door_1x1": ("intact", "damaged", "breached"),
 }
@@ -194,16 +195,19 @@ def _is_nonnegative_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
 
+def _is_finite_number(value: object) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return True
+    return isinstance(value, float) and math.isfinite(value)
+
+
 def _is_finite_vector(value: object) -> bool:
     return (
         isinstance(value, (list, tuple))
         and len(value) == 3
-        and all(
-            isinstance(item, (int, float))
-            and not isinstance(item, bool)
-            and math.isfinite(float(item))
-            for item in value
-        )
+        and all(_is_finite_number(item) for item in value)
     )
 
 
@@ -212,16 +216,11 @@ def _validate_bounds(bounds: object, label: str, errors: list[str]) -> None:
         errors.append(f"{label} must be an object")
         return
 
-    # Existing GLB metadata uses local_min_m/local_max_m.  Accept min/max as
-    # the compact equivalent while keeping the metric shape unambiguous.
+    _append_unknown_fields(bounds, ("local_min_m", "local_max_m"), label, errors)
     if {"local_min_m", "local_max_m"}.issubset(bounds):
         minimum = bounds["local_min_m"]
         maximum = bounds["local_max_m"]
         vector_label = "local_min_m/local_max_m"
-    elif {"min", "max"}.issubset(bounds):
-        minimum = bounds["min"]
-        maximum = bounds["max"]
-        vector_label = "min/max"
     else:
         errors.append(f"{label} must contain a min/max 3-vector pair")
         return
@@ -231,6 +230,26 @@ def _validate_bounds(bounds: object, label: str, errors: list[str]) -> None:
         return
     if any(low > high for low, high in zip(minimum, maximum)):
         errors.append(f"{label}.{vector_label} minimum must not exceed maximum")
+
+
+def _is_normalized_project_relative_path(value: object) -> bool:
+    if not isinstance(value, str) or not value.startswith("res://"):
+        return False
+    relative = value[len("res://") :]
+    if not relative or relative.startswith("/") or "\\" in relative:
+        return False
+    return all(part not in ("", ".", "..") for part in relative.split("/"))
+
+
+def _expected_staged_glbs(asset_id: str) -> tuple[str, ...]:
+    kind = _asset_kind(asset_id)
+    directory = _STAGE_ROOT / kind
+    if kind == "structural":
+        directory /= asset_id
+    return tuple(
+        f"res://{(directory / (f'{asset_id}.glb' if role == 'intact' else f'{asset_id}_{role}.glb')).as_posix()}"
+        for role in _asset_roles(asset_id)
+    )
 
 
 def _validate_metrics(metrics: object, label: str, errors: list[str]) -> None:
@@ -250,10 +269,10 @@ def _validate_metrics(metrics: object, label: str, errors: list[str]) -> None:
             errors.append(f"{label}.{field} must be a non-negative integer")
 
     material_names = metrics.get("material_names")
-    if not isinstance(material_names, list) or not all(
+    if not isinstance(material_names, list) or not material_names or not all(
         isinstance(name, str) and bool(name) for name in material_names
     ):
-        errors.append(f"{label}.material_names must be a list of non-empty strings")
+        errors.append(f"{label}.material_names must be a non-empty list of non-empty strings")
 
     if "bounds" in metrics:
         _validate_bounds(metrics["bounds"], f"{label}.bounds", errors)
@@ -288,12 +307,20 @@ def _validate_asset(asset: object, index: int, errors: list[str]) -> None:
     source_path = asset.get("source_path")
     if not isinstance(source_path, str) or not source_path:
         errors.append(f"{label}.source_path must be a non-empty string")
+    elif not _is_normalized_project_relative_path(source_path):
+        errors.append(f"{label}.source_path must be a normalized project-relative path")
 
     staged_glbs = asset.get("staged_glbs")
-    if not isinstance(staged_glbs, list) or not all(
+    if not isinstance(staged_glbs, list) or not staged_glbs or not all(
         isinstance(path, str) and bool(path) for path in staged_glbs
     ):
-        errors.append(f"{label}.staged_glbs must be a list of non-empty strings")
+        errors.append(f"{label}.staged_glbs must be a non-empty list of canonical paths")
+    elif (
+        isinstance(asset_id, str)
+        and asset_id in _REGISTERED_ASSET_IDS
+        and tuple(staged_glbs) != _expected_staged_glbs(asset_id)
+    ):
+        errors.append(f"{label}.staged_glbs must exactly match asset_stage_glb roles")
 
     if "metrics" in asset:
         _validate_metrics(asset["metrics"], f"{label}.metrics", errors)
@@ -333,8 +360,21 @@ def validate_report(document: dict) -> list[str]:
         if not isinstance(document["assets"], list):
             errors.append("assets must be a list")
         else:
+            if not document["assets"] or len(document["assets"]) != len(_REGISTERED_ASSET_IDS):
+                errors.append("assets must contain exactly the nine registered assets")
+            seen_asset_ids: set[str] = set()
+            duplicate_asset_ids: set[str] = set()
             for index, asset in enumerate(document["assets"]):
                 _validate_asset(asset, index, errors)
+                if isinstance(asset, dict) and isinstance(asset.get("asset_id"), str):
+                    asset_id = asset["asset_id"]
+                    if asset_id in seen_asset_ids:
+                        duplicate_asset_ids.add(asset_id)
+                    seen_asset_ids.add(asset_id)
+            for asset_id in sorted(duplicate_asset_ids):
+                errors.append(f"assets duplicate asset_id: {asset_id}")
+            for asset_id in sorted(set(_REGISTERED_ASSET_IDS) - seen_asset_ids):
+                errors.append(f"assets missing registered asset_id: {asset_id}")
     for field in ("baseline", "improved", "preview"):
         if field in document and not isinstance(document[field], dict):
             errors.append(f"{field} must be an object")

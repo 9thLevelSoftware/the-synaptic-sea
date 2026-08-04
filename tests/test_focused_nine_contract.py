@@ -12,13 +12,22 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _valid_asset(*, asset_id: str = "floor_1x1", kind: str = "structural") -> dict:
+    staged_root = "res://assets/_staging/focused_nine"
+    if asset_id == "pressure_door_1x1":
+        staged_glbs = [
+            f"{staged_root}/structural/{asset_id}/{asset_id}.glb",
+            f"{staged_root}/structural/{asset_id}/{asset_id}_damaged.glb",
+            f"{staged_root}/structural/{asset_id}/{asset_id}_breached.glb",
+        ]
+    elif kind == "prop":
+        staged_glbs = [f"{staged_root}/props/{asset_id}.glb"]
+    else:
+        staged_glbs = [f"{staged_root}/{kind}/{asset_id}/{asset_id}.glb"]
     return {
         "asset_id": asset_id,
         "kind": kind,
         "source_path": f"res://assets/imported/{kind}/{asset_id}.glb",
-        "staged_glbs": [
-            f"res://assets/_staging/focused_nine/{kind}/{asset_id}/{asset_id}.glb"
-        ],
+        "staged_glbs": staged_glbs,
         "metrics": {
             "sha256": "a" * 64,
             "byte_size": 128,
@@ -37,12 +46,20 @@ def _valid_asset(*, asset_id: str = "floor_1x1", kind: str = "structural") -> di
 
 
 def _valid_report() -> dict:
+    assets = [
+        *(_valid_asset(asset_id=asset_id) for asset_id in contract.STRUCTURAL_IDS[:-1]),
+        _valid_asset(asset_id="pressure_door_1x1"),
+        *(
+            _valid_asset(asset_id=asset_id, kind="prop")
+            for asset_id in contract.PROP_IDS
+        ),
+    ]
     return {
         "schema_version": "1.0.0",
         "document_kind": "focused_nine_comparison",
-        "assets": [_valid_asset()],
-        "baseline": {"asset_count": 1},
-        "improved": {"asset_count": 1},
+        "assets": assets,
+        "baseline": {"asset_count": len(assets)},
+        "improved": {"asset_count": len(assets)},
         "preview": {"path": "res://assets/_staging/focused_nine/preview.png"},
         "overall_pass": True,
     }
@@ -202,3 +219,99 @@ def test_report_rejects_nonfinite_values_anywhere() -> None:
 
     assert errors == sorted(errors)
     assert any("preview.camera_yaw contains non-finite value" in error for error in errors)
+
+
+def test_report_huge_integer_values_return_deterministic_errors_without_raising() -> None:
+    document = _valid_report()
+    huge = 10**1000
+    bounds = document["assets"][0]["metrics"]["bounds"]
+    bounds["local_min_m"][0] = huge
+    document["assets"][0]["metrics"]["byte_size"] = huge
+    document["baseline"]["huge_metadata_value"] = huge
+
+    errors = contract.validate_report(document)
+
+    assert errors == sorted(errors)
+    assert "asset[0].metrics.bounds.local_min_m/local_max_m minimum must not exceed maximum" in errors
+
+
+def test_report_bounds_accept_only_canonical_glb_metadata_keys() -> None:
+    document = _valid_report()
+    document["assets"][0]["metrics"]["bounds"] = {
+        "min": [0.0, 0.0, 0.0],
+        "max": [1.0, 1.0, 1.0],
+    }
+
+    errors = contract.validate_report(document)
+
+    assert errors == sorted(errors)
+    assert "asset[0].metrics.bounds must contain a min/max 3-vector pair" in errors
+    assert "unknown asset[0].metrics.bounds field: min" in errors
+    assert "unknown asset[0].metrics.bounds field: max" in errors
+
+
+def test_report_rejects_unknown_bounds_keys_even_with_canonical_pair() -> None:
+    document = _valid_report()
+    document["assets"][0]["metrics"]["bounds"]["min"] = [0.0, 0.0, 0.0]
+
+    errors = contract.validate_report(document)
+
+    assert errors == sorted(errors)
+    assert "unknown asset[0].metrics.bounds field: min" in errors
+
+
+def test_report_requires_all_nine_registered_assets_exactly_once() -> None:
+    document = _valid_report()
+    document["assets"] = document["assets"][:-1]
+    document["assets"].append(_valid_asset(asset_id="floor_1x1"))
+
+    errors = contract.validate_report(document)
+
+    assert errors == sorted(errors)
+    assert "assets missing registered asset_id: fire_suppression_station" in errors
+    assert "assets duplicate asset_id: floor_1x1" in errors
+
+
+def test_report_rejects_empty_assets_staged_glbs_and_material_names() -> None:
+    document = _valid_report()
+    document["assets"] = []
+    errors = contract.validate_report(document)
+    assert "assets must contain exactly the nine registered assets" in errors
+
+    document = _valid_report()
+    document["assets"][0]["staged_glbs"] = []
+    document["assets"][0]["metrics"]["material_names"] = []
+    errors = contract.validate_report(document)
+
+    assert errors == sorted(errors)
+    assert "asset[0].staged_glbs must be a non-empty list of canonical paths" in errors
+    assert "asset[0].metrics.material_names must be a non-empty list of non-empty strings" in errors
+
+
+def test_report_enforces_exact_asset_kinds_and_staged_glb_roles() -> None:
+    document = _valid_report()
+    pressure_door = document["assets"][6]
+    pressure_door["kind"] = "prop"
+    pressure_door["staged_glbs"] = [
+        "res://assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1.glb"
+    ]
+    document["assets"][7]["staged_glbs"] = [
+        "res://assets/_staging/focused_nine/props/../props/hull_breach_seal_point.glb"
+    ]
+
+    errors = contract.validate_report(document)
+
+    assert errors == sorted(errors)
+    assert "asset[6].kind does not match registered asset" in errors
+    assert "asset[6].staged_glbs must exactly match asset_stage_glb roles" in errors
+    assert "asset[7].staged_glbs must exactly match asset_stage_glb roles" in errors
+
+
+def test_report_source_paths_must_be_normalized_project_relative_strings() -> None:
+    document = _valid_report()
+    document["assets"][0]["source_path"] = "res://assets/imported/structural/../escape.glb"
+
+    errors = contract.validate_report(document)
+
+    assert errors == sorted(errors)
+    assert "asset[0].source_path must be a normalized project-relative path" in errors
