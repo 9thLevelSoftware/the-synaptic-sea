@@ -54,6 +54,8 @@ PROOF_RELATIVE = Path("docs/superpowers/proofs/focused-nine-comparison.md")
 _CAPTURE_SCENE = "res://scenes/validation/focused_nine_comparison_harness.tscn"
 _CAPTURE_SCRIPT = "res://scripts/validation/focused_nine_comparison_capture.gd"
 CAPTURE_TIMEOUT_SECONDS = 120
+_CAPTURE_DIAGNOSTIC_MARKERS = ("WARNING:", "ERROR:", "SCRIPT ERROR:")
+_CAPTURE_DIAGNOSTIC_BLOCKER = "comparison capture blocker: Godot emitted diagnostics"
 
 
 # Re-exporting this pure validator keeps the batch's report gate obvious to
@@ -490,24 +492,54 @@ def _publish_structural_asset(private: Path, final: Path) -> None:
         shutil.rmtree(backup, ignore_errors=True)
 
 
+def _path_exists_without_following(path: Path) -> bool:
+    return os.path.lexists(os.fspath(path))
+
+
+def _discard_path_without_unlinking_target(path: Path) -> None:
+    """Remove one path by first moving it to a private rollback tombstone."""
+
+    if not _path_exists_without_following(path):
+        return
+    tombstone = path.with_name(f".{path.name}.rollback-{next(tempfile._get_candidate_names())}")
+    os.replace(path, tombstone)
+    try:
+        mode = tombstone.lstat().st_mode
+        if stat.S_ISDIR(mode):
+            shutil.rmtree(tombstone)
+        else:
+            os.unlink(tombstone)
+    except BaseException:
+        # Do not attempt to unlink the caller-visible target.  The tombstone is
+        # deliberately private to this transaction and remains recoverable if
+        # cleanup itself is interrupted.
+        raise
+
+
 def _publish_prop_asset(private_glb: Path, private_sidecar: Path, final_glb: Path, final_sidecar: Path) -> None:
+    """Publish a prop GLB and sidecar as one rollback-safe pair."""
+
     final_glb.parent.mkdir(parents=True, exist_ok=True)
-    previous: list[tuple[Path, Path]] = []
+    final_sidecar.parent.mkdir(parents=True, exist_ok=True)
+    transactions: list[tuple[Path, Path | None]] = []
     try:
         for source, target in ((private_glb, final_glb), (private_sidecar, final_sidecar)):
-            if target.exists() or target.is_symlink():
+            backup: Path | None = None
+            if _path_exists_without_following(target):
                 backup = target.with_name(f".{target.name}.previous-{next(tempfile._get_candidate_names())}")
                 os.replace(target, backup)
-                previous.append((target, backup))
+            transactions.append((target, backup))
             os.replace(source, target)
     except BaseException:
-        for target, backup in reversed(previous):
-            if target.exists():
-                target.unlink()
-            os.replace(backup, target)
+        for target, backup in reversed(transactions):
+            if backup is None:
+                _discard_path_without_unlinking_target(target)
+            else:
+                os.replace(backup, target)
         raise
-    for _target, backup in previous:
-        backup.unlink(missing_ok=True)
+    for _target, backup in transactions:
+        if backup is not None:
+            _discard_path_without_unlinking_target(backup)
 
 
 def _copy_pressure_package(private_root: Path, project_root: Path) -> None:
@@ -554,7 +586,11 @@ def _process_asset(args: argparse.Namespace, asset_id: str, private_root: Path) 
         _copy_pressure_package(private_root, args.project_root)
     intact = evidence_records["intact"]
     for role, record in evidence_records.items():
-        role_metrics[role] = _metrics_from_evidence(record)
+        role_metrics[role] = {
+            **_metrics_from_evidence(record),
+            "path": f"res://{contract.asset_stage_glb(args.project_root, asset_id, role).relative_to(args.project_root.resolve()).as_posix()}",
+            "validation": "PASS",
+        }
     return (
         _asset_record(args.project_root, args, asset_id, source, staged, _metrics_from_evidence(intact), (), True, None, role_metrics),
         source,
@@ -635,6 +671,12 @@ def _run_capture(project_root: Path, preview_dir: Path) -> tuple[bool, str | Non
     if result.returncode != 0:
         detail = next((line.strip() for line in output.splitlines() if line.strip()), f"exit {result.returncode}")
         return False, f"comparison capture blocker: {detail}", output
+    if any(
+        line.strip().startswith(_CAPTURE_DIAGNOSTIC_MARKERS)
+        for line in output.splitlines()
+        if line.strip()
+    ):
+        return False, _CAPTURE_DIAGNOSTIC_BLOCKER, output
     if marker not in output:
         return False, "comparison capture blocker: missing FOCUSED_NINE_COMPARISON_CAPTURE PASS marker", output
     stable = preview_dir / "focused-nine-comparison.png"
@@ -738,7 +780,26 @@ def _build_report(
     return report
 
 
-def _write_proof(project_root: Path, records: Sequence[dict[str, Any]], source_paths: dict[str, str], report_path: Path, preview_dir: Path) -> None:
+def _write_proof(
+    project_root: Path,
+    records: Sequence[dict[str, Any]],
+    source_paths: dict[str, str],
+    report_path: Path,
+    preview_dir: Path,
+    role_metrics: dict[str, dict[str, Any]],
+) -> None:
+    if (
+        len(records) != len(ORDERED_ASSET_IDS)
+        or tuple(asset.get("asset_id") for asset in records) != ORDERED_ASSET_IDS
+        or any(
+            asset.get("pass") is not True
+            or asset.get("validation") != []
+            or asset.get("first_error") is not None
+            for asset in records
+        )
+    ):
+        raise ValueError("cannot write proof before all assets pass")
+
     lines = [
         "# Focused-nine comparison evidence",
         "",
@@ -749,17 +810,43 @@ def _write_proof(project_root: Path, records: Sequence[dict[str, Any]], source_p
         f"- Report: `{report_path.relative_to(project_root).as_posix()}`",
         f"- Preview: `{(preview_dir / 'focused-nine-comparison.png').relative_to(project_root).as_posix()}`",
         "",
-        "| Asset | Source | Staged GLBs | SHA-256 | Bytes | Triangles | Meshes | Materials |",
-        "| --- | --- | --- | --- | ---: | ---: | ---: | --- |",
+        "## Asset validation and role metrics",
+        "",
     ]
     for asset in records:
-        metrics = asset["metrics"]
-        lines.append(
-            f"| `{asset['asset_id']}` | `{source_paths[asset['asset_id']]}` | "
-            f"{', '.join(f'`{path}`' for path in asset['staged_glbs'])} | "
-            f"`{metrics['sha256']}` | {metrics['byte_size']} | {metrics['triangle_count']} | "
-            f"{metrics['mesh_count']} | {', '.join(metrics['material_names'])} |"
+        asset_id = asset["asset_id"]
+        if asset_id not in source_paths:
+            raise ValueError(f"cannot write proof without source path: {asset_id}")
+        lines.extend(
+            (
+                f"### `{asset_id}`",
+                "",
+                f"- Source: `{source_paths[asset_id]}`",
+                "- Validation result: `PASS`",
+                "",
+                "| Role | Validation | Path | SHA-256 | Bytes | Triangles | Meshes | Materials |",
+                "| --- | --- | --- | --- | ---: | ---: | ---: | --- |",
+            )
         )
+        expected_roles = contract.VARIANT_ROLES.get(asset_id, ("intact",))
+        asset_role_metrics = role_metrics.get(asset_id)
+        if not isinstance(asset_role_metrics, dict):
+            raise ValueError(f"cannot write proof without role metrics: {asset_id}")
+        for index, role in enumerate(expected_roles):
+            metrics = asset_role_metrics.get(role)
+            if not isinstance(metrics, dict):
+                raise ValueError(f"cannot write proof without role metrics: {asset_id}/{role}")
+            required = ("path", "sha256", "byte_size", "triangle_count", "mesh_count", "material_names", "validation")
+            if any(field not in metrics for field in required):
+                raise ValueError(f"cannot write proof with incomplete role metrics: {asset_id}/{role}")
+            if metrics["path"] != asset["staged_glbs"][index] or metrics["validation"] != "PASS":
+                raise ValueError(f"cannot write proof with invalid role metrics: {asset_id}/{role}")
+            lines.append(
+                f"| `{role}` | `{metrics['validation']}` | `{metrics['path']}` | `{metrics['sha256']}` | "
+                f"{metrics['byte_size']} | {metrics['triangle_count']} | {metrics['mesh_count']} | "
+                f"{', '.join(metrics['material_names'])} |"
+            )
+        lines.append("")
     lines.extend(("", "Acceptance marker: `FOCUSED_NINE_BATCH PASS assets=9`", ""))
     _atomic_write_bytes(project_root / PROOF_RELATIVE, "\n".join(lines).encode("utf-8"))
 
@@ -870,7 +957,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         _atomic_write_bytes(report_path, _canonical_json(report))
 
         if report["overall_pass"] and full_batch:
-            _write_proof(project_root, records, source_paths, report_path, preview_dir)
+            _write_proof(project_root, records, source_paths, report_path, preview_dir, role_metrics)
+            for record in records:
+                print(f"FOCUSED_NINE_STAGED asset={record['asset_id']}")
             print(f"FOCUSED_NINE_REPORT path={report_path}")
             print("FOCUSED_NINE_BATCH PASS assets=9")
             return 0
