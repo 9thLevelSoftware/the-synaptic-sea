@@ -49,6 +49,28 @@ SCENE_PROPERTIES = {
         description="Latest toolkit operation status",
         default="Ready",
     ),
+    # Compatibility aliases used by the standalone smoke probe and older scene
+    # files.  The panel continues to display the canonical properties above.
+    "structural_family": EnumProperty(
+        name="Family (compatibility)",
+        description="Compatibility alias for structural_module_family",
+        items=FAMILY_ITEMS,
+        default="floor",
+    ),
+    "structural_grid_w": IntProperty(
+        name="Grid Width (compatibility)",
+        description="Compatibility alias for structural_grid_size_x",
+        default=3,
+        min=1,
+        max=256,
+    ),
+    "structural_grid_d": IntProperty(
+        name="Grid Depth (compatibility)",
+        description="Compatibility alias for structural_grid_size_y",
+        default=3,
+        min=0,
+        max=256,
+    ),
 }
 
 

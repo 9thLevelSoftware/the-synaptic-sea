@@ -1,9 +1,9 @@
 """Structural Module Toolkit Blender add-on.
 
 The toolkit provides a small N-panel workflow for authoring structural module
-source assets.  The operators intentionally remain lightweight stubs until the
-contract, import, helper-generation, export, and validation implementations are
-added in later tasks.
+source assets.  Contract generation, helper creation, and staged GLB export are
+implemented in the registered operators; import and validation remain explicit
+extension points for the later toolkit tasks.
 """
 
 from __future__ import annotations
