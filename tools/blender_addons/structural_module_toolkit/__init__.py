@@ -8,9 +8,15 @@ added in later tasks.
 
 from __future__ import annotations
 
-import bpy
+try:
+    import bpy
+except ModuleNotFoundError:  # Pure-Python helpers remain importable for unit tests.
+    bpy = None  # type: ignore[assignment]
 
-from . import operators, panels, preferences
+if bpy is not None:
+    from . import operators, panels, preferences
+else:
+    operators = panels = preferences = None  # type: ignore[assignment]
 
 
 bl_info = {
@@ -24,11 +30,14 @@ bl_info = {
 }
 
 
-_CLASSES = (
-    preferences.StructuralModulePreferences,
-    *operators.CLASSES,
-    panels.VIEW3D_PT_structural_module_tool,
-)
+if bpy is not None:
+    _CLASSES = (
+        preferences.StructuralModulePreferences,
+        *operators.CLASSES,
+        panels.VIEW3D_PT_structural_module_tool,
+    )
+else:
+    _CLASSES = ()
 
 
 def register() -> None:
