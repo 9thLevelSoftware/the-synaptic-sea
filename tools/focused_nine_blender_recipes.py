@@ -11,9 +11,16 @@ The two source roots are intentionally distinct:
   ``ship_structural_v0`` kit source directory.
 * ``--props-source-root`` contains ``<asset>.blend`` files directly.
 
-Only objects in the generated namespace ``FocusedNine_<asset_id>_`` are
-removed.  Authored objects, helpers, collections, and runtime assets are never
-cleared or replaced by this driver.
+Only objects in the generated namespace ``FocusedNine_<asset_id>_`` with the
+explicit generated marker and matching asset id are removed.  Authored objects,
+helpers, collections, and runtime assets are never cleared or replaced by this
+driver.
+
+Trusted-workspace boundary: after the initial path and inode observations, the
+caller must approve a same-user trusted workspace for Blender's path-based
+open/save. Blender cannot be given an FD-pinned ``.blend`` path here, so these
+checks do not solve a same-user rebind race after the observations; that race is
+outside this boundary rather than being silently claimed safe.
 """
 
 from __future__ import annotations
@@ -21,6 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import stat
 import sys
 from collections.abc import Mapping
 from pathlib import Path
@@ -46,6 +54,12 @@ REQUIRED_MATERIAL_NAMES: tuple[str, ...] = (
 )
 _GENERATED_PREFIX = "FocusedNine_"
 _MATERIAL_LIBRARY_NAME = "salvage_industrial.blend"
+TRUST_BOUNDARY_DOCUMENTATION = (
+    "Trusted-workspace boundary: after the initial path and inode observations, "
+    "the caller must approve a same-user trusted workspace for Blender's "
+    "path-based open/save. Blender cannot FD-pin a .blend path here, so these "
+    "checks do not solve same-user rebind races after those observations."
+)
 
 # Blender is deliberately not imported at module import time.
 _BPY: Any | None = None
@@ -126,6 +140,75 @@ def _is_same_or_descendant(candidate: Path, parent: Path) -> bool:
     return True
 
 
+def _iter_real_regular_files(root: Path) -> Iterable[Path]:
+    """Yield regular files under *root* without following symlink entries."""
+
+    try:
+        root_stat = root.stat(follow_symlinks=False)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise ValueError(f"could not scan runtime mutation surface: {root}") from exc
+
+    if stat.S_ISREG(root_stat.st_mode):
+        yield root
+        return
+    if not stat.S_ISDIR(root_stat.st_mode):
+        return
+
+    try:
+        with os.scandir(root) as iterator:
+            entries = sorted(iterator, key=lambda entry: entry.name)
+    except OSError as exc:
+        raise ValueError(f"could not scan runtime mutation surface: {root}") from exc
+    for entry in entries:
+        try:
+            entry_stat = entry.stat(follow_symlinks=False)
+        except OSError as exc:
+            raise ValueError(
+                f"could not scan runtime mutation surface: {entry.path}"
+            ) from exc
+        if stat.S_ISREG(entry_stat.st_mode):
+            yield Path(entry.path)
+        elif stat.S_ISDIR(entry_stat.st_mode):
+            yield from _iter_real_regular_files(Path(entry.path))
+
+
+def _reject_hardlinked_runtime_source(
+    source: Path, runtime_surfaces: Iterable[Path]
+) -> None:
+    """Reject an external source sharing an inode with a live runtime file."""
+
+    try:
+        source_stat = source.stat()
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise ValueError(f"could not stat focused-nine source candidate: {source}") from exc
+    if not stat.S_ISREG(source_stat.st_mode):
+        return
+
+    source_inode = (source_stat.st_dev, source_stat.st_ino)
+    seen_surfaces: set[str] = set()
+    for surface in sorted(runtime_surfaces, key=os.fspath):
+        surface_key = os.fspath(surface)
+        if surface_key in seen_surfaces:
+            continue
+        seen_surfaces.add(surface_key)
+        for runtime_file in _iter_real_regular_files(surface):
+            try:
+                runtime_stat = runtime_file.stat(follow_symlinks=False)
+            except OSError as exc:
+                raise ValueError(
+                    f"could not stat runtime mutation file: {runtime_file}"
+                ) from exc
+            if (runtime_stat.st_dev, runtime_stat.st_ino) == source_inode:
+                raise ValueError(
+                    "focused-nine source candidate is an external hardlink to "
+                    f"runtime mutation file: {source} -> {runtime_file}"
+                )
+
+
 def resolve_source_path(
     project_root: Path,
     structural_source_root: Path,
@@ -165,11 +248,17 @@ def resolve_source_path(
             raise ValueError(
                 f"focused-nine source candidate is on a runtime surface: {source}"
             )
+    _reject_hardlinked_runtime_source(
+        source_resolved,
+        (*runtime_lexical, *runtime_resolved),
+    )
     return source_resolved
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__, epilog=TRUST_BOUNDARY_DOCUMENTATION
+    )
     parser.add_argument("--project-root", type=Path, required=True)
     parser.add_argument("--structural-source-root", type=Path, required=True)
     parser.add_argument("--props-source-root", type=Path, required=True)
@@ -321,6 +410,11 @@ def _link_object(obj: Any, collection: Any) -> None:
     collection.objects.link(obj)
 
 
+def _mark_generated(obj: Any, asset_id: str) -> None:
+    obj["focused_nine_generated"] = True
+    obj["focused_nine_asset_id"] = asset_id
+
+
 def _activate_only(obj: Any) -> None:
     """Select only a newly created object without touching scene contents."""
 
@@ -380,6 +474,7 @@ def _box(
     bpy.ops.mesh.primitive_cube_add(size=1.0, location=tuple(float(value) for value in location))
     obj = bpy.context.active_object
     obj.name = _generated_name(asset_id, token)
+    _mark_generated(obj, asset_id)
     _link_object(obj, collection)
     obj.dimensions = dimensions
     _apply_transform(obj)
@@ -411,6 +506,7 @@ def _cylinder(
     )
     obj = bpy.context.active_object
     obj.name = _generated_name(asset_id, token)
+    _mark_generated(obj, asset_id)
     _link_object(obj, collection)
     _apply_transform(obj)
     _assign_material(obj, material_name)
@@ -687,31 +783,82 @@ def ensure_structural_helpers(spec: Any, root: Any, helpers: Any) -> dict[str, A
 
 
 def replace_generated_visuals(root: Any, geometry: Any, asset_id: str) -> None:
-    """Remove this asset's generated objects from the exact target collection."""
+    """Remove only owned objects from the exact target collection.
 
-    del root  # The caller supplies the target collection explicitly.
-    select_asset(asset_id)
-    prefix = _generated_name(asset_id, "")
+    Structural calls must provide their exact module root; prop calls must use
+    ``None`` because their generated collection is their ownership boundary.
+    """
+
+    kind = select_asset(asset_id)
+    expected_root = f"ModuleRoot_{asset_id}"
+    if kind == "structural":
+        if root is None or getattr(root, "name", None) != expected_root:
+            raise ValueError(
+                f"focused-nine replacement requires root {expected_root!r}"
+            )
+    elif root is not None:
+        raise ValueError("focused-nine prop replacement root must be None")
+    _replace_owned_objects(geometry, asset_id)
+
+
+def _object_property(obj: Any, key: str, default: Any = None) -> Any:
+    getter = getattr(obj, "get", None)
+    if callable(getter):
+        return getter(key, default)
+    return getattr(obj, key, default)
+
+
+def _is_owned_generated_object(obj: Any, asset_id: str) -> bool:
+    return (
+        _object_property(obj, "focused_nine_generated") is True
+        and _object_property(obj, "focused_nine_asset_id") == asset_id
+    )
+
+
+def _unlink_from_collection(collection: Any, obj: Any) -> None:
+    links = collection.objects
+    unlink = getattr(links, "unlink", None)
+    if callable(unlink):
+        unlink(obj)
+        return
+    try:
+        links.remove(obj)
+    except ValueError:
+        pass
+    users_collection = getattr(obj, "users_collection", None)
+    if isinstance(users_collection, list) and collection in users_collection:
+        users_collection.remove(collection)
+
+
+def _remove_owned_object_if_unlinked(obj: Any) -> None:
     bpy = _require_bpy()
-    for obj in list(geometry.objects):
-        if obj.name.startswith(prefix):
-            bpy.data.objects.remove(obj, do_unlink=True)
+    users_collection = getattr(obj, "users_collection", None)
+    if users_collection is not None and len(users_collection) > 0:
+        return
+    bpy.data.objects.remove(obj, do_unlink=False)
+
+
+def _replace_owned_objects(collection: Any, asset_id: str) -> None:
+    for obj in list(collection.objects):
+        if not _is_owned_generated_object(obj, asset_id):
+            continue
+        _unlink_from_collection(collection, obj)
+        _remove_owned_object_if_unlinked(obj)
 
 
 def _replace_generated_collection(collection: Any, asset_id: str) -> None:
-    """Clear generated objects from one explicitly selected export collection."""
+    """Clear owned objects from one explicitly selected export collection."""
 
-    prefix = _generated_name(asset_id, "")
-    bpy = _require_bpy()
-    for obj in list(collection.objects):
-        if obj.name.startswith(prefix):
-            bpy.data.objects.remove(obj, do_unlink=True)
+    _replace_owned_objects(collection, asset_id)
 
 
-def _parent_generated(root: Any, objects: Iterable[Any]) -> None:
+def _parent_generated(
+    root: Any, objects: Iterable[Any], asset_id: str | None = None
+) -> None:
     for obj in objects:
         obj.parent = root
-        obj["focused_nine_generated"] = True
+        if asset_id is not None:
+            _mark_generated(obj, asset_id)
 
 
 def _link_existing_object(obj: Any, collection: Any) -> None:
@@ -746,7 +893,7 @@ def _build_export_variants(
             copy.name = _generated_name(asset_id, f"{role}_{token}")
             destination.objects.link(copy)
             copy.parent = root
-            copy["focused_nine_generated"] = True
+            _mark_generated(copy, asset_id)
             copy["variant_role"] = role
             variant_objects.append(copy)
     return variant_objects
@@ -846,12 +993,12 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         replace_generated_visuals(root, geometry, args.asset_id)
         export_collections = ensure_structural_helpers(spec, root, helpers)
         helper_collections = export_collections
-        generated = build_structural_recipe(args.asset_id, spec, geometry)
-        _parent_generated(root, generated)
         if "intact" not in export_collections:
             raise RuntimeError(f"missing Export_intact collection for {args.asset_id}")
         for collection in export_collections.values():
             _replace_generated_collection(collection, args.asset_id)
+        generated = build_structural_recipe(args.asset_id, spec, geometry)
+        _parent_generated(root, generated, args.asset_id)
         generated = _build_export_variants(args.asset_id, root, generated, export_collections)
     else:
         root = None

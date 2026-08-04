@@ -115,6 +115,25 @@ def test_source_candidates_reject_runtime_surfaces_and_symlink_aliases(tmp_path:
     assert resolved == (external_root / "floor_1x1/floor_1x1.blend").resolve()
 
 
+def test_source_candidates_reject_external_hardlinks_to_runtime_files(tmp_path: Path) -> None:
+    from tools.focused_nine_blender_recipes import resolve_source_path
+
+    project_root = tmp_path / "project"
+    runtime_file = project_root / "assets/imported/shared.blend"
+    runtime_file.parent.mkdir(parents=True)
+    runtime_file.write_bytes(b"shared inode")
+    props_root = tmp_path / "props"
+    props_root.mkdir()
+    source = props_root / "fire_suppression_station.blend"
+    try:
+        source.hardlink_to(runtime_file)
+    except OSError as exc:
+        pytest.skip(f"hardlinks unavailable: {exc}")
+
+    with pytest.raises(ValueError, match="hardlink"):
+        resolve_source_path(project_root, tmp_path / "structural", props_root, "fire_suppression_station")
+
+
 def test_run_rejects_runtime_source_before_blender_or_save(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -156,6 +175,22 @@ class _FakeCollection:
         return self._props.get(key, default)
 
 
+class _FakeObject:
+    def __init__(self, name: str, **properties: object) -> None:
+        self.name = name
+        self.users_collection: list[object] = []
+        self._props = properties
+
+    def __getitem__(self, key: str) -> object:
+        return self._props[key]
+
+    def __setitem__(self, key: str, value: object) -> None:
+        self._props[key] = value
+
+    def get(self, key: str, default: object = None) -> object:
+        return self._props.get(key, default)
+
+
 class _FakeCollections(list[_FakeCollection]):
     def get(self, name: str) -> _FakeCollection | None:
         return next((collection for collection in self if collection.name == name), None)
@@ -171,15 +206,28 @@ def test_replace_generated_visuals_is_limited_to_the_passed_collection(
 ) -> None:
     import tools.focused_nine_blender_recipes as recipes
 
-    target_generated = SimpleNamespace(name="FocusedNine_floor_1x1_target")
-    target_authored = SimpleNamespace(name="Authored_floor_1x1_panel")
-    unrelated_generated = SimpleNamespace(name="FocusedNine_floor_1x1_same_name")
-    target = _FakeCollection("Geometry", [target_generated, target_authored])
+    target_generated = _FakeObject(
+        "FocusedNine_floor_1x1_target",
+        focused_nine_generated=True,
+        focused_nine_asset_id="floor_1x1",
+    )
+    target_authored = _FakeObject("FocusedNine_floor_1x1_authored_panel")
+    wrong_asset = _FakeObject(
+        "FocusedNine_floor_1x1_wrong_asset",
+        focused_nine_generated=True,
+        focused_nine_asset_id="wall_straight_1x1",
+    )
+    unrelated_generated = _FakeObject(
+        "FocusedNine_floor_1x1_same_name",
+        focused_nine_generated=True,
+        focused_nine_asset_id="floor_1x1",
+    )
+    target = _FakeCollection("Geometry", [target_generated, target_authored, wrong_asset])
     unrelated = _FakeCollection("Export_intact", [unrelated_generated])
 
     class FakeObjects:
         def remove(self, obj: object, *, do_unlink: bool) -> None:
-            assert do_unlink is True
+            assert do_unlink is False
             for collection in (target, unrelated):
                 if obj in collection.objects:
                     collection.objects.remove(obj)
@@ -191,8 +239,44 @@ def test_replace_generated_visuals_is_limited_to_the_passed_collection(
 
     recipes.replace_generated_visuals(SimpleNamespace(name="ModuleRoot_floor_1x1"), target, "floor_1x1")
 
-    assert target.objects == [target_authored]
+    assert target.objects == [target_authored, wrong_asset]
     assert unrelated.objects == [unrelated_generated]
+
+
+def test_generated_replacement_unlinks_target_without_destroying_external_collection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import tools.focused_nine_blender_recipes as recipes
+
+    target = _FakeCollection("Geometry")
+    external = _FakeCollection("AuthoredCollection")
+    shared_generated = _FakeObject(
+        "FocusedNine_floor_1x1_shared_generated",
+        focused_nine_generated=True,
+        focused_nine_asset_id="floor_1x1",
+    )
+    shared_generated.users_collection = [target, external]
+    target.objects.append(shared_generated)
+    external.objects.append(shared_generated)
+    removed: list[object] = []
+
+    class FakeObjects:
+        def remove(self, obj: object, *, do_unlink: bool) -> None:
+            assert do_unlink is False
+            removed.append(obj)
+
+    monkeypatch.setattr(
+        recipes,
+        "_BPY",
+        SimpleNamespace(data=SimpleNamespace(objects=FakeObjects())),
+    )
+
+    recipes._replace_generated_collection(target, "floor_1x1")
+
+    assert target.objects == []
+    assert external.objects == [shared_generated]
+    assert shared_generated.users_collection == [external]
+    assert removed == []
 
 
 def test_existing_helper_metadata_is_untouched_and_incompatible_metadata_fails(
@@ -434,6 +518,25 @@ def test_blender_prop_recipe_is_idempotent_and_uses_library_material_on_collisio
     material_dir.mkdir()
     shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
 
+    ownership_seed_expr = (
+        "import bpy; "
+        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+        "geometry=bpy.data.collections.get('FocusedNine_fire_suppression_station_Generated') or bpy.data.collections.new('FocusedNine_fire_suppression_station_Generated'); "
+        "bpy.context.scene.collection.children.link(geometry) if geometry.name not in {child.name for child in bpy.context.scene.collection.children} else None; "
+        "authored=bpy.data.objects.new('FocusedNine_fire_suppression_station_authored_panel', None); geometry.objects.link(authored); "
+        "authored['authored_marker']='preserve'; "
+        "stale=bpy.data.objects.new('FocusedNine_fire_suppression_station_stale_generated', None); geometry.objects.link(stale); "
+        "stale['focused_nine_generated']=True; stale['focused_nine_asset_id']='fire_suppression_station'; "
+        f"bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})"
+    )
+    ownership_seed = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", ownership_seed_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert ownership_seed.returncode == 0, ownership_seed.stdout + ownership_seed.stderr
+
     stale_expr = (
         "import bpy; "
         f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
@@ -476,8 +579,10 @@ def test_blender_prop_recipe_is_idempotent_and_uses_library_material_on_collisio
         "import bpy,json; "
         f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
         "obj=bpy.data.objects['FocusedNine_fire_suppression_station_labeled_shape_panel']; "
+        "authored=bpy.data.objects.get('FocusedNine_fire_suppression_station_authored_panel'); "
+        "stale_generated=bpy.data.objects.get('FocusedNine_fire_suppression_station_stale_generated'); "
         "mat=obj.data.materials[0]; stale=bpy.data.materials['MAT_PaintedAlloyGray']; "
-        "print('MATERIAL_PROOF '+json.dumps({'generated':mat.name,'library':mat.get('focused_nine_source_library'),'source':mat.get('focused_nine_source_name'),'stale':stale.get('authored_marker')}))"
+        "print('MATERIAL_PROOF '+json.dumps({'generated':mat.name,'library':mat.get('focused_nine_source_library'),'source':mat.get('focused_nine_source_name'),'stale':stale.get('authored_marker'),'authored':authored.get('authored_marker') if authored else None,'stale_generated':stale_generated is not None,'generated_marker':obj.get('focused_nine_generated'),'generated_asset':obj.get('focused_nine_asset_id')}))"
     )
     proof = subprocess.run(
         [str(BLENDER), "--background", "--factory-startup", "--python-expr", proof_expr],
@@ -492,6 +597,10 @@ def test_blender_prop_recipe_is_idempotent_and_uses_library_material_on_collisio
     assert material_proof["library"].endswith("salvage_industrial.blend")
     assert material_proof["source"] == "focused-nine:MAT_PaintedAlloyGray"
     assert material_proof["stale"] == "stale-authored-material"
+    assert material_proof["authored"] == "preserve"
+    assert material_proof["stale_generated"] is False
+    assert material_proof["generated_marker"] is True
+    assert material_proof["generated_asset"] == "fire_suppression_station"
     assert PROP_SOURCE_FIXTURE.read_bytes() == prop_fixture_bytes
     assert MATERIAL_FIXTURE.read_bytes() == material_fixture_bytes
 
@@ -515,6 +624,25 @@ def test_blender_floor_recipe_is_idempotent_and_source_scoped(tmp_path: Path) ->
     shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
     props_root = tmp_path / "props"
     props_root.mkdir()
+
+    seed_expr = (
+        "import bpy; "
+        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+        "geometry=bpy.data.collections.get('Geometry') or bpy.data.collections.new('Geometry'); "
+        "bpy.context.scene.collection.children.link(geometry) if geometry.name not in {child.name for child in bpy.context.scene.collection.children} else None; "
+        "authored=bpy.data.objects.new('FocusedNine_floor_1x1_authored_panel', None); geometry.objects.link(authored); "
+        "authored['authored_marker']='preserve'; "
+        "stale=bpy.data.objects.new('FocusedNine_floor_1x1_stale_generated', None); geometry.objects.link(stale); "
+        "stale['focused_nine_generated']=True; stale['focused_nine_asset_id']='floor_1x1'; "
+        f"bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})"
+    )
+    prepared = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", seed_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert prepared.returncode == 0, prepared.stdout + prepared.stderr
 
     command = [
         str(BLENDER),
@@ -557,6 +685,30 @@ def test_blender_floor_recipe_is_idempotent_and_source_scoped(tmp_path: Path) ->
     assert first_report["triangle_count"] > 0
     assert first_report["boolean_modifiers"] == []
     assert "BOOLEAN" not in first_report["modifier_types"]
+
+    proof_expr = (
+        "import bpy,json; "
+        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+        "authored=bpy.data.objects.get('FocusedNine_floor_1x1_authored_panel'); "
+        "stale=bpy.data.objects.get('FocusedNine_floor_1x1_stale_generated'); "
+        "generated=bpy.data.objects['FocusedNine_floor_1x1_floor_panel']; "
+        "print('OWNERSHIP_PROOF '+json.dumps({'authored':authored.get('authored_marker') if authored else None,'stale':stale is not None,'generated':generated.get('focused_nine_generated'),'asset':generated.get('focused_nine_asset_id')}))"
+    )
+    proof = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", proof_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proof.returncode == 0, proof.stdout + proof.stderr
+    proof_line = next(line for line in proof.stdout.splitlines() if line.startswith("OWNERSHIP_PROOF "))
+    ownership_proof = json.loads(proof_line.removeprefix("OWNERSHIP_PROOF "))
+    assert ownership_proof == {
+        "authored": "preserve",
+        "stale": False,
+        "generated": True,
+        "asset": "floor_1x1",
+    }
     assert SOURCE_FIXTURE.read_bytes() == source_fixture_bytes
 
 
