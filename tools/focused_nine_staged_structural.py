@@ -492,39 +492,77 @@ def _validate_scene_text(scene_text: str) -> None:
         raise ValueError("invalid staged wrapper ext_resource path")
 
     lines = [line.strip() for line in scene_text.splitlines()]
-    node_records: list[tuple[str, str, str]] = []
+    node_records: list[tuple[str, str, str, list[str]]] = []
     node_re = re.compile(r'^\[node\s+name="([^"]+)"(?:\s+type="([^"]+)")?(?:\s+parent="([^"]+)")?[^\]]*\]$')
-    for line in lines:
+    current_node: tuple[str, str, str, list[str]] | None = None
+    node_records_by_line: dict[int, tuple[str, str, str, list[str]]] = {}
+    for line_index, line in enumerate(lines):
         match = node_re.match(line)
         if match:
-            node_records.append((match.group(1), match.group(2) or "", match.group(3) or ""))
-    direct_root = {name: node_type for name, node_type, parent in node_records if parent in ("", ".")}
-    direct_visual = {name for name, _node_type, parent in node_records if parent == "Visual"}
+            current_node = (match.group(1), match.group(2) or "", match.group(3) or "", [])
+            node_records.append(current_node)
+            node_records_by_line[line_index] = current_node
+        elif current_node is not None and line and not line.startswith("["):
+            current_node[3].append(line)
+
+    def node_matches(name: str, parent: str | None = None) -> list[tuple[str, str, str, list[str]]]:
+        return [
+            record
+            for record in node_records
+            if record[0] == name and (parent is None or record[2] == parent)
+        ]
+
+    def explicit_visibility(record: tuple[str, str, str, list[str]], label: str) -> bool:
+        visibility_lines = [line for line in record[3] if line.startswith("visible")]
+        if len(visibility_lines) != 1:
+            raise ValueError(f"invalid staged wrapper {label} visibility")
+        visibility_match = re.fullmatch(r"visible\s*=\s*(true|false)", visibility_lines[0])
+        if visibility_match is None:
+            raise ValueError(f"invalid staged wrapper {label} visibility")
+        return visibility_match.group(1) == "true"
+
+    root_records = node_matches("Pressure_Door_1x1")
+    if len(root_records) != 1 or root_records[0][1] != "Node3D" or root_records[0][2] not in ("", "."):
+        raise ValueError("invalid staged wrapper root")
+    if not explicit_visibility(root_records[0], "root"):
+        raise ValueError("invalid staged wrapper root visibility")
+
+    visual_root_records = node_matches("Visual")
+    if (
+        len(visual_root_records) != 1
+        or visual_root_records[0][1] != "Node3D"
+        or visual_root_records[0][2] not in ("", ".")
+    ):
+        raise ValueError("invalid staged wrapper visual root")
+    if not explicit_visibility(visual_root_records[0], "visual root"):
+        raise ValueError("invalid staged wrapper visual root visibility")
+
+    direct_root = {
+        name: node_type for name, node_type, parent, _properties in node_records if parent in ("", ".")
+    }
+    direct_visual = {
+        name for name, _node_type, parent, _properties in node_records if parent == "Visual"
+    }
     visual_node_re = re.compile(
         r'^\[node\b(?=[^\]]*\bname="VisualInstance_(?P<role>Intact|Damaged|Breached)")'
         r'(?=[^\]]*\bparent="Visual")'
         r'(?=[^\]]*\binstance=ExtResource\("(?P<resource_id>[^"]+)"\))[^\]]*\]$'
     )
     visual_bindings: dict[str, str] = {}
-    visual_visibility: dict[str, bool | None] = {}
+    visual_visibility: dict[str, bool] = {}
+    visual_records: dict[str, tuple[str, str, str, list[str]]] = {}
     for line_index, line in enumerate(lines):
         match = visual_node_re.match(line)
         if match:
             role = match.group("role").lower()
-            if role in visual_bindings:
+            if role in visual_bindings or role in visual_records:
                 raise ValueError("duplicate staged wrapper visual binding")
             visual_bindings[role] = match.group("resource_id")
-            visible: bool | None = None
-            property_index = line_index + 1
-            while property_index < len(lines) and not lines[property_index].startswith("["):
-                property_line = lines[property_index]
-                if property_line.startswith("visible"):
-                    visible_match = re.fullmatch(r"visible\s*=\s*(true|false)", property_line)
-                    if visible_match is None:
-                        raise ValueError(f"invalid staged wrapper {role} visibility")
-                    visible = visible_match.group(1) == "true"
-                property_index += 1
-            visual_visibility[role] = visible
+            record = node_records_by_line.get(line_index)
+            if record is None or record[0] != f"VisualInstance_{match.group('role')}" or record[2] != "Visual":
+                raise ValueError(f"invalid staged wrapper {role} nesting")
+            visual_records[role] = record
+            visual_visibility[role] = explicit_visibility(record, role)
     if set(visual_bindings) != set(_VARIANT_ROLES):
         raise ValueError("invalid staged wrapper visual binding set")
     for role in _VARIANT_ROLES:
@@ -532,9 +570,8 @@ def _validate_scene_text(scene_text: str) -> None:
         if resource_bindings.get(resource_id) != expected_by_role[role]:
             raise ValueError(f"invalid staged wrapper visual binding for {role}")
         visible = visual_visibility[role]
-        if (role == "intact" and visible is False) or (
-            role in ("damaged", "breached") and visible is not False
-        ):
+        expected_visible = role == "intact"
+        if visible is not expected_visible:
             raise ValueError(f"invalid staged wrapper {role} visibility")
 
     expected_anchors = {
@@ -550,7 +587,8 @@ def _validate_scene_text(scene_text: str) -> None:
     if any(direct_root.get(name) != "Marker3D" for name in expected_anchors):
         raise ValueError("invalid staged wrapper anchor types")
     if direct_root.get("CollisionRoot") != "StaticBody3D" or not any(
-        name == "CollisionShape3D" and parent == "CollisionRoot" for name, _type, parent in node_records
+        name == "CollisionShape3D" and parent == "CollisionRoot"
+        for name, _type, parent, _properties in node_records
     ):
         raise ValueError("invalid staged wrapper collision")
     expected_visual = {

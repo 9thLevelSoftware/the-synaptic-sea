@@ -25,6 +25,9 @@ func _initialize() -> void:
     if wrapper == null or wrapper.name != "Pressure_Door_1x1":
         _fail("pressure-door wrapper root mismatch")
         return
+    if not wrapper.visible:
+        _fail("pressure-door wrapper root visibility mismatch")
+        return
 
     var anchors: Array[String] = []
     for child: Node in wrapper.get_children():
@@ -40,6 +43,9 @@ func _initialize() -> void:
     var visual: Node = wrapper.get_node_or_null("Visual")
     if visual == null:
         _fail("pressure-door visual root missing")
+        return
+    if not visual.visible:
+        _fail("pressure-door visual root visibility mismatch")
         return
     var variants: Array[String] = []
     for child: Node in visual.get_children():

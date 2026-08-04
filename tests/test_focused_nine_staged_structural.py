@@ -211,6 +211,20 @@ def test_wrapper_uses_only_overlay_canonical_import_paths_and_contract_anchors()
     assert "assets/_staging" not in scene
     assert "/Volumes/" not in scene
     assert scene.count("[ext_resource") == 3
+    assert '[node name="Pressure_Door_1x1" type="Node3D"]\nvisible = true' in scene
+    assert '[node name="Visual" type="Node3D" parent="."]\nvisible = true' in scene
+    assert (
+        'name="VisualInstance_Intact" parent="Visual" '
+        'instance=ExtResource("1_visual_intact")]\nvisible = true'
+    ) in scene
+    assert (
+        'name="VisualInstance_Damaged" parent="Visual" '
+        'instance=ExtResource("2_visual_damaged")]\nvisible = false'
+    ) in scene
+    assert (
+        'name="VisualInstance_Breached" parent="Visual" '
+        'instance=ExtResource("3_visual_breached")]\nvisible = false'
+    ) in scene
     for variant in (ASSET_ID, f"{ASSET_ID}_damaged", f"{ASSET_ID}_breached"):
         assert f"res://assets/imported/structural/ship_structural_v0/{ASSET_ID}/{variant}.glb" in scene
     for anchor in (
@@ -296,6 +310,119 @@ def test_swapped_visual_visibility_states_are_rejected_before_godot(
     errors = validator.validate_pressure_door_overlay(PROJECT_ROOT, staging_root, Path("godot"))
 
     assert any("visibility" in error for error in errors)
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("description", "mutate"),
+    [
+        (
+            "hidden root",
+            lambda scene: scene.replace(
+                '[node name="Pressure_Door_1x1" type="Node3D"]',
+                '[node name="Pressure_Door_1x1" type="Node3D"]\nvisible = false',
+            ),
+        ),
+        (
+            "hidden visual root",
+            lambda scene: scene.replace(
+                '[node name="Visual" type="Node3D" parent="."]',
+                '[node name="Visual" type="Node3D" parent="."]\nvisible = false',
+            ),
+        ),
+        (
+            "missing intact visibility",
+            lambda scene: scene.replace("visible = true\n", "", 1),
+        ),
+        (
+            "hidden intact visual",
+            lambda scene: scene.replace(
+                'name="VisualInstance_Intact" parent="Visual" instance=ExtResource("1_visual_intact")]\nvisible = true',
+                'name="VisualInstance_Intact" parent="Visual" instance=ExtResource("1_visual_intact")]\nvisible = false',
+            ),
+        ),
+        (
+            "shown damaged visual",
+            lambda scene: scene.replace(
+                'name="VisualInstance_Damaged" parent="Visual" instance=ExtResource("2_visual_damaged")]\nvisible = false',
+                'name="VisualInstance_Damaged" parent="Visual" instance=ExtResource("2_visual_damaged")]\nvisible = true',
+            ),
+        ),
+        (
+            "shown breached visual",
+            lambda scene: scene.replace(
+                'name="VisualInstance_Breached" parent="Visual" instance=ExtResource("3_visual_breached")]\nvisible = false',
+                'name="VisualInstance_Breached" parent="Visual" instance=ExtResource("3_visual_breached")]\nvisible = true',
+            ),
+        ),
+    ],
+)
+def test_required_wrapper_visibility_contract_is_rejected_before_godot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    description: str,
+    mutate: Callable[[str], str],
+) -> None:
+    del description
+    staging_root = _staging_fixture(tmp_path)
+    package = staging_root / "structural" / ASSET_ID
+    staged_scene = package / f"{ASSET_ID}.tscn"
+    staged_scene.write_text(mutate(staged_scene.read_text(encoding="utf-8")), encoding="utf-8")
+
+    calls: list[list[str]] = []
+
+    def fail_if_called(command: list[str], **kwargs: object) -> object:
+        calls.append(command)
+        raise AssertionError("Godot must not run for an invalid wrapper visibility contract")
+
+    monkeypatch.setattr(validator.subprocess, "run", fail_if_called)
+    errors = validator.validate_pressure_door_overlay(PROJECT_ROOT, staging_root, Path("godot"))
+
+    assert any("visibility" in error for error in errors)
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("name", "mutate"),
+    [
+        (
+            "root nested under Visual",
+            lambda scene: scene.replace(
+                '[node name="Pressure_Door_1x1" type="Node3D"]',
+                '[node name="Pressure_Door_1x1" type="Node3D" parent="Visual"]',
+            ),
+        ),
+        (
+            "visual nested under an unrelated node",
+            lambda scene: scene.replace(
+                '[node name="Visual" type="Node3D" parent="."]',
+                '[node name="Visual" type="Node3D" parent="CollisionRoot"]',
+            ),
+        ),
+    ],
+)
+def test_malformed_wrapper_visibility_nesting_is_rejected_before_godot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    mutate: Callable[[str], str],
+) -> None:
+    del name
+    staging_root = _staging_fixture(tmp_path)
+    package = staging_root / "structural" / ASSET_ID
+    staged_scene = package / f"{ASSET_ID}.tscn"
+    staged_scene.write_text(mutate(staged_scene.read_text(encoding="utf-8")), encoding="utf-8")
+
+    calls: list[list[str]] = []
+
+    def fail_if_called(command: list[str], **kwargs: object) -> object:
+        calls.append(command)
+        raise AssertionError("Godot must not run for malformed wrapper nesting")
+
+    monkeypatch.setattr(validator.subprocess, "run", fail_if_called)
+    errors = validator.validate_pressure_door_overlay(PROJECT_ROOT, staging_root, Path("godot"))
+
+    assert any("root" in error or "visual" in error for error in errors)
     assert calls == []
 
 

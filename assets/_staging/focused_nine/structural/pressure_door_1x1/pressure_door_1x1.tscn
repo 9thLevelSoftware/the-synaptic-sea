@@ -8,6 +8,7 @@
 size = Vector3(4, 3.2, 0.25)
 
 [node name="Pressure_Door_1x1" type="Node3D"]
+visible = true
 
 [node name="Anchor_FloorCenter" type="Marker3D" parent="."]
 
@@ -27,6 +28,7 @@ collision_mask = 1
 shape = SubResource("BoxShape3D_pressure_door")
 
 [node name="Visual" type="Node3D" parent="."]
+visible = true
 
 [node name="VisualInstance_Intact" parent="Visual" instance=ExtResource("1_visual_intact")]
 visible = true
