@@ -56,6 +56,9 @@ CAPTURE_SCRIPT_RELATIVE = Path("scripts/validation/focused_nine_airlock_control_
 CAPTURE_SCENE_RELATIVE = Path("scenes/validation/focused_nine_airlock_control_room_harness.tscn")
 CAPTURE_OUTPUT_RELATIVE = Path("artifacts/validation-previews/focused-nine")
 CAPTURE_IMAGE_NAME = "focused-nine-airlock-control-room.png"
+LOGICAL_CAPTURE_OUTPUT = (
+    f"res://{(CAPTURE_OUTPUT_RELATIVE / CAPTURE_IMAGE_NAME).as_posix()}"
+)
 CAPTURE_MARKER_PREFIX = "FOCUSED_NINE_AIRLOCK_ROOM_CAPTURE PASS output="
 PREVIEW_MARKER_PREFIX = "FOCUSED_NINE_AIRLOCK_ROOM_PREVIEW PASS path="
 DIAGNOSTIC_MARKERS = ("WARNING:", "ERROR:", "SCRIPT ERROR:")
@@ -516,6 +519,13 @@ def _validate_capture_image(path: Path) -> tuple[int, int]:
     if path.stat().st_size <= 0:
         raise ValueError("capture image is empty")
     try:
+        with path.open("rb") as handle:
+            signature = handle.read(8)
+    except OSError as exc:
+        raise ValueError(f"cannot read capture image: {exc}") from exc
+    if signature != b"\x89PNG\r\n\x1a\n":
+        raise ValueError("capture image is not a valid PNG")
+    try:
         result = _run_bounded_process(
             [str(SIPS), "-g", "pixelWidth", "-g", "pixelHeight", str(path)],
             timeout=IMAGE_CHECK_TIMEOUT_SECONDS,
@@ -652,6 +662,8 @@ def build_proof(
 ) -> str:
     """Build proof text in memory; callers decide whether to publish it."""
 
+    marker = _sanitise_capture_marker(marker)
+
     return "\n".join(
         (
             "# Focused-Nine Airlock/Control Room Preview",
@@ -665,6 +677,25 @@ def build_proof(
             "",
         )
     )
+
+
+def _sanitise_capture_marker(marker: str) -> str:
+    """Keep only the stable logical output field from Godot's capture marker."""
+
+    value = marker.strip()
+    if not value.startswith(CAPTURE_MARKER_PREFIX):
+        return f"{CAPTURE_MARKER_PREFIX}<redacted>"
+    raw_output = value.removeprefix(CAPTURE_MARKER_PREFIX).strip()
+    expected_relative = (CAPTURE_OUTPUT_RELATIVE / CAPTURE_IMAGE_NAME).as_posix()
+    accepted_relative = {expected_relative, CAPTURE_IMAGE_NAME}
+    if raw_output == LOGICAL_CAPTURE_OUTPUT or raw_output in accepted_relative:
+        return f"{CAPTURE_MARKER_PREFIX}{LOGICAL_CAPTURE_OUTPUT}"
+    candidate = Path(raw_output)
+    if candidate.is_absolute() and candidate.parts[-len(Path(expected_relative).parts) :] == Path(
+        expected_relative
+    ).parts:
+        return f"{CAPTURE_MARKER_PREFIX}{LOGICAL_CAPTURE_OUTPUT}"
+    return f"{CAPTURE_MARKER_PREFIX}<redacted>"
 
 
 def _logical_path(project_root: Path, path: Path) -> str:

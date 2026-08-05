@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import shutil
 import subprocess
@@ -309,7 +310,7 @@ def test_bounded_capture_timeout_kills_process_group(tmp_path: Path) -> None:
 
 def test_wrong_png_dimensions_block_publication(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     image = tmp_path / "capture.png"
-    image.write_bytes(b"not-empty")
+    image.write_bytes(b"\x89PNG\r\n\x1a\nnot-empty")
     monkeypatch.setattr(
         preview,
         "_run_bounded_process",
@@ -320,6 +321,70 @@ def test_wrong_png_dimensions_block_publication(tmp_path: Path, monkeypatch: pyt
 
     with pytest.raises(ValueError, match="1600x900"):
         preview._validate_capture_image(image)
+
+
+def test_jpeg_renamed_png_is_rejected_even_when_sips_reports_target_dimensions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    image = tmp_path / "capture.png"
+    image.write_bytes(
+        base64.b64decode(
+            "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoM"
+            "DAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsN"
+            "FBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/"
+            "wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QA"
+            "tRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2Jyg"
+            "gkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGipc3R1dnd4eXqD"
+            "hIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uH"
+            "i4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8Q"
+            "AtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYn"
+            "LRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6"
+            "goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4"
+            "uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9U6KKKAP/2Q=="
+        )
+    )
+    assert image.read_bytes().startswith(b"\xff\xd8\xff")
+    monkeypatch.setattr(
+        preview,
+        "_run_bounded_process",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess(
+            [], 0, "pixelWidth: 1600\npixelHeight: 900\n", ""
+        ),
+    )
+
+    with pytest.raises(ValueError, match="PNG"):
+        preview._validate_capture_image(image)
+
+
+def test_build_proof_maps_absolute_capture_marker_to_logical_output_path(tmp_path: Path) -> None:
+    external_marker_path = Path(
+        "/private/tmp/focused-nine-room-preview-abc/project/"
+        "artifacts/validation-previews/focused-nine/focused-nine-airlock-control-room.png"
+    )
+    proof = preview.build_proof(
+        output_path=tmp_path / "published" / "focused-nine-airlock-control-room.png",
+        dimensions=(1600, 900),
+        marker=f"{preview.CAPTURE_MARKER_PREFIX}{external_marker_path}",
+    )
+
+    assert (
+        f"{preview.CAPTURE_MARKER_PREFIX}res://"
+        "artifacts/validation-previews/focused-nine/focused-nine-airlock-control-room.png"
+    ) in proof
+    assert str(external_marker_path) not in proof
+    assert str(tmp_path) not in proof
+
+
+def test_build_proof_redacts_unknown_absolute_marker_path(tmp_path: Path) -> None:
+    proof = preview.build_proof(
+        output_path=tmp_path / "published" / "focused-nine-airlock-control-room.png",
+        dimensions=(1600, 900),
+        marker=f"{preview.CAPTURE_MARKER_PREFIX}/private/unexpected/secret.png",
+    )
+
+    assert f"{preview.CAPTURE_MARKER_PREFIX}<redacted>" in proof
+    assert "/private/unexpected/secret.png" not in proof
+    assert str(tmp_path) not in proof
 
 
 
