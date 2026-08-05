@@ -747,8 +747,9 @@ def bounds(obj):
     points = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
     return [[min(point[index] for point in points), max(point[index] for point in points)] for index in range(3)]
 support = bounds(bpy.data.objects[{support_object!r}])
-mount = bounds(bpy.data.objects[{mount_object!r}])
-print('LANDMARK_MOUNT_AABB '+json.dumps({{'support': support, 'mount': mount}}, sort_keys=True))
+mount_object = bpy.data.objects[{mount_object!r}]
+mount = bounds(mount_object)
+print('LANDMARK_MOUNT_AABB '+json.dumps({{'support': support, 'mount': mount, 'mount_focused_role': mount_object.get('focused_nine_role'), 'mount_landmark_role': mount_object.get('landmark_role')}}, sort_keys=True))
 """
         evidence = subprocess.run(
             [str(BLENDER), "--background", "--factory-startup", "--python-expr", proof],
@@ -764,5 +765,10 @@ print('LANDMARK_MOUNT_AABB '+json.dumps({{'support': support, 'mount': mount}}, 
             if line.startswith("LANDMARK_MOUNT_AABB ")
         )
         aabb = json.loads(line.removeprefix("LANDMARK_MOUNT_AABB "))
-        assert aabb["mount"][1][0] <= aabb["support"][1][1] + 1e-5
-        assert aabb["support"][1][0] <= aabb["mount"][1][1] + 1e-5
+        assert (
+            aabb["mount"][1][0] >= aabb["support"][1][1] - 1e-5
+            or aabb["support"][1][0] >= aabb["mount"][1][1] - 1e-5
+        ), (asset_id, aabb)
+        assert aabb["mount"][1][0] != pytest.approx(aabb["support"][1][0], abs=1e-5)
+        assert aabb["mount_focused_role"] == "mounting_plate"
+        assert aabb["mount_landmark_role"] == "mounting_plate"

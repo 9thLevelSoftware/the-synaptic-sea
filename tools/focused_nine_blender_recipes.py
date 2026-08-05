@@ -91,6 +91,14 @@ TRUST_BOUNDARY_DOCUMENTATION = (
     "path-based open/save. Blender cannot FD-pin a .blend path here, so these "
     "checks do not solve same-user rebind races after those observations."
 )
+# Export collections intentionally remain source-visible. The Godot wrapper is
+# the runtime visibility authority and selects one imported GLB at a time.
+PRESSURE_VARIANT_VISIBILITY_POLICY = "source_visible_wrapper_authority"
+_PRESSURE_LEGACY_VISUAL_RULES: Mapping[str, str] = {
+    "intact": "all pressure-door panels",
+    "damaged": "one cosmetic indicator panel omitted",
+    "breached": "central leaf omitted",
+}
 
 # Blender is deliberately not imported at module import time.
 _BPY: Any | None = None
@@ -1574,8 +1582,22 @@ def _ensure_empty(name: str, root: Any, helpers: Any, role: str) -> Any:
     return empty
 
 
+def _is_owned_pressure_helper_collection(collection: Any) -> bool:
+    return (
+        _collection_property(collection, "focused_nine_generated") is True
+        and _collection_property(collection, "focused_nine_asset_id")
+        == "pressure_door_1x1"
+    )
+
+
 def ensure_structural_helpers(spec: Any, root: Any, helpers: Any) -> dict[str, Any]:
-    """Return target helper collections without rewriting authored metadata."""
+    """Return helper collections, migrating only owned Task 1 pressure rules.
+
+    The Task 1 pressure-door rules were descriptive metadata, not authored
+    geometry.  They are migrated only when the collection carries both
+    generated ownership markers.  An authored or foreign collection with the
+    same stale rule remains a hard failure rather than being silently claimed.
+    """
 
     module_id = getattr(spec, "module_id", "")
     if getattr(root, "name", "") == "ModuleRoot_pressure_door_1x1":
@@ -1620,13 +1642,40 @@ def ensure_structural_helpers(spec: Any, root: Any, helpers: Any) -> dict[str, A
         if created:
             for key, value in expected.items():
                 collection[key] = value
+            if module_id == "pressure_door_1x1":
+                collection["variant_visibility_policy"] = PRESSURE_VARIANT_VISIBILITY_POLICY
         else:
+            owned_pressure = module_id == "pressure_door_1x1" and _is_owned_pressure_helper_collection(collection)
             for key, value in expected.items():
-                if key in collection and collection[key] != value:
+                existing = _collection_property(collection, key)
+                if existing is None:
+                    if key == "variant_visual_rule" and owned_pressure:
+                        collection[key] = value
+                    continue
+                if existing == value:
+                    continue
+                if (
+                    key == "variant_visual_rule"
+                    and owned_pressure
+                    and existing == _PRESSURE_LEGACY_VISUAL_RULES[role]
+                ):
+                    collection[key] = value
+                    continue
+                if key in collection:
                     raise RuntimeError(
                         f"incompatible metadata on existing helper collection {name}: "
-                        f"{key}={collection[key]!r}, expected {value!r}"
+                        f"{key}={existing!r}, expected {value!r}"
                     )
+            if owned_pressure:
+                collection["variant_visibility_policy"] = PRESSURE_VARIANT_VISIBILITY_POLICY
+        if module_id == "pressure_door_1x1" and (
+            bool(getattr(collection, "hide_viewport", False))
+            or bool(getattr(collection, "hide_render", False))
+        ):
+            raise RuntimeError(
+                f"pressure-door helper collection {name} must remain source-visible "
+                f"under {PRESSURE_VARIANT_VISIBILITY_POLICY}; runtime wrapper owns visibility"
+            )
         helper_collections[role] = collection
     return helper_collections
 
@@ -1701,6 +1750,44 @@ def _replace_generated_collection(collection: Any, asset_id: str) -> None:
     _replace_owned_objects(collection, asset_id)
 
 
+def _remove_owned_pressure_foreign_details(
+    root: Any, collections: Iterable[Any]
+) -> None:
+    """Remove doorway recipe remnants only after proving generated ownership.
+
+    Pressure Task 2 sources were initially copied from the doorway recipe.  A
+    doorway object is removable here only when its canonical generated marker,
+    foreign asset id, namespace, and parent root all agree.  Authored objects,
+    differently marked objects, and foreign links outside the selected export
+    namespace are not touched.
+    """
+
+    target_collections = tuple(collections)
+    target_ids = {id(collection) for collection in target_collections}
+    seen: set[int] = set()
+    for collection in target_collections:
+        for obj in list(collection.objects):
+            if id(obj) in seen:
+                continue
+            if not (
+                _object_property(obj, "focused_nine_generated") is True
+                and _object_property(obj, "focused_nine_asset_id")
+                == "doorway_frame_open_1x1"
+                and getattr(obj, "name", "").startswith(
+                    _generated_name("doorway_frame_open_1x1", "")
+                )
+                and any(parent is root for parent in _object_parent_chain(obj))
+            ):
+                continue
+            seen.add(id(obj))
+            for target in target_collections:
+                if id(target) not in target_ids:
+                    continue
+                if obj in list(target.objects):
+                    _unlink_from_collection(target, obj)
+            _remove_owned_object_if_unlinked(obj)
+
+
 def _parent_generated(
     root: Any, objects: Iterable[Any], asset_id: str | None = None
 ) -> None:
@@ -1721,11 +1808,11 @@ def _build_export_variants(
     generated: Sequence[Any],
     export_collections: dict[str, Any],
 ) -> list[Any]:
-    """Link intact visuals and make pressure-door-only variant copies."""
+    """Build deterministic export inventories with one shared pressure base."""
 
-    for obj in generated:
-        _link_existing_object(obj, export_collections["intact"])
     if asset_id != "pressure_door_1x1":
+        for obj in generated:
+            _link_existing_object(obj, export_collections["intact"])
         return list(generated)
 
     portal_width = 2.7
@@ -1740,17 +1827,49 @@ def _build_export_variants(
                 height = max(3.4, float(dimension_z) / 0.78)
             break
     variant_objects: list[Any] = list(generated)
+
+    # These are the only state-specific members of the source recipe.  Every
+    # other generated object is linked (not copied) into every variant export
+    # collection, making the common portal/base silhouette exact by identity
+    # and inventory.  Collection metadata remains the export-role authority.
+    state_specific_tokens = {
+        "split_leaf_left",
+        "cyan_indicator_right",
+        "intact_lock_bar",
+    }
+    shared_base = [
+        obj
+        for obj in generated
+        if not any(obj.name.endswith(f"_{token}") for token in state_specific_tokens)
+    ]
+    for obj in shared_base:
+        for role in ("intact", "damaged", "breached"):
+            _link_existing_object(obj, export_collections[role])
+        obj["variant_role"] = "shared_base"
+        obj["visibility_role"] = "Shared"
+
+    # Intact owns the pristine state-specific objects.  Damaged retains the
+    # left leaf, while breached retains the right indicator; the omitted pieces
+    # are the intended state deltas and never contaminate the shared base.
     for obj in generated:
-        obj["variant_role"] = "intact"
-        obj["visibility_role"] = "Intact"
+        if obj in shared_base:
+            continue
+        if obj.name.endswith(("_split_leaf_left", "_cyan_indicator_right", "_intact_lock_bar")):
+            _link_existing_object(obj, export_collections["intact"])
+            obj["variant_role"] = "intact"
+            obj["visibility_role"] = "Intact"
     for role in ("damaged", "breached"):
         destination = export_collections[role]
         for obj in generated:
-            if role == "damaged" and obj.name.endswith("_cyan_indicator_right"):
+            if obj in shared_base:
                 continue
-            if role == "breached" and obj.name.endswith("_split_leaf_left"):
+            if role == "damaged" and obj.name.endswith(
+                ("_cyan_indicator_right", "_intact_lock_bar")
+            ):
                 continue
-            if role != "intact" and obj.name.endswith("_intact_lock_bar"):
+            if role == "breached" and obj.name.endswith(
+                ("_split_leaf_left", "_intact_lock_bar")
+            ):
                 continue
             copy = obj.copy()
             copy.data = obj.data.copy()
@@ -1872,6 +1991,17 @@ def _report(
             f"generated recipe emitted non-canonical materials for {asset_id}: "
             + ", ".join(material_names)
         )
+    export_visibility = {
+        role: {
+            "hide_viewport": bool(getattr(collection, "hide_viewport", False)),
+            "hide_render": bool(getattr(collection, "hide_render", False)),
+        }
+        for role, collection in (helpers or {}).items()
+    }
+    pressure_helpers = any(
+        _collection_property(collection, "module_id") == "pressure_door_1x1"
+        for collection in (helpers or {}).values()
+    )
     return {
         "asset_id": asset_id,
         "kind": kind,
@@ -1880,6 +2010,10 @@ def _report(
         "generated_count": len(names),
         "triangle_count": _triangle_count(generated),
         "helper_names": helper_names,
+        "export_collection_visibility": export_visibility,
+        "variant_visibility_policy": (
+            PRESSURE_VARIANT_VISIBILITY_POLICY if pressure_helpers else None
+        ),
         "material_names": material_names,
         "modifier_types": modifier_types,
         "boolean_modifiers": [
@@ -1924,6 +2058,11 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         helper_collections = export_collections
         if "intact" not in export_collections:
             raise RuntimeError(f"missing Export_intact collection for {args.asset_id}")
+        if args.asset_id == "pressure_door_1x1":
+            _remove_owned_pressure_foreign_details(
+                root,
+                (geometry, *export_collections.values()),
+            )
         for collection in export_collections.values():
             _replace_generated_collection(collection, args.asset_id)
         generated = build_structural_recipe(args.asset_id, spec, geometry)

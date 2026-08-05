@@ -5,6 +5,7 @@ import ast
 import json
 import os
 import shutil
+import struct
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -349,6 +350,133 @@ def test_existing_helper_metadata_is_untouched_and_incompatible_metadata_fails(
         recipes.ensure_structural_helpers(
             SimpleNamespace(module_id="floor_1x1"),
             SimpleNamespace(name="ModuleRoot_floor_1x1"),
+            helpers,
+        )
+
+
+def test_owned_pressure_helper_legacy_rules_migrate_but_foreign_metadata_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import tools.focused_nine_blender_recipes as recipes
+
+    legacy_rules = {
+        "intact": "all pressure-door panels",
+        "damaged": "one cosmetic indicator panel omitted",
+        "breached": "central leaf omitted",
+    }
+    expected_rules = {
+        "intact": "shared frame rails seals and intact lock bar",
+        "damaged": "shared frame rails seals plus reinforcement and hinge damage",
+        "breached": "shared frame rails seals plus omitted leaf and exposed conduit",
+    }
+    helpers = _FakeCollection("AuthoringHelpers")
+    owned = []
+    for role, legacy_rule in legacy_rules.items():
+        collection = _FakeCollection(f"Export_{role}")
+        collection["variant_role"] = role
+        collection["module_id"] = "pressure_door_1x1"
+        collection["variant_visual_rule"] = legacy_rule
+        collection["focused_nine_generated"] = True
+        collection["focused_nine_asset_id"] = "pressure_door_1x1"
+        helpers.children.append(collection)
+        owned.append(collection)
+    collections = _FakeCollections([helpers, *owned])
+    monkeypatch.setattr(
+        recipes,
+        "_BPY",
+        SimpleNamespace(data=SimpleNamespace(collections=collections)),
+    )
+
+    result = recipes.ensure_structural_helpers(
+        SimpleNamespace(module_id="pressure_door_1x1"),
+        SimpleNamespace(name="ModuleRoot_pressure_door_1x1"),
+        helpers,
+    )
+    assert set(result) == {"intact", "damaged", "breached"}
+    assert {
+        role: collection["variant_visual_rule"]
+        for role, collection in result.items()
+    } == expected_rules
+
+    # Migration must be idempotent on the second Task 2 invocation.
+    assert recipes.ensure_structural_helpers(
+        SimpleNamespace(module_id="pressure_door_1x1"),
+        SimpleNamespace(name="ModuleRoot_pressure_door_1x1"),
+        helpers,
+    ) == result
+
+    foreign = _FakeCollection("Export_intact")
+    foreign["variant_role"] = "intact"
+    foreign["module_id"] = "pressure_door_1x1"
+    foreign["variant_visual_rule"] = legacy_rules["intact"]
+    foreign_helpers = _FakeCollection("AuthoringHelpers")
+    foreign_helpers.children.append(foreign)
+    monkeypatch.setattr(
+        recipes,
+        "_BPY",
+        SimpleNamespace(
+            data=SimpleNamespace(collections=_FakeCollections([foreign_helpers, foreign]))
+        ),
+    )
+    with pytest.raises(RuntimeError, match="incompatible metadata"):
+        recipes.ensure_structural_helpers(
+            SimpleNamespace(module_id="pressure_door_1x1"),
+            SimpleNamespace(name="ModuleRoot_pressure_door_1x1"),
+            foreign_helpers,
+        )
+
+    unknown = _FakeCollection("Export_intact")
+    unknown["variant_role"] = "intact"
+    unknown["module_id"] = "pressure_door_1x1"
+    unknown["variant_visual_rule"] = "unknown pressure migration rule"
+    unknown["focused_nine_generated"] = True
+    unknown["focused_nine_asset_id"] = "pressure_door_1x1"
+    unknown_helpers = _FakeCollection("AuthoringHelpers")
+    unknown_helpers.children.append(unknown)
+    monkeypatch.setattr(
+        recipes,
+        "_BPY",
+        SimpleNamespace(
+            data=SimpleNamespace(collections=_FakeCollections([unknown_helpers, unknown]))
+        ),
+    )
+    with pytest.raises(RuntimeError, match="incompatible metadata"):
+        recipes.ensure_structural_helpers(
+            SimpleNamespace(module_id="pressure_door_1x1"),
+            SimpleNamespace(name="ModuleRoot_pressure_door_1x1"),
+            unknown_helpers,
+        )
+
+
+def test_pressure_export_collections_preserve_source_visibility_for_wrapper_authority(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import tools.focused_nine_blender_recipes as recipes
+
+    helpers = _FakeCollection("AuthoringHelpers")
+    collections = []
+    for role in ("intact", "damaged", "breached"):
+        collection = _FakeCollection(f"Export_{role}")
+        collection["variant_role"] = role
+        collection["module_id"] = "pressure_door_1x1"
+        collection["variant_visual_rule"] = {
+            "intact": "shared frame rails seals and intact lock bar",
+            "damaged": "shared frame rails seals plus reinforcement and hinge damage",
+            "breached": "shared frame rails seals plus omitted leaf and exposed conduit",
+        }[role]
+        helpers.children.append(collection)
+        collections.append(collection)
+    collections[1].hide_viewport = True
+    monkeypatch.setattr(
+        recipes,
+        "_BPY",
+        SimpleNamespace(data=SimpleNamespace(collections=_FakeCollections([helpers, *collections]))),
+    )
+
+    with pytest.raises(RuntimeError, match="source-visible"):
+        recipes.ensure_structural_helpers(
+            SimpleNamespace(module_id="pressure_door_1x1"),
+            SimpleNamespace(name="ModuleRoot_pressure_door_1x1"),
             helpers,
         )
 
@@ -885,15 +1013,31 @@ def test_blender_pressure_door_landmark_roles_are_distinct_and_idempotent(tmp_pa
     pressure_glb.parent.mkdir(parents=True)
     shutil.copy2(PRESSURE_CANDIDATE_CONTRACT_FIXTURE, pressure_contract)
     shutil.copy2(PRESSURE_GLB_FIXTURE, pressure_glb)
-    prepare_pressure_source_expr = (
-        "import bpy; "
-        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
-        "root=bpy.data.objects.get('ModuleRoot_doorway_frame_open_1x1'); "
-        "assert root is not None; root.name='ModuleRoot_pressure_door_1x1'; "
-        "intact=bpy.data.collections.get('Export_intact'); "
-        "assert intact is not None; intact['module_id']='pressure_door_1x1'; "
-        f"bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})"
-    )
+    prepare_pressure_source_expr = f"""
+import bpy
+bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r})
+root = bpy.data.objects.get('ModuleRoot_doorway_frame_open_1x1')
+assert root is not None
+root.name = 'ModuleRoot_pressure_door_1x1'
+helpers = bpy.data.collections.get('AuthoringHelpers')
+assert helpers is not None
+legacy_rules = {{
+    'intact': 'all pressure-door panels',
+    'damaged': 'one cosmetic indicator panel omitted',
+    'breached': 'central leaf omitted',
+}}
+for role, rule in legacy_rules.items():
+    collection = bpy.data.collections.get('Export_' + role)
+    if collection is None:
+        collection = bpy.data.collections.new('Export_' + role)
+        helpers.children.link(collection)
+    collection['module_id'] = 'pressure_door_1x1'
+    collection['variant_role'] = role
+    collection['variant_visual_rule'] = rule
+    collection['focused_nine_generated'] = True
+    collection['focused_nine_asset_id'] = 'pressure_door_1x1'
+bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})
+"""
     prepared = subprocess.run(
         [str(BLENDER), "--background", "--factory-startup", "--python-expr", prepare_pressure_source_expr],
         capture_output=True,
@@ -940,6 +1084,12 @@ def test_blender_pressure_door_landmark_roles_are_distinct_and_idempotent(tmp_pa
         "Export_damaged",
         "Export_intact",
     ]
+    assert first_report["variant_visibility_policy"] == "source_visible_wrapper_authority"
+    assert first_report["export_collection_visibility"] == {
+        "intact": {"hide_viewport": False, "hide_render": False},
+        "damaged": {"hide_viewport": False, "hide_render": False},
+        "breached": {"hide_viewport": False, "hide_render": False},
+    }
     damaged = {name for name in names if name.startswith(prefix + "damaged_")}
     breached = {name for name in names if name.startswith(prefix + "breached_")}
     assert damaged and breached and damaged != breached
@@ -950,10 +1100,85 @@ def test_blender_pressure_door_landmark_roles_are_distinct_and_idempotent(tmp_pa
     assert first_report["boolean_modifiers"] == []
     assert "BOOLEAN" not in first_report["modifier_types"]
     assert first_report["triangle_count"] > 0
+
+    role_probe = """
+import bpy
+import json
+bpy.ops.wm.open_mainfile(filepath={source!r})
+roles = {{
+    name: (bpy.data.objects[name].get('focused_nine_role'), bpy.data.objects[name].get('landmark_role'))
+    for name in (
+        'FocusedNine_pressure_door_1x1_shared_frame_left',
+        'FocusedNine_pressure_door_1x1_shared_rail_left',
+        'FocusedNine_pressure_door_1x1_seal_left',
+        'FocusedNine_pressure_door_1x1_intact_lock_bar',
+    )
+}}
+print('PRESSURE_ROLE_PROOF '+json.dumps(roles, sort_keys=True))
+""".format(source=str(source_blend))
+    role_result = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", role_probe],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert role_result.returncode == 0, role_result.stdout + role_result.stderr
+    role_line = next(
+        line for line in role_result.stdout.splitlines() if line.startswith("PRESSURE_ROLE_PROOF ")
+    )
+    assert json.loads(role_line.removeprefix("PRESSURE_ROLE_PROOF ")) == {
+        "FocusedNine_pressure_door_1x1_intact_lock_bar": ["Intact", "Intact"],
+        "FocusedNine_pressure_door_1x1_seal_left": ["seal", "seal"],
+        "FocusedNine_pressure_door_1x1_shared_frame_left": ["shared_frame", "shared_frame"],
+        "FocusedNine_pressure_door_1x1_shared_rail_left": ["shared_rail", "shared_rail"],
+    }
     assert PRESSURE_SOURCE_FIXTURE.read_bytes() == pressure_fixture_bytes
     assert PRESSURE_CONTRACT_FIXTURE.read_bytes() == pressure_contract_bytes
     assert PRESSURE_GLB_FIXTURE.read_bytes() == pressure_glb_bytes
     assert MATERIAL_FIXTURE.read_bytes() == material_fixture_bytes
+
+    exported = _export_structural_variants_for_evidence(
+        source=source_blend,
+        asset_id="pressure_door_1x1",
+        destination=tmp_path / "exports",
+    )
+    inventories = {role: _glb_node_inventory(path) for role, path in exported.items()}
+    assert all(
+        not any("FocusedNine_doorway_frame_open_1x1_" in name for name in names)
+        for names in inventories.values()
+    )
+    common_base = set.intersection(*inventories.values())
+    assert common_base == {
+        "FocusedNine_pressure_door_1x1_outer_portal_left",
+        "FocusedNine_pressure_door_1x1_outer_portal_right",
+        "FocusedNine_pressure_door_1x1_outer_portal_lintel",
+        "FocusedNine_pressure_door_1x1_motor_housing",
+        "FocusedNine_pressure_door_1x1_warning_threshold",
+        "FocusedNine_pressure_door_1x1_cyan_indicator_left",
+        "FocusedNine_pressure_door_1x1_split_leaf_right",
+        "FocusedNine_pressure_door_1x1_shared_frame_left",
+        "FocusedNine_pressure_door_1x1_shared_frame_right",
+        "FocusedNine_pressure_door_1x1_shared_rail_left",
+        "FocusedNine_pressure_door_1x1_shared_rail_right",
+        "FocusedNine_pressure_door_1x1_seal_left",
+        "FocusedNine_pressure_door_1x1_seal_right",
+    }
+    assert inventories["intact"] - common_base == {
+        "FocusedNine_pressure_door_1x1_split_leaf_left",
+        "FocusedNine_pressure_door_1x1_cyan_indicator_right",
+        "FocusedNine_pressure_door_1x1_intact_lock_bar",
+    }
+    assert inventories["damaged"] - common_base == {
+        "FocusedNine_pressure_door_1x1_damaged_split_leaf_left",
+        "FocusedNine_pressure_door_1x1_damaged_reinforcement",
+        "FocusedNine_pressure_door_1x1_damaged_hinge_block",
+    }
+    assert inventories["breached"] - common_base == {
+        "FocusedNine_pressure_door_1x1_breached_cyan_indicator_right",
+        "FocusedNine_pressure_door_1x1_breached_void_marker",
+        "FocusedNine_pressure_door_1x1_breached_exposed_conduit",
+    }
 
 
 def test_blender_prop_recipe_is_idempotent_with_exact_library_material_names(
@@ -1262,6 +1487,58 @@ def _export_recipe_result_for_evidence(
     output = destination / f"{asset_id}.glb"
     assert output.is_file() and output.stat().st_size > 0
     return output
+
+
+def _export_structural_variants_for_evidence(
+    *, source: Path, asset_id: str, destination: Path
+) -> dict[str, Path]:
+    destination.mkdir(parents=True, exist_ok=True)
+    command = [
+        str(BLENDER),
+        "--background",
+        "--factory-startup",
+        "--python",
+        str(PROJECT_ROOT / "tools/export_structural_glb.py"),
+        "--",
+        "--blend-path",
+        str(source),
+        "--staging-dir",
+        str(destination),
+        "--module",
+        asset_id,
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr
+    outputs = {
+        "intact": destination / f"{asset_id}.glb",
+        "damaged": destination / f"{asset_id}_damaged.glb",
+        "breached": destination / f"{asset_id}_breached.glb",
+    }
+    assert all(path.is_file() and path.stat().st_size > 0 for path in outputs.values())
+    return outputs
+
+
+def _glb_node_inventory(path: Path) -> set[str]:
+    payload = path.read_bytes()
+    assert payload[:4] == b"glTF"
+    _version, total_length = struct.unpack_from("<II", payload, 4)
+    assert total_length == len(payload)
+    offset = 12
+    document: dict[str, object] | None = None
+    while offset < len(payload):
+        chunk_length, chunk_type = struct.unpack_from("<I4s", payload, offset)
+        chunk = payload[offset + 8 : offset + 8 + chunk_length]
+        if chunk_type == b"JSON":
+            document = json.loads(chunk.rstrip(b" \t\r\n\x00"))
+        offset += 8 + chunk_length
+    assert document is not None
+    nodes = document.get("nodes", [])
+    assert isinstance(nodes, list)
+    return {
+        str(node["name"])
+        for node in nodes
+        if isinstance(node, dict) and isinstance(node.get("name"), str)
+    }
 
 
 def test_blender_under_budget_recipes_meet_gameplay_evidence_minima(tmp_path: Path) -> None:
