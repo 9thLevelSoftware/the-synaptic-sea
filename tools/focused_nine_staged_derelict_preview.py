@@ -31,17 +31,14 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 try:
-    from tools import focused_nine_airlock_control_room_preview as room_preview
     from tools import focused_nine_batch as batch
     from tools import focused_nine_contract as contract
     from tools import focused_nine_staged_props as staged_props
     from tools import focused_nine_staged_structural as staged_structural
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from tools import focused_nine_airlock_control_room_preview as room_preview
     from tools import focused_nine_batch as batch
     from tools import focused_nine_contract as contract
     from tools import focused_nine_staged_props as staged_props
