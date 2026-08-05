@@ -21,9 +21,23 @@ from tools.focused_nine_staged_props import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+BLENDER = Path("/opt/homebrew/bin/blender")
 FIXTURE_GLB = PROJECT_ROOT / "assets/imported/props/components/reactor_console.glb"
 STAGING_RELATIVE = Path("assets/_staging/focused_nine/props")
 ASSET_IDS = ("fire_suppression_station", "hull_breach_seal_point")
+MATERIAL_FIXTURE = Path(
+    "/Volumes/Untitled/SynapticSeaAssets/meshes/source/materials/salvage_industrial.blend"
+)
+LANDMARK_SOURCE_FIXTURES = {
+    "hull_breach_seal_point": Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshes/source/props/"
+        "hull_breach_seal_point.blend"
+    ),
+    "fire_suppression_station": Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshes/source/props/"
+        "fire_suppression_station.blend"
+    ),
+}
 
 
 @pytest.fixture
@@ -658,3 +672,97 @@ def test_cli_preserves_existing_output_when_validation_fails(
     assert "focused-nine staging" in result.stderr
     assert output.read_bytes() == original
     assert not list(output.parent.glob(f".{output.name}.*.tmp"))
+
+
+def test_landmark_prop_mounts_contact_supporting_faces_in_real_blender_aabb_fixture(
+    tmp_path: Path,
+) -> None:
+    for candidate in (BLENDER, MATERIAL_FIXTURE, *LANDMARK_SOURCE_FIXTURES.values()):
+        if not candidate.is_file():
+            pytest.fail(f"fixture missing: {candidate}")
+
+    structural_root = tmp_path / "structural"
+    structural_root.mkdir()
+    props_root = tmp_path / "props"
+    props_root.mkdir()
+    material_dir = tmp_path / "materials"
+    material_dir.mkdir()
+    shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+
+    for asset_id, fixture in LANDMARK_SOURCE_FIXTURES.items():
+        source = props_root / f"{asset_id}.blend"
+        shutil.copy2(fixture, source)
+        material_free = (
+            "import bpy; "
+            f"bpy.ops.wm.open_mainfile(filepath={str(source)!r}); "
+            "[obj.data.materials.clear() for obj in bpy.data.objects if obj.type == 'MESH']; "
+            "[bpy.data.materials.remove(material) for material in list(bpy.data.materials)]; "
+            f"result=bpy.ops.wm.save_as_mainfile(filepath={str(source)!r}); "
+            "assert 'FINISHED' in result"
+        )
+        prepared = subprocess.run(
+            [str(BLENDER), "--background", "--factory-startup", "--python-expr", material_free],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+        assert prepared.returncode == 0, prepared.stdout + prepared.stderr
+        command = [
+            str(BLENDER),
+            "--background",
+            "--factory-startup",
+            "--python",
+            str(PROJECT_ROOT / "tools/focused_nine_blender_recipes.py"),
+            "--",
+            "--project-root",
+            str(PROJECT_ROOT),
+            "--structural-source-root",
+            str(structural_root),
+            "--props-source-root",
+            str(props_root),
+            "--asset-id",
+            asset_id,
+            "--overwrite-generated-only",
+        ]
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+            env={**os.environ, "FOCUSED_NINE_MATERIAL_LIBRARY": str(MATERIAL_FIXTURE)},
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+
+        supporting_name = "orange_face" if asset_id == "hull_breach_seal_point" else "red_cabinet"
+        support_object = f"FocusedNine_{asset_id}_{supporting_name}"
+        mount_object = f"FocusedNine_{asset_id}_mounting_plate"
+        proof = f"""
+import bpy
+import json
+from mathutils import Vector
+bpy.ops.wm.open_mainfile(filepath={str(source)!r})
+def bounds(obj):
+    points = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
+    return [[min(point[index] for point in points), max(point[index] for point in points)] for index in range(3)]
+support = bounds(bpy.data.objects[{support_object!r}])
+mount = bounds(bpy.data.objects[{mount_object!r}])
+print('LANDMARK_MOUNT_AABB '+json.dumps({{'support': support, 'mount': mount}}, sort_keys=True))
+"""
+        evidence = subprocess.run(
+            [str(BLENDER), "--background", "--factory-startup", "--python-expr", proof],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+        assert evidence.returncode == 0, evidence.stdout + evidence.stderr
+        line = next(
+            line
+            for line in evidence.stdout.splitlines()
+            if line.startswith("LANDMARK_MOUNT_AABB ")
+        )
+        aabb = json.loads(line.removeprefix("LANDMARK_MOUNT_AABB "))
+        assert aabb["mount"][1][0] <= aabb["support"][1][1] + 1e-5
+        assert aabb["support"][1][0] <= aabb["mount"][1][1] + 1e-5

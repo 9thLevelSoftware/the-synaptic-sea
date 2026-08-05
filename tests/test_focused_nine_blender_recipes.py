@@ -846,7 +846,7 @@ def test_blender_floor_recipe_emits_exact_material_names_and_exports(tmp_path: P
     assert all("." not in name for name in evidence["material_names"])
 
 
-def test_blender_pressure_door_roles_are_distinct_and_idempotent(tmp_path: Path) -> None:
+def test_blender_pressure_door_landmark_roles_are_distinct_and_idempotent(tmp_path: Path) -> None:
     for fixture in (
         BLENDER,
         PRESSURE_SOURCE_FIXTURE,
@@ -923,6 +923,18 @@ def test_blender_pressure_door_roles_are_distinct_and_idempotent(tmp_path: Path)
     assert names
     assert all(name.startswith(prefix) for name in names)
     assert first_report["generated_count"] == len(names)
+    for token in (
+        "shared_frame_left",
+        "shared_frame_right",
+        "shared_rail_left",
+        "shared_rail_right",
+        "seal_left",
+        "seal_right",
+        "intact_lock_bar",
+        "damaged_reinforcement",
+        "breached_void_marker",
+    ):
+        assert any(token in name for name in names), (token, names)
     assert first_report["helper_names"] == [
         "Export_breached",
         "Export_damaged",
@@ -1668,3 +1680,100 @@ print('WALL_FRAME_PROOF '+json.dumps({{'frame_names':[obj.name for obj in frames
             and frame[2][0] < panel_xz[1][1]
             and panel_xz[1][0] < frame[2][1]
         ), (frame, panel_xz)
+
+
+@pytest.mark.parametrize(
+    ("asset_id", "fixture", "kind", "tokens"),
+    [
+        (
+            "doorway_frame_open_1x1",
+            Path(
+                "/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/"
+                "doorway_frame_open_1x1/doorway_frame_open_1x1.blend"
+            ),
+            "structural",
+            (
+                "frame_inner_left",
+                "frame_inner_right",
+                "mechanical_rail_left",
+                "mechanical_rail_right",
+                "seal_left",
+                "seal_right",
+                "threshold_rail",
+                "threshold_seal",
+            ),
+        ),
+        (
+            "hull_breach_seal_point",
+            Path(
+                "/Volumes/Untitled/SynapticSeaAssets/meshes/source/props/"
+                "hull_breach_seal_point.blend"
+            ),
+            "prop",
+            ("mounting_plate", "hose", "cable", "status"),
+        ),
+        (
+            "fire_suppression_station",
+            Path(
+                "/Volumes/Untitled/SynapticSeaAssets/meshes/source/props/"
+                "fire_suppression_station.blend"
+            ),
+            "prop",
+            ("mounting_plate", "handle", "hose", "cable", "indicator"),
+        ),
+    ],
+)
+def test_landmark_recipes_emit_deterministic_role_inventories_and_canonical_materials(
+    tmp_path: Path,
+    asset_id: str,
+    fixture: Path,
+    kind: str,
+    tokens: tuple[str, ...],
+) -> None:
+    for candidate in (BLENDER, fixture, MATERIAL_FIXTURE):
+        if not candidate.is_file():
+            pytest.fail(f"fixture missing: {candidate}")
+
+    structural_root = tmp_path / "structural"
+    props_root = tmp_path / "props"
+    if kind == "structural":
+        source_dir = structural_root / asset_id
+        source_dir.mkdir(parents=True)
+        source = source_dir / f"{asset_id}.blend"
+    else:
+        structural_root.mkdir(parents=True)
+        props_root.mkdir(parents=True)
+        source = props_root / f"{asset_id}.blend"
+    shutil.copy2(fixture, source)
+    _prepare_material_free_source(source)
+    material_dir = tmp_path / "materials"
+    material_dir.mkdir()
+    shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+
+    command = _recipe_command(
+        project_root=PROJECT_ROOT,
+        structural_root=structural_root,
+        props_root=props_root,
+        asset_id=asset_id,
+    )
+    first = _recipe_with_external_material_library(command)
+    second = _recipe_with_external_material_library(command)
+    assert first.returncode == 0, first.stdout + first.stderr
+    assert second.returncode == 0, second.stdout + second.stderr
+    first_report, first_line = _report_from_stdout(first.stdout)
+    second_report, second_line = _report_from_stdout(second.stdout)
+    names = first_report["generated_object_names"]
+
+    assert first_report == second_report
+    assert first_line == second_line
+    assert names and len(names) == len(set(names))
+    assert all(name.startswith(f"FocusedNine_{asset_id}_") for name in names)
+    for token in tokens:
+        assert any(token in name for name in names), (asset_id, token, names)
+    assert first_report["material_names"]
+    assert set(first_report["material_names"]).issubset(
+        {"MAT_PaintedAlloyGray", "MAT_WarningStripe", "MAT_ReactorGlow", "MAT_Conduit"}
+    )
+    assert all("." not in name for name in first_report["material_names"])
+    assert first_report["boolean_modifiers"] == []
+    assert "BOOLEAN" not in first_report["modifier_types"]

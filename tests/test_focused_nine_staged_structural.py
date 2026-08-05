@@ -236,6 +236,27 @@ def test_wrapper_uses_only_overlay_canonical_import_paths_and_contract_anchors()
         assert f'name="{anchor}"' in scene
 
 
+def test_landmark_pressure_wrapper_defaults_to_exact_intact_role_visibility() -> None:
+    scene = (PROJECT_ROOT / STAGED_PACKAGE / f"{ASSET_ID}.tscn").read_text(
+        encoding="utf-8"
+    )
+    assert 'name="VisualInstance_Intact" parent="Visual" ' in scene
+    assert 'name="VisualInstance_Damaged" parent="Visual" ' in scene
+    assert 'name="VisualInstance_Breached" parent="Visual" ' in scene
+    assert (
+        'name="VisualInstance_Intact" parent="Visual" '
+        'instance=ExtResource("1_visual_intact")]\nvisible = true'
+    ) in scene
+    assert (
+        'name="VisualInstance_Damaged" parent="Visual" '
+        'instance=ExtResource("2_visual_damaged")]\nvisible = false'
+    ) in scene
+    assert (
+        'name="VisualInstance_Breached" parent="Visual" '
+        'instance=ExtResource("3_visual_breached")]\nvisible = false'
+    ) in scene
+
+
 def test_bad_ext_resource_is_rejected_without_touching_live_project(
     tmp_path: Path,
 ) -> None:

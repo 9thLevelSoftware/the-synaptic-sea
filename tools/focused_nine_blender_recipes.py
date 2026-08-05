@@ -52,6 +52,37 @@ REQUIRED_MATERIAL_NAMES: tuple[str, ...] = (
     "MAT_ReactorGlow",
     "MAT_Conduit",
 )
+LANDMARK_ROLE_TOKENS: Mapping[str, tuple[str, ...]] = {
+    "doorway_frame_open_1x1": (
+        "frame_inner_left",
+        "frame_inner_right",
+        "mechanical_rail_left",
+        "mechanical_rail_right",
+        "seal_left",
+        "seal_right",
+        "threshold_rail",
+        "threshold_seal",
+    ),
+    "pressure_door_1x1": (
+        "shared_frame_left",
+        "shared_frame_right",
+        "shared_rail_left",
+        "shared_rail_right",
+        "seal_left",
+        "seal_right",
+        "intact_lock_bar",
+        "damaged_reinforcement",
+        "breached_void_marker",
+    ),
+    "hull_breach_seal_point": ("mounting_plate", "hose", "cable", "status"),
+    "fire_suppression_station": (
+        "mounting_plate",
+        "handle",
+        "hose",
+        "cable",
+        "indicator",
+    ),
+}
 _GENERATED_PREFIX = "FocusedNine_"
 _MATERIAL_LIBRARY_NAME = "salvage_industrial.blend"
 TRUST_BOUNDARY_DOCUMENTATION = (
@@ -644,6 +675,14 @@ def _mark_generated(obj: Any, asset_id: str) -> None:
     obj["focused_nine_asset_id"] = asset_id
 
 
+def _mark_landmark_role(obj: Any, role: str) -> Any:
+    """Attach a stable semantic role to a generated landmark object."""
+
+    obj["focused_nine_role"] = role
+    obj["landmark_role"] = role
+    return obj
+
+
 def _activate_only(obj: Any) -> None:
     """Select only a newly created object without touching scene contents."""
 
@@ -895,6 +934,105 @@ def _add_doorway_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
         _box(asset_id, "indicator_bay_right", collection, (0.12, 0.48, 0.26), (opening_width / 2 + 0.2, -0.26, jamb_height - 0.5), "MAT_ReactorGlow", bevel_width=0.015),
         _box(asset_id, "threshold", collection, (opening_width + 0.72, 0.65, 0.12), (0, 0, 0.06), "MAT_WarningStripe", bevel_width=0.02),
     ]
+    inner_frame_x = opening_width / 2 - 0.06
+    objects.extend(
+        (
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "frame_inner_left",
+                    collection,
+                    (0.16, 0.12, jamb_height * 0.76),
+                    (-inner_frame_x, -0.18, jamb_height * 0.42),
+                    "MAT_PaintedAlloyGray",
+                    bevel_width=0.018,
+                ),
+                "frame",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "frame_inner_right",
+                    collection,
+                    (0.16, 0.12, jamb_height * 0.76),
+                    (inner_frame_x, -0.18, jamb_height * 0.42),
+                    "MAT_PaintedAlloyGray",
+                    bevel_width=0.018,
+                ),
+                "frame",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "mechanical_rail_left",
+                    collection,
+                    (0.09, 0.09, jamb_height * 0.7),
+                    (-opening_width / 2 - 0.1, -0.29, jamb_height * 0.4),
+                    "MAT_Conduit",
+                    bevel_width=0.012,
+                ),
+                "rail",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "mechanical_rail_right",
+                    collection,
+                    (0.09, 0.09, jamb_height * 0.7),
+                    (opening_width / 2 + 0.1, -0.29, jamb_height * 0.4),
+                    "MAT_Conduit",
+                    bevel_width=0.012,
+                ),
+                "rail",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "seal_left",
+                    collection,
+                    (0.06, 0.07, jamb_height * 0.66),
+                    (-opening_width / 2 + 0.02, -0.34, jamb_height * 0.4),
+                    "MAT_WarningStripe",
+                ),
+                "seal",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "seal_right",
+                    collection,
+                    (0.06, 0.07, jamb_height * 0.66),
+                    (opening_width / 2 - 0.02, -0.34, jamb_height * 0.4),
+                    "MAT_WarningStripe",
+                ),
+                "seal",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "threshold_rail",
+                    collection,
+                    (opening_width + 0.22, 0.1, 0.07),
+                    (0, 0.27, 0.17),
+                    "MAT_Conduit",
+                    bevel_width=0.012,
+                ),
+                "threshold",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "threshold_seal",
+                    collection,
+                    (opening_width, 0.06, 0.05),
+                    (0, -0.25, 0.17),
+                    "MAT_WarningStripe",
+                    bevel_width=0.008,
+                ),
+                "threshold",
+            ),
+        )
+    )
     for side, x in (("left", -opening_width / 2 - 0.2), ("right", opening_width / 2 + 0.2)):
         for segment_index, z in enumerate((jamb_height * 0.28, jamb_height * 0.5, jamb_height * 0.72)):
             objects.append(
@@ -1082,6 +1220,94 @@ def _add_pressure_door_recipe(asset_id: str, spec: Any, collection: Any) -> list
         _box(asset_id, "cyan_indicator_left", collection, (0.09, 0.12, 0.3), (-portal_width / 2 - 0.28, -0.31, height - 0.62), "MAT_ReactorGlow", bevel_width=0.01),
         _box(asset_id, "cyan_indicator_right", collection, (0.09, 0.12, 0.3), (portal_width / 2 + 0.28, -0.31, height - 0.62), "MAT_ReactorGlow", bevel_width=0.01),
     ]
+    frame_x = portal_width / 2 + 0.28
+    inner_x = portal_width / 2 - 0.08
+    objects.extend(
+        (
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "shared_frame_left",
+                    collection,
+                    (0.16, 0.1, height * 0.8),
+                    (-frame_x, -0.28, height * 0.45),
+                    "MAT_PaintedAlloyGray",
+                    bevel_width=0.014,
+                ),
+                "shared_frame",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "shared_frame_right",
+                    collection,
+                    (0.16, 0.1, height * 0.8),
+                    (frame_x, -0.28, height * 0.45),
+                    "MAT_PaintedAlloyGray",
+                    bevel_width=0.014,
+                ),
+                "shared_frame",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "shared_rail_left",
+                    collection,
+                    (0.09, 0.1, height * 0.7),
+                    (-inner_x, -0.2, height * 0.43),
+                    "MAT_Conduit",
+                    bevel_width=0.012,
+                ),
+                "shared_rail",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "shared_rail_right",
+                    collection,
+                    (0.09, 0.1, height * 0.7),
+                    (inner_x, -0.2, height * 0.43),
+                    "MAT_Conduit",
+                    bevel_width=0.012,
+                ),
+                "shared_rail",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "seal_left",
+                    collection,
+                    (0.06, 0.08, height * 0.68),
+                    (-inner_x, -0.27, height * 0.43),
+                    "MAT_WarningStripe",
+                ),
+                "seal",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "seal_right",
+                    collection,
+                    (0.06, 0.08, height * 0.68),
+                    (inner_x, -0.27, height * 0.43),
+                    "MAT_WarningStripe",
+                ),
+                "seal",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "intact_lock_bar",
+                    collection,
+                    (portal_width * 0.62, 0.08, 0.1),
+                    (0, -0.2, height * 0.44),
+                    "MAT_ReactorGlow",
+                    bevel_width=0.012,
+                ),
+                "Intact",
+            ),
+        )
+    )
     return objects
 
 
@@ -1111,6 +1337,71 @@ def _add_hull_breach_prop(asset_id: str, collection: Any) -> list[Any]:
         _box(asset_id, "orange_face", collection, (1.45, 0.14, 0.72), (0, -0.08, 0), "MAT_WarningStripe", bevel_width=0.025),
         _box(asset_id, "conduit", collection, (0.13, 0.35, 1.65), (0.72, -0.16, 0), "MAT_Conduit", bevel_width=0.015),
     ]
+    objects.extend(
+        (
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "mounting_plate",
+                    collection,
+                    (1.72, 0.18, 1.76),
+                    (0, 0.08, 0),
+                    "MAT_PaintedAlloyGray",
+                    bevel_width=0.018,
+                ),
+                "mounting_plate",
+            ),
+            _mark_landmark_role(
+                _cylinder(
+                    asset_id,
+                    "hose_vertical",
+                    collection,
+                    0.07,
+                    1.18,
+                    (-0.62, -0.22, 0),
+                    "MAT_Conduit",
+                    vertices=12,
+                ),
+                "hose",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "cable_run",
+                    collection,
+                    (0.07, 0.08, 1.48),
+                    (0.84, -0.22, 0),
+                    "MAT_Conduit",
+                    bevel_width=0.012,
+                ),
+                "cable",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "status_indicator",
+                    collection,
+                    (0.22, 0.08, 0.16),
+                    (-0.62, -0.24, 0.78),
+                    "MAT_ReactorGlow",
+                    bevel_width=0.012,
+                ),
+                "status",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "status_warning",
+                    collection,
+                    (0.22, 0.08, 0.12),
+                    (-0.62, -0.24, -0.78),
+                    "MAT_WarningStripe",
+                    bevel_width=0.01,
+                ),
+                "status",
+            ),
+        )
+    )
     for index, (x, z) in enumerate(((-0.72, -0.72), (0.72, -0.72), (-0.72, 0.72), (0.72, 0.72))):
         objects.append(_box(asset_id, f"clamp_arm_{index:02d}", collection, (0.14, 0.32, 0.72), (x, 0, z), "MAT_Conduit", bevel_width=0.015))
     return objects
@@ -1125,6 +1416,104 @@ def _add_fire_station_prop(asset_id: str, collection: Any) -> list[Any]:
     ]
     objects[-1]["label_shape"] = "emergency_service_panel"
     objects[-1]["text_mesh"] = False
+    objects.extend(
+        (
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "mounting_plate",
+                    collection,
+                    (0.96, 0.06, 1.58),
+                    (0, -0.24, 0.9),
+                    "MAT_PaintedAlloyGray",
+                    bevel_width=0.015,
+                ),
+                "mounting_plate",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "handle_bar",
+                    collection,
+                    (0.34, 0.05, 0.06),
+                    (0, -0.35, 1.18),
+                    "MAT_PaintedAlloyGray",
+                    bevel_width=0.012,
+                ),
+                "handle",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "handle_mount_left",
+                    collection,
+                    (0.06, 0.06, 0.12),
+                    (-0.17, -0.34, 1.18),
+                    "MAT_Conduit",
+                ),
+                "handle",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "handle_mount_right",
+                    collection,
+                    (0.06, 0.06, 0.12),
+                    (0.17, -0.34, 1.18),
+                    "MAT_Conduit",
+                ),
+                "handle",
+            ),
+            _mark_landmark_role(
+                _cylinder(
+                    asset_id,
+                    "hose_drop",
+                    collection,
+                    0.05,
+                    0.72,
+                    (0.34, -0.35, 0.62),
+                    "MAT_Conduit",
+                    vertices=12,
+                ),
+                "hose",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "cable_run",
+                    collection,
+                    (0.06, 0.05, 0.78),
+                    (-0.42, -0.34, 0.9),
+                    "MAT_Conduit",
+                ),
+                "cable",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "status_indicator_amber",
+                    collection,
+                    (0.18, 0.05, 0.14),
+                    (0, -0.35, 1.56),
+                    "MAT_ReactorGlow",
+                    bevel_width=0.012,
+                ),
+                "indicator",
+            ),
+            _mark_landmark_role(
+                _box(
+                    asset_id,
+                    "status_indicator_fault",
+                    collection,
+                    (0.12, 0.05, 0.08),
+                    (0.31, -0.35, 1.56),
+                    "MAT_WarningStripe",
+                    bevel_width=0.008,
+                ),
+                "indicator",
+            ),
+        )
+    )
     objects.extend(
         (
             _box(asset_id, "cabinet_seam_left", collection, (0.025, 0.045, 1.42), (-0.34, -0.235, 0.9), "MAT_Conduit"),
@@ -1197,9 +1586,9 @@ def ensure_structural_helpers(spec: Any, root: Any, helpers: Any) -> dict[str, A
         else ("intact",)
     )
     visual_rules = {
-        "intact": "all pressure-door panels",
-        "damaged": "one cosmetic indicator panel omitted",
-        "breached": "central leaf omitted",
+        "intact": "shared frame rails seals and intact lock bar",
+        "damaged": "shared frame rails seals plus reinforcement and hinge damage",
+        "breached": "shared frame rails seals plus omitted leaf and exposed conduit",
     }
     bpy = _require_bpy()
     helper_collections: dict[str, Any] = {}
@@ -1339,7 +1728,21 @@ def _build_export_variants(
     if asset_id != "pressure_door_1x1":
         return list(generated)
 
+    portal_width = 2.7
+    height = 3.4
+    for obj in generated:
+        if obj.name.endswith("_split_leaf_left"):
+            dimensions = getattr(obj, "dimensions", None)
+            dimension_x = getattr(dimensions, "x", None)
+            dimension_z = getattr(dimensions, "z", None)
+            if dimension_x is not None and dimension_z is not None:
+                portal_width = max(0.5, float(dimension_x) / 0.47)
+                height = max(3.4, float(dimension_z) / 0.78)
+            break
     variant_objects: list[Any] = list(generated)
+    for obj in generated:
+        obj["variant_role"] = "intact"
+        obj["visibility_role"] = "Intact"
     for role in ("damaged", "breached"):
         destination = export_collections[role]
         for obj in generated:
@@ -1347,15 +1750,65 @@ def _build_export_variants(
                 continue
             if role == "breached" and obj.name.endswith("_split_leaf_left"):
                 continue
+            if role != "intact" and obj.name.endswith("_intact_lock_bar"):
+                continue
             copy = obj.copy()
             copy.data = obj.data.copy()
             token = obj.name.removeprefix(_generated_name(asset_id, ""))
-            copy.name = _generated_name(asset_id, f"{role}_{token}")
+            expected_name = _claim_generated_name(asset_id, f"{role}_{token}")
+            _set_exact_generated_name(copy, expected_name)
             destination.objects.link(copy)
             copy.parent = root
             _mark_generated(copy, asset_id)
             copy["variant_role"] = role
+            copy["visibility_role"] = role.capitalize()
             variant_objects.append(copy)
+
+        variant_specs: dict[str, tuple[tuple[str, Sequence[float], Sequence[float], str], ...]] = {
+            "damaged": (
+                (
+                    "damaged_reinforcement",
+                    (0.42, 0.1, 0.18),
+                    (-portal_width * 0.18, -0.31, 0.84),
+                    "MAT_WarningStripe",
+                ),
+                (
+                    "damaged_hinge_block",
+                    (0.16, 0.14, 0.42),
+                    (portal_width * 0.25, -0.3, height * 0.42),
+                    "MAT_Conduit",
+                ),
+            ),
+            "breached": (
+                (
+                    "breached_void_marker",
+                    (portal_width * 0.44, 0.08, height * 0.42),
+                    (0, -0.32, height * 0.43),
+                    "MAT_WarningStripe",
+                ),
+                (
+                    "breached_exposed_conduit",
+                    (0.08, 0.12, height * 0.58),
+                    (portal_width * 0.25, -0.34, height * 0.38),
+                    "MAT_Conduit",
+                ),
+            ),
+        }
+        for token, size, location, material_name in variant_specs[role]:
+            overlay = _box(
+                asset_id,
+                token,
+                destination,
+                size,
+                location,
+                material_name,
+                bevel_width=0.012,
+            )
+            _mark_landmark_role(overlay, role.capitalize())
+            overlay.parent = root
+            overlay["variant_role"] = role
+            overlay["visibility_role"] = role.capitalize()
+            variant_objects.append(overlay)
     return variant_objects
 
 
