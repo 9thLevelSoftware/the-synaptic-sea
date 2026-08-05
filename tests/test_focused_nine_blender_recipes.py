@@ -8,8 +8,9 @@ import shutil
 import struct
 import subprocess
 import sys
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -22,6 +23,9 @@ SOURCE_FIXTURE = Path(
 )
 PRESSURE_SOURCE_FIXTURE = Path(
     "/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/doorway_frame_open_1x1/doorway_frame_open_1x1.blend"
+)
+PRESSURE_LEGACY_SOURCE_FIXTURE = Path(
+    "/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/pressure_door_1x1/pressure_door_1x1.blend"
 )
 PRESSURE_CONTRACT_FIXTURE = PROJECT_ROOT / (
     "data/placement/contracts/structural/ship_structural_v0/doorway_frame_open_1x1_contract.json"
@@ -219,10 +223,15 @@ class _FakeCollection:
     def get(self, key: str, default: object = None) -> object:
         return self._props.get(key, default)
 
+    def keys(self):
+        return self._props.keys()
+
 
 class _FakeObject:
     def __init__(self, name: str, **properties: object) -> None:
         self.name = name
+        self.parent: object | None = None
+        self.type = "MESH"
         self.users_collection: list[object] = []
         self._props = properties
 
@@ -234,6 +243,9 @@ class _FakeObject:
 
     def get(self, key: str, default: object = None) -> object:
         return self._props.get(key, default)
+
+    def keys(self):
+        return self._props.keys()
 
 
 class _FakeCollections(list[_FakeCollection]):
@@ -445,6 +457,90 @@ def test_owned_pressure_helper_legacy_rules_migrate_but_foreign_metadata_fails(
             SimpleNamespace(module_id="pressure_door_1x1"),
             SimpleNamespace(name="ModuleRoot_pressure_door_1x1"),
             unknown_helpers,
+        )
+
+
+def test_actual_pressure_source_legacy_helper_schema_migrates_only_with_rooted_generated_objects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import tools.focused_nine_blender_recipes as recipes
+
+    legacy_rules = {
+        "intact": "all pressure-door panels",
+        "damaged": "one cosmetic indicator panel omitted",
+        "breached": "central leaf omitted",
+    }
+    expected_rules = {
+        "intact": "shared frame rails seals and intact lock bar",
+        "damaged": "shared frame rails seals plus reinforcement and hinge damage",
+        "breached": "shared frame rails seals plus omitted leaf and exposed conduit",
+    }
+    root = SimpleNamespace(name="ModuleRoot_pressure_door_1x1")
+    helpers = _FakeCollection("AuthoringHelpers")
+    owned = []
+    for role, legacy_rule in legacy_rules.items():
+        collection = _FakeCollection(f"Export_{role}")
+        collection["module_id"] = "pressure_door_1x1"
+        collection["variant_role"] = role
+        collection["variant_visual_rule"] = legacy_rule
+        generated = _FakeObject(
+            f"FocusedNine_pressure_door_1x1_{role}_legacy_panel",
+            focused_nine_generated=True,
+            focused_nine_asset_id="pressure_door_1x1",
+        )
+        generated.parent = root
+        generated.type = "MESH"
+        generated.users_collection = [collection]
+        collection.objects.append(generated)
+        helpers.children.append(collection)
+        owned.append(collection)
+    collections = _FakeCollections([helpers, *owned])
+    monkeypatch.setattr(
+        recipes,
+        "_BPY",
+        SimpleNamespace(data=SimpleNamespace(collections=collections)),
+    )
+
+    result = recipes.ensure_structural_helpers(
+        SimpleNamespace(module_id="pressure_door_1x1"),
+        root,
+        helpers,
+    )
+    assert {
+        role: collection["variant_visual_rule"]
+        for role, collection in result.items()
+    } == expected_rules
+
+    # A matching name/rule with an authored collection property is not legacy
+    # ownership evidence and must remain fail-closed.
+    foreign = _FakeCollection("Export_intact")
+    foreign["module_id"] = "pressure_door_1x1"
+    foreign["variant_role"] = "intact"
+    foreign["variant_visual_rule"] = legacy_rules["intact"]
+    foreign["authored_metadata"] = "do-not-claim"
+    generated = _FakeObject(
+        "FocusedNine_pressure_door_1x1_foreign_panel",
+        focused_nine_generated=True,
+        focused_nine_asset_id="pressure_door_1x1",
+    )
+    generated.parent = root
+    generated.type = "MESH"
+    generated.users_collection = [foreign]
+    foreign.objects.append(generated)
+    foreign_helpers = _FakeCollection("AuthoringHelpers")
+    foreign_helpers.children.append(foreign)
+    monkeypatch.setattr(
+        recipes,
+        "_BPY",
+        SimpleNamespace(
+            data=SimpleNamespace(collections=_FakeCollections([foreign_helpers, foreign]))
+        ),
+    )
+    with pytest.raises(RuntimeError, match="incompatible metadata"):
+        recipes.ensure_structural_helpers(
+            SimpleNamespace(module_id="pressure_door_1x1"),
+            root,
+            foreign_helpers,
         )
 
 
@@ -1179,6 +1275,154 @@ print('PRESSURE_ROLE_PROOF '+json.dumps(roles, sort_keys=True))
         "FocusedNine_pressure_door_1x1_breached_void_marker",
         "FocusedNine_pressure_door_1x1_breached_exposed_conduit",
     }
+
+
+def test_blender_actual_legacy_pressure_source_migrates_and_preserves_non_owned_nodes(
+    tmp_path: Path,
+) -> None:
+    for fixture in (
+        BLENDER,
+        PRESSURE_LEGACY_SOURCE_FIXTURE,
+        PRESSURE_CANDIDATE_CONTRACT_FIXTURE,
+        PRESSURE_GLB_FIXTURE,
+        MATERIAL_FIXTURE,
+    ):
+        if not fixture.is_file():
+            pytest.fail(f"fixture missing: {fixture}")
+
+    structural_root = tmp_path / "structural"
+    source_dir = structural_root / "pressure_door_1x1"
+    source_dir.mkdir(parents=True)
+    source_blend = source_dir / "pressure_door_1x1.blend"
+    legacy_fixture_bytes = PRESSURE_LEGACY_SOURCE_FIXTURE.read_bytes()
+    shutil.copy2(PRESSURE_LEGACY_SOURCE_FIXTURE, source_blend)
+    _prepare_material_free_source(source_blend)
+    props_root = tmp_path / "props"
+    props_root.mkdir()
+    material_dir = tmp_path / "materials"
+    material_dir.mkdir()
+    shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+
+    pressure_project = tmp_path / "pressure-project"
+    pressure_contract = pressure_project / (
+        "data/placement/contracts/structural/ship_structural_v0/pressure_door_1x1_contract.json"
+    )
+    pressure_glb = pressure_project / (
+        "assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1.glb"
+    )
+    pressure_contract.parent.mkdir(parents=True)
+    pressure_glb.parent.mkdir(parents=True)
+    shutil.copy2(PRESSURE_CANDIDATE_CONTRACT_FIXTURE, pressure_contract)
+    shutil.copy2(PRESSURE_GLB_FIXTURE, pressure_glb)
+
+    seed_expr = f"""
+import bpy
+bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r})
+geometry = bpy.data.collections['Geometry']
+mesh = bpy.data.meshes.new('AuthoredLegacyPanelMesh')
+mesh.from_pydata([(0, 0, 0), (1, 0, 0), (0, 0, 1)], [], [(0, 1, 2)])
+authored = bpy.data.objects.new('AuthoredLegacyPanel', mesh)
+geometry.objects.link(authored)
+authored.location = (1.25, 2.5, 3.75)
+authored['authored_marker'] = 'preserve-byte-for-byte'
+bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r})
+"""
+    seeded = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", seed_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert seeded.returncode == 0, seeded.stdout + seeded.stderr
+
+    def snapshot() -> dict[str, Any]:
+        expression = f"""
+import bpy
+import json
+bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r})
+authored = bpy.data.objects['AuthoredLegacyPanel']
+mesh = authored.data
+helpers = {{
+    role: bpy.data.collections['Export_' + role]
+    for role in ('intact', 'damaged', 'breached')
+}}
+print('LEGACY_PRESSURE_PROOF ' + json.dumps({{
+    'authored': {{
+        'name': authored.name,
+        'type': authored.type,
+        'marker': authored.get('authored_marker'),
+        'location': [round(float(value), 8) for value in authored.location],
+        'collections': sorted(collection.name for collection in authored.users_collection),
+        'vertices': [[round(float(value), 8) for value in vertex.co] for vertex in mesh.vertices],
+        'polygons': [list(polygon.vertices) for polygon in mesh.polygons],
+    }},
+    'helpers': {{
+        role: {{
+            'keys': sorted(collection.keys()),
+            'module_id': collection.get('module_id'),
+            'variant_role': collection.get('variant_role'),
+            'variant_visual_rule': collection.get('variant_visual_rule'),
+            'variant_visibility_policy': collection.get('variant_visibility_policy'),
+        }}
+        for role, collection in helpers.items()
+    }},
+}}, sort_keys=True))
+"""
+        result = subprocess.run(
+            [str(BLENDER), "--background", "--factory-startup", "--python-expr", expression],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        line = next(
+            line for line in result.stdout.splitlines()
+            if line.startswith("LEGACY_PRESSURE_PROOF ")
+        )
+        return json.loads(line.removeprefix("LEGACY_PRESSURE_PROOF "))
+
+    before = snapshot()
+    legacy_rules = {
+        "intact": "all pressure-door panels",
+        "damaged": "one cosmetic indicator panel omitted",
+        "breached": "central leaf omitted",
+    }
+    assert {
+        role: helper["variant_visual_rule"]
+        for role, helper in before["helpers"].items()
+    } == legacy_rules
+
+    result = _recipe_with_external_material_library(
+        _recipe_command(
+            project_root=pressure_project,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id="pressure_door_1x1",
+        )
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    report, _report_line = _report_from_stdout(result.stdout)
+    assert report["variant_visibility_policy"] == "source_visible_wrapper_authority"
+
+    after = snapshot()
+    expected_rules = {
+        "intact": "shared frame rails seals and intact lock bar",
+        "damaged": "shared frame rails seals plus reinforcement and hinge damage",
+        "breached": "shared frame rails seals plus omitted leaf and exposed conduit",
+    }
+    assert {
+        role: helper["variant_visual_rule"]
+        for role, helper in after["helpers"].items()
+    } == expected_rules
+    assert all(
+        helper["variant_visibility_policy"] == "source_visible_wrapper_authority"
+        for helper in after["helpers"].values()
+    )
+    assert before["authored"] == after["authored"]
+    assert PRESSURE_LEGACY_SOURCE_FIXTURE.read_bytes() == legacy_fixture_bytes
+    assert PRESSURE_LEGACY_SOURCE_FIXTURE.read_bytes() != source_blend.read_bytes()
 
 
 def test_blender_prop_recipe_is_idempotent_with_exact_library_material_names(

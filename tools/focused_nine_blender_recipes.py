@@ -1582,21 +1582,118 @@ def _ensure_empty(name: str, root: Any, helpers: Any, role: str) -> Any:
     return empty
 
 
-def _is_owned_pressure_helper_collection(collection: Any) -> bool:
-    return (
+_PRESSURE_HELPER_PROPERTY_KEYS = frozenset(
+    {
+        "module_id",
+        "variant_role",
+        "variant_visual_rule",
+        "variant_visibility_policy",
+        "focused_nine_generated",
+        "focused_nine_asset_id",
+    }
+)
+_PRESSURE_LEGACY_OBJECT_PROPERTY_KEYS = frozenset(
+    {
+        "focused_nine_generated",
+        "focused_nine_asset_id",
+        "variant_role",
+    }
+)
+
+
+def _has_only_id_properties(value: Any, allowed: frozenset[str]) -> bool:
+    keys = getattr(value, "keys", None)
+    if not callable(keys):
+        return False
+    try:
+        return set(keys()).issubset(allowed)
+    except (TypeError, ValueError):
+        return False
+
+
+def _is_legacy_pressure_helper_collection(
+    collection: Any, root: Any, role: str
+) -> bool:
+    """Recognize the exact pre-marker pressure helper schema.
+
+    The old batch did not mark collections themselves.  Its durable ownership
+    evidence is the complete combination of the exact export collection name,
+    module/role metadata, generated object namespace, pressure asset marker,
+    and linkage to the pressure module root.  Require every member to satisfy
+    that evidence and reject any unknown ID properties so copied names or
+    authored metadata cannot be claimed as legacy ownership.
+    """
+
+    if getattr(collection, "name", None) != f"Export_{role}":
+        return False
+    if _collection_property(collection, "module_id") != "pressure_door_1x1":
+        return False
+    if _collection_property(collection, "variant_role") != role:
+        return False
+    if (
+        _collection_property(collection, "variant_visual_rule")
+        != _PRESSURE_LEGACY_VISUAL_RULES[role]
+    ):
+        return False
+    legacy_collection_keys = frozenset(
+        {"module_id", "variant_role", "variant_visual_rule"}
+    )
+    if not _has_only_id_properties(collection, legacy_collection_keys):
+        return False
+    if getattr(root, "name", None) != "ModuleRoot_pressure_door_1x1":
+        return False
+
+    objects = tuple(getattr(collection, "objects", ()))
+    if not objects:
+        return False
+    for obj in objects:
+        if getattr(obj, "type", None) != "MESH":
+            return False
+        if not _has_only_id_properties(obj, _PRESSURE_LEGACY_OBJECT_PROPERTY_KEYS):
+            return False
+        if (
+            _object_property(obj, "focused_nine_generated") is not True
+            or _object_property(obj, "focused_nine_asset_id") != "pressure_door_1x1"
+            or not getattr(obj, "name", "").startswith(
+                _generated_name("pressure_door_1x1", "")
+            )
+            or not any(parent is root for parent in _object_parent_chain(obj))
+        ):
+            return False
+        object_role = _object_property(obj, "variant_role")
+        if object_role is not None and object_role != role:
+            return False
+    return True
+
+
+def _is_owned_pressure_helper_collection(
+    collection: Any, *, root: Any | None = None, role: str | None = None
+) -> bool:
+    """Return whether a pressure helper is owned by the focused-nine recipe."""
+
+    if not _has_only_id_properties(collection, _PRESSURE_HELPER_PROPERTY_KEYS):
+        return False
+    if (
         _collection_property(collection, "focused_nine_generated") is True
         and _collection_property(collection, "focused_nine_asset_id")
         == "pressure_door_1x1"
-    )
+    ):
+        return True
+    if root is None or role is None:
+        return False
+    return _is_legacy_pressure_helper_collection(collection, root, role)
 
 
 def ensure_structural_helpers(spec: Any, root: Any, helpers: Any) -> dict[str, Any]:
     """Return helper collections, migrating only owned Task 1 pressure rules.
 
     The Task 1 pressure-door rules were descriptive metadata, not authored
-    geometry.  They are migrated only when the collection carries both
-    generated ownership markers.  An authored or foreign collection with the
-    same stale rule remains a hard failure rather than being silently claimed.
+    geometry.  They are migrated only when the collection carries the current
+    generated ownership markers or the exact legacy ownership evidence: the
+    pressure module/role metadata plus generated pressure objects in the exact
+    namespace and module-root parent chain.  An authored or foreign collection
+    with the same stale rule remains a hard failure rather than being silently
+    claimed.
     """
 
     module_id = getattr(spec, "module_id", "")
@@ -1645,7 +1742,11 @@ def ensure_structural_helpers(spec: Any, root: Any, helpers: Any) -> dict[str, A
             if module_id == "pressure_door_1x1":
                 collection["variant_visibility_policy"] = PRESSURE_VARIANT_VISIBILITY_POLICY
         else:
-            owned_pressure = module_id == "pressure_door_1x1" and _is_owned_pressure_helper_collection(collection)
+            owned_pressure = module_id == "pressure_door_1x1" and _is_owned_pressure_helper_collection(
+                collection,
+                root=root,
+                role=role,
+            )
             for key, value in expected.items():
                 existing = _collection_property(collection, key)
                 if existing is None:
