@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import shutil
@@ -497,6 +498,7 @@ def _prepare_material_free_source(source: Path) -> None:
         capture_output=True,
         text=True,
         check=False,
+        timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
@@ -507,6 +509,7 @@ def _recipe_with_external_material_library(command: list[str]) -> subprocess.Com
         capture_output=True,
         text=True,
         check=False,
+        timeout=60,
         env={**os.environ, "FOCUSED_NINE_MATERIAL_LIBRARY": str(MATERIAL_FIXTURE)},
     )
 
@@ -553,6 +556,7 @@ def test_blender_authored_material_collision_fails_before_mutation(tmp_path: Pat
         capture_output=True,
         text=True,
         check=False,
+        timeout=60,
     )
     assert proof.returncode == 0, proof.stdout + proof.stderr
     collision_line = next(line for line in proof.stdout.splitlines() if line.startswith("COLLISION_PROOF "))
@@ -592,6 +596,7 @@ def test_blender_owned_suffixed_library_remnant_is_repaired_canonically(
         capture_output=True,
         text=True,
         check=False,
+        timeout=60,
     )
     assert seeded.returncode == 0, seeded.stdout + seeded.stderr
 
@@ -625,6 +630,7 @@ def test_blender_owned_suffixed_library_remnant_is_repaired_canonically(
         capture_output=True,
         text=True,
         check=False,
+        timeout=60,
     )
     assert proof.returncode == 0, proof.stdout + proof.stderr
     proof_line = next(line for line in proof.stdout.splitlines() if line.startswith("REMNANT_PROOF "))
@@ -687,6 +693,7 @@ def test_blender_verified_remnant_with_wrong_module_context_is_rejected(
         capture_output=True,
         text=True,
         check=False,
+        timeout=60,
     )
     assert seeded.returncode == 0, seeded.stdout + seeded.stderr
     before = source_blend.read_bytes()
@@ -737,6 +744,7 @@ def test_blender_owned_canonical_legacy_material_is_repaired_from_library(
         capture_output=True,
         text=True,
         check=False,
+        timeout=60,
     )
     assert seeded.returncode == 0, seeded.stdout + seeded.stderr
 
@@ -768,6 +776,7 @@ def test_blender_owned_canonical_legacy_material_is_repaired_from_library(
         capture_output=True,
         text=True,
         check=False,
+        timeout=60,
     )
     assert proof.returncode == 0, proof.stdout + proof.stderr
     proof_line = next(line for line in proof.stdout.splitlines() if line.startswith("CANONICAL_LEGACY_PROOF "))
@@ -806,10 +815,10 @@ def test_blender_floor_recipe_emits_exact_material_names_and_exports(tmp_path: P
         props_root=props_root,
         asset_id="floor_1x1",
     )
-    first = subprocess.run(command, capture_output=True, text=True, check=False)
+    first = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
     assert first.returncode == 0, first.stdout + first.stderr
     first_report, first_line = _report_from_stdout(first.stdout)
-    second = subprocess.run(command, capture_output=True, text=True, check=False)
+    second = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
     assert second.returncode == 0, second.stdout + second.stderr
     second_report, second_line = _report_from_stdout(second.stdout)
     assert first_report == second_report
@@ -890,6 +899,7 @@ def test_blender_pressure_door_roles_are_distinct_and_idempotent(tmp_path: Path)
         capture_output=True,
         text=True,
         check=False,
+        timeout=60,
     )
     assert prepared.returncode == 0, prepared.stdout + prepared.stderr
 
@@ -899,10 +909,10 @@ def test_blender_pressure_door_roles_are_distinct_and_idempotent(tmp_path: Path)
         props_root=props_root,
         asset_id="pressure_door_1x1",
     )
-    first = subprocess.run(command, capture_output=True, text=True, check=False)
+    first = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
     assert first.returncode == 0, first.stdout + first.stderr
     first_report, first_line = _report_from_stdout(first.stdout)
-    second = subprocess.run(command, capture_output=True, text=True, check=False)
+    second = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
     assert second.returncode == 0, second.stdout + second.stderr
     second_report, second_line = _report_from_stdout(second.stdout)
 
@@ -960,10 +970,10 @@ def test_blender_prop_recipe_is_idempotent_with_exact_library_material_names(
         props_root=props_root,
         asset_id="fire_suppression_station",
     )
-    first = subprocess.run(command, capture_output=True, text=True, check=False)
+    first = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
     assert first.returncode == 0, first.stdout + first.stderr
     first_report, first_line = _report_from_stdout(first.stdout)
-    second = subprocess.run(command, capture_output=True, text=True, check=False)
+    second = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
     assert second.returncode == 0, second.stdout + second.stderr
     second_report, second_line = _report_from_stdout(second.stdout)
 
@@ -991,6 +1001,7 @@ def test_blender_prop_recipe_is_idempotent_with_exact_library_material_names(
         capture_output=True,
         text=True,
         check=False,
+        timeout=60,
     )
     assert proof.returncode == 0, proof.stdout + proof.stderr
     proof_line = next(line for line in proof.stdout.splitlines() if line.startswith("MATERIAL_PROOF "))
@@ -1042,6 +1053,7 @@ def test_blender_floor_recipe_is_idempotent_and_source_scoped(tmp_path: Path) ->
         capture_output=True,
         text=True,
         check=False,
+        timeout=60,
     )
     assert prepared.returncode == 0, prepared.stdout + prepared.stderr
 
@@ -1062,11 +1074,11 @@ def test_blender_floor_recipe_is_idempotent_and_source_scoped(tmp_path: Path) ->
         "floor_1x1",
         "--overwrite-generated-only",
     ]
-    first = subprocess.run(command, capture_output=True, text=True, check=False)
+    first = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
     assert first.returncode == 0, first.stdout + first.stderr
     first_report, first_report_line = _report_from_stdout(first.stdout)
 
-    second = subprocess.run(command, capture_output=True, text=True, check=False)
+    second = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
     assert second.returncode == 0, second.stdout + second.stderr
     second_report, second_report_line = _report_from_stdout(second.stdout)
 
@@ -1100,6 +1112,7 @@ def test_blender_floor_recipe_is_idempotent_and_source_scoped(tmp_path: Path) ->
         capture_output=True,
         text=True,
         check=False,
+        timeout=60,
     )
     assert proof.returncode == 0, proof.stdout + proof.stderr
     proof_line = next(line for line in proof.stdout.splitlines() if line.startswith("OWNERSHIP_PROOF "))
@@ -1167,7 +1180,7 @@ def test_blender_compatibility_wrapper_normalizes_blender_arguments(tmp_path: Pa
         "floor_1x1",
         "--overwrite",
     ]
-    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
 
     assert result.returncode == 0, result.stdout + result.stderr
     report, report_line = _report_from_stdout(result.stdout)
@@ -1232,7 +1245,7 @@ def _export_recipe_result_for_evidence(
             "--python-expr",
             expression,
         ]
-    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
     output = destination / f"{asset_id}.glb"
     assert output.is_file() and output.stat().st_size > 0
@@ -1272,7 +1285,7 @@ def test_blender_under_budget_recipes_meet_gameplay_evidence_minima(tmp_path: Pa
             props_root=props_root,
             asset_id=asset_id,
         )
-        recipe = subprocess.run(command, capture_output=True, text=True, check=False)
+        recipe = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
         assert recipe.returncode == 0, recipe.stdout + recipe.stderr
         report, _report_line = _report_from_stdout(recipe.stdout)
         assert report["boolean_modifiers"] == []
@@ -1358,6 +1371,7 @@ print('STRUCTURAL_CONTRACT_IDENTITY '+json.dumps({{'root': path(root), 'root_mat
         capture_output=True,
         text=True,
         check=False,
+        timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     line = next(
@@ -1395,10 +1409,10 @@ def test_salvage_detail_recipes_are_named_canonical_and_contract_preserving(
         props_root=props_root,
         asset_id=asset_id,
     )
-    first = subprocess.run(command, capture_output=True, text=True, check=False)
+    first = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
     assert first.returncode == 0, first.stdout + first.stderr
     first_report, first_line = _report_from_stdout(first.stdout)
-    second = subprocess.run(command, capture_output=True, text=True, check=False)
+    second = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)
     assert second.returncode == 0, second.stdout + second.stderr
     second_report, second_line = _report_from_stdout(second.stdout)
 
@@ -1416,3 +1430,241 @@ def test_salvage_detail_recipes_are_named_canonical_and_contract_preserving(
     assert "BOOLEAN" not in first_report["modifier_types"]
     assert first_report["triangle_count"] > 0
     assert _structural_contract_identity(source, asset_id) == before_identity
+
+
+def test_blender_subprocess_invocations_have_explicit_60_second_timeout() -> None:
+    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "subprocess"
+        and node.func.attr == "run"
+    ]
+    assert calls
+    missing = []
+    for call in calls:
+        timeout = next((keyword for keyword in call.keywords if keyword.arg == "timeout"), None)
+        if timeout is None:
+            missing.append(call.lineno)
+            continue
+        try:
+            value = ast.literal_eval(timeout.value)
+        except (ValueError, TypeError):
+            value = None
+        if value != 60:
+            missing.append(call.lineno)
+    assert not missing, f"Blender subprocess calls without timeout=60: {missing}"
+
+
+def test_blender_authored_generated_name_collision_fails_without_coownership(
+    tmp_path: Path,
+) -> None:
+    for fixture in (BLENDER, SOURCE_FIXTURE, MATERIAL_FIXTURE):
+        if not fixture.is_file():
+            pytest.fail(f"fixture missing: {fixture}")
+
+    structural_root = tmp_path / "structural"
+    source_dir = structural_root / "floor_1x1"
+    source_dir.mkdir(parents=True)
+    source_blend = source_dir / "floor_1x1.blend"
+    shutil.copy2(SOURCE_FIXTURE, source_blend)
+    _prepare_material_free_source(source_blend)
+    props_root = tmp_path / "props"
+    props_root.mkdir()
+    material_dir = tmp_path / "materials"
+    material_dir.mkdir()
+    shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+
+    seed_expr = (
+        "import bpy; "
+        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+        "geometry=bpy.data.collections.get('Geometry') or bpy.data.collections.new('Geometry'); "
+        "bpy.context.scene.collection.children.link(geometry) if geometry.name not in {child.name for child in bpy.context.scene.collection.children} else None; "
+        "existing=bpy.data.objects.get('FocusedNine_floor_1x1_floor_panel'); bpy.data.objects.remove(existing, do_unlink=True) if existing else None; "
+        "authored=bpy.data.objects.new('FocusedNine_floor_1x1_floor_panel', None); geometry.objects.link(authored); "
+        "authored['authored_marker']='preserve'; "
+        f"result=bpy.ops.wm.save_as_mainfile(filepath={str(source_blend)!r}); assert 'FINISHED' in result"
+    )
+    seeded = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", seed_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert seeded.returncode == 0, seeded.stdout + seeded.stderr
+    before = source_blend.read_bytes()
+
+    result = _recipe_with_external_material_library(
+        _recipe_command(
+            project_root=PROJECT_ROOT,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id="floor_1x1",
+        )
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "generated object name" in result.stdout + result.stderr
+    assert "occupied" in result.stdout + result.stderr
+    assert source_blend.read_bytes() == before
+
+    proof_expr = (
+        "import bpy,json; "
+        f"bpy.ops.wm.open_mainfile(filepath={str(source_blend)!r}); "
+        "objects=[obj for obj in bpy.data.objects if obj.name.startswith('FocusedNine_floor_1x1_floor_panel')]; "
+        "print('OBJECT_COLLISION_PROOF '+json.dumps({'names':[obj.name for obj in objects],'markers':[obj.get('focused_nine_generated') for obj in objects],'authored':[obj.get('authored_marker') for obj in objects]}))"
+    )
+    proof = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", proof_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert proof.returncode == 0, proof.stdout + proof.stderr
+    line = next(line for line in proof.stdout.splitlines() if line.startswith("OBJECT_COLLISION_PROOF "))
+    collision = json.loads(line.removeprefix("OBJECT_COLLISION_PROOF "))
+    assert collision == {
+        "names": ["FocusedNine_floor_1x1_floor_panel"],
+        "markers": [None],
+        "authored": ["preserve"],
+    }
+
+
+def test_blender_pillar_details_overlap_body_by_real_world_aabb(tmp_path: Path) -> None:
+    fixture = SALVAGE_DETAIL_FIXTURES["pillar_support_1x1"]
+    for candidate in (BLENDER, fixture, MATERIAL_FIXTURE):
+        if not candidate.is_file():
+            pytest.fail(f"fixture missing: {candidate}")
+
+    structural_root = tmp_path / "structural"
+    source_dir = structural_root / "pillar_support_1x1"
+    source_dir.mkdir(parents=True)
+    source = source_dir / "pillar_support_1x1.blend"
+    shutil.copy2(fixture, source)
+    _prepare_material_free_source(source)
+    props_root = tmp_path / "props"
+    props_root.mkdir()
+    material_dir = tmp_path / "materials"
+    material_dir.mkdir()
+    shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+
+    result = _recipe_with_external_material_library(
+        _recipe_command(
+            project_root=PROJECT_ROOT,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id="pillar_support_1x1",
+        )
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    proof_expr = f"""
+import bpy
+import json
+from mathutils import Vector
+bpy.ops.wm.open_mainfile(filepath={str(source)!r})
+def bounds(obj):
+    points = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
+    return [[min(point[index] for point in points), max(point[index] for point in points)] for index in range(3)]
+names = ['pillar_body', 'structural_rib_00', 'structural_rib_01', 'repair_bracket_00', 'repair_bracket_01']
+print('PILLAR_AABB_PROOF '+json.dumps({{name: bounds(bpy.data.objects['FocusedNine_pillar_support_1x1_'+name]) for name in names}}, sort_keys=True))
+"""
+    proof = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", proof_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert proof.returncode == 0, proof.stdout + proof.stderr
+    line = next(line for line in proof.stdout.splitlines() if line.startswith("PILLAR_AABB_PROOF "))
+    evidence = json.loads(line.removeprefix("PILLAR_AABB_PROOF "))
+    body = evidence["pillar_body"]
+
+    def intersects(lhs: list[list[float]], rhs: list[list[float]]) -> bool:
+        return all(
+            lhs[axis][0] <= rhs[axis][1] and rhs[axis][0] <= lhs[axis][1]
+            for axis in range(3)
+        )
+
+    for token in ("structural_rib_00", "structural_rib_01", "repair_bracket_00", "repair_bracket_01"):
+        assert intersects(body, evidence[token]), (token, body, evidence[token])
+    assert body[1] == pytest.approx([-0.68, 0.68], abs=1e-5)
+
+
+def test_blender_wall_frame_is_four_rails_without_panel_face_occlusion(
+    tmp_path: Path,
+) -> None:
+    fixture = SALVAGE_DETAIL_FIXTURES["wall_straight_1x1"]
+    for candidate in (BLENDER, fixture, MATERIAL_FIXTURE):
+        if not candidate.is_file():
+            pytest.fail(f"fixture missing: {candidate}")
+
+    structural_root = tmp_path / "structural"
+    source_dir = structural_root / "wall_straight_1x1"
+    source_dir.mkdir(parents=True)
+    source = source_dir / "wall_straight_1x1.blend"
+    shutil.copy2(fixture, source)
+    _prepare_material_free_source(source)
+    props_root = tmp_path / "props"
+    props_root.mkdir()
+    material_dir = tmp_path / "materials"
+    material_dir.mkdir()
+    shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+
+    result = _recipe_with_external_material_library(
+        _recipe_command(
+            project_root=PROJECT_ROOT,
+            structural_root=structural_root,
+            props_root=props_root,
+            asset_id="wall_straight_1x1",
+        )
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    proof_expr = f"""
+import bpy
+import json
+from mathutils import Vector
+bpy.ops.wm.open_mainfile(filepath={str(source)!r})
+def bounds(obj):
+    points = [obj.matrix_world @ Vector(corner) for corner in obj.bound_box]
+    return [[min(point[index] for point in points), max(point[index] for point in points)] for index in range(3)]
+prefix = 'FocusedNine_wall_straight_1x1_'
+frames = sorted((obj for obj in bpy.data.objects if obj.name.startswith(prefix+'panel_frame_outer_')), key=lambda obj: obj.name)
+panels = [bpy.data.objects[prefix+name] for name in ('panel_inset_upper', 'panel_inset_lower', 'inset_panel_00', 'inset_panel_01')]
+panel_bounds = [
+    [min(bounds(obj)[axis][0] for obj in panels), max(bounds(obj)[axis][1] for obj in panels)]
+    for axis in (0, 2)
+]
+print('WALL_FRAME_PROOF '+json.dumps({{'frame_names':[obj.name for obj in frames], 'frame_bounds':{{obj.name: bounds(obj) for obj in frames}}, 'panel_xz_bounds':panel_bounds}}, sort_keys=True))
+"""
+    proof = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", proof_expr],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert proof.returncode == 0, proof.stdout + proof.stderr
+    line = next(line for line in proof.stdout.splitlines() if line.startswith("WALL_FRAME_PROOF "))
+    evidence = json.loads(line.removeprefix("WALL_FRAME_PROOF "))
+    prefix = "FocusedNine_wall_straight_1x1_"
+    assert evidence["frame_names"] == [
+        prefix + "panel_frame_outer_bottom",
+        prefix + "panel_frame_outer_left",
+        prefix + "panel_frame_outer_right",
+        prefix + "panel_frame_outer_top",
+    ]
+    panel_xz = evidence["panel_xz_bounds"]
+    for frame in evidence["frame_bounds"].values():
+        assert not (
+            frame[0][0] < panel_xz[0][1]
+            and panel_xz[0][0] < frame[0][1]
+            and frame[2][0] < panel_xz[1][1]
+            and panel_xz[1][0] < frame[2][1]
+        ), (frame, panel_xz)

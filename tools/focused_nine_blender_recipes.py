@@ -673,6 +673,34 @@ def _assign_material(obj: Any, material_name: str) -> None:
             obj.data.materials[0] = material
 
 
+def _claim_generated_name(asset_id: str, token: str) -> str:
+    """Reserve one canonical generated object name before creating geometry."""
+
+    bpy = _require_bpy()
+    expected_name = _generated_name(asset_id, token)
+    if bpy.data.objects.get(expected_name) is not None:
+        raise RuntimeError(
+            f"generated object name {expected_name!r} is occupied; refusing to "
+            "co-own an authored or stale object"
+        )
+    return expected_name
+
+
+def _set_exact_generated_name(obj: Any, expected_name: str) -> None:
+    """Fail closed if Blender ever suffixes a canonical generated name."""
+
+    bpy = _require_bpy()
+    obj.name = expected_name
+    if obj.name == expected_name:
+        return
+    actual_name = obj.name
+    bpy.data.objects.remove(obj, do_unlink=True)
+    raise RuntimeError(
+        f"Blender could not assign exact generated object name {expected_name!r}; "
+        f"received {actual_name!r}"
+    )
+
+
 def _bevel(obj: Any, width: float) -> Any:
     """Apply a small non-destructive-looking bevel to a generated box."""
 
@@ -699,10 +727,11 @@ def _box(
     bevel_width: float = 0.0,
 ) -> Any:
     bpy = _require_bpy()
+    expected_name = _claim_generated_name(asset_id, token)
     dimensions = tuple(max(0.001, float(value)) for value in size)
     bpy.ops.mesh.primitive_cube_add(size=1.0, location=tuple(float(value) for value in location))
     obj = bpy.context.active_object
-    obj.name = _generated_name(asset_id, token)
+    _set_exact_generated_name(obj, expected_name)
     _mark_generated(obj, asset_id)
     _link_object(obj, collection)
     obj.dimensions = dimensions
@@ -726,6 +755,7 @@ def _cylinder(
     vertices: int = 12,
 ) -> Any:
     bpy = _require_bpy()
+    expected_name = _claim_generated_name(asset_id, token)
     bpy.ops.mesh.primitive_cylinder_add(
         vertices=vertices,
         radius=max(0.001, float(radius)),
@@ -734,7 +764,7 @@ def _cylinder(
         rotation=tuple(float(value) for value in rotation),
     )
     obj = bpy.context.active_object
-    obj.name = _generated_name(asset_id, token)
+    _set_exact_generated_name(obj, expected_name)
     _mark_generated(obj, asset_id)
     _link_object(obj, collection)
     _apply_transform(obj)
@@ -810,11 +840,22 @@ def _add_wall_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
     width, _depth, height = _dimensions_from_spec(spec)
     height = max(3.5, height)
     thickness = 0.28
+    frame_width = width * 0.81
+    frame_height = height * 0.78
+    frame_depth = 0.045
+    frame_rail_width = 0.12
+    frame_rail_height = 0.10
+    frame_center_z = height * 0.47
+    frame_side_x = (frame_width - frame_rail_width) / 2
+    frame_top_bottom_z = (frame_height - frame_rail_height) / 2
     objects = [
         _box(asset_id, "perimeter_left", collection, (0.22, thickness, height), (-width / 2 + 0.12, 0, height / 2), "MAT_PaintedAlloyGray", bevel_width=0.02),
         _box(asset_id, "perimeter_right", collection, (0.22, thickness, height), (width / 2 - 0.12, 0, height / 2), "MAT_PaintedAlloyGray", bevel_width=0.02),
         _box(asset_id, "perimeter_top", collection, (width, thickness, 0.22), (0, 0, height - 0.11), "MAT_PaintedAlloyGray", bevel_width=0.02),
-        _box(asset_id, "panel_frame_outer", collection, (width * 0.76, 0.045, height * 0.78), (0, -0.21, height * 0.47), "MAT_PaintedAlloyGray", bevel_width=0.018),
+        _box(asset_id, "panel_frame_outer_left", collection, (frame_rail_width, frame_depth, frame_height), (-frame_side_x, -0.21, frame_center_z), "MAT_PaintedAlloyGray", bevel_width=0.018),
+        _box(asset_id, "panel_frame_outer_right", collection, (frame_rail_width, frame_depth, frame_height), (frame_side_x, -0.21, frame_center_z), "MAT_PaintedAlloyGray", bevel_width=0.018),
+        _box(asset_id, "panel_frame_outer_bottom", collection, (frame_width, frame_depth, frame_rail_height), (0, -0.21, frame_center_z - frame_top_bottom_z), "MAT_PaintedAlloyGray", bevel_width=0.018),
+        _box(asset_id, "panel_frame_outer_top", collection, (frame_width, frame_depth, frame_rail_height), (0, -0.21, frame_center_z + frame_top_bottom_z), "MAT_PaintedAlloyGray", bevel_width=0.018),
         _box(asset_id, "panel_inset_upper", collection, (width * 0.24, 0.06, height * 0.22), (-width * 0.22, -0.245, height * 0.69), "MAT_PaintedAlloyGray", bevel_width=0.018),
         _box(asset_id, "panel_inset_lower", collection, (width * 0.24, 0.06, height * 0.22), (width * 0.22, -0.245, height * 0.25), "MAT_PaintedAlloyGray", bevel_width=0.018),
     ]
@@ -891,13 +932,15 @@ def _add_pillar_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
     ]
     for index, x in enumerate((-body * 0.58, body * 0.58)):
         objects.append(_box(asset_id, f"rib_{index:02d}", collection, (0.1, body * 0.98, max(1.8, height * 0.72)), (x, 0, max(1.8, height * 0.72) / 2 + 0.35), "MAT_Conduit", bevel_width=0.015))
-    for index, y in enumerate((-body * 0.58, body * 0.58)):
+    structural_rib_depth = 0.1
+    structural_rib_offset = body / 2 + structural_rib_depth / 2 - 0.01
+    for index, y in enumerate((-structural_rib_offset, structural_rib_offset)):
         objects.append(
             _box(
                 asset_id,
                 f"structural_rib_{index:02d}",
                 collection,
-                (body * 0.72, 0.1, max(1.8, height * 0.68)),
+                (body * 0.72, structural_rib_depth, max(1.8, height * 0.68)),
                 (0, y, max(1.8, height * 0.68) / 2 + 0.35),
                 "MAT_Conduit",
                 bevel_width=0.015,
@@ -910,7 +953,7 @@ def _add_pillar_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
                 f"repair_bracket_{index:02d}",
                 collection,
                 (body * 0.8, 0.14, 0.12),
-                (0, -body * 0.68, z),
+                (0, -(body / 2 + 0.14 / 2 - 0.01), z),
                 "MAT_WarningStripe",
                 bevel_width=0.012,
             )
