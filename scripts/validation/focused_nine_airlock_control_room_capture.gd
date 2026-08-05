@@ -243,9 +243,85 @@ func _populate_room(room: Node3D) -> bool:
 	# Dressing: fire station beside the south entry and breach seal on east wall.
 	if not _add_room_asset(room, FIRE_SUPPRESSION_GLB_PATH, "FireSuppressionBesideEntry", Vector3(-2.0, 0.0, 3.0), 0.0):
 		return false
-	if not _add_room_asset(room, HULL_BREACH_GLB_PATH, "EastWallBreachSeal", Vector3(3.75, 0.0, 0.0), PI / 2.0):
+	var east_wall: Node3D = room.get_node_or_null("Wall_05") as Node3D
+	if east_wall == null:
+		_fail("east wall is missing for breach seal anchoring")
 		return false
+	var breach_visual: Node3D = _load_glb(HULL_BREACH_GLB_PATH)
+	if breach_visual == null:
+		return false
+	_disable_local_lights(breach_visual)
+	breach_visual.name = "EastWallBreachSeal"
+	breach_visual.rotation.y = PI / 2.0
+	# Anchor from direct imported bounds: the prop's rotated max-x meets the
+	# east wall's inner-face min-x, and its min-y meets the floor.
+	var east_wall_bounds: AABB = _bounds_in_ancestor(east_wall, room)
+	var breach_local_bounds: AABB = _bounds_in_ancestor(breach_visual, breach_visual)
+	var breach_rotated_bounds: AABB = _transform_aabb(breach_local_bounds, Transform3D(Basis(Vector3.UP, PI / 2.0), Vector3.ZERO))
+	var wall_midpoint_z: float = (east_wall_bounds.position.z + east_wall_bounds.end.z) / 2.0
+	var breach_midpoint_z: float = (breach_rotated_bounds.position.z + breach_rotated_bounds.end.z) / 2.0
+	breach_visual.position = Vector3(
+		east_wall_bounds.position.x - breach_rotated_bounds.end.x,
+		-breach_rotated_bounds.position.y,
+		wall_midpoint_z - breach_midpoint_z,
+	)
+	room.add_child(breach_visual)
 	return true
+
+
+func _bounds_in_ancestor(node: Node3D, ancestor: Node3D) -> AABB:
+	var found: bool = false
+	var combined := AABB()
+	var node_transform: Transform3D = _transform_to_ancestor(node, ancestor)
+	for mesh_node: Node in node.find_children("*", "MeshInstance3D", true, false):
+		var instance: MeshInstance3D = mesh_node as MeshInstance3D
+		if instance == null or instance.mesh == null:
+			continue
+		var mesh_transform: Transform3D = node_transform * _transform_to_ancestor(instance, node)
+		var local_bounds: AABB = instance.mesh.get_aabb()
+		for x in [local_bounds.position.x, local_bounds.end.x]:
+			for y in [local_bounds.position.y, local_bounds.end.y]:
+				for z in [local_bounds.position.z, local_bounds.end.z]:
+					var point: Vector3 = mesh_transform * Vector3(x, y, z)
+					if not found:
+						combined = AABB(point, Vector3.ZERO)
+						found = true
+					else:
+						combined = combined.expand(point)
+	if not found:
+			_fail("GLTF asset has no mesh bounds")
+	return combined
+
+
+func _transform_to_ancestor(node: Node3D, ancestor: Node3D) -> Transform3D:
+	var result := Transform3D.IDENTITY
+	var cursor: Node = node
+	while cursor != ancestor:
+		var node_3d: Node3D = cursor as Node3D
+		if node_3d == null:
+			_fail("GLTF asset hierarchy contains a non-Node3D")
+			return Transform3D.IDENTITY
+		result = node_3d.transform * result
+		cursor = cursor.get_parent()
+		if cursor == null:
+			_fail("GLTF asset escaped its ancestor")
+			return Transform3D.IDENTITY
+	return result
+
+
+func _transform_aabb(bounds: AABB, transform: Transform3D) -> AABB:
+	var found: bool = false
+	var transformed := AABB()
+	for x in [bounds.position.x, bounds.end.x]:
+		for y in [bounds.position.y, bounds.end.y]:
+			for z in [bounds.position.z, bounds.end.z]:
+				var point: Vector3 = transform * Vector3(x, y, z)
+				if not found:
+					transformed = AABB(point, Vector3.ZERO)
+					found = true
+				else:
+					transformed = transformed.expand(point)
+	return transformed
 
 
 func _add_room_asset(room: Node3D, path: String, node_name: String, position: Vector3, rotation_y: float) -> bool:
@@ -469,7 +545,10 @@ func _restore_publication_leaf(path: String, snapshot: Dictionary) -> bool:
 			return true
 		if entry_kind != "regular":
 			return false
-		return DirAccess.remove_absolute(path) == OK
+		var remove_error: Error = DirAccess.remove_absolute(path)
+		return remove_error == OK and _path_entry_kind(path) == "missing"
+	if not snapshot.has("bytes"):
+		return false
 	var temporary_path: String = _allocate_temporary_path(path.get_file())
 	if temporary_path.is_empty():
 		return false
@@ -486,7 +565,9 @@ func _restore_publication_leaf(path: String, snapshot: Dictionary) -> bool:
 	if rename_error != OK:
 		_cleanup_temporary_file(temporary_path)
 		return false
-	return true
+	if _path_entry_kind(path) != "regular":
+		return false
+	return FileAccess.get_file_as_bytes(path) == snapshot["bytes"]
 
 
 func _validate_publication_leaf(leaf_path: String) -> bool:

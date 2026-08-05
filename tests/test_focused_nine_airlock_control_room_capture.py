@@ -277,6 +277,24 @@ func _initialize() -> void:
     _expect_vec(ramp_bounds.end, Vector3(1.97, 0.87, 12.0), "south ramp world maximum", 0.02)
     _expect(ramp_bounds.position.z >= 4.0, "south ramp stays outside the south doorway")
 
+    var doorway := room.get_node("SouthDoorway") as Node3D
+    _expect(doorway != null, "south doorway node")
+    _expect_vec(doorway.position, Vector3(0.0, 0.0, 4.0), "south doorway offset")
+    _expect(absf(doorway.rotation.y) <= 0.001, "south doorway yaw")
+    var doorway_bounds := _bounds_in_ancestor(doorway, room)
+    _expect_vec(doorway_bounds.position, Vector3(-1.63, 0.0, 3.675), "south doorway world minimum", 0.02)
+    _expect_vec(doorway_bounds.end, Vector3(1.63, 3.4, 4.5), "south doorway world maximum", 0.02)
+    _expect(doorway_bounds.position.z < 4.0 and doorway_bounds.end.z > 4.0, "south doorway straddles entry threshold")
+
+    var pressure_door := room.get_node("NorthPressureDoor") as Node3D
+    _expect(pressure_door != null, "north pressure door node")
+    _expect_vec(pressure_door.position, Vector3(0.0, 0.0, -4.0), "north pressure door offset")
+    _expect(absf(pressure_door.rotation.y - PI) <= 0.001, "north pressure door yaw")
+    var pressure_door_bounds := _bounds_in_ancestor(pressure_door, room)
+    _expect_vec(pressure_door_bounds.position, Vector3(-1.805, 0.0, -4.37), "north pressure door world minimum", 0.02)
+    _expect_vec(pressure_door_bounds.end, Vector3(1.805, 3.4, -3.64), "north pressure door world maximum", 0.02)
+    _expect(pressure_door_bounds.position.z < -4.0 and pressure_door_bounds.end.z > -4.0, "north pressure door straddles rear threshold")
+
     var side_rotation_seen := false
     var wall_envelope_found := false
     var wall_envelope := AABB()
@@ -313,6 +331,39 @@ func _initialize() -> void:
         _expect(absf(cap_bounds.end.y - 4.0) <= 0.02, "ceiling local top %d" % index)
     _expect(cap_bottom > 3.5 and cap_bottom < 4.0, "ceiling caps sit around wall top")
 
+    for pillar_name in ["RearPillarWest", "RearPillarEast"]:
+        var pillar := room.get_node(pillar_name) as Node3D
+        _expect(pillar != null, "%s node" % pillar_name)
+        var pillar_bounds := _bounds_in_ancestor(pillar, room)
+        _expect(pillar_bounds.position.y >= wall_envelope.position.y and pillar_bounds.end.y <= wall_envelope.end.y, "%s vertical envelope" % pillar_name)
+        _expect(pillar_bounds.position.x >= wall_envelope.position.x and pillar_bounds.end.x <= wall_envelope.end.x, "%s x envelope" % pillar_name)
+        _expect(pillar_bounds.position.z >= wall_envelope.position.z and pillar_bounds.end.z <= wall_envelope.end.z, "%s z envelope" % pillar_name)
+
+    var fire_station := room.get_node("FireSuppressionBesideEntry") as Node3D
+    _expect(fire_station != null, "fire suppression station node")
+    _expect_vec(fire_station.position, Vector3(-2.0, 0.0, 3.0), "fire suppression station offset")
+    _expect(absf(fire_station.rotation.y) <= 0.001, "fire suppression station yaw")
+    var fire_bounds := _bounds_in_ancestor(fire_station, room)
+    _expect_vec(fire_bounds.position, Vector3(-2.55, 0.0, 2.79), "fire suppression world minimum", 0.02)
+    _expect_vec(fire_bounds.end, Vector3(-1.45, 1.8, 3.36), "fire suppression world maximum", 0.02)
+    _expect(fire_bounds.position.x >= wall_envelope.position.x and fire_bounds.end.x <= wall_envelope.end.x, "fire suppression x envelope")
+    _expect(fire_bounds.position.z >= wall_envelope.position.z and fire_bounds.end.z <= wall_envelope.end.z, "fire suppression z envelope")
+
+    var east_wall := room.get_node("Wall_05") as Node3D
+    _expect(east_wall != null, "east wall node for breach seal")
+    var east_wall_bounds := _bounds_in_ancestor(east_wall, room)
+    var breach := room.get_node("EastWallBreachSeal") as Node3D
+    _expect(breach != null, "east wall breach seal node")
+    _expect_vec(breach.position, Vector3(5.525, 1.09, 0.0), "east wall breach seal offset", 0.02)
+    _expect(absf(breach.rotation.y - PI / 2.0) <= 0.001, "east wall breach seal yaw")
+    var breach_bounds := _bounds_in_ancestor(breach, room)
+    _expect_vec(breach_bounds.position, Vector3(5.365, 0.0, -1.09), "east wall breach seal world minimum", 0.02)
+    _expect_vec(breach_bounds.end, Vector3(5.86, 2.18, 1.09), "east wall breach seal world maximum", 0.02)
+    _expect(absf(breach_bounds.end.x - east_wall_bounds.position.x) <= 0.02, "east wall breach seal meets east wall inner face")
+    _expect(breach_bounds.position.x >= wall_envelope.position.x and breach_bounds.end.x <= wall_envelope.end.x, "east wall breach seal x envelope")
+    _expect(breach_bounds.position.y >= wall_envelope.position.y and breach_bounds.end.y <= wall_envelope.end.y, "east wall breach seal y envelope")
+    _expect(breach_bounds.position.z >= wall_envelope.position.z and breach_bounds.end.z <= wall_envelope.end.z, "east wall breach seal z envelope")
+
     capture.free()
     room.free()
     if _failed:
@@ -338,6 +389,7 @@ def test_real_gltf_layout_probe_exercises_all_nine_assets_and_world_bounds() -> 
             capture_output=True,
             text=True,
             check=False,
+            timeout=60,
         )
         output = result.stdout + result.stderr
         assert result.returncode == 0, output
@@ -353,6 +405,7 @@ def _write_rollback_probe_project(project: Path, probe: Path) -> None:
 
 var force_stable_rename_failure := false
 var force_restore_failure := false
+var force_restore_content_mismatch := false
 var first_rename_completed := false
 
 
@@ -363,6 +416,12 @@ func _rename_publication_leaf(source_path: String, destination_path: String) -> 
         return ERR_CANT_CREATE
     var rename_error: Error = super._rename_publication_leaf(source_path, destination_path)
     if rename_error == OK and destination_path.get_file() == FIRST_FRAME_NAME:
+        if force_restore_content_mismatch and first_rename_completed:
+            var corrupt := FileAccess.open(destination_path, FileAccess.WRITE)
+            if corrupt == null:
+                return ERR_CANT_OPEN
+            corrupt.store_buffer(PackedByteArray([99, 98, 97]))
+            corrupt = null
         first_rename_completed = true
     return rename_error
 """,
@@ -443,6 +502,30 @@ func _initialize() -> void:
     _assert_no_temporary_files(nonempty_dir, "temporary files after successful rollback")
     forced_nonempty.free()
 
+    var prepared_missing = _prepare_capture(ProjectSettings.globalize_path("res://artifacts/validation-previews/focused-nine/rollback-missing"), ForcedCapture, PackedByteArray(), PackedByteArray())
+    var forced_missing = prepared_missing[0]
+    var missing_dir: String = prepared_missing[1]
+    _expect(DirAccess.remove_absolute(missing_dir.path_join(FIRST_NAME)) == OK, "remove missing first leaf")
+    _expect(DirAccess.remove_absolute(missing_dir.path_join(STABLE_NAME)) == OK, "remove missing stable leaf")
+    forced_missing.set("force_stable_rename_failure", true)
+    _expect(not bool(forced_missing.call("_publish_capture_files", image)), "forced stable rename with missing leaves")
+    _expect(str(forced_missing.get("_last_failure_reason")).contains("prior leaves restored"), "missing-leaf restore causal message")
+    _expect(str(forced_missing.call("_path_entry_kind", missing_dir.path_join(FIRST_NAME))) == "missing", "missing first leaf remains absent")
+    _expect(str(forced_missing.call("_path_entry_kind", missing_dir.path_join(STABLE_NAME))) == "missing", "missing stable leaf remains absent")
+    _assert_no_temporary_files(missing_dir, "temporary files after missing-leaf rollback")
+    forced_missing.free()
+
+    var prepared_mismatch = _prepare_capture(ProjectSettings.globalize_path("res://artifacts/validation-previews/focused-nine/rollback-content-mismatch"), ForcedCapture, old_first, old_stable)
+    var forced_mismatch = prepared_mismatch[0]
+    var mismatch_dir: String = prepared_mismatch[1]
+    forced_mismatch.set("force_stable_rename_failure", true)
+    forced_mismatch.set("force_restore_content_mismatch", true)
+    _expect(not bool(forced_mismatch.call("_publish_capture_files", image)), "forced restore content mismatch")
+    _expect(str(forced_mismatch.get("_last_failure_reason")).contains("rollback failed restoring first frame leaf"), "content mismatch is a rollback failure")
+    _expect(str(forced_mismatch.call("_path_entry_kind", mismatch_dir.path_join(FIRST_NAME))) == "regular", "mismatched restored leaf remains regular")
+    _expect(FileAccess.get_file_as_bytes(mismatch_dir.path_join(FIRST_NAME)) != old_first, "controlled mismatch changed restored bytes")
+    forced_mismatch.free()
+
     var prepared_empty = _prepare_capture(ProjectSettings.globalize_path("res://artifacts/validation-previews/focused-nine/rollback-empty"), ForcedCapture, PackedByteArray(), PackedByteArray())
     var forced_empty = prepared_empty[0]
     var empty_dir: String = prepared_empty[1]
@@ -450,6 +533,8 @@ func _initialize() -> void:
     _expect(not bool(forced_empty.call("_publish_capture_files", image)), "forced stable rename with empty leaves")
     _expect(FileAccess.file_exists(empty_dir.path_join(FIRST_NAME)), "empty first leaf exists after restore")
     _expect(FileAccess.file_exists(empty_dir.path_join(STABLE_NAME)), "empty stable leaf exists after rollback")
+    _expect(str(forced_empty.call("_path_entry_kind", empty_dir.path_join(FIRST_NAME))) == "regular", "empty first leaf is regular and non-symlink")
+    _expect(str(forced_empty.call("_path_entry_kind", empty_dir.path_join(STABLE_NAME))) == "regular", "empty stable leaf is regular and non-symlink")
     _expect(FileAccess.get_file_as_bytes(empty_dir.path_join(FIRST_NAME)).is_empty(), "empty first leaf restored exactly")
     _expect(FileAccess.get_file_as_bytes(empty_dir.path_join(STABLE_NAME)).is_empty(), "empty stable leaf preserved exactly")
     _assert_no_temporary_files(empty_dir, "temporary files after empty rollback")
@@ -495,6 +580,7 @@ def test_publication_rollback_probe_covers_forced_failure_restore_and_empty_leav
             capture_output=True,
             text=True,
             check=False,
+            timeout=60,
         )
         output = result.stdout + result.stderr
         assert result.returncode == 0, output
@@ -694,6 +780,7 @@ def test_capture_behavioral_probe_exercises_parser_sources_containment_and_publi
             capture_output=True,
             text=True,
             check=False,
+            timeout=60,
         )
         output = result.stdout + result.stderr
 
@@ -744,6 +831,7 @@ def test_target_harness_editor_loads_without_godot_diagnostics() -> None:
             capture_output=True,
             text=True,
             check=False,
+            timeout=60,
         )
         output = result.stdout + result.stderr
         assert result.returncode == 0, output
