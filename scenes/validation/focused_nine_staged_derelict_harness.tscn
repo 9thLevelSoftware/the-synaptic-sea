@@ -1,0 +1,44 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/validation/focused_nine_staged_derelict_capture.gd" id="1_capture"]
+
+[sub_resource type="Environment" id="Environment_staged_derelict"]
+background_mode = 1
+background_color = Color(0.004, 0.010, 0.035, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.12, 0.20, 0.40, 1)
+ambient_light_energy = 0.72
+reflected_light_source = 2
+
+[node name="FocusedNineStagedDerelictHarness" type="Node3D"]
+script = ExtResource("1_capture")
+
+[node name="DerelictCamera" type="Camera3D" parent="."]
+projection = 1
+size = 28.0
+current = true
+
+[node name="DerelictKeyLight" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-48, 35, 0)
+light_color = Color(0.72, 0.84, 1, 1)
+light_energy = 1.55
+shadow_enabled = true
+
+[node name="DerelictFillLight" type="OmniLight3D" parent="."]
+position = Vector3(-5, 9, 5)
+light_color = Color(0.16, 0.36, 0.90, 1)
+light_energy = 4.0
+omni_range = 34.0
+shadow_enabled = false
+
+[node name="DerelictRimLight" type="OmniLight3D" parent="."]
+position = Vector3(22, 8, -14)
+light_color = Color(0.15, 0.86, 0.98, 1)
+light_energy = 5.0
+omni_range = 38.0
+shadow_enabled = false
+
+[node name="DerelictEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_staged_derelict")
+
+[node name="GeneratedShipRoot" type="Node3D" parent="."]
