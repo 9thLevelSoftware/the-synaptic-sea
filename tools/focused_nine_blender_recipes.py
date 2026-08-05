@@ -777,6 +777,32 @@ def _add_floor_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
     objects.append(_cylinder(asset_id, "drain_grate", collection, 0.18, 0.035, (0, 0.95, z + thickness + 0.02), "MAT_Conduit", vertices=16))
     for index, x in enumerate((-0.09, 0.09)):
         objects.append(_box(asset_id, f"drain_bar_{index:02d}", collection, (0.025, 0.26, 0.025), (x, 0.95, z + thickness + 0.045), "MAT_WarningStripe"))
+    track_span = max(1.0, depth - 0.8)
+    track_z = z + thickness + 0.055
+    for side, x in (("west", -0.72), ("east", 0.72)):
+        objects.append(
+            _box(
+                asset_id,
+                f"service_track_{side}",
+                collection,
+                (0.16, track_span, 0.045),
+                (x, 0, track_z),
+                "MAT_Conduit",
+                bevel_width=0.01,
+            )
+        )
+    for index, y in enumerate((-depth / 2 + 0.38, -depth / 2 + 0.56, -depth / 2 + 0.74)):
+        objects.append(
+            _box(
+                asset_id,
+                f"threshold_rib_{index:02d}",
+                collection,
+                (width * 0.66, 0.06, 0.045),
+                (0, y, track_z + 0.012),
+                "MAT_WarningStripe",
+                bevel_width=0.008,
+            )
+        )
     return objects
 
 
@@ -788,12 +814,16 @@ def _add_wall_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
         _box(asset_id, "perimeter_left", collection, (0.22, thickness, height), (-width / 2 + 0.12, 0, height / 2), "MAT_PaintedAlloyGray", bevel_width=0.02),
         _box(asset_id, "perimeter_right", collection, (0.22, thickness, height), (width / 2 - 0.12, 0, height / 2), "MAT_PaintedAlloyGray", bevel_width=0.02),
         _box(asset_id, "perimeter_top", collection, (width, thickness, 0.22), (0, 0, height - 0.11), "MAT_PaintedAlloyGray", bevel_width=0.02),
+        _box(asset_id, "panel_frame_outer", collection, (width * 0.76, 0.045, height * 0.78), (0, -0.21, height * 0.47), "MAT_PaintedAlloyGray", bevel_width=0.018),
+        _box(asset_id, "panel_inset_upper", collection, (width * 0.24, 0.06, height * 0.22), (-width * 0.22, -0.245, height * 0.69), "MAT_PaintedAlloyGray", bevel_width=0.018),
+        _box(asset_id, "panel_inset_lower", collection, (width * 0.24, 0.06, height * 0.22), (width * 0.22, -0.245, height * 0.25), "MAT_PaintedAlloyGray", bevel_width=0.018),
     ]
     for index, x in enumerate((-width * 0.22, width * 0.22)):
         objects.append(_box(asset_id, f"inset_panel_{index:02d}", collection, (width * 0.28, 0.06, height * 0.52), (x, -0.17, height * 0.49), "MAT_PaintedAlloyGray", bevel_width=0.025))
     objects.extend(
         (
             _box(asset_id, "conduit_vertical", collection, (0.09, 0.09, height * 0.72), (-width / 2 + 0.42, -0.22, height * 0.46), "MAT_Conduit", bevel_width=0.015),
+            _box(asset_id, "conduit_run_horizontal", collection, (width * 0.52, 0.09, 0.09), (-width * 0.08, -0.25, height * 0.18), "MAT_Conduit", bevel_width=0.015),
             _box(asset_id, "service_cover", collection, (0.46, 0.08, 0.38), (width / 2 - 0.42, -0.22, height * 0.3), "MAT_WarningStripe", bevel_width=0.015),
         )
     )
@@ -861,6 +891,30 @@ def _add_pillar_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
     ]
     for index, x in enumerate((-body * 0.58, body * 0.58)):
         objects.append(_box(asset_id, f"rib_{index:02d}", collection, (0.1, body * 0.98, max(1.8, height * 0.72)), (x, 0, max(1.8, height * 0.72) / 2 + 0.35), "MAT_Conduit", bevel_width=0.015))
+    for index, y in enumerate((-body * 0.58, body * 0.58)):
+        objects.append(
+            _box(
+                asset_id,
+                f"structural_rib_{index:02d}",
+                collection,
+                (body * 0.72, 0.1, max(1.8, height * 0.68)),
+                (0, y, max(1.8, height * 0.68) / 2 + 0.35),
+                "MAT_Conduit",
+                bevel_width=0.015,
+            )
+        )
+    for index, z in enumerate((max(0.8, height * 0.38), max(1.4, height * 0.7))):
+        objects.append(
+            _box(
+                asset_id,
+                f"repair_bracket_{index:02d}",
+                collection,
+                (body * 0.8, 0.14, 0.12),
+                (0, -body * 0.68, z),
+                "MAT_WarningStripe",
+                bevel_width=0.012,
+            )
+        )
     bolt_positions = (
         (-body * 0.45, -body * 0.45),
         (body * 0.45, -body * 0.45),
@@ -893,6 +947,17 @@ def _add_ramp_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
         y = -depth / 2 + (index + 0.5) * depth / tread_count
         z = 0.09 + index * 0.14
         objects.append(_box(asset_id, f"tread_{index:02d}", collection, (width - 0.4, depth / tread_count - 0.04, 0.16), (0, y, z), "MAT_PaintedAlloyGray", bevel_width=0.018))
+        objects.append(
+            _box(
+                asset_id,
+                f"anti_slip_rib_{index:02d}",
+                collection,
+                (width - 0.62, 0.06, 0.045),
+                (0, y, z + 0.105),
+                "MAT_WarningStripe",
+                bevel_width=0.008,
+            )
+        )
     for side, x in (("left", -width / 2 + 0.12), ("right", width / 2 - 0.12)):
         objects.append(_box(asset_id, f"curb_{side}", collection, (0.18, depth, 0.42), (x, 0, 0.22), "MAT_WarningStripe", bevel_width=0.02))
     objects.append(_box(asset_id, "raceway", collection, (0.13, depth * 0.78, 0.11), (width / 2 - 0.42, 0, 0.58), "MAT_Conduit", bevel_width=0.015))
@@ -904,10 +969,14 @@ def _add_ceiling_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
     objects = [
         _box(asset_id, "ceiling_cap", collection, (width - 0.12, depth - 0.12, 0.2), (0, 0, 3.9), "MAT_PaintedAlloyGray", bevel_width=0.025),
         _box(asset_id, "light_trough", collection, (width * 0.58, 0.3, 0.08), (0, 0, 3.76), "MAT_ReactorGlow", bevel_width=0.015),
+        _box(asset_id, "service_tray_frame", collection, (width * 0.36, depth * 0.46, 0.045), (width * 0.28, 0, 3.71), "MAT_Conduit", bevel_width=0.01),
         _box(asset_id, "service_tray", collection, (width * 0.3, depth * 0.4, 0.08), (width * 0.28, 0, 3.76), "MAT_Conduit", bevel_width=0.015),
+        _box(asset_id, "emissive_recess", collection, (0.36, 0.24, 0.045), (-width * 0.28, -depth * 0.22, 3.73), "MAT_ReactorGlow", bevel_width=0.012),
     ]
     for index, x in enumerate((-width * 0.25, -width * 0.08, width * 0.09, width * 0.26)):
         objects.append(_box(asset_id, f"vent_bar_{index:02d}", collection, (0.06, depth * 0.48, 0.08), (x, 0, 3.76), "MAT_WarningStripe"))
+    for index, x in enumerate((-width * 0.34, -width * 0.17, 0, width * 0.17, width * 0.34)):
+        objects.append(_box(asset_id, f"vent_grille_{index:02d}", collection, (0.045, depth * 0.24, 0.045), (x, -depth * 0.2, 3.72), "MAT_WarningStripe"))
     for index, x in enumerate((-width * 0.36, -width * 0.12, width * 0.12, width * 0.36)):
         objects.append(
             _box(

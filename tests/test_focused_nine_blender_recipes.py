@@ -1294,3 +1294,125 @@ def test_blender_under_budget_recipes_meet_gameplay_evidence_minima(tmp_path: Pa
     assert set(measured) == set(UNDER_BUDGET_FIXTURES)
     for asset_id, (_, fixture, _) in UNDER_BUDGET_FIXTURES.items():
         assert fixture.read_bytes() == fixture_bytes[asset_id]
+
+
+SALVAGE_DETAIL_FIXTURES: dict[str, Path] = {
+    "floor_1x1": Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/"
+        "floor_1x1/floor_1x1.blend"
+    ),
+    "wall_straight_1x1": Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/"
+        "wall_straight_1x1/wall_straight_1x1.blend"
+    ),
+    "ramp_up_1x2": Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/"
+        "ramp_up_1x2/ramp_up_1x2.blend"
+    ),
+    "pillar_support_1x1": Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/"
+        "pillar_support_1x1/pillar_support_1x1.blend"
+    ),
+    "ceiling_cap_1x1": Path(
+        "/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0/"
+        "ceiling_cap_1x1/ceiling_cap_1x1.blend"
+    ),
+}
+SALVAGE_DETAIL_ROLE_TOKENS: dict[str, tuple[str, ...]] = {
+    "floor_1x1": ("service_track_west", "service_track_east", "threshold_rib_00"),
+    "wall_straight_1x1": (
+        "panel_frame_outer",
+        "panel_inset_upper",
+        "panel_inset_lower",
+        "conduit_run_horizontal",
+    ),
+    "ramp_up_1x2": ("anti_slip_rib_00", "anti_slip_rib_05"),
+    "pillar_support_1x1": ("structural_rib_00", "repair_bracket_00"),
+    "ceiling_cap_1x1": ("service_tray_frame", "vent_grille_00", "emissive_recess"),
+}
+
+
+def _structural_contract_identity(source: Path, asset_id: str) -> dict[str, object]:
+    expression = f"""
+import bpy
+import json
+bpy.ops.wm.open_mainfile(filepath={str(source)!r})
+root = bpy.data.objects['ModuleRoot_{asset_id}']
+def path(obj):
+    parts = []
+    current = obj
+    while current is not None:
+        parts.append(current.name)
+        current = current.parent
+    return list(reversed(parts))
+def matrix(obj):
+    return [round(float(value), 8) for row in obj.matrix_world for value in row]
+connectors = sorted(
+    (obj for obj in bpy.data.objects if obj.name.startswith('Anchor_SOCK_')),
+    key=lambda obj: obj.name,
+)
+print('STRUCTURAL_CONTRACT_IDENTITY '+json.dumps({{'root': path(root), 'root_matrix': matrix(root), 'connectors': [(obj.name, path(obj), matrix(obj)) for obj in connectors]}}, sort_keys=True))
+"""
+    result = subprocess.run(
+        [str(BLENDER), "--background", "--factory-startup", "--python-expr", expression],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    line = next(
+        line for line in result.stdout.splitlines() if line.startswith("STRUCTURAL_CONTRACT_IDENTITY ")
+    )
+    return json.loads(line.removeprefix("STRUCTURAL_CONTRACT_IDENTITY "))
+
+
+@pytest.mark.parametrize("asset_id", tuple(SALVAGE_DETAIL_FIXTURES))
+def test_salvage_detail_recipes_are_named_canonical_and_contract_preserving(
+    tmp_path: Path, asset_id: str
+) -> None:
+    from tools.focused_nine_blender_recipes import REQUIRED_MATERIAL_NAMES
+
+    for fixture in (BLENDER, MATERIAL_FIXTURE, SALVAGE_DETAIL_FIXTURES[asset_id]):
+        if not fixture.is_file():
+            pytest.fail(f"fixture missing: {fixture}")
+
+    structural_root = tmp_path / "structural"
+    source_dir = structural_root / asset_id
+    source_dir.mkdir(parents=True)
+    source = source_dir / f"{asset_id}.blend"
+    shutil.copy2(SALVAGE_DETAIL_FIXTURES[asset_id], source)
+    _prepare_material_free_source(source)
+    props_root = tmp_path / "props"
+    props_root.mkdir()
+    material_dir = tmp_path / "materials"
+    material_dir.mkdir()
+    shutil.copy2(MATERIAL_FIXTURE, material_dir / "salvage_industrial.blend")
+    before_identity = _structural_contract_identity(source, asset_id)
+
+    command = _recipe_command(
+        project_root=PROJECT_ROOT,
+        structural_root=structural_root,
+        props_root=props_root,
+        asset_id=asset_id,
+    )
+    first = subprocess.run(command, capture_output=True, text=True, check=False)
+    assert first.returncode == 0, first.stdout + first.stderr
+    first_report, first_line = _report_from_stdout(first.stdout)
+    second = subprocess.run(command, capture_output=True, text=True, check=False)
+    assert second.returncode == 0, second.stdout + second.stderr
+    second_report, second_line = _report_from_stdout(second.stdout)
+
+    names = first_report["generated_object_names"]
+    assert first_report == second_report
+    assert first_line == second_line
+    assert len(names) == len(set(names))
+    assert names and all(name.startswith(f"FocusedNine_{asset_id}_") for name in names)
+    for token in SALVAGE_DETAIL_ROLE_TOKENS[asset_id]:
+        assert any(token in name for name in names), (asset_id, token, names)
+    assert set(first_report["material_names"]).issubset(set(REQUIRED_MATERIAL_NAMES))
+    assert first_report["material_names"]
+    assert all("." not in name for name in first_report["material_names"])
+    assert first_report["boolean_modifiers"] == []
+    assert "BOOLEAN" not in first_report["modifier_types"]
+    assert first_report["triangle_count"] > 0
+    assert _structural_contract_identity(source, asset_id) == before_identity
