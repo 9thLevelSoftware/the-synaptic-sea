@@ -56,6 +56,9 @@ CAPTURE_SCRIPT_RELATIVE = Path("scripts/validation/focused_nine_airlock_control_
 CAPTURE_SCENE_RELATIVE = Path("scenes/validation/focused_nine_airlock_control_room_harness.tscn")
 CAPTURE_OUTPUT_RELATIVE = Path("artifacts/validation-previews/focused-nine")
 CAPTURE_IMAGE_NAME = "focused-nine-airlock-control-room.png"
+# Godot reads the application icon while booting the project, even when the
+# explicit capture scene overrides project.godot's main scene.
+PROJECT_BOOTSTRAP_RELATIVES = (Path("icon.svg"),)
 LOGICAL_CAPTURE_OUTPUT = (
     f"res://{(CAPTURE_OUTPUT_RELATIVE / CAPTURE_IMAGE_NAME).as_posix()}"
 )
@@ -350,13 +353,20 @@ def _copy_regular(source: Path, destination: Path, label: str) -> None:
 
 
 def _build_overlay(project_root: Path, inputs: ValidatedInputs, destination: Path) -> Path:
-    """Create an overlay containing only Godot capture files and staged inputs."""
+    """Create an overlay containing capture files, bootstrap assets, and staged inputs."""
 
     if destination.exists() or destination.is_symlink():
         raise ValueError(f"overlay destination already exists: {destination}")
+    bootstrap_sources = tuple(
+        _regular_file(project_root / relative, f"project bootstrap asset {relative}")
+        for relative in PROJECT_BOOTSTRAP_RELATIVES
+    )
     _reject_static_symlink_components(destination, "overlay destination")
     destination.mkdir(parents=True)
     _copy_regular(project_root / "project.godot", destination / "project.godot", "project.godot")
+    for source in bootstrap_sources:
+        relative = source.relative_to(project_root)
+        _copy_regular(source, destination / relative, "project bootstrap asset")
     _copy_regular(
         project_root / CAPTURE_SCENE_RELATIVE,
         destination / CAPTURE_SCENE_RELATIVE,

@@ -54,6 +54,7 @@ def _project_fixture(tmp_path: Path) -> Path:
         copy_function=shutil.copy2,
     )
     _copy_regular(PROJECT_ROOT / "project.godot", project / "project.godot")
+    _copy_regular(PROJECT_ROOT / "icon.svg", project / "icon.svg")
     _copy_regular(
         PROJECT_ROOT / "scripts/validation/focused_nine_airlock_control_room_capture.gd",
         project / "scripts/validation/focused_nine_airlock_control_room_capture.gd",
@@ -485,17 +486,50 @@ def test_late_publication_failure_restores_exact_old_preview_and_proof(
         assert proof_path.read_bytes() == old_proof
 
 
+@pytest.mark.parametrize("bootstrap_state", ["missing", "symlinked"])
+def test_missing_or_symlinked_bootstrap_asset_blocks_before_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, bootstrap_state: str
+) -> None:
+    project = _project_fixture(tmp_path)
+    icon = project / "icon.svg"
+    if bootstrap_state == "missing":
+        icon.unlink()
+    else:
+        outside = tmp_path / "outside-icon.svg"
+        shutil.copy2(icon, outside)
+        icon.unlink()
+        icon.symlink_to(outside)
+
+    _stub_validation(monkeypatch)
+    captured = False
+
+    def should_not_capture(*_args: object, **_kwargs: object) -> tuple[bool, str, None]:
+        nonlocal captured
+        captured = True
+        return False, "capture must not start", None
+
+    monkeypatch.setattr(preview, "_run_room_capture", should_not_capture)
+
+    result = preview.run(_namespace_args(project))
+
+    assert result.exit_code == 1
+    assert "bootstrap" in result.reason
+    assert captured is False
+
+
 
 def test_overlay_is_external_and_contains_only_regular_capture_inputs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project = _project_fixture(tmp_path)
-    args = _namespace_args(project)
-    inputs = preview.validate_inputs(args)
+    inputs = preview.validate_inputs(_namespace_args(project))
     with preview.disposable_overlay(project, inputs) as overlay:
         assert overlay != project
         assert not str(overlay).startswith(str(project))
         assert (overlay / "project.godot").is_file()
+        assert (overlay / "icon.svg").is_file()
+        assert not (overlay / "icon.svg").is_symlink()
+        assert (overlay / "icon.svg").read_bytes() == (project / "icon.svg").read_bytes()
         assert (overlay / "scenes/validation/focused_nine_airlock_control_room_harness.tscn").is_file()
         assert (overlay / "scripts/validation/focused_nine_airlock_control_room_capture.gd").is_file()
         for path in preview.required_staged_paths(inputs):
