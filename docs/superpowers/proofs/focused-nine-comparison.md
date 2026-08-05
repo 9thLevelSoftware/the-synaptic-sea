@@ -18,7 +18,7 @@ The focused-nine comparison batch passed its staging, evidence, pressure-door ov
 
 | Role | Validation | Path | SHA-256 | Bytes | Triangles | Meshes | Materials |
 | --- | --- | --- | --- | ---: | ---: | ---: | --- |
-| `intact` | `PASS` | `res://assets/_staging/focused_nine/structural/floor_1x1/floor_1x1.glb` | `f295a90263224b3d3f2fae07db4991d591d5de672fae99a97cf11727c448fab3` | 39768 | 460 | 13 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_WarningStripe |
+| `intact` | `PASS` | `res://assets/_staging/focused_nine/structural/floor_1x1/floor_1x1.glb` | `7c9672badc65aad765f947ce54021de5c8f5af7dcbbfb7e3a1b5bf9020aee6f9` | 58940 | 680 | 18 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_WarningStripe |
 
 ### `wall_straight_1x1`
 
@@ -27,7 +27,7 @@ The focused-nine comparison batch passed its staging, evidence, pressure-door ov
 
 | Role | Validation | Path | SHA-256 | Bytes | Triangles | Meshes | Materials |
 | --- | --- | --- | --- | ---: | ---: | ---: | --- |
-| `intact` | `PASS` | `res://assets/_staging/focused_nine/structural/wall_straight_1x1/wall_straight_1x1.glb` | `8121d847d5a3185da780cfbc9e3c1a9623a520fc9fd191fe83be21d3a3b13e8f` | 34336 | 356 | 11 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_WarningStripe |
+| `intact` | `PASS` | `res://assets/_staging/focused_nine/structural/wall_straight_1x1/wall_straight_1x1.glb` | `76d6419cc7237be3d6b646537060876030f631949b73aec723129cf00ca889c7` | 61328 | 664 | 18 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_WarningStripe |
 
 ### `doorway_frame_open_1x1`
 
@@ -36,7 +36,7 @@ The focused-nine comparison batch passed its staging, evidence, pressure-door ov
 
 | Role | Validation | Path | SHA-256 | Bytes | Triangles | Meshes | Materials |
 | --- | --- | --- | --- | ---: | ---: | ---: | --- |
-| `intact` | `PASS` | `res://assets/_staging/focused_nine/structural/doorway_frame_open_1x1/doorway_frame_open_1x1.glb` | `1b339c16095c29d9ec28535b293491fa3121e73264893eb489c73b1c62f3c0f3` | 37172 | 360 | 14 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_ReactorGlow, MAT_WarningStripe |
+| `intact` | `PASS` | `res://assets/_staging/focused_nine/structural/doorway_frame_open_1x1/doorway_frame_open_1x1.glb` | `1e1ac3ae2794f66643e8cd3f56fb60974243715fab2a574696e8008bd594def2` | 63412 | 648 | 22 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_ReactorGlow, MAT_WarningStripe |
 
 ### `pillar_support_1x1`
 
@@ -45,7 +45,7 @@ The focused-nine comparison batch passed its staging, evidence, pressure-door ov
 
 | Role | Validation | Path | SHA-256 | Bytes | Triangles | Meshes | Materials |
 | --- | --- | --- | --- | ---: | ---: | ---: | --- |
-| `intact` | `PASS` | `res://assets/_staging/focused_nine/structural/pillar_support_1x1/pillar_support_1x1.glb` | `70f8f5aa9a2f304f4b27daf4399c3379fb48bebe9c4d36f1192bdabe57c73def` | 36248 | 360 | 14 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_WarningStripe |
+| `intact` | `PASS` | `res://assets/_staging/focused_nine/structural/pillar_support_1x1/pillar_support_1x1.glb` | `f2d2ea32a02398afa2d804a0dbd29e2c583c20158bee2d2e61dd71aa6441d887` | 51608 | 536 | 18 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_WarningStripe |
 
 ### `ramp_up_1x2`
 
@@ -54,7 +54,7 @@ The focused-nine comparison batch passed its staging, evidence, pressure-door ov
 
 | Role | Validation | Path | SHA-256 | Bytes | Triangles | Meshes | Materials |
 | --- | --- | --- | --- | ---: | ---: | ---: | --- |
-| `intact` | `PASS` | `res://assets/_staging/focused_nine/structural/ramp_up_1x2/ramp_up_1x2.glb` | `004fb4f644514fbb8d61dfd653fcaea3123cfd122a706b781674e70510b5fff3` | 35432 | 396 | 9 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_WarningStripe |
+| `intact` | `PASS` | `res://assets/_staging/focused_nine/structural/ramp_up_1x2/ramp_up_1x2.glb` | `7c612f502cd17a55255c0feb3ff0a823c15975dfb78fcc71f6849521624cfcf0` | 58408 | 660 | 15 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_WarningStripe |
 
 ### `ceiling_cap_1x1`
 
@@ -63,7 +63,7 @@ The focused-nine comparison batch passed its staging, evidence, pressure-door ov
 
 | Role | Validation | Path | SHA-256 | Bytes | Triangles | Meshes | Materials |
 | --- | --- | --- | --- | ---: | ---: | ---: | --- |
-| `intact` | `PASS` | `res://assets/_staging/focused_nine/structural/ceiling_cap_1x1/ceiling_cap_1x1.glb` | `d539d885cf8e308a10e7b0b866c1ef3880a8d6b8d26448863f6b3dfb332f61bb` | 43832 | 372 | 23 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_ReactorGlow, MAT_WarningStripe |
+| `intact` | `PASS` | `res://assets/_staging/focused_nine/structural/ceiling_cap_1x1/ceiling_cap_1x1.glb` | `b66987fe1dd8330170a5e14ec0cbff247a8512e14406c29280311e145d47f687` | 59268 | 520 | 30 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_ReactorGlow, MAT_WarningStripe |
 
 ### `pressure_door_1x1`
 
@@ -72,9 +72,9 @@ The focused-nine comparison batch passed its staging, evidence, pressure-door ov
 
 | Role | Validation | Path | SHA-256 | Bytes | Triangles | Meshes | Materials |
 | --- | --- | --- | --- | ---: | ---: | ---: | --- |
-| `intact` | `PASS` | `res://assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1.glb` | `4c0833e94f99430a0233ab576d3647c9fa219d626d547a1a8bc24b845d143ef7` | 36032 | 396 | 9 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_ReactorGlow, MAT_WarningStripe |
-| `damaged` | `PASS` | `res://assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1_damaged.glb` | `7962b7b759ced8410fdaeb5ea677085b245924ecc915122b07b3207a39e440a9` | 32236 | 352 | 8 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_ReactorGlow, MAT_WarningStripe |
-| `breached` | `PASS` | `res://assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1_breached.glb` | `652b3203bd9700a44e5e10ce4c230157df5754bbff1c6142da5ca89c830d0f58` | 32252 | 352 | 8 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_ReactorGlow, MAT_WarningStripe |
+| `intact` | `PASS` | `res://assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1.glb` | `d098b2a1ea72178392a87bd3c72a2fa6173fa886694a066bb564fd2bb21bdf14` | 58604 | 640 | 16 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_ReactorGlow, MAT_WarningStripe |
+| `damaged` | `PASS` | `res://assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1_damaged.glb` | `0879a826a0ad5d031bc28abde780d1ec1e3f4a3a800367aa8f2ca1c77786e687` | 58640 | 640 | 16 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_ReactorGlow, MAT_WarningStripe |
+| `breached` | `PASS` | `res://assets/_staging/focused_nine/structural/pressure_door_1x1/pressure_door_1x1_breached.glb` | `4f97af60e78c4a2440f5f8219da7153f3b74495af62cf606122df08867249dde` | 58624 | 640 | 16 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_ReactorGlow, MAT_WarningStripe |
 
 ### `hull_breach_seal_point`
 
@@ -83,7 +83,7 @@ The focused-nine comparison batch passed its staging, evidence, pressure-door ov
 
 | Role | Validation | Path | SHA-256 | Bytes | Triangles | Meshes | Materials |
 | --- | --- | --- | --- | ---: | ---: | ---: | --- |
-| `intact` | `PASS` | `res://assets/_staging/focused_nine/props/hull_breach_seal_point.glb` | `2c0c7c56e4fbfc6168e71bf18636a0542d659e35e008b942f72098020da98569` | 39240 | 440 | 10 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_WarningStripe |
+| `intact` | `PASS` | `res://assets/_staging/focused_nine/props/hull_breach_seal_point.glb` | `d697de44f988c329167ed62eefe10ab7f08ae4b9e1f863596cf769d6ed90f534` | 58452 | 660 | 15 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_ReactorGlow, MAT_WarningStripe |
 
 ### `fire_suppression_station`
 
@@ -92,7 +92,7 @@ The focused-nine comparison batch passed its staging, evidence, pressure-door ov
 
 | Role | Validation | Path | SHA-256 | Bytes | Triangles | Meshes | Materials |
 | --- | --- | --- | --- | ---: | ---: | ---: | --- |
-| `intact` | `PASS` | `res://assets/_staging/focused_nine/props/fire_suppression_station.glb` | `b3e7a3729912876baab04b9fbfe5f8485df84571f7a069c4697b2781a0b95ece` | 33000 | 312 | 14 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_ReactorGlow, MAT_WarningStripe |
+| `intact` | `PASS` | `res://assets/_staging/focused_nine/props/fire_suppression_station.glb` | `20ebd655a282b0c2d150ff54e44c2fd73f50ef3f7b7133f95215e4c55a864b38` | 56612 | 568 | 22 | MAT_Conduit, MAT_PaintedAlloyGray, MAT_ReactorGlow, MAT_WarningStripe |
 
 
 Acceptance marker: `FOCUSED_NINE_BATCH PASS assets=9`
