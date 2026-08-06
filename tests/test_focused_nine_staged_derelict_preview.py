@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import sys
 import time
@@ -107,7 +108,7 @@ def test_overlay_uses_regular_staged_glbs_at_canonical_import_paths(tmp_path: Pa
 def test_capture_output_rejects_diagnostics_even_with_pass_marker(tmp_path: Path) -> None:
     wrapper = tmp_path / "capture.py"
     wrapper.write_text(
-        "print('FOCUSED_NINE_STAGED_DERELICT_CAPTURE PASS seed=17 rooms=5 wrappers=5')\n"
+        "print('FOCUSED_NINE_STAGED_DERELICT_CAPTURE PASS seed=17 rooms=5 placements=5 walls=4 portals=1 staged_wrapper_count=5 staged=17 debug=res://artifacts/validation-previews/focused-nine/edge_map.json output=res://artifacts/validation-previews/focused-nine/focused-nine-staged-derelict.png')\n"
         "print('WARNING: injected')\n",
         encoding="utf-8",
     )
@@ -159,6 +160,103 @@ def test_capture_scene_source_uses_direct_viewport_texture_and_staged_generator_
     assert "FOCUSED_NINE_STAGED_DERELICT_CAPTURE PASS" in text
 
 
+def test_capture_uses_one_production_generator_path_and_never_decorates_floors() -> None:
+    source = (PROJECT_ROOT / "scripts/validation/focused_nine_staged_derelict_capture.gd").read_text(
+        encoding="utf-8"
+    )
+    assert "ShipGeneratorScript.new()" in source
+    assert "generator.generate(blueprint, derelict_archetype)" in source
+    assert source.count("generator.generate(blueprint, derelict_archetype)") == 1
+    assert "RoomGraphGeneratorScript" not in source
+    assert "StructuralPlacerScript" not in source
+    assert "_decorate_from_generated_rooms" not in source
+    assert "_add_generated_labels" not in source
+
+
+def test_preview_runner_requires_edge_debug_bundle_before_publish() -> None:
+    source = (PROJECT_ROOT / "tools/focused_nine_staged_derelict_preview.py").read_text(encoding="utf-8")
+    assert "edge_map.json" in source
+    assert "duplicate edge key" in source
+    assert "portal endpoint" in source
+    assert "_validate_debug_bundle" in source
+
+
+def test_capture_scene_keeps_only_production_root_and_camera_inputs() -> None:
+    scene = (PROJECT_ROOT / "scenes/validation/focused_nine_staged_derelict_harness.tscn").read_text(
+        encoding="utf-8"
+    )
+    assert 'node name="GeneratedShipRoot" type="Node3D" parent="."' in scene
+    assert 'node name="DerelictCamera" type="Camera3D" parent="."' in scene
+    assert "RoomGraphGenerator" not in scene
+    assert "StructuralPlacer" not in scene
+
+
+def test_debug_bundle_rejects_duplicate_edge_keys(tmp_path: Path) -> None:
+    bundle = tmp_path / "edge_map.json"
+    edge = {"edge_key": "0|h|0|0", "kind": "SOLID", "room_ids": ["room_a", ""]}
+    bundle.write_text(
+        json.dumps(
+            {
+                "schema": "focused_nine_canonical_edge_map_v1",
+                "capture_id": "StagedFocusedNine",
+                "seed": 17,
+                "rooms": 5,
+                "occupancy": [],
+                "edges": [
+                    {**edge, "placement_required": False, "wrapper_required": False},
+                    {**edge, "placement_required": False, "wrapper_required": False},
+                ],
+                "placements": [],
+                "wrapper_metadata": [],
+                "validation": {
+                    "edge_keys_unique": True,
+                    "portal_endpoints_valid": True,
+                    "no_portal_wall_overlap": True,
+                    "canonical_validator": True,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="duplicate edge key"):
+        preview._validate_debug_bundle(bundle)
+
+
+def test_debug_bundle_rejects_nonreciprocal_portal_endpoint(tmp_path: Path) -> None:
+    bundle = tmp_path / "edge_map.json"
+    bundle.write_text(
+        json.dumps(
+            {
+                "schema": "focused_nine_canonical_edge_map_v1",
+                "capture_id": "StagedFocusedNine",
+                "seed": 17,
+                "rooms": 5,
+                "occupancy": [],
+                "edges": [
+                    {
+                        "edge_key": "0|h|0|0",
+                        "kind": "DOOR",
+                        "room_ids": ["room_a", ""],
+                        "placement_required": True,
+                        "wrapper_required": True,
+                    }
+                ],
+                "placements": [],
+                "wrapper_metadata": [],
+                "validation": {
+                    "edge_keys_unique": True,
+                    "portal_endpoints_valid": True,
+                    "no_portal_wall_overlap": True,
+                    "canonical_validator": True,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="portal endpoint"):
+        preview._validate_debug_bundle(bundle)
+
+
 def test_dry_run_does_not_build_overlay_or_write_outputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     project = _project_fixture(tmp_path)
     args = _namespace_args(project, dry_run=True)
@@ -191,3 +289,101 @@ def test_png_dimension_validation_requires_real_1600x900_png(tmp_path: Path) -> 
     image.write_bytes(b"\x89PNG\r\n\x1a\ninvalid")
     with pytest.raises(ValueError, match="PNG|1600x900"):
         preview._validate_capture_image(image)
+
+
+def test_png_validation_rejects_forged_dimensions_without_complete_chunks(tmp_path: Path) -> None:
+    image = tmp_path / IMAGE_NAME
+    # This has enough bytes to forge the IHDR dimensions, but no complete
+    # IDAT/IEND chunk stream. Header-only validation would accept it.
+    image.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + (13).to_bytes(4, "big")
+        + b"IHDR"
+        + (1600).to_bytes(4, "big")
+        + (900).to_bytes(4, "big")
+        + b"\x08\x06\x00\x00\x00"
+        + b"\x00\x00\x00\x00"
+    )
+    with pytest.raises(ValueError, match="PNG|chunk|IEND|IDAT"):
+        preview._validate_capture_image(image)
+
+
+def test_publication_outputs_use_private_directory_and_file_modes(tmp_path: Path) -> None:
+    preview_path = tmp_path / "new" / "nested" / "preview.png"
+    proof_path = tmp_path / "other" / "nested" / "proof.md"
+
+    preview.publish_artifacts(preview_path, b"png", proof_path, "proof")
+
+    for directory in (preview_path.parent, preview_path.parent.parent, proof_path.parent, proof_path.parent.parent):
+        assert directory.stat().st_mode & 0o777 == 0o700
+    assert preview_path.stat().st_mode & 0o777 == 0o600
+    assert proof_path.stat().st_mode & 0o777 == 0o600
+
+
+def _debug_bundle(*, schema: bool = True, capture_id: bool = True, wrapper_metadata: bool = True) -> dict:
+    edge_key = "0|h|0|0"
+    placement_id = f"placement:{edge_key}"
+    document = {
+        "schema": "focused_nine_canonical_edge_map_v1",
+        "capture_id": "StagedFocusedNine",
+        "seed": 17,
+        "rooms": 5,
+        "occupancy": [],
+        "edges": [
+            {
+                "edge_key": edge_key,
+                "kind": "SOLID",
+                "room_ids": ["room_a", ""],
+                "placement_required": True,
+                "wrapper_required": True,
+            }
+        ],
+        "placements": [{"edge_key": edge_key, "placement_id": placement_id, "kind": "SOLID"}],
+        "wrapper_metadata": [{"edge_key": edge_key, "placement_id": placement_id}],
+        "validation": {
+            "edge_keys_unique": True,
+            "portal_endpoints_valid": True,
+            "no_portal_wall_overlap": True,
+            "canonical_validator": True,
+        },
+    }
+    if not schema:
+        document.pop("schema")
+    if not capture_id:
+        document.pop("capture_id")
+    if not wrapper_metadata:
+        document.pop("wrapper_metadata")
+    return document
+
+
+def test_debug_bundle_requires_schema_capture_id_and_wrapper_metadata(tmp_path: Path) -> None:
+    bundle = tmp_path / "edge_map.json"
+    document = _debug_bundle(schema=False, capture_id=False, wrapper_metadata=False)
+    bundle.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="schema|capture_id|wrapper_metadata"):
+        preview._validate_debug_bundle(bundle)
+
+
+def test_debug_bundle_rejects_placement_redirect_to_open_unrequired_edge(tmp_path: Path) -> None:
+    bundle = tmp_path / "edge_map.json"
+    document = _debug_bundle()
+    required_key = "0|h|0|0"
+    open_key = "0|h|0|1"
+    document["edges"] = [
+        document["edges"][0],
+        {
+            "edge_key": open_key,
+            "kind": "OPEN",
+            "room_ids": ["room_a", "room_b"],
+            "placement_required": False,
+            "wrapper_required": False,
+        },
+    ]
+    document["placements"] = [{"edge_key": open_key, "placement_id": f"placement:{open_key}", "kind": "OPEN"}]
+    document["wrapper_metadata"] = [{"edge_key": open_key, "placement_id": f"placement:{open_key}"}]
+    assert required_key not in {entry["edge_key"] for entry in document["placements"]}
+    bundle.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="required|OPEN|unrequired|placement"):
+        preview._validate_debug_bundle(bundle)

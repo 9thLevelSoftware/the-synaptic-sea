@@ -42,3 +42,4 @@ shadow_enabled = false
 environment = SubResource("Environment_staged_derelict")
 
 [node name="GeneratedShipRoot" type="Node3D" parent="."]
+metadata/capture_contract = "ShipGenerator.generate -> GeneratedShipLoader"

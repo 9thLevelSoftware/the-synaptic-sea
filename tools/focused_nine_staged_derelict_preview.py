@@ -27,6 +27,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import zlib
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -53,6 +54,7 @@ CAPTURE_SCENE_RELATIVE = Path("scenes/validation/focused_nine_staged_derelict_ha
 CAPTURE_SCRIPT_RELATIVE = Path("scripts/validation/focused_nine_staged_derelict_capture.gd")
 CAPTURE_OUTPUT_RELATIVE = Path("artifacts/validation-previews/focused-nine")
 CAPTURE_IMAGE_NAME = "focused-nine-staged-derelict.png"
+DEBUG_BUNDLE_NAME = "edge_map.json"
 PROOF_RELATIVE = Path("docs/superpowers/proofs/focused-nine-staged-derelict.md")
 STAGED_ROOT_RELATIVE = Path("assets/_staging/focused_nine")
 CANONICAL_IMPORTED_RELATIVE = Path("assets/imported/structural/ship_structural_v0")
@@ -61,6 +63,10 @@ COMPARISON_REPORT_NAME = "focused-nine-comparison.json"
 CAPTURE_MARKER_PREFIX = "FOCUSED_NINE_STAGED_DERELICT_CAPTURE PASS "
 PREVIEW_MARKER_PREFIX = "FOCUSED_NINE_STAGED_DERELICT_PREVIEW PASS "
 DIAGNOSTIC_MARKERS = ("WARNING:", "ERROR:", "SCRIPT ERROR:")
+DEBUG_BUNDLE_SCHEMA = "focused_nine_canonical_edge_map_v1"
+DEBUG_CAPTURE_ID = "StagedFocusedNine"
+PRIVATE_DIRECTORY_MODE = 0o700
+PRIVATE_FILE_MODE = 0o600
 PRESSURE_ROLES = ("intact", "damaged", "breached")
 NON_PRESSURE_ROLES = ("intact", "damaged", "breached")
 
@@ -106,8 +112,12 @@ class _PriorLeaf:
 class _CaptureMetadata:
     seed: int
     room_count: int
+    placement_count: int
+    wall_count: int
+    portal_count: int
     staged_wrapper_count: int
     staged_input_count: int
+    debug_bundle: str
     output: str
 
 
@@ -355,9 +365,7 @@ def _skip_overlay_relative(relative: Path) -> bool:
         return True
     if parts[:2] == ("assets", "imported") or parts[:2] == ("assets", "_staging"):
         return True
-    if parts[:3] == ("artifacts", "validation-previews", "focused-nine"):
-        return True
-    return False
+    return parts[:3] == ("artifacts", "validation-previews", "focused-nine")
 
 
 def _copy_project_regular_files(project_root: Path, destination: Path) -> None:
@@ -410,6 +418,16 @@ def _build_overlay(project_root: Path, inputs: ValidatedInputs, destination: Pat
         for role in roles:
             source = contract.asset_stage_glb(project_root, asset_id, role) if role in contract.VARIANT_ROLES.get(asset_id, ()) else source_intact
             _copy_regular(source, destination / _canonical_import_path(asset_id, role), f"staged {asset_id}/{role} GLB")
+
+    # The production kit's canonical DOOR wrapper is bulkhead_portal_2x1,
+    # while focused-nine stages the visually compatible doorway_frame asset.
+    # Keep this compatibility mapping disposable and overlay-only: the live
+    # wrapper/kit paths and staged registry are never rewritten or promoted.
+    _copy_regular(
+        contract.asset_stage_glb(project_root, "doorway_frame_open_1x1"),
+        destination / _canonical_import_path("bulkhead_portal_2x1"),
+        "staged bulkhead portal compatibility visual",
+    )
 
     # Props are preflighted for the package gate and copied only into the
     # overlay, never into the live runtime surface. The runtime prop binder is
@@ -491,8 +509,10 @@ def _combined_output(result: subprocess.CompletedProcess[str]) -> str:
 def _parse_capture_marker(line: str) -> _CaptureMetadata:
     pattern = re.compile(
         re.escape(CAPTURE_MARKER_PREFIX)
-        + r"seed=(?P<seed>-?\d+) rooms=(?P<rooms>\d+) wrappers=(?P<wrappers>\d+) "
-        + r"staged=(?P<staged>\d+) output=(?P<output>\S+)"
+        + r"seed=(?P<seed>-?\d+) rooms=(?P<rooms>\d+) "
+        + r"placements=(?P<placements>\d+) walls=(?P<walls>\d+) portals=(?P<portals>\d+) "
+        + r"staged_wrapper_count=(?P<wrappers_new>\d+) staged=(?P<staged>\d+) "
+        + r"debug=(?P<debug>\S+) output=(?P<output>\S+)"
     )
     match = pattern.fullmatch(line.strip())
     if match is None:
@@ -500,8 +520,12 @@ def _parse_capture_marker(line: str) -> _CaptureMetadata:
     return _CaptureMetadata(
         seed=int(match.group("seed")),
         room_count=int(match.group("rooms")),
-        staged_wrapper_count=int(match.group("wrappers")),
+        placement_count=int(match.group("placements")),
+        wall_count=int(match.group("walls")),
+        portal_count=int(match.group("portals")),
+        staged_wrapper_count=int(match.group("wrappers_new")),
         staged_input_count=int(match.group("staged")),
+        debug_bundle=match.group("debug"),
         output=match.group("output"),
     )
 
@@ -550,17 +574,246 @@ def _prime_overlay_imports(overlay: Path, timeout: float = CAPTURE_TIMEOUT_SECON
 
 
 def _validate_capture_image(path: Path) -> tuple[int, int]:
+    """Validate the complete PNG chunk stream, not just its dimensions."""
+
     _regular_file(path, "capture image")
-    with path.open("rb") as handle:
-        data = handle.read(32)
-    if len(data) < 24 or data[:8] != b"\x89PNG\r\n\x1a\n":
-        raise ValueError("capture image is not a valid PNG")
-    if data[12:16] != b"IHDR":
-        raise ValueError("capture image has no PNG IHDR")
-    width, height = struct.unpack(">II", data[16:24])
+    payload = path.read_bytes()
+    signature = b"\x89PNG\r\n\x1a\n"
+    if not payload.startswith(signature):
+        raise ValueError("capture image is not a valid PNG signature")
+
+    # Godot's PNG writer uses standard PNG chunks. Rejecting unknown chunk
+    # types is deliberate: a forged stream must not smuggle arbitrary bytes
+    # past this publication gate while still looking like a PNG header.
+    known_chunks = {
+        b"IHDR",
+        b"PLTE",
+        b"IDAT",
+        b"IEND",
+        b"cHRM",
+        b"gAMA",
+        b"iCCP",
+        b"sBIT",
+        b"sRGB",
+        b"tEXt",
+        b"tIME",
+        b"zTXt",
+        b"bKGD",
+        b"hIST",
+        b"pHYs",
+        b"sPLT",
+        b"tRNS",
+        b"iTXt",
+        b"eXIf",
+        b"acTL",
+        b"fcTL",
+        b"fdAT",
+    }
+    offset = len(signature)
+    saw_ihdr = False
+    saw_idat = False
+    saw_iend = False
+    dimensions: tuple[int, int] | None = None
+
+    while offset < len(payload):
+        if len(payload) - offset < 12:
+            raise ValueError("capture PNG chunk header is truncated")
+        length = struct.unpack(">I", payload[offset : offset + 4])[0]
+        chunk_type = payload[offset + 4 : offset + 8]
+        if chunk_type not in known_chunks or not all(65 <= byte <= 122 and not (91 <= byte <= 96) for byte in chunk_type):
+            raise ValueError(f"capture PNG contains an unknown or malformed chunk: {chunk_type!r}")
+        data_start = offset + 8
+        data_end = data_start + length
+        chunk_end = data_end + 4
+        if data_end < data_start or chunk_end > len(payload):
+            raise ValueError(f"capture PNG chunk is truncated: {chunk_type.decode('ascii', errors='replace')}")
+        chunk_data = payload[data_start:data_end]
+        expected_crc = struct.unpack(">I", payload[data_end:chunk_end])[0]
+        actual_crc = zlib.crc32(chunk_type + chunk_data) & 0xFFFFFFFF
+        if expected_crc != actual_crc:
+            raise ValueError(f"capture PNG chunk CRC is invalid: {chunk_type.decode('ascii', errors='replace')}")
+
+        if not saw_ihdr:
+            if chunk_type != b"IHDR":
+                raise ValueError("capture PNG must begin with IHDR")
+            if length != 13:
+                raise ValueError("capture PNG IHDR is malformed")
+            width, height = struct.unpack(">II", chunk_data[:8])
+            if width <= 0 or height <= 0:
+                raise ValueError("capture PNG dimensions are invalid")
+            dimensions = (width, height)
+            saw_ihdr = True
+        elif chunk_type == b"IHDR":
+            raise ValueError("capture PNG contains duplicate IHDR")
+
+        if chunk_type == b"IDAT" and length > 0:
+            saw_idat = True
+        if chunk_type == b"IEND":
+            if length != 0:
+                raise ValueError("capture PNG IEND is malformed")
+            saw_iend = True
+            offset = chunk_end
+            if offset != len(payload):
+                raise ValueError("capture PNG contains data after terminal IEND")
+            break
+        offset = chunk_end
+
+    if not saw_ihdr or dimensions is None:
+        raise ValueError("capture PNG has no IHDR")
+    if not saw_idat:
+        raise ValueError("capture PNG has no non-empty IDAT chunk")
+    if not saw_iend:
+        raise ValueError("capture PNG has no terminal IEND chunk")
+
+    width, height = dimensions
     if (width, height) != (1600, 900):
         raise ValueError(f"capture image must be exactly 1600x900, got {width}x{height}")
-    return width, height
+    return dimensions
+
+
+def _validate_debug_bundle(path: Path, metadata: _CaptureMetadata | None = None) -> dict[str, object]:
+    """Validate canonical edge evidence and its loader-wrapper bijection."""
+
+    _regular_file(path, "canonical edge debug bundle")
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError("canonical edge debug bundle is invalid JSON") from exc
+    if not isinstance(document, dict):
+        raise TypeError("canonical edge debug bundle must be a JSON object")
+
+    required_fields = ("schema", "capture_id", "seed", "rooms", "occupancy", "edges", "placements", "wrapper_metadata", "validation")
+    missing = [field for field in required_fields if field not in document]
+    if missing:
+        raise ValueError("canonical edge debug bundle missing " + ", ".join(missing))
+    if document["schema"] != DEBUG_BUNDLE_SCHEMA:
+        raise ValueError("canonical edge debug bundle schema is invalid")
+    if document["capture_id"] != DEBUG_CAPTURE_ID:
+        raise ValueError("canonical edge debug bundle capture_id is invalid")
+
+    edges = document["edges"]
+    placements = document["placements"]
+    wrapper_metadata = document["wrapper_metadata"]
+    if not isinstance(edges, list) or not isinstance(placements, list) or not isinstance(wrapper_metadata, list):
+        raise TypeError("canonical edge debug bundle edges, placements, and wrapper_metadata must be arrays")
+
+    edge_by_key: dict[str, dict[str, object]] = {}
+    placement_required_keys: set[str] = set()
+    for edge in edges:
+        if not isinstance(edge, dict):
+            raise TypeError("canonical edge debug bundle contains a non-object edge")
+        edge_key = edge.get("edge_key")
+        if not isinstance(edge_key, str) or not edge_key:
+            raise ValueError("canonical edge debug bundle contains an empty edge key")
+        if edge_key in edge_by_key:
+            raise ValueError(f"duplicate edge key: {edge_key}")
+        edge_by_key[edge_key] = edge
+        kind = edge.get("kind")
+        if not isinstance(kind, str) or not kind:
+            raise ValueError(f"canonical edge debug bundle edge kind is invalid: {edge_key}")
+        placement_required = edge.get("placement_required")
+        wrapper_required = edge.get("wrapper_required", placement_required)
+        if not isinstance(placement_required, bool) or not isinstance(wrapper_required, bool):
+            raise TypeError(f"canonical edge debug bundle placement requirement is invalid: {edge_key}")
+        if placement_required != wrapper_required:
+            raise ValueError(f"canonical edge debug bundle placement/wrapper requirement mismatch: {edge_key}")
+        if kind == "OPEN" and placement_required:
+            raise ValueError(f"OPEN edge cannot require placement: {edge_key}")
+        if placement_required:
+            placement_required_keys.add(edge_key)
+        if kind in {"DOOR", "LOCKED", "HATCH", "BREACH"}:
+            room_ids = edge.get("room_ids")
+            endpoint_count = (
+                sum(1 for room_id in room_ids if isinstance(room_id, str) and room_id)
+                if isinstance(room_ids, list)
+                else 0
+            )
+            if endpoint_count != 2 and not bool(edge.get("exterior", False)):
+                raise ValueError(f"portal endpoint reciprocity failed: {edge_key}")
+
+    placement_by_edge: dict[str, dict[str, object]] = {}
+    for placement in placements:
+        if not isinstance(placement, dict):
+            raise TypeError("canonical edge debug bundle contains a non-object placement")
+        edge_key = placement.get("edge_key")
+        if not isinstance(edge_key, str) or not edge_key:
+            raise ValueError("canonical edge debug bundle placement has an empty edge key")
+        if edge_key in placement_by_edge:
+            raise ValueError(f"duplicate placement edge key: {edge_key}")
+        edge = edge_by_key.get(edge_key)
+        if edge is None:
+            raise ValueError(f"placement references missing edge key: {edge_key}")
+        if edge_key not in placement_required_keys:
+            kind = edge.get("kind")
+            raise ValueError(f"placement redirects to OPEN/unrequired edge: {edge_key} ({kind})")
+        placement_id = placement.get("placement_id")
+        expected_id = edge.get("placement_id", f"placement:{edge_key}")
+        if not isinstance(placement_id, str) or not placement_id or placement_id != str(expected_id):
+            raise ValueError(f"placement metadata binding mismatch: {edge_key}")
+        if "kind" in placement and placement["kind"] != edge.get("kind"):
+            raise ValueError(f"placement kind mismatch: {edge_key}")
+        edge_kind = edge.get("kind")
+        if edge_kind in {"DOOR", "LOCKED", "HATCH", "BREACH"} and placement.get("kind") == "SOLID":
+            raise ValueError(f"portal edge has wall placement: {edge_key}")
+        placement_by_edge[edge_key] = placement
+
+    wrapper_by_edge: dict[str, dict[str, object]] = {}
+    for wrapper in wrapper_metadata:
+        if not isinstance(wrapper, dict):
+            raise TypeError("canonical edge debug bundle contains non-object wrapper metadata")
+        edge_key = wrapper.get("edge_key")
+        if not isinstance(edge_key, str) or not edge_key:
+            raise ValueError("canonical edge debug bundle wrapper metadata has an empty edge key")
+        if edge_key in wrapper_by_edge:
+            raise ValueError(f"duplicate wrapper metadata edge key: {edge_key}")
+        if edge_key not in edge_by_key:
+            raise ValueError(f"wrapper metadata references missing edge key: {edge_key}")
+        if edge_key not in placement_required_keys:
+            kind = edge_by_key[edge_key].get("kind")
+            raise ValueError(f"wrapper metadata redirects to OPEN/unrequired edge: {edge_key} ({kind})")
+        placement = placement_by_edge.get(edge_key)
+        placement_id = wrapper.get("placement_id")
+        if placement is None or not isinstance(placement_id, str) or not placement_id:
+            raise ValueError(f"wrapper metadata has no matching placement: {edge_key}")
+        if placement_id != placement.get("placement_id"):
+            raise ValueError(f"wrapper/placement metadata binding mismatch: {edge_key}")
+        wrapper_by_edge[edge_key] = wrapper
+
+    missing_placements = sorted(placement_required_keys - placement_by_edge.keys())
+    if missing_placements:
+        raise ValueError("required edge has no placement: " + ", ".join(missing_placements))
+    missing_wrappers = sorted(placement_required_keys - wrapper_by_edge.keys())
+    if missing_wrappers:
+        raise ValueError("required edge has no wrapper metadata: " + ", ".join(missing_wrappers))
+    if set(placement_by_edge) != set(wrapper_by_edge):
+        raise ValueError("placement and wrapper metadata edge bindings are not an exact set")
+
+    validation = document["validation"]
+    if not isinstance(validation, dict):
+        raise TypeError("canonical edge debug bundle validation must be an object")
+    for field in ("edge_keys_unique", "portal_endpoints_valid", "no_portal_wall_overlap", "canonical_validator"):
+        if validation.get(field) is not True:
+            raise ValueError(f"canonical edge debug bundle validation failed: {field}")
+
+    if metadata is not None:
+        expected = {
+            "seed": metadata.seed,
+            "rooms": metadata.room_count,
+            "placements": metadata.placement_count,
+            "walls": metadata.wall_count,
+            "portals": metadata.portal_count,
+        }
+        if document.get("seed") != expected["seed"] or document.get("rooms") != expected["rooms"]:
+            raise ValueError("canonical edge debug bundle metadata does not match capture marker")
+        actual_walls = sum(1 for edge in edges if isinstance(edge, dict) and edge.get("kind") == "SOLID")
+        actual_portals = sum(
+            1
+            for edge in edges
+            if isinstance(edge, dict) and edge.get("kind") in {"DOOR", "LOCKED", "HATCH", "BREACH"}
+        )
+        if len(placements) != expected["placements"] or actual_walls != expected["walls"] or actual_portals != expected["portals"]:
+            raise ValueError("canonical edge debug bundle counts do not match capture marker")
+    return document
 
 
 def _snapshot_leaf(path: Path) -> _PriorLeaf:
@@ -576,17 +829,42 @@ def _snapshot_leaf(path: Path) -> _PriorLeaf:
     return _PriorLeaf(True, path.read_bytes())
 
 
+def _ensure_private_output_parent(path: Path) -> None:
+    """Create output parents privately and tighten already-existing leaves."""
+
+    parent = path.parent
+    missing: list[Path] = []
+    cursor = parent
+    while not cursor.exists():
+        missing.append(cursor)
+        next_cursor = cursor.parent
+        if next_cursor == cursor:
+            break
+        cursor = next_cursor
+    parent.mkdir(parents=True, exist_ok=True)
+    # mkdir(mode=...) does not change an existing directory and is filtered by
+    # umask. Explicitly chmod every output parent, including parents created by
+    # an earlier publication, while leaving the pre-existing ancestor alone.
+    for directory in [parent, *missing]:
+        _reject_static_symlink_components(directory, f"output parent {directory}")
+        os.chmod(directory, PRIVATE_DIRECTORY_MODE)
+
+
 def _write_temp_sibling(path: Path, payload: bytes) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    _reject_static_symlink_components(path, f"output path {path}")
+    _ensure_private_output_parent(path)
     _reject_static_symlink_components(path.parent, f"output parent {path.parent}")
     descriptor, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
     temporary = Path(name)
     try:
+        os.fchmod(descriptor, PRIVATE_FILE_MODE)
         with os.fdopen(descriptor, "wb") as handle:
             descriptor = -1
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
+        if stat.S_IMODE(temporary.stat().st_mode) != PRIVATE_FILE_MODE:
+            raise PublicationError(f"temporary output permissions are not private: {path}")
         if temporary.read_bytes() != payload:
             raise PublicationError(f"temporary output verification failed: {path}")
         return temporary
@@ -599,6 +877,8 @@ def _write_temp_sibling(path: Path, payload: bytes) -> Path:
 
 def _verify_published(path: Path, payload: bytes) -> None:
     _regular_file(path, "published output")
+    if stat.S_IMODE(path.stat().st_mode) != PRIVATE_FILE_MODE:
+        raise PublicationError(f"published output permissions are not private: {path}")
     if path.read_bytes() != payload:
         raise PublicationError(f"published output verification failed: {path}")
 
@@ -626,33 +906,47 @@ def _restore_leaf(path: Path, prior: _PriorLeaf) -> None:
         _remove_leaf(path)
 
 
-def publish_artifacts(preview_path: Path, preview_bytes: bytes, proof_path: Path, proof_content: str | bytes) -> None:
+def publish_artifacts(
+    preview_path: Path,
+    preview_bytes: bytes,
+    proof_path: Path,
+    proof_content: str | bytes,
+    debug_path: Path | None = None,
+    debug_bytes: bytes | None = None,
+) -> None:
     if not preview_bytes:
         raise PublicationError("preview bytes are empty")
     proof_bytes = proof_content.encode("utf-8") if isinstance(proof_content, str) else bytes(proof_content)
     if not proof_bytes:
         raise PublicationError("proof content is empty")
-    prior_preview = _snapshot_leaf(preview_path)
-    prior_proof = _snapshot_leaf(proof_path)
-    temporary_preview: Path | None = None
-    temporary_proof: Path | None = None
+    if (debug_path is None) != (debug_bytes is None):
+        raise PublicationError("debug path and debug bytes must be supplied together")
+    if debug_bytes is not None and not debug_bytes:
+        raise PublicationError("debug bundle bytes are empty")
+
+    targets: list[tuple[Path, bytes]] = [(preview_path, preview_bytes), (proof_path, proof_bytes)]
+    if debug_path is not None and debug_bytes is not None:
+        targets.append((debug_path, debug_bytes))
+    prior = {path: _snapshot_leaf(path) for path, _payload in targets}
+    temporary_paths: list[Path | None] = []
     try:
-        temporary_preview = _write_temp_sibling(preview_path, preview_bytes)
-        temporary_proof = _write_temp_sibling(proof_path, proof_bytes)
-        os.replace(temporary_preview, preview_path)
-        temporary_preview = None
-        _verify_published(preview_path, preview_bytes)
-        os.replace(temporary_proof, proof_path)
-        temporary_proof = None
-        _verify_published(proof_path, proof_bytes)
+        for path, payload in targets:
+            temporary_paths.append(_write_temp_sibling(path, payload))
+        for index, (path, payload) in enumerate(targets):
+            temporary = temporary_paths[index]
+            if temporary is None:
+                raise PublicationError(f"missing temporary output for {path}")
+            os.replace(temporary, path)
+            temporary_paths[index] = None
+            _verify_published(path, payload)
     except BaseException as exc:
-        for temporary in (temporary_preview, temporary_proof):
+        for temporary in temporary_paths:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
         try:
-            _restore_leaf(preview_path, prior_preview)
-            _restore_leaf(proof_path, prior_proof)
-        except BaseException as rollback_exc:
+            for path, _payload in targets:
+                _restore_leaf(path, prior[path])
+        except Exception as rollback_exc:  # noqa: BLE001 - preserve the original publication failure during rollback
             raise PublicationError(f"publication failed and rollback failed: {rollback_exc}") from exc
         raise PublicationError(f"publication failed: {exc}") from exc
 
@@ -666,6 +960,10 @@ def build_proof(
     staged_wrapper_count: int,
     staged_input_count: int,
     marker: str,
+    placement_count: int = 0,
+    wall_count: int = 0,
+    portal_count: int = 0,
+    debug_bundle: str = "edge_map.json",
 ) -> str:
     return "\n".join(
         (
@@ -674,9 +972,12 @@ def build_proof(
             "- Source root: `assets/_staging/focused_nine` (staged-only).",
             f"- Runtime generator seed: `{seed}` (seed={seed}).",
             f"- Generated room count: `{room_count}` (room_count={room_count}, small derelict range 5-8).",
+            f"- Canonical structural placement count: `{placement_count}` (placements={placement_count}).",
+            f"- Canonical wall/portal edge counts: walls={wall_count}, portals={portal_count}.",
             f"- Generated staged wrapper count: `{staged_wrapper_count}` (staged_wrapper_count={staged_wrapper_count}).",
             f"- Staged focused-nine input count: `{staged_input_count}` (staged_input_count={staged_input_count}).",
             f"- Capture: `{output_path.name}`, {dimensions[0]}x{dimensions[1]}.",
+            f"- Canonical debug bundle: `{debug_bundle}` (`edge_map.json`).",
             "- The disposable overlay copied regular staged GLBs to canonical production import paths.",
             "- Pressure-door intact/damaged/breached triplet was preserved byte-for-byte in the overlay.",
             "- Tree inspection found no fallback or live imported visual references.",
@@ -783,6 +1084,12 @@ def run(args: argparse.Namespace) -> RunResult:
                 preview_bytes = output_path.read_bytes()
             except (OSError, RuntimeError, ValueError) as exc:
                 return RunResult(1, str(exc) or "capture image validation failed")
+            try:
+                _validate_debug_bundle(output_dir / DEBUG_BUNDLE_NAME, metadata)
+                debug_bytes = (output_dir / DEBUG_BUNDLE_NAME).read_bytes()
+            except (OSError, RuntimeError, TypeError, ValueError) as exc:
+                return RunResult(1, str(exc) or "canonical debug bundle validation failed")
+            published_debug = normalised.preview_dir / DEBUG_BUNDLE_NAME
             proof_content = build_proof(
                 output_path=normalised.preview_dir / CAPTURE_IMAGE_NAME,
                 dimensions=dimensions,
@@ -791,6 +1098,10 @@ def run(args: argparse.Namespace) -> RunResult:
                 staged_wrapper_count=metadata.staged_wrapper_count,
                 staged_input_count=metadata.staged_input_count,
                 marker=detail,
+                placement_count=metadata.placement_count,
+                wall_count=metadata.wall_count,
+                portal_count=metadata.portal_count,
+                debug_bundle=_logical_path(normalised.project_root, published_debug),
             )
             try:
                 publish_artifacts(
@@ -798,6 +1109,8 @@ def run(args: argparse.Namespace) -> RunResult:
                     preview_bytes,
                     normalised.proof,
                     proof_content,
+                    debug_path=published_debug,
+                    debug_bytes=debug_bytes,
                 )
             except (OSError, RuntimeError, PublicationError, ValueError) as exc:
                 return RunResult(1, str(exc) or "preview/proof publication failed")
@@ -808,7 +1121,9 @@ def run(args: argparse.Namespace) -> RunResult:
     return RunResult(
         0,
         f"{PREVIEW_MARKER_PREFIX}seed={metadata.seed} rooms={metadata.room_count} "
+        f"placements={metadata.placement_count} walls={metadata.wall_count} portals={metadata.portal_count} "
         f"staged_wrapper_count={metadata.staged_wrapper_count} staged_input_count={metadata.staged_input_count} "
+        f"debug={_logical_path(normalised.project_root, published_debug)} "
         f"png={_logical_path(normalised.project_root, published)}",
         published,
     )
