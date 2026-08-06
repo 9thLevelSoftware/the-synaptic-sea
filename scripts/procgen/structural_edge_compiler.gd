@@ -17,6 +17,8 @@ const EDGE_DOOR: String = "DOOR"
 const EDGE_LOCKED: String = "LOCKED"
 const EDGE_HATCH: String = "HATCH"
 const EDGE_BREACH: String = "BREACH"
+const FLOOR_KIND: String = "FLOOR"
+const FLOOR_MODULE_IDS: Array[String] = ["floor_1x1", "corridor_floor_1x1"]
 
 # Kept here as an explicit compiler contract so wall placement cannot drift
 # back into floor/module-list decoration.
@@ -34,6 +36,7 @@ func compile(layout: Dictionary) -> Dictionary:
 	var emitted_edge_keys: Dictionary = {}
 	var edges: Dictionary = {}
 	var placements: Array[Dictionary] = []
+	var floor_placements: Array[Dictionary] = []
 	var portal_intents: Dictionary = {}
 	var matched_portal_ids: Dictionary = {}
 
@@ -82,6 +85,29 @@ func compile(layout: Dictionary) -> Dictionary:
 			var cell_record: Dictionary = StructuralEdgePlanScript.make_cell(deck, cell, room_id)
 			occupancy[cell_key] = cell_record
 			room_by_cell[cell_key] = room_id
+
+	# Floors are cell-owned records, not edge records. Keep them in a separate
+	# collection so edge uniqueness/reciprocity validation cannot accidentally
+	# treat a floor as a second owner of a wall or portal edge.
+	for cell_key_variant in occupancy.keys():
+		var floor_cell_record: Dictionary = occupancy[cell_key_variant]
+		var floor_room_id: String = String(floor_cell_record.get("room_id", ""))
+		var floor_room: Dictionary = rooms_by_id.get(floor_room_id, {})
+		var floor_module_id: String = _floor_module_id_for_room(floor_room)
+		floor_placements.append({
+			"id": "floor:" + String(cell_key_variant),
+			"placement_id": "floor:" + String(cell_key_variant),
+			"module_id": floor_module_id,
+			"floor_module_id": floor_module_id,
+			"kind": FLOOR_KIND,
+			"state": FLOOR_KIND,
+			"position": floor_cell_record.get("position", Vector3.ZERO),
+			"yaw_degrees": 0.0,
+			"deck": int(floor_cell_record.get("deck", 0)),
+			"cell": floor_cell_record.get("cell", Vector2i.ZERO),
+			"room_id": floor_room_id,
+			"room_ids": [floor_room_id],
+		})
 
 	# 2. Portal records are intents, not visual instances. Store them by the
 	# unordered room pair and optionally constrain them to one required edge.
@@ -185,6 +211,7 @@ func compile(layout: Dictionary) -> Dictionary:
 		"occupancy": occupancy,
 		"edges": edges,
 		"placements": placements,
+		"floor_placements": floor_placements,
 		"errors": errors,
 	}
 
@@ -408,6 +435,30 @@ func _room_pair_key(first: String, second: String) -> String:
 	if first < second:
 		return first + "|" + second
 	return second + "|" + first
+
+
+func _floor_module_id_for_room(room: Dictionary) -> String:
+	var declared_module: String = String(room.get("floor_module_id", ""))
+	if FLOOR_MODULE_IDS.has(declared_module):
+		return declared_module
+
+	# A migrated fixture may still carry its legacy floor records. They are
+	# consulted only to preserve the authored floor/corridor wrapper choice;
+	# walls and portals never read this list.
+	var legacy_placements: Variant = room.get("structural_placements", [])
+	if legacy_placements is Array:
+		for placement_variant in legacy_placements:
+			if not (placement_variant is Dictionary):
+				continue
+			var placement: Dictionary = placement_variant
+			var module_id: String = String(placement.get("module_id", placement.get("module", "")))
+			if FLOOR_MODULE_IDS.has(module_id):
+				return module_id
+
+	var role: String = String(room.get("role", room.get("room_role", ""))).to_lower()
+	if role == "corridor" or role.find("spine") >= 0 or role.find("access") >= 0 or role.find("arm") >= 0 or role.find("convergence") >= 0:
+		return "corridor_floor_1x1"
+	return "floor_1x1"
 
 
 func _room_records(raw_rooms: Variant, errors: Array[String]) -> Array:

@@ -1158,6 +1158,13 @@ func _is_number(value: Variant) -> bool:
 func _parse_integer(value: Variant) -> Dictionary:
 	if typeof(value) == TYPE_INT:
 		return {"ok": true, "value": int(value)}
+	# JSON.stringify emits integral Godot integers as JSON floats (for example
+	# deck=0 becomes 0.0). Preserve the integer contract while accepting that
+	# lossless wire representation.
+	if typeof(value) == TYPE_FLOAT and is_equal_approx(float(value), round(float(value))):
+		return {"ok": true, "value": int(value)}
+	if value is String and String(value).strip_edges().is_valid_int():
+		return {"ok": true, "value": int(String(value).strip_edges())}
 	return {"ok": false, "value": 0}
 
 
@@ -1185,6 +1192,20 @@ func _parse_cell(value: Variant) -> Dictionary:
 			var y_result: Dictionary = _parse_integer(value_dict["y"])
 			if bool(x_result.get("ok", false)) and bool(y_result.get("ok", false)):
 				return {"ok": true, "cell": Vector2i(int(x_result["value"]), int(y_result["value"]))}
+	if value is String:
+		var text: String = String(value).strip_edges()
+		if text.begins_with("Vector2i(") and text.ends_with(")"):
+			text = text.substr(9, text.length() - 10)
+		elif text.begins_with("(") and text.ends_with(")"):
+			text = text.substr(1, text.length() - 2)
+		else:
+			return {"ok": false, "cell": Vector2i.ZERO}
+		var parts: PackedStringArray = text.split(",")
+		if parts.size() == 2:
+			var x_result: Dictionary = _parse_integer(parts[0].strip_edges())
+			var y_result: Dictionary = _parse_integer(parts[1].strip_edges())
+			if bool(x_result.get("ok", false)) and bool(y_result.get("ok", false)):
+				return {"ok": true, "cell": Vector2i(int(x_result["value"]), int(y_result["value"]))}
 	return {"ok": false, "cell": Vector2i.ZERO}
 
 
@@ -1195,5 +1216,23 @@ func _parse_vector3(value: Variant) -> Dictionary:
 		var values: Array = value
 		if values.size() == 3 and _is_number(values[0]) and _is_number(values[1]) and _is_number(values[2]):
 			return {"ok": true, "value": Vector3(float(values[0]), float(values[1]), float(values[2]))}
+	if value is String:
+		var text: String = String(value).strip_edges()
+		if text.begins_with("Vector3(") and text.ends_with(")"):
+			text = text.substr(8, text.length() - 9)
+		elif text.begins_with("(") and text.ends_with(")"):
+			text = text.substr(1, text.length() - 2)
+		else:
+			return {"ok": false, "value": Vector3.ZERO}
+		var parts: PackedStringArray = text.split(",")
+		if parts.size() == 3 and parts[0].strip_edges().is_valid_float() and parts[1].strip_edges().is_valid_float() and parts[2].strip_edges().is_valid_float():
+			return {
+				"ok": true,
+				"value": Vector3(
+					float(parts[0].strip_edges()),
+					float(parts[1].strip_edges()),
+					float(parts[2].strip_edges()),
+				),
+			}
 	return {"ok": false, "value": Vector3.ZERO}
 

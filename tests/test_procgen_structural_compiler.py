@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
@@ -274,6 +275,95 @@ def test_ship_generator_validates_structural_plan_before_loader():
     assert 'layout["structural_plan"] = structural_plan' in source
 
 
+def test_loader_uses_compiler_placements_not_role_module_lists():
+    source = _read("scripts/procgen/generated_ship_loader.gd")
+    assert '"structural_plan"' in source
+    assert '"placements"' in source
+    for metadata_key in (
+        "structural_edge_key",
+        "structural_kind",
+        "structural_placement_id",
+        "structural_room_ids",
+    ):
+        assert metadata_key in source
+
+    start = source.index("func _instance_structural_wrappers(")
+    end = source.index("func _parse_prefixed_int(", start)
+    instance_body = source[start:end]
+    assert "structural_placements" not in instance_body
+    assert "_read_placement_position" not in instance_body
+    assert 'record.get("position"' in instance_body
+    assert 'record.get("yaw_degrees"' in instance_body
+
+
+def test_loader_fails_closed_when_compiled_plan_is_missing_or_invalid():
+    source = _read("scripts/procgen/generated_ship_loader.gd")
+    assert "layout missing validated structural_plan" in source
+    assert "compiled placement references unavailable wrapper" in source
+
+
+def test_loader_invokes_full_validator_before_wrapper_resource_lookup_and_preflights_all_records():
+    source = _read("scripts/procgen/generated_ship_loader.gd")
+    assert 'preload("res://scripts/procgen/structural_plan_validator.gd")' in source
+    assert ".validate(structural_plan, layout)" in source
+    validator_index = source.index("_validate_structural_plan_for_loading")
+    module_lookup_index = source.index("_build_module_scene_map")
+    assert validator_index < module_lookup_index
+    assert "func _preflight_structural_wrappers(" in source
+    preflight_start = source.index("func _preflight_structural_wrappers(")
+    instance_start = source.index("func _instance_structural_wrappers(")
+    preflight_body = source[preflight_start:instance_start]
+    assert "record_variant is Dictionary" in preflight_body
+    assert "placement_id" in preflight_body
+    assert "room_ids" in preflight_body
+    assert "PackedScene" in preflight_body
+    assert "instantiate()" not in preflight_body
+    assert "_preflight_structural_wrappers" in source[instance_start:]
+
+
+def test_loader_playable_smoke_asserts_canonical_wrapper_tree_contract():
+    source = _read("scripts/validation/procgen_loader_playable_contract_smoke.gd")
+    assert "PROCGEN_STRUCTURAL_LOADER_PASS" in source
+    assert "structural_placement_id" in source
+    assert "structural_edge_key" in source
+    assert "north" in source
+    assert "z=-2" in source
+    assert "_run_loader_preflight_regressions" in source
+    assert "malformed-edge-position" in source
+    assert "malformed-yaw" in source
+    assert "mixed module" in source
+
+
+def test_compiler_emits_floor_placements_from_canonical_occupancy():
+    source = _read("scripts/procgen/structural_edge_compiler.gd")
+    assert '"floor_placements"' in source
+    assert "FLOOR_KIND" in source
+    assert "floor_module_id" in source
+    assert "floor_placements.append" in source
+
+
+def test_task5_layout_fixtures_embed_migrated_structural_plans():
+    fixture_paths = (
+        "data/procgen/smoke/seed_000017/layout.json",
+        "data/procgen/golden/coherent_ship_001/layout.json",
+        "data/procgen/golden/coherent_ship_002/layout.json",
+        "data/procgen/golden/coherent_ship_003/layout.json",
+    )
+    for relative_path in fixture_paths:
+        document = json.loads(_read(relative_path))
+        assert all("cells" in room for room in document["rooms"]), relative_path
+        assert document.get("portals"), relative_path
+        structural_plan = document.get("structural_plan")
+        assert isinstance(structural_plan, dict), relative_path
+        assert structural_plan.get("validated") is True, relative_path
+        assert not structural_plan.get("errors"), relative_path
+        occupancy = structural_plan.get("occupancy")
+        floor_placements = structural_plan.get("floor_placements")
+        assert isinstance(occupancy, dict) and occupancy, relative_path
+        assert isinstance(floor_placements, list), relative_path
+        assert len(floor_placements) == len(occupancy), relative_path
+
+
 def test_layout_stress_smoke_has_seed_17_footprint_ownership_evidence():
     source = _read("scripts/validation/procgen_layout_stress_smoke.gd")
     assert "seed_val == 17" in source or "seed_val = 17" in source
@@ -326,6 +416,13 @@ def test_generated_seed_17_emits_valid_explicit_footprints_and_portals(tmp_path:
         var verdict: Dictionary = Validator.new().validate(structural_plan, layout)
         if not bool(verdict.get("ok", false)):
             _fail("validator rejected generated layout: " + JSON.stringify(verdict["errors"]))
+        var floor_placements: Array = structural_plan.get("floor_placements", [])
+        if floor_placements.size() != ownership.size():
+            _fail("compiler floor placement count=%d does not match occupancy=%d" % [floor_placements.size(), ownership.size()])
+        for floor_variant in floor_placements:
+            if not (floor_variant is Dictionary) or String((floor_variant as Dictionary).get("kind", "")) != "FLOOR":
+                _fail("compiler emitted a malformed floor placement: " + JSON.stringify(floor_variant))
+                break
         var portal_count := 0
         for portal_variant in layout.get("portals", []):
             var portal: Dictionary = portal_variant
@@ -850,11 +947,20 @@ def test_validator_accepts_a_valid_compiler_plan(tmp_path: Path):
             }],
         }
         var plan: Dictionary = Compiler.new().compile(topology)
-        var verdict: Dictionary = Validator.new().validate(plan, topology)
+        var validator := Validator.new()
+        var verdict: Dictionary = validator.validate(plan, topology)
         if not bool(verdict.get("ok", false)):
             _fail("valid compiler plan was rejected: " + JSON.stringify(verdict.get("errors", [])))
         if int(verdict.get("stats", {}).get("placement_count", -1)) != plan["placements"].size():
             _fail("validator stats did not count canonical placements")
+
+        var wire_plan_variant: Variant = JSON.parse_string(JSON.stringify(plan))
+        var wire_topology_variant: Variant = JSON.parse_string(JSON.stringify(topology))
+        if not (wire_plan_variant is Dictionary) or not (wire_topology_variant is Dictionary):
+            _fail("serialized canonical validator fixture did not remain dictionaries")
+        var wire_verdict: Dictionary = validator.validate(wire_plan_variant, wire_topology_variant)
+        if not bool(wire_verdict.get("ok", false)):
+            _fail("validator rejected serialized compiler plan: " + JSON.stringify(wire_verdict.get("errors", [])))
         """,
     )
     output = "\n".join(part for part in (result.stdout, result.stderr) if part)

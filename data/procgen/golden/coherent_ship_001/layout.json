@@ -1,19 +1,342 @@
 {
-  "schema_version": "1.2.0",
-  "document_kind": "ship_layout",
-  "program_id": "coherent-proof-ship-001",
-  "kit_id": "ship_structural_v0",
-  "design_intent": "curated coherent 5-8 room proof ship",
+  "arc_zones": [],
+  "blocked_links": [
+    {
+      "from_cell": [
+        8.0,
+        1.0,
+        1.0
+      ],
+      "from_room": "spine_01",
+      "id": "spine_to_reactor_blocked_shortcut",
+      "module_id": "doorway_frame_blocked_1x1",
+      "reason": "biomatter blockage",
+      "to_cell": [
+        9.0,
+        1.0,
+        1.0
+      ],
+      "to_room": "reactor_01"
+    }
+  ],
+  "breach_zones": [],
   "cell_size": 4.0,
+  "critical_path": [
+    "airlock_01",
+    "corridor_01",
+    "ramp_01",
+    "spine_01",
+    "reactor_01"
+  ],
+  "design_intent": "curated coherent 5-8 room proof ship",
+  "document_kind": "ship_layout",
+  "encounters": [],
+  "fire_zones": [
+    {
+      "from_cell": [
+        6.0,
+        0.0,
+        1.0
+      ],
+      "from_room": "spine_01",
+      "id": "side_corridor_fire",
+      "kind": "timed_fire",
+      "module_id": "doorway_frame_open_1x1",
+      "rationale": "non-critical side link off the spine; cargo is optional loot (objective 1) so fire here cannot trap the player or block any main objective",
+      "to_cell": [
+        6.0,
+        -1.0,
+        1.0
+      ],
+      "to_room": "cargo_01"
+    }
+  ],
+  "kit_id": "ship_structural_v0",
+  "landmarks": [
+    {
+      "color": "blue",
+      "id": "spine_blue_beacon",
+      "kind": "orientation_beacon",
+      "position": [
+        24.0,
+        4.15,
+        0.0
+      ],
+      "room_id": "spine_01"
+    },
+    {
+      "color": "green",
+      "id": "reactor_green_core",
+      "kind": "destination_core",
+      "position": [
+        38.0,
+        4.15,
+        2.0
+      ],
+      "room_id": "reactor_01"
+    }
+  ],
+  "portals": [
+    {
+      "deck": 0.0,
+      "direction": "east",
+      "edge_key": "0|v|0|1",
+      "from_cell": [
+        1.0,
+        0.0
+      ],
+      "from_room": "airlock_01",
+      "id": "airlock_to_corridor",
+      "required": true,
+      "to_cell": [
+        2.0,
+        0.0
+      ],
+      "to_room": "corridor_01",
+      "type": "hatch"
+    },
+    {
+      "deck": 0.0,
+      "direction": "east",
+      "edge_key": "0|v|0|3",
+      "from_cell": [
+        3.0,
+        0.0
+      ],
+      "from_room": "corridor_01",
+      "id": "corridor_to_ramp",
+      "required": true,
+      "to_cell": [
+        4.0,
+        0.0
+      ],
+      "to_room": "ramp_01",
+      "type": "hatch"
+    },
+    {
+      "deck": 1.0,
+      "direction": "north",
+      "edge_key": "1|h|-1|5",
+      "from_cell": [
+        5.0,
+        0.0
+      ],
+      "from_room": "spine_01",
+      "id": "spine_to_cargo",
+      "required": true,
+      "to_cell": [
+        5.0,
+        -1.0
+      ],
+      "to_room": "cargo_01",
+      "type": "hatch"
+    },
+    {
+      "deck": 1.0,
+      "direction": "north",
+      "edge_key": "1|h|-1|7",
+      "from_cell": [
+        7.0,
+        0.0
+      ],
+      "from_room": "spine_01",
+      "id": "spine_to_medbay",
+      "required": true,
+      "to_cell": [
+        7.0,
+        -1.0
+      ],
+      "to_room": "medbay_01",
+      "type": "hatch"
+    },
+    {
+      "deck": 1.0,
+      "direction": "south",
+      "edge_key": "1|h|0|5",
+      "from_cell": [
+        5.0,
+        0.0
+      ],
+      "from_room": "spine_01",
+      "id": "spine_to_maintenance",
+      "required": true,
+      "to_cell": [
+        5.0,
+        1.0
+      ],
+      "to_room": "maintenance_01",
+      "type": "hatch"
+    },
+    {
+      "deck": 1.0,
+      "direction": "east",
+      "edge_key": "1|v|0|8",
+      "from_cell": [
+        8.0,
+        0.0
+      ],
+      "from_room": "spine_01",
+      "id": "spine_to_reactor_main",
+      "required": true,
+      "to_cell": [
+        9.0,
+        0.0
+      ],
+      "to_room": "reactor_01",
+      "type": "hatch"
+    }
+  ],
+  "program_id": "coherent-proof-ship-001",
+  "prototype": {
+    "goal_room": "reactor_01",
+    "start_room": "airlock_01"
+  },
+  "room_links": [
+    {
+      "from_cell": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "from_room": "airlock_01",
+      "id": "airlock_to_corridor",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        2.0,
+        0.0,
+        0.0
+      ],
+      "to_room": "corridor_01"
+    },
+    {
+      "from_cell": [
+        3.0,
+        0.0,
+        0.0
+      ],
+      "from_room": "corridor_01",
+      "id": "corridor_to_ramp",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        4.0,
+        0.0,
+        0.0
+      ],
+      "to_room": "ramp_01"
+    },
+    {
+      "from_cell": [
+        4.0,
+        0.0,
+        0.0
+      ],
+      "from_room": "ramp_01",
+      "id": "ramp_to_spine",
+      "module_id": "ramp_up_1x2",
+      "to_cell": [
+        4.0,
+        0.0,
+        1.0
+      ],
+      "to_room": "spine_01"
+    },
+    {
+      "from_cell": [
+        5.0,
+        0.0,
+        1.0
+      ],
+      "from_room": "spine_01",
+      "id": "spine_to_cargo",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        5.0,
+        -1.0,
+        1.0
+      ],
+      "to_room": "cargo_01"
+    },
+    {
+      "from_cell": [
+        7.0,
+        0.0,
+        1.0
+      ],
+      "from_room": "spine_01",
+      "id": "spine_to_medbay",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        7.0,
+        -1.0,
+        1.0
+      ],
+      "to_room": "medbay_01"
+    },
+    {
+      "from_cell": [
+        5.0,
+        0.0,
+        1.0
+      ],
+      "from_room": "spine_01",
+      "id": "spine_to_maintenance",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        5.0,
+        1.0,
+        1.0
+      ],
+      "to_room": "maintenance_01"
+    },
+    {
+      "from_cell": [
+        8.0,
+        0.0,
+        1.0
+      ],
+      "from_room": "spine_01",
+      "id": "spine_to_reactor_main",
+      "module_id": "doorway_frame_open_1x1",
+      "to_cell": [
+        9.0,
+        0.0,
+        1.0
+      ],
+      "to_room": "reactor_01"
+    }
+  ],
   "rooms": [
     {
+      "cells": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0
+        ]
+      ],
+      "deck": 0.0,
+      "floor_module_id": "floor_1x1",
+      "footprint": [
+        2.0,
+        2.0
+      ],
       "id": "airlock_01",
       "room_role": "airlock",
-      "deck": 0,
       "structural_placements": [
         {
-          "name": "floor_cell_x0_z0",
           "module": "floor_1x1",
+          "name": "floor_cell_x0_z0",
           "world_position": [
             0.0,
             0.0,
@@ -21,8 +344,8 @@
           ]
         },
         {
-          "name": "floor_cell_x1_z0",
           "module": "floor_1x1",
+          "name": "floor_cell_x1_z0",
           "world_position": [
             4.0,
             0.0,
@@ -30,8 +353,8 @@
           ]
         },
         {
-          "name": "floor_cell_x0_z1",
           "module": "floor_1x1",
+          "name": "floor_cell_x0_z1",
           "world_position": [
             0.0,
             0.0,
@@ -39,8 +362,8 @@
           ]
         },
         {
-          "name": "floor_cell_x1_z1",
           "module": "floor_1x1",
+          "name": "floor_cell_x1_z1",
           "world_position": [
             4.0,
             0.0,
@@ -50,13 +373,28 @@
       ]
     },
     {
+      "cells": [
+        [
+          2.0,
+          0.0
+        ],
+        [
+          3.0,
+          0.0
+        ]
+      ],
+      "deck": 0.0,
+      "floor_module_id": "corridor_floor_1x1",
+      "footprint": [
+        2.0,
+        1.0
+      ],
       "id": "corridor_01",
       "room_role": "corridor",
-      "deck": 0,
       "structural_placements": [
         {
-          "name": "floor_cell_x2_z0",
           "module": "corridor_floor_1x1",
+          "name": "floor_cell_x2_z0",
           "world_position": [
             8.0,
             0.0,
@@ -64,8 +402,8 @@
           ]
         },
         {
-          "name": "floor_cell_x3_z0",
           "module": "corridor_floor_1x1",
+          "name": "floor_cell_x3_z0",
           "world_position": [
             12.0,
             0.0,
@@ -75,13 +413,24 @@
       ]
     },
     {
+      "cells": [
+        [
+          4.0,
+          0.0
+        ]
+      ],
+      "deck": 0.0,
+      "floor_module_id": "floor_1x1",
+      "footprint": [
+        1.0,
+        1.0
+      ],
       "id": "ramp_01",
       "room_role": "ramp",
-      "deck": 0,
       "structural_placements": [
         {
-          "name": "floor_cell_x4_z0",
           "module": "floor_1x1",
+          "name": "floor_cell_x4_z0",
           "world_position": [
             16.0,
             0.0,
@@ -89,8 +438,8 @@
           ]
         },
         {
-          "name": "ramp_up_1x2",
           "module": "ramp_up_1x2",
+          "name": "ramp_up_1x2",
           "world_position": [
             16.0,
             0.0,
@@ -100,13 +449,40 @@
       ]
     },
     {
+      "cells": [
+        [
+          4.0,
+          0.0
+        ],
+        [
+          5.0,
+          0.0
+        ],
+        [
+          6.0,
+          0.0
+        ],
+        [
+          7.0,
+          0.0
+        ],
+        [
+          8.0,
+          0.0
+        ]
+      ],
+      "deck": 1.0,
+      "floor_module_id": "corridor_floor_1x1",
+      "footprint": [
+        5.0,
+        1.0
+      ],
       "id": "spine_01",
       "room_role": "main_spine",
-      "deck": 1,
       "structural_placements": [
         {
-          "name": "floor_cell_d1_x4_z0",
           "module": "corridor_floor_1x1",
+          "name": "floor_cell_d1_x4_z0",
           "world_position": [
             16.0,
             4.0,
@@ -114,8 +490,8 @@
           ]
         },
         {
+          "module": "corridor_floor_1x1",
           "name": "floor_cell_d1_x5_z0",
-          "module": "corridor_floor_1x1",
           "world_position": [
             20.0,
             4.0,
@@ -123,8 +499,8 @@
           ]
         },
         {
+          "module": "corridor_floor_1x1",
           "name": "floor_cell_d1_x6_z0",
-          "module": "corridor_floor_1x1",
           "world_position": [
             24.0,
             4.0,
@@ -132,8 +508,8 @@
           ]
         },
         {
+          "module": "corridor_floor_1x1",
           "name": "floor_cell_d1_x7_z0",
-          "module": "corridor_floor_1x1",
           "world_position": [
             28.0,
             4.0,
@@ -141,8 +517,8 @@
           ]
         },
         {
+          "module": "corridor_floor_1x1",
           "name": "floor_cell_d1_x8_z0",
-          "module": "corridor_floor_1x1",
           "world_position": [
             32.0,
             4.0,
@@ -152,360 +528,4377 @@
       ]
     },
     {
-      "id": "cargo_01",
-      "room_role": "cargo",
-      "deck": 1,
-      "structural_placements": [
-        {
-          "name": "floor_cell_d1_x5_z-1",
-          "module": "floor_1x1",
-          "world_position": [
-            20.0,
-            4.0,
-            -4.0
-          ]
-        },
-        {
-          "name": "floor_cell_d1_x6_z-1",
-          "module": "floor_1x1",
-          "world_position": [
-            24.0,
-            4.0,
-            -4.0
-          ]
-        },
-        {
-          "name": "floor_cell_d1_x5_z-2",
-          "module": "floor_1x1",
-          "world_position": [
-            20.0,
-            4.0,
-            -8.0
-          ]
-        },
-        {
-          "name": "floor_cell_d1_x6_z-2",
-          "module": "floor_1x1",
-          "world_position": [
-            24.0,
-            4.0,
-            -8.0
-          ]
-        }
-      ]
-    },
-    {
-      "id": "medbay_01",
-      "room_role": "medical",
-      "deck": 1,
-      "structural_placements": [
-        {
-          "name": "floor_cell_d1_x7_z-1",
-          "module": "floor_1x1",
-          "world_position": [
-            28.0,
-            4.0,
-            -4.0
-          ]
-        },
-        {
-          "name": "floor_cell_d1_x8_z-1",
-          "module": "floor_1x1",
-          "world_position": [
-            32.0,
-            4.0,
-            -4.0
-          ]
-        }
-      ]
-    },
-    {
-      "id": "maintenance_01",
-      "room_role": "maintenance",
-      "deck": 1,
-      "structural_placements": [
-        {
-          "name": "floor_cell_d1_x5_z1",
-          "module": "floor_1x1",
-          "world_position": [
-            20.0,
-            4.0,
-            4.0
-          ]
-        },
-        {
-          "name": "floor_cell_d1_x6_z1",
-          "module": "floor_1x1",
-          "world_position": [
-            24.0,
-            4.0,
-            4.0
-          ]
-        },
-        {
-          "name": "floor_cell_d1_x5_z2",
-          "module": "floor_1x1",
-          "world_position": [
-            20.0,
-            4.0,
-            8.0
-          ]
-        },
-        {
-          "name": "floor_cell_d1_x6_z2",
-          "module": "floor_1x1",
-          "world_position": [
-            24.0,
-            4.0,
-            8.0
-          ]
-        }
-      ]
-    },
-    {
-      "id": "reactor_01",
-      "room_role": "reactor",
-      "deck": 1,
-      "structural_placements": [
-        {
-          "name": "floor_cell_d1_x9_z0",
-          "module": "floor_1x1",
-          "world_position": [
-            36.0,
-            4.0,
-            0.0
-          ]
-        },
-        {
-          "name": "floor_cell_d1_x10_z0",
-          "module": "floor_1x1",
-          "world_position": [
-            40.0,
-            4.0,
-            0.0
-          ]
-        },
-        {
-          "name": "floor_cell_d1_x9_z1",
-          "module": "floor_1x1",
-          "world_position": [
-            36.0,
-            4.0,
-            4.0
-          ]
-        },
-        {
-          "name": "floor_cell_d1_x10_z1",
-          "module": "floor_1x1",
-          "world_position": [
-            40.0,
-            4.0,
-            4.0
-          ]
-        }
-      ]
-    }
-  ],
-  "room_links": [
-    {
-      "id": "airlock_to_corridor",
-      "from_room": "airlock_01",
-      "to_room": "corridor_01",
-      "from_cell": [
-        1,
-        0,
-        0
+      "cells": [
+        [
+          5.0,
+          -2.0
+        ],
+        [
+          6.0,
+          -2.0
+        ],
+        [
+          5.0,
+          -1.0
+        ],
+        [
+          6.0,
+          -1.0
+        ]
       ],
-      "to_cell": [
-        2,
-        0,
-        0
-      ],
-      "module_id": "doorway_frame_open_1x1"
-    },
-    {
-      "id": "corridor_to_ramp",
-      "from_room": "corridor_01",
-      "to_room": "ramp_01",
-      "from_cell": [
-        3,
-        0,
-        0
-      ],
-      "to_cell": [
-        4,
-        0,
-        0
-      ],
-      "module_id": "doorway_frame_open_1x1"
-    },
-    {
-      "id": "ramp_to_spine",
-      "from_room": "ramp_01",
-      "to_room": "spine_01",
-      "from_cell": [
-        4,
-        0,
-        0
-      ],
-      "to_cell": [
-        4,
-        0,
-        1
-      ],
-      "module_id": "ramp_up_1x2"
-    },
-    {
-      "id": "spine_to_cargo",
-      "from_room": "spine_01",
-      "to_room": "cargo_01",
-      "from_cell": [
-        5,
-        0,
-        1
-      ],
-      "to_cell": [
-        5,
-        -1,
-        1
-      ],
-      "module_id": "doorway_frame_open_1x1"
-    },
-    {
-      "id": "spine_to_medbay",
-      "from_room": "spine_01",
-      "to_room": "medbay_01",
-      "from_cell": [
-        7,
-        0,
-        1
-      ],
-      "to_cell": [
-        7,
-        -1,
-        1
-      ],
-      "module_id": "doorway_frame_open_1x1"
-    },
-    {
-      "id": "spine_to_maintenance",
-      "from_room": "spine_01",
-      "to_room": "maintenance_01",
-      "from_cell": [
-        5,
-        0,
-        1
-      ],
-      "to_cell": [
-        5,
-        1,
-        1
-      ],
-      "module_id": "doorway_frame_open_1x1"
-    },
-    {
-      "id": "spine_to_reactor_main",
-      "from_room": "spine_01",
-      "to_room": "reactor_01",
-      "from_cell": [
-        8,
-        0,
-        1
-      ],
-      "to_cell": [
-        9,
-        0,
-        1
-      ],
-      "module_id": "doorway_frame_open_1x1"
-    }
-  ],
-  "blocked_links": [
-    {
-      "id": "spine_to_reactor_blocked_shortcut",
-      "from_room": "spine_01",
-      "to_room": "reactor_01",
-      "from_cell": [
-        8,
-        1,
-        1
-      ],
-      "to_cell": [
-        9,
-        1,
-        1
-      ],
-      "module_id": "doorway_frame_blocked_1x1",
-      "reason": "biomatter blockage"
-    }
-  ],
-  "fire_zones": [
-    {
-      "id": "side_corridor_fire",
-      "from_room": "spine_01",
-      "to_room": "cargo_01",
-      "from_cell": [6, 0, 1],
-      "to_cell": [6, -1, 1],
-      "module_id": "doorway_frame_open_1x1",
-      "kind": "timed_fire",
-      "rationale": "non-critical side link off the spine; cargo is optional loot (objective 1) so fire here cannot trap the player or block any main objective"
-    }
-  ],
-  "vertical_connections": [
-    {
-      "id": "ramp_01_to_spine_01",
-      "type": "ramp",
-      "module_id": "ramp_up_1x2",
-      "from_room": "ramp_01",
-      "from_cell": [
-        4,
-        0,
-        0
-      ],
-      "to_room": "spine_01",
-      "to_cell": [
-        4,
-        0,
-        1
-      ]
-    }
-  ],
-  "landmarks": [
-    {
-      "id": "spine_blue_beacon",
-      "room_id": "spine_01",
-      "kind": "orientation_beacon",
-      "position": [
-        24.0,
-        4.15,
-        0.0
-      ],
-      "color": "blue"
-    },
-    {
-      "id": "reactor_green_core",
-      "room_id": "reactor_01",
-      "kind": "destination_core",
-      "position": [
-        38.0,
-        4.15,
+      "deck": 1.0,
+      "floor_module_id": "floor_1x1",
+      "footprint": [
+        2.0,
         2.0
       ],
-      "color": "green"
+      "id": "cargo_01",
+      "room_role": "cargo",
+      "structural_placements": [
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_d1_x5_z-1",
+          "world_position": [
+            20.0,
+            4.0,
+            -4.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_d1_x6_z-1",
+          "world_position": [
+            24.0,
+            4.0,
+            -4.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_d1_x5_z-2",
+          "world_position": [
+            20.0,
+            4.0,
+            -8.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_d1_x6_z-2",
+          "world_position": [
+            24.0,
+            4.0,
+            -8.0
+          ]
+        }
+      ]
+    },
+    {
+      "cells": [
+        [
+          7.0,
+          -1.0
+        ],
+        [
+          8.0,
+          -1.0
+        ]
+      ],
+      "deck": 1.0,
+      "floor_module_id": "floor_1x1",
+      "footprint": [
+        2.0,
+        1.0
+      ],
+      "id": "medbay_01",
+      "room_role": "medical",
+      "structural_placements": [
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_d1_x7_z-1",
+          "world_position": [
+            28.0,
+            4.0,
+            -4.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_d1_x8_z-1",
+          "world_position": [
+            32.0,
+            4.0,
+            -4.0
+          ]
+        }
+      ]
+    },
+    {
+      "cells": [
+        [
+          5.0,
+          1.0
+        ],
+        [
+          6.0,
+          1.0
+        ],
+        [
+          5.0,
+          2.0
+        ],
+        [
+          6.0,
+          2.0
+        ]
+      ],
+      "deck": 1.0,
+      "floor_module_id": "floor_1x1",
+      "footprint": [
+        2.0,
+        2.0
+      ],
+      "id": "maintenance_01",
+      "room_role": "maintenance",
+      "structural_placements": [
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_d1_x5_z1",
+          "world_position": [
+            20.0,
+            4.0,
+            4.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_d1_x6_z1",
+          "world_position": [
+            24.0,
+            4.0,
+            4.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_d1_x5_z2",
+          "world_position": [
+            20.0,
+            4.0,
+            8.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_d1_x6_z2",
+          "world_position": [
+            24.0,
+            4.0,
+            8.0
+          ]
+        }
+      ]
+    },
+    {
+      "cells": [
+        [
+          9.0,
+          0.0
+        ],
+        [
+          10.0,
+          0.0
+        ],
+        [
+          9.0,
+          1.0
+        ],
+        [
+          10.0,
+          1.0
+        ]
+      ],
+      "deck": 1.0,
+      "floor_module_id": "floor_1x1",
+      "footprint": [
+        2.0,
+        2.0
+      ],
+      "id": "reactor_01",
+      "room_role": "reactor",
+      "structural_placements": [
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_d1_x9_z0",
+          "world_position": [
+            36.0,
+            4.0,
+            0.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_d1_x10_z0",
+          "world_position": [
+            40.0,
+            4.0,
+            0.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_d1_x9_z1",
+          "world_position": [
+            36.0,
+            4.0,
+            4.0
+          ]
+        },
+        {
+          "module": "floor_1x1",
+          "name": "floor_cell_d1_x10_z1",
+          "world_position": [
+            40.0,
+            4.0,
+            4.0
+          ]
+        }
+      ]
     }
   ],
-  "critical_path": [
-    "airlock_01",
-    "corridor_01",
-    "ramp_01",
-    "spine_01",
-    "reactor_01"
-  ],
-  "arc_zones": [],
-  "breach_zones": [],
-  "encounters": [],
-  "prototype": {
-    "start_room": "airlock_01",
-    "goal_room": "reactor_01"
-  }
+  "schema_version": "1.2.0",
+  "structural_plan": {
+    "edges": {
+      "0|h|-1|0": {
+        "cell": "(0, 0)",
+        "deck": 0,
+        "direction": "north",
+        "edge_key": "0|h|-1|0",
+        "exterior": false,
+        "id": "edge:0|h|-1|0",
+        "key": "0|h|-1|0",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "airlock_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(0.0, 0.0, -2.0)",
+        "room_ids": [
+          "airlock_01",
+          ""
+        ],
+        "source_cells": [
+          "(0, 0)",
+          "(0, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      "0|h|-1|1": {
+        "cell": "(1, 0)",
+        "deck": 0,
+        "direction": "north",
+        "edge_key": "0|h|-1|1",
+        "exterior": false,
+        "id": "edge:0|h|-1|1",
+        "key": "0|h|-1|1",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "airlock_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(4.0, 0.0, -2.0)",
+        "room_ids": [
+          "airlock_01",
+          ""
+        ],
+        "source_cells": [
+          "(1, 0)",
+          "(1, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      "0|h|-1|2": {
+        "cell": "(2, 0)",
+        "deck": 0,
+        "direction": "north",
+        "edge_key": "0|h|-1|2",
+        "exterior": false,
+        "id": "edge:0|h|-1|2",
+        "key": "0|h|-1|2",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "corridor_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(8.0, 0.0, -2.0)",
+        "room_ids": [
+          "corridor_01",
+          ""
+        ],
+        "source_cells": [
+          "(2, 0)",
+          "(2, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      "0|h|-1|3": {
+        "cell": "(3, 0)",
+        "deck": 0,
+        "direction": "north",
+        "edge_key": "0|h|-1|3",
+        "exterior": false,
+        "id": "edge:0|h|-1|3",
+        "key": "0|h|-1|3",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "corridor_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(12.0, 0.0, -2.0)",
+        "room_ids": [
+          "corridor_01",
+          ""
+        ],
+        "source_cells": [
+          "(3, 0)",
+          "(3, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      "0|h|-1|4": {
+        "cell": "(4, 0)",
+        "deck": 0,
+        "direction": "north",
+        "edge_key": "0|h|-1|4",
+        "exterior": false,
+        "id": "edge:0|h|-1|4",
+        "key": "0|h|-1|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "ramp_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(16.0, 0.0, -2.0)",
+        "room_ids": [
+          "ramp_01",
+          ""
+        ],
+        "source_cells": [
+          "(4, 0)",
+          "(4, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      "0|h|0|0": {
+        "cell": "(0, 0)",
+        "deck": 0,
+        "direction": "south",
+        "edge_key": "0|h|0|0",
+        "exterior": false,
+        "id": "edge:0|h|0|0",
+        "key": "0|h|0|0",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "north",
+        "other_room": "airlock_01",
+        "owner_room": "airlock_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(0.0, 0.0, 2.0)",
+        "room_ids": [
+          "airlock_01",
+          "airlock_01"
+        ],
+        "source_cells": [
+          "(0, 0)",
+          "(0, 1)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 0.0
+      },
+      "0|h|0|1": {
+        "cell": "(1, 0)",
+        "deck": 0,
+        "direction": "south",
+        "edge_key": "0|h|0|1",
+        "exterior": false,
+        "id": "edge:0|h|0|1",
+        "key": "0|h|0|1",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "north",
+        "other_room": "airlock_01",
+        "owner_room": "airlock_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(4.0, 0.0, 2.0)",
+        "room_ids": [
+          "airlock_01",
+          "airlock_01"
+        ],
+        "source_cells": [
+          "(1, 0)",
+          "(1, 1)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 0.0
+      },
+      "0|h|0|2": {
+        "cell": "(2, 0)",
+        "deck": 0,
+        "direction": "south",
+        "edge_key": "0|h|0|2",
+        "exterior": false,
+        "id": "edge:0|h|0|2",
+        "key": "0|h|0|2",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "corridor_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(8.0, 0.0, 2.0)",
+        "room_ids": [
+          "corridor_01",
+          ""
+        ],
+        "source_cells": [
+          "(2, 0)",
+          "(2, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "0|h|0|3": {
+        "cell": "(3, 0)",
+        "deck": 0,
+        "direction": "south",
+        "edge_key": "0|h|0|3",
+        "exterior": false,
+        "id": "edge:0|h|0|3",
+        "key": "0|h|0|3",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "corridor_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(12.0, 0.0, 2.0)",
+        "room_ids": [
+          "corridor_01",
+          ""
+        ],
+        "source_cells": [
+          "(3, 0)",
+          "(3, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "0|h|0|4": {
+        "cell": "(4, 0)",
+        "deck": 0,
+        "direction": "south",
+        "edge_key": "0|h|0|4",
+        "exterior": false,
+        "id": "edge:0|h|0|4",
+        "key": "0|h|0|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "ramp_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(16.0, 0.0, 2.0)",
+        "room_ids": [
+          "ramp_01",
+          ""
+        ],
+        "source_cells": [
+          "(4, 0)",
+          "(4, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "0|h|1|0": {
+        "cell": "(0, 1)",
+        "deck": 0,
+        "direction": "south",
+        "edge_key": "0|h|1|0",
+        "exterior": false,
+        "id": "edge:0|h|1|0",
+        "key": "0|h|1|0",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "airlock_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(0.0, 0.0, 6.0)",
+        "room_ids": [
+          "airlock_01",
+          ""
+        ],
+        "source_cells": [
+          "(0, 1)",
+          "(0, 2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "0|h|1|1": {
+        "cell": "(1, 1)",
+        "deck": 0,
+        "direction": "south",
+        "edge_key": "0|h|1|1",
+        "exterior": false,
+        "id": "edge:0|h|1|1",
+        "key": "0|h|1|1",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "airlock_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(4.0, 0.0, 6.0)",
+        "room_ids": [
+          "airlock_01",
+          ""
+        ],
+        "source_cells": [
+          "(1, 1)",
+          "(1, 2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "0|v|0|-1": {
+        "cell": "(0, 0)",
+        "deck": 0,
+        "direction": "west",
+        "edge_key": "0|v|0|-1",
+        "exterior": false,
+        "id": "edge:0|v|0|-1",
+        "key": "0|v|0|-1",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "airlock_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(-2.0, 0.0, 0.0)",
+        "room_ids": [
+          "airlock_01",
+          ""
+        ],
+        "source_cells": [
+          "(0, 0)",
+          "(-1, 0)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      "0|v|0|0": {
+        "cell": "(0, 0)",
+        "deck": 0,
+        "direction": "east",
+        "edge_key": "0|v|0|0",
+        "exterior": false,
+        "id": "edge:0|v|0|0",
+        "key": "0|v|0|0",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "west",
+        "other_room": "airlock_01",
+        "owner_room": "airlock_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(2.0, 0.0, 0.0)",
+        "room_ids": [
+          "airlock_01",
+          "airlock_01"
+        ],
+        "source_cells": [
+          "(0, 0)",
+          "(1, 0)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 270.0
+      },
+      "0|v|0|1": {
+        "cell": "(1, 0)",
+        "deck": 0,
+        "direction": "east",
+        "edge_key": "0|v|0|1",
+        "exterior": false,
+        "id": "edge:0|v|0|1",
+        "key": "0|v|0|1",
+        "kind": "HATCH",
+        "module_id": "doorway_frame_open_1x1",
+        "opposite_direction": "west",
+        "other_room": "corridor_01",
+        "owner_room": "airlock_01",
+        "placement_required": true,
+        "portal": true,
+        "portal_intent_id": "portal:0",
+        "position": "(6.0, 0.0, 0.0)",
+        "room_ids": [
+          "airlock_01",
+          "corridor_01"
+        ],
+        "source_cells": [
+          "(1, 0)",
+          "(2, 0)"
+        ],
+        "state": "HATCH",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      "0|v|0|2": {
+        "cell": "(2, 0)",
+        "deck": 0,
+        "direction": "east",
+        "edge_key": "0|v|0|2",
+        "exterior": false,
+        "id": "edge:0|v|0|2",
+        "key": "0|v|0|2",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "west",
+        "other_room": "corridor_01",
+        "owner_room": "corridor_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(10.0, 0.0, 0.0)",
+        "room_ids": [
+          "corridor_01",
+          "corridor_01"
+        ],
+        "source_cells": [
+          "(2, 0)",
+          "(3, 0)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 270.0
+      },
+      "0|v|0|3": {
+        "cell": "(3, 0)",
+        "deck": 0,
+        "direction": "east",
+        "edge_key": "0|v|0|3",
+        "exterior": false,
+        "id": "edge:0|v|0|3",
+        "key": "0|v|0|3",
+        "kind": "HATCH",
+        "module_id": "doorway_frame_open_1x1",
+        "opposite_direction": "west",
+        "other_room": "ramp_01",
+        "owner_room": "corridor_01",
+        "placement_required": true,
+        "portal": true,
+        "portal_intent_id": "portal:1",
+        "position": "(14.0, 0.0, 0.0)",
+        "room_ids": [
+          "corridor_01",
+          "ramp_01"
+        ],
+        "source_cells": [
+          "(3, 0)",
+          "(4, 0)"
+        ],
+        "state": "HATCH",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      "0|v|0|4": {
+        "cell": "(4, 0)",
+        "deck": 0,
+        "direction": "east",
+        "edge_key": "0|v|0|4",
+        "exterior": false,
+        "id": "edge:0|v|0|4",
+        "key": "0|v|0|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "ramp_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(18.0, 0.0, 0.0)",
+        "room_ids": [
+          "ramp_01",
+          ""
+        ],
+        "source_cells": [
+          "(4, 0)",
+          "(5, 0)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      "0|v|1|-1": {
+        "cell": "(0, 1)",
+        "deck": 0,
+        "direction": "west",
+        "edge_key": "0|v|1|-1",
+        "exterior": false,
+        "id": "edge:0|v|1|-1",
+        "key": "0|v|1|-1",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "airlock_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(-2.0, 0.0, 4.0)",
+        "room_ids": [
+          "airlock_01",
+          ""
+        ],
+        "source_cells": [
+          "(0, 1)",
+          "(-1, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      "0|v|1|0": {
+        "cell": "(0, 1)",
+        "deck": 0,
+        "direction": "east",
+        "edge_key": "0|v|1|0",
+        "exterior": false,
+        "id": "edge:0|v|1|0",
+        "key": "0|v|1|0",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "west",
+        "other_room": "airlock_01",
+        "owner_room": "airlock_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(2.0, 0.0, 4.0)",
+        "room_ids": [
+          "airlock_01",
+          "airlock_01"
+        ],
+        "source_cells": [
+          "(0, 1)",
+          "(1, 1)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 270.0
+      },
+      "0|v|1|1": {
+        "cell": "(1, 1)",
+        "deck": 0,
+        "direction": "east",
+        "edge_key": "0|v|1|1",
+        "exterior": false,
+        "id": "edge:0|v|1|1",
+        "key": "0|v|1|1",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "airlock_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(6.0, 0.0, 4.0)",
+        "room_ids": [
+          "airlock_01",
+          ""
+        ],
+        "source_cells": [
+          "(1, 1)",
+          "(2, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      "1|h|-1|10": {
+        "cell": "(10, 0)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|-1|10",
+        "exterior": false,
+        "id": "edge:1|h|-1|10",
+        "key": "1|h|-1|10",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "reactor_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(40.0, 4.0, -2.0)",
+        "room_ids": [
+          "reactor_01",
+          ""
+        ],
+        "source_cells": [
+          "(10, 0)",
+          "(10, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      "1|h|-1|4": {
+        "cell": "(4, 0)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|-1|4",
+        "exterior": false,
+        "id": "edge:1|h|-1|4",
+        "key": "1|h|-1|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "spine_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(16.0, 4.0, -2.0)",
+        "room_ids": [
+          "spine_01",
+          ""
+        ],
+        "source_cells": [
+          "(4, 0)",
+          "(4, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      "1|h|-1|5": {
+        "cell": "(5, -1)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|-1|5",
+        "exterior": false,
+        "id": "edge:1|h|-1|5",
+        "key": "1|h|-1|5",
+        "kind": "HATCH",
+        "module_id": "doorway_frame_open_1x1",
+        "opposite_direction": "north",
+        "other_room": "spine_01",
+        "owner_room": "cargo_01",
+        "placement_required": true,
+        "portal": true,
+        "portal_intent_id": "portal:2",
+        "position": "(20.0, 4.0, -2.0)",
+        "room_ids": [
+          "cargo_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(5, -1)",
+          "(5, 0)"
+        ],
+        "state": "HATCH",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "1|h|-1|6": {
+        "cell": "(6, -1)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|-1|6",
+        "exterior": false,
+        "id": "edge:1|h|-1|6",
+        "key": "1|h|-1|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "spine_01",
+        "owner_room": "cargo_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(24.0, 4.0, -2.0)",
+        "room_ids": [
+          "cargo_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(6, -1)",
+          "(6, 0)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "1|h|-1|7": {
+        "cell": "(7, -1)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|-1|7",
+        "exterior": false,
+        "id": "edge:1|h|-1|7",
+        "key": "1|h|-1|7",
+        "kind": "HATCH",
+        "module_id": "doorway_frame_open_1x1",
+        "opposite_direction": "north",
+        "other_room": "spine_01",
+        "owner_room": "medbay_01",
+        "placement_required": true,
+        "portal": true,
+        "portal_intent_id": "portal:3",
+        "position": "(28.0, 4.0, -2.0)",
+        "room_ids": [
+          "medbay_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(7, -1)",
+          "(7, 0)"
+        ],
+        "state": "HATCH",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "1|h|-1|8": {
+        "cell": "(8, -1)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|-1|8",
+        "exterior": false,
+        "id": "edge:1|h|-1|8",
+        "key": "1|h|-1|8",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "spine_01",
+        "owner_room": "medbay_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(32.0, 4.0, -2.0)",
+        "room_ids": [
+          "medbay_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(8, -1)",
+          "(8, 0)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "1|h|-1|9": {
+        "cell": "(9, 0)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|-1|9",
+        "exterior": false,
+        "id": "edge:1|h|-1|9",
+        "key": "1|h|-1|9",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "reactor_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(36.0, 4.0, -2.0)",
+        "room_ids": [
+          "reactor_01",
+          ""
+        ],
+        "source_cells": [
+          "(9, 0)",
+          "(9, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      "1|h|-2|5": {
+        "cell": "(5, -2)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|-2|5",
+        "exterior": false,
+        "id": "edge:1|h|-2|5",
+        "key": "1|h|-2|5",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "north",
+        "other_room": "cargo_01",
+        "owner_room": "cargo_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(20.0, 4.0, -6.0)",
+        "room_ids": [
+          "cargo_01",
+          "cargo_01"
+        ],
+        "source_cells": [
+          "(5, -2)",
+          "(5, -1)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 0.0
+      },
+      "1|h|-2|6": {
+        "cell": "(6, -2)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|-2|6",
+        "exterior": false,
+        "id": "edge:1|h|-2|6",
+        "key": "1|h|-2|6",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "north",
+        "other_room": "cargo_01",
+        "owner_room": "cargo_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(24.0, 4.0, -6.0)",
+        "room_ids": [
+          "cargo_01",
+          "cargo_01"
+        ],
+        "source_cells": [
+          "(6, -2)",
+          "(6, -1)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 0.0
+      },
+      "1|h|-2|7": {
+        "cell": "(7, -1)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|-2|7",
+        "exterior": false,
+        "id": "edge:1|h|-2|7",
+        "key": "1|h|-2|7",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "medbay_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(28.0, 4.0, -6.0)",
+        "room_ids": [
+          "medbay_01",
+          ""
+        ],
+        "source_cells": [
+          "(7, -1)",
+          "(7, -2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      "1|h|-2|8": {
+        "cell": "(8, -1)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|-2|8",
+        "exterior": false,
+        "id": "edge:1|h|-2|8",
+        "key": "1|h|-2|8",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "medbay_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(32.0, 4.0, -6.0)",
+        "room_ids": [
+          "medbay_01",
+          ""
+        ],
+        "source_cells": [
+          "(8, -1)",
+          "(8, -2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      "1|h|-3|5": {
+        "cell": "(5, -2)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|-3|5",
+        "exterior": false,
+        "id": "edge:1|h|-3|5",
+        "key": "1|h|-3|5",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "cargo_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(20.0, 4.0, -10.0)",
+        "room_ids": [
+          "cargo_01",
+          ""
+        ],
+        "source_cells": [
+          "(5, -2)",
+          "(5, -3)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      "1|h|-3|6": {
+        "cell": "(6, -2)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|-3|6",
+        "exterior": false,
+        "id": "edge:1|h|-3|6",
+        "key": "1|h|-3|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "cargo_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(24.0, 4.0, -10.0)",
+        "room_ids": [
+          "cargo_01",
+          ""
+        ],
+        "source_cells": [
+          "(6, -2)",
+          "(6, -3)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      "1|h|0|10": {
+        "cell": "(10, 0)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|0|10",
+        "exterior": false,
+        "id": "edge:1|h|0|10",
+        "key": "1|h|0|10",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "north",
+        "other_room": "reactor_01",
+        "owner_room": "reactor_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(40.0, 4.0, 2.0)",
+        "room_ids": [
+          "reactor_01",
+          "reactor_01"
+        ],
+        "source_cells": [
+          "(10, 0)",
+          "(10, 1)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 0.0
+      },
+      "1|h|0|4": {
+        "cell": "(4, 0)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|0|4",
+        "exterior": false,
+        "id": "edge:1|h|0|4",
+        "key": "1|h|0|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "spine_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(16.0, 4.0, 2.0)",
+        "room_ids": [
+          "spine_01",
+          ""
+        ],
+        "source_cells": [
+          "(4, 0)",
+          "(4, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "1|h|0|5": {
+        "cell": "(5, 1)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|0|5",
+        "exterior": false,
+        "id": "edge:1|h|0|5",
+        "key": "1|h|0|5",
+        "kind": "HATCH",
+        "module_id": "doorway_frame_open_1x1",
+        "opposite_direction": "south",
+        "other_room": "spine_01",
+        "owner_room": "maintenance_01",
+        "placement_required": true,
+        "portal": true,
+        "portal_intent_id": "portal:4",
+        "position": "(20.0, 4.0, 2.0)",
+        "room_ids": [
+          "maintenance_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(5, 1)",
+          "(5, 0)"
+        ],
+        "state": "HATCH",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      "1|h|0|6": {
+        "cell": "(6, 1)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|0|6",
+        "exterior": false,
+        "id": "edge:1|h|0|6",
+        "key": "1|h|0|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "spine_01",
+        "owner_room": "maintenance_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(24.0, 4.0, 2.0)",
+        "room_ids": [
+          "maintenance_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(6, 1)",
+          "(6, 0)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      "1|h|0|7": {
+        "cell": "(7, 0)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|0|7",
+        "exterior": false,
+        "id": "edge:1|h|0|7",
+        "key": "1|h|0|7",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "spine_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(28.0, 4.0, 2.0)",
+        "room_ids": [
+          "spine_01",
+          ""
+        ],
+        "source_cells": [
+          "(7, 0)",
+          "(7, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "1|h|0|8": {
+        "cell": "(8, 0)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|0|8",
+        "exterior": false,
+        "id": "edge:1|h|0|8",
+        "key": "1|h|0|8",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "spine_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(32.0, 4.0, 2.0)",
+        "room_ids": [
+          "spine_01",
+          ""
+        ],
+        "source_cells": [
+          "(8, 0)",
+          "(8, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "1|h|0|9": {
+        "cell": "(9, 0)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|0|9",
+        "exterior": false,
+        "id": "edge:1|h|0|9",
+        "key": "1|h|0|9",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "north",
+        "other_room": "reactor_01",
+        "owner_room": "reactor_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(36.0, 4.0, 2.0)",
+        "room_ids": [
+          "reactor_01",
+          "reactor_01"
+        ],
+        "source_cells": [
+          "(9, 0)",
+          "(9, 1)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 0.0
+      },
+      "1|h|1|10": {
+        "cell": "(10, 1)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|1|10",
+        "exterior": false,
+        "id": "edge:1|h|1|10",
+        "key": "1|h|1|10",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "reactor_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(40.0, 4.0, 6.0)",
+        "room_ids": [
+          "reactor_01",
+          ""
+        ],
+        "source_cells": [
+          "(10, 1)",
+          "(10, 2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "1|h|1|5": {
+        "cell": "(5, 1)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|1|5",
+        "exterior": false,
+        "id": "edge:1|h|1|5",
+        "key": "1|h|1|5",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "north",
+        "other_room": "maintenance_01",
+        "owner_room": "maintenance_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(20.0, 4.0, 6.0)",
+        "room_ids": [
+          "maintenance_01",
+          "maintenance_01"
+        ],
+        "source_cells": [
+          "(5, 1)",
+          "(5, 2)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 0.0
+      },
+      "1|h|1|6": {
+        "cell": "(6, 1)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|1|6",
+        "exterior": false,
+        "id": "edge:1|h|1|6",
+        "key": "1|h|1|6",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "north",
+        "other_room": "maintenance_01",
+        "owner_room": "maintenance_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(24.0, 4.0, 6.0)",
+        "room_ids": [
+          "maintenance_01",
+          "maintenance_01"
+        ],
+        "source_cells": [
+          "(6, 1)",
+          "(6, 2)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 0.0
+      },
+      "1|h|1|9": {
+        "cell": "(9, 1)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|1|9",
+        "exterior": false,
+        "id": "edge:1|h|1|9",
+        "key": "1|h|1|9",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "reactor_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(36.0, 4.0, 6.0)",
+        "room_ids": [
+          "reactor_01",
+          ""
+        ],
+        "source_cells": [
+          "(9, 1)",
+          "(9, 2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "1|h|2|5": {
+        "cell": "(5, 2)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|2|5",
+        "exterior": false,
+        "id": "edge:1|h|2|5",
+        "key": "1|h|2|5",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "maintenance_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(20.0, 4.0, 10.0)",
+        "room_ids": [
+          "maintenance_01",
+          ""
+        ],
+        "source_cells": [
+          "(5, 2)",
+          "(5, 3)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "1|h|2|6": {
+        "cell": "(6, 2)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|2|6",
+        "exterior": false,
+        "id": "edge:1|h|2|6",
+        "key": "1|h|2|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "maintenance_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(24.0, 4.0, 10.0)",
+        "room_ids": [
+          "maintenance_01",
+          ""
+        ],
+        "source_cells": [
+          "(6, 2)",
+          "(6, 3)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      "1|v|-1|4": {
+        "cell": "(5, -1)",
+        "deck": 1,
+        "direction": "west",
+        "edge_key": "1|v|-1|4",
+        "exterior": false,
+        "id": "edge:1|v|-1|4",
+        "key": "1|v|-1|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "cargo_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(18.0, 4.0, -4.0)",
+        "room_ids": [
+          "cargo_01",
+          ""
+        ],
+        "source_cells": [
+          "(5, -1)",
+          "(4, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      "1|v|-1|5": {
+        "cell": "(5, -1)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|-1|5",
+        "exterior": false,
+        "id": "edge:1|v|-1|5",
+        "key": "1|v|-1|5",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "west",
+        "other_room": "cargo_01",
+        "owner_room": "cargo_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(22.0, 4.0, -4.0)",
+        "room_ids": [
+          "cargo_01",
+          "cargo_01"
+        ],
+        "source_cells": [
+          "(5, -1)",
+          "(6, -1)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 270.0
+      },
+      "1|v|-1|6": {
+        "cell": "(6, -1)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|-1|6",
+        "exterior": false,
+        "id": "edge:1|v|-1|6",
+        "key": "1|v|-1|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "medbay_01",
+        "owner_room": "cargo_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(26.0, 4.0, -4.0)",
+        "room_ids": [
+          "cargo_01",
+          "medbay_01"
+        ],
+        "source_cells": [
+          "(6, -1)",
+          "(7, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      "1|v|-1|7": {
+        "cell": "(7, -1)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|-1|7",
+        "exterior": false,
+        "id": "edge:1|v|-1|7",
+        "key": "1|v|-1|7",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "west",
+        "other_room": "medbay_01",
+        "owner_room": "medbay_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(30.0, 4.0, -4.0)",
+        "room_ids": [
+          "medbay_01",
+          "medbay_01"
+        ],
+        "source_cells": [
+          "(7, -1)",
+          "(8, -1)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 270.0
+      },
+      "1|v|-1|8": {
+        "cell": "(8, -1)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|-1|8",
+        "exterior": false,
+        "id": "edge:1|v|-1|8",
+        "key": "1|v|-1|8",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "medbay_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(34.0, 4.0, -4.0)",
+        "room_ids": [
+          "medbay_01",
+          ""
+        ],
+        "source_cells": [
+          "(8, -1)",
+          "(9, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      "1|v|-2|4": {
+        "cell": "(5, -2)",
+        "deck": 1,
+        "direction": "west",
+        "edge_key": "1|v|-2|4",
+        "exterior": false,
+        "id": "edge:1|v|-2|4",
+        "key": "1|v|-2|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "cargo_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(18.0, 4.0, -8.0)",
+        "room_ids": [
+          "cargo_01",
+          ""
+        ],
+        "source_cells": [
+          "(5, -2)",
+          "(4, -2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      "1|v|-2|5": {
+        "cell": "(5, -2)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|-2|5",
+        "exterior": false,
+        "id": "edge:1|v|-2|5",
+        "key": "1|v|-2|5",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "west",
+        "other_room": "cargo_01",
+        "owner_room": "cargo_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(22.0, 4.0, -8.0)",
+        "room_ids": [
+          "cargo_01",
+          "cargo_01"
+        ],
+        "source_cells": [
+          "(5, -2)",
+          "(6, -2)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 270.0
+      },
+      "1|v|-2|6": {
+        "cell": "(6, -2)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|-2|6",
+        "exterior": false,
+        "id": "edge:1|v|-2|6",
+        "key": "1|v|-2|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "cargo_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(26.0, 4.0, -8.0)",
+        "room_ids": [
+          "cargo_01",
+          ""
+        ],
+        "source_cells": [
+          "(6, -2)",
+          "(7, -2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      "1|v|0|10": {
+        "cell": "(10, 0)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|0|10",
+        "exterior": false,
+        "id": "edge:1|v|0|10",
+        "key": "1|v|0|10",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "reactor_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(42.0, 4.0, 0.0)",
+        "room_ids": [
+          "reactor_01",
+          ""
+        ],
+        "source_cells": [
+          "(10, 0)",
+          "(11, 0)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      "1|v|0|3": {
+        "cell": "(4, 0)",
+        "deck": 1,
+        "direction": "west",
+        "edge_key": "1|v|0|3",
+        "exterior": false,
+        "id": "edge:1|v|0|3",
+        "key": "1|v|0|3",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "spine_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(14.0, 4.0, 0.0)",
+        "room_ids": [
+          "spine_01",
+          ""
+        ],
+        "source_cells": [
+          "(4, 0)",
+          "(3, 0)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      "1|v|0|4": {
+        "cell": "(4, 0)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|0|4",
+        "exterior": false,
+        "id": "edge:1|v|0|4",
+        "key": "1|v|0|4",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "west",
+        "other_room": "spine_01",
+        "owner_room": "spine_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(18.0, 4.0, 0.0)",
+        "room_ids": [
+          "spine_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(4, 0)",
+          "(5, 0)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 270.0
+      },
+      "1|v|0|5": {
+        "cell": "(5, 0)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|0|5",
+        "exterior": false,
+        "id": "edge:1|v|0|5",
+        "key": "1|v|0|5",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "west",
+        "other_room": "spine_01",
+        "owner_room": "spine_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(22.0, 4.0, 0.0)",
+        "room_ids": [
+          "spine_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(5, 0)",
+          "(6, 0)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 270.0
+      },
+      "1|v|0|6": {
+        "cell": "(6, 0)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|0|6",
+        "exterior": false,
+        "id": "edge:1|v|0|6",
+        "key": "1|v|0|6",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "west",
+        "other_room": "spine_01",
+        "owner_room": "spine_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(26.0, 4.0, 0.0)",
+        "room_ids": [
+          "spine_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(6, 0)",
+          "(7, 0)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 270.0
+      },
+      "1|v|0|7": {
+        "cell": "(7, 0)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|0|7",
+        "exterior": false,
+        "id": "edge:1|v|0|7",
+        "key": "1|v|0|7",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "west",
+        "other_room": "spine_01",
+        "owner_room": "spine_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(30.0, 4.0, 0.0)",
+        "room_ids": [
+          "spine_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(7, 0)",
+          "(8, 0)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 270.0
+      },
+      "1|v|0|8": {
+        "cell": "(9, 0)",
+        "deck": 1,
+        "direction": "west",
+        "edge_key": "1|v|0|8",
+        "exterior": false,
+        "id": "edge:1|v|0|8",
+        "key": "1|v|0|8",
+        "kind": "HATCH",
+        "module_id": "doorway_frame_open_1x1",
+        "opposite_direction": "east",
+        "other_room": "spine_01",
+        "owner_room": "reactor_01",
+        "placement_required": true,
+        "portal": true,
+        "portal_intent_id": "portal:5",
+        "position": "(34.0, 4.0, 0.0)",
+        "room_ids": [
+          "reactor_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(9, 0)",
+          "(8, 0)"
+        ],
+        "state": "HATCH",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      "1|v|0|9": {
+        "cell": "(9, 0)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|0|9",
+        "exterior": false,
+        "id": "edge:1|v|0|9",
+        "key": "1|v|0|9",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "west",
+        "other_room": "reactor_01",
+        "owner_room": "reactor_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(38.0, 4.0, 0.0)",
+        "room_ids": [
+          "reactor_01",
+          "reactor_01"
+        ],
+        "source_cells": [
+          "(9, 0)",
+          "(10, 0)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 270.0
+      },
+      "1|v|1|10": {
+        "cell": "(10, 1)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|1|10",
+        "exterior": false,
+        "id": "edge:1|v|1|10",
+        "key": "1|v|1|10",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "reactor_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(42.0, 4.0, 4.0)",
+        "room_ids": [
+          "reactor_01",
+          ""
+        ],
+        "source_cells": [
+          "(10, 1)",
+          "(11, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      "1|v|1|4": {
+        "cell": "(5, 1)",
+        "deck": 1,
+        "direction": "west",
+        "edge_key": "1|v|1|4",
+        "exterior": false,
+        "id": "edge:1|v|1|4",
+        "key": "1|v|1|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "maintenance_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(18.0, 4.0, 4.0)",
+        "room_ids": [
+          "maintenance_01",
+          ""
+        ],
+        "source_cells": [
+          "(5, 1)",
+          "(4, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      "1|v|1|5": {
+        "cell": "(5, 1)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|1|5",
+        "exterior": false,
+        "id": "edge:1|v|1|5",
+        "key": "1|v|1|5",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "west",
+        "other_room": "maintenance_01",
+        "owner_room": "maintenance_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(22.0, 4.0, 4.0)",
+        "room_ids": [
+          "maintenance_01",
+          "maintenance_01"
+        ],
+        "source_cells": [
+          "(5, 1)",
+          "(6, 1)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 270.0
+      },
+      "1|v|1|6": {
+        "cell": "(6, 1)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|1|6",
+        "exterior": false,
+        "id": "edge:1|v|1|6",
+        "key": "1|v|1|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "maintenance_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(26.0, 4.0, 4.0)",
+        "room_ids": [
+          "maintenance_01",
+          ""
+        ],
+        "source_cells": [
+          "(6, 1)",
+          "(7, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      "1|v|1|8": {
+        "cell": "(9, 1)",
+        "deck": 1,
+        "direction": "west",
+        "edge_key": "1|v|1|8",
+        "exterior": false,
+        "id": "edge:1|v|1|8",
+        "key": "1|v|1|8",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "reactor_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(34.0, 4.0, 4.0)",
+        "room_ids": [
+          "reactor_01",
+          ""
+        ],
+        "source_cells": [
+          "(9, 1)",
+          "(8, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      "1|v|1|9": {
+        "cell": "(9, 1)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|1|9",
+        "exterior": false,
+        "id": "edge:1|v|1|9",
+        "key": "1|v|1|9",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "west",
+        "other_room": "reactor_01",
+        "owner_room": "reactor_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(38.0, 4.0, 4.0)",
+        "room_ids": [
+          "reactor_01",
+          "reactor_01"
+        ],
+        "source_cells": [
+          "(9, 1)",
+          "(10, 1)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 270.0
+      },
+      "1|v|2|4": {
+        "cell": "(5, 2)",
+        "deck": 1,
+        "direction": "west",
+        "edge_key": "1|v|2|4",
+        "exterior": false,
+        "id": "edge:1|v|2|4",
+        "key": "1|v|2|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "maintenance_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(18.0, 4.0, 8.0)",
+        "room_ids": [
+          "maintenance_01",
+          ""
+        ],
+        "source_cells": [
+          "(5, 2)",
+          "(4, 2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      "1|v|2|5": {
+        "cell": "(5, 2)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|2|5",
+        "exterior": false,
+        "id": "edge:1|v|2|5",
+        "key": "1|v|2|5",
+        "kind": "OPEN",
+        "module_id": "",
+        "opposite_direction": "west",
+        "other_room": "maintenance_01",
+        "owner_room": "maintenance_01",
+        "placement_required": false,
+        "portal": false,
+        "position": "(22.0, 4.0, 8.0)",
+        "room_ids": [
+          "maintenance_01",
+          "maintenance_01"
+        ],
+        "source_cells": [
+          "(5, 2)",
+          "(6, 2)"
+        ],
+        "state": "OPEN",
+        "wrapper_required": false,
+        "yaw_degrees": 270.0
+      },
+      "1|v|2|6": {
+        "cell": "(6, 2)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|2|6",
+        "exterior": false,
+        "id": "edge:1|v|2|6",
+        "key": "1|v|2|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "maintenance_01",
+        "placement_required": true,
+        "portal": false,
+        "position": "(26.0, 4.0, 8.0)",
+        "room_ids": [
+          "maintenance_01",
+          ""
+        ],
+        "source_cells": [
+          "(6, 2)",
+          "(7, 2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      }
+    },
+    "errors": [],
+    "floor_placements": [
+      {
+        "cell": "(0, 0)",
+        "deck": 0,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:0|0|0",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:0|0|0",
+        "position": "(0.0, 0.0, 0.0)",
+        "room_id": "airlock_01",
+        "room_ids": [
+          "airlock_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(1, 0)",
+        "deck": 0,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:0|1|0",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:0|1|0",
+        "position": "(4.0, 0.0, 0.0)",
+        "room_id": "airlock_01",
+        "room_ids": [
+          "airlock_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(0, 1)",
+        "deck": 0,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:0|0|1",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:0|0|1",
+        "position": "(0.0, 0.0, 4.0)",
+        "room_id": "airlock_01",
+        "room_ids": [
+          "airlock_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(1, 1)",
+        "deck": 0,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:0|1|1",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:0|1|1",
+        "position": "(4.0, 0.0, 4.0)",
+        "room_id": "airlock_01",
+        "room_ids": [
+          "airlock_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(2, 0)",
+        "deck": 0,
+        "floor_module_id": "corridor_floor_1x1",
+        "id": "floor:0|2|0",
+        "kind": "FLOOR",
+        "module_id": "corridor_floor_1x1",
+        "placement_id": "floor:0|2|0",
+        "position": "(8.0, 0.0, 0.0)",
+        "room_id": "corridor_01",
+        "room_ids": [
+          "corridor_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(3, 0)",
+        "deck": 0,
+        "floor_module_id": "corridor_floor_1x1",
+        "id": "floor:0|3|0",
+        "kind": "FLOOR",
+        "module_id": "corridor_floor_1x1",
+        "placement_id": "floor:0|3|0",
+        "position": "(12.0, 0.0, 0.0)",
+        "room_id": "corridor_01",
+        "room_ids": [
+          "corridor_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(4, 0)",
+        "deck": 0,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:0|4|0",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:0|4|0",
+        "position": "(16.0, 0.0, 0.0)",
+        "room_id": "ramp_01",
+        "room_ids": [
+          "ramp_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(4, 0)",
+        "deck": 1,
+        "floor_module_id": "corridor_floor_1x1",
+        "id": "floor:1|4|0",
+        "kind": "FLOOR",
+        "module_id": "corridor_floor_1x1",
+        "placement_id": "floor:1|4|0",
+        "position": "(16.0, 4.0, 0.0)",
+        "room_id": "spine_01",
+        "room_ids": [
+          "spine_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(5, 0)",
+        "deck": 1,
+        "floor_module_id": "corridor_floor_1x1",
+        "id": "floor:1|5|0",
+        "kind": "FLOOR",
+        "module_id": "corridor_floor_1x1",
+        "placement_id": "floor:1|5|0",
+        "position": "(20.0, 4.0, 0.0)",
+        "room_id": "spine_01",
+        "room_ids": [
+          "spine_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(6, 0)",
+        "deck": 1,
+        "floor_module_id": "corridor_floor_1x1",
+        "id": "floor:1|6|0",
+        "kind": "FLOOR",
+        "module_id": "corridor_floor_1x1",
+        "placement_id": "floor:1|6|0",
+        "position": "(24.0, 4.0, 0.0)",
+        "room_id": "spine_01",
+        "room_ids": [
+          "spine_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(7, 0)",
+        "deck": 1,
+        "floor_module_id": "corridor_floor_1x1",
+        "id": "floor:1|7|0",
+        "kind": "FLOOR",
+        "module_id": "corridor_floor_1x1",
+        "placement_id": "floor:1|7|0",
+        "position": "(28.0, 4.0, 0.0)",
+        "room_id": "spine_01",
+        "room_ids": [
+          "spine_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(8, 0)",
+        "deck": 1,
+        "floor_module_id": "corridor_floor_1x1",
+        "id": "floor:1|8|0",
+        "kind": "FLOOR",
+        "module_id": "corridor_floor_1x1",
+        "placement_id": "floor:1|8|0",
+        "position": "(32.0, 4.0, 0.0)",
+        "room_id": "spine_01",
+        "room_ids": [
+          "spine_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(5, -2)",
+        "deck": 1,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:1|5|-2",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:1|5|-2",
+        "position": "(20.0, 4.0, -8.0)",
+        "room_id": "cargo_01",
+        "room_ids": [
+          "cargo_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(6, -2)",
+        "deck": 1,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:1|6|-2",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:1|6|-2",
+        "position": "(24.0, 4.0, -8.0)",
+        "room_id": "cargo_01",
+        "room_ids": [
+          "cargo_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(5, -1)",
+        "deck": 1,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:1|5|-1",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:1|5|-1",
+        "position": "(20.0, 4.0, -4.0)",
+        "room_id": "cargo_01",
+        "room_ids": [
+          "cargo_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(6, -1)",
+        "deck": 1,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:1|6|-1",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:1|6|-1",
+        "position": "(24.0, 4.0, -4.0)",
+        "room_id": "cargo_01",
+        "room_ids": [
+          "cargo_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(7, -1)",
+        "deck": 1,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:1|7|-1",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:1|7|-1",
+        "position": "(28.0, 4.0, -4.0)",
+        "room_id": "medbay_01",
+        "room_ids": [
+          "medbay_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(8, -1)",
+        "deck": 1,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:1|8|-1",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:1|8|-1",
+        "position": "(32.0, 4.0, -4.0)",
+        "room_id": "medbay_01",
+        "room_ids": [
+          "medbay_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(5, 1)",
+        "deck": 1,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:1|5|1",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:1|5|1",
+        "position": "(20.0, 4.0, 4.0)",
+        "room_id": "maintenance_01",
+        "room_ids": [
+          "maintenance_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(6, 1)",
+        "deck": 1,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:1|6|1",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:1|6|1",
+        "position": "(24.0, 4.0, 4.0)",
+        "room_id": "maintenance_01",
+        "room_ids": [
+          "maintenance_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(5, 2)",
+        "deck": 1,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:1|5|2",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:1|5|2",
+        "position": "(20.0, 4.0, 8.0)",
+        "room_id": "maintenance_01",
+        "room_ids": [
+          "maintenance_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(6, 2)",
+        "deck": 1,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:1|6|2",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:1|6|2",
+        "position": "(24.0, 4.0, 8.0)",
+        "room_id": "maintenance_01",
+        "room_ids": [
+          "maintenance_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(9, 0)",
+        "deck": 1,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:1|9|0",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:1|9|0",
+        "position": "(36.0, 4.0, 0.0)",
+        "room_id": "reactor_01",
+        "room_ids": [
+          "reactor_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(10, 0)",
+        "deck": 1,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:1|10|0",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:1|10|0",
+        "position": "(40.0, 4.0, 0.0)",
+        "room_id": "reactor_01",
+        "room_ids": [
+          "reactor_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(9, 1)",
+        "deck": 1,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:1|9|1",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:1|9|1",
+        "position": "(36.0, 4.0, 4.0)",
+        "room_id": "reactor_01",
+        "room_ids": [
+          "reactor_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(10, 1)",
+        "deck": 1,
+        "floor_module_id": "floor_1x1",
+        "id": "floor:1|10|1",
+        "kind": "FLOOR",
+        "module_id": "floor_1x1",
+        "placement_id": "floor:1|10|1",
+        "position": "(40.0, 4.0, 4.0)",
+        "room_id": "reactor_01",
+        "room_ids": [
+          "reactor_01"
+        ],
+        "state": "FLOOR",
+        "yaw_degrees": 0.0
+      }
+    ],
+    "occupancy": {
+      "0|0|0": {
+        "cell": "(0, 0)",
+        "deck": 0,
+        "id": "cell:0|0|0",
+        "key": "0|0|0",
+        "position": "(0.0, 0.0, 0.0)",
+        "room_id": "airlock_01"
+      },
+      "0|0|1": {
+        "cell": "(0, 1)",
+        "deck": 0,
+        "id": "cell:0|0|1",
+        "key": "0|0|1",
+        "position": "(0.0, 0.0, 4.0)",
+        "room_id": "airlock_01"
+      },
+      "0|1|0": {
+        "cell": "(1, 0)",
+        "deck": 0,
+        "id": "cell:0|1|0",
+        "key": "0|1|0",
+        "position": "(4.0, 0.0, 0.0)",
+        "room_id": "airlock_01"
+      },
+      "0|1|1": {
+        "cell": "(1, 1)",
+        "deck": 0,
+        "id": "cell:0|1|1",
+        "key": "0|1|1",
+        "position": "(4.0, 0.0, 4.0)",
+        "room_id": "airlock_01"
+      },
+      "0|2|0": {
+        "cell": "(2, 0)",
+        "deck": 0,
+        "id": "cell:0|2|0",
+        "key": "0|2|0",
+        "position": "(8.0, 0.0, 0.0)",
+        "room_id": "corridor_01"
+      },
+      "0|3|0": {
+        "cell": "(3, 0)",
+        "deck": 0,
+        "id": "cell:0|3|0",
+        "key": "0|3|0",
+        "position": "(12.0, 0.0, 0.0)",
+        "room_id": "corridor_01"
+      },
+      "0|4|0": {
+        "cell": "(4, 0)",
+        "deck": 0,
+        "id": "cell:0|4|0",
+        "key": "0|4|0",
+        "position": "(16.0, 0.0, 0.0)",
+        "room_id": "ramp_01"
+      },
+      "1|10|0": {
+        "cell": "(10, 0)",
+        "deck": 1,
+        "id": "cell:1|10|0",
+        "key": "1|10|0",
+        "position": "(40.0, 4.0, 0.0)",
+        "room_id": "reactor_01"
+      },
+      "1|10|1": {
+        "cell": "(10, 1)",
+        "deck": 1,
+        "id": "cell:1|10|1",
+        "key": "1|10|1",
+        "position": "(40.0, 4.0, 4.0)",
+        "room_id": "reactor_01"
+      },
+      "1|4|0": {
+        "cell": "(4, 0)",
+        "deck": 1,
+        "id": "cell:1|4|0",
+        "key": "1|4|0",
+        "position": "(16.0, 4.0, 0.0)",
+        "room_id": "spine_01"
+      },
+      "1|5|-1": {
+        "cell": "(5, -1)",
+        "deck": 1,
+        "id": "cell:1|5|-1",
+        "key": "1|5|-1",
+        "position": "(20.0, 4.0, -4.0)",
+        "room_id": "cargo_01"
+      },
+      "1|5|-2": {
+        "cell": "(5, -2)",
+        "deck": 1,
+        "id": "cell:1|5|-2",
+        "key": "1|5|-2",
+        "position": "(20.0, 4.0, -8.0)",
+        "room_id": "cargo_01"
+      },
+      "1|5|0": {
+        "cell": "(5, 0)",
+        "deck": 1,
+        "id": "cell:1|5|0",
+        "key": "1|5|0",
+        "position": "(20.0, 4.0, 0.0)",
+        "room_id": "spine_01"
+      },
+      "1|5|1": {
+        "cell": "(5, 1)",
+        "deck": 1,
+        "id": "cell:1|5|1",
+        "key": "1|5|1",
+        "position": "(20.0, 4.0, 4.0)",
+        "room_id": "maintenance_01"
+      },
+      "1|5|2": {
+        "cell": "(5, 2)",
+        "deck": 1,
+        "id": "cell:1|5|2",
+        "key": "1|5|2",
+        "position": "(20.0, 4.0, 8.0)",
+        "room_id": "maintenance_01"
+      },
+      "1|6|-1": {
+        "cell": "(6, -1)",
+        "deck": 1,
+        "id": "cell:1|6|-1",
+        "key": "1|6|-1",
+        "position": "(24.0, 4.0, -4.0)",
+        "room_id": "cargo_01"
+      },
+      "1|6|-2": {
+        "cell": "(6, -2)",
+        "deck": 1,
+        "id": "cell:1|6|-2",
+        "key": "1|6|-2",
+        "position": "(24.0, 4.0, -8.0)",
+        "room_id": "cargo_01"
+      },
+      "1|6|0": {
+        "cell": "(6, 0)",
+        "deck": 1,
+        "id": "cell:1|6|0",
+        "key": "1|6|0",
+        "position": "(24.0, 4.0, 0.0)",
+        "room_id": "spine_01"
+      },
+      "1|6|1": {
+        "cell": "(6, 1)",
+        "deck": 1,
+        "id": "cell:1|6|1",
+        "key": "1|6|1",
+        "position": "(24.0, 4.0, 4.0)",
+        "room_id": "maintenance_01"
+      },
+      "1|6|2": {
+        "cell": "(6, 2)",
+        "deck": 1,
+        "id": "cell:1|6|2",
+        "key": "1|6|2",
+        "position": "(24.0, 4.0, 8.0)",
+        "room_id": "maintenance_01"
+      },
+      "1|7|-1": {
+        "cell": "(7, -1)",
+        "deck": 1,
+        "id": "cell:1|7|-1",
+        "key": "1|7|-1",
+        "position": "(28.0, 4.0, -4.0)",
+        "room_id": "medbay_01"
+      },
+      "1|7|0": {
+        "cell": "(7, 0)",
+        "deck": 1,
+        "id": "cell:1|7|0",
+        "key": "1|7|0",
+        "position": "(28.0, 4.0, 0.0)",
+        "room_id": "spine_01"
+      },
+      "1|8|-1": {
+        "cell": "(8, -1)",
+        "deck": 1,
+        "id": "cell:1|8|-1",
+        "key": "1|8|-1",
+        "position": "(32.0, 4.0, -4.0)",
+        "room_id": "medbay_01"
+      },
+      "1|8|0": {
+        "cell": "(8, 0)",
+        "deck": 1,
+        "id": "cell:1|8|0",
+        "key": "1|8|0",
+        "position": "(32.0, 4.0, 0.0)",
+        "room_id": "spine_01"
+      },
+      "1|9|0": {
+        "cell": "(9, 0)",
+        "deck": 1,
+        "id": "cell:1|9|0",
+        "key": "1|9|0",
+        "position": "(36.0, 4.0, 0.0)",
+        "room_id": "reactor_01"
+      },
+      "1|9|1": {
+        "cell": "(9, 1)",
+        "deck": 1,
+        "id": "cell:1|9|1",
+        "key": "1|9|1",
+        "position": "(36.0, 4.0, 4.0)",
+        "room_id": "reactor_01"
+      }
+    },
+    "placements": [
+      {
+        "cell": "(0, 0)",
+        "deck": 0,
+        "direction": "north",
+        "edge_key": "0|h|-1|0",
+        "exterior": false,
+        "id": "edge:0|h|-1|0",
+        "key": "0|h|-1|0",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "airlock_01",
+        "placement_id": "placement:0|h|-1|0",
+        "placement_required": true,
+        "portal": false,
+        "position": "(0.0, 0.0, -2.0)",
+        "room_ids": [
+          "airlock_01",
+          ""
+        ],
+        "source_cells": [
+          "(0, 0)",
+          "(0, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      {
+        "cell": "(0, 0)",
+        "deck": 0,
+        "direction": "west",
+        "edge_key": "0|v|0|-1",
+        "exterior": false,
+        "id": "edge:0|v|0|-1",
+        "key": "0|v|0|-1",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "airlock_01",
+        "placement_id": "placement:0|v|0|-1",
+        "placement_required": true,
+        "portal": false,
+        "position": "(-2.0, 0.0, 0.0)",
+        "room_ids": [
+          "airlock_01",
+          ""
+        ],
+        "source_cells": [
+          "(0, 0)",
+          "(-1, 0)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      {
+        "cell": "(1, 0)",
+        "deck": 0,
+        "direction": "north",
+        "edge_key": "0|h|-1|1",
+        "exterior": false,
+        "id": "edge:0|h|-1|1",
+        "key": "0|h|-1|1",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "airlock_01",
+        "placement_id": "placement:0|h|-1|1",
+        "placement_required": true,
+        "portal": false,
+        "position": "(4.0, 0.0, -2.0)",
+        "room_ids": [
+          "airlock_01",
+          ""
+        ],
+        "source_cells": [
+          "(1, 0)",
+          "(1, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      {
+        "cell": "(1, 0)",
+        "deck": 0,
+        "direction": "east",
+        "edge_key": "0|v|0|1",
+        "exterior": false,
+        "id": "edge:0|v|0|1",
+        "key": "0|v|0|1",
+        "kind": "HATCH",
+        "module_id": "doorway_frame_open_1x1",
+        "opposite_direction": "west",
+        "other_room": "corridor_01",
+        "owner_room": "airlock_01",
+        "placement_id": "placement:0|v|0|1",
+        "placement_required": true,
+        "portal": true,
+        "portal_intent_id": "portal:0",
+        "position": "(6.0, 0.0, 0.0)",
+        "room_ids": [
+          "airlock_01",
+          "corridor_01"
+        ],
+        "source_cells": [
+          "(1, 0)",
+          "(2, 0)"
+        ],
+        "state": "HATCH",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      {
+        "cell": "(0, 1)",
+        "deck": 0,
+        "direction": "south",
+        "edge_key": "0|h|1|0",
+        "exterior": false,
+        "id": "edge:0|h|1|0",
+        "key": "0|h|1|0",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "airlock_01",
+        "placement_id": "placement:0|h|1|0",
+        "placement_required": true,
+        "portal": false,
+        "position": "(0.0, 0.0, 6.0)",
+        "room_ids": [
+          "airlock_01",
+          ""
+        ],
+        "source_cells": [
+          "(0, 1)",
+          "(0, 2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(0, 1)",
+        "deck": 0,
+        "direction": "west",
+        "edge_key": "0|v|1|-1",
+        "exterior": false,
+        "id": "edge:0|v|1|-1",
+        "key": "0|v|1|-1",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "airlock_01",
+        "placement_id": "placement:0|v|1|-1",
+        "placement_required": true,
+        "portal": false,
+        "position": "(-2.0, 0.0, 4.0)",
+        "room_ids": [
+          "airlock_01",
+          ""
+        ],
+        "source_cells": [
+          "(0, 1)",
+          "(-1, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      {
+        "cell": "(1, 1)",
+        "deck": 0,
+        "direction": "east",
+        "edge_key": "0|v|1|1",
+        "exterior": false,
+        "id": "edge:0|v|1|1",
+        "key": "0|v|1|1",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "airlock_01",
+        "placement_id": "placement:0|v|1|1",
+        "placement_required": true,
+        "portal": false,
+        "position": "(6.0, 0.0, 4.0)",
+        "room_ids": [
+          "airlock_01",
+          ""
+        ],
+        "source_cells": [
+          "(1, 1)",
+          "(2, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      {
+        "cell": "(1, 1)",
+        "deck": 0,
+        "direction": "south",
+        "edge_key": "0|h|1|1",
+        "exterior": false,
+        "id": "edge:0|h|1|1",
+        "key": "0|h|1|1",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "airlock_01",
+        "placement_id": "placement:0|h|1|1",
+        "placement_required": true,
+        "portal": false,
+        "position": "(4.0, 0.0, 6.0)",
+        "room_ids": [
+          "airlock_01",
+          ""
+        ],
+        "source_cells": [
+          "(1, 1)",
+          "(1, 2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(2, 0)",
+        "deck": 0,
+        "direction": "north",
+        "edge_key": "0|h|-1|2",
+        "exterior": false,
+        "id": "edge:0|h|-1|2",
+        "key": "0|h|-1|2",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "corridor_01",
+        "placement_id": "placement:0|h|-1|2",
+        "placement_required": true,
+        "portal": false,
+        "position": "(8.0, 0.0, -2.0)",
+        "room_ids": [
+          "corridor_01",
+          ""
+        ],
+        "source_cells": [
+          "(2, 0)",
+          "(2, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      {
+        "cell": "(2, 0)",
+        "deck": 0,
+        "direction": "south",
+        "edge_key": "0|h|0|2",
+        "exterior": false,
+        "id": "edge:0|h|0|2",
+        "key": "0|h|0|2",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "corridor_01",
+        "placement_id": "placement:0|h|0|2",
+        "placement_required": true,
+        "portal": false,
+        "position": "(8.0, 0.0, 2.0)",
+        "room_ids": [
+          "corridor_01",
+          ""
+        ],
+        "source_cells": [
+          "(2, 0)",
+          "(2, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(3, 0)",
+        "deck": 0,
+        "direction": "north",
+        "edge_key": "0|h|-1|3",
+        "exterior": false,
+        "id": "edge:0|h|-1|3",
+        "key": "0|h|-1|3",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "corridor_01",
+        "placement_id": "placement:0|h|-1|3",
+        "placement_required": true,
+        "portal": false,
+        "position": "(12.0, 0.0, -2.0)",
+        "room_ids": [
+          "corridor_01",
+          ""
+        ],
+        "source_cells": [
+          "(3, 0)",
+          "(3, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      {
+        "cell": "(3, 0)",
+        "deck": 0,
+        "direction": "east",
+        "edge_key": "0|v|0|3",
+        "exterior": false,
+        "id": "edge:0|v|0|3",
+        "key": "0|v|0|3",
+        "kind": "HATCH",
+        "module_id": "doorway_frame_open_1x1",
+        "opposite_direction": "west",
+        "other_room": "ramp_01",
+        "owner_room": "corridor_01",
+        "placement_id": "placement:0|v|0|3",
+        "placement_required": true,
+        "portal": true,
+        "portal_intent_id": "portal:1",
+        "position": "(14.0, 0.0, 0.0)",
+        "room_ids": [
+          "corridor_01",
+          "ramp_01"
+        ],
+        "source_cells": [
+          "(3, 0)",
+          "(4, 0)"
+        ],
+        "state": "HATCH",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      {
+        "cell": "(3, 0)",
+        "deck": 0,
+        "direction": "south",
+        "edge_key": "0|h|0|3",
+        "exterior": false,
+        "id": "edge:0|h|0|3",
+        "key": "0|h|0|3",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "corridor_01",
+        "placement_id": "placement:0|h|0|3",
+        "placement_required": true,
+        "portal": false,
+        "position": "(12.0, 0.0, 2.0)",
+        "room_ids": [
+          "corridor_01",
+          ""
+        ],
+        "source_cells": [
+          "(3, 0)",
+          "(3, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(4, 0)",
+        "deck": 0,
+        "direction": "north",
+        "edge_key": "0|h|-1|4",
+        "exterior": false,
+        "id": "edge:0|h|-1|4",
+        "key": "0|h|-1|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "ramp_01",
+        "placement_id": "placement:0|h|-1|4",
+        "placement_required": true,
+        "portal": false,
+        "position": "(16.0, 0.0, -2.0)",
+        "room_ids": [
+          "ramp_01",
+          ""
+        ],
+        "source_cells": [
+          "(4, 0)",
+          "(4, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      {
+        "cell": "(4, 0)",
+        "deck": 0,
+        "direction": "east",
+        "edge_key": "0|v|0|4",
+        "exterior": false,
+        "id": "edge:0|v|0|4",
+        "key": "0|v|0|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "ramp_01",
+        "placement_id": "placement:0|v|0|4",
+        "placement_required": true,
+        "portal": false,
+        "position": "(18.0, 0.0, 0.0)",
+        "room_ids": [
+          "ramp_01",
+          ""
+        ],
+        "source_cells": [
+          "(4, 0)",
+          "(5, 0)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      {
+        "cell": "(4, 0)",
+        "deck": 0,
+        "direction": "south",
+        "edge_key": "0|h|0|4",
+        "exterior": false,
+        "id": "edge:0|h|0|4",
+        "key": "0|h|0|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "ramp_01",
+        "placement_id": "placement:0|h|0|4",
+        "placement_required": true,
+        "portal": false,
+        "position": "(16.0, 0.0, 2.0)",
+        "room_ids": [
+          "ramp_01",
+          ""
+        ],
+        "source_cells": [
+          "(4, 0)",
+          "(4, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(4, 0)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|-1|4",
+        "exterior": false,
+        "id": "edge:1|h|-1|4",
+        "key": "1|h|-1|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "spine_01",
+        "placement_id": "placement:1|h|-1|4",
+        "placement_required": true,
+        "portal": false,
+        "position": "(16.0, 4.0, -2.0)",
+        "room_ids": [
+          "spine_01",
+          ""
+        ],
+        "source_cells": [
+          "(4, 0)",
+          "(4, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      {
+        "cell": "(4, 0)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|0|4",
+        "exterior": false,
+        "id": "edge:1|h|0|4",
+        "key": "1|h|0|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "spine_01",
+        "placement_id": "placement:1|h|0|4",
+        "placement_required": true,
+        "portal": false,
+        "position": "(16.0, 4.0, 2.0)",
+        "room_ids": [
+          "spine_01",
+          ""
+        ],
+        "source_cells": [
+          "(4, 0)",
+          "(4, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(4, 0)",
+        "deck": 1,
+        "direction": "west",
+        "edge_key": "1|v|0|3",
+        "exterior": false,
+        "id": "edge:1|v|0|3",
+        "key": "1|v|0|3",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "spine_01",
+        "placement_id": "placement:1|v|0|3",
+        "placement_required": true,
+        "portal": false,
+        "position": "(14.0, 4.0, 0.0)",
+        "room_ids": [
+          "spine_01",
+          ""
+        ],
+        "source_cells": [
+          "(4, 0)",
+          "(3, 0)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      {
+        "cell": "(5, -1)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|-1|5",
+        "exterior": false,
+        "id": "edge:1|h|-1|5",
+        "key": "1|h|-1|5",
+        "kind": "HATCH",
+        "module_id": "doorway_frame_open_1x1",
+        "opposite_direction": "north",
+        "other_room": "spine_01",
+        "owner_room": "cargo_01",
+        "placement_id": "placement:1|h|-1|5",
+        "placement_required": true,
+        "portal": true,
+        "portal_intent_id": "portal:2",
+        "position": "(20.0, 4.0, -2.0)",
+        "room_ids": [
+          "cargo_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(5, -1)",
+          "(5, 0)"
+        ],
+        "state": "HATCH",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(5, 1)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|0|5",
+        "exterior": false,
+        "id": "edge:1|h|0|5",
+        "key": "1|h|0|5",
+        "kind": "HATCH",
+        "module_id": "doorway_frame_open_1x1",
+        "opposite_direction": "south",
+        "other_room": "spine_01",
+        "owner_room": "maintenance_01",
+        "placement_id": "placement:1|h|0|5",
+        "placement_required": true,
+        "portal": true,
+        "portal_intent_id": "portal:4",
+        "position": "(20.0, 4.0, 2.0)",
+        "room_ids": [
+          "maintenance_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(5, 1)",
+          "(5, 0)"
+        ],
+        "state": "HATCH",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      {
+        "cell": "(6, -1)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|-1|6",
+        "exterior": false,
+        "id": "edge:1|h|-1|6",
+        "key": "1|h|-1|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "spine_01",
+        "owner_room": "cargo_01",
+        "placement_id": "placement:1|h|-1|6",
+        "placement_required": true,
+        "portal": false,
+        "position": "(24.0, 4.0, -2.0)",
+        "room_ids": [
+          "cargo_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(6, -1)",
+          "(6, 0)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(6, 1)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|0|6",
+        "exterior": false,
+        "id": "edge:1|h|0|6",
+        "key": "1|h|0|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "spine_01",
+        "owner_room": "maintenance_01",
+        "placement_id": "placement:1|h|0|6",
+        "placement_required": true,
+        "portal": false,
+        "position": "(24.0, 4.0, 2.0)",
+        "room_ids": [
+          "maintenance_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(6, 1)",
+          "(6, 0)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      {
+        "cell": "(7, -1)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|-1|7",
+        "exterior": false,
+        "id": "edge:1|h|-1|7",
+        "key": "1|h|-1|7",
+        "kind": "HATCH",
+        "module_id": "doorway_frame_open_1x1",
+        "opposite_direction": "north",
+        "other_room": "spine_01",
+        "owner_room": "medbay_01",
+        "placement_id": "placement:1|h|-1|7",
+        "placement_required": true,
+        "portal": true,
+        "portal_intent_id": "portal:3",
+        "position": "(28.0, 4.0, -2.0)",
+        "room_ids": [
+          "medbay_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(7, -1)",
+          "(7, 0)"
+        ],
+        "state": "HATCH",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(7, 0)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|0|7",
+        "exterior": false,
+        "id": "edge:1|h|0|7",
+        "key": "1|h|0|7",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "spine_01",
+        "placement_id": "placement:1|h|0|7",
+        "placement_required": true,
+        "portal": false,
+        "position": "(28.0, 4.0, 2.0)",
+        "room_ids": [
+          "spine_01",
+          ""
+        ],
+        "source_cells": [
+          "(7, 0)",
+          "(7, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(8, -1)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|-1|8",
+        "exterior": false,
+        "id": "edge:1|h|-1|8",
+        "key": "1|h|-1|8",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "spine_01",
+        "owner_room": "medbay_01",
+        "placement_id": "placement:1|h|-1|8",
+        "placement_required": true,
+        "portal": false,
+        "position": "(32.0, 4.0, -2.0)",
+        "room_ids": [
+          "medbay_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(8, -1)",
+          "(8, 0)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(9, 0)",
+        "deck": 1,
+        "direction": "west",
+        "edge_key": "1|v|0|8",
+        "exterior": false,
+        "id": "edge:1|v|0|8",
+        "key": "1|v|0|8",
+        "kind": "HATCH",
+        "module_id": "doorway_frame_open_1x1",
+        "opposite_direction": "east",
+        "other_room": "spine_01",
+        "owner_room": "reactor_01",
+        "placement_id": "placement:1|v|0|8",
+        "placement_required": true,
+        "portal": true,
+        "portal_intent_id": "portal:5",
+        "position": "(34.0, 4.0, 0.0)",
+        "room_ids": [
+          "reactor_01",
+          "spine_01"
+        ],
+        "source_cells": [
+          "(9, 0)",
+          "(8, 0)"
+        ],
+        "state": "HATCH",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      {
+        "cell": "(8, 0)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|0|8",
+        "exterior": false,
+        "id": "edge:1|h|0|8",
+        "key": "1|h|0|8",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "spine_01",
+        "placement_id": "placement:1|h|0|8",
+        "placement_required": true,
+        "portal": false,
+        "position": "(32.0, 4.0, 2.0)",
+        "room_ids": [
+          "spine_01",
+          ""
+        ],
+        "source_cells": [
+          "(8, 0)",
+          "(8, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(5, -2)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|-3|5",
+        "exterior": false,
+        "id": "edge:1|h|-3|5",
+        "key": "1|h|-3|5",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "cargo_01",
+        "placement_id": "placement:1|h|-3|5",
+        "placement_required": true,
+        "portal": false,
+        "position": "(20.0, 4.0, -10.0)",
+        "room_ids": [
+          "cargo_01",
+          ""
+        ],
+        "source_cells": [
+          "(5, -2)",
+          "(5, -3)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      {
+        "cell": "(5, -2)",
+        "deck": 1,
+        "direction": "west",
+        "edge_key": "1|v|-2|4",
+        "exterior": false,
+        "id": "edge:1|v|-2|4",
+        "key": "1|v|-2|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "cargo_01",
+        "placement_id": "placement:1|v|-2|4",
+        "placement_required": true,
+        "portal": false,
+        "position": "(18.0, 4.0, -8.0)",
+        "room_ids": [
+          "cargo_01",
+          ""
+        ],
+        "source_cells": [
+          "(5, -2)",
+          "(4, -2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      {
+        "cell": "(6, -2)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|-3|6",
+        "exterior": false,
+        "id": "edge:1|h|-3|6",
+        "key": "1|h|-3|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "cargo_01",
+        "placement_id": "placement:1|h|-3|6",
+        "placement_required": true,
+        "portal": false,
+        "position": "(24.0, 4.0, -10.0)",
+        "room_ids": [
+          "cargo_01",
+          ""
+        ],
+        "source_cells": [
+          "(6, -2)",
+          "(6, -3)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      {
+        "cell": "(6, -2)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|-2|6",
+        "exterior": false,
+        "id": "edge:1|v|-2|6",
+        "key": "1|v|-2|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "cargo_01",
+        "placement_id": "placement:1|v|-2|6",
+        "placement_required": true,
+        "portal": false,
+        "position": "(26.0, 4.0, -8.0)",
+        "room_ids": [
+          "cargo_01",
+          ""
+        ],
+        "source_cells": [
+          "(6, -2)",
+          "(7, -2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      {
+        "cell": "(5, -1)",
+        "deck": 1,
+        "direction": "west",
+        "edge_key": "1|v|-1|4",
+        "exterior": false,
+        "id": "edge:1|v|-1|4",
+        "key": "1|v|-1|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "cargo_01",
+        "placement_id": "placement:1|v|-1|4",
+        "placement_required": true,
+        "portal": false,
+        "position": "(18.0, 4.0, -4.0)",
+        "room_ids": [
+          "cargo_01",
+          ""
+        ],
+        "source_cells": [
+          "(5, -1)",
+          "(4, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      {
+        "cell": "(6, -1)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|-1|6",
+        "exterior": false,
+        "id": "edge:1|v|-1|6",
+        "key": "1|v|-1|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "medbay_01",
+        "owner_room": "cargo_01",
+        "placement_id": "placement:1|v|-1|6",
+        "placement_required": true,
+        "portal": false,
+        "position": "(26.0, 4.0, -4.0)",
+        "room_ids": [
+          "cargo_01",
+          "medbay_01"
+        ],
+        "source_cells": [
+          "(6, -1)",
+          "(7, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      {
+        "cell": "(7, -1)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|-2|7",
+        "exterior": false,
+        "id": "edge:1|h|-2|7",
+        "key": "1|h|-2|7",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "medbay_01",
+        "placement_id": "placement:1|h|-2|7",
+        "placement_required": true,
+        "portal": false,
+        "position": "(28.0, 4.0, -6.0)",
+        "room_ids": [
+          "medbay_01",
+          ""
+        ],
+        "source_cells": [
+          "(7, -1)",
+          "(7, -2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      {
+        "cell": "(8, -1)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|-2|8",
+        "exterior": false,
+        "id": "edge:1|h|-2|8",
+        "key": "1|h|-2|8",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "medbay_01",
+        "placement_id": "placement:1|h|-2|8",
+        "placement_required": true,
+        "portal": false,
+        "position": "(32.0, 4.0, -6.0)",
+        "room_ids": [
+          "medbay_01",
+          ""
+        ],
+        "source_cells": [
+          "(8, -1)",
+          "(8, -2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      {
+        "cell": "(8, -1)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|-1|8",
+        "exterior": false,
+        "id": "edge:1|v|-1|8",
+        "key": "1|v|-1|8",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "medbay_01",
+        "placement_id": "placement:1|v|-1|8",
+        "placement_required": true,
+        "portal": false,
+        "position": "(34.0, 4.0, -4.0)",
+        "room_ids": [
+          "medbay_01",
+          ""
+        ],
+        "source_cells": [
+          "(8, -1)",
+          "(9, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      {
+        "cell": "(5, 1)",
+        "deck": 1,
+        "direction": "west",
+        "edge_key": "1|v|1|4",
+        "exterior": false,
+        "id": "edge:1|v|1|4",
+        "key": "1|v|1|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "maintenance_01",
+        "placement_id": "placement:1|v|1|4",
+        "placement_required": true,
+        "portal": false,
+        "position": "(18.0, 4.0, 4.0)",
+        "room_ids": [
+          "maintenance_01",
+          ""
+        ],
+        "source_cells": [
+          "(5, 1)",
+          "(4, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      {
+        "cell": "(6, 1)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|1|6",
+        "exterior": false,
+        "id": "edge:1|v|1|6",
+        "key": "1|v|1|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "maintenance_01",
+        "placement_id": "placement:1|v|1|6",
+        "placement_required": true,
+        "portal": false,
+        "position": "(26.0, 4.0, 4.0)",
+        "room_ids": [
+          "maintenance_01",
+          ""
+        ],
+        "source_cells": [
+          "(6, 1)",
+          "(7, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      {
+        "cell": "(5, 2)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|2|5",
+        "exterior": false,
+        "id": "edge:1|h|2|5",
+        "key": "1|h|2|5",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "maintenance_01",
+        "placement_id": "placement:1|h|2|5",
+        "placement_required": true,
+        "portal": false,
+        "position": "(20.0, 4.0, 10.0)",
+        "room_ids": [
+          "maintenance_01",
+          ""
+        ],
+        "source_cells": [
+          "(5, 2)",
+          "(5, 3)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(5, 2)",
+        "deck": 1,
+        "direction": "west",
+        "edge_key": "1|v|2|4",
+        "exterior": false,
+        "id": "edge:1|v|2|4",
+        "key": "1|v|2|4",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "maintenance_01",
+        "placement_id": "placement:1|v|2|4",
+        "placement_required": true,
+        "portal": false,
+        "position": "(18.0, 4.0, 8.0)",
+        "room_ids": [
+          "maintenance_01",
+          ""
+        ],
+        "source_cells": [
+          "(5, 2)",
+          "(4, 2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      {
+        "cell": "(6, 2)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|2|6",
+        "exterior": false,
+        "id": "edge:1|v|2|6",
+        "key": "1|v|2|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "maintenance_01",
+        "placement_id": "placement:1|v|2|6",
+        "placement_required": true,
+        "portal": false,
+        "position": "(26.0, 4.0, 8.0)",
+        "room_ids": [
+          "maintenance_01",
+          ""
+        ],
+        "source_cells": [
+          "(6, 2)",
+          "(7, 2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      {
+        "cell": "(6, 2)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|2|6",
+        "exterior": false,
+        "id": "edge:1|h|2|6",
+        "key": "1|h|2|6",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "maintenance_01",
+        "placement_id": "placement:1|h|2|6",
+        "placement_required": true,
+        "portal": false,
+        "position": "(24.0, 4.0, 10.0)",
+        "room_ids": [
+          "maintenance_01",
+          ""
+        ],
+        "source_cells": [
+          "(6, 2)",
+          "(6, 3)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(9, 0)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|-1|9",
+        "exterior": false,
+        "id": "edge:1|h|-1|9",
+        "key": "1|h|-1|9",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "reactor_01",
+        "placement_id": "placement:1|h|-1|9",
+        "placement_required": true,
+        "portal": false,
+        "position": "(36.0, 4.0, -2.0)",
+        "room_ids": [
+          "reactor_01",
+          ""
+        ],
+        "source_cells": [
+          "(9, 0)",
+          "(9, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      {
+        "cell": "(10, 0)",
+        "deck": 1,
+        "direction": "north",
+        "edge_key": "1|h|-1|10",
+        "exterior": false,
+        "id": "edge:1|h|-1|10",
+        "key": "1|h|-1|10",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "south",
+        "other_room": "",
+        "owner_room": "reactor_01",
+        "placement_id": "placement:1|h|-1|10",
+        "placement_required": true,
+        "portal": false,
+        "position": "(40.0, 4.0, -2.0)",
+        "room_ids": [
+          "reactor_01",
+          ""
+        ],
+        "source_cells": [
+          "(10, 0)",
+          "(10, -1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 180.0
+      },
+      {
+        "cell": "(10, 0)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|0|10",
+        "exterior": false,
+        "id": "edge:1|v|0|10",
+        "key": "1|v|0|10",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "reactor_01",
+        "placement_id": "placement:1|v|0|10",
+        "placement_required": true,
+        "portal": false,
+        "position": "(42.0, 4.0, 0.0)",
+        "room_ids": [
+          "reactor_01",
+          ""
+        ],
+        "source_cells": [
+          "(10, 0)",
+          "(11, 0)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      {
+        "cell": "(9, 1)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|1|9",
+        "exterior": false,
+        "id": "edge:1|h|1|9",
+        "key": "1|h|1|9",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "reactor_01",
+        "placement_id": "placement:1|h|1|9",
+        "placement_required": true,
+        "portal": false,
+        "position": "(36.0, 4.0, 6.0)",
+        "room_ids": [
+          "reactor_01",
+          ""
+        ],
+        "source_cells": [
+          "(9, 1)",
+          "(9, 2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": "(9, 1)",
+        "deck": 1,
+        "direction": "west",
+        "edge_key": "1|v|1|8",
+        "exterior": false,
+        "id": "edge:1|v|1|8",
+        "key": "1|v|1|8",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "east",
+        "other_room": "",
+        "owner_room": "reactor_01",
+        "placement_id": "placement:1|v|1|8",
+        "placement_required": true,
+        "portal": false,
+        "position": "(34.0, 4.0, 4.0)",
+        "room_ids": [
+          "reactor_01",
+          ""
+        ],
+        "source_cells": [
+          "(9, 1)",
+          "(8, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 90.0
+      },
+      {
+        "cell": "(10, 1)",
+        "deck": 1,
+        "direction": "east",
+        "edge_key": "1|v|1|10",
+        "exterior": false,
+        "id": "edge:1|v|1|10",
+        "key": "1|v|1|10",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "west",
+        "other_room": "",
+        "owner_room": "reactor_01",
+        "placement_id": "placement:1|v|1|10",
+        "placement_required": true,
+        "portal": false,
+        "position": "(42.0, 4.0, 4.0)",
+        "room_ids": [
+          "reactor_01",
+          ""
+        ],
+        "source_cells": [
+          "(10, 1)",
+          "(11, 1)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 270.0
+      },
+      {
+        "cell": "(10, 1)",
+        "deck": 1,
+        "direction": "south",
+        "edge_key": "1|h|1|10",
+        "exterior": false,
+        "id": "edge:1|h|1|10",
+        "key": "1|h|1|10",
+        "kind": "SOLID",
+        "module_id": "wall_straight_1x1",
+        "opposite_direction": "north",
+        "other_room": "",
+        "owner_room": "reactor_01",
+        "placement_id": "placement:1|h|1|10",
+        "placement_required": true,
+        "portal": false,
+        "position": "(40.0, 4.0, 6.0)",
+        "room_ids": [
+          "reactor_01",
+          ""
+        ],
+        "source_cells": [
+          "(10, 1)",
+          "(10, 2)"
+        ],
+        "state": "SOLID",
+        "wrapper_required": true,
+        "yaw_degrees": 0.0
+      }
+    ],
+    "validated": true
+  },
+  "structural_plan_migration": "task5-canonical-floor-and-edge-plan",
+  "vertical_connections": [
+    {
+      "from_cell": [
+        4.0,
+        0.0,
+        0.0
+      ],
+      "from_room": "ramp_01",
+      "id": "ramp_01_to_spine_01",
+      "module_id": "ramp_up_1x2",
+      "to_cell": [
+        4.0,
+        0.0,
+        1.0
+      ],
+      "to_room": "spine_01",
+      "type": "ramp"
+    }
+  ]
 }
