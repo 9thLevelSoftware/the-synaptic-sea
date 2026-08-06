@@ -1926,3 +1926,176 @@ def test_resolver_adapts_canonical_cardinal_edge_poses(tmp_path: Path):
         """,
     )
     _assert_probe_passed(result)
+
+
+def test_task8_debug_export_declares_all_canonical_artifacts_and_sorted_serialization():
+    source = _read("scripts/validation/procgen_structural_debug_export.gd")
+    for artifact in (
+        "topology.json",
+        "occupancy.json",
+        "edge_map.json",
+        "placements.json",
+        "validation.json",
+        "topdown_layout.png",
+    ):
+        assert artifact in source
+    assert "--seed" in source
+    assert "--output-dir" in source
+    assert "sort_custom" in source or "sort()" in source
+    assert "save_png" in source
+    for state in ("SOLID", "OPEN", "DOOR", "LOCKED", "HATCH", "BREACH"):
+        assert state in source
+    assert "arrow" in source.lower()
+
+
+def test_task8_compiler_plan_is_byte_stable_for_reversed_room_and_portal_input(tmp_path: Path):
+    result = _run_godot_probe(
+        tmp_path,
+        """
+        var forward: Dictionary = Compiler.new().compile({
+            "rooms": [
+                {"id": "room_a", "deck": 0, "cells": [Vector2i(0, 0)]},
+                {"id": "room_b", "deck": 0, "cells": [Vector2i(1, 0)]},
+            ],
+            "portals": [
+                {"from_room": "room_a", "to_room": "room_b", "type": "door"},
+            ],
+        })
+        var reversed: Dictionary = Compiler.new().compile({
+            "rooms": [
+                {"id": "room_b", "deck": 0, "cells": [Vector2i(1, 0)]},
+                {"id": "room_a", "deck": 0, "cells": [Vector2i(0, 0)]},
+            ],
+            "portals": [
+                {"from_room": "room_b", "to_room": "room_a", "type": "door"},
+            ],
+        })
+        if JSON.stringify(forward) != JSON.stringify(reversed):
+            _fail("compiler output changed under equivalent reversed room/portal ordering")
+        """,
+    )
+    _assert_probe_passed(result)
+
+
+def test_task8_debug_export_is_byte_stable_for_reversed_input(tmp_path: Path):
+    godot = shutil.which("godot") or "/opt/homebrew/bin/godot"
+    if not Path(godot).exists():
+        pytest.skip("Godot is required for debug-export behavioral probes")
+
+    outputs = {}
+    for label, extra_args in (("forward", []), ("reversed", ["--reverse-input"])):
+        output_dir = tmp_path / label
+        result = subprocess.run(
+            [
+                godot,
+                "--headless",
+                "--path",
+                str(PROJECT_ROOT),
+                "--script",
+                "res://scripts/validation/procgen_structural_debug_export.gd",
+                "--",
+                "--seed",
+                "17",
+                "--output-dir",
+                str(output_dir),
+                *extra_args,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+        output = "\\n".join(part for part in (result.stdout, result.stderr) if part)
+        assert result.returncode == 0, output
+        assert "PROCGEN STRUCTURAL DEBUG EXPORT PASS" in output
+        assert "ERROR:" not in output
+        assert "WARNING:" not in output
+        outputs[label] = {
+            path.name: path.read_bytes()
+            for path in sorted(output_dir.iterdir())
+            if path.is_file()
+        }
+
+    assert set(outputs["forward"]) == {
+        "topology.json",
+        "occupancy.json",
+        "edge_map.json",
+        "placements.json",
+        "validation.json",
+        "topdown_layout.png",
+    }
+    assert outputs["forward"] == outputs["reversed"]
+
+
+def test_task8_debug_export_renders_all_state_colors_and_portal_normals(tmp_path: Path):
+    result = _run_godot_probe(
+        tmp_path,
+        """
+        var exporter_script: GDScript = load("res://scripts/validation/procgen_structural_debug_export.gd")
+        var exporter = exporter_script.new()
+        var plan_script: GDScript = load("res://scripts/procgen/structural_edge_plan.gd")
+        var occupancy: Dictionary = {}
+        var edges: Dictionary = {}
+        var states: Array[String] = ["SOLID", "OPEN", "DOOR", "LOCKED", "HATCH", "BREACH"]
+        var directions: Array[String] = ["north", "north", "north", "north", "north", "north"]
+        var expected: Array[Color] = [
+            Color(0.46, 0.50, 0.56, 1.0),
+            Color(0.15, 0.82, 0.42, 1.0),
+            Color(0.18, 0.55, 0.96, 1.0),
+            Color(0.94, 0.22, 0.28, 1.0),
+            Color(0.98, 0.62, 0.12, 1.0),
+            Color(0.70, 0.34, 0.94, 1.0),
+        ]
+        for index in states.size():
+            var cell := Vector2i(index, 0)
+            occupancy[plan_script.cell_key(0, cell)] = plan_script.make_cell(0, cell, "room_%d" % index)
+            var edge_key: String = plan_script.edge_key(0, cell, directions[index])
+            var edge: Dictionary = plan_script.make_edge(edge_key, states[index], "room_a", "room_b", cell, directions[index])
+            edge["state"] = states[index]
+            edge["portal"] = states[index] in ["DOOR", "LOCKED", "HATCH", "BREACH"]
+            edges[edge_key] = edge
+        var image: Image = exporter._render_topdown({"occupancy": occupancy, "edges": edges})
+        for index in states.size():
+            var found := false
+            for x in image.get_width():
+                for y in image.get_height():
+                    var actual: Color = image.get_pixel(x, y)
+                    if absf(actual.r - expected[index].r) < 0.01 and absf(actual.g - expected[index].g) < 0.01 and absf(actual.b - expected[index].b) < 0.01:
+                        found = true
+                        break
+                if found:
+                    break
+            if not found:
+                _fail("missing rendered state color: " + states[index])
+        # The DOOR north edge is at x=104, y=24; its normal arrow tip is y=13.
+        var arrow_pixel: Color = image.get_pixel(104, 13)
+        if absf(arrow_pixel.r - expected[2].r) >= 0.01 or absf(arrow_pixel.g - expected[2].g) >= 0.01 or absf(arrow_pixel.b - expected[2].b) >= 0.01:
+            _fail("portal normal arrow was not rendered for DOOR")
+        image = null
+        exporter.free()
+        """,
+    )
+    _assert_probe_passed(result)
+
+
+def test_task8_structural_smoke_checks_multi_seed_canonical_invariants():
+    source = _read("scripts/validation/procgen_structural_compiler_smoke.gd")
+    for seed in ("17", "23", "41", "73", "101"):
+        assert seed in source
+    assert "duplicate edge" in source
+    assert "flood" in source.lower()
+    assert "wrapper" in source.lower()
+    assert "PROCGEN_STRUCTURAL_COMPILER_PASS" in source
+    assert "seeds=%d placements=%d portals=%d" in source
+
+
+def test_task8_stress_and_walkability_use_canonical_plan_invariants():
+    stress = _read("scripts/validation/procgen_stress_test.gd")
+    walkability = _read("scripts/validation/procgen_walkability_smoke.gd")
+    for source in (stress, walkability):
+        assert "StructuralEdgeCompiler" in source
+        assert "StructuralPlanValidator" in source
+        assert "structural_plan" in source
+        assert "floor_placements" in source
+        assert "duplicate edge" in source or "duplicate" in source
+        assert "flood" in source.lower() or "connected" in source.lower()

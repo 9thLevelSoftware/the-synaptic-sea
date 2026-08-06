@@ -243,7 +243,7 @@ func _build_portal_intents(raw_portals: Variant, destination: Dictionary, errors
 		return
 
 	var next_id: int = 0
-	for portal_variant in raw_portals:
+	for portal_variant in _sorted_portal_records(raw_portals):
 		if not (portal_variant is Dictionary):
 			errors.append("portal intent is not a Dictionary")
 			continue
@@ -464,7 +464,15 @@ func _floor_module_id_for_room(room: Dictionary) -> String:
 func _room_records(raw_rooms: Variant, errors: Array[String]) -> Array:
 	var records: Array = []
 	if raw_rooms is Array:
-		return raw_rooms
+		for room_variant in raw_rooms:
+			if room_variant is Dictionary:
+				var room: Dictionary = (room_variant as Dictionary).duplicate(true)
+				room["cells"] = _sorted_cells(room.get("cells", []))
+				records.append(room)
+			else:
+				records.append(room_variant)
+		records.sort_custom(Callable(self, "_room_record_precedes"))
+		return records
 	if raw_rooms is Dictionary:
 		for room_key in raw_rooms.keys():
 			var room_variant: Variant = raw_rooms[room_key]
@@ -474,10 +482,78 @@ func _room_records(raw_rooms: Variant, errors: Array[String]) -> Array:
 			var room: Dictionary = room_variant.duplicate(true)
 			if not room.has("id"):
 				room["id"] = String(room_key)
+			room["cells"] = _sorted_cells(room.get("cells", []))
 			records.append(room)
+		records.sort_custom(Callable(self, "_room_record_precedes"))
 		return records
 	errors.append("layout rooms must be an Array or Dictionary")
 	return records
+
+
+func _room_record_precedes(first: Variant, second: Variant) -> bool:
+	return _room_record_sort_key(first) < _room_record_sort_key(second)
+
+
+func _room_record_sort_key(value: Variant) -> String:
+	if not (value is Dictionary):
+		return "0|" + str(value)
+	var room: Dictionary = value
+	var room_id: String = String(room.get("id", ""))
+	var deck: int = int(room.get("deck", 0))
+	return "1|%s|%d|%s" % [room_id, deck, JSON.stringify(room)]
+
+
+func _sorted_cells(raw_cells: Variant) -> Array:
+	var cells: Array = []
+	if raw_cells is Array:
+		for cell in raw_cells:
+			cells.append(cell)
+	cells.sort_custom(Callable(self, "_cell_precedes"))
+	return cells
+
+
+func _cell_precedes(first: Variant, second: Variant) -> bool:
+	return _cell_sort_key(first) < _cell_sort_key(second)
+
+
+func _cell_sort_key(value: Variant) -> String:
+	if value is Vector2i:
+		var cell: Vector2i = value
+		return "1|%d|%d" % [cell.x, cell.y]
+	if value is Array and (value as Array).size() == 2:
+		var values: Array = value
+		if typeof(values[0]) == TYPE_INT and typeof(values[1]) == TYPE_INT:
+			return "1|%d|%d" % [int(values[0]), int(values[1])]
+	return "0|" + str(value)
+
+
+func _sorted_portal_records(raw_portals: Array) -> Array:
+	var records: Array = []
+	for portal_variant in raw_portals:
+		if portal_variant is Dictionary:
+			records.append((portal_variant as Dictionary).duplicate(true))
+		else:
+			records.append(portal_variant)
+	records.sort_custom(Callable(self, "_portal_record_precedes"))
+	return records
+
+
+func _portal_record_precedes(first: Variant, second: Variant) -> bool:
+	return _portal_record_sort_key(first) < _portal_record_sort_key(second)
+
+
+func _portal_record_sort_key(value: Variant) -> String:
+	if not (value is Dictionary):
+		return "0|" + str(value)
+	var portal: Dictionary = value
+	var first_room: String = String(portal.get("from_room", portal.get("room_a", portal.get("from", ""))))
+	var second_room: String = String(portal.get("to_room", portal.get("room_b", portal.get("to", ""))))
+	var pair_first: String = first_room if first_room < second_room else second_room
+	var pair_second: String = second_room if first_room < second_room else first_room
+	var raw_edge: Variant = portal.get("edge_key", portal.get("required_edge", portal.get("edge", "")))
+	var edge_key: String = String(raw_edge) if raw_edge is String else str(raw_edge)
+	var kind: String = String(portal.get("type", portal.get("portal_type", portal.get("kind", "DOOR")))).to_lower()
+	return "1|%s|%s|%s|%s" % [pair_first, pair_second, edge_key, kind + "|" + JSON.stringify(portal)]
 
 
 func _parse_integer(raw_value: Variant) -> Dictionary:

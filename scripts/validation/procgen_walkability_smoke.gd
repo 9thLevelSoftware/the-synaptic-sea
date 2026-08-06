@@ -7,6 +7,9 @@ extends SceneTree
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_generator.gd")
 const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
+const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
+const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
+const StructuralEdgePlanScript := preload("res://scripts/procgen/structural_edge_plan.gd")
 
 const CELL_SIZE: float = 4.0
 const FLOOR_Y_OFFSET: float = 0.12
@@ -91,6 +94,21 @@ func _initialize() -> void:
 		quit(1)
 		return
 
+	var structural_plan: Dictionary = StructuralEdgeCompilerScript.new().compile(layout)
+	var compiler_errors: Variant = structural_plan.get("errors", [])
+	if not (compiler_errors is Array) or not (compiler_errors as Array).is_empty():
+		push_error("WALKABILITY FAIL %s canonical compiler errors=%s" % [label, JSON.stringify(compiler_errors)])
+		quit(1)
+		return
+	var structural_verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout)
+	if not bool(structural_verdict.get("ok", false)):
+		push_error("WALKABILITY FAIL %s canonical validator errors=%s" % [label, JSON.stringify(structural_verdict.get("errors", []))])
+		quit(1)
+		return
+	if not _canonical_plan_invariants(structural_plan, label):
+		quit(1)
+		return
+
 	var rooms: Array = layout.get("rooms", [])
 	var gameplay: Dictionary = slice_builder.build(layout)
 	var start_room_id: String = str(gameplay.get("start_room", ""))
@@ -161,6 +179,83 @@ func _initialize() -> void:
 	walker.add_child(agent)
 
 	print("WALKABILITY start room=%s goal=%s waypoints=%d" % [start_room_id, goal_room_id, waypoints.size()])
+
+
+func _canonical_plan_invariants(structural_plan: Dictionary, label: String) -> bool:
+	var placements: Variant = structural_plan.get("placements", null)
+	var floor_placements: Variant = structural_plan.get("floor_placements", null)
+	var occupancy: Variant = structural_plan.get("occupancy", null)
+	var edges: Variant = structural_plan.get("edges", null)
+	if not (placements is Array) or not (floor_placements is Array) or (floor_placements as Array).is_empty():
+		push_error("WALKABILITY FAIL %s canonical floor_placements missing" % label)
+		return false
+	if not (occupancy is Dictionary) or (occupancy as Dictionary).is_empty() or not (edges is Dictionary):
+		push_error("WALKABILITY FAIL %s canonical occupancy/edges malformed" % label)
+		return false
+
+	var seen_edges: Dictionary = {}
+	for placement_variant in placements:
+		if not (placement_variant is Dictionary):
+			push_error("WALKABILITY FAIL %s canonical placement malformed" % label)
+			return false
+		var edge_key: String = str((placement_variant as Dictionary).get("edge_key", ""))
+		if edge_key.is_empty() or seen_edges.has(edge_key):
+			push_error("WALKABILITY FAIL %s duplicate edge=%s" % [label, edge_key])
+			return false
+		seen_edges[edge_key] = true
+	for floor_variant in floor_placements:
+		if not (floor_variant is Dictionary) or str((floor_variant as Dictionary).get("module_id", "")).is_empty():
+			push_error("WALKABILITY FAIL %s incomplete floor wrapper" % label)
+			return false
+
+	var adjacency: Dictionary = {}
+	for cell_key_variant in (occupancy as Dictionary).keys():
+		adjacency[str(cell_key_variant)] = []
+	for edge_variant in (edges as Dictionary).values():
+		if not (edge_variant is Dictionary):
+			continue
+		var edge: Dictionary = edge_variant
+		if str(edge.get("kind", edge.get("state", "SOLID"))).to_upper() == "SOLID":
+			continue
+		var source_cells: Variant = edge.get("source_cells", [])
+		if not (source_cells is Array) or (source_cells as Array).size() != 2:
+			continue
+		var first: Dictionary = _read_canonical_cell((source_cells as Array)[0])
+		var second: Dictionary = _read_canonical_cell((source_cells as Array)[1])
+		if not bool(first.get("ok", false)) or not bool(second.get("ok", false)):
+			continue
+		var deck: int = int(edge.get("deck", -1))
+		var first_key: String = StructuralEdgePlanScript.cell_key(deck, first["cell"])
+		var second_key: String = StructuralEdgePlanScript.cell_key(deck, second["cell"])
+		if adjacency.has(first_key) and adjacency.has(second_key):
+			(adjacency[first_key] as Array).append(second_key)
+			(adjacency[second_key] as Array).append(first_key)
+
+	var start_key: String = str((occupancy as Dictionary).keys()[0])
+	var visited: Dictionary = {start_key: true}
+	var queue: Array[String] = [start_key]
+	while not queue.is_empty():
+		var current: String = queue.pop_front()
+		for neighbor_variant in (adjacency.get(current, []) as Array):
+			var neighbor: String = str(neighbor_variant)
+			if not visited.has(neighbor):
+				visited[neighbor] = true
+				queue.append(neighbor)
+	if visited.size() != (occupancy as Dictionary).size():
+		push_error("WALKABILITY FAIL %s flood connectivity=%d/%d" % [
+			label, visited.size(), (occupancy as Dictionary).size()])
+		return false
+	return true
+
+
+func _read_canonical_cell(value: Variant) -> Dictionary:
+	if value is Vector2i:
+		return {"ok": true, "cell": value}
+	if value is Array and (value as Array).size() >= 2:
+		var values: Array = value
+		if typeof(values[0]) == TYPE_INT and typeof(values[1]) == TYPE_INT:
+			return {"ok": true, "cell": Vector2i(int(values[0]), int(values[1]))}
+	return {"ok": false}
 
 
 func _room_center(rooms: Array, room_id: String) -> Vector3:
