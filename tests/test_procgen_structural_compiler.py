@@ -1837,3 +1837,92 @@ def test_validator_rejects_final_edge_map_and_placement_reconciliation_false_acc
         """,
     )
     _assert_validator_probe_passed(result)
+
+
+def test_resolver_has_no_independent_wall_offset_authority():
+    source = _read("scripts/procgen/wall_door_resolver.gd")
+    assert "StructuralEdgeCompilerScript" in source
+    assert "StructuralPlanValidatorScript" in source
+    assert "StructuralEdgeCompilerScript.new" in source
+    assert "StructuralPlanValidatorScript.new" in source
+    assert "WALL_OFFSET" not in source
+    assert "WALL_YAW" not in source
+    assert "const DIRECTIONS" not in source
+    assert "func _add_wall(" not in source
+
+
+def test_structural_placer_is_not_a_production_ship_generator_dependency():
+    ship_generator = _read("scripts/procgen/ship_generator.gd")
+    assert "StructuralPlacer" not in ship_generator
+
+
+def test_structural_placer_is_marked_legacy_debug_only_with_stable_diagnostic():
+    source = _read("scripts/procgen/structural_placer.gd")
+    assert "Legacy debug-only room visualizer" in source
+    assert "must never be used by ShipGenerator" in source
+    assert "legacy_debug_context" in source
+    assert "STRUCTURAL_PLACER DEPRECATED" in source
+
+
+def test_resolver_adapts_canonical_cardinal_edge_poses(tmp_path: Path):
+    result = _run_godot_probe(
+        tmp_path,
+        """
+        var resolver = load("res://scripts/procgen/wall_door_resolver.gd").new()
+        var center := "room_center"
+        var directions: Array = [
+            {"name": "north", "neighbor": "room_north", "cell": Vector2i(0, 0), "neighbor_cell": Vector2i(0, -1)},
+            {"name": "east", "neighbor": "room_east", "cell": Vector2i(0, 0), "neighbor_cell": Vector2i(1, 0)},
+            {"name": "south", "neighbor": "room_south", "cell": Vector2i(0, 0), "neighbor_cell": Vector2i(0, 1)},
+            {"name": "west", "neighbor": "room_west", "cell": Vector2i(0, 0), "neighbor_cell": Vector2i(-1, 0)},
+        ]
+        var rooms: Array = []
+        rooms.append({"id": center, "deck": 0, "cells": [Vector2i(0, 0)]})
+        var adjacencies: Array = []
+        for direction_variant in directions:
+            var direction: Dictionary = direction_variant
+            rooms.append({"id": direction["neighbor"], "deck": 0, "cells": [direction["neighbor_cell"]]})
+            adjacencies.append({
+                "from_room": center,
+                "to_room": direction["neighbor"],
+                "from_cell": direction["cell"],
+                "to_cell": direction["neighbor_cell"],
+                "type": "door",
+            })
+        var legacy_room_plan: Array[Dictionary] = []
+        var geometry: Dictionary = resolver.resolve(
+            {"rooms": {
+                center: rooms[0],
+                "room_north": rooms[1],
+                "room_east": rooms[2],
+                "room_south": rooms[3],
+                "room_west": rooms[4],
+            }, "adjacencies": adjacencies},
+            legacy_room_plan,
+        )
+        var center_geometry: Dictionary = geometry.get(center, {})
+        var portals: Array = center_geometry.get("portals", [])
+        var expected: Dictionary = {
+            "north": {"position": Vector3(0.0, 0.0, -2.0), "yaw": 180.0},
+            "east": {"position": Vector3(2.0, 0.0, 0.0), "yaw": 270.0},
+            "south": {"position": Vector3(0.0, 0.0, 2.0), "yaw": 0.0},
+            "west": {"position": Vector3(-2.0, 0.0, 0.0), "yaw": 90.0},
+        }
+        for expected_direction_variant in expected.keys():
+            var expected_direction: String = String(expected_direction_variant)
+            var expected_record: Dictionary = expected[expected_direction_variant]
+            var found := false
+            for portal_variant in portals:
+                var portal: Dictionary = portal_variant
+                if String(portal.get("direction", "")) != expected_direction:
+                    continue
+                found = true
+                if portal.get("position", Vector3.INF) != expected_record["position"]:
+                    _fail("resolver position drift for " + expected_direction)
+                if not is_equal_approx(float(portal.get("yaw_degrees", -1.0)), float(expected_record["yaw"])):
+                    _fail("resolver yaw drift for " + expected_direction)
+            if not found:
+                _fail("resolver omitted " + expected_direction + " portal")
+        """,
+    )
+    _assert_probe_passed(result)
