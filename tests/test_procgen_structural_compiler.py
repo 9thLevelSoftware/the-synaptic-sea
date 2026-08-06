@@ -158,6 +158,72 @@ def _assert_validator_probe_passed(result: subprocess.CompletedProcess[str]) -> 
     assert "PROCGEN VALIDATOR PROBE PASS" in output
 
 
+def _run_layout_probe(tmp_path: Path, body: str) -> subprocess.CompletedProcess[str]:
+    godot = shutil.which("godot") or "/opt/homebrew/bin/godot"
+    if not Path(godot).exists():
+        pytest.skip("Godot is required for explicit layout probes")
+
+    probe = tmp_path / "explicit_layout_probe.gd"
+    script = textwrap.dedent(
+        """
+        extends SceneTree
+
+        const Blueprint = preload("res://scripts/procgen/ship_blueprint.gd")
+        const LayoutGenerator = preload("res://scripts/procgen/ship_layout_generator.gd")
+        const Compiler = preload("res://scripts/procgen/structural_edge_compiler.gd")
+        const Validator = preload("res://scripts/procgen/structural_plan_validator.gd")
+        var failed := false
+
+
+        func _fail(message: String) -> void:
+            failed = true
+            print("PROCGEN LAYOUT FAIL: " + message)
+
+
+        func _init() -> void:
+        """
+    )
+    script += textwrap.indent(textwrap.dedent(body).strip(), "    ")
+    script += '\n    if failed:\n        quit(1)\n        return\n    print("PROCGEN LAYOUT PROBE PASS")\n    quit(0)\n'
+    probe.write_text(script, encoding="utf-8")
+    command = [godot, "--headless", "--path", str(PROJECT_ROOT), "--script", str(probe)]
+    try:
+        return subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout or ""
+        stderr = exc.stderr or ""
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode(errors="replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode(errors="replace")
+        pytest.fail(
+            "Godot explicit layout probe timed out after 60 seconds.\n"
+            "command: %s\n"
+            "stdout:\n%s\n"
+            "stderr:\n%s" % (" ".join(command), stdout, stderr)
+        )
+        raise AssertionError("Godot explicit layout probe timed out")
+
+
+def _assert_layout_probe_passed(result: subprocess.CompletedProcess[str]) -> None:
+    output = "\n".join(part for part in (result.stdout, result.stderr) if part)
+    diagnostics = [
+        marker for marker in ("ERROR:", "WARNING:", "SCRIPT ERROR:") if marker in output
+    ]
+    assert not diagnostics, "Godot layout probe emitted diagnostics %s:\n%s" % (
+        diagnostics,
+        output,
+    )
+    assert result.returncode == 0, output
+    assert "PROCGEN LAYOUT PROBE PASS" in output
+
+
 def _validator_case_body(label: str, plan_expression: str, expected: str) -> str:
     return f"""
     var case_plan: Dictionary = {plan_expression}
@@ -187,6 +253,226 @@ def test_assert_probe_passed_rejects_godot_diagnostics(diagnostic: str):
     )
     with pytest.raises(AssertionError):
         _assert_probe_passed(result)
+
+
+def test_layout_generator_emits_explicit_cells_and_portal_intents():
+    source = _read("scripts/procgen/ship_layout_generator.gd")
+    assert '"cells"' in source
+    assert '"footprint"' in source
+    assert '"portals"' in source
+    assert "edge_key" in source
+
+
+def test_ship_generator_validates_structural_plan_before_loader():
+    source = _read("scripts/procgen/ship_generator.gd")
+    assert "StructuralEdgeCompilerScript" in source
+    assert "StructuralPlanValidatorScript" in source
+    assert "structural plan validation failed" in source
+    compile_index = source.index("StructuralEdgeCompilerScript.new")
+    loader_index = source.index('preload("res://scripts/procgen/generated_ship_loader.gd")')
+    assert compile_index < loader_index
+    assert 'layout["structural_plan"] = structural_plan' in source
+
+
+def test_layout_stress_smoke_has_seed_17_footprint_ownership_evidence():
+    source = _read("scripts/validation/procgen_layout_stress_smoke.gd")
+    assert "seed_val == 17" in source or "seed_val = 17" in source
+    assert "ownership" in source
+    assert "room_cell_coordinates" in source
+    assert "floor_coordinates" in source
+    assert "adjacency_intents" in source
+    assert "structural_portal_placement_counts" in source
+    assert "does not map to exactly one portal record" in source
+    assert "does not map to exactly one portal edge placement" in source
+    assert "structural_room_links" in source  # named in the guard comment as the dedup view
+    assert "cells" in source
+    assert "portal" in source
+
+
+def test_generated_seed_17_emits_valid_explicit_footprints_and_portals(tmp_path: Path):
+    result = _run_layout_probe(
+        tmp_path,
+        """
+        var generator := LayoutGenerator.new()
+        var blueprint := Blueprint.new(Blueprint.Size.MEDIUM, Blueprint.Condition.PRISTINE, 17)
+        var layout: Dictionary = generator.generate(blueprint, {"template": "spine"})
+        if layout.is_empty():
+            _fail("seed 17 produced an empty layout")
+        var ownership: Dictionary = {}
+        for room_variant in layout.get("rooms", []):
+            if not (room_variant is Dictionary):
+                _fail("layout contains a non-Dictionary room")
+                continue
+            var room: Dictionary = room_variant
+            var cells: Variant = room.get("cells", null)
+            if not (cells is Array) or (cells as Array).is_empty():
+                _fail("room %s has no explicit cells" % String(room.get("id", "?")))
+                continue
+            if not room.has("footprint"):
+                _fail("room %s has no explicit footprint" % String(room.get("id", "?")))
+            for cell_variant in cells:
+                if not (cell_variant is Vector2i):
+                    _fail("room %s emitted a non-Vector2i cell" % String(room.get("id", "?")))
+                    continue
+                var cell: Vector2i = cell_variant
+                var key := "%d|%d|%d" % [int(room.get("deck", 0)), cell.x, cell.y]
+                if ownership.has(key):
+                    _fail("cell ownership collision at %s" % key)
+                ownership[key] = String(room.get("id", ""))
+
+        var structural_plan: Dictionary = Compiler.new().compile(layout)
+        if not (structural_plan.get("errors", []) as Array).is_empty():
+            _fail("compiler rejected generated layout: " + JSON.stringify(structural_plan["errors"]))
+        var verdict: Dictionary = Validator.new().validate(structural_plan, layout)
+        if not bool(verdict.get("ok", false)):
+            _fail("validator rejected generated layout: " + JSON.stringify(verdict["errors"]))
+        var portal_count := 0
+        for portal_variant in layout.get("portals", []):
+            var portal: Dictionary = portal_variant
+            var edge_key := String(portal.get("edge_key", ""))
+            var matched := 0
+            for edge_variant in structural_plan.get("edges", {}).values():
+                var edge: Dictionary = edge_variant
+                if String(edge.get("edge_key", "")) == edge_key and String(edge.get("kind", "")) != "SOLID":
+                    matched += 1
+            if matched != 1:
+                _fail("portal %s matched %d non-solid edges" % [edge_key, matched])
+            portal_count += 1
+        if portal_count == 0:
+            _fail("seed 17 emitted no explicit portal intents")
+        """,
+    )
+    output = "\n".join(part for part in (result.stdout, result.stderr) if part)
+    assert result.returncode == 0, output
+    assert not any(marker in output for marker in ("ERROR:", "WARNING:", "SCRIPT ERROR:")), output
+    assert "PROCGEN LAYOUT PROBE PASS" in output
+
+
+def test_layout_generator_rejects_stale_portal_cells_and_coordinate_mismatch(tmp_path: Path):
+    result = _run_layout_probe(
+        tmp_path,
+        """
+        var generator := LayoutGenerator.new()
+        var placed_rooms: Dictionary = {
+            "A": {"deck": 0, "cells": [Vector2i(0, 0)]},
+            "B": {"deck": 0, "cells": [Vector2i(1, 0)]},
+        }
+        var cases: Array = [
+            {
+                "label": "stale-source",
+                "adjacency": {"from_room": "A", "to_room": "B", "from_cell": Vector2i(99, 99), "to_cell": Vector2i(1, 0)},
+            },
+            {
+                "label": "stale-target",
+                "adjacency": {"from_room": "A", "to_room": "B", "from_cell": Vector2i(0, 0), "to_cell": Vector2i(99, 99)},
+            },
+            {
+                "label": "non-cardinal",
+                "adjacency": {"from_room": "A", "to_room": "B", "from_cell": Vector2i(0, 0), "to_cell": Vector2i(2, 0)},
+            },
+            {
+                "label": "declared-direction-mismatch",
+                "adjacency": {"from_room": "A", "to_room": "B", "from_cell": Vector2i(0, 0), "to_cell": Vector2i(1, 0), "direction": "north"},
+            },
+            {
+                "label": "declared-edge-mismatch",
+                "adjacency": {"from_room": "A", "to_room": "B", "from_cell": Vector2i(0, 0), "to_cell": Vector2i(1, 0), "edge_key": "0|v|100|100"},
+            },
+        ]
+        for case_variant in cases:
+            var test_case: Dictionary = case_variant
+            var result_case: Dictionary = generator._build_explicit_portals([test_case["adjacency"]], placed_rooms)
+            if bool(result_case.get("ok", true)):
+                _fail("invalid %s adjacency was accepted" % String(test_case["label"]))
+            if not (result_case.get("portals", []) as Array).is_empty():
+                _fail("invalid %s adjacency emitted a portal" % String(test_case["label"]))
+
+        var stamped_layout: Dictionary = {"rooms": []}
+        var stale_grid: Dictionary = {"rooms": placed_rooms, "adjacencies": [cases[0]["adjacency"]]}
+        if generator._stamp_explicit_structural_layout(stamped_layout, stale_grid):
+            _fail("stale adjacency was accepted by the structural layout stamp")
+        if stamped_layout.has("portals") and not (stamped_layout["portals"] as Array).is_empty():
+            _fail("failed structural layout stamp emitted stale portal records")
+        """,
+    )
+    _assert_layout_probe_passed(result)
+
+
+def test_layout_generator_preserves_portal_intent_type_alias_and_required_false(tmp_path: Path):
+    result = _run_layout_probe(
+        tmp_path,
+        """
+        var generator := LayoutGenerator.new()
+        var placed_rooms: Dictionary = {
+            "A": {"deck": 0, "cells": [Vector2i(0, 0)]},
+            "B": {"deck": 0, "cells": [Vector2i(1, 0)]},
+        }
+        var type_result: Dictionary = generator._build_explicit_portals([{
+            "from_room": "A",
+            "to_room": "B",
+            "from_cell": Vector2i(0, 0),
+            "to_cell": Vector2i(1, 0),
+            "type": "locked",
+            "required": false,
+        }], placed_rooms)
+        if not bool(type_result.get("ok", false)) or (type_result["portals"] as Array).size() != 1:
+            _fail("locked intent did not produce one portal record")
+        else:
+            var type_portal: Dictionary = type_result["portals"][0]
+            if String(type_portal.get("type", "")) != "locked":
+                _fail("type intent was flattened: " + JSON.stringify(type_portal))
+            if String(type_portal.get("portal_type", "")) != "locked":
+                _fail("portal_type alias was not preserved: " + JSON.stringify(type_portal))
+            if bool(type_portal.get("required", true)):
+                _fail("required=false was coerced to true: " + JSON.stringify(type_portal))
+
+        var alias_result: Dictionary = generator._build_explicit_portals([{
+            "from_room": "A",
+            "to_room": "B",
+            "from_cell": Vector2i(0, 0),
+            "to_cell": Vector2i(1, 0),
+            "portal_type": "hatch",
+            "required": false,
+        }], placed_rooms)
+        if not bool(alias_result.get("ok", false)) or (alias_result["portals"] as Array).size() != 1:
+            _fail("portal_type alias did not produce one portal record")
+        else:
+            var alias_portal: Dictionary = alias_result["portals"][0]
+            if String(alias_portal.get("type", "")) != "hatch" or String(alias_portal.get("portal_type", "")) != "hatch":
+                _fail("portal_type intent was not preserved: " + JSON.stringify(alias_portal))
+            if bool(alias_portal.get("required", true)):
+                _fail("portal_type required=false was coerced to true: " + JSON.stringify(alias_portal))
+        """,
+    )
+    _assert_layout_probe_passed(result)
+
+
+def test_layout_generator_deduplicates_physical_portal_but_exposes_missing_portal(tmp_path: Path):
+    result = _run_layout_probe(
+        tmp_path,
+        """
+        var generator := LayoutGenerator.new()
+        var placed_rooms: Dictionary = {
+            "A": {"deck": 0, "cells": [Vector2i(0, 0)]},
+            "B": {"deck": 0, "cells": [Vector2i(1, 0)]},
+        }
+        var duplicate_result: Dictionary = generator._build_explicit_portals([
+            {"from_room": "A", "to_room": "B", "from_cell": Vector2i(0, 0), "to_cell": Vector2i(1, 0)},
+            {"from_room": "B", "to_room": "A", "from_cell": Vector2i(1, 0), "to_cell": Vector2i(0, 0)},
+        ], placed_rooms)
+        if not bool(duplicate_result.get("ok", false)):
+            _fail("duplicate physical adjacency was rejected: " + JSON.stringify(duplicate_result.get("errors", [])))
+        elif (duplicate_result.get("portals", []) as Array).size() != 1:
+            _fail("duplicate physical adjacency emitted more than one portal")
+
+        var missing_result: Dictionary = generator._build_explicit_portals([], placed_rooms)
+        if not bool(missing_result.get("ok", false)):
+            _fail("missing portal intent was treated as an invalid layout")
+        elif not (missing_result.get("portals", []) as Array).is_empty():
+            _fail("missing portal intent fabricated a portal")
+        """,
+    )
+    _assert_layout_probe_passed(result)
 
 
 def test_run_godot_probe_times_out_with_partial_output_context(
