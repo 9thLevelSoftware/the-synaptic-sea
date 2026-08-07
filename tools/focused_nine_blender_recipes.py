@@ -789,6 +789,28 @@ def _box(
     return obj
 
 
+def _collision_box(
+    asset_id: str,
+    collection: Any,
+    size: Sequence[float],
+    location: Sequence[float],
+) -> Any:
+    """Create a collision-only box mesh in the FocusedNine namespace."""
+    bpy = _require_bpy()
+    expected_name = _claim_generated_name(asset_id, "collision_body")
+    dimensions = tuple(max(0.001, float(value)) for value in size)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=tuple(float(value) for value in location))
+    obj = bpy.context.active_object
+    _set_exact_generated_name(obj, expected_name)
+    _mark_generated(obj, asset_id)
+    _link_object(obj, collection)
+    obj.dimensions = dimensions
+    _apply_transform(obj)
+    # Tag for post-export collision conversion
+    obj["is_collision_proxy"] = True
+    return obj
+
+
 def _cylinder(
     asset_id: str,
     token: str,
@@ -843,6 +865,8 @@ def _add_floor_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
     width, depth, thickness = _dimensions_from_spec(spec)
     z = _base_z(spec)
     objects: list[Any] = []
+    # Collision box for physics - named for Godot GLTF collision import
+    objects.append(_collision_box(asset_id, collection, (width, depth, thickness), (0, 0, z + thickness / 2)))
     objects.append(_box(asset_id, "floor_panel", collection, (width - 0.12, depth - 0.12, max(0.12, thickness)), (0, 0, z + thickness / 2), "MAT_PaintedAlloyGray", bevel_width=0.025))
     objects.append(_box(asset_id, "panel_seam_ns", collection, (0.025, depth - 0.22, 0.018), (0, 0, z + thickness + 0.012), "MAT_Conduit"))
     objects.append(_box(asset_id, "panel_seam_ew", collection, (width - 0.22, 0.025, 0.018), (0, 0, z + thickness + 0.013), "MAT_Conduit"))
@@ -918,6 +942,8 @@ def _add_wall_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
     backing_width = width - 0.24
     backing_height = height - 0.22
     objects.append(_box(asset_id, "wall_backing_plate", collection, (backing_width, 0.04, backing_height), (0, -0.14, backing_height / 2 + 0.11), "MAT_PaintedAlloyGray", bevel_width=0.012))
+    # Collision box for physics - named for Godot GLTF collision import
+    objects.append(_collision_box(asset_id, collection, (width, thickness, height), (0, 0, height / 2)))
     for index, x in enumerate((-width * 0.22, width * 0.22)):
         objects.append(_box(asset_id, f"inset_panel_{index:02d}", collection, (width * 0.28, 0.06, height * 0.52), (x, -0.17, height * 0.49), "MAT_PaintedAlloyGray", bevel_width=0.025))
     objects.extend(
