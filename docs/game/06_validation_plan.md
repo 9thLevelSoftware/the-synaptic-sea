@@ -197,6 +197,11 @@ DOCK_GUARANTEE_WARNING="^WARNING: RoomAssigner: guaranteed role 'dock' has no el
 # Soft-fail when all salted connectivity retries still produce a disconnected layout
 # (best-effort ship still returned; quality gate fails hard on disconnect).
 CONNECTIVITY_SOFT_FAIL_WARNING="^WARNING: ShipLayoutGenerator: layout connectivity soft-fail after [0-9]+ attempts seed="
+# The playable floor collision smoke intentionally boots the full playable ship,
+# whose home lifeboat still exercises the legacy StructuralPlacer visualizer.
+# Keep this exact known warning visible in the smoke output while allowing the
+# bundle helper to classify it as established baseline noise.
+STRUCTURAL_PLACER_WARNING="^WARNING: STRUCTURAL_PLACER DEPRECATED: legacy/debug-only visualizer invoked without a named legacy_debug_context$"
 # load_from_blueprint_smoke's null_rejected case deliberately passes a null
 # blueprint to prove load_from_blueprint refuses it; this is the expected
 # rejection line.
@@ -216,7 +221,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$CONNECTIVITY_SOFT_FAIL_WARNING|$BLUEPRINT_NULL_ERROR|$RELEASE_LEDGER_UNKNOWN_WARNING|$RELEASE_LEDGER_STATUS_WARNING|$RELEASE_LEDGER_EXTERNAL_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$CONNECTIVITY_SOFT_FAIL_WARNING|$STRUCTURAL_PLACER_WARNING|$BLUEPRINT_NULL_ERROR|$RELEASE_LEDGER_UNKNOWN_WARNING|$RELEASE_LEDGER_STATUS_WARNING|$RELEASE_LEDGER_EXTERNAL_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -480,7 +485,8 @@ run_clean 'interior aabb smoke' 'INTERIOR AABB PASS nondegenerate=true positione
 run_clean 'kit catalog smoke' 'KIT CATALOG PASS loaded=3 default=ship_structural_v0 airlock=3 eng=3 breach_select=ok fallback=ok real_stems=true default_role_module=floor_1x1 ids_sorted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/kit_catalog_smoke.gd
 run_clean 'floor wrapper collision footprint smoke' 'FLOOR WRAPPER COLLISION FOOTPRINT PASS checked=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/floor_wrapper_collision_footprint_smoke.gd
 run_clean 'readability prop factory smoke' 'READABILITY PROP FACTORY PASS props=9' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/readability_prop_factory_smoke.gd
-run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=122' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
+run_clean 'procgen loader playable contract smoke' 'PROCGEN_STRUCTURAL_LOADER_PASS PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=127' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
+run_clean 'playable generated ship floor collision smoke' 'PLAYABLE GENERATED SHIP FLOOR COLLISION SMOKE PASS floor_wrapper_coverage=true player_controller=true settling_grounded=true negative_preflight_cases=4 validator_rejected=true attached_wrappers=0' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/playable_generated_ship_floor_collision_smoke.gd
 # --- Tranche 6 (2026-07-07): demo gate wiring + unlock triggers + the promoted gate model smoke ---
 run_clean 'Tranche 6 demo scope gate model smoke' 'DEMO SCOPE GATE PASS build_kind=release blocked=5 allowed=0 unknown_rejected=true params=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_gate_smoke.gd
 run_clean 'Tranche 6 demo scope enforcement smoke' 'DEMO SCOPE ENFORCEMENT PASS dev_unaffected=true save_cap=true world_skip=true hub_blocked=true hazards_capped=true cargo_capped=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_enforcement_smoke.gd

@@ -108,7 +108,7 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 	var module_to_scene: Dictionary = _build_module_scene_map(kit_doc, kit_abs)
 	if module_to_scene.is_empty():
 		return _fail_load("kit contains no usable module wrapper scenes: %s" % kit_abs)
-	var wrapper_preflight: Dictionary = _preflight_structural_wrappers(layout_doc, module_to_scene, true)
+	var wrapper_preflight: Dictionary = _preflight_structural_wrappers(layout_doc, module_to_scene)
 	if not bool(wrapper_preflight.get("ok", false)):
 		return _fail_load("structural wrapper preflight failed: %s" % str(wrapper_preflight.get("error", "unknown error")))
 
@@ -133,7 +133,7 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 	objective_root.name = "ObjectiveRoot"
 	add_child(objective_root)
 
-	var instantiated_count: int = _instance_structural_wrappers(layout_doc, module_to_scene, structural_root, wrapper_preflight)
+	var instantiated_count: int = _instance_structural_wrappers(layout_doc, module_to_scene, structural_root)
 	if instantiated_count < 0:
 		clear_loaded_ship()
 		return _fail_load("failed to instantiate structural wrapper scenes")
@@ -505,12 +505,10 @@ func _validate_structural_plan_for_loading(layout: Dictionary) -> String:
 
 func _preflight_structural_wrappers(
 		layout_doc: Dictionary,
-		module_to_scene: Dictionary,
-		plan_already_validated: bool = false) -> Dictionary:
-	if not plan_already_validated:
-		var validation_error: String = _validate_structural_plan_for_loading(layout_doc)
-		if not validation_error.is_empty():
-			return {"ok": false, "error": validation_error}
+		module_to_scene: Dictionary) -> Dictionary:
+	var validation_error: String = _validate_structural_plan_for_loading(layout_doc)
+	if not validation_error.is_empty():
+		return {"ok": false, "error": validation_error}
 
 	var structural_plan_variant: Variant = layout_doc.get("structural_plan", null)
 	if not (structural_plan_variant is Dictionary):
@@ -522,6 +520,7 @@ func _preflight_structural_wrappers(
 
 	var placements: Array = placements_variant
 	var prepared_records: Array = []
+	var seen_placement_ids: Dictionary = {}
 	for record_variant in placements:
 		if not (record_variant is Dictionary):
 			return {"ok": false, "error": "placement record is not a Dictionary"}
@@ -545,6 +544,10 @@ func _preflight_structural_wrappers(
 		var placement_id_variant: Variant = record.get("placement_id", null)
 		if not (placement_id_variant is String) or String(placement_id_variant).is_empty():
 			return {"ok": false, "error": "placement_id must be a non-empty String"}
+		var placement_id: String = String(placement_id_variant)
+		if seen_placement_ids.has(placement_id):
+			return {"ok": false, "error": "duplicate structural placement_id: %s" % placement_id}
+		seen_placement_ids[placement_id] = true
 		var module_id_variant: Variant = record.get("module_id", null)
 		if not (module_id_variant is String) or String(module_id_variant).is_empty():
 			return {"ok": false, "error": "module_id must be a non-empty String"}
@@ -579,17 +582,87 @@ func _preflight_structural_wrappers(
 			"record": record,
 			"packed_scene": packed_scene,
 		})
+
+	var floor_preflight: Dictionary = _preflight_floor_structural_wrappers(layout_doc, module_to_scene)
+	if not bool(floor_preflight.get("ok", false)):
+		return {"ok": false, "error": str(floor_preflight.get("error", "unknown floor wrapper error"))}
+	for prepared_floor_variant in floor_preflight.get("records", []):
+		if not (prepared_floor_variant is Dictionary):
+			return {"ok": false, "error": "floor wrapper preflight record is not a Dictionary"}
+		var prepared_floor: Dictionary = prepared_floor_variant
+		var floor_record: Dictionary = prepared_floor.get("record", {})
+		var floor_placement_id: String = String(floor_record.get("placement_id", ""))
+		if seen_placement_ids.has(floor_placement_id):
+			return {"ok": false, "error": "duplicate structural placement_id: %s" % floor_placement_id}
+		seen_placement_ids[floor_placement_id] = true
+		prepared_records.append(prepared_floor)
+	return {"ok": true, "records": prepared_records}
+
+
+func _preflight_floor_structural_wrappers(layout_doc: Dictionary, module_to_scene: Dictionary) -> Dictionary:
+	var structural_plan_variant: Variant = layout_doc.get("structural_plan", null)
+	if not (structural_plan_variant is Dictionary):
+		return {"ok": false, "error": "plan dictionary is missing"}
+	var structural_plan: Dictionary = structural_plan_variant
+	var floor_placements_variant: Variant = structural_plan.get("floor_placements", null)
+	if not (floor_placements_variant is Array) or (floor_placements_variant as Array).is_empty():
+		return {"ok": false, "error": "plan floor_placements are missing or empty"}
+
+	var prepared_records: Array = []
+	for floor_record_variant in floor_placements_variant as Array:
+		if not (floor_record_variant is Dictionary):
+			return {"ok": false, "error": "floor placement record is not a Dictionary"}
+		var floor_record: Dictionary = floor_record_variant
+		var kind_variant: Variant = floor_record.get("kind", null)
+		if not (kind_variant is String) or String(kind_variant) != "FLOOR":
+			return {"ok": false, "error": "floor placement kind must be FLOOR"}
+		var placement_id_variant: Variant = floor_record.get("placement_id", null)
+		if not (placement_id_variant is String) or String(placement_id_variant).is_empty():
+			return {"ok": false, "error": "floor placement_id must be a non-empty String"}
+		var module_id_variant: Variant = floor_record.get("module_id", null)
+		if not (module_id_variant is String) or String(module_id_variant).is_empty():
+			return {"ok": false, "error": "floor module_id must be a non-empty String"}
+		var module_id: String = String(module_id_variant)
+		if not FLOOR_MODULES.has(module_id):
+			return {"ok": false, "error": "floor placement references non-floor module: %s" % module_id}
+		var room_ids_variant: Variant = floor_record.get("room_ids", null)
+		if not (room_ids_variant is Array) or (room_ids_variant as Array).is_empty():
+			return {"ok": false, "error": "floor room_ids must be a non-empty Array"}
+		var placement_position: Vector3 = _read_structural_record_position(floor_record.get("position", null))
+		if placement_position == Vector3.INF:
+			return {"ok": false, "error": "floor placement position is malformed: %s" % String(placement_id_variant)}
+		var yaw_variant: Variant = floor_record.get("yaw_degrees", null)
+		if not _is_numeric_variant(yaw_variant):
+			return {"ok": false, "error": "floor placement yaw_degrees is malformed: %s" % String(placement_id_variant)}
+
+		if not module_to_scene.has(module_id):
+			return {"ok": false, "error": "compiled floor placement references unavailable wrapper: %s" % module_id}
+		var scene_value: Variant = module_to_scene.get(module_id, null)
+		var packed_scene: PackedScene = null
+		if scene_value is PackedScene:
+			packed_scene = scene_value as PackedScene
+		elif scene_value is String:
+			var scene_path: String = String(scene_value)
+			if scene_path.is_empty() or not ResourceLoader.exists(scene_path):
+				return {"ok": false, "error": "floor wrapper scene missing for compiled module %s: %s" % [module_id, scene_path]}
+			var loaded_resource: Resource = load(scene_path)
+			if loaded_resource is PackedScene:
+				packed_scene = loaded_resource as PackedScene
+		if packed_scene == null:
+			return {"ok": false, "error": "compiled floor wrapper scene is not PackedScene for module %s" % module_id}
+
+		prepared_records.append({
+			"record": floor_record,
+			"packed_scene": packed_scene,
+		})
 	return {"ok": true, "records": prepared_records}
 
 
 func _instance_structural_wrappers(
 		layout_doc: Dictionary,
 		module_to_scene: Dictionary,
-		ship_root: Node3D,
-		preflight: Dictionary = {}) -> int:
-	var wrapper_preflight: Dictionary = preflight
-	if wrapper_preflight.is_empty():
-		wrapper_preflight = _preflight_structural_wrappers(layout_doc, module_to_scene)
+		ship_root: Node3D) -> int:
+	var wrapper_preflight: Dictionary = _preflight_structural_wrappers(layout_doc, module_to_scene)
 	if not bool(wrapper_preflight.get("ok", false)):
 		return -1
 
