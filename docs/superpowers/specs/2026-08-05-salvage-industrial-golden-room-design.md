@@ -73,3 +73,28 @@ At the 1600x900 locked-isometric room capture:
 3. Render the staged-only golden room and inspect it visually against the baseline capture.
 4. Accept, revise, or reject individual asset families based on the quality bar.
 5. Derive the next structural expansion batch—corners, T-junctions, end caps, corridor/door variants—from the accepted language.
+
+## Canonical Structural Compiler and Capture Policy (Task9)
+
+`StructuralEdgePlan` is the sole boundary authority. `StructuralEdgeCompiler` may
+compile its records and `StructuralPlanValidator` may reject an invalid plan, but
+no resolver, placer, loader, capture harness, or visual asset may derive a second
+wall/door boundary, pose, or placement identity. The canonical inventory is the
+sorted tuple of `placement_id`, `edge_key`, `kind`, `state`, `module_id`, pose,
+and `room_ids` emitted by the validated structural plan.
+
+The legacy `wall_door_resolver` is an adapter for legacy debug/serializer callers;
+it is not a competing production authority. `structural_placer` is a legacy
+debug-only room visualizer and must never be used by `ShipGenerator` or a capture
+path to create production geometry. Any new boundary behavior belongs in the
+compiler/plan contract first, with resolver and placer output treated as
+diagnostic compatibility views only.
+
+Runtime capture and staged capture have separate policies. Runtime capture uses
+the live wrapper catalog and proves that instantiated wrapper metadata is backed
+one-for-one by the canonical plan. Staged capture runs the disposable overlay
+runner, which mounts staged GLBs/materials at canonical import/wrapper paths
+without promoting them into the runtime tree. The Task9 parity smoke compares
+only the structural inventory across those paths: GLB, material, and scene-path
+differences are permitted visual differences, while any structural plan drift
+fails the gate. A staged capture is evidence, not a runtime promotion decision.

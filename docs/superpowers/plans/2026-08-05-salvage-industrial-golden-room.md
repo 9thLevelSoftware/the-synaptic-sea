@@ -177,3 +177,35 @@ git commit -m "feat: stage salvage industrial golden room"
 - Spec coverage: Tasks 1–2 cover every scoped asset family and material/variant rule; Task 3 preserves evidence/no-promotion gates; Task 4 proves the visual quality bar in the actual staged room.
 - No placeholders or alternate interpretations remain: every task names its files, required interface, test behavior, command, and commit boundary.
 - Scope remains one staged golden-room slice; new corners, T-junctions, end caps, and expanded corridor families intentionally wait for a later plan derived from the accepted visual language.
+
+### Task 9: Record canonical compiler parity and close the integration gate
+
+**Files:**
+- Create: `docs/superpowers/proofs/procgen-canonical-structural-compiler.md`
+- Modify: `docs/superpowers/specs/2026-08-05-salvage-industrial-golden-room-design.md`
+- Modify: `scripts/validation/procgen_golden_parity_smoke.gd`
+- Modify: `tests/test_procgen_structural_compiler.py`
+
+**Canonical policy:** `StructuralEdgePlan` is the sole boundary authority. The
+legacy resolver and `structural_placer` are debug-only adapters/visualizers and
+must not derive or place production boundaries. Runtime capture uses live wrapper
+resources; staged capture uses the disposable overlay runner. The parity gate
+compares the sorted structural `placement_id`/`edge_key` inventory, semantic
+kind/state/module, canonical pose, and room IDs. GLB/material/scene-path changes
+are visual-only exceptions; any structural plan drift is a failure.
+
+- [x] Write source tests for the parity smoke, policy text, and proof contract;
+  observe them fail before implementation.
+- [x] Implement the parity smoke and record the staged overlay evidence.
+- [x] Run the final integration gate in this order:
+
+```bash
+PYTHONPATH=. python3.11 -m pytest -q tests/test_procgen_structural_compiler.py tests/test_focused_nine_staged_derelict_preview.py
+godot --headless --path . --script res://scripts/validation/procgen_structural_compiler_smoke.gd -- 17 23 41 73 101
+godot --headless --path . --script res://scripts/validation/procgen_golden_parity_smoke.gd
+git diff --check
+```
+
+The final report must include complete output and exit status for all four
+commands. Do not claim a pass if any command emits an unexpected Godot
+diagnostic, fails to print its explicit marker, or reports structural plan drift.

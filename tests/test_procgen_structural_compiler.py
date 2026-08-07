@@ -2099,3 +2099,55 @@ def test_task8_stress_and_walkability_use_canonical_plan_invariants():
         assert "floor_placements" in source
         assert "duplicate edge" in source or "duplicate" in source
         assert "flood" in source.lower() or "connected" in source.lower()
+
+
+def test_task9_parity_smoke_compares_live_and_staged_canonical_wrapper_inventories():
+    source = _read("scripts/validation/procgen_golden_parity_smoke.gd")
+    for required in (
+        "ShipGeneratorScript",
+        "GeneratedShipLoaderScript",
+        "live wrappers",
+        "staged overlay",
+        "placement_id",
+        "edge_key",
+        "room_ids",
+        "sort",
+        "PROCGEN GOLDEN PARITY PASS",
+    ):
+        assert required in source
+    assert "structural plan drift" in source.lower()
+    assert "GLB" in source and "material" in source
+
+
+def test_task9_docs_make_compiler_and_capture_boundaries_canonical():
+    documents = (
+        _read("docs/superpowers/specs/2026-08-05-salvage-industrial-golden-room-design.md"),
+        _read("docs/superpowers/plans/2026-08-05-salvage-industrial-golden-room.md"),
+    )
+    combined = "\n".join(documents)
+    for required in (
+        "StructuralEdgePlan",
+        "sole boundary authority",
+        "legacy resolver",
+        "debug-only",
+        "runtime capture",
+        "staged capture",
+        "structural plan drift",
+    ):
+        assert required.lower() in combined.lower()
+
+
+def test_task9_parity_proof_records_structural_only_acceptance_boundary():
+    proof = _read("docs/superpowers/proofs/procgen-canonical-structural-compiler.md")
+    for required in (
+        "Task9",
+        "PROCGEN GOLDEN PARITY PASS",
+        "live wrapper",
+        "staged overlay",
+        "placement_id",
+        "edge_key",
+        "room IDs",
+        "GLB/material",
+        "structural plan drift",
+    ):
+        assert required.lower() in proof.lower()
