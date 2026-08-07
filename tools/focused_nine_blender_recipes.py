@@ -846,6 +846,14 @@ def _add_floor_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
     objects.append(_box(asset_id, "floor_panel", collection, (width - 0.12, depth - 0.12, max(0.12, thickness)), (0, 0, z + thickness / 2), "MAT_PaintedAlloyGray", bevel_width=0.025))
     objects.append(_box(asset_id, "panel_seam_ns", collection, (0.025, depth - 0.22, 0.018), (0, 0, z + thickness + 0.012), "MAT_Conduit"))
     objects.append(_box(asset_id, "panel_seam_ew", collection, (width - 0.22, 0.025, 0.018), (0, 0, z + thickness + 0.013), "MAT_Conduit"))
+    # Tile grid: 3x3 subdivision with visible recessed seams
+    tile_seam_width = 0.045
+    tile_seam_depth = 0.04
+    tile_seam_z = z + thickness + tile_seam_depth / 2
+    for tx in (-width / 3, width / 3):
+        objects.append(_box(asset_id, f"tile_seam_v_{int(tx*100):03d}", collection, (tile_seam_width, depth - 0.18, tile_seam_depth), (tx, 0, tile_seam_z), "MAT_Conduit"))
+    for ty in (-depth / 3, depth / 3):
+        objects.append(_box(asset_id, f"tile_seam_h_{int(ty*100):03d}", collection, (width - 0.18, tile_seam_width, tile_seam_depth), (0, ty, tile_seam_z), "MAT_Conduit"))
     objects.append(_box(asset_id, "access_plate", collection, (0.72, 0.72, 0.045), (0.55, -0.55, z + thickness + 0.025), "MAT_PaintedAlloyGray", bevel_width=0.02))
     for index, (x, y) in enumerate(((0.26, -0.84), (0.84, -0.84), (0.26, -0.26), (0.84, -0.26))):
         objects.append(_cylinder(asset_id, f"access_bolt_{index:02d}", collection, 0.045, 0.035, (x, y, z + thickness + 0.065), "MAT_WarningStripe", vertices=12))
@@ -906,6 +914,10 @@ def _add_wall_recipe(asset_id: str, spec: Any, collection: Any) -> list[Any]:
         _box(asset_id, "panel_inset_upper", collection, (width * 0.24, 0.06, height * 0.22), (-width * 0.22, -0.245, height * 0.69), "MAT_PaintedAlloyGray", bevel_width=0.018),
         _box(asset_id, "panel_inset_lower", collection, (width * 0.24, 0.06, height * 0.22), (width * 0.22, -0.245, height * 0.25), "MAT_PaintedAlloyGray", bevel_width=0.018),
     ]
+    # Solid backing plate closes gaps between perimeter pieces and frame
+    backing_width = width - 0.24
+    backing_height = height - 0.22
+    objects.append(_box(asset_id, "wall_backing_plate", collection, (backing_width, 0.04, backing_height), (0, -0.14, backing_height / 2 + 0.11), "MAT_PaintedAlloyGray", bevel_width=0.012))
     for index, x in enumerate((-width * 0.22, width * 0.22)):
         objects.append(_box(asset_id, f"inset_panel_{index:02d}", collection, (width * 0.28, 0.06, height * 0.52), (x, -0.17, height * 0.49), "MAT_PaintedAlloyGray", bevel_width=0.025))
     objects.extend(
