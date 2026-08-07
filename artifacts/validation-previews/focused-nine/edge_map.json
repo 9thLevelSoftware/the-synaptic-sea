@@ -72,7 +72,7 @@
       "owner_room": "corridor_03",
       "placement_required": true,
       "portal": true,
-      "portal_intent_id": "portal:3",
+      "portal_intent_id": "portal:5",
       "position": "(40.0, 0.0, -2.0)",
       "room_ids": [
         "corridor_03",
@@ -367,16 +367,16 @@
       "yaw_degrees": 180.0
     },
     {
-      "cell": "(10, -2)",
+      "cell": "(10, -1)",
       "deck": 0.0,
-      "direction": "south",
+      "direction": "north",
       "edge_key": "0|h|-2|10",
       "exterior": false,
       "id": "edge:0|h|-2|10",
       "key": "0|h|-2|10",
       "kind": "OPEN",
       "module_id": "",
-      "opposite_direction": "north",
+      "opposite_direction": "south",
       "other_room": "engineering_01",
       "owner_room": "engineering_01",
       "placement_required": false,
@@ -387,24 +387,24 @@
         "engineering_01"
       ],
       "source_cells": [
-        "(10, -2)",
-        "(10, -1)"
+        "(10, -1)",
+        "(10, -2)"
       ],
       "state": "OPEN",
       "wrapper_required": false,
-      "yaw_degrees": 0.0
+      "yaw_degrees": 180.0
     },
     {
-      "cell": "(11, -2)",
+      "cell": "(11, -1)",
       "deck": 0.0,
-      "direction": "south",
+      "direction": "north",
       "edge_key": "0|h|-2|11",
       "exterior": false,
       "id": "edge:0|h|-2|11",
       "key": "0|h|-2|11",
       "kind": "OPEN",
       "module_id": "",
-      "opposite_direction": "north",
+      "opposite_direction": "south",
       "other_room": "engineering_01",
       "owner_room": "engineering_01",
       "placement_required": false,
@@ -415,24 +415,24 @@
         "engineering_01"
       ],
       "source_cells": [
-        "(11, -2)",
-        "(11, -1)"
+        "(11, -1)",
+        "(11, -2)"
       ],
       "state": "OPEN",
       "wrapper_required": false,
-      "yaw_degrees": 0.0
+      "yaw_degrees": 180.0
     },
     {
-      "cell": "(12, -2)",
+      "cell": "(12, -1)",
       "deck": 0.0,
-      "direction": "south",
+      "direction": "north",
       "edge_key": "0|h|-2|12",
       "exterior": false,
       "id": "edge:0|h|-2|12",
       "key": "0|h|-2|12",
       "kind": "OPEN",
       "module_id": "",
-      "opposite_direction": "north",
+      "opposite_direction": "south",
       "other_room": "engineering_01",
       "owner_room": "engineering_01",
       "placement_required": false,
@@ -443,12 +443,12 @@
         "engineering_01"
       ],
       "source_cells": [
-        "(12, -2)",
-        "(12, -1)"
+        "(12, -1)",
+        "(12, -2)"
       ],
       "state": "OPEN",
       "wrapper_required": false,
-      "yaw_degrees": 0.0
+      "yaw_degrees": 180.0
     },
     {
       "cell": "(10, -2)",
@@ -605,7 +605,7 @@
       "owner_room": "cargo_01",
       "placement_required": true,
       "portal": true,
-      "portal_intent_id": "portal:4",
+      "portal_intent_id": "portal:1",
       "position": "(40.0, 0.0, 2.0)",
       "room_ids": [
         "cargo_01",
@@ -662,7 +662,7 @@
       "owner_room": "corridor_03",
       "placement_required": true,
       "portal": true,
-      "portal_intent_id": "portal:5",
+      "portal_intent_id": "portal:6",
       "position": "(48.0, 0.0, 2.0)",
       "room_ids": [
         "corridor_03",
@@ -1700,7 +1700,7 @@
       "owner_room": "corridor_01",
       "placement_required": true,
       "portal": true,
-      "portal_intent_id": "portal:1",
+      "portal_intent_id": "portal:3",
       "position": "(22.0, 0.0, 0.0)",
       "room_ids": [
         "corridor_01",
@@ -1813,7 +1813,7 @@
       "owner_room": "corridor_02",
       "placement_required": true,
       "portal": true,
-      "portal_intent_id": "portal:2",
+      "portal_intent_id": "portal:4",
       "position": "(38.0, 0.0, 0.0)",
       "room_ids": [
         "corridor_02",
@@ -1954,7 +1954,7 @@
       "owner_room": "cargo_01",
       "placement_required": true,
       "portal": true,
-      "portal_intent_id": "portal:6",
+      "portal_intent_id": "portal:2",
       "position": "(46.0, 0.0, 4.0)",
       "room_ids": [
         "cargo_01",
@@ -2502,7 +2502,7 @@
       "placement_id": "placement:0|h|-1|10",
       "placement_required": true,
       "portal": true,
-      "portal_intent_id": "portal:3",
+      "portal_intent_id": "portal:5",
       "position": "(40.0, 0.0, -2.0)",
       "room_ids": [
         "corridor_03",
@@ -2909,7 +2909,7 @@
       "placement_id": "placement:0|h|0|10",
       "placement_required": true,
       "portal": true,
-      "portal_intent_id": "portal:4",
+      "portal_intent_id": "portal:1",
       "position": "(40.0, 0.0, 2.0)",
       "room_ids": [
         "cargo_01",
@@ -2968,7 +2968,7 @@
       "placement_id": "placement:0|h|0|12",
       "placement_required": true,
       "portal": true,
-      "portal_intent_id": "portal:5",
+      "portal_intent_id": "portal:6",
       "position": "(48.0, 0.0, 2.0)",
       "room_ids": [
         "corridor_03",
@@ -3637,7 +3637,7 @@
       "placement_id": "placement:0|v|0|5",
       "placement_required": true,
       "portal": true,
-      "portal_intent_id": "portal:1",
+      "portal_intent_id": "portal:3",
       "position": "(22.0, 0.0, 0.0)",
       "room_ids": [
         "corridor_01",
@@ -3667,7 +3667,7 @@
       "placement_id": "placement:0|v|0|9",
       "placement_required": true,
       "portal": true,
-      "portal_intent_id": "portal:2",
+      "portal_intent_id": "portal:4",
       "position": "(38.0, 0.0, 0.0)",
       "room_ids": [
         "corridor_02",
@@ -3755,7 +3755,7 @@
       "placement_id": "placement:0|v|1|11",
       "placement_required": true,
       "portal": true,
-      "portal_intent_id": "portal:6",
+      "portal_intent_id": "portal:2",
       "position": "(46.0, 0.0, 4.0)",
       "room_ids": [
         "cargo_01",
@@ -4014,6 +4014,94 @@
       "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
     },
     {
+      "edge_key": "0|h|0|10",
+      "kind": "DOOR",
+      "name": "Structural_placement_0_h_0_10",
+      "placement_id": "placement:0|h|0|10",
+      "room_ids": [
+        "cargo_01",
+        "corridor_03"
+      ],
+      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/bulkhead_portal_2x1.tscn"
+    },
+    {
+      "edge_key": "0|v|1|9",
+      "kind": "SOLID",
+      "name": "Structural_placement_0_v_1_9",
+      "placement_id": "placement:0|v|1|9",
+      "room_ids": [
+        "cargo_01",
+        ""
+      ],
+      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
+    },
+    {
+      "edge_key": "0|h|2|10",
+      "kind": "SOLID",
+      "name": "Structural_placement_0_h_2_10",
+      "placement_id": "placement:0|h|2|10",
+      "room_ids": [
+        "cargo_01",
+        ""
+      ],
+      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
+    },
+    {
+      "edge_key": "0|v|2|9",
+      "kind": "SOLID",
+      "name": "Structural_placement_0_v_2_9",
+      "placement_id": "placement:0|v|2|9",
+      "room_ids": [
+        "cargo_01",
+        ""
+      ],
+      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
+    },
+    {
+      "edge_key": "0|h|0|11",
+      "kind": "SOLID",
+      "name": "Structural_placement_0_h_0_11",
+      "placement_id": "placement:0|h|0|11",
+      "room_ids": [
+        "cargo_01",
+        "corridor_03"
+      ],
+      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
+    },
+    {
+      "edge_key": "0|v|1|11",
+      "kind": "DOOR",
+      "name": "Structural_placement_0_v_1_11",
+      "placement_id": "placement:0|v|1|11",
+      "room_ids": [
+        "cargo_01",
+        "medical_01"
+      ],
+      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/bulkhead_portal_2x1.tscn"
+    },
+    {
+      "edge_key": "0|v|2|11",
+      "kind": "SOLID",
+      "name": "Structural_placement_0_v_2_11",
+      "placement_id": "placement:0|v|2|11",
+      "room_ids": [
+        "cargo_01",
+        "medical_01"
+      ],
+      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
+    },
+    {
+      "edge_key": "0|h|2|11",
+      "kind": "SOLID",
+      "name": "Structural_placement_0_h_2_11",
+      "placement_id": "placement:0|h|2|11",
+      "room_ids": [
+        "cargo_01",
+        ""
+      ],
+      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
+    },
+    {
       "edge_key": "0|h|-1|2",
       "kind": "SOLID",
       "name": "Structural_placement_0_h_-1_2",
@@ -4223,17 +4311,6 @@
       "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/bulkhead_portal_2x1.tscn"
     },
     {
-      "edge_key": "0|h|0|10",
-      "kind": "DOOR",
-      "name": "Structural_placement_0_h_0_10",
-      "placement_id": "placement:0|h|0|10",
-      "room_ids": [
-        "cargo_01",
-        "corridor_03"
-      ],
-      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/bulkhead_portal_2x1.tscn"
-    },
-    {
       "edge_key": "0|h|-1|11",
       "kind": "SOLID",
       "name": "Structural_placement_0_h_-1_11",
@@ -4241,17 +4318,6 @@
       "room_ids": [
         "corridor_03",
         "engineering_01"
-      ],
-      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
-    },
-    {
-      "edge_key": "0|h|0|11",
-      "kind": "SOLID",
-      "name": "Structural_placement_0_h_0_11",
-      "placement_id": "placement:0|h|0|11",
-      "room_ids": [
-        "cargo_01",
-        "corridor_03"
       ],
       "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
     },
@@ -4289,67 +4355,78 @@
       "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/bulkhead_portal_2x1.tscn"
     },
     {
-      "edge_key": "0|v|1|9",
+      "edge_key": "0|v|-1|9",
       "kind": "SOLID",
-      "name": "Structural_placement_0_v_1_9",
-      "placement_id": "placement:0|v|1|9",
+      "name": "Structural_placement_0_v_-1_9",
+      "placement_id": "placement:0|v|-1|9",
       "room_ids": [
-        "cargo_01",
+        "engineering_01",
         ""
       ],
       "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
     },
     {
-      "edge_key": "0|h|2|10",
+      "edge_key": "0|h|-3|10",
       "kind": "SOLID",
-      "name": "Structural_placement_0_h_2_10",
-      "placement_id": "placement:0|h|2|10",
+      "name": "Structural_placement_0_h_-3_10",
+      "placement_id": "placement:0|h|-3|10",
       "room_ids": [
-        "cargo_01",
+        "engineering_01",
         ""
       ],
       "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
     },
     {
-      "edge_key": "0|v|2|9",
+      "edge_key": "0|v|-2|9",
       "kind": "SOLID",
-      "name": "Structural_placement_0_v_2_9",
-      "placement_id": "placement:0|v|2|9",
+      "name": "Structural_placement_0_v_-2_9",
+      "placement_id": "placement:0|v|-2|9",
       "room_ids": [
-        "cargo_01",
+        "engineering_01",
         ""
       ],
       "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
     },
     {
-      "edge_key": "0|v|1|11",
-      "kind": "DOOR",
-      "name": "Structural_placement_0_v_1_11",
-      "placement_id": "placement:0|v|1|11",
-      "room_ids": [
-        "cargo_01",
-        "medical_01"
-      ],
-      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/bulkhead_portal_2x1.tscn"
-    },
-    {
-      "edge_key": "0|v|2|11",
+      "edge_key": "0|h|-3|11",
       "kind": "SOLID",
-      "name": "Structural_placement_0_v_2_11",
-      "placement_id": "placement:0|v|2|11",
+      "name": "Structural_placement_0_h_-3_11",
+      "placement_id": "placement:0|h|-3|11",
       "room_ids": [
-        "cargo_01",
-        "medical_01"
+        "engineering_01",
+        ""
       ],
       "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
     },
     {
-      "edge_key": "0|h|2|11",
+      "edge_key": "0|v|-1|12",
       "kind": "SOLID",
-      "name": "Structural_placement_0_h_2_11",
-      "placement_id": "placement:0|h|2|11",
+      "name": "Structural_placement_0_v_-1_12",
+      "placement_id": "placement:0|v|-1|12",
       "room_ids": [
-        "cargo_01",
+        "engineering_01",
+        ""
+      ],
+      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
+    },
+    {
+      "edge_key": "0|h|-3|12",
+      "kind": "SOLID",
+      "name": "Structural_placement_0_h_-3_12",
+      "placement_id": "placement:0|h|-3|12",
+      "room_ids": [
+        "engineering_01",
+        ""
+      ],
+      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
+    },
+    {
+      "edge_key": "0|v|-2|12",
+      "kind": "SOLID",
+      "name": "Structural_placement_0_v_-2_12",
+      "placement_id": "placement:0|v|-2|12",
+      "room_ids": [
+        "engineering_01",
         ""
       ],
       "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
@@ -4405,83 +4482,6 @@
       "placement_id": "placement:0|h|2|13",
       "room_ids": [
         "medical_01",
-        ""
-      ],
-      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
-    },
-    {
-      "edge_key": "0|h|-3|10",
-      "kind": "SOLID",
-      "name": "Structural_placement_0_h_-3_10",
-      "placement_id": "placement:0|h|-3|10",
-      "room_ids": [
-        "engineering_01",
-        ""
-      ],
-      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
-    },
-    {
-      "edge_key": "0|v|-2|9",
-      "kind": "SOLID",
-      "name": "Structural_placement_0_v_-2_9",
-      "placement_id": "placement:0|v|-2|9",
-      "room_ids": [
-        "engineering_01",
-        ""
-      ],
-      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
-    },
-    {
-      "edge_key": "0|v|-1|9",
-      "kind": "SOLID",
-      "name": "Structural_placement_0_v_-1_9",
-      "placement_id": "placement:0|v|-1|9",
-      "room_ids": [
-        "engineering_01",
-        ""
-      ],
-      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
-    },
-    {
-      "edge_key": "0|h|-3|11",
-      "kind": "SOLID",
-      "name": "Structural_placement_0_h_-3_11",
-      "placement_id": "placement:0|h|-3|11",
-      "room_ids": [
-        "engineering_01",
-        ""
-      ],
-      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
-    },
-    {
-      "edge_key": "0|h|-3|12",
-      "kind": "SOLID",
-      "name": "Structural_placement_0_h_-3_12",
-      "placement_id": "placement:0|h|-3|12",
-      "room_ids": [
-        "engineering_01",
-        ""
-      ],
-      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
-    },
-    {
-      "edge_key": "0|v|-2|12",
-      "kind": "SOLID",
-      "name": "Structural_placement_0_v_-2_12",
-      "placement_id": "placement:0|v|-2|12",
-      "room_ids": [
-        "engineering_01",
-        ""
-      ],
-      "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
-    },
-    {
-      "edge_key": "0|v|-1|12",
-      "kind": "SOLID",
-      "name": "Structural_placement_0_v_-1_12",
-      "placement_id": "placement:0|v|-1|12",
-      "room_ids": [
-        "engineering_01",
         ""
       ],
       "scene_path": "res://scenes/wrappers/structural/ship_structural_v0/wall_straight_1x1.tscn"
