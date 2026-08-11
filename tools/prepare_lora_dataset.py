@@ -145,6 +145,11 @@ def prepare_dataset(
         if source.suffix.lower() not in IMAGE_SUFFIXES:
             print(f"Warning: skipping non-image source: {source}", file=sys.stderr)
             continue
+        # Never train on pipeline intermediates
+        stem_l = source.stem.lower()
+        if "edge_mask" in stem_l or "test_grid" in stem_l:
+            print(f"Skipping intermediate: {source}")
+            continue
 
         digest = _sha256(source)
         if digest in seen_hashes:
