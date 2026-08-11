@@ -273,7 +273,7 @@ def _is_complete(entry: Mapping[str, Any]) -> bool:
     return bool(entry.get("outputs")) and not isinstance(status, Mapping)
 
 
-def poll_completion(prompt_id: str, api_url: str, timeout: int = 300) -> dict[str, Any]:
+def poll_completion(prompt_id: str, api_url: str, timeout: int = 600) -> dict[str, Any]:
     """Poll ComfyUI history until a prompt succeeds and return its history entry."""
 
     if timeout < 0:
