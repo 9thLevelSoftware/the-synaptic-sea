@@ -134,6 +134,15 @@ def build_workflow(
         replacements["__LORA_NAME__"] = str(lora_name)
     workflow = _replace_placeholders(workflow, replacements)
 
+    # Strip non-node metadata keys (e.g. _comment) that ComfyUI can't process
+    non_node_keys = [k for k, v in workflow.items() if not isinstance(v, dict) or "class_type" not in v]
+    for k in non_node_keys:
+        workflow.pop(k, None)
+    # Also strip _comment keys inside nodes
+    for node_id in list(workflow.keys()):
+        if isinstance(workflow[node_id], dict):
+            workflow[node_id].pop("_comment", None)
+
     # Keep the node IDs from the checked-in template, but configure every
     # generation setting from tile_prompts.json rather than duplicating values.
     latent_inputs = workflow.get("5", {}).get("inputs", {})
