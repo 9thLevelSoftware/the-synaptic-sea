@@ -1,4 +1,5 @@
 {
+  "kit_id": "gameplay_prop_v0",
   "version": "gameplay-prop-v0",
   "props": {
     "loot_crate": {
