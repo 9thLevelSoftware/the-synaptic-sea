@@ -1,6 +1,11 @@
 # The Synaptic Sea — Project Status (source of truth)
 
-**Last updated:** 2026-07-23
+**Last updated:** 2026-08-11
+
+## Active milestone: Vertical Slice v1
+
+- Contract: [`docs/game/features/vertical_slice_v1.md`](docs/game/features/vertical_slice_v1.md)
+- State: **pre-polish mechanical bar COMPLETE**; current work is productization (presentation/content/onboarding/demo), **not new simulation domains**.
 
 This file is the entry point for "what is actually built and what's left." It exists
 because the older roadmap docs were inaccurate and have been quarantined (see below).
