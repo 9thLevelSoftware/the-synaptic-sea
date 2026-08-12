@@ -73,7 +73,9 @@ Pipeline exists (ADR-0044). Milestone A requires **real clips** for:
 - `death_sting`
 - `music_explore` / `music_tension` / `music_critical`
 
-## 20-minute script (cold player beats)
+## 20-minute script
+
+A cold player should hit these beats in order:
 
 - Title → New Game with the fixed default start; no class picker is required for Milestone A.
 - Move and complete the first tutorial prompt.
