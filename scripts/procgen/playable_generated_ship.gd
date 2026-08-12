@@ -378,6 +378,7 @@ var _home_player_position: Vector3 = Vector3.ZERO
 var completed_objective_types: Dictionary = {}
 # Stream E: rooms first touched via objective completion (discover_room training).
 var discovered_room_ids: Dictionary = {}
+var threats_killed_count: int = 0
 var route_control_state: RouteControlState
 var route_control_root: Node3D
 var route_gate_nodes: Array = []
@@ -721,6 +722,9 @@ func get_slice_completion_summary() -> Dictionary:
 		"objectives_completed": objective_completion_count,
 		"current_sequence": current_objective_sequence,
 		"run_complete": slice_complete,
+		"play_time_seconds": run_play_time_seconds,
+		"rooms_discovered": discovered_room_ids.size(),
+		"threats_killed": threats_killed_count,
 		"player_spawned": player != null,
 		"camera_spawned": camera_rig != null and camera_rig.camera != null,
 	}
@@ -5803,6 +5807,7 @@ func _on_hatch_resealed(hatch_id: String, _lock_kind: String) -> void:
 ## + revisit (or save/load) re-spawns the drop — previously they lived only in the
 ## transient loot_containers array and vanished with scene_root.
 func _on_threat_killed(record: Dictionary) -> void:
+	threats_killed_count += 1
 	# XP (data-driven interim skill via training_actions.json).
 	emit_training_event("threat_killed", str(record.get("archetype_id", "")))
 	# Stream F: melee/unarmed kills train intimidation (crowbar / empty weapon).
