@@ -51,6 +51,23 @@ func _initialize() -> void:
 		push_error("loader contract smoke failed: collision shape count is zero")
 		quit(1)
 		return
+	var edge_wrapper_count: int = _count_wrappers_with_meta(loader.structural_root, "structural_edge_key")
+	var floor_wrapper_count: int = _count_wrappers_with_meta(loader.structural_root, "structural_cell_key")
+	var structural_plan: Dictionary = loader.layout_doc.get("structural_plan", {})
+	var expected_edge_count: int = (structural_plan.get("placements", []) as Array).size()
+	var expected_floor_count: int = (structural_plan.get("floor_placements", []) as Array).size()
+	if edge_wrapper_count != expected_edge_count:
+		push_error("loader contract smoke failed: edge wrappers=%d expected=%d" % [edge_wrapper_count, expected_edge_count])
+		quit(1)
+		return
+	if floor_wrapper_count != expected_floor_count or floor_wrapper_count <= 0:
+		push_error("loader contract smoke failed: floor wrappers=%d expected=%d" % [floor_wrapper_count, expected_floor_count])
+		quit(1)
+		return
+	if _count_floor_wrappers_with_edge_meta(loader.structural_root) != 0:
+		push_error("loader contract smoke failed: floor wrapper has fake edge metadata")
+		quit(1)
+		return
 
 	var tracker = ObjectiveTrackerScript.new()
 	tracker.name = "LoaderPlayableContractSmokeTracker"
@@ -63,10 +80,26 @@ func _initialize() -> void:
 		return
 
 	print(
-		"PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=%d"
-		% loader.count_collision_shapes()
+		"PROCGEN_STRUCTURAL_LOADER_PASS seed=17 edge_wrappers=%d floor_wrappers=%d collision_shapes=%d objectives=4"
+		% [edge_wrapper_count, floor_wrapper_count, loader.count_collision_shapes()]
 	)
 	quit(0)
+
+
+func _count_wrappers_with_meta(node: Node, meta_name: String) -> int:
+	var count: int = 1 if node.has_meta(meta_name) else 0
+	for child in node.get_children():
+		count += _count_wrappers_with_meta(child, meta_name)
+	return count
+
+
+func _count_floor_wrappers_with_edge_meta(node: Node) -> int:
+	var count: int = 0
+	if node.has_meta("structural_cell_key") and node.has_meta("structural_edge_key"):
+		count += 1
+	for child in node.get_children():
+		count += _count_floor_wrappers_with_edge_meta(child)
+	return count
 
 
 func _on_ship_loaded(_summary: Dictionary) -> void:

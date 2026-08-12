@@ -304,6 +304,7 @@ run_clean 'Domain 10 menu state model smoke' 'MENU STATE PASS menus=2 navigation
 run_clean 'Domain 10 settings state model smoke' 'SETTINGS STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_state_smoke.gd
 run_clean 'Domain 10 tutorial state model smoke' 'TUTORIAL STATE PASS once=true dismiss=true codex_unlocks=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tutorial_state_smoke.gd
 run_clean 'Task 2.1 tutorial slice coverage smoke' 'TUTORIAL SLICE COVERAGE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tutorial_slice_coverage_smoke.gd
+run_clean 'Task 2.2 run results/death screen smoke' 'RUN RESULTS PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/run_results_smoke.gd
 run_clean 'Domain 10 controller glyph state model smoke' 'CONTROLLER GLYPH STATE PASS schemes=3 action=interact' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/controller_glyph_state_smoke.gd
 run_clean 'Domain 10 UI shell parse check' 'UI SHELL PARSE PASS classes=12' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_shell_parse_check.gd
 run_clean 'Domain 10 UI shell save/load smoke' 'UI SHELL SAVE LOAD PASS restored=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_shell_save_load_smoke.gd
@@ -390,7 +391,8 @@ run_clean 'interior aabb smoke' 'INTERIOR AABB PASS nondegenerate=true positione
 run_clean 'kit catalog smoke' 'KIT CATALOG PASS loaded=3 default=ship_structural_v0 airlock=3 eng=3 breach_select=ok fallback=ok real_stems=true default_role_module=floor_1x1 ids_sorted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/kit_catalog_smoke.gd
 run_clean 'floor wrapper collision footprint smoke' 'FLOOR WRAPPER COLLISION FOOTPRINT PASS checked=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/floor_wrapper_collision_footprint_smoke.gd
 run_clean 'readability prop factory smoke' 'READABILITY PROP FACTORY PASS props=9' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/readability_prop_factory_smoke.gd
-run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=122' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
+run_clean 'procgen loader playable contract smoke' 'PROCGEN_STRUCTURAL_LOADER_PASS seed=17 edge_wrappers=84 floor_wrappers=51 collision_shapes=136 objectives=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
+run_clean 'Task 1.3 structural live loader smoke' 'STRUCTURAL LIVE LOADER PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_live_loader_smoke.gd
 # --- Tranche 6 (2026-07-07): demo gate wiring + unlock triggers + the promoted gate model smoke ---
 run_clean 'Tranche 6 demo scope gate model smoke' 'DEMO SCOPE GATE PASS build_kind=release blocked=5 allowed=0 unknown_rejected=true params=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_gate_smoke.gd
 run_clean 'Tranche 6 demo scope enforcement smoke' 'DEMO SCOPE ENFORCEMENT PASS dev_unaffected=true save_cap=true world_skip=true hub_blocked=true hazards_capped=true cargo_capped=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_enforcement_smoke.gd

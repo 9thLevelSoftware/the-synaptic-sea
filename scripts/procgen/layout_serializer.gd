@@ -9,6 +9,7 @@ class_name LayoutSerializer
 
 const CELL_SIZE: float = 4.0
 const DECK_HEIGHT: float = 4.0
+const StructuralEdgeCompilerScript: GDScript = preload("res://scripts/procgen/structural_edge_compiler.gd")
 
 # Default motif requests per role
 const ROLE_MOTIFS: Dictionary = {
@@ -45,6 +46,7 @@ func serialize(cell_grid: Dictionary, geometry: Dictionary,
 
 	# Assemble rooms array
 	var rooms_array: Array = []
+	var all_portals: Array = []
 	for rid in room_order:
 		if not rooms_data.has(rid):
 			continue
@@ -56,11 +58,23 @@ func serialize(cell_grid: Dictionary, geometry: Dictionary,
 		var placements: Array = _build_structural_placements(cells, deck, role)
 		var geo: Dictionary = geometry.get(rid, {})
 
+		# Serialize cells to plain arrays for JSON round-trip
+		var serialized_cells: Array = []
+		for cell in cells:
+			if cell is Vector2i:
+				serialized_cells.append([cell.x, cell.y])
+			elif cell is Array:
+				serialized_cells.append(cell)
+			else:
+				serialized_cells.append([int(cell.x), int(cell.y)])
+
 		var room_dict: Dictionary = {
 			"id": rid,
 			"room_role": role,
 			"variant": str(room_variants.get(rid, "standard")),
 			"deck": deck,
+			"cells": serialized_cells,
+			"footprint": _footprint_from_cells(cells),
 			"structural_placements": placements,
 		}
 
@@ -71,7 +85,12 @@ func serialize(cell_grid: Dictionary, geometry: Dictionary,
 			for wp in wall_placements:
 				placements.append(wp)
 
-			room_dict["portals"] = _serialize_portals(geo.get("portals", []))
+			var room_portals: Array = _serialize_portals(geo.get("portals", []))
+			room_dict["portals"] = room_portals
+			for p in room_portals:
+				var portal_copy: Dictionary = p.duplicate()
+				portal_copy["from_room"] = rid
+				all_portals.append(portal_copy)
 			room_dict["interior_zones"] = _serialize_interior_zones(geo.get("interior_zones", {}))
 		else:
 			room_dict["portals"] = []
@@ -83,8 +102,35 @@ func serialize(cell_grid: Dictionary, geometry: Dictionary,
 	# Build room_links from adjacencies
 	var room_links: Array = _build_room_links(adjacencies, rooms_data)
 
-	# Build vertical_connections
+	# Build canonical portals from room_links (one entry per adjacency)
+	# Cross-deck links (ramps/elevators) are excluded — they belong in
+	# vertical_connections, not the portals array.
+	var canonical_portals: Array = []
+	for link in room_links:
+		var from_room: String = str(link.get("from_room", ""))
+		var to_room: String = str(link.get("to_room", ""))
+		var from_cell: Array = link.get("from_cell", [0, 0, 0])
+		var to_cell: Array = link.get("to_cell", [0, 0, 0])
+		# Skip cross-deck links — those are vertical connections
+		if from_cell.size() >= 3 and to_cell.size() >= 3 and int(from_cell[2]) != int(to_cell[2]):
+			continue
+		canonical_portals.append({
+			"id": "portal_%s_%s" % [from_room, to_room],
+			"from_room": from_room,
+			"to_room": to_room,
+			"from_cell": from_cell,
+			"to_cell": to_cell,
+			"state": "DOOR",
+		})
+
 	var vertical_connections: Array = _build_vertical_connections(rooms_data, adjacencies, room_roles)
+	var structural_layout: Dictionary = {
+		"cell_size": CELL_SIZE,
+		"rooms": rooms_array,
+		"portals": canonical_portals,
+		"vertical_connections": vertical_connections,
+	}
+	var structural_plan: Dictionary = StructuralEdgeCompilerScript.new().compile(structural_layout)
 
 	# Build landmarks
 	var landmarks: Array = _build_landmarks(rooms_data, room_roles, room_order)
@@ -103,6 +149,7 @@ func serialize(cell_grid: Dictionary, geometry: Dictionary,
 		"cell_size": CELL_SIZE,
 		"rooms": rooms_array,
 		"room_links": room_links,
+		"portals": canonical_portals,
 		"blocked_links": [],
 		"vertical_connections": vertical_connections,
 		"landmarks": landmarks,
@@ -111,11 +158,29 @@ func serialize(cell_grid: Dictionary, geometry: Dictionary,
 		"arc_zones": [],
 		"breach_zones": [],
 		"encounters": [],  # populated by EncounterInjector (Task 12)
+		"structural_plan": structural_plan,
 		"prototype": {
 			"start_room": entry_id,
 			"goal_room": dest_id,
 		},
 	}
+
+
+func _footprint_from_cells(cells: Array) -> Array:
+	if cells.is_empty():
+		return [0, 0]
+	var min_x: int = 999999
+	var max_x: int = -999999
+	var min_z: int = 999999
+	var max_z: int = -999999
+	for cell in cells:
+		var x: int = cell.x if cell is Vector2i else int(cell.x)
+		var z: int = cell.y if cell is Vector2i else int(cell.y)
+		min_x = mini(min_x, x)
+		max_x = maxi(max_x, x)
+		min_z = mini(min_z, z)
+		max_z = maxi(max_z, z)
+	return [max_x - min_x + 1, max_z - min_z + 1]
 
 
 func _build_structural_placements(cells: Array, deck: int, role: String) -> Array:
@@ -129,14 +194,14 @@ func _build_structural_placements(cells: Array, deck: int, role: String) -> Arra
 		var world_y: float = float(deck) * DECK_HEIGHT
 		var world_z: float = float(z) * CELL_SIZE
 
-		var name: String
+		var cell_name: String
 		if deck == 0:
-			name = "floor_cell_x%d_z%d" % [x, z]
+			cell_name = "floor_cell_x%d_z%d" % [x, z]
 		else:
-			name = "floor_cell_d%d_x%d_z%d" % [deck, x, z]
+			cell_name = "floor_cell_d%d_x%d_z%d" % [deck, x, z]
 
 		placements.append({
-			"name": name,
+			"name": cell_name,
 			"module": floor_module,
 			"world_position": [world_x, world_y, world_z],
 		})
@@ -175,10 +240,6 @@ func _build_wall_placements(wall_segments: Array) -> Array:
 
 
 func _serialize_portals(portals: Array) -> Array:
-	# Tranche 5 (audit LOW): portals used to be copied raw, so Vector3/Vector2i
-	# fields collapsed to opaque strings ("(6.0, 0.0, 0.0)") under
-	# JSON.stringify. Convert to plain numeric arrays (same policy as
-	# _serialize_interior_zones); values that are already arrays pass through.
 	var result: Array = []
 	for portal_variant in portals:
 		if typeof(portal_variant) != TYPE_DICTIONARY:
@@ -226,10 +287,6 @@ func _build_room_links(adjacencies: Array, rooms_data: Dictionary) -> Array:
 		var from_cell: Variant = adj.get("from_cell", Vector2i.ZERO)
 		var to_cell: Variant = adj.get("to_cell", Vector2i.ZERO)
 
-		# Tranche 5 (audit LOW): the third component is the endpoint's DECK —
-		# it was hardcoded 0, so the loader's floor_cell_d<deck>_* placement
-		# lookup (_placement_matches_endpoint_cell) silently failed for every
-		# cross-deck link and dropped its nav marker.
 		var from_deck: int = int(rooms_data.get(from_room, {}).get("deck", 0))
 		var to_deck: int = int(rooms_data.get(to_room, {}).get("deck", 0))
 		var from_arr: Array = [from_cell.x, from_cell.y, from_deck] if from_cell is Vector2i else [0, 0, from_deck]
@@ -362,8 +419,8 @@ func _build_critical_path(start_id: String, end_id: String, adjacencies: Array) 
 
 	# Reconstruct path
 	var path: Array = []
-	var current: String = end_id
-	while not current.is_empty():
-		path.insert(0, current)
-		current = str(visited.get(current, ""))
+	var current_path: String = end_id
+	while not current_path.is_empty():
+		path.insert(0, current_path)
+		current_path = str(visited.get(current_path, ""))
 	return path

@@ -2,6 +2,7 @@ extends Node3D
 class_name GeneratedShipLoader
 
 const GameplayObjectiveVolumeScript := preload("res://scripts/procgen/gameplay_objective_volume.gd")
+const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
 
 signal ship_loaded(summary: Dictionary)
 signal load_failed(reason: String)
@@ -104,6 +105,12 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 	var module_to_scene: Dictionary = _build_module_scene_map(kit_doc, kit_abs)
 	if module_to_scene.is_empty():
 		return _fail_load("kit contains no usable module wrapper scenes: %s" % kit_abs)
+
+	var structural_verdict: Dictionary = _validate_structural_plan_for_loading()
+	if not bool(structural_verdict.get("ok", false)):
+		return _fail_load("layout structural plan validation failed: %s" % str(structural_verdict.get("errors", [])))
+	if not _preflight_structural_wrappers(module_to_scene, layout_doc.get("structural_plan", {})):
+		return _fail_load("structural wrapper preflight failed")
 
 	objective_specs = _build_objective_specs(layout_doc, gameplay_doc, gameplay_slice_abs)
 	if objective_specs.is_empty():
@@ -263,6 +270,51 @@ func _build_module_scene_map(kit_doc: Dictionary, kit_path: String) -> Dictionar
 			continue
 		module_to_scene[module_id] = scene_path
 	return module_to_scene
+
+
+func _validate_structural_plan_for_loading() -> Dictionary:
+	var structural_plan_variant: Variant = layout_doc.get("structural_plan", null)
+	if typeof(structural_plan_variant) != TYPE_DICTIONARY:
+		return {"ok": false, "errors": ["layout missing validated structural_plan"]}
+	var structural_plan: Dictionary = structural_plan_variant
+	var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout_doc)
+	return verdict
+
+
+func _preflight_structural_wrappers(module_to_scene: Dictionary, structural_plan: Dictionary) -> bool:
+	var edge_variant: Variant = structural_plan.get("placements", null)
+	var floor_variant: Variant = structural_plan.get("floor_placements", null)
+	if typeof(edge_variant) != TYPE_ARRAY or typeof(floor_variant) != TYPE_ARRAY:
+		push_error("structural plan wrapper preflight requires edge and floor placement arrays")
+		return false
+	var all_records: Array = []
+	all_records.append_array(edge_variant as Array)
+	all_records.append_array(floor_variant as Array)
+	for record_variant in all_records:
+		if typeof(record_variant) != TYPE_DICTIONARY:
+			push_error("structural plan wrapper preflight found non-object placement")
+			return false
+		var record: Dictionary = record_variant
+		var module_id: String = str(record.get("module_id", ""))
+		var scene_path: String = str(module_to_scene.get(module_id, ""))
+		if module_id.is_empty() or scene_path.is_empty():
+			push_error("structural plan wrapper preflight missing wrapper for module %s" % module_id)
+			return false
+		if not ResourceLoader.exists(scene_path):
+			push_error("structural plan wrapper preflight missing scene %s" % scene_path)
+			return false
+		var scene: Resource = ResourceLoader.load(scene_path)
+		if scene == null or not (scene is PackedScene):
+			push_error("structural plan wrapper preflight scene is not PackedScene: %s" % scene_path)
+			return false
+		var probe: Node = (scene as PackedScene).instantiate()
+		if probe == null or not (probe is Node3D):
+			if probe != null:
+				probe.free()
+			push_error("structural plan wrapper preflight instance is not Node3D: %s" % module_id)
+			return false
+		probe.free()
+	return true
 
 
 func _build_objective_specs(layout_doc: Dictionary, gameplay_doc: Dictionary, gameplay_slice_path: String) -> Array:
@@ -444,22 +496,24 @@ func _cell_name_candidates(cell: Array) -> Array:
 
 
 func _room_cell_world(room: Dictionary, cell: Array) -> Vector3:
-	var candidates: Array = _cell_name_candidates(cell)
-	if candidates.is_empty():
+	if cell.size() < 2:
 		return Vector3.INF
-
-	var placements_variant: Variant = room.get("structural_placements", [])
-	if typeof(placements_variant) != TYPE_ARRAY:
+	var room_id: String = str(room.get("id", ""))
+	var deck: int = int(room.get("deck", -1))
+	if cell.size() >= 3:
+		deck = int(cell[2])
+	var cell_key_value: String = "%d|%d|%d" % [deck, int(cell[0]), int(cell[1])]
+	var structural_plan: Dictionary = layout_doc.get("structural_plan", {})
+	var floors_variant: Variant = structural_plan.get("floor_placements", [])
+	if typeof(floors_variant) != TYPE_ARRAY:
 		return Vector3.INF
-	var placements: Array = placements_variant
-	for placement_variant in placements:
-		if typeof(placement_variant) != TYPE_DICTIONARY:
+	for floor_variant in (floors_variant as Array):
+		if typeof(floor_variant) != TYPE_DICTIONARY:
 			continue
-		var placement: Dictionary = placement_variant
-		var name: String = str(placement.get("name", ""))
-		if not candidates.has(name):
+		var floor: Dictionary = floor_variant
+		if str(floor.get("cell_key", "")) != cell_key_value or str(floor.get("room_id", "")) != room_id:
 			continue
-		var pos: Array = _read_placement_position(placement)
+		var pos: Array = _read_placement_position(floor)
 		if pos.size() < 3:
 			return Vector3.INF
 		return Vector3(float(pos[0]), float(pos[1]) + FLOOR_Y_OFFSET, float(pos[2]))
@@ -467,57 +521,84 @@ func _room_cell_world(room: Dictionary, cell: Array) -> Vector3:
 
 
 func _instance_structural_wrappers(layout_doc: Dictionary, module_to_scene: Dictionary, ship_root: Node3D) -> int:
-	var rooms_variant: Variant = layout_doc.get("rooms", [])
-	if typeof(rooms_variant) != TYPE_ARRAY:
+	var structural_plan_variant: Variant = layout_doc.get("structural_plan", null)
+	if typeof(structural_plan_variant) != TYPE_DICTIONARY:
 		return -1
-	var rooms: Array = rooms_variant
-	var count: int = 0
-	for room_variant in rooms:
-		if typeof(room_variant) != TYPE_DICTIONARY:
-			continue
-		var room: Dictionary = room_variant
-		var room_id: String = str(room.get("id", ""))
-		var placements_variant: Variant = room.get("structural_placements", [])
-		if typeof(placements_variant) != TYPE_ARRAY:
-			continue
-		for placement_variant in placements_variant:
-			if typeof(placement_variant) != TYPE_DICTIONARY:
-				continue
-			var placement: Dictionary = placement_variant
-			var module_id: String = str(placement.get("module_id", placement.get("module", "")))
-			var scene_path: String = str(module_to_scene.get(module_id, ""))
-			if scene_path.is_empty():
-				continue
-			if not ResourceLoader.exists(scene_path):
-				push_error("wrapper scene missing for module %s: %s" % [module_id, scene_path])
-				return -1
-			var scene: Resource = load(scene_path)
-			if scene == null:
-				push_error("could not load wrapper scene for module %s: %s" % [module_id, scene_path])
-				return -1
-			if not (scene is PackedScene):
-				push_error("wrapper scene is not PackedScene for module %s: %s" % [module_id, scene_path])
-				return -1
-			var instance: Node = (scene as PackedScene).instantiate()
-			if not (instance is Node3D):
-				push_error("wrapper instance is not Node3D for module %s: %s" % [module_id, scene_path])
-				return -1
-			var placement_pos: Array = _read_placement_position(placement)
-			if placement_pos.size() < 3:
-				continue
-			var wrapper: Node3D = instance as Node3D
-			wrapper.position = Vector3(float(placement_pos[0]), float(placement_pos[1]), float(placement_pos[2]))
-			wrapper.rotation_degrees.y = float(placement.get("yaw_degrees", 0.0))
-			var pname: String = str(placement.get("name", module_id))
-			wrapper.name = "%s_%s" % [room_id, pname]
-			# PKG-B2.1b: identity for ModuleIntegrityMap keys room_id/name
-			wrapper.set_meta("module_kind", module_id)
-			wrapper.set_meta("module_key", "%s/%s" % [room_id, pname])
-			wrapper.set_meta("room_id", room_id)
-			wrapper.set_meta("integrity_state", "intact")
-			ship_root.add_child(wrapper)
-			count += 1
-	return count
+	var structural_plan: Dictionary = structural_plan_variant
+	var edge_variant: Variant = structural_plan.get("placements", null)
+	var floor_variant: Variant = structural_plan.get("floor_placements", null)
+	if typeof(edge_variant) != TYPE_ARRAY or typeof(floor_variant) != TYPE_ARRAY:
+		return -1
+
+	# Instantiate detached first. No partial structural tree is published if a
+	# record is malformed or a wrapper fails; the caller can then discard the
+	# empty root atomically.
+	var pending: Array[Node3D] = []
+	for record_variant in (edge_variant as Array):
+		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, false)
+		if wrapper == null:
+			for previous in pending:
+				previous.free()
+			return -1
+		pending.append(wrapper)
+	for record_variant in (floor_variant as Array):
+		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, true)
+		if wrapper == null:
+			for previous in pending:
+				previous.free()
+			return -1
+		pending.append(wrapper)
+	for wrapper in pending:
+		ship_root.add_child(wrapper)
+	return pending.size()
+
+
+func _instantiate_structural_record(record_variant: Variant, module_to_scene: Dictionary, is_floor: bool) -> Node3D:
+	if typeof(record_variant) != TYPE_DICTIONARY:
+		return null
+	var record: Dictionary = record_variant
+	var module_id: String = str(record.get("module_id", ""))
+	var scene_path: String = str(module_to_scene.get(module_id, ""))
+	if module_id.is_empty() or scene_path.is_empty() or not ResourceLoader.exists(scene_path):
+		return null
+	var scene: Resource = ResourceLoader.load(scene_path)
+	if scene == null or not (scene is PackedScene):
+		return null
+	var instance: Node = (scene as PackedScene).instantiate()
+	if instance == null or not (instance is Node3D):
+		if instance != null:
+			instance.free()
+		return null
+	var wrapper: Node3D = instance as Node3D
+	var placement_pos: Array = _read_placement_position(record)
+	if placement_pos.size() < 3:
+		wrapper.free()
+		return null
+	wrapper.position = Vector3(float(placement_pos[0]), float(placement_pos[1]), float(placement_pos[2]))
+	wrapper.rotation_degrees.y = float(record.get("yaw_degrees", 0.0))
+	if is_floor:
+		var cell_key_value: String = str(record.get("cell_key", ""))
+		wrapper.name = "Floor_%s" % cell_key_value.replace("|", "_")
+		wrapper.set_meta("structural_floor_placement_id", str(record.get("placement_id", record.get("id", ""))))
+		wrapper.set_meta("structural_cell_key", cell_key_value)
+		wrapper.set_meta("structural_room_id", str(record.get("room_id", "")))
+		wrapper.set_meta("structural_kind", "FLOOR")
+		wrapper.set_meta("module_kind", module_id)
+		wrapper.set_meta("module_key", "floor/%s" % cell_key_value)
+		wrapper.set_meta("room_id", str(record.get("room_id", "")))
+	else:
+		var edge_key_value: String = str(record.get("edge_key", ""))
+		wrapper.name = "StructuralEdge_%s" % edge_key_value.replace("|", "_")
+		wrapper.set_meta("structural_edge_key", edge_key_value)
+		wrapper.set_meta("structural_kind", str(record.get("kind", "")))
+		wrapper.set_meta("structural_placement_id", str(record.get("placement_id", record.get("id", ""))))
+		wrapper.set_meta("structural_room_ids", (record.get("room_ids", []) as Array).duplicate(true))
+		wrapper.set_meta("module_kind", module_id)
+		wrapper.set_meta("module_key", "edge/%s" % edge_key_value)
+		var room_ids: Array = record.get("room_ids", []) if typeof(record.get("room_ids", [])) == TYPE_ARRAY else []
+		wrapper.set_meta("room_id", str(room_ids[0]) if not room_ids.is_empty() else "")
+	wrapper.set_meta("integrity_state", "intact")
+	return wrapper
 
 
 func _parse_prefixed_int(value: String, prefix: String) -> int:
@@ -571,32 +652,15 @@ func _cell_world_from_link_endpoint(link_doc: Dictionary, cell_key: String, room
 	if typeof(endpoint_variant) != TYPE_ARRAY:
 		return Vector3.INF
 	var endpoint: Array = endpoint_variant
+	if endpoint.size() < 2:
+		return Vector3.INF
 	var room_id: String = str(link_doc.get(room_key, ""))
 	if room_id.is_empty():
 		return Vector3.INF
-	var rooms_variant: Variant = layout_doc.get("rooms", [])
-	if typeof(rooms_variant) != TYPE_ARRAY:
+	var room: Dictionary = _find_room_in_layout(room_id)
+	if room.is_empty():
 		return Vector3.INF
-	for room_variant in rooms_variant:
-		if typeof(room_variant) != TYPE_DICTIONARY:
-			continue
-		var room: Dictionary = room_variant
-		if str(room.get("id", "")) != room_id:
-			continue
-		var placements_variant: Variant = room.get("structural_placements", [])
-		if typeof(placements_variant) != TYPE_ARRAY:
-			return Vector3.INF
-		for placement_variant in placements_variant:
-			if typeof(placement_variant) != TYPE_DICTIONARY:
-				continue
-			var placement: Dictionary = placement_variant
-			if not _placement_matches_endpoint_cell(placement, endpoint):
-				continue
-			var pos: Array = _read_placement_position(placement)
-			if pos.size() < 3:
-				return Vector3.INF
-			return Vector3(float(pos[0]), float(pos[1]) + FLOOR_Y_OFFSET, float(pos[2]))
-	return Vector3.INF
+	return _room_cell_world(room, endpoint)
 
 
 func _add_vertical_links(layout_doc: Dictionary, ship_root: Node3D) -> int:
@@ -623,38 +687,35 @@ func _add_vertical_links(layout_doc: Dictionary, ship_root: Node3D) -> int:
 	return count
 
 
-func _build_navigation_region(rooms: Array, ship_root: Node3D) -> NavigationRegion3D:
+func _build_navigation_region(_rooms: Array, ship_root: Node3D) -> NavigationRegion3D:
 	var source: NavigationMeshSourceGeometryData3D = NavigationMeshSourceGeometryData3D.new()
 	var floor_cell_count: int = 0
-	for room_variant in rooms:
-		if typeof(room_variant) != TYPE_DICTIONARY:
+	var structural_plan: Dictionary = layout_doc.get("structural_plan", {})
+	var floors_variant: Variant = structural_plan.get("floor_placements", [])
+	if typeof(floors_variant) != TYPE_ARRAY:
+		return null
+	for floor_variant in (floors_variant as Array):
+		if typeof(floor_variant) != TYPE_DICTIONARY:
 			continue
-		var room: Dictionary = room_variant
-		var placements_variant: Variant = room.get("structural_placements", [])
-		if typeof(placements_variant) != TYPE_ARRAY:
+		var floor: Dictionary = floor_variant
+		var module_id: String = str(floor.get("module_id", ""))
+		if not FLOOR_MODULES.has(module_id):
 			continue
-		for placement_variant in placements_variant:
-			if typeof(placement_variant) != TYPE_DICTIONARY:
-				continue
-			var placement: Dictionary = placement_variant
-			var module_id: String = str(placement.get("module_id", placement.get("module", "")))
-			if not FLOOR_MODULES.has(module_id):
-				continue
-			var pos: Array = _read_placement_position(placement)
-			if pos.size() < 3:
-				continue
-			var cell_center: Vector3 = Vector3(float(pos[0]), float(pos[1]) + FLOOR_Y_OFFSET, float(pos[2]))
-			var half: float = CELL_SIZE * 0.5
-			var faces: PackedVector3Array = PackedVector3Array([
-				cell_center + Vector3(-half, 0.0, -half),
-				cell_center + Vector3(half, 0.0, -half),
-				cell_center + Vector3(half, 0.0, half),
-				cell_center + Vector3(-half, 0.0, -half),
-				cell_center + Vector3(half, 0.0, half),
-				cell_center + Vector3(-half, 0.0, half),
-			])
-			source.add_faces(faces, Transform3D())
-			floor_cell_count += 1
+		var pos: Array = _read_placement_position(floor)
+		if pos.size() < 3:
+			continue
+		var cell_center: Vector3 = Vector3(float(pos[0]), float(pos[1]) + FLOOR_Y_OFFSET, float(pos[2]))
+		var half: float = CELL_SIZE * 0.5
+		var faces: PackedVector3Array = PackedVector3Array([
+			cell_center + Vector3(-half, 0.0, -half),
+			cell_center + Vector3(half, 0.0, -half),
+			cell_center + Vector3(half, 0.0, half),
+			cell_center + Vector3(-half, 0.0, -half),
+			cell_center + Vector3(half, 0.0, half),
+			cell_center + Vector3(-half, 0.0, half),
+		])
+		source.add_faces(faces, Transform3D())
+		floor_cell_count += 1
 
 	if floor_cell_count == 0:
 		push_error("no floor/corridor floor placements found for navigation mesh")
@@ -671,14 +732,19 @@ func _build_navigation_region(rooms: Array, ship_root: Node3D) -> NavigationRegi
 
 
 func _read_placement_position(placement: Dictionary) -> Array:
-	# Accept either `position` (legacy / seed-17 fixtures) or `world_position`
-	# (golden coherent fixture). Return [] unless the value is an Array with
-	# at least 3 numeric-ish values.
 	if typeof(placement) != TYPE_DICTIONARY:
 		return []
 	var raw: Variant = placement.get("position", null)
 	if raw == null:
 		raw = placement.get("world_position", null)
+	if typeof(raw) == TYPE_VECTOR3:
+		var vector: Vector3 = raw
+		return [vector.x, vector.y, vector.z]
+	if typeof(raw) == TYPE_STRING:
+		var parsed: Array = _parse_vector_string(str(raw), 3)
+		if parsed.size() == 3:
+			return parsed
+		return []
 	if typeof(raw) != TYPE_ARRAY:
 		return []
 	var arr: Array = raw
@@ -694,40 +760,43 @@ func _read_placement_position(placement: Dictionary) -> Array:
 	return arr
 
 
-func _room_center(rooms: Array, room_id: String) -> Vector3:
-	for room_variant in rooms:
-		if typeof(room_variant) != TYPE_DICTIONARY:
+func _parse_vector_string(value: String, expected: int) -> Array:
+	var text: String = value.strip_edges()
+	if text.begins_with("(") and text.ends_with(")"):
+		text = text.substr(1, text.length() - 2)
+	var parts: PackedStringArray = text.split(",")
+	if parts.size() != expected:
+		return []
+	var result: Array = []
+	for part in parts:
+		var token: String = part.strip_edges()
+		if not token.is_valid_float():
+			return []
+		result.append(float(token))
+	return result
+
+
+func _room_center(_rooms: Array, room_id: String) -> Vector3:
+	var structural_plan: Dictionary = layout_doc.get("structural_plan", {})
+	var floors_variant: Variant = structural_plan.get("floor_placements", [])
+	if typeof(floors_variant) != TYPE_ARRAY:
+		return Vector3.INF
+	var total: Vector3 = Vector3.ZERO
+	var count: int = 0
+	for floor_variant in (floors_variant as Array):
+		if typeof(floor_variant) != TYPE_DICTIONARY:
 			continue
-		var room: Dictionary = room_variant
-		if str(room.get("id", "")) != room_id:
+		var floor: Dictionary = floor_variant
+		if str(floor.get("room_id", "")) != room_id:
 			continue
-		var placements_variant: Variant = room.get("structural_placements", [])
-		if typeof(placements_variant) != TYPE_ARRAY:
-			break
-		var placements: Array = placements_variant
-		var total: Vector3 = Vector3.ZERO
-		var count: int = 0
-		for placement_variant in placements:
-			if typeof(placement_variant) != TYPE_DICTIONARY:
-				continue
-			var placement: Dictionary = placement_variant
-			var module_id: String = str(placement.get("module_id", placement.get("module", "")))
-			if not FLOOR_MODULES.has(module_id):
-				continue
-			var pos: Array = _read_placement_position(placement)
-			if pos.size() < 3:
-				continue
-			total += Vector3(float(pos[0]), float(pos[1]) + FLOOR_Y_OFFSET, float(pos[2]))
-			count += 1
-		if count == 0:
-			var origin_variant: Variant = room.get("origin", [0.0, 0.0, 0.0])
-			if typeof(origin_variant) == TYPE_ARRAY:
-				var origin: Array = origin_variant
-				if origin.size() >= 3:
-					return Vector3(float(origin[0]), float(origin[1]) + FLOOR_Y_OFFSET, float(origin[2]))
-			return Vector3.INF
-		return total / float(count)
-	return Vector3.INF
+		var pos: Array = _read_placement_position(floor)
+		if pos.size() < 3:
+			continue
+		total += Vector3(float(pos[0]), float(pos[1]) + FLOOR_Y_OFFSET, float(pos[2]))
+		count += 1
+	if count == 0:
+		return Vector3.INF
+	return total / float(count)
 
 
 # --- Public metadata accessors -------------------------------------------------

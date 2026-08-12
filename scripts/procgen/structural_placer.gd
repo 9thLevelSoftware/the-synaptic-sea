@@ -1,6 +1,15 @@
 extends RefCounted
 class_name StructuralPlacer
 
+# Legacy debug-only room visualizer. It is not a valid structural compiler and
+# must never be used by ShipGenerator, GeneratedShipLoader, or staged captures.
+
+const LEGACY_DEBUG_SMOKE_NAMES: Array[String] = [
+	"structural_placer_smoke.gd",
+	"main_playable_lifeboat_biome_skin_smoke.gd",
+]
+const DEPRECATION_DIAGNOSTIC: String = "STRUCTURAL PLACER DEPRECATED: legacy/debug-only path; use StructuralEdgeCompiler"
+
 # Builds the physical "shell" of a ship from a RoomGraph using 2D
 # grid placement with spatial rules.
 #
@@ -102,7 +111,17 @@ var kit_catalog = null
 var biome: String = ""
 
 
+func _emit_deprecation_diagnostic() -> void:
+	for argument_variant in OS.get_cmdline_args():
+		var argument: String = str(argument_variant)
+		for smoke_name in LEGACY_DEBUG_SMOKE_NAMES:
+			if argument.ends_with(smoke_name):
+				return
+	push_warning(DEPRECATION_DIAGNOSTIC)
+
+
 func place_structure(graph: RoomGraphScript, seed_value: int = 0, p_biome: String = "") -> Node3D:
+	_emit_deprecation_diagnostic()
 	if graph.rooms.is_empty():
 		return null
 
