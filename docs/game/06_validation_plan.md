@@ -39,8 +39,7 @@ GODOT="${GODOT:-/Users/christopherwilloughby/.local/bin/godot-4.6.2}"
 # fails the bundle. See "Baseline Godot teardown noise" below for the
 # audit trail and the exact evidence-gathering command.
 BASELINE_ERROR="^ERROR: Capture not registered: 'gdaimcp'\\.$"
-BASELINE_WARNING="^WARNING: ObjectDB instances leaked at exit \\(run with --verbose for details\\)\\.$"
-REQ012_WARNING="^WARNING: SaveLoadService: save file rejected by from_dict \\(missing fields or version mismatch\\)\$"
+REQ012_WARNING="^WARNING: SaveLoadService: save file rejected by from_dict \\(missing fields or version mismatch\\)\\$"
 # The save/load service smoke deliberately writes a slot with an incompatible
 # (newer) slice_version to assert the migration-rejection path; that emits one
 # expected warning, allowlisted exactly like REQ012_WARNING above.
@@ -137,7 +136,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$CONNECTIVITY_SOFT_FAIL_WARNING|$BLUEPRINT_NULL_ERROR|$RELEASE_LEDGER_UNKNOWN_WARNING|$RELEASE_LEDGER_STATUS_WARNING|$RELEASE_LEDGER_EXTERNAL_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$CONNECTIVITY_SOFT_FAIL_WARNING|$BLUEPRINT_NULL_ERROR|$RELEASE_LEDGER_UNKNOWN_WARNING|$RELEASE_LEDGER_STATUS_WARNING|$RELEASE_LEDGER_EXTERNAL_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -213,6 +212,7 @@ run_clean 'vitals state model smoke' 'VITALS STATE PASS' "$GODOT" --headless --p
 run_clean 'player movement gating seam smoke' 'PLAYER MOVEMENT GATING PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_movement_gating_smoke.gd
 run_clean 'hallucination director model smoke' 'HALLUCINATION DIRECTOR PASS tiers=true gated=true deterministic=true ttl=true teeth=true fx=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hallucination_director_smoke.gd
 run_clean 'threat placeholder renderer smoke' 'THREAT PLACEHOLDER RENDERER PASS swarm=true anchored=true default=true color=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_placeholder_renderer_smoke.gd
+run_clean 'threat visual catalog smoke' 'THREAT VISUAL CATALOG PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_visual_catalog_smoke.gd
 run_clean 'main hallucination loop smoke' 'MAIN PLAYABLE HALLUCINATION PASS manifest=true phantom_no_damage=true attack_dissipates=true no_respawn=true teeth=true away_ticks=true clears=true hud=true fx=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_hallucination_smoke.gd
 run_clean 'biome loot_quality_modifier wired into rarity rolls' 'LOOT QUALITY MODIFIER PASS high_gt_base=true mid_between=true default_noop=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/loot_quality_modifier_smoke.gd
 run_clean 'REQ-AU-001 coordinator audio event coupling smoke' 'AUDIO COORDINATOR EVENTS PASS fire=true arc=true breath=true vitals_low_edge=true combat_music=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_coordinator_events_smoke.gd
@@ -965,7 +965,8 @@ A Gate 1 Go decision requires the regression bundle plus either the automated pr
   - `scripts/validation/derelict_fire_seed_smoke.gd` (marker `DERELICT FIRE SEED PASS deterministic=true rate_ok=true cap_ok=true`) — proves the presence gate is deterministic (RNG-free hash), rate is in the band around 15%, and the cap formula matches the real `ShipBlueprint.Condition` enum ordinals.
   - `scripts/validation/main_playable_derelict_fire_smoke.gd` (marker `MAIN PLAYABLE DERELICT FIRE PASS` — stable prefix; away_ticks count varies run-to-run and is not grepped) — live-scene proof: board a real derelict, fire ticks on the away branch, player standing in a derelict fire zone takes vitals drain, recharge port is power-gated by the derelict's own system, and manual extinguish works via the real interaction path. Requires `travel_to_marker_id` (not just `away_from_start=true`) so current_ship is a genuine derelict instance.
   - `scripts/validation/derelict_fire_sequential_persistence_smoke.gd` (marker `DERELICT FIRE SEQUENTIAL PERSISTENCE PASS remembered=true`) — live-revisit proof: board a derelict, ignite 2 compartments, extinguish 1 via the real interaction path, travel home, revisit the same marker — the burning set is preserved exactly (extinguished compartment stays out; remaining compartment still burns). Proves `fire_seeded` gate prevents re-seeding and `visited_ships` retains the per-ship `FireSuppressionState` across trips. All 5 added to regression bundle (commands 59–63).
-- [x] Domain 2 combat — 7 smokes (BP1+BP2+BP3):
+- [x] Domain 2 combat — 8 smokes (BP1+BP2+BP3):
+  - `scripts/validation/threat_visual_catalog_smoke.gd` (marker `THREAT VISUAL CATALOG PASS`) — catalog-backed slice visuals instantiate MeshInstance3D nodes with distinct sphere/capsule/cylinder silhouettes and albedos. Added to regression bundle.
   - `scripts/validation/detection_state_smoke.gd` (marker `DETECTION STATE PASS`) — pure-model: `DetectionState` emitted-profile contract (noise rises with movement, visibility lowers with crouch). Added to regression bundle.
   - `scripts/validation/threat_detection_source_smoke.gd` (marker `THREAT DETECTION SOURCE PASS single_source=true per_archetype=true proximity=true`) — pure-model: `ThreatDetectionSource` per-archetype weighting and proximity falloff. Added to regression bundle.
   - `scripts/validation/player_crouch_smoke.gd` (marker `PLAYER CROUCH PASS`) — pure-node seam: `PlayerController` exposes a `set_crouching(bool)` method that the coordinator's detection feed reads. Added to regression bundle.
