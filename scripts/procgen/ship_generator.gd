@@ -137,7 +137,9 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 	# Load via GeneratedShipLoader
 	var LoaderScript := preload("res://scripts/procgen/generated_ship_loader.gd")
 	var loader: Node3D = LoaderScript.new()
-	var success: bool = loader.load_from_paths(layout_path, kit_path, gameplay_path)
+	# Generated derelicts are the away branch; pass that context to the loader's
+	# single atmosphere hook so biome fog can deepen without playable edits.
+	var success: bool = loader.load_from_paths(layout_path, kit_path, gameplay_path, true)
 	if not success:
 		push_error("SHIP GENERATOR FAIL loader returned false")
 		loader.queue_free()

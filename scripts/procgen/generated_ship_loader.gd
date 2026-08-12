@@ -3,6 +3,7 @@ class_name GeneratedShipLoader
 
 const GameplayObjectiveVolumeScript := preload("res://scripts/procgen/gameplay_objective_volume.gd")
 const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
+const SliceAtmosphereApplierScript := preload("res://scripts/procgen/slice_atmosphere_applier.gd")
 
 signal ship_loaded(summary: Dictionary)
 signal load_failed(reason: String)
@@ -60,7 +61,7 @@ func clear_loaded_ship() -> void:
 	room_variant_descriptors = {}
 
 
-func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path: String) -> bool:
+func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path: String, is_away: bool = false) -> bool:
 	clear_loaded_ship()
 
 	var layout_abs: String = _resolve_path(layout_path)
@@ -148,6 +149,7 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 	_add_coherence_runtime_nodes(layout_doc, structural_root)
 	# PKG-B5.1: apply dressing fog/tint/light meta per room variant descriptors.
 	_apply_dressing_visuals(layout_doc, structural_root)
+	_apply_slice_atmosphere(layout_doc, is_away)
 
 	objective_volumes = []
 	for objective_variant in objective_specs:
@@ -177,6 +179,22 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 		}
 	)
 	return true
+
+
+func _apply_slice_atmosphere(source_layout: Dictionary, is_away: bool) -> void:
+	var biome_id: String = str(source_layout.get("biome_id", ""))
+	if biome_id.is_empty():
+		return
+	var biome_path: String = "res://data/procgen/biomes/%s.json" % biome_id
+	if not FileAccess.file_exists(biome_path):
+		push_warning("GeneratedShipLoader: atmosphere biome file missing: %s" % biome_path)
+		return
+	var biome_doc: Dictionary = _load_json_dict(biome_path, "biome")
+	var atmosphere_variant: Variant = biome_doc.get("atmosphere", {})
+	if typeof(atmosphere_variant) != TYPE_DICTIONARY:
+		return
+	var applier = SliceAtmosphereApplierScript.new()
+	applier.apply(self, atmosphere_variant as Dictionary, is_away)
 
 
 func _fail_load(reason: String) -> bool:
