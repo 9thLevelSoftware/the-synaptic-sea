@@ -21,3 +21,7 @@ __pycache__/
 
 # Local architecture renderer dependencies
 tools/architecture/node_modules/
+
+# Local ML training weights (too large for GitHub)
+data/training/**/output/
+*.safetensors
