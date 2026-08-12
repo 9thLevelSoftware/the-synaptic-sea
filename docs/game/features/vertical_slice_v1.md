@@ -117,7 +117,7 @@ Art must pass [`docs/game/art_shippable_gate.md`](../art_shippable_gate.md) befo
 
 1. **Biome:** `breach_field` (public face for A/B)
 2. **Difficulty:** `standard`
-3. **Seeds:** `42`, `777` for playtests and first-run contract
+3. **Seeds:** `42`, `777` for playtests and first-run contract. The first-run resolver validates the preferred seeds against the generated slice and deterministically selects the first passing seed; current standard derelict generation selects `777` when seed `42` has no fire/breach variant.
 4. **Demo length (B):** 60–90 min, hard cap 90 — not A’s exit
 5. **Permadeath:** keep existing ironman model; results screen must explain death
 6. **Art source:** shippable gate required; hand-authored Blender/kitbash preferred; AI-assisted only if gate passes

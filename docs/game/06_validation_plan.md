@@ -306,6 +306,7 @@ run_clean 'Domain 10 settings state model smoke' 'SETTINGS STATE PASS' "$GODOT" 
 run_clean 'Domain 10 tutorial state model smoke' 'TUTORIAL STATE PASS once=true dismiss=true codex_unlocks=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tutorial_state_smoke.gd
 run_clean 'Task 2.1 tutorial slice coverage smoke' 'TUTORIAL SLICE COVERAGE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tutorial_slice_coverage_smoke.gd
 run_clean 'Task 2.2 run results/death screen smoke' 'RUN RESULTS PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/run_results_smoke.gd
+run_clean 'Task 2.3 first-run derelict beat contract smoke' 'FIRST RUN CONTRACT PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/first_run_contract_smoke.gd
 run_clean 'Domain 10 controller glyph state model smoke' 'CONTROLLER GLYPH STATE PASS schemes=3 action=interact' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/controller_glyph_state_smoke.gd
 run_clean 'Domain 10 UI shell parse check' 'UI SHELL PARSE PASS classes=12' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_shell_parse_check.gd
 run_clean 'Domain 10 UI shell save/load smoke' 'UI SHELL SAVE LOAD PASS restored=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_shell_save_load_smoke.gd

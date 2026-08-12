@@ -48,6 +48,9 @@ const AchievementStateScript := preload("res://scripts/systems/achievement_state
 const WorldSnapshotScript := preload("res://scripts/systems/world_snapshot.gd")
 const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
+const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_generator.gd")
+const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
+const FirstRunContractScript := preload("res://scripts/procgen/first_run_contract.gd")
 const PlayerProgressionScript := preload("res://scripts/systems/player_progression_state.gd")
 const ClassDefinitionScript := preload("res://scripts/systems/class_definition.gd")
 const ShipInstanceScript := preload("res://scripts/systems/ship_instance.gd")
@@ -253,6 +256,8 @@ var synaptic_sea_world         # SynapticSeaWorld
 var scanner_state          # ScannerState
 var travel_controller      # TravelController
 var ship_generator         # ShipGenerator (injected into travel)
+var first_run_contract: RefCounted = null
+
 # True while the player is aboard a traveled derelict (not the starting ship).
 # Gates the starting-ship hazard/objective _process so the unoccupied starting
 # ship does not keep simulating in the background.
@@ -1412,6 +1417,35 @@ func _build_runtime_nodes() -> void:
 	scanner_state = ScannerStateScript.new()
 	travel_controller = TravelControllerScript.new()
 	ship_generator = ShipGeneratorScript.new()
+	first_run_contract = FirstRunContractScript.new()
+	first_run_contract.load_contract()
+
+## The first away derelict is the only travel that may be redirected by the
+## first-run contract. The marker object is regenerated on every scan, so
+## changing its seed here affects this travel request only; later travel keeps
+## the scanner's authored marker seed and normal biome/difficulty resolution.
+func _apply_first_run_contract_to_marker(marker) -> bool:
+	if marker == null or first_run_contract == null or first_run_contract.contract.is_empty():
+		return false
+	if not visited_ships.is_empty() or String(marker.marker_id).is_empty():
+		return false
+	var layout_generator = ShipLayoutGeneratorScript.new()
+	var slice_builder = GameplaySliceBuilderScript.new()
+	var candidates: Dictionary = {}
+	var biome_id: String = str(first_run_contract.contract.get("biome_id", ""))
+	var difficulty_id: String = str(first_run_contract.contract.get("difficulty_id", ""))
+	for seed_variant in first_run_contract.contract.get("preferred_seeds", []):
+		var seed_value: int = int(seed_variant)
+		var blueprint = ShipBlueprintScript.new(int(marker.size_class), int(marker.condition), seed_value)
+		var layout: Dictionary = layout_generator.generate_with_options(
+			blueprint, {}, biome_id, difficulty_id, true)
+		candidates[seed_value] = {
+			"layout": layout,
+			"gameplay_slice": slice_builder.build(layout),
+		}
+	var chosen_seed: int = first_run_contract.pick_seed(candidates)
+	marker.seed_value = chosen_seed
+	return true
 
 ## Configures the progression model from starting_class_id (defaults to engineer
 ## when the id is unknown). Idempotent: re-callable on reload.
@@ -6020,12 +6054,18 @@ func travel_to(marker) -> Dictionary:
 	# generated mark) so the dock-compat check below can roll it back on rejection.
 	var prev_player_pos: Vector3 = synaptic_sea_world.player_position
 	var was_generated: bool = synaptic_sea_world.is_generated(String(marker.marker_id))
+	var first_run_contract_applied: bool = _apply_first_run_contract_to_marker(marker)
 	var ops_t: Dictionary = {"propulsion": bool(_current_systems_ops().get("propulsion", false))}
 	# Light up the procgen expansion lane for this derelict: resolve a deterministic
 	# biome + difficulty from the target marker and hand them to the generator so
 	# ShipLayoutGenerator runs EncounterInjector + room-variant selection and stamps
 	# biome_id/difficulty_id on the layout (consumed by threat spawning + scanner/HUD).
 	var run_ctx: Dictionary = _resolve_derelict_run_context(marker)
+	if first_run_contract_applied and first_run_contract != null:
+		run_ctx = {
+			"biome": str(first_run_contract.contract.get("biome_id", run_ctx.get("biome", ""))),
+			"difficulty": str(first_run_contract.contract.get("difficulty_id", run_ctx.get("difficulty", ""))),
+		}
 	ship_generator.configure_run_context(str(run_ctx.get("biome", "")), str(run_ctx.get("difficulty", "")))
 	var result: Dictionary = travel_controller.attempt_travel(
 		marker, ops_t, synaptic_sea_world, ship_generator, scanner_state.range_radius)
