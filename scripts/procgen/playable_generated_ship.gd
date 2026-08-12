@@ -1529,6 +1529,8 @@ func _tick_active_fire(delta: float) -> void:
 	_apply_fire_system_damage(delta)
 	# PKG-B2.1b: fire damages wall modules; scene/nav consequences update.
 	_apply_fire_module_integrity(delta)
+	if _player_fire_intensity() > 0.0 and is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("hazard_entered", "fire")
 
 ## Foundation contagion seed: while away and docked to a still-web-attached
 ## derelict, the web creeps onto the hub faster (contact boost). Full dock-graph
@@ -1743,6 +1745,8 @@ func end_run(reason: String = "extraction") -> int:
 		return 0
 	slice_complete = true
 	tracker.mark_run_complete()
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("run_ended", reason)
 	# Terminal cue: death plays vitals-critical audio; successful ends use objective advance.
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		if reason == "death":
@@ -3138,6 +3142,8 @@ func _on_breach_sealed(compartment_id: String) -> void:
 	# Stream D/F: sealing a breach is welding + field construction.
 	emit_training_event("weld_panel", compartment_id)
 	emit_training_event("build_shelter", compartment_id)
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("breach_sealed", "any")
 
 ## Tranche 1 (audit): shared surface for hazard-interaction feedback. Reuses
 ## the _last_loot_feedback_line channel (the one line _combined_system_status_lines
@@ -5662,6 +5668,8 @@ func _on_loot_container_searched(container_id: String, granted: Array, source: N
 	# in production, so all three were dead. Event-driven (fires from the
 	# interact path on BOTH home and away), not a per-frame system.
 	emit_training_event("scavenge_container", container_id)
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("loot_searched", "any")
 	# REQ-RL-003: first_loot achievement (loot_searched / any).
 	_try_unlock_achievement("loot_searched", container_id)
 	# Scavenge feedback: success tool-use when something was granted; soft deny when
@@ -6878,6 +6886,8 @@ func _tick_threat_runtime(delta: float) -> void:
 	update_threat_engaged_los()
 	_refresh_threat_nav_costs()
 	threat_manager.tick_threats(delta, vitals_state, status_effects_state, _player_armor_profile(), player_pos)
+	if threat_manager.get_detected_threat_count() > 0 and is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("threat_spotted", "any")
 	_sync_current_ship_combat_summary()
 	_refresh_weapon_hotbar()
 
@@ -7363,6 +7373,8 @@ func _add_interactable_to_sequence(sequence: int, interactable: Node) -> void:
 	sequence_interactables[sequence].append(interactable)
 
 func _on_player_interact_requested(player_body: PlayerController) -> void:
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("player_interacted", "any")
 	# Phase 4.5: while aboard a traveled derelict the starting ship's retained
 	# interactables/pickups are detached but still referenced here; gate them so
 	# a derelict cannot complete stale starting-ship objectives.
@@ -8371,6 +8383,10 @@ func _refresh_oxygen_state(force_initial: bool, delta_seconds: float) -> void:
 	_apply_breach_zone_scene_state()
 	_refresh_tracker_system_status_lines()
 	_refresh_player_vitals(delta_seconds)
+	if is_instance_valid(menu_coordinator):
+		var oxygen_summary: Dictionary = oxygen_state.get_summary()
+		if float(oxygen_summary.get("oxygen", 100.0)) <= float(oxygen_summary.get("safe_threshold", 35.0)):
+			menu_coordinator.trigger_tutorial("vitals_warning", "oxygen_low")
 
 ## True when suit O2 should drain as hostile field atmosphere: boarded on a
 ## derelict hull, not inside the piloted lifeboat / home ship.
@@ -10882,6 +10898,8 @@ func _input(event: InputEvent) -> void:
 	if scanner_panel != null:
 		if event.is_action_pressed("toggle_scanner") and _menus_are_closed() and (not is_instance_valid(inventory_panel) or not inventory_panel.is_open()) and (not is_instance_valid(recipe_picker_panel) or not recipe_picker_panel.is_open()):
 			scanner_panel.toggle()
+			if scanner_panel.is_open() and is_instance_valid(menu_coordinator):
+				menu_coordinator.trigger_tutorial("scanner_opened", "any")
 			if player != null and scanner_panel.is_open():
 				player.set_physics_process(false)
 				player.set_process_input(false)

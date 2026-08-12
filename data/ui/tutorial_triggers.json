@@ -29,6 +29,42 @@
       "codex_entry_id": "first_inventory_open"
     },
     {
+      "id": "first_breach",
+      "trigger_event": "breach_sealed",
+      "trigger_target": "any",
+      "title": "Breach Seal",
+      "body": "An open breach drains your suit and weakens the ship. Apply sealant at the breach point to make the compartment safe.",
+      "codex_topic": "Ship Systems",
+      "codex_entry_id": "first_breach"
+    },
+    {
+      "id": "first_threat_spotted",
+      "trigger_event": "threat_spotted",
+      "trigger_target": "any",
+      "title": "Threat Spotted",
+      "body": "Something has noticed you. Crouch to reduce noise and visibility, or fight if it closes in.",
+      "codex_topic": "Combat",
+      "codex_entry_id": "first_threat_spotted"
+    },
+    {
+      "id": "first_loot_search",
+      "trigger_event": "loot_searched",
+      "trigger_target": "any",
+      "title": "Search for Loot",
+      "body": "Search containers and corpses for parts, tools, and supplies. Every item can change your odds of surviving the next room.",
+      "codex_topic": "Exploration",
+      "codex_entry_id": "first_loot_search"
+    },
+    {
+      "id": "first_scanner_open",
+      "trigger_event": "scanner_opened",
+      "trigger_target": "any",
+      "title": "Scanner",
+      "body": "Open the scanner to locate nearby derelicts. Select a destination when you are ready to travel.",
+      "codex_topic": "Exploration",
+      "codex_entry_id": "first_scanner_open"
+    },
+    {
       "id": "first_save",
       "trigger_event": "run_saved",
       "trigger_target": "any",
@@ -72,6 +108,15 @@
       "body": "Your suit is leaking oxygen. Find a refill station or return to the lifeboat.",
       "codex_topic": "Survival",
       "codex_entry_id": "first_low_oxygen"
+    },
+    {
+      "id": "first_death",
+      "trigger_event": "run_ended",
+      "trigger_target": "death",
+      "title": "Death and Saving",
+      "body": "Death ends the current run. Save before a risky trip so you understand what progress can be recovered and what the loss means.",
+      "codex_topic": "Survival",
+      "codex_entry_id": "first_death"
     },
     {
       "id": "save_and_exit_failed",
