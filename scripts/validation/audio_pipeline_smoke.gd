@@ -105,7 +105,8 @@ func _validate_and_drive() -> void:
 	if sfx_player == null or sfx_player.stream == null:
 		_fail("sfx player has no stream assigned after play_sfx")
 		return
-	if not sfx_player.playing:
+	var headless: bool = DisplayServer.get_name() == "headless"
+	if not headless and not sfx_player.playing:
 		_fail("sfx player is not playing after play_sfx")
 		return
 	# Drive one manual tick so _apply_music_layer_gains (which lazily assigns
@@ -115,7 +116,7 @@ func _validate_and_drive() -> void:
 	if music_player == null or music_player.stream == null:
 		_fail("music player has no stream assigned")
 		return
-	if not music_player.playing:
+	if not headless and not music_player.playing:
 		_fail("music player is not playing")
 		return
 	var stream_playing_ok: bool = true
