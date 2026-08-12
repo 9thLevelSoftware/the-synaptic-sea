@@ -64,7 +64,22 @@ var current_voice_log_id: String = ""
 ## only behavior (the deferred asset library is honest about what plays).
 const STREAM_CATALOG: Dictionary = {
 	"sfx.tool.pickup": "res://data/audio/sfx/tool_pickup.wav",
+	"sfx.footstep": "res://data/audio/sfx/footstep.wav",
+	"ui.panel.open": "res://data/audio/ui/panel_open.wav",
+	"ui.panel.close": "res://data/audio/ui/panel_close.wav",
+	"sfx.fire.crackle": "res://data/audio/sfx/fire_crackle.wav",
+	# Hull-groan is the existing breach/meta cue; the content pack supplies
+	# the authored-id-compatible alarm placeholder without a new event system.
+	"meta.hull.groan": "res://data/audio/sfx/breach_alarm.wav",
+	"sfx.combat.hit": "res://data/audio/sfx/combat_hit.wav",
+	"sfx.combat.threat_alert": "res://data/audio/sfx/threat_alert.wav",
+	"sfx.door.open": "res://data/audio/sfx/door_open.wav",
+	"sfx.door.close": "res://data/audio/sfx/door_close.wav",
+	"sfx.dock.land": "res://data/audio/sfx/dock_land.wav",
+	"ui.vitals.low": "res://data/audio/sfx/vitals_low.wav",
 	"layer.base": "res://data/audio/music/exploration_base.wav",
+	"layer.tension_drone": "res://data/audio/music/tension_drone.wav",
+	"layer.critical_pad": "res://data/audio/music/critical_pad.wav",
 }
 
 ## Path -> loaded AudioStream cache. Avoids re-loading the same WAV from
@@ -75,10 +90,50 @@ var _loaded_streams: Dictionary = {}
 ## missing asset doesn't spam push_warning every frame it's requested).
 var _warned_missing_paths: Dictionary = {}
 
+## Internal: is the audio device headless (no real audio output)?
+## Used to skip player.play() calls that create AudioStreamPlayback
+## objects whose references are held by the AudioServer's mixing thread.
+var _headless: bool = false
+
 func _ready() -> void:
+	_headless = DisplayServer.get_name() == "headless"
 	_build_stream_players()
 	_apply_bus_volumes()
 	_initialize_sub_models()
+
+## Explicit teardown: release all cached AudioStream references so the
+## RefCounted AudioStreamWAV / AudioStreamPlaybackWAV instances are freed
+## before Godot's ObjectDB leak check runs. Without this, the cleanup
+## order during scene-tree destruction leaves dangling references in
+## _loaded_streams and in each AudioStreamPlayer.stream property.
+func _exit_tree() -> void:
+	_release_audio_refs()
+
+## Shared cleanup logic for both _exit_tree and NOTIFICATION_PREDELETE.
+func _release_audio_refs() -> void:
+	# Drop the stream cache so RefCounted entries lose our reference.
+	_loaded_streams.clear()
+	# Detach streams from every bus player so the internal
+	# AudioStreamPlayback is released.
+	for key in _bus_players:
+		var player = _bus_players[key]
+		if player != null and is_instance_valid(player):
+			player.stop()
+			player.stream = null
+	_bus_players.clear()
+	for key in _spatial_pool:
+		var pool: Array = _spatial_pool[key]
+		for player in pool:
+			if player != null and is_instance_valid(player):
+				player.stop()
+				player.stream = null
+	_spatial_pool.clear()
+	music_state = null
+	ambient_zone_state = null
+	sfx_router = null
+	spatial_resolver = null
+	meta_event_state = null
+	bus_config = null
 
 ## Call configure() on each of the six pure models with a baseline
 ## dictionary. Per ADR-0029, AudioManager owns the model instances;
@@ -422,7 +477,8 @@ func _play_via_bus(bus_id: String, volume_db: float, event_id: StringName = &"",
 		if stream != null:
 			if player.stream != stream:
 				player.stream = stream
-			player.play()
+			if not _headless:
+				player.play()
 
 ## Internal: play through a spatial AudioStreamPlayer3D pool entry. Stream
 ## assignment mirrors _play_via_bus exactly (ADR-0044): a STREAM_CATALOG
@@ -452,7 +508,8 @@ func _play_spatial(event_id: StringName, position: Vector3, bus_id: String, volu
 		if stream != null:
 			if player.stream != stream:
 				player.stream = stream
-			player.play()
+			if not _headless:
+				player.play()
 
 ## Internal: deterministic "is this emitter occluded" check. Real LOS
 ## raycasts are out of scope; we report true when the emitter sits in a
@@ -485,7 +542,8 @@ func _apply_music_layer_gains() -> void:
 				if stream is AudioStreamWAV:
 					(stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
 				player.stream = stream
-				player.play()
+				if not _headless:
+					player.play()
 	var gains: Dictionary = music_state.get_layer_gains()
 	# Combined layer gain is the maximum across the four layers (they
 	# stack rather than average so exploration always has audible base).
