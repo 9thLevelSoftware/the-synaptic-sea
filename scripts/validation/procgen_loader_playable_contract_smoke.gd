@@ -80,8 +80,8 @@ func _initialize() -> void:
 		return
 
 	print(
-		"PROCGEN_STRUCTURAL_LOADER_PASS seed=17 edge_wrappers=%d floor_wrappers=%d collision_shapes=%d objectives=4"
-		% [edge_wrapper_count, floor_wrapper_count, loader.count_collision_shapes()]
+		"PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=%d structural_live=true edge_wrappers=%d floor_wrappers=%d"
+		% [loader.count_collision_shapes(), edge_wrapper_count, floor_wrapper_count]
 	)
 	quit(0)
 
