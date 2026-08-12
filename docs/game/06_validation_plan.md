@@ -254,6 +254,7 @@ run_clean 'main playable reachability smoke' 'MAIN PLAYABLE REACHABILITY PASS or
 run_clean 'main playable quicksave smoke' 'MAIN PLAYABLE QUICKSAVE PASS slot=quicksave kind=quick cooldown=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_quicksave_smoke.gd
 run_clean 'encounter table dead fleet smoke' 'ENCOUNTER TABLE DEAD FLEET PASS table=threat_drone_swarm kinds=drone_swarm' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encounter_table_dead_fleet_smoke.gd
 run_clean 'status effect icons smoke' 'STATUS EFFECT ICONS PASS entries=8 all_exist=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/status_effect_icons_smoke.gd
+run_clean 'UI icon paths smoke' 'UI ICON PATHS PASS status_entries=8 achievement_entries=8 all_exist=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_icon_paths_smoke.gd
 run_clean 'derelict fire sequential persistence smoke' 'DERELICT FIRE SEQUENTIAL PERSISTENCE PASS remembered=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_fire_sequential_persistence_smoke.gd
 run_clean 'detection state model smoke' 'DETECTION STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/detection_state_smoke.gd
 run_clean 'threat detection source smoke' 'THREAT DETECTION SOURCE PASS single_source=true per_archetype=true proximity=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_detection_source_smoke.gd
