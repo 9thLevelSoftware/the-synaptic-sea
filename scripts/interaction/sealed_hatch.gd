@@ -10,6 +10,8 @@ signal hatch_bypassed(hatch_id: String, lock_kind: String)
 ## Re-seal after bypass: restores the bulkhead blocker (Fire B2 closed link).
 signal hatch_resealed(hatch_id: String, lock_kind: String)
 
+const GameplayPropFactoryScript := preload("res://scripts/placement/gameplay_prop_factory.gd")
+
 const MECHANICAL: String = "mechanical"
 const ELECTRONIC: String = "electronic"
 
@@ -23,6 +25,7 @@ var compartment_b: String = ""
 var _radius: float = 1.8
 var _player_in_range: bool = false
 var _blocker: StaticBody3D = null
+var marker: MeshInstance3D = null
 
 func configure(p_hatch_id: String, p_lock_kind: String, world_position: Vector3, radius: float = 1.8, p_compartment_a: String = "", p_compartment_b: String = "") -> void:
 	assert(radius >= 0.0, "radius must be non-negative")
@@ -34,6 +37,7 @@ func configure(p_hatch_id: String, p_lock_kind: String, world_position: Vector3,
 	position = world_position
 	_ensure_detection(radius)
 	_ensure_blocker(radius)
+	_ensure_visual()
 	_apply_blocked_state()
 
 func required_flag() -> String:
@@ -112,6 +116,15 @@ func _apply_blocked_state() -> void:
 	for c in _blocker.get_children():
 		if c is CollisionShape3D:
 			(c as CollisionShape3D).disabled = bypassed
+
+func _ensure_visual() -> void:
+	if marker != null:
+		return
+	var visual: Node3D = GameplayPropFactoryScript.build("hatch_wheel")
+	visual.name = "GameplayPropVisual"
+	add_child(visual)
+	marker = visual.get_node("Mesh") as MeshInstance3D
+	marker.set_meta("debug_hatch_wheel_marker", true)
 
 func _on_body_entered(body: Node3D) -> void:
 	if is_instance_valid(body) and body is PlayerController:

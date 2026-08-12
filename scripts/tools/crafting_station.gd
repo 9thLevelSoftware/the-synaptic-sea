@@ -19,6 +19,8 @@ signal craft_blocked(station_kind: String, reason: String)
 ## REQ-CS-016: non-salvage interact opens the coordinator recipe picker for this kind.
 signal recipe_picker_requested(station_kind: String)
 
+const GameplayPropFactoryScript := preload("res://scripts/placement/gameplay_prop_factory.gd")
+
 var station_kind: String = ""
 var crafting_state                       # CraftingState
 var material_state                       # MaterialState
@@ -209,19 +211,10 @@ func _ensure_collision(radius: float) -> void:
 func _ensure_marker(radius: float) -> void:
 	assert(radius >= 0.0, "radius must be non-negative")
 	if not is_instance_valid(marker):
-		marker = MeshInstance3D.new()
-		marker.name = "CraftingStationMarker"
-		add_child(marker)
-	var box := BoxMesh.new()
-	box.size = Vector3(radius * 0.5, radius * 0.5, radius * 0.5)
-	marker.mesh = box
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.25, 0.65, 0.95, 0.7)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	marker.material_override = mat
-	marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var visual: Node3D = GameplayPropFactoryScript.build("workbench")
+		visual.name = "GameplayPropVisual"
+		add_child(visual)
+		marker = visual.get_node("Mesh") as MeshInstance3D
 	marker.visible = marker_visible
 	marker.set_meta("debug_crafting_station_marker", true)
 

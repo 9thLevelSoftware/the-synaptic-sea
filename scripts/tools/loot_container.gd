@@ -6,6 +6,7 @@ class_name LootContainer
 ## then marks itself searched. Mirrors ToolPickup's interaction/range contract.
 
 const LootDistributionScript := preload("res://scripts/systems/loot_distribution.gd")
+const GameplayPropFactoryScript := preload("res://scripts/placement/gameplay_prop_factory.gd")
 
 signal container_searched(container_id: String, granted: Array)
 
@@ -114,19 +115,11 @@ func _ensure_collision(radius: float) -> void:
 
 func _ensure_marker(radius: float) -> void:
 	if marker == null:
-		marker = MeshInstance3D.new()
-		marker.name = "LootContainerMarker"
-		add_child(marker)
-	var box := BoxMesh.new()
-	box.size = Vector3(radius * 0.6, radius * 0.6, radius * 0.6)
-	marker.mesh = box
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.85, 0.7, 0.2, 0.65)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	marker.material_override = mat
-	marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var prop_id: String = "corpse_bag" if container_id.begins_with("corpse_") else "loot_crate"
+		var visual: Node3D = GameplayPropFactoryScript.build(prop_id)
+		visual.name = "GameplayPropVisual"
+		add_child(visual)
+		marker = visual.get_node("Mesh") as MeshInstance3D
 	marker.visible = marker_visible and not searched
 	marker.set_meta("debug_loot_container_marker", true)
 
