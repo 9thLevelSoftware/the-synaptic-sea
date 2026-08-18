@@ -133,8 +133,6 @@ func tick_threats(delta: float, player_position: Vector2, context: Dictionary = 
 		var node = threat_nodes.get(threat_state.instance_id)
 		if node:
 			node.position = _threat_world_pos(threat_state)
-			node.is_moving = threat_state.effective_move_speed() > 0.0
-			node.is_attacking = threat_state.state == "attack"
 
 		# Check for death
 		if threat_state.state == "dead" and old_state != "dead":
