@@ -1,0 +1,58 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/validation/top_down_readability_harness.gd" id="1_harness"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_floor"]
+size = Vector2(768, 432)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_player"]
+size = Vector2(48, 48)
+
+[node name="TopDownReadabilityHarness" type="Node2D"]
+script = ExtResource("1_harness")
+
+[node name="Camera" type="Camera2D" parent="."]
+zoom = Vector2(1, 1)
+current = true
+
+[node name="Floor" type="ColorRect" parent="."]
+offset_left = -384.0
+offset_top = -216.0
+offset_right = 384.0
+offset_bottom = 216.0
+color = Color(0.09, 0.1, 0.11, 1)
+
+[node name="PlayerPlaceholder" type="ColorRect" parent="."]
+offset_left = -24.0
+offset_top = -24.0
+offset_right = 24.0
+offset_bottom = 24.0
+color = Color(0.2, 0.6, 0.9, 1)
+
+[node name="WallNorth" type="ColorRect" parent="."]
+offset_left = -384.0
+offset_top = -216.0
+offset_right = 384.0
+offset_bottom = -168.0
+color = Color(0.3, 0.3, 0.35, 1)
+
+[node name="WallSouth" type="ColorRect" parent="."]
+offset_left = -384.0
+offset_top = 168.0
+offset_right = 384.0
+offset_bottom = 216.0
+color = Color(0.3, 0.3, 0.35, 1)
+
+[node name="WallEast" type="ColorRect" parent="."]
+offset_left = 336.0
+offset_top = -168.0
+offset_right = 384.0
+offset_bottom = 168.0
+color = Color(0.3, 0.3, 0.35, 1)
+
+[node name="WallWest" type="ColorRect" parent="."]
+offset_left = -384.0
+offset_top = -168.0
+offset_right = -336.0
+offset_bottom = 168.0
+color = Color(0.3, 0.3, 0.35, 1)
