@@ -72,14 +72,19 @@ func _read_move_direction() -> Vector2:
 	if use_scripted_movement:
 		return scripted_move_direction
 	var dir := Vector2.ZERO
-	if Input.is_action_pressed("move_left"):
-		dir.x -= 1.0
-	if Input.is_action_pressed("move_right"):
-		dir.x += 1.0
-	if Input.is_action_pressed("move_up"):
-		dir.y -= 1.0
-	if Input.is_action_pressed("move_down"):
-		dir.y += 1.0
+	# Use same action names as 3D PlayerController for consistency
+	var left := Input.get_action_strength("move_left") if InputMap.has_action("move_left") else 0.0
+	var right := Input.get_action_strength("move_right") if InputMap.has_action("move_right") else 0.0
+	var up := Input.get_action_strength("move_forward") if InputMap.has_action("move_forward") else 0.0
+	var down := Input.get_action_strength("move_back") if InputMap.has_action("move_back") else 0.0
+	# Fallback to ui_ actions if custom ones don't exist
+	if left == 0.0 and right == 0.0 and up == 0.0 and down == 0.0:
+		left = Input.get_action_strength("ui_left")
+		right = Input.get_action_strength("ui_right")
+		up = Input.get_action_strength("ui_up")
+		down = Input.get_action_strength("ui_down")
+	dir.x = right - left
+	dir.y = down - up
 	return dir
 
 

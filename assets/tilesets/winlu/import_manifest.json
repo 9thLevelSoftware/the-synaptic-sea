@@ -1,0 +1,50 @@
+{
+  "source": "Winlu Spaceship Tileset",
+  "license": "commercial (itch.io purchase)",
+  "tile_size": 48,
+  "format": "RPG Maker autotile sheets",
+  "tilesets": [
+    {
+      "name": "Spacestation_Inside_A1.png",
+      "w": 768,
+      "h": 576
+    },
+    {
+      "name": "Spacestation_Inside_A2.png",
+      "w": 768,
+      "h": 576
+    },
+    {
+      "name": "Spacestation_Inside_A4.png",
+      "w": 768,
+      "h": 720
+    },
+    {
+      "name": "Spacestation_Inside_A5.png",
+      "w": 384,
+      "h": 768
+    },
+    {
+      "name": "Spacestation_Inside_B.png",
+      "w": 768,
+      "h": 768
+    },
+    {
+      "name": "Spacestation_Inside_C.png",
+      "w": 768,
+      "h": 768
+    },
+    {
+      "name": "Spacestation_Inside_D.png",
+      "w": 768,
+      "h": 768
+    },
+    {
+      "name": "Spacestation_Inside_E.png",
+      "w": 768,
+      "h": 768
+    }
+  ],
+  "characters": 32,
+  "parallaxes": 2
+}

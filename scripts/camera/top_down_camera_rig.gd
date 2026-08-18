@@ -77,5 +77,6 @@ func _ensure_camera() -> void:
 	camera.zoom = Vector2(DEFAULT_ZOOM, DEFAULT_ZOOM)
 	camera.position_smoothing_enabled = true
 	camera.position_smoothing_speed = SMOOTH_SPEED
-	camera.current = true
 	add_child(camera)
+	# Defer make_current until after node enters tree
+	camera.call_deferred("make_current")
