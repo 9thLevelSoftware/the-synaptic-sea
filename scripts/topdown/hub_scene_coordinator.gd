@@ -62,11 +62,6 @@ func _create_winlu_tileset() -> TileSet:
 				var coords := Vector2i(col, row)
 				atlas.create_tile(coords)
 
-		# Add physics layer for wall source (index 1 = A4)
-		if i == 1:
-			ts.add_physics_layer()
-			ts.set_physics_layer_collision_layer(0, 1)  # Layer 1 = walls
-
 		ts.add_source(atlas, i)
 
 	return ts

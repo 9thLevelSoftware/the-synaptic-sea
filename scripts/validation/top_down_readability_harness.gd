@@ -3,30 +3,14 @@ extends Node2D
 ## Renders 4 placeholder colored rectangles at 16:9 aspect ratio.
 ## Used by CI to verify the 2D harness builds and renders correctly.
 
-const HARNESS_WIDTH := 768   # 16 tiles × 48px
-const HARNESS_HEIGHT := 432  # 9 tiles × 48px
+const HARNESS_WIDTH := 768   # 16 tiles x 48px
+const HARNESS_HEIGHT := 432  # 9 tiles x 48px
 
 var _frame_count := 0
 
 
 func _ready() -> void:
-	# Position placeholders at tile-grid centers
-	var player := get_node_or_null("PlayerPlaceholder")
-	if player:
-		player.position = Vector2(0, 0)
-
-	var wall_n := get_node_or_null("WallNorth")
-	if wall_n:
-		wall_n.position = Vector2(0, 0)
-	var wall_s := get_node_or_null("WallSouth")
-	if wall_s:
-		wall_s.position = Vector2(0, 0)
-	var wall_e := get_node_or_null("WallEast")
-	if wall_e:
-		wall_e.position = Vector2(0, 0)
-	var wall_w := get_node_or_null("WallWest")
-	if wall_w:
-		wall_w.position = Vector2(0, 0)
+	pass  # Positions are set in the .tscn
 
 
 func _process(_delta: float) -> void:

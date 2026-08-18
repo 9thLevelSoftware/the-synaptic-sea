@@ -12,7 +12,7 @@ import sys
 import json
 from pathlib import Path
 
-PROJECT_ROOT = Path("/Volumes/Untitled/offloaded/projects/the-synaptic-sea")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 INCOMING_DIR = PROJECT_ROOT / "assets" / "_incoming" / "winlu"
 TILESET_DIR = PROJECT_ROOT / "assets" / "tilesets" / "winlu"
 TILE_SIZE = 48

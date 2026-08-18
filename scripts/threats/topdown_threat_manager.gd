@@ -10,17 +10,27 @@ const GridCoordinateScript := preload("res://scripts/world/grid_coordinate.gd")
 const CellOccupancyScript := preload("res://scripts/world/cell_occupancy.gd")
 const THREAT_ARCHETYPE_PATH: String = "res://data/combat/threat_archetypes.json"
 
-const BiomatterSwarm2DScript := preload("res://scripts/threats/biomatter_swarm_2d.gd")
-const Stalker2DScript := preload("res://scripts/threats/stalker_2d.gd")
-const HullTendril2DScript := preload("res://scripts/threats/hull_tendril_2d.gd")
+const PlaceholderThreat2DScript := preload("res://scripts/threats/placeholder_threat_2d.gd")
+
+# Threat archetype visual configs
+const THREAT_COLORS := {
+	"biomatter_swarm": Color(0.55, 1.0, 0.45),
+	"stalker": Color(0.7, 0.7, 1.0),
+	"hull_tendril": Color(0.55, 0.9, 1.0),
+}
+const THREAT_SIZES := {
+	"biomatter_swarm": Vector2(32, 32),
+	"stalker": Vector2(36, 36),
+	"hull_tendril": Vector2(40, 40),
+}
 
 signal threat_killed(record: Dictionary)
 
 var threat_archetypes: Dictionary = {}
-var threats: Array = []  # Array of ThreatAIState
+var threats: Array[ThreatAIState] = []
 var damage_pipeline = DamagePipelineScript.new()
 var cell_occupancy = CellOccupancyScript.new()
-var threat_nodes: Dictionary = {}  # instance_id -> SpriteAnimDriver node
+var threat_nodes: Dictionary = {}  # instance_id -> Node2D
 var _initialized: bool = false
 
 
@@ -92,10 +102,7 @@ func spawn_threat(archetype_id: String, world_pos: Vector2, instance_id: String 
 
 
 func tick_threats(delta: float, player_position: Vector2, context: Dictionary = {}) -> void:
-	for threat in threats:
-		if not (threat is Object) or not (threat as Object).has_method("tick"):
-			continue
-		var threat_state: ThreatAIState = threat as ThreatAIState
+	for threat_state: ThreatAIState in threats:
 		if threat_state.health <= 0.0:
 			continue
 
@@ -159,12 +166,14 @@ func _move_threat(threat_state: ThreatAIState, delta: float, player_pos: Vector2
 		"flee":
 			direction = (threat_pos - player_pos).normalized()
 		"investigate":
-			# Move toward last known position if available
 			if threat_state.last_known_position.size() >= 2:
 				var lkp := Vector2(threat_state.last_known_position[0], threat_state.last_known_position[1])
 				direction = (lkp - threat_pos).normalized()
 			else:
 				direction = (player_pos - threat_pos).normalized() * 0.5
+		_:
+			# idle, stun, dead, telegraph — no movement
+			return
 
 	if direction.length_squared() > 0.0:
 		var movement := direction * speed * float(GridCoordinateScript.TILE_SIZE) * delta
@@ -195,24 +204,11 @@ func _on_threat_died(threat_state: ThreatAIState) -> void:
 
 
 func _create_threat_node(archetype_id: String, pos: Vector2) -> Node2D:
-	match archetype_id:
-		"biomatter_swarm":
-			var node := BiomatterSwarm2DScript.new()
-			node.position = pos
-			return node
-		"stalker":
-			var node := Stalker2DScript.new()
-			node.position = pos
-			return node
-		"hull_tendril":
-			var node := HullTendril2DScript.new()
-			node.position = pos
-			return node
-		_:
-			# Fallback: colored rectangle
-			var node := Node2D.new()
-			node.position = pos
-			return node
+	var color: Color = THREAT_COLORS.get(archetype_id, Color(1.0, 0.35, 0.35))
+	var sz: Vector2 = THREAT_SIZES.get(archetype_id, Vector2(32, 32))
+	var node := PlaceholderThreat2DScript.new(color, sz)
+	node.position = pos
+	return node
 
 
 func _threat_world_pos(threat_state: ThreatAIState) -> Vector2:
@@ -224,8 +220,8 @@ func _threat_world_pos(threat_state: ThreatAIState) -> Vector2:
 
 func _find_threat(instance_id: String) -> ThreatAIState:
 	for t in threats:
-		if t is ThreatAIState and (t as ThreatAIState).instance_id == instance_id:
-			return t as ThreatAIState
+		if t.instance_id == instance_id:
+			return t
 	return null
 
 
@@ -248,6 +244,6 @@ func get_threat_count() -> int:
 func get_alive_count() -> int:
 	var count := 0
 	for t in threats:
-		if t is ThreatAIState and (t as ThreatAIState).health > 0.0:
+		if t.health > 0.0:
 			count += 1
 	return count

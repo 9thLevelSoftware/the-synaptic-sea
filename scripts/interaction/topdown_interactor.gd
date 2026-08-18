@@ -7,6 +7,7 @@ signal interaction_detected(target: Node2D)
 signal interaction_cleared()
 
 const INTERACT_RANGE: float = 64.0  # pixels (1.33 tiles at 48px)
+const MAX_INTERACT_HITS: int = 32
 
 var owner_node: Node2D
 var _current_target: Node2D = null
@@ -47,7 +48,7 @@ func _update_interaction_target() -> void:
 	query.position = owner_node.global_position
 	query.collide_with_areas = true
 	query.collide_with_bodies = true
-	var results := space.intersect_point(query, 32)
+	var results := space.intersect_point(query, MAX_INTERACT_HITS)
 
 	var closest: Node2D = null
 	var closest_dist := INTERACT_RANGE

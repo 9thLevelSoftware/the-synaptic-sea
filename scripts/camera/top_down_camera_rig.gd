@@ -75,8 +75,7 @@ func _ensure_camera() -> void:
 	camera = Camera2D.new()
 	camera.name = "TopDownCamera"
 	camera.zoom = Vector2(DEFAULT_ZOOM, DEFAULT_ZOOM)
-	camera.position_smoothing_enabled = true
-	camera.position_smoothing_speed = SMOOTH_SPEED
+	camera.position_smoothing_enabled = false  # We lerp manually in _sync_camera_to_target
 	add_child(camera)
 	# Defer make_current until after node enters tree
 	camera.call_deferred("make_current")
