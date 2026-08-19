@@ -64,6 +64,8 @@ var away_from_start: bool = false
 func _ready() -> void:
 	_ensure_nodes()
 	_init_systems()
+	# Auto-generate hub on scene load
+	generate_hub(42)
 
 
 func _ensure_nodes() -> void:
