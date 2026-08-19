@@ -320,41 +320,28 @@ func get_travel_controller():
 
 
 func _ensure_tileset() -> void:
-	## Create a TileSet with Winlu texture atlases if not already assigned.
+	## Create a TileSet with DithArt Sci-Fi tileset texture.
 	if tilemap.tile_set != null:
 		return
 
 	var ts := TileSet.new()
 	ts.tile_size = Vector2i(48, 48)
 
-	# Source order must match LayoutTilemapAdapter constants:
-	# 0: A2 (floors), 1: A4 (walls), 2-5: B-E (details)
-	var sources := [
-		{"path": "res://assets/tilesets/winlu/tilesets/Spacestation_Inside_A2.png", "cols": 16, "rows": 12},
-		{"path": "res://assets/tilesets/winlu/tilesets/Spacestation_Inside_A4.png", "cols": 16, "rows": 15},
-		{"path": "res://assets/tilesets/winlu/tilesets/Spacestation_Inside_B.png", "cols": 16, "rows": 16},
-		{"path": "res://assets/tilesets/winlu/tilesets/Spacestation_Inside_C.png", "cols": 16, "rows": 16},
-		{"path": "res://assets/tilesets/winlu/tilesets/Spacestation_Inside_D.png", "cols": 16, "rows": 16},
-		{"path": "res://assets/tilesets/winlu/tilesets/Spacestation_Inside_E.png", "cols": 16, "rows": 16},
-	]
+	var tex: Texture2D = load("res://assets/tilesets/dithart/free_scifi_tileset_48x48.png") as Texture2D
+	if tex == null:
+		push_warning("TopDownPlayableShip: could not load DithArt tileset")
+		return
 
-	for i in range(sources.size()):
-		var src_info: Dictionary = sources[i]
-		var tex: Texture2D = load(src_info["path"]) as Texture2D
-		if tex == null:
-			push_warning("TopDownPlayableShip: could not load " + src_info["path"])
-			continue
+	var atlas := TileSetAtlasSource.new()
+	atlas.texture = tex
+	atlas.texture_region_size = Vector2i(48, 48)
 
-		var atlas := TileSetAtlasSource.new()
-		atlas.texture = tex
-		atlas.texture_region_size = Vector2i(48, 48)
+	# The DithArt tileset is 8 columns x 15 rows = 120 tiles
+	for col in range(8):
+		for row in range(15):
+			atlas.create_tile(Vector2i(col, row))
 
-		for col in range(src_info["cols"]):
-			for row in range(src_info["rows"]):
-				atlas.create_tile(Vector2i(col, row))
-
-		ts.add_source(atlas, i)
-
+	ts.add_source(atlas, 0)
 	tilemap.tile_set = ts
 
 	# Add a dark space background so tiles are visible against it
