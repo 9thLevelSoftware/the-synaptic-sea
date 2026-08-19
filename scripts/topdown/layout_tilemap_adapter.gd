@@ -8,26 +8,28 @@ class_name LayoutTilemapAdapter
 
 const TILE_SIZE := 48
 
-# Tile source indices (matching hub_scene_coordinator)
-const SOURCE_FLOORS := 0   # A2 - floor autotiles
-const SOURCE_WALLS := 1    # A4 - wall autotiles
+# Source order — using B/C standalone sheets instead of A2/A4 autotile sheets
+const SOURCE_FLOORS := 2   # B sheet - standalone floor tiles
+const SOURCE_WALLS := 3    # C sheet - standalone wall tiles
 const SOURCE_DETAIL_B := 2
 const SOURCE_DETAIL_C := 3
 const SOURCE_DETAIL_D := 4
 const SOURCE_DETAIL_E := 5
 
-# Tile atlas coordinates
-const FLOOR_METAL := Vector2i(0, 0)
-const FLOOR_DARK := Vector2i(1, 0)
-const FLOOR_GRATE := Vector2i(2, 0)
-const WALL_TOP := Vector2i(0, 0)
-const WALL_BOTTOM := Vector2i(0, 1)
-const WALL_LEFT := Vector2i(1, 0)
-const WALL_RIGHT := Vector2i(1, 1)
-const WALL_CORNER_TL := Vector2i(2, 0)
-const WALL_CORNER_TR := Vector2i(3, 0)
-const WALL_CORNER_BL := Vector2i(2, 1)
-const WALL_CORNER_BR := Vector2i(3, 1)
+# Tile atlas coordinates — using B/C/D/E standalone tiles (not A2/A4 autotile sheets)
+# B sheet (source 2): floor tiles at rows 1-6, cols 1-6 (2304px = full 48x48)
+# C sheet (source 3): wall tiles at row 1, cols 1-6 (near-black, 1152px = full tile)
+const FLOOR_METAL := Vector2i(1, 2)      # B: dark blue-grey floor
+const FLOOR_DARK := Vector2i(2, 1)       # B: darker floor variant
+const FLOOR_GRATE := Vector2i(3, 2)      # B: lighter grate-style floor
+const WALL_TOP := Vector2i(1, 1)         # C: near-black wall
+const WALL_BOTTOM := Vector2i(2, 1)      # C: near-black wall variant
+const WALL_LEFT := Vector2i(3, 1)        # C: near-black wall
+const WALL_RIGHT := Vector2i(4, 1)       # C: near-black wall
+const WALL_CORNER_TL := Vector2i(1, 1)   # C: wall corner
+const WALL_CORNER_TR := Vector2i(2, 1)   # C: wall corner
+const WALL_CORNER_BL := Vector2i(3, 1)   # C: wall corner
+const WALL_CORNER_BR := Vector2i(4, 1)   # C: wall corner
 
 # Room role → floor tile mapping
 const ROLE_FLOOR_MAP := {
