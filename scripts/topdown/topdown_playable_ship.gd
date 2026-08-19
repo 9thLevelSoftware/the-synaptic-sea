@@ -356,3 +356,16 @@ func _ensure_tileset() -> void:
 		ts.add_source(atlas, i)
 
 	tilemap.tile_set = ts
+
+	# Add a dark space background so tiles are visible against it
+	if get_node_or_null("Background") == null:
+		var bg := ColorRect.new()
+		bg.name = "Background"
+		bg.color = Color(0.02, 0.02, 0.04, 1.0)  # Near-black space
+		bg.z_index = -10
+		# Make it huge to cover any camera position
+		bg.offset_left = -5000
+		bg.offset_top = -5000
+		bg.offset_right = 5000
+		bg.offset_bottom = 5000
+		add_child(bg)
