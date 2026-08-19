@@ -3,9 +3,9 @@ class_name TopDownCameraRig
 ## Camera2D follow rig for the top-down production path.
 ## Replaces IsoCameraRig for 2D presentation. Camera2D handles zoom natively.
 
-const DEFAULT_ZOOM: float = 1.0
-const MIN_ZOOM: float = 0.6
-const MAX_ZOOM: float = 1.5
+const DEFAULT_ZOOM: float = 0.8
+const MIN_ZOOM: float = 0.3
+const MAX_ZOOM: float = 2.0
 const ZOOM_STEP: float = 0.1
 const SMOOTH_SPEED: float = 8.0
 
