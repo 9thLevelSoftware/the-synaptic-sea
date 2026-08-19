@@ -159,9 +159,16 @@ func generate_hub(seed_value: int = 42) -> Dictionary:
 		start_pos = room_centers[start_room]
 	player.position = start_pos
 
-	# Wire camera
+	# Wire camera and make it current
 	if camera_rig.has_method("set_follow_target"):
 		camera_rig.set_follow_target(player)
+	# Force camera current after tree entry
+	if camera_rig.camera and camera_rig.camera.is_inside_tree():
+		camera_rig.camera.make_current()
+	elif camera_rig.camera:
+		camera_rig.camera.call_deferred("make_current")
+	# Also move camera rig to player position immediately
+	camera_rig.global_position = player.position
 
 	# Spawn loot containers from gameplay_slice
 	_spawn_loot_containers(current_gameplay_slice)
