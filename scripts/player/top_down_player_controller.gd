@@ -96,3 +96,23 @@ func _ensure_support_nodes() -> void:
 		circle.radius = DEFAULT_COLLISION_RADIUS
 		collision_shape.shape = circle
 		add_child(collision_shape)
+	# Add visible player sprite
+	if marker == null:
+		var sprite := Sprite2D.new()
+		sprite.name = "PlayerSprite"
+		# Create a simple colored square texture
+		var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
+		img.fill(Color(0.2, 0.6, 1.0, 1.0))
+		# Draw a border
+		for x in range(32):
+			for y in range(32):
+				if x < 2 or x >= 30 or y < 2 or y >= 30:
+					img.set_pixel(x, y, Color(0.1, 0.3, 0.7, 1.0))
+				elif x >= 12 and x < 20 and y >= 4 and y < 12:
+					# "Visor" detail
+					img.set_pixel(x, y, Color(0.4, 0.8, 1.0, 1.0))
+		var tex := ImageTexture.create_from_image(img)
+		sprite.texture = tex
+		sprite.scale = Vector2(1.5, 1.5)
+		add_child(sprite)
+		marker = sprite
