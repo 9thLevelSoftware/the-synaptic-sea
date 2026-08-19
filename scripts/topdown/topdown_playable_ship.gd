@@ -8,6 +8,10 @@ const LayoutTilemapAdapterScript = preload("res://scripts/topdown/layout_tilemap
 const TopDownThreatManagerScript = preload("res://scripts/threats/topdown_threat_manager.gd")
 const TopDownCameraRigScript = preload("res://scripts/camera/top_down_camera_rig.gd")
 const TopDownPlayerControllerScript = preload("res://scripts/player/top_down_player_controller.gd")
+const TopDownTravelControllerScript = preload("res://scripts/topdown/td_travel_controller.gd")
+const SfxEventRouterScript = preload("res://scripts/systems/sfx_event_router.gd")
+const AudioEventSeamScript = preload("res://scripts/audio/audio_event_seam.gd")
+const PlayerVitalsPanelScript = preload("res://scripts/ui/player_vitals_panel.gd")
 
 # Simulation systems (all RefCounted, reused from 3D path)
 const PlayerVitalsModelScript = preload("res://scripts/systems/player_vitals_model.gd")
@@ -40,6 +44,9 @@ var inventory_state
 var audio_manager
 var crafting_state
 var damage_pipeline
+var sfx_router
+var travel_controller  # TopDownTravelController
+var vitals_panel  # PlayerVitalsPanel
 
 # Procgen
 var layout_adapter = LayoutTilemapAdapterScript.new()
@@ -83,6 +90,19 @@ func _ensure_nodes() -> void:
 	threat_manager.name = "ThreatManager"
 	add_child(threat_manager)
 
+	# Travel controller
+	travel_controller = TopDownTravelControllerScript.new()
+	travel_controller.name = "TravelController"
+	add_child(travel_controller)
+
+	# HUD
+	var hud_scene: PackedScene = load("res://scenes/topdown/topdown_hud.tscn") as PackedScene
+	if hud_scene:
+		var hud := hud_scene.instantiate()
+		hud.name = "HUD"
+		add_child(hud)
+		vitals_panel = hud.get_node_or_null("PlayerVitalsPanel")
+
 
 func _init_systems() -> void:
 	# Vitals
@@ -97,11 +117,21 @@ func _init_systems() -> void:
 	# Audio
 	audio_manager = AudioManagerScript.new()
 	add_child(audio_manager)
+	sfx_router = SfxEventRouterScript.new()
+	sfx_router.configure({}) if sfx_router.has_method("configure") else null
 
 	# Configure systems with defaults
 	damage_pipeline.configure({})
 	oxygen_state.configure({}) if oxygen_state.has_method("configure") else null
 	power_grid_state.configure({}) if power_grid_state.has_method("configure") else null
+
+	# Wire travel controller
+	if travel_controller:
+		travel_controller.setup(self)
+
+	# Wire vitals panel
+	if vitals_panel and vitals_panel.has_method("set_vitals_state"):
+		vitals_panel.set_vitals_state(vitals_state)
 
 
 func generate_hub(seed_value: int = 42) -> Dictionary:
@@ -172,6 +202,7 @@ func _process(delta: float) -> void:
 	_tick_vitals(delta)
 	_tick_threats(delta)
 	_tick_audio(delta)
+	_update_hud()
 
 
 func _tick_oxygen(delta: float) -> void:
@@ -255,4 +286,19 @@ func get_simulation_summary() -> Dictionary:
 		"away_from_start": away_from_start,
 		"threats_alive": threat_manager.get_alive_count() if threat_manager else 0,
 		"rooms": room_centers.size(),
+		"location": travel_controller.get_current_location() if travel_controller else "hub",
 	}
+
+
+func _update_hud() -> void:
+	if vitals_panel and vitals_panel.has_method("refresh"):
+		vitals_panel.refresh()
+
+
+func play_sfx(event_id: String) -> void:
+	if audio_manager and audio_manager.has_method("play_sfx"):
+		audio_manager.play_sfx(event_id)
+
+
+func get_travel_controller():
+	return travel_controller
