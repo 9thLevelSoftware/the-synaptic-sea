@@ -221,7 +221,7 @@
         "SOCK_floor_edge_west_01"
       ],
       "pivot_policy": "cell-center-floor",
-      "godot_wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/floor_2x1.tscn",
+      "godot_wrapper_scene": "res://scenes/wrappers/structural/ithappy/floor_2x1.tscn",
       "godot_contract": "res://data/placement/contracts/structural/ship_structural_v0/floor_2x1_contract.tres",
       "provenance_id": "ship_structural_v0:floor_2x1",
       "collision_policy": "static-body-proxy"
@@ -293,7 +293,7 @@
         "SOCK_floor_edge_west_01"
       ],
       "pivot_policy": "cell-center-floor",
-      "godot_wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x1.tscn",
+      "godot_wrapper_scene": "res://scenes/wrappers/structural/ithappy/corridor_floor_1x1.tscn",
       "godot_contract": "res://data/placement/contracts/structural/ship_structural_v0/corridor_floor_1x1_contract.tres",
       "provenance_id": "ship_structural_v0:corridor_floor_1x1",
       "collision_policy": "static-body-proxy"
@@ -365,7 +365,7 @@
         "SOCK_floor_edge_west_01"
       ],
       "pivot_policy": "cell-center-floor",
-      "godot_wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/corridor_floor_1x2.tscn",
+      "godot_wrapper_scene": "res://scenes/wrappers/structural/ithappy/corridor_floor_1x2.tscn",
       "godot_contract": "res://data/placement/contracts/structural/ship_structural_v0/corridor_floor_1x2_contract.tres",
       "provenance_id": "ship_structural_v0:corridor_floor_1x2",
       "collision_policy": "static-body-proxy"
@@ -507,7 +507,7 @@
         "SOCK_wall_face_internal_01"
       ],
       "pivot_policy": "edge-center",
-      "godot_wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/wall_end_cap.tscn",
+      "godot_wrapper_scene": "res://scenes/wrappers/structural/ithappy/wall_end_cap.tscn",
       "godot_contract": "res://data/placement/contracts/structural/ship_structural_v0/wall_end_cap_contract.tres",
       "provenance_id": "ship_structural_v0:wall_end_cap",
       "collision_policy": "static-body-proxy"
@@ -577,7 +577,7 @@
         "SOCK_inner_corner_vertex_south_01"
       ],
       "pivot_policy": "edge-center",
-      "godot_wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/wall_inner_corner.tscn",
+      "godot_wrapper_scene": "res://scenes/wrappers/structural/ithappy/wall_inner_corner.tscn",
       "godot_contract": "res://data/placement/contracts/structural/ship_structural_v0/wall_inner_corner_contract.tres",
       "provenance_id": "ship_structural_v0:wall_inner_corner",
       "collision_policy": "static-body-proxy"
@@ -647,7 +647,7 @@
         "SOCK_inner_corner_vertex_south_01"
       ],
       "pivot_policy": "edge-center",
-      "godot_wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/wall_outer_corner.tscn",
+      "godot_wrapper_scene": "res://scenes/wrappers/structural/ithappy/wall_outer_corner.tscn",
       "godot_contract": "res://data/placement/contracts/structural/ship_structural_v0/wall_outer_corner_contract.tres",
       "provenance_id": "ship_structural_v0:wall_outer_corner",
       "collision_policy": "static-body-proxy"
@@ -718,7 +718,7 @@
         "SOCK_wall_face_west_01"
       ],
       "pivot_policy": "edge-center",
-      "godot_wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/wall_t_junction.tscn",
+      "godot_wrapper_scene": "res://scenes/wrappers/structural/ithappy/wall_t_junction.tscn",
       "godot_contract": "res://data/placement/contracts/structural/ship_structural_v0/wall_t_junction_contract.tres",
       "provenance_id": "ship_structural_v0:wall_t_junction",
       "collision_policy": "static-body-proxy"
@@ -860,7 +860,7 @@
         "SOCK_portal_center_internal_01"
       ],
       "pivot_policy": "edge-center",
-      "godot_wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/bulkhead_portal_2x1.tscn",
+      "godot_wrapper_scene": "res://scenes/wrappers/structural/ithappy/bulkhead_portal_2x1.tscn",
       "godot_contract": "res://data/placement/contracts/structural/ship_structural_v0/bulkhead_portal_2x1_contract.tres",
       "provenance_id": "ship_structural_v0:bulkhead_portal_2x1",
       "collision_policy": "static-body-proxy"
@@ -931,7 +931,7 @@
         "SOCK_portal_center_internal_01"
       ],
       "pivot_policy": "edge-center",
-      "godot_wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/doorway_frame_blocked_1x1.tscn",
+      "godot_wrapper_scene": "res://scenes/wrappers/structural/ithappy/doorway_frame_blocked_1x1.tscn",
       "godot_contract": "res://data/placement/contracts/structural/ship_structural_v0/doorway_frame_blocked_1x1_contract.tres",
       "provenance_id": "ship_structural_v0:doorway_frame_blocked_1x1",
       "collision_policy": "static-body-proxy"
@@ -1001,7 +1001,7 @@
         "SOCK_floor_edge_north_01"
       ],
       "pivot_policy": "edge-center",
-      "godot_wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/ramp_up_1x2.tscn",
+      "godot_wrapper_scene": "res://scenes/wrappers/structural/ithappy/ramp_up_1x2.tscn",
       "godot_contract": "res://data/placement/contracts/structural/ship_structural_v0/ramp_up_1x2_contract.tres",
       "provenance_id": "ship_structural_v0:ramp_up_1x2",
       "collision_policy": "static-body-proxy"
@@ -1071,7 +1071,7 @@
         "SOCK_prop_anchor_up_01"
       ],
       "pivot_policy": "edge-center",
-      "godot_wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/pillar_support_1x1.tscn",
+      "godot_wrapper_scene": "res://scenes/wrappers/structural/ithappy/pillar_support_1x1.tscn",
       "godot_contract": "res://data/placement/contracts/structural/ship_structural_v0/pillar_support_1x1_contract.tres",
       "provenance_id": "ship_structural_v0:pillar_support_1x1",
       "collision_policy": "static-body-proxy"
@@ -1140,11 +1140,11 @@
         "SOCK_prop_anchor_internal_01"
       ],
       "pivot_policy": "cell-center-floor",
-      "godot_wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/ceiling_cap_1x1.tscn",
+      "godot_wrapper_scene": "res://scenes/wrappers/structural/ithappy/ceiling_cap_1x1.tscn",
       "godot_contract": "res://data/placement/contracts/structural/ship_structural_v0/ceiling_cap_1x1_contract.tres",
       "provenance_id": "ship_structural_v0:ceiling_cap_1x1",
       "collision_policy": "static-body-proxy"
     }
   ],
-  "description": "ithappy Sci-Fi Props pack \u2014 prototype kit for 3 modules"
+  "description": "ithappy Sci-Fi Props pack \u2014 all 15 structural modules"
 }

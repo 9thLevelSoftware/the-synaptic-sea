@@ -7,12 +7,10 @@
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
 size = Vector3(4, 4, 0.25)
 
-[node name="Wall_Straight_1x1" type="Node3D"]
+[node name="Wall_Straight_1X1" type="Node3D"]
 
 [node name="Anchor_SOCK_wall_face_north_01" type="Marker3D" parent="."]
-
 [node name="Anchor_SOCK_wall_edge_east_01" type="Marker3D" parent="."]
-
 [node name="Anchor_SOCK_wall_edge_west_01" type="Marker3D" parent="."]
 
 [node name="CollisionRoot" type="StaticBody3D" parent="."]
