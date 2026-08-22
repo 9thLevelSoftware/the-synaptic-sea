@@ -61,3 +61,8 @@ Review the two capture images and decide:
 ## Next step
 
 Gate 4: Full asset import (all 1080+ assets, all 15 structural modules).
+
+## Operator decision (2026-08-22)
+
+- **Camera:** Isometric confirmed. Top-down abandoned.
+- **Procgen feedback:** Current output is visually incoherent — modules pile up without spatial logic. Assets are good; placement algorithm needs redesign. Procgen redesign is a separate future workstream, not blocking asset import.
