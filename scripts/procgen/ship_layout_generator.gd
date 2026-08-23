@@ -154,11 +154,19 @@ func _generate_once(
 		var injector: RefCounted = EncounterInjectorScript.new()
 		layout = injector.inject(layout, biome, difficulty, int(blueprint.seed_value))
 
+	# Stamp template_id here (not in LayoutSerializer) so golden schema-key
+	# coherence stays on serializer output. Hive binds biomatter independent of biome.
+	layout["template_id"] = str(template.id)
 	# Stamp biome / difficulty / kit_id / hazard authority on the layout.
 	if not biome_id.is_empty():
 		layout["biome_id"] = biome_id
+	if str(template.id) == "hive":
+		layout["kit_id"] = "ship_structural_biomatter"
+	elif not biome_id.is_empty():
 		# E3: biome-biased structural kit preference (loader still uses module ids).
 		layout["kit_id"] = _kit_id_for_biome(biome_id)
+	elif str(layout.get("kit_id", "")).is_empty():
+		layout["kit_id"] = "ship_structural_v0"
 	if not difficulty_id.is_empty():
 		layout["difficulty_id"] = difficulty_id
 	# F4: runtime coordinator owns fire/breach seeding for derelicts; layout arrays

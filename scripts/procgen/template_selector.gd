@@ -23,6 +23,7 @@ const EXTENDED_TEMPLATES: Array[String] = [
 	"stacked_v2", "compact", "dispersed",
 	"derelict_a", "derelict_b",
 	"ring", "radial", "double_spine", "hangar_wing", "vault",
+	"hive",
 ]
 const DERELICT_TEMPLATES: Array[String] = ["derelict_a", "derelict_b"]
 const WRECK_TEMPLATES: Array[String] = ["derelict_a", "derelict_b", "vault"]

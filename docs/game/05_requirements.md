@@ -1597,3 +1597,26 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Verification:
   - `scripts/validation/enclosed_slot_fill_smoke.gd` marker `ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true`
   - Existing component slot smokes remain green
+
+---
+
+# Hive topology + biomatter kit remap
+
+## REQ-HIVE-001: Hive template + biomatter kit remap
+
+- Source: `features/hive_biomatter_kit.md`
+- Type: technical / procgen
+- Priority: should
+- Status: Approved
+- Rationale: Hive flavour is occupancy topology plus a kit-id stamp on the same sockets. Unique meshes and a fourth biome are later content.
+- Acceptance criteria:
+  - `hive.json` loads through `CellLayoutEngine` (shared cardinal edges, integer occupancy).
+  - Generator stamps `template_id` after serialize (not in `LayoutSerializer`).
+  - When `template_id == "hive"`, `kit_id = ship_structural_biomatter`, independent of biome.
+  - That kit’s `modules[].godot_wrapper_scene` may be v0 paths (intentional first milestone, not a visual remap).
+  - Compiler sockets fall back to v0 contracts. `ShipGenerator` passes a kit file that contains wrapper scenes.
+  - `"hive"` is in `EXTENDED_TEMPLATES` only — not a derelict guaranteed template, not forced into the 16-seed quality-gate pool.
+- Verification:
+  - `hive_biomatter_kit_smoke.gd` (`HIVE BIOMATTER KIT PASS template=true kit=true sockets_fallback=true occupancy=true v0_paths=true`)
+  - `kit_catalog_smoke.gd` remains green
+  - `template_selector_smoke.gd` legacy three unchanged
