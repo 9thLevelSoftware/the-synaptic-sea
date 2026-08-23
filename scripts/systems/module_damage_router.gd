@@ -77,6 +77,7 @@ static func apply_decompression_to_compartment(
 	var rooms_v: Variant = layout.get("rooms", [])
 	if typeof(rooms_v) != TYPE_ARRAY:
 		return changed
+	var seen: Dictionary = {}
 	for room_v in (rooms_v as Array):
 		if typeof(room_v) != TYPE_DICTIONARY:
 			continue
@@ -92,6 +93,9 @@ static func apply_decompression_to_compartment(
 		if not registered.is_empty():
 			for mid_v in registered:
 				var mid: String = str(mid_v)
+				if seen.has(mid):
+					continue
+				seen[mid] = true
 				var rec: RefCounted = module_map.call("get_module", mid) if module_map.has_method("get_module") else null
 				var kind: String = str(rec.get("kind")) if rec != null else ""
 				var r: Dictionary = apply(module_map, mid, SOURCE_DECOMPRESSION, amount, kind)
