@@ -7,6 +7,7 @@ const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const TemplateSelectorScript := preload("res://scripts/procgen/template_selector.gd")
 const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_generator.gd")
 const ShipGeneratorScript := preload("res://scripts/procgen/ship_generator.gd")
+const ModularSocketCatalogScript := preload("res://scripts/procgen/modular_socket_catalog.gd")
 
 const HIVE_TEMPLATE_PATH := "res://data/procgen/templates/hive.json"
 const BIOMATTER_KIT_PATH := "res://data/kits/ship_structural_biomatter.json"
@@ -151,30 +152,20 @@ func _check_wrapper_map_fallback() -> bool:
 
 
 func _check_sockets_fallback() -> bool:
-	# This PR does not ship ModularSocketCatalog. Sockets fallback is the
-	# contract-dir fact: biomatter has none, compiler/catalog consumers use v0.
 	var biomatter_dir: String = ProjectSettings.globalize_path(
 		"res://data/placement/contracts/structural/ship_structural_biomatter")
-	var v0_dir: String = ProjectSettings.globalize_path(
-		"res://data/placement/contracts/structural/ship_structural_v0")
 	if DirAccess.dir_exists_absolute(biomatter_dir):
 		return _fail("biomatter must not ship a unique contract dir this milestone")
-	if not DirAccess.dir_exists_absolute(v0_dir):
-		return _fail("v0 contract dir missing for socket fallback")
-	var v0_abs: DirAccess = DirAccess.open(v0_dir)
-	if v0_abs == null:
-		return _fail("cannot open v0 contract dir")
-	var saw_contract: bool = false
-	v0_abs.list_dir_begin()
-	var entry: String = v0_abs.get_next()
-	while entry != "":
-		if entry.ends_with("_contract.json"):
-			saw_contract = true
-			break
-		entry = v0_abs.get_next()
-	v0_abs.list_dir_end()
-	if not saw_contract:
-		return _fail("v0 contract dir has no *_contract.json")
+	var catalog: ModularSocketCatalogScript = ModularSocketCatalogScript.new()
+	if not catalog.load_kit("ship_structural_biomatter"):
+		return _fail("biomatter socket load_kit failed to fall back to v0")
+	if str(catalog.kit_id) != ModularSocketCatalogScript.DEFAULT_KIT_ID:
+		return _fail("biomatter sockets did not bind v0 kit_id, got %s" % str(catalog.kit_id))
+	if catalog.modules.is_empty():
+		return _fail("v0 socket fallback loaded no modules")
+	var mid: String = str(catalog.modules.keys()[0])
+	if catalog.sockets_of(mid).is_empty():
+		return _fail("v0 fallback module %s has no sockets" % mid)
 	return true
 
 
