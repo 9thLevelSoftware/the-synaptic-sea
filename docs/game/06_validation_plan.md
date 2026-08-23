@@ -38,6 +38,22 @@ Expected:
 
 - `ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true`
 
+## Hive template + biomatter kit remap (REQ-HIVE-001) — GREEN
+
+Feature: `docs/game/features/hive_biomatter_kit.md`.
+Requirements: REQ-HIVE-001.
+Registered in the regression bundle after GREEN.
+
+```bash
+ROOT="${ROOT:-/Users/christopherwilloughby/the-synaptic-sea-of-stars}"
+GODOT="${GODOT:-/Users/christopherwilloughby/.local/bin/godot-4.6.2}"
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hive_biomatter_kit_smoke.gd
+```
+
+Expected:
+
+- `HIVE BIOMATTER KIT PASS template=true kit=true sockets_fallback=true occupancy=true v0_paths=true`
+
 ## Regression bundle
 
 ```bash
@@ -405,7 +421,8 @@ run_clean 'procgen playable ship smoke' 'PLAYABLE SHIP SMOKE PASS player_spawned
 run_clean 'procgen runtime demo smoke' 'RUNTIME GAMEPLAY DEMO PASS objectives=4 interactions=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_runtime_demo_smoke.gd
 run_clean 'procgen walkability smoke' 'WALKABILITY PASS spine_seed_42 compiler_walls=true doorway=true no_void=true no_wall_through=true nav_kinds=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_walkability_smoke.gd
 run_clean 'interior aabb smoke' 'INTERIOR AABB PASS nondegenerate=true positioned=true contains=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interior_aabb_smoke.gd
-run_clean 'kit catalog smoke' 'KIT CATALOG PASS loaded=3 default=ship_structural_v0 airlock=3 eng=3 breach_select=ok fallback=ok real_stems=true default_role_module=floor_1x1 ids_sorted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/kit_catalog_smoke.gd
+run_clean 'kit catalog smoke' 'KIT CATALOG PASS loaded=6 default=ship_structural_v0 airlock=3 eng=3 breach_select=ok fallback=ok real_stems=true default_role_module=floor_1x1 ids_sorted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/kit_catalog_smoke.gd
+run_clean 'hive biomatter kit smoke' 'HIVE BIOMATTER KIT PASS template=true kit=true sockets_fallback=true occupancy=true v0_paths=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hive_biomatter_kit_smoke.gd
 run_clean 'floor wrapper collision footprint smoke' 'FLOOR WRAPPER COLLISION FOOTPRINT PASS checked=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/floor_wrapper_collision_footprint_smoke.gd
 run_clean 'readability prop factory smoke' 'READABILITY PROP FACTORY PASS props=9' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/readability_prop_factory_smoke.gd
 run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=136 structural_live=true edge_wrappers=84 floor_wrappers=51' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
@@ -830,7 +847,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=628 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=629 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 

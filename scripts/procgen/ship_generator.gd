@@ -130,10 +130,16 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 	layout_file.store_string(layout_json)
 	layout_file.close()
 
-	# The GeneratedShipLoader needs the shared structural module kit JSON.
-	var kit_path: String = "res://data/kits/ship_structural_v0.json"
+	# Layout kit_id selects the structural JSON. Hazard/industrial catalogs have
+	# no modules[].godot_wrapper_scene array yet, so they fall back to v0 wrappers.
+	var kit_id: String = str(layout.get("kit_id", "ship_structural_v0"))
+	if kit_id.is_empty():
+		kit_id = "ship_structural_v0"
+	var kit_path: String = "res://data/kits/%s.json" % kit_id
 	# FileAccess.file_exists natively supports res:// and works in exported
 	# builds (.pck); ProjectSettings.globalize_path would break inside a pack.
+	if not FileAccess.file_exists(kit_path) or not _kit_has_wrapper_map(kit_path):
+		kit_path = "res://data/kits/ship_structural_v0.json"
 	if not FileAccess.file_exists(kit_path):
 		push_error("SHIP GENERATOR FAIL structural kit not found: %s" % kit_path)
 		return null
@@ -162,3 +168,21 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 	# "StructuralRoot" (geometry + nav) and "ObjectiveRoot" children under it.
 	loader.name = "GeneratedShip"
 	return loader
+
+
+func _kit_has_wrapper_map(kit_path: String) -> bool:
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(kit_path))
+	if not (parsed is Dictionary):
+		return false
+	var modules_v: Variant = (parsed as Dictionary).get("modules", [])
+	if not (modules_v is Array) or (modules_v as Array).is_empty():
+		return false
+	for entry in (modules_v as Array):
+		if not (entry is Dictionary):
+			return false
+		if str((entry as Dictionary).get("module_id", "")).is_empty():
+			return false
+		if str((entry as Dictionary).get("godot_wrapper_scene", "")).is_empty():
+			return false
+	return true
+
