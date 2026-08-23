@@ -119,8 +119,10 @@ func _fill_slots(
 
 func _extract_slots(room: Dictionary, slot_key: String) -> Array:
 	# REQ-FILL-001: interior_zones from WallDoorResolver / serializer first.
+	# Serializer always emits the three keys, even as empty arrays — treat an
+	# all-empty zone object as absent so floor-only rooms still synthesize.
 	var interior: Variant = room.get("interior_zones", null)
-	if interior is Dictionary and not (interior as Dictionary).is_empty():
+	if interior is Dictionary and _interior_zones_have_slots(interior as Dictionary):
 		var interior_slots: Variant = (interior as Dictionary).get(slot_key, [])
 		if interior_slots is Array:
 			return _normalize_slots(interior_slots as Array, slot_key == "wall_slots")
@@ -137,6 +139,14 @@ func _extract_slots(room: Dictionary, slot_key: String) -> Array:
 	# Golden/hub layouts often only stamp floor structural_placements — synthesize
 	# wall/center slots from floor cells so component population still runs.
 	return _synthesize_slots_from_structure(room, slot_key)
+
+
+func _interior_zones_have_slots(interior: Dictionary) -> bool:
+	for key in ["wall_slots", "center_slots", "reserved_cells"]:
+		var values: Variant = interior.get(key, [])
+		if values is Array and not (values as Array).is_empty():
+			return true
+	return false
 
 
 func _normalize_slots(raw: Array, against_wall: bool) -> Array:

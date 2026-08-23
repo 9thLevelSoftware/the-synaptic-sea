@@ -80,8 +80,8 @@ Crates sit against bulkheads. Salvage is in the room, not stacked in the doorway
 ## Validation
 
 ```
-GODOT="C:/Users/dasbl/Documents/Godot/Godot_v4.6.2-stable_win64_console.exe"
-ROOT="<project root>"
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/enclosed_slot_fill_smoke.gd
 ```
 

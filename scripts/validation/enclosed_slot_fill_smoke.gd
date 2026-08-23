@@ -98,6 +98,21 @@ func _check_extract_interior_zones() -> bool:
 	var cparsed: Array = LayoutSerializerScript.parse_slot_cell((centers[0] as Dictionary).get("cell", []))
 	if cparsed.size() < 2 or int(cparsed[0]) != 4:
 		return _fail("interior_zones center cell expected [4,5] got %s" % str(cparsed))
+	var empty_keys: Dictionary = {
+		"id": "floor_only",
+		"interior_zones": {
+			"reserved_cells": [],
+			"center_slots": [],
+			"wall_slots": [],
+		},
+		"structural_placements": [
+			{"name": "floor_cell_x0_z0", "module": "floor_1x1", "world_position": [0.0, 0.0, 0.0]},
+			{"name": "floor_cell_x1_z0", "module": "floor_1x1", "world_position": [4.0, 0.0, 0.0]},
+		],
+	}
+	var synthesized: Array = place._extract_slots(empty_keys, "wall_slots")
+	if synthesized.size() < 1:
+		return _fail("all-empty interior_zones should synthesize wall slots from floors")
 	return true
 
 

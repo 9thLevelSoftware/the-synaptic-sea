@@ -4214,16 +4214,17 @@ func _nearest_remount_target(
 
 func _slot_occupancy_from_loader() -> Dictionary:
 	var occupied: Dictionary = {}
-	if loader == null:
+	var active_loader = current_ship.scene_root if (away_from_start and current_ship != null) else loader
+	if active_loader == null or not is_instance_valid(active_loader):
 		return occupied
-	var loot_v: Variant = loader.loot_container_specs if loader.get("loot_container_specs") != null else []
+	var loot_v: Variant = active_loader.loot_container_specs if active_loader.get("loot_container_specs") != null else []
 	if loot_v is Array:
 		for loot_row in (loot_v as Array):
 			if typeof(loot_row) != TYPE_DICTIONARY:
 				continue
 			var loot: Dictionary = loot_row
 			_mark_occupancy(occupied, str(loot.get("room_id", "")), loot.get("approach_cell", []))
-	var gameplay: Dictionary = loader.gameplay_doc if typeof(loader.get("gameplay_doc")) == TYPE_DICTIONARY else {}
+	var gameplay: Dictionary = active_loader.gameplay_doc if typeof(active_loader.get("gameplay_doc")) == TYPE_DICTIONARY else {}
 	var objectives_v: Variant = gameplay.get("objectives", [])
 	if objectives_v is Array:
 		for obj_row in (objectives_v as Array):
@@ -4231,7 +4232,7 @@ func _slot_occupancy_from_loader() -> Dictionary:
 				continue
 			var obj: Dictionary = obj_row
 			_mark_occupancy(occupied, str(obj.get("room_id", "")), obj.get("approach_cell", []))
-	var specs_v: Variant = loader.objective_specs if loader.get("objective_specs") != null else []
+	var specs_v: Variant = active_loader.objective_specs if active_loader.get("objective_specs") != null else []
 	if specs_v is Array:
 		for spec_row in (specs_v as Array):
 			if typeof(spec_row) != TYPE_DICTIONARY:
@@ -4239,12 +4240,12 @@ func _slot_occupancy_from_loader() -> Dictionary:
 			var spec: Dictionary = spec_row
 			_mark_occupancy(occupied, str(spec.get("room_id", "")), spec.get("approach_cell", []))
 	var start_room: String = str(gameplay.get("start_room", ""))
-	if start_room.is_empty() and typeof(loader.get("layout_doc")) == TYPE_DICTIONARY:
-		var proto: Variant = loader.layout_doc.get("prototype", {})
+	if start_room.is_empty() and typeof(active_loader.get("layout_doc")) == TYPE_DICTIONARY:
+		var proto: Variant = active_loader.layout_doc.get("prototype", {})
 		if proto is Dictionary:
 			start_room = str((proto as Dictionary).get("start_room", ""))
-	if not start_room.is_empty() and typeof(loader.get("layout_doc")) == TYPE_DICTIONARY:
-		var rooms_v: Variant = loader.layout_doc.get("rooms", [])
+	if not start_room.is_empty() and typeof(active_loader.get("layout_doc")) == TYPE_DICTIONARY:
+		var rooms_v: Variant = active_loader.layout_doc.get("rooms", [])
 		if rooms_v is Array:
 			for room_v in (rooms_v as Array):
 				if typeof(room_v) != TYPE_DICTIONARY:
@@ -4256,8 +4257,7 @@ func _slot_occupancy_from_loader() -> Dictionary:
 				if boarding_cell.size() >= 2:
 					_mark_occupancy(occupied, start_room, boarding_cell)
 				break
-	if is_instance_valid(loader):
-		_collect_dressing_occupancy(loader, occupied)
+	_collect_dressing_occupancy(active_loader, occupied)
 	return occupied
 
 
