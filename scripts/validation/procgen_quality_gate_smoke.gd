@@ -65,8 +65,11 @@ func _initialize() -> void:
 		if not _blocked_hops_kept(layout):
 			_fail("blocked hop removed from room_links seed=%d" % s)
 			return
-		if not _has_wreck_lock(layout):
-			_fail("DAMAGED seed has no blocked_links or LOCKED edge seed=%d" % s)
+		# Tree templates skip LOCKED/BREACH on every remaining hop (all
+		# bridges). wreck_applied + module_damage is the overlay there,
+		# matching live_decay_stamp_smoke.
+		if not _has_wreck_lock(layout) and not _has_module_damage(layout):
+			_fail("DAMAGED seed has no blocked_links/LOCKED edge or module_damage overlay seed=%d" % s)
 			return
 		# Guaranteed dock after alias normalization.
 		var roles: Dictionary = {}
@@ -199,6 +202,12 @@ func _has_wreck_lock(layout: Dictionary) -> bool:
 				if kind == "LOCKED":
 					return true
 	return false
+
+
+func _has_module_damage(layout: Dictionary) -> bool:
+	var md_v: Variant = layout.get("module_damage", [])
+	return md_v is Array and not (md_v as Array).is_empty()
+
 
 func _standing_room_pos(occupancy: Dictionary, room: Dictionary, room_id: String) -> Vector3:
 	for record_variant in occupancy.values():
