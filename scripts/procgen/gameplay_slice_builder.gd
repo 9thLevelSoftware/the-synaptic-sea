@@ -457,7 +457,16 @@ func _pick_salvage_slot(
 			adjacent.append({"cell": [int(cell[0]), int(cell[1]), deck], "slot_kind": "center", "slot_index": i})
 	if not adjacent.is_empty():
 		return _pick_eligible(rng, adjacent)
+	# Adjacent centers first, then reserved portal cells. Do not pick a
+	# non-adjacent center before the reserved fallback (REQ-FILL-001).
 	var eligible: Array = []
+	for i in range(reserved.size()):
+		var cell: Array = reserved[i]
+		if _is_blocked(rid, cell, occupied, boarding):
+			continue
+		eligible.append({"cell": [int(cell[0]), int(cell[1]), deck], "slot_kind": "reserved", "slot_index": i})
+	if not eligible.is_empty():
+		return _pick_eligible(rng, eligible)
 	for i in range(centers.size()):
 		var cell: Array = centers[i]
 		if _is_blocked(rid, cell, occupied, boarding):
@@ -465,13 +474,6 @@ func _pick_salvage_slot(
 		if reserved_set.has(_cell_key(rid, cell)):
 			continue
 		eligible.append({"cell": [int(cell[0]), int(cell[1]), deck], "slot_kind": "center", "slot_index": i})
-	if not eligible.is_empty():
-		return _pick_eligible(rng, eligible)
-	for i in range(reserved.size()):
-		var cell: Array = reserved[i]
-		if _is_blocked(rid, cell, occupied, boarding):
-			continue
-		eligible.append({"cell": [int(cell[0]), int(cell[1]), deck], "slot_kind": "reserved", "slot_index": i})
 	return _pick_eligible(rng, eligible)
 
 

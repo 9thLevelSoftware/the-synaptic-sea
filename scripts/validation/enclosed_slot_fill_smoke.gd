@@ -33,6 +33,8 @@ func _initialize() -> void:
 		return
 	if not _check_small_room_dressing():
 		return
+	if not _check_salvage_reserved_fallback():
+		return
 	print("ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true")
 	quit(0)
 
@@ -699,4 +701,42 @@ func _check_small_room_dressing() -> bool:
 	loader.free()
 	if prop_count < 1:
 		return _fail("small 3-wall room reserved every slot; no DressingProp_* left")
+	return true
+
+
+func _check_salvage_reserved_fallback() -> bool:
+	# Center [2,2] is not adjacent to reserved [0,0]; salvage must take reserved.
+	var cargo: Dictionary = {
+		"id": "cargo_01",
+		"room_role": "cargo",
+		"deck": 0,
+		"interior_zones": {
+			"reserved_cells": [[0, 0]],
+			"center_slots": [[2, 2]],
+			"wall_slots": [{"cell": [1, 0], "against_wall": true}],
+		},
+		"structural_placements": [
+			{"name": "floor_cell_x0_z0", "module": "floor_1x1", "world_position": [0.0, 0.0, 0.0]},
+			{"name": "floor_cell_x2_z2", "module": "floor_1x1", "world_position": [8.0, 0.0, 8.0]},
+		],
+	}
+	var rooms: Array = _bare_start_goal()
+	rooms.insert(1, cargo)
+	var layout: Dictionary = {
+		"program_id": "procgen-derelict-seed-42",
+		"prototype": {"start_room": "airlock_01", "goal_room": "bridge_01"},
+		"rooms": rooms,
+		"room_links": [],
+		"critical_path": ["airlock_01", "cargo_01", "bridge_01"],
+	}
+	var slice: Dictionary = GameplaySliceBuilderScript.new().build(layout)
+	var salvage: Array = []
+	for obj_v in slice.get("objectives", []):
+		if typeof(obj_v) == TYPE_DICTIONARY and str((obj_v as Dictionary).get("type", "")) == "salvage":
+			salvage = (obj_v as Dictionary).get("approach_cell", [])
+			break
+	if salvage.size() < 2:
+		return _fail("non-adjacent-center salvage missing")
+	if int(salvage[0]) != 0 or int(salvage[1]) != 0:
+		return _fail("salvage should take reserved portal [0,0], got %s" % str(salvage))
 	return true
