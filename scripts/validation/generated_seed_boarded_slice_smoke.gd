@@ -150,7 +150,26 @@ func _validate() -> void:
 		_fail("HUD/objective surface dead after away ticks")
 		return
 
+	if playable.first_run_contract == null:
+		_fail("first_run_contract missing after travel")
+		return
+	var contract: Dictionary = playable.first_run_contract.contract
+	if contract.is_empty():
+		_fail("first_run_contract empty after travel")
+		return
+	var preferred: Array = contract.get("preferred_seeds", []) as Array
+	if preferred.is_empty():
+		_fail("first-run preferred_seeds empty")
+		return
 	var seed_n: int = playable._ship_seed(cur)
+	var seed_ok := false
+	for seed_variant in preferred:
+		if int(seed_variant) == seed_n:
+			seed_ok = true
+			break
+	if not seed_ok:
+		_fail("boarded seed=%d is not in first-run preferred_seeds %s" % [seed_n, str(preferred)])
+		return
 	print("GENERATED SEED BOARDED SLICE PASS away=true nav=true slots=true wreck=true objectives=true away_ticks=30 seed=%d" % seed_n)
 	_cleanup(0)
 
