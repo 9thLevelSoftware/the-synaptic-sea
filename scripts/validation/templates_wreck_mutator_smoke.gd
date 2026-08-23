@@ -61,6 +61,7 @@ func _initialize() -> void:
 			{"id": "l3", "from_room": "corridor", "to_room": "med", "module_id": "doorway_frame_open_1x1"},
 			{"id": "l4", "from_room": "cargo", "to_room": "storage", "module_id": "doorway_frame_open_1x1"},
 			{"id": "l5", "from_room": "med", "to_room": "crew", "module_id": "doorway_frame_open_1x1"},
+			{"id": "l6", "from_room": "cargo", "to_room": "med", "module_id": "doorway_frame_open_1x1"},
 		],
 		"blocked_links": [],
 		"portals": [
@@ -69,6 +70,7 @@ func _initialize() -> void:
 			{"from_room": "corridor", "to_room": "med", "state": "DOOR"},
 			{"from_room": "cargo", "to_room": "storage", "state": "DOOR"},
 			{"from_room": "med", "to_room": "crew", "state": "DOOR"},
+			{"from_room": "cargo", "to_room": "med", "state": "DOOR"},
 		],
 	}
 	var links_before: int = (layout["room_links"] as Array).size()

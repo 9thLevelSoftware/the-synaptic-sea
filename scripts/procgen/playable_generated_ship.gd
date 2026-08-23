@@ -3509,13 +3509,7 @@ func _apply_fire_module_integrity(delta: float) -> void:
 	if changed.is_empty():
 		return
 	_apply_module_integrity_scene(changed)
-	# Soften nav through rooms with breaches/destroyed walls (threat nav graph).
-	var nav = null
-	if threat_manager != null and "nav_graph" in threat_manager:
-		nav = threat_manager.nav_graph
-	if nav != null and nav is RefCounted and (nav as RefCounted).has_method("set_edge_cost_multiplier"):
-		var gap_rooms: PackedStringArray = module_integrity_map.rooms_with_nav_gaps()
-		ModuleIntegrityConsequencesScript.apply_nav_gaps(nav as RefCounted, gap_rooms)
+	_apply_integrity_nav_gaps()
 
 
 ## Hull breaches + module wall breaches (atmosphere links).
@@ -4442,15 +4436,17 @@ func _nearest_damaged_wall_module(layout: Dictionary, player_pos: Vector3, max_r
 			if st2 not in ["damaged", "breached"]:
 				continue
 			var m = module_integrity_map.call("get_module", id) if module_integrity_map.has_method("get_module") else null
-			var rid: String = str(m.get("room_id")) if m != null else ""
-			if rid.is_empty():
-				var prefix: String = id.get_slice("/", 0)
-				if prefix == "floor" or prefix == "edge" or prefix == "ceiling":
+			var pos: Vector3 = _compiled_wrapper_world_position(id)
+			if pos == Vector3.INF:
+				var rid: String = str(m.get("room_id")) if m != null else ""
+				if rid.is_empty():
+					var prefix: String = id.get_slice("/", 0)
+					if prefix == "floor" or prefix == "edge" or prefix == "ceiling":
+						continue
+					rid = prefix
+				if not room_centers.has(rid):
 					continue
-				rid = prefix
-			if not room_centers.has(rid):
-				continue
-			var pos: Vector3 = room_centers[rid] as Vector3
+				pos = room_centers[rid] as Vector3
 			var d: float = player_pos.distance_to(pos)
 			if d <= best_d:
 				best_d = d
@@ -7037,6 +7033,7 @@ func _configure_threat_runtime_for_current_ship() -> void:
 			threat_manager.configure_nav_graph(_combat_layout_for_current_ship())
 	else:
 		threat_manager.configure_for_layout(_combat_layout_for_current_ship(), _combat_markers_for_current_ship(), anchor)
+	_apply_integrity_nav_gaps()
 	_refresh_weapon_hotbar()
 
 func _refresh_weapon_hotbar() -> void:
@@ -7184,6 +7181,37 @@ func _refresh_threat_nav_costs() -> void:
 				and not str(h.compartment_a).is_empty() and not str(h.compartment_b).is_empty():
 			bulkheads.append([str(h.compartment_a), str(h.compartment_b)])
 	threat_manager.update_nav_dynamic_costs(fire_rooms, bulkheads)
+	# reset_dynamic_costs copies _base_edges; re-apply integrity gaps after that.
+	_apply_integrity_nav_gaps()
+
+func _apply_integrity_nav_gaps() -> void:
+	if module_integrity_map == null or threat_manager == null:
+		return
+	if not ("nav_graph" in threat_manager):
+		return
+	var nav = threat_manager.nav_graph
+	if nav == null or not (nav is RefCounted) or not (nav as RefCounted).has_method("set_edge_cost_multiplier"):
+		return
+	if not module_integrity_map.has_method("rooms_with_nav_gaps"):
+		return
+	var gap_rooms: PackedStringArray = module_integrity_map.rooms_with_nav_gaps()
+	ModuleIntegrityConsequencesScript.apply_nav_gaps(nav as RefCounted, gap_rooms)
+
+
+func _compiled_wrapper_world_position(module_key: String) -> Vector3:
+	if module_key.is_empty():
+		return Vector3.INF
+	var root: Node = null
+	if current_ship != null and is_instance_valid(current_ship.scene_root):
+		root = current_ship.scene_root
+	elif is_instance_valid(loader):
+		root = loader
+	if root == null:
+		return Vector3.INF
+	var node: Node = _find_structural_module_node(root, module_key)
+	if node is Node3D:
+		return (node as Node3D).global_position
+	return Vector3.INF
 
 func _consumable_pipeline_context() -> Dictionary:
 	return {
