@@ -21,6 +21,10 @@ func _initialize() -> void:
 		return
 	if not _check_synthetic_fill():
 		return
+	if not _check_floor_fallback_occupancy():
+		return
+	if not _check_boarding_room_scoped():
+		return
 	if not _check_generated_fill():
 		return
 	if not _check_dressing_props():
@@ -219,6 +223,164 @@ func _check_synthetic_fill() -> bool:
 	return true
 
 
+func _bare_start_goal() -> Array:
+	return [
+		{
+			"id": "airlock_01",
+			"room_role": "airlock",
+			"deck": 0,
+			"structural_placements": [
+				{"name": "floor_cell_x0_z0", "module": "floor_1x1", "world_position": [0.0, 0.0, 0.0]},
+			],
+		},
+		{
+			"id": "bridge_01",
+			"room_role": "bridge",
+			"deck": 0,
+			"structural_placements": [
+				{"name": "floor_cell_x8_z8", "module": "floor_1x1", "world_position": [32.0, 0.0, 32.0]},
+			],
+		},
+	]
+
+
+func _check_floor_fallback_occupancy() -> bool:
+	var cargo_two: Dictionary = {
+		"id": "cargo_01",
+		"room_role": "cargo",
+		"deck": 0,
+		"structural_placements": [
+			{"name": "floor_cell_x0_z0", "module": "floor_1x1", "world_position": [0.0, 0.0, 0.0]},
+			{"name": "floor_cell_x1_z0", "module": "floor_1x1", "world_position": [4.0, 0.0, 0.0]},
+		],
+	}
+	var rooms_two: Array = _bare_start_goal()
+	rooms_two.insert(1, cargo_two)
+	var layout_two: Dictionary = {
+		"program_id": "procgen-derelict-seed-42",
+		"prototype": {"start_room": "airlock_01", "goal_room": "bridge_01"},
+		"rooms": rooms_two,
+		"room_links": [],
+		"critical_path": ["airlock_01", "cargo_01", "bridge_01"],
+	}
+	var builder = GameplaySliceBuilderScript.new()
+	var slice_two: Dictionary = builder.build(layout_two)
+	var loot_two: Array = slice_two.get("loot_containers", [])
+	if loot_two.is_empty():
+		return _fail("empty-zone two-floor cargo should still place loot")
+	var salvage_two: Array = []
+	for obj_v in slice_two.get("objectives", []):
+		if typeof(obj_v) == TYPE_DICTIONARY and str((obj_v as Dictionary).get("type", "")) == "salvage":
+			salvage_two = (obj_v as Dictionary).get("approach_cell", [])
+			break
+	var loot_cell: Array = (loot_two[0] as Dictionary).get("approach_cell", [])
+	if salvage_two.size() < 2 or loot_cell.size() < 2:
+		return _fail("empty-zone fallback cells incomplete")
+	if int(salvage_two[0]) == int(loot_cell[0]) and int(salvage_two[1]) == int(loot_cell[1]):
+		return _fail("empty-zone salvage and loot shared first floor cell %s" % str(loot_cell))
+	var cargo_one: Dictionary = {
+		"id": "cargo_01",
+		"room_role": "cargo",
+		"deck": 0,
+		"structural_placements": [
+			{"name": "floor_cell_x0_z0", "module": "floor_1x1", "world_position": [0.0, 0.0, 0.0]},
+		],
+	}
+	var rooms_one: Array = _bare_start_goal()
+	rooms_one.insert(1, cargo_one)
+	var layout_one: Dictionary = {
+		"program_id": "procgen-derelict-seed-42",
+		"prototype": {"start_room": "airlock_01", "goal_room": "bridge_01"},
+		"rooms": rooms_one,
+		"room_links": [],
+		"critical_path": ["airlock_01", "cargo_01", "bridge_01"],
+	}
+	var slice_one: Dictionary = builder.build(layout_one)
+	var salvage_one: Array = []
+	for obj_v2 in slice_one.get("objectives", []):
+		if typeof(obj_v2) == TYPE_DICTIONARY and str((obj_v2 as Dictionary).get("type", "")) == "salvage":
+			salvage_one = (obj_v2 as Dictionary).get("approach_cell", [])
+			break
+	if salvage_one.size() < 2:
+		return _fail("single-floor empty-zone salvage missing")
+	for loot_v in slice_one.get("loot_containers", []):
+		if typeof(loot_v) != TYPE_DICTIONARY:
+			continue
+		var lc: Array = (loot_v as Dictionary).get("approach_cell", [])
+		if lc.size() >= 2 and int(lc[0]) == int(salvage_one[0]) and int(lc[1]) == int(salvage_one[1]):
+			return _fail("single-floor empty-zone loot reused salvage cell")
+	return true
+
+
+func _check_boarding_room_scoped() -> bool:
+	var start_room: Dictionary = {
+		"id": "airlock_01",
+		"room_role": "airlock",
+		"deck": 0,
+		"interior_zones": {
+			"reserved_cells": [[0, 0]],
+			"center_slots": [],
+			"wall_slots": [],
+		},
+		"structural_placements": [
+			{"name": "floor_cell_x0_z0", "module": "floor_1x1", "world_position": [0.0, 0.0, 0.0]},
+		],
+	}
+	var cargo: Dictionary = {
+		"id": "cargo_01",
+		"room_role": "cargo",
+		"deck": 1,
+		"interior_zones": {
+			"reserved_cells": [],
+			"center_slots": [[0, 0]],
+			"wall_slots": [{"cell": [1, 0], "against_wall": true}],
+		},
+		"structural_placements": [
+			{"name": "floor_cell_d1_x0_z0", "module": "floor_1x1", "world_position": [0.0, 4.0, 0.0]},
+			{"name": "floor_cell_d1_x1_z0", "module": "floor_1x1", "world_position": [4.0, 4.0, 0.0]},
+		],
+	}
+	var goal_room: Dictionary = {
+		"id": "bridge_01",
+		"room_role": "bridge",
+		"deck": 1,
+		"structural_placements": [
+			{"name": "floor_cell_d1_x8_z8", "module": "floor_1x1", "world_position": [32.0, 4.0, 32.0]},
+		],
+	}
+	var layout: Dictionary = {
+		"program_id": "procgen-derelict-seed-42",
+		"prototype": {"start_room": "airlock_01", "goal_room": "bridge_01"},
+		"rooms": [start_room, cargo, goal_room],
+		"room_links": [],
+		"critical_path": ["airlock_01", "cargo_01", "bridge_01"],
+	}
+	var builder = GameplaySliceBuilderScript.new()
+	var slice: Dictionary = builder.build(layout)
+	var used_cargo_00: bool = false
+	for row_v in slice.get("loot_containers", []):
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		if str(row.get("room_id", "")) != "cargo_01":
+			continue
+		var cell: Array = row.get("approach_cell", [])
+		if cell.size() >= 2 and int(cell[0]) == 0 and int(cell[1]) == 0:
+			used_cargo_00 = true
+	for obj_v in slice.get("objectives", []):
+		if typeof(obj_v) != TYPE_DICTIONARY:
+			continue
+		var obj: Dictionary = obj_v
+		if str(obj.get("room_id", "")) != "cargo_01":
+			continue
+		var cell2: Array = obj.get("approach_cell", [])
+		if cell2.size() >= 2 and int(cell2[0]) == 0 and int(cell2[1]) == 0:
+			used_cargo_00 = true
+	if not used_cargo_00:
+		return _fail("boarding (0,0) in airlock blocked cargo deck-1 (0,0)")
+	return true
+
+
 func _first_floor_xz(room: Dictionary) -> Array:
 	var placements: Array = room.get("structural_placements", [])
 	for placement in placements:
@@ -307,6 +469,13 @@ func _check_generated_fill() -> bool:
 		var parsed: Array = LayoutSerializerScript.parse_slot_cell(row2.get("approach_cell", []))
 		if parsed.size() >= 2:
 			occupied["%s|%d|%d" % [str(row2.get("room_id", "")), int(parsed[0]), int(parsed[1])]] = true
+	for obj_v in slice.get("objectives", []):
+		if typeof(obj_v) != TYPE_DICTIONARY:
+			continue
+		var obj: Dictionary = obj_v
+		var parsed_o: Array = LayoutSerializerScript.parse_slot_cell(obj.get("approach_cell", []))
+		if parsed_o.size() >= 2:
+			occupied["%s|%d|%d" % [str(obj.get("room_id", "")), int(parsed_o[0]), int(parsed_o[1])]] = true
 	var place = ComponentPlacementStateScript.new()
 	place.populate(layout, cat, 42, occupied)
 	var components_on_cell: bool = false
@@ -317,10 +486,12 @@ func _check_generated_fill() -> bool:
 		var parsed_c: Array = LayoutSerializerScript.parse_slot_cell(e.get("cell", null))
 		if parsed_c.size() < 2:
 			continue
+		var ckey: String = "%s|%d|%d" % [str(e.get("room_id", "")), int(parsed_c[0]), int(parsed_c[1])]
+		if occupied.has(ckey):
+			return _fail("component shared salvage/loot cell %s" % ckey)
 		var room_c: Dictionary = _room_by_id(rooms, str(e.get("room_id", "")))
 		if _cell_in_slots(room_c, parsed_c):
 			components_on_cell = true
-			break
 	if not components_on_cell:
 		return _fail("generated components not on slot cells")
 	return true
@@ -328,6 +499,14 @@ func _check_generated_fill() -> bool:
 
 func _check_dressing_props() -> bool:
 	var cargo: Dictionary = _synthetic_room()
+	(cargo["interior_zones"] as Dictionary)["wall_slots"] = [
+		{"cell": [1, 0], "against_wall": true},
+		{"cell": [2, 0], "against_wall": true},
+		{"cell": [0, 1], "against_wall": true},
+		{"cell": [3, 0], "against_wall": true},
+		{"cell": [3, 1], "against_wall": true},
+		{"cell": [4, 0], "against_wall": true},
+	]
 	var layout: Dictionary = {
 		"program_id": "procgen-derelict-seed-42",
 		"prototype": {"start_room": "airlock_01", "goal_room": "bridge_01"},
@@ -339,6 +518,9 @@ func _check_dressing_props() -> bool:
 				{"cell_key": "0|2|0", "room_id": "cargo_01", "world_position": [8.0, 0.0, 0.0]},
 				{"cell_key": "0|0|1", "room_id": "cargo_01", "world_position": [0.0, 0.0, 4.0]},
 				{"cell_key": "0|1|1", "room_id": "cargo_01", "world_position": [4.0, 0.0, 4.0]},
+				{"cell_key": "0|3|0", "room_id": "cargo_01", "world_position": [12.0, 0.0, 0.0]},
+				{"cell_key": "0|3|1", "room_id": "cargo_01", "world_position": [12.0, 0.0, 4.0]},
+				{"cell_key": "0|4|0", "room_id": "cargo_01", "world_position": [16.0, 0.0, 0.0]},
 			],
 		},
 	}
@@ -350,13 +532,13 @@ func _check_dressing_props() -> bool:
 		"loot_containers": [{
 			"id": "loot_cargo_01",
 			"room_id": "cargo_01",
-			"approach_cell": [1, 1, 0],
+			"approach_cell": [1, 0, 0],
 		}],
 	}
 	loader.loot_container_specs = [{
 		"id": "loot_cargo_01",
 		"room_id": "cargo_01",
-		"approach_cell": [1, 1, 0],
+		"approach_cell": [1, 0, 0],
 	}]
 	loader._build_room_variant_descriptors()
 	if loader.room_variant_descriptors.is_empty():
@@ -388,6 +570,11 @@ func _check_dressing_props() -> bool:
 				root.free()
 				loader.free()
 				return _fail("dressing prop has collision body")
+			var slot_cell: Array = LayoutSerializerScript.parse_slot_cell(child.get_meta("slot_cell", []))
+			if slot_cell.size() >= 2 and int(slot_cell[0]) == 1 and int(slot_cell[1]) == 0:
+				root.free()
+				loader.free()
+				return _fail("dressing prop placed on loot wall slot [1,0]")
 		if n.begins_with("ObjectiveAffordance_") or n.begins_with("BlockedAffordance_"):
 			bad_name = true
 	root.free()

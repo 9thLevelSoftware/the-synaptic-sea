@@ -4222,12 +4222,56 @@ func _slot_occupancy_from_loader() -> Dictionary:
 			if typeof(loot_row) != TYPE_DICTIONARY:
 				continue
 			var loot: Dictionary = loot_row
-			var parsed: Array = LayoutSerializerScript.parse_slot_cell(loot.get("approach_cell", []))
-			if parsed.size() >= 2:
-				occupied["%s|%d|%d" % [str(loot.get("room_id", "")), int(parsed[0]), int(parsed[1])]] = true
+			_mark_occupancy(occupied, str(loot.get("room_id", "")), loot.get("approach_cell", []))
+	var gameplay: Dictionary = loader.gameplay_doc if typeof(loader.get("gameplay_doc")) == TYPE_DICTIONARY else {}
+	var objectives_v: Variant = gameplay.get("objectives", [])
+	if objectives_v is Array:
+		for obj_row in (objectives_v as Array):
+			if typeof(obj_row) != TYPE_DICTIONARY:
+				continue
+			var obj: Dictionary = obj_row
+			_mark_occupancy(occupied, str(obj.get("room_id", "")), obj.get("approach_cell", []))
+	var specs_v: Variant = loader.objective_specs if loader.get("objective_specs") != null else []
+	if specs_v is Array:
+		for spec_row in (specs_v as Array):
+			if typeof(spec_row) != TYPE_DICTIONARY:
+				continue
+			var spec: Dictionary = spec_row
+			_mark_occupancy(occupied, str(spec.get("room_id", "")), spec.get("approach_cell", []))
+	var start_room: String = str(gameplay.get("start_room", ""))
+	if start_room.is_empty() and typeof(loader.get("layout_doc")) == TYPE_DICTIONARY:
+		var proto: Variant = loader.layout_doc.get("prototype", {})
+		if proto is Dictionary:
+			start_room = str((proto as Dictionary).get("start_room", ""))
+	if not start_room.is_empty() and typeof(loader.get("layout_doc")) == TYPE_DICTIONARY:
+		var rooms_v: Variant = loader.layout_doc.get("rooms", [])
+		if rooms_v is Array:
+			for room_v in (rooms_v as Array):
+				if typeof(room_v) != TYPE_DICTIONARY:
+					continue
+				var room: Dictionary = room_v
+				if str(room.get("id", "")) != start_room:
+					continue
+				var interior: Variant = room.get("interior_zones", {})
+				var boarding_cell: Array = []
+				if interior is Dictionary:
+					var reserved_v: Variant = (interior as Dictionary).get("reserved_cells", [])
+					if reserved_v is Array and not (reserved_v as Array).is_empty():
+						boarding_cell = LayoutSerializerScript.parse_slot_cell((reserved_v as Array)[0])
+				if boarding_cell.size() >= 2:
+					_mark_occupancy(occupied, start_room, boarding_cell)
+				break
 	if is_instance_valid(loader):
 		_collect_dressing_occupancy(loader, occupied)
 	return occupied
+
+
+func _mark_occupancy(occupied: Dictionary, room_id: String, cell_v: Variant) -> void:
+	if room_id.is_empty():
+		return
+	var parsed: Array = LayoutSerializerScript.parse_slot_cell(cell_v)
+	if parsed.size() >= 2:
+		occupied["%s|%d|%d" % [room_id, int(parsed[0]), int(parsed[1])]] = true
 
 
 func _collect_dressing_occupancy(root: Node, occupied: Dictionary) -> void:

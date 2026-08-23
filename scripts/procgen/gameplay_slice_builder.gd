@@ -50,8 +50,7 @@ func build(layout: Dictionary) -> Dictionary:
 			goal_room = bridge_id if not bridge_id.is_empty() else str(rooms[rooms.size() - 1].get("id", "")) if rooms.size() > 0 else ""
 
 	var occupied: Dictionary = {}
-	var boarding: Array = _boarding_cell(rooms, start_room)
-	var seed_value: int = _seed_from_layout(layout)
+	var boarding: Dictionary = _boarding_info(rooms, start_room)
 
 	var objectives: Array = []
 	var sequence: int = 1
@@ -67,7 +66,7 @@ func build(layout: Dictionary) -> Dictionary:
 		if role in CONNECTIVE_ROLES:
 			room_index += 1
 			continue
-		var salvage_pick: Dictionary = _pick_slot_cell(room, "salvage", occupied, boarding, seed_value, room_index)
+		var salvage_pick: Dictionary = _pick_slot_cell(room, "salvage", occupied, boarding)
 		var approach_cell: Array = salvage_pick.get("cell", []) as Array
 		if approach_cell.is_empty():
 			room_index += 1
@@ -90,8 +89,7 @@ func build(layout: Dictionary) -> Dictionary:
 
 	# Always add a "reach goal" objective as the final objective
 	var goal_room_dict: Dictionary = _find_room(rooms, goal_room)
-	var goal_index: int = _room_index_of(rooms, goal_room)
-	var goal_pick: Dictionary = _pick_slot_cell(goal_room_dict, "loot", occupied, boarding, seed_value, goal_index)
+	var goal_pick: Dictionary = _pick_slot_cell(goal_room_dict, "loot", occupied, boarding)
 	var goal_approach: Array = goal_pick.get("cell", []) as Array
 	if goal_approach.is_empty():
 		push_warning("GameplaySliceBuilder: goal room '%s' has no floor cells; using [0,0,0] fallback" % goal_room)
@@ -121,7 +119,7 @@ func build(layout: Dictionary) -> Dictionary:
 		if role2 in CONNECTIVE_ROLES:
 			room_index += 1
 			continue
-		var loot_pick: Dictionary = _pick_slot_cell(room, "loot", occupied, boarding, seed_value, room_index)
+		var loot_pick: Dictionary = _pick_slot_cell(room, "loot", occupied, boarding)
 		var cell2: Array = loot_pick.get("cell", []) as Array
 		if cell2.is_empty():
 			room_index += 1
@@ -235,43 +233,25 @@ func _get_first_floor_cell(room: Dictionary) -> Array:
 	return []
 
 
-func _seed_from_layout(layout: Dictionary) -> int:
-	if layout.has("seed_value"):
-		return int(layout.get("seed_value", 0))
-	var pid: String = str(layout.get("program_id", ""))
-	var idx: int = pid.rfind("seed-")
-	if idx >= 0:
-		var tail: String = pid.substr(idx + 5)
-		var digits: String = ""
-		for i in range(tail.length()):
-			var ch: String = tail.substr(i, 1)
-			if ch.is_valid_int():
-				digits += ch
-			else:
-				break
-		if digits.is_valid_int():
-			return int(digits)
-	return 0
-
-
-func _room_index_of(rooms: Array, room_id: String) -> int:
-	for i in range(rooms.size()):
-		if typeof(rooms[i]) == TYPE_DICTIONARY and str((rooms[i] as Dictionary).get("id", "")) == room_id:
-			return i
-	return 0
-
-
-func _boarding_cell(rooms: Array, start_room: String) -> Array:
+func _boarding_info(rooms: Array, start_room: String) -> Dictionary:
 	var room: Dictionary = _find_room(rooms, start_room)
-	if room.is_empty():
-		return []
+	if room.is_empty() or start_room.is_empty():
+		return {}
 	var reserved: Array = _interior_cell_list(room, "reserved_cells")
+	var cell: Array = []
 	if not reserved.is_empty():
-		return reserved[0]
-	var first: Array = _get_first_floor_cell(room)
-	if first.size() >= 2:
-		return [int(first[0]), int(first[1])]
-	return []
+		cell = reserved[0]
+	else:
+		var first: Array = _get_first_floor_cell(room)
+		if first.size() >= 2:
+			cell = [int(first[0]), int(first[1])]
+	if cell.size() < 2:
+		return {}
+	return {
+		"room_id": start_room,
+		"cell": cell,
+		"deck": int(room.get("deck", 0)),
+	}
 
 
 func _interior_cell_list(room: Dictionary, slot_key: String) -> Array:
@@ -310,11 +290,13 @@ func _cell_key(room_id: String, cell: Array) -> String:
 	return "%s|%d|%d" % [room_id, int(cell[0]), int(cell[1])]
 
 
-func _is_blocked(room_id: String, cell: Array, occupied: Dictionary, boarding: Array) -> bool:
+func _is_blocked(room_id: String, cell: Array, occupied: Dictionary, boarding: Dictionary) -> bool:
 	if cell.size() < 2:
 		return true
-	if boarding.size() >= 2 and int(cell[0]) == int(boarding[0]) and int(cell[1]) == int(boarding[1]):
-		return true
+	if str(boarding.get("room_id", "")) == room_id:
+		var bcell: Array = boarding.get("cell", []) as Array if typeof(boarding.get("cell", [])) == TYPE_ARRAY else []
+		if bcell.size() >= 2 and int(cell[0]) == int(bcell[0]) and int(cell[1]) == int(bcell[1]):
+			return true
 	var key: String = _cell_key(room_id, cell)
 	return key.is_empty() or occupied.has(key)
 
@@ -325,19 +307,35 @@ func _claim(room_id: String, cell: Array, occupied: Dictionary) -> void:
 		occupied[key] = true
 
 
+func _all_floor_cells(room: Dictionary) -> Array:
+	var out: Array = []
+	var seen: Dictionary = {}
+	var deck: int = int(room.get("deck", 0))
+	var placements: Array = room.get("structural_placements", [])
+	for placement in placements:
+		if typeof(placement) != TYPE_DICTIONARY:
+			continue
+		var placement_name: String = str((placement as Dictionary).get("name", ""))
+		if not placement_name.begins_with("floor_cell"):
+			continue
+		var parsed: Array = LayoutSerializerScript.parse_slot_cell(placement_name)
+		if parsed.size() < 2:
+			continue
+		var key: String = "%d|%d" % [int(parsed[0]), int(parsed[1])]
+		if seen.has(key):
+			continue
+		seen[key] = true
+		out.append([int(parsed[0]), int(parsed[1]), deck])
+	return out
+
+
 func _pick_slot_cell(
 		room: Dictionary,
 		kind: String,
 		occupied: Dictionary,
-		boarding: Array,
-		seed_value: int,
-		room_index: int) -> Dictionary:
+		boarding: Dictionary) -> Dictionary:
 	var rid: String = str(room.get("id", ""))
 	var deck: int = int(room.get("deck", 0))
-	var rng := RandomNumberGenerator.new()
-	rng.seed = (int(seed_value) ^ int(room_index)) & 0x7FFFFFFF
-	if rng.seed == 0:
-		rng.seed = 1
 	var reserved: Array = _interior_cell_list(room, "reserved_cells")
 	var reserved_set: Dictionary = {}
 	for cell in reserved:
@@ -348,18 +346,21 @@ func _pick_slot_cell(
 	if kind == "salvage":
 		picked = _pick_salvage_slot(rid, deck, centers, reserved, reserved_set, occupied, boarding)
 	else:
-		picked = _pick_loot_slot(rid, deck, centers, walls, reserved_set, occupied, boarding, rng)
+		picked = _pick_loot_slot(rid, deck, centers, walls, reserved_set, occupied, boarding)
 	if not picked.is_empty():
 		_claim(rid, picked.get("cell", []), occupied)
 		return picked
-	var fallback: Array = _get_first_floor_cell(room)
-	if fallback.size() >= 3 and not _is_blocked(rid, fallback, occupied, boarding):
+	var floors: Array = _all_floor_cells(room)
+	for i in range(floors.size()):
+		var fallback: Array = floors[i]
+		if _is_blocked(rid, fallback, occupied, boarding):
+			continue
+		if kind != "salvage" and reserved_set.has(_cell_key(rid, fallback)):
+			continue
+		# print (not push_warning): run_clean treats WARNING: as a hard fail.
 		print("GameplaySliceBuilder slot_fallback room=%s kind=%s" % [rid, kind])
 		_claim(rid, fallback, occupied)
-		return {"cell": fallback, "slot_kind": "floor", "slot_index": 0, "fallback": true}
-	if fallback.size() >= 3:
-		print("GameplaySliceBuilder slot_fallback room=%s kind=%s" % [rid, kind])
-		return {"cell": fallback, "slot_kind": "floor", "slot_index": 0, "fallback": true}
+		return {"cell": fallback, "slot_kind": "floor", "slot_index": i, "fallback": true}
 	return {}
 
 
@@ -370,8 +371,7 @@ func _pick_loot_slot(
 		walls: Array,
 		reserved_set: Dictionary,
 		occupied: Dictionary,
-		boarding: Array,
-		_rng: RandomNumberGenerator) -> Dictionary:
+		boarding: Dictionary) -> Dictionary:
 	for i in range(centers.size()):
 		var cell: Array = centers[i]
 		if _is_blocked(rid, cell, occupied, boarding):
@@ -396,7 +396,7 @@ func _pick_salvage_slot(
 		reserved: Array,
 		reserved_set: Dictionary,
 		occupied: Dictionary,
-		boarding: Array) -> Dictionary:
+		boarding: Dictionary) -> Dictionary:
 	var adjacent: Array = []
 	for i in range(centers.size()):
 		var cell: Array = centers[i]

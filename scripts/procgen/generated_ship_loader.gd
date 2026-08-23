@@ -7,6 +7,8 @@ const SliceAtmosphereApplierScript := preload("res://scripts/procgen/slice_atmos
 const LayoutSerializerScript := preload("res://scripts/procgen/layout_serializer.gd")
 
 const DRESSING_PROP_KINDS: Array[String] = ["crate", "pipe", "growth"]
+const COMPONENT_WALL_RESERVE: int = 3
+const COMPONENT_CENTER_RESERVE: int = 1
 
 signal ship_loaded(summary: Dictionary)
 signal load_failed(reason: String)
@@ -311,18 +313,12 @@ func _preflight_structural_wrappers(module_to_scene: Dictionary, structural_plan
 	var all_records: Array = []
 	all_records.append_array(edge_variant as Array)
 	all_records.append_array(floor_variant as Array)
-	var ceiling_variant: Variant = structural_plan.get("ceiling_placements", [])
-	if typeof(ceiling_variant) == TYPE_ARRAY:
-		all_records.append_array(ceiling_variant as Array)
-	var probed_modules: Dictionary = {}
 	for record_variant in all_records:
 		if typeof(record_variant) != TYPE_DICTIONARY:
 			push_error("structural plan wrapper preflight found non-object placement")
 			return false
 		var record: Dictionary = record_variant
 		var module_id: String = str(record.get("module_id", ""))
-		if probed_modules.has(module_id):
-			continue
 		var scene_path: String = str(module_to_scene.get(module_id, ""))
 		if module_id.is_empty() or scene_path.is_empty():
 			push_error("structural plan wrapper preflight missing wrapper for module %s" % module_id)
@@ -341,7 +337,6 @@ func _preflight_structural_wrappers(module_to_scene: Dictionary, structural_plan
 			push_error("structural plan wrapper preflight instance is not Node3D: %s" % module_id)
 			return false
 		probe.free()
-		probed_modules[module_id] = true
 	return true
 
 
@@ -451,6 +446,7 @@ func _build_objective_specs(layout_doc: Dictionary, gameplay_doc: Dictionary, ga
 			"type": str(objective.get("type", "unknown")),
 			"kind": kind,
 			"room_id": room_id,
+			"approach_cell": approach_cell.duplicate(),
 			"position": target_position,
 			"radius": OBJECTIVE_TRIGGER_RADIUS,
 			"steps": step_specs,
@@ -562,60 +558,31 @@ func _instance_structural_wrappers(layout_doc: Dictionary, module_to_scene: Dict
 	var floor_variant: Variant = structural_plan.get("floor_placements", null)
 	if typeof(edge_variant) != TYPE_ARRAY or typeof(floor_variant) != TYPE_ARRAY:
 		return -1
-	var ceiling_variant: Variant = structural_plan.get("ceiling_placements", [])
-	var ceilings: Array = ceiling_variant if typeof(ceiling_variant) == TYPE_ARRAY else []
 
 	# Instantiate detached first. No partial structural tree is published if a
 	# record is malformed or a wrapper fails; the caller can then discard the
 	# empty root atomically.
 	var pending: Array[Node3D] = []
-	var scene_cache: Dictionary = {}
 	for record_variant in (edge_variant as Array):
-		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, "edge", scene_cache)
+		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, false)
 		if wrapper == null:
 			for previous in pending:
 				previous.free()
-			_free_cached_prototypes(scene_cache)
 			return -1
 		pending.append(wrapper)
 	for record_variant in (floor_variant as Array):
-		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, "floor", scene_cache)
+		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, true)
 		if wrapper == null:
 			for previous in pending:
 				previous.free()
-			_free_cached_prototypes(scene_cache)
-			return -1
-		pending.append(wrapper)
-	for record_variant in ceilings:
-		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, "ceiling", scene_cache)
-		if wrapper == null:
-			for previous in pending:
-				previous.free()
-			_free_cached_prototypes(scene_cache)
 			return -1
 		pending.append(wrapper)
 	for wrapper in pending:
 		ship_root.add_child(wrapper)
-	_free_cached_prototypes(scene_cache)
 	return pending.size()
 
 
-func _free_cached_prototypes(scene_cache: Dictionary) -> void:
-	for key_variant in scene_cache.keys():
-		var key: String = str(key_variant)
-		if not key.ends_with("::proto"):
-			continue
-		var proto_variant: Variant = scene_cache[key_variant]
-		if proto_variant is Node:
-			(proto_variant as Node).free()
-		scene_cache.erase(key_variant)
-
-
-func _instantiate_structural_record(
-		record_variant: Variant,
-		module_to_scene: Dictionary,
-		record_kind: String,
-		scene_cache: Dictionary) -> Node3D:
+func _instantiate_structural_record(record_variant: Variant, module_to_scene: Dictionary, is_floor: bool) -> Node3D:
 	if typeof(record_variant) != TYPE_DICTIONARY:
 		return null
 	var record: Dictionary = record_variant
@@ -623,24 +590,10 @@ func _instantiate_structural_record(
 	var scene_path: String = str(module_to_scene.get(module_id, ""))
 	if module_id.is_empty() or scene_path.is_empty() or not ResourceLoader.exists(scene_path):
 		return null
-	var scene: Resource = null
-	if scene_cache.has(scene_path):
-		scene = scene_cache[scene_path]
-	else:
-		scene = ResourceLoader.load(scene_path)
-		if scene != null and scene is PackedScene:
-			scene_cache[scene_path] = scene
+	var scene: Resource = ResourceLoader.load(scene_path)
 	if scene == null or not (scene is PackedScene):
 		return null
-	var proto_key: String = "%s::proto" % scene_path
-	var instance: Node = null
-	if scene_cache.has(proto_key):
-		instance = (scene_cache[proto_key] as Node3D).duplicate()
-	else:
-		instance = (scene as PackedScene).instantiate()
-		if instance != null and instance is Node3D:
-			scene_cache[proto_key] = instance
-			instance = (instance as Node3D).duplicate()
+	var instance: Node = (scene as PackedScene).instantiate()
 	if instance == null or not (instance is Node3D):
 		if instance != null:
 			instance.free()
@@ -652,7 +605,7 @@ func _instantiate_structural_record(
 		return null
 	wrapper.position = Vector3(float(placement_pos[0]), float(placement_pos[1]), float(placement_pos[2]))
 	wrapper.rotation_degrees.y = float(record.get("yaw_degrees", 0.0))
-	if record_kind == "floor":
+	if is_floor:
 		var cell_key_value: String = str(record.get("cell_key", ""))
 		wrapper.name = "Floor_%s" % cell_key_value.replace("|", "_")
 		wrapper.set_meta("structural_floor_placement_id", str(record.get("placement_id", record.get("id", ""))))
@@ -661,16 +614,6 @@ func _instantiate_structural_record(
 		wrapper.set_meta("structural_kind", "FLOOR")
 		wrapper.set_meta("module_kind", module_id)
 		wrapper.set_meta("module_key", "floor/%s" % cell_key_value)
-		wrapper.set_meta("room_id", str(record.get("room_id", "")))
-	elif record_kind == "ceiling":
-		var ceiling_key: String = str(record.get("cell_key", ""))
-		wrapper.name = "Ceiling_%s" % ceiling_key.replace("|", "_")
-		wrapper.set_meta("structural_ceiling_placement_id", str(record.get("placement_id", record.get("id", ""))))
-		wrapper.set_meta("structural_ceiling_cell_key", ceiling_key)
-		wrapper.set_meta("structural_room_id", str(record.get("room_id", "")))
-		wrapper.set_meta("structural_kind", "CEILING")
-		wrapper.set_meta("module_kind", module_id)
-		wrapper.set_meta("module_key", "ceiling/%s" % ceiling_key)
 		wrapper.set_meta("room_id", str(record.get("room_id", "")))
 	else:
 		var edge_key_value: String = str(record.get("edge_key", ""))
@@ -1206,7 +1149,51 @@ func _dressing_occupied_cells(layout_doc: Dictionary, rooms: Array) -> Dictionar
 			var parsed: Array = LayoutSerializerScript.parse_slot_cell(obj.get("approach_cell", []))
 			if parsed.size() >= 2:
 				occupied["%s|%d|%d" % [str(obj.get("room_id", "")), int(parsed[0]), int(parsed[1])]] = true
+	_reserve_component_slots(rooms, occupied)
 	return occupied
+
+
+func _reserve_component_slots(rooms: Array, occupied: Dictionary) -> void:
+	# Components populate after dressing; hold the same 3 wall + 1 center cap
+	# those fills will take so clutter cannot steal machine slots.
+	for room_variant in rooms:
+		if typeof(room_variant) != TYPE_DICTIONARY:
+			continue
+		var room: Dictionary = room_variant
+		var rid: String = str(room.get("id", ""))
+		if rid.is_empty():
+			continue
+		var interior: Variant = room.get("interior_zones", {})
+		if not (interior is Dictionary):
+			continue
+		var walls_v: Variant = (interior as Dictionary).get("wall_slots", [])
+		var wall_kept: int = 0
+		if walls_v is Array:
+			for item in (walls_v as Array):
+				if wall_kept >= COMPONENT_WALL_RESERVE:
+					break
+				var parsed: Array = LayoutSerializerScript.parse_slot_cell(item)
+				if parsed.size() < 2:
+					continue
+				var key: String = "%s|%d|%d" % [rid, int(parsed[0]), int(parsed[1])]
+				if occupied.has(key):
+					continue
+				occupied[key] = true
+				wall_kept += 1
+		var centers_v: Variant = (interior as Dictionary).get("center_slots", [])
+		var center_kept: int = 0
+		if centers_v is Array:
+			for item in (centers_v as Array):
+				if center_kept >= COMPONENT_CENTER_RESERVE:
+					break
+				var parsed: Array = LayoutSerializerScript.parse_slot_cell(item)
+				if parsed.size() < 2:
+					continue
+				var key: String = "%s|%d|%d" % [rid, int(parsed[0]), int(parsed[1])]
+				if occupied.has(key):
+					continue
+				occupied[key] = true
+				center_kept += 1
 
 
 func _place_dressing_props(

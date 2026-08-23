@@ -7,6 +7,9 @@ class_name ComponentPlacementState
 const ComponentCatalogScript := preload("res://scripts/systems/component_catalog.gd")
 const LayoutSerializerScript := preload("res://scripts/procgen/layout_serializer.gd")
 
+const MAX_WALL_FILLS: int = 3
+const MAX_CENTER_FILLS: int = 1
+
 ## placed: Array of {component_instance_id, component_id, room_id, slot_kind, slot_index, cell, condition, linked_system, linked_subcomponent, item_form, mass}
 var placed: Array = []
 var seed_value: int = 0
@@ -62,7 +65,10 @@ func _fill_slots(
 		return 0
 	var reserved: Dictionary = _reserved_cell_keys(room, room_id)
 	var filled: int = 0
+	var max_fill: int = MAX_WALL_FILLS if slot_kind == "wall" else MAX_CENTER_FILLS
 	for i in range(slots.size()):
+		if filled >= max_fill:
+			break
 		var key: String = "%s|%s|%d" % [room_id, slot_kind, i]
 		if used_keys.has(key):
 			continue
