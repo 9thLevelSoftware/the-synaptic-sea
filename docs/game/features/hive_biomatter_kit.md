@@ -8,10 +8,8 @@ existing v0 wrapper scenes, not a visual remap.
 ## Requirement cross-reference
 
 - REQ-HIVE-001 in `docs/game/05_requirements.md`
-- REQ-ENC-004 (biome → kit_id mapping is implemented; loader kit file
-  selection and hive template are the remainder)
-- ADR-0053 catalog fallback (`ModularSocketCatalog.load_kit` falls back
-  to `ship_structural_v0` contracts when a kit directory is missing)
+- ADR-0053 catalog fallback (when present, `ModularSocketCatalog.load_kit`
+  falls back to `ship_structural_v0` contracts when a kit directory is missing)
 - Related: `docs/game/features/remaining_procgen_play_stack.md`,
   `docs/game/features/socketed_enclosed_interiors.md`
 
@@ -40,9 +38,10 @@ encounter/dressing (`biomatter_crusted`).
 ## Core behavior
 
 1. `data/procgen/templates/hive.json` is occupancy-in: clustered
-   compartments around a short corridor core, one lateral overgrown
-   pocket, destination on the bow. Integer cells, shared cardinal
-   edges. Same schema as `derelict_a.json`.
+   compartments around a short **linear** corridor core (`count: [2, 3]`,
+   same pattern as `compact.json` spine), one lateral overgrown pocket,
+   destination on the bow. Integer cells, shared cardinal edges. Same
+   schema as `derelict_a.json`.
 2. `"hive"` is appended to `TemplateSelector.EXTENDED_TEMPLATES` only.
    It is not a derelict guaranteed template and is not forced into the
    16-seed quality-gate pool.

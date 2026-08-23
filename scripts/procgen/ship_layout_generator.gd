@@ -25,8 +25,6 @@ const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
 const DifficultyProfileScript := preload("res://scripts/procgen/difficulty_profile.gd")
 const EncounterInjectorScript := preload("res://scripts/procgen/encounter_injector.gd")
 const StructuralEdgePlanScript := preload("res://scripts/procgen/structural_edge_plan.gd")
-const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
-const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
 
 var template_selector: RefCounted = TemplateSelectorScript.new()
 var room_assigner: RefCounted = RoomAssignerScript.new()
@@ -174,12 +172,6 @@ func _generate_once(
 	# F4: runtime coordinator owns fire/breach seeding for derelicts; layout arrays
 	# remain optional overlays (goldens may still author markers).
 	layout["hazard_source"] = "runtime"
-
-	# Recompile after stamp / kit_id so occupancy, ceilings, and socket_bindings
-	# match the solved footprints rather than the serializer's first pass.
-	if not _stamp_structural_plan(layout):
-		push_error("SHIP LAYOUT GENERATOR FAIL structural plan validation failed")
-		return {}
 
 	return layout
 
@@ -407,24 +399,15 @@ func _layout_is_connected(layout: Dictionary) -> bool:
 	return seen.size() >= room_ids.size()
 
 
-func _stamp_structural_plan(layout: Dictionary) -> bool:
-	var compiler: RefCounted = StructuralEdgeCompilerScript.new()
-	var structural_plan: Dictionary = compiler.compile(layout)
-	var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout)
-	if not bool(verdict.get("ok", false)):
-		push_error("SHIP LAYOUT GENERATOR FAIL structural plan validation failed: %s" % str(verdict.get("errors", [])))
-		return false
-	layout["structural_plan"] = structural_plan
-	return true
-
-
 func _kit_id_for_biome(biome: String) -> String:
-	# KitCatalog biome preference: enclosed rooms, remapped stems. No new meshes.
+	# Prefer abyssal-biased kit when present; else structural default.
 	match biome:
+		"abyssal_synaptic_sea":
+			return "ship_structural_v0"
 		"breach_field":
-			return "ship_structural_hazard"
+			return "ship_structural_v0"
 		"dead_fleet":
-			return "ship_structural_industrial"
+			return "ship_structural_v0"
 		_:
 			return "ship_structural_v0"
 

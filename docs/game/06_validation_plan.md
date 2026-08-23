@@ -41,7 +41,7 @@ Expected:
 ## Hive template + biomatter kit remap (REQ-HIVE-001) — GREEN
 
 Feature: `docs/game/features/hive_biomatter_kit.md`.
-Requirements: REQ-HIVE-001.
+Requirement: REQ-HIVE-001.
 Registered in the regression bundle after GREEN.
 
 ```bash

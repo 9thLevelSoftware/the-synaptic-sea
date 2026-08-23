@@ -1600,7 +1600,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ---
 
-# Hive template + biomatter kit (remaining procgen play stack WP4)
+# Hive topology + biomatter kit remap
 
 ## REQ-HIVE-001: Hive template + biomatter kit remap
 

@@ -18,10 +18,13 @@
       "role_pool": [
         "corridor"
       ],
-      "count": 1,
+      "count": [
+        2,
+        3
+      ],
       "position_hint": "center",
       "deck": 0,
-      "layout": "single",
+      "layout": "linear",
       "attach_to": "entry"
     },
     {

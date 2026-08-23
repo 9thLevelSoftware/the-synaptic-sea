@@ -23,6 +23,7 @@ var layout_generator: RefCounted = ShipLayoutGeneratorScript.new()
 # exactly, so existing callers/smokes are unaffected.
 var biome_id: String = ""
 var difficulty_id: String = ""
+var _wrapper_map_cache: Dictionary = {}
 
 
 # Sets the biome / difficulty applied to the NEXT generate()/generate_from_seed()
@@ -132,14 +133,9 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 
 	# Layout kit_id selects the structural JSON. Hazard/industrial catalogs have
 	# no modules[].godot_wrapper_scene array yet, so they fall back to v0 wrappers.
-	var kit_id: String = str(layout.get("kit_id", "ship_structural_v0"))
-	if kit_id.is_empty():
-		kit_id = "ship_structural_v0"
-	var kit_path: String = "res://data/kits/%s.json" % kit_id
+	var kit_path: String = kit_path_for_layout(layout)
 	# FileAccess.file_exists natively supports res:// and works in exported
 	# builds (.pck); ProjectSettings.globalize_path would break inside a pack.
-	if not FileAccess.file_exists(kit_path) or not _kit_has_wrapper_map(kit_path):
-		kit_path = "res://data/kits/ship_structural_v0.json"
 	if not FileAccess.file_exists(kit_path):
 		push_error("SHIP GENERATOR FAIL structural kit not found: %s" % kit_path)
 		return null
@@ -170,19 +166,32 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 	return loader
 
 
+func kit_path_for_layout(layout: Dictionary) -> String:
+	var kit_id: String = str(layout.get("kit_id", "ship_structural_v0"))
+	if kit_id.is_empty():
+		kit_id = "ship_structural_v0"
+	var kit_path: String = "res://data/kits/%s.json" % kit_id
+	if not _kit_has_wrapper_map(kit_path):
+		kit_path = "res://data/kits/ship_structural_v0.json"
+	return kit_path
+
+
 func _kit_has_wrapper_map(kit_path: String) -> bool:
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(kit_path))
-	if not (parsed is Dictionary):
-		return false
-	var modules_v: Variant = (parsed as Dictionary).get("modules", [])
-	if not (modules_v is Array) or (modules_v as Array).is_empty():
-		return false
-	for entry in (modules_v as Array):
-		if not (entry is Dictionary):
-			return false
-		if str((entry as Dictionary).get("module_id", "")).is_empty():
-			return false
-		if str((entry as Dictionary).get("godot_wrapper_scene", "")).is_empty():
-			return false
-	return true
+	if _wrapper_map_cache.has(kit_path):
+		return bool(_wrapper_map_cache[kit_path])
+	var ok: bool = false
+	if FileAccess.file_exists(kit_path):
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(kit_path))
+		if parsed is Dictionary:
+			var modules_v: Variant = (parsed as Dictionary).get("modules", [])
+			if modules_v is Array and not (modules_v as Array).is_empty():
+				ok = true
+				for entry in (modules_v as Array):
+					if not (entry is Dictionary) \
+							or str((entry as Dictionary).get("module_id", "")).is_empty() \
+							or str((entry as Dictionary).get("godot_wrapper_scene", "")).is_empty():
+						ok = false
+						break
+	_wrapper_map_cache[kit_path] = ok
+	return ok
 
