@@ -166,19 +166,20 @@ func _check_sockets_fallback() -> bool:
 	var mid: String = str(catalog.modules.keys()[0])
 	if catalog.sockets_of(mid).is_empty():
 		return _fail("v0 fallback module %s has no sockets" % mid)
-	var inner_a: Dictionary = {
-		"kind": "inner_corner_vertex",
-		"compatible_kinds": ["wall_edge", "portal_edge"],
-	}
+	var inner_a: Dictionary = _socket_of_kind(catalog, "wall_inner_corner", "inner_corner_vertex")
+	var wall_end: Dictionary = _socket_of_kind(catalog, "wall_straight_1x1", "wall_end")
+	var portal: Dictionary = _socket_of_kind(catalog, "pressure_door_1x1", "portal_edge")
+	if inner_a.is_empty() or wall_end.is_empty() or portal.is_empty():
+		return _fail("v0 fallback missing authored wall_end/inner_corner/portal_edge sockets")
 	var inner_b: Dictionary = inner_a.duplicate(true)
 	if catalog.sockets_compatible(inner_a, inner_b):
 		return _fail("same-kind inner_corner_vertex must still consult compatible_kinds")
-	var wall: Dictionary = {
-		"kind": "wall_edge",
-		"compatible_kinds": ["wall_edge", "portal_edge", "inner_corner_vertex"],
-	}
-	if not catalog.sockets_compatible(inner_a, wall):
-		return _fail("inner_corner_vertex should join wall_edge via compatible_kinds")
+	if not catalog.sockets_compatible(wall_end, wall_end.duplicate(true)):
+		return _fail("authored wall_end sockets should join each other via wall_edge alias")
+	if not catalog.sockets_compatible(wall_end, portal):
+		return _fail("wall_end should join authored portal_edge")
+	if not catalog.sockets_compatible(inner_a, wall_end):
+		return _fail("inner_corner_vertex should join authored wall_end")
 	return true
 
 
@@ -347,6 +348,16 @@ func _cells_centroid_x(cells: Array[Vector2i]) -> float:
 	for cell in cells:
 		acc += float(cell.x)
 	return acc / float(cells.size())
+
+
+func _socket_of_kind(catalog: ModularSocketCatalogScript, module_id: String, kind: String) -> Dictionary:
+	for socket_v in catalog.sockets_of(module_id):
+		if typeof(socket_v) != TYPE_DICTIONARY:
+			continue
+		var socket: Dictionary = socket_v
+		if str(socket.get("kind", "")) == kind:
+			return socket
+	return {}
 
 
 func _fail(msg: String) -> bool:

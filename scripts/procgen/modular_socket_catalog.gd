@@ -24,6 +24,10 @@ const ENCLOSURE_KINDS: Array[String] = [
 	"ceiling_bottom",
 ]
 
+# v0 wall_straight_1x1 exposes wall_end (and wall_base on some kits) while
+# authored compatible_kinds name the abstract join wall_edge.
+const WALL_JOIN_KINDS: Array[String] = ["wall_edge", "wall_end", "wall_base"]
+
 var kit_id: String = ""
 var modules: Dictionary = {}
 
@@ -106,13 +110,13 @@ func sockets_compatible(socket_a: Dictionary, socket_b: Dictionary) -> bool:
 		return false
 	if not ENCLOSURE_KINDS.has(kind_a) or not ENCLOSURE_KINDS.has(kind_b):
 		return false
-	var compatible_a: Array = _compatible_kinds(socket_a)
-	var compatible_b: Array = _compatible_kinds(socket_b)
-	if compatible_a.is_empty():
-		compatible_a = [kind_a]
-	if compatible_b.is_empty():
-		compatible_b = [kind_b]
-	return compatible_a.has(kind_b) and compatible_b.has(kind_a)
+	# One authored list naming the other kind (or its wall_edge alias) is enough.
+	# Mutual membership rejects v0 wall_end↔portal_edge and wall_end↔inner_corner
+	# because portals/corners list wall_edge, not wall_end. Same-kind still fails
+	# when the list omits that kind (inner_corner_vertex).
+	var accepts_b: bool = _list_accepts(_effective_compatible_kinds(socket_a, kind_a), kind_b)
+	var accepts_a: bool = _list_accepts(_effective_compatible_kinds(socket_b, kind_b), kind_a)
+	return accepts_b or accepts_a
 
 
 func world_socket_position(placement_position: Vector3, yaw_degrees: float, local_position: Vector3) -> Vector3:
@@ -194,6 +198,24 @@ func _compatible_kinds(socket: Dictionary) -> Array:
 	if typeof(kinds_variant) != TYPE_ARRAY:
 		return []
 	return kinds_variant
+
+
+func _effective_compatible_kinds(socket: Dictionary, kind: String) -> Array:
+	var compatible: Array = _compatible_kinds(socket)
+	if compatible.is_empty():
+		return [kind]
+	return compatible
+
+
+func _list_accepts(compatible: Array, other_kind: String) -> bool:
+	if compatible.has(other_kind):
+		return true
+	if not WALL_JOIN_KINDS.has(other_kind):
+		return false
+	for join_kind in WALL_JOIN_KINDS:
+		if compatible.has(join_kind):
+			return true
+	return false
 
 
 func _snap_to_grid(value: Vector3) -> Vector3:

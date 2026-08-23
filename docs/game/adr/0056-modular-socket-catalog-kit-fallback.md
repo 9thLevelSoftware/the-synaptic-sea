@@ -15,7 +15,7 @@ A kit-id stamp without a socket catalog would either fail closed (no sockets, no
 
 1. `ModularSocketCatalog` is the runtime consumer of structural socket contracts. `load_kit(kit_id)` loads `data/placement/contracts/structural/<kit_id>/`.
 2. If that directory is missing or yields no modules, the catalog loads `ship_structural_v0` and binds `kit_id` to `DEFAULT_KIT_ID`. Callers must not synthesize unique meshes for the missing kit.
-3. `sockets_compatible` is mutual `compatible_kinds` membership for both equal and differing kinds. Authored lists are authoritative; same-kind is not an automatic join (inner/outer corner vertex sockets list only `wall_edge` / `portal_edge`).
+3. `sockets_compatible` accepts a join when either authored `compatible_kinds` list names the other socket's kind. v0 `wall_end` / `wall_base` alias `wall_edge` because contracts expose those kinds while lists name the abstract join. Same-kind is not an automatic join (inner/outer corner vertex sockets list only `wall_edge` / `portal_edge`).
 4. Wrapper-map absence in `ShipGenerator` remains a separate fallback to `ship_structural_v0.json` scene paths. Catalog fallback does not replace that path.
 
 ## Consequences
@@ -32,4 +32,4 @@ A kit-id stamp without a socket catalog would either fail closed (no sockets, no
 
 ## Verification
 
-- `hive_biomatter_kit_smoke.gd` (`sockets_fallback=true`, catalog `load_kit("ship_structural_biomatter")` binds v0, `sockets_compatible` rejects same-kind inner-corner joins)
+- `hive_biomatter_kit_smoke.gd` (`sockets_fallback=true`, catalog `load_kit("ship_structural_biomatter")` binds v0, authored `wall_end` joins portal/inner-corner, same-kind inner-corner still rejected)
