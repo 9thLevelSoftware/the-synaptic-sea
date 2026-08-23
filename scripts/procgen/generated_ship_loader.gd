@@ -4,6 +4,7 @@ class_name GeneratedShipLoader
 const GameplayObjectiveVolumeScript := preload("res://scripts/procgen/gameplay_objective_volume.gd")
 const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
 const SliceAtmosphereApplierScript := preload("res://scripts/procgen/slice_atmosphere_applier.gd")
+const IntegrityVisualResolverScript := preload("res://scripts/systems/integrity_visual_resolver.gd")
 const LayoutSerializerScript := preload("res://scripts/procgen/layout_serializer.gd")
 const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
 const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
@@ -143,6 +144,7 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 	if instantiated_count < 0:
 		clear_loaded_ship()
 		return _fail_load("failed to instantiate structural wrapper scenes")
+	_apply_module_damage_visuals(layout_doc, structural_root)
 
 	var nav_region: NavigationRegion3D = _build_navigation_region(rooms, structural_root)
 	if nav_region == null:
@@ -564,25 +566,34 @@ func _instance_structural_wrappers(layout_doc: Dictionary, module_to_scene: Dict
 	# empty root atomically.
 	var pending: Array[Node3D] = []
 	for record_variant in (edge_variant as Array):
-		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, false)
+		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, "edge")
 		if wrapper == null:
 			for previous in pending:
 				previous.free()
 			return -1
 		pending.append(wrapper)
 	for record_variant in (floor_variant as Array):
-		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, true)
+		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, "floor")
 		if wrapper == null:
 			for previous in pending:
 				previous.free()
 			return -1
 		pending.append(wrapper)
+	var ceiling_variant: Variant = structural_plan.get("ceiling_placements", [])
+	if ceiling_variant is Array:
+		for record_variant in (ceiling_variant as Array):
+			var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, "ceiling")
+			if wrapper == null:
+				for previous in pending:
+					previous.free()
+				return -1
+			pending.append(wrapper)
 	for wrapper in pending:
 		ship_root.add_child(wrapper)
 	return pending.size()
 
 
-func _instantiate_structural_record(record_variant: Variant, module_to_scene: Dictionary, is_floor: bool) -> Node3D:
+func _instantiate_structural_record(record_variant: Variant, module_to_scene: Dictionary, layer: String) -> Node3D:
 	if typeof(record_variant) != TYPE_DICTIONARY:
 		return null
 	var record: Dictionary = record_variant
@@ -605,22 +616,32 @@ func _instantiate_structural_record(record_variant: Variant, module_to_scene: Di
 		return null
 	wrapper.position = Vector3(float(placement_pos[0]), float(placement_pos[1]), float(placement_pos[2]))
 	wrapper.rotation_degrees.y = float(record.get("yaw_degrees", 0.0))
-	if is_floor:
+	var placement_id: String = str(record.get("placement_id", record.get("id", "")))
+	if layer == "floor":
 		var cell_key_value: String = str(record.get("cell_key", ""))
 		wrapper.name = "Floor_%s" % cell_key_value.replace("|", "_")
-		wrapper.set_meta("structural_floor_placement_id", str(record.get("placement_id", record.get("id", ""))))
+		wrapper.set_meta("structural_floor_placement_id", placement_id)
 		wrapper.set_meta("structural_cell_key", cell_key_value)
 		wrapper.set_meta("structural_room_id", str(record.get("room_id", "")))
 		wrapper.set_meta("structural_kind", "FLOOR")
 		wrapper.set_meta("module_kind", module_id)
 		wrapper.set_meta("module_key", "floor/%s" % cell_key_value)
 		wrapper.set_meta("room_id", str(record.get("room_id", "")))
+	elif layer == "ceiling":
+		var ceil_key: String = str(record.get("cell_key", ""))
+		wrapper.name = "Ceiling_%s" % ceil_key.replace("|", "_")
+		wrapper.set_meta("structural_ceiling_placement_id", placement_id)
+		wrapper.set_meta("structural_cell_key", ceil_key)
+		wrapper.set_meta("structural_kind", "CEILING")
+		wrapper.set_meta("module_kind", module_id)
+		wrapper.set_meta("module_key", "ceiling/%s" % ceil_key)
+		wrapper.set_meta("room_id", str(record.get("room_id", "")))
 	else:
 		var edge_key_value: String = str(record.get("edge_key", ""))
 		wrapper.name = "StructuralEdge_%s" % edge_key_value.replace("|", "_")
 		wrapper.set_meta("structural_edge_key", edge_key_value)
 		wrapper.set_meta("structural_kind", str(record.get("kind", "")))
-		wrapper.set_meta("structural_placement_id", str(record.get("placement_id", record.get("id", ""))))
+		wrapper.set_meta("structural_placement_id", placement_id)
 		wrapper.set_meta("structural_room_ids", (record.get("room_ids", []) as Array).duplicate(true))
 		wrapper.set_meta("module_kind", module_id)
 		wrapper.set_meta("module_key", "edge/%s" % edge_key_value)
@@ -628,6 +649,55 @@ func _instantiate_structural_record(record_variant: Variant, module_to_scene: Di
 		wrapper.set_meta("room_id", str(room_ids[0]) if not room_ids.is_empty() else "")
 	wrapper.set_meta("integrity_state", "intact")
 	return wrapper
+
+
+func _apply_module_damage_visuals(layout: Dictionary, ship_root: Node3D) -> void:
+	if ship_root == null:
+		return
+	var lookup: Dictionary = _module_damage_lookup(layout)
+	if lookup.is_empty():
+		return
+	_apply_module_damage_visuals_in_tree(ship_root, lookup)
+
+
+func _module_damage_lookup(layout: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	var md_v: Variant = layout.get("module_damage", [])
+	if typeof(md_v) != TYPE_ARRAY:
+		return out
+	for row_v in (md_v as Array):
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		var key: String = str(row.get("module_key", row.get("module_id", "")))
+		if not key.is_empty():
+			out[key] = row
+		var placement_id: String = str(row.get("placement_id", ""))
+		if not placement_id.is_empty():
+			out[placement_id] = row
+	return out
+
+
+func _apply_module_damage_visuals_in_tree(node: Node, lookup: Dictionary) -> void:
+	if node is Node3D and node.has_meta("module_key"):
+		var module_key: String = str(node.get_meta("module_key"))
+		var placement_id: String = ""
+		if node.has_meta("structural_placement_id"):
+			placement_id = str(node.get_meta("structural_placement_id"))
+		elif node.has_meta("structural_floor_placement_id"):
+			placement_id = str(node.get_meta("structural_floor_placement_id"))
+		elif node.has_meta("structural_ceiling_placement_id"):
+			placement_id = str(node.get_meta("structural_ceiling_placement_id"))
+		var row_v: Variant = lookup.get(module_key, lookup.get(placement_id, {}))
+		if row_v is Dictionary and not (row_v as Dictionary).is_empty():
+			var state: String = str((row_v as Dictionary).get("state", "intact"))
+			if state.is_empty():
+				state = "intact"
+			(node as Node3D).set_meta("integrity_state", state)
+			if state != "intact":
+				IntegrityVisualResolverScript.apply_visual_state(node as Node3D, state)
+	for child in node.get_children():
+		_apply_module_damage_visuals_in_tree(child, lookup)
 
 
 func _parse_prefixed_int(value: String, prefix: String) -> int:

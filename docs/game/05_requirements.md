@@ -1558,6 +1558,24 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - `ship_nav_graph_smoke.gd`
   - `procgen_quality_gate_smoke.gd`
 
+## REQ-DECAY-001: Live wreck stamps
+
+- Source: `features/live_decay_stamping.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: DAMAGED/WRECKED generation must overlay locked doors and pre-damaged modules on the live compile path without deleting `room_links`.
+- Acceptance criteria:
+  - `Condition.DAMAGED` / `WRECKED` layouts overlay `blocked_links` without removing `room_links`.
+  - Matching portals are `LOCKED` (optional existing-DOOR `BREACH` on WRECKED). Never insert a portal.
+  - `wreck_applied=true` and `module_damage` keyed by loader `module_key` after the last compile.
+  - At least one wrapper is not `intact`, with the Damaged or Breached child visible.
+  - Imports emit no unclassified ERROR/WARNING. `_layout_is_connected` remains true. Standing start→goal remains.
+- Verification:
+  - `live_decay_stamp_smoke.gd`
+  - `structural_variant_wrapper_smoke.gd`
+  - `procgen_quality_gate_smoke.gd`
+
 ## REQ-AVB-009: Explicit derived refresh preserves authored extensions
 
 - Source: `features/asset_metadata_pipeline.md`, ADR-0052

@@ -25,6 +25,10 @@ const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
 const DifficultyProfileScript := preload("res://scripts/procgen/difficulty_profile.gd")
 const EncounterInjectorScript := preload("res://scripts/procgen/encounter_injector.gd")
 const StructuralEdgePlanScript := preload("res://scripts/procgen/structural_edge_plan.gd")
+const LayoutMutatorScript := preload("res://scripts/procgen/layout_mutator.gd")
+const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
+const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
+const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 
 var template_selector: RefCounted = TemplateSelectorScript.new()
 var room_assigner: RefCounted = RoomAssignerScript.new()
@@ -173,7 +177,52 @@ func _generate_once(
 	# remain optional overlays (goldens may still author markers).
 	layout["hazard_source"] = "runtime"
 
+	# Overlay locks/breaches before compile so the plan sees LOCKED/BREACH kinds.
+	# Wreck module_damage is keyed by compiler module_key and must land after
+	# the last compile (quality-gate never calls ShipGenerator).
+	_apply_condition_mutators(layout, blueprint)
+	if not _stamp_structural_plan(layout):
+		return {}
+	_apply_wreck_to_compiled_plan(layout, blueprint)
+
 	return layout
+
+
+func _apply_condition_mutators(layout: Dictionary, blueprint: RefCounted) -> void:
+	if blueprint == null:
+		return
+	var condition: int = int(blueprint.condition)
+	if condition == ShipBlueprintScript.Condition.PRISTINE:
+		return
+	var seed_value: int = int(blueprint.seed_value)
+	LayoutMutatorScript.apply_branch_overlays(layout, seed_value)
+	var wrecked: bool = condition == ShipBlueprintScript.Condition.WRECKED
+	LayoutMutatorScript.apply_portal_overlays(layout, seed_value, wrecked)
+
+
+func _stamp_structural_plan(layout: Dictionary) -> bool:
+	var compiler: RefCounted = StructuralEdgeCompilerScript.new()
+	var structural_plan: Dictionary = compiler.compile(layout)
+	var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout)
+	if not bool(verdict.get("ok", false)):
+		push_error("SHIP LAYOUT GENERATOR FAIL structural plan validation failed: %s" % JSON.stringify(verdict.get("errors", [])))
+		layout["structural_plan_validated"] = false
+		return false
+	layout["structural_plan"] = structural_plan
+	layout["structural_plan_validated"] = true
+	return true
+
+
+func _apply_wreck_to_compiled_plan(layout: Dictionary, blueprint: RefCounted) -> void:
+	if blueprint == null:
+		return
+	var condition: int = int(blueprint.condition)
+	if condition == ShipBlueprintScript.Condition.PRISTINE:
+		return
+	var frac: float = 0.35
+	if condition == ShipBlueprintScript.Condition.WRECKED:
+		frac = 0.55
+	LayoutMutatorScript.apply_wreck_to_compiled_plan(layout, int(blueprint.seed_value), null, frac)
 
 
 func _stamp_explicit_structural_layout(layout: Dictionary, cell_grid: Dictionary) -> bool:

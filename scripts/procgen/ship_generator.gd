@@ -91,16 +91,21 @@ func generate_from_seed(
 
 
 func _load_layout_as_scene(layout: Dictionary) -> Node3D:
-	# Compile and validate before creating temp files or touching the loader. A
-	# malformed footprint/portal plan is a hard generation failure, not a best
-	# effort visual fallback.
-	var compiler: RefCounted = StructuralEdgeCompilerScript.new()
-	var structural_plan: Dictionary = compiler.compile(layout)
-	var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout)
-	if not bool(verdict.get("ok", false)):
-		push_error("SHIP GENERATOR FAIL structural plan validation failed: %s" % JSON.stringify(verdict.get("errors", [])))
-		return null
-	layout["structural_plan"] = structural_plan
+	# Skip recompile when ShipLayoutGenerator already stamped a validated plan.
+	# Never restamp wreck here — module_damage keys would drift from the plan.
+	var plan_variant: Variant = layout.get("structural_plan", {})
+	var plan_ready: bool = plan_variant is Dictionary \
+		and not (plan_variant as Dictionary).is_empty() \
+		and bool(layout.get("structural_plan_validated", false))
+	if not plan_ready:
+		var compiler: RefCounted = StructuralEdgeCompilerScript.new()
+		var structural_plan: Dictionary = compiler.compile(layout)
+		var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout)
+		if not bool(verdict.get("ok", false)):
+			push_error("SHIP GENERATOR FAIL structural plan validation failed: %s" % JSON.stringify(verdict.get("errors", [])))
+			return null
+		layout["structural_plan"] = structural_plan
+		layout["structural_plan_validated"] = true
 
 	# Write layout, kit reference, and minimal gameplay slice to temp files
 	var temp_dir: String = "user://procgen_temp"

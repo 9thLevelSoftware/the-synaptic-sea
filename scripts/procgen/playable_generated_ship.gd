@@ -121,6 +121,7 @@ const WebInfestationStateScript := preload("res://scripts/systems/web_infestatio
 const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
 const ModuleIntegrityMapScript := preload("res://scripts/systems/module_integrity_map.gd")
 const ModuleIntegrityConsequencesScript := preload("res://scripts/systems/module_integrity_consequences.gd")
+const IntegrityVisualResolverScript := preload("res://scripts/systems/integrity_visual_resolver.gd")
 const ModuleDamageRouterScript := preload("res://scripts/systems/module_damage_router.gd")
 const ExtinguisherStateScript := preload("res://scripts/systems/extinguisher_state.gd")
 const FireSuppressionPointScript := preload("res://scripts/tools/fire_suppression_point.gd")
@@ -3499,7 +3500,7 @@ func _apply_fire_module_integrity(delta: float) -> void:
 	if layout.is_empty():
 		return
 	if module_integrity_map.size() == 0:
-		ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
+		ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(module_integrity_map, layout)
 	var resist: float = _hub_structure_damage_resist()
 	var rate: float = ModuleIntegrityConsequencesScript.FIRE_MODULE_DAMAGE_PER_INTENSITY * (1.0 - resist)
 	var changed: Array = ModuleIntegrityConsequencesScript.apply_fire_damage(
@@ -3508,13 +3509,7 @@ func _apply_fire_module_integrity(delta: float) -> void:
 	if changed.is_empty():
 		return
 	_apply_module_integrity_scene(changed)
-	# Soften nav through rooms with breaches/destroyed walls (threat nav graph).
-	var nav = null
-	if threat_manager != null and "nav_graph" in threat_manager:
-		nav = threat_manager.nav_graph
-	if nav != null and nav is RefCounted and (nav as RefCounted).has_method("set_edge_cost_multiplier"):
-		var gap_rooms: PackedStringArray = module_integrity_map.rooms_with_nav_gaps()
-		ModuleIntegrityConsequencesScript.apply_nav_gaps(nav as RefCounted, gap_rooms)
+	_apply_integrity_nav_gaps()
 
 
 ## Hull breaches + module wall breaches (atmosphere links).
@@ -4064,7 +4059,7 @@ func _try_work_action_interact(player_body) -> bool:
 		if module_integrity_map == null:
 			module_integrity_map = ModuleIntegrityMapScript.new()
 		if module_integrity_map.size() == 0:
-			ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
+			ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(module_integrity_map, layout)
 		var has_lance: bool = int(inv.get("welding_lance", 0)) > 0 or int(inv.get("tool_welding_lance", 0)) > 0
 		var has_plate: bool = int(inv.get("hull_plate", 0)) > 0 or int(inv.get("plating_plate", 0)) > 0 or int(inv.get("hull_plate_kit", 0)) > 0
 		# REQ-SMOD / WA: weld damaged/breached modules when lance + plate available.
@@ -4440,16 +4435,21 @@ func _nearest_damaged_wall_module(layout: Dictionary, player_pos: Vector3, max_r
 			var st2: String = str(module_integrity_map.get_state(id))
 			if st2 not in ["damaged", "breached"]:
 				continue
-			var rid: String = id.get_slice("/", 0)
-			var pos: Vector3 = room_centers.get(rid, Vector3.ZERO) as Vector3
-			if room_centers.has(rid):
+			var m = module_integrity_map.call("get_module", id) if module_integrity_map.has_method("get_module") else null
+			var pos: Vector3 = _compiled_wrapper_world_position(id)
+			if pos == Vector3.INF:
+				var rid: String = str(m.get("room_id")) if m != null else ""
+				if rid.is_empty():
+					var prefix: String = id.get_slice("/", 0)
+					if prefix == "floor" or prefix == "edge" or prefix == "ceiling":
+						continue
+					rid = prefix
+				if not room_centers.has(rid):
+					continue
 				pos = room_centers[rid] as Vector3
-			else:
-				continue
 			var d: float = player_pos.distance_to(pos)
 			if d <= best_d:
 				best_d = d
-				var m = module_integrity_map.call("get_module", id) if module_integrity_map.has_method("get_module") else null
 				var kind: String = str(m.get("kind")) if m != null else "wall"
 				best = {"module_id": id, "kind": kind, "distance": d}
 	return best
@@ -4801,16 +4801,34 @@ func _apply_module_integrity_scene(module_ids: Array) -> void:
 		var st: String = str(module_integrity_map.get_state(mid))
 		var node: Node = _find_structural_module_node(root, mid)
 		if node is Node3D:
+			IntegrityVisualResolverScript.apply_visual_state(node as Node3D, st)
 			ModuleIntegrityConsequencesScript.apply_to_node(node as Node3D, st)
 
 
 func _find_structural_module_node(root: Node, module_key: String) -> Node:
-	# module_key format: room_id/placement_name → node name room_id_placement_name
+	if root == null or module_key.is_empty():
+		return null
+	var by_meta: Node = _scan_structural_module_meta(root, module_key)
+	if by_meta != null:
+		return by_meta
+	# Legacy goldens: room_id/placement_name → node name room_id_placement_name
 	var parts: PackedStringArray = module_key.split("/")
 	if parts.size() < 2:
 		return root.find_child(module_key, true, false)
 	var expected: String = "%s_%s" % [parts[0], parts[1]]
 	return root.find_child(expected, true, false)
+
+
+func _scan_structural_module_meta(node: Node, module_key: String) -> Node:
+	if node.has_meta("module_key") and str(node.get_meta("module_key")) == module_key:
+		return node
+	if node.has_meta("structural_placement_id") and str(node.get_meta("structural_placement_id")) == module_key:
+		return node
+	for child in node.get_children():
+		var found: Node = _scan_structural_module_meta(child, module_key)
+		if found != null:
+			return found
+	return null
 
 func _build_fire_zones() -> void:
 	_clear_fire_zones()
@@ -5059,7 +5077,7 @@ func _apply_decompression_module_damage(compartment_id: String) -> void:
 	if layout.is_empty() and module_integrity_map.size() == 0:
 		return
 	if module_integrity_map.size() == 0 and not layout.is_empty():
-		ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
+		ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(module_integrity_map, layout)
 	var resist: float = _hub_structure_damage_resist()
 	var amount: float = ModuleDamageRouterScript.DEFAULT_DECOMPRESSION_AMOUNT * (1.0 - resist)
 	var changed: Array = ModuleDamageRouterScript.apply_decompression_to_compartment(
@@ -6911,12 +6929,17 @@ func _sync_current_ship_pillar_summaries() -> void:
 	if current_ship == null:
 		return
 	if module_integrity_map != null and module_integrity_map.has_method("get_summary"):
-		var mi: Dictionary = module_integrity_map.get_summary()
-		var deltas: Array = mi.get("deltas", []) as Array if typeof(mi.get("deltas", [])) == TYPE_ARRAY else []
-		if deltas.is_empty():
-			current_ship.module_integrity_summary = {}
-		else:
-			current_ship.module_integrity_summary = mi.duplicate(true)
+		# Hub DAMAGED/WRECKED `_on_ship_loaded` may never have seeded the map.
+		# Packing an empty-delta summary then would look initialized and skip
+		# wreck restamp on restore. Seed first when live deltas are also empty.
+		if current_ship.module_integrity_summary.is_empty():
+			var live: Dictionary = module_integrity_map.get_summary()
+			var live_d: Variant = live.get("deltas", [])
+			if not (live_d is Array) or (live_d as Array).is_empty():
+				_restore_module_integrity_for_current_ship()
+		# Persist even when deltas are empty so a fully repaired ship is not
+		# treated as a first visit (which would restamp layout.module_damage).
+		current_ship.module_integrity_summary = module_integrity_map.get_summary().duplicate(true)
 	if component_placement_state != null and component_placement_state.has_method("get_summary"):
 		var cp: Dictionary = component_placement_state.get_summary()
 		var placed: Array = cp.get("placed", []) as Array if typeof(cp.get("placed", [])) == TYPE_ARRAY else []
@@ -6930,10 +6953,22 @@ func _restore_module_integrity_for_current_ship() -> void:
 	module_integrity_map = ModuleIntegrityMapScript.new()
 	if current_ship == null:
 		return
+	var layout: Dictionary = {}
+	if current_ship.built_layout is Dictionary:
+		layout = current_ship.built_layout
+	elif is_instance_valid(loader) and loader.has_method("get_layout_copy"):
+		layout = loader.get_layout_copy()
 	var packed: Dictionary = current_ship.module_integrity_summary
-	if typeof(packed) == TYPE_DICTIONARY and not packed.is_empty():
-		if module_integrity_map.has_method("apply_summary"):
-			module_integrity_map.apply_summary(packed)
+	var has_deltas: bool = typeof(packed) == TYPE_DICTIONARY and not packed.is_empty()
+	if not layout.is_empty():
+		# Revisit: register every compiled module, skip wreck restamp so
+		# persisted deltas win. First visit applies layout.module_damage.
+		ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(
+			module_integrity_map, layout, not has_deltas)
+	if has_deltas and module_integrity_map.has_method("apply_sparse_deltas"):
+		var deltas_v: Variant = packed.get("deltas", [])
+		if deltas_v is Array:
+			module_integrity_map.apply_sparse_deltas(deltas_v as Array)
 	_apply_module_integrity_state_to_scene()
 
 
@@ -6998,6 +7033,7 @@ func _configure_threat_runtime_for_current_ship() -> void:
 			threat_manager.configure_nav_graph(_combat_layout_for_current_ship())
 	else:
 		threat_manager.configure_for_layout(_combat_layout_for_current_ship(), _combat_markers_for_current_ship(), anchor)
+	_apply_integrity_nav_gaps()
 	_refresh_weapon_hotbar()
 
 func _refresh_weapon_hotbar() -> void:
@@ -7145,6 +7181,37 @@ func _refresh_threat_nav_costs() -> void:
 				and not str(h.compartment_a).is_empty() and not str(h.compartment_b).is_empty():
 			bulkheads.append([str(h.compartment_a), str(h.compartment_b)])
 	threat_manager.update_nav_dynamic_costs(fire_rooms, bulkheads)
+	# reset_dynamic_costs copies _base_edges; re-apply integrity gaps after that.
+	_apply_integrity_nav_gaps()
+
+func _apply_integrity_nav_gaps() -> void:
+	if module_integrity_map == null or threat_manager == null:
+		return
+	if not ("nav_graph" in threat_manager):
+		return
+	var nav = threat_manager.nav_graph
+	if nav == null or not (nav is RefCounted) or not (nav as RefCounted).has_method("set_edge_cost_multiplier"):
+		return
+	if not module_integrity_map.has_method("rooms_with_nav_gaps"):
+		return
+	var gap_rooms: PackedStringArray = module_integrity_map.rooms_with_nav_gaps()
+	ModuleIntegrityConsequencesScript.apply_nav_gaps(nav as RefCounted, gap_rooms)
+
+
+func _compiled_wrapper_world_position(module_key: String) -> Vector3:
+	if module_key.is_empty():
+		return Vector3.INF
+	var root: Node = null
+	if current_ship != null and is_instance_valid(current_ship.scene_root):
+		root = current_ship.scene_root
+	elif is_instance_valid(loader):
+		root = loader
+	if root == null:
+		return Vector3.INF
+	var node: Node = _find_structural_module_node(root, module_key)
+	if node is Node3D:
+		return (node as Node3D).global_position
+	return Vector3.INF
 
 func _consumable_pipeline_context() -> Dictionary:
 	return {
@@ -10146,11 +10213,27 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	if utility_item_state != null and not snapshot.utility_summary.is_empty():
 		utility_item_state.apply_summary(snapshot.utility_summary)
 	# PKG-D6.1 / D2.6 / D8: restore pillar + ship-mod models after reload rebuild.
-	if module_integrity_map != null and not snapshot.module_integrity_summary.is_empty():
-		module_integrity_map.apply_summary(snapshot.module_integrity_summary)
-		_apply_module_integrity_state_to_scene()
-		if current_ship != null:
-			current_ship.module_integrity_summary = snapshot.module_integrity_summary.duplicate(true)
+	# apply_summary() clears then restores sparse deltas; seed compiled first so
+	# fire/decomp still find pristine walls in the same room.
+	if module_integrity_map != null:
+		var snap_layout: Dictionary = {}
+		if current_ship != null and current_ship.built_layout is Dictionary:
+			snap_layout = current_ship.built_layout
+		elif is_instance_valid(loader) and loader.has_method("get_layout_copy"):
+			snap_layout = loader.get_layout_copy()
+		if not snap_layout.is_empty():
+			ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(
+				module_integrity_map, snap_layout, false)
+		if not snapshot.module_integrity_summary.is_empty():
+			var packed: Dictionary = snapshot.module_integrity_summary
+			var deltas_v: Variant = packed.get("deltas", [])
+			if module_integrity_map.has_method("apply_sparse_deltas") and deltas_v is Array:
+				module_integrity_map.apply_sparse_deltas(deltas_v as Array)
+			else:
+				module_integrity_map.apply_summary(packed)
+			_apply_module_integrity_state_to_scene()
+			if current_ship != null:
+				current_ship.module_integrity_summary = packed.duplicate(true)
 	if component_placement_state != null and not snapshot.component_placement_summary.is_empty():
 		component_placement_state.apply_summary(snapshot.component_placement_summary)
 		if current_ship != null:
