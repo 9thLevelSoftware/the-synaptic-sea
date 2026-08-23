@@ -67,7 +67,8 @@ func _initialize() -> void:
 	if path_keys.is_empty():
 		_fail(label, "standing path empty")
 		return
-	var void_key: String = WalkabilityContractScript.standing_void_reason(structural_plan, occupancy, path_keys)
+	var void_key: String = WalkabilityContractScript.standing_void_reason(
+		structural_plan, occupancy, path_keys, layout)
 	if not void_key.is_empty():
 		_fail(label, "void at %s" % void_key)
 		return

@@ -258,7 +258,8 @@ static func capsule_passes_door_opening(edge: Dictionary, occupancy: Dictionary)
 static func standing_void_reason(
 		plan: Dictionary,
 		occupancy: Dictionary,
-		path_keys: Array[String]) -> String:
+		path_keys: Array[String],
+		topology: Dictionary = {}) -> String:
 	var floors: Dictionary = floor_cell_keys(plan)
 	for path_key in path_keys:
 		if not occupancy.has(path_key):
@@ -276,7 +277,7 @@ static func standing_void_reason(
 			var neighbor_key: String = CompilerScript.cell_key(deck, neighbor)
 			if occupancy.has(neighbor_key):
 				continue
-			if _standing_edge_between(plan, path_key, neighbor_key, deck):
+			if _standing_edge_between(plan, path_key, neighbor_key, deck, topology):
 				return neighbor_key
 	return ""
 
@@ -285,7 +286,8 @@ static func _standing_edge_between(
 		plan: Dictionary,
 		first_key: String,
 		second_key: String,
-		deck: int) -> bool:
+		deck: int,
+		topology: Dictionary = {}) -> bool:
 	var edges_variant: Variant = plan.get("edges", {})
 	if not (edges_variant is Dictionary):
 		return false
@@ -297,11 +299,11 @@ static func _standing_edge_between(
 			continue
 		if int(edge.get("deck", deck)) != deck:
 			continue
-		var source_cells: Variant = edge.get("source_cells", [])
-		if not (source_cells is Array) or (source_cells as Array).size() < 2:
+		var cells: Array = _flood_endpoint_cells(edge, topology)
+		if cells.size() < 2:
 			continue
-		var a: Dictionary = _cell_key_from_value((source_cells as Array)[0], deck)
-		var b: Dictionary = _cell_key_from_value((source_cells as Array)[1], deck)
+		var a: Dictionary = _cell_key_from_value(cells[0], deck)
+		var b: Dictionary = _cell_key_from_value(cells[1], deck)
 		if not bool(a.get("ok", false)) or not bool(b.get("ok", false)):
 			continue
 		var a_key: String = str(a["key"])

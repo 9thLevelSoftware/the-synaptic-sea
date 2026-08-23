@@ -5,6 +5,7 @@ extends SceneTree
 
 const ShipNavGraphScript := preload("res://scripts/systems/ship_nav_graph.gd")
 const ThreatPathfinderScript := preload("res://scripts/systems/threat_pathfinder.gd")
+const WalkabilityContractScript := preload("res://scripts/procgen/walkability_contract.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_generator.gd")
 const GOLDEN: String = "res://data/procgen/golden/coherent_ship_001/layout.json"
@@ -250,6 +251,14 @@ func _golden_logical_portal_connects_arc_side() -> bool:
 		return false
 	if graph.edge_cost(from_key, to_key) >= ShipNavGraphScript.BLOCKED_COST:
 		_fail("logical portal corridor_to_arc_side is standing-blocked")
+		return false
+	var plan: Dictionary = plan_variant if plan_variant is Dictionary else {}
+	var occ_from: String = ShipNavGraphScript.occupancy_key_for_cell(
+		portal.get("logical_from_cell", portal.get("from_cell", null)), 0)
+	var void_key: String = WalkabilityContractScript.standing_void_reason(
+		plan, occupancy, [occ_from], layout)
+	if not void_key.is_empty():
+		_fail("logical portal corridor_to_arc_side reported standing void at %s" % void_key)
 		return false
 	return true
 
