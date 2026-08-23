@@ -332,12 +332,7 @@ func _is_floor_module(module_id: String) -> bool:
 	return false
 
 func _read_world_position(placement: Dictionary) -> Vector3:
-	var raw: Variant = placement.get("world_position", placement.get("position", null))
-	if raw is Vector3:
-		return raw as Vector3
-	if raw is Array and (raw as Array).size() >= 3:
-		return Vector3(float(raw[0]), float(raw[1]), float(raw[2]))
-	return Vector3.INF
+	return _vec3_from_variant(placement.get("world_position", placement.get("position", null)))
 
 func _snap_pos(pos: Vector3) -> Vector3:
 	var gx: float = roundf(pos.x / cell_size) * cell_size
@@ -505,20 +500,43 @@ func _node_key_from_cell(value: Variant, fallback_deck: int, occupancy: Dictiona
 
 
 func _occupancy_world_position(record: Dictionary) -> Vector3:
-	var raw: Variant = record.get("position", record.get("world_position", null))
+	var from_pos: Vector3 = _vec3_from_variant(record.get("position", record.get("world_position", null)))
+	if from_pos != Vector3.INF:
+		return from_pos
+	var deck: int = int(record.get("deck", 0))
+	var cell: Vector2i = _cell_xz_from_variant(record.get("cell", null))
+	if cell == Vector2i(-99999, -99999):
+		var key_parts: PackedStringArray = str(record.get("cell_key", "")).split("|")
+		if key_parts.size() >= 3:
+			deck = int(key_parts[0])
+			cell = Vector2i(int(key_parts[1]), int(key_parts[2]))
+	if cell == Vector2i(-99999, -99999):
+		cell = Vector2i.ZERO
+	return Vector3(float(cell.x) * cell_size, float(deck) * deck_height, float(cell.y) * cell_size)
+
+
+func _vec3_from_variant(raw: Variant) -> Vector3:
 	if raw is Vector3:
 		return raw as Vector3
 	if raw is Array and (raw as Array).size() >= 3:
-		var values: Array = raw
-		return Vector3(float(values[0]), float(values[1]), float(values[2]))
-	var deck: int = int(record.get("deck", 0))
-	var cell_variant: Variant = record.get("cell", null)
-	var cell := Vector2i.ZERO
-	if cell_variant is Vector2i:
-		cell = cell_variant as Vector2i
-	elif cell_variant is Array and (cell_variant as Array).size() >= 2:
-		cell = Vector2i(int((cell_variant as Array)[0]), int((cell_variant as Array)[1]))
-	return Vector3(float(cell.x) * cell_size, float(deck) * deck_height, float(cell.y) * cell_size)
+		return Vector3(float((raw as Array)[0]), float((raw as Array)[1]), float((raw as Array)[2]))
+	if raw is Dictionary:
+		var d: Dictionary = raw
+		if d.has("x") and d.has("y") and d.has("z"):
+			return Vector3(float(d.get("x", 0.0)), float(d.get("y", 0.0)), float(d.get("z", 0.0)))
+	return Vector3.INF
+
+
+func _cell_xz_from_variant(raw: Variant) -> Vector2i:
+	if raw is Vector2i:
+		return raw as Vector2i
+	if raw is Array and (raw as Array).size() >= 2:
+		return Vector2i(int((raw as Array)[0]), int((raw as Array)[1]))
+	if raw is Dictionary:
+		var d: Dictionary = raw
+		if d.has("x") and d.has("y"):
+			return Vector2i(int(d.get("x", 0)), int(d.get("y", 0)))
+	return Vector2i(-99999, -99999)
 
 
 func _room_decks(layout: Dictionary) -> Dictionary:
