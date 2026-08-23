@@ -1539,6 +1539,25 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - Future prop validator with `--check-index`.
   - Future structural audit where structural records participate in the derived view.
 
+## REQ-WALK-001: Compiler-edge walkability and nav
+
+- Source: `features/compiler_walkability.md`, ADR-0054
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Enclosure flood must stay watertight including `LOCKED`/`BREACH`; standing play and production `ShipNavGraph` must not tunnel `SOLID`, `LOCKED`, or `BREACH`.
+- Acceptance criteria:
+  - Two floods: enclosure = non-SOLID all occupied cells; standing-play = OPEN/DOOR/HATCH + `vertical_connections`, start→goal only.
+  - `ShipNavGraph` standing path cannot cross `SOLID`, `LOCKED`, or `BREACH`.
+  - `LOCKED`/`BREACH` exist in `_base_edges` at `BLOCKED_COST` for the life of this stack (no `unlock_edge`).
+  - Walkability Stage A capsule-sweeps SOLID (must hit 0.20 m slab) and DOOR (must pass 0.80×1.70 opening).
+  - `coherent_ship_001` biomatter shortcut is standing-blocked.
+  - Stacked `vertical_connections` path.
+- Verification:
+  - `procgen_walkability_smoke.gd`
+  - `ship_nav_graph_smoke.gd`
+  - `procgen_quality_gate_smoke.gd`
+
 ## REQ-AVB-009: Explicit derived refresh preserves authored extensions
 
 - Source: `features/asset_metadata_pipeline.md`, ADR-0052

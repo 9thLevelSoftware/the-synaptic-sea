@@ -148,7 +148,7 @@ func compile(layout: Dictionary) -> Dictionary:
 				module_id = ""
 				wrapper_required = false
 			elif portal_present:
-				edge_state = _portal_kind(portal)
+				edge_state = _portal_kind(portal, layout)
 				module_id = _portal_module(portal, edge_state)
 				wrapper_required = edge_state != "BREACH" or not module_id.is_empty()
 				if edge_other_room.is_empty() and not bool(portal.get("exterior", false)):
@@ -189,6 +189,12 @@ func compile(layout: Dictionary) -> Dictionary:
 				"placement_required": wrapper_required,
 				"wrapper_required": wrapper_required,
 			}
+			if portal_present:
+				var logical_boundary: bool = bool(portal.get("logical_boundary", false))
+				edge_record["logical_boundary"] = logical_boundary
+				if logical_boundary:
+					edge_record["logical_from_cell"] = portal.get("logical_from_cell", portal.get("from_cell", null))
+					edge_record["logical_to_cell"] = portal.get("logical_to_cell", portal.get("to_cell", null))
 			edge_map[edge_key_value] = edge_record
 			if edge_state == "OPEN" or not wrapper_required:
 				continue
@@ -317,13 +323,51 @@ func _direction_between(from_cell: Vector2i, to_cell: Vector2i) -> String:
 	return ""
 
 
-func _portal_kind(portal: Dictionary) -> String:
+func _portal_kind(portal: Dictionary, layout: Dictionary = {}) -> String:
+	if _blocked_link_matches(portal, layout):
+		return "LOCKED"
 	var raw: String = str(portal.get("state", portal.get("portal_type", portal.get("kind", "DOOR")))).to_upper()
 	if raw == "OPEN":
 		return "DOOR"
 	if raw == "DOOR" or raw == "LOCKED" or raw == "HATCH" or raw == "BREACH":
 		return raw
 	return "DOOR"
+
+
+func _blocked_link_matches(portal: Dictionary, layout: Dictionary) -> bool:
+	var blocked_variant: Variant = layout.get("blocked_links", [])
+	if typeof(blocked_variant) != TYPE_ARRAY:
+		return false
+	var portal_from: String = str(portal.get("from_room", ""))
+	var portal_to: String = str(portal.get("to_room", ""))
+	var portal_from_cell: Vector2i = _cell_xz(portal.get("from_cell", portal.get("logical_from_cell", null)))
+	var portal_to_cell: Vector2i = _cell_xz(portal.get("to_cell", portal.get("logical_to_cell", null)))
+	for link_variant in (blocked_variant as Array):
+		if typeof(link_variant) != TYPE_DICTIONARY:
+			continue
+		var link: Dictionary = link_variant
+		var from_room: String = str(link.get("from_room", ""))
+		var to_room: String = str(link.get("to_room", ""))
+		var rooms_match: bool = (from_room == portal_from and to_room == portal_to) \
+			or (from_room == portal_to and to_room == portal_from)
+		if not rooms_match:
+			continue
+		var from_cell: Vector2i = _cell_xz(link.get("from_cell", null))
+		var to_cell: Vector2i = _cell_xz(link.get("to_cell", null))
+		if from_cell == Vector2i(-99999, -99999) or to_cell == Vector2i(-99999, -99999):
+			continue
+		if (from_cell == portal_from_cell and to_cell == portal_to_cell) \
+				or (from_cell == portal_to_cell and to_cell == portal_from_cell):
+			return true
+	return false
+
+
+func _cell_xz(value: Variant) -> Vector2i:
+	if typeof(value) == TYPE_VECTOR2I:
+		return value as Vector2i
+	if typeof(value) == TYPE_ARRAY and (value as Array).size() >= 2:
+		return Vector2i(int((value as Array)[0]), int((value as Array)[1]))
+	return Vector2i(-99999, -99999)
 
 
 func _portal_module(portal: Dictionary, state: String) -> String:
