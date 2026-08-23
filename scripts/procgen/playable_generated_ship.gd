@@ -4230,15 +4230,13 @@ func _slot_occupancy_from_loader() -> Dictionary:
 		for obj_row in (objectives_v as Array):
 			if typeof(obj_row) != TYPE_DICTIONARY:
 				continue
-			var obj: Dictionary = obj_row
-			_mark_occupancy(occupied, str(obj.get("room_id", "")), obj.get("approach_cell", []))
+			_mark_objective_occupancy(occupied, obj_row)
 	var specs_v: Variant = active_loader.objective_specs if active_loader.get("objective_specs") != null else []
 	if specs_v is Array:
 		for spec_row in (specs_v as Array):
 			if typeof(spec_row) != TYPE_DICTIONARY:
 				continue
-			var spec: Dictionary = spec_row
-			_mark_occupancy(occupied, str(spec.get("room_id", "")), spec.get("approach_cell", []))
+			_mark_objective_occupancy(occupied, spec_row)
 	var start_room: String = str(gameplay.get("start_room", ""))
 	if start_room.is_empty() and typeof(active_loader.get("layout_doc")) == TYPE_DICTIONARY:
 		var proto: Variant = active_loader.layout_doc.get("prototype", {})
@@ -4259,6 +4257,20 @@ func _slot_occupancy_from_loader() -> Dictionary:
 				break
 	_collect_dressing_occupancy(active_loader, occupied)
 	return occupied
+
+
+func _mark_objective_occupancy(occupied: Dictionary, obj: Dictionary) -> void:
+	var room_id: String = str(obj.get("room_id", ""))
+	_mark_occupancy(occupied, room_id, obj.get("approach_cell", []))
+	var steps_v: Variant = obj.get("steps", [])
+	if not (steps_v is Array):
+		return
+	for step_v in (steps_v as Array):
+		if typeof(step_v) != TYPE_DICTIONARY:
+			continue
+		var step: Dictionary = step_v
+		var step_room: String = str(step.get("room_id", room_id))
+		_mark_occupancy(occupied, step_room, step.get("approach_cell", []))
 
 
 func _mark_occupancy(occupied: Dictionary, room_id: String, cell_v: Variant) -> void:

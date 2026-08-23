@@ -1143,11 +1143,26 @@ func _dressing_occupied_cells(layout_doc: Dictionary, rooms: Array) -> Dictionar
 			if typeof(obj_v) != TYPE_DICTIONARY:
 				continue
 			var obj: Dictionary = obj_v
-			var parsed: Array = LayoutSerializerScript.parse_slot_cell(obj.get("approach_cell", []))
-			if parsed.size() >= 2:
-				occupied["%s|%d|%d" % [str(obj.get("room_id", "")), int(parsed[0]), int(parsed[1])]] = true
+			_occupy_approach(occupied, str(obj.get("room_id", "")), obj.get("approach_cell", []))
+			var steps_v: Variant = obj.get("steps", [])
+			if steps_v is Array:
+				for step_v in (steps_v as Array):
+					if typeof(step_v) != TYPE_DICTIONARY:
+						continue
+					var step: Dictionary = step_v
+					_occupy_approach(
+						occupied,
+						str(step.get("room_id", obj.get("room_id", ""))),
+						step.get("approach_cell", []))
 	_reserve_component_slots(rooms, occupied)
 	return occupied
+
+
+func _occupy_approach(occupied: Dictionary, room_id: String, cell_v: Variant) -> void:
+	var parsed: Array = LayoutSerializerScript.parse_slot_cell(cell_v)
+	if parsed.size() < 2 or room_id.is_empty():
+		return
+	occupied["%s|%d|%d" % [room_id, int(parsed[0]), int(parsed[1])]] = true
 
 
 func _reserve_component_slots(rooms: Array, occupied: Dictionary) -> void:
@@ -1163,34 +1178,26 @@ func _reserve_component_slots(rooms: Array, occupied: Dictionary) -> void:
 		var interior: Variant = room.get("interior_zones", {})
 		if not (interior is Dictionary):
 			continue
-		var walls_v: Variant = (interior as Dictionary).get("wall_slots", [])
-		var wall_kept: int = 0
-		if walls_v is Array:
-			for item in (walls_v as Array):
-				if wall_kept >= ComponentPlacementStateScript.MAX_WALL_FILLS:
-					break
-				var parsed: Array = LayoutSerializerScript.parse_slot_cell(item)
-				if parsed.size() < 2:
-					continue
-				var key: String = "%s|%d|%d" % [rid, int(parsed[0]), int(parsed[1])]
-				if occupied.has(key):
-					continue
-				occupied[key] = true
-				wall_kept += 1
-		var centers_v: Variant = (interior as Dictionary).get("center_slots", [])
-		var center_kept: int = 0
-		if centers_v is Array:
-			for item in (centers_v as Array):
-				if center_kept >= ComponentPlacementStateScript.MAX_CENTER_FILLS:
-					break
-				var parsed: Array = LayoutSerializerScript.parse_slot_cell(item)
-				if parsed.size() < 2:
-					continue
-				var key: String = "%s|%d|%d" % [rid, int(parsed[0]), int(parsed[1])]
-				if occupied.has(key):
-					continue
-				occupied[key] = true
-				center_kept += 1
+		_reserve_slot_kind(rid, interior as Dictionary, "wall_slots", ComponentPlacementStateScript.MAX_WALL_FILLS, occupied)
+		_reserve_slot_kind(rid, interior as Dictionary, "center_slots", ComponentPlacementStateScript.MAX_CENTER_FILLS, occupied)
+
+
+func _reserve_slot_kind(rid: String, interior: Dictionary, slot_key: String, max_count: int, occupied: Dictionary) -> void:
+	var slots_v: Variant = interior.get(slot_key, [])
+	if not (slots_v is Array):
+		return
+	var kept: int = 0
+	for item in (slots_v as Array):
+		if kept >= max_count:
+			break
+		var parsed: Array = LayoutSerializerScript.parse_slot_cell(item)
+		if parsed.size() < 2:
+			continue
+		var key: String = "%s|%d|%d" % [rid, int(parsed[0]), int(parsed[1])]
+		if occupied.has(key):
+			continue
+		occupied[key] = true
+		kept += 1
 
 
 func _place_dressing_props(

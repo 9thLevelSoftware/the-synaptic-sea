@@ -284,21 +284,6 @@ func _interior_cell_list(room: Dictionary, slot_key: String) -> Array:
 	return out
 
 
-func _wall_slot_cells(room: Dictionary) -> Array:
-	var interior: Variant = room.get("interior_zones", {})
-	if not (interior is Dictionary):
-		return []
-	var raw: Variant = (interior as Dictionary).get("wall_slots", [])
-	if not (raw is Array):
-		return []
-	var out: Array = []
-	for item in (raw as Array):
-		var parsed: Array = LayoutSerializerScript.parse_slot_cell(item)
-		if parsed.size() >= 2:
-			out.append(parsed)
-	return out
-
-
 func _cell_key(room_id: String, cell: Array) -> String:
 	if cell.size() < 2:
 		return ""
@@ -356,7 +341,7 @@ func _pick_slot_cell(
 	for cell in reserved:
 		reserved_set[_cell_key(rid, cell)] = true
 	var centers: Array = _interior_cell_list(room, "center_slots")
-	var walls: Array = _wall_slot_cells(room)
+	var walls: Array = _interior_cell_list(room, "wall_slots")
 	var picked: Dictionary = {}
 	if kind == "salvage":
 		picked = _pick_salvage_slot(rid, deck, centers, reserved, reserved_set, occupied, boarding)
