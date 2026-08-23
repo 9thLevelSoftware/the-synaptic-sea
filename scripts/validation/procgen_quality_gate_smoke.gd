@@ -72,7 +72,7 @@ func _initialize() -> void:
 		if not has_board:
 			_fail("layout has neither dock nor airlock boarding role seed=%d roles=%s" % [s, str(roles.keys())])
 			return
-		# Nav graph walkable start → goal
+		# Standing-play start → goal (compiler kinds; no 4-connect around SOLID/LOCKED).
 		var graph = ShipNavGraphScript.new()
 		var n: int = graph.build_from_layout(layout)
 		if n < rooms.size():
@@ -82,23 +82,28 @@ func _initialize() -> void:
 		var goal_id: String = str((layout.get("prototype", {}) as Dictionary).get("goal_room", ""))
 		var start_pos := Vector3.ZERO
 		var goal_pos := Vector3(8, 0, 0)
+		var plan_variant: Variant = layout.get("structural_plan", {})
+		var occupancy: Dictionary = {}
+		if plan_variant is Dictionary:
+			var occ_variant: Variant = (plan_variant as Dictionary).get("occupancy", {})
+			if occ_variant is Dictionary:
+				occupancy = occ_variant
 		for room_v3 in rooms:
 			if not (room_v3 is Dictionary):
 				continue
 			var rid: String = str((room_v3 as Dictionary).get("id", ""))
-			if rid == start_id or rid == goal_id:
-				var pl: Array = (room_v3 as Dictionary).get("structural_placements", []) as Array
-				if not pl.is_empty() and pl[0] is Dictionary:
-					var wp: Variant = (pl[0] as Dictionary).get("world_position", null)
-					if wp is Array and (wp as Array).size() >= 3:
-						var pos := Vector3(float(wp[0]), float(wp[1]), float(wp[2]))
-						if rid == start_id:
-							start_pos = pos
-						if rid == goal_id:
-							goal_pos = pos
+			if rid != start_id and rid != goal_id:
+				continue
+			var pos: Vector3 = _standing_room_pos(occupancy, room_v3 as Dictionary, rid)
+			if pos == Vector3.INF:
+				continue
+			if rid == start_id:
+				start_pos = pos
+			if rid == goal_id:
+				goal_pos = pos
 		var path: Array = ThreatPathfinderScript.find_path(graph, start_pos, goal_pos)
 		if path.is_empty() and start_id != goal_id:
-			_fail("no nav path start→goal seed=%d" % s)
+			_fail("no standing nav path start→goal seed=%d" % s)
 			return
 		# Encounters well-formed when density path active
 		var enc: Array = layout.get("encounters", []) as Array
@@ -137,6 +142,26 @@ func _initialize() -> void:
 	print("PROCGEN QUALITY GATE PASS seeds=%d layouts=%d walkable=true encounters=true schema=true" % [
 		seeds_run, layouts_ok])
 	quit(0)
+
+func _standing_room_pos(occupancy: Dictionary, room: Dictionary, room_id: String) -> Vector3:
+	for record_variant in occupancy.values():
+		if not (record_variant is Dictionary):
+			continue
+		var record: Dictionary = record_variant
+		if str(record.get("room_id", "")) != room_id:
+			continue
+		var raw: Variant = record.get("position", null)
+		if raw is Vector3:
+			return raw as Vector3
+		if raw is Array and (raw as Array).size() >= 3:
+			return Vector3(float(raw[0]), float(raw[1]), float(raw[2]))
+	var pl: Array = room.get("structural_placements", []) as Array
+	if not pl.is_empty() and pl[0] is Dictionary:
+		var wp: Variant = (pl[0] as Dictionary).get("world_position", null)
+		if wp is Array and (wp as Array).size() >= 3:
+			return Vector3(float(wp[0]), float(wp[1]), float(wp[2]))
+	return Vector3.INF
+
 
 func _load_json(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):

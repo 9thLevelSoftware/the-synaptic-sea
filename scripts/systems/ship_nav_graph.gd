@@ -1,9 +1,10 @@
 extends RefCounted
 class_name ShipNavGraph
 
-## Pure walkable-cell graph built from a ship layout (ADR-0049).
-## Nodes are floor cell centers; edges are 4-connected (same deck) plus optional
-## vertical edges when cells stack. Dynamic blockers raise edge cost or cut edges.
+## Pure walkable-cell graph built from a ship layout (ADR-0049, ADR-0054).
+## Production graph is standing-play: compiler OPEN/DOOR/HATCH plus
+## layout.vertical_connections, with LOCKED/BREACH present at BLOCKED_COST.
+## Floor-module 4-connect is fallback only when structural_plan is absent.
 ## Never touches the scene tree.
 
 const DEFAULT_CELL_SIZE: float = 4.0
@@ -31,11 +32,83 @@ func clear() -> void:
 	_base_edges.clear()
 	dirty = true
 
-## Build graph from a layout.json-shaped dictionary (rooms + structural_placements).
+## Build graph from a layout.json-shaped dictionary.
 func build_from_layout(layout: Dictionary) -> int:
 	clear()
 	cell_size = maxf(0.1, float(layout.get("cell_size", DEFAULT_CELL_SIZE)))
 	deck_height = maxf(0.1, float(layout.get("deck_height", DEFAULT_DECK_HEIGHT)))
+	var plan_variant: Variant = layout.get("structural_plan", {})
+	if plan_variant is Dictionary:
+		var plan: Dictionary = plan_variant
+		if not plan.is_empty() and plan.has("occupancy") and plan.has("edges"):
+			return build_from_structural_plan(layout)
+	return _build_from_floor_placements(layout)
+
+
+func build_from_structural_plan(layout: Dictionary) -> int:
+	var plan_variant: Variant = layout.get("structural_plan", {})
+	if not (plan_variant is Dictionary):
+		return 0
+	var plan: Dictionary = plan_variant
+	var occupancy_variant: Variant = plan.get("occupancy", {})
+	var edges_variant: Variant = plan.get("edges", {})
+	if not (occupancy_variant is Dictionary) or not (edges_variant is Dictionary):
+		return 0
+	var occupancy: Dictionary = occupancy_variant
+	var plan_edges: Dictionary = edges_variant
+	for occupancy_key_variant in occupancy.keys():
+		var record_variant: Variant = occupancy[occupancy_key_variant]
+		if not (record_variant is Dictionary):
+			continue
+		var record: Dictionary = record_variant
+		var pos: Vector3 = _occupancy_world_position(record)
+		var key: String = _key_for_pos(pos)
+		if nodes.has(key):
+			continue
+		nodes[key] = {
+			"pos": _snap_pos(pos),
+			"room_id": str(record.get("room_id", "")),
+			"key": key,
+			"cell_key": str(record.get("cell_key", occupancy_key_variant)),
+		}
+	for edge_variant in plan_edges.values():
+		if not (edge_variant is Dictionary):
+			continue
+		var edge: Dictionary = edge_variant
+		var kind: String = str(edge.get("kind", edge.get("state", "SOLID"))).to_upper()
+		if kind == "SOLID":
+			continue
+		var pair: PackedStringArray = _edge_node_keys(edge, occupancy)
+		if pair.size() != 2:
+			continue
+		var cost: float = standing_cost_for_kind(kind)
+		_set_base_edge(pair[0], pair[1], cost)
+	_overlay_blocked_links(layout, occupancy)
+	_add_vertical_connection_edges(layout, occupancy)
+	_base_edges = edges.duplicate(true)
+	dirty = false
+	return nodes.size()
+
+
+static func standing_cost_for_kind(kind: String) -> float:
+	var k: String = kind.to_upper()
+	if k == "OPEN" or k == "DOOR":
+		return 1.0
+	if k == "HATCH":
+		return 1.15
+	return BLOCKED_COST
+
+
+static func crouch_cost_for_kind(kind: String) -> float:
+	var k: String = kind.to_upper()
+	if k == "BREACH":
+		return 1.75
+	if k == "LOCKED" or k == "SOLID":
+		return BLOCKED_COST
+	return standing_cost_for_kind(k)
+
+
+func _build_from_floor_placements(layout: Dictionary) -> int:
 	var rooms_v: Variant = layout.get("rooms", [])
 	if not (rooms_v is Array):
 		return 0
@@ -57,7 +130,6 @@ func build_from_layout(layout: Dictionary) -> int:
 			var pos: Vector3 = _read_world_position(placement)
 			if pos == Vector3.INF:
 				continue
-			# Snap to cell grid so neighbors match cleanly.
 			var key: String = _key_for_pos(pos)
 			if nodes.has(key):
 				continue
@@ -230,6 +302,126 @@ func _key_for_pos(pos: Vector3) -> String:
 
 func _edge_key(a: String, b: String) -> String:
 	return a + "|" + b if a < b else b + "|" + a
+
+func _set_base_edge(a: String, b: String, cost: float) -> void:
+	if a.is_empty() or b.is_empty() or a == b:
+		return
+	if not nodes.has(a) or not nodes.has(b):
+		return
+	edges[_edge_key(a, b)] = cost
+
+
+func _overlay_blocked_links(layout: Dictionary, occupancy: Dictionary) -> void:
+	var blocked_variant: Variant = layout.get("blocked_links", [])
+	if not (blocked_variant is Array):
+		return
+	var room_decks: Dictionary = _room_decks(layout)
+	for link_variant in (blocked_variant as Array):
+		if not (link_variant is Dictionary):
+			continue
+		var link: Dictionary = link_variant
+		var from_room: String = str(link.get("from_room", ""))
+		var to_room: String = str(link.get("to_room", ""))
+		var from_key: String = _node_key_from_cell(
+			link.get("from_cell", null), int(room_decks.get(from_room, 0)), occupancy)
+		var to_key: String = _node_key_from_cell(
+			link.get("to_cell", null), int(room_decks.get(to_room, 0)), occupancy)
+		if from_key.is_empty() or to_key.is_empty():
+			continue
+		_set_base_edge(from_key, to_key, BLOCKED_COST)
+
+
+func _add_vertical_connection_edges(layout: Dictionary, occupancy: Dictionary) -> void:
+	var vertical_variant: Variant = layout.get("vertical_connections", [])
+	if not (vertical_variant is Array):
+		return
+	var room_decks: Dictionary = _room_decks(layout)
+	for link_variant in (vertical_variant as Array):
+		if not (link_variant is Dictionary):
+			continue
+		var link: Dictionary = link_variant
+		var from_room: String = str(link.get("from_room", ""))
+		var to_room: String = str(link.get("to_room", ""))
+		var from_key: String = _node_key_from_cell(
+			link.get("from_cell", null), int(room_decks.get(from_room, 0)), occupancy)
+		var to_key: String = _node_key_from_cell(
+			link.get("to_cell", null), int(room_decks.get(to_room, 0)), occupancy)
+		if from_key.is_empty() or to_key.is_empty():
+			continue
+		var pa: Vector3 = get_node_pos(from_key)
+		var pb: Vector3 = get_node_pos(to_key)
+		var dx: float = absf(pa.x - pb.x)
+		var dz: float = absf(pa.z - pb.z)
+		var same_xz: bool = dx < 0.01 and dz < 0.01
+		var cost: float = 1.25 if same_xz else 1.5
+		_set_base_edge(from_key, to_key, cost)
+
+
+func _edge_node_keys(edge: Dictionary, occupancy: Dictionary) -> PackedStringArray:
+	var source_cells: Variant = edge.get("source_cells", [])
+	if not (source_cells is Array) or (source_cells as Array).size() < 2:
+		return PackedStringArray()
+	var deck: int = int(edge.get("deck", 0))
+	var a: String = _node_key_from_cell((source_cells as Array)[0], deck, occupancy)
+	var b: String = _node_key_from_cell((source_cells as Array)[1], deck, occupancy)
+	if a.is_empty() or b.is_empty() or a == b:
+		return PackedStringArray()
+	return PackedStringArray([a, b])
+
+
+func _node_key_from_cell(value: Variant, fallback_deck: int, occupancy: Dictionary) -> String:
+	var cell := Vector2i.ZERO
+	var deck: int = fallback_deck
+	if value is Vector2i:
+		cell = value as Vector2i
+	elif value is Array and (value as Array).size() >= 2:
+		var values: Array = value
+		cell = Vector2i(int(values[0]), int(values[1]))
+		if values.size() >= 3:
+			deck = int(values[2])
+	else:
+		return ""
+	var occupancy_key: String = "%d|%d|%d" % [deck, cell.x, cell.y]
+	if occupancy.has(occupancy_key):
+		var record_variant: Variant = occupancy[occupancy_key]
+		if record_variant is Dictionary:
+			return _key_for_pos(_occupancy_world_position(record_variant as Dictionary))
+	var pos := Vector3(float(cell.x) * cell_size, float(deck) * deck_height, float(cell.y) * cell_size)
+	var key: String = _key_for_pos(pos)
+	return key if nodes.has(key) else ""
+
+
+func _occupancy_world_position(record: Dictionary) -> Vector3:
+	var raw: Variant = record.get("position", record.get("world_position", null))
+	if raw is Vector3:
+		return raw as Vector3
+	if raw is Array and (raw as Array).size() >= 3:
+		var values: Array = raw
+		return Vector3(float(values[0]), float(values[1]), float(values[2]))
+	var deck: int = int(record.get("deck", 0))
+	var cell_variant: Variant = record.get("cell", null)
+	var cell := Vector2i.ZERO
+	if cell_variant is Vector2i:
+		cell = cell_variant as Vector2i
+	elif cell_variant is Array and (cell_variant as Array).size() >= 2:
+		cell = Vector2i(int((cell_variant as Array)[0]), int((cell_variant as Array)[1]))
+	return Vector3(float(cell.x) * cell_size, float(deck) * deck_height, float(cell.y) * cell_size)
+
+
+func _room_decks(layout: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	var rooms_variant: Variant = layout.get("rooms", [])
+	if not (rooms_variant is Array):
+		return out
+	for room_variant in (rooms_variant as Array):
+		if not (room_variant is Dictionary):
+			continue
+		var room: Dictionary = room_variant
+		var room_id: String = str(room.get("id", ""))
+		if not room_id.is_empty():
+			out[room_id] = int(room.get("deck", 0))
+	return out
+
 
 func _connect_orthogonal_neighbors() -> void:
 	var keys: Array = nodes.keys()

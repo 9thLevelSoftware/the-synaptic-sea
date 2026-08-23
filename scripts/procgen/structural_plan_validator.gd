@@ -6,6 +6,7 @@ class_name StructuralPlanValidator
 ## floors identify occupied cells; edge records identify canonical boundaries.
 
 const CompilerScript: GDScript = preload("res://scripts/procgen/structural_edge_compiler.gd")
+const WalkabilityContractScript: GDScript = preload("res://scripts/procgen/walkability_contract.gd")
 const FLOOR_MODULES: Array[String] = ["floor_1x1", "corridor_floor_1x1"]
 const EDGE_KINDS: Array[String] = ["SOLID", "OPEN", "DOOR", "LOCKED", "HATCH", "BREACH"]
 
@@ -338,7 +339,7 @@ func _validate_walkable_flood_fill(topology: Dictionary, occupancy: Dictionary, 
 			continue
 		var edge: Dictionary = edge_variant
 		var kind: String = str(edge.get("kind", edge.get("state", "SOLID")))
-		if kind == "SOLID":
+		if not WalkabilityContractScript.enclosure_passable(kind):
 			continue
 		var source_cells: Array = edge.get("source_cells", []) if typeof(edge.get("source_cells", [])) == TYPE_ARRAY else []
 		if source_cells.size() < 2:
