@@ -4144,7 +4144,7 @@ func play_work_tool_missing_sfx_for_validation() -> void:
 	_emit_work_tool_missing_sfx()
 
 
-## Nearest mounted component; uses room floor center as approximate world position.
+## Nearest mounted component; uses the same slot world position as the visible marker.
 func _nearest_mounted_component(layout: Dictionary, player_pos: Vector3, max_range: float) -> Dictionary:
 	var best: Dictionary = {}
 	var best_d: float = max_range
@@ -4152,25 +4152,26 @@ func _nearest_mounted_component(layout: Dictionary, player_pos: Vector3, max_ran
 		return best
 	var placed: Array = component_placement_state.get("placed") as Array if typeof(component_placement_state.get("placed")) == TYPE_ARRAY else []
 	var room_centers: Dictionary = _room_world_centers(layout)
+	var i: int = 0
 	for entry_v in placed:
 		if typeof(entry_v) != TYPE_DICTIONARY:
+			i += 1
 			continue
 		var e: Dictionary = entry_v
 		if not bool(e.get("mounted", true)):
+			i += 1
 			continue
-		var rid: String = str(e.get("room_id", ""))
-		if not room_centers.has(rid):
-			continue
-		var pos: Vector3 = room_centers[rid] as Vector3
+		var pos: Vector3 = _component_marker_world(layout, e, room_centers, i)
 		var d: float = player_pos.distance_to(pos)
 		if d <= best_d:
 			best_d = d
 			best = e.duplicate(true)
 			best["distance"] = d
+		i += 1
 	return best
 
 
-## Find dismounted placement whose item_form is in inventory and room is in range.
+## Find dismounted placement whose item_form is in inventory and slot is in range.
 func _nearest_remount_target(
 		layout: Dictionary,
 		player_pos: Vector3,
@@ -4182,21 +4183,24 @@ func _nearest_remount_target(
 		return best
 	var placed: Array = component_placement_state.get("placed") as Array if typeof(component_placement_state.get("placed")) == TYPE_ARRAY else []
 	var room_centers: Dictionary = _room_world_centers(layout)
+	var i: int = 0
 	for entry_v in placed:
 		if typeof(entry_v) != TYPE_DICTIONARY:
+			i += 1
 			continue
 		var e: Dictionary = entry_v
 		if bool(e.get("mounted", true)):
+			i += 1
 			continue
 		var form: String = str(e.get("item_form", e.get("component_id", "")))
 		if form.is_empty() or int(inventory.get(form, 0)) < 1:
+			i += 1
 			continue
 		var rid: String = str(e.get("room_id", ""))
-		if not room_centers.has(rid):
-			continue
-		var pos: Vector3 = room_centers[rid] as Vector3
+		var pos: Vector3 = _component_marker_world(layout, e, room_centers, i)
 		var d: float = player_pos.distance_to(pos)
 		if d > best_d:
+			i += 1
 			continue
 		best_d = d
 		best = {
@@ -4209,6 +4213,7 @@ func _nearest_remount_target(
 			"distance": d,
 			"item_form": form,
 		}
+		i += 1
 	return best
 
 
