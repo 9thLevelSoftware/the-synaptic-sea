@@ -162,6 +162,8 @@ python3 tools/build_system_inventory.py --check
 
 The authoritative regression bundle is defined in [`docs/game/06_validation_plan.md`](../06_validation_plan.md). Focused smokes land with later plan tasks (threat visual, props, audio content, tutorials, run results).
 
+Away generated-seed boarding (not the hub golden) is proved by `scripts/validation/generated_seed_boarded_slice_smoke.gd`. Hub lock above is unchanged.
+
 ## Playtest
 
 Protocol (planned): [`docs/game/playtests/vertical_slice_protocol.md`](../playtests/vertical_slice_protocol.md)  
@@ -177,6 +179,7 @@ Related:
 
 - `docs/game/art_shippable_gate.md` — runtime art promotion gate
 - `docs/game/features/demo_scope_v1.md` — Milestone B demo bounds
+- `docs/game/features/generated_seed_boarded_slice.md` — away generated-seed boarding proof (REQ-SLICE-001). Hub remains golden `coherent_ship_001`.
 - `STATUS.md` — active milestone pointer
 - Inventory truth: `docs/game/inventory/SYSTEM_INVENTORY.md`
 

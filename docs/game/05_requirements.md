@@ -1655,3 +1655,22 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - `hive_biomatter_kit_smoke.gd` (`HIVE BIOMATTER KIT PASS template=true kit=true sockets_fallback=true occupancy=true v0_paths=true`)
   - `kit_catalog_smoke.gd` remains green
   - `template_selector_smoke.gd` legacy three unchanged
+
+---
+
+# Boarded generated-seed slice (remaining procgen play stack WP5)
+
+## REQ-SLICE-001: Boarded generated-seed play proof
+
+- Source: `features/generated_seed_boarded_slice.md`, `features/remaining_procgen_play_stack.md` WP5
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Walkability, live decay, wrapper collision, and slot fill are only play once a production `travel_to` boarding attaches `current_ship` and enters the away `_process` branch. `generate_from_seed` alone does not board.
+- Acceptance criteria:
+  - Headless `travel_to_marker_id` boarding of a generated wreck (not `coherent_ship_001`), copied from `away_branch_integrity_smoke.gd`.
+  - `away_from_start` is true as a result of `_attach_derelict_active`.
+  - Standing nav start→goal, slot-placed loot, wreck overlay when the boarded condition is DAMAGED/WRECKED, at least one objective, `away_ticks=30`.
+  - No extract requirement. Bundle pin does not include `seed=42`.
+- Verification:
+  - `scripts/validation/generated_seed_boarded_slice_smoke.gd` — registered in the bundle in the same PR after GREEN

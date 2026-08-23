@@ -54,6 +54,22 @@ Expected:
 
 - `HIVE BIOMATTER KIT PASS template=true kit=true sockets_fallback=true occupancy=true v0_paths=true`
 
+## Boarded generated-seed slice (REQ-SLICE-001) — GREEN
+
+Feature: `docs/game/features/generated_seed_boarded_slice.md`. Hub remains golden `coherent_ship_001`.
+
+```bash
+ROOT="${ROOT:-/Users/christopherwilloughby/the-synaptic-sea-of-stars}"
+GODOT="${GODOT:-/Users/christopherwilloughby/.local/bin/godot-4.6.2}"
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/generated_seed_boarded_slice_smoke.gd
+```
+
+Expected:
+
+- `GENERATED SEED BOARDED SLICE PASS away=true nav=true slots=true wreck=true objectives=true away_ticks=30`
+
+`seed=` on the same line is informational. Do not pin `seed=42`.
+
 ## Regression bundle
 
 ```bash
@@ -140,9 +156,9 @@ ENCOUNTER_TABLE_WARNING="^WARNING: EncounterInjector: encounter table file missi
 # zone pools can host the archetype's guaranteed "dock" — the assigner's
 # guarantee post-pass (Tranche 5 enforcement) correctly reports the skip.
 # The dock itself is guaranteed by the v3 RoomGraphGenerator layer (the same
-# smoke asserts dock_count==1) and by the derelict_a/b templates; production
-# derelict travel passes an empty archetype, so this diagnostic never fires
-# in play.
+# smoke asserts dock_count==1) and by the derelict_a/b templates. Production
+# generate_from_seed (travel_to / generated_seed_boarded_slice_smoke) can emit
+# the same skip when the selected template has no dock zone.
 DOCK_GUARANTEE_WARNING="^WARNING: RoomAssigner: guaranteed role 'dock' has no eligible zone in this template; guarantee skipped\$"
 # Soft-fail when all salted connectivity retries still produce a disconnected layout
 # (best-effort ship still returned; quality gate fails hard on disconnect).
@@ -466,6 +482,7 @@ run_clean 'Manifestation pool schema smoke' 'MANIFESTATION POOL PASS schema=true
 run_clean 'Sea graph pure smoke' 'SEA GRAPH PASS nodes=true route=true cost=true biomes=true extract=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sea_graph_smoke.gd
 run_clean 'Templates wreck mutator smoke' 'TEMPLATES WRECK MUTATOR PASS catalog=true load=true zone=true branch=true wreck=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/templates_wreck_mutator_smoke.gd
 run_clean 'Live decay stamp smoke' 'LIVE DECAY STAMP PASS locked=true wreck=true integrity=true links_kept=true quiet_import=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/live_decay_stamp_smoke.gd
+run_clean 'generated seed boarded slice smoke' 'GENERATED SEED BOARDED SLICE PASS away=true nav=true slots=true wreck=true objectives=true away_ticks=30' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/generated_seed_boarded_slice_smoke.gd
 run_clean 'Structural variant wrapper smoke' 'STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_variant_wrapper_smoke.gd
 run_clean 'Food sustenance closure smoke' 'FOOD CLOSURE PASS spoil_eat=true harvest=true travel=true loop=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/food_closure_smoke.gd
 run_clean 'Skill effects consumers smoke' 'SKILL EFFECTS PASS audit=true work=true craft=true heal=true travel=true class_kit=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/skill_effects_smoke.gd
@@ -850,7 +867,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=630 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=631 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 
