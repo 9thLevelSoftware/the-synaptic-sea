@@ -9,6 +9,7 @@ class_name BreachSealPoint
 ## PKG-B2.5: progress/interrupt rides WorkActionChannel (action patch_breach).
 
 const WorkActionChannelScript := preload("res://scripts/systems/work_action_channel.gd")
+const GameplayPropFactoryScript := preload("res://scripts/placement/gameplay_prop_factory.gd")
 const WORK_ACTION_ID: String = "patch_breach"
 
 signal breach_sealed(compartment_id: String)
@@ -195,19 +196,10 @@ func _ensure_collision(radius: float) -> void:
 
 func _ensure_marker(radius: float) -> void:
 	if marker == null:
-		marker = MeshInstance3D.new()
-		marker.name = "BreachSealMarker"
-		add_child(marker)
-	var box := BoxMesh.new()
-	box.size = Vector3(radius * 0.5, radius * 0.5, radius * 0.5)
-	marker.mesh = box
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.2, 0.6, 0.95, 0.7)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	marker.material_override = mat
-	marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var visual: Node3D = GameplayPropFactoryScript.build("breach_patch_panel")
+		visual.name = "GameplayPropVisual"
+		add_child(visual)
+		marker = visual.get_node("Mesh") as MeshInstance3D
 	marker.visible = marker_visible and not sealed
 	marker.set_meta("debug_breach_seal_marker", true)
 

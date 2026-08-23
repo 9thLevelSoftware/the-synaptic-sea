@@ -12,6 +12,8 @@ class_name ToolPickup
 
 signal tool_acquired(tool_id: String)
 
+const GameplayPropFactoryScript := preload("res://scripts/placement/gameplay_prop_factory.gd")
+
 var tool_id: String = ""
 var inventory_state: InventoryState
 var interaction_radius: float = 1.8
@@ -106,19 +108,10 @@ func _ensure_collision(radius: float) -> void:
 
 func _ensure_marker(radius: float) -> void:
 	if marker == null:
-		marker = MeshInstance3D.new()
-		marker.name = "ToolPickupMarker"
-		add_child(marker)
-	var box_mesh: BoxMesh = BoxMesh.new()
-	box_mesh.size = Vector3(radius * 0.6, radius * 0.6, radius * 0.6)
-	marker.mesh = box_mesh
-	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.albedo_color = Color(0.25, 0.75, 0.95, 0.65)
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	marker.material_override = material
-	marker.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var visual: Node3D = GameplayPropFactoryScript.build("tool_case")
+		visual.name = "GameplayPropVisual"
+		add_child(visual)
+		marker = visual.get_node("Mesh") as MeshInstance3D
 	marker.visible = marker_visible and not acquired
 	marker.set_meta("debug_tool_pickup_marker", true)
 

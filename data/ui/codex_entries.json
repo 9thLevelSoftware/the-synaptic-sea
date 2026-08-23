@@ -50,6 +50,42 @@
       "body": "Your suit's oxygen drains continuously. Refill at the lifeboat or a refill station. Below 0.0 you suffocate."
     },
     {
+      "id": "first_breach",
+      "topic": "Ship Systems",
+      "title": "Breach Seal",
+      "body": "An open breach drains oxygen and weakens the ship. Use sealant at the breach point to restore a safe compartment."
+    },
+    {
+      "id": "first_threat_spotted",
+      "topic": "Combat",
+      "title": "Threat Spotted",
+      "body": "Threats react to noise, light, and visibility. Crouch to stay quiet, or attack when you are ready."
+    },
+    {
+      "id": "first_loot_search",
+      "topic": "Exploration",
+      "title": "Search for Loot",
+      "body": "Search containers and corpses to collect parts, tools, and supplies. Loot is recorded per ship once searched."
+    },
+    {
+      "id": "first_scanner_open",
+      "topic": "Exploration",
+      "title": "Scanner",
+      "body": "The scanner lists nearby derelicts and their range. Select a target and confirm to travel when propulsion is online."
+    },
+    {
+      "id": "first_death",
+      "topic": "Survival",
+      "title": "Death and Saving",
+      "body": "Death ends the current run and freezes its saved slots for review. Save before a risky trip so you understand what progress is recoverable."
+    },
+    {
+      "id": "save_and_exit_failed",
+      "topic": "Survival",
+      "title": "Save Failed",
+      "body": "If saving fails, leaving would discard your progress. Resolve the problem before exiting; the run remains active."
+    },
+    {
       "id": "circuit_board",
       "topic": "Items",
       "title": "Circuit Board",

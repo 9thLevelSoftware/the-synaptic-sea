@@ -3,6 +3,7 @@ class_name GeneratedShipLoader
 
 const GameplayObjectiveVolumeScript := preload("res://scripts/procgen/gameplay_objective_volume.gd")
 const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
+const SliceAtmosphereApplierScript := preload("res://scripts/procgen/slice_atmosphere_applier.gd")
 
 signal ship_loaded(summary: Dictionary)
 signal load_failed(reason: String)
@@ -60,7 +61,7 @@ func clear_loaded_ship() -> void:
 	room_variant_descriptors = {}
 
 
-func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path: String) -> bool:
+func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path: String, is_away: bool = false) -> bool:
 	clear_loaded_ship()
 
 	var layout_abs: String = _resolve_path(layout_path)
@@ -77,9 +78,6 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 	layout_doc = _load_json_dict(layout_abs, "layout")
 	if layout_doc.is_empty():
 		return _fail_load("layout JSON is invalid: %s" % layout_abs)
-	var structural_plan_error: String = _validate_structural_plan_for_loading(layout_doc)
-	if not structural_plan_error.is_empty():
-		return _fail_load("layout missing validated structural_plan: %s" % structural_plan_error)
 	_build_room_variant_descriptors()
 	kit_doc = _load_json_dict(kit_abs, "kit")
 	if kit_doc.is_empty():
@@ -108,9 +106,12 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 	var module_to_scene: Dictionary = _build_module_scene_map(kit_doc, kit_abs)
 	if module_to_scene.is_empty():
 		return _fail_load("kit contains no usable module wrapper scenes: %s" % kit_abs)
-	var wrapper_preflight: Dictionary = _preflight_structural_wrappers(layout_doc, module_to_scene)
-	if not bool(wrapper_preflight.get("ok", false)):
-		return _fail_load("structural wrapper preflight failed: %s" % str(wrapper_preflight.get("error", "unknown error")))
+
+	var structural_verdict: Dictionary = _validate_structural_plan_for_loading()
+	if not bool(structural_verdict.get("ok", false)):
+		return _fail_load("layout structural plan validation failed: %s" % str(structural_verdict.get("errors", [])))
+	if not _preflight_structural_wrappers(module_to_scene, layout_doc.get("structural_plan", {})):
+		return _fail_load("structural wrapper preflight failed")
 
 	objective_specs = _build_objective_specs(layout_doc, gameplay_doc, gameplay_slice_abs)
 	if objective_specs.is_empty():
@@ -138,7 +139,7 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 		clear_loaded_ship()
 		return _fail_load("failed to instantiate structural wrapper scenes")
 
-	var nav_region: NavigationRegion3D = _build_navigation_region(layout_doc, structural_root)
+	var nav_region: NavigationRegion3D = _build_navigation_region(rooms, structural_root)
 	if nav_region == null:
 		clear_loaded_ship()
 		return _fail_load("no floor/corridor floor placements found for navigation mesh")
@@ -148,6 +149,7 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 	_add_coherence_runtime_nodes(layout_doc, structural_root)
 	# PKG-B5.1: apply dressing fog/tint/light meta per room variant descriptors.
 	_apply_dressing_visuals(layout_doc, structural_root)
+	_apply_slice_atmosphere(layout_doc, is_away)
 
 	objective_volumes = []
 	for objective_variant in objective_specs:
@@ -177,6 +179,22 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 		}
 	)
 	return true
+
+
+func _apply_slice_atmosphere(source_layout: Dictionary, is_away: bool) -> void:
+	var biome_id: String = str(source_layout.get("biome_id", ""))
+	if biome_id.is_empty():
+		return
+	var biome_path: String = "res://data/procgen/biomes/%s.json" % biome_id
+	if not FileAccess.file_exists(biome_path):
+		push_warning("GeneratedShipLoader: atmosphere biome file missing: %s" % biome_path)
+		return
+	var biome_doc: Dictionary = _load_json_dict(biome_path, "biome")
+	var atmosphere_variant: Variant = biome_doc.get("atmosphere", {})
+	if typeof(atmosphere_variant) != TYPE_DICTIONARY:
+		return
+	var applier = SliceAtmosphereApplierScript.new()
+	applier.apply(self, atmosphere_variant as Dictionary, is_away)
 
 
 func _fail_load(reason: String) -> bool:
@@ -270,6 +288,51 @@ func _build_module_scene_map(kit_doc: Dictionary, kit_path: String) -> Dictionar
 			continue
 		module_to_scene[module_id] = scene_path
 	return module_to_scene
+
+
+func _validate_structural_plan_for_loading() -> Dictionary:
+	var structural_plan_variant: Variant = layout_doc.get("structural_plan", null)
+	if typeof(structural_plan_variant) != TYPE_DICTIONARY:
+		return {"ok": false, "errors": ["layout missing validated structural_plan"]}
+	var structural_plan: Dictionary = structural_plan_variant
+	var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout_doc)
+	return verdict
+
+
+func _preflight_structural_wrappers(module_to_scene: Dictionary, structural_plan: Dictionary) -> bool:
+	var edge_variant: Variant = structural_plan.get("placements", null)
+	var floor_variant: Variant = structural_plan.get("floor_placements", null)
+	if typeof(edge_variant) != TYPE_ARRAY or typeof(floor_variant) != TYPE_ARRAY:
+		push_error("structural plan wrapper preflight requires edge and floor placement arrays")
+		return false
+	var all_records: Array = []
+	all_records.append_array(edge_variant as Array)
+	all_records.append_array(floor_variant as Array)
+	for record_variant in all_records:
+		if typeof(record_variant) != TYPE_DICTIONARY:
+			push_error("structural plan wrapper preflight found non-object placement")
+			return false
+		var record: Dictionary = record_variant
+		var module_id: String = str(record.get("module_id", ""))
+		var scene_path: String = str(module_to_scene.get(module_id, ""))
+		if module_id.is_empty() or scene_path.is_empty():
+			push_error("structural plan wrapper preflight missing wrapper for module %s" % module_id)
+			return false
+		if not ResourceLoader.exists(scene_path):
+			push_error("structural plan wrapper preflight missing scene %s" % scene_path)
+			return false
+		var scene: Resource = ResourceLoader.load(scene_path)
+		if scene == null or not (scene is PackedScene):
+			push_error("structural plan wrapper preflight scene is not PackedScene: %s" % scene_path)
+			return false
+		var probe: Node = (scene as PackedScene).instantiate()
+		if probe == null or not (probe is Node3D):
+			if probe != null:
+				probe.free()
+			push_error("structural plan wrapper preflight instance is not Node3D: %s" % module_id)
+			return false
+		probe.free()
+	return true
 
 
 func _build_objective_specs(layout_doc: Dictionary, gameplay_doc: Dictionary, gameplay_slice_path: String) -> Array:
@@ -376,7 +439,6 @@ func _build_objective_specs(layout_doc: Dictionary, gameplay_doc: Dictionary, ga
 			"id": objective_id,
 			"sequence": sequence,
 			"type": str(objective.get("type", "unknown")),
-			"placement_id": str(objective.get("placement_id", "")),
 			"kind": kind,
 			"room_id": room_id,
 			"position": target_position,
@@ -452,267 +514,109 @@ func _cell_name_candidates(cell: Array) -> Array:
 
 
 func _room_cell_world(room: Dictionary, cell: Array) -> Vector3:
-	var candidates: Array = _cell_name_candidates(cell)
-	if candidates.is_empty():
+	if cell.size() < 2:
 		return Vector3.INF
-
-	var placements_variant: Variant = room.get("structural_placements", [])
-	if typeof(placements_variant) != TYPE_ARRAY:
+	var room_id: String = str(room.get("id", ""))
+	var deck: int = int(room.get("deck", -1))
+	if cell.size() >= 3:
+		deck = int(cell[2])
+	var cell_key_value: String = "%d|%d|%d" % [deck, int(cell[0]), int(cell[1])]
+	var structural_plan: Dictionary = layout_doc.get("structural_plan", {})
+	var floors_variant: Variant = structural_plan.get("floor_placements", [])
+	if typeof(floors_variant) != TYPE_ARRAY:
 		return Vector3.INF
-	var placements: Array = placements_variant
-	for placement_variant in placements:
-		if typeof(placement_variant) != TYPE_DICTIONARY:
+	for floor_variant in (floors_variant as Array):
+		if typeof(floor_variant) != TYPE_DICTIONARY:
 			continue
-		var placement: Dictionary = placement_variant
-		var name: String = str(placement.get("name", ""))
-		if not candidates.has(name):
+		var floor: Dictionary = floor_variant
+		if str(floor.get("cell_key", "")) != cell_key_value or str(floor.get("room_id", "")) != room_id:
 			continue
-		var pos: Array = _read_placement_position(placement)
+		var pos: Array = _read_placement_position(floor)
 		if pos.size() < 3:
 			return Vector3.INF
 		return Vector3(float(pos[0]), float(pos[1]) + FLOOR_Y_OFFSET, float(pos[2]))
 	return Vector3.INF
 
 
-func _validate_structural_plan_for_loading(layout: Dictionary) -> String:
-	var structural_plan_variant: Variant = layout.get("structural_plan", null)
-	if not (structural_plan_variant is Dictionary):
-		return "plan dictionary is missing"
-	var structural_plan: Dictionary = structural_plan_variant
-	if structural_plan.has("validated") and not bool(structural_plan.get("validated", false)):
-		return "plan validation flag is false"
-
-	var compiler_errors_variant: Variant = structural_plan.get("errors", null)
-	if not (compiler_errors_variant is Array):
-		return "plan errors are not an Array"
-	if not (compiler_errors_variant as Array).is_empty():
-		return "plan contains compiler errors"
-	var occupancy_variant: Variant = structural_plan.get("occupancy", null)
-	if not (occupancy_variant is Dictionary) or (occupancy_variant as Dictionary).is_empty():
-		return "plan occupancy is missing or empty"
-	var edges_variant: Variant = structural_plan.get("edges", null)
-	if not (edges_variant is Dictionary) or (edges_variant as Dictionary).is_empty():
-		return "plan edges are missing or empty"
-	var placements_variant: Variant = structural_plan.get("placements", null)
-	if not (placements_variant is Array) or (placements_variant as Array).is_empty():
-		return "plan placements are missing or empty"
-
-	var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout)
-	if not bool(verdict.get("ok", false)):
-		return JSON.stringify(verdict.get("errors", []))
-	return ""
-
-
-func _preflight_structural_wrappers(
-		layout_doc: Dictionary,
-		module_to_scene: Dictionary) -> Dictionary:
-	var validation_error: String = _validate_structural_plan_for_loading(layout_doc)
-	if not validation_error.is_empty():
-		return {"ok": false, "error": validation_error}
-
+func _instance_structural_wrappers(layout_doc: Dictionary, module_to_scene: Dictionary, ship_root: Node3D) -> int:
 	var structural_plan_variant: Variant = layout_doc.get("structural_plan", null)
-	if not (structural_plan_variant is Dictionary):
-		return {"ok": false, "error": "plan dictionary is missing"}
+	if typeof(structural_plan_variant) != TYPE_DICTIONARY:
+		return -1
 	var structural_plan: Dictionary = structural_plan_variant
-	var placements_variant: Variant = structural_plan.get("placements", null)
-	if not (placements_variant is Array) or (placements_variant as Array).is_empty():
-		return {"ok": false, "error": "plan placements are missing or empty"}
-
-	var placements: Array = placements_variant
-	var prepared_records: Array = []
-	var seen_placement_ids: Dictionary = {}
-	for record_variant in placements:
-		if not (record_variant is Dictionary):
-			return {"ok": false, "error": "placement record is not a Dictionary"}
-		var record: Dictionary = record_variant
-		var kind_variant: Variant = record.get("kind", null)
-		if not (kind_variant is String):
-			return {"ok": false, "error": "placement kind must be a String"}
-		var kind: String = String(kind_variant)
-		if kind == "OPEN":
-			return {"ok": false, "error": "OPEN placement cannot be materialized"}
-		if not ["SOLID", "DOOR", "LOCKED", "HATCH", "BREACH"].has(kind):
-			return {"ok": false, "error": "placement kind is unknown: %s" % kind}
-
-		var edge_key_variant: Variant = record.get("edge_key", null)
-		if not (edge_key_variant is String):
-			return {"ok": false, "error": "placement edge_key must be a non-empty String"}
-		if String(edge_key_variant).is_empty():
-			return {"ok": false, "error": "placement edge_key must be a non-empty String"}
-		var edge_key: String = String(edge_key_variant)
-
-		var placement_id_variant: Variant = record.get("placement_id", null)
-		if not (placement_id_variant is String) or String(placement_id_variant).is_empty():
-			return {"ok": false, "error": "placement_id must be a non-empty String"}
-		var placement_id: String = String(placement_id_variant)
-		if seen_placement_ids.has(placement_id):
-			return {"ok": false, "error": "duplicate structural placement_id: %s" % placement_id}
-		seen_placement_ids[placement_id] = true
-		var module_id_variant: Variant = record.get("module_id", null)
-		if not (module_id_variant is String) or String(module_id_variant).is_empty():
-			return {"ok": false, "error": "module_id must be a non-empty String"}
-		var module_id: String = String(module_id_variant)
-		var room_ids_variant: Variant = record.get("room_ids", null)
-		if not (room_ids_variant is Array) or (room_ids_variant as Array).is_empty():
-			return {"ok": false, "error": "room_ids must be a non-empty Array"}
-		var placement_position: Vector3 = _read_structural_record_position(record.get("position", null))
-		if placement_position == Vector3.INF:
-			return {"ok": false, "error": "placement position is malformed: %s" % edge_key}
-		var yaw_variant: Variant = record.get("yaw_degrees", null)
-		if not _is_numeric_variant(yaw_variant):
-			return {"ok": false, "error": "placement yaw_degrees is malformed: %s" % edge_key}
-
-		if not module_to_scene.has(module_id):
-			return {"ok": false, "error": "compiled placement references unavailable wrapper: %s" % module_id}
-		var scene_value: Variant = module_to_scene.get(module_id, null)
-		var packed_scene: PackedScene = null
-		if scene_value is PackedScene:
-			packed_scene = scene_value as PackedScene
-		elif scene_value is String:
-			var scene_path: String = String(scene_value)
-			if scene_path.is_empty() or not ResourceLoader.exists(scene_path):
-				return {"ok": false, "error": "wrapper scene missing for compiled module %s: %s" % [module_id, scene_path]}
-			var loaded_resource: Resource = load(scene_path)
-			if loaded_resource is PackedScene:
-				packed_scene = loaded_resource as PackedScene
-		if packed_scene == null:
-			return {"ok": false, "error": "compiled wrapper scene is not PackedScene for module %s" % module_id}
-
-		prepared_records.append({
-			"record": record,
-			"packed_scene": packed_scene,
-		})
-
-	var floor_preflight: Dictionary = _preflight_floor_structural_wrappers(layout_doc, module_to_scene)
-	if not bool(floor_preflight.get("ok", false)):
-		return {"ok": false, "error": str(floor_preflight.get("error", "unknown floor wrapper error"))}
-	for prepared_floor_variant in floor_preflight.get("records", []):
-		if not (prepared_floor_variant is Dictionary):
-			return {"ok": false, "error": "floor wrapper preflight record is not a Dictionary"}
-		var prepared_floor: Dictionary = prepared_floor_variant
-		var floor_record: Dictionary = prepared_floor.get("record", {})
-		var floor_placement_id: String = String(floor_record.get("placement_id", ""))
-		if seen_placement_ids.has(floor_placement_id):
-			return {"ok": false, "error": "duplicate structural placement_id: %s" % floor_placement_id}
-		seen_placement_ids[floor_placement_id] = true
-		prepared_records.append(prepared_floor)
-	return {"ok": true, "records": prepared_records}
-
-
-func _preflight_floor_structural_wrappers(layout_doc: Dictionary, module_to_scene: Dictionary) -> Dictionary:
-	var structural_plan_variant: Variant = layout_doc.get("structural_plan", null)
-	if not (structural_plan_variant is Dictionary):
-		return {"ok": false, "error": "plan dictionary is missing"}
-	var structural_plan: Dictionary = structural_plan_variant
-	var floor_placements_variant: Variant = structural_plan.get("floor_placements", null)
-	if not (floor_placements_variant is Array) or (floor_placements_variant as Array).is_empty():
-		return {"ok": false, "error": "plan floor_placements are missing or empty"}
-
-	var prepared_records: Array = []
-	for floor_record_variant in floor_placements_variant as Array:
-		if not (floor_record_variant is Dictionary):
-			return {"ok": false, "error": "floor placement record is not a Dictionary"}
-		var floor_record: Dictionary = floor_record_variant
-		var kind_variant: Variant = floor_record.get("kind", null)
-		if not (kind_variant is String) or String(kind_variant) != "FLOOR":
-			return {"ok": false, "error": "floor placement kind must be FLOOR"}
-		var placement_id_variant: Variant = floor_record.get("placement_id", null)
-		if not (placement_id_variant is String) or String(placement_id_variant).is_empty():
-			return {"ok": false, "error": "floor placement_id must be a non-empty String"}
-		var module_id_variant: Variant = floor_record.get("module_id", null)
-		if not (module_id_variant is String) or String(module_id_variant).is_empty():
-			return {"ok": false, "error": "floor module_id must be a non-empty String"}
-		var module_id: String = String(module_id_variant)
-		if not FLOOR_MODULES.has(module_id):
-			return {"ok": false, "error": "floor placement references non-floor module: %s" % module_id}
-		var room_ids_variant: Variant = floor_record.get("room_ids", null)
-		if not (room_ids_variant is Array) or (room_ids_variant as Array).is_empty():
-			return {"ok": false, "error": "floor room_ids must be a non-empty Array"}
-		var placement_position: Vector3 = _read_structural_record_position(floor_record.get("position", null))
-		if placement_position == Vector3.INF:
-			return {"ok": false, "error": "floor placement position is malformed: %s" % String(placement_id_variant)}
-		var yaw_variant: Variant = floor_record.get("yaw_degrees", null)
-		if not _is_numeric_variant(yaw_variant):
-			return {"ok": false, "error": "floor placement yaw_degrees is malformed: %s" % String(placement_id_variant)}
-
-		if not module_to_scene.has(module_id):
-			return {"ok": false, "error": "compiled floor placement references unavailable wrapper: %s" % module_id}
-		var scene_value: Variant = module_to_scene.get(module_id, null)
-		var packed_scene: PackedScene = null
-		if scene_value is PackedScene:
-			packed_scene = scene_value as PackedScene
-		elif scene_value is String:
-			var scene_path: String = String(scene_value)
-			if scene_path.is_empty() or not ResourceLoader.exists(scene_path):
-				return {"ok": false, "error": "floor wrapper scene missing for compiled module %s: %s" % [module_id, scene_path]}
-			var loaded_resource: Resource = load(scene_path)
-			if loaded_resource is PackedScene:
-				packed_scene = loaded_resource as PackedScene
-		if packed_scene == null:
-			return {"ok": false, "error": "compiled floor wrapper scene is not PackedScene for module %s" % module_id}
-
-		prepared_records.append({
-			"record": floor_record,
-			"packed_scene": packed_scene,
-		})
-	return {"ok": true, "records": prepared_records}
-
-
-func _instance_structural_wrappers(
-		layout_doc: Dictionary,
-		module_to_scene: Dictionary,
-		ship_root: Node3D) -> int:
-	var wrapper_preflight: Dictionary = _preflight_structural_wrappers(layout_doc, module_to_scene)
-	if not bool(wrapper_preflight.get("ok", false)):
+	var edge_variant: Variant = structural_plan.get("placements", null)
+	var floor_variant: Variant = structural_plan.get("floor_placements", null)
+	if typeof(edge_variant) != TYPE_ARRAY or typeof(floor_variant) != TYPE_ARRAY:
 		return -1
 
-	var pending_wrappers: Array[Node3D] = []
-	for prepared_variant in wrapper_preflight.get("records", []):
-		if not (prepared_variant is Dictionary):
-			push_error("structural wrapper preflight record is not a Dictionary")
-			for pending in pending_wrappers:
-				pending.free()
+	# Instantiate detached first. No partial structural tree is published if a
+	# record is malformed or a wrapper fails; the caller can then discard the
+	# empty root atomically.
+	var pending: Array[Node3D] = []
+	for record_variant in (edge_variant as Array):
+		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, false)
+		if wrapper == null:
+			for previous in pending:
+				previous.free()
 			return -1
-		var prepared: Dictionary = prepared_variant
-		var record: Dictionary = prepared.get("record", {})
-		var packed_scene: PackedScene = prepared.get("packed_scene", null) as PackedScene
-		if packed_scene == null:
-			push_error("structural wrapper preflight PackedScene is null")
-			for pending in pending_wrappers:
-				pending.free()
+		pending.append(wrapper)
+	for record_variant in (floor_variant as Array):
+		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, true)
+		if wrapper == null:
+			for previous in pending:
+				previous.free()
 			return -1
-		var instance: Node = packed_scene.instantiate()
-		if instance == null or not (instance is Node3D):
-			if instance != null:
-				instance.free()
-			for pending in pending_wrappers:
-				pending.free()
-			push_error("compiled wrapper instance is not Node3D for module %s" % str(record.get("module_id", "")))
-			return -1
-
-		var wrapper: Node3D = instance as Node3D
-		var edge_key: String = String(record.get("edge_key", ""))
-		var kind: String = String(record.get("kind", ""))
-		var placement_id: String = String(record.get("placement_id", ""))
-		var room_ids: Array = (record.get("room_ids", []) as Array).duplicate(true)
-		wrapper.position = _read_structural_record_position(record.get("position", null))
-		wrapper.rotation_degrees.y = float(record.get("yaw_degrees", 0.0))
-		wrapper.name = "Structural_%s" % placement_id.replace(":", "_").replace("|", "_")
-		wrapper.set_meta("structural_edge_key", edge_key)
-		wrapper.set_meta("structural_kind", kind)
-		wrapper.set_meta("structural_placement_id", placement_id)
-		wrapper.set_meta("structural_room_ids", room_ids)
-		# Preserve existing integrity consumers while binding them to the
-		# canonical placement identity rather than a room-local legacy name.
-		wrapper.set_meta("module_kind", String(record.get("module_id", "")))
-		wrapper.set_meta("module_key", placement_id)
-		wrapper.set_meta("room_id", str(room_ids[0]) if not room_ids.is_empty() else "")
-		wrapper.set_meta("integrity_state", "intact")
-		pending_wrappers.append(wrapper)
-
-	for wrapper in pending_wrappers:
+		pending.append(wrapper)
+	for wrapper in pending:
 		ship_root.add_child(wrapper)
-	return pending_wrappers.size()
+	return pending.size()
+
+
+func _instantiate_structural_record(record_variant: Variant, module_to_scene: Dictionary, is_floor: bool) -> Node3D:
+	if typeof(record_variant) != TYPE_DICTIONARY:
+		return null
+	var record: Dictionary = record_variant
+	var module_id: String = str(record.get("module_id", ""))
+	var scene_path: String = str(module_to_scene.get(module_id, ""))
+	if module_id.is_empty() or scene_path.is_empty() or not ResourceLoader.exists(scene_path):
+		return null
+	var scene: Resource = ResourceLoader.load(scene_path)
+	if scene == null or not (scene is PackedScene):
+		return null
+	var instance: Node = (scene as PackedScene).instantiate()
+	if instance == null or not (instance is Node3D):
+		if instance != null:
+			instance.free()
+		return null
+	var wrapper: Node3D = instance as Node3D
+	var placement_pos: Array = _read_placement_position(record)
+	if placement_pos.size() < 3:
+		wrapper.free()
+		return null
+	wrapper.position = Vector3(float(placement_pos[0]), float(placement_pos[1]), float(placement_pos[2]))
+	wrapper.rotation_degrees.y = float(record.get("yaw_degrees", 0.0))
+	if is_floor:
+		var cell_key_value: String = str(record.get("cell_key", ""))
+		wrapper.name = "Floor_%s" % cell_key_value.replace("|", "_")
+		wrapper.set_meta("structural_floor_placement_id", str(record.get("placement_id", record.get("id", ""))))
+		wrapper.set_meta("structural_cell_key", cell_key_value)
+		wrapper.set_meta("structural_room_id", str(record.get("room_id", "")))
+		wrapper.set_meta("structural_kind", "FLOOR")
+		wrapper.set_meta("module_kind", module_id)
+		wrapper.set_meta("module_key", "floor/%s" % cell_key_value)
+		wrapper.set_meta("room_id", str(record.get("room_id", "")))
+	else:
+		var edge_key_value: String = str(record.get("edge_key", ""))
+		wrapper.name = "StructuralEdge_%s" % edge_key_value.replace("|", "_")
+		wrapper.set_meta("structural_edge_key", edge_key_value)
+		wrapper.set_meta("structural_kind", str(record.get("kind", "")))
+		wrapper.set_meta("structural_placement_id", str(record.get("placement_id", record.get("id", ""))))
+		wrapper.set_meta("structural_room_ids", (record.get("room_ids", []) as Array).duplicate(true))
+		wrapper.set_meta("module_kind", module_id)
+		wrapper.set_meta("module_key", "edge/%s" % edge_key_value)
+		var room_ids: Array = record.get("room_ids", []) if typeof(record.get("room_ids", [])) == TYPE_ARRAY else []
+		wrapper.set_meta("room_id", str(room_ids[0]) if not room_ids.is_empty() else "")
+	wrapper.set_meta("integrity_state", "intact")
+	return wrapper
 
 
 func _parse_prefixed_int(value: String, prefix: String) -> int:
@@ -766,32 +670,15 @@ func _cell_world_from_link_endpoint(link_doc: Dictionary, cell_key: String, room
 	if typeof(endpoint_variant) != TYPE_ARRAY:
 		return Vector3.INF
 	var endpoint: Array = endpoint_variant
+	if endpoint.size() < 2:
+		return Vector3.INF
 	var room_id: String = str(link_doc.get(room_key, ""))
 	if room_id.is_empty():
 		return Vector3.INF
-	var rooms_variant: Variant = layout_doc.get("rooms", [])
-	if typeof(rooms_variant) != TYPE_ARRAY:
+	var room: Dictionary = _find_room_in_layout(room_id)
+	if room.is_empty():
 		return Vector3.INF
-	for room_variant in rooms_variant:
-		if typeof(room_variant) != TYPE_DICTIONARY:
-			continue
-		var room: Dictionary = room_variant
-		if str(room.get("id", "")) != room_id:
-			continue
-		var placements_variant: Variant = room.get("structural_placements", [])
-		if typeof(placements_variant) != TYPE_ARRAY:
-			return Vector3.INF
-		for placement_variant in placements_variant:
-			if typeof(placement_variant) != TYPE_DICTIONARY:
-				continue
-			var placement: Dictionary = placement_variant
-			if not _placement_matches_endpoint_cell(placement, endpoint):
-				continue
-			var pos: Array = _read_placement_position(placement)
-			if pos.size() < 3:
-				return Vector3.INF
-			return Vector3(float(pos[0]), float(pos[1]) + FLOOR_Y_OFFSET, float(pos[2]))
-	return Vector3.INF
+	return _room_cell_world(room, endpoint)
 
 
 func _add_vertical_links(layout_doc: Dictionary, ship_root: Node3D) -> int:
@@ -818,27 +705,24 @@ func _add_vertical_links(layout_doc: Dictionary, ship_root: Node3D) -> int:
 	return count
 
 
-func _build_navigation_region(layout_doc: Dictionary, ship_root: Node3D) -> NavigationRegion3D:
-	var structural_plan_variant: Variant = layout_doc.get("structural_plan", null)
-	if not (structural_plan_variant is Dictionary):
-		return null
-	var structural_plan: Dictionary = structural_plan_variant
-	var floor_placements_variant: Variant = structural_plan.get("floor_placements", null)
-	if not (floor_placements_variant is Array):
-		return null
-
+func _build_navigation_region(_rooms: Array, ship_root: Node3D) -> NavigationRegion3D:
 	var source: NavigationMeshSourceGeometryData3D = NavigationMeshSourceGeometryData3D.new()
 	var floor_cell_count: int = 0
-	for floor_record_variant in floor_placements_variant:
-		if not (floor_record_variant is Dictionary):
-			return null
-		var floor_record: Dictionary = floor_record_variant
-		var module_id: String = String(floor_record.get("module_id", ""))
+	var structural_plan: Dictionary = layout_doc.get("structural_plan", {})
+	var floors_variant: Variant = structural_plan.get("floor_placements", [])
+	if typeof(floors_variant) != TYPE_ARRAY:
+		return null
+	for floor_variant in (floors_variant as Array):
+		if typeof(floor_variant) != TYPE_DICTIONARY:
+			continue
+		var floor: Dictionary = floor_variant
+		var module_id: String = str(floor.get("module_id", ""))
 		if not FLOOR_MODULES.has(module_id):
-			return null
-		var cell_center: Vector3 = _read_structural_record_position(floor_record.get("position", null))
-		if cell_center == Vector3.INF:
-			return null
+			continue
+		var pos: Array = _read_placement_position(floor)
+		if pos.size() < 3:
+			continue
+		var cell_center: Vector3 = Vector3(float(pos[0]), float(pos[1]) + FLOOR_Y_OFFSET, float(pos[2]))
 		var half: float = CELL_SIZE * 0.5
 		var faces: PackedVector3Array = PackedVector3Array([
 			cell_center + Vector3(-half, 0.0, -half),
@@ -852,7 +736,7 @@ func _build_navigation_region(layout_doc: Dictionary, ship_root: Node3D) -> Navi
 		floor_cell_count += 1
 
 	if floor_cell_count == 0:
-		push_error("no compiler floor placement records found for navigation mesh")
+		push_error("no floor/corridor floor placements found for navigation mesh")
 		return null
 
 	var nav_mesh: NavigationMesh = NavigationMesh.new()
@@ -866,14 +750,19 @@ func _build_navigation_region(layout_doc: Dictionary, ship_root: Node3D) -> Navi
 
 
 func _read_placement_position(placement: Dictionary) -> Array:
-	# Accept either `position` (legacy / seed-17 fixtures) or `world_position`
-	# (golden coherent fixture). Return [] unless the value is an Array with
-	# at least 3 numeric-ish values.
 	if typeof(placement) != TYPE_DICTIONARY:
 		return []
 	var raw: Variant = placement.get("position", null)
 	if raw == null:
 		raw = placement.get("world_position", null)
+	if typeof(raw) == TYPE_VECTOR3:
+		var vector: Vector3 = raw
+		return [vector.x, vector.y, vector.z]
+	if typeof(raw) == TYPE_STRING:
+		var parsed: Array = _parse_vector_string(str(raw), 3)
+		if parsed.size() == 3:
+			return parsed
+		return []
 	if typeof(raw) != TYPE_ARRAY:
 		return []
 	var arr: Array = raw
@@ -889,78 +778,43 @@ func _read_placement_position(placement: Dictionary) -> Array:
 	return arr
 
 
-func _read_structural_record_position(raw: Variant) -> Vector3:
-	if raw is Vector3:
-		return raw
-	if raw is Array:
-		var values: Array = raw
-		if values.size() < 3:
-			return Vector3.INF
-		for value in values.slice(0, 3):
-			if not _is_numeric_variant(value):
-				return Vector3.INF
-		return Vector3(float(values[0]), float(values[1]), float(values[2]))
-	if raw is String:
-		var text: String = String(raw).strip_edges()
-		if text.begins_with("Vector3(") and text.ends_with(")"):
-			text = text.substr(8, text.length() - 9)
-		elif text.begins_with("(") and text.ends_with(")"):
-			text = text.substr(1, text.length() - 2)
-		var parts: PackedStringArray = text.split(",")
-		if parts.size() < 3:
-			return Vector3.INF
-		for index in range(3):
-			if not parts[index].strip_edges().is_valid_float():
-				return Vector3.INF
-		return Vector3(
-			float(parts[0].strip_edges()),
-			float(parts[1].strip_edges()),
-			float(parts[2].strip_edges()),
-		)
-	return Vector3.INF
+func _parse_vector_string(value: String, expected: int) -> Array:
+	var text: String = value.strip_edges()
+	if text.begins_with("(") and text.ends_with(")"):
+		text = text.substr(1, text.length() - 2)
+	var parts: PackedStringArray = text.split(",")
+	if parts.size() != expected:
+		return []
+	var result: Array = []
+	for part in parts:
+		var token: String = part.strip_edges()
+		if not token.is_valid_float():
+			return []
+		result.append(float(token))
+	return result
 
 
-func _is_numeric_variant(value: Variant) -> bool:
-	var value_type: int = typeof(value)
-	if value_type == TYPE_INT or value_type == TYPE_FLOAT:
-		return true
-	return value_type == TYPE_STRING and String(value).is_valid_float()
-
-
-func _room_center(rooms: Array, room_id: String) -> Vector3:
-	for room_variant in rooms:
-		if typeof(room_variant) != TYPE_DICTIONARY:
+func _room_center(_rooms: Array, room_id: String) -> Vector3:
+	var structural_plan: Dictionary = layout_doc.get("structural_plan", {})
+	var floors_variant: Variant = structural_plan.get("floor_placements", [])
+	if typeof(floors_variant) != TYPE_ARRAY:
+		return Vector3.INF
+	var total: Vector3 = Vector3.ZERO
+	var count: int = 0
+	for floor_variant in (floors_variant as Array):
+		if typeof(floor_variant) != TYPE_DICTIONARY:
 			continue
-		var room: Dictionary = room_variant
-		if str(room.get("id", "")) != room_id:
+		var floor: Dictionary = floor_variant
+		if str(floor.get("room_id", "")) != room_id:
 			continue
-		var placements_variant: Variant = room.get("structural_placements", [])
-		if typeof(placements_variant) != TYPE_ARRAY:
-			break
-		var placements: Array = placements_variant
-		var total: Vector3 = Vector3.ZERO
-		var count: int = 0
-		for placement_variant in placements:
-			if typeof(placement_variant) != TYPE_DICTIONARY:
-				continue
-			var placement: Dictionary = placement_variant
-			var module_id: String = str(placement.get("module_id", placement.get("module", "")))
-			if not FLOOR_MODULES.has(module_id):
-				continue
-			var pos: Array = _read_placement_position(placement)
-			if pos.size() < 3:
-				continue
-			total += Vector3(float(pos[0]), float(pos[1]) + FLOOR_Y_OFFSET, float(pos[2]))
-			count += 1
-		if count == 0:
-			var origin_variant: Variant = room.get("origin", [0.0, 0.0, 0.0])
-			if typeof(origin_variant) == TYPE_ARRAY:
-				var origin: Array = origin_variant
-				if origin.size() >= 3:
-					return Vector3(float(origin[0]), float(origin[1]) + FLOOR_Y_OFFSET, float(origin[2]))
-			return Vector3.INF
-		return total / float(count)
-	return Vector3.INF
+		var pos: Array = _read_placement_position(floor)
+		if pos.size() < 3:
+			continue
+		total += Vector3(float(pos[0]), float(pos[1]) + FLOOR_Y_OFFSET, float(pos[2]))
+		count += 1
+	if count == 0:
+		return Vector3.INF
+	return total / float(count)
 
 
 # --- Public metadata accessors -------------------------------------------------

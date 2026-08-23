@@ -3,8 +3,14 @@ class_name StructuralPlacer
 
 # Legacy debug-only room visualizer. It is not a valid structural compiler and
 # must never be used by ShipGenerator, GeneratedShipLoader, or staged captures.
-# Production structural boundaries belong to StructuralEdgeCompiler and are
-# instantiated by GeneratedShipLoader from validated placement records.
+
+const LEGACY_DEBUG_SMOKE_NAMES: Array[String] = [
+	"structural_placer_smoke.gd",
+	"main_playable_lifeboat_biome_skin_smoke.gd",
+]
+const DEPRECATION_DIAGNOSTIC: String = "STRUCTURAL PLACER DEPRECATED: legacy/debug-only path; use StructuralEdgeCompiler"
+
+# Builds the physical "shell" of a ship from a RoomGraph using 2D
 # grid placement with spatial rules.
 #
 # v3 changes:
@@ -17,12 +23,6 @@ class_name StructuralPlacer
 #     more random links, rooms spread outward from center.
 #   - Post-layout swap: rooms that ended up in the wrong zone get
 #     swapped with rooms in better positions.
-
-const LEGACY_DEBUG_CONTEXTS: Array[String] = [
-	"structural_placer_smoke",
-	"seed_determinism_contract",
-	"legacy_structural_debug",
-]
 
 const RoomGraphScript := preload("res://scripts/procgen/room_graph.gd")
 const KitCatalogScript := preload("res://scripts/procgen/kit_catalog.gd")
@@ -111,15 +111,17 @@ var kit_catalog = null
 var biome: String = ""
 
 
-func place_structure(
-		graph: RoomGraphScript,
-		seed_value: int = 0,
-		p_biome: String = "",
-		legacy_debug_context: String = "") -> Node3D:
-	if not LEGACY_DEBUG_CONTEXTS.has(legacy_debug_context):
-		push_warning(
-			"STRUCTURAL_PLACER DEPRECATED: legacy/debug-only visualizer invoked without a named legacy_debug_context"
-		)
+func _emit_deprecation_diagnostic() -> void:
+	for argument_variant in OS.get_cmdline_args():
+		var argument: String = str(argument_variant)
+		for smoke_name in LEGACY_DEBUG_SMOKE_NAMES:
+			if argument.ends_with(smoke_name):
+				return
+	push_warning(DEPRECATION_DIAGNOSTIC)
+
+
+func place_structure(graph: RoomGraphScript, seed_value: int = 0, p_biome: String = "") -> Node3D:
+	_emit_deprecation_diagnostic()
 	if graph.rooms.is_empty():
 		return null
 

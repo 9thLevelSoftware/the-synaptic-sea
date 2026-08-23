@@ -64,7 +64,22 @@ var current_voice_log_id: String = ""
 ## only behavior (the deferred asset library is honest about what plays).
 const STREAM_CATALOG: Dictionary = {
 	"sfx.tool.pickup": "res://data/audio/sfx/tool_pickup.wav",
+	"sfx.footstep": "res://data/audio/sfx/footstep.wav",
+	"ui.panel.open": "res://data/audio/ui/panel_open.wav",
+	"ui.panel.close": "res://data/audio/ui/panel_close.wav",
+	"sfx.fire.crackle": "res://data/audio/sfx/fire_crackle.wav",
+	# Hull-groan is the existing breach/meta cue; the content pack supplies
+	# the authored-id-compatible alarm placeholder without a new event system.
+	"meta.hull.groan": "res://data/audio/sfx/breach_alarm.wav",
+	"sfx.combat.hit": "res://data/audio/sfx/combat_hit.wav",
+	"sfx.combat.threat_alert": "res://data/audio/sfx/threat_alert.wav",
+	"sfx.door.open": "res://data/audio/sfx/door_open.wav",
+	"sfx.door.close": "res://data/audio/sfx/door_close.wav",
+	"sfx.dock.land": "res://data/audio/sfx/dock_land.wav",
+	"ui.vitals.low": "res://data/audio/sfx/vitals_low.wav",
 	"layer.base": "res://data/audio/music/exploration_base.wav",
+	"layer.tension_drone": "res://data/audio/music/tension_drone.wav",
+	"layer.critical_pad": "res://data/audio/music/critical_pad.wav",
 }
 
 ## Path -> loaded AudioStream cache. Avoids re-loading the same WAV from
@@ -75,8 +90,9 @@ var _loaded_streams: Dictionary = {}
 ## missing asset doesn't spam push_warning every frame it's requested).
 var _warned_missing_paths: Dictionary = {}
 
-## Headless runs retain playback objects in AudioServer until process exit.
-## Keep routing and stream assignment testable, but do not start playback.
+## Internal: is the audio device headless (no real audio output)?
+## Used to skip player.play() calls that create AudioStreamPlayback
+## objects whose references are held by the AudioServer's mixing thread.
 var _headless: bool = false
 
 func _ready() -> void:
@@ -85,11 +101,22 @@ func _ready() -> void:
 	_apply_bus_volumes()
 	_initialize_sub_models()
 
-## Release audio resources on teardown.
+## Explicit teardown: release all cached AudioStream references so the
+## RefCounted AudioStreamWAV / AudioStreamPlaybackWAV instances are freed
+## before Godot's ObjectDB leak check runs. Without this, the cleanup
+## order during scene-tree destruction leaves dangling references in
+## _loaded_streams and in each AudioStreamPlayer.stream property.
 func _exit_tree() -> void:
+	_release_audio_refs()
+
+## Shared cleanup logic for both _exit_tree and NOTIFICATION_PREDELETE.
+func _release_audio_refs() -> void:
+	# Drop the stream cache so RefCounted entries lose our reference.
 	_loaded_streams.clear()
-	for bus_id in _bus_players:
-		var player: AudioStreamPlayer = _bus_players[bus_id]
+	# Detach streams from every bus player so the internal
+	# AudioStreamPlayback is released.
+	for key in _bus_players:
+		var player = _bus_players[key]
 		if player != null and is_instance_valid(player):
 			player.stop()
 			player.stream = null

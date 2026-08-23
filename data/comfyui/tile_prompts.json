@@ -1,0 +1,28 @@
+{
+  "style_prefix": "synaptic_sea_style, salvage-industrial derelict spaceship interior, weathered dark metal panels, visible rivets and seam lines, subtle rust and grime patina, dim amber and cool blue-green accent lighting from recessed strips, functional military aesthetic, utilitarian and slightly worn",
+  "negative": "blurry, low quality, cartoon, anime, bright colors, clean, new, pristine, text, watermark, 3d render, plastic, oversaturated, white background",
+  "per_module": {
+    "floor_1x1": "top-down isometric view of metal floor plate, panel seam lines forming quadrants, small drainage grate in center, diamond tread anti-slip pattern",
+    "floor_2x1": "top-down isometric view of elongated metal floor plate, two panel sections with seam line down the middle, conduit channel along one edge",
+    "corridor_floor_1x1": "top-down isometric view of narrow corridor floor, directional arrow markings, recessed lighting strip down center, scuffed metal",
+    "corridor_floor_1x2": "top-down isometric view of narrow corridor floor spanning two cells, directional markings, cable tray along edge, worn metal",
+    "wall_straight_1x1": "front-facing isometric view of metal wall panel, two visible bolt lines, subtle vertical seam dividing into thirds, small indicator light",
+    "wall_end_cap": "front-facing isometric view of wall end cap, rounded termination plate, riveted edge trim, warning stripe accent",
+    "wall_inner_corner": "isometric view of interior corner where two walls meet at 90 degrees, reinforcing bracket at joint, pipe running along corner",
+    "wall_outer_corner": "isometric view of exterior corner, trim piece covering joint, riveted in place, clean geometric edge",
+    "wall_t_junction": "isometric view of T-junction wall, three-way intersection, reinforced junction box, cable routing",
+    "doorway_frame_open_1x1": "isometric view of open doorway frame, mechanical rails on both sides, recessed seal groove, threshold plate with wear marks",
+    "doorway_frame_blocked_1x1": "isometric view of blocked doorway, welded metal plate sealing the opening, warning markings, scorch marks from welding",
+    "bulkhead_portal_2x1": "isometric view of large bulkhead portal, heavy-duty frame, pressure seal rings, locking mechanism visible",
+    "ceiling_cap_1x1": "underside isometric view of ceiling panel, recessed rectangular light fixture casting cool blue-white light, cable conduit along one edge",
+    "pillar_support_1x1": "isometric view of structural support pillar, square cross-section, mounting plates at top and bottom, bolts visible",
+    "ramp_up_1x2": "isometric view of ramp connecting two deck levels, angled metal surface, side curbs, anti-slip strips, transition plates at top and bottom"
+  },
+  "lora_weight": 0.7,
+  "controlnet_strength": 0.8,
+  "cfg_scale": 7.0,
+  "steps": 20,
+  "sampler": "euler_ancestral",
+  "scheduler": "normal",
+  "resolution": 1024
+}

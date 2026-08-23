@@ -1,64 +1,65 @@
 extends RefCounted
 class_name StructuralPlanValidator
 
-## Pure, fail-closed validation for the data-only canonical structural plan.
-##
-## This class deliberately accepts the compiler's plain Dictionary/Array output
-## and the original topology dictionary. It never loads a scene or touches the
-## scene tree, so generation can reject bad geometry before instantiation.
+## Fail-closed validator for compiler-produced structural plans.
+## Edge placements and floor placements are intentionally separate contracts:
+## floors identify occupied cells; edge records identify canonical boundaries.
 
-const StructuralEdgePlanScript: GDScript = preload("res://scripts/procgen/structural_edge_plan.gd")
-
-const EDGE_SOLID: String = "SOLID"
-const EDGE_OPEN: String = "OPEN"
-const EDGE_DOOR: String = "DOOR"
-const EDGE_LOCKED: String = "LOCKED"
-const EDGE_HATCH: String = "HATCH"
-const EDGE_BREACH: String = "BREACH"
-const ALLOWED_EDGE_STATES: Array[String] = [
-	EDGE_SOLID,
-	EDGE_OPEN,
-	EDGE_DOOR,
-	EDGE_LOCKED,
-	EDGE_HATCH,
-	EDGE_BREACH,
-]
-const CELL_SIZE: float = 4.0
-const DECK_HEIGHT: float = 4.0
-const POSITION_EPSILON: float = 0.001
-const CARDINAL_DIRECTIONS: Array[String] = ["north", "east", "south", "west"]
-const FLOOR_MODULE_IDS: Array[String] = ["floor_1x1", "corridor_floor_1x1"]
+const CompilerScript: GDScript = preload("res://scripts/procgen/structural_edge_compiler.gd")
+const FLOOR_MODULES: Array[String] = ["floor_1x1", "corridor_floor_1x1"]
+const EDGE_KINDS: Array[String] = ["SOLID", "OPEN", "DOOR", "LOCKED", "HATCH", "BREACH"]
 
 
-## Validates a compiler plan before any wrapper/scene instantiation.
 func validate(plan: Dictionary, topology: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
-	var compiler_errors: Variant = plan.get("errors", [])
-	if compiler_errors is Array:
-		for compiler_error in compiler_errors:
-			errors.append("compiler plan error: %s" % String(compiler_error))
-	elif compiler_errors != null:
-		errors.append("compiler plan errors must be an Array")
+	var stats: Dictionary = {
+		"occupied_cells": 0,
+		"floor_placements": 0,
+		"edges": 0,
+		"edge_placements": 0,
+	}
+	if plan.is_empty():
+		errors.append("structural plan must be a non-empty object")
+		return _verdict(errors, stats)
 
-	_validate_semantic_states(plan, errors)
-	_validate_occupancy(plan, topology, errors)
-	_validate_floor_placements(plan, topology, errors)
-	_validate_canonical_edge_map_presence(plan, errors)
-	_validate_unique_edge_placements(plan, errors)
-	_validate_unique_materialized_placement_ids(plan, errors)
-	_validate_placement_edge_reconciliation(plan, errors)
-	_validate_materialization_records(plan, errors)
-	_validate_portal_endpoints(plan, errors)
-	_validate_placement_grid_pose(plan, errors)
-	_validate_edge_occupancy_consistency(plan, errors)
-	var overlap_plan: Dictionary = plan
-	if topology.has("rooms"):
-		overlap_plan = plan.duplicate(true)
-		overlap_plan["rooms"] = topology["rooms"]
-	_validate_footprint_overlap(overlap_plan, errors)
-	_validate_walkable_reachability(plan, topology, errors)
+	var compiler_errors_variant: Variant = plan.get("errors", null)
+	if typeof(compiler_errors_variant) != TYPE_ARRAY:
+		errors.append("structural plan errors must be an array")
+	elif not (compiler_errors_variant as Array).is_empty():
+		for compiler_error in (compiler_errors_variant as Array):
+			errors.append("compiler error: %s" % str(compiler_error))
 
-	var stats: Dictionary = _build_stats(plan, topology, errors)
+	var occupancy_variant: Variant = plan.get("occupancy", null)
+	if typeof(occupancy_variant) != TYPE_DICTIONARY:
+		errors.append("occupancy must be a dictionary")
+		return _verdict(errors, stats)
+	var occupancy: Dictionary = occupancy_variant
+	stats["occupied_cells"] = occupancy.size()
+	if occupancy.is_empty():
+		errors.append("occupancy must be non-empty")
+
+	var edges_variant: Variant = plan.get("edges", null)
+	if typeof(edges_variant) != TYPE_DICTIONARY:
+		errors.append("edges must be a dictionary")
+	var edges: Dictionary = edges_variant if typeof(edges_variant) == TYPE_DICTIONARY else {}
+	stats["edges"] = edges.size()
+
+	var placements_variant: Variant = plan.get("placements", null)
+	if typeof(placements_variant) != TYPE_ARRAY:
+		errors.append("placements must be an array")
+	var placements: Array = placements_variant if typeof(placements_variant) == TYPE_ARRAY else []
+	stats["edge_placements"] = placements.size()
+
+	_validate_occupancy_records(occupancy, errors)
+	_validate_floor_placements(plan, occupancy, topology, errors, stats)
+	_validate_edge_placements(edges, placements, errors)
+	_validate_portal_endpoints(topology, occupancy, edges, errors)
+	_validate_walkable_flood_fill(topology, occupancy, edges, errors)
+
+	return _verdict(errors, stats)
+
+
+func _verdict(errors: Array[String], stats: Dictionary) -> Dictionary:
 	return {
 		"ok": errors.is_empty(),
 		"errors": errors,
@@ -66,1364 +67,481 @@ func validate(plan: Dictionary, topology: Dictionary) -> Dictionary:
 	}
 
 
-func _validate_semantic_states(plan: Dictionary, errors: Array[String]) -> void:
-	var edges: Variant = plan.get("edges", null)
-	if edges is Dictionary:
-		for edge_key_variant in edges.keys():
-			var edge_variant: Variant = edges[edge_key_variant]
-			if edge_variant is Dictionary:
-				_validate_semantic_state_record(edge_variant, "edge %s" % String(edge_key_variant), errors)
-
-	var placements: Variant = plan.get("placements", null)
-	if placements is Array:
-		var index: int = 0
-		for placement_variant in placements:
-			if placement_variant is Dictionary:
-				_validate_semantic_state_record(placement_variant, "placement index %d" % index, errors)
-			index += 1
-
-
-func _validate_semantic_state_record(record: Dictionary, label: String, errors: Array[String]) -> void:
-	# The current compiler emits `kind` as the canonical state and older records
-	# may omit the redundant `state` alias. Require one semantic field; when both
-	# are present they must be equal and both must be from the strict allowlist.
-	var has_kind: bool = record.has("kind")
-	var has_state: bool = record.has("state")
-	if not has_kind and not has_state:
-		errors.append("%s semantic state is missing: kind/state is required" % label)
-		return
-	var kind: String = ""
-	var state: String = ""
-	if has_kind:
-		var raw_kind: Variant = record["kind"]
-		if not (raw_kind is String):
-			errors.append("%s unknown semantic state: kind must be a string" % label)
-		else:
-			kind = String(raw_kind)
-	if has_state:
-		var raw_state: Variant = record["state"]
-		if not (raw_state is String):
-			errors.append("%s unknown semantic state: state must be a string" % label)
-		else:
-			state = String(raw_state)
-	if kind.is_empty() and not state.is_empty():
-		kind = state
-	if state.is_empty() and not kind.is_empty():
-		state = kind
-	if not ALLOWED_EDGE_STATES.has(kind):
-		errors.append("%s unknown semantic state kind: %s" % [label, kind])
-	if not ALLOWED_EDGE_STATES.has(state):
-		errors.append("%s unknown semantic state state: %s" % [label, state])
-	if has_kind and has_state and kind != state:
-		errors.append("%s kind/state mismatch: kind=%s state=%s" % [label, kind, state])
-
-
-## A non-empty footprint or any non-OPEN placement must be backed by a
-## non-empty canonical edge map. An empty map otherwise makes reconciliation
-## vacuously succeed and allows structural geometry to disappear.
-func _validate_canonical_edge_map_presence(plan: Dictionary, errors: Array[String]) -> void:
-	var occupancy: Variant = plan.get("occupancy", null)
-	var has_occupancy: bool = false
-	if occupancy is Dictionary or occupancy is Array:
-		has_occupancy = occupancy.size() > 0
-
-	var placements: Variant = plan.get("placements", null)
-	var has_non_open_placement: bool = false
-	if placements is Array:
-		for placement_variant in placements:
-			if placement_variant is Dictionary and _record_kind(placement_variant) != EDGE_OPEN:
-				has_non_open_placement = true
-				break
-
-	if not has_occupancy and not has_non_open_placement:
-		return
-
-	var edges: Variant = plan.get("edges", null)
-	if not (edges is Dictionary) or edges.is_empty():
-		errors.append(
-			"canonical edge map must be non-empty when occupancy or non-OPEN placements exist"
-		)
-
-
-## Every placement must reconcile to the exact canonical edge record. `key` is
-## an edge-record compatibility field only; it is never a placement identity.
-func _validate_placement_edge_reconciliation(plan: Dictionary, errors: Array[String]) -> void:
-	var edges: Variant = plan.get("edges", null)
-	if not (edges is Dictionary):
-		return
-	var placements: Variant = plan.get("placements", null)
-	if not (placements is Array):
-		return
-
-	for placement_variant in placements:
-		if not (placement_variant is Dictionary):
+func _validate_occupancy_records(occupancy: Dictionary, errors: Array[String]) -> void:
+	for occupancy_key_variant in occupancy.keys():
+		var occupancy_key: String = str(occupancy_key_variant)
+		var record_variant: Variant = occupancy[occupancy_key_variant]
+		if typeof(record_variant) != TYPE_DICTIONARY:
+			errors.append("occupancy record must be an object: %s" % occupancy_key)
 			continue
-		var placement: Dictionary = placement_variant
-		if not placement.has("edge_key") or not _has_nonempty_string(placement.get("edge_key", null)):
-			errors.append("placement edge_key is required; legacy key fallback is forbidden")
+		var record: Dictionary = record_variant
+		var parsed_cell: Dictionary = _read_cell(record.get("cell", null), int(record.get("deck", -1)))
+		if not bool(parsed_cell.get("ok", false)):
+			errors.append("occupancy cell is malformed: %s" % occupancy_key)
 			continue
-
-		var edge_key: String = String(placement["edge_key"])
-		if not edges.has(edge_key):
-			continue
-		var edge_variant: Variant = edges[edge_key]
-		if not (edge_variant is Dictionary):
-			continue
-		var edge: Dictionary = edge_variant
-		if not _record_field_matches_exactly(edge, placement, "kind") or not _record_field_matches_exactly(edge, placement, "state"):
-			errors.append(
-				"placement kind/state does not match canonical edge: %s" % edge_key
-			)
-		if not _record_field_matches_exactly(edge, placement, "module_id"):
-			errors.append(
-				"placement module_id does not match canonical edge: %s" % edge_key
-			)
+		var deck: int = int(parsed_cell["deck"])
+		var cell: Vector2i = parsed_cell["cell"]
+		if not _is_integer(record.get("deck", null)) or int(record.get("deck")) != deck:
+			errors.append("occupancy deck mismatch: %s" % occupancy_key)
+		if str(record.get("cell_key", occupancy_key)) != occupancy_key:
+			errors.append("occupancy cell_key mismatch: %s" % occupancy_key)
+		if CompilerScript.cell_key(deck, cell) != occupancy_key:
+			errors.append("occupancy canonical key mismatch: %s" % occupancy_key)
+		if str(record.get("room_id", "")).is_empty():
+			errors.append("occupancy room_id missing: %s" % occupancy_key)
 
 
-func _record_field_matches_exactly(first: Dictionary, second: Dictionary, field: String) -> bool:
-	var first_has: bool = first.has(field)
-	var second_has: bool = second.has(field)
-	if first_has != second_has:
-		return false
-	if not first_has:
-		return true
-	var first_value: Variant = first[field]
-	var second_value: Variant = second[field]
-	if typeof(first_value) != typeof(second_value):
-		return false
-	return first_value == second_value
-
-
-## Every wrapper-backed canonical edge owns exactly one non-OPEN placement.
-func _validate_unique_edge_placements(plan: Dictionary, errors: Array[String]) -> void:
-	var placements: Variant = plan.get("placements", null)
-	if not (placements is Array):
-		errors.append("structural plan placements must be an Array")
-		return
-
-	var edges: Variant = plan.get("edges", {})
-	if not (edges is Dictionary):
-		errors.append("structural plan edges must be a Dictionary")
-		return
-
-	var counts: Dictionary = {}
-	for placement_variant in placements:
-		if not (placement_variant is Dictionary):
-			errors.append("structural placement is not a Dictionary")
-			continue
-		var placement: Dictionary = placement_variant
-		var edge_key: String = String(placement.get("edge_key", ""))
-		if edge_key.is_empty():
-			errors.append("placement is missing edge_key")
-			continue
-		if not edges.has(edge_key):
-			errors.append("placement edge_key is not present in canonical edges: %s" % edge_key)
-		if placement.has("key") and String(placement.get("key", "")) != edge_key:
-			errors.append("placement key/body drift: %s != %s" % [String(placement.get("key", "")), edge_key])
-
-		var kind: String = _record_kind(placement)
-		if kind == EDGE_OPEN:
-			continue
-		var count: int = int(counts.get(edge_key, 0)) + 1
-		counts[edge_key] = count
-		if count > 1:
-			errors.append(
-				"duplicate edge placement: %s; exactly one non-OPEN placement is required" % edge_key
-			)
-
-	for edge_key_variant in edges.keys():
-		var edge_key: String = String(edge_key_variant)
-		var edge_variant: Variant = edges[edge_key_variant]
-		if not (edge_variant is Dictionary):
-			errors.append("edge record is not a Dictionary: %s" % edge_key)
-			continue
-		var edge: Dictionary = edge_variant
-		var kind: String = _record_kind(edge)
-		var requires_placement: bool = _requires_materialization(kind)
-		if requires_placement:
-			var count: int = int(counts.get(edge_key, 0))
-			if count != 1:
-				errors.append(
-					"edge %s requires exactly one non-OPEN placement; found %d" % [edge_key, count]
-				)
-
-
-func _validate_unique_materialized_placement_ids(plan: Dictionary, errors: Array[String]) -> void:
-	var edge_ids: Dictionary = {}
-	var placements: Variant = plan.get("placements", null)
-	if placements is Array:
-		for placement_variant in placements:
-			if not (placement_variant is Dictionary):
-				continue
-			var placement: Dictionary = placement_variant
-			if _record_kind(placement) == EDGE_OPEN:
-				continue
-			var placement_id_variant: Variant = placement.get("placement_id", null)
-			if not _has_nonempty_string(placement_id_variant):
-				errors.append("materialized edge placement_id must be a non-empty String: %s" % String(placement.get("edge_key", "")))
-				continue
-			var placement_id: String = String(placement_id_variant)
-			if edge_ids.has(placement_id):
-				errors.append("duplicate materialized edge placement_id: %s" % placement_id)
-			else:
-				edge_ids[placement_id] = true
-
-	var floor_ids: Dictionary = {}
-	var floor_placements: Variant = plan.get("floor_placements", null)
-	if floor_placements is Array:
-		for floor_variant in floor_placements:
-			if not (floor_variant is Dictionary):
-				continue
-			var floor_record: Dictionary = floor_variant
-			var floor_id_variant: Variant = floor_record.get("placement_id", null)
-			if not _has_nonempty_string(floor_id_variant):
-				continue
-			var floor_id: String = String(floor_id_variant)
-			if floor_ids.has(floor_id):
-				continue
-			floor_ids[floor_id] = true
-			if edge_ids.has(floor_id):
-				errors.append("materialized edge/floor placement_id collision: %s" % floor_id)
-
-
-func _validate_occupancy(plan: Dictionary, topology: Dictionary, errors: Array[String]) -> void:
-	var occupancy: Variant = plan.get("occupancy", null)
-	if not (occupancy is Dictionary) and not (occupancy is Array):
-		errors.append("structural plan occupancy must be a non-empty Dictionary or Array")
-		return
-	if occupancy.size() == 0:
-		errors.append("structural plan occupancy must be a non-empty Dictionary or Array")
-		return
-
-	var has_room_registry: bool = topology.has("rooms") and (
-		topology.get("rooms") is Array or topology.get("rooms") is Dictionary
-	)
-	var room_registry: Dictionary = _room_registry(topology.get("rooms", null))
-	var topology_cells: Dictionary = _topology_cell_registry(topology.get("rooms", null))
-	var occupied_keys: Dictionary = {}
-
-	if occupancy is Dictionary:
-		for cell_key_variant in occupancy.keys():
-			var label: String = String(cell_key_variant)
-			var record_variant: Variant = occupancy[cell_key_variant]
-			_validate_occupancy_record(record_variant, label, errors)
-			if not (record_variant is Dictionary):
-				continue
-			var record: Dictionary = record_variant
-			var parsed: Dictionary = _cell_record_geometry(record)
-			if not bool(parsed.get("ok", false)):
-				continue
-			var expected_key: String = StructuralEdgePlanScript.cell_key(int(parsed["deck"]), parsed["cell"])
-			if typeof(cell_key_variant) != TYPE_STRING or label != expected_key:
-				errors.append("occupancy cell-key/body drift: map key %s != %s" % [label, expected_key])
-			if record.has("key") and String(record.get("key", "")) != expected_key:
-				errors.append("occupancy cell-key/body drift: record key %s != %s" % [String(record.get("key", "")), expected_key])
-			_occupancy_matches_topology(expected_key, record, topology_cells, has_room_registry, room_registry, errors)
-			occupied_keys[expected_key] = true
-	else:
-		var index: int = 0
-		for record_variant in occupancy:
-			_validate_occupancy_record(record_variant, "index %d" % index, errors)
-			if record_variant is Dictionary:
-				var record: Dictionary = record_variant
-				var parsed: Dictionary = _cell_record_geometry(record)
-				if bool(parsed.get("ok", false)):
-					var expected_key: String = StructuralEdgePlanScript.cell_key(int(parsed["deck"]), parsed["cell"])
-					if record.has("key") and String(record.get("key", "")) != expected_key:
-						errors.append("occupancy cell-key/body drift: record key %s != %s" % [String(record.get("key", "")), expected_key])
-					_occupancy_matches_topology(expected_key, record, topology_cells, has_room_registry, room_registry, errors)
-					occupied_keys[expected_key] = true
-			index += 1
-
-	if not topology_cells.is_empty():
-		for topology_key_variant in topology_cells.keys():
-			var topology_key: String = String(topology_key_variant)
-			if not occupied_keys.has(topology_key):
-				errors.append("topology cell has no matching occupancy record: %s" % topology_key)
-
-
-func _room_registry(raw_rooms: Variant) -> Dictionary:
-	var registry: Dictionary = {}
-	for room_variant in _room_records(raw_rooms):
-		if room_variant is Dictionary:
-			var room: Dictionary = room_variant
-			var room_id: String = String(room.get("id", ""))
-			if not room_id.is_empty():
-				registry[room_id] = room
-	return registry
-
-
-func _topology_cell_registry(raw_rooms: Variant) -> Dictionary:
-	var registry: Dictionary = {}
-	for room_variant in _room_records(raw_rooms):
-		if not room_variant is Dictionary:
-			continue
-		var room: Dictionary = room_variant
-		var room_id: String = String(room.get("id", ""))
-		var deck_result: Dictionary = _parse_integer(room.get("deck", null))
-		var raw_cells: Variant = room.get("cells", null)
-		if room_id.is_empty() or not bool(deck_result.get("ok", false)) or not (raw_cells is Array):
-			continue
-		for raw_cell in raw_cells:
-			var cell_result: Dictionary = _parse_cell(raw_cell)
-			if not bool(cell_result.get("ok", false)):
-				continue
-			var cell: Vector2i = cell_result["cell"]
-			var key: String = StructuralEdgePlanScript.cell_key(int(deck_result["value"]), cell)
-			registry[key] = {"room_id": room_id, "deck": int(deck_result["value"]), "cell": cell}
-	return registry
-
-
-func _occupancy_matches_topology(
-		cell_key: String,
-		record: Dictionary,
-		topology_cells: Dictionary,
-		has_room_registry: bool,
-		room_registry: Dictionary,
-		errors: Array[String]) -> void:
-	var room_id: String = String(record.get("room_id", ""))
-	if has_room_registry and not room_registry.has(room_id):
-		errors.append("occupancy record has unknown room_id: %s" % room_id)
-	if topology_cells.is_empty():
-		return
-	if not topology_cells.has(cell_key):
-		errors.append("occupied cell has no matching cell record in topology: %s" % cell_key)
-		return
-	var topology_record: Dictionary = topology_cells[cell_key]
-	if String(topology_record.get("room_id", "")) != room_id:
-		errors.append(
-			"occupied cell room_id does not match topology cell record: %s != %s for %s" % [room_id, String(topology_record.get("room_id", "")), cell_key]
-		)
-
-
-func _validate_occupancy_record(record_variant: Variant, label: String, errors: Array[String]) -> void:
-	if not (record_variant is Dictionary):
-		errors.append("occupancy record is not a Dictionary: %s" % label)
-		return
-	var record: Dictionary = record_variant
-	var parsed: Dictionary = _cell_record_geometry(record)
-	if not bool(parsed.get("ok", false)):
-		errors.append(
-			"occupancy record is malformed: %s; integer deck and cell are required" % label
-		)
-		return
-	if not _has_nonempty_string(record.get("room_id", null)):
-		errors.append("occupancy record is malformed: %s; nonempty room_id is required" % label)
-
-
-func _validate_floor_placements(plan: Dictionary, topology: Dictionary, errors: Array[String]) -> void:
-	var occupancy_variant: Variant = plan.get("occupancy", null)
-	var has_occupancy: bool = (
-		(occupancy_variant is Dictionary or occupancy_variant is Array)
-		and occupancy_variant.size() > 0
-	)
+func _validate_floor_placements(
+		plan: Dictionary,
+		occupancy: Dictionary,
+		topology: Dictionary,
+		errors: Array[String],
+		stats: Dictionary) -> void:
 	var floor_variant: Variant = plan.get("floor_placements", null)
-	if floor_variant == null:
-		if has_occupancy:
-			errors.append("structural plan floor_placements must be a non-empty Array when occupancy exists")
-		return
-	if not (floor_variant is Array):
-		errors.append("structural plan floor_placements must be an Array")
+	if typeof(floor_variant) != TYPE_ARRAY:
+		errors.append("floor_placements must be a non-empty array")
 		return
 	var floors: Array = floor_variant
+	stats["floor_placements"] = floors.size()
 	if floors.is_empty():
-		if has_occupancy:
-			errors.append("structural plan floor_placements must be non-empty when occupancy exists")
+		errors.append("floor_placements must be non-empty")
 		return
 
-	var floor_cells: Dictionary = {}
-	var floor_ids: Dictionary = {}
-	var occupancy_cells: Dictionary = _canonical_cells(plan, {})
-	var topology_rooms: Variant = topology.get("rooms", null)
-	var topology_cells: Dictionary = _topology_cell_registry(topology_rooms)
-	var has_room_registry: bool = topology.has("rooms") and (
-		topology_rooms is Array or topology_rooms is Dictionary
-	)
-	var room_registry: Dictionary = _room_registry(topology_rooms)
-
-	var index: int = 0
+	var seen_cell_keys: Dictionary = {}
+	# The floor contract is exactly one record for each occupied cell.
+	var room_decks: Dictionary = _room_decks(topology)
 	for floor_record_variant in floors:
-		var label: String = "floor placement index %d" % index
-		index += 1
-		if not (floor_record_variant is Dictionary):
-			errors.append("floor placement record is not a Dictionary: %s" % label)
+		if typeof(floor_record_variant) != TYPE_DICTIONARY:
+			errors.append("floor placement must be an object")
 			continue
-		var floor_record: Dictionary = floor_record_variant
-		if floor_record.has("edge_key"):
-			errors.append("floor placement must not contain edge_key: %s" % label)
-
-		var kind_variant: Variant = floor_record.get("kind", null)
-		if not (kind_variant is String) or String(kind_variant) != "FLOOR":
-			errors.append("floor placement kind must be FLOOR: %s" % label)
-		var state_variant: Variant = floor_record.get("state", null)
-		if not (state_variant is String) or String(state_variant) != "FLOOR":
-			errors.append("floor placement state must be FLOOR: %s" % label)
-
-		var module_id_variant: Variant = floor_record.get("module_id", null)
-		var floor_module_id_variant: Variant = floor_record.get("floor_module_id", null)
-		if not _has_nonempty_string(module_id_variant):
-			errors.append("floor placement module_id must be a non-empty String: %s" % label)
-		if not _has_nonempty_string(floor_module_id_variant):
-			errors.append("floor placement floor_module_id must be a non-empty String: %s" % label)
-		if _has_nonempty_string(module_id_variant) and not FLOOR_MODULE_IDS.has(String(module_id_variant)):
-			errors.append("floor placement references non-floor module: %s" % String(module_id_variant))
-		if _has_nonempty_string(module_id_variant) and _has_nonempty_string(floor_module_id_variant) and String(module_id_variant) != String(floor_module_id_variant):
-			errors.append("floor placement module_id/floor_module_id mismatch: %s" % label)
-
-		var room_id_variant: Variant = floor_record.get("room_id", null)
-		if not _has_nonempty_string(room_id_variant):
-			errors.append("floor placement room_id must be a non-empty String: %s" % label)
-		var room_ids_variant: Variant = floor_record.get("room_ids", null)
-		var room_id: String = String(room_id_variant) if _has_nonempty_string(room_id_variant) else ""
-		if not (room_ids_variant is Array) or (room_ids_variant as Array).size() != 1:
-			errors.append("floor placement room_ids must contain exactly one room_id: %s" % label)
-		else:
-			var floor_room_ids: Array = room_ids_variant
-			if not _has_nonempty_string(floor_room_ids[0]) or String(floor_room_ids[0]) != room_id:
-				errors.append("floor placement room_id/room_ids mismatch: %s" % label)
-		if has_room_registry and not room_id.is_empty() and not room_registry.has(room_id):
-			errors.append("floor placement has unknown room_id: %s" % room_id)
-
-		var cell_result: Dictionary = _parse_cell(floor_record.get("cell", null))
-		var deck_result: Dictionary = _parse_integer(floor_record.get("deck", null))
-		if not bool(cell_result.get("ok", false)):
-			errors.append("floor placement cell is malformed: %s" % label)
-		if not bool(deck_result.get("ok", false)):
-			errors.append("floor placement deck is malformed: %s" % label)
-		if not bool(cell_result.get("ok", false)) or not bool(deck_result.get("ok", false)):
+		var floor: Dictionary = floor_record_variant
+		var cell_key_value: String = str(floor.get("cell_key", ""))
+		if cell_key_value.is_empty():
+			errors.append("floor placement cell_key missing")
 			continue
-
-		var cell: Vector2i = cell_result["cell"]
-		var deck: int = int(deck_result["value"])
-		var cell_key: String = StructuralEdgePlanScript.cell_key(deck, cell)
-		if floor_cells.has(cell_key):
-			errors.append("duplicate floor placement cell/deck identity: %s" % cell_key)
+		if seen_cell_keys.has(cell_key_value):
+			errors.append("duplicate floor placement cell_key: %s" % cell_key_value)
+			continue
+		seen_cell_keys[cell_key_value] = true
+		if floor.has("edge_key") and not str(floor.get("edge_key", "")).is_empty():
+			errors.append("floor placement must not declare edge_key: %s" % cell_key_value)
+		var room_id: String = str(floor.get("room_id", ""))
+		if room_id.is_empty():
+			errors.append("floor placement room_id missing: %s" % cell_key_value)
+		elif not room_decks.has(room_id):
+			errors.append("floor placement room unknown: %s" % room_id)
+		var deck_value: Variant = floor.get("deck", null)
+		if not _is_integer(deck_value):
+			errors.append("floor placement deck malformed: %s" % cell_key_value)
+			continue
+		var deck: int = int(deck_value)
+		var parsed_cell: Dictionary = _read_cell(floor.get("cell", null), deck)
+		if not bool(parsed_cell.get("ok", false)):
+			errors.append("floor placement cell malformed: %s" % cell_key_value)
+			continue
+		var cell: Vector2i = parsed_cell["cell"]
+		if int(parsed_cell["deck"]) != deck:
+			errors.append("floor placement deck/cell mismatch: %s" % cell_key_value)
+		var expected_key: String = CompilerScript.cell_key(deck, cell)
+		if expected_key != cell_key_value:
+			errors.append("floor placement cell mismatch: expected=%s got=%s" % [expected_key, cell_key_value])
+		if not occupancy.has(cell_key_value):
+			errors.append("floor placement has no occupancy cell: %s" % cell_key_value)
 		else:
-			floor_cells[cell_key] = true
-
-		var expected_placement_id: String = "floor:" + cell_key
-		for identity_field in ["id", "placement_id"]:
-			var identity_variant: Variant = floor_record.get(identity_field, null)
-			if not _has_nonempty_string(identity_variant):
-				errors.append("floor placement %s must be a non-empty String: %s" % [identity_field, label])
-				continue
-			var identity: String = String(identity_variant)
-			if identity != expected_placement_id:
-				errors.append(
-					"floor placement %s is not canonical for cell %s: %s" % [identity_field, cell_key, identity]
-				)
-			if identity_field == "placement_id":
-				if floor_ids.has(identity):
-					errors.append("duplicate floor placement_id: %s" % identity)
-				else:
-					floor_ids[identity] = true
-
-		var position_result: Dictionary = _parse_vector3(floor_record.get("position", null))
-		if not bool(position_result.get("ok", false)):
-			errors.append("floor placement position is malformed: %s" % label)
+			var occupancy_record_variant: Variant = occupancy[cell_key_value]
+			if typeof(occupancy_record_variant) == TYPE_DICTIONARY:
+				var occupancy_record: Dictionary = occupancy_record_variant
+				if str(occupancy_record.get("room_id", "")) != room_id:
+					errors.append("floor placement room mismatch: %s" % cell_key_value)
+				var occupancy_module: String = str(occupancy_record.get("module_id", ""))
+				if not occupancy_module.is_empty() and str(floor.get("module_id", "")) != occupancy_module:
+					errors.append("floor placement module mismatch: %s" % cell_key_value)
+		if room_decks.has(room_id) and int(room_decks[room_id]) != deck:
+			errors.append("floor placement room deck mismatch: %s" % cell_key_value)
+		var module_id: String = str(floor.get("module_id", ""))
+		if not FLOOR_MODULES.has(module_id):
+			errors.append("unsupported floor placement module: %s" % module_id)
+		var position: Dictionary = _read_position(floor.get("position", null))
+		if not bool(position.get("ok", false)):
+			errors.append("floor placement position malformed: %s" % cell_key_value)
 		else:
-			var cell_record: Dictionary = StructuralEdgePlanScript.make_cell(deck, cell, room_id)
-			var expected_position: Vector3 = cell_record.get("position", Vector3.INF)
-			var actual_position: Vector3 = position_result["value"]
-			if not actual_position.is_equal_approx(expected_position):
-				errors.append(
-					"floor placement position is not canonical for %s: expected %s got %s" % [cell_key, expected_position, actual_position]
-				)
+			var expected_position: Vector3 = CompilerScript.cell_world_position(deck, cell)
+			if not (position["value"] as Vector3).is_equal_approx(expected_position):
+				errors.append("floor placement position mismatch: %s" % cell_key_value)
+		if not _is_zero(floor.get("yaw_degrees", null)):
+			errors.append("floor placement yaw must be zero: %s" % cell_key_value)
 
-		var raw_yaw: Variant = floor_record.get("yaw_degrees", null)
-		if not _is_number(raw_yaw) or not is_equal_approx(float(raw_yaw), 0.0):
-			errors.append("floor placement yaw is outside canonical pose set {0}: %s" % cell_key)
-
-		if has_occupancy:
-			if not occupancy_cells.has(cell_key):
-				errors.append("floor placement cell has no matching occupancy record: %s" % cell_key)
-			else:
-				var occupancy_record: Dictionary = occupancy_cells[cell_key]
-				if String(occupancy_record.get("room_id", "")) != room_id:
-					errors.append("floor placement room_id does not match occupancy: %s" % cell_key)
-		if not topology_cells.is_empty():
-			if not topology_cells.has(cell_key):
-				errors.append("floor placement cell has no matching topology cell: %s" % cell_key)
-			else:
-				var topology_record: Dictionary = topology_cells[cell_key]
-				if String(topology_record.get("room_id", "")) != room_id:
-					errors.append("floor placement room_id does not match topology: %s" % cell_key)
-
-	if has_occupancy:
-		for occupancy_key_variant in occupancy_cells.keys():
-			var occupancy_key: String = String(occupancy_key_variant)
-			if not floor_cells.has(occupancy_key):
-				errors.append("occupancy cell has no matching floor placement: %s" % occupancy_key)
-	if not topology_cells.is_empty():
-		for topology_key_variant in topology_cells.keys():
-			var topology_key: String = String(topology_key_variant)
-			if not floor_cells.has(topology_key):
-				errors.append("topology cell has no matching floor placement: %s" % topology_key)
+	if seen_cell_keys.size() != occupancy.size():
+		errors.append("floor placements are not an exact occupancy bijection: floors=%d occupancy=%d" % [seen_cell_keys.size(), occupancy.size()])
+	for occupancy_key in occupancy.keys():
+		if not seen_cell_keys.has(str(occupancy_key)):
+			errors.append("occupancy cell has no floor placement: %s" % str(occupancy_key))
 
 
-func _validate_materialization_records(plan: Dictionary, errors: Array[String]) -> void:
-	var edges: Variant = plan.get("edges", null)
-	if edges is Dictionary:
-		for edge_key_variant in edges.keys():
-			var edge_variant: Variant = edges[edge_key_variant]
-			if not (edge_variant is Dictionary):
-				continue
-			var edge: Dictionary = edge_variant
-			var kind: String = _record_kind(edge)
-			if _requires_materialization(kind) and not _has_nonempty_string(edge.get("module_id", null)):
-				errors.append(
-					"materialized edge module_id is missing: %s" % String(edge_key_variant)
-				)
-
-	var placements: Variant = plan.get("placements", null)
-	if not (placements is Array):
-		return
+func _validate_edge_placements(edges: Dictionary, placements: Array, errors: Array[String]) -> void:
+	var seen_edge_keys: Dictionary = {}
 	for placement_variant in placements:
-		if not (placement_variant is Dictionary):
+		if typeof(placement_variant) != TYPE_DICTIONARY:
+			errors.append("edge placement must be an object")
 			continue
 		var placement: Dictionary = placement_variant
-		var kind: String = _record_kind(placement)
-		if _requires_materialization(kind) and not _has_nonempty_string(placement.get("module_id", null)):
-			errors.append(
-				"materialized placement module_id is missing: %s" % String(
-					placement.get("edge_key", "")
-				)
-			)
-
-
-## exterior BREACH/HATCH records may have one room side and one exterior side.
-func _validate_portal_endpoints(plan: Dictionary, errors: Array[String]) -> void:
-	var edges: Variant = plan.get("edges", {})
-	if not (edges is Dictionary):
-		return
-	for edge_key_variant in edges.keys():
-		var edge_variant: Variant = edges[edge_key_variant]
-		if not (edge_variant is Dictionary):
+		var edge_key_value: String = str(placement.get("edge_key", ""))
+		if edge_key_value.is_empty():
+			errors.append("edge placement missing edge_key")
+			continue
+		if seen_edge_keys.has(edge_key_value):
+			errors.append("duplicate edge placement: %s" % edge_key_value)
+			continue
+		seen_edge_keys[edge_key_value] = true
+		if not edges.has(edge_key_value):
+			errors.append("edge placement references missing edge: %s" % edge_key_value)
+			continue
+		var edge_variant: Variant = edges[edge_key_value]
+		if typeof(edge_variant) != TYPE_DICTIONARY:
+			errors.append("edge record must be an object: %s" % edge_key_value)
 			continue
 		var edge: Dictionary = edge_variant
-		var kind: String = _record_kind(edge)
-		var is_open_portal: bool = kind == EDGE_OPEN and bool(edge.get("portal", false))
-		if not _is_portal_kind(kind) and not is_open_portal:
-			continue
-		var edge_key: String = String(edge.get("edge_key", edge_key_variant))
-		var room_ids: Array = _room_ids_for_record(edge)
-		var exterior: bool = _is_explicit_exterior(edge, kind, room_ids)
-		var is_one_sided_hatch_or_breach: bool = (
-			(kind == EDGE_BREACH or kind == EDGE_HATCH)
-			and _nonempty_room_count(room_ids) == 1
-		)
-		if exterior:
-			if (room_ids.size() != 1 and room_ids.size() != 2) or _nonempty_room_count(room_ids) != 1:
-				errors.append(
-					"portal endpoints are not reciprocal: %s; exterior BREACH/HATCH requires exactly one room side" % edge_key
-				)
-		elif is_one_sided_hatch_or_breach:
-			errors.append(
-				"one-sided %s portal must explicitly set exterior=true: %s" % [kind, edge_key]
-			)
-		elif room_ids.size() != 2 or room_ids[0].is_empty() or room_ids[1].is_empty() or room_ids[0] == room_ids[1]:
-			errors.append(
-				"portal endpoints are not reciprocal: %s; exactly two reciprocal room sides are required" % edge_key
-			)
+		var kind: String = str(placement.get("kind", ""))
+		if not EDGE_KINDS.has(kind):
+			errors.append("unsupported edge kind: %s" % kind)
+		if kind == "OPEN":
+			errors.append("OPEN edge must not have a placement: %s" % edge_key_value)
+		if FLOOR_MODULES.has(str(placement.get("module_id", ""))):
+			errors.append("floor module cannot be an edge placement: %s" % edge_key_value)
+		if str(edge.get("kind", edge.get("state", ""))) != kind:
+			errors.append("edge placement kind mismatch: %s" % edge_key_value)
+		if str(edge.get("module_id", "")) != str(placement.get("module_id", "")):
+			errors.append("edge placement module mismatch: %s" % edge_key_value)
+		_validate_edge_pose(placement, edge_key_value, errors)
 
-		_validate_portal_source_cells(edge_key, edge, errors)
-
-		var endpoint_data: Variant = edge.get("endpoints", edge.get("portal_endpoints", null))
-		if endpoint_data != null:
-			_validate_explicit_endpoint_normals(edge_key, endpoint_data, errors)
-		else:
-			var direction: String = String(edge.get("direction", ""))
-			var opposite_direction: String = String(edge.get("opposite_direction", ""))
-			if not _is_direction(direction) or String(StructuralEdgePlanScript.OPPOSITE.get(direction, "")) != opposite_direction:
-				errors.append(
-					"opposed portal normals are invalid for %s; canonical direction/opposite_direction are required" % edge_key
-			)
-		var normals: Variant = edge.get("normals", null)
-		if normals != null:
-			_validate_explicit_endpoint_normals(edge_key, normals, errors)
-
-
-func _validate_portal_source_cells(edge_key: String, edge: Dictionary, errors: Array[String]) -> void:
-	_validate_source_edge_correspondence(edge_key, edge, errors, "portal")
-
-
-func _validate_source_edge_correspondence(
-		edge_key: String,
-		record: Dictionary,
-		errors: Array[String],
-		record_label: String) -> void:
-	var raw_source_cells: Variant = record.get("source_cells", null)
-	if not (raw_source_cells is Array) or raw_source_cells.size() != 2:
-		errors.append(
-			"%s source_cells must be an Array of exactly two cells: %s" % [record_label, edge_key]
-		)
-		return
-
-	var first_result: Dictionary = _parse_cell(raw_source_cells[0])
-	var second_result: Dictionary = _parse_cell(raw_source_cells[1])
-	if not bool(first_result.get("ok", false)) or not bool(second_result.get("ok", false)):
-		errors.append(
-			"%s source_cells are invalid: %s; both cells must be integer Vector2i values" % [record_label, edge_key]
-		)
-		return
-
-	var direction: String = String(record.get("direction", ""))
-	if not _is_direction(direction):
-		errors.append(
-			"%s source_cells cannot be checked without a declared cardinal edge direction: %s" % [record_label, edge_key]
-		)
-		return
-
-	var source_a: Vector2i = first_result["cell"]
-	var source_b: Vector2i = second_result["cell"]
-	var expected_second: Vector2i = source_a + StructuralEdgePlanScript.DIRECTIONS[direction]
-	if source_b != expected_second:
-		errors.append(
-			"%s source_cells are not adjacent across declared edge: %s" % [record_label, edge_key]
-		)
-
-	var deck_result: Dictionary = _parse_integer(record.get("deck", null))
-	if not bool(deck_result.get("ok", false)):
-		errors.append(
-			"%s source/deck does not match edge record: deck must be an integer for %s" % [record_label, edge_key]
-		)
-		return
-	var deck: int = int(deck_result["value"])
-	var edge_key_deck_result: Dictionary = _edge_key_deck(edge_key)
-	if not bool(edge_key_deck_result.get("ok", false)):
-		errors.append(
-			"%s source/deck does not match declared edge: invalid edge_key %s" % [record_label, edge_key]
-		)
-	else:
-		var declared_deck: int = int(edge_key_deck_result["value"])
-		if deck != declared_deck:
-			errors.append(
-				"%s source/deck does not match declared edge: %d != %d for %s" % [record_label, deck, declared_deck, edge_key]
-			)
-
-	var canonical_edge_key: String = StructuralEdgePlanScript.edge_key(deck, source_a, direction)
-	if canonical_edge_key != edge_key:
-		errors.append(
-			"%s source_cells do not match declared edge_key: %s != %s" % [record_label, canonical_edge_key, edge_key]
-		)
-
-	var record_cell_result: Dictionary = _parse_cell(record.get("cell", null))
-	if not bool(record_cell_result.get("ok", false)):
-		errors.append(
-			"%s source_cells do not match edge record cell: missing integer cell for %s" % [record_label, edge_key]
-		)
-	elif record_cell_result["cell"] != source_a:
-		errors.append(
-			"%s source_cells do not match edge record cell: %s != %s for %s" % [record_label, source_a, record_cell_result["cell"], edge_key]
-		)
-
-
-## Positions and rotations must be the integer-grid canonical pose, not a
-## transform inferred from a visual mesh or a sequential floor strip.
-func _validate_placement_grid_pose(plan: Dictionary, errors: Array[String]) -> void:
-	var placements: Variant = plan.get("placements", null)
-	if not (placements is Array):
-		return
-	for placement_variant in placements:
-		if not (placement_variant is Dictionary):
-			continue
-		var placement: Dictionary = placement_variant
-		if _record_kind(placement) == EDGE_OPEN:
-			continue
-		var edge_key: String = String(placement.get("edge_key", ""))
-		_validate_source_edge_correspondence(edge_key, placement, errors, "placement")
-		var geometry: Dictionary = _placement_geometry(placement)
-		if not bool(geometry.get("ok", false)):
-			errors.append("placement grid pose is invalid for %s: %s" % [edge_key, String(geometry.get("error", "unknown geometry"))])
-			continue
-
-		var canonical_edge_key: String = String(geometry["canonical_edge_key"])
-		if edge_key.is_empty() or edge_key != canonical_edge_key:
-			errors.append(
-				"placement edge_key is not canonical for the cell edge: %s != %s" % [edge_key, canonical_edge_key]
-			)
-
-		var raw_yaw: Variant = placement.get("yaw_degrees", null)
-		if not _is_number(raw_yaw):
-			errors.append("placement yaw is outside canonical pose set {0,90,180,270}: %s" % edge_key)
-		else:
-			var yaw: float = float(raw_yaw)
-			if not _is_canonical_yaw(yaw):
-				errors.append("placement yaw is outside canonical pose set {0,90,180,270}: %s" % edge_key)
-			elif not is_equal_approx(yaw, float(geometry["expected_yaw"])):
-				errors.append(
-					"placement yaw does not match canonical edge pose for %s: expected %s" % [edge_key, String(geometry["expected_yaw"])]
-				)
-
-		var position_result: Dictionary = _parse_vector3(placement.get("position", null))
-		if not bool(position_result.get("ok", false)):
-			errors.append("placement position is not on a canonical cell edge: %s" % edge_key)
-		else:
-			var actual_position: Vector3 = position_result["value"]
-			var expected_position: Vector3 = geometry["expected_position"]
-			if not actual_position.is_equal_approx(expected_position):
-				errors.append(
-					"placement position is not aligned to canonical cell edge: %s expected %s got %s" % [edge_key, expected_position, actual_position]
-				)
-
-
-func _validate_edge_occupancy_consistency(plan: Dictionary, errors: Array[String]) -> void:
-	var edges: Variant = plan.get("edges", null)
-	if not (edges is Dictionary):
-		return
-	var occupied_cells: Dictionary = _canonical_cells(plan, {})
 	for edge_key_variant in edges.keys():
-		var edge_key: String = String(edge_key_variant)
+		var edge_key_value: String = str(edge_key_variant)
 		var edge_variant: Variant = edges[edge_key_variant]
-		if not (edge_variant is Dictionary):
+		if typeof(edge_variant) != TYPE_DICTIONARY:
+			errors.append("edge record must be an object: %s" % edge_key_value)
 			continue
 		var edge: Dictionary = edge_variant
-		if not edge.has("edge_key") or String(edge.get("edge_key", "")) != edge_key:
-			errors.append("edge key/body drift: canonical edge map key %s does not match record edge_key" % edge_key)
-		_validate_source_edge_correspondence(edge_key, edge, errors, "edge")
+		var kind: String = str(edge.get("kind", edge.get("state", "")))
+		if not EDGE_KINDS.has(kind):
+			errors.append("unsupported edge kind: %s" % kind)
+		if kind != "OPEN" and bool(edge.get("wrapper_required", edge.get("placement_required", true))) and not seen_edge_keys.has(edge_key_value):
+			errors.append("required edge has no placement: %s" % edge_key_value)
 
-		var source_cells: Array = _source_cells_for_record(edge)
-		if source_cells.size() != 2:
+
+func _validate_edge_pose(placement: Dictionary, edge_key_value: String, errors: Array[String]) -> void:
+	var deck_variant: Variant = placement.get("deck", null)
+	var direction: String = str(placement.get("direction", ""))
+	if not _is_integer(deck_variant) or not CompilerScript.DIRECTIONS.has(direction):
+		errors.append("edge placement grid pose malformed: %s" % edge_key_value)
+		return
+	var deck: int = int(deck_variant)
+	var parsed_cell: Dictionary = _read_cell(placement.get("cell", null), deck)
+	if not bool(parsed_cell.get("ok", false)):
+		errors.append("edge placement cell malformed: %s" % edge_key_value)
+		return
+	var cell: Vector2i = parsed_cell["cell"]
+	var expected_key: String = CompilerScript.edge_key(deck, cell, direction)
+	if expected_key != edge_key_value:
+		errors.append("edge placement edge_key mismatch: %s" % edge_key_value)
+	var expected_position: Vector3 = CompilerScript.edge_world_position(deck, cell, direction)
+	var position: Dictionary = _read_position(placement.get("position", null))
+	if not bool(position.get("ok", false)) or not (position["value"] as Vector3).is_equal_approx(expected_position):
+		errors.append("edge placement position mismatch: %s" % edge_key_value)
+	var expected_yaw: float = float(CompilerScript.YAW_DEGREES[direction])
+	if not _is_number(placement.get("yaw_degrees", null)) or not is_equal_approx(float(placement.get("yaw_degrees")), expected_yaw):
+		errors.append("edge placement yaw mismatch: %s" % edge_key_value)
+
+
+func _validate_portal_endpoints(topology: Dictionary, occupancy: Dictionary, edges: Dictionary, errors: Array[String]) -> void:
+	var portals_variant: Variant = topology.get("portals", null)
+	if typeof(portals_variant) != TYPE_ARRAY:
+		errors.append("topology portals must be an array")
+		return
+	var room_decks: Dictionary = _room_decks(topology)
+	for portal_variant in (portals_variant as Array):
+		if typeof(portal_variant) != TYPE_DICTIONARY:
+			errors.append("portal record must be an object")
 			continue
-		var first_result: Dictionary = _parse_cell(source_cells[0])
-		var second_result: Dictionary = _parse_cell(source_cells[1])
-		if not bool(first_result.get("ok", false)) or not bool(second_result.get("ok", false)):
+		var portal: Dictionary = portal_variant
+		var from_room: String = str(portal.get("from_room", ""))
+		var to_room: String = str(portal.get("to_room", ""))
+		if not room_decks.has(from_room) or not room_decks.has(to_room):
+			errors.append("portal room endpoints are not reciprocal: %s" % str(portal.get("id", "")))
 			continue
-		var deck_result: Dictionary = _parse_integer(edge.get("deck", null))
-		if not bool(deck_result.get("ok", false)):
+		var from_info: Dictionary = _read_cell(portal.get("from_cell", null), int(room_decks[from_room]))
+		var to_info: Dictionary = _read_cell(portal.get("to_cell", null), int(room_decks[to_room]))
+		if not bool(from_info.get("ok", false)) or not bool(to_info.get("ok", false)):
+			errors.append("portal endpoints are malformed: %s" % str(portal.get("id", "")))
 			continue
-		var first_key: String = StructuralEdgePlanScript.cell_key(int(deck_result["value"]), first_result["cell"])
-		var second_key: String = StructuralEdgePlanScript.cell_key(int(deck_result["value"]), second_result["cell"])
-		var room_ids: Array = _room_ids_for_record(edge)
-		var owner_room: String = String(edge.get("owner_room", ""))
-		var other_room: String = String(edge.get("other_room", ""))
-		if room_ids.size() != 2:
-			errors.append("edge endpoint room_ids are inconsistent with owner_room/other_room: %s" % edge_key)
-		elif String(room_ids[0]) != owner_room or String(room_ids[1]) != other_room:
-			errors.append("edge endpoint room_ids are inconsistent with owner_room/other_room: %s" % edge_key)
+		if int(from_info["deck"]) != int(to_info["deck"]):
+			errors.append("portal endpoints must be same-deck: %s" % str(portal.get("id", "")))
+			continue
+		var from_cell: Vector2i = from_info["cell"]
+		var to_cell: Vector2i = to_info["cell"]
+		var from_key: String = CompilerScript.cell_key(int(from_info["deck"]), from_cell)
+		var to_key: String = CompilerScript.cell_key(int(to_info["deck"]), to_cell)
+		if _occupancy_room(occupancy, from_key) != from_room or _occupancy_room(occupancy, to_key) != to_room:
+			errors.append("portal endpoints are not reciprocal: %s" % str(portal.get("id", "")))
+			continue
+		var declared_from_direction: String = str(portal.get("from_direction", ""))
+		var declared_to_direction: String = str(portal.get("to_direction", ""))
+		if not declared_from_direction.is_empty() or not declared_to_direction.is_empty():
+			if not CompilerScript.OPPOSITE.has(declared_from_direction) or declared_to_direction != str(CompilerScript.OPPOSITE[declared_from_direction]):
+				errors.append("opposed portal normals mismatch: %s" % str(portal.get("id", "")))
+		var delta: Vector2i = to_cell - from_cell
+		var edge_cell: Vector2i = from_cell
+		var direction: String = ""
+		for candidate in CompilerScript.DIRECTIONS.keys():
+			if (CompilerScript.DIRECTIONS[candidate] as Vector2i) == delta:
+				direction = str(candidate)
+				break
+		var logical_boundary: bool = false
+		if direction.is_empty() and typeof(portal.get("edge_cell", null)) != TYPE_NIL:
+			var edge_info: Dictionary = _read_cell(portal.get("edge_cell", null), int(from_info["deck"]))
+			var declared_direction: String = str(portal.get("edge_direction", ""))
+			if bool(edge_info.get("ok", false)) and CompilerScript.DIRECTIONS.has(declared_direction):
+				edge_cell = edge_info["cell"]
+				direction = declared_direction
+				logical_boundary = true
+		if direction.is_empty():
+			errors.append("portal endpoints are not adjacent: %s" % str(portal.get("id", "")))
+			continue
+		var edge_key_value: String = CompilerScript.edge_key(int(from_info["deck"]), edge_cell, direction)
+		if not edges.has(edge_key_value):
+			errors.append("portal has no canonical edge: %s" % edge_key_value)
+			continue
+		var edge: Dictionary = edges[edge_key_value]
+		if not bool(edge.get("portal", false)):
+			errors.append("portal edge was compiled as non-portal: %s" % edge_key_value)
+		if str(edge.get("kind", "SOLID")) == "SOLID":
+			errors.append("topology-connected rooms blocked by SOLID edge: %s" % edge_key_value)
+		if logical_boundary and str(edge.get("other_room", "")) != to_room:
+			errors.append("logical portal room endpoint mismatch: %s" % edge_key_value)
 
-		if not occupied_cells.has(first_key):
-			errors.append("edge endpoint has no matching occupied cell record: %s" % first_key)
-		else:
-			var first_record: Dictionary = occupied_cells[first_key]
-			if not owner_room.is_empty() and String(first_record.get("room_id", "")) != owner_room:
-				errors.append("edge endpoint owner_room does not match occupied cell: %s" % edge_key)
 
-		var second_is_occupied: bool = occupied_cells.has(second_key)
-		var exterior: bool = _is_explicit_exterior(edge, _record_kind(edge), room_ids)
-		if second_is_occupied:
-			var second_record: Dictionary = occupied_cells[second_key]
-			var second_room: String = String(second_record.get("room_id", ""))
-			if not other_room.is_empty() and second_room != other_room:
-				errors.append("edge endpoint other_room does not match occupied cell: %s" % edge_key)
-			elif other_room.is_empty() and not exterior:
-				errors.append("edge endpoint is occupied but other_room is empty: %s" % edge_key)
-		elif not other_room.is_empty():
-			errors.append("edge endpoint references an unoccupied other_room: %s" % edge_key)
+func _occupancy_room(occupancy: Dictionary, cell_key_value: String) -> String:
+	if not occupancy.has(cell_key_value):
+		return ""
+	var record_variant: Variant = occupancy[cell_key_value]
+	if typeof(record_variant) != TYPE_DICTIONARY:
+		return ""
+	return str((record_variant as Dictionary).get("room_id", ""))
 
 
-## Detects duplicate physical occupancy even when a malformed plan uses an Array
-## or inconsistent dictionary keys that cannot represent duplicate keys directly.
-func _validate_footprint_overlap(plan: Dictionary, errors: Array[String]) -> void:
-	var plan_cells: Dictionary = {}
-	var occupancy: Variant = plan.get("occupancy", null)
-	if occupancy is Dictionary:
-		for cell_key_variant in occupancy.keys():
-			var record_variant: Variant = occupancy[cell_key_variant]
-			if not (record_variant is Dictionary):
+func _validate_walkable_flood_fill(topology: Dictionary, occupancy: Dictionary, edges: Dictionary, errors: Array[String]) -> void:
+	var adjacency: Dictionary = {}
+	for occupancy_key_variant in occupancy.keys():
+		adjacency[str(occupancy_key_variant)] = []
+	for edge_key_variant in edges.keys():
+		var edge_variant: Variant = edges[edge_key_variant]
+		if typeof(edge_variant) != TYPE_DICTIONARY:
+			continue
+		var edge: Dictionary = edge_variant
+		var kind: String = str(edge.get("kind", edge.get("state", "SOLID")))
+		if kind == "SOLID":
+			continue
+		var source_cells: Array = edge.get("source_cells", []) if typeof(edge.get("source_cells", [])) == TYPE_ARRAY else []
+		if source_cells.size() < 2:
+			continue
+		var first: Dictionary = _cell_key_from_value(source_cells[0], int(edge.get("deck", -1)))
+		var second: Dictionary = _cell_key_from_value(source_cells[1], int(edge.get("deck", -1)))
+		if not bool(first.get("ok", false)) or not bool(second.get("ok", false)):
+			continue
+		var first_key: String = str(first["key"])
+		var second_key: String = str(second["key"])
+		if not adjacency.has(first_key) or not adjacency.has(second_key):
+			continue
+		(adjacency[first_key] as Array).append(second_key)
+		(adjacency[second_key] as Array).append(first_key)
+
+	var vertical_variant: Variant = topology.get("vertical_connections", [])
+	if typeof(vertical_variant) == TYPE_ARRAY:
+		var room_decks: Dictionary = _room_decks(topology)
+		for link_variant in (vertical_variant as Array):
+			if typeof(link_variant) != TYPE_DICTIONARY:
 				continue
-			var record: Dictionary = record_variant
-			var parsed: Dictionary = _cell_record_geometry(record)
-			if not bool(parsed.get("ok", false)):
+			var link: Dictionary = link_variant
+			var from_room: String = str(link.get("from_room", ""))
+			var to_room: String = str(link.get("to_room", ""))
+			if not room_decks.has(from_room) or not room_decks.has(to_room):
 				continue
-			_register_occupied_cell(
-				plan_cells,
-				int(parsed["deck"]),
-				parsed["cell"],
-				String(record.get("room_id", "")),
-				errors,
-			)
-	elif occupancy is Array:
-			for record_variant in occupancy:
-				if not (record_variant is Dictionary):
-					continue
-				var record: Dictionary = record_variant
-				var parsed: Dictionary = _cell_record_geometry(record)
-				if bool(parsed.get("ok", false)):
-					_register_occupied_cell(
-						plan_cells,
-						int(parsed["deck"]),
-						parsed["cell"],
-						String(record.get("room_id", "")),
-						errors,
-					)
-	elif occupancy != null:
-		errors.append("structural plan occupancy must be a Dictionary or Array")
+			var from_info: Dictionary = _read_cell(link.get("from_cell", null), int(room_decks[from_room]))
+			var to_info: Dictionary = _read_cell(link.get("to_cell", null), int(room_decks[to_room]))
+			if not bool(from_info.get("ok", false)) or not bool(to_info.get("ok", false)):
+				continue
+			var from_key: String = CompilerScript.cell_key(int(from_info["deck"]), from_info["cell"])
+			var to_key: String = CompilerScript.cell_key(int(to_info["deck"]), to_info["cell"])
+			if adjacency.has(from_key) and adjacency.has(to_key):
+				(adjacency[from_key] as Array).append(to_key)
+				(adjacency[to_key] as Array).append(from_key)
 
-	var topology_rooms: Variant = plan.get("rooms", null)
-	# The compiler plan normally has no rooms field, so topology is the source of
-	# truth for solved footprints. Keeping this fallback also supports direct
-	# validator fixtures that place rooms on the plan itself.
-	if topology_rooms is Dictionary or topology_rooms is Array:
-		_validate_room_footprints(topology_rooms, errors)
+	var portals_variant: Variant = topology.get("portals", [])
+	if typeof(portals_variant) == TYPE_ARRAY:
+		for portal_variant in (portals_variant as Array):
+			if typeof(portal_variant) != TYPE_DICTIONARY:
+				continue
+			var portal: Dictionary = portal_variant
+			var room_decks: Dictionary = _room_decks(topology)
+			var from_room: String = str(portal.get("from_room", ""))
+			var to_room: String = str(portal.get("to_room", ""))
+			if not room_decks.has(from_room) or not room_decks.has(to_room):
+				continue
+			var from_info: Dictionary = _read_cell(portal.get("from_cell", null), int(room_decks[from_room]))
+			var to_info: Dictionary = _read_cell(portal.get("to_cell", null), int(room_decks[to_room]))
+			if not bool(from_info.get("ok", false)) or not bool(to_info.get("ok", false)):
+				continue
+			var from_key: String = CompilerScript.cell_key(int(from_info["deck"]), from_info["cell"])
+			var to_key: String = CompilerScript.cell_key(int(to_info["deck"]), to_info["cell"])
+			if not adjacency.has(from_key) or not adjacency.has(to_key):
+				continue
+			if not _reachable(adjacency, from_key, to_key):
+				# A diagonal legacy link has an explicit rendered boundary, but
+				# must still participate in logical flood fill exactly once.
+				if bool(portal.get("logical_boundary", false)):
+					(adjacency[from_key] as Array).append(to_key)
+					(adjacency[to_key] as Array).append(from_key)
+				if not _reachable(adjacency, from_key, to_key):
+					errors.append("flood-fill/topology reachability disagreement: %s" % str(portal.get("id", "")))
 
+	_validate_critical_path_reachability(topology, occupancy, adjacency, errors)
 
-## The walkability gate uses a real flood fill over occupied cells, then compares
-## the resulting components with topology portal reachability.
-func _validate_walkable_reachability(plan: Dictionary, topology: Dictionary, errors: Array[String]) -> void:
-	var cells: Dictionary = _canonical_cells(plan, topology)
-	var components: Array = _flood_fill(cells, plan)
-	var room_components: Dictionary = {}
-	for component_variant in components:
-		var component: Dictionary = component_variant
-		var component_id: int = int(component.get("id", 0))
-		var rooms: Dictionary = component.get("rooms", {})
-		for room_variant in rooms.keys():
-			var room_id: String = String(room_variant)
-			var ids: Array = room_components.get(room_id, [])
-			ids.append(component_id)
-			room_components[room_id] = ids
-
-	var topology_pairs: Dictionary = _topology_pairs(topology)
-	var edges: Dictionary = plan.get("edges", {}) if plan.get("edges", {}) is Dictionary else {}
-	for pair_key_variant in topology_pairs.keys():
-		var pair_key: String = String(pair_key_variant)
-		var pair: Dictionary = topology_pairs[pair_key_variant]
-		var rooms: Array = pair.get("rooms", [])
-		if rooms.size() != 2:
+func _validate_critical_path_reachability(topology: Dictionary, occupancy: Dictionary, adjacency: Dictionary, errors: Array[String]) -> void:
+	var critical_variant: Variant = topology.get("critical_path", [])
+	if typeof(critical_variant) != TYPE_ARRAY:
+		return
+	var critical: Array = critical_variant
+	for index in range(critical.size() - 1):
+		var from_room: String = str(critical[index])
+		var to_room: String = str(critical[index + 1])
+		var from_cells: Array[String] = _room_cells(occupancy, from_room)
+		var to_cells: Array[String] = _room_cells(occupancy, to_room)
+		if from_cells.is_empty() or to_cells.is_empty():
+			errors.append("topology reachability room missing: %s -> %s" % [from_room, to_room])
 			continue
-		var first_room: String = String(rooms[0])
-		var second_room: String = String(rooms[1])
-		var required_edge: String = String(pair.get("edge_key", ""))
-		var separated_by_solid: bool = false
-		if not required_edge.is_empty() and edges.has(required_edge):
-			var required_edge_variant: Variant = edges[required_edge]
-			if required_edge_variant is Dictionary:
-				var edge: Dictionary = required_edge_variant
-				if _record_kind(edge) == EDGE_SOLID:
-					separated_by_solid = true
-		elif required_edge.is_empty():
-			for edge_variant in edges.values():
-				if not (edge_variant is Dictionary):
-					continue
-				var edge: Dictionary = edge_variant
-				if _record_kind(edge) != EDGE_SOLID:
-					continue
-				var edge_rooms: Array = _room_ids_for_record(edge)
-				if edge_rooms.size() == 2 and not String(edge_rooms[0]).is_empty() and not String(edge_rooms[1]).is_empty() and _room_pair_key(String(edge_rooms[0]), String(edge_rooms[1])) == pair_key:
-					separated_by_solid = true
+		var connected: bool = false
+		for from_key in from_cells:
+			for to_key in to_cells:
+				if _reachable(adjacency, from_key, to_key):
+					connected = true
 					break
-		if separated_by_solid:
-			errors.append(
-				"topology-connected rooms separated by SOLID edge: %s" % pair_key
-			)
-		if bool(pair.get("walkable", true)) and not _rooms_share_component(first_room, second_room, room_components):
-			errors.append(
-				"topology reachability mismatch: flood_fill cannot connect topology-connected rooms %s" % pair_key
-			)
-
-	# A plan must not create a traversable room seam absent from the declared
-	# topology. This is the converse half of the flood-fill/topology agreement.
-	var actual_cross_room_pairs: Dictionary = _walkable_cross_room_pairs(cells, plan)
-	for actual_pair_variant in actual_cross_room_pairs.keys():
-		var actual_pair: String = String(actual_pair_variant)
-		if not topology_pairs.has(actual_pair):
-			errors.append(
-				"topology reachability mismatch: flood_fill found undeclared walkable seam %s" % actual_pair
-			)
+			if connected:
+				break
+		if not connected:
+			errors.append("flood-fill/topology reachability disagreement: %s -> %s" % [from_room, to_room])
 
 
-func _build_stats(plan: Dictionary, topology: Dictionary, errors: Array[String]) -> Dictionary:
-	var edge_count: int = 0
-	var portal_count: int = 0
-	var occupancy_count: int = 0
-	var placement_count: int = 0
-	var edges: Variant = plan.get("edges", {})
-	if edges is Dictionary:
-		edge_count = edges.size()
-		for edge_variant in edges.values():
-			if edge_variant is Dictionary and (_is_portal_kind(_record_kind(edge_variant)) or (_record_kind(edge_variant) == EDGE_OPEN and bool(edge_variant.get("portal", false)))):
-				portal_count += 1
-	var occupancy: Variant = plan.get("occupancy", {})
-	if occupancy is Dictionary or occupancy is Array:
-		occupancy_count = occupancy.size()
-	var placements: Variant = plan.get("placements", [])
-	if placements is Array:
-		placement_count = placements.size()
-	var component_count: int = _flood_fill(_canonical_cells(plan, topology), plan).size()
-	return {
-		"edge_count": edge_count,
-		"portal_count": portal_count,
-		"placement_count": placement_count,
-		"occupied_cell_count": occupancy_count,
-		"walkable_component_count": component_count,
-		"error_count": errors.size(),
-	}
-
-
-func _record_kind(record: Dictionary) -> String:
-	var raw_kind: String = String(record.get("kind", record.get("state", "")))
-	return raw_kind.to_upper()
-
-
-func _is_portal_kind(kind: String) -> bool:
-	return kind == EDGE_DOOR or kind == EDGE_LOCKED or kind == EDGE_HATCH or kind == EDGE_BREACH
-
-
-func _requires_materialization(kind: String) -> bool:
-	return kind == EDGE_SOLID or kind == EDGE_DOOR or kind == EDGE_LOCKED or kind == EDGE_HATCH
-
-
-func _has_nonempty_string(value: Variant) -> bool:
-	return value is String and not String(value).strip_edges().is_empty()
-
-
-func _is_explicit_exterior(edge: Dictionary, kind: String, room_ids: Array) -> bool:
-	if kind != EDGE_BREACH and kind != EDGE_HATCH:
-		return false
-	var exterior_value: Variant = edge.get("exterior", null)
-	return typeof(exterior_value) == TYPE_BOOL and bool(exterior_value)
-
-
-func _nonempty_room_count(room_ids: Array) -> int:
-	var count: int = 0
-	for room_variant in room_ids:
-		if not String(room_variant).is_empty():
-			count += 1
-	return count
-
-
-func _room_ids_for_record(record: Dictionary) -> Array:
-	var room_ids: Array = []
-	var raw_room_ids: Variant = record.get("room_ids", null)
-	if raw_room_ids is Array:
-		for room_variant in raw_room_ids:
-			room_ids.append(String(room_variant))
-		return room_ids
-	var owner_room: String = String(record.get("owner_room", ""))
-	var other_room: String = String(record.get("other_room", ""))
-	if not owner_room.is_empty() or not other_room.is_empty():
-		room_ids.append(owner_room)
-		room_ids.append(other_room)
-	return room_ids
-
-
-func _source_cells_for_record(record: Dictionary) -> Array:
-	var raw_cells: Variant = record.get("source_cells", null)
-	if raw_cells is Array:
-		return raw_cells
-	var result: Array = []
-	if record.has("cell"):
-		result.append(record["cell"])
-	return result
-
-
-func _validate_explicit_endpoint_normals(edge_key: String, endpoint_data: Variant, errors: Array[String]) -> void:
-	if not (endpoint_data is Array) or endpoint_data.size() != 2:
-		errors.append(
-			"portal endpoints are not reciprocal: %s; exactly two endpoint records are required" % edge_key
-		)
-		return
-	var first: Variant = endpoint_data[0]
-	var second: Variant = endpoint_data[1]
-	if not (first is Dictionary) or not (second is Dictionary):
-		errors.append("portal endpoints are not reciprocal: %s; endpoint records must be Dictionaries" % edge_key)
-		return
-	var first_direction: String = String(first.get("normal_direction", first.get("direction", "")))
-	var second_direction: String = String(second.get("normal_direction", second.get("direction", "")))
-	if not _is_direction(first_direction) or not _is_direction(second_direction) or String(StructuralEdgePlanScript.OPPOSITE.get(first_direction, "")) != second_direction:
-		errors.append("opposed portal normals are invalid for %s" % edge_key)
-
-
-func _placement_geometry(placement: Dictionary) -> Dictionary:
-	var direction: String = String(placement.get("direction", ""))
-	var source_cells: Array = _source_cells_for_record(placement)
-	var cell_result: Dictionary = _parse_cell(placement.get("cell", null))
-	if not bool(cell_result.get("ok", false)) and not source_cells.is_empty():
-		cell_result = _parse_cell(source_cells[0])
-	if not bool(cell_result.get("ok", false)) and source_cells.size() == 2:
-		var first_result: Dictionary = _parse_cell(source_cells[0])
-		var second_result: Dictionary = _parse_cell(source_cells[1])
-		if bool(first_result.get("ok", false)) and bool(second_result.get("ok", false)):
-			direction = _direction_from_delta(second_result["cell"] - first_result["cell"])
-	if not _is_direction(direction):
-		return {"ok": false, "error": "missing canonical cardinal direction"}
-	if not bool(cell_result.get("ok", false)):
-		return {"ok": false, "error": "missing integer source cell"}
-	var deck_result: Dictionary = _parse_integer(placement.get("deck", null))
-	if not bool(deck_result.get("ok", false)):
-		var edge_parts: PackedStringArray = String(placement.get("edge_key", "")).split("|")
-		if edge_parts.size() >= 1 and edge_parts[0].is_valid_int():
-			deck_result = {"ok": true, "value": int(edge_parts[0])}
-	if not bool(deck_result.get("ok", false)):
-		return {"ok": false, "error": "missing integer deck"}
-	var deck: int = int(deck_result["value"])
-	var cell: Vector2i = cell_result["cell"]
-	var canonical_edge_key: String = StructuralEdgePlanScript.edge_key(deck, cell, direction)
-	return {
-		"ok": true,
-		"deck": deck,
-		"cell": cell,
-		"direction": direction,
-		"canonical_edge_key": canonical_edge_key,
-		"expected_position": StructuralEdgePlanScript.edge_world_position(deck, cell, direction),
-		"expected_yaw": float(StructuralEdgePlanScript.YAW_DEGREES[direction]),
-	}
-
-
-func _cell_record_geometry(record: Dictionary) -> Dictionary:
-	var cell_result: Dictionary = _parse_cell(record.get("cell", null))
-	var deck_result: Dictionary = _parse_integer(record.get("deck", null))
-	if not bool(cell_result.get("ok", false)) or not bool(deck_result.get("ok", false)):
-		return {"ok": false}
-	return {
-		"ok": true,
-		"cell": cell_result["cell"],
-		"deck": int(deck_result["value"]),
-	}
-
-
-func _register_occupied_cell(
-		cell_map: Dictionary,
-		deck: int,
-		cell: Vector2i,
-		room_id: String,
-		errors: Array[String]) -> void:
-	var key: String = StructuralEdgePlanScript.cell_key(deck, cell)
-	if cell_map.has(key):
-		errors.append(
-			"occupied-cell overlap at %s between %s and %s" % [key, String(cell_map[key]), room_id]
-		)
-		return
-	cell_map[key] = room_id
-
-
-func _validate_room_footprints(raw_rooms: Variant, errors: Array[String]) -> void:
-	var room_cells: Dictionary = {}
-	for room_variant in _room_records(raw_rooms):
-		if not (room_variant is Dictionary):
-			continue
-		var room: Dictionary = room_variant
-		var room_id: String = String(room.get("id", ""))
-		var deck_result: Dictionary = _parse_integer(room.get("deck", null))
-		var raw_cells: Variant = room.get("cells", null)
-		if not bool(deck_result.get("ok", false)) or not (raw_cells is Array):
-			continue
-		for raw_cell in raw_cells:
-			var cell_result: Dictionary = _parse_cell(raw_cell)
-			if bool(cell_result.get("ok", false)):
-				_register_occupied_cell(room_cells, int(deck_result["value"]), cell_result["cell"], room_id, errors)
-
-
-func _room_records(raw_rooms: Variant) -> Array:
-	if raw_rooms is Array:
-		return raw_rooms
-	var records: Array = []
-	if raw_rooms is Dictionary:
-		for room_key in raw_rooms.keys():
-			var room_variant: Variant = raw_rooms[room_key]
-			if not (room_variant is Dictionary):
-				continue
-			var room: Dictionary = room_variant.duplicate(true)
-			if not room.has("id"):
-				room["id"] = String(room_key)
-			records.append(room)
-	return records
-
-
-func _canonical_cells(plan: Dictionary, topology: Dictionary) -> Dictionary:
-	var cells: Dictionary = {}
-	var occupancy: Variant = plan.get("occupancy", null)
-	if occupancy is Dictionary:
-		for record_variant in occupancy.values():
-			if not (record_variant is Dictionary):
-				continue
-			var record: Dictionary = record_variant
-			var parsed: Dictionary = _cell_record_geometry(record)
-			if bool(parsed.get("ok", false)):
-				var key: String = StructuralEdgePlanScript.cell_key(int(parsed["deck"]), parsed["cell"])
-				cells[key] = {
-					"deck": int(parsed["deck"]),
-					"cell": parsed["cell"],
-					"room_id": String(record.get("room_id", "")),
-				}
-	elif occupancy is Array:
-		for record_variant in occupancy:
-			if not (record_variant is Dictionary):
-				continue
-			var record: Dictionary = record_variant
-			var parsed: Dictionary = _cell_record_geometry(record)
-			if bool(parsed.get("ok", false)):
-				var key: String = StructuralEdgePlanScript.cell_key(int(parsed["deck"]), parsed["cell"])
-				cells[key] = {
-					"deck": int(parsed["deck"]),
-					"cell": parsed["cell"],
-					"room_id": String(record.get("room_id", "")),
-				}
-	if not cells.is_empty():
-		return cells
-	var rooms: Variant = topology.get("rooms", plan.get("rooms", null))
-	for room_variant in _room_records(rooms):
-		if not (room_variant is Dictionary):
-			continue
-		var room: Dictionary = room_variant
-		var room_id: String = String(room.get("id", ""))
-		var deck_result: Dictionary = _parse_integer(room.get("deck", null))
-		var raw_cells: Variant = room.get("cells", null)
-		if not bool(deck_result.get("ok", false)) or not (raw_cells is Array):
-			continue
-		for raw_cell in raw_cells:
-			var cell_result: Dictionary = _parse_cell(raw_cell)
-			if bool(cell_result.get("ok", false)):
-				var key: String = StructuralEdgePlanScript.cell_key(int(deck_result["value"]), cell_result["cell"])
-				cells[key] = {
-					"deck": int(deck_result["value"]),
-					"cell": cell_result["cell"],
-					"room_id": room_id,
-				}
+func _room_cells(occupancy: Dictionary, room_id: String) -> Array[String]:
+	var cells: Array[String] = []
+	for key_variant in occupancy.keys():
+		var key: String = str(key_variant)
+		if _occupancy_room(occupancy, key) == room_id:
+			cells.append(key)
 	return cells
 
 
-func _flood_fill(cells: Dictionary, plan: Dictionary) -> Array:
-	var components: Array = []
-	var visited: Dictionary = {}
-	var edges: Dictionary = plan.get("edges", {}) if plan.get("edges", {}) is Dictionary else {}
-	for start_key_variant in cells.keys():
-		var start_key: String = String(start_key_variant)
-		if visited.has(start_key):
-			continue
-		var component_id: int = components.size()
-		var queue: Array = [start_key]
-		var queue_index: int = 0
-		var component_cells: Dictionary = {}
-		var component_rooms: Dictionary = {}
-		visited[start_key] = true
-		while queue_index < queue.size():
-			var current_key: String = String(queue[queue_index])
-			queue_index += 1
-			var current: Dictionary = cells[current_key]
-			component_cells[current_key] = true
-			var current_room: String = String(current.get("room_id", ""))
-			component_rooms[current_room] = true
-			var current_cell: Vector2i = current.get("cell", Vector2i.ZERO)
-			var deck: int = int(current.get("deck", 0))
-			for direction in CARDINAL_DIRECTIONS:
-				var neighbor_cell: Vector2i = current_cell + StructuralEdgePlanScript.DIRECTIONS[direction]
-				var neighbor_key: String = StructuralEdgePlanScript.cell_key(deck, neighbor_cell)
-				if not cells.has(neighbor_key) or visited.has(neighbor_key):
-					continue
-				var neighbor: Dictionary = cells[neighbor_key]
-				var neighbor_room: String = String(neighbor.get("room_id", ""))
-				var crossing_key: String = StructuralEdgePlanScript.edge_key(deck, current_cell, direction)
-				var crossing_edge: Variant = edges.get(crossing_key, null)
-				if current_room != neighbor_room and not _edge_is_walkable(crossing_edge):
-					continue
-				visited[neighbor_key] = true
-				queue.append(neighbor_key)
-		components.append({
-			"id": component_id,
-			"cells": component_cells,
-			"rooms": component_rooms,
-		})
-	return components
-
-
-func _edge_is_walkable(edge_variant: Variant) -> bool:
-	if not (edge_variant is Dictionary):
-		return false
-	var edge: Dictionary = edge_variant
-	var kind: String = _record_kind(edge)
-	return kind == EDGE_OPEN or kind == EDGE_DOOR or kind == EDGE_HATCH or kind == EDGE_BREACH
-
-
-func _rooms_share_component(first_room: String, second_room: String, room_components: Dictionary) -> bool:
-	var first_components: Array = room_components.get(first_room, [])
-	var second_components: Array = room_components.get(second_room, [])
-	for component_variant in first_components:
-		if component_variant in second_components:
+func _reachable(adjacency: Dictionary, start_key: String, goal_key: String) -> bool:
+	var queue: Array[String] = [start_key]
+	var visited: Dictionary = {start_key: true}
+	while not queue.is_empty():
+		var current: String = queue.pop_front()
+		if current == goal_key:
 			return true
+		for neighbor_variant in (adjacency.get(current, []) as Array):
+			var neighbor: String = str(neighbor_variant)
+			if not visited.has(neighbor):
+				visited[neighbor] = true
+				queue.append(neighbor)
 	return false
 
 
-func _walkable_cross_room_pairs(cells: Dictionary, plan: Dictionary) -> Dictionary:
-	var pairs: Dictionary = {}
-	var edges: Dictionary = plan.get("edges", {}) if plan.get("edges", {}) is Dictionary else {}
-	for cell_key_variant in cells.keys():
-		var current_key: String = String(cell_key_variant)
-		var current: Dictionary = cells[current_key]
-		var current_room: String = String(current.get("room_id", ""))
-		var current_cell: Vector2i = current.get("cell", Vector2i.ZERO)
-		var deck: int = int(current.get("deck", 0))
-		for direction in CARDINAL_DIRECTIONS:
-			var neighbor_cell: Vector2i = current_cell + StructuralEdgePlanScript.DIRECTIONS[direction]
-			var neighbor_key: String = StructuralEdgePlanScript.cell_key(deck, neighbor_cell)
-			if not cells.has(neighbor_key):
-				continue
-			var neighbor: Dictionary = cells[neighbor_key]
-			var neighbor_room: String = String(neighbor.get("room_id", ""))
-			if current_room == neighbor_room:
-				continue
-			var edge_key: String = StructuralEdgePlanScript.edge_key(deck, current_cell, direction)
-			var edge: Variant = edges.get(edge_key, null)
-			if _edge_is_walkable(edge):
-				pairs[_room_pair_key(current_room, neighbor_room)] = true
-	return pairs
+func _room_decks(topology: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	var rooms_variant: Variant = topology.get("rooms", [])
+	if typeof(rooms_variant) != TYPE_ARRAY:
+		return out
+	for room_variant in (rooms_variant as Array):
+		if typeof(room_variant) != TYPE_DICTIONARY:
+			continue
+		var room: Dictionary = room_variant
+		var room_id: String = str(room.get("id", ""))
+		if not room_id.is_empty() and _is_integer(room.get("deck", null)):
+			out[room_id] = int(room.get("deck"))
+	return out
 
 
-func _topology_pairs(topology: Dictionary) -> Dictionary:
-	var pairs: Dictionary = {}
-	for field in ["portals", "connections", "links"]:
-		var raw: Variant = topology.get(field, null)
-		if raw is Array:
-			for item in raw:
-				if item is Dictionary:
-					_add_topology_pair(pairs, item)
-		elif raw is Dictionary:
-			for first_key in raw.keys():
-				var value: Variant = raw[first_key]
-				if value is Array:
-					for neighbor in value:
-						if neighbor is Dictionary:
-							var item: Dictionary = neighbor.duplicate(true)
-							if not item.has("from_room"):
-								item["from_room"] = String(first_key)
-							_add_topology_pair(pairs, item)
-				else:
-					_add_topology_pair(pairs, {"from_room": String(first_key), "to_room": String(value)})
-	var topology_edges: Variant = topology.get("edges", null)
-	if topology_edges is Dictionary:
-		for edge_variant in topology_edges.values():
-			if edge_variant is Dictionary:
-				_add_topology_pair(pairs, edge_variant)
-	elif topology_edges is Array:
-		for edge_variant in topology_edges:
-			if edge_variant is Dictionary:
-				_add_topology_pair(pairs, edge_variant)
-	return pairs
+func _cell_key_from_value(value: Variant, default_deck: int) -> Dictionary:
+	var info: Dictionary = _read_cell(value, default_deck)
+	if not bool(info.get("ok", false)):
+		return {"ok": false}
+	return {"ok": true, "key": CompilerScript.cell_key(int(info["deck"]), info["cell"]), "cell": info["cell"], "deck": int(info["deck"])}
 
 
-func _add_topology_pair(pairs: Dictionary, record: Dictionary) -> void:
-	var first_room: String = String(record.get("from_room", record.get("room_a", record.get("from", ""))))
-	var second_room: String = String(record.get("to_room", record.get("room_b", record.get("to", ""))))
-	if first_room.is_empty() or second_room.is_empty() or first_room == second_room:
-		return
-	var raw_kind: String = String(record.get("type", record.get("portal_type", record.get("kind", EDGE_DOOR)))).to_upper()
-	if raw_kind == EDGE_SOLID:
-		return
-	var pair_key: String = _room_pair_key(first_room, second_room)
-	var raw_edge_key: Variant = record.get("edge_key", record.get("required_edge", ""))
-	var edge_key: String = String(raw_edge_key) if raw_edge_key is String else ""
-	pairs[pair_key] = {
-		"rooms": [first_room, second_room],
-		"edge_key": edge_key,
-		"required": bool(record.get("required", false)),
-		"walkable": raw_kind != EDGE_LOCKED,
-	}
+func _read_cell(value: Variant, default_deck: int) -> Dictionary:
+	if typeof(value) == TYPE_VECTOR2I:
+		return {"ok": default_deck >= 0, "cell": value, "deck": default_deck}
+	if typeof(value) != TYPE_ARRAY:
+		if typeof(value) == TYPE_STRING:
+			var parsed: Array = _parse_vector_string(str(value), 2)
+			if parsed.size() == 2 and default_deck >= 0:
+				return {"ok": true, "cell": Vector2i(int(parsed[0]), int(parsed[1])), "deck": default_deck}
+		return {"ok": false}
+	var values: Array = value
+	if values.size() < 2 or not _is_integer(values[0]) or not _is_integer(values[1]):
+		return {"ok": false}
+	var deck: int = default_deck
+	if values.size() >= 3:
+		if not _is_integer(values[2]):
+			return {"ok": false}
+		deck = int(values[2])
+	if deck < 0:
+		return {"ok": false}
+	return {"ok": true, "cell": Vector2i(int(values[0]), int(values[1])), "deck": deck}
 
 
-func _room_pair_key(first_room: String, second_room: String) -> String:
-	if first_room < second_room:
-		return first_room + "|" + second_room
-	return second_room + "|" + first_room
+func _read_position(value: Variant) -> Dictionary:
+	if typeof(value) == TYPE_VECTOR3:
+		return {"ok": true, "value": value}
+	if typeof(value) == TYPE_ARRAY:
+		var values: Array = value
+		if values.size() < 3 or not _is_number(values[0]) or not _is_number(values[1]) or not _is_number(values[2]):
+			return {"ok": false}
+		return {"ok": true, "value": Vector3(float(values[0]), float(values[1]), float(values[2]))}
+	if typeof(value) == TYPE_STRING:
+		var parsed: Array = _parse_vector_string(str(value), 3)
+		if parsed.size() == 3:
+			return {"ok": true, "value": Vector3(float(parsed[0]), float(parsed[1]), float(parsed[2]))}
+	return {"ok": false}
 
 
-func _is_direction(direction: String) -> bool:
-	return StructuralEdgePlanScript.DIRECTIONS.has(direction)
-
-
-func _direction_from_delta(delta: Vector2i) -> String:
-	for direction in CARDINAL_DIRECTIONS:
-		if StructuralEdgePlanScript.DIRECTIONS[direction] == delta:
-			return direction
-	return ""
-
-
-func _is_canonical_yaw(yaw: float) -> bool:
-	return is_equal_approx(yaw, 0.0) or is_equal_approx(yaw, 90.0) or is_equal_approx(yaw, 180.0) or is_equal_approx(yaw, 270.0)
+func _parse_vector_string(value: String, expected: int) -> Array:
+	var text: String = value.strip_edges()
+	if text.begins_with("(") and text.ends_with(")"):
+		text = text.substr(1, text.length() - 2)
+	var pieces: PackedStringArray = text.split(",")
+	if pieces.size() != expected:
+		return []
+	var result: Array = []
+	for piece in pieces:
+		var token: String = piece.strip_edges()
+		if not token.is_valid_float():
+			return []
+		result.append(float(token))
+	return result
 
 
 func _is_number(value: Variant) -> bool:
-	return typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT
+	return typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT or (typeof(value) == TYPE_STRING and str(value).is_valid_float())
 
 
-func _parse_integer(value: Variant) -> Dictionary:
+func _is_integer(value: Variant) -> bool:
 	if typeof(value) == TYPE_INT:
-		return {"ok": true, "value": int(value)}
-	# JSON.stringify emits integral Godot integers as JSON floats (for example
-	# deck=0 becomes 0.0). Preserve the integer contract while accepting that
-	# lossless wire representation.
-	if typeof(value) == TYPE_FLOAT and is_equal_approx(float(value), round(float(value))):
-		return {"ok": true, "value": int(value)}
-	if value is String and String(value).strip_edges().is_valid_int():
-		return {"ok": true, "value": int(String(value).strip_edges())}
-	return {"ok": false, "value": 0}
+		return true
+	if typeof(value) == TYPE_FLOAT:
+		return is_equal_approx(float(value), roundf(float(value)))
+	if typeof(value) == TYPE_STRING:
+		return str(value).is_valid_int()
+	return false
 
 
-func _edge_key_deck(edge_key: String) -> Dictionary:
-	var parts: PackedStringArray = edge_key.split("|")
-	if parts.size() != 4 or not parts[0].is_valid_int():
-		return {"ok": false, "value": 0}
-	return {"ok": true, "value": int(parts[0])}
-
-
-func _parse_cell(value: Variant) -> Dictionary:
-	if value is Vector2i:
-		return {"ok": true, "cell": value}
-	if value is Array:
-		var values: Array = value
-		if values.size() == 2:
-			var x_result: Dictionary = _parse_integer(values[0])
-			var y_result: Dictionary = _parse_integer(values[1])
-			if bool(x_result.get("ok", false)) and bool(y_result.get("ok", false)):
-				return {"ok": true, "cell": Vector2i(int(x_result["value"]), int(y_result["value"]))}
-	if value is Dictionary:
-		var value_dict: Dictionary = value
-		if value_dict.has("x") and value_dict.has("y"):
-			var x_result: Dictionary = _parse_integer(value_dict["x"])
-			var y_result: Dictionary = _parse_integer(value_dict["y"])
-			if bool(x_result.get("ok", false)) and bool(y_result.get("ok", false)):
-				return {"ok": true, "cell": Vector2i(int(x_result["value"]), int(y_result["value"]))}
-	if value is String:
-		var text: String = String(value).strip_edges()
-		if text.begins_with("Vector2i(") and text.ends_with(")"):
-			text = text.substr(9, text.length() - 10)
-		elif text.begins_with("(") and text.ends_with(")"):
-			text = text.substr(1, text.length() - 2)
-		else:
-			return {"ok": false, "cell": Vector2i.ZERO}
-		var parts: PackedStringArray = text.split(",")
-		if parts.size() == 2:
-			var x_result: Dictionary = _parse_integer(parts[0].strip_edges())
-			var y_result: Dictionary = _parse_integer(parts[1].strip_edges())
-			if bool(x_result.get("ok", false)) and bool(y_result.get("ok", false)):
-				return {"ok": true, "cell": Vector2i(int(x_result["value"]), int(y_result["value"]))}
-	return {"ok": false, "cell": Vector2i.ZERO}
-
-
-func _parse_vector3(value: Variant) -> Dictionary:
-	if value is Vector3:
-		return {"ok": true, "value": value}
-	if value is Array:
-		var values: Array = value
-		if values.size() == 3 and _is_number(values[0]) and _is_number(values[1]) and _is_number(values[2]):
-			return {"ok": true, "value": Vector3(float(values[0]), float(values[1]), float(values[2]))}
-	if value is String:
-		var text: String = String(value).strip_edges()
-		if text.begins_with("Vector3(") and text.ends_with(")"):
-			text = text.substr(8, text.length() - 9)
-		elif text.begins_with("(") and text.ends_with(")"):
-			text = text.substr(1, text.length() - 2)
-		else:
-			return {"ok": false, "value": Vector3.ZERO}
-		var parts: PackedStringArray = text.split(",")
-		if parts.size() == 3 and parts[0].strip_edges().is_valid_float() and parts[1].strip_edges().is_valid_float() and parts[2].strip_edges().is_valid_float():
-			return {
-				"ok": true,
-				"value": Vector3(
-					float(parts[0].strip_edges()),
-					float(parts[1].strip_edges()),
-					float(parts[2].strip_edges()),
-				),
-			}
-	return {"ok": false, "value": Vector3.ZERO}
-
+func _is_zero(value: Variant) -> bool:
+	return _is_number(value) and is_equal_approx(float(value), 0.0)

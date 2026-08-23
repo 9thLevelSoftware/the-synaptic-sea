@@ -42,3 +42,4 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 
 - Number reuse exists in historical Task 12/13/10 ADRs (`0029`, `0031`, `0033`, `0034`, `0037`). The index keeps the file path as the identity because these ADRs were authored by separate package workers in a no-git/shared-workspace wave.
 - ADR-0040 owns future currency checks for this index, requirements, systems map, validation plan, build plan, and Kanban manifests.
+| 0048 | docs/game/adr/ADR-0048-top-down-pivot.md | Top-down 2D pivot: supersedes ADR-0010/0017, replaces locked-iso 3D with TileMap-based presentation |

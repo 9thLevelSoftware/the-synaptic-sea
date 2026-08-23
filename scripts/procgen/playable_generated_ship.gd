@@ -50,6 +50,9 @@ const AchievementStateScript := preload("res://scripts/systems/achievement_state
 const WorldSnapshotScript := preload("res://scripts/systems/world_snapshot.gd")
 const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
+const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_generator.gd")
+const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
+const FirstRunContractScript := preload("res://scripts/procgen/first_run_contract.gd")
 const PlayerProgressionScript := preload("res://scripts/systems/player_progression_state.gd")
 const ClassDefinitionScript := preload("res://scripts/systems/class_definition.gd")
 const ShipInstanceScript := preload("res://scripts/systems/ship_instance.gd")
@@ -255,6 +258,8 @@ var synaptic_sea_world         # SynapticSeaWorld
 var scanner_state          # ScannerState
 var travel_controller      # TravelController
 var ship_generator         # ShipGenerator (injected into travel)
+var first_run_contract: RefCounted = null
+
 # True while the player is aboard a traveled derelict (not the starting ship).
 # Gates the starting-ship hazard/objective _process so the unoccupied starting
 # ship does not keep simulating in the background.
@@ -380,6 +385,7 @@ var _home_player_position: Vector3 = Vector3.ZERO
 var completed_objective_types: Dictionary = {}
 # Stream E: rooms first touched via objective completion (discover_room training).
 var discovered_room_ids: Dictionary = {}
+var threats_killed_count: int = 0
 var route_control_state: RouteControlState
 var route_control_root: Node3D
 var route_gate_nodes: Array = []
@@ -723,6 +729,9 @@ func get_slice_completion_summary() -> Dictionary:
 		"objectives_completed": objective_completion_count,
 		"current_sequence": current_objective_sequence,
 		"run_complete": slice_complete,
+		"play_time_seconds": run_play_time_seconds,
+		"rooms_discovered": discovered_room_ids.size(),
+		"threats_killed": threats_killed_count,
 		"player_spawned": player != null,
 		"camera_spawned": camera_rig != null and camera_rig.camera != null,
 	}
@@ -1441,6 +1450,35 @@ func _build_runtime_nodes() -> void:
 	scanner_state = ScannerStateScript.new()
 	travel_controller = TravelControllerScript.new()
 	ship_generator = ShipGeneratorScript.new()
+	first_run_contract = FirstRunContractScript.new()
+	first_run_contract.load_contract()
+
+## The first away derelict is the only travel that may be redirected by the
+## first-run contract. The marker object is regenerated on every scan, so
+## changing its seed here affects this travel request only; later travel keeps
+## the scanner's authored marker seed and normal biome/difficulty resolution.
+func _apply_first_run_contract_to_marker(marker) -> bool:
+	if marker == null or first_run_contract == null or first_run_contract.contract.is_empty():
+		return false
+	if not visited_ships.is_empty() or String(marker.marker_id).is_empty():
+		return false
+	var layout_generator = ShipLayoutGeneratorScript.new()
+	var slice_builder = GameplaySliceBuilderScript.new()
+	var candidates: Dictionary = {}
+	var biome_id: String = str(first_run_contract.contract.get("biome_id", ""))
+	var difficulty_id: String = str(first_run_contract.contract.get("difficulty_id", ""))
+	for seed_variant in first_run_contract.contract.get("preferred_seeds", []):
+		var seed_value: int = int(seed_variant)
+		var blueprint = ShipBlueprintScript.new(int(marker.size_class), int(marker.condition), seed_value)
+		var layout: Dictionary = layout_generator.generate_with_options(
+			blueprint, {}, biome_id, difficulty_id, true)
+		candidates[seed_value] = {
+			"layout": layout,
+			"gameplay_slice": slice_builder.build(layout),
+		}
+	var chosen_seed: int = first_run_contract.pick_seed(candidates)
+	marker.seed_value = chosen_seed
+	return true
 
 ## Configures the progression model from starting_class_id (defaults to engineer
 ## when the id is unknown). Idempotent: re-callable on reload.
@@ -1562,6 +1600,8 @@ func _tick_active_fire(delta: float) -> void:
 	_apply_fire_system_damage(delta)
 	# PKG-B2.1b: fire damages wall modules; scene/nav consequences update.
 	_apply_fire_module_integrity(delta)
+	if _player_fire_intensity() > 0.0 and is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("hazard_entered", "fire")
 
 ## Foundation contagion seed: while away and docked to a still-web-attached
 ## derelict, the web creeps onto the hub faster (contact boost). Full dock-graph
@@ -1776,6 +1816,8 @@ func end_run(reason: String = "extraction") -> int:
 		return 0
 	slice_complete = true
 	tracker.mark_run_complete()
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("run_ended", reason)
 	# Terminal cue: death plays vitals-critical audio; successful ends use objective advance.
 	if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 		if reason == "death":
@@ -3171,6 +3213,8 @@ func _on_breach_sealed(compartment_id: String) -> void:
 	# Stream D/F: sealing a breach is welding + field construction.
 	emit_training_event("weld_panel", compartment_id)
 	emit_training_event("build_shelter", compartment_id)
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("breach_sealed", "any")
 
 ## Tranche 1 (audit): shared surface for hazard-interaction feedback. Reuses
 ## the _last_loot_feedback_line channel (the one line _combined_system_status_lines
@@ -5704,6 +5748,8 @@ func _on_loot_container_searched(container_id: String, granted: Array, source: N
 	# in production, so all three were dead. Event-driven (fires from the
 	# interact path on BOTH home and away), not a per-frame system.
 	emit_training_event("scavenge_container", container_id)
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("loot_searched", "any")
 	# REQ-RL-003: first_loot achievement (loot_searched / any).
 	_try_unlock_achievement("loot_searched", container_id)
 	# Scavenge feedback: success tool-use when something was granted; soft deny when
@@ -5837,6 +5883,7 @@ func _on_hatch_resealed(hatch_id: String, _lock_kind: String) -> void:
 ## + revisit (or save/load) re-spawns the drop — previously they lived only in the
 ## transient loot_containers array and vanished with scene_root.
 func _on_threat_killed(record: Dictionary) -> void:
+	threats_killed_count += 1
 	# XP (data-driven interim skill via training_actions.json).
 	emit_training_event("threat_killed", str(record.get("archetype_id", "")))
 	# Stream F: melee/unarmed kills train intimidation (crowbar / empty weapon).
@@ -6049,12 +6096,18 @@ func travel_to(marker) -> Dictionary:
 	# generated mark) so the dock-compat check below can roll it back on rejection.
 	var prev_player_pos: Vector3 = synaptic_sea_world.player_position
 	var was_generated: bool = synaptic_sea_world.is_generated(String(marker.marker_id))
+	var first_run_contract_applied: bool = _apply_first_run_contract_to_marker(marker)
 	var ops_t: Dictionary = {"propulsion": bool(_current_systems_ops().get("propulsion", false))}
 	# Light up the procgen expansion lane for this derelict: resolve a deterministic
 	# biome + difficulty from the target marker and hand them to the generator so
 	# ShipLayoutGenerator runs EncounterInjector + room-variant selection and stamps
 	# biome_id/difficulty_id on the layout (consumed by threat spawning + scanner/HUD).
 	var run_ctx: Dictionary = _resolve_derelict_run_context(marker)
+	if first_run_contract_applied and first_run_contract != null:
+		run_ctx = {
+			"biome": str(first_run_contract.contract.get("biome_id", run_ctx.get("biome", ""))),
+			"difficulty": str(first_run_contract.contract.get("difficulty_id", run_ctx.get("difficulty", ""))),
+		}
 	ship_generator.configure_run_context(str(run_ctx.get("biome", "")), str(run_ctx.get("difficulty", "")))
 	var result: Dictionary = travel_controller.attempt_travel(
 		marker, ops_t, synaptic_sea_world, ship_generator, scanner_state.range_radius)
@@ -6920,6 +6973,8 @@ func _tick_threat_runtime(delta: float) -> void:
 	update_threat_engaged_los()
 	_refresh_threat_nav_costs()
 	threat_manager.tick_threats(delta, vitals_state, status_effects_state, _player_armor_profile(), player_pos)
+	if threat_manager.get_detected_threat_count() > 0 and is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("threat_spotted", "any")
 	_sync_current_ship_combat_summary()
 	_refresh_weapon_hotbar()
 
@@ -7405,6 +7460,8 @@ func _add_interactable_to_sequence(sequence: int, interactable: Node) -> void:
 	sequence_interactables[sequence].append(interactable)
 
 func _on_player_interact_requested(player_body: PlayerController) -> void:
+	if is_instance_valid(menu_coordinator):
+		menu_coordinator.trigger_tutorial("player_interacted", "any")
 	# Phase 4.5: while aboard a traveled derelict the starting ship's retained
 	# interactables/pickups are detached but still referenced here; gate them so
 	# a derelict cannot complete stale starting-ship objectives.
@@ -8413,6 +8470,10 @@ func _refresh_oxygen_state(force_initial: bool, delta_seconds: float) -> void:
 	_apply_breach_zone_scene_state()
 	_refresh_tracker_system_status_lines()
 	_refresh_player_vitals(delta_seconds)
+	if is_instance_valid(menu_coordinator):
+		var oxygen_summary: Dictionary = oxygen_state.get_summary()
+		if float(oxygen_summary.get("oxygen", 100.0)) <= float(oxygen_summary.get("safe_threshold", 35.0)):
+			menu_coordinator.trigger_tutorial("vitals_warning", "oxygen_low")
 
 ## True when suit O2 should drain as hostile field atmosphere: boarded on a
 ## derelict hull, not inside the piloted lifeboat / home ship.
@@ -10924,6 +10985,8 @@ func _input(event: InputEvent) -> void:
 	if scanner_panel != null:
 		if event.is_action_pressed("toggle_scanner") and _menus_are_closed() and (not is_instance_valid(inventory_panel) or not inventory_panel.is_open()) and (not is_instance_valid(recipe_picker_panel) or not recipe_picker_panel.is_open()):
 			scanner_panel.toggle()
+			if scanner_panel.is_open() and is_instance_valid(menu_coordinator):
+				menu_coordinator.trigger_tutorial("scanner_opened", "any")
 			if player != null and scanner_panel.is_open():
 				player.set_physics_process(false)
 				player.set_process_input(false)

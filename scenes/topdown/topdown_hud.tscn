@@ -1,0 +1,38 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/player_vitals_panel.gd" id="1_vitals"]
+[ext_resource type="Script" path="res://scripts/ui/inventory_panel.gd" id="2_inv"]
+[ext_resource type="Script" path="res://scripts/ui/hotbar_panel.gd" id="3_hotbar"]
+[ext_resource type="Script" path="res://scripts/ui/objective_tracker.gd" id="4_obj"]
+
+[node name="TopDownHUD" type="CanvasLayer"]
+
+[node name="PlayerVitalsPanel" type="Control" parent="."]
+anchors_preset = 0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 210.0
+offset_bottom = 110.0
+script = ExtResource("1_vitals")
+
+[node name="HotbarPanel" type="PanelContainer" parent="."]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = -60.0
+offset_right = 200.0
+offset_bottom = -10.0
+script = ExtResource("3_hotbar")
+
+[node name="ObjectiveTracker" type="Control" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -250.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 150.0
+script = ExtResource("4_obj")

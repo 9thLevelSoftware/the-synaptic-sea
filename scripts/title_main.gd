@@ -13,6 +13,7 @@ const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.
 const PermadeathResolverScript := preload("res://scripts/systems/permadeath_resolver.gd")
 const TitleSaveQueryScript := preload("res://scripts/systems/title_save_query.gd")
 const SettingsStateScript := preload("res://scripts/systems/settings_state.gd")
+const RunResultsPanelScript := preload("res://scripts/ui/run_results_panel.gd")
 
 var menu_state
 var menu_panel
@@ -37,6 +38,7 @@ var _failure_handled: bool = false
 var _last_run_outcome: String = ""
 var _last_run_progress: String = ""
 var _last_playable_summary: Dictionary = {}
+var run_results_panel: Control = null
 
 func _ready() -> void:
 	_save_load_service = SaveLoadServiceScript.new()
@@ -129,6 +131,7 @@ func _on_title_continue() -> void:
 	_instantiate_gameplay(true)
 
 func _instantiate_gameplay(should_load: bool) -> void:
+	_clear_run_results_panel()
 	_last_boot_error = ""
 	_failure_handled = false
 	main_node = MAIN_SCENE.instantiate()
@@ -219,6 +222,7 @@ func _on_gameplay_failed(reason: String) -> void:
 	_on_gameplay_return_to_title()
 
 func _on_gameplay_return_to_title() -> void:
+	_clear_run_results_panel()
 	if main_node != null and is_instance_valid(main_node):
 		main_node.queue_free()
 	main_node = null
@@ -255,6 +259,39 @@ func _on_gameplay_interaction_completed(_interaction_id: String, _objective_id: 
 
 func _on_gameplay_slice_completed(summary: Dictionary) -> void:
 	_last_run_outcome = str(summary.get("reason", summary.get("outcome", "complete")))
+	_last_playable_summary = summary.duplicate(true)
+	_show_run_results(summary)
+
+func _show_run_results(summary: Dictionary) -> void:
+	_clear_run_results_panel()
+	if is_instance_valid(main_node):
+		# The run is terminal; stop it from consuming the results screen's
+		# navigation input while leaving the completed scene available behind it.
+		main_node.process_mode = Node.PROCESS_MODE_DISABLED
+	run_results_panel = RunResultsPanelScript.new()
+	run_results_panel.name = "RunResultsPanel"
+	add_child(run_results_panel)
+	run_results_panel.set_run_summary(summary)
+	if run_results_panel.has_signal("return_to_title_requested"):
+		run_results_panel.return_to_title_requested.connect(_on_results_return_to_title)
+	if run_results_panel.has_signal("new_run_requested"):
+		run_results_panel.new_run_requested.connect(_on_results_new_run)
+
+func _on_results_return_to_title() -> void:
+	_on_gameplay_return_to_title()
+
+func _on_results_new_run() -> void:
+	if main_node != null and is_instance_valid(main_node):
+		main_node.queue_free()
+	main_node = null
+	playable_instance = null
+	_clear_run_results_panel()
+	_instantiate_gameplay(false)
+
+func _clear_run_results_panel() -> void:
+	if run_results_panel != null and is_instance_valid(run_results_panel):
+		run_results_panel.queue_free()
+	run_results_panel = null
 
 func _refresh_panel() -> void:
 	if not is_instance_valid(menu_panel) or menu_state == null:

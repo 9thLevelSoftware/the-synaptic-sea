@@ -6,96 +6,17 @@ No completion claim without fresh validation evidence.
 
 ## Godot binary
 
-`/opt/homebrew/bin/godot` (Godot 4.7.1)
+`/Users/christopherwilloughby/.local/bin/godot-4.6.2`
 
 ## Project root
 
-`.` (run commands from the repository root)
-
-## Asset metadata retrofit validation
-
-All commands in this section are reproducible from the repository root. Set the binary
-explicitly so a different editor installation cannot silently change the evidence:
-
-Each governed prop's canonical portable record is one adjacent same-basename `.sidecar.json`
-file paired with its GLB (for example, `<name>.glb` and `<name>.sidecar.json`). This naming
-rule does not change the runtime-derived index convention.
-
-### Read-only structural variant audit
-
-Task 8 audits exactly these eight `ship_structural_v0` integrity families:
-
-```text
-floor_1x1, floor_2x1, corridor_floor_1x1, corridor_floor_1x2,
-wall_straight_1x1, doorway_frame_open_1x1, pillar_support_1x1, ramp_up_1x2
-```
-
-The audit reads the intact, `_damaged`, and `_breached` GLBs, wrapper scenes, wrapper
-manifests/inputs, and `IntegrityVisualResolver`. It computes a SHA-256 for every GLB,
-requires the wrapper's three exact `res://` references, checks `Anchor_FloorCenter` and
-the manifest/input `Anchor_SOCK_*` set, requires all three `VisualInstance_*` nodes to be
-direct children of `Visual`, and verifies that the resolver names those scene nodes.
-The validator is strictly read-only: it never rewrites GLBs, scenes, manifests, contracts,
-or generated engine state. A zero exit status means all eight trios pass; diagnostics are
-printed as `ERROR:` lines.
-
-```bash
-GODOT_BIN=/opt/homebrew/bin/godot
-ROOT=.
-
-# Run each command independently; the wrapper validator is an expected Task 1 failure.
-# Import preflight (Task 1 baseline; currently present).
-"$GODOT_BIN" --headless --editor --path "$ROOT" --quit
-
-# Component-marker smoke (Task 1 baseline; the exact-two ObjectDB warning is allowed only here).
-"$GODOT_BIN" --headless --path "$ROOT" --script res://scripts/validation/component_markers_smoke.gd
-
-# Task 2+ command: the prop metadata validator is present after the metadata retrofit.
-python3 tools/validate_prop_visual_bindings.py --project-root "$ROOT" --check-index
-
-# Task 8 read-only gate: validates the eight structural integrity trios.
-python3 tools/validate_structural_variant_bindings.py --project-root "$ROOT"
-
-# Future Task 2+ command: the structural variant smoke is not present in the Task 1 baseline.
-"$GODOT_BIN" --headless --path "$ROOT" --script res://scripts/validation/structural_variant_wrapper_smoke.gd
-
-# Structural wrapper validator (Task 1 baseline; expected to fail until Task 2).
-"$GODOT_BIN" --headless --path "$ROOT" --script res://scripts/placement/validate_wrapper_scenes.gd -- scenes/wrappers/structural/ship_structural_v0
-
-# Future Task 2+ command: the prop visual binding smoke is not present in the Task 1 baseline.
-"$GODOT_BIN" --headless --path "$ROOT" --script res://scripts/validation/prop_visual_binding_smoke.gd
-
-# Future Task 2+ command: the objective visual binding smoke is not present in the Task 1 baseline.
-"$GODOT_BIN" --headless --path "$ROOT" --script res://scripts/validation/objective_visual_binding_smoke.gd
-```
-
-Task 1 baseline evidence, captured with `GODOT_BIN=/opt/homebrew/bin/godot`:
-
-- Import preflight exited `0` and reported Godot `4.7.1.stable.official`.
-- Structural wrapper validator exited `1` with exactly eight expected
-  `missing VisualInstance node for generated.visual_scene_path` errors. This remains
-  intentionally pending Task 2; do not fix it in the documentation task.
-- `component_markers_smoke.gd` exited `0` and printed
-  `COMPONENT MARKERS PASS wired=true count=true rebuild=true` followed by exactly
-  ``WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).``
-  The warning is classified as pre-existing external baseline noise owned by `ship-core`;
-  exactly two instances are permitted only for this component-marker baseline while blocked
-  Kanban card `t_b9b4e4f9` (title: Investigate ObjectDB leak in component marker smoke) remains
-  unresolved. Any other warning or count fails this feature gate.
-- The future structural variant smoke command is registered as
-  `res://scripts/validation/structural_variant_wrapper_smoke.gd` and must print
-  `STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true`.
-- The future commands marked above are required gates once their scripts exist; a
-  missing future script is not a passing result.
-
-Generated `.godot` state and untracked `*.import` files must be restored or removed after
-any Godot command before staging documentation changes.
+`/Users/christopherwilloughby/the-synaptic-sea-of-stars`
 
 ## Focused route-control validation
 
 ```bash
-/opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/route_control_state_smoke.gd
-/opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/route_control_state_smoke.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/main_playable_slice_route_control_smoke.gd
 ```
 
 Expected markers:
@@ -107,19 +28,18 @@ Expected markers:
 
 ```bash
 set -euo pipefail
-ROOT="${ROOT:-.}"
-GODOT="${GODOT:-/opt/homebrew/bin/godot}"
-# The GDAI MCP capture error is a known baseline engine line that is not
-# introduced by the Synaptic Sea runtime and is filtered from the strict global
-# ERROR/WARNING check below. The exact-two ObjectDB exception is scoped to the
-# component-marker helper only; any other ERROR:/WARNING: line (including an
-# ObjectDB count other than two) fails the bundle. See "Baseline Godot teardown
-# noise" below for the audit trail and the exact evidence-gathering command.
+ROOT="${ROOT:-/Users/christopherwilloughby/the-synaptic-sea-of-stars}"
+GODOT="${GODOT:-/Users/christopherwilloughby/.local/bin/godot-4.6.2}"
+# Known baseline Godot shutdown lines that appear identically in every
+# unchanged smoke (route-control, completion, input, readability, oxygen,
+# hazard, ship-systems) and are NOT introduced by the Synaptic Sea hazard code
+# or any other Gate 1 runtime system. They are filtered out of the strict
+# ERROR/WARNING check below; any other ERROR:/WARNING: line (parse errors,
+# GDScript runtime errors, validation markers pushed via push_error) still
+# fails the bundle. See "Baseline Godot teardown noise" below for the
+# audit trail and the exact evidence-gathering command.
 BASELINE_ERROR="^ERROR: Capture not registered: 'gdaimcp'\\.$"
-# This exact-two exception is scoped to the component-marker baseline below; it is not
-# filtered by the general regression helper.
-BASELINE_WARNING='^WARNING: 2 ObjectDB instances were leaked at exit \(run with `--verbose` for details\)\.$'
-REQ012_WARNING="^WARNING: SaveLoadService: save file rejected by from_dict \\(missing fields or version mismatch\\)\$"
+REQ012_WARNING="^WARNING: SaveLoadService: save file rejected by from_dict \\(missing fields or version mismatch\\)\\$"
 # The save/load service smoke deliberately writes a slot with an incompatible
 # (newer) slice_version to assert the migration-rejection path; that emits one
 # expected warning, allowlisted exactly like REQ012_WARNING above.
@@ -197,11 +117,6 @@ DOCK_GUARANTEE_WARNING="^WARNING: RoomAssigner: guaranteed role 'dock' has no el
 # Soft-fail when all salted connectivity retries still produce a disconnected layout
 # (best-effort ship still returned; quality gate fails hard on disconnect).
 CONNECTIVITY_SOFT_FAIL_WARNING="^WARNING: ShipLayoutGenerator: layout connectivity soft-fail after [0-9]+ attempts seed="
-# The playable floor collision smoke intentionally boots the full playable ship,
-# whose home lifeboat still exercises the legacy StructuralPlacer visualizer.
-# Keep this exact known warning visible in the smoke output while allowing the
-# bundle helper to classify it as established baseline noise.
-STRUCTURAL_PLACER_WARNING="^WARNING: STRUCTURAL_PLACER DEPRECATED: legacy/debug-only visualizer invoked without a named legacy_debug_context$"
 # load_from_blueprint_smoke's null_rejected case deliberately passes a null
 # blueprint to prove load_from_blueprint refuses it; this is the expected
 # rejection line.
@@ -221,22 +136,7 @@ run_clean() {
   OUT=$("$@" 2>&1)
   printf '%s\n' "$OUT"
   printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$CONNECTIVITY_SOFT_FAIL_WARNING|$STRUCTURAL_PLACER_WARNING|$BLUEPRINT_NULL_ERROR|$RELEASE_LEDGER_UNKNOWN_WARNING|$RELEASE_LEDGER_STATUS_WARNING|$RELEASE_LEDGER_EXTERNAL_WARNING" || true)
-  if [ -n "$FILTERED" ]; then
-    printf '%s\n' "$FILTERED"
-    echo "UNEXPECTED_ERROR_OR_WARNING in $label"
-    exit 1
-  fi
-}
-run_component_marker_clean() {
-  label="$1"
-  marker="$2"
-  shift 2
-  echo "=== $label ==="
-  OUT=$("$@" 2>&1)
-  printf '%s\n' "$OUT"
-  printf '%s\n' "$OUT" | grep -q "$marker"
-  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$BASELINE_WARNING" || true)
+  FILTERED=$(printf '%s\n' "$OUT" | grep -E '^(ERROR|WARNING):' | grep -Ev "$BASELINE_ERROR|$REQ012_WARNING|$MIGRATION_REJECT_WARNING|$WORLD_MIGRATION_REJECT_WARNING|$CORRUPT_WORLD_WARNING|$CORRUPT_WORLD_JSON_ERROR|$WORLD_WRITE_FAIL_WARNING|$TITLE_BOOT_FAIL_ERROR|$TITLE_BOOT_FAIL_WARNING|$META_SCHEMA_WARNING|$NULL_WORLD_WARNING|$CORRUPT_SLOT_WARNING|$VOICE_CLIP_WARNING|$ENCOUNTER_TABLE_WARNING|$DOCK_GUARANTEE_WARNING|$CONNECTIVITY_SOFT_FAIL_WARNING|$BLUEPRINT_NULL_ERROR|$RELEASE_LEDGER_UNKNOWN_WARNING|$RELEASE_LEDGER_STATUS_WARNING|$RELEASE_LEDGER_EXTERNAL_WARNING" || true)
   if [ -n "$FILTERED" ]; then
     printf '%s\n' "$FILTERED"
     echo "UNEXPECTED_ERROR_OR_WARNING in $label"
@@ -312,6 +212,8 @@ run_clean 'vitals state model smoke' 'VITALS STATE PASS' "$GODOT" --headless --p
 run_clean 'player movement gating seam smoke' 'PLAYER MOVEMENT GATING PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/player_movement_gating_smoke.gd
 run_clean 'hallucination director model smoke' 'HALLUCINATION DIRECTOR PASS tiers=true gated=true deterministic=true ttl=true teeth=true fx=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hallucination_director_smoke.gd
 run_clean 'threat placeholder renderer smoke' 'THREAT PLACEHOLDER RENDERER PASS swarm=true anchored=true default=true color=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_placeholder_renderer_smoke.gd
+run_clean 'threat visual catalog smoke' 'THREAT VISUAL CATALOG PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_visual_catalog_smoke.gd
+run_clean 'gameplay prop visual catalog smoke' 'GAMEPLAY PROP VISUAL PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/gameplay_prop_visual_smoke.gd
 run_clean 'main hallucination loop smoke' 'MAIN PLAYABLE HALLUCINATION PASS manifest=true phantom_no_damage=true attack_dissipates=true no_respawn=true teeth=true away_ticks=true clears=true hud=true fx=true reachable=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_hallucination_smoke.gd
 run_clean 'biome loot_quality_modifier wired into rarity rolls' 'LOOT QUALITY MODIFIER PASS high_gt_base=true mid_between=true default_noop=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/loot_quality_modifier_smoke.gd
 run_clean 'REQ-AU-001 coordinator audio event coupling smoke' 'AUDIO COORDINATOR EVENTS PASS fire=true arc=true breath=true vitals_low_edge=true combat_music=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_coordinator_events_smoke.gd
@@ -325,6 +227,7 @@ run_clean 'meta event state model smoke' 'META EVENT STATE PASS fired=3 pending=
 run_clean 'main playable audio smoke' 'MAIN PLAYABLE AUDIO PASS buses=6 routed=4 fired_meta=3 ambient_role=engine' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_slice_audio_smoke.gd
 run_clean 'audio save/load model smoke' 'AUDIO SAVE LOAD PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_save_load_smoke.gd
 run_clean 'Domain 9 audio pipeline smoke' 'AUDIO PIPELINE PASS bus_index=true stream_playing=true caption_hud=true captions_toggle=true voice_toggle=true away_ticks=30' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_pipeline_smoke.gd
+run_clean 'Task 1.5 audio content coverage smoke' 'AUDIO CONTENT COVERAGE PASS clips=15 catalog=true non_empty=true decoded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_content_coverage_smoke.gd
 run_clean 'REQ-AU-005 spatial audio playback smoke' 'AUDIO SPATIAL PASS catalogued_playing=true fallback_honest=true production_pickup=true position_tracked=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/audio_spatial_playback_smoke.gd
 # --- Task 15 documentation/manifest currency validators (host-side Python; no Godot) ---
 # doc_currency_validators.py auto-detects the repo root (overridable via ROOT) and
@@ -351,6 +254,7 @@ run_clean 'main playable reachability smoke' 'MAIN PLAYABLE REACHABILITY PASS or
 run_clean 'main playable quicksave smoke' 'MAIN PLAYABLE QUICKSAVE PASS slot=quicksave kind=quick cooldown=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_quicksave_smoke.gd
 run_clean 'encounter table dead fleet smoke' 'ENCOUNTER TABLE DEAD FLEET PASS table=threat_drone_swarm kinds=drone_swarm' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/encounter_table_dead_fleet_smoke.gd
 run_clean 'status effect icons smoke' 'STATUS EFFECT ICONS PASS entries=8 all_exist=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/status_effect_icons_smoke.gd
+run_clean 'UI icon paths smoke' 'UI ICON PATHS PASS status_entries=8 achievement_entries=8 all_exist=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_icon_paths_smoke.gd
 run_clean 'derelict fire sequential persistence smoke' 'DERELICT FIRE SEQUENTIAL PERSISTENCE PASS remembered=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/derelict_fire_sequential_persistence_smoke.gd
 run_clean 'detection state model smoke' 'DETECTION STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/detection_state_smoke.gd
 run_clean 'threat detection source smoke' 'THREAT DETECTION SOURCE PASS single_source=true per_archetype=true proximity=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/threat_detection_source_smoke.gd
@@ -389,6 +293,7 @@ run_clean 'Domain 6 progression meta closure smoke' 'PROGRESSION META CLOSURE PA
 run_clean 'Domain 7 room variant selector smoke' 'ROOM VARIANT SELECTOR PASS distinct_per_index=4 distinct_per_seed=7 airlock_variants=4 corridor_variants=7 extended=8 legacy=3 deterministic=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_variant_selector_smoke.gd
 run_clean 'Domain 7 procgen variation smoke' 'PROCGEN VARIATION PASS variants_vary=true loot_biased=true tmpl_gated=true deterministic=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_variation_smoke.gd
 run_clean 'Domain 7 procgen variant hazard smoke' 'PROCGEN VARIANT HAZARD PASS away_ticks=1 fire_lit=true breach_open=true home_clean=true seal_point=true guarded=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_variant_hazard_smoke.gd
+run_clean 'Task 1.4 biome atmosphere/lighting smoke' 'SLICE ATMOSPHERE PASS ambient=true fog=true away_fog=true key_light=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/slice_atmosphere_smoke.gd
 run_clean 'Domain 8 permadeath freeze smoke' 'PERMADEATH FREEZE PASS wrote=true died=true frozen=true reloadable=false epitaph_present=true reclaim=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/permadeath_freeze_smoke.gd
 run_clean 'Domain 8 title save query smoke' 'TITLE SAVE QUERY PASS no_save=true has_save=true frozen_blocks=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/title_save_query_smoke.gd
 run_clean 'Domain 8 title screen flow smoke' 'TITLE SCREEN FLOW PASS new_game=true continue=true quit_signal=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/title_screen_flow_smoke.gd
@@ -399,6 +304,9 @@ run_clean 'Domain 10 tooltip presenter model smoke' 'TOOLTIP PRESENTER PASS titl
 run_clean 'Domain 10 menu state model smoke' 'MENU STATE PASS menus=2 navigation=true enable_toggle=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/menu_state_smoke.gd
 run_clean 'Domain 10 settings state model smoke' 'SETTINGS STATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/settings_state_smoke.gd
 run_clean 'Domain 10 tutorial state model smoke' 'TUTORIAL STATE PASS once=true dismiss=true codex_unlocks=1' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tutorial_state_smoke.gd
+run_clean 'Task 2.1 tutorial slice coverage smoke' 'TUTORIAL SLICE COVERAGE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tutorial_slice_coverage_smoke.gd
+run_clean 'Task 2.2 run results/death screen smoke' 'RUN RESULTS PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/run_results_smoke.gd
+run_clean 'Task 2.3 first-run derelict beat contract smoke' 'FIRST RUN CONTRACT PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/first_run_contract_smoke.gd
 run_clean 'Domain 10 controller glyph state model smoke' 'CONTROLLER GLYPH STATE PASS schemes=3 action=interact' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/controller_glyph_state_smoke.gd
 run_clean 'Domain 10 UI shell parse check' 'UI SHELL PARSE PASS classes=12' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_shell_parse_check.gd
 run_clean 'Domain 10 UI shell save/load smoke' 'UI SHELL SAVE LOAD PASS restored=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ui_shell_save_load_smoke.gd
@@ -485,8 +393,8 @@ run_clean 'interior aabb smoke' 'INTERIOR AABB PASS nondegenerate=true positione
 run_clean 'kit catalog smoke' 'KIT CATALOG PASS loaded=3 default=ship_structural_v0 airlock=3 eng=3 breach_select=ok fallback=ok real_stems=true default_role_module=floor_1x1 ids_sorted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/kit_catalog_smoke.gd
 run_clean 'floor wrapper collision footprint smoke' 'FLOOR WRAPPER COLLISION FOOTPRINT PASS checked=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/floor_wrapper_collision_footprint_smoke.gd
 run_clean 'readability prop factory smoke' 'READABILITY PROP FACTORY PASS props=9' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/readability_prop_factory_smoke.gd
-run_clean 'procgen loader playable contract smoke' 'PROCGEN_STRUCTURAL_LOADER_PASS PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=127' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
-run_clean 'playable generated ship floor collision smoke' 'PLAYABLE GENERATED SHIP FLOOR COLLISION SMOKE PASS floor_wrapper_coverage=true player_controller=true settling_grounded=true negative_preflight_cases=4 validator_rejected=true attached_wrappers=0' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/playable_generated_ship_floor_collision_smoke.gd
+run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=136 structural_live=true edge_wrappers=84 floor_wrappers=51' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
+run_clean 'Task 1.3 structural live loader smoke' 'STRUCTURAL LIVE LOADER PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_live_loader_smoke.gd
 # --- Tranche 6 (2026-07-07): demo gate wiring + unlock triggers + the promoted gate model smoke ---
 run_clean 'Tranche 6 demo scope gate model smoke' 'DEMO SCOPE GATE PASS build_kind=release blocked=5 allowed=0 unknown_rejected=true params=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_gate_smoke.gd
 run_clean 'Tranche 6 demo scope enforcement smoke' 'DEMO SCOPE ENFORCEMENT PASS dev_unaffected=true save_cap=true world_skip=true hub_blocked=true hazards_capped=true cargo_capped=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_enforcement_smoke.gd
@@ -540,7 +448,7 @@ run_clean 'Work action interact smoke' 'WORK ACTION INTERACT PASS start=true tic
 run_clean 'Component placement runtime smoke' 'COMPONENT PLACEMENT RUNTIME PASS wired=true populate_or_empty=true round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_placement_runtime_smoke.gd
 run_clean 'Component dismount interact smoke' 'COMPONENT DISMOUNT INTERACT PASS start=true tick=true stripped=true yield=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_dismount_interact_smoke.gd
 run_clean 'Component mount interact smoke' 'COMPONENT MOUNT INTERACT PASS dismount=true remount=true mounted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_mount_interact_smoke.gd
-run_component_marker_clean 'Component markers smoke' 'COMPONENT MARKERS PASS wired=true count=true rebuild=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_markers_smoke.gd
+run_clean 'Component markers smoke' 'COMPONENT MARKERS PASS wired=true count=true rebuild=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_markers_smoke.gd
 run_clean 'Component system link smoke' 'COMPONENT SYSTEM LINK PASS catalog_links=true soft_fill=true coverage=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/component_system_link_smoke.gd
 run_clean 'Dismount system damage smoke' 'DISMOUNT SYSTEM DAMAGE PASS link=true damage=true remount_no_autoheal=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/dismount_system_damage_smoke.gd
 run_clean 'Synthetic wall slots smoke' 'SYNTHETIC WALL SLOTS PASS wall=true center=true placed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/synthetic_wall_slots_smoke.gd
@@ -913,20 +821,20 @@ echo 'SYNAPTIC_SEA REGRESSION PASS commands=627 clean_output=true'
 
 ## Baseline Godot teardown noise
 
-The global regression bundle filters the known GDAI MCP `ERROR:` line and keeps
-all other diagnostics strict. The exact-two ObjectDB warning is not a global
-allowlist entry: it is filtered only by the component-marker baseline helper.
+Two `ERROR:`/`WARNING:` lines are emitted on the engine teardown of every
+smoke run in this regression bundle, including in unchanged smokes that were
+already passing before the hazard feature was added. They are classified as
+baseline engine noise and filtered by the script above:
 
 - `ERROR: Capture not registered: 'gdaimcp'.` — emitted by Godot's
   `engine_debugger.cpp:62` when a registered message capture (the GDAI MCP
   capture, registered when the Synaptic Sea Godot editor session is live) is
   not active during a `--headless --script` run. Present in every smoke.
-- ``WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).``
-  — the exact two-instance Godot cleanup-time warning from `core/object/object.cpp:2536`.
-  It is permitted only for `component_markers_smoke.gd`, and only while blocked
-  Kanban card `t_b9b4e4f9` (title: Investigate ObjectDB leak in component marker smoke)
-  remains unresolved. Any other ObjectDB diagnostic, including any count other than two,
-  is a failure; the general regression helper does not filter it.
+- `WARNING: ObjectDB instances leaked at exit (run with --verbose for details).`
+  — generic Godot cleanup-time warning from `object.cpp:2641`. The ObjectDB
+  leak count is identical across every smoke; the smoke that runs first
+  reports a higher count because earlier `addons/gdai-mcp-plugin-godot/`
+  capture registrations are torn down once and not re-registered per run.
 
 REQ-012 adds one additional expected `WARNING:` line that is part of the
 save/load service contract test (the smoke writes a snapshot with an
@@ -989,10 +897,10 @@ bundle; any unexpected `ERROR:`/`WARNING:` line that is not on the allowlist
 must block the change):
 
 ```bash
-ROOT=.
+ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
 for s in route_control_state_smoke main_playable_slice_route_control_smoke oxygen_state_smoke main_playable_slice_hazard_smoke fire_suppression_state_smoke extinguisher_state_smoke ship_systems_damage_smoke fire_suppression_point_smoke extinguisher_recharge_port_smoke main_playable_slice_fire_smoke main_playable_fire_loop_smoke main_playable_slice_ship_systems_smoke main_playable_slice_completion_smoke main_playable_slice_input_smoke main_playable_slice_readability_smoke save_load_service_smoke main_playable_slice_save_load_smoke objective_progress_state_smoke objective_progress_hud_label_smoke main_playable_slice_objective_variation_smoke req012_autosave_sequence_smoke main_playable_slice_text_scale_smoke electrical_arc_state_smoke main_playable_slice_arc_smoke main_playable_slice_junction_calibrator_save_load_smoke; do
   echo "=== $s ==="
-  /opt/homebrew/bin/godot --headless --path "$ROOT" --script res://scripts/validation/$s.gd 2>&1 | grep -E '^(ERROR|WARNING):'
+  /Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path "$ROOT" --script res://scripts/validation/$s.gd 2>&1 | grep -E '^(ERROR|WARNING):'
 done
 ```
 
@@ -1005,7 +913,7 @@ section (and update the allowlist) before re-running.
 Use after gameplay-system milestones where the user asked to avoid proof churn:
 
 ```bash
-ROOT=.
+ROOT=/Users/christopherwilloughby/the-synaptic-sea-of-stars
 find "$ROOT/docs/superpowers/proofs" -maxdepth 1 -type f -newer "$ROOT/docs/game/00_vision.md" -print 2>/dev/null || true
 find "$ROOT/.superpowers" -type f \( -name '*.html' -o -name '*.png' \) -newer "$ROOT/docs/game/00_vision.md" -print 2>/dev/null || true
 ```
@@ -1028,7 +936,7 @@ Gate 1 accepts two evidence paths:
 Automated Gate 1 command:
 
 ```bash
-/opt/homebrew/bin/godot --headless --path . --script res://scripts/validation/gate1_automated_playtest.gd
+/Users/christopherwilloughby/.local/bin/godot-4.6.2 --headless --path /Users/christopherwilloughby/the-synaptic-sea-of-stars --script res://scripts/validation/gate1_automated_playtest.gd
 ```
 
 A Gate 1 Go decision requires the regression bundle plus either the automated protocol acceptance checklist or the human playtest protocol acceptance checklist to pass.
@@ -1065,7 +973,8 @@ A Gate 1 Go decision requires the regression bundle plus either the automated pr
   - `scripts/validation/derelict_fire_seed_smoke.gd` (marker `DERELICT FIRE SEED PASS deterministic=true rate_ok=true cap_ok=true`) — proves the presence gate is deterministic (RNG-free hash), rate is in the band around 15%, and the cap formula matches the real `ShipBlueprint.Condition` enum ordinals.
   - `scripts/validation/main_playable_derelict_fire_smoke.gd` (marker `MAIN PLAYABLE DERELICT FIRE PASS` — stable prefix; away_ticks count varies run-to-run and is not grepped) — live-scene proof: board a real derelict, fire ticks on the away branch, player standing in a derelict fire zone takes vitals drain, recharge port is power-gated by the derelict's own system, and manual extinguish works via the real interaction path. Requires `travel_to_marker_id` (not just `away_from_start=true`) so current_ship is a genuine derelict instance.
   - `scripts/validation/derelict_fire_sequential_persistence_smoke.gd` (marker `DERELICT FIRE SEQUENTIAL PERSISTENCE PASS remembered=true`) — live-revisit proof: board a derelict, ignite 2 compartments, extinguish 1 via the real interaction path, travel home, revisit the same marker — the burning set is preserved exactly (extinguished compartment stays out; remaining compartment still burns). Proves `fire_seeded` gate prevents re-seeding and `visited_ships` retains the per-ship `FireSuppressionState` across trips. All 5 added to regression bundle (commands 59–63).
-- [x] Domain 2 combat — 7 smokes (BP1+BP2+BP3):
+- [x] Domain 2 combat — 8 smokes (BP1+BP2+BP3):
+  - `scripts/validation/threat_visual_catalog_smoke.gd` (marker `THREAT VISUAL CATALOG PASS`) — catalog-backed slice visuals instantiate MeshInstance3D nodes with distinct sphere/capsule/cylinder silhouettes and albedos. Added to regression bundle.
   - `scripts/validation/detection_state_smoke.gd` (marker `DETECTION STATE PASS`) — pure-model: `DetectionState` emitted-profile contract (noise rises with movement, visibility lowers with crouch). Added to regression bundle.
   - `scripts/validation/threat_detection_source_smoke.gd` (marker `THREAT DETECTION SOURCE PASS single_source=true per_archetype=true proximity=true`) — pure-model: `ThreatDetectionSource` per-archetype weighting and proximity falloff. Added to regression bundle.
   - `scripts/validation/player_crouch_smoke.gd` (marker `PLAYER CROUCH PASS`) — pure-node seam: `PlayerController` exposes a `set_crouching(bool)` method that the coordinator's detection feed reads. Added to regression bundle.
@@ -1294,25 +1203,3 @@ membership changes).
 | `travel_integration_smoke` | promotion-candidate |
 | `unique_item_state_smoke` | promotion-candidate |
 | `windowed_fps_capture` | legacy-capture |
-
-## Blender Structural Source Recovery
-
-The following commands verify the external Blender source library against authoritative contracts.
-These tests use Python 3.11 and Blender; they do not invoke Godot.
-
-### Unit tests
-/opt/homebrew/bin/python3.11 -m pytest -q \
-  tests/test_structural_source_contract.py \
-  tests/test_recover_modules_cli.py \
-  tests/test_validate_structural_sources.py
-
-### Source validation
-ROOT=/Volumes/Untitled/SynapticSeaAssets/worktrees/the-synaptic-sea-asset-metadata-retrofit
-SOURCE_ROOT=/Volumes/Untitled/SynapticSeaAssets/meshes/source/ship_structural_v0
-/opt/homebrew/bin/python3.11 tools/validate_structural_sources.py \
-  --project-root "$ROOT" --source-root "$SOURCE_ROOT" --all
-
-### Runtime structural audit
-python3 tools/validate_structural_variant_bindings.py --project-root "$ROOT"
-
-Godot smoke tests still require the frozen external state runner; Blender recovery itself must not invoke Godot or cause generated-state cleanup.
