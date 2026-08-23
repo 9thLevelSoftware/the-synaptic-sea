@@ -193,14 +193,40 @@ func _standing_start_to_goal(layout: Dictionary, loader: GeneratedShipLoader) ->
 		goal_pos = _standing_room_pos(layout, goal_id)
 	if start_pos == Vector3.INF or goal_pos == Vector3.INF:
 		return "standing start/goal position missing start_room=%s goal_room=%s" % [start_id, goal_id]
+	var start_node: String = _nearest_node_in_room(graph, start_pos, start_id)
+	var goal_node: String = _nearest_node_in_room(graph, goal_pos, goal_id)
+	if start_node.is_empty() or graph.get_node_room(start_node) != start_id:
+		return "standing start node missing in start_room=%s nodes=%d" % [start_id, node_n]
 	if start_id == goal_id:
-		if graph.nearest_node(start_pos).is_empty():
-			return "standing start node missing for start_room=%s nodes=%d" % [start_id, node_n]
 		return ""
-	var path: Array = ThreatPathfinderScript.find_path(graph, start_pos, goal_pos)
+	if goal_node.is_empty():
+		# First-run DAMAGED/WRECKED overlay can isolate the goal room
+		# (one standing node in the dock). Unrestricted nearest_node would
+		# snap both ends to that node and false-pass; we still require the
+		# start endpoint to live in start_id.
+		return ""
+	if graph.get_node_room(goal_node) != goal_id:
+		return "standing goal node room=%s expected=%s" % [graph.get_node_room(goal_node), goal_id]
+	var path: Array = ThreatPathfinderScript.find_path(
+		graph, graph.get_node_pos(start_node), graph.get_node_pos(goal_node))
 	if path.is_empty():
 		return "standing start→goal empty nodes=%d start_room=%s goal_room=%s" % [node_n, start_id, goal_id]
 	return ""
+
+
+func _nearest_node_in_room(graph, world_pos: Vector3, room_id: String) -> String:
+	var best: String = ""
+	var best_d: float = INF
+	for key in graph.nodes:
+		var nid: String = str(key)
+		if graph.get_node_room(nid) != room_id:
+			continue
+		var p: Vector3 = graph.get_node_pos(nid)
+		var d: float = p.distance_squared_to(world_pos)
+		if d < best_d:
+			best_d = d
+			best = nid
+	return best
 
 
 func _standing_room_pos(layout: Dictionary, room_id: String) -> Vector3:
