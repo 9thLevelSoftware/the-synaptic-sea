@@ -78,6 +78,39 @@ func _initialize() -> void:
 	if st == ModuleIntegrityStateScript.STATE_INTACT:
 		_fail("engineering wall should not stay intact under fire")
 		return
+
+	# Compiler-keyed modules (edge/<key>) must take fire, not room/placement names.
+	var compiled_layout: Dictionary = {
+		"rooms": [{
+			"id": "eng_1",
+			"room_role": "engineering",
+			"structural_placements": [
+				{"module_id": "wall_straight_1x1", "name": "wall_a", "world_position": [0, 0, 0]},
+			],
+		}],
+		"structural_plan": {
+			"placements": [{
+				"module_id": "wall_straight_1x1",
+				"edge_key": "0|v|0|0",
+				"room_id": "eng_1",
+			}],
+			"floor_placements": [],
+			"ceiling_placements": [],
+		},
+	}
+	var compiled_map = ModuleIntegrityMapScript.new()
+	if ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(compiled_map, compiled_layout) < 1:
+		_fail("compiled seed expected edge module")
+		return
+	var compiled_changed: Array = ModuleIntegrityConsequencesScript.apply_fire_damage(
+		compiled_map, compiled_layout, burning, roles, 1.0, 1.0
+	)
+	if not compiled_changed.has("edge/0|v|0|0"):
+		_fail("fire should damage compiler module_key edge/0|v|0|0, got %s" % str(compiled_changed))
+		return
+	if compiled_changed.has("eng_1/wall_a"):
+		_fail("fire should not also stamp legacy placement id when compiled keys exist")
+		return
 	var breaches: int = ModuleIntegrityConsequencesScript.derived_breach_count(map)
 	if breaches < 1 and st != ModuleIntegrityStateScript.STATE_DAMAGED:
 		# damaged only is ok short-term; force more damage

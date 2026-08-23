@@ -249,6 +249,17 @@ static func apply_fire_damage(
 			continue
 		var room_id: String = str(room.get("id", ""))
 		var dmg: float = damage_rate * intensity * delta
+		var compiled_ids: Array = registered_ids_for_room(module_map, room_id, true)
+		if not compiled_ids.is_empty():
+			for mid_v in compiled_ids:
+				var mid: String = str(mid_v)
+				var rec: RefCounted = module_map.call("get_module", mid) if module_map.has_method("get_module") else null
+				var kind: String = str(rec.get("kind")) if rec != null else ""
+				var before: String = str(module_map.call("get_state", mid)) if module_map.has_method("get_state") else ""
+				var after: String = str(module_map.call("apply_damage", mid, dmg, kind))
+				if after != before:
+					changed.append(mid)
+			continue
 		var placements_v: Variant = room.get("structural_placements", [])
 		if typeof(placements_v) != TYPE_ARRAY:
 			continue
@@ -266,6 +277,28 @@ static func apply_fire_damage(
 			if after != before:
 				changed.append(mid)
 	return changed
+
+
+## Registered map ids for a room. Prefers compiler `edge/` `floor/` `ceiling/`
+## keys already seeded on the map; empty means the caller should use placement names.
+static func registered_ids_for_room(module_map: RefCounted, room_id: String, walls_only: bool) -> Array:
+	var out: Array = []
+	if module_map == null or room_id.is_empty() or not module_map.has_method("module_ids"):
+		return out
+	for mid_v in module_map.call("module_ids"):
+		var mid: String = str(mid_v)
+		if not module_map.has_method("get_module"):
+			continue
+		var rec: RefCounted = module_map.call("get_module", mid)
+		if rec == null:
+			continue
+		if str(rec.get("room_id")) != room_id:
+			continue
+		var kind: String = str(rec.get("kind"))
+		if walls_only and not is_wall_kind(kind):
+			continue
+		out.append(mid)
+	return out
 
 
 ## Apply collision / modulate consequences to a structural wrapper Node3D.

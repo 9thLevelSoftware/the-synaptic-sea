@@ -88,6 +88,16 @@ static func apply_decompression_to_compartment(
 			if str(room.get("id", "")) != compartment_id:
 				continue
 		var room_id: String = str(room.get("id", ""))
+		var registered: Array = _registered_ids_for_room(module_map, room_id)
+		if not registered.is_empty():
+			for mid_v in registered:
+				var mid: String = str(mid_v)
+				var rec: RefCounted = module_map.call("get_module", mid) if module_map.has_method("get_module") else null
+				var kind: String = str(rec.get("kind")) if rec != null else ""
+				var r: Dictionary = apply(module_map, mid, SOURCE_DECOMPRESSION, amount, kind)
+				if bool(r.get("ok", false)):
+					changed.append(mid)
+			continue
 		var placements_v: Variant = room.get("structural_placements", [])
 		if typeof(placements_v) != TYPE_ARRAY:
 			# Fall back: damage any registered modules with this room_id prefix.
@@ -110,6 +120,23 @@ static func apply_decompression_to_compartment(
 			if bool(r2.get("ok", false)):
 				changed.append(mid2)
 	return changed
+
+
+static func _registered_ids_for_room(module_map: RefCounted, room_id: String) -> Array:
+	var out: Array = []
+	if module_map == null or room_id.is_empty() or not module_map.has_method("module_ids"):
+		return out
+	for mid_v in module_map.call("module_ids"):
+		var mid: String = str(mid_v)
+		if not module_map.has_method("get_module"):
+			continue
+		var rec: RefCounted = module_map.call("get_module", mid)
+		if rec == null:
+			continue
+		if str(rec.get("room_id")) != room_id:
+			continue
+		out.append(mid)
+	return out
 
 
 ## Threat structure strike against a single module (hull tendril fantasy).
