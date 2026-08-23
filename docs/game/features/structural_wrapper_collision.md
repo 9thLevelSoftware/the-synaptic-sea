@@ -75,8 +75,8 @@ Open-doorway aperture is ~1.2 × 2.2 m. Standing capsule 0.80 × 1.70 must pass.
 ## Validation
 
 ```
-GODOT="C:/Users/dasbl/Documents/Godot/Godot_v4.6.2-stable_win64_console.exe"
-ROOT="<project root>"
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_wrapper_collision_footprint_smoke.gd
 ```
 
