@@ -4252,12 +4252,7 @@ func _slot_occupancy_from_loader() -> Dictionary:
 				var room: Dictionary = room_v
 				if str(room.get("id", "")) != start_room:
 					continue
-				var interior: Variant = room.get("interior_zones", {})
-				var boarding_cell: Array = []
-				if interior is Dictionary:
-					var reserved_v: Variant = (interior as Dictionary).get("reserved_cells", [])
-					if reserved_v is Array and not (reserved_v as Array).is_empty():
-						boarding_cell = LayoutSerializerScript.parse_slot_cell((reserved_v as Array)[0])
+				var boarding_cell: Array = GameplaySliceBuilderScript.boarding_cell_xz(room)
 				if boarding_cell.size() >= 2:
 					_mark_occupancy(occupied, start_room, boarding_cell)
 				break

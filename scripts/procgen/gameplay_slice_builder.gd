@@ -233,18 +233,33 @@ func _get_first_floor_cell(room: Dictionary) -> Array:
 	return []
 
 
+## Start-room boarding xz: reserved_cells[0], else first floor_cell_*.
+static func boarding_cell_xz(room: Dictionary) -> Array:
+	var interior: Variant = room.get("interior_zones", {})
+	if interior is Dictionary:
+		var reserved_v: Variant = (interior as Dictionary).get("reserved_cells", [])
+		if reserved_v is Array and not (reserved_v as Array).is_empty():
+			var parsed: Array = LayoutSerializerScript.parse_slot_cell((reserved_v as Array)[0])
+			if parsed.size() >= 2:
+				return parsed
+	var placements: Array = room.get("structural_placements", [])
+	for placement in placements:
+		if typeof(placement) != TYPE_DICTIONARY:
+			continue
+		var placement_name: String = str((placement as Dictionary).get("name", ""))
+		if not placement_name.begins_with("floor_cell"):
+			continue
+		var parsed_floor: Array = LayoutSerializerScript.parse_slot_cell(placement_name)
+		if parsed_floor.size() >= 2:
+			return parsed_floor
+	return []
+
+
 func _boarding_info(rooms: Array, start_room: String) -> Dictionary:
 	var room: Dictionary = _find_room(rooms, start_room)
 	if room.is_empty() or start_room.is_empty():
 		return {}
-	var reserved: Array = _interior_cell_list(room, "reserved_cells")
-	var cell: Array = []
-	if not reserved.is_empty():
-		cell = reserved[0]
-	else:
-		var first: Array = _get_first_floor_cell(room)
-		if first.size() >= 2:
-			cell = [int(first[0]), int(first[1])]
+	var cell: Array = boarding_cell_xz(room)
 	if cell.size() < 2:
 		return {}
 	return {

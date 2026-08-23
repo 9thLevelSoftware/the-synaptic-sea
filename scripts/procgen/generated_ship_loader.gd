@@ -5,10 +5,10 @@ const GameplayObjectiveVolumeScript := preload("res://scripts/procgen/gameplay_o
 const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
 const SliceAtmosphereApplierScript := preload("res://scripts/procgen/slice_atmosphere_applier.gd")
 const LayoutSerializerScript := preload("res://scripts/procgen/layout_serializer.gd")
+const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
+const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
 
 const DRESSING_PROP_KINDS: Array[String] = ["crate", "pipe", "growth"]
-const COMPONENT_WALL_RESERVE: int = 3
-const COMPONENT_CENTER_RESERVE: int = 1
 
 signal ship_loaded(summary: Dictionary)
 signal load_failed(reason: String)
@@ -1118,20 +1118,17 @@ func _dressing_occupied_cells(layout_doc: Dictionary, rooms: Array) -> Dictionar
 		var room: Dictionary = room_variant
 		var rid: String = str(room.get("id", ""))
 		var interior: Variant = room.get("interior_zones", {})
-		if not (interior is Dictionary):
-			continue
-		var reserved_v: Variant = (interior as Dictionary).get("reserved_cells", [])
-		if reserved_v is Array:
-			for cell_v in (reserved_v as Array):
-				var parsed: Array = LayoutSerializerScript.parse_slot_cell(cell_v)
-				if parsed.size() >= 2:
-					occupied["%s|%d|%d" % [rid, int(parsed[0]), int(parsed[1])]] = true
+		if interior is Dictionary:
+			var reserved_v: Variant = (interior as Dictionary).get("reserved_cells", [])
+			if reserved_v is Array:
+				for cell_v in (reserved_v as Array):
+					var parsed: Array = LayoutSerializerScript.parse_slot_cell(cell_v)
+					if parsed.size() >= 2:
+						occupied["%s|%d|%d" % [rid, int(parsed[0]), int(parsed[1])]] = true
 		if rid == start_room:
-			var reserved_list: Array = reserved_v if reserved_v is Array else []
-			if not reserved_list.is_empty():
-				var boarding: Array = LayoutSerializerScript.parse_slot_cell(reserved_list[0])
-				if boarding.size() >= 2:
-					occupied["%s|%d|%d" % [rid, int(boarding[0]), int(boarding[1])]] = true
+			var boarding: Array = GameplaySliceBuilderScript.boarding_cell_xz(room)
+			if boarding.size() >= 2:
+				occupied["%s|%d|%d" % [rid, int(boarding[0]), int(boarding[1])]] = true
 	for loot_variant in loot_container_specs:
 		if typeof(loot_variant) != TYPE_DICTIONARY:
 			continue
@@ -1170,7 +1167,7 @@ func _reserve_component_slots(rooms: Array, occupied: Dictionary) -> void:
 		var wall_kept: int = 0
 		if walls_v is Array:
 			for item in (walls_v as Array):
-				if wall_kept >= COMPONENT_WALL_RESERVE:
+				if wall_kept >= ComponentPlacementStateScript.MAX_WALL_FILLS:
 					break
 				var parsed: Array = LayoutSerializerScript.parse_slot_cell(item)
 				if parsed.size() < 2:
@@ -1184,7 +1181,7 @@ func _reserve_component_slots(rooms: Array, occupied: Dictionary) -> void:
 		var center_kept: int = 0
 		if centers_v is Array:
 			for item in (centers_v as Array):
-				if center_kept >= COMPONENT_CENTER_RESERVE:
+				if center_kept >= ComponentPlacementStateScript.MAX_CENTER_FILLS:
 					break
 				var parsed: Array = LayoutSerializerScript.parse_slot_cell(item)
 				if parsed.size() < 2:

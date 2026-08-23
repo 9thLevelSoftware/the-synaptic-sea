@@ -25,6 +25,8 @@ func _initialize() -> void:
 		return
 	if not _check_boarding_room_scoped():
 		return
+	if not _check_boarding_floor_fallback():
+		return
 	if not _check_generated_fill():
 		return
 	if not _check_dressing_props():
@@ -378,6 +380,51 @@ func _check_boarding_room_scoped() -> bool:
 			used_cargo_00 = true
 	if not used_cargo_00:
 		return _fail("boarding (0,0) in airlock blocked cargo deck-1 (0,0)")
+	return true
+
+
+func _check_boarding_floor_fallback() -> bool:
+	var start_room: Dictionary = {
+		"id": "airlock_01",
+		"room_role": "airlock",
+		"deck": 0,
+		"structural_placements": [
+			{"name": "floor_cell_x0_z0", "module": "floor_1x1", "world_position": [0.0, 0.0, 0.0]},
+			{"name": "floor_cell_x1_z0", "module": "floor_1x1", "world_position": [4.0, 0.0, 0.0]},
+		],
+	}
+	var parsed: Array = GameplaySliceBuilderScript.boarding_cell_xz(start_room)
+	if parsed.size() < 2 or int(parsed[0]) != 0 or int(parsed[1]) != 0:
+		return _fail("boarding fallback expected first floor [0,0], got %s" % str(parsed))
+	var layout: Dictionary = {
+		"prototype": {"start_room": "airlock_01", "goal_room": "bridge_01"},
+		"rooms": [
+			start_room,
+			{
+				"id": "bridge_01",
+				"room_role": "bridge",
+				"deck": 0,
+				"structural_placements": [
+					{"name": "floor_cell_x8_z8", "module": "floor_1x1", "world_position": [32.0, 0.0, 32.0]},
+				],
+			},
+		],
+	}
+	var cat = ComponentCatalogScript.new()
+	if not cat.load_default():
+		return _fail("catalog load boarding fallback")
+	var occupied: Dictionary = {"airlock_01|0|0": true}
+	var place = ComponentPlacementStateScript.new()
+	place.populate(layout, cat, 42, occupied)
+	for entry_v in place.placed:
+		if typeof(entry_v) != TYPE_DICTIONARY:
+			continue
+		var e: Dictionary = entry_v
+		if str(e.get("room_id", "")) != "airlock_01":
+			continue
+		var cell: Array = LayoutSerializerScript.parse_slot_cell(e.get("cell", null))
+		if cell.size() >= 2 and int(cell[0]) == 0 and int(cell[1]) == 0:
+			return _fail("component placed on start-room boarding floor cell")
 	return true
 
 
