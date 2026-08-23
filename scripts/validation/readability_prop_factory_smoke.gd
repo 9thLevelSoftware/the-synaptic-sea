@@ -52,6 +52,12 @@ func _validate_prop(node: Node3D, expected_name: String, expected_kind: String) 
 	if str(node.get_meta("readability_kind", "")) != expected_kind:
 		_fail("kind mismatch expected=%s actual=%s" % [expected_kind, str(node.get_meta("readability_kind", ""))])
 		return
+	if not bool(node.get_meta("normal_mode_visual", false)):
+		_fail("prop is not marked normal-mode visual name=%s" % node.name)
+		return
+	if expected_kind.begins_with("Objective") and str(node.get_meta("visual_source", "")) == "imported":
+		_fail("factory objective unexpectedly marked imported name=%s" % node.name)
+		return
 	if node.get_child_count() <= 0:
 		_fail("prop has no children name=%s" % node.name)
 		return

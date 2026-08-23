@@ -1,0 +1,76 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "staged_structural_wrapper_manifest",
+  "status": "staged_not_promoted",
+  "promotion": {
+    "promoted": false,
+    "runtime_paths_modified": false,
+    "promotion_required": true
+  },
+  "asset": {
+    "id": "pressure_door_1x1",
+    "module_id": "pressure_door_1x1",
+    "category": "structural",
+    "kit_id": "ship_structural_v0",
+    "module_family": "portal",
+    "contract_path": "res://data/placement/contracts/structural/ship_structural_v0/pressure_door_1x1_contract.json",
+    "wrapper_scene": "res://scenes/wrappers/structural/ship_structural_v0/pressure_door_1x1.tscn",
+    "source_asset_path": "assets/imported/structural/ship_structural_v0/pressure_door_1x1/pressure_door_1x1.glb",
+    "anchors": {
+      "policy": "required",
+      "exposed": [
+        {
+          "name": "Anchor_FloorCenter",
+          "kind": "floor-center",
+          "surface": "floor"
+        },
+        {
+          "name": "Anchor_SOCK_portal_edge_west_01",
+          "kind": "attachment",
+          "socket_id": "portal_edge_west_01",
+          "surface": "custom"
+        },
+        {
+          "name": "Anchor_SOCK_portal_edge_east_01",
+          "kind": "attachment",
+          "socket_id": "portal_edge_east_01",
+          "surface": "custom"
+        },
+        {
+          "name": "Anchor_SOCK_portal_center_internal_01",
+          "kind": "attachment",
+          "socket_id": "portal_center_internal_01",
+          "surface": "custom"
+        }
+      ]
+    },
+    "collision": {
+      "kind": "static-body-proxy",
+      "proxy_shape": "box",
+      "nav_blocker": true
+    }
+  },
+  "required_roles": ["intact", "damaged", "breached"],
+  "variants": [
+    {
+      "role": "intact",
+      "path": "res://assets/imported/structural/ship_structural_v0/pressure_door_1x1/pressure_door_1x1.glb",
+      "sha256": null
+    },
+    {
+      "role": "damaged",
+      "path": "res://assets/imported/structural/ship_structural_v0/pressure_door_1x1/pressure_door_1x1_damaged.glb",
+      "sha256": null
+    },
+    {
+      "role": "breached",
+      "path": "res://assets/imported/structural/ship_structural_v0/pressure_door_1x1/pressure_door_1x1_breached.glb",
+      "sha256": null
+    }
+  ],
+  "hash_slots": {
+    "intact": null,
+    "damaged": null,
+    "breached": null
+  }
+}

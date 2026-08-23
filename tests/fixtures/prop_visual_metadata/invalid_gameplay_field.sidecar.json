@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "prop_visual_binding",
+  "asset_id": "reactor_console",
+  "prop_kind": "component",
+  "visual_scene_path": "res://assets/imported/props/components/reactor_console.glb",
+  "binding": {
+    "namespace": "component_id",
+    "ids": ["reactor_console"]
+  },
+  "placement": {
+    "origin": "scene_origin",
+    "offset_m": [0, 0, 0],
+    "rotation_degrees": [0, 0, 0],
+    "allowed_yaw_deg": [0, 90, 180, 270],
+    "scale": 1.0
+  },
+  "source": {
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "byte_size": 0,
+    "mesh_count": 1,
+    "gltf_version": "2.0"
+  },
+  "bounds": {
+    "local_min_m": [0, 0, 0],
+    "local_max_m": [1, 1, 1]
+  },
+  "collision_policy": "none_visual_only",
+  "provenance": {
+    "license_state": "self-authored",
+    "source_platform": "self-authored"
+  },
+  "extensions": {},
+  "mass": 10.0
+}

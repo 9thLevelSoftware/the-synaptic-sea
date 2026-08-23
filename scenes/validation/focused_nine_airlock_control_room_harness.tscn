@@ -1,0 +1,38 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/validation/focused_nine_airlock_control_room_capture.gd" id="1_capture"]
+
+[sub_resource type="Environment" id="Environment_airlock_room"]
+background_mode = 1
+background_color = Color(0.006, 0.012, 0.035, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.12, 0.18, 0.34, 1)
+ambient_light_energy = 0.55
+reflected_light_source = 2
+
+[node name="FocusedNineAirlockControlRoomHarness" type="Node3D"]
+script = ExtResource("1_capture")
+
+[node name="RoomCamera" type="Camera3D" parent="."]
+transform = Transform3D(0.707107, -0.408248, 0.57735, 0, 0.816497, 0.57735, -0.707107, -0.408248, 0.57735, 16, 14, 16)
+projection = 1
+size = 18.0
+current = true
+
+[node name="RoomKeyLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.25, 0.433013, 0, 0.866025, 0.5, -0.5, -0.433013, 0.75, 0, 8, 0)
+light_color = Color(0.74, 0.83, 1, 1)
+light_energy = 1.35
+shadow_enabled = true
+
+[node name="RoomFillLight" type="OmniLight3D" parent="."]
+position = Vector3(-2, 5, 3)
+light_color = Color(0.18, 0.28, 0.62, 1)
+light_energy = 2.0
+omni_range = 18.0
+shadow_enabled = false
+
+[node name="RoomEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_airlock_room")
+
+[node name="Room" type="Node3D" parent="."]

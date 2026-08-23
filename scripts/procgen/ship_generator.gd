@@ -11,6 +11,8 @@ class_name ShipGenerator
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_generator.gd")
 const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
+const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
+const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
 
 var layout_generator: RefCounted = ShipLayoutGeneratorScript.new()
 
@@ -88,6 +90,17 @@ func generate_from_seed(
 
 
 func _load_layout_as_scene(layout: Dictionary) -> Node3D:
+	# Compile and validate before creating temp files or touching the loader. A
+	# malformed footprint/portal plan is a hard generation failure, not a best
+	# effort visual fallback.
+	var compiler: RefCounted = StructuralEdgeCompilerScript.new()
+	var structural_plan: Dictionary = compiler.compile(layout)
+	var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout)
+	if not bool(verdict.get("ok", false)):
+		push_error("SHIP GENERATOR FAIL structural plan validation failed: %s" % JSON.stringify(verdict.get("errors", [])))
+		return null
+	layout["structural_plan"] = structural_plan
+
 	# Write layout, kit reference, and minimal gameplay slice to temp files
 	var temp_dir: String = "user://procgen_temp"
 	if not DirAccess.dir_exists_absolute(temp_dir):

@@ -50,6 +50,7 @@ func configure_from_objective(objective: Dictionary, world_position: Vector3, ra
 	set_meta("objective_id", objective_id)
 	set_meta("objective_sequence", sequence)
 	set_meta("objective_type", objective_type)
+	set_meta("placement_id", str(objective.get("placement_id", "")))
 	set_meta("room_id", room_id)
 	_ensure_collision(radius)
 	_ensure_marker(radius)
@@ -70,6 +71,7 @@ func configure_from_step(objective: Dictionary, step: Dictionary, world_position
 	tooltip_subject_id = "junction_step"
 	name = "Interactable_seq%d_step_%s" % [sequence, step_id]
 	set_meta("step_id", step_id)
+	set_meta("placement_id", str(objective.get("placement_id", "")))
 	set_meta("is_step", true)
 
 

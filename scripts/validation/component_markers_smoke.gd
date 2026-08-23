@@ -56,6 +56,9 @@ func _validate() -> void:
 	var place = ComponentPlacementStateScript.new()
 	if place.populate(live, cat, 12) < 1:
 		_fail("populate"); return
+	var first_entry: Dictionary = place.placed[0] as Dictionary
+	first_entry["component_id"] = "reactor_console"
+	place.placed[0] = first_entry
 	playable.component_placement_state = place
 	playable._rebuild_component_markers()
 	var markers: Array = playable.get_component_markers_for_validation()
@@ -65,6 +68,18 @@ func _validate() -> void:
 			mounted_n += 1
 	if markers.size() != mounted_n:
 		_fail("marker count %d != mounted %d" % [markers.size(), mounted_n]); return
+	var reactor_marker: Node3D = null
+	for marker_variant in markers:
+		var marker_candidate: Node3D = marker_variant as Node3D
+		if marker_candidate != null and str(marker_candidate.get_meta("component_id", "")) == "reactor_console":
+			reactor_marker = marker_candidate
+			break
+	if reactor_marker == null:
+		_fail("reactor console marker missing"); return
+	if str(reactor_marker.get_meta("visual_source", "")) != "imported":
+		_fail("reactor console uses imported GLB"); return
+	if reactor_marker.get_node_or_null("ImportedVisual") == null:
+		_fail("imported visual child missing"); return
 	# Dismount one and rebuild
 	var mid: String = str(place.placed[0].get("component_instance_id", ""))
 	place.dismount(mid)

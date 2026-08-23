@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "document_kind": "modular_asset_spec",
+  "asset_id": "floor_2x1",
+  "module_id": "floor_2x1",
+  "category": "structural",
+  "kit_id": "ship_structural_v0",
+  "module_family": "floor",
+  "grid_step_m": 4.0,
+  "bounds": {
+    "local_min_m": [-2.0, 0.0, -2.0],
+    "local_max_m": [2.0, 0.25, 2.0],
+    "placement_origin": "cell-center-floor"
+  },
+  "footprint_cells": [1, 1],
+  "sockets": []
+}
