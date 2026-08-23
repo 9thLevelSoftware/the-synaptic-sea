@@ -19,6 +19,11 @@ const DOOR_HEIGHT_M: float = 3.2
 const WALL_HALF_SPAN_M: float = 2.0
 const HEADER_CLEARANCE_M: float = 0.10
 const SLAB_INTERIOR_T_EPS: float = 0.05
+## Live wrapper proxies (REQ-DECAY-002). Inner post faces at ±0.6 m = opening 1.20 m.
+const DOOR_POST_WIDTH_M: float = 1.4
+const DOOR_POST_OFFSET_X_M: float = 1.3
+const DOOR_HEADER_HEIGHT_M: float = 1.0
+const DOOR_HEADER_BOTTOM_Y_M: float = 2.2
 
 const STANDING_KINDS: Array[String] = ["OPEN", "DOOR", "HATCH"]
 
