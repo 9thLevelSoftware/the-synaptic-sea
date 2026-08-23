@@ -134,8 +134,8 @@ static func seed_structural_map_from_layout(module_map: RefCounted, layout: Dict
 
 
 ## Register compiler-keyed modules (floor/<cell>, edge/<edge>, ceiling/<cell>)
-## and apply layout.module_damage. Falls back to placement names when no plan.
-static func seed_map_from_compiled_layout(module_map: RefCounted, layout: Dictionary) -> int:
+## and optionally apply layout.module_damage. Falls back to placement names when no plan.
+static func seed_map_from_compiled_layout(module_map: RefCounted, layout: Dictionary, apply_wreck: bool = true) -> int:
 	if module_map == null or not module_map.has_method("ensure_module"):
 		return 0
 	var plan_v: Variant = layout.get("structural_plan", {})
@@ -146,6 +146,8 @@ static func seed_map_from_compiled_layout(module_map: RefCounted, layout: Dictio
 	registered += _seed_compiled_records(module_map, plan.get("floor_placements", []), "floor")
 	registered += _seed_compiled_records(module_map, plan.get("placements", []), "edge")
 	registered += _seed_compiled_records(module_map, plan.get("ceiling_placements", []), "ceiling")
+	if not apply_wreck:
+		return registered
 	var md_v: Variant = layout.get("module_damage", [])
 	if typeof(md_v) == TYPE_ARRAY:
 		for row_v in (md_v as Array):
@@ -177,12 +179,20 @@ static func _seed_compiled_records(module_map: RefCounted, records_v: Variant, l
 		if key_part.is_empty():
 			continue
 		var mid: String = "%s/%s" % [layer, key_part]
+		var owners: PackedStringArray = PackedStringArray()
+		var rooms_v: Variant = rec.get("room_ids", [])
+		if rooms_v is Array:
+			for rid_v in (rooms_v as Array):
+				var rid: String = str(rid_v)
+				if not rid.is_empty() and not owners.has(rid):
+					owners.append(rid)
 		var room_id: String = str(rec.get("room_id", ""))
-		if room_id.is_empty():
-			var rooms_v: Variant = rec.get("room_ids", [])
-			if rooms_v is Array and not (rooms_v as Array).is_empty():
-				room_id = str((rooms_v as Array)[0])
-		module_map.call("ensure_module", mid, kind, {}, room_id)
+		if not room_id.is_empty() and not owners.has(room_id):
+			owners.insert(0, room_id)
+		var primary: String = owners[0] if owners.size() > 0 else ""
+		var inst: RefCounted = module_map.call("ensure_module", mid, kind, {}, primary)
+		if inst != null and owners.size() > 1:
+			inst.set("owner_rooms", owners)
 		n += 1
 	return n
 
@@ -292,13 +302,26 @@ static func registered_ids_for_room(module_map: RefCounted, room_id: String, wal
 		var rec: RefCounted = module_map.call("get_module", mid)
 		if rec == null:
 			continue
-		if str(rec.get("room_id")) != room_id:
+		if not _module_owned_by_room(rec, room_id):
 			continue
 		var kind: String = str(rec.get("kind"))
 		if walls_only and not is_wall_kind(kind):
 			continue
 		out.append(mid)
 	return out
+
+
+static func _module_owned_by_room(rec: RefCounted, room_id: String) -> bool:
+	if str(rec.get("room_id")) == room_id:
+		return true
+	var owners_v: Variant = rec.get("owner_rooms")
+	if owners_v is PackedStringArray:
+		return (owners_v as PackedStringArray).has(room_id)
+	if owners_v is Array:
+		for rid_v in (owners_v as Array):
+			if str(rid_v) == room_id:
+				return true
+	return false
 
 
 ## Apply collision / modulate consequences to a structural wrapper Node3D.

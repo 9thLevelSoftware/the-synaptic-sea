@@ -106,6 +106,14 @@ static func apply_branch_mutators(layout: Dictionary, seed_value: int, overlay: 
 	var blocked_n: int = 0
 	var max_block: int = maxi(1, links.size() / 4)
 	var overlay_fallback: Dictionary = {}
+	var blocked_keys: Dictionary = {}
+	for existing in blocked:
+		if typeof(existing) != TYPE_DICTIONARY:
+			continue
+		var ea: String = str((existing as Dictionary).get("from_room", (existing as Dictionary).get("from", "")))
+		var eb: String = str((existing as Dictionary).get("to_room", (existing as Dictionary).get("to", "")))
+		blocked_keys["%s|%s" % [ea, eb]] = true
+		blocked_keys["%s|%s" % [eb, ea]] = true
 	for link in links:
 		if typeof(link) != TYPE_DICTIONARY:
 			continue
@@ -115,7 +123,8 @@ static func apply_branch_mutators(layout: Dictionary, seed_value: int, overlay: 
 		var key: String = "%s|%s" % [a, b]
 		var key_r: String = "%s|%s" % [b, a]
 		var vertical: bool = _link_is_vertical(original)
-		var can_block: bool = not protected.has(key) and not protected.has(key_r) and not vertical
+		var can_block: bool = not protected.has(key) and not protected.has(key_r) and not vertical \
+			and not _link_is_bridge(links, blocked_keys, a, b)
 		if overlay:
 			kept.append(original)
 			if can_block:
@@ -127,6 +136,8 @@ static func apply_branch_mutators(layout: Dictionary, seed_value: int, overlay: 
 					stamped["reason"] = "branch_mutator"
 					blocked.append(stamped)
 					blocked_n += 1
+					blocked_keys[key] = true
+					blocked_keys[key_r] = true
 			continue
 		if not can_block:
 			kept.append(original)
@@ -136,6 +147,8 @@ static func apply_branch_mutators(layout: Dictionary, seed_value: int, overlay: 
 			original["reason"] = "branch_mutator"
 			blocked.append(original)
 			blocked_n += 1
+			blocked_keys[key] = true
+			blocked_keys[key_r] = true
 		else:
 			kept.append(original)
 	if overlay and blocked_n == 0 and not overlay_fallback.is_empty():
@@ -367,6 +380,53 @@ static func _protected_hops(layout: Dictionary, overlay: bool) -> Dictionary:
 		protected["%s|%s" % [a, b]] = true
 		protected["%s|%s" % [b, a]] = true
 	return protected
+
+
+static func _link_is_bridge(links: Array, blocked_keys: Dictionary, a: String, b: String) -> bool:
+	if a.is_empty() or b.is_empty() or a == b:
+		return true
+	var skip: Dictionary = blocked_keys.duplicate()
+	skip["%s|%s" % [a, b]] = true
+	skip["%s|%s" % [b, a]] = true
+	return not _rooms_reachable(links, skip, a, b)
+
+
+static func _rooms_reachable(links: Array, skip: Dictionary, start_id: String, goal_id: String) -> bool:
+	if start_id == goal_id:
+		return true
+	var adj: Dictionary = {}
+	for link_v in links:
+		if typeof(link_v) != TYPE_DICTIONARY:
+			continue
+		var link: Dictionary = link_v
+		var fa: String = str(link.get("from_room", link.get("from", "")))
+		var tb: String = str(link.get("to_room", link.get("to", "")))
+		if fa.is_empty() or tb.is_empty() or fa == tb:
+			continue
+		var hop: String = "%s|%s" % [fa, tb]
+		if skip.has(hop) or skip.has("%s|%s" % [tb, fa]):
+			continue
+		if not adj.has(fa):
+			adj[fa] = []
+		if not adj.has(tb):
+			adj[tb] = []
+		(adj[fa] as Array).append(tb)
+		(adj[tb] as Array).append(fa)
+	if not adj.has(start_id):
+		return false
+	var seen: Dictionary = {start_id: true}
+	var queue: Array = [start_id]
+	while not queue.is_empty():
+		var cur: String = str(queue.pop_front())
+		if cur == goal_id:
+			return true
+		for nxt_v in (adj.get(cur, []) as Array):
+			var nxt: String = str(nxt_v)
+			if seen.has(nxt):
+				continue
+			seen[nxt] = true
+			queue.append(nxt)
+	return false
 
 
 static func _link_is_vertical(link: Dictionary) -> bool:

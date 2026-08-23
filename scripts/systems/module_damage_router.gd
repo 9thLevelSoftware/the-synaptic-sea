@@ -134,7 +134,12 @@ static func _registered_ids_for_room(module_map: RefCounted, room_id: String) ->
 		if rec == null:
 			continue
 		if str(rec.get("room_id")) != room_id:
-			continue
+			var owners_v: Variant = rec.get("owner_rooms")
+			var owned: bool = false
+			if owners_v is PackedStringArray:
+				owned = (owners_v as PackedStringArray).has(room_id)
+			if not owned:
+				continue
 		out.append(mid)
 	return out
 

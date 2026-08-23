@@ -6952,18 +6952,22 @@ func _restore_module_integrity_for_current_ship() -> void:
 	module_integrity_map = ModuleIntegrityMapScript.new()
 	if current_ship == null:
 		return
+	var layout: Dictionary = {}
+	if current_ship.built_layout is Dictionary:
+		layout = current_ship.built_layout
+	elif is_instance_valid(loader) and loader.has_method("get_layout_copy"):
+		layout = loader.get_layout_copy()
 	var packed: Dictionary = current_ship.module_integrity_summary
-	if typeof(packed) == TYPE_DICTIONARY and not packed.is_empty():
-		if module_integrity_map.has_method("apply_summary"):
-			module_integrity_map.apply_summary(packed)
-	else:
-		var layout: Dictionary = {}
-		if current_ship.built_layout is Dictionary:
-			layout = current_ship.built_layout
-		elif is_instance_valid(loader) and loader.has_method("get_layout_copy"):
-			layout = loader.get_layout_copy()
-		if not layout.is_empty():
-			ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(module_integrity_map, layout)
+	var has_deltas: bool = typeof(packed) == TYPE_DICTIONARY and not packed.is_empty()
+	if not layout.is_empty():
+		# Revisit: register every compiled module, skip wreck restamp so
+		# persisted deltas win. First visit applies layout.module_damage.
+		ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(
+			module_integrity_map, layout, not has_deltas)
+	if has_deltas and module_integrity_map.has_method("apply_sparse_deltas"):
+		var deltas_v: Variant = packed.get("deltas", [])
+		if deltas_v is Array:
+			module_integrity_map.apply_sparse_deltas(deltas_v as Array)
 	_apply_module_integrity_state_to_scene()
 
 
