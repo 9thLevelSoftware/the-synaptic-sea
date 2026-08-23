@@ -12,6 +12,11 @@ const WALL_PREFIXES: Array[String] = [
 	"wall_", "bulkhead_", "panel_", "door_",
 ]
 
+const STRUCTURAL_PREFIXES: Array[String] = [
+	"wall_", "bulkhead_", "panel_", "door_",
+	"doorway_", "floor_", "corridor_", "pillar_", "ramp_",
+]
+
 ## Damage to a wall module per unit fire intensity per second.
 const FIRE_MODULE_DAMAGE_PER_INTENSITY: float = 0.08
 
@@ -21,6 +26,17 @@ static func is_wall_kind(kind: String) -> bool:
 		return false
 	var k: String = kind.to_lower()
 	for prefix in WALL_PREFIXES:
+		if k.begins_with(prefix) or k.find(prefix) >= 0:
+			return true
+	return false
+
+
+## True for every P0 structural module family, including floors and traversal pieces.
+static func is_structural_kind(kind: String) -> bool:
+	if kind.is_empty():
+		return false
+	var k: String = kind.to_lower()
+	for prefix in STRUCTURAL_PREFIXES:
 		if k.begins_with(prefix) or k.find(prefix) >= 0:
 			return true
 	return false
@@ -106,6 +122,21 @@ static func _count_breaches_via_size(module_map: RefCounted) -> int:
 
 ## Seed wall modules from a layout.json-shaped document. Returns modules registered.
 static func seed_map_from_layout(module_map: RefCounted, layout: Dictionary) -> int:
+	return _seed_map_from_layout_filtered(module_map, layout, Callable(is_wall_kind))
+
+
+## Seed every P0 structural module family from a layout.json-shaped document.
+## This companion path preserves the wall-only seed API for existing callers while
+## allowing visual/integrity systems to register floors, corridors, pillars, ramps,
+## and doorway modules as well.
+static func seed_structural_map_from_layout(module_map: RefCounted, layout: Dictionary) -> int:
+	return _seed_map_from_layout_filtered(module_map, layout, Callable(is_structural_kind))
+
+
+static func _seed_map_from_layout_filtered(
+		module_map: RefCounted,
+		layout: Dictionary,
+		kind_filter: Callable) -> int:
 	if module_map == null or not module_map.has_method("ensure_module"):
 		return 0
 	var rooms_v: Variant = layout.get("rooms", [])
@@ -125,7 +156,7 @@ static func seed_map_from_layout(module_map: RefCounted, layout: Dictionary) -> 
 				continue
 			var placement: Dictionary = placement_v
 			var kind: String = str(placement.get("module_id", placement.get("module", "")))
-			if not is_wall_kind(kind):
+			if not bool(kind_filter.call(kind)):
 				continue
 			var pname: String = str(placement.get("name", kind))
 			var mid: String = "%s/%s" % [room_id, pname]

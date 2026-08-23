@@ -10,8 +10,6 @@ const TopDownCameraRigScript = preload("res://scripts/camera/top_down_camera_rig
 const TopDownPlayerControllerScript = preload("res://scripts/player/top_down_player_controller.gd")
 const TopDownTravelControllerScript = preload("res://scripts/topdown/td_travel_controller.gd")
 const SfxEventRouterScript = preload("res://scripts/systems/sfx_event_router.gd")
-const AudioEventSeamScript = preload("res://scripts/audio/audio_event_seam.gd")
-const PlayerVitalsPanelScript = preload("res://scripts/ui/player_vitals_panel.gd")
 
 # Simulation systems (all RefCounted, reused from 3D path)
 const PlayerVitalsModelScript = preload("res://scripts/systems/player_vitals_model.gd")
@@ -64,8 +62,6 @@ var away_from_start: bool = false
 func _ready() -> void:
 	_ensure_nodes()
 	_init_systems()
-	# Auto-generate hub on scene load
-	generate_hub(42)
 
 
 func _ensure_nodes() -> void:
@@ -145,9 +141,6 @@ func generate_hub(seed_value: int = 42) -> Dictionary:
 	current_layout = layout
 	current_gameplay_slice = gameplay_slice_builder.build(layout)
 
-	# Ensure TileMapLayer has a TileSet with Winlu textures
-	_ensure_tileset()
-
 	# Build tilemap from layout
 	var build_info = layout_adapter.build(tilemap, layout)
 	room_centers = build_info.get("room_centers", {})
@@ -159,16 +152,9 @@ func generate_hub(seed_value: int = 42) -> Dictionary:
 		start_pos = room_centers[start_room]
 	player.position = start_pos
 
-	# Wire camera and make it current
+	# Wire camera
 	if camera_rig.has_method("set_follow_target"):
 		camera_rig.set_follow_target(player)
-	# Force camera current after tree entry
-	if camera_rig.camera and camera_rig.camera.is_inside_tree():
-		camera_rig.camera.make_current()
-	elif camera_rig.camera:
-		camera_rig.camera.call_deferred("make_current")
-	# Also move camera rig to player position immediately
-	camera_rig.global_position = player.position
 
 	# Spawn loot containers from gameplay_slice
 	_spawn_loot_containers(current_gameplay_slice)
@@ -186,9 +172,6 @@ func generate_derelict(seed_value: int = 777, biome_id: String = "breach_field")
 	var layout = ship_generator.generate_layout(blueprint)
 	current_layout = layout
 	current_gameplay_slice = gameplay_slice_builder.build(layout)
-
-	# Ensure TileMapLayer has a TileSet with Winlu textures
-	_ensure_tileset()
 
 	# Rebuild tilemap
 	var build_info = layout_adapter.build(tilemap, layout)
@@ -317,42 +300,3 @@ func play_sfx(event_id: String) -> void:
 
 func get_travel_controller():
 	return travel_controller
-
-
-func _ensure_tileset() -> void:
-	## Create a TileSet with DithArt Sci-Fi tileset texture.
-	if tilemap.tile_set != null:
-		return
-
-	var ts := TileSet.new()
-	ts.tile_size = Vector2i(48, 48)
-
-	var tex: Texture2D = load("res://assets/tilesets/dithart/free_scifi_tileset_48x48.png") as Texture2D
-	if tex == null:
-		push_warning("TopDownPlayableShip: could not load DithArt tileset")
-		return
-
-	var atlas := TileSetAtlasSource.new()
-	atlas.texture = tex
-	atlas.texture_region_size = Vector2i(48, 48)
-
-	# The DithArt tileset is 8 columns x 15 rows = 120 tiles
-	for col in range(8):
-		for row in range(15):
-			atlas.create_tile(Vector2i(col, row))
-
-	ts.add_source(atlas, 0)
-	tilemap.tile_set = ts
-
-	# Add a dark space background so tiles are visible against it
-	if get_node_or_null("Background") == null:
-		var bg := ColorRect.new()
-		bg.name = "Background"
-		bg.color = Color(0.02, 0.02, 0.04, 1.0)  # Near-black space
-		bg.z_index = -10
-		# Make it huge to cover any camera position
-		bg.offset_left = -5000
-		bg.offset_top = -5000
-		bg.offset_right = 5000
-		bg.offset_bottom = 5000
-		add_child(bg)
