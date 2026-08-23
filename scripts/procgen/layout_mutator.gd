@@ -480,6 +480,18 @@ static func _stamp_one_breach_portal(layout: Dictionary, seed_value: int) -> int
 	rng.seed = (int(seed_value) ^ 0xB4EAC4) & 0x7FFFFFFF
 	if rng.seed == 0:
 		rng.seed = 1
+	var links_v: Variant = layout.get("room_links", [])
+	var links: Array = links_v if links_v is Array else []
+	var blocked_keys: Dictionary = {}
+	var blocked_v: Variant = layout.get("blocked_links", [])
+	if blocked_v is Array:
+		for existing in (blocked_v as Array):
+			if typeof(existing) != TYPE_DICTIONARY:
+				continue
+			var ea: String = str((existing as Dictionary).get("from_room", (existing as Dictionary).get("from", "")))
+			var eb: String = str((existing as Dictionary).get("to_room", (existing as Dictionary).get("to", "")))
+			blocked_keys["%s|%s" % [ea, eb]] = true
+			blocked_keys["%s|%s" % [eb, ea]] = true
 	var candidates: Array[int] = []
 	for i in range(portals.size()):
 		if typeof(portals[i]) != TYPE_DICTIONARY:
@@ -491,6 +503,8 @@ static func _stamp_one_breach_portal(layout: Dictionary, seed_value: int) -> int
 		var a: String = str(portal.get("from_room", ""))
 		var b: String = str(portal.get("to_room", ""))
 		if protected.has("%s|%s" % [a, b]) or protected.has("%s|%s" % [b, a]):
+			continue
+		if _link_is_bridge(links, blocked_keys, a, b):
 			continue
 		candidates.append(i)
 	if candidates.is_empty():

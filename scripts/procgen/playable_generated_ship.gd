@@ -6933,12 +6933,9 @@ func _sync_current_ship_pillar_summaries() -> void:
 	if current_ship == null:
 		return
 	if module_integrity_map != null and module_integrity_map.has_method("get_summary"):
-		var mi: Dictionary = module_integrity_map.get_summary()
-		var deltas: Array = mi.get("deltas", []) as Array if typeof(mi.get("deltas", [])) == TYPE_ARRAY else []
-		if deltas.is_empty():
-			current_ship.module_integrity_summary = {}
-		else:
-			current_ship.module_integrity_summary = mi.duplicate(true)
+		# Persist even when deltas are empty so a fully repaired ship is not
+		# treated as a first visit (which would restamp layout.module_damage).
+		current_ship.module_integrity_summary = module_integrity_map.get_summary().duplicate(true)
 	if component_placement_state != null and component_placement_state.has_method("get_summary"):
 		var cp: Dictionary = component_placement_state.get_summary()
 		var placed: Array = cp.get("placed", []) as Array if typeof(cp.get("placed", [])) == TYPE_ARRAY else []

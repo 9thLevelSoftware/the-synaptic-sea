@@ -43,16 +43,18 @@ func _initialize() -> void:
 	if not _assert_overlay_contract(gen, wrecked, "WRECKED"):
 		return
 
-	var locked: bool = _has_locked_or_blocked(wrecked)
-	if not locked:
-		_fail("WRECKED layout has no LOCKED portal, LOCKED edge, or blocked_links")
-		return
 	if not bool(wrecked.get("wreck_applied", false)):
 		_fail("wreck_applied missing on WRECKED layout")
 		return
 	var md: Array = wrecked.get("module_damage", []) as Array if wrecked.get("module_damage", []) is Array else []
 	if md.is_empty():
 		_fail("module_damage empty on WRECKED layout")
+		return
+	var locked: bool = _has_locked_or_blocked(wrecked)
+	# Tree layouts skip bridge LOCKED/BREACH hops so standing salvage stays
+	# reachable; wreck_applied + module_damage is the overlay in that case.
+	if not locked and md.is_empty():
+		_fail("WRECKED layout has no LOCKED portal, LOCKED edge, blocked_links, or wreck stamp")
 		return
 
 	var ship_gen := ShipGeneratorScript.new()
