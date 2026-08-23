@@ -10,8 +10,6 @@ const TopDownCameraRigScript = preload("res://scripts/camera/top_down_camera_rig
 const TopDownPlayerControllerScript = preload("res://scripts/player/top_down_player_controller.gd")
 const TopDownTravelControllerScript = preload("res://scripts/topdown/td_travel_controller.gd")
 const SfxEventRouterScript = preload("res://scripts/systems/sfx_event_router.gd")
-const AudioEventSeamScript = preload("res://scripts/audio/audio_event_seam.gd")
-const PlayerVitalsPanelScript = preload("res://scripts/ui/player_vitals_panel.gd")
 
 # Simulation systems (all RefCounted, reused from 3D path)
 const PlayerVitalsModelScript = preload("res://scripts/systems/player_vitals_model.gd")

@@ -11,10 +11,6 @@ const TILE_SIZE := 48
 # Tile source indices (matching hub_scene_coordinator)
 const SOURCE_FLOORS := 0   # A2 - floor autotiles
 const SOURCE_WALLS := 1    # A4 - wall autotiles
-const SOURCE_DETAIL_B := 2
-const SOURCE_DETAIL_C := 3
-const SOURCE_DETAIL_D := 4
-const SOURCE_DETAIL_E := 5
 
 # Tile atlas coordinates
 const FLOOR_METAL := Vector2i(0, 0)
@@ -24,10 +20,6 @@ const WALL_TOP := Vector2i(0, 0)
 const WALL_BOTTOM := Vector2i(0, 1)
 const WALL_LEFT := Vector2i(1, 0)
 const WALL_RIGHT := Vector2i(1, 1)
-const WALL_CORNER_TL := Vector2i(2, 0)
-const WALL_CORNER_TR := Vector2i(3, 0)
-const WALL_CORNER_BL := Vector2i(2, 1)
-const WALL_CORNER_BR := Vector2i(3, 1)
 
 # Room role → floor tile mapping
 const ROLE_FLOOR_MAP := {
@@ -144,12 +136,8 @@ func build(tilemap: TileMapLayer, layout: Dictionary) -> Dictionary:
 				tilemap.set_cell(wall_pos, SOURCE_WALLS, WALL_TOP)
 
 	# Return info for the coordinator
-	var room_centers_out: Dictionary = {}
-	for room_id in room_centers:
-		room_centers_out[room_id] = room_centers[room_id]
-
 	return {
-		"room_centers": room_centers_out,
+		"room_centers": room_centers,
 		"floor_cells": floor_cells.keys(),
 	}
 
