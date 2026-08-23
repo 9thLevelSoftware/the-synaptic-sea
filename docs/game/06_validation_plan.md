@@ -24,6 +24,20 @@ Expected markers:
 - `ROUTE CONTROL STATE PASS gates=2 opened=2 blockers=0 extraction=true`
 - `MAIN PLAYABLE ROUTE CONTROL PASS gates=1 opened=1 blockers=0 extraction=true`
 
+## Enclosed slot fill (REQ-FILL-001) — GREEN
+
+Feature: `docs/game/features/enclosed_slot_fill.md`.
+
+```bash
+ROOT="${ROOT:-/Users/christopherwilloughby/the-synaptic-sea-of-stars}"
+GODOT="${GODOT:-/Users/christopherwilloughby/.local/bin/godot-4.6.2}"
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/enclosed_slot_fill_smoke.gd
+```
+
+Expected:
+
+- `ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true`
+
 ## Regression bundle
 
 ```bash
@@ -366,6 +380,7 @@ run_clean 'template data smoke' 'TEMPLATE DATA PASS templates=3 all_valid=true' 
 run_clean 'template selector smoke' 'TEMPLATE SELECTOR PASS explicit=true deterministic=true varied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_selector_smoke.gd
 run_clean 'marker generator smoke' 'MARKER GENERATOR PASS deterministic=true per_cell=3 round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/marker_generator_smoke.gd
 run_clean 'wall door resolver smoke' 'WALL DOOR RESOLVER PASS walls=true portals=true interior=true no_conflict=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wall_door_resolver_smoke.gd
+run_clean 'enclosed slot fill smoke' 'ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/enclosed_slot_fill_smoke.gd
 # seed_determinism's marker ends with the pipeline-output hash, which is
 # stable per code version but changes with ANY legitimate pipeline change —
 # the pin stops at `hash=` on purpose.

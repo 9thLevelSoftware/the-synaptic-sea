@@ -5,6 +5,7 @@ class_name ComponentPlacementState
 ## Deterministic under (layout, seed). Never touches scene tree.
 
 const ComponentCatalogScript := preload("res://scripts/systems/component_catalog.gd")
+const LayoutSerializerScript := preload("res://scripts/procgen/layout_serializer.gd")
 
 ## placed: Array of {component_instance_id, component_id, room_id, slot_kind, slot_index, cell, condition, linked_system, linked_subcomponent, item_form, mass}
 var placed: Array = []
@@ -15,7 +16,7 @@ func clear() -> void:
 	placed.clear()
 
 
-func populate(layout: Dictionary, catalog: RefCounted, p_seed: int) -> int:
+func populate(layout: Dictionary, catalog: RefCounted, p_seed: int, occupied_cells: Dictionary = {}) -> int:
 	clear()
 	seed_value = p_seed
 	if catalog == null or not catalog.has_method("role_set"):
@@ -28,6 +29,7 @@ func populate(layout: Dictionary, catalog: RefCounted, p_seed: int) -> int:
 	if rng.seed == 0:
 		rng.seed = 1
 	var used_keys: Dictionary = {}  # room|slot_kind|index -> true
+	var used_cells: Dictionary = occupied_cells.duplicate()
 	var instance_n: int = 0
 	for room_v in (rooms_v as Array):
 		if typeof(room_v) != TYPE_DICTIONARY:
@@ -37,8 +39,8 @@ func populate(layout: Dictionary, catalog: RefCounted, p_seed: int) -> int:
 		if room_id.is_empty():
 			continue
 		var role: String = str(room.get("room_role", room.get("role", "default")))
-		instance_n += _fill_slots(room, room_id, role, "wall", "wall_slots", catalog, rng, used_keys)
-		instance_n += _fill_slots(room, room_id, role, "center", "center_slots", catalog, rng, used_keys)
+		instance_n += _fill_slots(room, room_id, role, "wall", "wall_slots", catalog, rng, used_keys, used_cells)
+		instance_n += _fill_slots(room, room_id, role, "center", "center_slots", catalog, rng, used_keys, used_cells)
 	return placed.size()
 
 
@@ -50,17 +52,25 @@ func _fill_slots(
 		slot_key: String,
 		catalog: RefCounted,
 		rng: RandomNumberGenerator,
-		used_keys: Dictionary) -> int:
+		used_keys: Dictionary,
+		used_cells: Dictionary) -> int:
 	var slots: Array = _extract_slots(room, slot_key)
 	if slots.is_empty():
 		return 0
 	var choices: Array = catalog.call("role_set", role, slot_kind)
 	if choices.is_empty():
 		return 0
+	var reserved: Dictionary = _reserved_cell_keys(room, room_id)
 	var filled: int = 0
 	for i in range(slots.size()):
 		var key: String = "%s|%s|%d" % [room_id, slot_kind, i]
 		if used_keys.has(key):
+			continue
+		var slot_info: Dictionary = slots[i] if typeof(slots[i]) == TYPE_DICTIONARY else {}
+		var cell_value: Variant = slot_info.get("cell", "")
+		var parsed_cell: Array = LayoutSerializerScript.parse_slot_cell(cell_value)
+		var cell_key: String = _cell_occupancy_key(room_id, parsed_cell)
+		if not cell_key.is_empty() and (used_cells.has(cell_key) or reserved.has(cell_key)):
 			continue
 		var component_id: String = _weighted_pick(choices, rng)
 		if component_id.is_empty() or not catalog.call("has_component", component_id):
@@ -77,14 +87,14 @@ func _fill_slots(
 			want_slot = str(def.get("slot", slot_kind))
 			if want_slot != slot_kind and want_slot != "any":
 				continue
-		var slot_info: Dictionary = slots[i] if typeof(slots[i]) == TYPE_DICTIONARY else {}
+		var stored_cell: Variant = parsed_cell if parsed_cell.size() >= 2 else cell_value
 		var entry: Dictionary = {
 			"component_instance_id": "%s_%s_%d" % [room_id, slot_kind, i],
 			"component_id": component_id,
 			"room_id": room_id,
 			"slot_kind": slot_kind,
 			"slot_index": i,
-			"cell": str(slot_info.get("cell", "")),
+			"cell": stored_cell,
 			"against_wall": bool(slot_info.get("against_wall", slot_kind == "wall")),
 			"condition": float(def.get("condition_default", 1.0)),
 			"item_form": str(def.get("item_form", component_id)),
@@ -95,23 +105,76 @@ func _fill_slots(
 		}
 		placed.append(entry)
 		used_keys[key] = true
+		if not cell_key.is_empty():
+			used_cells[cell_key] = true
 		filled += 1
 	return filled
 
 
 func _extract_slots(room: Dictionary, slot_key: String) -> Array:
-	# Slots may live on room root or under zones (serializer variants).
+	# REQ-FILL-001: interior_zones from WallDoorResolver / serializer first.
+	var interior: Variant = room.get("interior_zones", null)
+	if interior is Dictionary and not (interior as Dictionary).is_empty():
+		var interior_slots: Variant = (interior as Dictionary).get(slot_key, [])
+		if interior_slots is Array:
+			return _normalize_slots(interior_slots as Array, slot_key == "wall_slots")
+		return []
+	# Legacy: slots may live on room root or under zones.
 	var direct: Variant = room.get(slot_key, null)
 	if direct is Array and not (direct as Array).is_empty():
-		return direct as Array
+		return _normalize_slots(direct as Array, slot_key == "wall_slots")
 	var zones: Variant = room.get("zones", {})
 	if zones is Dictionary:
 		var z: Variant = (zones as Dictionary).get(slot_key, [])
 		if z is Array and not (z as Array).is_empty():
-			return z as Array
+			return _normalize_slots(z as Array, slot_key == "wall_slots")
 	# Golden/hub layouts often only stamp floor structural_placements — synthesize
 	# wall/center slots from floor cells so component population still runs.
 	return _synthesize_slots_from_structure(room, slot_key)
+
+
+func _normalize_slots(raw: Array, against_wall: bool) -> Array:
+	var out: Array = []
+	for item in raw:
+		var cell_value: Variant = item
+		var wall_flag: bool = against_wall
+		var extra: Dictionary = {}
+		if typeof(item) == TYPE_DICTIONARY:
+			var row: Dictionary = item
+			cell_value = row.get("cell", "")
+			wall_flag = bool(row.get("against_wall", against_wall))
+			extra = row.duplicate(true)
+		var parsed: Array = LayoutSerializerScript.parse_slot_cell(cell_value)
+		var entry: Dictionary = extra if not extra.is_empty() else {}
+		entry["against_wall"] = wall_flag
+		if parsed.size() >= 2:
+			entry["cell"] = parsed
+		else:
+			entry["cell"] = cell_value
+		out.append(entry)
+	return out
+
+
+func _reserved_cell_keys(room: Dictionary, room_id: String) -> Dictionary:
+	var keys: Dictionary = {}
+	var interior: Variant = room.get("interior_zones", {})
+	if not (interior is Dictionary):
+		return keys
+	var reserved_v: Variant = (interior as Dictionary).get("reserved_cells", [])
+	if not (reserved_v is Array):
+		return keys
+	for cell_v in (reserved_v as Array):
+		var parsed: Array = LayoutSerializerScript.parse_slot_cell(cell_v)
+		var key: String = _cell_occupancy_key(room_id, parsed)
+		if not key.is_empty():
+			keys[key] = true
+	return keys
+
+
+func _cell_occupancy_key(room_id: String, cell: Array) -> String:
+	if cell.size() < 2:
+		return ""
+	return "%s|%d|%d" % [room_id, int(cell[0]), int(cell[1])]
 
 
 ## Derive wall_slots / center_slots from floor structural placements (max 3 wall, 1 center).
