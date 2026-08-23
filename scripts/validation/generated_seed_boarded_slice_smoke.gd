@@ -170,6 +170,14 @@ func _validate() -> void:
 	if not seed_ok:
 		_fail("boarded seed=%d is not in first-run preferred_seeds %s" % [seed_n, str(preferred)])
 		return
+	var gameplay: Dictionary = loader.gameplay_doc.duplicate(true) if typeof(loader.gameplay_doc) == TYPE_DICTIONARY else {}
+	var loot_v: Variant = gameplay.get("loot_containers", [])
+	if not (loot_v is Array) or (loot_v as Array).is_empty():
+		gameplay["loot_containers"] = loader.get_loot_container_specs_copy()
+	if not bool(playable.first_run_contract.validate(layout, gameplay)):
+		_fail("boarded layout failed FirstRunContract.validate biome=%s difficulty=%s" % [
+			str(layout.get("biome_id", "")), str(layout.get("difficulty_id", ""))])
+		return
 	print("GENERATED SEED BOARDED SLICE PASS away=true nav=true slots=true wreck=true objectives=true away_ticks=30 seed=%d" % seed_n)
 	_cleanup(0)
 
