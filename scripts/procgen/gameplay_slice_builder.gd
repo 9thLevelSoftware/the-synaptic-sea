@@ -26,10 +26,31 @@ func _loot_table_for_room(room: Dictionary, role_default: String) -> String:
 	return bias if not bias.is_empty() else role_default
 
 
+func _seed_from_layout_doc(layout: Dictionary) -> int:
+	# LayoutSerializer stamps the seed in program_id (`procgen-...-seed-N`),
+	# not seed_value. Parse the same way GeneratedShipLoader does so loot and
+	# salvage stay per-seed instead of collapsing to RNG seed 0.
+	if layout.has("seed_value"):
+		return int(layout.get("seed_value", 0))
+	var pid: String = str(layout.get("program_id", ""))
+	var idx: int = pid.rfind("seed-")
+	if idx < 0:
+		return 0
+	var tail: String = pid.substr(idx + 5)
+	var digits: String = ""
+	for i in range(tail.length()):
+		var ch: String = tail.substr(i, 1)
+		if ch.is_valid_int():
+			digits += ch
+		else:
+			break
+	return int(digits) if digits.is_valid_int() else 0
+
+
 func build(layout: Dictionary) -> Dictionary:
 	var proto: Dictionary = layout.get("prototype", {})
 	var rooms: Array = layout.get("rooms", [])
-	var seed_value: int = int(layout.get("seed_value", 0))
+	var seed_value: int = _seed_from_layout_doc(layout)
 
 	var start_room: String = str(proto.get("start_room", ""))
 	var goal_room: String = str(proto.get("goal_room", ""))
@@ -377,7 +398,9 @@ func _pick_slot_cell(
 		if kind != "salvage" and reserved_set.has(_cell_key(rid, fallback)):
 			continue
 		floor_eligible.append({"cell": fallback, "slot_kind": "floor", "slot_index": i, "fallback": true})
-	picked = _pick_eligible(rng, floor_eligible)
+	# Compatibility fallback stays first eligible floor in serialized order
+	# (goldens / empty interior_zones). RNG is only for interior slot picks.
+	picked = floor_eligible[0] if not floor_eligible.is_empty() else {}
 	if not picked.is_empty():
 		print("GameplaySliceBuilder slot_fallback room=%s kind=%s" % [rid, kind])
 		_claim(rid, picked.get("cell", []), occupied)

@@ -239,6 +239,16 @@ func _check_synthetic_fill() -> bool:
 		on_cell = true
 	if not on_cell:
 		return _fail("no cargo component on a slot cell")
+	if builder._seed_from_layout_doc(layout) != 42:
+		return _fail("program_id seed-42 parsed as %d" % builder._seed_from_layout_doc(layout))
+	var layout_other: Dictionary = layout.duplicate(true)
+	layout_other["program_id"] = "procgen-derelict-seed-777"
+	if builder._seed_from_layout_doc(layout_other) != 777:
+		return _fail("program_id seed-777 parsed as %d" % builder._seed_from_layout_doc(layout_other))
+	var rng_a: RandomNumberGenerator = builder._rng_for_slot(42, 1)
+	var rng_b: RandomNumberGenerator = builder._rng_for_slot(777, 1)
+	if rng_a.seed == rng_b.seed:
+		return _fail("distinct program_id seeds produced identical slot RNG seeds")
 	return true
 
 
@@ -295,8 +305,10 @@ func _check_floor_fallback_occupancy() -> bool:
 	var loot_cell: Array = (loot_two[0] as Dictionary).get("approach_cell", [])
 	if salvage_two.size() < 2 or loot_cell.size() < 2:
 		return _fail("empty-zone fallback cells incomplete")
-	if int(salvage_two[0]) == int(loot_cell[0]) and int(salvage_two[1]) == int(loot_cell[1]):
-		return _fail("empty-zone salvage and loot shared first floor cell %s" % str(loot_cell))
+	if int(salvage_two[0]) != 0 or int(salvage_two[1]) != 0:
+		return _fail("empty-zone salvage should claim first floor cell, got %s" % str(salvage_two))
+	if int(loot_cell[0]) != 1 or int(loot_cell[1]) != 0:
+		return _fail("empty-zone loot should claim second floor cell, got %s" % str(loot_cell))
 	var cargo_one: Dictionary = {
 		"id": "cargo_01",
 		"room_role": "cargo",
