@@ -6933,6 +6933,14 @@ func _sync_current_ship_pillar_summaries() -> void:
 	if current_ship == null:
 		return
 	if module_integrity_map != null and module_integrity_map.has_method("get_summary"):
+		# Hub DAMAGED/WRECKED `_on_ship_loaded` may never have seeded the map.
+		# Packing an empty-delta summary then would look initialized and skip
+		# wreck restamp on restore. Seed first when live deltas are also empty.
+		if current_ship.module_integrity_summary.is_empty():
+			var live: Dictionary = module_integrity_map.get_summary()
+			var live_d: Variant = live.get("deltas", [])
+			if not (live_d is Array) or (live_d as Array).is_empty():
+				_restore_module_integrity_for_current_ship()
 		# Persist even when deltas are empty so a fully repaired ship is not
 		# treated as a first visit (which would restamp layout.module_damage).
 		current_ship.module_integrity_summary = module_integrity_map.get_summary().duplicate(true)
