@@ -683,6 +683,9 @@ func _check_small_room_dressing() -> bool:
 	loader.gameplay_doc = {"start_room": "airlock_01", "loot_containers": []}
 	loader.loot_container_specs = []
 	loader._build_room_variant_descriptors()
+	if loader.room_variant_descriptors.has("cargo_01"):
+		# vacuum 0.40 * one leftover wall rounds to 0 without the floor-at-one rule
+		(loader.room_variant_descriptors["cargo_01"] as Dictionary)["prop_density"] = 0.4
 	var root := Node3D.new()
 	get_root().add_child(root)
 	loader._apply_dressing_visuals(layout, root)

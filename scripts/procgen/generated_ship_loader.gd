@@ -1249,6 +1249,8 @@ func _place_dressing_props(
 	if available.is_empty():
 		return
 	var count: int = clampi(int(round(float(available.size()) * prop_density)), 0, available.size())
+	if prop_density > 0.001 and not available.is_empty():
+		count = maxi(1, count)
 	if count <= 0:
 		return
 	var rng := RandomNumberGenerator.new()
