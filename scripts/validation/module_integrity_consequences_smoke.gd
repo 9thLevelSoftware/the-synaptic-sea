@@ -111,6 +111,36 @@ func _initialize() -> void:
 	if compiled_changed.has("eng_1/wall_a"):
 		_fail("fire should not also stamp legacy placement id when compiled keys exist")
 		return
+	# Shared compiled wall: hotter neighboring compartment must win over room order.
+	var shared_layout: Dictionary = {
+		"rooms": [
+			{"id": "eng_1", "room_role": "engineering"},
+			{"id": "br_1", "room_role": "bridge"},
+		],
+		"structural_plan": {
+			"placements": [{
+				"module_id": "wall_straight_1x1",
+				"edge_key": "shared|v|0|0",
+				"room_id": "eng_1",
+				"room_ids": ["eng_1", "br_1"],
+			}],
+			"floor_placements": [],
+			"ceiling_placements": [],
+		},
+	}
+	var shared_map = ModuleIntegrityMapScript.new()
+	if ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(shared_map, shared_layout) < 1:
+		_fail("shared compiled seed expected edge module")
+		return
+	var dual_burn: Dictionary = {"engineering": 0.1, "bridge": 1.0}
+	ModuleIntegrityConsequencesScript.apply_fire_damage(shared_map, shared_layout, dual_burn, roles, 1.0, 1.0)
+	var shared_mod = shared_map.get_module("edge/shared|v|0|0")
+	if shared_mod == null:
+		_fail("shared compiled wall missing after seed")
+		return
+	if float(shared_mod.integrity) > 0.05:
+		_fail("shared wall should take max compartment intensity, integrity=%s" % str(shared_mod.integrity))
+		return
 	var breaches: int = ModuleIntegrityConsequencesScript.derived_breach_count(map)
 	if breaches < 1 and st != ModuleIntegrityStateScript.STATE_DAMAGED:
 		# damaged only is ok short-term; force more damage

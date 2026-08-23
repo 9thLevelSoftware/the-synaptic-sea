@@ -246,7 +246,9 @@ static func apply_fire_damage(
 	var rooms_v: Variant = layout.get("rooms", [])
 	if typeof(rooms_v) != TYPE_ARRAY:
 		return changed
-	var seen: Dictionary = {}
+	# Shared compiled walls can belong to two burning compartments. Keep the
+	# max intensity per module so room order cannot suppress a hotter fire.
+	var exposure: Dictionary = {}
 	for room_v in (rooms_v as Array):
 		if typeof(room_v) != TYPE_DICTIONARY:
 			continue
@@ -259,20 +261,13 @@ static func apply_fire_damage(
 		if intensity <= 0.0:
 			continue
 		var room_id: String = str(room.get("id", ""))
-		var dmg: float = damage_rate * intensity * delta
 		var compiled_ids: Array = registered_ids_for_room(module_map, room_id, true)
 		if not compiled_ids.is_empty():
 			for mid_v in compiled_ids:
 				var mid: String = str(mid_v)
-				if seen.has(mid):
-					continue
-				seen[mid] = true
 				var rec: RefCounted = module_map.call("get_module", mid) if module_map.has_method("get_module") else null
 				var kind: String = str(rec.get("kind")) if rec != null else ""
-				var before: String = str(module_map.call("get_state", mid)) if module_map.has_method("get_state") else ""
-				var after: String = str(module_map.call("apply_damage", mid, dmg, kind))
-				if after != before:
-					changed.append(mid)
+				_accumulate_fire_exposure(exposure, mid, intensity, kind)
 			continue
 		var placements_v: Variant = room.get("structural_placements", [])
 		if typeof(placements_v) != TYPE_ARRAY:
@@ -286,11 +281,30 @@ static func apply_fire_damage(
 				continue
 			var pname: String = str(placement.get("name", kind))
 			var mid: String = "%s/%s" % [room_id, pname]
-			var before: String = str(module_map.call("get_state", mid)) if module_map.has_method("get_state") else ""
-			var after: String = str(module_map.call("apply_damage", mid, dmg, kind))
-			if after != before:
-				changed.append(mid)
+			_accumulate_fire_exposure(exposure, mid, intensity, kind)
+	for mid_v in exposure.keys():
+		var mid: String = str(mid_v)
+		var rec_exp: Dictionary = exposure[mid]
+		var dmg: float = damage_rate * float(rec_exp.get("intensity", 0.0)) * delta
+		var kind: String = str(rec_exp.get("kind", ""))
+		var before: String = str(module_map.call("get_state", mid)) if module_map.has_method("get_state") else ""
+		var after: String = str(module_map.call("apply_damage", mid, dmg, kind))
+		if after != before:
+			changed.append(mid)
 	return changed
+
+
+static func _accumulate_fire_exposure(exposure: Dictionary, mid: String, intensity: float, kind: String) -> void:
+	if mid.is_empty() or intensity <= 0.0:
+		return
+	if exposure.has(mid):
+		var prev: Dictionary = exposure[mid]
+		if intensity > float(prev.get("intensity", 0.0)):
+			prev["intensity"] = intensity
+		if str(prev.get("kind", "")).is_empty() and not kind.is_empty():
+			prev["kind"] = kind
+		return
+	exposure[mid] = {"intensity": intensity, "kind": kind}
 
 
 ## Registered map ids for a room. Prefers compiler `edge/` `floor/` `ceiling/`
