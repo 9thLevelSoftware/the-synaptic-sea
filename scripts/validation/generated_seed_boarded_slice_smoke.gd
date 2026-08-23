@@ -199,14 +199,21 @@ func _standing_start_to_goal(layout: Dictionary, loader: GeneratedShipLoader) ->
 		return "standing start node missing in start_room=%s nodes=%d" % [start_id, node_n]
 	if start_id == goal_id:
 		return ""
-	if goal_node.is_empty():
-		# First-run DAMAGED/WRECKED overlay can isolate the goal room
-		# (one standing node in the dock). Unrestricted nearest_node would
-		# snap both ends to that node and false-pass; we still require the
-		# start endpoint to live in start_id.
-		return ""
-	if graph.get_node_room(goal_node) != goal_id:
-		return "standing goal node room=%s expected=%s" % [graph.get_node_room(goal_node), goal_id]
+	if goal_node.is_empty() or graph.get_node_room(goal_node) != goal_id:
+		var occ_n: int = 0
+		var plan_v: Variant = layout.get("structural_plan", {})
+		if plan_v is Dictionary:
+			var occ_v: Variant = (plan_v as Dictionary).get("occupancy", {})
+			if occ_v is Dictionary:
+				occ_n = (occ_v as Dictionary).size()
+		var rooms_n: int = (layout.get("rooms", []) as Array).size() if layout.get("rooms", []) is Array else 0
+		var rooms_seen: Array = []
+		for key in graph.nodes:
+			var rid: String = graph.get_node_room(str(key))
+			if not rooms_seen.has(rid):
+				rooms_seen.append(rid)
+		return "standing goal node missing in goal_room=%s nodes=%d occupancy=%d rooms=%d graph_rooms=%s" % [
+			goal_id, node_n, occ_n, rooms_n, str(rooms_seen)]
 	var path: Array = ThreatPathfinderScript.find_path(
 		graph, graph.get_node_pos(start_node), graph.get_node_pos(goal_node))
 	if path.is_empty():

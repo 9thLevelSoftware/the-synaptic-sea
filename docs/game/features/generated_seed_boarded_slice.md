@@ -7,7 +7,6 @@ Validated — REQ-SLICE-001.
 ## Requirement cross-reference
 
 - REQ-SLICE-001 in `docs/game/05_requirements.md`
-- Design: `docs/game/features/remaining_procgen_play_stack.md` work package 5
 - Related: `docs/game/features/vertical_slice_v1.md` (hub remains golden `coherent_ship_001`)
 
 ## Design pillar alignment
