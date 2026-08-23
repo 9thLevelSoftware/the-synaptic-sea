@@ -10180,11 +10180,27 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	if utility_item_state != null and not snapshot.utility_summary.is_empty():
 		utility_item_state.apply_summary(snapshot.utility_summary)
 	# PKG-D6.1 / D2.6 / D8: restore pillar + ship-mod models after reload rebuild.
-	if module_integrity_map != null and not snapshot.module_integrity_summary.is_empty():
-		module_integrity_map.apply_summary(snapshot.module_integrity_summary)
-		_apply_module_integrity_state_to_scene()
-		if current_ship != null:
-			current_ship.module_integrity_summary = snapshot.module_integrity_summary.duplicate(true)
+	# apply_summary() clears then restores sparse deltas; seed compiled first so
+	# fire/decomp still find pristine walls in the same room.
+	if module_integrity_map != null:
+		var snap_layout: Dictionary = {}
+		if current_ship != null and current_ship.built_layout is Dictionary:
+			snap_layout = current_ship.built_layout
+		elif is_instance_valid(loader) and loader.has_method("get_layout_copy"):
+			snap_layout = loader.get_layout_copy()
+		if not snap_layout.is_empty():
+			ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(
+				module_integrity_map, snap_layout, false)
+		if not snapshot.module_integrity_summary.is_empty():
+			var packed: Dictionary = snapshot.module_integrity_summary
+			var deltas_v: Variant = packed.get("deltas", [])
+			if module_integrity_map.has_method("apply_sparse_deltas") and deltas_v is Array:
+				module_integrity_map.apply_sparse_deltas(deltas_v as Array)
+			else:
+				module_integrity_map.apply_summary(packed)
+			_apply_module_integrity_state_to_scene()
+			if current_ship != null:
+				current_ship.module_integrity_summary = packed.duplicate(true)
 	if component_placement_state != null and not snapshot.component_placement_summary.is_empty():
 		component_placement_state.apply_summary(snapshot.component_placement_summary)
 		if current_ship != null:

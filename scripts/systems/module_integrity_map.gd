@@ -157,12 +157,23 @@ func rooms_with_nav_gaps() -> PackedStringArray:
 		var summary: Dictionary = m.call("get_summary") if m.has_method("get_summary") else {}
 		var room_id: String = str(summary.get("room_id", ""))
 		if room_id.is_empty():
+			room_id = str(m.get("room_id"))
+		if room_id.is_empty():
 			# mid format room/name
 			var parts: PackedStringArray = str(mid).split("/")
 			if parts.size() >= 1:
 				room_id = parts[0]
 		if not room_id.is_empty():
 			rooms[room_id] = true
+		var owners_v: Variant = m.get("owner_rooms")
+		if owners_v is PackedStringArray:
+			for rid in (owners_v as PackedStringArray):
+				if not str(rid).is_empty():
+					rooms[str(rid)] = true
+		elif owners_v is Array:
+			for rid_v in (owners_v as Array):
+				if not str(rid_v).is_empty():
+					rooms[str(rid_v)] = true
 	var out: PackedStringArray = PackedStringArray()
 	for rid in rooms.keys():
 		out.append(str(rid))
