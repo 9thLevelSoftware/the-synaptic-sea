@@ -30,28 +30,22 @@ func setup(p_coordinator) -> void:
 func travel_to_derelict(seed_value: int = 777, biome_id: String = "breach_field") -> void:
 	if is_traveling:
 		return
-	is_traveling = true
 	travel_started.emit("derelict")
-
 	if coordinator:
 		coordinator.generate_derelict(seed_value, biome_id)
-
 	current_location = "derelict"
-	is_traveling = false
 	travel_completed.emit("derelict")
 
 
 func travel_to_hub(seed_value: int = 42) -> void:
 	if is_traveling:
 		return
-	is_traveling = true
 	travel_started.emit("hub")
 
 	if coordinator:
 		coordinator.generate_hub(seed_value)
 
 	current_location = "hub"
-	is_traveling = false
 	travel_completed.emit("hub")
 	returned_to_hub.emit()
 
