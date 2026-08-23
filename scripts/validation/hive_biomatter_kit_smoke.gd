@@ -166,6 +166,19 @@ func _check_sockets_fallback() -> bool:
 	var mid: String = str(catalog.modules.keys()[0])
 	if catalog.sockets_of(mid).is_empty():
 		return _fail("v0 fallback module %s has no sockets" % mid)
+	var inner_a: Dictionary = {
+		"kind": "inner_corner_vertex",
+		"compatible_kinds": ["wall_edge", "portal_edge"],
+	}
+	var inner_b: Dictionary = inner_a.duplicate(true)
+	if catalog.sockets_compatible(inner_a, inner_b):
+		return _fail("same-kind inner_corner_vertex must still consult compatible_kinds")
+	var wall: Dictionary = {
+		"kind": "wall_edge",
+		"compatible_kinds": ["wall_edge", "portal_edge", "inner_corner_vertex"],
+	}
+	if not catalog.sockets_compatible(inner_a, wall):
+		return _fail("inner_corner_vertex should join wall_edge via compatible_kinds")
 	return true
 
 

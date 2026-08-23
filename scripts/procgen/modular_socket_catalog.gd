@@ -106,10 +106,12 @@ func sockets_compatible(socket_a: Dictionary, socket_b: Dictionary) -> bool:
 		return false
 	if not ENCLOSURE_KINDS.has(kind_a) or not ENCLOSURE_KINDS.has(kind_b):
 		return false
-	if kind_a == kind_b:
-		return true
 	var compatible_a: Array = _compatible_kinds(socket_a)
 	var compatible_b: Array = _compatible_kinds(socket_b)
+	if compatible_a.is_empty():
+		compatible_a = [kind_a]
+	if compatible_b.is_empty():
+		compatible_b = [kind_b]
 	return compatible_a.has(kind_b) and compatible_b.has(kind_a)
 
 

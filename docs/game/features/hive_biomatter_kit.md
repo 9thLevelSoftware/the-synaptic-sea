@@ -8,10 +8,10 @@ existing v0 wrapper scenes, not a visual remap.
 ## Requirement cross-reference
 
 - REQ-HIVE-001 in `docs/game/05_requirements.md`
-- ADR-0053 catalog fallback (when present, `ModularSocketCatalog.load_kit`
-  falls back to `ship_structural_v0` contracts when a kit directory is missing)
+- ADR-0056 catalog fallback (`ModularSocketCatalog.load_kit` falls back to
+  `ship_structural_v0` contracts when a kit directory is missing)
 - Related: `docs/game/features/remaining_procgen_play_stack.md`,
-  `docs/game/features/socketed_enclosed_interiors.md`
+  ADR-0053 enclosure geometry (not this catalog policy)
 
 ## Design pillar alignment
 
@@ -128,5 +128,5 @@ Also remains green: `template_selector_smoke.gd` (legacy three),
 
 ## ADRs
 
-- ADR-0053 (socketed enclosed interiors; catalog fallback)
-- No new ADR for hive (occupancy + kit stamp, not architecture)
+- ADR-0056 (ModularSocketCatalog missing-kit fallback and `compatible_kinds`)
+- ADR-0053 (enclosure geometry; not catalog fallback)
