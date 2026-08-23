@@ -141,11 +141,11 @@ func _nav_kinds_ok(graph, edges: Dictionary, occupancy: Dictionary) -> bool:
 			return false
 		var cost: float = graph.edge_cost(pair[0], pair[1])
 		if kind == "SOLID":
-			if graph._base_edges.has(graph._edge_key(pair[0], pair[1])) \
+			if graph.has_base_edge(pair[0], pair[1]) \
 					and cost < ShipNavGraphScript.BLOCKED_COST:
 				return false
 		elif kind == "LOCKED" or kind == "BREACH":
-			if not graph._base_edges.has(graph._edge_key(pair[0], pair[1])):
+			if not graph.has_base_edge(pair[0], pair[1]):
 				return false
 			if cost < ShipNavGraphScript.BLOCKED_COST:
 				return false
@@ -160,8 +160,8 @@ func _graph_keys_for_edge(graph, edge: Dictionary, occupancy: Dictionary) -> Pac
 	if not (source_cells is Array) or (source_cells as Array).size() < 2:
 		return PackedStringArray()
 	var deck: int = int(edge.get("deck", 0))
-	var a: String = graph._node_key_from_cell((source_cells as Array)[0], deck, occupancy)
-	var b: String = graph._node_key_from_cell((source_cells as Array)[1], deck, occupancy)
+	var a: String = graph.node_key_for_cell((source_cells as Array)[0], deck, occupancy)
+	var b: String = graph.node_key_for_cell((source_cells as Array)[1], deck, occupancy)
 	if a.is_empty() or b.is_empty() or a == b:
 		return PackedStringArray()
 	return PackedStringArray([a, b])

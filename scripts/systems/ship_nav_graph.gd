@@ -197,6 +197,22 @@ func edge_cost(a: String, b: String) -> float:
 		return BLOCKED_COST
 	return float(edges[k])
 
+## Public cell → standing-node lookup. Occupancy records win; otherwise the
+## snapped cell coordinate if that node exists.
+func node_key_for_cell(value: Variant, fallback_deck: int, occupancy: Dictionary) -> String:
+	return _node_key_from_cell(value, fallback_deck, occupancy)
+
+func has_base_edge(a: String, b: String) -> bool:
+	if a.is_empty() or b.is_empty() or a == b:
+		return false
+	return _base_edges.has(_edge_key(a, b))
+
+func base_edge_cost(a: String, b: String) -> float:
+	var k: String = _edge_key(a, b)
+	if not _base_edges.has(k):
+		return BLOCKED_COST
+	return float(_base_edges[k])
+
 func set_edge_blocked(a: String, b: String, blocked: bool = true) -> void:
 	var k: String = _edge_key(a, b)
 	if not _base_edges.has(k) and not edges.has(k):

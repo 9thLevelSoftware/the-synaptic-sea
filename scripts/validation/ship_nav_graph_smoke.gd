@@ -57,18 +57,57 @@ func _golden_shortcut_standing_blocked(graph, layout: Dictionary) -> bool:
 		var occ_variant: Variant = (plan_variant as Dictionary).get("occupancy", {})
 		if occ_variant is Dictionary:
 			occupancy = occ_variant
-	var from_key: String = graph._node_key_from_cell([8, 1, 1], 1, occupancy)
-	var to_key: String = graph._node_key_from_cell([9, 1, 1], 1, occupancy)
-	# Reactor cell [9,1,1] is occupied; failing to resolve it is not "no neighbor".
-	if to_key.is_empty():
-		_fail("golden reactor cell [9,1,1] did not resolve to a nav node")
+	var shortcut: Dictionary = _blocked_link_by_id(layout, "spine_to_reactor_blocked_shortcut")
+	if shortcut.is_empty():
+		_fail("golden blocked_links missing spine_to_reactor_blocked_shortcut")
 		return false
-	if from_key.is_empty() or from_key == to_key:
+	var from_cell: Variant = shortcut.get("from_cell", null)
+	var to_cell: Variant = shortcut.get("to_cell", null)
+	var from_key: String = graph.node_key_for_cell(from_cell, 1, occupancy)
+	var to_key: String = graph.node_key_for_cell(to_cell, 1, occupancy)
+	# Reactor occupancy must resolve; failing to is a layout/nav regression, not "no neighbor".
+	if to_key.is_empty():
+		_fail("golden reactor shortcut to_cell did not resolve to a nav node")
+		return false
+	if from_key.is_empty():
+		var from_occ_key: String = _occupancy_key_from_cell(from_cell, 1)
+		if occupancy.has(from_occ_key):
+			_fail("golden spine shortcut occupancy did not resolve to a nav node")
+			return false
+		# Occupancy-absent origin is "no neighbor" (REQ-WALK-001 / feature spec).
+		return true
+	if from_key == to_key:
 		return true
 	if graph.edge_cost(from_key, to_key) < ShipNavGraphScript.BLOCKED_COST:
 		_fail("golden spine_to_reactor_blocked_shortcut is standing-passable")
 		return false
 	return true
+
+
+func _occupancy_key_from_cell(value: Variant, fallback_deck: int) -> String:
+	var cell := Vector2i.ZERO
+	var deck: int = fallback_deck
+	if value is Array and (value as Array).size() >= 2:
+		var values: Array = value
+		cell = Vector2i(int(values[0]), int(values[1]))
+		if values.size() >= 3:
+			deck = int(values[2])
+	else:
+		return ""
+	return "%d|%d|%d" % [deck, cell.x, cell.y]
+
+
+func _blocked_link_by_id(layout: Dictionary, link_id: String) -> Dictionary:
+	var blocked_variant: Variant = layout.get("blocked_links", [])
+	if not (blocked_variant is Array):
+		return {}
+	for link_variant in (blocked_variant as Array):
+		if not (link_variant is Dictionary):
+			continue
+		var link: Dictionary = link_variant
+		if str(link.get("id", "")) == link_id:
+			return link
+	return {}
 
 
 func _blocked_links_overlay_on_stored_door() -> bool:
@@ -117,16 +156,15 @@ func _blocked_links_overlay_on_stored_door() -> bool:
 	if graph.build_from_layout(layout) < 2:
 		_fail("synthetic overlay layout built no nodes")
 		return false
-	var a_key: String = graph._node_key_from_cell([0, 0, 0], 0, occupancy)
-	var b_key: String = graph._node_key_from_cell([1, 0, 0], 0, occupancy)
+	var a_key: String = graph.node_key_for_cell([0, 0, 0], 0, occupancy)
+	var b_key: String = graph.node_key_for_cell([1, 0, 0], 0, occupancy)
 	if a_key.is_empty() or b_key.is_empty():
 		_fail("synthetic overlay occupancy keys missing")
 		return false
-	var edge_key: String = graph._edge_key(a_key, b_key)
-	if not graph._base_edges.has(edge_key):
+	if not graph.has_base_edge(a_key, b_key):
 		_fail("blocked_links overlay omitted the stored DOOR hop")
 		return false
-	if float(graph._base_edges[edge_key]) < ShipNavGraphScript.BLOCKED_COST:
+	if graph.base_edge_cost(a_key, b_key) < ShipNavGraphScript.BLOCKED_COST:
 		_fail("blocked_links overlay left stored DOOR standing-passable")
 		return false
 	for neigh in graph.neighbors(a_key):
@@ -154,16 +192,19 @@ func _stacked_has_vertical_and_path() -> bool:
 		_fail("stacked nav nodes %d" % n)
 		return false
 	var vertical: int = 0
-	for edge_key in graph._base_edges:
-		var parts: PackedStringArray = str(edge_key).split("|")
-		if parts.size() != 2:
-			continue
-		var pa: Vector3 = graph.get_node_pos(parts[0])
-		var pb: Vector3 = graph.get_node_pos(parts[1])
-		if absf(pa.y - pb.y) > graph.deck_height * 0.5:
-			vertical += 1
+	var node_ids: Array = graph.nodes.keys()
+	for i in range(node_ids.size()):
+		var a: String = str(node_ids[i])
+		for j in range(i + 1, node_ids.size()):
+			var b: String = str(node_ids[j])
+			if not graph.has_base_edge(a, b):
+				continue
+			var pa: Vector3 = graph.get_node_pos(a)
+			var pb: Vector3 = graph.get_node_pos(b)
+			if absf(pa.y - pb.y) > graph.deck_height * 0.5:
+				vertical += 1
 	if vertical < 1:
-		_fail("stacked template has no vertical _base_edges")
+		_fail("stacked template has no vertical base-edge hops")
 		return false
 	var proto: Dictionary = layout.get("prototype", {}) as Dictionary
 	var start_id: String = str(proto.get("start_room", ""))
