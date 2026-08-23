@@ -73,6 +73,7 @@ func _initialize() -> void:
 		return
 
 	var doorway_ok: bool = false
+	var solid_fixture_edge: Dictionary = {}
 	for edge_variant in edges.values():
 		if not (edge_variant is Dictionary):
 			continue
@@ -82,6 +83,8 @@ func _initialize() -> void:
 			if not WalkabilityContractScript.capsule_hits_solid_slab(edge, occupancy):
 				_fail(label, "wall_through edge=%s" % str(edge.get("edge_key", edge.get("key", ""))))
 				return
+			if solid_fixture_edge.is_empty():
+				solid_fixture_edge = edge
 		elif kind == "DOOR" or kind == "HATCH":
 			if not WalkabilityContractScript.capsule_passes_door_opening(edge, occupancy):
 				_fail(label, "doorway_clearance edge=%s" % str(edge.get("edge_key", edge.get("key", ""))))
@@ -91,9 +94,21 @@ func _initialize() -> void:
 			if not WalkabilityContractScript.capsule_hits_solid_slab(edge, occupancy):
 				_fail(label, "locked opening passable edge=%s" % str(edge.get("edge_key", edge.get("key", ""))))
 				return
+			if WalkabilityContractScript.capsule_passes_door_opening(edge, occupancy):
+				_fail(label, "locked doorway hole passable edge=%s" % str(edge.get("edge_key", edge.get("key", ""))))
+				return
 
 	if not doorway_ok:
 		_fail(label, "no DOOR/HATCH opening tested")
+		return
+	if solid_fixture_edge.is_empty():
+		_fail(label, "no SOLID edge for extrusion fixtures")
+		return
+	if WalkabilityContractScript.capsule_hits_zero_thickness_fixture(solid_fixture_edge, occupancy):
+		_fail(label, "zero-thickness slab fixture must FAIL")
+		return
+	if WalkabilityContractScript.capsule_hits_cell_center_aabb_fixture(solid_fixture_edge, occupancy):
+		_fail(label, "cell-center AABB fixture must FAIL")
 		return
 
 	var graph = ShipNavGraphScript.new()

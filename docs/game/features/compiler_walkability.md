@@ -2,7 +2,7 @@
 
 ## Status
 
-In implementation
+Validated
 
 ## Design pillar alignment
 

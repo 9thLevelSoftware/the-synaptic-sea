@@ -17,6 +17,8 @@ const CAPSULE_FLOOR_OFFSET_M: float = 0.12
 const WALL_HEIGHT_M: float = 3.0
 const DOOR_HEIGHT_M: float = 3.2
 const WALL_HALF_SPAN_M: float = 2.0
+const HEADER_CLEARANCE_M: float = 0.10
+const SLAB_INTERIOR_T_EPS: float = 0.05
 
 const STANDING_KINDS: Array[String] = ["OPEN", "DOOR", "HATCH"]
 
@@ -198,17 +200,20 @@ static func floor_cell_keys(plan: Dictionary) -> Dictionary:
 
 
 static func capsule_hits_solid_slab(edge: Dictionary, occupancy: Dictionary) -> bool:
+	return _capsule_enters_extruded_slab(edge, occupancy, SLAB_THICKNESS_M, Vector3.INF)
+
+
+## Fail-closed fixture: a zero-thickness plane at the edge must not count as a wall hit.
+static func capsule_hits_zero_thickness_fixture(edge: Dictionary, occupancy: Dictionary) -> bool:
+	return _capsule_enters_extruded_slab(edge, occupancy, 0.0, Vector3.INF)
+
+
+## Fail-closed fixture: a 0.20 m AABB at the source cell center must not count as the wall.
+static func capsule_hits_cell_center_aabb_fixture(edge: Dictionary, occupancy: Dictionary) -> bool:
 	var sweep: Dictionary = _capsule_sweep_segment(edge, occupancy)
 	if not bool(sweep.get("ok", false)):
 		return false
-	var slab: Dictionary = _slab_local_box(WALL_HEIGHT_M)
-	return _horizontal_capsule_hits_local_box(
-		sweep["from"] as Vector3,
-		sweep["to"] as Vector3,
-		sweep["origin"] as Vector3,
-		float(sweep["yaw"]),
-		slab["min"] as Vector3,
-		slab["max"] as Vector3)
+	return _capsule_enters_extruded_slab(edge, occupancy, SLAB_THICKNESS_M, sweep["from"] as Vector3)
 
 
 static func capsule_passes_door_opening(edge: Dictionary, occupancy: Dictionary) -> bool:
@@ -219,18 +224,22 @@ static func capsule_passes_door_opening(edge: Dictionary, occupancy: Dictionary)
 		sweep["from"] as Vector3, sweep["origin"] as Vector3, float(sweep["yaw"]))
 	var to_local: Vector3 = _world_to_local(
 		sweep["to"] as Vector3, sweep["origin"] as Vector3, float(sweep["yaw"]))
-	# Same standing capsule as SOLID; hole must clear the floor-offset top.
-	var opening_top: float = maxf(
-		STANDING_OPENING_HEIGHT_M, CAPSULE_FLOOR_OFFSET_M + PLAYER_HEIGHT_M)
 	var half_w: float = DOOR_OPENING_WIDTH_M * 0.5
+	var half_t: float = SLAB_THICKNESS_M * 0.5
+	var header_min_y: float = STANDING_OPENING_HEIGHT_M + HEADER_CLEARANCE_M
 	var boxes: Array[Dictionary] = [
-		{"min": Vector3(-WALL_HALF_SPAN_M, 0.0, -SLAB_THICKNESS_M * 0.5),
-			"max": Vector3(-half_w, DOOR_HEIGHT_M, SLAB_THICKNESS_M * 0.5)},
-		{"min": Vector3(half_w, 0.0, -SLAB_THICKNESS_M * 0.5),
-			"max": Vector3(WALL_HALF_SPAN_M, DOOR_HEIGHT_M, SLAB_THICKNESS_M * 0.5)},
-		{"min": Vector3(-WALL_HALF_SPAN_M, opening_top, -SLAB_THICKNESS_M * 0.5),
-			"max": Vector3(WALL_HALF_SPAN_M, DOOR_HEIGHT_M, SLAB_THICKNESS_M * 0.5)},
+		{"min": Vector3(-WALL_HALF_SPAN_M, 0.0, -half_t),
+			"max": Vector3(-half_w, DOOR_HEIGHT_M, half_t)},
+		{"min": Vector3(half_w, 0.0, -half_t),
+			"max": Vector3(WALL_HALF_SPAN_M, DOOR_HEIGHT_M, half_t)},
+		{"min": Vector3(-WALL_HALF_SPAN_M, header_min_y, -half_t),
+			"max": Vector3(WALL_HALF_SPAN_M, DOOR_HEIGHT_M, half_t)},
 	]
+	if edge_kind(edge) == "LOCKED":
+		boxes.append({
+			"min": Vector3(-half_w, 0.0, -half_t),
+			"max": Vector3(half_w, header_min_y, half_t),
+		})
 	for box_variant in boxes:
 		var box: Dictionary = box_variant
 		if _horizontal_capsule_hits_aabb_local(
@@ -239,7 +248,9 @@ static func capsule_passes_door_opening(edge: Dictionary, occupancy: Dictionary)
 			box["min"] as Vector3,
 			box["max"] as Vector3):
 			return false
-	return _segment_crosses_opening_plane(from_local, to_local, half_w, opening_top)
+	if edge_kind(edge) == "LOCKED":
+		return false
+	return _segment_crosses_opening_plane(from_local, to_local, half_w, STANDING_OPENING_HEIGHT_M)
 
 
 static func standing_void_reason(
@@ -383,8 +394,39 @@ static func _edge_origin(edge: Dictionary) -> Vector3:
 	return CompilerScript.edge_world_position(deck, cell, direction)
 
 
-static func _slab_local_box(height_m: float) -> Dictionary:
-	var half_t: float = SLAB_THICKNESS_M * 0.5
+static func _capsule_enters_extruded_slab(
+		edge: Dictionary,
+		occupancy: Dictionary,
+		thickness_m: float,
+		origin_override: Vector3) -> bool:
+	var sweep: Dictionary = _capsule_sweep_segment(edge, occupancy)
+	if not bool(sweep.get("ok", false)):
+		return false
+	var origin: Vector3 = origin_override
+	if origin == Vector3.INF:
+		origin = sweep["origin"] as Vector3
+	var from_local: Vector3 = _world_to_local(sweep["from"] as Vector3, origin, float(sweep["yaw"]))
+	var to_local: Vector3 = _world_to_local(sweep["to"] as Vector3, origin, float(sweep["yaw"]))
+	var slab: Dictionary = _slab_local_box(WALL_HEIGHT_M, thickness_m)
+	if not _capsule_y_overlaps_aabb(from_local, to_local, slab["min"] as Vector3, slab["max"] as Vector3):
+		return false
+	var interval: Vector2 = _segment_aabb2_interval(
+		Vector2(from_local.x, from_local.z),
+		Vector2(to_local.x, to_local.z),
+		Vector2((slab["min"] as Vector3).x, (slab["min"] as Vector3).z),
+		Vector2((slab["max"] as Vector3).x, (slab["max"] as Vector3).z))
+	if interval.x > interval.y:
+		return false
+	var path_len: float = Vector2(from_local.x, from_local.z).distance_to(Vector2(to_local.x, to_local.z))
+	var overlap_m: float = (interval.y - interval.x) * path_len
+	var min_overlap: float = thickness_m * 0.5 if thickness_m > 0.0 else 0.05
+	if overlap_m < min_overlap:
+		return false
+	return interval.x < (1.0 - SLAB_INTERIOR_T_EPS) and interval.y > SLAB_INTERIOR_T_EPS
+
+
+static func _slab_local_box(height_m: float, thickness_m: float = SLAB_THICKNESS_M) -> Dictionary:
+	var half_t: float = thickness_m * 0.5
 	return {
 		"min": Vector3(-WALL_HALF_SPAN_M, 0.0, -half_t),
 		"max": Vector3(WALL_HALF_SPAN_M, height_m, half_t),
@@ -403,14 +445,22 @@ static func _horizontal_capsule_hits_local_box(
 	return _horizontal_capsule_hits_aabb_local(from_local, to_local, box_min, box_max)
 
 
-static func _horizontal_capsule_hits_aabb_local(
+static func _capsule_y_overlaps_aabb(
 		from_local: Vector3,
 		to_local: Vector3,
 		box_min: Vector3,
 		box_max: Vector3) -> bool:
 	var cap_y0: float = minf(from_local.y, to_local.y)
 	var cap_y1: float = cap_y0 + PLAYER_HEIGHT_M
-	if cap_y1 < box_min.y or cap_y0 > box_max.y:
+	return cap_y1 > box_min.y and cap_y0 < box_max.y
+
+
+static func _horizontal_capsule_hits_aabb_local(
+		from_local: Vector3,
+		to_local: Vector3,
+		box_min: Vector3,
+		box_max: Vector3) -> bool:
+	if not _capsule_y_overlaps_aabb(from_local, to_local, box_min, box_max):
 		return false
 	var expanded_min := Vector2(box_min.x - PLAYER_RADIUS_M, box_min.z - PLAYER_RADIUS_M)
 	var expanded_max := Vector2(box_max.x + PLAYER_RADIUS_M, box_max.z + PLAYER_RADIUS_M)
@@ -437,8 +487,9 @@ static func _segment_crosses_opening_plane(
 	var hit: Vector3 = from_local.lerp(to_local, t)
 	if absf(hit.x) > half_w - PLAYER_RADIUS_M:
 		return false
-	var cap_top: float = hit.y + PLAYER_HEIGHT_M
-	return hit.y >= 0.0 and cap_top <= opening_top + 0.0001
+	# Named opening is measured from floor Y=0; floor-plate offset is not counted.
+	var height_from_floor: float = hit.y - CAPSULE_FLOOR_OFFSET_M + PLAYER_HEIGHT_M
+	return hit.y >= 0.0 and height_from_floor <= opening_top + 0.0001
 
 
 static func _world_to_local(world: Vector3, origin: Vector3, yaw_degrees: float) -> Vector3:
@@ -447,8 +498,11 @@ static func _world_to_local(world: Vector3, origin: Vector3, yaw_degrees: float)
 
 
 static func _segment_hits_aabb2(p0: Vector2, p1: Vector2, box_min: Vector2, box_max: Vector2) -> bool:
-	if _point_in_aabb2(p0, box_min, box_max) or _point_in_aabb2(p1, box_min, box_max):
-		return true
+	var interval: Vector2 = _segment_aabb2_interval(p0, p1, box_min, box_max)
+	return interval.x <= interval.y
+
+
+static func _segment_aabb2_interval(p0: Vector2, p1: Vector2, box_min: Vector2, box_max: Vector2) -> Vector2:
 	var dir: Vector2 = p1 - p0
 	var t_min: float = 0.0
 	var t_max: float = 1.0
@@ -459,7 +513,7 @@ static func _segment_hits_aabb2(p0: Vector2, p1: Vector2, box_min: Vector2, box_
 		var max_a: float = box_max.x if axis == 0 else box_max.y
 		if is_zero_approx(dir_a):
 			if origin_a < min_a or origin_a > max_a:
-				return false
+				return Vector2(1.0, 0.0)
 			continue
 		var t1: float = (min_a - origin_a) / dir_a
 		var t2: float = (max_a - origin_a) / dir_a
@@ -470,8 +524,8 @@ static func _segment_hits_aabb2(p0: Vector2, p1: Vector2, box_min: Vector2, box_
 		t_min = maxf(t_min, t1)
 		t_max = minf(t_max, t2)
 		if t_min > t_max:
-			return false
-	return true
+			return Vector2(1.0, 0.0)
+	return Vector2(t_min, t_max)
 
 
 static func _point_in_aabb2(point: Vector2, box_min: Vector2, box_max: Vector2) -> bool:

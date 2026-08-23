@@ -39,7 +39,8 @@ func _initialize() -> void:
 		graph.set_edge_blocked(mid_a, mid_b, false)
 
 	if not _golden_shortcut_standing_blocked(graph, layout):
-		_fail("golden spine_to_reactor_blocked_shortcut is standing-passable")
+		return
+	if not _blocked_links_overlay_on_stored_door():
 		return
 	if not _stacked_has_vertical_and_path():
 		return
@@ -58,9 +59,83 @@ func _golden_shortcut_standing_blocked(graph, layout: Dictionary) -> bool:
 			occupancy = occ_variant
 	var from_key: String = graph._node_key_from_cell([8, 1, 1], 1, occupancy)
 	var to_key: String = graph._node_key_from_cell([9, 1, 1], 1, occupancy)
-	if from_key.is_empty() or to_key.is_empty() or from_key == to_key:
+	# Reactor cell [9,1,1] is occupied; failing to resolve it is not "no neighbor".
+	if to_key.is_empty():
+		_fail("golden reactor cell [9,1,1] did not resolve to a nav node")
+		return false
+	if from_key.is_empty() or from_key == to_key:
 		return true
-	return graph.edge_cost(from_key, to_key) >= ShipNavGraphScript.BLOCKED_COST
+	if graph.edge_cost(from_key, to_key) < ShipNavGraphScript.BLOCKED_COST:
+		_fail("golden spine_to_reactor_blocked_shortcut is standing-passable")
+		return false
+	return true
+
+
+func _blocked_links_overlay_on_stored_door() -> bool:
+	var occupancy := {
+		"0|0|0": {
+			"cell_key": "0|0|0", "deck": 0, "cell": [0, 0], "room_id": "a",
+			"position": [0.0, 0.0, 0.0],
+		},
+		"0|1|0": {
+			"cell_key": "0|1|0", "deck": 0, "cell": [1, 0], "room_id": "b",
+			"position": [4.0, 0.0, 0.0],
+		},
+	}
+	var layout := {
+		"cell_size": 4.0,
+		"deck_height": 4.0,
+		"rooms": [
+			{"id": "a", "deck": 0, "cells": [[0, 0]]},
+			{"id": "b", "deck": 0, "cells": [[1, 0]]},
+		],
+		"blocked_links": [{
+			"id": "synthetic_blocked_door",
+			"from_room": "a",
+			"to_room": "b",
+			"from_cell": [0, 0, 0],
+			"to_cell": [1, 0, 0],
+		}],
+		"vertical_connections": [],
+		"structural_plan": {
+			"occupancy": occupancy,
+			"edges": {
+				"0|v|0|0": {
+					"kind": "DOOR",
+					"state": "DOOR",
+					"deck": 0,
+					"cell": [0, 0],
+					"direction": "east",
+					"source_cells": [[0, 0, 0], [1, 0, 0]],
+					"position": [2.0, 0.0, 0.0],
+					"yaw_degrees": 270.0,
+				},
+			},
+		},
+	}
+	var graph = ShipNavGraphScript.new()
+	if graph.build_from_layout(layout) < 2:
+		_fail("synthetic overlay layout built no nodes")
+		return false
+	var a_key: String = graph._node_key_from_cell([0, 0, 0], 0, occupancy)
+	var b_key: String = graph._node_key_from_cell([1, 0, 0], 0, occupancy)
+	if a_key.is_empty() or b_key.is_empty():
+		_fail("synthetic overlay occupancy keys missing")
+		return false
+	var edge_key: String = graph._edge_key(a_key, b_key)
+	if not graph._base_edges.has(edge_key):
+		_fail("blocked_links overlay omitted the stored DOOR hop")
+		return false
+	if float(graph._base_edges[edge_key]) < ShipNavGraphScript.BLOCKED_COST:
+		_fail("blocked_links overlay left stored DOOR standing-passable")
+		return false
+	for neigh in graph.neighbors(a_key):
+		if not (neigh is Dictionary):
+			continue
+		if str((neigh as Dictionary).get("to", "")) == b_key:
+			_fail("neighbors() still returns blocked_links overlay hop")
+			return false
+	return true
 
 
 func _stacked_has_vertical_and_path() -> bool:
