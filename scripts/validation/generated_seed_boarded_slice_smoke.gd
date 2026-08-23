@@ -145,6 +145,10 @@ func _validate() -> void:
 		_fail("away _process did not tick present ships (cooldown=%s expected=%s)" % [
 			str(cooldown_after), str(10.0 - expected_dt)])
 		return
+	var hud_lines: PackedStringArray = playable.get_combined_system_status_lines()
+	if hud_lines.is_empty() and not bool(playable.complete_objective_sequence_for_validation(1)):
+		_fail("HUD/objective surface dead after away ticks")
+		return
 
 	var seed_n: int = playable._ship_seed(cur)
 	print("GENERATED SEED BOARDED SLICE PASS away=true nav=true slots=true wreck=true objectives=true away_ticks=30 seed=%d" % seed_n)
@@ -156,7 +160,8 @@ func _standing_start_to_goal(layout: Dictionary, loader: GeneratedShipLoader) ->
 	var node_n: int = graph.build_from_layout(layout)
 	if node_n <= 0:
 		return "standing nav nodes=0"
-	var proto: Dictionary = layout.get("prototype", {}) as Dictionary if layout.get("prototype", {}) is Dictionary else {}
+	var proto_v: Variant = layout.get("prototype", {})
+	var proto: Dictionary = proto_v if proto_v is Dictionary else {}
 	var start_id: String = str(proto.get("start_room", ""))
 	var goal_id: String = str(proto.get("goal_room", ""))
 	if start_id.is_empty() or goal_id.is_empty():
@@ -197,7 +202,8 @@ func _standing_room_pos(layout: Dictionary, room_id: String) -> Vector3:
 			return raw as Vector3
 		if raw is Array and (raw as Array).size() >= 3:
 			return Vector3(float(raw[0]), float(raw[1]), float(raw[2]))
-	var rooms: Array = layout.get("rooms", []) as Array if layout.get("rooms", []) is Array else []
+	var rooms_v: Variant = layout.get("rooms", [])
+	var rooms: Array = rooms_v if rooms_v is Array else []
 	var room: Dictionary = _room_by_id(rooms, room_id)
 	for placement in room.get("structural_placements", []):
 		if typeof(placement) != TYPE_DICTIONARY:
@@ -214,7 +220,8 @@ func _standing_room_pos(layout: Dictionary, room_id: String) -> Vector3:
 
 
 func _loot_on_interior_slot(layout: Dictionary, loot: Array) -> bool:
-	var rooms: Array = layout.get("rooms", []) as Array if layout.get("rooms", []) is Array else []
+	var rooms_v: Variant = layout.get("rooms", [])
+	var rooms: Array = rooms_v if rooms_v is Array else []
 	for loot_v in loot:
 		if typeof(loot_v) != TYPE_DICTIONARY:
 			continue
@@ -234,6 +241,9 @@ func _wreck_overlay_present(layout: Dictionary) -> bool:
 	var blocked_v: Variant = layout.get("blocked_links", [])
 	if blocked_v is Array and not (blocked_v as Array).is_empty():
 		return true
+	var damage_v: Variant = layout.get("module_damage", [])
+	if damage_v is Array and not (damage_v as Array).is_empty():
+		return true
 	var plan_v: Variant = layout.get("structural_plan", {})
 	if plan_v is Dictionary:
 		var edges_v: Variant = (plan_v as Dictionary).get("edges", {})
@@ -241,7 +251,8 @@ func _wreck_overlay_present(layout: Dictionary) -> bool:
 			for edge_v in (edges_v as Dictionary).values():
 				if not (edge_v is Dictionary):
 					continue
-				if str((edge_v as Dictionary).get("kind", "")).to_upper() == "LOCKED":
+				var kind: String = str((edge_v as Dictionary).get("kind", "")).to_upper()
+				if kind == "LOCKED" or kind == "BREACH":
 					return true
 	return false
 
@@ -259,8 +270,7 @@ func _cell_in_slots(room: Dictionary, cell: Array) -> bool:
 	var interior: Variant = room.get("interior_zones", {})
 	if not (interior is Dictionary):
 		return false
-	var zones: Dictionary = interior
-	for bucket_v in [zones.get("center_slots", []), zones.get("wall_slots", [])]:
+	for bucket_v in [interior.get("center_slots", []), interior.get("wall_slots", [])]:
 		if not (bucket_v is Array):
 			continue
 		for item in (bucket_v as Array):

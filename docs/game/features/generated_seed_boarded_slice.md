@@ -76,8 +76,8 @@ Headless `travel_to_marker_id` boarding copied from `away_branch_integrity_smoke
 ## Validation
 
 ```
-GODOT="C:/Users/dasbl/Documents/Godot/Godot_v4.6.2-stable_win64_console.exe"
-ROOT="<project root>"
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/generated_seed_boarded_slice_smoke.gd
 ```
 

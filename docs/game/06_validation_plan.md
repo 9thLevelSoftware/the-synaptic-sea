@@ -59,8 +59,8 @@ Expected:
 Feature: `docs/game/features/generated_seed_boarded_slice.md`. Hub remains golden `coherent_ship_001`.
 
 ```bash
-ROOT="${ROOT:-/Users/christopherwilloughby/the-synaptic-sea-of-stars}"
-GODOT="${GODOT:-/Users/christopherwilloughby/.local/bin/godot-4.6.2}"
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/generated_seed_boarded_slice_smoke.gd
 ```
 
