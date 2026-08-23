@@ -59,6 +59,15 @@ func _initialize() -> void:
 		if not gen._layout_is_connected(layout):
 			_fail("disconnected layout seed=%d" % s)
 			return
+		if not bool(layout.get("wreck_applied", false)):
+			_fail("DAMAGED seed missing wreck_applied seed=%d" % s)
+			return
+		if not _blocked_hops_kept(layout):
+			_fail("blocked hop removed from room_links seed=%d" % s)
+			return
+		if not _has_wreck_lock(layout):
+			_fail("DAMAGED seed has no blocked_links or LOCKED edge seed=%d" % s)
+			return
 		# Guaranteed dock after alias normalization.
 		var roles: Dictionary = {}
 		for room_v2 in rooms:
@@ -139,9 +148,58 @@ func _initialize() -> void:
 		_fail("role alias guarantees failed: %s" % str(gr))
 		return
 
-	print("PROCGEN QUALITY GATE PASS seeds=%d layouts=%d walkable=true encounters=true schema=true" % [
+	print("PROCGEN QUALITY GATE PASS seeds=%d layouts=%d walkable=true encounters=true schema=true wreck=true" % [
 		seeds_run, layouts_ok])
 	quit(0)
+
+
+func _blocked_hops_kept(layout: Dictionary) -> bool:
+	var blocked_v: Variant = layout.get("blocked_links", [])
+	var links_v: Variant = layout.get("room_links", [])
+	if not (blocked_v is Array) or not (links_v is Array):
+		return false
+	for blocked_row in (blocked_v as Array):
+		if not (blocked_row is Dictionary):
+			continue
+		var a: String = str((blocked_row as Dictionary).get("from_room", ""))
+		var b: String = str((blocked_row as Dictionary).get("to_room", ""))
+		if a.is_empty() or b.is_empty():
+			continue
+		var found: bool = false
+		for link_row in (links_v as Array):
+			if not (link_row is Dictionary):
+				continue
+			var fa: String = str((link_row as Dictionary).get("from_room", ""))
+			var fb: String = str((link_row as Dictionary).get("to_room", ""))
+			if (fa == a and fb == b) or (fa == b and fb == a):
+				found = true
+				break
+		if not found:
+			return false
+	return true
+
+
+func _has_wreck_lock(layout: Dictionary) -> bool:
+	var blocked_v: Variant = layout.get("blocked_links", [])
+	if blocked_v is Array and not (blocked_v as Array).is_empty():
+		return true
+	var portals_v: Variant = layout.get("portals", [])
+	if portals_v is Array:
+		for portal_v in (portals_v as Array):
+			if portal_v is Dictionary and str((portal_v as Dictionary).get("state", "")).to_upper() == "LOCKED":
+				return true
+	var plan_v: Variant = layout.get("structural_plan", {})
+	if plan_v is Dictionary:
+		var edges_v: Variant = (plan_v as Dictionary).get("edges", {})
+		if edges_v is Dictionary:
+			for edge_v in (edges_v as Dictionary).values():
+				if not (edge_v is Dictionary):
+					continue
+				var kind: String = str((edge_v as Dictionary).get("kind", "")).to_upper()
+				if kind == "LOCKED":
+					return true
+	var md_v: Variant = layout.get("module_damage", [])
+	return md_v is Array and not (md_v as Array).is_empty()
 
 func _standing_room_pos(occupancy: Dictionary, room: Dictionary, room_id: String) -> Vector3:
 	for record_variant in occupancy.values():

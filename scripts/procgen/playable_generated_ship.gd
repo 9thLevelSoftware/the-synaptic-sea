@@ -121,6 +121,7 @@ const WebInfestationStateScript := preload("res://scripts/systems/web_infestatio
 const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
 const ModuleIntegrityMapScript := preload("res://scripts/systems/module_integrity_map.gd")
 const ModuleIntegrityConsequencesScript := preload("res://scripts/systems/module_integrity_consequences.gd")
+const IntegrityVisualResolverScript := preload("res://scripts/systems/integrity_visual_resolver.gd")
 const ModuleDamageRouterScript := preload("res://scripts/systems/module_damage_router.gd")
 const ExtinguisherStateScript := preload("res://scripts/systems/extinguisher_state.gd")
 const FireSuppressionPointScript := preload("res://scripts/tools/fire_suppression_point.gd")
@@ -3499,7 +3500,7 @@ func _apply_fire_module_integrity(delta: float) -> void:
 	if layout.is_empty():
 		return
 	if module_integrity_map.size() == 0:
-		ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
+		ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(module_integrity_map, layout)
 	var resist: float = _hub_structure_damage_resist()
 	var rate: float = ModuleIntegrityConsequencesScript.FIRE_MODULE_DAMAGE_PER_INTENSITY * (1.0 - resist)
 	var changed: Array = ModuleIntegrityConsequencesScript.apply_fire_damage(
@@ -4064,7 +4065,7 @@ func _try_work_action_interact(player_body) -> bool:
 		if module_integrity_map == null:
 			module_integrity_map = ModuleIntegrityMapScript.new()
 		if module_integrity_map.size() == 0:
-			ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
+			ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(module_integrity_map, layout)
 		var has_lance: bool = int(inv.get("welding_lance", 0)) > 0 or int(inv.get("tool_welding_lance", 0)) > 0
 		var has_plate: bool = int(inv.get("hull_plate", 0)) > 0 or int(inv.get("plating_plate", 0)) > 0 or int(inv.get("hull_plate_kit", 0)) > 0
 		# REQ-SMOD / WA: weld damaged/breached modules when lance + plate available.
@@ -4801,16 +4802,34 @@ func _apply_module_integrity_scene(module_ids: Array) -> void:
 		var st: String = str(module_integrity_map.get_state(mid))
 		var node: Node = _find_structural_module_node(root, mid)
 		if node is Node3D:
+			IntegrityVisualResolverScript.apply_visual_state(node as Node3D, st)
 			ModuleIntegrityConsequencesScript.apply_to_node(node as Node3D, st)
 
 
 func _find_structural_module_node(root: Node, module_key: String) -> Node:
-	# module_key format: room_id/placement_name → node name room_id_placement_name
+	if root == null or module_key.is_empty():
+		return null
+	var by_meta: Node = _scan_structural_module_meta(root, module_key)
+	if by_meta != null:
+		return by_meta
+	# Legacy goldens: room_id/placement_name → node name room_id_placement_name
 	var parts: PackedStringArray = module_key.split("/")
 	if parts.size() < 2:
 		return root.find_child(module_key, true, false)
 	var expected: String = "%s_%s" % [parts[0], parts[1]]
 	return root.find_child(expected, true, false)
+
+
+func _scan_structural_module_meta(node: Node, module_key: String) -> Node:
+	if node.has_meta("module_key") and str(node.get_meta("module_key")) == module_key:
+		return node
+	if node.has_meta("structural_placement_id") and str(node.get_meta("structural_placement_id")) == module_key:
+		return node
+	for child in node.get_children():
+		var found: Node = _scan_structural_module_meta(child, module_key)
+		if found != null:
+			return found
+	return null
 
 func _build_fire_zones() -> void:
 	_clear_fire_zones()
@@ -5059,7 +5078,7 @@ func _apply_decompression_module_damage(compartment_id: String) -> void:
 	if layout.is_empty() and module_integrity_map.size() == 0:
 		return
 	if module_integrity_map.size() == 0 and not layout.is_empty():
-		ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
+		ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(module_integrity_map, layout)
 	var resist: float = _hub_structure_damage_resist()
 	var amount: float = ModuleDamageRouterScript.DEFAULT_DECOMPRESSION_AMOUNT * (1.0 - resist)
 	var changed: Array = ModuleDamageRouterScript.apply_decompression_to_compartment(
@@ -6934,6 +6953,14 @@ func _restore_module_integrity_for_current_ship() -> void:
 	if typeof(packed) == TYPE_DICTIONARY and not packed.is_empty():
 		if module_integrity_map.has_method("apply_summary"):
 			module_integrity_map.apply_summary(packed)
+	else:
+		var layout: Dictionary = {}
+		if current_ship.built_layout is Dictionary:
+			layout = current_ship.built_layout
+		elif is_instance_valid(loader) and loader.has_method("get_layout_copy"):
+			layout = loader.get_layout_copy()
+		if not layout.is_empty():
+			ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(module_integrity_map, layout)
 	_apply_module_integrity_state_to_scene()
 
 

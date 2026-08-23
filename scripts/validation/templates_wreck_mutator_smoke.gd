@@ -52,7 +52,7 @@ func _initialize() -> void:
 	if radial.zones.size() > zones_before:
 		_fail("zone mutator should not grow zones"); return
 
-	# Branch mutator blocks some links
+	# Overlay branch locks copy hops into blocked_links and keep room_links.
 	var layout: Dictionary = {
 		"critical_path": ["airlock", "corridor"],
 		"room_links": [
@@ -63,17 +63,37 @@ func _initialize() -> void:
 			{"id": "l5", "from_room": "med", "to_room": "crew", "module_id": "doorway_frame_open_1x1"},
 		],
 		"blocked_links": [],
+		"portals": [
+			{"from_room": "airlock", "to_room": "corridor", "state": "DOOR"},
+			{"from_room": "corridor", "to_room": "cargo", "state": "DOOR"},
+			{"from_room": "corridor", "to_room": "med", "state": "DOOR"},
+			{"from_room": "cargo", "to_room": "storage", "state": "DOOR"},
+			{"from_room": "med", "to_room": "crew", "state": "DOOR"},
+		],
 	}
-	var blocks: int = LayoutMutatorScript.apply_branch_mutators(layout, 7)
+	var links_before: int = (layout["room_links"] as Array).size()
+	var blocks: int = LayoutMutatorScript.apply_branch_overlays(layout, 7)
 	if blocks < 1:
-		_fail("branch mutator should block at least one link"); return
+		_fail("branch overlay should block at least one link"); return
+	if (layout["room_links"] as Array).size() != links_before:
+		_fail("overlay must keep every room_link"); return
+	LayoutMutatorScript.apply_portal_overlays(layout, 7, false)
 	# critical hop protected
 	var still_open: bool = false
 	for L in layout["room_links"]:
 		if str(L.get("from_room", "")) == "airlock" and str(L.get("to_room", "")) == "corridor":
 			still_open = true
 	if not still_open:
-		_fail("critical_path first hop must stay open"); return
+		_fail("critical_path first hop must stay in room_links"); return
+	for B in layout["blocked_links"]:
+		if str(B.get("from_room", "")) == "airlock" and str(B.get("to_room", "")) == "corridor":
+			_fail("critical_path first hop must not be overlay-locked"); return
+	var locked_portal: bool = false
+	for P in layout["portals"]:
+		if str(P.get("state", "")) == "LOCKED":
+			locked_portal = true
+	if not locked_portal:
+		_fail("overlay should stamp at least one LOCKED portal"); return
 
 	# Wreck mutator damages walls
 	var wreck_layout: Dictionary = {

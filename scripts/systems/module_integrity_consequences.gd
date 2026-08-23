@@ -133,6 +133,60 @@ static func seed_structural_map_from_layout(module_map: RefCounted, layout: Dict
 	return _seed_map_from_layout_filtered(module_map, layout, Callable(is_structural_kind))
 
 
+## Register compiler-keyed modules (floor/<cell>, edge/<edge>, ceiling/<cell>)
+## and apply layout.module_damage. Falls back to placement names when no plan.
+static func seed_map_from_compiled_layout(module_map: RefCounted, layout: Dictionary) -> int:
+	if module_map == null or not module_map.has_method("ensure_module"):
+		return 0
+	var plan_v: Variant = layout.get("structural_plan", {})
+	if typeof(plan_v) != TYPE_DICTIONARY or (plan_v as Dictionary).is_empty():
+		return seed_map_from_layout(module_map, layout)
+	var plan: Dictionary = plan_v
+	var registered: int = 0
+	registered += _seed_compiled_records(module_map, plan.get("floor_placements", []), "floor")
+	registered += _seed_compiled_records(module_map, plan.get("placements", []), "edge")
+	registered += _seed_compiled_records(module_map, plan.get("ceiling_placements", []), "ceiling")
+	var md_v: Variant = layout.get("module_damage", [])
+	if typeof(md_v) == TYPE_ARRAY:
+		for row_v in (md_v as Array):
+			if typeof(row_v) != TYPE_DICTIONARY:
+				continue
+			var row: Dictionary = row_v
+			var mid: String = str(row.get("module_key", row.get("module_id", "")))
+			if mid.is_empty():
+				continue
+			var kind: String = str(row.get("kind", ""))
+			var room_id: String = str(row.get("room_id", ""))
+			module_map.call("ensure_module", mid, kind, {}, room_id)
+			var amount: float = float(row.get("amount", 0.0))
+			if amount > 0.0 and module_map.has_method("apply_damage"):
+				module_map.call("apply_damage", mid, amount, kind)
+	return registered
+
+
+static func _seed_compiled_records(module_map: RefCounted, records_v: Variant, layer: String) -> int:
+	if typeof(records_v) != TYPE_ARRAY:
+		return 0
+	var n: int = 0
+	for rec_v in (records_v as Array):
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		var kind: String = str(rec.get("module_id", rec.get("module", "")))
+		var key_part: String = str(rec.get("edge_key", rec.get("key", ""))) if layer == "edge" else str(rec.get("cell_key", ""))
+		if key_part.is_empty():
+			continue
+		var mid: String = "%s/%s" % [layer, key_part]
+		var room_id: String = str(rec.get("room_id", ""))
+		if room_id.is_empty():
+			var rooms_v: Variant = rec.get("room_ids", [])
+			if rooms_v is Array and not (rooms_v as Array).is_empty():
+				room_id = str((rooms_v as Array)[0])
+		module_map.call("ensure_module", mid, kind, {}, room_id)
+		n += 1
+	return n
+
+
 static func _seed_map_from_layout_filtered(
 		module_map: RefCounted,
 		layout: Dictionary,
@@ -224,12 +278,26 @@ static func apply_to_node(node: Node3D, state: String) -> void:
 	node.set_meta("crawl_passable", bool(cons.get("crawl_passable", false)))
 	node.set_meta("atmosphere_link", bool(cons.get("atmosphere_link", false)))
 	node.set_meta("nav_gap", bool(cons.get("nav_gap", false)))
-	var mod_v: Variant = cons.get("modulate", [1.0, 1.0, 1.0, 1.0])
-	if mod_v is Array and (mod_v as Array).size() >= 3:
-		var col := Color(float(mod_v[0]), float(mod_v[1]), float(mod_v[2]), float(mod_v[3]) if (mod_v as Array).size() > 3 else 1.0)
-		_tint_meshes(node, col)
+	# Variant wrappers swap Intact/Damaged/Breached children; albedo tint fights
+	# IntegrityVisualResolver and is reserved for legacy single-child meshes.
+	if not _wrapper_has_variant_visuals(node):
+		var mod_v: Variant = cons.get("modulate", [1.0, 1.0, 1.0, 1.0])
+		if mod_v is Array and (mod_v as Array).size() >= 3:
+			var col := Color(float(mod_v[0]), float(mod_v[1]), float(mod_v[2]), float(mod_v[3]) if (mod_v as Array).size() > 3 else 1.0)
+			_tint_meshes(node, col)
 	var collision_on: bool = bool(cons.get("collision_enabled", true))
 	_set_collisions_enabled(node, collision_on)
+
+
+static func _wrapper_has_variant_visuals(node: Node) -> bool:
+	if node == null:
+		return false
+	var visual: Node = node.get_node_or_null("Visual")
+	if visual == null:
+		return false
+	return visual.get_node_or_null("VisualInstance_Intact") != null \
+		or visual.get_node_or_null("VisualInstance_Damaged") != null \
+		or visual.get_node_or_null("VisualInstance_Breached") != null
 
 
 static func _tint_meshes(node: Node, color: Color) -> void:
