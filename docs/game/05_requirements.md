@@ -1658,11 +1658,11 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ---
 
-# Boarded generated-seed slice (remaining procgen play stack WP5)
+# Boarded generated-seed slice
 
 ## REQ-SLICE-001: Boarded generated-seed play proof
 
-- Source: `features/generated_seed_boarded_slice.md`, `features/remaining_procgen_play_stack.md` WP5
+- Source: `features/generated_seed_boarded_slice.md`, `features/vertical_slice_v1.md`
 - Type: gameplay / technical
 - Priority: must
 - Status: Validated
