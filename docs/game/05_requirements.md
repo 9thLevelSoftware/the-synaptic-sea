@@ -1576,6 +1576,23 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - `structural_variant_wrapper_smoke.gd`
   - `procgen_quality_gate_smoke.gd`
 
+## REQ-DECAY-002: Structural wrapper collision matches walkability contract
+
+- Source: `features/structural_wrapper_collision.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Live wall/door proxies must be 0.20 m slabs and a posts+header opening, not 1×1×1 cubes, so the player capsule matches Stage A walkability numbers.
+- Acceptance criteria:
+  - `wall_straight_1x1` / `wall_end_cap` one `BoxShape3D(4, 3, 0.2)`.
+  - Inner/outer corner two wing slabs (not a 4×3×4 AABB); T-junction three wing slabs.
+  - `doorway_frame_open_1x1` posts at X ±1.3 m plus header bottom at Y=2.2 m; standing 0.80×1.70 opening is clear.
+  - `doorway_frame_blocked_1x1` full `BoxShape3D(4, 3.2, 0.2)` slab.
+  - `bulkhead_portal_2x1` unchanged.
+  - Numbers match `walkability_contract.gd`.
+- Verification:
+  - `structural_wrapper_collision_footprint_smoke.gd`
+
 ## REQ-AVB-009: Explicit derived refresh preserves authored extensions
 
 - Source: `features/asset_metadata_pipeline.md`, ADR-0052
