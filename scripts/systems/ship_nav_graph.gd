@@ -83,8 +83,10 @@ func build_from_structural_plan(layout: Dictionary) -> int:
 			continue
 		var cost: float = standing_cost_for_kind(kind)
 		_set_base_edge(pair[0], pair[1], cost)
-	_overlay_blocked_links(layout, occupancy)
+	# Vertical hops first; blocked_links overlay last so a blocked
+	# cross-deck room_link cannot be reopened at passable hatch cost.
 	_add_vertical_connection_edges(layout, occupancy)
+	_overlay_blocked_links(layout, occupancy)
 	_base_edges = edges.duplicate(true)
 	dirty = false
 	return nodes.size()
