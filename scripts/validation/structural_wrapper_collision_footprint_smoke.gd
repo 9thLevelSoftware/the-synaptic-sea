@@ -64,7 +64,7 @@ func _check_walls(failures: Array[String]) -> bool:
 			failures.append("%s expected 1 wall slab got %d" % [scene_path, boxes.size()])
 			ok = false
 			continue
-		if not _box_matches(boxes[0], wall_size, wall_center, false):
+		if not _box_matches(boxes[0], wall_size, wall_center):
 			failures.append("%s wall slab size/pose mismatch size=%s pos=%s" % [
 				scene_path, str(_box_size(boxes[0])), str(boxes[0].position)
 			])
@@ -131,7 +131,7 @@ func _check_doors(failures: Array[String]) -> bool:
 	if blocked.size() != 1:
 		failures.append("%s expected 1 full slab got %d" % [DOOR_BLOCKED_PATH, blocked.size()])
 		ok = false
-	elif not _box_matches(blocked[0], blocked_size, blocked_center, false):
+	elif not _box_matches(blocked[0], blocked_size, blocked_center):
 		failures.append("%s blocked slab size/pose mismatch size=%s pos=%s" % [
 			DOOR_BLOCKED_PATH, str(_box_size(blocked[0])), str(blocked[0].position)
 		])
@@ -157,14 +157,14 @@ func _check_doors(failures: Array[String]) -> bool:
 		failures.append("%s missing post/header boxes" % DOOR_OPEN_PATH)
 		return false
 	var post_y: float = WalkabilityContractScript.DOOR_HEIGHT_M * 0.5
-	if not _box_matches(west, post_size, Vector3(-WalkabilityContractScript.DOOR_POST_OFFSET_X_M, post_y, 0.0), false):
+	if not _box_matches(west, post_size, Vector3(-WalkabilityContractScript.DOOR_POST_OFFSET_X_M, post_y, 0.0)):
 		failures.append("%s west post pose mismatch pos=%s" % [DOOR_OPEN_PATH, str(west.position)])
 		ok = false
-	if not _box_matches(east, post_size, Vector3(WalkabilityContractScript.DOOR_POST_OFFSET_X_M, post_y, 0.0), false):
+	if not _box_matches(east, post_size, Vector3(WalkabilityContractScript.DOOR_POST_OFFSET_X_M, post_y, 0.0)):
 		failures.append("%s east post pose mismatch pos=%s" % [DOOR_OPEN_PATH, str(east.position)])
 		ok = false
 	var header_y: float = WalkabilityContractScript.DOOR_HEADER_BOTTOM_Y_M + WalkabilityContractScript.DOOR_HEADER_HEIGHT_M * 0.5
-	if not _box_matches(header, header_size, Vector3(0.0, header_y, 0.0), false):
+	if not _box_matches(header, header_size, Vector3(0.0, header_y, 0.0)):
 		failures.append("%s header pose mismatch pos=%s size=%s" % [
 			DOOR_OPEN_PATH, str(header.position), str(_box_size(header))
 		])
@@ -380,13 +380,11 @@ func _box_size_close(actual: Vector3, expected: Vector3) -> bool:
 	return actual.distance_to(expected) < SIZE_EPS
 
 
-func _box_matches(node: CollisionShape3D, expected_size: Vector3, expected_pos: Vector3, require_yaw_90: bool) -> bool:
+func _box_matches(node: CollisionShape3D, expected_size: Vector3, expected_pos: Vector3) -> bool:
 	if not _box_size_close(_box_size(node), expected_size):
 		return false
 	if node.position.distance_to(expected_pos) > POS_EPS:
 		return false
-	if require_yaw_90:
-		return _is_yaw_90(node)
 	return _is_yaw_identity(node)
 
 
