@@ -31,6 +31,8 @@ func _initialize() -> void:
 		return
 	if not _check_dressing_props():
 		return
+	if not _check_small_room_dressing():
+		return
 	print("ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true")
 	quit(0)
 
@@ -645,4 +647,41 @@ func _check_dressing_props() -> bool:
 		return _fail("dressing used ReadabilityPropFactory names")
 	if prop_count < 1:
 		return _fail("no DressingProp_cargo_01_* instances")
+	return true
+
+
+func _check_small_room_dressing() -> bool:
+	var cargo: Dictionary = _synthetic_room()
+	var layout: Dictionary = {
+		"program_id": "procgen-derelict-seed-42",
+		"prototype": {"start_room": "airlock_01", "goal_room": "bridge_01"},
+		"rooms": [cargo],
+		"cell_size": 4.0,
+		"structural_plan": {
+			"floor_placements": [
+				{"cell_key": "0|1|0", "room_id": "cargo_01", "world_position": [4.0, 0.0, 0.0]},
+				{"cell_key": "0|2|0", "room_id": "cargo_01", "world_position": [8.0, 0.0, 0.0]},
+				{"cell_key": "0|0|1", "room_id": "cargo_01", "world_position": [0.0, 0.0, 4.0]},
+			],
+		},
+	}
+	var loader: Node3D = GeneratedShipLoaderScript.new()
+	get_root().add_child(loader)
+	loader.layout_doc = layout
+	loader.gameplay_doc = {"start_room": "airlock_01", "loot_containers": []}
+	loader.loot_container_specs = []
+	loader._build_room_variant_descriptors()
+	var root := Node3D.new()
+	get_root().add_child(root)
+	loader._apply_dressing_visuals(layout, root)
+	var dressing_root: Node = root.get_node_or_null("DressingVisuals")
+	var prop_count: int = 0
+	if dressing_root != null:
+		for child in dressing_root.get_children():
+			if str(child.name).begins_with("DressingProp_cargo_01_"):
+				prop_count += 1
+	root.free()
+	loader.free()
+	if prop_count < 1:
+		return _fail("small 3-wall room reserved every slot; no DressingProp_* left")
 	return true

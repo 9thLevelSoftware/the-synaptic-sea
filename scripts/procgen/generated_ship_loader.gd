@@ -1168,6 +1168,7 @@ func _occupy_approach(occupied: Dictionary, room_id: String, cell_v: Variant) ->
 func _reserve_component_slots(rooms: Array, occupied: Dictionary) -> void:
 	# Components populate after dressing; hold the same 3 wall + 1 center cap
 	# those fills will take so clutter cannot steal machine slots.
+	# Small rooms (≤ MAX_WALL_FILLS free walls) keep one wall for dressing.
 	for room_variant in rooms:
 		if typeof(room_variant) != TYPE_DICTIONARY:
 			continue
@@ -1178,8 +1179,29 @@ func _reserve_component_slots(rooms: Array, occupied: Dictionary) -> void:
 		var interior: Variant = room.get("interior_zones", {})
 		if not (interior is Dictionary):
 			continue
-		_reserve_slot_kind(rid, interior as Dictionary, "wall_slots", ComponentPlacementStateScript.MAX_WALL_FILLS, occupied)
-		_reserve_slot_kind(rid, interior as Dictionary, "center_slots", ComponentPlacementStateScript.MAX_CENTER_FILLS, occupied)
+		var walls: Dictionary = interior as Dictionary
+		var wall_free: int = _unoccupied_slot_count(rid, walls, "wall_slots", occupied)
+		var wall_cap: int = ComponentPlacementStateScript.MAX_WALL_FILLS
+		if wall_free > 0 and wall_free <= ComponentPlacementStateScript.MAX_WALL_FILLS:
+			wall_cap = maxi(0, wall_free - 1)
+		_reserve_slot_kind(rid, walls, "wall_slots", wall_cap, occupied)
+		_reserve_slot_kind(rid, walls, "center_slots", ComponentPlacementStateScript.MAX_CENTER_FILLS, occupied)
+
+
+func _unoccupied_slot_count(rid: String, interior: Dictionary, slot_key: String, occupied: Dictionary) -> int:
+	var slots_v: Variant = interior.get(slot_key, [])
+	if not (slots_v is Array):
+		return 0
+	var n: int = 0
+	for item in (slots_v as Array):
+		var parsed: Array = LayoutSerializerScript.parse_slot_cell(item)
+		if parsed.size() < 2:
+			continue
+		var key: String = "%s|%d|%d" % [rid, int(parsed[0]), int(parsed[1])]
+		if occupied.has(key):
+			continue
+		n += 1
+	return n
 
 
 func _reserve_slot_kind(rid: String, interior: Dictionary, slot_key: String, max_count: int, occupied: Dictionary) -> void:
