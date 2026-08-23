@@ -108,8 +108,8 @@ encounter/dressing (`biomatter_crusted`).
 ## Validation
 
 ```bash
-GODOT="C:/Users/dasbl/Documents/Godot/Godot_v4.6.2-stable_win64_console.exe"
-ROOT="<project root>"
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hive_biomatter_kit_smoke.gd
 ```
 

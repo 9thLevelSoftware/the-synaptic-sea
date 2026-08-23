@@ -45,8 +45,8 @@ Requirement: REQ-HIVE-001.
 Registered in the regression bundle after GREEN.
 
 ```bash
-ROOT="${ROOT:-/Users/christopherwilloughby/the-synaptic-sea-of-stars}"
-GODOT="${GODOT:-/Users/christopherwilloughby/.local/bin/godot-4.6.2}"
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hive_biomatter_kit_smoke.gd
 ```
 
