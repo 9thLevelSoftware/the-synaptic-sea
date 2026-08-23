@@ -105,6 +105,7 @@ static func apply_branch_mutators(layout: Dictionary, seed_value: int, overlay: 
 	var kept: Array = []
 	var blocked_n: int = 0
 	var max_block: int = maxi(1, links.size() / 4)
+	var overlay_fallback: Dictionary = {}
 	for link in links:
 		if typeof(link) != TYPE_DICTIONARY:
 			continue
@@ -117,12 +118,15 @@ static func apply_branch_mutators(layout: Dictionary, seed_value: int, overlay: 
 		var can_block: bool = not protected.has(key) and not protected.has(key_r) and not vertical
 		if overlay:
 			kept.append(original)
-			if can_block and blocked_n < max_block and rng.randf() < 0.28:
-				var stamped: Dictionary = original.duplicate(true)
-				stamped["module_id"] = "doorway_frame_blocked_1x1"
-				stamped["reason"] = "branch_mutator"
-				blocked.append(stamped)
-				blocked_n += 1
+			if can_block:
+				if overlay_fallback.is_empty():
+					overlay_fallback = original
+				if blocked_n < max_block and rng.randf() < 0.28:
+					var stamped: Dictionary = original.duplicate(true)
+					stamped["module_id"] = "doorway_frame_blocked_1x1"
+					stamped["reason"] = "branch_mutator"
+					blocked.append(stamped)
+					blocked_n += 1
 			continue
 		if not can_block:
 			kept.append(original)
@@ -134,6 +138,12 @@ static func apply_branch_mutators(layout: Dictionary, seed_value: int, overlay: 
 			blocked_n += 1
 		else:
 			kept.append(original)
+	if overlay and blocked_n == 0 and not overlay_fallback.is_empty():
+		var forced: Dictionary = overlay_fallback.duplicate(true)
+		forced["module_id"] = "doorway_frame_blocked_1x1"
+		forced["reason"] = "branch_mutator"
+		blocked.append(forced)
+		blocked_n = 1
 	layout["room_links"] = kept
 	layout["blocked_links"] = blocked
 	return blocked_n
@@ -416,7 +426,7 @@ static func _stamp_one_breach_portal(layout: Dictionary, seed_value: int) -> int
 			continue
 		var portal: Dictionary = portals[i]
 		var state: String = str(portal.get("state", "DOOR")).to_upper()
-		if state != "DOOR" and state != "OPEN" and not state.is_empty():
+		if state != "DOOR":
 			continue
 		var a: String = str(portal.get("from_room", ""))
 		var b: String = str(portal.get("to_room", ""))

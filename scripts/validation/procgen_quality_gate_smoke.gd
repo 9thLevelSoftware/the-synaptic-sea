@@ -198,8 +198,7 @@ func _has_wreck_lock(layout: Dictionary) -> bool:
 				var kind: String = str((edge_v as Dictionary).get("kind", "")).to_upper()
 				if kind == "LOCKED":
 					return true
-	var md_v: Variant = layout.get("module_damage", [])
-	return md_v is Array and not (md_v as Array).is_empty()
+	return false
 
 func _standing_room_pos(occupancy: Dictionary, room: Dictionary, room_id: String) -> Vector3:
 	for record_variant in occupancy.values():

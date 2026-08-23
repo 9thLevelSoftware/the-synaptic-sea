@@ -4441,16 +4441,19 @@ func _nearest_damaged_wall_module(layout: Dictionary, player_pos: Vector3, max_r
 			var st2: String = str(module_integrity_map.get_state(id))
 			if st2 not in ["damaged", "breached"]:
 				continue
-			var rid: String = id.get_slice("/", 0)
-			var pos: Vector3 = room_centers.get(rid, Vector3.ZERO) as Vector3
-			if room_centers.has(rid):
-				pos = room_centers[rid] as Vector3
-			else:
+			var m = module_integrity_map.call("get_module", id) if module_integrity_map.has_method("get_module") else null
+			var rid: String = str(m.get("room_id")) if m != null else ""
+			if rid.is_empty():
+				var prefix: String = id.get_slice("/", 0)
+				if prefix == "floor" or prefix == "edge" or prefix == "ceiling":
+					continue
+				rid = prefix
+			if not room_centers.has(rid):
 				continue
+			var pos: Vector3 = room_centers[rid] as Vector3
 			var d: float = player_pos.distance_to(pos)
 			if d <= best_d:
 				best_d = d
-				var m = module_integrity_map.call("get_module", id) if module_integrity_map.has_method("get_module") else null
 				var kind: String = str(m.get("kind")) if m != null else "wall"
 				best = {"module_id": id, "kind": kind, "distance": d}
 	return best
