@@ -1577,3 +1577,23 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Verification:
   - Future prop validator refresh-preservation check.
   - Future prop visual binding smoke with an extension/provenance fixture.
+
+---
+
+# Enclosed slot fill (remaining procgen play stack WP3)
+
+## REQ-FILL-001: Slot-native interior fill
+
+- Source: `features/enclosed_slot_fill.md`, `features/remaining_procgen_play_stack.md` WP3
+- Type: gameplay / technical
+- Priority: must
+- Status: Implemented
+- Rationale: Enclosed rooms already expose `wall_slots` / `center_slots`; dumping loot on the first `floor_cell_*` is the remaining empty-box tell.
+- Acceptance criteria:
+  - Consumers read `room.interior_zones.{wall_slots,center_slots,reserved_cells}` with `[x, z]` cells (one-release parse of `"(x, y)"` strings).
+  - Generated loot / salvage / components / dressing use those slots; no live dump on the first `floor_cell_*` unless that cell is the chosen slot.
+  - Dressing clutter is not `ReadabilityPropFactory` unique affordance names; props are `DressingProp_<room>_<index>` with `collision_policy=none_visual_only`.
+  - Slots stay compile-time SOLID-wall cells; do not re-resolve after BREACH overlay.
+- Verification:
+  - `scripts/validation/enclosed_slot_fill_smoke.gd` marker `ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true`
+  - Existing component slot smokes remain green

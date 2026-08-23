@@ -52,6 +52,7 @@ const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_ma
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_generator.gd")
 const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
+const LayoutSerializerScript := preload("res://scripts/procgen/layout_serializer.gd")
 const FirstRunContractScript := preload("res://scripts/procgen/first_run_contract.gd")
 const PlayerProgressionScript := preload("res://scripts/systems/player_progression_state.gd")
 const ClassDefinitionScript := preload("res://scripts/systems/class_definition.gd")
@@ -3593,10 +3594,7 @@ func _rebuild_component_markers() -> void:
 		if not bool(e.get("mounted", true)):
 			continue
 		var rid: String = str(e.get("room_id", ""))
-		var pos: Vector3 = centers.get(rid, Vector3(float(i) * 0.5, 0.5, 0.0)) as Vector3 if centers.has(rid) else Vector3(float(i) * 0.5, 0.5, 0.0)
-		# Offset wall slots slightly so markers do not stack.
-		var slot_i: int = int(e.get("slot_index", 0))
-		pos += Vector3(0.4 * float(slot_i % 3), 0.6, 0.25 * float(slot_i % 2))
+		var pos: Vector3 = _component_marker_world(layout, e, centers, i)
 		# Convert world → parent-local if parent is offset.
 		var local_pos: Vector3 = pos
 		if parent.is_inside_tree():
@@ -4146,7 +4144,7 @@ func play_work_tool_missing_sfx_for_validation() -> void:
 	_emit_work_tool_missing_sfx()
 
 
-## Nearest mounted component; uses room floor center as approximate world position.
+## Nearest mounted component; uses the same slot world position as the visible marker.
 func _nearest_mounted_component(layout: Dictionary, player_pos: Vector3, max_range: float) -> Dictionary:
 	var best: Dictionary = {}
 	var best_d: float = max_range
@@ -4154,25 +4152,26 @@ func _nearest_mounted_component(layout: Dictionary, player_pos: Vector3, max_ran
 		return best
 	var placed: Array = component_placement_state.get("placed") as Array if typeof(component_placement_state.get("placed")) == TYPE_ARRAY else []
 	var room_centers: Dictionary = _room_world_centers(layout)
+	var i: int = 0
 	for entry_v in placed:
 		if typeof(entry_v) != TYPE_DICTIONARY:
+			i += 1
 			continue
 		var e: Dictionary = entry_v
 		if not bool(e.get("mounted", true)):
+			i += 1
 			continue
-		var rid: String = str(e.get("room_id", ""))
-		if not room_centers.has(rid):
-			continue
-		var pos: Vector3 = room_centers[rid] as Vector3
+		var pos: Vector3 = _component_marker_world(layout, e, room_centers, i)
 		var d: float = player_pos.distance_to(pos)
 		if d <= best_d:
 			best_d = d
 			best = e.duplicate(true)
 			best["distance"] = d
+		i += 1
 	return best
 
 
-## Find dismounted placement whose item_form is in inventory and room is in range.
+## Find dismounted placement whose item_form is in inventory and slot is in range.
 func _nearest_remount_target(
 		layout: Dictionary,
 		player_pos: Vector3,
@@ -4184,21 +4183,24 @@ func _nearest_remount_target(
 		return best
 	var placed: Array = component_placement_state.get("placed") as Array if typeof(component_placement_state.get("placed")) == TYPE_ARRAY else []
 	var room_centers: Dictionary = _room_world_centers(layout)
+	var i: int = 0
 	for entry_v in placed:
 		if typeof(entry_v) != TYPE_DICTIONARY:
+			i += 1
 			continue
 		var e: Dictionary = entry_v
 		if bool(e.get("mounted", true)):
+			i += 1
 			continue
 		var form: String = str(e.get("item_form", e.get("component_id", "")))
 		if form.is_empty() or int(inventory.get(form, 0)) < 1:
+			i += 1
 			continue
 		var rid: String = str(e.get("room_id", ""))
-		if not room_centers.has(rid):
-			continue
-		var pos: Vector3 = room_centers[rid] as Vector3
+		var pos: Vector3 = _component_marker_world(layout, e, room_centers, i)
 		var d: float = player_pos.distance_to(pos)
 		if d > best_d:
+			i += 1
 			continue
 		best_d = d
 		best = {
@@ -4211,7 +4213,154 @@ func _nearest_remount_target(
 			"distance": d,
 			"item_form": form,
 		}
+		i += 1
 	return best
+
+
+func _slot_occupancy_from_loader() -> Dictionary:
+	var occupied: Dictionary = {}
+	var active_loader = current_ship.scene_root if (away_from_start and current_ship != null) else loader
+	if active_loader == null or not is_instance_valid(active_loader):
+		return occupied
+	var loot_v: Variant = active_loader.loot_container_specs if active_loader.get("loot_container_specs") != null else []
+	if loot_v is Array:
+		for loot_row in (loot_v as Array):
+			if typeof(loot_row) != TYPE_DICTIONARY:
+				continue
+			var loot: Dictionary = loot_row
+			_mark_occupancy(occupied, str(loot.get("room_id", "")), loot.get("approach_cell", []))
+	var gameplay: Dictionary = active_loader.gameplay_doc if typeof(active_loader.get("gameplay_doc")) == TYPE_DICTIONARY else {}
+	var objectives_v: Variant = gameplay.get("objectives", [])
+	if objectives_v is Array:
+		for obj_row in (objectives_v as Array):
+			if typeof(obj_row) != TYPE_DICTIONARY:
+				continue
+			_mark_objective_occupancy(occupied, obj_row)
+	var specs_v: Variant = active_loader.objective_specs if active_loader.get("objective_specs") != null else []
+	if specs_v is Array:
+		for spec_row in (specs_v as Array):
+			if typeof(spec_row) != TYPE_DICTIONARY:
+				continue
+			_mark_objective_occupancy(occupied, spec_row)
+	var start_room: String = str(gameplay.get("start_room", ""))
+	if start_room.is_empty() and typeof(active_loader.get("layout_doc")) == TYPE_DICTIONARY:
+		var proto: Variant = active_loader.layout_doc.get("prototype", {})
+		if proto is Dictionary:
+			start_room = str((proto as Dictionary).get("start_room", ""))
+	if not start_room.is_empty() and typeof(active_loader.get("layout_doc")) == TYPE_DICTIONARY:
+		var rooms_v: Variant = active_loader.layout_doc.get("rooms", [])
+		if rooms_v is Array:
+			for room_v in (rooms_v as Array):
+				if typeof(room_v) != TYPE_DICTIONARY:
+					continue
+				var room: Dictionary = room_v
+				if str(room.get("id", "")) != start_room:
+					continue
+				var boarding_cell: Array = GameplaySliceBuilderScript.boarding_cell_xz(room)
+				if boarding_cell.size() >= 2:
+					_mark_occupancy(occupied, start_room, boarding_cell)
+				break
+	_collect_dressing_occupancy(active_loader, occupied)
+	return occupied
+
+
+func _mark_objective_occupancy(occupied: Dictionary, obj: Dictionary) -> void:
+	var room_id: String = str(obj.get("room_id", ""))
+	_mark_occupancy(occupied, room_id, obj.get("approach_cell", []))
+	var steps_v: Variant = obj.get("steps", [])
+	if not (steps_v is Array):
+		return
+	for step_v in (steps_v as Array):
+		if typeof(step_v) != TYPE_DICTIONARY:
+			continue
+		var step: Dictionary = step_v
+		var step_room: String = str(step.get("room_id", room_id))
+		_mark_occupancy(occupied, step_room, step.get("approach_cell", []))
+
+
+func _mark_occupancy(occupied: Dictionary, room_id: String, cell_v: Variant) -> void:
+	if room_id.is_empty():
+		return
+	var parsed: Array = LayoutSerializerScript.parse_slot_cell(cell_v)
+	if parsed.size() >= 2:
+		occupied["%s|%d|%d" % [room_id, int(parsed[0]), int(parsed[1])]] = true
+
+
+func _collect_dressing_occupancy(root: Node, occupied: Dictionary) -> void:
+	if root == null:
+		return
+	if str(root.name).begins_with("DressingProp_"):
+		var cell_v: Variant = root.get_meta("slot_cell", [])
+		var parsed: Array = LayoutSerializerScript.parse_slot_cell(cell_v)
+		var room_id: String = str(root.name).trim_prefix("DressingProp_")
+		var cut: int = room_id.rfind("_")
+		if cut >= 0:
+			room_id = room_id.substr(0, cut)
+		if parsed.size() >= 2 and not room_id.is_empty():
+			occupied["%s|%d|%d" % [room_id, int(parsed[0]), int(parsed[1])]] = true
+	for child in root.get_children():
+		_collect_dressing_occupancy(child, occupied)
+
+
+func _component_marker_world(layout: Dictionary, entry: Dictionary, centers: Dictionary, i: int) -> Vector3:
+	var rid: String = str(entry.get("room_id", ""))
+	var parsed: Array = LayoutSerializerScript.parse_slot_cell(entry.get("cell", null))
+	if parsed.size() >= 2:
+		var room: Dictionary = {}
+		var rooms_v: Variant = layout.get("rooms", [])
+		if rooms_v is Array:
+			for room_v in (rooms_v as Array):
+				if typeof(room_v) == TYPE_DICTIONARY and str((room_v as Dictionary).get("id", "")) == rid:
+					room = room_v
+					break
+		var deck: int = int(room.get("deck", 0))
+		var world: Vector3 = _slot_cell_to_world(layout, room, parsed, deck)
+		if world != Vector3.INF:
+			if current_ship != null and is_instance_valid(current_ship.scene_root) and current_ship.scene_root is Node3D:
+				return (current_ship.scene_root as Node3D).global_transform * world
+			return world
+	var fallback: Vector3 = centers.get(rid, Vector3(float(i) * 0.5, 0.5, 0.0)) as Vector3 if centers.has(rid) else Vector3(float(i) * 0.5, 0.5, 0.0)
+	return fallback
+
+
+func _slot_cell_to_world(layout: Dictionary, room: Dictionary, cell: Array, deck: int) -> Vector3:
+	if cell.size() < 2:
+		return Vector3.INF
+	var room_id: String = str(room.get("id", ""))
+	var cell_key_value: String = "%d|%d|%d" % [deck, int(cell[0]), int(cell[1])]
+	var plan: Variant = layout.get("structural_plan", {})
+	if plan is Dictionary:
+		var floors_v: Variant = (plan as Dictionary).get("floor_placements", [])
+		if floors_v is Array:
+			for floor_v in (floors_v as Array):
+				if typeof(floor_v) != TYPE_DICTIONARY:
+					continue
+				var floor: Dictionary = floor_v
+				if str(floor.get("cell_key", "")) != cell_key_value:
+					continue
+				if not room_id.is_empty() and str(floor.get("room_id", "")) != room_id:
+					continue
+				var pos_v: Variant = floor.get("world_position", floor.get("position", null))
+				if pos_v is Array and (pos_v as Array).size() >= 3:
+					var a: Array = pos_v
+					return Vector3(float(a[0]), float(a[1]) + 0.12, float(a[2]))
+				if pos_v is Vector3:
+					var v: Vector3 = pos_v
+					return Vector3(v.x, v.y + 0.12, v.z)
+	var want_names: PackedStringArray = PackedStringArray()
+	want_names.append("floor_cell_x%d_z%d" % [int(cell[0]), int(cell[1])])
+	want_names.append("floor_cell_d%d_x%d_z%d" % [deck, int(cell[0]), int(cell[1])])
+	for p_v in room.get("structural_placements", []):
+		if typeof(p_v) != TYPE_DICTIONARY:
+			continue
+		var pname: String = str((p_v as Dictionary).get("name", ""))
+		if not want_names.has(pname):
+			continue
+		var pos_v2: Variant = (p_v as Dictionary).get("world_position", null)
+		if pos_v2 is Array and (pos_v2 as Array).size() >= 3:
+			var a2: Array = pos_v2
+			return Vector3(float(a2[0]), float(a2[1]) + 0.12, float(a2[2]))
+	return Vector3(float(cell[0]) * 4.0, float(deck) * 4.0 + 0.12, float(cell[1]) * 4.0)
 
 
 func _room_world_centers(layout: Dictionary) -> Dictionary:
@@ -6804,7 +6953,7 @@ func _restore_or_populate_component_placement_for_current_ship() -> void:
 		_clear_component_markers()
 		return
 	var seed_v: int = _component_placement_seed_for_current_ship()
-	component_placement_state.populate(layout, component_catalog, seed_v)
+	component_placement_state.populate(layout, component_catalog, seed_v, _slot_occupancy_from_loader())
 	# REQ-CMP-002: map systems.json subcomponents onto physical placements.
 	var systems_doc: Dictionary = _load_json_dict("res://data/ship_systems/systems.json")
 	if not systems_doc.is_empty():
