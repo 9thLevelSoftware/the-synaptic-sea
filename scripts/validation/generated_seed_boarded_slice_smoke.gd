@@ -127,17 +127,23 @@ func _validate() -> void:
 		_fail("boarded condition=%d is not DAMAGED/WRECKED; wreck overlay required" % condition)
 		return
 
+	var play_time_before: float = float(playable.run_play_time_seconds)
+	# Decremented only inside `_tick_present_ships`, which the away `_process`
+	# body calls after the early `playable_started`/`slice_complete` return.
+	playable._biomatter_pulse_cooldown = 10.0
 	for _i in range(AWAY_TICKS):
 		playable._process(0.1)
 	if not playable.away_from_start:
 		_fail("away_from_start became false during away ticks")
 		return
-	var lines: PackedStringArray = playable.get_combined_system_status_lines()
-	var surface_alive: bool = not lines.is_empty()
-	if not surface_alive:
-		surface_alive = playable.complete_objective_sequence_for_validation(1)
-	if not surface_alive:
-		_fail("HUD/objective surface dead after away ticks")
+	var expected_dt: float = 0.1 * float(AWAY_TICKS)
+	if float(playable.run_play_time_seconds) + 0.001 < play_time_before + expected_dt:
+		_fail("run_play_time_seconds did not advance through away _process ticks")
+		return
+	var cooldown_after: float = float(playable._biomatter_pulse_cooldown)
+	if absf(cooldown_after - (10.0 - expected_dt)) > 0.05:
+		_fail("away _process did not tick present ships (cooldown=%s expected=%s)" % [
+			str(cooldown_after), str(10.0 - expected_dt)])
 		return
 
 	var seed_n: int = playable._ship_seed(cur)
