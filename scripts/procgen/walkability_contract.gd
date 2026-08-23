@@ -80,11 +80,13 @@ static func build_adjacency(
 				continue
 		elif not enclosure_passable(kind):
 			continue
-		var pair: PackedStringArray = _occupied_edge_keys(edge, occupancy)
+		var pair: PackedStringArray = _occupied_edge_keys(edge, occupancy, topology)
 		if pair.size() != 2:
 			continue
 		_link(adjacency, pair[0], pair[1])
 	_add_vertical_links(adjacency, occupancy, topology)
+	if standing:
+		_overlay_blocked_links(adjacency, occupancy, topology)
 	return adjacency
 
 
@@ -309,13 +311,13 @@ static func _standing_edge_between(
 	return false
 
 
-static func _occupied_edge_keys(edge: Dictionary, occupancy: Dictionary) -> PackedStringArray:
-	var source_cells: Variant = edge.get("source_cells", [])
-	if not (source_cells is Array) or (source_cells as Array).size() < 2:
-		return PackedStringArray()
+static func _occupied_edge_keys(edge: Dictionary, occupancy: Dictionary, topology: Dictionary = {}) -> PackedStringArray:
 	var deck: int = int(edge.get("deck", -1))
-	var first: Dictionary = _cell_key_from_value((source_cells as Array)[0], deck)
-	var second: Dictionary = _cell_key_from_value((source_cells as Array)[1], deck)
+	var cells: Array = _flood_endpoint_cells(edge, topology)
+	if cells.size() < 2:
+		return PackedStringArray()
+	var first: Dictionary = _cell_key_from_value(cells[0], deck)
+	var second: Dictionary = _cell_key_from_value(cells[1], deck)
 	if not bool(first.get("ok", false)) or not bool(second.get("ok", false)):
 		return PackedStringArray()
 	var first_key: String = str(first["key"])
@@ -323,6 +325,55 @@ static func _occupied_edge_keys(edge: Dictionary, occupancy: Dictionary) -> Pack
 	if not occupancy.has(first_key) or not occupancy.has(second_key):
 		return PackedStringArray()
 	return PackedStringArray([first_key, second_key])
+
+
+static func _flood_endpoint_cells(edge: Dictionary, topology: Dictionary) -> Array:
+	var lf: Variant = edge.get("logical_from_cell", null)
+	var lt: Variant = edge.get("logical_to_cell", null)
+	if lf != null and lt != null:
+		return [lf, lt]
+	if bool(edge.get("logical_boundary", false)) or bool(edge.get("portal", false)):
+		var portals_v: Variant = topology.get("portals", [])
+		if portals_v is Array:
+			var edge_key_value: String = str(edge.get("key", edge.get("edge_key", "")))
+			var edge_cell: Variant = edge.get("cell", null)
+			var direction: String = str(edge.get("direction", ""))
+			for portal_v in (portals_v as Array):
+				if not (portal_v is Dictionary):
+					continue
+				var portal: Dictionary = portal_v
+				if not bool(portal.get("logical_boundary", false)):
+					continue
+				if not edge_key_value.is_empty() and str(portal.get("edge_key", "")) == edge_key_value:
+					return [portal.get("from_cell", null), portal.get("to_cell", null)]
+				var portal_dir: String = str(portal.get("edge_direction", portal.get("direction", "")))
+				if portal_dir == direction:
+					var pec: Vector2i = _read_cell_xz(portal.get("edge_cell", null))
+					var ecell: Vector2i = _read_cell_xz(edge_cell)
+					if pec != Vector2i(-99999, -99999) and pec == ecell:
+						return [portal.get("from_cell", null), portal.get("to_cell", null)]
+	var source_cells: Variant = edge.get("source_cells", [])
+	if source_cells is Array:
+		return source_cells as Array
+	return []
+
+
+static func _overlay_blocked_links(adjacency: Dictionary, occupancy: Dictionary, topology: Dictionary) -> void:
+	var blocked_v: Variant = topology.get("blocked_links", [])
+	if not (blocked_v is Array):
+		return
+	var room_decks: Dictionary = _room_decks(topology)
+	for link_v in (blocked_v as Array):
+		if not (link_v is Dictionary):
+			continue
+		var link: Dictionary = link_v
+		var from_deck: int = int(room_decks.get(str(link.get("from_room", "")), int(link.get("from_deck", 0))))
+		var to_deck: int = int(room_decks.get(str(link.get("to_room", "")), int(link.get("to_deck", 0))))
+		var a: Dictionary = _cell_key_from_value(link.get("from_cell", null), from_deck)
+		var b: Dictionary = _cell_key_from_value(link.get("to_cell", null), to_deck)
+		if not bool(a.get("ok", false)) or not bool(b.get("ok", false)):
+			continue
+		_unlink(adjacency, str(a["key"]), str(b["key"]))
 
 
 static func _add_vertical_links(adjacency: Dictionary, occupancy: Dictionary, topology: Dictionary) -> void:
@@ -353,6 +404,15 @@ static func _link(adjacency: Dictionary, a: String, b: String) -> void:
 		return
 	(adjacency[a] as Array).append(b)
 	(adjacency[b] as Array).append(a)
+
+
+static func _unlink(adjacency: Dictionary, a: String, b: String) -> void:
+	if a.is_empty() or b.is_empty() or a == b:
+		return
+	if adjacency.has(a):
+		(adjacency[a] as Array).erase(b)
+	if adjacency.has(b):
+		(adjacency[b] as Array).erase(a)
 
 
 static func _capsule_sweep_segment(edge: Dictionary, occupancy: Dictionary) -> Dictionary:

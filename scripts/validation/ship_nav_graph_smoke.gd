@@ -72,8 +72,7 @@ func _golden_shortcut_standing_blocked(graph, layout: Dictionary) -> bool:
 		_fail("golden reactor shortcut to_cell did not resolve to a nav node")
 		return false
 	if from_key.is_empty():
-		var from_occ_key: String = _occupancy_key_from_cell(from_cell, 1)
-		if occupancy.has(from_occ_key):
+		if graph.occupancy_has_cell(occupancy, from_cell, 1):
 			_fail("golden spine shortcut occupancy did not resolve to a nav node")
 			return false
 		# Occupancy-absent origin is "no neighbor" (REQ-WALK-001 / feature spec).
@@ -86,17 +85,17 @@ func _golden_shortcut_standing_blocked(graph, layout: Dictionary) -> bool:
 	return true
 
 
-func _occupancy_key_from_cell(value: Variant, fallback_deck: int) -> String:
-	var cell := Vector2i.ZERO
-	var deck: int = fallback_deck
-	if value is Array and (value as Array).size() >= 2:
-		var values: Array = value
-		cell = Vector2i(int(values[0]), int(values[1]))
-		if values.size() >= 3:
-			deck = int(values[2])
-	else:
-		return ""
-	return "%d|%d|%d" % [deck, cell.x, cell.y]
+func _portal_by_id(layout: Dictionary, portal_id: String) -> Dictionary:
+	var portals_v: Variant = layout.get("portals", [])
+	if not (portals_v is Array):
+		return {}
+	for portal_v in (portals_v as Array):
+		if not (portal_v is Dictionary):
+			continue
+		var portal: Dictionary = portal_v
+		if str(portal.get("id", "")) == portal_id:
+			return portal
+	return {}
 
 
 func _blocked_link_by_id(layout: Dictionary, link_id: String) -> Dictionary:
@@ -194,17 +193,14 @@ func _stacked_has_vertical_and_path() -> bool:
 		_fail("stacked nav nodes %d" % n)
 		return false
 	var vertical: int = 0
-	var node_ids: Array = graph.nodes.keys()
-	for i in range(node_ids.size()):
-		var a: String = str(node_ids[i])
-		for j in range(i + 1, node_ids.size()):
-			var b: String = str(node_ids[j])
-			if not graph.has_base_edge(a, b):
-				continue
-			var pa: Vector3 = graph.get_node_pos(a)
-			var pb: Vector3 = graph.get_node_pos(b)
-			if absf(pa.y - pb.y) > graph.deck_height * 0.5:
-				vertical += 1
+	for pair_v in graph.base_edge_pairs():
+		if not (pair_v is PackedStringArray) or (pair_v as PackedStringArray).size() != 2:
+			continue
+		var pair: PackedStringArray = pair_v
+		var pa: Vector3 = graph.get_node_pos(pair[0])
+		var pb: Vector3 = graph.get_node_pos(pair[1])
+		if absf(pa.y - pb.y) > graph.deck_height * 0.5:
+			vertical += 1
 	if vertical < 1:
 		_fail("stacked template has no vertical base-edge hops")
 		return false
@@ -238,8 +234,14 @@ func _golden_logical_portal_connects_arc_side() -> bool:
 	if graph.build_from_layout(layout) < 2:
 		_fail("coherent_ship_002 built no nav nodes")
 		return false
-	var from_key: String = graph.node_key_for_cell([2, 0, 0], 0, occupancy)
-	var to_key: String = graph.node_key_for_cell([1, -1, 0], 0, occupancy)
+	var portal: Dictionary = _portal_by_id(layout, "corridor_to_arc_side")
+	if portal.is_empty():
+		_fail("coherent_ship_002 corridor_to_arc_side portal missing")
+		return false
+	var from_key: String = graph.node_key_for_cell(
+		portal.get("logical_from_cell", portal.get("from_cell", null)), 0, occupancy)
+	var to_key: String = graph.node_key_for_cell(
+		portal.get("logical_to_cell", portal.get("to_cell", null)), 0, occupancy)
 	if from_key.is_empty() or to_key.is_empty():
 		_fail("coherent_ship_002 corridor_to_arc_side cells did not resolve")
 		return false

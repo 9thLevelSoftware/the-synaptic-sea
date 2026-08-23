@@ -205,6 +205,24 @@ func node_key_for_cell(value: Variant, fallback_deck: int, occupancy: Dictionary
 func node_keys_for_edge(edge: Dictionary, occupancy: Dictionary, layout: Dictionary = {}) -> PackedStringArray:
 	return _edge_node_keys(edge, occupancy, layout)
 
+static func occupancy_key_for_cell(value: Variant, fallback_deck: int) -> String:
+	var cell := Vector2i.ZERO
+	var deck: int = fallback_deck
+	if value is Vector2i:
+		cell = value as Vector2i
+	elif value is Array and (value as Array).size() >= 2:
+		var values: Array = value
+		cell = Vector2i(int(values[0]), int(values[1]))
+		if values.size() >= 3:
+			deck = int(values[2])
+	else:
+		return ""
+	return "%d|%d|%d" % [deck, cell.x, cell.y]
+
+func occupancy_has_cell(occupancy: Dictionary, value: Variant, fallback_deck: int) -> bool:
+	var key: String = occupancy_key_for_cell(value, fallback_deck)
+	return not key.is_empty() and occupancy.has(key)
+
 func has_base_edge(a: String, b: String) -> bool:
 	if a.is_empty() or b.is_empty() or a == b:
 		return false
@@ -215,6 +233,16 @@ func base_edge_cost(a: String, b: String) -> float:
 	if not _base_edges.has(k):
 		return BLOCKED_COST
 	return float(_base_edges[k])
+
+## Undirected base hops as [a, b] pairs. Includes BLOCKED_COST edges.
+func base_edge_pairs() -> Array:
+	var out: Array = []
+	for edge_key in _base_edges:
+		var parts: PackedStringArray = str(edge_key).split("|")
+		if parts.size() != 2:
+			continue
+		out.append(PackedStringArray([parts[0], parts[1]]))
+	return out
 
 func set_edge_blocked(a: String, b: String, blocked: bool = true) -> void:
 	var k: String = _edge_key(a, b)
@@ -462,7 +490,9 @@ func _node_key_from_cell(value: Variant, fallback_deck: int, occupancy: Dictiona
 			deck = int(values[2])
 	else:
 		return ""
-	var occupancy_key: String = "%d|%d|%d" % [deck, cell.x, cell.y]
+	var occupancy_key: String = occupancy_key_for_cell(value, fallback_deck)
+	if occupancy_key.is_empty():
+		occupancy_key = "%d|%d|%d" % [deck, cell.x, cell.y]
 	if occupancy.has(occupancy_key):
 		var record_variant: Variant = occupancy[occupancy_key]
 		if record_variant is Dictionary:
