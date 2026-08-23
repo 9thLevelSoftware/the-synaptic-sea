@@ -189,6 +189,12 @@ func compile(layout: Dictionary) -> Dictionary:
 				"placement_required": wrapper_required,
 				"wrapper_required": wrapper_required,
 			}
+			if portal_present:
+				var logical_boundary: bool = bool(portal.get("logical_boundary", false))
+				edge_record["logical_boundary"] = logical_boundary
+				if logical_boundary:
+					edge_record["logical_from_cell"] = portal.get("logical_from_cell", portal.get("from_cell", null))
+					edge_record["logical_to_cell"] = portal.get("logical_to_cell", portal.get("to_cell", null))
 			edge_map[edge_key_value] = edge_record
 			if edge_state == "OPEN" or not wrapper_required:
 				continue

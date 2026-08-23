@@ -44,6 +44,8 @@ func _initialize() -> void:
 		return
 	if not _stacked_has_vertical_and_path():
 		return
+	if not _golden_logical_portal_connects_arc_side():
+		return
 
 	print("SHIP NAV GRAPH PASS nodes=%d edges=%d path=true wall=true shortcut_blocked=true stacked_vertical=true" % [
 		n, graph.edge_count()])
@@ -217,6 +219,35 @@ func _stacked_has_vertical_and_path() -> bool:
 	var path: Array = ThreatPathfinderScript.find_path(graph, start_pos, goal_pos)
 	if path.is_empty() and start_id != goal_id:
 		_fail("stacked standing start→goal empty")
+		return false
+	return true
+
+
+func _golden_logical_portal_connects_arc_side() -> bool:
+	var layout: Dictionary = _load_json("res://data/procgen/golden/coherent_ship_002/layout.json")
+	if layout.is_empty():
+		_fail("golden coherent_ship_002 missing")
+		return false
+	var occupancy: Dictionary = {}
+	var plan_variant: Variant = layout.get("structural_plan", {})
+	if plan_variant is Dictionary:
+		var occ_variant: Variant = (plan_variant as Dictionary).get("occupancy", {})
+		if occ_variant is Dictionary:
+			occupancy = occ_variant
+	var graph = ShipNavGraphScript.new()
+	if graph.build_from_layout(layout) < 2:
+		_fail("coherent_ship_002 built no nav nodes")
+		return false
+	var from_key: String = graph.node_key_for_cell([2, 0, 0], 0, occupancy)
+	var to_key: String = graph.node_key_for_cell([1, -1, 0], 0, occupancy)
+	if from_key.is_empty() or to_key.is_empty():
+		_fail("coherent_ship_002 corridor_to_arc_side cells did not resolve")
+		return false
+	if not graph.has_base_edge(from_key, to_key):
+		_fail("logical portal corridor_to_arc_side missing from standing graph")
+		return false
+	if graph.edge_cost(from_key, to_key) >= ShipNavGraphScript.BLOCKED_COST:
+		_fail("logical portal corridor_to_arc_side is standing-blocked")
 		return false
 	return true
 

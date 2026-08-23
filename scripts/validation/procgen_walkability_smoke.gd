@@ -117,7 +117,7 @@ func _initialize() -> void:
 	if node_n < occupancy.size():
 		_fail(label, "nav nodes %d < occupancy %d" % [node_n, occupancy.size()])
 		return
-	if not _nav_kinds_ok(graph, edges, occupancy):
+	if not _nav_kinds_ok(graph, edges, occupancy, layout):
 		_fail(label, "nav_kinds mismatch")
 		return
 
@@ -125,17 +125,18 @@ func _initialize() -> void:
 	quit(0)
 
 
-func _nav_kinds_ok(graph, edges: Dictionary, occupancy: Dictionary) -> bool:
+func _nav_kinds_ok(graph, edges: Dictionary, occupancy: Dictionary, layout: Dictionary) -> bool:
 	for edge_variant in edges.values():
 		if not (edge_variant is Dictionary):
 			continue
 		var edge: Dictionary = edge_variant
 		var kind: String = WalkabilityContractScript.edge_kind(edge)
-		var pair: PackedStringArray = _graph_keys_for_edge(graph, edge, occupancy)
+		var pair: PackedStringArray = graph.node_keys_for_edge(edge, occupancy, layout)
 		if pair.size() != 2:
 			if kind == "SOLID":
 				continue
-			if kind == "LOCKED" or kind == "BREACH" or kind == "OPEN" or kind == "DOOR" or kind == "HATCH":
+			var other_room: String = str(edge.get("other_room", ""))
+			if other_room.is_empty() and (kind == "LOCKED" or kind == "BREACH" or kind == "OPEN" or kind == "DOOR" or kind == "HATCH"):
 				# Exterior / one-sided compiler edges have no standing graph hop.
 				continue
 			return false
@@ -153,18 +154,6 @@ func _nav_kinds_ok(graph, edges: Dictionary, occupancy: Dictionary) -> bool:
 			if cost >= ShipNavGraphScript.BLOCKED_COST:
 				return false
 	return true
-
-
-func _graph_keys_for_edge(graph, edge: Dictionary, occupancy: Dictionary) -> PackedStringArray:
-	var source_cells: Variant = edge.get("source_cells", [])
-	if not (source_cells is Array) or (source_cells as Array).size() < 2:
-		return PackedStringArray()
-	var deck: int = int(edge.get("deck", 0))
-	var a: String = graph.node_key_for_cell((source_cells as Array)[0], deck, occupancy)
-	var b: String = graph.node_key_for_cell((source_cells as Array)[1], deck, occupancy)
-	if a.is_empty() or b.is_empty() or a == b:
-		return PackedStringArray()
-	return PackedStringArray([a, b])
 
 
 func _fail(label: String, reason: String) -> void:

@@ -78,7 +78,7 @@ func build_from_structural_plan(layout: Dictionary) -> int:
 		var kind: String = str(edge.get("kind", edge.get("state", "SOLID"))).to_upper()
 		if kind == "SOLID":
 			continue
-		var pair: PackedStringArray = _edge_node_keys(edge, occupancy)
+		var pair: PackedStringArray = _edge_node_keys(edge, occupancy, layout)
 		if pair.size() != 2:
 			continue
 		var cost: float = standing_cost_for_kind(kind)
@@ -201,6 +201,9 @@ func edge_cost(a: String, b: String) -> float:
 ## snapped cell coordinate if that node exists.
 func node_key_for_cell(value: Variant, fallback_deck: int, occupancy: Dictionary) -> String:
 	return _node_key_from_cell(value, fallback_deck, occupancy)
+
+func node_keys_for_edge(edge: Dictionary, occupancy: Dictionary, layout: Dictionary = {}) -> PackedStringArray:
+	return _edge_node_keys(edge, occupancy, layout)
 
 func has_base_edge(a: String, b: String) -> bool:
 	if a.is_empty() or b.is_empty() or a == b:
@@ -373,16 +376,78 @@ func _add_vertical_connection_edges(layout: Dictionary, occupancy: Dictionary) -
 		_set_base_edge(from_key, to_key, cost)
 
 
-func _edge_node_keys(edge: Dictionary, occupancy: Dictionary) -> PackedStringArray:
-	var source_cells: Variant = edge.get("source_cells", [])
-	if not (source_cells is Array) or (source_cells as Array).size() < 2:
-		return PackedStringArray()
+func _edge_node_keys(edge: Dictionary, occupancy: Dictionary, layout: Dictionary = {}) -> PackedStringArray:
 	var deck: int = int(edge.get("deck", 0))
-	var a: String = _node_key_from_cell((source_cells as Array)[0], deck, occupancy)
-	var b: String = _node_key_from_cell((source_cells as Array)[1], deck, occupancy)
+	var cells: Array = _standing_cells_for_edge(edge, layout)
+	if cells.size() < 2:
+		return PackedStringArray()
+	var a: String = _node_key_from_cell(cells[0], deck, occupancy)
+	var b: String = _node_key_from_cell(cells[1], deck, occupancy)
 	if a.is_empty() or b.is_empty() or a == b:
 		return PackedStringArray()
 	return PackedStringArray([a, b])
+
+
+func _standing_cells_for_edge(edge: Dictionary, layout: Dictionary) -> Array:
+	var logical: Array = _logical_endpoint_cells(edge, layout)
+	if logical.size() >= 2:
+		return logical
+	var source_cells: Variant = edge.get("source_cells", [])
+	if source_cells is Array:
+		return source_cells as Array
+	return []
+
+
+func _logical_endpoint_cells(edge: Dictionary, layout: Dictionary) -> Array:
+	var lf: Variant = edge.get("logical_from_cell", null)
+	var lt: Variant = edge.get("logical_to_cell", null)
+	if lf != null and lt != null:
+		return [lf, lt]
+	if not bool(edge.get("portal", false)) and not bool(edge.get("logical_boundary", false)):
+		return []
+	var portals_v: Variant = layout.get("portals", [])
+	if not (portals_v is Array):
+		return []
+	var edge_key_value: String = str(edge.get("key", edge.get("edge_key", "")))
+	var edge_cell: Variant = edge.get("cell", null)
+	var direction: String = str(edge.get("direction", ""))
+	var owner: String = str(edge.get("owner_room", ""))
+	var other: String = str(edge.get("other_room", ""))
+	for portal_v in (portals_v as Array):
+		if not (portal_v is Dictionary):
+			continue
+		var portal: Dictionary = portal_v
+		if not bool(portal.get("logical_boundary", false)):
+			continue
+		var portal_key: String = str(portal.get("edge_key", ""))
+		if not edge_key_value.is_empty() and portal_key == edge_key_value:
+			return [portal.get("from_cell", null), portal.get("to_cell", null)]
+		var portal_dir: String = str(portal.get("edge_direction", portal.get("direction", "")))
+		if portal_dir == direction and _cell_xz_equal(portal.get("edge_cell", null), edge_cell):
+			return [portal.get("from_cell", null), portal.get("to_cell", null)]
+		var from_room: String = str(portal.get("from_room", ""))
+		var to_room: String = str(portal.get("to_room", ""))
+		if other.is_empty():
+			continue
+		if (from_room == owner and to_room == other) or (from_room == other and to_room == owner):
+			return [portal.get("from_cell", null), portal.get("to_cell", null)]
+	return []
+
+
+func _cell_xz_equal(a: Variant, b: Variant) -> bool:
+	var ac: Vector2i = _cell_xz(a)
+	var bc: Vector2i = _cell_xz(b)
+	if ac == Vector2i(-99999, -99999) or bc == Vector2i(-99999, -99999):
+		return false
+	return ac == bc
+
+
+func _cell_xz(value: Variant) -> Vector2i:
+	if value is Vector2i:
+		return value as Vector2i
+	if value is Array and (value as Array).size() >= 2:
+		return Vector2i(int((value as Array)[0]), int((value as Array)[1]))
+	return Vector2i(-99999, -99999)
 
 
 func _node_key_from_cell(value: Variant, fallback_deck: int, occupancy: Dictionary) -> String:
