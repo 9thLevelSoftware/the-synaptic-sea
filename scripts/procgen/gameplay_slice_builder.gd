@@ -29,6 +29,7 @@ func _loot_table_for_room(room: Dictionary, role_default: String) -> String:
 func build(layout: Dictionary) -> Dictionary:
 	var proto: Dictionary = layout.get("prototype", {})
 	var rooms: Array = layout.get("rooms", [])
+	var seed_value: int = int(layout.get("seed_value", 0))
 
 	var start_room: String = str(proto.get("start_room", ""))
 	var goal_room: String = str(proto.get("goal_room", ""))
@@ -66,7 +67,7 @@ func build(layout: Dictionary) -> Dictionary:
 		if role in CONNECTIVE_ROLES:
 			room_index += 1
 			continue
-		var salvage_pick: Dictionary = _pick_slot_cell(room, "salvage", occupied, boarding)
+		var salvage_pick: Dictionary = _pick_slot_cell(room, "salvage", occupied, boarding, seed_value, room_index)
 		var approach_cell: Array = salvage_pick.get("cell", []) as Array
 		if approach_cell.is_empty():
 			room_index += 1
@@ -89,7 +90,7 @@ func build(layout: Dictionary) -> Dictionary:
 
 	# Always add a "reach goal" objective as the final objective
 	var goal_room_dict: Dictionary = _find_room(rooms, goal_room)
-	var goal_pick: Dictionary = _pick_slot_cell(goal_room_dict, "loot", occupied, boarding)
+	var goal_pick: Dictionary = _pick_slot_cell(goal_room_dict, "loot", occupied, boarding, seed_value, room_index)
 	var goal_approach: Array = goal_pick.get("cell", []) as Array
 	if goal_approach.is_empty():
 		push_warning("GameplaySliceBuilder: goal room '%s' has no floor cells; using [0,0,0] fallback" % goal_room)
@@ -119,7 +120,7 @@ func build(layout: Dictionary) -> Dictionary:
 		if role2 in CONNECTIVE_ROLES:
 			room_index += 1
 			continue
-		var loot_pick: Dictionary = _pick_slot_cell(room, "loot", occupied, boarding)
+		var loot_pick: Dictionary = _pick_slot_cell(room, "loot", occupied, boarding, seed_value, room_index)
 		var cell2: Array = loot_pick.get("cell", []) as Array
 		if cell2.is_empty():
 			room_index += 1
@@ -329,13 +330,30 @@ func _all_floor_cells(room: Dictionary) -> Array:
 	return out
 
 
+func _rng_for_slot(seed_value: int, room_index: int) -> RandomNumberGenerator:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = (int(seed_value) ^ int(room_index) ^ 0x51C7110) & 0x7FFFFFFF
+	if rng.seed == 0:
+		rng.seed = 1
+	return rng
+
+
+func _pick_eligible(rng: RandomNumberGenerator, eligible: Array) -> Dictionary:
+	if eligible.is_empty():
+		return {}
+	return eligible[rng.randi() % eligible.size()]
+
+
 func _pick_slot_cell(
 		room: Dictionary,
 		kind: String,
 		occupied: Dictionary,
-		boarding: Dictionary) -> Dictionary:
+		boarding: Dictionary,
+		seed_value: int = 0,
+		room_index: int = 0) -> Dictionary:
 	var rid: String = str(room.get("id", ""))
 	var deck: int = int(room.get("deck", 0))
+	var rng: RandomNumberGenerator = _rng_for_slot(seed_value, room_index)
 	var reserved: Array = _interior_cell_list(room, "reserved_cells")
 	var reserved_set: Dictionary = {}
 	for cell in reserved:
@@ -344,23 +362,26 @@ func _pick_slot_cell(
 	var walls: Array = _interior_cell_list(room, "wall_slots")
 	var picked: Dictionary = {}
 	if kind == "salvage":
-		picked = _pick_salvage_slot(rid, deck, centers, reserved, reserved_set, occupied, boarding)
+		picked = _pick_salvage_slot(rid, deck, centers, reserved, reserved_set, occupied, boarding, rng)
 	else:
-		picked = _pick_loot_slot(rid, deck, centers, walls, reserved_set, occupied, boarding)
+		picked = _pick_loot_slot(rid, deck, centers, walls, reserved_set, occupied, boarding, rng)
 	if not picked.is_empty():
 		_claim(rid, picked.get("cell", []), occupied)
 		return picked
 	var floors: Array = _all_floor_cells(room)
+	var floor_eligible: Array = []
 	for i in range(floors.size()):
 		var fallback: Array = floors[i]
 		if _is_blocked(rid, fallback, occupied, boarding):
 			continue
 		if kind != "salvage" and reserved_set.has(_cell_key(rid, fallback)):
 			continue
-		# print (not push_warning): run_clean treats WARNING: as a hard fail.
+		floor_eligible.append({"cell": fallback, "slot_kind": "floor", "slot_index": i, "fallback": true})
+	picked = _pick_eligible(rng, floor_eligible)
+	if not picked.is_empty():
 		print("GameplaySliceBuilder slot_fallback room=%s kind=%s" % [rid, kind])
-		_claim(rid, fallback, occupied)
-		return {"cell": fallback, "slot_kind": "floor", "slot_index": i, "fallback": true}
+		_claim(rid, picked.get("cell", []), occupied)
+		return picked
 	return {}
 
 
@@ -371,22 +392,26 @@ func _pick_loot_slot(
 		walls: Array,
 		reserved_set: Dictionary,
 		occupied: Dictionary,
-		boarding: Dictionary) -> Dictionary:
+		boarding: Dictionary,
+		rng: RandomNumberGenerator) -> Dictionary:
+	var eligible: Array = []
 	for i in range(centers.size()):
 		var cell: Array = centers[i]
 		if _is_blocked(rid, cell, occupied, boarding):
 			continue
 		if reserved_set.has(_cell_key(rid, cell)):
 			continue
-		return {"cell": [int(cell[0]), int(cell[1]), deck], "slot_kind": "center", "slot_index": i}
+		eligible.append({"cell": [int(cell[0]), int(cell[1]), deck], "slot_kind": "center", "slot_index": i})
+	if not eligible.is_empty():
+		return _pick_eligible(rng, eligible)
 	for i in range(walls.size()):
 		var cell: Array = walls[i]
 		if _is_blocked(rid, cell, occupied, boarding):
 			continue
 		if reserved_set.has(_cell_key(rid, cell)):
 			continue
-		return {"cell": [int(cell[0]), int(cell[1]), deck], "slot_kind": "wall", "slot_index": i}
-	return {}
+		eligible.append({"cell": [int(cell[0]), int(cell[1]), deck], "slot_kind": "wall", "slot_index": i})
+	return _pick_eligible(rng, eligible)
 
 
 func _pick_salvage_slot(
@@ -396,7 +421,8 @@ func _pick_salvage_slot(
 		reserved: Array,
 		reserved_set: Dictionary,
 		occupied: Dictionary,
-		boarding: Dictionary) -> Dictionary:
+		boarding: Dictionary,
+		rng: RandomNumberGenerator) -> Dictionary:
 	var adjacent: Array = []
 	for i in range(centers.size()):
 		var cell: Array = centers[i]
@@ -405,24 +431,25 @@ func _pick_salvage_slot(
 		if reserved_set.has(_cell_key(rid, cell)):
 			continue
 		if _neighbors_reserved(cell, reserved_set, rid):
-			adjacent.append(i)
+			adjacent.append({"cell": [int(cell[0]), int(cell[1]), deck], "slot_kind": "center", "slot_index": i})
 	if not adjacent.is_empty():
-		var idx: int = int(adjacent[0])
-		var cell: Array = centers[idx]
-		return {"cell": [int(cell[0]), int(cell[1]), deck], "slot_kind": "center", "slot_index": idx}
+		return _pick_eligible(rng, adjacent)
+	var eligible: Array = []
 	for i in range(centers.size()):
 		var cell: Array = centers[i]
 		if _is_blocked(rid, cell, occupied, boarding):
 			continue
 		if reserved_set.has(_cell_key(rid, cell)):
 			continue
-		return {"cell": [int(cell[0]), int(cell[1]), deck], "slot_kind": "center", "slot_index": i}
+		eligible.append({"cell": [int(cell[0]), int(cell[1]), deck], "slot_kind": "center", "slot_index": i})
+	if not eligible.is_empty():
+		return _pick_eligible(rng, eligible)
 	for i in range(reserved.size()):
 		var cell: Array = reserved[i]
 		if _is_blocked(rid, cell, occupied, boarding):
 			continue
-		return {"cell": [int(cell[0]), int(cell[1]), deck], "slot_kind": "reserved", "slot_index": i}
-	return {}
+		eligible.append({"cell": [int(cell[0]), int(cell[1]), deck], "slot_kind": "reserved", "slot_index": i})
+	return _pick_eligible(rng, eligible)
 
 
 func _neighbors_reserved(cell: Array, reserved_set: Dictionary, rid: String) -> bool:
