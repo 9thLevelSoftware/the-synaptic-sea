@@ -217,12 +217,8 @@ func _loot_on_interior_slot(layout: Dictionary, loot: Array) -> bool:
 		var approach: Array = LayoutSerializerScript.parse_slot_cell(row.get("approach_cell", []))
 		if approach.size() < 2:
 			continue
-		if not _cell_in_slots(room, approach):
-			var first: Array = _first_floor_xz(room)
-			if first.size() >= 2 and int(approach[0]) == int(first[0]) and int(approach[1]) == int(first[1]):
-				continue
-			continue
-		return true
+		if _cell_in_slots(room, approach):
+			return true
 	return false
 
 
@@ -266,17 +262,6 @@ func _cell_in_slots(room: Dictionary, cell: Array) -> bool:
 			if parsed.size() >= 2 and int(parsed[0]) == int(cell[0]) and int(parsed[1]) == int(cell[1]):
 				return true
 	return false
-
-
-func _first_floor_xz(room: Dictionary) -> Array:
-	var placements: Array = room.get("structural_placements", [])
-	for placement in placements:
-		if typeof(placement) != TYPE_DICTIONARY:
-			continue
-		var parsed: Array = LayoutSerializerScript.parse_slot_cell(str((placement as Dictionary).get("name", "")))
-		if parsed.size() >= 2:
-			return parsed
-	return []
 
 
 func _find_playable(node: Node) -> PlayableGeneratedShip:
