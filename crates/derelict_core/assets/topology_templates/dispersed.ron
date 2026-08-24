@@ -1,0 +1,19 @@
+// Ported from The Synaptic Sea data/procgen/templates/dispersed.json
+(
+    id: "dispersed",
+    description: "Wide single-deck layout where rooms spread out laterally rather than along a spine. Bridge forward-center, cargo starboard, medical port, engineering aft. Tests lateral-spread topology.",
+    zones: [
+        (id: "entry", role_pool: [Airlock], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: ""),
+        (id: "central_hub", role_pool: [Hub], count: Fixed(1), position_hint: Center, deck: 0, layout: Single, attach_to: "entry"),
+        (id: "starboard_branch", role_pool: [Cargo, Engineering, Maintenance], count: Range(2, 3), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "central_hub"),
+        (id: "port_branch", role_pool: [Medical, CrewQuarters, MessHall], count: Range(1, 2), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "central_hub"),
+        (id: "destination", role_pool: [Bridge], count: Fixed(1), position_hint: Bow, deck: 0, layout: Single, attach_to: "central_hub"),
+    ],
+    connections: [
+        (from_zone: "entry", to_zone: "central_hub", distribution: Adjacent),
+        (from_zone: "central_hub", to_zone: "starboard_branch", distribution: Spread),
+        (from_zone: "central_hub", to_zone: "port_branch", distribution: Spread),
+        (from_zone: "central_hub", to_zone: "destination", distribution: Adjacent),
+    ],
+    deck_config: (max_decks: 1, vertical_transition_bp: 0),
+)

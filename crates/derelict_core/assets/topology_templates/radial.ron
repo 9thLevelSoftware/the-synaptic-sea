@@ -1,0 +1,23 @@
+// Ported from The Synaptic Sea data/procgen/templates/radial.json
+(
+    id: "radial",
+    description: "Hub-and-spoke: central junction with 3–4 wings (bridge, cargo, medical, engineering). High branching variety.",
+    zones: [
+        (id: "entry", role_pool: [Airlock], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: ""),
+        (id: "hub", role_pool: [Corridor], count: Fixed(1), position_hint: Center, deck: 0, layout: Single, attach_to: "entry"),
+        (id: "spoke_bridge", role_pool: [Bridge], count: Fixed(1), position_hint: Bow, deck: 0, layout: Single, attach_to: "hub"),
+        (id: "spoke_cargo", role_pool: [Cargo, Storage, Armory], count: Range(1, 2), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "hub"),
+        (id: "spoke_life", role_pool: [CrewQuarters, Medical, MessHall], count: Range(1, 2), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "hub"),
+        (id: "spoke_eng", role_pool: [Engineering, LifeSupport], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "hub"),
+        (id: "destination", role_pool: [Reactor], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "spoke_eng"),
+    ],
+    connections: [
+        (from_zone: "entry", to_zone: "hub", distribution: Adjacent),
+        (from_zone: "hub", to_zone: "spoke_bridge", distribution: Adjacent),
+        (from_zone: "hub", to_zone: "spoke_cargo", distribution: Spread),
+        (from_zone: "hub", to_zone: "spoke_life", distribution: Spread),
+        (from_zone: "hub", to_zone: "spoke_eng", distribution: Adjacent),
+        (from_zone: "spoke_eng", to_zone: "destination", distribution: Adjacent),
+    ],
+    deck_config: (max_decks: 1, vertical_transition_bp: 0),
+)

@@ -126,8 +126,10 @@ pub fn compile(topology: &Topology, picker: &dyn ModulePicker) -> StructuralPlan
     let mut portal_by_edge: BTreeMap<String, &PortalIntent> = BTreeMap::new();
     for portal in &topology.portals {
         if portal.from_room == portal.to_room {
-            plan.errors
-                .push(format!("portal connects room {} to itself", portal.from_room));
+            plan.errors.push(format!(
+                "portal connects room {} to itself",
+                portal.from_room
+            ));
             continue;
         }
         if portal.from_cell.deck != portal.to_cell.deck {
@@ -218,7 +220,10 @@ pub fn compile(topology: &Topology, picker: &dyn ModulePicker) -> StructuralPlan
                 continue; // canonical dedup: second side is a no-op
             }
             let neighbor = rec.cell.neighbor(dir);
-            let other_room = room_by_cell.get(&neighbor.key()).copied().unwrap_or(NO_ROOM);
+            let other_room = room_by_cell
+                .get(&neighbor.key())
+                .copied()
+                .unwrap_or(NO_ROOM);
             let portal = portal_by_edge.get(&key).copied();
 
             let (kind, module_id, is_portal, exterior) = match portal {
@@ -231,9 +236,7 @@ pub fn compile(topology: &Topology, picker: &dyn ModulePicker) -> StructuralPlan
                     }
                     (p.state, picker.portal(p.state), true, exterior)
                 }
-                None if other_room == rec.room_id => {
-                    (EdgeKind::Open, String::new(), false, false)
-                }
+                None if other_room == rec.room_id => (EdgeKind::Open, String::new(), false, false),
                 None => (EdgeKind::Solid, picker.wall(), false, other_room == NO_ROOM),
             };
             let wrapper_required = kind != EdgeKind::Open && !module_id.is_empty();
@@ -348,7 +351,9 @@ fn apply_vertex_modules(
                 None
             };
             let Some(vk) = vertex_kind else { continue };
-            let Some(module) = picker.vertex(vk) else { continue };
+            let Some(module) = picker.vertex(vk) else {
+                continue;
+            };
             // First replaceable wall: non-portal solid edge still carrying
             // the plain wall module (else any non-portal solid edge).
             let target = solid_keys
@@ -360,9 +365,12 @@ fn apply_vertex_modules(
                         .unwrap_or(false)
                 })
                 .or_else(|| {
-                    solid_keys
-                        .iter()
-                        .find(|k| plan.edges.get(k.as_str()).map(|e| !e.portal).unwrap_or(false))
+                    solid_keys.iter().find(|k| {
+                        plan.edges
+                            .get(k.as_str())
+                            .map(|e| !e.portal)
+                            .unwrap_or(false)
+                    })
                 })
                 .cloned();
             if let Some(key) = target {

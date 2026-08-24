@@ -113,26 +113,41 @@ pub fn validate(
 
     // --- 1. Compiler diagnostics automatically fail validation -------------
     for e in &plan.errors {
-        push(IssueCode::CompilerError, format!("compiler error: {e}"), &mut issues);
+        push(
+            IssueCode::CompilerError,
+            format!("compiler error: {e}"),
+            &mut issues,
+        );
     }
 
     let room_of: BTreeMap<RoomId, &RoomSpec> = topology.rooms.iter().map(|r| (r.id, r)).collect();
 
     // --- 2. Occupancy round-trip -------------------------------------------
     if plan.occupancy.is_empty() {
-        push(IssueCode::OccupancyMalformed, "occupancy is empty".into(), &mut issues);
+        push(
+            IssueCode::OccupancyMalformed,
+            "occupancy is empty".into(),
+            &mut issues,
+        );
         return Err(issues);
     }
     for (key, rec) in &plan.occupancy {
         if &rec.cell.key() != key {
             push(
                 IssueCode::OccupancyMalformed,
-                format!("occupancy key {key} does not reconstruct from cell {:?}", rec.cell),
+                format!(
+                    "occupancy key {key} does not reconstruct from cell {:?}",
+                    rec.cell
+                ),
                 &mut issues,
             );
         }
         if rec.room_id == NO_ROOM {
-            push(IssueCode::OccupancyMalformed, format!("occupancy {key} has no room"), &mut issues);
+            push(
+                IssueCode::OccupancyMalformed,
+                format!("occupancy {key} has no room"),
+                &mut issues,
+            );
         }
     }
 
@@ -140,15 +155,27 @@ pub fn validate(
     let mut seen_floor_keys: BTreeSet<&str> = BTreeSet::new();
     for f in &plan.floor_placements {
         if !seen_floor_keys.insert(&f.cell_key) {
-            push(IssueCode::FloorDuplicate, format!("duplicate floor {}", f.cell_key), &mut issues);
+            push(
+                IssueCode::FloorDuplicate,
+                format!("duplicate floor {}", f.cell_key),
+                &mut issues,
+            );
             continue;
         }
         let Some(room) = room_of.get(&f.room_id) else {
-            push(IssueCode::FloorUnknownRoom, format!("floor {} room {}", f.cell_key, f.room_id), &mut issues);
+            push(
+                IssueCode::FloorUnknownRoom,
+                format!("floor {} room {}", f.cell_key, f.room_id),
+                &mut issues,
+            );
             continue;
         };
         if f.cell.key() != f.cell_key {
-            push(IssueCode::FloorKeyMismatch, format!("floor {} cell/key mismatch", f.cell_key), &mut issues);
+            push(
+                IssueCode::FloorKeyMismatch,
+                format!("floor {} cell/key mismatch", f.cell_key),
+                &mut issues,
+            );
         }
         match plan.occupancy.get(&f.cell_key) {
             None => push(
@@ -174,13 +201,25 @@ pub fn validate(
             }
         }
         if room.deck != f.cell.deck {
-            push(IssueCode::FloorOccupancyMismatch, format!("floor {} deck mismatch", f.cell_key), &mut issues);
+            push(
+                IssueCode::FloorOccupancyMismatch,
+                format!("floor {} deck mismatch", f.cell_key),
+                &mut issues,
+            );
         }
         if !FLOOR_MODULES.contains(&f.module_id.as_str()) {
-            push(IssueCode::FloorBadModule, format!("floor {} module '{}'", f.cell_key, f.module_id), &mut issues);
+            push(
+                IssueCode::FloorBadModule,
+                format!("floor {} module '{}'", f.cell_key, f.module_id),
+                &mut issues,
+            );
         }
         if f.position != f.cell.world_pos() || f.yaw_degrees != 0 {
-            push(IssueCode::FloorBadPose, format!("floor {} pose", f.cell_key), &mut issues);
+            push(
+                IssueCode::FloorBadPose,
+                format!("floor {} pose", f.cell_key),
+                &mut issues,
+            );
         }
     }
     if plan.floor_placements.len() != plan.occupancy.len() {
@@ -196,7 +235,11 @@ pub fn validate(
     }
     for key in plan.occupancy.keys() {
         if !seen_floor_keys.contains(key.as_str()) {
-            push(IssueCode::FloorBijectionBroken, format!("occupancy cell {key} has no floor placement"), &mut issues);
+            push(
+                IssueCode::FloorBijectionBroken,
+                format!("occupancy cell {key} has no floor placement"),
+                &mut issues,
+            );
         }
     }
 
@@ -209,34 +252,61 @@ pub fn validate(
     let mut seen_ceiling: BTreeSet<&str> = BTreeSet::new();
     for c in &plan.ceiling_placements {
         if !seen_ceiling.insert(&c.cell_key) {
-            push(IssueCode::CeilingInvalid, format!("duplicate ceiling {}", c.cell_key), &mut issues);
+            push(
+                IssueCode::CeilingInvalid,
+                format!("duplicate ceiling {}", c.cell_key),
+                &mut issues,
+            );
         }
         if vertical_cells.contains(&c.cell_key) {
             push(
                 IssueCode::CeilingOnVerticalOpening,
-                format!("ceiling placement on authored vertical opening {}", c.cell_key),
+                format!(
+                    "ceiling placement on authored vertical opening {}",
+                    c.cell_key
+                ),
                 &mut issues,
             );
         }
         if !plan.occupancy.contains_key(&c.cell_key) {
-            push(IssueCode::CeilingInvalid, format!("ceiling {} not on occupied cell", c.cell_key), &mut issues);
+            push(
+                IssueCode::CeilingInvalid,
+                format!("ceiling {} not on occupied cell", c.cell_key),
+                &mut issues,
+            );
         }
         if c.position != c.cell.world_pos() {
-            push(IssueCode::CeilingInvalid, format!("ceiling {} pose", c.cell_key), &mut issues);
+            push(
+                IssueCode::CeilingInvalid,
+                format!("ceiling {} pose", c.cell_key),
+                &mut issues,
+            );
         }
         if !c.module_id.contains("ceiling") {
-            push(IssueCode::CeilingInvalid, format!("ceiling {} module '{}'", c.cell_key, c.module_id), &mut issues);
+            push(
+                IssueCode::CeilingInvalid,
+                format!("ceiling {} module '{}'", c.cell_key, c.module_id),
+                &mut issues,
+            );
         }
     }
     for key in plan.occupancy.keys() {
         if !vertical_cells.contains(key) && !seen_ceiling.contains(key.as_str()) {
-            push(IssueCode::CeilingInvalid, format!("occupied cell {key} has no ceiling"), &mut issues);
+            push(
+                IssueCode::CeilingInvalid,
+                format!("occupied cell {key} has no ceiling"),
+                &mut issues,
+            );
         }
     }
 
     // --- 5. Socket bindings mandatory --------------------------------------
     if plan.socket_bindings.is_empty() {
-        push(IssueCode::SocketBindingsMissing, "socket_bindings missing".into(), &mut issues);
+        push(
+            IssueCode::SocketBindingsMissing,
+            "socket_bindings missing".into(),
+            &mut issues,
+        );
     }
     for b in &plan.socket_bindings {
         if b.placement_id.is_empty()
@@ -244,67 +314,124 @@ pub fn validate(
             || b.neighbor_placement_id.is_empty()
             || b.neighbor_socket_id.is_empty()
         {
-            push(IssueCode::SocketBindingsMissing, "socket binding with empty field".into(), &mut issues);
+            push(
+                IssueCode::SocketBindingsMissing,
+                "socket binding with empty field".into(),
+                &mut issues,
+            );
             break;
         }
     }
 
     // --- 6. Not floor-only ---------------------------------------------------
     let has_enclosure = plan.placements.iter().any(|p| {
-        p.module_id.contains("wall") || p.module_id.contains("door") || p.module_id.contains("portal")
+        p.module_id.contains("wall")
+            || p.module_id.contains("door")
+            || p.module_id.contains("portal")
             || p.module_id.contains("bulkhead")
     });
     if !has_enclosure {
-        push(IssueCode::FloorOnlyPlan, "no wall/door/portal placements at all".into(), &mut issues);
+        push(
+            IssueCode::FloorOnlyPlan,
+            "no wall/door/portal placements at all".into(),
+            &mut issues,
+        );
     }
 
     // --- 7. Edge placements: forward ----------------------------------------
     let mut seen_edge_keys: BTreeSet<&str> = BTreeSet::new();
     for p in &plan.placements {
         if !seen_edge_keys.insert(&p.edge_key) {
-            push(IssueCode::EdgePlacementDuplicate, format!("duplicate edge placement {}", p.edge_key), &mut issues);
+            push(
+                IssueCode::EdgePlacementDuplicate,
+                format!("duplicate edge placement {}", p.edge_key),
+                &mut issues,
+            );
             continue;
         }
         let Some(edge) = plan.edges.get(&p.edge_key) else {
-            push(IssueCode::EdgePlacementOrphan, format!("placement {} has no edge record", p.edge_key), &mut issues);
+            push(
+                IssueCode::EdgePlacementOrphan,
+                format!("placement {} has no edge record", p.edge_key),
+                &mut issues,
+            );
             continue;
         };
         if p.kind == EdgeKind::Open {
-            push(IssueCode::OpenEdgePlaced, format!("OPEN edge must not have a placement: {}", p.edge_key), &mut issues);
+            push(
+                IssueCode::OpenEdgePlaced,
+                format!("OPEN edge must not have a placement: {}", p.edge_key),
+                &mut issues,
+            );
         }
         if FLOOR_MODULES.contains(&p.module_id.as_str()) {
-            push(IssueCode::EdgeModuleMismatch, format!("floor module on edge {}", p.edge_key), &mut issues);
+            push(
+                IssueCode::EdgeModuleMismatch,
+                format!("floor module on edge {}", p.edge_key),
+                &mut issues,
+            );
         }
         if p.kind != edge.kind {
-            push(IssueCode::EdgeKindMismatch, format!("placement kind differs from edge {}", p.edge_key), &mut issues);
+            push(
+                IssueCode::EdgeKindMismatch,
+                format!("placement kind differs from edge {}", p.edge_key),
+                &mut issues,
+            );
         }
         if p.module_id != edge.module_id {
-            push(IssueCode::EdgeModuleMismatch, format!("placement module differs from edge {}", p.edge_key), &mut issues);
+            push(
+                IssueCode::EdgeModuleMismatch,
+                format!("placement module differs from edge {}", p.edge_key),
+                &mut issues,
+            );
         }
         // Pose round-trip.
         if edge_key(p.cell, p.direction) != p.edge_key
             || p.position != edge_world_position(p.cell, p.direction)
             || p.yaw_degrees != p.direction.yaw_degrees()
         {
-            push(IssueCode::EdgeBadPose, format!("edge {} pose round-trip failed", p.edge_key), &mut issues);
+            push(
+                IssueCode::EdgeBadPose,
+                format!("edge {} pose round-trip failed", p.edge_key),
+                &mut issues,
+            );
         }
     }
 
     // --- 8. Edges: reverse — every required edge has a placement ------------
     for (key, edge) in &plan.edges {
-        if edge.kind != EdgeKind::Open && edge.wrapper_required && !seen_edge_keys.contains(key.as_str()) {
-            push(IssueCode::RequiredEdgeUnplaced, format!("required edge has no placement: {key}"), &mut issues);
+        if edge.kind != EdgeKind::Open
+            && edge.wrapper_required
+            && !seen_edge_keys.contains(key.as_str())
+        {
+            push(
+                IssueCode::RequiredEdgeUnplaced,
+                format!("required edge has no placement: {key}"),
+                &mut issues,
+            );
         }
     }
 
     // --- 9. Portal endpoints vs authored topology ---------------------------
     for portal in &topology.portals {
         let interior = !portal.exterior && portal.to_room != NO_ROOM;
-        if !room_of.contains_key(&portal.from_room) || (interior && !room_of.contains_key(&portal.to_room)) {
-            push(IssueCode::PortalEndpointsInvalid, format!("portal rooms unknown {} -> {}", portal.from_room, portal.to_room), &mut issues);
+        if !room_of.contains_key(&portal.from_room)
+            || (interior && !room_of.contains_key(&portal.to_room))
+        {
+            push(
+                IssueCode::PortalEndpointsInvalid,
+                format!(
+                    "portal rooms unknown {} -> {}",
+                    portal.from_room, portal.to_room
+                ),
+                &mut issues,
+            );
             continue;
         }
-        let owner = plan.occupancy.get(&portal.from_cell.key()).map(|o| o.room_id);
+        let owner = plan
+            .occupancy
+            .get(&portal.from_cell.key())
+            .map(|o| o.room_id);
         let owner_ok = owner == Some(portal.from_room);
         let to_ok = if interior {
             plan.occupancy.get(&portal.to_cell.key()).map(|o| o.room_id) == Some(portal.to_room)
@@ -312,22 +439,48 @@ pub fn validate(
             !plan.occupancy.contains_key(&portal.to_cell.key())
         };
         if !owner_ok || !to_ok {
-            push(IssueCode::PortalEndpointsInvalid, format!("portal endpoints are not reciprocal {} -> {}", portal.from_room, portal.to_room), &mut issues);
+            push(
+                IssueCode::PortalEndpointsInvalid,
+                format!(
+                    "portal endpoints are not reciprocal {} -> {}",
+                    portal.from_room, portal.to_room
+                ),
+                &mut issues,
+            );
             continue;
         }
         let Some(dir) = Dir::between(portal.from_cell, portal.to_cell) else {
-            push(IssueCode::PortalEndpointsInvalid, format!("portal endpoints not adjacent {} -> {}", portal.from_room, portal.to_room), &mut issues);
+            push(
+                IssueCode::PortalEndpointsInvalid,
+                format!(
+                    "portal endpoints not adjacent {} -> {}",
+                    portal.from_room, portal.to_room
+                ),
+                &mut issues,
+            );
             continue;
         };
         let key = edge_key(portal.from_cell, dir);
         match plan.edges.get(&key) {
-            None => push(IssueCode::PortalHasNoEdge, format!("portal has no canonical edge {key}"), &mut issues),
+            None => push(
+                IssueCode::PortalHasNoEdge,
+                format!("portal has no canonical edge {key}"),
+                &mut issues,
+            ),
             Some(edge) => {
                 if !edge.portal {
-                    push(IssueCode::PortalCompiledNonPortal, format!("portal edge was compiled as non-portal {key}"), &mut issues);
+                    push(
+                        IssueCode::PortalCompiledNonPortal,
+                        format!("portal edge was compiled as non-portal {key}"),
+                        &mut issues,
+                    );
                 }
                 if edge.kind == EdgeKind::Solid {
-                    push(IssueCode::PortalBlockedBySolid, format!("topology-connected rooms blocked by SOLID edge {key}"), &mut issues);
+                    push(
+                        IssueCode::PortalBlockedBySolid,
+                        format!("topology-connected rooms blocked by SOLID edge {key}"),
+                        &mut issues,
+                    );
                 }
             }
         }
@@ -437,11 +590,18 @@ fn check_reachability(
         // Unreachable: legal only post-damage across fragments with story
         // sanction.
         let cross_fragment = frag_of_cell(ka) != frag_of_cell(kb);
-        if policy.stage == ValidationStage::PostDamage && cross_fragment && policy.allows_fragment_split {
+        if policy.stage == ValidationStage::PostDamage
+            && cross_fragment
+            && policy.allows_fragment_split
+        {
             continue;
         }
         issues.push(ValidationIssue {
-            code: if cross_fragment { IssueCode::CriticalPathSevered } else { IssueCode::CriticalPathBroken },
+            code: if cross_fragment {
+                IssueCode::CriticalPathSevered
+            } else {
+                IssueCode::CriticalPathBroken
+            },
             detail: format!("flood-fill/topology reachability disagreement: {a} -> {b}"),
         });
     }

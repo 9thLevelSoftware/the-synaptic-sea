@@ -1,0 +1,28 @@
+// Ported from The Synaptic Sea data/procgen/templates/stacked_v2.json
+(
+    id: "stacked_v2",
+    description: "Three-deck vertical with an auxiliary service deck between the main upper and lower decks. Bridge on top, service deck middle, reactor at the bottom. Tests multi-deck traversal and three vertical transitions.",
+    zones: [
+        (id: "entry", role_pool: [Airlock], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: ""),
+        (id: "lower_hub", role_pool: [Hub], count: Fixed(1), position_hint: Center, deck: 0, layout: Single, attach_to: "entry"),
+        (id: "ramp_1", role_pool: [Ramp], count: Fixed(1), position_hint: Center, deck: 0, layout: Single, attach_to: "lower_hub"),
+        (id: "service_corridor", role_pool: [Corridor], count: Fixed(1), position_hint: Center, deck: 1, layout: Single, attach_to: "ramp_1"),
+        (id: "service_room", role_pool: [Maintenance, Storage, Storage], count: Range(1, 2), position_hint: Lateral, deck: 1, layout: Clustered, attach_to: "service_corridor"),
+        (id: "ramp_2", role_pool: [Ramp], count: Fixed(1), position_hint: Center, deck: 1, layout: Single, attach_to: "service_corridor"),
+        (id: "elevator", role_pool: [Elevator], count: Fixed(1), position_hint: Stern, deck: 1, layout: Single, attach_to: "service_corridor"),
+        (id: "upper_hub", role_pool: [Hub], count: Fixed(1), position_hint: Center, deck: 2, layout: Single, attach_to: "ramp_2"),
+        (id: "destination", role_pool: [Bridge], count: Fixed(1), position_hint: Bow, deck: 2, layout: Single, attach_to: "upper_hub"),
+    ],
+    connections: [
+        (from_zone: "entry", to_zone: "lower_hub", distribution: Adjacent),
+        (from_zone: "lower_hub", to_zone: "ramp_1", distribution: Adjacent),
+        (from_zone: "ramp_1", to_zone: "service_corridor", distribution: Adjacent),
+        (from_zone: "service_corridor", to_zone: "service_room", distribution: Spread),
+        (from_zone: "service_corridor", to_zone: "ramp_2", distribution: Adjacent),
+        (from_zone: "service_corridor", to_zone: "elevator", distribution: Adjacent),
+        (from_zone: "ramp_2", to_zone: "upper_hub", distribution: Adjacent),
+        (from_zone: "elevator", to_zone: "upper_hub", distribution: Adjacent),
+        (from_zone: "upper_hub", to_zone: "destination", distribution: Adjacent),
+    ],
+    deck_config: (max_decks: 3, vertical_transition_bp: 10000),
+)

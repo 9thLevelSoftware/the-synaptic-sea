@@ -1,0 +1,29 @@
+// Ported from The Synaptic Sea data/procgen/templates/bifurcated.json
+(
+    id: "bifurcated",
+    description: "Y-fork: bridge forward, junction splits port (cargo/engineering) and starboard (crew/medical), engineering aft.",
+    zones: [
+        (id: "entry", role_pool: [Airlock], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: ""),
+        (id: "fore_corridor", role_pool: [Corridor], count: Fixed(1), position_hint: Bow, deck: 0, layout: Single, attach_to: "entry"),
+        (id: "destination", role_pool: [Bridge], count: Fixed(1), position_hint: Bow, deck: 0, layout: Single, attach_to: "fore_corridor"),
+        (id: "junction", role_pool: [Corridor], count: Fixed(1), position_hint: Center, deck: 0, layout: Single, attach_to: "fore_corridor"),
+        (id: "port_corridor", role_pool: [Corridor], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: "junction"),
+        (id: "port_room", role_pool: [CrewQuarters, Medical, MessHall], count: Range(1, 2), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "port_corridor"),
+        (id: "starboard_corridor", role_pool: [Corridor], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: "junction"),
+        (id: "starboard_room", role_pool: [Cargo, Storage, Armory], count: Range(1, 2), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "starboard_corridor"),
+        (id: "aft_corridor", role_pool: [Corridor], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "junction"),
+        (id: "engine_room", role_pool: [Engineering, Reactor, LifeSupport], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "aft_corridor"),
+    ],
+    connections: [
+        (from_zone: "entry", to_zone: "fore_corridor", distribution: Adjacent),
+        (from_zone: "fore_corridor", to_zone: "destination", distribution: Adjacent),
+        (from_zone: "fore_corridor", to_zone: "junction", distribution: Adjacent),
+        (from_zone: "junction", to_zone: "port_corridor", distribution: Adjacent),
+        (from_zone: "port_corridor", to_zone: "port_room", distribution: Spread),
+        (from_zone: "junction", to_zone: "starboard_corridor", distribution: Adjacent),
+        (from_zone: "starboard_corridor", to_zone: "starboard_room", distribution: Spread),
+        (from_zone: "junction", to_zone: "aft_corridor", distribution: Adjacent),
+        (from_zone: "aft_corridor", to_zone: "engine_room", distribution: Adjacent),
+    ],
+    deck_config: (max_decks: 1, vertical_transition_bp: 0),
+)

@@ -1,0 +1,21 @@
+// Ported from The Synaptic Sea data/procgen/templates/derelict_a.json
+(
+    id: "derelict_a",
+    description: "Derelict variant A — dock + compartments with one biomatter blockage on a non-critical side link. Player enters via the dock and explores compartments.",
+    zones: [
+        (id: "entry", role_pool: [Dock], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: ""),
+        (id: "corridor_a", role_pool: [Corridor], count: Fixed(1), position_hint: Center, deck: 0, layout: Single, attach_to: "entry"),
+        (id: "compartment_a", role_pool: [Cargo, CrewQuarters], count: Range(1, 2), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "corridor_a"),
+        (id: "corridor_b", role_pool: [Corridor], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "corridor_a"),
+        (id: "compartment_b", role_pool: [Cargo, Hangar], count: Range(1, 2), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "corridor_b"),
+        (id: "destination", role_pool: [Bridge], count: Fixed(1), position_hint: Bow, deck: 0, layout: Single, attach_to: "corridor_b"),
+    ],
+    connections: [
+        (from_zone: "entry", to_zone: "corridor_a", distribution: Adjacent),
+        (from_zone: "corridor_a", to_zone: "compartment_a", distribution: Spread),
+        (from_zone: "corridor_a", to_zone: "corridor_b", distribution: Adjacent),
+        (from_zone: "corridor_b", to_zone: "compartment_b", distribution: Spread),
+        (from_zone: "corridor_b", to_zone: "destination", distribution: Adjacent),
+    ],
+    deck_config: (max_decks: 1, vertical_transition_bp: 0),
+)

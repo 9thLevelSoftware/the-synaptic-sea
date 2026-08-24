@@ -1,0 +1,27 @@
+// Ported from The Synaptic Sea data/procgen/templates/spine.json
+(
+    id: "spine",
+    description: "Linear corridor backbone. Bridge forward, engineering aft, airlock lateral entry. Classic submarine layout.",
+    zones: [
+        (id: "entry", role_pool: [Airlock], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: ""),
+        (id: "fore_corridor", role_pool: [Corridor], count: Fixed(1), position_hint: Bow, deck: 0, layout: Single, attach_to: "entry"),
+        (id: "destination", role_pool: [Bridge], count: Fixed(1), position_hint: Bow, deck: 0, layout: Single, attach_to: "fore_corridor"),
+        (id: "crew_corridor", role_pool: [Corridor], count: Fixed(1), position_hint: Center, deck: 0, layout: Single, attach_to: "fore_corridor"),
+        (id: "crew_wing", role_pool: [CrewQuarters, Medical, MessHall], count: Range(1, 2), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "crew_corridor"),
+        (id: "mid_corridor", role_pool: [Corridor], count: Range(1, 2), position_hint: Stern, deck: 0, layout: Linear, attach_to: "crew_corridor"),
+        (id: "cargo_wing", role_pool: [Cargo, Storage, Armory], count: Range(1, 2), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "mid_corridor"),
+        (id: "aft_corridor", role_pool: [Corridor], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "mid_corridor"),
+        (id: "engine_room", role_pool: [Engineering, Reactor, LifeSupport], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "aft_corridor"),
+    ],
+    connections: [
+        (from_zone: "entry", to_zone: "fore_corridor", distribution: Adjacent),
+        (from_zone: "fore_corridor", to_zone: "destination", distribution: Adjacent),
+        (from_zone: "fore_corridor", to_zone: "crew_corridor", distribution: Adjacent),
+        (from_zone: "crew_corridor", to_zone: "crew_wing", distribution: Spread),
+        (from_zone: "crew_corridor", to_zone: "mid_corridor", distribution: Adjacent),
+        (from_zone: "mid_corridor", to_zone: "cargo_wing", distribution: Spread),
+        (from_zone: "mid_corridor", to_zone: "aft_corridor", distribution: Adjacent),
+        (from_zone: "aft_corridor", to_zone: "engine_room", distribution: Adjacent),
+    ],
+    deck_config: (max_decks: 1, vertical_transition_bp: 0),
+)

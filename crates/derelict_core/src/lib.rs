@@ -12,6 +12,7 @@ pub mod rng;
 pub mod role;
 pub mod stages;
 pub mod structural;
+pub mod topology;
 
 pub use archetype::GenData;
 pub use model::{

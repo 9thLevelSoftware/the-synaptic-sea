@@ -6,9 +6,7 @@
 use derelict_core::role::Role;
 use derelict_core::structural::compile::{compile, DefaultModulePicker};
 use derelict_core::structural::plan::*;
-use derelict_core::structural::validate::{
-    validate, IssueCode, ValidationPolicy,
-};
+use derelict_core::structural::validate::{validate, IssueCode, ValidationPolicy};
 
 /// Two-deck fixture: airlock (4 cells) + bridge (4 cells) joined by a door,
 /// an exterior airlock door, an upper deck room over the airlock joined by
@@ -29,9 +27,24 @@ fn fixture() -> Topology {
     let upper_cells = vec![Cell::new(1, 0, 0), Cell::new(1, 1, 0)];
     Topology {
         rooms: vec![
-            RoomSpec { id: 1, role: Role::Airlock, deck: 0, cells: airlock_cells },
-            RoomSpec { id: 2, role: Role::Bridge, deck: 0, cells: bridge_cells },
-            RoomSpec { id: 3, role: Role::CrewQuarters, deck: 1, cells: upper_cells },
+            RoomSpec {
+                id: 1,
+                role: Role::Airlock,
+                deck: 0,
+                cells: airlock_cells,
+            },
+            RoomSpec {
+                id: 2,
+                role: Role::Bridge,
+                deck: 0,
+                cells: bridge_cells,
+            },
+            RoomSpec {
+                id: 3,
+                role: Role::CrewQuarters,
+                deck: 1,
+                cells: upper_cells,
+            },
         ],
         portals: vec![
             PortalIntent {
@@ -104,7 +117,12 @@ fn red_01_compiler_errors_fail_validation() {
 #[test]
 fn red_02_occupancy_key_roundtrip() {
     let (mut plan, topo) = compiled();
-    let (key, mut rec) = plan.occupancy.iter().next().map(|(k, v)| (k.clone(), v.clone())).unwrap();
+    let (key, mut rec) = plan
+        .occupancy
+        .iter()
+        .next()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .unwrap();
     rec.cell.x += 5; // key no longer reconstructs
     plan.occupancy.insert(key, rec);
     assert_code(&plan, &topo, IssueCode::OccupancyMalformed);
@@ -264,9 +282,10 @@ fn red_17_reachability_broken() {
     assert!(plan.errors.is_empty());
     let issues = validate(&plan, &topo, &policy()).expect_err("must fail");
     assert!(
-        issues
-            .iter()
-            .any(|i| matches!(i.code, IssueCode::ReachabilityBroken | IssueCode::CriticalPathBroken)),
+        issues.iter().any(|i| matches!(
+            i.code,
+            IssueCode::ReachabilityBroken | IssueCode::CriticalPathBroken
+        )),
         "got: {issues:?}"
     );
 }

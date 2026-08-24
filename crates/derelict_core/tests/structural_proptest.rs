@@ -49,7 +49,11 @@ fn room_strip() -> impl Strategy<Value = Topology> {
             }
             rooms.push(RoomSpec {
                 id,
-                role: if i == 0 { Role::Airlock } else { Role::Compartment },
+                role: if i == 0 {
+                    Role::Airlock
+                } else {
+                    Role::Compartment
+                },
                 deck: 0,
                 cells,
             });
@@ -67,7 +71,11 @@ fn room_strip() -> impl Strategy<Value = Topology> {
             }
             x0 += *w as i32;
         }
-        Topology { rooms, portals, verticals: Vec::new() }
+        Topology {
+            rooms,
+            portals,
+            verticals: Vec::new(),
+        }
     })
 }
 

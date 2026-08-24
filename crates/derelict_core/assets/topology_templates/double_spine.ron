@@ -1,0 +1,27 @@
+// Ported from The Synaptic Sea data/procgen/templates/double_spine.json
+(
+    id: "double_spine",
+    description: "Two parallel corridor spines linked by cross-passages. Redundant routes for salvage under threat pressure.",
+    zones: [
+        (id: "entry", role_pool: [Airlock], count: Fixed(1), position_hint: Lateral, deck: 0, layout: Single, attach_to: ""),
+        (id: "spine_port", role_pool: [Corridor], count: Range(2, 3), position_hint: Center, deck: 0, layout: Linear, attach_to: "entry"),
+        (id: "spine_starboard", role_pool: [Corridor], count: Range(2, 3), position_hint: Center, deck: 0, layout: Linear, attach_to: "entry"),
+        (id: "cross_fore", role_pool: [Corridor], count: Fixed(1), position_hint: Bow, deck: 0, layout: Single, attach_to: "spine_port"),
+        (id: "cross_aft", role_pool: [Corridor], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "spine_port"),
+        (id: "destination", role_pool: [Bridge], count: Fixed(1), position_hint: Bow, deck: 0, layout: Single, attach_to: "cross_fore"),
+        (id: "crew_wing", role_pool: [CrewQuarters, Medical], count: Range(1, 2), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "spine_starboard"),
+        (id: "engine_block", role_pool: [Engineering, Reactor, LifeSupport], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "cross_aft"),
+    ],
+    connections: [
+        (from_zone: "entry", to_zone: "spine_port", distribution: Adjacent),
+        (from_zone: "entry", to_zone: "spine_starboard", distribution: Adjacent),
+        (from_zone: "spine_port", to_zone: "cross_fore", distribution: Adjacent),
+        (from_zone: "spine_starboard", to_zone: "cross_fore", distribution: Adjacent),
+        (from_zone: "spine_port", to_zone: "cross_aft", distribution: Adjacent),
+        (from_zone: "spine_starboard", to_zone: "cross_aft", distribution: Adjacent),
+        (from_zone: "cross_fore", to_zone: "destination", distribution: Adjacent),
+        (from_zone: "spine_starboard", to_zone: "crew_wing", distribution: Spread),
+        (from_zone: "cross_aft", to_zone: "engine_block", distribution: Adjacent),
+    ],
+    deck_config: (max_decks: 1, vertical_transition_bp: 0),
+)

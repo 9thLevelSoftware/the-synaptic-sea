@@ -1,0 +1,29 @@
+// Ported from The Synaptic Sea data/procgen/templates/stacked.json
+(
+    id: "stacked",
+    description: "Two decks connected by ramp. Upper deck: bridge forward, crew areas. Lower deck: cargo, engineering aft, reactor.",
+    zones: [
+        (id: "entry", role_pool: [Airlock], count: Fixed(1), position_hint: Lateral, deck: 1, layout: Single, attach_to: ""),
+        (id: "upper_fore_corridor", role_pool: [Corridor], count: Fixed(1), position_hint: Bow, deck: 1, layout: Single, attach_to: "entry"),
+        (id: "destination", role_pool: [Bridge], count: Fixed(1), position_hint: Bow, deck: 1, layout: Single, attach_to: "upper_fore_corridor"),
+        (id: "upper_corridor", role_pool: [Corridor], count: Fixed(1), position_hint: Center, deck: 1, layout: Single, attach_to: "upper_fore_corridor"),
+        (id: "crew_wing", role_pool: [CrewQuarters, Medical, MessHall], count: Range(1, 2), position_hint: Lateral, deck: 1, layout: Clustered, attach_to: "upper_corridor"),
+        (id: "ramp", role_pool: [Ramp], count: Fixed(1), position_hint: Stern, deck: 1, layout: Single, attach_to: "upper_corridor"),
+        (id: "lower_corridor", role_pool: [Corridor], count: Fixed(1), position_hint: Center, deck: 0, layout: Single, attach_to: "ramp"),
+        (id: "cargo_bay", role_pool: [Cargo, Storage, Armory], count: Range(1, 2), position_hint: Lateral, deck: 0, layout: Clustered, attach_to: "lower_corridor"),
+        (id: "lower_aft_corridor", role_pool: [Corridor], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "lower_corridor"),
+        (id: "engine_room", role_pool: [Engineering, Reactor, LifeSupport], count: Fixed(1), position_hint: Stern, deck: 0, layout: Single, attach_to: "lower_aft_corridor"),
+    ],
+    connections: [
+        (from_zone: "entry", to_zone: "upper_fore_corridor", distribution: Adjacent),
+        (from_zone: "upper_fore_corridor", to_zone: "destination", distribution: Adjacent),
+        (from_zone: "upper_fore_corridor", to_zone: "upper_corridor", distribution: Adjacent),
+        (from_zone: "upper_corridor", to_zone: "crew_wing", distribution: Spread),
+        (from_zone: "upper_corridor", to_zone: "ramp", distribution: Adjacent),
+        (from_zone: "ramp", to_zone: "lower_corridor", distribution: Adjacent),
+        (from_zone: "lower_corridor", to_zone: "cargo_bay", distribution: Spread),
+        (from_zone: "lower_corridor", to_zone: "lower_aft_corridor", distribution: Adjacent),
+        (from_zone: "lower_aft_corridor", to_zone: "engine_room", distribution: Adjacent),
+    ],
+    deck_config: (max_decks: 2, vertical_transition_bp: 10000),
+)
