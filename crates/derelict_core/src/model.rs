@@ -126,7 +126,9 @@ impl DeckLayer {
     }
 
     pub fn floor_at(&self, x: TileCoord, y: TileCoord) -> FloorTile {
-        self.idx(x, y).map(|i| self.floor[i]).unwrap_or(FloorTile::Void)
+        self.idx(x, y)
+            .map(|i| self.floor[i])
+            .unwrap_or(FloorTile::Void)
     }
 
     pub fn room_at(&self, x: TileCoord, y: TileCoord) -> u16 {
@@ -455,14 +457,17 @@ pub fn apply_diff(ship: &mut Ship, diff: &ShipMutationDiff) {
             e.inventory = inv.clone();
         }
     }
-    ship.entities.retain(|e| !diff.removed_entities.contains(&e.id));
+    ship.entities
+        .retain(|e| !diff.removed_entities.contains(&e.id));
     for (pos, destruction) in &diff.destroyed_tiles {
         let deck_i = pos.deck as usize;
         if deck_i >= ship.decks.len() {
             continue;
         }
         let layer = &mut ship.decks[deck_i].layer;
-        let Some(i) = layer.idx(pos.x, pos.y) else { continue };
+        let Some(i) = layer.idx(pos.x, pos.y) else {
+            continue;
+        };
         match destruction {
             TileDestruction::FloorBreached => layer.floor[i] = FloorTile::DamagedDeck,
             TileDestruction::WallBreached { side_north } => {

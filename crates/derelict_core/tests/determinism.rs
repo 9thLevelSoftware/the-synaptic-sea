@@ -36,5 +36,8 @@ fn intactness_override_respected() {
     let ship = derelict_core::generate_ship(5, &params, &data).unwrap();
     assert_eq!(ship.intactness, 10_000);
     assert!(!ship.fractured);
-    assert!(ship.damage_events.is_empty(), "pristine ship must have no damage events");
+    assert!(
+        ship.damage_events.is_empty(),
+        "pristine ship must have no damage events"
+    );
 }

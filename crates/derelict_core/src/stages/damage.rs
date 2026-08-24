@@ -51,7 +51,7 @@ fn remove_tile(layer: &mut DeckLayer, x: TileCoord, y: TileCoord) {
 #[allow(clippy::too_many_arguments)]
 pub fn apply_damage(
     master_seed: u64,
-    layers: &mut Vec<DeckLayer>,
+    layers: &mut [DeckLayer],
     entities: &mut Vec<EntitySpec>,
     next_entity_id: &mut u32,
     kind_of: &BTreeMap<u16, RoomType>,
@@ -67,7 +67,16 @@ pub fn apply_damage(
     };
     let damage_bp = (10_000 - intactness) as i64;
 
-    breach_pass(master_seed, layers, entities, kind_of, profile, damage_bp, arch, &mut out);
+    breach_pass(
+        master_seed,
+        layers,
+        entities,
+        kind_of,
+        profile,
+        damage_bp,
+        arch,
+        &mut out,
+    );
     scorch_pass(master_seed, layers, kind_of, profile);
     seal_doors_pass(master_seed, entities, profile);
 
@@ -75,7 +84,15 @@ pub fn apply_damage(
         fracture_pass(master_seed, layers, entities, next_entity_id, &mut out);
     }
 
-    body_pass(master_seed, layers, entities, next_entity_id, kind_of, profile, damage_bp);
+    body_pass(
+        master_seed,
+        layers,
+        entities,
+        next_entity_id,
+        kind_of,
+        profile,
+        damage_bp,
+    );
 
     if matches!(profile.cause, crate::model::CauseOfLoss::Depressurization) {
         // Ship-wide loss of atmosphere.
@@ -171,7 +188,9 @@ fn breach_pass(
                 weights.push(if bias_near[deck][i] { 8 } else { 1 });
             }
         }
-        let Some(pick) = weighted_choice(&mut rng, &weights) else { continue };
+        let Some(pick) = weighted_choice(&mut rng, &weights) else {
+            continue;
+        };
         let (ox, oy) = cands[pick];
         placed.push((deck, ox, oy));
 
@@ -253,10 +272,10 @@ fn carve_breach(
     // Jagged wall remnants around the hole.
     for (x, y) in &removed {
         for (dx, dy, north, ex, ey) in [
-            (0, -1, true, *x, *y),      // north edge of removed tile
-            (0, 1, true, *x, *y + 1),   // south edge
-            (-1, 0, false, *x, *y),     // west edge
-            (1, 0, false, *x + 1, *y),  // east edge
+            (0, -1, true, *x, *y),     // north edge of removed tile
+            (0, 1, true, *x, *y + 1),  // south edge
+            (-1, 0, false, *x, *y),    // west edge
+            (1, 0, false, *x + 1, *y), // east edge
         ] {
             let (nx, ny) = (x + dx, y + dy);
             if layer.floor_at(nx, ny) != FloorTile::Void && roll_bp(rng, 3500) {
@@ -287,7 +306,9 @@ fn scorch_pass(
             if layer.floor[i] == FloorTile::Void {
                 continue;
             }
-            let Some(k) = kind_of.get(&layer.room_id[i]) else { continue };
+            let Some(k) = kind_of.get(&layer.room_id[i]) else {
+                continue;
+            };
             if profile.scorch_rooms.contains(k) && roll_bp(&mut rng, 4500) {
                 layer.decal[i] = if roll_bp(&mut rng, 4000) {
                     decal::SCORCH_HEAVY
@@ -327,12 +348,18 @@ fn body_pass(
 ) {
     let mut rng = rng::stream(master_seed, "bodies", 0);
     let extra = damage_bp / 3000; // more carnage on more damaged ships
-    let n = roll_range(&mut rng, profile.bodies.0 as i64, profile.bodies.1 as i64 + extra);
+    let n = roll_range(
+        &mut rng,
+        profile.bodies.0 as i64,
+        profile.bodies.1 as i64 + extra,
+    );
     if n <= 0 {
         return;
     }
-    let occupied: BTreeSet<(u8, i32, i32)> =
-        entities.iter().map(|e| (e.pos.deck, e.pos.x, e.pos.y)).collect();
+    let occupied: BTreeSet<(u8, i32, i32)> = entities
+        .iter()
+        .map(|e| (e.pos.deck, e.pos.x, e.pos.y))
+        .collect();
     // Candidates: walkable tiles in preferred rooms first, any room fallback.
     let mut preferred: Vec<GridPos> = Vec::new();
     let mut fallback: Vec<GridPos> = Vec::new();
@@ -358,7 +385,11 @@ fn body_pass(
     }
     let mut placed: Vec<GridPos> = Vec::new();
     for b in 0..n {
-        let pool: &[GridPos] = if !preferred.is_empty() { &preferred } else { &fallback };
+        let pool: &[GridPos] = if !preferred.is_empty() {
+            &preferred
+        } else {
+            &fallback
+        };
         if pool.is_empty() {
             break;
         }
@@ -388,7 +419,7 @@ fn body_pass(
 
 fn fracture_pass(
     master_seed: u64,
-    layers: &mut Vec<DeckLayer>,
+    layers: &mut [DeckLayer],
     entities: &mut Vec<EntitySpec>,
     next_entity_id: &mut u32,
     out: &mut DamageOutcome,
@@ -417,8 +448,11 @@ fn fracture_pass(
     let mut cut_x = 0;
     let mut ok = false;
     for _attempt in 0..4 {
-        cut_x = roll_range(&mut rng, (x0 + (x1 - x0) * 3 / 10) as i64, (x0 + (x1 - x0) * 7 / 10) as i64)
-            as i32;
+        cut_x = roll_range(
+            &mut rng,
+            (x0 + (x1 - x0) * 3 / 10) as i64,
+            (x0 + (x1 - x0) * 7 / 10) as i64,
+        ) as i32;
         // Balance check on deck 0 tile counts.
         let (mut left, mut right) = (0i64, 0i64);
         for y in 0..h {
@@ -478,8 +512,8 @@ fn fracture_pass(
     let new_w = (w + dx) as u16;
     let new_h = (h + dy) as u16;
     let mut right_rooms: BTreeSet<u16> = BTreeSet::new();
-    for li in 0..layers.len() {
-        let old = &layers[li];
+    for layer in layers.iter_mut() {
+        let old = &*layer;
         let mut new_layer = DeckLayer::new(new_w, new_h);
         for y in 0..h {
             let cx = cut_x + jitter[y as usize];
@@ -487,7 +521,9 @@ fn fracture_pass(
                 let Some(oi) = old.idx(x, y) else { continue };
                 let is_right = x >= cx + gap;
                 let (nx, ny) = if is_right { (x + dx, y + dy) } else { (x, y) };
-                let Some(ni) = new_layer.idx(nx, ny) else { continue };
+                let Some(ni) = new_layer.idx(nx, ny) else {
+                    continue;
+                };
                 new_layer.floor[ni] = old.floor[oi];
                 new_layer.walls[ni] = old.walls[oi];
                 new_layer.room_id[ni] = old.room_id[oi];
@@ -497,7 +533,7 @@ fn fracture_pass(
                 }
             }
         }
-        layers[li] = new_layer;
+        *layer = new_layer;
     }
     for e in entities.iter_mut() {
         let cx = cut_x + jitter[e.pos.y.clamp(0, h - 1) as usize];
@@ -509,8 +545,16 @@ fn fracture_pass(
 
     out.fractured = true;
     out.fragments = vec![
-        ShipFragment { id: 0, rooms: Vec::new(), drift: (0, 0) },
-        ShipFragment { id: 1, rooms: right_rooms.iter().copied().collect(), drift: (dx, dy) },
+        ShipFragment {
+            id: 0,
+            rooms: Vec::new(),
+            drift: (0, 0),
+        },
+        ShipFragment {
+            id: 1,
+            rooms: right_rooms.iter().copied().collect(),
+            drift: (dx, dy),
+        },
     ];
     out.events.push(DamageEvent {
         kind: DamageEventKind::StructuralFracture,
@@ -532,7 +576,10 @@ fn fracture_pass(
             if roll_bp(&mut debris_rng, 3500) {
                 let jx = roll_range(&mut debris_rng, 0, (cell - 1) as i64) as i32;
                 let jy = roll_range(&mut debris_rng, 0, (cell - 1) as i64) as i32;
-                let (px, py) = ((gx + jx).min(new_w as i32 - 1), (gy + jy).min(new_h as i32 - 1));
+                let (px, py) = (
+                    (gx + jx).min(new_w as i32 - 1),
+                    (gy + jy).min(new_h as i32 - 1),
+                );
                 let on_void = layers.iter().all(|l| l.floor_at(px, py) == FloorTile::Void);
                 if on_void {
                     let protos: [(&str, EntityKind, u32); 4] = [

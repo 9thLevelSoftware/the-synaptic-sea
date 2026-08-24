@@ -22,7 +22,8 @@ pub fn seed_loot(
     // Effective richness: request knob x story multiplier x intactness decay
     // (badly damaged ships have had more destroyed/pilfered).
     let intact_mult = 5000 + intactness as i64 / 2; // 5000..=10000 bp
-    let richness = loot_richness as i64 * profile.loot_mult_bp as i64 / 10_000 * intact_mult / 10_000;
+    let richness =
+        loot_richness as i64 * profile.loot_mult_bp as i64 / 10_000 * intact_mult / 10_000;
 
     for e in entities.iter_mut() {
         if e.kind != EntityKind::Container {
@@ -43,7 +44,9 @@ pub fn seed_loot(
             continue;
         }
 
-        let Some(table) = data.loot.tables.get(&room_kind) else { continue };
+        let Some(table) = data.loot.tables.get(&room_kind) else {
+            continue;
+        };
         if table.is_empty() {
             continue;
         }
@@ -51,11 +54,17 @@ pub fn seed_loot(
         let rolls = (base_rolls * richness / 10_000).clamp(0, 8);
         // Even at low richness, give a floor chance of one roll so ships
         // aren't universally empty.
-        let rolls = if rolls == 0 && roll_bp(&mut rng, 3000) { 1 } else { rolls };
+        let rolls = if rolls == 0 && roll_bp(&mut rng, 3000) {
+            1
+        } else {
+            rolls
+        };
         let mut inv: Vec<ItemStack> = Vec::new();
         let weights: Vec<u32> = table.iter().map(|t: &LootEntry| t.weight).collect();
         for _ in 0..rolls {
-            let Some(pick) = weighted_choice(&mut rng, &weights) else { break };
+            let Some(pick) = weighted_choice(&mut rng, &weights) else {
+                break;
+            };
             let entry = &table[pick];
             let qty = roll_range(&mut rng, entry.qty.0 as i64, entry.qty.1 as i64) as u16;
             if qty == 0 {

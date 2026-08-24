@@ -5,9 +5,7 @@
 use derelict_core::model::{
     CauseOfLoss, DamageEventKind, EdgeKind, EntityKind, GenParams, RoomType, Ship,
 };
-use godot::builtin::{
-    VarDictionary, PackedInt32Array, PackedStringArray, VarArray,
-};
+use godot::builtin::{PackedInt32Array, PackedStringArray, VarArray, VarDictionary};
 use godot::meta::ToGodot;
 
 pub fn ship_to_dictionary(ship: &Ship) -> VarDictionary {
@@ -25,7 +23,10 @@ pub fn ship_to_dictionary(ship: &Ship) -> VarDictionary {
         let mut dd = VarDictionary::new();
         dd.set("width", l.width as i64);
         dd.set("height", l.height as i64);
-        dd.set("floor", &PackedInt32Array::from_iter(l.floor.iter().map(|f| *f as i32)));
+        dd.set(
+            "floor",
+            &PackedInt32Array::from_iter(l.floor.iter().map(|f| *f as i32)),
+        );
         dd.set(
             "wall_north",
             &PackedInt32Array::from_iter(l.walls.iter().map(|w| w.north as i32)),
@@ -34,8 +35,14 @@ pub fn ship_to_dictionary(ship: &Ship) -> VarDictionary {
             "wall_west",
             &PackedInt32Array::from_iter(l.walls.iter().map(|w| w.west as i32)),
         );
-        dd.set("room_id", &PackedInt32Array::from_iter(l.room_id.iter().map(|r| *r as i32)));
-        dd.set("decal", &PackedInt32Array::from_iter(l.decal.iter().map(|v| *v as i32)));
+        dd.set(
+            "room_id",
+            &PackedInt32Array::from_iter(l.room_id.iter().map(|r| *r as i32)),
+        );
+        dd.set(
+            "decal",
+            &PackedInt32Array::from_iter(l.decal.iter().map(|v| *v as i32)),
+        );
         decks.push(&dd.to_variant());
     }
     d.set("decks", &decks);
@@ -93,7 +100,10 @@ pub fn ship_to_dictionary(ship: &Ship) -> VarDictionary {
             inv.push(s.qty as i32);
         }
         ed.set("inventory", &inv);
-        ed.set("tags", &PackedStringArray::from_iter(e.tags.iter().map(|t| t.into())));
+        ed.set(
+            "tags",
+            &PackedStringArray::from_iter(e.tags.iter().map(|t| t.into())),
+        );
         entities.push(&ed.to_variant());
     }
     d.set("entities", &entities);
@@ -124,7 +134,10 @@ pub fn ship_to_dictionary(ship: &Ship) -> VarDictionary {
         fd.set("id", f.id as i64);
         fd.set("drift_x", f.drift.0 as i64);
         fd.set("drift_y", f.drift.1 as i64);
-        fd.set("rooms", &PackedInt32Array::from_iter(f.rooms.iter().map(|r| *r as i32)));
+        fd.set(
+            "rooms",
+            &PackedInt32Array::from_iter(f.rooms.iter().map(|r| *r as i32)),
+        );
         fragments.push(&fd.to_variant());
     }
     d.set("fragments", &fragments);

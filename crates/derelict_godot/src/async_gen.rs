@@ -19,7 +19,10 @@ pub struct AsyncGen {
 
 impl Default for AsyncGen {
     fn default() -> Self {
-        Self { next_request: 1, pending: BTreeMap::new() }
+        Self {
+            next_request: 1,
+            pending: BTreeMap::new(),
+        }
     }
 }
 

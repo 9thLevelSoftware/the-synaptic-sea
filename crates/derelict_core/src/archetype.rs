@@ -109,7 +109,10 @@ impl ItemRegistry {
         self.items.iter().find(|i| i.name == name).map(|i| i.id)
     }
     pub fn name_of(&self, id: u32) -> Option<&str> {
-        self.items.iter().find(|i| i.id == id).map(|i| i.name.as_str())
+        self.items
+            .iter()
+            .find(|i| i.id == id)
+            .map(|i| i.name.as_str())
     }
 }
 
@@ -164,7 +167,12 @@ impl GenData {
             ron::from_str(DEFAULT_LOOT).map_err(|e| DataError::Parse(e.to_string()))?;
         let items: ItemRegistry =
             ron::from_str(DEFAULT_ITEMS).map_err(|e| DataError::Parse(e.to_string()))?;
-        let data = Self { archetypes, furnishing, loot, items };
+        let data = Self {
+            archetypes,
+            furnishing,
+            loot,
+            items,
+        };
         data.validate()?;
         Ok(data)
     }

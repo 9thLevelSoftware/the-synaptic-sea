@@ -26,7 +26,11 @@ pub fn choose_shafts(
     if decks.len() < 2 {
         return Vec::new();
     }
-    let want = roll_range(rng, arch.shafts.0.max(1) as i64, arch.shafts.1.max(1) as i64) as usize;
+    let want = roll_range(
+        rng,
+        arch.shafts.0.max(1) as i64,
+        arch.shafts.1.max(1) as i64,
+    ) as usize;
     let w = decks[0].width as i32;
     let h = decks[0].height as i32;
 
@@ -60,7 +64,10 @@ pub fn choose_shafts(
         if shafts.len() >= want {
             break;
         }
-        if shafts.iter().all(|s| (s.x - x).abs() + (s.y - y).abs() >= min_sep) {
+        if shafts
+            .iter()
+            .all(|s| (s.x - x).abs() + (s.y - y).abs() >= min_sep)
+        {
             shafts.push(ShaftSpec { x, y });
         }
     }

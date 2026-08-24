@@ -27,7 +27,11 @@ pub struct DamageProfile {
     pub sealed_door_bp: u32,
 }
 
-pub fn choose_cause(rng: &mut Pcg64, arch: &ShipArchetype, over: Option<CauseOfLoss>) -> CauseOfLoss {
+pub fn choose_cause(
+    rng: &mut Pcg64,
+    arch: &ShipArchetype,
+    over: Option<CauseOfLoss>,
+) -> CauseOfLoss {
     if let Some(c) = over {
         return c;
     }

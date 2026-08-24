@@ -147,7 +147,10 @@ pub fn carve_deck_corridors(
                     continue;
                 }
                 let d = manhattan(cents[i], cents[j]);
-                if best.map(|(bd, bi, bj)| (d, i, j) < (bd, bi, bj)).unwrap_or(true) {
+                if best
+                    .map(|(bd, bi, bj)| (d, i, j) < (bd, bi, bj))
+                    .unwrap_or(true)
+                {
                     best = Some((d, i, j));
                 }
             }
@@ -158,7 +161,10 @@ pub fn carve_deck_corridors(
     }
 
     // Loop-back edges: short non-MST pairs, seeded roll each.
-    let avg_len = edges.iter().map(|(a, b)| manhattan(cents[*a], cents[*b])).sum::<i64>()
+    let avg_len = edges
+        .iter()
+        .map(|(a, b)| manhattan(cents[*a], cents[*b]))
+        .sum::<i64>()
         / edges.len().max(1) as i64;
     let mut extra: Vec<(i64, usize, usize)> = Vec::new();
     for i in 0..n {
@@ -230,8 +236,12 @@ pub fn carve_deck_corridors(
     let mut new_rooms: Vec<RoomSlot> = Vec::new();
     let old_rooms = std::mem::take(&mut dr.rooms);
     for room in old_rooms {
-        let tiles: Vec<usize> =
-            room.tiles.iter().copied().filter(|i| dr.room_grid[*i] == room.id).collect();
+        let tiles: Vec<usize> = room
+            .tiles
+            .iter()
+            .copied()
+            .filter(|i| dr.room_grid[*i] == room.id)
+            .collect();
         if tiles.is_empty() {
             continue;
         }
@@ -273,7 +283,11 @@ pub fn carve_deck_corridors(
                 *next_room_id += 1;
                 id
             };
-            let kind = if ci == 0 { room.kind } else { RoomType::Compartment };
+            let kind = if ci == 0 {
+                room.kind
+            } else {
+                RoomType::Compartment
+            };
             for &i in &comp {
                 dr.room_grid[i] = id;
             }
@@ -281,9 +295,16 @@ pub fn carve_deck_corridors(
         }
     }
     // Corridor room record.
-    let corridor_tiles: Vec<usize> =
-        (0..dr.room_grid.len()).filter(|i| dr.room_grid[*i] == corridor_id).collect();
-    new_rooms.push(build_slot(corridor_id, RoomType::Corridor, corridor_tiles, w, mask));
+    let corridor_tiles: Vec<usize> = (0..dr.room_grid.len())
+        .filter(|i| dr.room_grid[*i] == corridor_id)
+        .collect();
+    new_rooms.push(build_slot(
+        corridor_id,
+        RoomType::Corridor,
+        corridor_tiles,
+        w,
+        mask,
+    ));
     new_rooms.sort_by_key(|r| r.id);
     dr.rooms = new_rooms;
     corridor_id
@@ -344,24 +365,48 @@ fn shared_edges(dr: &DeckRooms, a: u16, b: u16) -> Vec<SharedEdge> {
                 continue;
             }
             // North neighbor.
-            let up = if y > 0 { dr.room_grid[(y - 1) as usize * w as usize + x as usize] } else { NO_ROOM };
+            let up = if y > 0 {
+                dr.room_grid[(y - 1) as usize * w as usize + x as usize]
+            } else {
+                NO_ROOM
+            };
             if up == b {
                 out.push(SharedEdge { x, y, north: true });
             }
             // West neighbor.
-            let left = if x > 0 { dr.room_grid[y as usize * w as usize + (x - 1) as usize] } else { NO_ROOM };
+            let left = if x > 0 {
+                dr.room_grid[y as usize * w as usize + (x - 1) as usize]
+            } else {
+                NO_ROOM
+            };
             if left == b {
                 out.push(SharedEdge { x, y, north: false });
             }
             // South neighbor: edge stored as north edge of (x, y+1).
-            let down = if y + 1 < h { dr.room_grid[(y + 1) as usize * w as usize + x as usize] } else { NO_ROOM };
+            let down = if y + 1 < h {
+                dr.room_grid[(y + 1) as usize * w as usize + x as usize]
+            } else {
+                NO_ROOM
+            };
             if down == b {
-                out.push(SharedEdge { x, y: y + 1, north: true });
+                out.push(SharedEdge {
+                    x,
+                    y: y + 1,
+                    north: true,
+                });
             }
             // East neighbor: edge stored as west edge of (x+1, y).
-            let right = if x + 1 < w { dr.room_grid[y as usize * w as usize + (x + 1) as usize] } else { NO_ROOM };
+            let right = if x + 1 < w {
+                dr.room_grid[y as usize * w as usize + (x + 1) as usize]
+            } else {
+                NO_ROOM
+            };
             if right == b {
-                out.push(SharedEdge { x: x + 1, y, north: false });
+                out.push(SharedEdge {
+                    x: x + 1,
+                    y,
+                    north: false,
+                });
             }
         }
     }
@@ -374,26 +419,30 @@ fn shared_edges(dr: &DeckRooms, a: u16, b: u16) -> Vec<SharedEdge> {
 /// Place doors on one deck. Every non-corridor room ends reachable from the
 /// corridor (or from any room, on corridor-less decks). Returns door specs;
 /// caller stamps `Doorway` edges into the DeckLayer afterwards.
-pub fn place_doors(
-    rng: &mut Pcg64,
-    dr: &DeckRooms,
-    deck: u8,
-    corridor_id: u16,
-) -> Vec<DoorSpec> {
+pub fn place_doors(rng: &mut Pcg64, dr: &DeckRooms, deck: u8, corridor_id: u16) -> Vec<DoorSpec> {
     let mut specs: Vec<DoorSpec> = Vec::new();
     let mut connected: std::collections::BTreeSet<u16> = std::collections::BTreeSet::new();
     if corridor_id != NO_ROOM {
         connected.insert(corridor_id);
     }
 
-    let add_door = |specs: &mut Vec<DoorSpec>, edges: &[SharedEdge], a: u16, b: u16, exterior: bool| {
-        if edges.is_empty() {
-            return false;
-        }
-        let e = edges[edges.len() / 2];
-        specs.push(DoorSpec { deck, x: e.x, y: e.y, north: e.north, room_a: a, room_b: b, exterior });
-        true
-    };
+    let add_door =
+        |specs: &mut Vec<DoorSpec>, edges: &[SharedEdge], a: u16, b: u16, exterior: bool| {
+            if edges.is_empty() {
+                return false;
+            }
+            let e = edges[edges.len() / 2];
+            specs.push(DoorSpec {
+                deck,
+                x: e.x,
+                y: e.y,
+                north: e.north,
+                room_a: a,
+                room_b: b,
+                exterior,
+            });
+            true
+        };
 
     // Pass 1: rooms adjacent to the corridor get 1-2 doors to it.
     if corridor_id != NO_ROOM {
@@ -410,8 +459,20 @@ pub fn place_doors(
             // Big rooms sometimes get a second corridor door far from the first.
             if room.tiles.len() > 60 && edges.len() > 8 && roll_bp(rng, 5000) {
                 let far = [edges[0], edges[edges.len() - 1]];
-                let e = if roll_range(rng, 0, 1) == 0 { far[0] } else { far[1] };
-                specs.push(DoorSpec { deck, x: e.x, y: e.y, north: e.north, room_a: room.id, room_b: corridor_id, exterior: false });
+                let e = if roll_range(rng, 0, 1) == 0 {
+                    far[0]
+                } else {
+                    far[1]
+                };
+                specs.push(DoorSpec {
+                    deck,
+                    x: e.x,
+                    y: e.y,
+                    north: e.north,
+                    room_a: room.id,
+                    room_b: corridor_id,
+                    exterior: false,
+                });
             }
         }
     } else if let Some(first) = dr.rooms.first() {
@@ -421,8 +482,11 @@ pub fn place_doors(
     // Pass 2: BFS repair — connect unreached rooms through already-reached
     // neighbors until everything is reachable.
     loop {
-        let unreached: Vec<&RoomSlot> =
-            dr.rooms.iter().filter(|r| !connected.contains(&r.id)).collect();
+        let unreached: Vec<&RoomSlot> = dr
+            .rooms
+            .iter()
+            .filter(|r| !connected.contains(&r.id))
+            .collect();
         if unreached.is_empty() {
             break;
         }

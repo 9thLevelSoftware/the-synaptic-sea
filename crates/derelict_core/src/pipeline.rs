@@ -85,11 +85,11 @@ pub fn generate_ship_timed(
 
     // --- Stage 4-5: corridors + doors --------------------------------------
     let mut corridor_ids: Vec<u16> = Vec::new();
-    for d in 0..deck_rooms.len() {
+    for (d, dr) in deck_rooms.iter_mut().enumerate() {
         let mut r = rng::stream(seed, "corridor", d as u64);
         let cid = corridors::carve_deck_corridors(
             &mut r,
-            &mut deck_rooms[d],
+            dr,
             &plan.deck_masks[d],
             arch,
             &mut next_room_id,
@@ -126,7 +126,11 @@ pub fn generate_ship_timed(
                 let r = dr.room_grid[i];
                 layer.room_id[i] = r;
                 if r != NO_ROOM {
-                    layer.floor[i] = if r == corridor_ids[d] { FloorTile::Grated } else { FloorTile::Deck };
+                    layer.floor[i] = if r == corridor_ids[d] {
+                        FloorTile::Grated
+                    } else {
+                        FloorTile::Deck
+                    };
                 }
             }
         }
@@ -134,8 +138,16 @@ pub fn generate_ship_timed(
         for y in 0..dr.height as i32 {
             for x in 0..w {
                 let here = dr.room_grid[(y * w + x) as usize];
-                let up = if y > 0 { dr.room_grid[((y - 1) * w + x) as usize] } else { NO_ROOM };
-                let left = if x > 0 { dr.room_grid[(y * w + x - 1) as usize] } else { NO_ROOM };
+                let up = if y > 0 {
+                    dr.room_grid[((y - 1) * w + x) as usize]
+                } else {
+                    NO_ROOM
+                };
+                let left = if x > 0 {
+                    dr.room_grid[(y * w + x - 1) as usize]
+                } else {
+                    NO_ROOM
+                };
                 let north = wall_between(here, up);
                 let west = wall_between(here, left);
                 let i = (y * w + x) as usize;
@@ -170,7 +182,11 @@ pub fn generate_ship_timed(
         rules: &data.furnishing,
         next_entity_id: 1,
     };
-    furnisher.create_doors(&all_door_specs, |id| kind_of.get(&id).copied(), &mut entities);
+    furnisher.create_doors(
+        &all_door_specs,
+        |id| kind_of.get(&id).copied(),
+        &mut entities,
+    );
     // Ladder entities per deck at each shaft.
     for (si, s) in shafts.iter().enumerate() {
         for d in 0..deck_rooms.len() {
@@ -256,7 +272,9 @@ pub fn generate_ship_timed(
                 if r == NO_ROOM {
                     continue;
                 }
-                let e = stats.entry(r).or_insert((i32::MAX, i32::MAX, i32::MIN, i32::MIN, 0));
+                let e = stats
+                    .entry(r)
+                    .or_insert((i32::MAX, i32::MAX, i32::MIN, i32::MIN, 0));
                 e.0 = e.0.min(x);
                 e.1 = e.1.min(y);
                 e.2 = e.2.max(x);
@@ -286,14 +304,27 @@ pub fn generate_ship_timed(
         }
         let layer = &layers[e.pos.deck as usize];
         let (a, b) = if e.rotation == 0 {
-            (layer.room_at(e.pos.x, e.pos.y), layer.room_at(e.pos.x, e.pos.y - 1))
+            (
+                layer.room_at(e.pos.x, e.pos.y),
+                layer.room_at(e.pos.x, e.pos.y - 1),
+            )
         } else {
-            (layer.room_at(e.pos.x, e.pos.y), layer.room_at(e.pos.x - 1, e.pos.y))
+            (
+                layer.room_at(e.pos.x, e.pos.y),
+                layer.room_at(e.pos.x - 1, e.pos.y),
+            )
         };
         if a != NO_ROOM && b != NO_ROOM && a != b {
             let (a, b) = if a < b { (a, b) } else { (b, a) };
-            if !edges.iter().any(|e| e.a == a && e.b == b && e.kind == EdgeKind::Door) {
-                edges.push(RoomEdge { a, b, kind: EdgeKind::Door });
+            if !edges
+                .iter()
+                .any(|e| e.a == a && e.b == b && e.kind == EdgeKind::Door)
+            {
+                edges.push(RoomEdge {
+                    a,
+                    b,
+                    kind: EdgeKind::Door,
+                });
             }
         }
     }
@@ -315,8 +346,15 @@ pub fn generate_ship_timed(
             let b = layers[d + 1].room_at(l.pos.x, l.pos.y);
             if a != NO_ROOM && b != NO_ROOM {
                 let (a, b) = if a < b { (a, b) } else { (b, a) };
-                if !edges.iter().any(|e| e.a == a && e.b == b && e.kind == EdgeKind::VerticalShaft) {
-                    edges.push(RoomEdge { a, b, kind: EdgeKind::VerticalShaft });
+                if !edges
+                    .iter()
+                    .any(|e| e.a == a && e.b == b && e.kind == EdgeKind::VerticalShaft)
+                {
+                    edges.push(RoomEdge {
+                        a,
+                        b,
+                        kind: EdgeKind::VerticalShaft,
+                    });
                 }
             }
         }
@@ -325,7 +363,10 @@ pub fn generate_ship_timed(
     let mut fragments = outcome.fragments;
     if let Some(frag1_rooms) = fragments.get(1).map(|f| f.rooms.clone()) {
         let all_ids: Vec<u16> = stats.keys().copied().collect();
-        fragments[0].rooms = all_ids.into_iter().filter(|id| !frag1_rooms.contains(id)).collect();
+        fragments[0].rooms = all_ids
+            .into_iter()
+            .filter(|id| !frag1_rooms.contains(id))
+            .collect();
     }
 
     let ship = Ship {
@@ -342,7 +383,10 @@ pub fn generate_ship_timed(
         fragments,
     };
     lap("assemble", &mut timings, &mut mark);
-    Ok(GenReport { ship, stage_micros: timings })
+    Ok(GenReport {
+        ship,
+        stage_micros: timings,
+    })
 }
 
 /// Corridor carving can shrink or absorb the assigned airlock until it no
@@ -357,9 +401,11 @@ fn ensure_hull_airlock(deck_rooms: &mut [rooms::DeckRooms]) {
             }
         }
     }
-    let has_airlock = deck_rooms
-        .iter()
-        .any(|dr| dr.rooms.iter().any(|r| r.kind == RoomType::Airlock && r.touches_hull));
+    let has_airlock = deck_rooms.iter().any(|dr| {
+        dr.rooms
+            .iter()
+            .any(|r| r.kind == RoomType::Airlock && r.touches_hull)
+    });
     if has_airlock {
         return;
     }

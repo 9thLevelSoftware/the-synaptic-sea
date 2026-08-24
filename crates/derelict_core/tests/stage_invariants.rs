@@ -93,11 +93,16 @@ fn fracture_produces_two_fragments() {
         assert!(a.is_disjoint(&b), "seed {seed}: fragments share rooms");
         // Debris field exists between the pieces.
         assert!(
-            ship.damage_events.iter().any(|e| e.kind == DamageEventKind::DebrisField),
+            ship.damage_events
+                .iter()
+                .any(|e| e.kind == DamageEventKind::DebrisField),
             "seed {seed}: fractured but no debris field"
         );
     }
-    assert!(fractured_seen >= 10, "fracture rate suspiciously low: {fractured_seen}/20");
+    assert!(
+        fractured_seen >= 10,
+        "fracture rate suspiciously low: {fractured_seen}/20"
+    );
 }
 
 #[test]
@@ -132,7 +137,11 @@ fn loot_is_per_container_deterministic() {
     let b = derelict_core::generate_ship(77, &params, &data).unwrap();
     for (ea, eb) in a.entities.iter().zip(b.entities.iter()) {
         assert_eq!(ea.id, eb.id);
-        assert_eq!(ea.inventory, eb.inventory, "container {} loot differs", ea.id);
+        assert_eq!(
+            ea.inventory, eb.inventory,
+            "container {} loot differs",
+            ea.id
+        );
     }
 }
 

@@ -74,7 +74,11 @@ fn main() {
             println!("  {name:<10} {:>8.2} ms", *t as f64 / iters as f64 / 1000.0);
             sum += t;
         }
-        println!("  {:<10} {:>8.2} ms", "TOTAL", sum as f64 / iters as f64 / 1000.0);
+        println!(
+            "  {:<10} {:>8.2} ms",
+            "TOTAL",
+            sum as f64 / iters as f64 / 1000.0
+        );
         return;
     }
 
@@ -133,7 +137,11 @@ fn print_summary(ship: &Ship, data: &GenData) {
     }
     let rooms: Vec<String> = by_kind.iter().map(|(k, c)| format!("{k}x{c}")).collect();
     println!("rooms: {}", rooms.join(", "));
-    let containers = ship.entities.iter().filter(|e| e.kind == EntityKind::Container).count();
+    let containers = ship
+        .entities
+        .iter()
+        .filter(|e| e.kind == EntityKind::Container)
+        .count();
     let stacks: usize = ship.entities.iter().map(|e| e.inventory.len()).sum();
     let items: u32 = ship
         .entities
@@ -149,10 +157,21 @@ fn print_summary(ship: &Ship, data: &GenData) {
         items
     );
     for ev in &ship.damage_events {
-        println!("damage: {:?} deck {} at {:?} r={}", ev.kind, ev.deck, ev.origin, ev.radius);
+        println!(
+            "damage: {:?} deck {} at {:?} r={}",
+            ev.kind, ev.deck, ev.origin, ev.radius
+        );
     }
-    let depress = ship.room_graph.nodes.iter().filter(|n| n.depressurized).count();
-    println!("depressurized rooms: {depress}/{}", ship.room_graph.nodes.len());
+    let depress = ship
+        .room_graph
+        .nodes
+        .iter()
+        .filter(|n| n.depressurized)
+        .count();
+    println!(
+        "depressurized rooms: {depress}/{}",
+        ship.room_graph.nodes.len()
+    );
     let _ = data;
 }
 
@@ -190,7 +209,9 @@ fn render_ascii(ship: &Ship, deck: usize) -> String {
             grid[gy * gw + gx] = match layer.floor[i] {
                 FloorTile::Void => ' ',
                 FloorTile::Deck => {
-                    if layer.decal[i] == decal::SCORCH_LIGHT || layer.decal[i] == decal::SCORCH_HEAVY {
+                    if layer.decal[i] == decal::SCORCH_LIGHT
+                        || layer.decal[i] == decal::SCORCH_HEAVY
+                    {
                         '*'
                     } else {
                         '.'

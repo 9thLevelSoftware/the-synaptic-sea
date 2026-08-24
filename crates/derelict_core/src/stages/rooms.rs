@@ -60,13 +60,65 @@ fn bsp_split(rng: &mut Pcg64, rect: Rect, min_dim: i32, max_dim: i32, out: &mut 
         roll_range(rng, 0, 1) == 0
     };
     if split_x {
-        let cut = roll_range(rng, (rect.x0 + min_dim) as i64, (rect.x1 - min_dim + 1) as i64) as i32;
-        bsp_split(rng, Rect { x0: rect.x0, y0: rect.y0, x1: cut - 1, y1: rect.y1 }, min_dim, max_dim, out);
-        bsp_split(rng, Rect { x0: cut, y0: rect.y0, x1: rect.x1, y1: rect.y1 }, min_dim, max_dim, out);
+        let cut = roll_range(
+            rng,
+            (rect.x0 + min_dim) as i64,
+            (rect.x1 - min_dim + 1) as i64,
+        ) as i32;
+        bsp_split(
+            rng,
+            Rect {
+                x0: rect.x0,
+                y0: rect.y0,
+                x1: cut - 1,
+                y1: rect.y1,
+            },
+            min_dim,
+            max_dim,
+            out,
+        );
+        bsp_split(
+            rng,
+            Rect {
+                x0: cut,
+                y0: rect.y0,
+                x1: rect.x1,
+                y1: rect.y1,
+            },
+            min_dim,
+            max_dim,
+            out,
+        );
     } else {
-        let cut = roll_range(rng, (rect.y0 + min_dim) as i64, (rect.y1 - min_dim + 1) as i64) as i32;
-        bsp_split(rng, Rect { x0: rect.x0, y0: rect.y0, x1: rect.x1, y1: cut - 1 }, min_dim, max_dim, out);
-        bsp_split(rng, Rect { x0: rect.x0, y0: cut, x1: rect.x1, y1: rect.y1 }, min_dim, max_dim, out);
+        let cut = roll_range(
+            rng,
+            (rect.y0 + min_dim) as i64,
+            (rect.y1 - min_dim + 1) as i64,
+        ) as i32;
+        bsp_split(
+            rng,
+            Rect {
+                x0: rect.x0,
+                y0: rect.y0,
+                x1: rect.x1,
+                y1: cut - 1,
+            },
+            min_dim,
+            max_dim,
+            out,
+        );
+        bsp_split(
+            rng,
+            Rect {
+                x0: rect.x0,
+                y0: cut,
+                x1: rect.x1,
+                y1: rect.y1,
+            },
+            min_dim,
+            max_dim,
+            out,
+        );
     }
 }
 
@@ -95,7 +147,18 @@ pub fn partition_deck(
     let min_dim = arch.min_room_dim as i32;
     let max_dim = (min_dim * 3).max(9);
     let mut leaves = Vec::new();
-    bsp_split(rng, Rect { x0: bx0, y0: by0, x1: bx1, y1: by1 }, min_dim, max_dim, &mut leaves);
+    bsp_split(
+        rng,
+        Rect {
+            x0: bx0,
+            y0: by0,
+            x1: bx1,
+            y1: by1,
+        },
+        min_dim,
+        max_dim,
+        &mut leaves,
+    );
 
     // Per-tile slot labeling (leaf order = deterministic recursion order).
     let mut slot_of = vec![usize::MAX; w as usize * h as usize];
@@ -162,11 +225,11 @@ pub fn partition_deck(
     let mut rooms: Vec<RoomSlot> = Vec::new();
     let mut room_grid = vec![0u16; w as usize * h as usize];
     let mut next_id = first_id;
-    for si in 0..n_slots {
-        if tiles_of[si].is_empty() {
+    for slot_tiles in tiles_of.iter_mut() {
+        if slot_tiles.is_empty() {
             continue;
         }
-        let tiles = std::mem::take(&mut tiles_of[si]);
+        let tiles = std::mem::take(slot_tiles);
         let (mut x0, mut y0, mut x1, mut y1) = (i32::MAX, i32::MAX, i32::MIN, i32::MIN);
         let (mut sx, mut sy) = (0i64, 0i64);
         let mut touches_hull = false;
@@ -204,7 +267,12 @@ pub fn partition_deck(
         next_id += 1;
     }
 
-    DeckRooms { width: w, height: h, room_grid, rooms }
+    DeckRooms {
+        width: w,
+        height: h,
+        room_grid,
+        rooms,
+    }
 }
 
 /// Assign room types to slots across all decks. Required rooms are placed by
@@ -225,7 +293,10 @@ pub fn assign_rooms(
             all.push((d, s));
         }
     }
-    let areas: Vec<usize> = all.iter().map(|(d, s)| decks[*d].rooms[*s].tiles.len()).collect();
+    let areas: Vec<usize> = all
+        .iter()
+        .map(|(d, s)| decks[*d].rooms[*s].tiles.len())
+        .collect();
     let mut sorted_areas = areas.clone();
     sorted_areas.sort_unstable();
     let median_area = sorted_areas[sorted_areas.len() / 2] as i64;

@@ -23,7 +23,11 @@ pub struct Mask {
 
 impl Mask {
     pub fn new(width: u16, height: u16) -> Self {
-        Self { width, height, cells: vec![false; width as usize * height as usize] }
+        Self {
+            width,
+            height,
+            cells: vec![false; width as usize * height as usize],
+        }
     }
 
     #[inline]
@@ -104,8 +108,8 @@ impl Mask {
         }
         let best = (1..sizes.len()).max_by_key(|i| sizes[*i]).unwrap_or(0) as u32;
         let mut out = Mask::new(self.width, self.height);
-        for i in 0..self.cells.len() {
-            out.cells[i] = label[i] == best && best != 0;
+        for (cell, l) in out.cells.iter_mut().zip(label.iter()) {
+            *cell = *l == best && best != 0;
         }
         out
     }
@@ -132,9 +136,9 @@ fn half_beam(dx: i64, half_len: i64, half_beam_max: i64) -> i64 {
 }
 
 pub fn generate_hull(rng_h: &mut Pcg64, arch: &ShipArchetype, deck_count: u8) -> HullPlan {
-    let length = roll_range(rng_h, arch.length.0 as i64, arch.length.1 as i64) as i64;
+    let length = roll_range(rng_h, arch.length.0 as i64, arch.length.1 as i64);
     let beam = {
-        let b = roll_range(rng_h, arch.beam.0 as i64, arch.beam.1 as i64) as i64;
+        let b = roll_range(rng_h, arch.beam.0 as i64, arch.beam.1 as i64);
         b.min(length - 2).max(4)
     };
     let width = (length + CANVAS_MARGIN as i64 * 2) as u16;
@@ -200,19 +204,23 @@ pub fn generate_hull(rng_h: &mut Pcg64, arch: &ShipArchetype, deck_count: u8) ->
         }
         weights.clear();
         weights.extend(frontier.iter().map(|(x, y)| weight_of(*x, *y)));
-        let Some(pick) = weighted_choice(rng_h, &weights) else { break };
+        let Some(pick) = weighted_choice(rng_h, &weights) else {
+            break;
+        };
         let (x, y) = frontier.swap_remove(pick);
         mask.set(x as i32, y as i32, true);
         count += 1;
         push_neighbors(&mask, &mut frontier, x, y);
         // Mirror across the centerline unless this step rolls asymmetric.
         let my = 2 * cy - y;
-        if my != y && !roll_bp(rng_h, arch.asymmetry_bp as u32) && !mask.get(x as i32, my as i32) {
-            if weight_of(x, my) > 0 {
-                mask.set(x as i32, my as i32, true);
-                count += 1;
-                push_neighbors(&mask, &mut frontier, x, my);
-            }
+        if my != y
+            && !roll_bp(rng_h, arch.asymmetry_bp as u32)
+            && !mask.get(x as i32, my as i32)
+            && weight_of(x, my) > 0
+        {
+            mask.set(x as i32, my as i32, true);
+            count += 1;
+            push_neighbors(&mask, &mut frontier, x, my);
         }
     }
 
@@ -294,13 +302,23 @@ pub fn generate_hull(rng_h: &mut Pcg64, arch: &ShipArchetype, deck_count: u8) ->
         deck_masks.push(m);
     }
 
-    HullPlan { width, height, deck_masks, length: length as u16, beam: beam as u16 }
+    HullPlan {
+        width,
+        height,
+        deck_masks,
+        length: length as u16,
+        beam: beam as u16,
+    }
 }
 
 /// Derive the site seed for a derelict from world seed + world position.
 /// Discovery-order independent: any co-op peer computes the same value.
 pub fn derive_site_seed(world_seed: u64, world_x: i64, world_y: i64) -> u64 {
-    rng::key(world_seed, "derelict_site", (world_x as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (world_y as u64))
+    rng::key(
+        world_seed,
+        "derelict_site",
+        (world_x as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (world_y as u64),
+    )
 }
 
 #[cfg(test)]
@@ -317,16 +335,21 @@ mod tests {
                 let mut r = stream(seed, "hull", 0);
                 let plan = generate_hull(&mut r, arch, arch.decks.1);
                 let m = &plan.deck_masks[0];
-                assert!(m.count() >= (arch.length.0 as usize * arch.beam.0 as usize) / 3,
-                    "{id} seed {seed}: hull too small: {}", m.count());
+                assert!(
+                    m.count() >= (arch.length.0 as usize * arch.beam.0 as usize) / 3,
+                    "{id} seed {seed}: hull too small: {}",
+                    m.count()
+                );
                 // Connectivity: largest component == whole mask.
                 assert_eq!(m.count(), m.largest_component().count(), "{id} seed {seed}");
                 // Decks nest.
                 for d in 1..plan.deck_masks.len() {
                     for i in 0..m.cells.len() {
                         if plan.deck_masks[d].cells[i] {
-                            assert!(plan.deck_masks[d - 1].cells[i],
-                                "{id} seed {seed}: deck {d} not nested");
+                            assert!(
+                                plan.deck_masks[d - 1].cells[i],
+                                "{id} seed {seed}: deck {d} not nested"
+                            );
                         }
                     }
                 }

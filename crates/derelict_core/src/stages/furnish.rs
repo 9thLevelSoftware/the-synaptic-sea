@@ -2,11 +2,11 @@
 //! containers, and terminals per data-driven rules.
 
 use crate::archetype::{FurnishingRules, Placement};
+use crate::model::DeckLayer;
 use crate::model::{EntityKind, EntitySpec, GridPos, RoomType, Side, WallEdge};
 use crate::rng::{self, roll_bp, roll_range, shuffle};
 use crate::stages::corridors::DoorSpec;
 use crate::stages::rooms::DeckRooms;
-use crate::model::DeckLayer;
 
 pub struct Furnisher<'a> {
     pub master_seed: u64,
@@ -37,7 +37,11 @@ impl<'a> Furnisher<'a> {
             out.push(EntitySpec {
                 id: self.next_entity_id,
                 kind: EntityKind::Door,
-                proto: if spec.exterior { "airlock_door".into() } else { "door".into() },
+                proto: if spec.exterior {
+                    "airlock_door".into()
+                } else {
+                    "door".into()
+                },
                 pos: GridPos::new(spec.x, spec.y, spec.deck),
                 rotation: if spec.north { 0 } else { 1 },
                 locked,
@@ -73,7 +77,9 @@ impl<'a> Furnisher<'a> {
         }
 
         for room in &dr.rooms {
-            let Some(rules) = self.rules.rules.get(&room.kind) else { continue };
+            let Some(rules) = self.rules.rules.get(&room.kind) else {
+                continue;
+            };
             let mut rng = rng::stream(self.master_seed, "furnish", room.id as u64);
             for rule in rules {
                 let count = roll_range(&mut rng, rule.count.0 as i64, rule.count.1 as i64);
@@ -103,7 +109,8 @@ impl<'a> Furnisher<'a> {
                     occupied[i] = true;
                     let x = (i as i32) % w;
                     let y = (i as i32) / w;
-                    let locked = rule.kind == EntityKind::Container && roll_bp(&mut rng, rule.lock_bp as u32);
+                    let locked = rule.kind == EntityKind::Container
+                        && roll_bp(&mut rng, rule.lock_bp as u32);
                     out.push(EntitySpec {
                         id: self.next_entity_id,
                         kind: rule.kind,
