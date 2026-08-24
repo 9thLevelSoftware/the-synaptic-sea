@@ -5,7 +5,6 @@ Zomboid-style Godot game. Ships are generated on demand as players discover
 them in the wild — some intact, some torn into pieces with debris fields
 drifting between the fragments.
 
-![architecture](docs/architecture.md)
 
 ## Layout
 
