@@ -7,4 +7,5 @@
 pub mod compile;
 pub mod plan;
 pub mod project;
+pub mod sockets;
 pub mod validate;
