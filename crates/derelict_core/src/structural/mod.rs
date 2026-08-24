@@ -5,6 +5,7 @@
 //! `validate` — fail-closed validation (pre- and post-damage policies).
 
 pub mod compile;
+pub mod export;
 pub mod plan;
 pub mod project;
 pub mod sockets;

@@ -109,7 +109,7 @@ impl SocketCatalog {
         if !preferred.is_empty() && self.has_all_kinds(preferred, required) {
             return preferred.to_string();
         }
-        for (id, _) in self.modules.iter() {
+        for id in self.modules.keys() {
             if self.has_all_kinds(id, required) {
                 return id.clone();
             }
@@ -120,7 +120,8 @@ impl SocketCatalog {
     /// Reciprocal socket compatibility (kind equality, or each side listing
     /// the other's kind).
     pub fn sockets_compatible(a: &SocketDef, b: &SocketDef) -> bool {
-        if !ENCLOSURE_KINDS.contains(&a.kind.as_str()) || !ENCLOSURE_KINDS.contains(&b.kind.as_str())
+        if !ENCLOSURE_KINDS.contains(&a.kind.as_str())
+            || !ENCLOSURE_KINDS.contains(&b.kind.as_str())
         {
             return false;
         }

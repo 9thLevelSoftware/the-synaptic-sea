@@ -23,7 +23,11 @@ fn catalog() -> Option<SocketCatalog> {
 #[test]
 fn contracts_load_and_choose_expected_modules() {
     let Some(cat) = catalog() else { return };
-    assert!(cat.modules.len() >= 10, "expected the 15-module kit, got {}", cat.modules.len());
+    assert!(
+        cat.modules.len() >= 10,
+        "expected the 15-module kit, got {}",
+        cat.modules.len()
+    );
     let picker = SocketModulePicker { catalog: cat };
     assert_eq!(picker.floor(false), "floor_1x1");
     assert_eq!(picker.floor(true), "corridor_floor_1x1");

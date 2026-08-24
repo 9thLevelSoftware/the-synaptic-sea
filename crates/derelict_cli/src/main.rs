@@ -34,6 +34,17 @@ struct Args {
     /// Render a sweep of seeds (count) as summaries only.
     #[arg(long)]
     sweep: Option<u64>,
+    /// Export layout.json + gameplay_slice.json (The Synaptic Sea contract)
+    /// into this directory.
+    #[arg(long)]
+    export_dir: Option<String>,
+    /// Kit id stamped into the exported layout.
+    #[arg(long, default_value = "ship_structural_v0")]
+    kit_id: String,
+    /// Stress sweep: every archetype x 3 intactness bands x 150 seeds
+    /// (1,800 ships), all fail-closed validated. Non-zero exit on any error.
+    #[arg(long)]
+    stress: bool,
 }
 
 fn main() {
@@ -42,6 +53,37 @@ fn main() {
     let mut params = GenParams::new(&args.archetype);
     if let Some(f) = args.intactness {
         params.intactness_override = Some((f.clamp(0.0, 1.0) * 10_000.0) as u16);
+    }
+
+    if args.stress {
+        let mut failures = 0u32;
+        let mut total = 0u32;
+        let mut rooms_total = 0u64;
+        let mut placements_total = 0u64;
+        for arch in ["shuttle", "corvette", "freighter", "frigate"] {
+            for (band, intact) in [("pristine", 9500u16), ("damaged", 5000), ("wrecked", 1000)] {
+                for seed in 0..150u64 {
+                    total += 1;
+                    let mut p = GenParams::new(arch);
+                    p.intactness_override = Some(intact);
+                    match derelict_core::generate_ship(seed * 7 + 13, &p, &data) {
+                        Ok(ship) => {
+                            rooms_total += ship.room_graph.nodes.len() as u64;
+                            placements_total += ship.plan.placements.len() as u64;
+                        }
+                        Err(e) => {
+                            failures += 1;
+                            println!("FAIL {arch}/{band} seed {}: {e}", seed * 7 + 13);
+                        }
+                    }
+                }
+            }
+        }
+        println!(
+            "STRESS {}: runs={total} failures={failures} rooms={rooms_total} module_placements={placements_total}",
+            if failures == 0 { "PASS" } else { "FAIL" }
+        );
+        std::process::exit(if failures == 0 { 0 } else { 1 });
     }
 
     if let Some(n) = args.sweep {
@@ -90,6 +132,24 @@ fn main() {
         }
     };
     print_summary(&ship, &data);
+
+    if let Some(dir) = &args.export_dir {
+        use derelict_core::structural::export::{
+            to_gameplay_slice_json, to_layout_json, ExportOptions,
+        };
+        std::fs::create_dir_all(dir).expect("create export dir");
+        let opts = ExportOptions {
+            kit_id: args.kit_id.clone(),
+            ..Default::default()
+        };
+        let layout = to_layout_json(&ship, &opts);
+        let slice = to_gameplay_slice_json(&ship);
+        let lp = format!("{dir}/layout.json");
+        let gp = format!("{dir}/gameplay_slice.json");
+        std::fs::write(&lp, serde_json::to_string_pretty(&layout).unwrap()).expect("write layout");
+        std::fs::write(&gp, serde_json::to_string_pretty(&slice).unwrap()).expect("write slice");
+        println!("exported {lp} and {gp}");
+    }
 
     let decks: Vec<usize> = if args.all_decks {
         (0..ship.decks.len()).collect()

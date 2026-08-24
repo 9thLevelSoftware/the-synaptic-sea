@@ -105,7 +105,9 @@ fn repair_connectivity(
     entities: &mut Vec<EntitySpec>,
     protected: &[RoomId],
 ) {
-    for _ in 0..32 {
+    // Each iteration merges (blast opening) or destroys at least one whole
+    // stray COMPONENT, so iterations are bounded by the component count.
+    for _ in 0..64 {
         let alive: Vec<RoomId> = topology.rooms.iter().map(|r| r.id).collect();
         if alive.is_empty() {
             return;
@@ -140,28 +142,47 @@ fn repair_connectivity(
                 }
             }
         }
-        let mut sizes: BTreeMap<(u8, u32), usize> = BTreeMap::new();
-        for &id in &alive {
-            *sizes.entry((frag(id), comp[&id])).or_insert(0) += topology
+        let cell_count = |id: RoomId| {
+            topology
                 .rooms
                 .iter()
                 .find(|r| r.id == id)
                 .map(|r| r.cells.len())
-                .unwrap_or(0);
+                .unwrap_or(0)
+        };
+        let mut sizes: BTreeMap<(u8, u32), usize> = BTreeMap::new();
+        for &id in &alive {
+            *sizes.entry((frag(id), comp[&id])).or_insert(0) += cell_count(id);
         }
+        // Main component per fragment: protected rooms (entry/goal) anchor
+        // it — the ship must stay navigable around them — then size.
         let mut main_comp: BTreeMap<u8, u32> = BTreeMap::new();
-        for (&(f, c), &n) in &sizes {
-            let cur = main_comp.get(&f).map(|mc| sizes[&(f, *mc)]).unwrap_or(0);
-            if n > cur {
-                main_comp.insert(f, c);
+        let rank = |f: u8, c: u32| -> (u32, usize) {
+            let has_protected = protected
+                .iter()
+                .any(|id| comp.get(id) == Some(&c) && frag(*id) == f);
+            (u32::from(has_protected), sizes[&(f, c)])
+        };
+        for &(f, c) in sizes.keys() {
+            match main_comp.get(&f) {
+                Some(&mc) if rank(f, mc) >= rank(f, c) => {}
+                _ => {
+                    main_comp.insert(f, c);
+                }
             }
         }
-        let stray: Vec<RoomId> = alive
-            .iter()
-            .copied()
-            .filter(|id| main_comp.get(&frag(*id)) != Some(&comp[id]))
-            .collect();
-        if stray.is_empty() {
+        // Group stray rooms by their (fragment, component).
+        let mut stray_comps: BTreeMap<(u8, u32), Vec<RoomId>> = BTreeMap::new();
+        for &id in &alive {
+            let key = (frag(id), comp[&id]);
+            if main_comp.get(&key.0) != Some(&key.1) {
+                stray_comps.entry(key).or_default().push(id);
+            }
+        }
+        if std::env::var("DERELICT_DEBUG").is_ok() {
+            eprintln!("  [repair] stray_comps={:?} sizes={:?}", stray_comps, sizes);
+        }
+        if stray_comps.is_empty() {
             return;
         }
         let cells_of: BTreeMap<RoomId, BTreeSet<(u8, i32, i32)>> = topology
@@ -169,51 +190,55 @@ fn repair_connectivity(
             .iter()
             .map(|r| (r.id, r.cells.iter().map(|c| (c.deck, c.x, c.y)).collect()))
             .collect();
-        let mut reconnected = false;
-        'outer: for &sid in &stray {
-            for &oid in &alive {
-                if frag(oid) != frag(sid) || main_comp.get(&frag(oid)) != Some(&comp[&oid]) {
-                    continue;
-                }
-                for &(d, x, y) in &cells_of[&sid] {
-                    for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
-                        if cells_of[&oid].contains(&(d, x + dx, y + dy)) {
-                            topology.portals.push(PortalIntent {
-                                from_room: sid,
-                                to_room: oid,
-                                from_cell: Cell::new(d, x, y),
-                                to_cell: Cell::new(d, x + dx, y + dy),
-                                state: EdgeKind::Breach,
-                                exterior: false,
-                            });
-                            dedup_portals(topology);
-                            reconnected = true;
-                            break 'outer;
+        let is_main = |id: RoomId| main_comp.get(&frag(id)) == Some(&comp[&id]);
+        let mut progressed = false;
+        // Reconnect every stray component that touches the main component.
+        for ((_f, _c), rooms) in &stray_comps {
+            let mut connected = false;
+            'search: for &sid in rooms {
+                for &oid in &alive {
+                    if !is_main(oid) || frag(oid) != frag(sid) {
+                        continue;
+                    }
+                    for &(d, x, y) in &cells_of[&sid] {
+                        for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
+                            if cells_of[&oid].contains(&(d, x + dx, y + dy)) {
+                                topology.portals.push(PortalIntent {
+                                    from_room: sid,
+                                    to_room: oid,
+                                    from_cell: Cell::new(d, x, y),
+                                    to_cell: Cell::new(d, x + dx, y + dy),
+                                    state: EdgeKind::Breach,
+                                    exterior: false,
+                                });
+                                connected = true;
+                                break 'search;
+                            }
                         }
                     }
                 }
             }
+            progressed = progressed || connected;
         }
-        if !reconnected {
-            // Destroy the smallest expendable stray room (never entry/goal).
-            let Some(smallest) = stray
-                .iter()
-                .filter(|id| !protected.contains(id))
-                .min_by_key(|id| {
-                    topology
-                        .rooms
-                        .iter()
-                        .find(|r| r.id == **id)
-                        .map(|r| r.cells.len())
-                        .unwrap_or(0)
-                })
-                .copied()
-            else {
-                return; // only protected rooms are stray; leave to validation
-            };
-            let doomed: BTreeSet<(u8, i32, i32)> = cells_of[&smallest].clone();
-            remove_cells(topology, &doomed, entities);
+        if progressed {
+            dedup_portals(topology);
+            continue;
         }
+        // Nothing touches the main component: destroy the smallest
+        // expendable stray component wholesale (blown to space).
+        let doomed_comp = stray_comps
+            .iter()
+            .filter(|(_, rooms)| rooms.iter().all(|id| !protected.contains(id)))
+            .min_by_key(|((f, c), _)| (sizes[&(*f, *c)], *f, *c))
+            .map(|(_, rooms)| rooms.clone());
+        let Some(rooms) = doomed_comp else {
+            return; // only protected components are stray; leave to validation
+        };
+        let mut doomed: BTreeSet<(u8, i32, i32)> = BTreeSet::new();
+        for id in rooms {
+            doomed.extend(cells_of[&id].iter().copied());
+        }
+        remove_cells(topology, &doomed, entities);
     }
 }
 
@@ -749,6 +774,17 @@ fn fracture_pass(
         .filter(|(_, s)| **s == 1)
         .map(|(id, _)| *id)
         .collect();
+    // Links crossing the tear cannot survive: prune portals and verticals
+    // whose rooms ended up on opposite sides (jitter can leave diagonal
+    // neighbors alive across the gap).
+    topology.portals.retain(|p| {
+        p.exterior
+            || p.to_room == NO_ROOM
+            || right_rooms.contains(&p.from_room) == right_rooms.contains(&p.to_room)
+    });
+    topology
+        .verticals
+        .retain(|v| right_rooms.contains(&v.from_room) == right_rooms.contains(&v.to_room));
     // Entities shift by their pre-drift side (before room coords change).
     for e in entities.iter_mut() {
         let was_right = e.pos.x >= cut_x + jitter_at(e.pos.y) + gap;

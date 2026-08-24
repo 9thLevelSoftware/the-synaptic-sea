@@ -112,7 +112,7 @@ pub fn generate_ship_timed(
     // minimum footprint need fits (with slack for corridors/walkways) are
     // candidates. Each retry attempt re-picks deterministically.
     let hull_cells: u32 = hull_plan.deck_masks.iter().map(|m| m.count() as u32).sum();
-    let pick_template = |attempt: u64| -> Result<&TemplateDef, GenError> {
+    let pick_template = |attempt: u64, exclude: &[String]| -> Result<&TemplateDef, GenError> {
         if !arch.template.is_empty() {
             return data
                 .templates
@@ -133,7 +133,17 @@ pub fn generate_ship_timed(
             .iter()
             .copied()
             .filter(|t| t.min_cell_need() * 3 / 2 <= hull_cells)
+            .filter(|t| !exclude.contains(&t.id))
             .collect();
+        if fitting.is_empty() {
+            // Every fitting template already failed an attempt; retry the
+            // full fitting pool with fresh placement RNG rather than none.
+            fitting = compatible
+                .iter()
+                .copied()
+                .filter(|t| t.min_cell_need() * 3 / 2 <= hull_cells)
+                .collect();
+        }
         if fitting.is_empty() {
             // Smallest-need compatible template as a last resort.
             fitting = vec![compatible
@@ -146,7 +156,7 @@ pub fn generate_ship_timed(
         let weights: Vec<u32> = vec![1; fitting.len()];
         Ok(fitting[weighted_choice(&mut trng, &weights).unwrap_or(0)])
     };
-    let template: &TemplateDef = pick_template(0)?;
+    let template: &TemplateDef = pick_template(0, &[])?;
     let role_params = RoleParams {
         weights: arch.role_weights.iter().copied().collect(),
         guaranteed: arch.guaranteed_roles.clone(),
@@ -158,14 +168,16 @@ pub fn generate_ship_timed(
     let mut placed = None;
     let mut last_err: Option<GenError> = None;
     let mut template = template;
+    let mut failed_templates: Vec<String> = Vec::new();
     for attempt in 0..TOPOLOGY_ATTEMPTS {
-        template = pick_template(attempt)?;
+        template = pick_template(attempt, &failed_templates)?;
         let mut trng = rng::stream(seed, "topology", attempt);
         let mut candidate =
             match place_topology(&mut trng, template, &hull_plan.deck_masks, &role_params) {
                 Ok(p) => p,
                 Err(e) => {
                     last_err = Some(GenError::TopologyFailed(e.to_string()));
+                    failed_templates.push(template.id.clone());
                     continue;
                 }
             };
@@ -299,6 +311,31 @@ pub fn generate_ship_timed(
                 break;
             }
             Err(issues) => {
+                if std::env::var("DERELICT_DEBUG").is_ok() {
+                    eprintln!(
+                        "[damage attempt {attempt}] validation: {:?}",
+                        issues.iter().take(2).collect::<Vec<_>>()
+                    );
+                    for v in &topo2.verticals {
+                        eprintln!(
+                            "  vertical {} {} -> {} {}",
+                            v.from_room,
+                            v.from_cell.key(),
+                            v.to_room,
+                            v.to_cell.key()
+                        );
+                    }
+                    for r in &topo2.rooms {
+                        if [7u16, 68].contains(&r.id) {
+                            eprintln!(
+                                "  room {} deck {} cells {:?}",
+                                r.id,
+                                r.deck,
+                                r.cells.iter().map(|c| c.key()).collect::<Vec<_>>()
+                            );
+                        }
+                    }
+                }
                 last_err = Some(GenError::StructuralValidationFailed {
                     stage: ValidationStage::PostDamage,
                     issues: issues.iter().map(|i| i.to_string()).collect(),

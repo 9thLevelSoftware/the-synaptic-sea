@@ -3,7 +3,7 @@
 use crate::async_gen::{AsyncGen, GenResult};
 use crate::convert::{gen_params_from_dict, ship_to_dictionary};
 use derelict_core::GenData;
-use godot::builtin::{VarDictionary, Variant};
+use godot::builtin::{GString, VarDictionary, Variant};
 use godot::classes::RefCounted;
 use godot::meta::ToGodot;
 use godot::obj::Base;
@@ -97,5 +97,51 @@ impl DerelictGenerator {
     #[func]
     fn generator_version(&self) -> i64 {
         derelict_core::GENERATOR_VERSION as i64
+    }
+
+    /// Generate a ship and return The Synaptic Sea layout.json document as a
+    /// JSON string (schema 1.2.0, embedded structural_plan). Empty string on
+    /// failure (details pushed to the Godot error log).
+    #[func]
+    fn export_layout_json(&mut self, seed: i64, params: VarDictionary, kit_id: GString) -> GString {
+        use derelict_core::structural::export::{to_layout_json, ExportOptions};
+        let p = gen_params_from_dict(&params);
+        let data = self.data().clone();
+        match derelict_core::generate_ship(seed as u64, &p, &data) {
+            Ok(ship) => {
+                let opts = ExportOptions {
+                    kit_id: kit_id.to_string(),
+                    ..Default::default()
+                };
+                GString::from(
+                    serde_json::to_string_pretty(&to_layout_json(&ship, &opts))
+                        .unwrap_or_default()
+                        .as_str(),
+                )
+            }
+            Err(e) => {
+                godot::global::godot_error!("worldgen export failed: {e}");
+                GString::new()
+            }
+        }
+    }
+
+    /// Companion gameplay_slice.json document for the same seed/params.
+    #[func]
+    fn export_gameplay_slice_json(&mut self, seed: i64, params: VarDictionary) -> GString {
+        use derelict_core::structural::export::to_gameplay_slice_json;
+        let p = gen_params_from_dict(&params);
+        let data = self.data().clone();
+        match derelict_core::generate_ship(seed as u64, &p, &data) {
+            Ok(ship) => GString::from(
+                serde_json::to_string_pretty(&to_gameplay_slice_json(&ship))
+                    .unwrap_or_default()
+                    .as_str(),
+            ),
+            Err(e) => {
+                godot::global::godot_error!("worldgen export failed: {e}");
+                GString::new()
+            }
+        }
     }
 }

@@ -557,11 +557,24 @@ fn check_reachability(
     for (frag, cells) in &by_fragment {
         let comps: BTreeSet<u32> = cells.iter().map(|k| component_of[k.as_str()]).collect();
         if comps.len() > 1 {
+            // Name one cell (and its room) per component for debuggability.
+            let mut samples: Vec<String> = Vec::new();
+            for comp_id in &comps {
+                if let Some(k) = cells.iter().find(|k| component_of[k.as_str()] == *comp_id) {
+                    let room = plan
+                        .occupancy
+                        .get(k.as_str())
+                        .map(|r| r.room_id)
+                        .unwrap_or(0);
+                    samples.push(format!("{k}(room {room})"));
+                }
+            }
             issues.push(ValidationIssue {
                 code: IssueCode::ReachabilityBroken,
                 detail: format!(
-                    "flood-fill/topology reachability disagreement: fragment {frag} splits into {} components",
-                    comps.len()
+                    "flood-fill/topology reachability disagreement: fragment {frag} splits into {} components [{}]",
+                    comps.len(),
+                    samples.join(", ")
                 ),
             });
         }
