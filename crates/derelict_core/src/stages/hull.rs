@@ -288,7 +288,7 @@ pub fn generate_hull(rng_h: &mut Pcg64, arch: &ShipArchetype, deck_count: u8) ->
 
     // Upper decks: erode the deck below `deck_erosion` times; drop decks
     // that fall under a viable area.
-    let min_deck_area = (arch.min_room_dim as usize).pow(2) * 4;
+    let min_deck_area = 12; // smallest viable upper deck in cells
     let mut deck_masks = vec![mask];
     for _ in 1..deck_count {
         let mut m = deck_masks.last().unwrap().clone();

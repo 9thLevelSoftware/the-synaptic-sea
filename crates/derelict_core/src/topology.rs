@@ -94,6 +94,33 @@ impl TemplateDef {
         self.zones.iter().map(|z| z.deck).max().unwrap_or(0)
     }
 
+    /// Minimum cells this template needs: per zone, min room count times the
+    /// smallest footprint of the cheapest role in its pool.
+    pub fn min_cell_need(&self) -> u32 {
+        self.zones
+            .iter()
+            .map(|z| {
+                let count = match z.count {
+                    CountSpec::Fixed(n) => n as u32,
+                    CountSpec::Range(a, _) => a as u32,
+                };
+                let cheapest = z
+                    .role_pool
+                    .iter()
+                    .map(|r| {
+                        footprint_options(*r)
+                            .iter()
+                            .map(|(w, h)| (w * h) as u32)
+                            .min()
+                            .unwrap_or(4)
+                    })
+                    .min()
+                    .unwrap_or(4);
+                count * cheapest
+            })
+            .sum()
+    }
+
     /// Can this template satisfy every guaranteed role (some zone's pool
     /// contains it)?
     pub fn can_satisfy(&self, guaranteed: &[Role]) -> bool {
@@ -348,6 +375,37 @@ pub fn place_topology(
     params: &RoleParams,
 ) -> Result<PlacedTopology, TopoError> {
     // --- 1. Expand zones into a room plan (zone file order = room order) ---
+    // Budget-aware: extra rooms (beyond a zone's minimum) are only planned
+    // while the remaining hull area still covers the minimum needs of every
+    // later zone — so the last zones (often the goal) always fit.
+    let hull_budget: i64 = masks.iter().map(|m| m.count() as i64).sum::<i64>() * 9 / 10;
+    let min_need_of = |zone: &ZoneDef| -> i64 {
+        let count = match zone.count {
+            CountSpec::Fixed(n) => n as i64,
+            CountSpec::Range(a, _) => a as i64,
+        };
+        let cheapest = zone
+            .role_pool
+            .iter()
+            .map(|r| {
+                footprint_options(*r)
+                    .iter()
+                    .map(|(w, h)| (w * h) as i64)
+                    .min()
+                    .unwrap_or(4)
+            })
+            .min()
+            .unwrap_or(4);
+        count * cheapest
+    };
+    let suffix_need: Vec<i64> = {
+        let mut v = vec![0i64; template.zones.len() + 1];
+        for i in (0..template.zones.len()).rev() {
+            v[i] = v[i + 1] + min_need_of(&template.zones[i]);
+        }
+        v
+    };
+    let mut allocated: i64 = 0;
     let mut plan: Vec<PlannedRoom> = Vec::new();
     let mut role_counter: BTreeMap<Role, u32> = BTreeMap::new();
     let mut next_id: RoomId = 1;
@@ -358,10 +416,32 @@ pub fn place_topology(
                 detail: format!("zone deck {} but hull has {} decks", zone.deck, masks.len()),
             });
         }
+        let avg_room = zone
+            .role_pool
+            .iter()
+            .map(|r| {
+                footprint_options(*r)
+                    .first()
+                    .map(|(w, h)| (w * h) as i64)
+                    .unwrap_or(6)
+            })
+            .max()
+            .unwrap_or(6);
         let count = match zone.count {
             CountSpec::Fixed(n) => n as i64,
-            CountSpec::Range(a, b) => roll_range(rng, a as i64, b as i64),
+            CountSpec::Range(a, b) => {
+                let rolled = roll_range(rng, a as i64, b as i64);
+                // Trim extras that would eat later zones' reserved minimums.
+                let mut allowed = a as i64;
+                while allowed < rolled
+                    && allocated + (allowed + 1) * avg_room + suffix_need[zi + 1] <= hull_budget
+                {
+                    allowed += 1;
+                }
+                allowed
+            }
         };
+        allocated += count * avg_room;
         for _ in 0..count {
             let role = pick_role(rng, &zone.role_pool, params, &mut role_counter);
             plan.push(PlannedRoom {
@@ -384,10 +464,15 @@ pub fn place_topology(
         if plan.iter().any(|r| r.role == wanted) {
             continue;
         }
-        // Replace a middle room whose zone pool allows the wanted role.
-        let candidate = (1..plan.len().saturating_sub(1)).find(|&i| {
+        // Replace a room whose zone pool allows the wanted role. Zones with
+        // a single-role pool are authored intent (entry airlock, bridge) and
+        // never repurposed; multi-role pools anywhere — including the goal
+        // zone (e.g. spine's engine_room) — are fair game.
+        let candidate = (0..plan.len()).find(|&i| {
             let z = &template.zones[plan[i].zone_index];
-            z.role_pool.contains(&wanted) && !params.guaranteed.contains(&plan[i].role)
+            z.role_pool.len() > 1
+                && z.role_pool.contains(&wanted)
+                && !params.guaranteed.contains(&plan[i].role)
         });
         match candidate {
             Some(i) => plan[i].role = wanted,
@@ -408,9 +493,15 @@ pub fn place_topology(
     }
     let bbox = hull_bbox(&masks[0]);
 
+    let mut dropped: BTreeSet<RoomId> = BTreeSet::new();
     for &zi in &zone_order {
         let zone = &template.zones[zi];
+        let zone_min = match zone.count {
+            CountSpec::Fixed(n) => n as usize,
+            CountSpec::Range(a, _) => a as usize,
+        };
         let rooms: Vec<&PlannedRoom> = plan.iter().filter(|r| r.zone_index == zi).collect();
+        let mut placed_in_zone = 0usize;
         let mut prev_in_zone: Option<RoomId> = None;
         for room in rooms {
             // Anchors: parent-zone rooms, rooms of already-placed zones this
@@ -444,19 +535,34 @@ pub fn place_topology(
             }
             anchors.sort();
             anchors.dedup();
-            let placed = place_room(
+            let placement = place_room(
                 rng, &grid, zone, room.role, &anchors, &cells_of, &deck_of, &role_of, bbox,
-            )
-            .ok_or_else(|| TopoError::ZonePlacementFailed {
-                zone: zone.id.clone(),
-                detail: format!("no viable footprint for {:?} room {}", room.role, room.id),
-            })?;
+            );
+            let Some(placed) = placement else {
+                // Rooms beyond the zone's minimum count are droppable when
+                // space runs out — unless they carry a guaranteed role with
+                // no other holder.
+                let sole_guarantee = params.guaranteed.contains(&room.role)
+                    && !plan.iter().any(|r| {
+                        r.id != room.id && r.role == room.role && !dropped.contains(&r.id)
+                    });
+                if placed_in_zone >= zone_min && !sole_guarantee {
+                    dropped.insert(room.id);
+                    continue;
+                }
+                return Err(TopoError::ZonePlacementFailed {
+                    zone: zone.id.clone(),
+                    detail: format!("no viable footprint for {:?} room {}", room.role, room.id),
+                });
+            };
             grid.claim(zone.deck, &placed, room.id);
             cells_of.insert(room.id, placed);
             deck_of.insert(room.id, zone.deck);
             prev_in_zone = Some(room.id);
+            placed_in_zone += 1;
         }
     }
+    plan.retain(|r| !dropped.contains(&r.id));
 
     // --- 5. Realize connections as portals / connectors / verticals --------
     let mut portals: Vec<PortalIntent> = Vec::new();
@@ -677,6 +783,210 @@ pub fn place_topology(
 }
 
 // ---------------------------------------------------------------------------
+// Residual fill
+// ---------------------------------------------------------------------------
+
+/// Fill unclaimed hull cells with filler rooms (storage/compartments...)
+/// after template placement. Components adjacent to existing rooms get a
+/// door; upper-deck components with vertical overlap onto a room below get
+/// a ladder connection. Unreachable pockets stay void (never sealed rooms).
+pub fn residual_fill(
+    rng: &mut Pcg64,
+    placed: &mut PlacedTopology,
+    masks: &[Mask],
+    filler_roles: &[(Role, u32)],
+) {
+    if filler_roles.is_empty() {
+        return;
+    }
+    let mut next_id: RoomId = placed
+        .topology
+        .rooms
+        .iter()
+        .map(|r| r.id)
+        .max()
+        .unwrap_or(0)
+        + 1;
+    let mut owner: BTreeMap<(u8, i32, i32), RoomId> = BTreeMap::new();
+    let mut role_of: BTreeMap<RoomId, Role> = BTreeMap::new();
+    for room in &placed.topology.rooms {
+        role_of.insert(room.id, room.role);
+        for c in &room.cells {
+            owner.insert((c.deck, c.x, c.y), room.id);
+        }
+    }
+    let weights: Vec<u32> = filler_roles.iter().map(|(_, w)| *w).collect();
+
+    for (d, mask) in masks.iter().enumerate() {
+        let deck = d as u8;
+        let mut free: BTreeSet<(i32, i32)> = BTreeSet::new();
+        for y in 0..mask.height as i32 {
+            for x in 0..mask.width as i32 {
+                if mask.get(x, y) && !owner.contains_key(&(deck, x, y)) {
+                    free.insert((x, y));
+                }
+            }
+        }
+        let mut chunks: Vec<Vec<(i32, i32)>> = Vec::new();
+        while let Some(&start) = free.iter().next() {
+            free.remove(&start);
+            let mut comp = vec![start];
+            let mut stack = vec![start];
+            while let Some((x, y)) = stack.pop() {
+                for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
+                    let n = (x + dx, y + dy);
+                    if free.remove(&n) {
+                        comp.push(n);
+                        stack.push(n);
+                    }
+                }
+            }
+            split_chunks(comp, &mut chunks);
+        }
+        chunks.sort();
+
+        // Multi-pass: chunks can attach to rooms created by earlier chunks.
+        let mut pending = chunks;
+        loop {
+            let mut progress = false;
+            let mut still_pending = Vec::new();
+            for chunk in pending {
+                let neighbor = chunk.iter().find_map(|&(x, y)| {
+                    [(0, -1), (0, 1), (-1, 0), (1, 0)]
+                        .iter()
+                        .find_map(|(dx, dy)| owner.get(&(deck, x + dx, y + dy)).copied())
+                });
+                let below = if deck > 0 {
+                    chunk.iter().find_map(|&(x, y)| {
+                        owner.get(&(deck - 1, x, y)).copied().map(|r| (r, x, y))
+                    })
+                } else {
+                    None
+                };
+                if neighbor.is_none() && below.is_none() {
+                    still_pending.push(chunk);
+                    continue;
+                }
+                progress = true;
+                let adjacent_hazard = chunk.iter().any(|&(x, y)| {
+                    [(0, -1), (0, 1), (-1, 0), (1, 0)].iter().any(|(dx, dy)| {
+                        owner
+                            .get(&(deck, x + dx, y + dy))
+                            .and_then(|id| role_of.get(id))
+                            .map(|r| r.is_hazardous())
+                            .unwrap_or(false)
+                    })
+                });
+                let role = loop {
+                    let pick = weighted_choice(rng, &weights).unwrap_or(0);
+                    let r = filler_roles[pick].0;
+                    if !(adjacent_hazard && r.is_crew_comfort()) {
+                        break r;
+                    }
+                    if filler_roles.iter().all(|(fr, _)| fr.is_crew_comfort()) {
+                        break Role::Compartment;
+                    }
+                };
+                let id = next_id;
+                next_id += 1;
+                role_of.insert(id, role);
+                for &(x, y) in &chunk {
+                    owner.insert((deck, x, y), id);
+                }
+                placed.topology.rooms.push(RoomSpec {
+                    id,
+                    role,
+                    deck,
+                    cells: chunk.iter().map(|&(x, y)| Cell::new(deck, x, y)).collect(),
+                });
+                if let Some(nid) = neighbor {
+                    let n_cells: Vec<(i32, i32)> = placed
+                        .topology
+                        .rooms
+                        .iter()
+                        .find(|r| r.id == nid)
+                        .map(|r| r.cells.iter().map(|c| (c.x, c.y)).collect())
+                        .unwrap_or_default();
+                    if let Some((ca, cb)) = shared_boundary(&chunk, &n_cells) {
+                        placed.topology.portals.push(PortalIntent {
+                            from_room: id,
+                            to_room: nid,
+                            from_cell: Cell::new(deck, ca.0, ca.1),
+                            to_cell: Cell::new(deck, cb.0, cb.1),
+                            state: EdgeKind::Door,
+                            exterior: false,
+                        });
+                        placed.room_links.push((id, nid));
+                    }
+                } else if let Some((rid, x, y)) = below {
+                    placed.topology.verticals.push(VerticalConnection {
+                        from_room: rid,
+                        to_room: id,
+                        from_cell: Cell::new(deck - 1, x, y),
+                        to_cell: Cell::new(deck, x, y),
+                    });
+                    placed.room_links.push((rid, id));
+                }
+            }
+            pending = still_pending;
+            if !progress || pending.is_empty() {
+                break;
+            }
+        }
+    }
+    // Refresh the critical path over the richer link graph.
+    placed.room_links.sort();
+    placed.room_links.dedup();
+    if let Some(path) = bfs_room_path(placed.entry_room, placed.goal_room, &placed.room_links) {
+        placed.critical_path = path;
+    }
+}
+
+/// Recursively split an irregular free component into room-sized chunks.
+fn split_chunks(comp: Vec<(i32, i32)>, out: &mut Vec<Vec<(i32, i32)>>) {
+    if comp.len() <= 9 {
+        if !comp.is_empty() {
+            out.push(comp);
+        }
+        return;
+    }
+    let (mut x0, mut y0, mut x1, mut y1) = (i32::MAX, i32::MAX, i32::MIN, i32::MIN);
+    for &(x, y) in &comp {
+        x0 = x0.min(x);
+        y0 = y0.min(y);
+        x1 = x1.max(x);
+        y1 = y1.max(y);
+    }
+    let split_x = x1 - x0 >= y1 - y0;
+    let mid = if split_x {
+        (x0 + x1) / 2
+    } else {
+        (y0 + y1) / 2
+    };
+    let (a, b): (Vec<_>, Vec<_>) =
+        comp.into_iter()
+            .partition(|&(x, y)| if split_x { x <= mid } else { y <= mid });
+    for half in [a, b] {
+        let mut set: BTreeSet<(i32, i32)> = half.into_iter().collect();
+        while let Some(&start) = set.iter().next() {
+            set.remove(&start);
+            let mut comp2 = vec![start];
+            let mut stack = vec![start];
+            while let Some((x, y)) = stack.pop() {
+                for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
+                    let n = (x + dx, y + dy);
+                    if set.remove(&n) {
+                        comp2.push(n);
+                        stack.push(n);
+                    }
+                }
+            }
+            split_chunks(comp2, out);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -888,7 +1198,82 @@ fn place_room(
             break; // first footprint option that fits anywhere wins
         }
     }
-    best.map(|(_, _, _, cells)| cells)
+    if let Some((_, _, _, cells)) = best {
+        return Some(cells);
+    }
+    // Organic fallback for tight/irregular hulls (mirrors The Synaptic
+    // Sea's grow-from-seed): claim a connected blob of free cells the size
+    // of the smallest footprint, seeded next to the anchor when possible.
+    let min_area = footprint_options(role)
+        .iter()
+        .map(|(w, h)| (w * h) as usize)
+        .min()
+        .unwrap_or(4)
+        .min(4);
+    let mut seeds: Vec<(i32, i32)> = Vec::new();
+    let cell_compatible = |x: i32, y: i32| -> bool {
+        Dir::ALL.iter().all(|d2| {
+            let (ddx, ddy) = d2.delta();
+            let other = grid.owner_at(deck, x + ddx, y + ddy);
+            other == NO_ROOM || {
+                let or = role_of[&other];
+                !((role.is_hazardous() && or.is_crew_comfort())
+                    || (role.is_crew_comfort() && or.is_hazardous()))
+            }
+        })
+    };
+    for &(ax, ay) in &same_deck_anchor {
+        for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
+            if grid.free(deck, ax + dx, ay + dy) && cell_compatible(ax + dx, ay + dy) {
+                seeds.push((ax + dx, ay + dy));
+            }
+        }
+    }
+    if seeds.is_empty() {
+        for y in 0..mask.height as i32 {
+            for x in 0..mask.width as i32 {
+                if grid.free(deck, x, y) && cell_compatible(x, y) {
+                    seeds.push((x, y));
+                }
+            }
+        }
+    }
+    seeds.sort();
+    seeds.dedup();
+    let seed_cell = *seeds.first()?;
+    let mut blob: Vec<(i32, i32)> = vec![seed_cell];
+    let mut frontier: Vec<(i32, i32)> = vec![seed_cell];
+    let mut seen: BTreeSet<(i32, i32)> = BTreeSet::from([seed_cell]);
+    while blob.len() < min_area && !frontier.is_empty() {
+        // Deterministic frontier expansion; small rng tiebreak via index.
+        let idx = (roll_range(rng, 0, frontier.len() as i64 - 1)) as usize;
+        let (cx, cy) = frontier.remove(idx);
+        for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
+            let n = (cx + dx, cy + dy);
+            if blob.len() >= min_area || !grid.free(deck, n.0, n.1) {
+                continue;
+            }
+            // Hazard/comfort hard filter applies to organic growth too.
+            let incompatible = Dir::ALL.iter().any(|d2| {
+                let (ddx, ddy) = d2.delta();
+                let other = grid.owner_at(deck, n.0 + ddx, n.1 + ddy);
+                other != NO_ROOM && {
+                    let or = role_of[&other];
+                    (role.is_hazardous() && or.is_crew_comfort())
+                        || (role.is_crew_comfort() && or.is_hazardous())
+                }
+            });
+            if !incompatible && seen.insert(n) {
+                blob.push(n);
+                frontier.push(n);
+            }
+        }
+    }
+    if blob.len() >= min_area.min(2) {
+        Some(blob)
+    } else {
+        None
+    }
 }
 
 fn rooms_of_zone(template: &TemplateDef, plan: &[PlannedRoom], zone_id: &str) -> Vec<RoomId> {
@@ -1060,6 +1445,12 @@ fn hull_boundary_edge(grid: &Grid, deck: u8, cells: &[(i32, i32)]) -> Option<(Ce
     }
     candidates.sort_by_key(|(c, d)| (c.y, c.x, d.yaw_degrees()));
     candidates.get(candidates.len() / 2).copied()
+}
+
+/// Public BFS path over room links (used by the pipeline for post-damage
+/// critical-path recomputation).
+pub fn room_path(start: RoomId, goal: RoomId, links: &[(RoomId, RoomId)]) -> Option<Vec<RoomId>> {
+    bfs_room_path(start, goal, links)
 }
 
 fn bfs_room_path(start: RoomId, goal: RoomId, links: &[(RoomId, RoomId)]) -> Option<Vec<RoomId>> {

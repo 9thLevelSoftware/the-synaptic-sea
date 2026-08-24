@@ -35,12 +35,12 @@
             (item: "luxury_goods", weight: 12, qty: (1, 2)),
             (item: "hull_plate", weight: 25, qty: (1, 3)),
         ],
-        Medbay: [
+        Medical: [
             (item: "medkit", weight: 45, qty: (1, 2)),
             (item: "stim_injector", weight: 30, qty: (1, 3)),
             (item: "oxygen_candle", weight: 20, qty: (1, 2)),
         ],
-        Galley: [
+        MessHall: [
             (item: "ration_pack", weight: 50, qty: (2, 5)),
             (item: "water_canister", weight: 40, qty: (1, 3)),
         ],
@@ -57,10 +57,10 @@
             (item: "oxygen_candle", weight: 15, qty: (1, 2)),
             (item: "tool_kit", weight: 10, qty: (1, 1)),
         ],
-        Hydroponics: [
-            (item: "seed_packet", weight: 45, qty: (1, 4)),
+        LifeSupport: [
+            (item: "oxygen_candle", weight: 45, qty: (1, 3)),
             (item: "water_canister", weight: 30, qty: (1, 2)),
-            (item: "ration_pack", weight: 20, qty: (1, 2)),
+            (item: "vac_suit_patch", weight: 20, qty: (1, 2)),
         ],
         Airlock: [
             (item: "vac_suit_patch", weight: 40, qty: (1, 2)),
@@ -69,6 +69,26 @@
         Compartment: [
             (item: "scrap_metal", weight: 40, qty: (1, 3)),
             (item: "electronics", weight: 20, qty: (1, 2)),
+        ],
+        Dock: [
+            (item: "vac_suit_patch", weight: 40, qty: (1, 2)),
+            (item: "oxygen_candle", weight: 30, qty: (1, 2)),
+            (item: "cargo_crate_sealed", weight: 15, qty: (1, 1)),
+        ],
+        Maintenance: [
+            (item: "tool_kit", weight: 40, qty: (1, 1)),
+            (item: "scrap_metal", weight: 40, qty: (1, 4)),
+            (item: "electronics", weight: 25, qty: (1, 2)),
+        ],
+        Security: [
+            (item: "pistol", weight: 30, qty: (1, 1)),
+            (item: "pistol_ammo", weight: 40, qty: (1, 3)),
+            (item: "keycard", weight: 25, qty: (1, 1)),
+        ],
+        Hangar: [
+            (item: "cargo_crate_sealed", weight: 30, qty: (1, 1)),
+            (item: "hull_plate", weight: 30, qty: (1, 3)),
+            (item: "fuel_rod", weight: 20, qty: (1, 2)),
         ],
     },
     rolls: (1, 3),

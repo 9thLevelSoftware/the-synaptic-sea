@@ -1,24 +1,18 @@
-// Small utility shuttle: single deck, a handful of compartments.
+// v2 archetype: sizes are in 4 m module-grid cells.
 (
     id: "shuttle",
     display_name: "Utility Shuttle",
-    length: (18, 26),
-    beam: (9, 13),
+    length: (10, 14),
+    beam: (6, 8),
     decks: (1, 1),
-    hull_fill_bp: 8200,
-    asymmetry_bp: 800,
-    deck_erosion: 2,
-    min_room_dim: 3,
-    required_rooms: [
-        (kind: Bridge, bow_bias: 90, size_pref: Medium),
-        (kind: Engineering, bow_bias: -90, size_pref: Medium),
-        (kind: Airlock, bow_bias: 0, size_pref: Small),
-        (kind: Cargo, bow_bias: -20, size_pref: Largest),
-    ],
-    optional_rooms: [
-        (CrewQuarters, 100),
-        (Storage, 80),
-    ],
+    hull_fill_bp: 9200,
+    asymmetry_bp: 600,
+    deck_erosion: 1,
+    template: "",
+    role_weights: [(Cargo, 3), (Storage, 3), (CrewQuarters, 2), (Maintenance, 2), (Medical, 1)],
+    guaranteed_roles: [],
+    max_duplicates: 2,
+    filler_roles: [(Storage, 100), (Compartment, 80)],
     cause_weights: [
         (Depressurization, 30),
         (PirateBoarding, 25),
@@ -27,6 +21,4 @@
         (Unknown, 15),
     ],
     max_breaches: 3,
-    corridor_loop_bp: 1000,
-    shafts: (0, 0),
 )

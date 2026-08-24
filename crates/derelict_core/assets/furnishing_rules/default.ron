@@ -30,12 +30,12 @@
             (proto: "cargo_rack", kind: Furniture, count: (0, 3), place: WallAdjacent, lock_bp: 0),
             (proto: "loader_arm", kind: Furniture, count: (0, 1), place: Corner, lock_bp: 0),
         ],
-        Medbay: [
+        Medical: [
             (proto: "med_bed", kind: Furniture, count: (1, 2), place: WallAdjacent, lock_bp: 0),
             (proto: "med_cabinet", kind: Container, count: (1, 2), place: WallAdjacent, lock_bp: 2500),
             (proto: "surgical_unit", kind: Furniture, count: (0, 1), place: Center, lock_bp: 0),
         ],
-        Galley: [
+        MessHall: [
             (proto: "counter", kind: Furniture, count: (1, 3), place: WallAdjacent, lock_bp: 0),
             (proto: "food_locker", kind: Container, count: (1, 2), place: WallAdjacent, lock_bp: 0),
             (proto: "mess_table", kind: Furniture, count: (1, 2), place: Center, lock_bp: 0),
@@ -49,9 +49,9 @@
             (proto: "supply_crate", kind: Container, count: (1, 4), place: Free, lock_bp: 500),
             (proto: "shelf_unit", kind: Furniture, count: (0, 2), place: WallAdjacent, lock_bp: 0),
         ],
-        Hydroponics: [
-            (proto: "grow_bed", kind: Furniture, count: (2, 4), place: Center, lock_bp: 0),
-            (proto: "seed_cabinet", kind: Container, count: (0, 1), place: WallAdjacent, lock_bp: 0),
+        LifeSupport: [
+            (proto: "air_scrubber", kind: Furniture, count: (2, 4), place: Center, lock_bp: 0),
+            (proto: "filter_cabinet", kind: Container, count: (0, 1), place: WallAdjacent, lock_bp: 0),
         ],
         Airlock: [
             (proto: "suit_locker", kind: Container, count: (1, 2), place: WallAdjacent, lock_bp: 500),
@@ -59,12 +59,31 @@
         Compartment: [
             (proto: "supply_crate", kind: Container, count: (0, 2), place: Free, lock_bp: 500),
         ],
+        Dock: [
+            (proto: "suit_locker", kind: Container, count: (1, 2), place: WallAdjacent, lock_bp: 500),
+            (proto: "cargo_crate", kind: Container, count: (0, 1), place: Corner, lock_bp: 0),
+        ],
+        Maintenance: [
+            (proto: "tool_rack", kind: Container, count: (1, 2), place: WallAdjacent, lock_bp: 0),
+            (proto: "workbench", kind: Furniture, count: (0, 1), place: WallAdjacent, lock_bp: 0),
+        ],
+        Security: [
+            (proto: "weapon_locker", kind: Container, count: (1, 1), place: WallAdjacent, lock_bp: 6000),
+            (proto: "ops_console", kind: Terminal, count: (0, 1), place: WallAdjacent, lock_bp: 0),
+        ],
+        Hangar: [
+            (proto: "cargo_crate", kind: Container, count: (1, 3), place: Free, lock_bp: 800),
+            (proto: "loader_arm", kind: Furniture, count: (0, 1), place: Corner, lock_bp: 0),
+        ],
+        Hub: [
+            (proto: "ops_console", kind: Terminal, count: (0, 1), place: WallAdjacent, lock_bp: 0),
+        ],
     },
     door_lock_bp: {
         Bridge: 3500,
         Armory: 8000,
         Reactor: 4000,
-        Medbay: 1500,
+        Medical: 1500,
         Cargo: 2000,
         Storage: 1000,
     },

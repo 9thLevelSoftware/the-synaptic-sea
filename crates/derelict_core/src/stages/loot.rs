@@ -1,50 +1,52 @@
-//! Stage 9: loot seeding. Each container rolls from the loot table of its
-//! room type using an RNG stream keyed by its entity id — regeneration-
+//! Stage: loot seeding. Each container rolls from the loot table of its
+//! room's role using an RNG stream keyed by its entity id — regeneration-
 //! stable, and independent of every other container.
 
 use crate::archetype::{GenData, LootEntry};
-use crate::model::{DeckLayer, EntityKind, EntitySpec, ItemStack, RoomType, NO_ROOM};
+use crate::model::{EntityKind, EntitySpec, ItemStack};
 use crate::rng::{self, roll_bp, roll_range, weighted_choice};
+use crate::role::Role;
 use crate::stages::story::DamageProfile;
+use crate::structural::plan::Topology;
 use std::collections::BTreeMap;
 
-#[allow(clippy::too_many_arguments)]
 pub fn seed_loot(
     master_seed: u64,
     entities: &mut [EntitySpec],
-    layers: &[DeckLayer],
-    kind_of: &BTreeMap<u16, RoomType>,
+    topology: &Topology,
     data: &GenData,
     profile: &DamageProfile,
     intactness: u16,
     loot_richness: u16,
 ) {
-    // Effective richness: request knob x story multiplier x intactness decay
-    // (badly damaged ships have had more destroyed/pilfered).
     let intact_mult = 5000 + intactness as i64 / 2; // 5000..=10000 bp
     let richness =
         loot_richness as i64 * profile.loot_mult_bp as i64 / 10_000 * intact_mult / 10_000;
+
+    let mut role_at: BTreeMap<(u8, i32, i32), Role> = BTreeMap::new();
+    for room in &topology.rooms {
+        for c in &room.cells {
+            role_at.insert((c.deck, c.x, c.y), room.role);
+        }
+    }
 
     for e in entities.iter_mut() {
         if e.kind != EntityKind::Container {
             continue;
         }
         let mut rng = rng::stream(master_seed, "loot", e.id as u64);
-        // Room type of the container's tile (debris-field crates: Cargo).
-        let room_kind = layers
-            .get(e.pos.deck as usize)
-            .map(|l| l.room_at(e.pos.x, e.pos.y))
-            .filter(|id| *id != NO_ROOM)
-            .and_then(|id| kind_of.get(&id).copied())
-            .unwrap_or(RoomType::Cargo);
+        // Debris-field crates (floating in the gap) loot as cargo.
+        let room_role = role_at
+            .get(&(e.pos.deck, e.pos.x, e.pos.y))
+            .copied()
+            .unwrap_or(Role::Cargo);
 
-        // Pirate boarding strips weapon lockers.
-        if room_kind == RoomType::Armory && roll_bp(&mut rng, profile.weapon_empty_bp) {
+        if room_role == Role::Armory && roll_bp(&mut rng, profile.weapon_empty_bp) {
             e.tags.push("ransacked".into());
             continue;
         }
 
-        let Some(table) = data.loot.tables.get(&room_kind) else {
+        let Some(table) = data.loot.tables.get(&room_role) else {
             continue;
         };
         if table.is_empty() {
@@ -52,8 +54,6 @@ pub fn seed_loot(
         }
         let base_rolls = roll_range(&mut rng, data.loot.rolls.0 as i64, data.loot.rolls.1 as i64);
         let rolls = (base_rolls * richness / 10_000).clamp(0, 8);
-        // Even at low richness, give a floor chance of one roll so ships
-        // aren't universally empty.
         let rolls = if rolls == 0 && roll_bp(&mut rng, 3000) {
             1
         } else {

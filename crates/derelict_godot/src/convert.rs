@@ -2,9 +2,8 @@
 //! binary: bulk tile layers travel as PackedInt32Array (one per layer), and
 //! small structured data (entities, rooms, events) as arrays of dictionaries.
 
-use derelict_core::model::{
-    CauseOfLoss, DamageEventKind, EdgeKind, EntityKind, GenParams, RoomType, Ship,
-};
+use derelict_core::model::{CauseOfLoss, DamageEventKind, EdgeKind, EntityKind, GenParams, Ship};
+use derelict_core::role::Role;
 use godot::builtin::{PackedInt32Array, PackedStringArray, VarArray, VarDictionary};
 use godot::meta::ToGodot;
 
@@ -13,6 +12,7 @@ pub fn ship_to_dictionary(ship: &Ship) -> VarDictionary {
     d.set("generator_version", ship.generator_version as i64);
     d.set("seed", ship.seed as i64);
     d.set("archetype_id", ship.archetype_id.as_str());
+    d.set("template_id", ship.template_id.as_str());
     d.set("intactness", ship.intactness as i64);
     d.set("cause_of_loss", cause_name(ship.cause_of_loss));
     d.set("fractured", ship.fractured);
@@ -189,23 +189,8 @@ fn cause_from_name(s: &str) -> Option<CauseOfLoss> {
     })
 }
 
-fn room_name(k: RoomType) -> &'static str {
-    match k {
-        RoomType::Bridge => "bridge",
-        RoomType::Engineering => "engineering",
-        RoomType::Reactor => "reactor",
-        RoomType::CrewQuarters => "crew_quarters",
-        RoomType::Cargo => "cargo",
-        RoomType::Medbay => "medbay",
-        RoomType::Galley => "galley",
-        RoomType::Armory => "armory",
-        RoomType::Storage => "storage",
-        RoomType::Hydroponics => "hydroponics",
-        RoomType::Airlock => "airlock",
-        RoomType::Corridor => "corridor",
-        RoomType::VerticalShaft => "vertical_shaft",
-        RoomType::Compartment => "compartment",
-    }
+fn room_name(k: Role) -> &'static str {
+    k.name()
 }
 
 fn entity_kind_name(k: EntityKind) -> &'static str {

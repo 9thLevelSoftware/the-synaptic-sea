@@ -1,6 +1,7 @@
 //! Structural invariants that must hold for every generated ship.
 
 use derelict_core::model::*;
+use derelict_core::role::Role;
 use derelict_core::{GenData, GenParams};
 use std::collections::BTreeSet;
 
@@ -16,15 +17,18 @@ fn every_room_reachable_when_intact() {
     for arch in ["shuttle", "corvette", "freighter", "frigate"] {
         for seed in 0..10u64 {
             let ship = intact_ship(arch, seed, &data);
-            // Start from airlocks (ship entrances).
-            let mut reached: BTreeSet<u16> = ship
+            // Start from the authored entry room (airlock or dock).
+            let mut reached: BTreeSet<u16> = BTreeSet::from([ship.entry_room]);
+            let entry_kind = ship
                 .room_graph
                 .nodes
                 .iter()
-                .filter(|n| n.kind == RoomType::Airlock)
-                .map(|n| n.id)
-                .collect();
-            assert!(!reached.is_empty(), "{arch} seed {seed}: no airlock room");
+                .find(|n| n.id == ship.entry_room)
+                .map(|n| n.kind);
+            assert!(
+                matches!(entry_kind, Some(Role::Airlock) | Some(Role::Dock)),
+                "{arch} seed {seed}: entry room is {entry_kind:?}"
+            );
             loop {
                 let before = reached.len();
                 for e in &ship.room_graph.edges {

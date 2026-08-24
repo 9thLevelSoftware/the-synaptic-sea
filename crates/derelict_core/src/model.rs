@@ -5,12 +5,14 @@
 //! a float or an unordered collection — generated ships must serialize to
 //! byte-identical output for identical (seed, params, GENERATOR_VERSION).
 
+use crate::role::Role;
+use crate::structural::plan::{RoomId, StructuralPlan, Topology};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Bumped on ANY change that alters generated output (stage logic, RNG
 /// consumption order, archetype schema). Baked into ships and save diffs.
-pub const GENERATOR_VERSION: u32 = 1;
+pub const GENERATOR_VERSION: u32 = 2;
 
 /// Intactness is fixed-point: 0..=10000 basis points (10000 = pristine).
 pub type Intactness = u16;
@@ -186,50 +188,11 @@ impl Side {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
-pub enum RoomType {
-    Bridge,
-    Engineering,
-    Reactor,
-    CrewQuarters,
-    Cargo,
-    Medbay,
-    Galley,
-    Armory,
-    Storage,
-    Hydroponics,
-    Airlock,
-    Corridor,
-    VerticalShaft,
-    Compartment, // generic unnamed compartment
-}
-
-impl RoomType {
-    pub fn short_code(self) -> &'static str {
-        match self {
-            RoomType::Bridge => "BRG",
-            RoomType::Engineering => "ENG",
-            RoomType::Reactor => "RCT",
-            RoomType::CrewQuarters => "CRW",
-            RoomType::Cargo => "CRG",
-            RoomType::Medbay => "MED",
-            RoomType::Galley => "GAL",
-            RoomType::Armory => "ARM",
-            RoomType::Storage => "STO",
-            RoomType::Hydroponics => "HYD",
-            RoomType::Airlock => "AIR",
-            RoomType::Corridor => "COR",
-            RoomType::VerticalShaft => "SHF",
-            RoomType::Compartment => "CMP",
-        }
-    }
-}
-
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct RoomNode {
     pub id: u16,
     pub deck: u8,
-    pub kind: RoomType,
+    pub kind: Role,
     /// AABB in deck-local tile coords (min inclusive, max inclusive).
     pub min: (TileCoord, TileCoord),
     pub max: (TileCoord, TileCoord),
@@ -355,8 +318,20 @@ pub struct Ship {
     pub generator_version: u32,
     pub seed: u64,
     pub archetype_id: String,
+    /// Topology template that authored this ship.
+    pub template_id: String,
     pub intactness: Intactness,
     pub cause_of_loss: CauseOfLoss,
+    /// Authored topology (rooms with explicit occupancy, portal intents,
+    /// vertical connections) — the compile input, kept for validation and
+    /// export cross-checks.
+    pub topology: Topology,
+    /// The canonical structural plan — the AUTHORITATIVE geometry. Deck
+    /// raster layers below are a derived projection of this.
+    pub plan: StructuralPlan,
+    pub entry_room: RoomId,
+    pub goal_room: RoomId,
+    pub critical_path: Vec<RoomId>,
     pub decks: Vec<Deck>,
     pub room_graph: RoomGraph,
     pub entities: Vec<EntitySpec>,

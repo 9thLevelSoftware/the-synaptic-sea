@@ -17,8 +17,8 @@ pub mod topology;
 pub use archetype::GenData;
 pub use model::{
     apply_diff, CauseOfLoss, Deck, DeckLayer, EntityKind, EntitySpec, FloorTile, GenParams,
-    GridPos, ItemStack, RoomGraph, RoomNode, RoomType, Ship, ShipMutationDiff, WallEdge,
-    GENERATOR_VERSION,
+    GridPos, ItemStack, RoomGraph, RoomNode, Ship, ShipMutationDiff, WallEdge, GENERATOR_VERSION,
 };
 pub use pipeline::{generate_ship, generate_ship_timed, GenError, GenReport};
+pub use role::Role;
 pub use stages::hull::derive_site_seed;

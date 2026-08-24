@@ -1,31 +1,18 @@
-// Boxy cargo hauler: big holds, sparse crew spaces.
+// v2 archetype: sizes are in 4 m module-grid cells.
 (
     id: "freighter",
     display_name: "Bulk Freighter",
-    length: (55, 80),
-    beam: (24, 36),
+    length: (18, 26),
+    beam: (10, 14),
     decks: (1, 2),
-    hull_fill_bp: 8800,
+    hull_fill_bp: 9000,
     asymmetry_bp: 400,
-    deck_erosion: 3,
-    min_room_dim: 4,
-    required_rooms: [
-        (kind: Bridge, bow_bias: 95, size_pref: Medium),
-        (kind: Engineering, bow_bias: -90, size_pref: Large),
-        (kind: Reactor, bow_bias: -75, size_pref: Medium),
-        (kind: Airlock, bow_bias: 30, size_pref: Small),
-        (kind: Cargo, bow_bias: -10, size_pref: Largest),
-        (kind: Cargo, bow_bias: 10, size_pref: Largest),
-        (kind: CrewQuarters, bow_bias: 60, size_pref: Medium),
-        (kind: Galley, bow_bias: 55, size_pref: Small),
-    ],
-    optional_rooms: [
-        (Storage, 120),
-        (Cargo, 100),
-        (Medbay, 50),
-        (Hydroponics, 40),
-        (Compartment, 60),
-    ],
+    deck_erosion: 2,
+    template: "",
+    role_weights: [(Cargo, 5), (Storage, 4), (CrewQuarters, 2), (Engineering, 2), (MessHall, 2), (Medical, 1), (Hangar, 2)],
+    guaranteed_roles: [Cargo],
+    max_duplicates: 3,
+    filler_roles: [(Cargo, 120), (Storage, 100), (Compartment, 60)],
     cause_weights: [
         (PirateBoarding, 40),
         (Depressurization, 20),
@@ -35,6 +22,4 @@
         (Unknown, 10),
     ],
     max_breaches: 7,
-    corridor_loop_bp: 1500,
-    shafts: (1, 2),
 )

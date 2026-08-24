@@ -3,54 +3,41 @@
 //! the generator works with zero filesystem setup, and can be overridden by
 //! loading replacement RON at runtime (modding / game-side tuning).
 
-use crate::model::{CauseOfLoss, EntityKind, RoomType};
+use crate::model::{CauseOfLoss, EntityKind};
+use crate::role::Role;
+use crate::topology::TemplateSet;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum SizePref {
-    Largest,
-    Large,
-    Medium,
-    Small,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct RoomReq {
-    pub kind: RoomType,
-    /// Positional preference along the ship's long axis, -100 (stern) to
-    /// +100 (bow). 0 = no preference. Bow is +x.
-    pub bow_bias: i16,
-    pub size_pref: SizePref,
-}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ShipArchetype {
     pub id: String,
     pub display_name: String,
-    /// Deck-0 hull length range (tiles along x).
+    /// Deck-0 hull length range (cells along x; 1 cell = 4 m).
     pub length: (u16, u16),
-    /// Deck-0 hull beam range (tiles along y).
+    /// Deck-0 hull beam range (cells along y).
     pub beam: (u16, u16),
     pub decks: (u8, u8),
-    /// Fraction of the hull envelope to fill with tiles, basis points.
+    /// Fraction of the hull envelope to fill with cells, basis points.
     pub hull_fill_bp: u16,
     /// Probability per growth step of skipping the mirrored twin, bp.
     pub asymmetry_bp: u16,
-    /// Boundary erosion (tiles) applied per deck away from the main deck.
+    /// Boundary erosion (cells) applied per deck away from the main deck.
     pub deck_erosion: u8,
-    /// Minimum room dimension for BSP leaves.
-    pub min_room_dim: u8,
-    pub required_rooms: Vec<RoomReq>,
-    /// (room type, weight) pool for filling leftover BSP slots.
-    pub optional_rooms: Vec<(RoomType, u32)>,
+    /// Optional fixed template; empty = seeded pick from compatible set.
+    pub template: String,
+    /// Role weights for zone role-pool picks.
+    pub role_weights: Vec<(Role, u32)>,
+    /// Roles that MUST exist on every ship of this archetype. Load-time
+    /// validation guarantees at least one template can satisfy them.
+    pub guaranteed_roles: Vec<Role>,
+    /// Max rooms sharing a role (0 = unlimited).
+    pub max_duplicates: u8,
+    /// (role, weight) pool for residual-space filler rooms.
+    pub filler_roles: Vec<(Role, u32)>,
     pub cause_weights: Vec<(CauseOfLoss, u32)>,
     /// Max breach count at intactness 0.
     pub max_breaches: u8,
-    /// Number of extra loop-back corridor edges, bp of non-MST edges kept.
-    pub corridor_loop_bp: u16,
-    /// Vertical shaft count range (multi-deck ships).
-    pub shafts: (u8, u8),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -73,8 +60,8 @@ pub struct FurnitureRule {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct FurnishingRules {
-    pub rules: BTreeMap<RoomType, Vec<FurnitureRule>>,
-    pub door_lock_bp: BTreeMap<RoomType, u16>,
+    pub rules: BTreeMap<Role, Vec<FurnitureRule>>,
+    pub door_lock_bp: BTreeMap<Role, u16>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -94,7 +81,7 @@ pub struct LootEntry {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct LootTables {
     /// Per room type: pool of possible items for containers in that room.
-    pub tables: BTreeMap<RoomType, Vec<LootEntry>>,
+    pub tables: BTreeMap<Role, Vec<LootEntry>>,
     /// Rolls per container, before richness scaling.
     pub rolls: (u8, u8),
 }
@@ -120,6 +107,7 @@ impl ItemRegistry {
 #[derive(Clone, Debug)]
 pub struct GenData {
     pub archetypes: BTreeMap<String, ShipArchetype>,
+    pub templates: TemplateSet,
     pub furnishing: FurnishingRules,
     pub loot: LootTables,
     pub items: ItemRegistry,
@@ -167,8 +155,10 @@ impl GenData {
             ron::from_str(DEFAULT_LOOT).map_err(|e| DataError::Parse(e.to_string()))?;
         let items: ItemRegistry =
             ron::from_str(DEFAULT_ITEMS).map_err(|e| DataError::Parse(e.to_string()))?;
+        let templates = TemplateSet::default_bundle().map_err(DataError::Parse)?;
         let data = Self {
             archetypes,
+            templates,
             furnishing,
             loot,
             items,
@@ -182,9 +172,9 @@ impl GenData {
     /// resolve, weights are non-degenerate.
     pub fn validate(&self) -> Result<(), DataError> {
         for (id, a) in &self.archetypes {
-            if a.length.0 < 8 || a.beam.0 < 6 {
+            if a.length.0 < 6 || a.beam.0 < 4 {
                 return Err(DataError::Validation(format!(
-                    "archetype '{id}': hull too small (min 8x6)"
+                    "archetype '{id}': hull too small (min 6x4 cells)"
                 )));
             }
             if a.length.0 > a.length.1 || a.beam.0 > a.beam.1 || a.decks.0 > a.decks.1 {
@@ -192,20 +182,41 @@ impl GenData {
                     "archetype '{id}': inverted range"
                 )));
             }
-            // Min-tile-budget guard: required rooms must plausibly fit the
-            // smallest hull at ~60% interior yield.
-            let min_room = (a.min_room_dim as u32).pow(2);
-            let budget = a.length.0 as u32 * a.beam.0 as u32 * 6 / 10;
-            let need = a.required_rooms.len() as u32 * min_room;
-            if need > budget {
-                return Err(DataError::Validation(format!(
-                    "archetype '{id}': {} required rooms cannot fit min hull ({need} > {budget} tiles)",
-                    a.required_rooms.len()
-                )));
-            }
             if a.cause_weights.iter().map(|(_, w)| *w as u64).sum::<u64>() == 0 {
                 return Err(DataError::Validation(format!(
                     "archetype '{id}': cause_weights all zero"
+                )));
+            }
+            // Fail-closed guarantee contract: at MINIMUM deck count, at
+            // least one template must satisfy every guaranteed role — the
+            // structural fix for the Synaptic Sea silently-skipped-dock bug.
+            if !a.template.is_empty() {
+                let t = self.templates.templates.get(&a.template).ok_or_else(|| {
+                    DataError::Validation(format!(
+                        "archetype '{id}': unknown template '{}'",
+                        a.template
+                    ))
+                })?;
+                if !t.can_satisfy(&a.guaranteed_roles) {
+                    return Err(DataError::Validation(format!(
+                        "archetype '{id}': pinned template '{}' cannot satisfy guaranteed roles",
+                        a.template
+                    )));
+                }
+                if t.max_zone_deck() >= a.decks.0 {
+                    return Err(DataError::Validation(format!(
+                        "archetype '{id}': pinned template '{}' needs more decks than min {}",
+                        a.template, a.decks.0
+                    )));
+                }
+            } else if self
+                .templates
+                .compatible(&a.guaranteed_roles, a.decks.0)
+                .is_empty()
+            {
+                return Err(DataError::Validation(format!(
+                    "archetype '{id}': no template can satisfy guaranteed roles {:?} at {} deck(s)",
+                    a.guaranteed_roles, a.decks.0
                 )));
             }
         }

@@ -3,28 +3,32 @@
 //! damage and loot stages, plus environmental-storytelling knobs.
 
 use crate::archetype::ShipArchetype;
-use crate::model::{CauseOfLoss, RoomType};
+use crate::model::CauseOfLoss;
 use crate::rng::weighted_choice;
+use crate::role::Role;
 use rand_pcg::Pcg64;
 
 #[derive(Clone, Debug)]
 pub struct DamageProfile {
     pub cause: CauseOfLoss,
     /// Breaches concentrate near these room types.
-    pub breach_bias_rooms: Vec<RoomType>,
+    pub breach_bias_rooms: Vec<Role>,
     /// Chance (bp) of scorch decals around each breach.
     pub scorch_bp: u32,
     /// Extra scorch zones around these rooms (reactor fires etc.).
-    pub scorch_rooms: Vec<RoomType>,
+    pub scorch_rooms: Vec<Role>,
     /// Crew body count range (scaled up as intactness drops).
     pub bodies: (u8, u8),
-    pub body_rooms: Vec<RoomType>,
+    pub body_rooms: Vec<Role>,
     /// Loot richness multiplier, bp (pirates strip ships; plague leaves all).
     pub loot_mult_bp: u16,
     /// Chance (bp) that each Armory container was emptied.
     pub weapon_empty_bp: u32,
     /// Extra chance (bp) that interior doors are locked/sealed.
     pub sealed_door_bp: u32,
+    /// Story sanctions the ship tearing apart so hard that the critical
+    /// path is severed across fragments (validated post-damage).
+    pub allows_fragment_split: bool,
 }
 
 pub fn choose_cause(
@@ -44,7 +48,7 @@ pub fn choose_cause(
 
 pub fn profile_for(cause: CauseOfLoss) -> DamageProfile {
     use CauseOfLoss::*;
-    use RoomType::*;
+    use Role::*;
     match cause {
         ReactorBreach => DamageProfile {
             cause,
@@ -56,6 +60,7 @@ pub fn profile_for(cause: CauseOfLoss) -> DamageProfile {
             loot_mult_bp: 9000,
             weapon_empty_bp: 0,
             sealed_door_bp: 500,
+            allows_fragment_split: true,
         },
         Depressurization => DamageProfile {
             cause,
@@ -63,10 +68,11 @@ pub fn profile_for(cause: CauseOfLoss) -> DamageProfile {
             scorch_bp: 1500,
             scorch_rooms: vec![],
             bodies: (2, 6),
-            body_rooms: vec![CrewQuarters, Corridor, Galley],
+            body_rooms: vec![CrewQuarters, Corridor, MessHall],
             loot_mult_bp: 10_000,
             weapon_empty_bp: 0,
             sealed_door_bp: 2500, // emergency bulkheads sealed
+            allows_fragment_split: true,
         },
         PirateBoarding => DamageProfile {
             cause,
@@ -78,6 +84,7 @@ pub fn profile_for(cause: CauseOfLoss) -> DamageProfile {
             loot_mult_bp: 5500, // stripped
             weapon_empty_bp: 7500,
             sealed_door_bp: 0,
+            allows_fragment_split: false,
         },
         Plague => DamageProfile {
             cause,
@@ -85,10 +92,11 @@ pub fn profile_for(cause: CauseOfLoss) -> DamageProfile {
             scorch_bp: 500,
             scorch_rooms: vec![],
             bodies: (4, 10),
-            body_rooms: vec![CrewQuarters, Medbay, Galley],
+            body_rooms: vec![CrewQuarters, Medical, MessHall],
             loot_mult_bp: 11_000, // untouched cargo
             weapon_empty_bp: 0,
             sealed_door_bp: 5500, // quarantine seals
+            allows_fragment_split: false,
         },
         DriveMisjump => DamageProfile {
             cause,
@@ -100,6 +108,7 @@ pub fn profile_for(cause: CauseOfLoss) -> DamageProfile {
             loot_mult_bp: 10_000,
             weapon_empty_bp: 0,
             sealed_door_bp: 500,
+            allows_fragment_split: true,
         },
         Unknown => DamageProfile {
             cause,
@@ -111,6 +120,7 @@ pub fn profile_for(cause: CauseOfLoss) -> DamageProfile {
             loot_mult_bp: 9500,
             weapon_empty_bp: 0,
             sealed_door_bp: 1500,
+            allows_fragment_split: true,
         },
     }
 }

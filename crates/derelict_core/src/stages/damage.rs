@@ -1,353 +1,569 @@
-//! Stage 8: damage/wreck pass, gated by intactness (0..=10000 bp).
+//! Stage: damage/wreck pass, gated by intactness (0..=10000 bp), operating
+//! on the AUTHORED TOPOLOGY (the single mutable authority). Breaches are
+//! modeled as damage portals (state = Breach), holes as removed occupancy
+//! cells, and fracture as an integer drift applied to one side's rooms —
+//! the structural plan is recompiled afterwards, so every canonical key is
+//! re-derived rather than patched (no re-keying drift bugs by construction).
 //!
-//! Sub-passes: hull breaches (CA-eroded holes, story-biased placement),
-//! scorch decals, crew bodies, sealed doors, and — below the fracture
-//! threshold — a structural fracture that tears the ship into two pieces,
-//! bakes them apart into an enlarged canvas, and fills the gap with a
-//! deterministic debris field.
+//! Cosmetic overlays (scorch decals, damaged module variants) are returned
+//! separately and stamped onto the recompiled plan; they never affect
+//! topology or validation.
 
 use crate::archetype::ShipArchetype;
-use crate::model::{
-    decal, DamageEvent, DamageEventKind, DeckLayer, EntityKind, EntitySpec, FloorTile, GridPos,
-    RoomType, ShipFragment, TileCoord, WallEdge, NO_ROOM,
-};
+use crate::model::{DamageEvent, DamageEventKind, EntityKind, EntitySpec, GridPos, ShipFragment};
 use crate::rng::{self, roll_bp, roll_range, weighted_choice};
+use crate::role::Role;
 use crate::stages::story::DamageProfile;
-use rand_pcg::Pcg64;
+use crate::structural::plan::{Cell, Dir, EdgeKind, PortalIntent, RoomId, Topology, NO_ROOM};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const FRACTURE_THRESHOLD_BP: u16 = 3500;
 
+#[derive(Default)]
 pub struct DamageOutcome {
     pub events: Vec<DamageEvent>,
-    pub depressurized: BTreeSet<u16>,
+    pub depressurized: BTreeSet<RoomId>,
     pub fractured: bool,
     pub fragments: Vec<ShipFragment>,
-}
-
-/// Clear the four wall edges surrounding tile (x, y).
-fn clear_edges_around(layer: &mut DeckLayer, x: TileCoord, y: TileCoord) {
-    if let Some(i) = layer.idx(x, y) {
-        layer.walls[i].north = WallEdge::None;
-        layer.walls[i].west = WallEdge::None;
-    }
-    if let Some(i) = layer.idx(x, y + 1) {
-        layer.walls[i].north = WallEdge::None;
-    }
-    if let Some(i) = layer.idx(x + 1, y) {
-        layer.walls[i].west = WallEdge::None;
-    }
-}
-
-fn remove_tile(layer: &mut DeckLayer, x: TileCoord, y: TileCoord) {
-    if let Some(i) = layer.idx(x, y) {
-        layer.floor[i] = FloorTile::Void;
-        layer.room_id[i] = NO_ROOM;
-        layer.decal[i] = decal::NONE;
-        clear_edges_around(layer, x, y);
-    }
+    pub fragment_of: BTreeMap<RoomId, u8>,
+    /// Cosmetic overlays keyed by cell key.
+    pub cell_decals: BTreeMap<String, u8>,
+    pub damaged_cells: BTreeSet<String>,
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn apply_damage(
     master_seed: u64,
-    layers: &mut [DeckLayer],
+    attempt: u64,
+    topology: &mut Topology,
     entities: &mut Vec<EntitySpec>,
     next_entity_id: &mut u32,
-    kind_of: &BTreeMap<u16, RoomType>,
     profile: &DamageProfile,
     intactness: u16,
     arch: &ShipArchetype,
+    protected: &[RoomId],
 ) -> DamageOutcome {
-    let mut out = DamageOutcome {
-        events: Vec::new(),
-        depressurized: BTreeSet::new(),
-        fractured: false,
-        fragments: Vec::new(),
-    };
+    let mut out = DamageOutcome::default();
     let damage_bp = (10_000 - intactness) as i64;
 
     breach_pass(
         master_seed,
-        layers,
+        attempt,
+        topology,
         entities,
-        kind_of,
         profile,
         damage_bp,
         arch,
+        protected,
         &mut out,
     );
-    scorch_pass(master_seed, layers, kind_of, profile);
-    seal_doors_pass(master_seed, entities, profile);
+    scorch_pass(master_seed, attempt, topology, profile, &mut out);
+    seal_doors_pass(master_seed, topology, entities, profile);
 
-    if intactness < FRACTURE_THRESHOLD_BP {
-        fracture_pass(master_seed, layers, entities, next_entity_id, &mut out);
+    // Fracture is story-gated: causes that cannot legally sever the ship
+    // (pirates, plague) never tear it in half — they take heavier breach
+    // damage instead of an impossible split.
+    if intactness < FRACTURE_THRESHOLD_BP && profile.allows_fragment_split {
+        fracture_pass(
+            master_seed,
+            attempt,
+            topology,
+            entities,
+            next_entity_id,
+            protected,
+            &mut out,
+        );
     }
 
     body_pass(
         master_seed,
-        layers,
+        attempt,
+        topology,
         entities,
         next_entity_id,
-        kind_of,
         profile,
         damage_bp,
     );
 
+    repair_connectivity(topology, &out.fragment_of, entities, protected);
+
     if matches!(profile.cause, crate::model::CauseOfLoss::Depressurization) {
-        // Ship-wide loss of atmosphere.
-        for id in kind_of.keys() {
-            out.depressurized.insert(*id);
+        for room in &topology.rooms {
+            out.depressurized.insert(room.id);
         }
     }
     out
 }
 
+/// After damage, every fragment must be internally connected. Rooms cut off
+/// by pruned doors reconnect through blast openings (Breach portals) to an
+/// adjacent reachable room; rooms with no adjacency left are destroyed
+/// outright. Runs until each fragment is one component.
+fn repair_connectivity(
+    topology: &mut Topology,
+    fragment_of: &BTreeMap<RoomId, u8>,
+    entities: &mut Vec<EntitySpec>,
+    protected: &[RoomId],
+) {
+    for _ in 0..32 {
+        let alive: Vec<RoomId> = topology.rooms.iter().map(|r| r.id).collect();
+        if alive.is_empty() {
+            return;
+        }
+        let mut adj: BTreeMap<RoomId, Vec<RoomId>> = BTreeMap::new();
+        for p in &topology.portals {
+            if !p.exterior && p.to_room != NO_ROOM {
+                adj.entry(p.from_room).or_default().push(p.to_room);
+                adj.entry(p.to_room).or_default().push(p.from_room);
+            }
+        }
+        for v in &topology.verticals {
+            adj.entry(v.from_room).or_default().push(v.to_room);
+            adj.entry(v.to_room).or_default().push(v.from_room);
+        }
+        let frag = |id: RoomId| fragment_of.get(&id).copied().unwrap_or(0);
+        let mut comp: BTreeMap<RoomId, u32> = BTreeMap::new();
+        let mut next = 0u32;
+        for &start in &alive {
+            if comp.contains_key(&start) {
+                continue;
+            }
+            next += 1;
+            let mut stack = vec![start];
+            comp.insert(start, next);
+            while let Some(cur) = stack.pop() {
+                for n in adj.get(&cur).cloned().unwrap_or_default() {
+                    if frag(n) == frag(cur) && !comp.contains_key(&n) {
+                        comp.insert(n, next);
+                        stack.push(n);
+                    }
+                }
+            }
+        }
+        let mut sizes: BTreeMap<(u8, u32), usize> = BTreeMap::new();
+        for &id in &alive {
+            *sizes.entry((frag(id), comp[&id])).or_insert(0) += topology
+                .rooms
+                .iter()
+                .find(|r| r.id == id)
+                .map(|r| r.cells.len())
+                .unwrap_or(0);
+        }
+        let mut main_comp: BTreeMap<u8, u32> = BTreeMap::new();
+        for (&(f, c), &n) in &sizes {
+            let cur = main_comp.get(&f).map(|mc| sizes[&(f, *mc)]).unwrap_or(0);
+            if n > cur {
+                main_comp.insert(f, c);
+            }
+        }
+        let stray: Vec<RoomId> = alive
+            .iter()
+            .copied()
+            .filter(|id| main_comp.get(&frag(*id)) != Some(&comp[id]))
+            .collect();
+        if stray.is_empty() {
+            return;
+        }
+        let cells_of: BTreeMap<RoomId, BTreeSet<(u8, i32, i32)>> = topology
+            .rooms
+            .iter()
+            .map(|r| (r.id, r.cells.iter().map(|c| (c.deck, c.x, c.y)).collect()))
+            .collect();
+        let mut reconnected = false;
+        'outer: for &sid in &stray {
+            for &oid in &alive {
+                if frag(oid) != frag(sid) || main_comp.get(&frag(oid)) != Some(&comp[&oid]) {
+                    continue;
+                }
+                for &(d, x, y) in &cells_of[&sid] {
+                    for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
+                        if cells_of[&oid].contains(&(d, x + dx, y + dy)) {
+                            topology.portals.push(PortalIntent {
+                                from_room: sid,
+                                to_room: oid,
+                                from_cell: Cell::new(d, x, y),
+                                to_cell: Cell::new(d, x + dx, y + dy),
+                                state: EdgeKind::Breach,
+                                exterior: false,
+                            });
+                            dedup_portals(topology);
+                            reconnected = true;
+                            break 'outer;
+                        }
+                    }
+                }
+            }
+        }
+        if !reconnected {
+            // Destroy the smallest expendable stray room (never entry/goal).
+            let Some(smallest) = stray
+                .iter()
+                .filter(|id| !protected.contains(id))
+                .min_by_key(|id| {
+                    topology
+                        .rooms
+                        .iter()
+                        .find(|r| r.id == **id)
+                        .map(|r| r.cells.len())
+                        .unwrap_or(0)
+                })
+                .copied()
+            else {
+                return; // only protected rooms are stray; leave to validation
+            };
+            let doomed: BTreeSet<(u8, i32, i32)> = cells_of[&smallest].clone();
+            remove_cells(topology, &doomed, entities);
+        }
+    }
+}
+
+fn occupied_map(topology: &Topology) -> BTreeMap<(u8, i32, i32), RoomId> {
+    let mut m = BTreeMap::new();
+    for room in &topology.rooms {
+        for c in &room.cells {
+            m.insert((c.deck, c.x, c.y), room.id);
+        }
+    }
+    m
+}
+
+/// Remove a set of cells from the topology: room cells shrink (empty rooms
+/// are dropped), portals with a removed endpoint are pruned, verticals with
+/// a removed endpoint are pruned, and loose entities standing on removed
+/// cells are destroyed. Door entities whose portal disappeared go too.
+fn remove_cells(
+    topology: &mut Topology,
+    cells: &BTreeSet<(u8, i32, i32)>,
+    entities: &mut Vec<EntitySpec>,
+) {
+    for room in topology.rooms.iter_mut() {
+        room.cells.retain(|c| !cells.contains(&(c.deck, c.x, c.y)));
+    }
+    // A hole can split a room's cells into islands; the minority islands are
+    // torn away too (iterate until stable - deleting can cascade).
+    loop {
+        let mut extra: BTreeSet<(u8, i32, i32)> = BTreeSet::new();
+        for room in topology.rooms.iter() {
+            if room.cells.len() <= 1 {
+                continue;
+            }
+            let mut set: BTreeSet<(u8, i32, i32)> =
+                room.cells.iter().map(|c| (c.deck, c.x, c.y)).collect();
+            let mut comps: Vec<Vec<(u8, i32, i32)>> = Vec::new();
+            while let Some(&start) = set.iter().next() {
+                set.remove(&start);
+                let mut comp = vec![start];
+                let mut stack = vec![start];
+                while let Some((d, x, y)) = stack.pop() {
+                    for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
+                        let n = (d, x + dx, y + dy);
+                        if set.remove(&n) {
+                            comp.push(n);
+                            stack.push(n);
+                        }
+                    }
+                }
+                comps.push(comp);
+            }
+            if comps.len() > 1 {
+                comps.sort_by_key(|c| usize::MAX - c.len());
+                for comp in comps.into_iter().skip(1) {
+                    extra.extend(comp);
+                }
+            }
+        }
+        if extra.is_empty() {
+            break;
+        }
+        for room in topology.rooms.iter_mut() {
+            room.cells.retain(|c| !extra.contains(&(c.deck, c.x, c.y)));
+        }
+        entities.retain(|e| {
+            e.kind == EntityKind::Door || !extra.contains(&(e.pos.deck, e.pos.x, e.pos.y))
+        });
+    }
+    topology.rooms.retain(|r| !r.cells.is_empty());
+    let alive: BTreeSet<RoomId> = topology.rooms.iter().map(|r| r.id).collect();
+    let occupied = occupied_map(topology);
+    // Portals whose endpoint cell died get RELOCATED to another shared
+    // boundary between the same two rooms when one exists; only portals
+    // with no surviving boundary are pruned.
+    let cells_of: BTreeMap<RoomId, Vec<(i32, i32, u8)>> = topology
+        .rooms
+        .iter()
+        .map(|r| (r.id, r.cells.iter().map(|c| (c.x, c.y, c.deck)).collect()))
+        .collect();
+    for p in topology.portals.iter_mut() {
+        if p.exterior || p.to_room == NO_ROOM {
+            continue;
+        }
+        let from_ok =
+            occupied.get(&(p.from_cell.deck, p.from_cell.x, p.from_cell.y)) == Some(&p.from_room);
+        let to_ok = occupied.get(&(p.to_cell.deck, p.to_cell.x, p.to_cell.y)) == Some(&p.to_room);
+        if from_ok && to_ok {
+            continue;
+        }
+        let (Some(fa), Some(fb)) = (cells_of.get(&p.from_room), cells_of.get(&p.to_room)) else {
+            continue;
+        };
+        let bset: BTreeSet<(i32, i32, u8)> = fb.iter().copied().collect();
+        let mut found = None;
+        for &(x, y, d) in fa {
+            for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
+                if bset.contains(&(x + dx, y + dy, d)) {
+                    found = Some((Cell::new(d, x, y), Cell::new(d, x + dx, y + dy)));
+                    break;
+                }
+            }
+            if found.is_some() {
+                break;
+            }
+        }
+        if let Some((ca, cb)) = found {
+            p.from_cell = ca;
+            p.to_cell = cb;
+        }
+    }
+    topology.portals.retain(|p| {
+        if !alive.contains(&p.from_room) {
+            return false;
+        }
+        if occupied.get(&(p.from_cell.deck, p.from_cell.x, p.from_cell.y)) != Some(&p.from_room) {
+            return false;
+        }
+        if p.exterior || p.to_room == NO_ROOM {
+            true
+        } else {
+            alive.contains(&p.to_room)
+                && occupied.get(&(p.to_cell.deck, p.to_cell.x, p.to_cell.y)) == Some(&p.to_room)
+        }
+    });
+    dedup_portals(topology);
+    topology.verticals.retain(|v| {
+        occupied.get(&(v.from_cell.deck, v.from_cell.x, v.from_cell.y)) == Some(&v.from_room)
+            && occupied.get(&(v.to_cell.deck, v.to_cell.x, v.to_cell.y)) == Some(&v.to_room)
+    });
+    entities
+        .retain(|e| e.kind == EntityKind::Door || !cells.contains(&(e.pos.deck, e.pos.x, e.pos.y)));
+    let portal_edge_keys: BTreeSet<String> = topology
+        .portals
+        .iter()
+        .filter_map(|p| {
+            Dir::between(p.from_cell, p.to_cell)
+                .map(|d| crate::structural::plan::edge_key(p.from_cell, d))
+        })
+        .collect();
+    entities.retain(|e| {
+        if e.kind != EntityKind::Door {
+            return true;
+        }
+        e.tags
+            .iter()
+            .find_map(|t| t.strip_prefix("edge:"))
+            .map(|key| portal_edge_keys.contains(key))
+            .unwrap_or(true)
+    });
+}
+
 #[allow(clippy::too_many_arguments)]
 fn breach_pass(
     master_seed: u64,
-    layers: &mut [DeckLayer],
+    attempt: u64,
+    topology: &mut Topology,
     entities: &mut Vec<EntitySpec>,
-    kind_of: &BTreeMap<u16, RoomType>,
     profile: &DamageProfile,
     damage_bp: i64,
     arch: &ShipArchetype,
+    protected: &[RoomId],
     out: &mut DamageOutcome,
 ) {
-    let mut rng = rng::stream(master_seed, "breach", 0);
+    let mut rng = rng::stream(master_seed, "breach", attempt);
     if damage_bp < 800 {
-        return; // pristine ships have no hull breaches
+        return;
     }
     let base = arch.max_breaches as i64 * damage_bp / 10_000;
     let min = if damage_bp >= 3000 { 1 } else { 0 };
     let n_breaches = (base + roll_range(&mut rng, -1, 1)).clamp(min, arch.max_breaches as i64);
 
-    // Precompute "near a bias room" grids per deck (BFS depth 6 from all
-    // bias-room tiles).
-    let bias_near: Vec<Vec<bool>> = layers
-        .iter()
-        .map(|layer| {
-            let w = layer.width as usize;
-            let mut near = vec![false; layer.floor.len()];
-            let mut frontier: Vec<usize> = Vec::new();
-            for (i, id) in layer.room_id.iter().enumerate() {
-                if let Some(k) = kind_of.get(id) {
-                    if profile.breach_bias_rooms.contains(k) {
-                        near[i] = true;
-                        frontier.push(i);
-                    }
-                }
-            }
-            for _ in 0..6 {
-                let mut next: Vec<usize> = Vec::new();
-                for &i in &frontier {
-                    let x = (i % w) as i32;
-                    let y = (i / w) as i32;
-                    for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
-                        if let Some(j) = layer.idx(x + dx, y + dy) {
-                            if !near[j] {
-                                near[j] = true;
-                                next.push(j);
-                            }
-                        }
-                    }
-                }
-                frontier = next;
-            }
-            near
-        })
-        .collect();
-
-    let mut placed: Vec<(usize, i32, i32)> = Vec::new(); // (deck, x, y)
-    for b in 0..n_breaches {
-        let deck = roll_range(&mut rng, 0, layers.len() as i64 - 1) as usize;
-        let layer = &layers[deck];
-        let w = layer.width as i32;
-        // Hull boundary tiles.
-        let mut cands: Vec<(i32, i32)> = Vec::new();
+    let role_of: BTreeMap<RoomId, Role> = topology.rooms.iter().map(|r| (r.id, r.role)).collect();
+    let mut placed: Vec<Cell> = Vec::new();
+    for _ in 0..n_breaches {
+        let occupied = occupied_map(topology);
+        let mut cands: Vec<Cell> = Vec::new();
         let mut weights: Vec<u32> = Vec::new();
-        for y in 0..layer.height as i32 {
-            for x in 0..w {
-                let i = (y * w + x) as usize;
-                if layer.floor[i] == FloorTile::Void {
-                    continue;
-                }
-                let boundary = [(0, -1), (0, 1), (-1, 0), (1, 0)]
-                    .iter()
-                    .any(|(dx, dy)| layer.floor_at(x + dx, y + dy) == FloorTile::Void);
-                if !boundary {
-                    continue;
-                }
-                if placed
-                    .iter()
-                    .any(|(d, px, py)| *d == deck && (px - x).abs() + (py - y).abs() < 5)
-                {
-                    continue;
-                }
-                cands.push((x, y));
-                weights.push(if bias_near[deck][i] { 8 } else { 1 });
+        for (&(deck, x, y), room_id) in &occupied {
+            if protected.contains(room_id) {
+                continue; // never blow holes in the entry or goal rooms
             }
+            let cell = Cell::new(deck, x, y);
+            let boundary = Dir::ALL.iter().any(|d| {
+                let n = cell.neighbor(*d);
+                !occupied.contains_key(&(n.deck, n.x, n.y))
+            });
+            if !boundary {
+                continue;
+            }
+            if placed
+                .iter()
+                .any(|p| p.deck == deck && (p.x - x).abs() + (p.y - y).abs() < 3)
+            {
+                continue;
+            }
+            let biased = role_of
+                .get(room_id)
+                .map(|r| profile.breach_bias_rooms.contains(r))
+                .unwrap_or(false);
+            cands.push(cell);
+            weights.push(if biased { 8 } else { 1 });
         }
         let Some(pick) = weighted_choice(&mut rng, &weights) else {
             continue;
         };
-        let (ox, oy) = cands[pick];
-        placed.push((deck, ox, oy));
+        let origin = cands[pick];
+        placed.push(origin);
 
-        let radius = (roll_range(&mut rng, 2, 4) + damage_bp / 4000) as i32;
-        carve_breach(&mut rng, &mut layers[deck], ox, oy, radius, profile, out);
-        out.events.push(DamageEvent {
-            kind: DamageEventKind::Breach,
-            deck: deck as u8,
-            origin: (ox, oy),
-            radius: radius as u16,
-        });
-        let _ = b;
-    }
-
-    // Entities standing on now-void tiles were destroyed.
-    entities.retain(|e| {
-        let layer = &layers[e.pos.deck as usize];
-        e.kind == EntityKind::Door || layer.floor_at(e.pos.x, e.pos.y) != FloorTile::Void
-    });
-    // Doors whose edge walls are gone likewise.
-    entities.retain(|e| {
-        if e.kind != EntityKind::Door {
-            return true;
-        }
-        let layer = &layers[e.pos.deck as usize];
-        let edge = if e.rotation == 0 {
-            layer.walls_at(e.pos.x, e.pos.y).north
-        } else {
-            layer.walls_at(e.pos.x, e.pos.y).west
-        };
-        edge == WallEdge::Doorway
-    });
-}
-
-fn carve_breach(
-    rng: &mut Pcg64,
-    layer: &mut DeckLayer,
-    ox: i32,
-    oy: i32,
-    radius: i32,
-    profile: &DamageProfile,
-    out: &mut DamageOutcome,
-) {
-    let w = layer.width as i32;
-    let h = layer.height as i32;
-    // Cellular erosion: removal probability falls off with distance.
-    let mut removed: Vec<(i32, i32)> = Vec::new();
-    for y in (oy - radius).max(0)..=(oy + radius).min(h - 1) {
-        for x in (ox - radius).max(0)..=(ox + radius).min(w - 1) {
-            let d = (x - ox).abs() + (y - oy).abs();
-            if d > radius {
-                continue;
-            }
-            let i = (y * w + x) as usize;
-            if layer.floor[i] == FloorTile::Void {
-                continue;
-            }
-            let p_remove = (radius - d + 1) as u32 * 9000 / (radius + 1) as u32;
-            if roll_bp(rng, p_remove) {
-                if layer.room_id[i] != NO_ROOM {
-                    out.depressurized.insert(layer.room_id[i]);
-                }
-                removed.push((x, y));
-            } else {
-                // Scarred ring.
-                layer.floor[i] = FloorTile::DamagedDeck;
-                if roll_bp(rng, profile.scorch_bp) {
-                    layer.decal[i] = decal::SCORCH_LIGHT;
-                }
-                if layer.room_id[i] != NO_ROOM {
-                    out.depressurized.insert(layer.room_id[i]);
+        // Hole: the origin cell always; ring neighbors probabilistically at
+        // heavy damage (cell scale is 4 m — holes stay small).
+        let mut hole: BTreeSet<(u8, i32, i32)> =
+            BTreeSet::from([(origin.deck, origin.x, origin.y)]);
+        if damage_bp > 5000 {
+            for d in Dir::ALL {
+                let n = origin.neighbor(d);
+                if occupied.contains_key(&(n.deck, n.x, n.y)) && roll_bp(&mut rng, 3000) {
+                    hole.insert((n.deck, n.x, n.y));
                 }
             }
         }
-    }
-    for (x, y) in &removed {
-        remove_tile(layer, *x, *y);
-    }
-    // Jagged wall remnants around the hole.
-    for (x, y) in &removed {
-        for (dx, dy, north, ex, ey) in [
-            (0, -1, true, *x, *y),     // north edge of removed tile
-            (0, 1, true, *x, *y + 1),  // south edge
-            (-1, 0, false, *x, *y),    // west edge
-            (1, 0, false, *x + 1, *y), // east edge
-        ] {
-            let (nx, ny) = (x + dx, y + dy);
-            if layer.floor_at(nx, ny) != FloorTile::Void && roll_bp(rng, 3500) {
-                if let Some(i) = layer.idx(ex, ey) {
-                    if north {
-                        layer.walls[i].north = WallEdge::Breached;
-                    } else {
-                        layer.walls[i].west = WallEdge::Breached;
+        for &(deck, x, y) in &hole {
+            if let Some(id) = occupied.get(&(deck, x, y)) {
+                out.depressurized.insert(*id);
+            }
+            for d in Dir::ALL {
+                let n = Cell::new(deck, x, y).neighbor(d);
+                if let Some(id) = occupied.get(&(n.deck, n.x, n.y)) {
+                    out.depressurized.insert(*id);
+                }
+            }
+        }
+        remove_cells(topology, &hole, entities);
+        // Rim: surviving neighbors get breach portals (open jagged boundary)
+        // most of the time; scars + scorch decals regardless.
+        let occupied_after = occupied_map(topology);
+        for &(deck, x, y) in &hole {
+            let hole_cell = Cell::new(deck, x, y);
+            for d in Dir::ALL {
+                let n = hole_cell.neighbor(d);
+                if let Some(room_id) = occupied_after.get(&(n.deck, n.x, n.y)) {
+                    out.damaged_cells.insert(n.key());
+                    if roll_bp(&mut rng, profile.scorch_bp) {
+                        out.cell_decals
+                            .insert(n.key(), crate::model::decal::SCORCH_LIGHT);
+                    }
+                    if roll_bp(&mut rng, 6500) {
+                        topology.portals.push(PortalIntent {
+                            from_room: *room_id,
+                            to_room: NO_ROOM,
+                            from_cell: n,
+                            to_cell: hole_cell,
+                            state: EdgeKind::Breach,
+                            exterior: true,
+                        });
                     }
                 }
             }
         }
+        out.events.push(DamageEvent {
+            kind: DamageEventKind::Breach,
+            deck: origin.deck,
+            origin: (origin.x, origin.y),
+            radius: 1,
+        });
     }
+    dedup_portals(topology);
+}
+
+fn dedup_portals(topology: &mut Topology) {
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    topology
+        .portals
+        .retain(|p| match Dir::between(p.from_cell, p.to_cell) {
+            Some(d) => seen.insert(crate::structural::plan::edge_key(p.from_cell, d)),
+            None => true,
+        });
 }
 
 fn scorch_pass(
     master_seed: u64,
-    layers: &mut [DeckLayer],
-    kind_of: &BTreeMap<u16, RoomType>,
+    attempt: u64,
+    topology: &Topology,
     profile: &DamageProfile,
+    out: &mut DamageOutcome,
 ) {
     if profile.scorch_rooms.is_empty() {
         return;
     }
-    for (d, layer) in layers.iter_mut().enumerate() {
-        let mut rng = rng::stream(master_seed, "scorch", d as u64);
-        for i in 0..layer.floor.len() {
-            if layer.floor[i] == FloorTile::Void {
-                continue;
-            }
-            let Some(k) = kind_of.get(&layer.room_id[i]) else {
-                continue;
-            };
-            if profile.scorch_rooms.contains(k) && roll_bp(&mut rng, 4500) {
-                layer.decal[i] = if roll_bp(&mut rng, 4000) {
-                    decal::SCORCH_HEAVY
-                } else {
-                    decal::SCORCH_LIGHT
-                };
+    let mut rng = rng::stream(master_seed, "scorch", attempt);
+    for room in &topology.rooms {
+        if !profile.scorch_rooms.contains(&room.role) {
+            continue;
+        }
+        for cell in &room.cells {
+            if roll_bp(&mut rng, 4500) {
+                let heavy = roll_bp(&mut rng, 4000);
+                out.cell_decals.insert(
+                    cell.key(),
+                    if heavy {
+                        crate::model::decal::SCORCH_HEAVY
+                    } else {
+                        crate::model::decal::SCORCH_LIGHT
+                    },
+                );
             }
         }
     }
 }
 
-fn seal_doors_pass(master_seed: u64, entities: &mut [EntitySpec], profile: &DamageProfile) {
+fn seal_doors_pass(
+    master_seed: u64,
+    topology: &mut Topology,
+    entities: &mut [EntitySpec],
+    profile: &DamageProfile,
+) {
     if profile.sealed_door_bp == 0 {
         return;
     }
-    for e in entities.iter_mut() {
-        if e.kind != EntityKind::Door || e.proto == "airlock_door" {
+    for portal in topology.portals.iter_mut() {
+        if portal.exterior || portal.state != EdgeKind::Door {
             continue;
         }
-        let mut rng = rng::stream(master_seed, "seal", e.id as u64);
+        let Some(d) = Dir::between(portal.from_cell, portal.to_cell) else {
+            continue;
+        };
+        let key = crate::structural::plan::edge_key(portal.from_cell, d);
+        let mut rng = rng::stream(master_seed, "seal", rng::key(0, &key, 0));
         if roll_bp(&mut rng, profile.sealed_door_bp) {
-            e.locked = true;
-            e.open = false;
-            e.tags.push("sealed".into());
+            portal.state = EdgeKind::Locked;
+            let tag = format!("edge:{key}");
+            if let Some(e) = entities.iter_mut().find(|e| e.tags.contains(&tag)) {
+                e.locked = true;
+                e.open = false;
+                e.tags.push("sealed".into());
+            }
         }
     }
 }
 
 fn body_pass(
     master_seed: u64,
-    layers: &[DeckLayer],
+    attempt: u64,
+    topology: &Topology,
     entities: &mut Vec<EntitySpec>,
     next_entity_id: &mut u32,
-    kind_of: &BTreeMap<u16, RoomType>,
     profile: &DamageProfile,
     damage_bp: i64,
 ) {
-    let mut rng = rng::stream(master_seed, "bodies", 0);
-    let extra = damage_bp / 3000; // more carnage on more damaged ships
+    let mut rng = rng::stream(master_seed, "bodies", attempt);
+    let extra = damage_bp / 3000;
     let n = roll_range(
         &mut rng,
         profile.bodies.0 as i64,
@@ -356,54 +572,44 @@ fn body_pass(
     if n <= 0 {
         return;
     }
-    let occupied: BTreeSet<(u8, i32, i32)> = entities
+    let occupied_by_entities: BTreeSet<(u8, i32, i32)> = entities
         .iter()
         .map(|e| (e.pos.deck, e.pos.x, e.pos.y))
         .collect();
-    // Candidates: walkable tiles in preferred rooms first, any room fallback.
-    let mut preferred: Vec<GridPos> = Vec::new();
-    let mut fallback: Vec<GridPos> = Vec::new();
-    for (d, layer) in layers.iter().enumerate() {
-        let w = layer.width as i32;
-        for y in 0..layer.height as i32 {
-            for x in 0..w {
-                let i = (y * w + x) as usize;
-                if !layer.floor[i].walkable() || layer.room_id[i] == NO_ROOM {
-                    continue;
-                }
-                if occupied.contains(&(d as u8, x, y)) {
-                    continue;
-                }
-                let pos = GridPos::new(x, y, d as u8);
-                match kind_of.get(&layer.room_id[i]) {
-                    Some(k) if profile.body_rooms.contains(k) => preferred.push(pos),
-                    Some(_) => fallback.push(pos),
-                    None => {}
-                }
+    let mut preferred: Vec<Cell> = Vec::new();
+    let mut fallback: Vec<Cell> = Vec::new();
+    for room in &topology.rooms {
+        let target = if profile.body_rooms.contains(&room.role) {
+            &mut preferred
+        } else {
+            &mut fallback
+        };
+        for &c in &room.cells {
+            if !occupied_by_entities.contains(&(c.deck, c.x, c.y)) {
+                target.push(c);
             }
         }
     }
-    let mut placed: Vec<GridPos> = Vec::new();
+    let mut placed: BTreeSet<(u8, i32, i32)> = BTreeSet::new();
     for b in 0..n {
-        let pool: &[GridPos] = if !preferred.is_empty() {
-            &preferred
-        } else {
+        let pool: &[Cell] = if preferred.is_empty() {
             &fallback
+        } else {
+            &preferred
         };
         if pool.is_empty() {
             break;
         }
         let pick = roll_range(&mut rng, 0, pool.len() as i64 - 1) as usize;
-        let pos = pool[pick];
-        if placed.contains(&pos) {
+        let cell = pool[pick];
+        if !placed.insert((cell.deck, cell.x, cell.y)) {
             continue;
         }
-        placed.push(pos);
         entities.push(EntitySpec {
             id: *next_entity_id,
             kind: EntityKind::Body,
             proto: "crew_body".into(),
-            pos,
+            pos: GridPos::new(cell.x, cell.y, cell.deck),
             rotation: roll_range(&mut rng, 0, 3) as u8,
             locked: false,
             open: false,
@@ -412,142 +618,221 @@ fn body_pass(
         });
         *next_entity_id += 1;
     }
-    // Blood under bodies (mutable borrow dance: collect first).
-    // (Decals painted by the caller via placed list would complicate; skip —
-    // bodies read fine without decals on placeholder art.)
 }
 
 fn fracture_pass(
     master_seed: u64,
-    layers: &mut [DeckLayer],
+    attempt: u64,
+    topology: &mut Topology,
     entities: &mut Vec<EntitySpec>,
     next_entity_id: &mut u32,
+    protected: &[RoomId],
     out: &mut DamageOutcome,
 ) {
-    let mut rng = rng::stream(master_seed, "fracture", 0);
-    let base = &layers[0];
-    let w = base.width as i32;
-    let h = base.height as i32;
-    // Hull x-extent on deck 0.
+    let mut rng = rng::stream(master_seed, "fracture", attempt);
+    let occupied = occupied_map(topology);
     let (mut x0, mut x1) = (i32::MAX, i32::MIN);
-    for y in 0..h {
-        for x in 0..w {
-            if base.floor_at(x, y) != FloorTile::Void {
-                x0 = x0.min(x);
-                x1 = x1.max(x);
-            }
-        }
+    let (mut y0, mut y1) = (i32::MAX, i32::MIN);
+    for &(_, x, y) in occupied.keys() {
+        x0 = x0.min(x);
+        x1 = x1.max(x);
+        y0 = y0.min(y);
+        y1 = y1.max(y);
     }
-    if x1 - x0 < 20 {
-        return; // too small to tear in half convincingly
+    if x1 - x0 < 8 {
+        return; // too small to tear convincingly
     }
 
-    // Jagged cut column with per-row jitter; retry for a balanced split.
-    let gap = roll_range(&mut rng, 4, 7) as i32;
-    let jitter: Vec<i32> = (0..h).map(|_| roll_range(&mut rng, -2, 2) as i32).collect();
+    let gap = roll_range(&mut rng, 1, 2) as i32;
+    let jitter: Vec<i32> = (y0..=y1)
+        .map(|_| roll_range(&mut rng, -1, 1) as i32)
+        .collect();
+    let jitter_at = |y: i32| jitter[(y - y0).clamp(0, (y1 - y0).max(0)) as usize];
     let mut cut_x = 0;
     let mut ok = false;
-    for _attempt in 0..4 {
+    for _ in 0..4 {
         cut_x = roll_range(
             &mut rng,
             (x0 + (x1 - x0) * 3 / 10) as i64,
             (x0 + (x1 - x0) * 7 / 10) as i64,
         ) as i32;
-        // Balance check on deck 0 tile counts.
         let (mut left, mut right) = (0i64, 0i64);
-        for y in 0..h {
-            let cx = cut_x + jitter[y as usize];
-            for x in 0..w {
-                if layers[0].floor_at(x, y) == FloorTile::Void {
-                    continue;
-                }
-                if x < cx {
-                    left += 1;
-                } else if x >= cx + gap {
-                    right += 1;
-                }
+        for &(_, x, y) in occupied.keys() {
+            let cx = cut_x + jitter_at(y);
+            if x < cx {
+                left += 1;
+            } else if x >= cx + gap {
+                right += 1;
             }
         }
         let total = left + right;
-        if total > 0 && left * 100 / total >= 25 && left * 100 / total <= 75 {
+        let balanced = total > 0 && left * 100 / total >= 25 && left * 100 / total <= 75;
+        // The tear must not touch or straddle the entry/goal rooms.
+        let protects = protected.iter().all(|id| {
+            topology
+                .rooms
+                .iter()
+                .find(|r| r.id == *id)
+                .map(|room| {
+                    let all_left = room.cells.iter().all(|c| c.x < cut_x + jitter_at(c.y));
+                    let all_right = room
+                        .cells
+                        .iter()
+                        .all(|c| c.x >= cut_x + jitter_at(c.y) + gap);
+                    all_left || all_right
+                })
+                .unwrap_or(true)
+        });
+        if balanced && protects {
             ok = true;
             break;
         }
     }
     if !ok {
-        return; // no balanced cut found; stay one heavily damaged piece
+        return; // stay one heavily damaged piece
     }
 
-    // Remove gap tiles on every deck; scar the torn edges.
-    for layer in layers.iter_mut() {
-        for y in 0..h {
-            let cx = cut_x + jitter[y as usize];
-            for x in cx..cx + gap {
-                remove_tile(layer, x, y);
-            }
-            for (edge_x, wall_x) in [(cx - 1, cx), (cx + gap, cx + gap)] {
-                if layer.floor_at(edge_x, y) != FloorTile::Void {
-                    if let Some(i) = layer.idx(edge_x, y) {
-                        layer.floor[i] = FloorTile::DamagedDeck;
-                        layer.decal[i] = decal::SCORCH_LIGHT;
-                    }
-                    // Torn wall remnant on the gap-facing edge.
-                    if let Some(i) = layer.idx(wall_x, y) {
-                        let _ = i;
-                    }
-                    let _ = wall_x;
-                }
+    let gap_cells: BTreeSet<(u8, i32, i32)> = occupied
+        .keys()
+        .filter(|&&(_, x, y)| {
+            let cx = cut_x + jitter_at(y);
+            x >= cx && x < cx + gap
+        })
+        .copied()
+        .collect();
+    remove_cells(topology, &gap_cells, entities);
+
+    // Per-room side assignment by majority; minority cells are torn away so
+    // no room ever straddles the gap.
+    let mut minority: BTreeSet<(u8, i32, i32)> = BTreeSet::new();
+    let mut side_of: BTreeMap<RoomId, u8> = BTreeMap::new();
+    for room in &topology.rooms {
+        let right = room
+            .cells
+            .iter()
+            .filter(|c| c.x >= cut_x + jitter_at(c.y) + gap)
+            .count();
+        let side = if right * 2 > room.cells.len() {
+            1u8
+        } else {
+            0u8
+        };
+        side_of.insert(room.id, side);
+        for c in &room.cells {
+            let on_right = c.x >= cut_x + jitter_at(c.y) + gap;
+            if (side == 1) != on_right {
+                minority.insert((c.deck, c.x, c.y));
             }
         }
     }
-    // Entities inside the gap are gone.
-    entities.retain(|e| {
-        let cx = cut_x + jitter[e.pos.y.clamp(0, h - 1) as usize];
-        e.pos.x < cx || e.pos.x >= cx + gap
-    });
+    remove_cells(topology, &minority, entities);
+    side_of.retain(|id, _| topology.rooms.iter().any(|r| r.id == *id));
 
-    // Bake the two pieces apart: right side drifts by (dx, dy).
-    let dx = roll_range(&mut rng, 4, 8) as i32;
-    let dy = roll_range(&mut rng, 0, 6) as i32;
-    let new_w = (w + dx) as u16;
-    let new_h = (h + dy) as u16;
-    let mut right_rooms: BTreeSet<u16> = BTreeSet::new();
-    for layer in layers.iter_mut() {
-        let old = &*layer;
-        let mut new_layer = DeckLayer::new(new_w, new_h);
-        for y in 0..h {
-            let cx = cut_x + jitter[y as usize];
-            for x in 0..w {
-                let Some(oi) = old.idx(x, y) else { continue };
-                let is_right = x >= cx + gap;
-                let (nx, ny) = if is_right { (x + dx, y + dy) } else { (x, y) };
-                let Some(ni) = new_layer.idx(nx, ny) else {
-                    continue;
-                };
-                new_layer.floor[ni] = old.floor[oi];
-                new_layer.walls[ni] = old.walls[oi];
-                new_layer.room_id[ni] = old.room_id[oi];
-                new_layer.decal[ni] = old.decal[oi];
-                if is_right && old.room_id[oi] != NO_ROOM {
-                    right_rooms.insert(old.room_id[oi]);
-                }
-            }
+    // Rim scars along the tear.
+    let occupied_after = occupied_map(topology);
+    for &(deck, x, y) in occupied_after.keys() {
+        let cx = cut_x + jitter_at(y);
+        if (x - cx).abs() <= 1 || (x - (cx + gap)).abs() <= 1 {
+            let cell = Cell::new(deck, x, y);
+            out.damaged_cells.insert(cell.key());
+            out.cell_decals
+                .insert(cell.key(), crate::model::decal::SCORCH_LIGHT);
         }
-        *layer = new_layer;
     }
+
+    // Drift the right side apart (topology coords mutate; recompile derives
+    // fresh canonical keys — no manual re-keying anywhere).
+    let dx = roll_range(&mut rng, 2, 4) as i32;
+    let dy = roll_range(&mut rng, 0, 2) as i32;
+    let right_rooms: BTreeSet<RoomId> = side_of
+        .iter()
+        .filter(|(_, s)| **s == 1)
+        .map(|(id, _)| *id)
+        .collect();
+    // Entities shift by their pre-drift side (before room coords change).
     for e in entities.iter_mut() {
-        let cx = cut_x + jitter[e.pos.y.clamp(0, h - 1) as usize];
-        if e.pos.x >= cx + gap {
+        let was_right = e.pos.x >= cut_x + jitter_at(e.pos.y) + gap;
+        if was_right {
             e.pos.x += dx;
             e.pos.y += dy;
         }
     }
+    for room in topology.rooms.iter_mut() {
+        if right_rooms.contains(&room.id) {
+            for c in room.cells.iter_mut() {
+                c.x += dx;
+                c.y += dy;
+            }
+        }
+    }
+    for p in topology.portals.iter_mut() {
+        if right_rooms.contains(&p.from_room) {
+            p.from_cell.x += dx;
+            p.from_cell.y += dy;
+            p.to_cell.x += dx;
+            p.to_cell.y += dy;
+        }
+    }
+    for v in topology.verticals.iter_mut() {
+        if right_rooms.contains(&v.from_room) {
+            v.from_cell.x += dx;
+            v.from_cell.y += dy;
+            v.to_cell.x += dx;
+            v.to_cell.y += dy;
+        }
+    }
+    // Shift overlay keys for cells that moved.
+    let occupied_final = occupied_map(topology);
+    let shift_key = |key: &String| -> String {
+        let parts: Vec<&str> = key.split('|').collect();
+        if parts.len() != 3 {
+            return key.clone();
+        }
+        let (Ok(deck), Ok(x), Ok(y)) = (
+            parts[0].parse::<u8>(),
+            parts[1].parse::<i32>(),
+            parts[2].parse::<i32>(),
+        ) else {
+            return key.clone();
+        };
+        let shifted = (deck, x + dx, y + dy);
+        match occupied_final.get(&shifted) {
+            Some(id) if right_rooms.contains(id) => Cell::new(deck, x + dx, y + dy).key(),
+            _ => key.clone(),
+        }
+    };
+    out.cell_decals = out
+        .cell_decals
+        .iter()
+        .map(|(k, v)| (shift_key(k), *v))
+        .collect();
+    out.damaged_cells = out.damaged_cells.iter().map(shift_key).collect();
+    // Door tags re-derived from post-drift positions.
+    for e in entities.iter_mut() {
+        if e.kind != EntityKind::Door {
+            continue;
+        }
+        let cell = Cell::new(e.pos.deck, e.pos.x, e.pos.y);
+        let dir = if e.rotation == 0 {
+            Dir::North
+        } else {
+            Dir::West
+        };
+        let key = crate::structural::plan::edge_key(cell, dir);
+        e.tags.retain(|t| !t.starts_with("edge:"));
+        e.tags.push(format!("edge:{key}"));
+    }
 
     out.fractured = true;
+    out.fragment_of = side_of.clone();
     out.fragments = vec![
         ShipFragment {
             id: 0,
-            rooms: Vec::new(),
+            rooms: side_of
+                .iter()
+                .filter(|(_, s)| **s == 0)
+                .map(|(id, _)| *id)
+                .collect(),
             drift: (0, 0),
         },
         ShipFragment {
@@ -559,60 +844,46 @@ fn fracture_pass(
     out.events.push(DamageEvent {
         kind: DamageEventKind::StructuralFracture,
         deck: 0,
-        origin: (cut_x, h / 2),
+        origin: (cut_x, (y0 + y1) / 2),
         radius: gap as u16,
     });
 
-    // Debris field in and around the gap (grid-jittered scatter, only on
-    // void tiles of the enlarged canvas).
-    let field_x0 = (cut_x - 2).max(0);
-    let field_x1 = (cut_x + gap + dx + 2).min(new_w as i32 - 1);
-    let mut debris_rng = rng::stream(master_seed, "debris", 0);
-    let cell = 3i32;
-    let mut gy = 0;
-    while gy < new_h as i32 {
-        let mut gx = field_x0;
-        while gx <= field_x1 {
-            if roll_bp(&mut debris_rng, 3500) {
-                let jx = roll_range(&mut debris_rng, 0, (cell - 1) as i64) as i32;
-                let jy = roll_range(&mut debris_rng, 0, (cell - 1) as i64) as i32;
-                let (px, py) = (
-                    (gx + jx).min(new_w as i32 - 1),
-                    (gy + jy).min(new_h as i32 - 1),
-                );
-                let on_void = layers.iter().all(|l| l.floor_at(px, py) == FloorTile::Void);
-                if on_void {
-                    let protos: [(&str, EntityKind, u32); 4] = [
-                        ("hull_plate_debris", EntityKind::Debris, 50),
-                        ("debris_small", EntityKind::Debris, 30),
-                        ("cargo_crate", EntityKind::Container, 10),
-                        ("crew_body", EntityKind::Body, 10),
-                    ];
-                    let weights: Vec<u32> = protos.iter().map(|p| p.2).collect();
-                    if let Some(pi) = weighted_choice(&mut debris_rng, &weights) {
-                        entities.push(EntitySpec {
-                            id: *next_entity_id,
-                            kind: protos[pi].1,
-                            proto: protos[pi].0.into(),
-                            pos: GridPos::new(px, py, 0),
-                            rotation: roll_range(&mut debris_rng, 0, 3) as u8,
-                            locked: false,
-                            open: false,
-                            inventory: Vec::new(),
-                            tags: vec!["debris_field".into()],
-                        });
-                        *next_entity_id += 1;
-                    }
-                }
+    // Debris field in the widened gap.
+    let mut debris_rng = rng::stream(master_seed, "debris", attempt);
+    let field_x0 = cut_x - 1;
+    let field_x1 = cut_x + gap + dx + 1;
+    for y in y0..=(y1 + dy) {
+        for x in field_x0..=field_x1 {
+            if occupied_final.contains_key(&(0, x, y)) || !roll_bp(&mut debris_rng, 2500) {
+                continue;
             }
-            gx += cell;
+            let protos: [(&str, EntityKind, u32); 4] = [
+                ("hull_plate_debris", EntityKind::Debris, 50),
+                ("debris_small", EntityKind::Debris, 30),
+                ("cargo_crate", EntityKind::Container, 10),
+                ("crew_body", EntityKind::Body, 10),
+            ];
+            let weights: Vec<u32> = protos.iter().map(|p| p.2).collect();
+            if let Some(pi) = weighted_choice(&mut debris_rng, &weights) {
+                entities.push(EntitySpec {
+                    id: *next_entity_id,
+                    kind: protos[pi].1,
+                    proto: protos[pi].0.into(),
+                    pos: GridPos::new(x, y, 0),
+                    rotation: roll_range(&mut debris_rng, 0, 3) as u8,
+                    locked: false,
+                    open: false,
+                    inventory: Vec::new(),
+                    tags: vec!["debris_field".into()],
+                });
+                *next_entity_id += 1;
+            }
         }
-        gy += cell;
     }
     out.events.push(DamageEvent {
         kind: DamageEventKind::DebrisField,
         deck: 0,
-        origin: ((field_x0 + field_x1) / 2, new_h as i32 / 2),
-        radius: ((field_x1 - field_x0) / 2) as u16,
+        origin: ((field_x0 + field_x1) / 2, (y0 + y1) / 2),
+        radius: ((field_x1 - field_x0) / 2).max(1) as u16,
     });
 }
