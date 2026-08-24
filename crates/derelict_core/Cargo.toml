@@ -1,0 +1,15 @@
+[package]
+name = "derelict_core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+ron = "0.8"
+rand = { version = "0.9", default-features = false }
+rand_pcg = "0.9"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+bincode = { version = "2", features = ["serde"] }
+
+[dev-dependencies]
+blake3 = "1"

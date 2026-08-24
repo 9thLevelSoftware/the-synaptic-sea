@@ -1,0 +1,32 @@
+// Small utility shuttle: single deck, a handful of compartments.
+(
+    id: "shuttle",
+    display_name: "Utility Shuttle",
+    length: (18, 26),
+    beam: (9, 13),
+    decks: (1, 1),
+    hull_fill_bp: 8200,
+    asymmetry_bp: 800,
+    deck_erosion: 2,
+    min_room_dim: 3,
+    required_rooms: [
+        (kind: Bridge, bow_bias: 90, size_pref: Medium),
+        (kind: Engineering, bow_bias: -90, size_pref: Medium),
+        (kind: Airlock, bow_bias: 0, size_pref: Small),
+        (kind: Cargo, bow_bias: -20, size_pref: Largest),
+    ],
+    optional_rooms: [
+        (CrewQuarters, 100),
+        (Storage, 80),
+    ],
+    cause_weights: [
+        (Depressurization, 30),
+        (PirateBoarding, 25),
+        (DriveMisjump, 20),
+        (ReactorBreach, 10),
+        (Unknown, 15),
+    ],
+    max_breaches: 3,
+    corridor_loop_bp: 1000,
+    shafts: (0, 0),
+)

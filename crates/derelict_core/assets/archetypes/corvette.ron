@@ -1,0 +1,36 @@
+// Fast military corvette: 1-2 decks, armory, tight quarters.
+(
+    id: "corvette",
+    display_name: "Patrol Corvette",
+    length: (34, 48),
+    beam: (14, 20),
+    decks: (1, 2),
+    hull_fill_bp: 7800,
+    asymmetry_bp: 600,
+    deck_erosion: 2,
+    min_room_dim: 3,
+    required_rooms: [
+        (kind: Bridge, bow_bias: 95, size_pref: Medium),
+        (kind: Engineering, bow_bias: -90, size_pref: Large),
+        (kind: Reactor, bow_bias: -70, size_pref: Medium),
+        (kind: Airlock, bow_bias: 10, size_pref: Small),
+        (kind: CrewQuarters, bow_bias: 20, size_pref: Large),
+        (kind: Armory, bow_bias: 40, size_pref: Medium),
+        (kind: Galley, bow_bias: 0, size_pref: Small),
+    ],
+    optional_rooms: [
+        (Storage, 100),
+        (Medbay, 70),
+        (Compartment, 50),
+    ],
+    cause_weights: [
+        (PirateBoarding, 35),
+        (ReactorBreach, 20),
+        (Depressurization, 20),
+        (DriveMisjump, 10),
+        (Unknown, 15),
+    ],
+    max_breaches: 5,
+    corridor_loop_bp: 2000,
+    shafts: (1, 1),
+)
