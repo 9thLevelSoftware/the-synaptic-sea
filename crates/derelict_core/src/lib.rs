@@ -9,7 +9,9 @@ pub mod archetype;
 pub mod model;
 pub mod pipeline;
 pub mod rng;
+pub mod role;
 pub mod stages;
+pub mod structural;
 
 pub use archetype::GenData;
 pub use model::{

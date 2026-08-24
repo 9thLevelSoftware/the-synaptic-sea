@@ -13,3 +13,4 @@ bincode = { version = "2", features = ["serde"] }
 
 [dev-dependencies]
 blake3 = "1"
+proptest = "1"
