@@ -1,8 +1,14 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=5 format=3]
 [ext_resource type="PackedScene" path="res://assets/imported/structural/ship_structural_v0/wall_t_junction/wall_t_junction.glb" id="1_visual"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
-size = Vector3(1, 1, 1)
+size = Vector3(4, 3, 0.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_2"]
+size = Vector3(0.2, 3, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_3"]
+size = Vector3(0.2, 3, 4)
 
 [node name="Wall_T_Junction" type="Node3D"]
 
@@ -20,6 +26,15 @@ collision_mask = 1
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="CollisionRoot"]
 shape = SubResource("BoxShape3D_1")
+position = Vector3(0, 0, 0)
+
+[node name="CollisionShape3D_East" type="CollisionShape3D" parent="CollisionRoot"]
+shape = SubResource("BoxShape3D_2")
+position = Vector3(2, 0, 0)
+
+[node name="CollisionShape3D_West" type="CollisionShape3D" parent="CollisionRoot"]
+shape = SubResource("BoxShape3D_3")
+position = Vector3(-2, 0, 0)
 
 [node name="Visual" type="Node3D" parent="."]
 

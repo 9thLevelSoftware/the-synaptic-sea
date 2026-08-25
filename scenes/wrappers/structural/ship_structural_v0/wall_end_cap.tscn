@@ -2,7 +2,7 @@
 [ext_resource type="PackedScene" path="res://assets/imported/structural/ship_structural_v0/wall_end_cap/wall_end_cap.glb" id="1_visual"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
-size = Vector3(1, 1, 1)
+size = Vector3(4, 3, 0.2)
 
 [node name="Wall_End_Cap" type="Node3D"]
 

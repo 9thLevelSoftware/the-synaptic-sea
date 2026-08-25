@@ -2,7 +2,7 @@
 [ext_resource type="PackedScene" path="res://assets/imported/structural/ship_structural_v0/doorway_frame_blocked_1x1/doorway_frame_blocked_1x1.glb" id="1_visual"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
-size = Vector3(1, 1, 1)
+size = Vector3(4, 3.2, 0.2)
 
 [node name="Doorway_Frame_Blocked_1x1" type="Node3D"]
 
