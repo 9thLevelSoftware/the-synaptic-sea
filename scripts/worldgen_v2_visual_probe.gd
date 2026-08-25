@@ -85,7 +85,13 @@ func _process(_delta: float) -> bool:
 		var shot := OS.get_environment("WORLDGEN_SHOT")
 		if shot.is_empty():
 			shot = "D:/world_gen/target/worldgen_in_synaptic_sea.png"
-		root.get_viewport().get_texture().get_image().save_png(shot)
+		var viewport_texture: ViewportTexture = root.get_viewport().get_texture()
+		var image: Image = viewport_texture.get_image() if viewport_texture != null else null
+		if image == null or image.is_empty():
+			push_error("VISUAL PROBE FAIL: renderer returned no viewport image")
+			quit(1)
+			return true
+		image.save_png(shot)
 		print("VISUAL PROBE PASS saved %s" % shot)
 		quit(0)
 		return true
