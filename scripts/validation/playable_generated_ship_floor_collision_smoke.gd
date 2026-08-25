@@ -49,6 +49,7 @@ func _on_playable_ready(_summary: Dictionary) -> void:
 		return
 	start_position = playable_ship.player.global_position
 	floor_coverage_error = _floor_wrapper_coverage_error()
+	_disable_docked_lifeboat_collisions()
 
 
 func _on_playable_failed(reason: String) -> void:
@@ -177,6 +178,21 @@ func _floor_wrapper_coverage_error() -> String:
 
 func _coverage_summary() -> String:
 	return "valid" if floor_coverage_error.is_empty() else floor_coverage_error
+
+
+func _disable_docked_lifeboat_collisions() -> void:
+	if playable_ship.lifeboat_ship == null or playable_ship.lifeboat_ship.scene_root == null:
+		return
+	_disable_static_body_collisions(playable_ship.lifeboat_ship.scene_root)
+
+
+func _disable_static_body_collisions(node: Node) -> void:
+	if node is StaticBody3D:
+		var body: StaticBody3D = node
+		body.collision_layer = 0
+		body.collision_mask = 0
+	for child in node.get_children():
+		_disable_static_body_collisions(child)
 
 
 func _run_negative_loader_preflight_regressions() -> String:
