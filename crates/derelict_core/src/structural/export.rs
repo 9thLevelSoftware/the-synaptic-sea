@@ -4,7 +4,9 @@
 //! shapes mirror the committed golden fixtures
 //! (`data/procgen/golden/coherent_ship_001`).
 
-use crate::model::{EntityKind, Ship};
+use crate::archetype::GenData;
+use crate::model::{EntityKind, GenParams, Ship};
+use crate::pipeline::GenError;
 use crate::role::Role;
 use crate::stages::furnish::interior_zones;
 use crate::structural::plan::{edge_key, Cell, DamageVariant, Dir, EdgeRecord, RoomId, NO_ROOM};
@@ -52,6 +54,29 @@ impl Default for ExportOptions {
     }
 }
 
+pub struct ExportDocuments {
+    pub layout: Value,
+    pub gameplay_slice: Value,
+}
+
+/// Generate one ship and serialize both documents from that same result.
+pub fn export_documents(
+    seed: u64,
+    params: &GenParams,
+    kit_id: &str,
+) -> Result<ExportDocuments, GenError> {
+    let data = GenData::default_bundle().expect("embedded content data");
+    let ship = crate::pipeline::generate_ship(seed, params, &data)?;
+    let opts = ExportOptions {
+        kit_id: kit_id.to_owned(),
+        ..Default::default()
+    };
+    Ok(ExportDocuments {
+        layout: to_layout_json(&ship, &opts),
+        gameplay_slice: to_gameplay_slice_json(&ship),
+    })
+}
+
 pub fn to_layout_json(ship: &Ship, opts: &ExportOptions) -> Value {
     let names: BTreeMap<RoomId, String> = ship
         .topology
@@ -94,6 +119,20 @@ pub fn to_layout_json(ship: &Ship, opts: &ExportOptions) -> Value {
                 })
                 .collect();
             let z = zones.get(&room.id);
+            let reserved_cells = z
+                .map(|z| {
+                    z.reserved_cells
+                        .iter()
+                        .map(|c| cell2(*c))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            let wall_slots = z
+                .map(|z| z.wall_slots.iter().map(|c| cell2(*c)).collect::<Vec<_>>())
+                .unwrap_or_default();
+            let center_slots = z
+                .map(|z| z.center_slots.iter().map(|c| cell2(*c)).collect::<Vec<_>>())
+                .unwrap_or_default();
             json!({
                 "id": name_of(room.id),
                 "room_role": room.role.name(),
@@ -101,10 +140,13 @@ pub fn to_layout_json(ship: &Ship, opts: &ExportOptions) -> Value {
                 "cells": room.cells.iter().map(|c| cell2(*c)).collect::<Vec<_>>(),
                 "footprint": [x1 - x0 + 1, y1 - y0 + 1],
                 "structural_placements": placements,
+                "reserved_cells": reserved_cells.clone(),
+                "wall_slots": wall_slots.clone(),
+                "center_slots": center_slots.clone(),
                 "interior_zones": {
-                    "reserved_cells": z.map(|z| z.reserved_cells.iter().map(|c| cell2(*c)).collect::<Vec<_>>()).unwrap_or_default(),
-                    "wall_slots": z.map(|z| z.wall_slots.iter().map(|c| cell2(*c)).collect::<Vec<_>>()).unwrap_or_default(),
-                    "center_slots": z.map(|z| z.center_slots.iter().map(|c| cell2(*c)).collect::<Vec<_>>()).unwrap_or_default(),
+                    "reserved_cells": reserved_cells,
+                    "wall_slots": wall_slots,
+                    "center_slots": center_slots,
                 },
             })
         })
