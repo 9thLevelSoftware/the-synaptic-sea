@@ -13,8 +13,30 @@ const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_ge
 const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
 const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
 const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
+const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
+const DifficultyProfileScript := preload("res://scripts/procgen/difficulty_profile.gd")
+const EncounterInjectorScript := preload("res://scripts/procgen/encounter_injector.gd")
+const GeneratedShipLoaderScript := preload("res://scripts/procgen/generated_ship_loader.gd")
+const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
+
+const USE_WORLDGEN := true
+const WORLDGEN_VERSION: int = 2
+const WORLDGEN_KIT_ID: String = "ship_structural_v0"
+const WORLDGEN_KIT_PATH: String = "res://data/kits/ship_structural_v0.json"
+const WORLDGEN_ARCHETYPE_BY_SIZE: Dictionary = {
+	0: "shuttle",
+	1: "corvette",
+	2: "freighter",
+}
+const WORLDGEN_INTACTNESS_BY_CONDITION: Dictionary = {
+	0: 9500,
+	1: 6000,
+	2: 2000,
+}
 
 var layout_generator: RefCounted = ShipLayoutGeneratorScript.new()
+var _worldgen_kit_loaded: bool = false
+var _worldgen_kit_doc: Dictionary = {}
 
 # Per-derelict run context. When non-empty, generate() forwards these to
 # ShipLayoutGenerator.generate_with_options(), which turns on room-variant
@@ -85,8 +107,188 @@ func generate_from_seed(
 		seed_value: int,
 		size: int = 0,
 		condition: int = 1) -> Node3D:
+	if USE_WORLDGEN:
+		return _generate_via_worldgen(seed_value, size, condition)
 	var blueprint = ShipBlueprintScript.new(size, condition, seed_value)
 	return generate(blueprint)
+
+
+func _generate_via_worldgen(seed_value: int, size: int, condition: int) -> Node3D:
+	if not ClassDB.class_exists("DerelictGenerator"):
+		push_error("SHIP GENERATOR FAIL DerelictGenerator class unavailable")
+		return null
+
+	var generator = ClassDB.instantiate("DerelictGenerator")
+	if generator == null:
+		push_error("SHIP GENERATOR FAIL DerelictGenerator instantiation failed")
+		return null
+	if not generator.has_method("generator_version"):
+		push_error("SHIP GENERATOR FAIL DerelictGenerator generator_version() unavailable")
+		return null
+	var generator_version: int = int(generator.generator_version())
+	assert(generator_version == WORLDGEN_VERSION, "ShipGenerator: unsupported DerelictGenerator version")
+	if generator_version != WORLDGEN_VERSION:
+		push_error("SHIP GENERATOR FAIL unsupported DerelictGenerator version: %d" % generator_version)
+		return null
+
+	if not WORLDGEN_ARCHETYPE_BY_SIZE.has(size):
+		push_error("SHIP GENERATOR FAIL unsupported worldgen size: %d" % size)
+		return null
+	if not WORLDGEN_INTACTNESS_BY_CONDITION.has(condition):
+		push_error("SHIP GENERATOR FAIL unsupported worldgen condition: %d" % condition)
+		return null
+	var archetype_id: String = str(WORLDGEN_ARCHETYPE_BY_SIZE[size])
+	var intactness_bp: int = int(WORLDGEN_INTACTNESS_BY_CONDITION[condition])
+	var params: Dictionary = {
+		"archetype_id": archetype_id,
+		"intactness_override": intactness_bp,
+	}
+
+	if not generator.has_method("export_layout_json") or not generator.has_method("export_gameplay_slice_json"):
+		push_error("SHIP GENERATOR FAIL DerelictGenerator document export methods unavailable")
+		return null
+	var layout_text: String = str(generator.export_layout_json(seed_value, params, WORLDGEN_KIT_ID))
+	if layout_text.is_empty():
+		push_error("SHIP GENERATOR FAIL worldgen layout export returned empty")
+		return null
+	var layout_variant: Variant = JSON.parse_string(layout_text)
+	if not (layout_variant is Dictionary):
+		push_error("SHIP GENERATOR FAIL worldgen layout export was not a Dictionary")
+		return null
+	var layout: Dictionary = (layout_variant as Dictionary).duplicate(true)
+
+	var gameplay_text: String = str(generator.export_gameplay_slice_json(seed_value, params))
+	if gameplay_text.is_empty():
+		push_error("SHIP GENERATOR FAIL worldgen gameplay slice export returned empty")
+		return null
+	var gameplay_variant: Variant = JSON.parse_string(gameplay_text)
+	if not (gameplay_variant is Dictionary):
+		push_error("SHIP GENERATOR FAIL worldgen gameplay slice export was not a Dictionary")
+		return null
+	var exported_gameplay: Dictionary = (gameplay_variant as Dictionary).duplicate(true)
+
+	layout["kit_id"] = WORLDGEN_KIT_ID
+	layout["biome_id"] = biome_id
+	layout["difficulty_id"] = difficulty_id
+	var biome_data: Dictionary = layout_generator._resolve_biome(biome_id)
+	var difficulty_data: Dictionary = layout_generator._resolve_difficulty(difficulty_id)
+	var biome = BiomeProfileScript.from_dict(biome_data)
+	var difficulty = DifficultyProfileScript.from_dict(difficulty_data)
+	layout = EncounterInjectorScript.new().inject(layout, biome, difficulty, seed_value)
+
+	var gameplay_builder: GameplaySliceBuilderScript = GameplaySliceBuilderScript.new()
+	var gameplay: Dictionary = gameplay_builder.build(layout)
+	if gameplay.is_empty() or not (gameplay.get("objectives", []) is Array) or (gameplay.get("objectives", []) as Array).is_empty():
+		push_error("SHIP GENERATOR FAIL worldgen gameplay slice builder returned no objectives")
+		return null
+	var loot_tables: Dictionary = LootRollerScript.load_tables()
+	if loot_tables.is_empty():
+		push_error("SHIP GENERATOR FAIL game loot registry is empty")
+		return null
+	if not _resolve_worldgen_loot_containers(gameplay, exported_gameplay, loot_tables):
+		return null
+
+	var kit: Dictionary = _load_worldgen_kit()
+	if kit.is_empty():
+		return null
+	var loader: Node3D = GeneratedShipLoaderScript.new()
+	var success: bool = loader.load_from_documents(layout, kit, gameplay, true)
+	if not success:
+		push_error("SHIP GENERATOR FAIL worldgen loader returned false")
+		loader.queue_free()
+		return null
+	loader.name = "GeneratedShip"
+	return loader
+
+
+func _load_worldgen_kit() -> Dictionary:
+	if _worldgen_kit_loaded:
+		return _worldgen_kit_doc.duplicate(true)
+	_worldgen_kit_loaded = true
+	if not FileAccess.file_exists(WORLDGEN_KIT_PATH):
+		push_error("SHIP GENERATOR FAIL structural kit not found: %s" % WORLDGEN_KIT_PATH)
+		return {}
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(WORLDGEN_KIT_PATH))
+	if not (parsed is Dictionary):
+		push_error("SHIP GENERATOR FAIL structural kit JSON is invalid: %s" % WORLDGEN_KIT_PATH)
+		return {}
+	_worldgen_kit_doc = (parsed as Dictionary).duplicate(true)
+	return _worldgen_kit_doc.duplicate(true)
+
+
+func _resolve_worldgen_loot_containers(
+		gameplay: Dictionary,
+		exported_gameplay: Dictionary,
+		loot_tables: Dictionary) -> bool:
+	var builder_containers: Variant = gameplay.get("loot_containers", [])
+	if not (builder_containers is Array):
+		push_error("SHIP GENERATOR FAIL gameplay builder loot_containers is not an Array")
+		return false
+	for container_variant in (builder_containers as Array):
+		if not (container_variant is Dictionary):
+			continue
+		var container: Dictionary = container_variant
+		var table_id: String = str(container.get("loot_table", ""))
+		if not loot_tables.has(table_id):
+			push_error("SHIP GENERATOR FAIL gameplay builder loot table missing: %s" % table_id)
+			return false
+
+	var exported_containers_variant: Variant = exported_gameplay.get("loot_containers", [])
+	if not (exported_containers_variant is Array):
+		push_error("SHIP GENERATOR FAIL worldgen loot_containers is not an Array")
+		return false
+	var merged_containers: Array = (builder_containers as Array).duplicate(true)
+	for exported_variant in (exported_containers_variant as Array):
+		if not (exported_variant is Dictionary):
+			continue
+		var exported_container: Dictionary = (exported_variant as Dictionary).duplicate(true)
+		var table_id: String = str(exported_container.get("loot_table", ""))
+		if not loot_tables.has(table_id):
+			if table_id != "worldgen_seeded":
+				push_error("SHIP GENERATOR FAIL worldgen loot table missing: %s" % table_id)
+				return false
+			table_id = _map_worldgen_loot_table(str(exported_container.get("kind", "")), loot_tables)
+			if table_id.is_empty():
+				push_error("SHIP GENERATOR FAIL no game loot table mapping for worldgen container kind: %s" % str(exported_container.get("kind", "")))
+				return false
+			exported_container["loot_table"] = table_id
+		if not _has_loot_container_at(merged_containers, exported_container):
+			merged_containers.append(exported_container)
+	gameplay["loot_containers"] = merged_containers
+	return true
+
+
+func _map_worldgen_loot_table(container_kind: String, loot_tables: Dictionary) -> String:
+	var candidate: String = ""
+	match container_kind:
+		"cargo_crate", "supply_crate":
+			candidate = "salvage_cargo"
+		"parts_locker", "tool_rack":
+			candidate = "salvage_engineering"
+		"bridge_locker", "footlocker", "med_cabinet", "food_locker", "weapon_locker", "ammo_crate", "filter_cabinet", "suit_locker":
+			candidate = "generic_locker"
+		_:
+			if container_kind.contains("crate"):
+				candidate = "generic_crate"
+			elif container_kind.contains("locker"):
+				candidate = "generic_locker"
+	if loot_tables.has(candidate):
+		return candidate
+	return ""
+
+
+func _has_loot_container_at(containers: Array, candidate: Dictionary) -> bool:
+	var candidate_room: String = str(candidate.get("room_id", ""))
+	var candidate_cell: Variant = candidate.get("approach_cell", [])
+	for existing_variant in containers:
+		if not (existing_variant is Dictionary):
+			continue
+		var existing: Dictionary = existing_variant
+		if str(existing.get("room_id", "")) != candidate_room:
+			continue
+		if str(existing.get("approach_cell", [])) == str(candidate_cell):
+			return true
+	return false
 
 
 func _load_layout_as_scene(layout: Dictionary) -> Node3D:
