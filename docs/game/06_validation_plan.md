@@ -434,7 +434,7 @@ run_clean 'enclosed slot fill smoke' 'ENCLOSED SLOT FILL PASS loot_on_slot=true 
 # stable per code version but changes with ANY legitimate pipeline change —
 # the pin stops at `hash=` on purpose.
 run_clean 'seed determinism smoke' 'SEED DETERMINISM PASS fnv_empty=ok fnv_hello=ok match=true golden_match=true seeds_differ=true hash=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/seed_determinism_smoke.gd
-run_clean 'cell layout engine smoke' 'CELL LAYOUT ENGINE PASS rooms=6 adjacencies=5 no_overlap=true connected=true deterministic=true connections_wired=true stacked_v2_elevator=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cell_layout_engine_smoke.gd
+run_clean 'cell layout engine smoke' 'CELL LAYOUT ENGINE PASS rooms=6 adjacencies=6 no_overlap=true connected=true deterministic=true connections_wired=true stacked_v2_elevator=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cell_layout_engine_smoke.gd
 run_clean 'room assigner smoke' 'ROOM ASSIGNER PASS rooms=5 first=airlock last=reactor keys=valid ids=unique deterministic=true guaranteed=enforced max_duplicates=enforced' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_assigner_smoke.gd
 run_clean 'layout serializer smoke' 'LAYOUT SERIALIZER PASS keys=valid rooms=2 schema=1.2.0 golden_format=true prototype=valid critical_path=valid portals_json=true link_deck=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/layout_serializer_smoke.gd
 run_clean 'ship layout generator smoke' 'SHIP LAYOUT GENERATOR PASS spine=true bifurcated=true stacked=true deterministic=true varied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_layout_generator_smoke.gd

@@ -108,7 +108,10 @@ func generate_from_seed(
 		seed_value: int,
 		size: int = 0,
 		condition: int = 1) -> Node3D:
-	if USE_WORLDGEN:
+	# Prefer DerelictGenerator when the platform GDExtension is loaded.
+	# The checked-in addon currently ships only win64, so Linux/macOS keep
+	# the layout pipeline rather than failing every generate_from_seed caller.
+	if USE_WORLDGEN and ClassDB.class_exists("DerelictGenerator"):
 		return _generate_via_worldgen(seed_value, size, condition)
 	var blueprint = ShipBlueprintScript.new(size, condition, seed_value)
 	return generate(blueprint)

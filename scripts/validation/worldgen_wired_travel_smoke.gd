@@ -28,6 +28,9 @@ const REAL_ENCOUNTER_KINDS: Array[String] = [
 
 
 func _initialize() -> void:
+	if not ClassDB.class_exists("DerelictGenerator"):
+		_fail("DerelictGenerator class unavailable")
+		return
 	var generator: ShipGeneratorScript = ShipGeneratorScript.new()
 	generator.configure_run_context(TEST_BIOME, TEST_DIFFICULTY)
 	var generated_cases: int = 0
