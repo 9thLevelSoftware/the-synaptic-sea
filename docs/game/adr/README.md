@@ -37,6 +37,7 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0050 | docs/game/adr/0050-derelict-hazard-source-of-truth.md | Runtime seed authoritative for derelict fire/breach; layout arrays optional overlays |
 | 0051 | docs/game/adr/0051-module-integrity-not-voxels.md | Module integrity is the unit of destruction (not voxels); salvage pillar grain lock |
 | 0052 | docs/game/adr/0052-asset-metadata-and-visual-binding-architecture.md | portable prop sidecars, generated bindings, and visual-only runtime binding |
+| 0053 | docs/game/adr/0053-socketed-enclosed-interiors.md | Replace topology construction + boundary compilation only; consume kit sockets; keep loader/goldens |
 
 ## Notes
 

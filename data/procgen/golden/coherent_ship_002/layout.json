@@ -6088,6 +6088,743 @@
         "yaw_degrees": 0.0
       }
     ],
+    "ceiling_placements": [
+      {
+        "cell": [
+          1,
+          -1
+        ],
+        "cell_key": "0|1|-1",
+        "deck": 0,
+        "id": "ceiling:0|1|-1",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|1|-1",
+        "position": [
+          4.0,
+          0.0,
+          -4.0
+        ],
+        "room_id": "arc_side_01",
+        "room_ids": [
+          "arc_side_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          0,
+          0
+        ],
+        "cell_key": "0|0|0",
+        "deck": 0,
+        "id": "ceiling:0|0|0",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|0|0",
+        "position": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "room_id": "airlock_01",
+        "room_ids": [
+          "airlock_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          1,
+          0
+        ],
+        "cell_key": "0|1|0",
+        "deck": 0,
+        "id": "ceiling:0|1|0",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|1|0",
+        "position": [
+          4.0,
+          0.0,
+          0.0
+        ],
+        "room_id": "airlock_01",
+        "room_ids": [
+          "airlock_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          0,
+          1
+        ],
+        "cell_key": "0|0|1",
+        "deck": 0,
+        "id": "ceiling:0|0|1",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|0|1",
+        "position": [
+          0.0,
+          0.0,
+          4.0
+        ],
+        "room_id": "airlock_01",
+        "room_ids": [
+          "airlock_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          1,
+          1
+        ],
+        "cell_key": "0|1|1",
+        "deck": 0,
+        "id": "ceiling:0|1|1",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|1|1",
+        "position": [
+          4.0,
+          0.0,
+          4.0
+        ],
+        "room_id": "airlock_01",
+        "room_ids": [
+          "airlock_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          2,
+          1
+        ],
+        "cell_key": "0|2|1",
+        "deck": 0,
+        "id": "ceiling:0|2|1",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|2|1",
+        "position": [
+          8.0,
+          0.0,
+          4.0
+        ],
+        "room_id": "tool_storage_01",
+        "room_ids": [
+          "tool_storage_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          2,
+          0
+        ],
+        "cell_key": "0|2|0",
+        "deck": 0,
+        "id": "ceiling:0|2|0",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|2|0",
+        "position": [
+          8.0,
+          0.0,
+          0.0
+        ],
+        "room_id": "corridor_01",
+        "room_ids": [
+          "corridor_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          3,
+          0
+        ],
+        "cell_key": "0|3|0",
+        "deck": 0,
+        "id": "ceiling:0|3|0",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|3|0",
+        "position": [
+          12.0,
+          0.0,
+          0.0
+        ],
+        "room_id": "corridor_01",
+        "room_ids": [
+          "corridor_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          4,
+          0
+        ],
+        "cell_key": "0|4|0",
+        "deck": 0,
+        "id": "ceiling:0|4|0",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|4|0",
+        "position": [
+          16.0,
+          0.0,
+          0.0
+        ],
+        "room_id": "hub_01",
+        "room_ids": [
+          "hub_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          4,
+          -1
+        ],
+        "cell_key": "0|4|-1",
+        "deck": 0,
+        "id": "ceiling:0|4|-1",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|4|-1",
+        "position": [
+          16.0,
+          0.0,
+          -4.0
+        ],
+        "room_id": "left_arm_01",
+        "room_ids": [
+          "left_arm_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          4,
+          -2
+        ],
+        "cell_key": "0|4|-2",
+        "deck": 0,
+        "id": "ceiling:0|4|-2",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|4|-2",
+        "position": [
+          16.0,
+          0.0,
+          -8.0
+        ],
+        "room_id": "left_arm_01",
+        "room_ids": [
+          "left_arm_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          2,
+          -2
+        ],
+        "cell_key": "0|2|-2",
+        "deck": 0,
+        "id": "ceiling:0|2|-2",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|2|-2",
+        "position": [
+          8.0,
+          0.0,
+          -8.0
+        ],
+        "room_id": "cargo_bay_01",
+        "room_ids": [
+          "cargo_bay_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          3,
+          -2
+        ],
+        "cell_key": "0|3|-2",
+        "deck": 0,
+        "id": "ceiling:0|3|-2",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|3|-2",
+        "position": [
+          12.0,
+          0.0,
+          -8.0
+        ],
+        "room_id": "cargo_bay_01",
+        "room_ids": [
+          "cargo_bay_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          2,
+          -3
+        ],
+        "cell_key": "0|2|-3",
+        "deck": 0,
+        "id": "ceiling:0|2|-3",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|2|-3",
+        "position": [
+          8.0,
+          0.0,
+          -12.0
+        ],
+        "room_id": "cargo_bay_01",
+        "room_ids": [
+          "cargo_bay_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          3,
+          -3
+        ],
+        "cell_key": "0|3|-3",
+        "deck": 0,
+        "id": "ceiling:0|3|-3",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|3|-3",
+        "position": [
+          12.0,
+          0.0,
+          -12.0
+        ],
+        "room_id": "cargo_bay_01",
+        "room_ids": [
+          "cargo_bay_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          5,
+          -2
+        ],
+        "cell_key": "0|5|-2",
+        "deck": 0,
+        "id": "ceiling:0|5|-2",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|5|-2",
+        "position": [
+          20.0,
+          0.0,
+          -8.0
+        ],
+        "room_id": "maintenance_bay_01",
+        "room_ids": [
+          "maintenance_bay_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          6,
+          -2
+        ],
+        "cell_key": "0|6|-2",
+        "deck": 0,
+        "id": "ceiling:0|6|-2",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|6|-2",
+        "position": [
+          24.0,
+          0.0,
+          -8.0
+        ],
+        "room_id": "maintenance_bay_01",
+        "room_ids": [
+          "maintenance_bay_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          5,
+          -3
+        ],
+        "cell_key": "0|5|-3",
+        "deck": 0,
+        "id": "ceiling:0|5|-3",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|5|-3",
+        "position": [
+          20.0,
+          0.0,
+          -12.0
+        ],
+        "room_id": "maintenance_bay_01",
+        "room_ids": [
+          "maintenance_bay_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          6,
+          -3
+        ],
+        "cell_key": "0|6|-3",
+        "deck": 0,
+        "id": "ceiling:0|6|-3",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|6|-3",
+        "position": [
+          24.0,
+          0.0,
+          -12.0
+        ],
+        "room_id": "maintenance_bay_01",
+        "room_ids": [
+          "maintenance_bay_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          4,
+          1
+        ],
+        "cell_key": "0|4|1",
+        "deck": 0,
+        "id": "ceiling:0|4|1",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|4|1",
+        "position": [
+          16.0,
+          0.0,
+          4.0
+        ],
+        "room_id": "right_arm_01",
+        "room_ids": [
+          "right_arm_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          4,
+          2
+        ],
+        "cell_key": "0|4|2",
+        "deck": 0,
+        "id": "ceiling:0|4|2",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|4|2",
+        "position": [
+          16.0,
+          0.0,
+          8.0
+        ],
+        "room_id": "right_arm_01",
+        "room_ids": [
+          "right_arm_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          2,
+          2
+        ],
+        "cell_key": "0|2|2",
+        "deck": 0,
+        "id": "ceiling:0|2|2",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|2|2",
+        "position": [
+          8.0,
+          0.0,
+          8.0
+        ],
+        "room_id": "medbay_01",
+        "room_ids": [
+          "medbay_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          3,
+          2
+        ],
+        "cell_key": "0|3|2",
+        "deck": 0,
+        "id": "ceiling:0|3|2",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|3|2",
+        "position": [
+          12.0,
+          0.0,
+          8.0
+        ],
+        "room_id": "medbay_01",
+        "room_ids": [
+          "medbay_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          2,
+          3
+        ],
+        "cell_key": "0|2|3",
+        "deck": 0,
+        "id": "ceiling:0|2|3",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|2|3",
+        "position": [
+          8.0,
+          0.0,
+          12.0
+        ],
+        "room_id": "medbay_01",
+        "room_ids": [
+          "medbay_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          3,
+          3
+        ],
+        "cell_key": "0|3|3",
+        "deck": 0,
+        "id": "ceiling:0|3|3",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|3|3",
+        "position": [
+          12.0,
+          0.0,
+          12.0
+        ],
+        "room_id": "medbay_01",
+        "room_ids": [
+          "medbay_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          5,
+          2
+        ],
+        "cell_key": "0|5|2",
+        "deck": 0,
+        "id": "ceiling:0|5|2",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|5|2",
+        "position": [
+          20.0,
+          0.0,
+          8.0
+        ],
+        "room_id": "bridge_01",
+        "room_ids": [
+          "bridge_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          6,
+          2
+        ],
+        "cell_key": "0|6|2",
+        "deck": 0,
+        "id": "ceiling:0|6|2",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|6|2",
+        "position": [
+          24.0,
+          0.0,
+          8.0
+        ],
+        "room_id": "bridge_01",
+        "room_ids": [
+          "bridge_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          5,
+          3
+        ],
+        "cell_key": "0|5|3",
+        "deck": 0,
+        "id": "ceiling:0|5|3",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|5|3",
+        "position": [
+          20.0,
+          0.0,
+          12.0
+        ],
+        "room_id": "bridge_01",
+        "room_ids": [
+          "bridge_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          6,
+          3
+        ],
+        "cell_key": "0|6|3",
+        "deck": 0,
+        "id": "ceiling:0|6|3",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|6|3",
+        "position": [
+          24.0,
+          0.0,
+          12.0
+        ],
+        "room_id": "bridge_01",
+        "room_ids": [
+          "bridge_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          5,
+          0
+        ],
+        "cell_key": "0|5|0",
+        "deck": 0,
+        "id": "ceiling:0|5|0",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|5|0",
+        "position": [
+          20.0,
+          0.0,
+          0.0
+        ],
+        "room_id": "convergence_01",
+        "room_ids": [
+          "convergence_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          6,
+          0
+        ],
+        "cell_key": "0|6|0",
+        "deck": 0,
+        "id": "ceiling:0|6|0",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|6|0",
+        "position": [
+          24.0,
+          0.0,
+          0.0
+        ],
+        "room_id": "convergence_01",
+        "room_ids": [
+          "convergence_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          7,
+          0
+        ],
+        "cell_key": "0|7|0",
+        "deck": 0,
+        "id": "ceiling:0|7|0",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|7|0",
+        "position": [
+          28.0,
+          0.0,
+          0.0
+        ],
+        "room_id": "reactor_01",
+        "room_ids": [
+          "reactor_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          8,
+          0
+        ],
+        "cell_key": "0|8|0",
+        "deck": 0,
+        "id": "ceiling:0|8|0",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|8|0",
+        "position": [
+          32.0,
+          0.0,
+          0.0
+        ],
+        "room_id": "reactor_01",
+        "room_ids": [
+          "reactor_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          7,
+          1
+        ],
+        "cell_key": "0|7|1",
+        "deck": 0,
+        "id": "ceiling:0|7|1",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|7|1",
+        "position": [
+          28.0,
+          0.0,
+          4.0
+        ],
+        "room_id": "reactor_01",
+        "room_ids": [
+          "reactor_01"
+        ],
+        "yaw_degrees": 0.0
+      },
+      {
+        "cell": [
+          8,
+          1
+        ],
+        "cell_key": "0|8|1",
+        "deck": 0,
+        "id": "ceiling:0|8|1",
+        "module_id": "ceiling_cap_1x1",
+        "placement_id": "ceiling:0|8|1",
+        "position": [
+          32.0,
+          0.0,
+          4.0
+        ],
+        "room_id": "reactor_01",
+        "room_ids": [
+          "reactor_01"
+        ],
+        "yaw_degrees": 0.0
+      }
+    ],
     "occupancy": {
       "0|0|0": {
         "cell": [
@@ -9800,6 +10537,1674 @@
         "state": "SOLID",
         "wrapper_required": true,
         "yaw_degrees": 0.0
+      }
+    ],
+    "socket_bindings": [
+      {
+        "placement_id": "floor:0|1|-1",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|1|-1",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|1|-1",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|1|-1",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|1|-1",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|-2|1",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-2|1",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|1|-1",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|1|-1",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|-1|1",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|-1|1",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|1|-1",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|1|-1",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|-1|1",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-1|1",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|1|-1",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|1|-1",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|-1|0",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|-1|0",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|1|-1",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|0|0",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|0|0",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|0|0",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|0|0",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|0|0",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|-1|0",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-1|0",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|0|0",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|0|0",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|0|-1",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|0|-1",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|0|0",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|1|0",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|1|0",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|1|0",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|1|0",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|1|0",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|-1|1",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-1|1",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|1|0",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|1|0",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|0|1",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|0|1",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|1|0",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|0|1",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|0|1",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|0|1",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|0|1",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|0|1",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|1|0",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|1|0",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|0|1",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|0|1",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|1|-1",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|1|-1",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|0|1",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|1|1",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|1|1",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|1|1",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|1|1",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|1|1",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|1|1",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|1|1",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|1|1",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|1|1",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|1|1",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|1|1",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|1|1",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|2|1",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|2|1",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|2|1",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|2|1",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|2|1",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|0|2",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|0|2",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|2|1",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|2|1",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|1|2",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|1|2",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|2|1",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|2|1",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|1|2",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|1|2",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|2|1",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|2|1",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|1|1",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|1|1",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|2|1",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|2|0",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|2|0",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|2|0",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|2|0",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|2|0",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|-1|2",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-1|2",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|2|0",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|2|0",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|0|2",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|0|2",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|2|0",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|2|0",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|0|1",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|0|1",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|2|0",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|3|0",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|3|0",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|3|0",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|3|0",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|3|0",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|-1|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-1|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|3|0",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|3|0",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|0|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|0|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|3|0",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|3|0",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|0|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|0|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|3|0",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|0",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|4|0",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|4|0",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|4|0",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|4|0",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|-1|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-1|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|0",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|0",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|0|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|0|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|0",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|0",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|0|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|0|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|0",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|0",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|0|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|0|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|0",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|-1",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|4|-1",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|4|-1",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|4|-1",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|4|-1",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|-1|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|-1|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|-1",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|-1",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|-1|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-1|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|-1",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|-1",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|-1|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|-1|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|-1",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|-2",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|4|-2",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|4|-2",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|4|-2",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|4|-2",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|-3|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-3|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|-2",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|-2",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|-2|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|-2|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|-2",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|-2",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|-2|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|-2|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|-2",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|2|-2",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|2|-2",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|2|-2",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|2|-2",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|2|-2",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|-2|2",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-2|2",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|2|-2",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|2|-2",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|-2|1",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|-2|1",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|2|-2",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|3|-2",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|3|-2",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|3|-2",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|3|-2",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|3|-2",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|-2|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|-2|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|3|-2",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|3|-2",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|-2|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-2|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|3|-2",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|2|-3",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|2|-3",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|2|-3",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|2|-3",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|2|-3",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|-4|2",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-4|2",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|2|-3",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|2|-3",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|-3|1",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|-3|1",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|2|-3",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|3|-3",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|3|-3",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|3|-3",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|3|-3",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|3|-3",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|-4|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-4|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|3|-3",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|3|-3",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|-3|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|-3|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|3|-3",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|5|-2",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|5|-2",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|5|-2",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|5|-2",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|5|-2",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|-2|5",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-2|5",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|5|-2",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|5|-2",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|-2|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|-2|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|5|-2",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|6|-2",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|6|-2",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|6|-2",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|6|-2",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|6|-2",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|-2|6",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|-2|6",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|6|-2",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|6|-2",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|-2|6",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-2|6",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|6|-2",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|5|-3",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|5|-3",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|5|-3",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|5|-3",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|5|-3",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|-4|5",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-4|5",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|5|-3",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|5|-3",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|-3|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|-3|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|5|-3",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|6|-3",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|6|-3",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|6|-3",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|6|-3",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|6|-3",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|-4|6",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-4|6",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|6|-3",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|6|-3",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|-3|6",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|-3|6",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|6|-3",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|1",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|4|1",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|4|1",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|4|1",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|4|1",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|0|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|0|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|1",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|1",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|1|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|1|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|1",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|1",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|1|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|1|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|1",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|2",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|4|2",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|4|2",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|4|2",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|4|2",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|2|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|2|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|2",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|2",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|2|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|2|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|2",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|4|2",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|2|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|2|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|4|2",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|2|2",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|2|2",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|2|2",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|2|2",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|2|2",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|1|2",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|1|2",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|2|2",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|2|2",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|2|1",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|2|1",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|2|2",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|3|2",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|3|2",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|3|2",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|3|2",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|3|2",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|1|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|1|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|3|2",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|3|2",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|2|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|2|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|3|2",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|2|3",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|2|3",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|2|3",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|2|3",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|2|3",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|3|2",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|3|2",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|2|3",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|2|3",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|3|1",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|3|1",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|2|3",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|3|3",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|3|3",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|3|3",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|3|3",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|3|3",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|3|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|3|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|3|3",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|3|3",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|3|3",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|3|3",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|3|3",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|5|2",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|5|2",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|5|2",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|5|2",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|5|2",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|1|5",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|1|5",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|5|2",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|5|2",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|2|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|2|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|5|2",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|6|2",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|6|2",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|6|2",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|6|2",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|6|2",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|1|6",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|1|6",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|6|2",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|6|2",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|2|6",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|2|6",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|6|2",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|5|3",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|5|3",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|5|3",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|5|3",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|5|3",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|3|5",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|3|5",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|5|3",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|5|3",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|3|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|3|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|5|3",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|6|3",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|6|3",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|6|3",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|6|3",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|6|3",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|3|6",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|3|6",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|6|3",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|6|3",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|3|6",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|3|6",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|6|3",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|5|0",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|5|0",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|5|0",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|5|0",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|5|0",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|-1|5",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-1|5",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|5|0",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|5|0",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|0|5",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|0|5",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|5|0",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|5|0",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|0|4",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|0|4",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|5|0",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|6|0",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|6|0",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|6|0",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|6|0",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|6|0",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|-1|6",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-1|6",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|6|0",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|6|0",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|0|6",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|0|6",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|6|0",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|6|0",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|0|6",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|0|6",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|6|0",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|7|0",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|7|0",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|7|0",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|7|0",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|7|0",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|-1|7",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-1|7",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|7|0",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|7|0",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|0|6",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|0|6",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|7|0",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|8|0",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|8|0",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|8|0",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|8|0",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|8|0",
+        "socket_id": "floor_edge_north_01",
+        "neighbor_placement_id": "edge:0|h|-1|8",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|-1|8",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|8|0",
+        "neighbor_socket_id": "floor_edge_north_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|8|0",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|0|8",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|0|8",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|8|0",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|7|1",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|7|1",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|7|1",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|7|1",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|7|1",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|1|7",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|1|7",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|7|1",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|7|1",
+        "socket_id": "floor_edge_west_01",
+        "neighbor_placement_id": "edge:0|v|1|6",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|1|6",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|7|1",
+        "neighbor_socket_id": "floor_edge_west_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|8|1",
+        "socket_id": "floor_top_01",
+        "neighbor_placement_id": "ceiling:0|8|1",
+        "neighbor_socket_id": "ceiling_bottom_01",
+        "kind": "floor_top"
+      },
+      {
+        "placement_id": "ceiling:0|8|1",
+        "socket_id": "ceiling_bottom_01",
+        "neighbor_placement_id": "floor:0|8|1",
+        "neighbor_socket_id": "floor_top_01",
+        "kind": "ceiling_bottom"
+      },
+      {
+        "placement_id": "floor:0|8|1",
+        "socket_id": "floor_edge_east_01",
+        "neighbor_placement_id": "edge:0|v|1|8",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|v|1|8",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|8|1",
+        "neighbor_socket_id": "floor_edge_east_01",
+        "kind": "wall_base"
+      },
+      {
+        "placement_id": "floor:0|8|1",
+        "socket_id": "floor_edge_south_01",
+        "neighbor_placement_id": "edge:0|h|1|8",
+        "neighbor_socket_id": "wall_base_01",
+        "kind": "floor_edge"
+      },
+      {
+        "placement_id": "edge:0|h|1|8",
+        "socket_id": "wall_base_01",
+        "neighbor_placement_id": "floor:0|8|1",
+        "neighbor_socket_id": "floor_edge_south_01",
+        "kind": "wall_base"
       }
     ]
   }

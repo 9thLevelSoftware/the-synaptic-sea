@@ -8,30 +8,78 @@
   "module_family": "portal",
   "grid_step_m": 4.0,
   "bounds": {
-    "local_min_m": [-2.0, 0.0, 0.0],
-    "local_max_m": [2.0, 3.2, 0.0],
+    "local_min_m": [
+      -2.0,
+      0.0,
+      0.0
+    ],
+    "local_max_m": [
+      2.0,
+      3.2,
+      0.0
+    ],
     "placement_origin": "edge-center",
-    "mesh_origin_offset_m": [0.0, 0.0, 0.0]
+    "mesh_origin_offset_m": [
+      0.0,
+      0.0,
+      0.0
+    ]
   },
-  "footprint_cells": [1, 0],
+  "footprint_cells": [
+    1,
+    0
+  ],
   "sockets": [
     {
       "id": "portal_edge_west_01",
       "kind": "portal_edge",
-      "position_m": [-2.0, 0.0, 0.0],
-      "compatible_kinds": ["portal_edge", "wall_edge"]
+      "position_m": [
+        -2.0,
+        0.0,
+        0.0
+      ],
+      "compatible_kinds": [
+        "portal_edge",
+        "wall_edge"
+      ]
     },
     {
       "id": "portal_edge_east_01",
       "kind": "portal_edge",
-      "position_m": [2.0, 0.0, 0.0],
-      "compatible_kinds": ["portal_edge", "wall_edge"]
+      "position_m": [
+        2.0,
+        0.0,
+        0.0
+      ],
+      "compatible_kinds": [
+        "portal_edge",
+        "wall_edge"
+      ]
     },
     {
       "id": "portal_center_internal_01",
       "kind": "portal_center",
-      "position_m": [0.0, 0.0, 0.0],
-      "compatible_kinds": ["portal_center"]
+      "position_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "compatible_kinds": [
+        "portal_center"
+      ]
+    },
+    {
+      "id": "wall_base_01",
+      "kind": "wall_base",
+      "position_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "compatible_kinds": [
+        "floor_edge",
+        "corridor_edge"
+      ]
     }
   ],
   "collision": {
@@ -60,30 +108,78 @@
       "pivot_policy": "edge-center"
     },
     "bounds": {
-      "local_min_m": [-2.0, 0.0, 0.0],
-      "local_max_m": [2.0, 3.2, 0.0],
+      "local_min_m": [
+        -2.0,
+        0.0,
+        0.0
+      ],
+      "local_max_m": [
+        2.0,
+        3.2,
+        0.0
+      ],
       "placement_origin": "edge-center",
-      "mesh_origin_offset_m": [0.0, 0.0, 0.0]
+      "mesh_origin_offset_m": [
+        0.0,
+        0.0,
+        0.0
+      ]
     },
-    "footprint_cells": [1, 0],
+    "footprint_cells": [
+      1,
+      0
+    ],
     "sockets": [
       {
         "id": "portal_edge_west_01",
         "kind": "portal_edge",
-        "position_m": [-2.0, 0.0, 0.0],
-        "compatible_kinds": ["portal_edge", "wall_edge"]
+        "position_m": [
+          -2.0,
+          0.0,
+          0.0
+        ],
+        "compatible_kinds": [
+          "portal_edge",
+          "wall_edge"
+        ]
       },
       {
         "id": "portal_edge_east_01",
         "kind": "portal_edge",
-        "position_m": [2.0, 0.0, 0.0],
-        "compatible_kinds": ["portal_edge", "wall_edge"]
+        "position_m": [
+          2.0,
+          0.0,
+          0.0
+        ],
+        "compatible_kinds": [
+          "portal_edge",
+          "wall_edge"
+        ]
       },
       {
         "id": "portal_center_internal_01",
         "kind": "portal_center",
-        "position_m": [0.0, 0.0, 0.0],
-        "compatible_kinds": ["portal_center"]
+        "position_m": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "compatible_kinds": [
+          "portal_center"
+        ]
+      },
+      {
+        "id": "wall_base_01",
+        "kind": "wall_base",
+        "position_m": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "compatible_kinds": [
+          "floor_edge",
+          "corridor_edge"
+        ]
       }
     ],
     "collision": {

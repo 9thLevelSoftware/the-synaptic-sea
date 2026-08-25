@@ -35,8 +35,8 @@
       "kind": "outer_corner_vertex",
       "position_m": [
         2.0,
-        2.0,
-        0.0
+        0.0,
+        -2.0
       ],
       "compatible_kinds": [
         "wall_edge",
@@ -48,8 +48,8 @@
       "kind": "inner_corner_vertex",
       "position_m": [
         -2.0,
-        -2.0,
-        0.0
+        0.0,
+        2.0
       ],
       "compatible_kinds": [
         "wall_edge",
@@ -110,8 +110,8 @@
         "kind": "outer_corner_vertex",
         "position_m": [
           2.0,
-          2.0,
-          0.0
+          0.0,
+          -2.0
         ],
         "compatible_kinds": [
           "wall_edge",
@@ -123,8 +123,8 @@
         "kind": "inner_corner_vertex",
         "position_m": [
           -2.0,
-          -2.0,
-          0.0
+          0.0,
+          2.0
         ],
         "compatible_kinds": [
           "wall_edge",

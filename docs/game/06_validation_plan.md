@@ -24,6 +24,22 @@ Expected markers:
 - `ROUTE CONTROL STATE PASS gates=2 opened=2 blockers=0 extraction=true`
 - `MAIN PLAYABLE ROUTE CONTROL PASS gates=1 opened=1 blockers=0 extraction=true`
 
+## Socketed enclosed interiors (ADR-0053) — GREEN
+
+Feature: `docs/game/features/socketed_enclosed_interiors.md`.
+Requirements: REQ-ENC-001..004.
+Registered in the regression bundle after GREEN.
+
+```bash
+ROOT="${ROOT:-/Users/christopherwilloughby/the-synaptic-sea-of-stars}"
+GODOT="${GODOT:-/Users/christopherwilloughby/.local/bin/godot-4.6.2}"
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/socketed_enclosure_smoke.gd
+```
+
+Expected:
+
+- `SOCKETED ENCLOSURE PASS no_floor_only=true no_room_gap=true sockets_consumed=true watertight=true corners_used=true floor_socket_axes=true hub_plan=true`
+
 ## Regression bundle
 
 ```bash
@@ -366,6 +382,7 @@ run_clean 'template data smoke' 'TEMPLATE DATA PASS templates=3 all_valid=true' 
 run_clean 'template selector smoke' 'TEMPLATE SELECTOR PASS explicit=true deterministic=true varied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_selector_smoke.gd
 run_clean 'marker generator smoke' 'MARKER GENERATOR PASS deterministic=true per_cell=3 round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/marker_generator_smoke.gd
 run_clean 'wall door resolver smoke' 'WALL DOOR RESOLVER PASS walls=true portals=true interior=true no_conflict=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wall_door_resolver_smoke.gd
+run_clean 'socketed enclosure smoke' 'SOCKETED ENCLOSURE PASS no_floor_only=true no_room_gap=true sockets_consumed=true watertight=true corners_used=true floor_socket_axes=true hub_plan=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/socketed_enclosure_smoke.gd
 # seed_determinism's marker ends with the pipeline-output hash, which is
 # stable per code version but changes with ANY legitimate pipeline change —
 # the pin stops at `hash=` on purpose.

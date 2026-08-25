@@ -67,6 +67,19 @@
       "compatible_kinds": [
         "wall_face"
       ]
+    },
+    {
+      "id": "wall_base_01",
+      "kind": "wall_base",
+      "position_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "compatible_kinds": [
+        "floor_edge",
+        "corridor_edge"
+      ]
     }
   ],
   "collision": {
@@ -153,6 +166,19 @@
         ],
         "compatible_kinds": [
           "wall_face"
+        ]
+      },
+      {
+        "id": "wall_base_01",
+        "kind": "wall_base",
+        "position_m": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "compatible_kinds": [
+          "floor_edge",
+          "corridor_edge"
         ]
       }
     ],

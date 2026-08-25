@@ -308,12 +308,18 @@ func _preflight_structural_wrappers(module_to_scene: Dictionary, structural_plan
 	var all_records: Array = []
 	all_records.append_array(edge_variant as Array)
 	all_records.append_array(floor_variant as Array)
+	var ceiling_variant: Variant = structural_plan.get("ceiling_placements", [])
+	if typeof(ceiling_variant) == TYPE_ARRAY:
+		all_records.append_array(ceiling_variant as Array)
+	var probed_modules: Dictionary = {}
 	for record_variant in all_records:
 		if typeof(record_variant) != TYPE_DICTIONARY:
 			push_error("structural plan wrapper preflight found non-object placement")
 			return false
 		var record: Dictionary = record_variant
 		var module_id: String = str(record.get("module_id", ""))
+		if probed_modules.has(module_id):
+			continue
 		var scene_path: String = str(module_to_scene.get(module_id, ""))
 		if module_id.is_empty() or scene_path.is_empty():
 			push_error("structural plan wrapper preflight missing wrapper for module %s" % module_id)
@@ -332,6 +338,7 @@ func _preflight_structural_wrappers(module_to_scene: Dictionary, structural_plan
 			push_error("structural plan wrapper preflight instance is not Node3D: %s" % module_id)
 			return false
 		probe.free()
+		probed_modules[module_id] = true
 	return true
 
 
@@ -547,31 +554,60 @@ func _instance_structural_wrappers(layout_doc: Dictionary, module_to_scene: Dict
 	var floor_variant: Variant = structural_plan.get("floor_placements", null)
 	if typeof(edge_variant) != TYPE_ARRAY or typeof(floor_variant) != TYPE_ARRAY:
 		return -1
+	var ceiling_variant: Variant = structural_plan.get("ceiling_placements", [])
+	var ceilings: Array = ceiling_variant if typeof(ceiling_variant) == TYPE_ARRAY else []
 
 	# Instantiate detached first. No partial structural tree is published if a
 	# record is malformed or a wrapper fails; the caller can then discard the
 	# empty root atomically.
 	var pending: Array[Node3D] = []
+	var scene_cache: Dictionary = {}
 	for record_variant in (edge_variant as Array):
-		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, false)
+		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, "edge", scene_cache)
 		if wrapper == null:
 			for previous in pending:
 				previous.free()
+			_free_cached_prototypes(scene_cache)
 			return -1
 		pending.append(wrapper)
 	for record_variant in (floor_variant as Array):
-		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, true)
+		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, "floor", scene_cache)
 		if wrapper == null:
 			for previous in pending:
 				previous.free()
+			_free_cached_prototypes(scene_cache)
+			return -1
+		pending.append(wrapper)
+	for record_variant in ceilings:
+		var wrapper: Node3D = _instantiate_structural_record(record_variant, module_to_scene, "ceiling", scene_cache)
+		if wrapper == null:
+			for previous in pending:
+				previous.free()
+			_free_cached_prototypes(scene_cache)
 			return -1
 		pending.append(wrapper)
 	for wrapper in pending:
 		ship_root.add_child(wrapper)
+	_free_cached_prototypes(scene_cache)
 	return pending.size()
 
 
-func _instantiate_structural_record(record_variant: Variant, module_to_scene: Dictionary, is_floor: bool) -> Node3D:
+func _free_cached_prototypes(scene_cache: Dictionary) -> void:
+	for key_variant in scene_cache.keys():
+		var key: String = str(key_variant)
+		if not key.ends_with("::proto"):
+			continue
+		var proto_variant: Variant = scene_cache[key_variant]
+		if proto_variant is Node:
+			(proto_variant as Node).free()
+		scene_cache.erase(key_variant)
+
+
+func _instantiate_structural_record(
+		record_variant: Variant,
+		module_to_scene: Dictionary,
+		record_kind: String,
+		scene_cache: Dictionary) -> Node3D:
 	if typeof(record_variant) != TYPE_DICTIONARY:
 		return null
 	var record: Dictionary = record_variant
@@ -579,10 +615,24 @@ func _instantiate_structural_record(record_variant: Variant, module_to_scene: Di
 	var scene_path: String = str(module_to_scene.get(module_id, ""))
 	if module_id.is_empty() or scene_path.is_empty() or not ResourceLoader.exists(scene_path):
 		return null
-	var scene: Resource = ResourceLoader.load(scene_path)
+	var scene: Resource = null
+	if scene_cache.has(scene_path):
+		scene = scene_cache[scene_path]
+	else:
+		scene = ResourceLoader.load(scene_path)
+		if scene != null and scene is PackedScene:
+			scene_cache[scene_path] = scene
 	if scene == null or not (scene is PackedScene):
 		return null
-	var instance: Node = (scene as PackedScene).instantiate()
+	var proto_key: String = "%s::proto" % scene_path
+	var instance: Node = null
+	if scene_cache.has(proto_key):
+		instance = (scene_cache[proto_key] as Node3D).duplicate()
+	else:
+		instance = (scene as PackedScene).instantiate()
+		if instance != null and instance is Node3D:
+			scene_cache[proto_key] = instance
+			instance = (instance as Node3D).duplicate()
 	if instance == null or not (instance is Node3D):
 		if instance != null:
 			instance.free()
@@ -594,7 +644,7 @@ func _instantiate_structural_record(record_variant: Variant, module_to_scene: Di
 		return null
 	wrapper.position = Vector3(float(placement_pos[0]), float(placement_pos[1]), float(placement_pos[2]))
 	wrapper.rotation_degrees.y = float(record.get("yaw_degrees", 0.0))
-	if is_floor:
+	if record_kind == "floor":
 		var cell_key_value: String = str(record.get("cell_key", ""))
 		wrapper.name = "Floor_%s" % cell_key_value.replace("|", "_")
 		wrapper.set_meta("structural_floor_placement_id", str(record.get("placement_id", record.get("id", ""))))
@@ -603,6 +653,16 @@ func _instantiate_structural_record(record_variant: Variant, module_to_scene: Di
 		wrapper.set_meta("structural_kind", "FLOOR")
 		wrapper.set_meta("module_kind", module_id)
 		wrapper.set_meta("module_key", "floor/%s" % cell_key_value)
+		wrapper.set_meta("room_id", str(record.get("room_id", "")))
+	elif record_kind == "ceiling":
+		var ceiling_key: String = str(record.get("cell_key", ""))
+		wrapper.name = "Ceiling_%s" % ceiling_key.replace("|", "_")
+		wrapper.set_meta("structural_ceiling_placement_id", str(record.get("placement_id", record.get("id", ""))))
+		wrapper.set_meta("structural_ceiling_cell_key", ceiling_key)
+		wrapper.set_meta("structural_room_id", str(record.get("room_id", "")))
+		wrapper.set_meta("structural_kind", "CEILING")
+		wrapper.set_meta("module_kind", module_id)
+		wrapper.set_meta("module_key", "ceiling/%s" % ceiling_key)
 		wrapper.set_meta("room_id", str(record.get("room_id", "")))
 	else:
 		var edge_key_value: String = str(record.get("edge_key", ""))
@@ -665,7 +725,7 @@ func _placement_matches_endpoint_cell(placement: Dictionary, endpoint: Array) ->
 	return int(signature[0]) == int(endpoint[0]) and int(signature[1]) == int(endpoint[1]) and int(signature[2]) == endpoint_deck
 
 
-func _cell_world_from_link_endpoint(link_doc: Dictionary, cell_key: String, room_key: String, layout_doc: Dictionary) -> Vector3:
+func _cell_world_from_link_endpoint(link_doc: Dictionary, cell_key: String, room_key: String, source_layout: Dictionary) -> Vector3:
 	var endpoint_variant: Variant = link_doc.get(cell_key, [])
 	if typeof(endpoint_variant) != TYPE_ARRAY:
 		return Vector3.INF
@@ -675,10 +735,15 @@ func _cell_world_from_link_endpoint(link_doc: Dictionary, cell_key: String, room
 	var room_id: String = str(link_doc.get(room_key, ""))
 	if room_id.is_empty():
 		return Vector3.INF
+	var saved_layout: Dictionary = layout_doc
+	if not source_layout.is_empty():
+		layout_doc = source_layout
 	var room: Dictionary = _find_room_in_layout(room_id)
-	if room.is_empty():
-		return Vector3.INF
-	return _room_cell_world(room, endpoint)
+	var resolved: Vector3 = Vector3.INF
+	if not room.is_empty():
+		resolved = _room_cell_world(room, endpoint)
+	layout_doc = saved_layout
+	return resolved
 
 
 func _add_vertical_links(layout_doc: Dictionary, ship_root: Node3D) -> int:

@@ -41,6 +41,66 @@
       "compatible_kinds": [
         "occlusion"
       ]
+    },
+    {
+      "id": "ceiling_edge_north_01",
+      "kind": "ceiling_edge",
+      "position_m": [
+        0.0,
+        0.0,
+        -2.0
+      ],
+      "compatible_kinds": [
+        "ceiling_edge"
+      ]
+    },
+    {
+      "id": "ceiling_edge_south_01",
+      "kind": "ceiling_edge",
+      "position_m": [
+        0.0,
+        0.0,
+        2.0
+      ],
+      "compatible_kinds": [
+        "ceiling_edge"
+      ]
+    },
+    {
+      "id": "ceiling_edge_east_01",
+      "kind": "ceiling_edge",
+      "position_m": [
+        2.0,
+        0.0,
+        0.0
+      ],
+      "compatible_kinds": [
+        "ceiling_edge"
+      ]
+    },
+    {
+      "id": "ceiling_edge_west_01",
+      "kind": "ceiling_edge",
+      "position_m": [
+        -2.0,
+        0.0,
+        0.0
+      ],
+      "compatible_kinds": [
+        "ceiling_edge"
+      ]
+    },
+    {
+      "id": "ceiling_bottom_01",
+      "kind": "ceiling_bottom",
+      "position_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "compatible_kinds": [
+        "floor_top"
+      ]
     }
   ],
   "collision": {
@@ -101,6 +161,66 @@
         ],
         "compatible_kinds": [
           "occlusion"
+        ]
+      },
+      {
+        "id": "ceiling_edge_north_01",
+        "kind": "ceiling_edge",
+        "position_m": [
+          0.0,
+          0.0,
+          -2.0
+        ],
+        "compatible_kinds": [
+          "ceiling_edge"
+        ]
+      },
+      {
+        "id": "ceiling_edge_south_01",
+        "kind": "ceiling_edge",
+        "position_m": [
+          0.0,
+          0.0,
+          2.0
+        ],
+        "compatible_kinds": [
+          "ceiling_edge"
+        ]
+      },
+      {
+        "id": "ceiling_edge_east_01",
+        "kind": "ceiling_edge",
+        "position_m": [
+          2.0,
+          0.0,
+          0.0
+        ],
+        "compatible_kinds": [
+          "ceiling_edge"
+        ]
+      },
+      {
+        "id": "ceiling_edge_west_01",
+        "kind": "ceiling_edge",
+        "position_m": [
+          -2.0,
+          0.0,
+          0.0
+        ],
+        "compatible_kinds": [
+          "ceiling_edge"
+        ]
+      },
+      {
+        "id": "ceiling_bottom_01",
+        "kind": "ceiling_bottom",
+        "position_m": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "compatible_kinds": [
+          "floor_top"
         ]
       }
     ],
