@@ -7,15 +7,15 @@
         0
       ],
       "from_room": "corridor_01",
-      "id": "corridor_01_to_corridor_02_arc",
+      "id": "corridor_01_to_corridor_05_arc",
       "kind": "electrical_arc",
       "rationale": "generated: non-critical side link off the objective spine; arc cannot trap the player or block an objective",
       "to_cell": [
         3,
-        1,
+        -1,
         0
       ],
-      "to_room": "corridor_02"
+      "to_room": "corridor_05"
     }
   ],
   "breach_zones": [],
@@ -46,8 +46,8 @@
     },
     {
       "approach_cell": [
-        -4,
-        3,
+        5,
+        4,
         0
       ],
       "id": "loot_armory_01",
@@ -85,8 +85,8 @@
     },
     {
       "approach_cell": [
-        -4,
-        3,
+        5,
+        4,
         0
       ],
       "id": "obj_salvage_armory_01",
@@ -98,8 +98,8 @@
     },
     {
       "approach_cell": [
-        -8,
-        0,
+        -3,
+        -1,
         0
       ],
       "id": "obj_reach_goal",

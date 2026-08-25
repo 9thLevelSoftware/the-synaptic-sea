@@ -8,6 +8,7 @@ class_name StructuralPlanValidator
 const CompilerScript: GDScript = preload("res://scripts/procgen/structural_edge_compiler.gd")
 const WalkabilityContractScript: GDScript = preload("res://scripts/procgen/walkability_contract.gd")
 const FLOOR_MODULES: Array[String] = ["floor_1x1", "corridor_floor_1x1"]
+const CEILING_MODULES: Array[String] = ["ceiling_cap_1x1"]
 const EDGE_KINDS: Array[String] = ["SOLID", "OPEN", "DOOR", "LOCKED", "HATCH", "BREACH"]
 
 
@@ -16,6 +17,8 @@ func validate(plan: Dictionary, topology: Dictionary) -> Dictionary:
 	var stats: Dictionary = {
 		"occupied_cells": 0,
 		"floor_placements": 0,
+		"ceiling_placements": 0,
+		"socket_bindings": 0,
 		"edges": 0,
 		"edge_placements": 0,
 	}
@@ -53,6 +56,9 @@ func validate(plan: Dictionary, topology: Dictionary) -> Dictionary:
 
 	_validate_occupancy_records(occupancy, errors)
 	_validate_floor_placements(plan, occupancy, topology, errors, stats)
+	_validate_ceiling_placements(plan, occupancy, topology, errors, stats)
+	_validate_socket_bindings(plan, errors, stats)
+	_validate_not_floor_only(plan, occupancy, errors)
 	_validate_edge_placements(edges, placements, errors)
 	_validate_portal_endpoints(topology, occupancy, edges, errors)
 	_validate_walkable_flood_fill(topology, occupancy, edges, errors)
@@ -177,6 +183,156 @@ func _validate_floor_placements(
 	for occupancy_key in occupancy.keys():
 		if not seen_cell_keys.has(str(occupancy_key)):
 			errors.append("occupancy cell has no floor placement: %s" % str(occupancy_key))
+
+
+func _validate_ceiling_placements(
+		plan: Dictionary,
+		occupancy: Dictionary,
+		topology: Dictionary,
+		errors: Array[String],
+		stats: Dictionary) -> void:
+	var ceiling_variant: Variant = plan.get("ceiling_placements", null)
+	if typeof(ceiling_variant) != TYPE_ARRAY:
+		errors.append("ceiling_placements must be an array")
+		return
+	var ceilings: Array = ceiling_variant
+	stats["ceiling_placements"] = ceilings.size()
+	var opening_keys: Dictionary = _vertical_opening_keys(topology)
+	var required_count: int = 0
+	for occupancy_key_variant in occupancy.keys():
+		if not opening_keys.has(str(occupancy_key_variant)):
+			required_count += 1
+	if occupancy.size() > 0 and required_count > 0 and ceilings.is_empty():
+		errors.append("ceiling_placements missing for occupied cells")
+		return
+
+	var seen_cell_keys: Dictionary = {}
+	for ceiling_record_variant in ceilings:
+		if typeof(ceiling_record_variant) != TYPE_DICTIONARY:
+			errors.append("ceiling placement must be an object")
+			continue
+		var ceiling: Dictionary = ceiling_record_variant
+		var cell_key_value: String = str(ceiling.get("cell_key", ""))
+		if cell_key_value.is_empty():
+			errors.append("ceiling placement cell_key missing")
+			continue
+		if seen_cell_keys.has(cell_key_value):
+			errors.append("duplicate ceiling placement cell_key: %s" % cell_key_value)
+			continue
+		seen_cell_keys[cell_key_value] = true
+		if opening_keys.has(cell_key_value):
+			errors.append("ceiling placement on authored vertical opening: %s" % cell_key_value)
+		if not occupancy.has(cell_key_value):
+			errors.append("ceiling placement has no occupancy cell: %s" % cell_key_value)
+			continue
+		var occupancy_record_variant: Variant = occupancy[cell_key_value]
+		if typeof(occupancy_record_variant) == TYPE_DICTIONARY:
+			var occupancy_record: Dictionary = occupancy_record_variant
+			if str(ceiling.get("room_id", "")) != str(occupancy_record.get("room_id", "")):
+				errors.append("ceiling placement room mismatch: %s" % cell_key_value)
+		var deck_value: Variant = ceiling.get("deck", null)
+		if not _is_integer(deck_value):
+			errors.append("ceiling placement deck malformed: %s" % cell_key_value)
+			continue
+		var deck: int = int(deck_value)
+		var parsed_cell: Dictionary = _read_cell(ceiling.get("cell", null), deck)
+		if not bool(parsed_cell.get("ok", false)):
+			errors.append("ceiling placement cell malformed: %s" % cell_key_value)
+			continue
+		var cell: Vector2i = parsed_cell["cell"]
+		if CompilerScript.cell_key(deck, cell) != cell_key_value:
+			errors.append("ceiling placement cell mismatch: %s" % cell_key_value)
+		var module_id: String = str(ceiling.get("module_id", ""))
+		if not CEILING_MODULES.has(module_id) and module_id.find("ceiling") < 0:
+			errors.append("unsupported ceiling placement module: %s" % module_id)
+		var position: Dictionary = _read_position(ceiling.get("position", null))
+		if not bool(position.get("ok", false)):
+			errors.append("ceiling placement position malformed: %s" % cell_key_value)
+		else:
+			var expected_position: Vector3 = CompilerScript.cell_world_position(deck, cell)
+			if not (position["value"] as Vector3).is_equal_approx(expected_position):
+				errors.append("ceiling placement position mismatch: %s" % cell_key_value)
+
+	for occupancy_key_variant in occupancy.keys():
+		var occupancy_key: String = str(occupancy_key_variant)
+		if opening_keys.has(occupancy_key):
+			continue
+		if not seen_cell_keys.has(occupancy_key):
+			errors.append("occupancy cell has no ceiling placement: %s" % occupancy_key)
+
+
+func _validate_socket_bindings(plan: Dictionary, errors: Array[String], stats: Dictionary) -> void:
+	var bindings_variant: Variant = plan.get("socket_bindings", null)
+	var bound_count: int = 0
+	if typeof(bindings_variant) == TYPE_ARRAY:
+		bound_count = (bindings_variant as Array).size()
+		for binding_variant in (bindings_variant as Array):
+			if typeof(binding_variant) != TYPE_DICTIONARY:
+				errors.append("socket_binding must be an object")
+				continue
+			var binding: Dictionary = binding_variant
+			if str(binding.get("placement_id", "")).is_empty() or str(binding.get("socket_id", "")).is_empty():
+				errors.append("socket_binding missing placement_id or socket_id")
+			if str(binding.get("neighbor_placement_id", "")).is_empty() or str(binding.get("neighbor_socket_id", "")).is_empty():
+				errors.append("socket_binding missing neighbor ids")
+	elif typeof(bindings_variant) == TYPE_DICTIONARY:
+		bound_count = (bindings_variant as Dictionary).size()
+	else:
+		errors.append("socket_bindings must be an array")
+		return
+	stats["socket_bindings"] = bound_count
+	if bound_count <= 0:
+		var placement_bound: int = 0
+		for record_variant in (plan.get("placements", []) as Array) + (plan.get("floor_placements", []) as Array) + (plan.get("ceiling_placements", []) as Array):
+			if typeof(record_variant) != TYPE_DICTIONARY:
+				continue
+			if (record_variant as Dictionary).has("socket_bindings"):
+				var nested: Variant = (record_variant as Dictionary).get("socket_bindings", [])
+				if typeof(nested) == TYPE_ARRAY:
+					placement_bound += (nested as Array).size()
+		if placement_bound <= 0:
+			errors.append("socket_bindings missing")
+
+
+func _validate_not_floor_only(plan: Dictionary, occupancy: Dictionary, errors: Array[String]) -> void:
+	if occupancy.is_empty():
+		return
+	var placements_variant: Variant = plan.get("placements", [])
+	if typeof(placements_variant) != TYPE_ARRAY:
+		errors.append("floor-only structural plan: missing edge placements")
+		return
+	var enclosure_count: int = 0
+	for placement_variant in (placements_variant as Array):
+		if typeof(placement_variant) != TYPE_DICTIONARY:
+			continue
+		var module_id: String = str((placement_variant as Dictionary).get("module_id", ""))
+		if module_id.find("wall") >= 0 or module_id.find("door") >= 0 or module_id.find("portal") >= 0:
+			enclosure_count += 1
+	if enclosure_count <= 0:
+		errors.append("floor-only structural plan: no wall or portal placements")
+
+
+func _vertical_opening_keys(topology: Dictionary) -> Dictionary:
+	var keys: Dictionary = {}
+	var vertical_variant: Variant = topology.get("vertical_connections", [])
+	if typeof(vertical_variant) != TYPE_ARRAY:
+		return keys
+	var room_decks: Dictionary = _room_decks(topology)
+	for link_variant in (vertical_variant as Array):
+		if typeof(link_variant) != TYPE_DICTIONARY:
+			continue
+		var link: Dictionary = link_variant
+		var from_room: String = str(link.get("from_room", ""))
+		var to_room: String = str(link.get("to_room", ""))
+		var from_deck: int = int(room_decks.get(from_room, -1))
+		var to_deck: int = int(room_decks.get(to_room, -1))
+		var from_info: Dictionary = _read_cell(link.get("from_cell", null), from_deck)
+		var to_info: Dictionary = _read_cell(link.get("to_cell", null), to_deck)
+		if bool(from_info.get("ok", false)):
+			keys[CompilerScript.cell_key(int(from_info["deck"]), from_info["cell"])] = true
+		if bool(to_info.get("ok", false)):
+			keys[CompilerScript.cell_key(int(to_info["deck"]), to_info["cell"])] = true
+	return keys
 
 
 func _validate_edge_placements(edges: Dictionary, placements: Array, errors: Array[String]) -> void:

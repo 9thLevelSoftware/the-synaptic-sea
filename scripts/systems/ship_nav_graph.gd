@@ -140,7 +140,12 @@ func _build_from_floor_placements(layout: Dictionary) -> int:
 				"room_id": room_id,
 				"key": key,
 			}
-	_connect_orthogonal_neighbors()
+	var structural_plan_variant: Variant = layout.get("structural_plan", null)
+	if structural_plan_variant is Dictionary and not (structural_plan_variant as Dictionary).is_empty():
+		_connect_structural_edges(structural_plan_variant as Dictionary)
+		_connect_vertical_neighbors()
+	else:
+		_connect_orthogonal_neighbors()
 	_base_edges = edges.duplicate(true)
 	dirty = false
 	return nodes.size()
@@ -582,3 +587,100 @@ func _connect_orthogonal_neighbors() -> void:
 					or (absf(dx - cell_size) < 0.01 and absf(dz - cell_size) < 0.01)
 				if step_xz:
 					edges[_edge_key(ka, kb)] = 1.5
+
+func _connect_vertical_neighbors() -> void:
+	var keys: Array = nodes.keys()
+	keys.sort()
+	for i in range(keys.size()):
+		var ka: String = str(keys[i])
+		var pa: Vector3 = get_node_pos(ka)
+		for j in range(i + 1, keys.size()):
+			var kb: String = str(keys[j])
+			var pb: Vector3 = get_node_pos(kb)
+			var dx: float = absf(pa.x - pb.x)
+			var dy: float = absf(pa.y - pb.y)
+			var dz: float = absf(pa.z - pb.z)
+			if absf(dy - deck_height) >= 0.01:
+				continue
+			if dx < 0.01 and dz < 0.01:
+				edges[_edge_key(ka, kb)] = 1.25
+			elif (absf(dx - cell_size) < 0.01 and dz < 0.01) \
+					or (absf(dz - cell_size) < 0.01 and dx < 0.01) \
+					or (absf(dx - cell_size) < 0.01 and absf(dz - cell_size) < 0.01):
+				edges[_edge_key(ka, kb)] = 1.5
+
+func _connect_structural_edges(structural_plan: Dictionary) -> void:
+	var edges_variant: Variant = structural_plan.get("edges", null)
+	if edges_variant is Dictionary:
+		for edge_key_variant in (edges_variant as Dictionary).keys():
+			var edge_variant: Variant = (edges_variant as Dictionary)[edge_key_variant]
+			if edge_variant is Dictionary:
+				_connect_structural_edge(edge_variant as Dictionary)
+	elif edges_variant is Array:
+		for edge_variant in edges_variant as Array:
+			if edge_variant is Dictionary:
+				_connect_structural_edge(edge_variant as Dictionary)
+
+func _connect_structural_edge(edge: Dictionary) -> void:
+	var kind: String = str(edge.get("kind", edge.get("state", "SOLID"))).to_upper()
+	if kind == "SOLID":
+		return
+	var source_cells_variant: Variant = edge.get("source_cells", [])
+	if not (source_cells_variant is Array) or (source_cells_variant as Array).size() < 2:
+		return
+	var first: Dictionary = _read_structural_cell((source_cells_variant as Array)[0], int(edge.get("deck", -1)))
+	var second: Dictionary = _read_structural_cell((source_cells_variant as Array)[1], int(edge.get("deck", -1)))
+	if not bool(first.get("ok", false)) or not bool(second.get("ok", false)):
+		return
+	if int(first.get("deck", -1)) != int(second.get("deck", -1)):
+		return
+	var first_key: String = _key_for_cell(int(first["deck"]), first["cell"])
+	var second_key: String = _key_for_cell(int(second["deck"]), second["cell"])
+	if not nodes.has(first_key) or not nodes.has(second_key) or first_key == second_key:
+		return
+	if kind == "OPEN" or kind == "DOOR" or kind == "HATCH" or kind == "BREACH":
+		edges[_edge_key(first_key, second_key)] = 1.0
+	elif kind == "LOCKED":
+		edges[_edge_key(first_key, second_key)] = BLOCKED_COST
+
+func _read_structural_cell(value: Variant, default_deck: int) -> Dictionary:
+	if value is Array:
+		var values: Array = value
+		if values.size() < 2:
+			return {"ok": false}
+		var x: Variant = values[0]
+		var z: Variant = values[1]
+		if not _is_integer_value(x) or not _is_integer_value(z):
+			return {"ok": false}
+		var deck: int = default_deck
+		if values.size() >= 3 and _is_integer_value(values[2]):
+			deck = int(values[2])
+		if deck < 0:
+			return {"ok": false}
+		return {"ok": true, "cell": Vector2i(int(x), int(z)), "deck": deck}
+	if value is String:
+		var text: String = str(value).strip_edges()
+		if text.begins_with("(") and text.ends_with(")"):
+			text = text.substr(1, text.length() - 2)
+		var parts: PackedStringArray = text.split(",")
+		if parts.size() < 2:
+			parts = text.split(" ", false)
+		if parts.size() < 2:
+			return {"ok": false}
+		var x_text: String = parts[0].strip_edges()
+		var z_text: String = parts[1].strip_edges()
+		if not x_text.is_valid_int() or not z_text.is_valid_int():
+			return {"ok": false}
+		var deck: int = default_deck
+		if parts.size() >= 3 and parts[2].strip_edges().is_valid_int():
+			deck = int(parts[2].strip_edges())
+		if deck < 0:
+			return {"ok": false}
+		return {"ok": true, "cell": Vector2i(int(x_text), int(z_text)), "deck": deck}
+	return {"ok": false}
+
+func _key_for_cell(deck: int, cell: Vector2i) -> String:
+	return "%d:%d:%d" % [cell.x, deck, cell.y]
+
+func _is_integer_value(value: Variant) -> bool:
+	return typeof(value) == TYPE_INT or (typeof(value) == TYPE_FLOAT and is_equal_approx(float(value), roundf(float(value)))) or (typeof(value) == TYPE_STRING and str(value).is_valid_int())

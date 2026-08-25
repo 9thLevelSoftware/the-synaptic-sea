@@ -24,6 +24,22 @@ Expected markers:
 - `ROUTE CONTROL STATE PASS gates=2 opened=2 blockers=0 extraction=true`
 - `MAIN PLAYABLE ROUTE CONTROL PASS gates=1 opened=1 blockers=0 extraction=true`
 
+## Socketed enclosed interiors (ADR-0053) — GREEN
+
+Feature: `docs/game/features/socketed_enclosed_interiors.md`.
+Requirements: REQ-ENC-001..004.
+Registered in the regression bundle after GREEN.
+
+```bash
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/socketed_enclosure_smoke.gd
+```
+
+Expected:
+
+- `SOCKETED ENCLOSURE PASS no_floor_only=true no_room_gap=true sockets_consumed=true watertight=true corners_used=true floor_socket_axes=true hub_plan=true`
+
 ## Enclosed slot fill (REQ-FILL-001) — GREEN
 
 Feature: `docs/game/features/enclosed_slot_fill.md`.
@@ -412,12 +428,13 @@ run_clean 'template data smoke' 'TEMPLATE DATA PASS templates=3 all_valid=true' 
 run_clean 'template selector smoke' 'TEMPLATE SELECTOR PASS explicit=true deterministic=true varied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/template_selector_smoke.gd
 run_clean 'marker generator smoke' 'MARKER GENERATOR PASS deterministic=true per_cell=3 round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/marker_generator_smoke.gd
 run_clean 'wall door resolver smoke' 'WALL DOOR RESOLVER PASS walls=true portals=true interior=true no_conflict=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wall_door_resolver_smoke.gd
+run_clean 'socketed enclosure smoke' 'SOCKETED ENCLOSURE PASS no_floor_only=true no_room_gap=true sockets_consumed=true watertight=true corners_used=true floor_socket_axes=true hub_plan=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/socketed_enclosure_smoke.gd
 run_clean 'enclosed slot fill smoke' 'ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/enclosed_slot_fill_smoke.gd
 # seed_determinism's marker ends with the pipeline-output hash, which is
 # stable per code version but changes with ANY legitimate pipeline change —
 # the pin stops at `hash=` on purpose.
 run_clean 'seed determinism smoke' 'SEED DETERMINISM PASS fnv_empty=ok fnv_hello=ok match=true golden_match=true seeds_differ=true hash=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/seed_determinism_smoke.gd
-run_clean 'cell layout engine smoke' 'CELL LAYOUT ENGINE PASS rooms=6 adjacencies=5 no_overlap=true connected=true deterministic=true connections_wired=true stacked_v2_elevator=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cell_layout_engine_smoke.gd
+run_clean 'cell layout engine smoke' 'CELL LAYOUT ENGINE PASS rooms=6 adjacencies=6 no_overlap=true connected=true deterministic=true connections_wired=true stacked_v2_elevator=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/cell_layout_engine_smoke.gd
 run_clean 'room assigner smoke' 'ROOM ASSIGNER PASS rooms=5 first=airlock last=reactor keys=valid ids=unique deterministic=true guaranteed=enforced max_duplicates=enforced' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/room_assigner_smoke.gd
 run_clean 'layout serializer smoke' 'LAYOUT SERIALIZER PASS keys=valid rooms=2 schema=1.2.0 golden_format=true prototype=valid critical_path=valid portals_json=true link_deck=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/layout_serializer_smoke.gd
 run_clean 'ship layout generator smoke' 'SHIP LAYOUT GENERATOR PASS spine=true bifurcated=true stacked=true deterministic=true varied=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_layout_generator_smoke.gd
@@ -867,7 +884,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=631 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=632 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 

@@ -1615,6 +1615,75 @@ and the Task 15 documentation-currency deliverable. They are validated by
 
 ---
 
+# Socketed enclosed interiors (ADR-0053)
+
+## REQ-ENC-001: Topology construction emits connector-grown occupancy with shared edges
+
+- Source: `features/socketed_enclosed_interiors.md`
+- Type: technical / procgen
+- Priority: must
+- Status: Approved
+- Rationale: Occupancy-only greedy placement and `ROOM_GAP` spacing are why rooms do not exist as shared-edge volumes. The cell-grid contract stays; the placer algorithm does not.
+- Acceptance criteria:
+  - Every generated room is a non-empty 4-connected integer cell set on the 4 m grid.
+  - Template-declared connections become shared cardinal edges or vertical connections.
+  - No live path spaces rooms by `CELL_SIZE + ROOM_GAP`.
+  - `CellLayoutEngine.layout()` output shape (`rooms`, `adjacencies`, footprints) remains the input to serialization.
+- Verification:
+  - `socketed_enclosure_smoke.gd` (`no_room_gap=true` when GREEN)
+  - Existing `cell_layout_engine_smoke.gd` remains green
+
+## REQ-ENC-002: Boundary compilation consumes kit sockets and emits watertight rooms
+
+- Source: `features/socketed_enclosed_interiors.md`
+- Type: technical / procgen
+- Priority: must
+- Status: Approved
+- Rationale: Hardcoded `wall_straight_1x1` on occupancy edges ignores wrapper sockets, skips corners and ceilings, and produces walls that do not close rooms.
+- Acceptance criteria:
+  - The compiler loads `ModularAssetSpec` contracts for the layout `kit_id` and chooses `module_id` by socket match.
+  - Every occupied cell has a floor and a ceiling unless it is an authored vertical opening.
+  - Every exterior non-OPEN edge is a wall or portal with `socket_bindings`.
+  - Vertices use corner / junction modules when those contracts match.
+  - Floor cardinal sockets are XZ cell-edge positions (north = −Z), and `floor_edge` is compatible with `wall_base`.
+  - New plan fields live inside `structural_plan`; `layout.json` schema_version stays `1.2.0`.
+- Verification:
+  - `socketed_enclosure_smoke.gd` (`sockets_consumed`, `watertight`, `corners_used`, `floor_socket_axes` when GREEN)
+  - `structural_plan_validator` fail-closed on floor-only plans
+  - `wall_door_resolver_smoke.gd` and `structural_live_loader_smoke.gd` remain green
+
+## REQ-ENC-003: Hub and lifeboat use the same compiler; StructuralPlacer is not a live path
+
+- Source: `features/socketed_enclosed_interiors.md`
+- Type: technical / procgen
+- Priority: must
+- Status: Approved
+- Rationale: `LifeBoatBuilder.build()` still instances the deprecated gapped placer, and `build_layout()` writes floor-only rooms with empty portals.
+- Acceptance criteria:
+  - `LifeBoatBuilder.build_layout()` emits schema `1.2.0` with a validated `structural_plan` and portals on the two real shared edges.
+  - `LifeBoatBuilder.build()` instances that plan and does not call `StructuralPlacer.place_structure`.
+  - Enclosure rules in REQ-ENC-002 apply to the hub craft.
+- Verification:
+  - `socketed_enclosure_smoke.gd` (`hub_plan=true`, `no_floor_only=true` when GREEN)
+  - Existing `life_boat_layout_smoke.gd` remains green for the 3-room role contract
+
+## REQ-ENC-004: Biome kit selection remaps stems on the enclosed kit, and the enclosure smoke is the gate
+
+- Source: `features/socketed_enclosed_interiors.md`
+- Type: technical / procgen
+- Priority: should
+- Status: Approved
+- Rationale: `_kit_id_for_biome` currently returns `ship_structural_v0` for every biome, so derelict / hive flavour cannot skin enclosed rooms even after sockets work. Enclosure itself is REQ-ENC-001..003; this row is the theme binding.
+- Acceptance criteria:
+  - `kit_id` follows `KitCatalog` biome preference (`breach_field` → hazard kit, `dead_fleet` → industrial kit, default → `ship_structural_v0`) without changing occupancy.
+  - No new hive / wreck meshes are required; kits remap existing stems.
+  - `socketed_enclosure_smoke.gd` is RED (`SOCKETED ENCLOSURE FAIL`) until REQ-ENC-001..003 pass, then prints `SOCKETED ENCLOSURE PASS` and is added to the regression bundle. It is not in the bundle while RED.
+- Verification:
+  - `socketed_enclosure_smoke.gd`
+  - `kit_catalog_smoke.gd` remains green
+
+---
+
 # Enclosed slot fill (remaining procgen play stack WP3)
 
 ## REQ-FILL-001: Slot-native interior fill
@@ -1674,3 +1743,4 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - No extract requirement. Bundle pin does not include `seed=42`.
 - Verification:
   - `scripts/validation/generated_seed_boarded_slice_smoke.gd` — registered in the bundle in the same PR after GREEN
+

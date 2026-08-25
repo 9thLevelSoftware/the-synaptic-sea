@@ -98,6 +98,84 @@ func _initialize() -> void:
 		quit(1)
 		return
 
+	for rid in rooms.keys():
+		var room_cells: Array = rooms[rid].get("cells", [])
+		if room_cells.is_empty():
+			push_error("CELL LAYOUT ENGINE FAIL room %s has empty cells" % str(rid))
+			quit(1)
+			return
+		if not _cells_are_four_connected(room_cells):
+			push_error("CELL LAYOUT ENGINE FAIL room %s cells are not 4-connected" % str(rid))
+			quit(1)
+			return
+
+	for adj in adjacencies:
+		var fr: String = str(adj["from_room"])
+		var tr: String = str(adj["to_room"])
+		if not rooms.has(fr) or not rooms.has(tr):
+			push_error("CELL LAYOUT ENGINE FAIL adjacency names unknown room %s -> %s" % [fr, tr])
+			quit(1)
+			return
+		var from_deck: int = int(rooms[fr].get("deck", 0))
+		var to_deck: int = int(rooms[tr].get("deck", 0))
+		if from_deck != to_deck:
+			continue
+		var fc: Vector2i = _as_cell(adj.get("from_cell", null))
+		var tc: Vector2i = _as_cell(adj.get("to_cell", null))
+		if absi(tc.x - fc.x) + absi(tc.y - fc.y) != 1:
+			push_error("CELL LAYOUT ENGINE FAIL non-cardinal same-deck adjacency %s -> %s" % [fr, tr])
+			quit(1)
+			return
+		if not _room_has_cell(rooms[fr], fc) or not _room_has_cell(rooms[tr], tc):
+			push_error("CELL LAYOUT ENGINE FAIL adjacency cells not in footprints %s -> %s" % [fr, tr])
+			quit(1)
+			return
+
+	var entry_rooms: Array[String] = []
+	var spine_rooms: Array[String] = []
+	var side_rooms: Array[String] = []
+	var dest_rooms: Array[String] = []
+	for room in room_plan:
+		var zid: String = str(room.get("zone_id", ""))
+		var plan_rid: String = str(room["id"])
+		if zid == "entry":
+			entry_rooms.append(plan_rid)
+		elif zid == "spine":
+			spine_rooms.append(plan_rid)
+		elif zid == "side":
+			side_rooms.append(plan_rid)
+		elif zid == "destination":
+			dest_rooms.append(plan_rid)
+	if entry_rooms.is_empty() or spine_rooms.is_empty() or dest_rooms.is_empty():
+		push_error("CELL LAYOUT ENGINE FAIL test template missing entry/spine/destination rooms")
+		quit(1)
+		return
+	if not _rooms_share_edge(rooms, entry_rooms[0], spine_rooms[0]):
+		push_error("CELL LAYOUT ENGINE FAIL entry does not share an edge with spine[0]")
+		quit(1)
+		return
+	for i in range(spine_rooms.size() - 1):
+		if not _rooms_share_edge(rooms, spine_rooms[i], spine_rooms[i + 1]):
+			push_error("CELL LAYOUT ENGINE FAIL spine[%d] does not share an edge with spine[%d]" % [i, i + 1])
+			quit(1)
+			return
+	if not _rooms_share_edge(rooms, spine_rooms[spine_rooms.size() - 1], dest_rooms[0]):
+		push_error("CELL LAYOUT ENGINE FAIL spine[-1] does not share an edge with destination")
+		quit(1)
+		return
+	var side_touch: bool = side_rooms.is_empty()
+	for side_rid in side_rooms:
+		for spine_rid in spine_rooms:
+			if _rooms_share_edge(rooms, side_rid, spine_rid):
+				side_touch = true
+				break
+		if side_touch:
+			break
+	if not side_touch:
+		push_error("CELL LAYOUT ENGINE FAIL side does not share an edge with spine")
+		quit(1)
+		return
+
 	var grid_a: Dictionary = engine.layout(room_plan, template, 42)
 	var grid_b: Dictionary = engine.layout(room_plan, template, 42)
 	if str(grid_a) != str(grid_b):
@@ -184,3 +262,51 @@ func _initialize() -> void:
 
 	print("CELL LAYOUT ENGINE PASS rooms=%d adjacencies=%d no_overlap=true connected=true deterministic=true connections_wired=true stacked_v2_elevator=true" % [rooms.size(), adjacencies.size()])
 	quit(0)
+
+
+func _as_cell(raw: Variant) -> Vector2i:
+	if raw is Vector2i:
+		return raw
+	if raw is Array and (raw as Array).size() >= 2:
+		return Vector2i(int((raw as Array)[0]), int((raw as Array)[1]))
+	return Vector2i.ZERO
+
+
+func _room_has_cell(room_data: Dictionary, cell: Vector2i) -> bool:
+	for raw in room_data.get("cells", []):
+		if _as_cell(raw) == cell:
+			return true
+	return false
+
+
+func _rooms_share_edge(rooms: Dictionary, a: String, b: String) -> bool:
+	if not rooms.has(a) or not rooms.has(b):
+		return false
+	var a_set: Dictionary = {}
+	for raw in rooms[a].get("cells", []):
+		a_set[_as_cell(raw)] = true
+	for raw in rooms[b].get("cells", []):
+		var cell: Vector2i = _as_cell(raw)
+		for dir in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+			if a_set.has(Vector2i(cell.x + dir.x, cell.y + dir.y)):
+				return true
+	return false
+
+
+func _cells_are_four_connected(cells: Array) -> bool:
+	if cells.size() <= 1:
+		return true
+	var cell_set: Dictionary = {}
+	var start: Vector2i = _as_cell(cells[0])
+	for raw in cells:
+		cell_set[_as_cell(raw)] = true
+	var seen: Dictionary = {start: true}
+	var queue: Array = [start]
+	while not queue.is_empty():
+		var cur: Vector2i = queue.pop_front()
+		for dir in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+			var nxt: Vector2i = Vector2i(cur.x + dir.x, cur.y + dir.y)
+			if cell_set.has(nxt) and not seen.has(nxt):
+				seen[nxt] = true
+				queue.append(nxt)
+	return seen.size() == cell_set.size()

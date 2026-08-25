@@ -35,12 +35,14 @@
       "kind": "floor_edge",
       "position_m": [
         0.0,
-        -4.0,
-        0.0
+        0.0,
+        4.0
       ],
       "compatible_kinds": [
         "ramp_edge",
-        "floor_edge"
+        "floor_edge",
+        "corridor_edge",
+        "wall_base"
       ]
     },
     {
@@ -48,12 +50,14 @@
       "kind": "floor_edge",
       "position_m": [
         0.0,
-        4.0,
-        0.0
+        0.0,
+        -4.0
       ],
       "compatible_kinds": [
         "ramp_edge",
-        "floor_edge"
+        "floor_edge",
+        "corridor_edge",
+        "wall_base"
       ]
     }
   ],
@@ -110,12 +114,14 @@
         "kind": "floor_edge",
         "position_m": [
           0.0,
-          -4.0,
-          0.0
+          0.0,
+          4.0
         ],
         "compatible_kinds": [
           "ramp_edge",
-          "floor_edge"
+          "floor_edge",
+          "corridor_edge",
+          "wall_base"
         ]
       },
       {
@@ -123,12 +129,14 @@
         "kind": "floor_edge",
         "position_m": [
           0.0,
-          4.0,
-          0.0
+          0.0,
+          -4.0
         ],
         "compatible_kinds": [
           "ramp_edge",
-          "floor_edge"
+          "floor_edge",
+          "corridor_edge",
+          "wall_base"
         ]
       }
     ],

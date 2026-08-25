@@ -35,8 +35,8 @@
       "kind": "wall_face",
       "position_m": [
         0.0,
-        2.0,
-        0.0
+        0.0,
+        -2.0
       ],
       "compatible_kinds": [
         "wall_edge",
@@ -123,8 +123,8 @@
         "kind": "wall_face",
         "position_m": [
           0.0,
-          2.0,
-          0.0
+          0.0,
+          -2.0
         ],
         "compatible_kinds": [
           "wall_edge",

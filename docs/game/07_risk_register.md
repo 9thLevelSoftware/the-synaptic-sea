@@ -3,7 +3,7 @@
 | ID | Risk | Likelihood | Impact | Area | Mitigation | Owner | Status |
 |---|---|---:|---:|---|---|---|---|
 | RISK-001 | Proof-artifact churn displaces real gameplay systems | Medium | High | Process | Enforce docs/game operating model, feature specs, and validation gates | Coordinator | Open |
-| RISK-002 | Procedural interiors become spatially incoherent or jumbled | High | High | Design/Tech | Require corridor/socket/topology validation and locked-iso readability checks | Coordinator | Open |
+| RISK-002 | Procedural interiors become spatially incoherent or jumbled | High | High | Design/Tech | ADR-0053 replaces topology construction and boundary compilation only; kit sockets become runtime-authoritative; `socketed_enclosure_smoke` fails closed on floor-only, gapped, and socket-ignored rooms (RED until GREEN, then regression-bundled) | Coordinator | Open — specified 2026-08-22 |
 | RISK-003 | Route/system state becomes a god-object | Medium | Medium | Tech | Keep pure state models separated; scene coordinator applies consequences | Coordinator | Mitigated for route control |
 | RISK-004 | No-git workspace loses change provenance | Medium | High | Process | Maintain no-git ledgers and Kanban manifests until a repo boundary exists | Coordinator | Open |
 | RISK-005 | Workers implement ad-hoc tasks without specs | Medium | High | Process | Require Kanban card contract with source requirements, scope, non-goals, verification | Coordinator | Open |

@@ -178,10 +178,13 @@ func _generate_once(
 	layout["hazard_source"] = "runtime"
 
 	# Overlay locks/breaches before compile so the plan sees LOCKED/BREACH kinds.
+	# Recompile after stamp / kit_id so occupancy, ceilings, and socket_bindings
+	# match the solved footprints rather than the serializer's first pass.
 	# Wreck module_damage is keyed by compiler module_key and must land after
 	# the last compile (quality-gate never calls ShipGenerator).
 	_apply_condition_mutators(layout, blueprint)
 	if not _stamp_structural_plan(layout):
+		push_error("SHIP LAYOUT GENERATOR FAIL structural plan validation failed")
 		return {}
 	_apply_wreck_to_compiled_plan(layout, blueprint)
 
@@ -449,14 +452,12 @@ func _layout_is_connected(layout: Dictionary) -> bool:
 
 
 func _kit_id_for_biome(biome: String) -> String:
-	# Prefer abyssal-biased kit when present; else structural default.
+	# KitCatalog biome preference: enclosed rooms, remapped stems. No new meshes.
 	match biome:
-		"abyssal_synaptic_sea":
-			return "ship_structural_v0"
 		"breach_field":
-			return "ship_structural_v0"
+			return "ship_structural_hazard"
 		"dead_fleet":
-			return "ship_structural_v0"
+			return "ship_structural_industrial"
 		_:
 			return "ship_structural_v0"
 
