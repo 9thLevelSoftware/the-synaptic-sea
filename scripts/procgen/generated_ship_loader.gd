@@ -38,7 +38,6 @@ var goal_position: Vector3 = Vector3.INF
 var structural_root: Node3D
 var objective_root: Node3D
 var room_variant_descriptors: Dictionary = {}  # room_id -> {"variant": String, "dressing": String}
-var _load_source_paths: Dictionary = {}
 const RoomVariantSelectorDressScript := preload("res://scripts/procgen/room_variant_selector.gd")
 
 
@@ -93,17 +92,25 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 	if gameplay_doc.is_empty():
 		return _fail_load("gameplay slice JSON is invalid: %s" % gameplay_slice_abs)
 
-	_load_source_paths = {
-		"layout": layout_abs,
-		"kit": kit_abs,
-		"gameplay_slice": gameplay_slice_abs,
-	}
-	return load_from_documents(layout_doc, kit_doc, gameplay_doc, is_away)
+	return load_from_documents(
+		layout_doc,
+		kit_doc,
+		gameplay_doc,
+		is_away,
+		{
+			"layout": layout_abs,
+			"kit": kit_abs,
+			"gameplay_slice": gameplay_slice_abs,
+		}
+	)
 
 
-func load_from_documents(layout: Dictionary, kit: Dictionary, gameplay_slice: Dictionary, apply_atmosphere: bool) -> bool:
-	var source_paths: Dictionary = _load_source_paths
-	_load_source_paths = {}
+func load_from_documents(
+		layout: Dictionary,
+		kit: Dictionary,
+		gameplay_slice: Dictionary,
+		apply_atmosphere: bool,
+		source_paths: Dictionary = {}) -> bool:
 	clear_loaded_ship()
 	layout_doc = layout
 	kit_doc = kit
