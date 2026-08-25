@@ -258,25 +258,88 @@ func _serialize_portals(portals: Array) -> Array:
 
 func _serialize_interior_zones(zones: Dictionary) -> Dictionary:
 	var result: Dictionary = {}
-
-	var reserved: Array = zones.get("reserved_cells", [])
-	var serialized_reserved: Array = []
-	for cell in reserved:
-		if cell is Vector2i:
-			serialized_reserved.append([cell.x, cell.y])
-	result["reserved_cells"] = serialized_reserved
-
-	var wall_slots: Array = zones.get("wall_slots", [])
-	result["wall_slots"] = wall_slots
-
-	var center: Array = zones.get("center_slots", [])
-	var serialized_center: Array = []
-	for cell in center:
-		if cell is Vector2i:
-			serialized_center.append([cell.x, cell.y])
-	result["center_slots"] = serialized_center
-
+	result["reserved_cells"] = _serialize_cell_list(zones.get("reserved_cells", []))
+	result["center_slots"] = _serialize_cell_list(zones.get("center_slots", []))
+	result["wall_slots"] = _serialize_wall_slots(zones.get("wall_slots", []))
 	return result
+
+
+## Slot cells are always JSON `[x, z]` (deck lives on the room). Parses Vector2i,
+## arrays, and leftover "(x, y)" strings from older serializer output.
+static func parse_slot_cell(value: Variant) -> Array:
+	if value is Vector2i:
+		return [value.x, value.y]
+	if value is Vector2:
+		return [int(round((value as Vector2).x)), int(round((value as Vector2).y))]
+	if typeof(value) == TYPE_ARRAY:
+		var arr: Array = value
+		if arr.size() >= 2:
+			return [int(arr[0]), int(arr[1])]
+		return []
+	if typeof(value) == TYPE_DICTIONARY:
+		return parse_slot_cell((value as Dictionary).get("cell", null))
+	if typeof(value) != TYPE_STRING:
+		return []
+	var s: String = (value as String).strip_edges()
+	if s.begins_with("floor_cell"):
+		return _parse_floor_cell_name(s)
+	if s.begins_with("(") and s.ends_with(")") and s.length() >= 5:
+		s = s.substr(1, s.length() - 2)
+	var parts: PackedStringArray = s.split(",")
+	if parts.size() < 2:
+		return []
+	var xs: String = String(parts[0]).strip_edges()
+	var zs: String = String(parts[1]).strip_edges()
+	if xs.is_valid_float() and zs.is_valid_float():
+		return [int(round(float(xs))), int(round(float(zs)))]
+	return []
+
+
+static func _parse_floor_cell_name(placement_name: String) -> Array:
+	var parts: PackedStringArray = placement_name.split("_")
+	for i in range(parts.size()):
+		if String(parts[i]).begins_with("x") and i + 1 < parts.size() and String(parts[i + 1]).begins_with("z"):
+			var x_str: String = String(parts[i]).substr(1)
+			var z_str: String = String(parts[i + 1]).substr(1)
+			if x_str.is_valid_int() and z_str.is_valid_int():
+				return [int(x_str), int(z_str)]
+	return []
+
+
+func _serialize_cell_list(cells: Array) -> Array:
+	var serialized: Array = []
+	for cell in cells:
+		var parsed: Array = parse_slot_cell(cell)
+		if parsed.size() >= 2:
+			serialized.append(parsed)
+	return serialized
+
+
+func _serialize_wall_slots(slots: Array) -> Array:
+	var serialized: Array = []
+	for slot_variant in slots:
+		var cell_value: Variant = slot_variant
+		var against_wall: bool = true
+		var extra: Dictionary = {}
+		if typeof(slot_variant) == TYPE_DICTIONARY:
+			var slot: Dictionary = slot_variant
+			cell_value = slot.get("cell", null)
+			against_wall = bool(slot.get("against_wall", true))
+			for key in slot.keys():
+				if str(key) == "cell" or str(key) == "against_wall":
+					continue
+				extra[key] = slot[key]
+		var parsed: Array = parse_slot_cell(cell_value)
+		if parsed.size() < 2:
+			continue
+		var entry: Dictionary = {
+			"cell": parsed,
+			"against_wall": against_wall,
+		}
+		for key in extra.keys():
+			entry[key] = extra[key]
+		serialized.append(entry)
+	return serialized
 
 
 func _build_room_links(adjacencies: Array, rooms_data: Dictionary) -> Array:

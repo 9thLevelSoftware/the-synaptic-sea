@@ -59,6 +59,18 @@ func _initialize() -> void:
 		if not gen._layout_is_connected(layout):
 			_fail("disconnected layout seed=%d" % s)
 			return
+		if not bool(layout.get("wreck_applied", false)):
+			_fail("DAMAGED seed missing wreck_applied seed=%d" % s)
+			return
+		if not _blocked_hops_kept(layout):
+			_fail("blocked hop removed from room_links seed=%d" % s)
+			return
+		# Tree templates skip LOCKED/BREACH on every remaining hop (all
+		# bridges). wreck_applied + module_damage is the overlay there,
+		# matching live_decay_stamp_smoke.
+		if not _has_wreck_lock(layout) and not _has_module_damage(layout):
+			_fail("DAMAGED seed has no blocked_links/LOCKED edge or module_damage overlay seed=%d" % s)
+			return
 		# Guaranteed dock after alias normalization.
 		var roles: Dictionary = {}
 		for room_v2 in rooms:
@@ -72,7 +84,7 @@ func _initialize() -> void:
 		if not has_board:
 			_fail("layout has neither dock nor airlock boarding role seed=%d roles=%s" % [s, str(roles.keys())])
 			return
-		# Nav graph walkable start → goal
+		# Standing-play start → goal (compiler kinds; no 4-connect around SOLID/LOCKED).
 		var graph = ShipNavGraphScript.new()
 		var n: int = graph.build_from_layout(layout)
 		if n < rooms.size():
@@ -82,23 +94,28 @@ func _initialize() -> void:
 		var goal_id: String = str((layout.get("prototype", {}) as Dictionary).get("goal_room", ""))
 		var start_pos := Vector3.ZERO
 		var goal_pos := Vector3(8, 0, 0)
+		var plan_variant: Variant = layout.get("structural_plan", {})
+		var occupancy: Dictionary = {}
+		if plan_variant is Dictionary:
+			var occ_variant: Variant = (plan_variant as Dictionary).get("occupancy", {})
+			if occ_variant is Dictionary:
+				occupancy = occ_variant
 		for room_v3 in rooms:
 			if not (room_v3 is Dictionary):
 				continue
 			var rid: String = str((room_v3 as Dictionary).get("id", ""))
-			if rid == start_id or rid == goal_id:
-				var pl: Array = (room_v3 as Dictionary).get("structural_placements", []) as Array
-				if not pl.is_empty() and pl[0] is Dictionary:
-					var wp: Variant = (pl[0] as Dictionary).get("world_position", null)
-					if wp is Array and (wp as Array).size() >= 3:
-						var pos := Vector3(float(wp[0]), float(wp[1]), float(wp[2]))
-						if rid == start_id:
-							start_pos = pos
-						if rid == goal_id:
-							goal_pos = pos
+			if rid != start_id and rid != goal_id:
+				continue
+			var pos: Vector3 = _standing_room_pos(occupancy, room_v3 as Dictionary, rid)
+			if pos == Vector3.INF:
+				continue
+			if rid == start_id:
+				start_pos = pos
+			if rid == goal_id:
+				goal_pos = pos
 		var path: Array = ThreatPathfinderScript.find_path(graph, start_pos, goal_pos)
 		if path.is_empty() and start_id != goal_id:
-			_fail("no nav path start→goal seed=%d" % s)
+			_fail("no standing nav path start→goal seed=%d" % s)
 			return
 		# Encounters well-formed when density path active
 		var enc: Array = layout.get("encounters", []) as Array
@@ -134,9 +151,83 @@ func _initialize() -> void:
 		_fail("role alias guarantees failed: %s" % str(gr))
 		return
 
-	print("PROCGEN QUALITY GATE PASS seeds=%d layouts=%d walkable=true encounters=true schema=true" % [
+	print("PROCGEN QUALITY GATE PASS seeds=%d layouts=%d walkable=true encounters=true schema=true wreck=true" % [
 		seeds_run, layouts_ok])
 	quit(0)
+
+
+func _blocked_hops_kept(layout: Dictionary) -> bool:
+	var blocked_v: Variant = layout.get("blocked_links", [])
+	var links_v: Variant = layout.get("room_links", [])
+	if not (blocked_v is Array) or not (links_v is Array):
+		return false
+	for blocked_row in (blocked_v as Array):
+		if not (blocked_row is Dictionary):
+			continue
+		var a: String = str((blocked_row as Dictionary).get("from_room", ""))
+		var b: String = str((blocked_row as Dictionary).get("to_room", ""))
+		if a.is_empty() or b.is_empty():
+			continue
+		var found: bool = false
+		for link_row in (links_v as Array):
+			if not (link_row is Dictionary):
+				continue
+			var fa: String = str((link_row as Dictionary).get("from_room", ""))
+			var fb: String = str((link_row as Dictionary).get("to_room", ""))
+			if (fa == a and fb == b) or (fa == b and fb == a):
+				found = true
+				break
+		if not found:
+			return false
+	return true
+
+
+func _has_wreck_lock(layout: Dictionary) -> bool:
+	var blocked_v: Variant = layout.get("blocked_links", [])
+	if blocked_v is Array and not (blocked_v as Array).is_empty():
+		return true
+	var portals_v: Variant = layout.get("portals", [])
+	if portals_v is Array:
+		for portal_v in (portals_v as Array):
+			if portal_v is Dictionary and str((portal_v as Dictionary).get("state", "")).to_upper() == "LOCKED":
+				return true
+	var plan_v: Variant = layout.get("structural_plan", {})
+	if plan_v is Dictionary:
+		var edges_v: Variant = (plan_v as Dictionary).get("edges", {})
+		if edges_v is Dictionary:
+			for edge_v in (edges_v as Dictionary).values():
+				if not (edge_v is Dictionary):
+					continue
+				var kind: String = str((edge_v as Dictionary).get("kind", "")).to_upper()
+				if kind == "LOCKED":
+					return true
+	return false
+
+
+func _has_module_damage(layout: Dictionary) -> bool:
+	var md_v: Variant = layout.get("module_damage", [])
+	return md_v is Array and not (md_v as Array).is_empty()
+
+
+func _standing_room_pos(occupancy: Dictionary, room: Dictionary, room_id: String) -> Vector3:
+	for record_variant in occupancy.values():
+		if not (record_variant is Dictionary):
+			continue
+		var record: Dictionary = record_variant
+		if str(record.get("room_id", "")) != room_id:
+			continue
+		var raw: Variant = record.get("position", null)
+		if raw is Vector3:
+			return raw as Vector3
+		if raw is Array and (raw as Array).size() >= 3:
+			return Vector3(float(raw[0]), float(raw[1]), float(raw[2]))
+	var pl: Array = room.get("structural_placements", []) as Array
+	if not pl.is_empty() and pl[0] is Dictionary:
+		var wp: Variant = (pl[0] as Dictionary).get("world_position", null)
+		if wp is Array and (wp as Array).size() >= 3:
+			return Vector3(float(wp[0]), float(wp[1]), float(wp[2]))
+	return Vector3.INF
+
 
 func _load_json(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):

@@ -52,6 +52,7 @@ const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_ma
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_generator.gd")
 const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
+const LayoutSerializerScript := preload("res://scripts/procgen/layout_serializer.gd")
 const FirstRunContractScript := preload("res://scripts/procgen/first_run_contract.gd")
 const PlayerProgressionScript := preload("res://scripts/systems/player_progression_state.gd")
 const ClassDefinitionScript := preload("res://scripts/systems/class_definition.gd")
@@ -120,6 +121,7 @@ const WebInfestationStateScript := preload("res://scripts/systems/web_infestatio
 const FireSuppressionStateScript := preload("res://scripts/systems/fire_suppression_state.gd")
 const ModuleIntegrityMapScript := preload("res://scripts/systems/module_integrity_map.gd")
 const ModuleIntegrityConsequencesScript := preload("res://scripts/systems/module_integrity_consequences.gd")
+const IntegrityVisualResolverScript := preload("res://scripts/systems/integrity_visual_resolver.gd")
 const ModuleDamageRouterScript := preload("res://scripts/systems/module_damage_router.gd")
 const ExtinguisherStateScript := preload("res://scripts/systems/extinguisher_state.gd")
 const FireSuppressionPointScript := preload("res://scripts/tools/fire_suppression_point.gd")
@@ -3498,7 +3500,7 @@ func _apply_fire_module_integrity(delta: float) -> void:
 	if layout.is_empty():
 		return
 	if module_integrity_map.size() == 0:
-		ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
+		ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(module_integrity_map, layout)
 	var resist: float = _hub_structure_damage_resist()
 	var rate: float = ModuleIntegrityConsequencesScript.FIRE_MODULE_DAMAGE_PER_INTENSITY * (1.0 - resist)
 	var changed: Array = ModuleIntegrityConsequencesScript.apply_fire_damage(
@@ -3507,13 +3509,7 @@ func _apply_fire_module_integrity(delta: float) -> void:
 	if changed.is_empty():
 		return
 	_apply_module_integrity_scene(changed)
-	# Soften nav through rooms with breaches/destroyed walls (threat nav graph).
-	var nav = null
-	if threat_manager != null and "nav_graph" in threat_manager:
-		nav = threat_manager.nav_graph
-	if nav != null and nav is RefCounted and (nav as RefCounted).has_method("set_edge_cost_multiplier"):
-		var gap_rooms: PackedStringArray = module_integrity_map.rooms_with_nav_gaps()
-		ModuleIntegrityConsequencesScript.apply_nav_gaps(nav as RefCounted, gap_rooms)
+	_apply_integrity_nav_gaps()
 
 
 ## Hull breaches + module wall breaches (atmosphere links).
@@ -3593,10 +3589,7 @@ func _rebuild_component_markers() -> void:
 		if not bool(e.get("mounted", true)):
 			continue
 		var rid: String = str(e.get("room_id", ""))
-		var pos: Vector3 = centers.get(rid, Vector3(float(i) * 0.5, 0.5, 0.0)) as Vector3 if centers.has(rid) else Vector3(float(i) * 0.5, 0.5, 0.0)
-		# Offset wall slots slightly so markers do not stack.
-		var slot_i: int = int(e.get("slot_index", 0))
-		pos += Vector3(0.4 * float(slot_i % 3), 0.6, 0.25 * float(slot_i % 2))
+		var pos: Vector3 = _component_marker_world(layout, e, centers, i)
 		# Convert world → parent-local if parent is offset.
 		var local_pos: Vector3 = pos
 		if parent.is_inside_tree():
@@ -4066,7 +4059,7 @@ func _try_work_action_interact(player_body) -> bool:
 		if module_integrity_map == null:
 			module_integrity_map = ModuleIntegrityMapScript.new()
 		if module_integrity_map.size() == 0:
-			ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
+			ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(module_integrity_map, layout)
 		var has_lance: bool = int(inv.get("welding_lance", 0)) > 0 or int(inv.get("tool_welding_lance", 0)) > 0
 		var has_plate: bool = int(inv.get("hull_plate", 0)) > 0 or int(inv.get("plating_plate", 0)) > 0 or int(inv.get("hull_plate_kit", 0)) > 0
 		# REQ-SMOD / WA: weld damaged/breached modules when lance + plate available.
@@ -4146,7 +4139,7 @@ func play_work_tool_missing_sfx_for_validation() -> void:
 	_emit_work_tool_missing_sfx()
 
 
-## Nearest mounted component; uses room floor center as approximate world position.
+## Nearest mounted component; uses the same slot world position as the visible marker.
 func _nearest_mounted_component(layout: Dictionary, player_pos: Vector3, max_range: float) -> Dictionary:
 	var best: Dictionary = {}
 	var best_d: float = max_range
@@ -4154,25 +4147,26 @@ func _nearest_mounted_component(layout: Dictionary, player_pos: Vector3, max_ran
 		return best
 	var placed: Array = component_placement_state.get("placed") as Array if typeof(component_placement_state.get("placed")) == TYPE_ARRAY else []
 	var room_centers: Dictionary = _room_world_centers(layout)
+	var i: int = 0
 	for entry_v in placed:
 		if typeof(entry_v) != TYPE_DICTIONARY:
+			i += 1
 			continue
 		var e: Dictionary = entry_v
 		if not bool(e.get("mounted", true)):
+			i += 1
 			continue
-		var rid: String = str(e.get("room_id", ""))
-		if not room_centers.has(rid):
-			continue
-		var pos: Vector3 = room_centers[rid] as Vector3
+		var pos: Vector3 = _component_marker_world(layout, e, room_centers, i)
 		var d: float = player_pos.distance_to(pos)
 		if d <= best_d:
 			best_d = d
 			best = e.duplicate(true)
 			best["distance"] = d
+		i += 1
 	return best
 
 
-## Find dismounted placement whose item_form is in inventory and room is in range.
+## Find dismounted placement whose item_form is in inventory and slot is in range.
 func _nearest_remount_target(
 		layout: Dictionary,
 		player_pos: Vector3,
@@ -4184,21 +4178,24 @@ func _nearest_remount_target(
 		return best
 	var placed: Array = component_placement_state.get("placed") as Array if typeof(component_placement_state.get("placed")) == TYPE_ARRAY else []
 	var room_centers: Dictionary = _room_world_centers(layout)
+	var i: int = 0
 	for entry_v in placed:
 		if typeof(entry_v) != TYPE_DICTIONARY:
+			i += 1
 			continue
 		var e: Dictionary = entry_v
 		if bool(e.get("mounted", true)):
+			i += 1
 			continue
 		var form: String = str(e.get("item_form", e.get("component_id", "")))
 		if form.is_empty() or int(inventory.get(form, 0)) < 1:
+			i += 1
 			continue
 		var rid: String = str(e.get("room_id", ""))
-		if not room_centers.has(rid):
-			continue
-		var pos: Vector3 = room_centers[rid] as Vector3
+		var pos: Vector3 = _component_marker_world(layout, e, room_centers, i)
 		var d: float = player_pos.distance_to(pos)
 		if d > best_d:
+			i += 1
 			continue
 		best_d = d
 		best = {
@@ -4211,7 +4208,154 @@ func _nearest_remount_target(
 			"distance": d,
 			"item_form": form,
 		}
+		i += 1
 	return best
+
+
+func _slot_occupancy_from_loader() -> Dictionary:
+	var occupied: Dictionary = {}
+	var active_loader = current_ship.scene_root if (away_from_start and current_ship != null) else loader
+	if active_loader == null or not is_instance_valid(active_loader):
+		return occupied
+	var loot_v: Variant = active_loader.loot_container_specs if active_loader.get("loot_container_specs") != null else []
+	if loot_v is Array:
+		for loot_row in (loot_v as Array):
+			if typeof(loot_row) != TYPE_DICTIONARY:
+				continue
+			var loot: Dictionary = loot_row
+			_mark_occupancy(occupied, str(loot.get("room_id", "")), loot.get("approach_cell", []))
+	var gameplay: Dictionary = active_loader.gameplay_doc if typeof(active_loader.get("gameplay_doc")) == TYPE_DICTIONARY else {}
+	var objectives_v: Variant = gameplay.get("objectives", [])
+	if objectives_v is Array:
+		for obj_row in (objectives_v as Array):
+			if typeof(obj_row) != TYPE_DICTIONARY:
+				continue
+			_mark_objective_occupancy(occupied, obj_row)
+	var specs_v: Variant = active_loader.objective_specs if active_loader.get("objective_specs") != null else []
+	if specs_v is Array:
+		for spec_row in (specs_v as Array):
+			if typeof(spec_row) != TYPE_DICTIONARY:
+				continue
+			_mark_objective_occupancy(occupied, spec_row)
+	var start_room: String = str(gameplay.get("start_room", ""))
+	if start_room.is_empty() and typeof(active_loader.get("layout_doc")) == TYPE_DICTIONARY:
+		var proto: Variant = active_loader.layout_doc.get("prototype", {})
+		if proto is Dictionary:
+			start_room = str((proto as Dictionary).get("start_room", ""))
+	if not start_room.is_empty() and typeof(active_loader.get("layout_doc")) == TYPE_DICTIONARY:
+		var rooms_v: Variant = active_loader.layout_doc.get("rooms", [])
+		if rooms_v is Array:
+			for room_v in (rooms_v as Array):
+				if typeof(room_v) != TYPE_DICTIONARY:
+					continue
+				var room: Dictionary = room_v
+				if str(room.get("id", "")) != start_room:
+					continue
+				var boarding_cell: Array = GameplaySliceBuilderScript.boarding_cell_xz(room)
+				if boarding_cell.size() >= 2:
+					_mark_occupancy(occupied, start_room, boarding_cell)
+				break
+	_collect_dressing_occupancy(active_loader, occupied)
+	return occupied
+
+
+func _mark_objective_occupancy(occupied: Dictionary, obj: Dictionary) -> void:
+	var room_id: String = str(obj.get("room_id", ""))
+	_mark_occupancy(occupied, room_id, obj.get("approach_cell", []))
+	var steps_v: Variant = obj.get("steps", [])
+	if not (steps_v is Array):
+		return
+	for step_v in (steps_v as Array):
+		if typeof(step_v) != TYPE_DICTIONARY:
+			continue
+		var step: Dictionary = step_v
+		var step_room: String = str(step.get("room_id", room_id))
+		_mark_occupancy(occupied, step_room, step.get("approach_cell", []))
+
+
+func _mark_occupancy(occupied: Dictionary, room_id: String, cell_v: Variant) -> void:
+	if room_id.is_empty():
+		return
+	var parsed: Array = LayoutSerializerScript.parse_slot_cell(cell_v)
+	if parsed.size() >= 2:
+		occupied["%s|%d|%d" % [room_id, int(parsed[0]), int(parsed[1])]] = true
+
+
+func _collect_dressing_occupancy(root: Node, occupied: Dictionary) -> void:
+	if root == null:
+		return
+	if str(root.name).begins_with("DressingProp_"):
+		var cell_v: Variant = root.get_meta("slot_cell", [])
+		var parsed: Array = LayoutSerializerScript.parse_slot_cell(cell_v)
+		var room_id: String = str(root.name).trim_prefix("DressingProp_")
+		var cut: int = room_id.rfind("_")
+		if cut >= 0:
+			room_id = room_id.substr(0, cut)
+		if parsed.size() >= 2 and not room_id.is_empty():
+			occupied["%s|%d|%d" % [room_id, int(parsed[0]), int(parsed[1])]] = true
+	for child in root.get_children():
+		_collect_dressing_occupancy(child, occupied)
+
+
+func _component_marker_world(layout: Dictionary, entry: Dictionary, centers: Dictionary, i: int) -> Vector3:
+	var rid: String = str(entry.get("room_id", ""))
+	var parsed: Array = LayoutSerializerScript.parse_slot_cell(entry.get("cell", null))
+	if parsed.size() >= 2:
+		var room: Dictionary = {}
+		var rooms_v: Variant = layout.get("rooms", [])
+		if rooms_v is Array:
+			for room_v in (rooms_v as Array):
+				if typeof(room_v) == TYPE_DICTIONARY and str((room_v as Dictionary).get("id", "")) == rid:
+					room = room_v
+					break
+		var deck: int = int(room.get("deck", 0))
+		var world: Vector3 = _slot_cell_to_world(layout, room, parsed, deck)
+		if world != Vector3.INF:
+			if current_ship != null and is_instance_valid(current_ship.scene_root) and current_ship.scene_root is Node3D:
+				return (current_ship.scene_root as Node3D).global_transform * world
+			return world
+	var fallback: Vector3 = centers.get(rid, Vector3(float(i) * 0.5, 0.5, 0.0)) as Vector3 if centers.has(rid) else Vector3(float(i) * 0.5, 0.5, 0.0)
+	return fallback
+
+
+func _slot_cell_to_world(layout: Dictionary, room: Dictionary, cell: Array, deck: int) -> Vector3:
+	if cell.size() < 2:
+		return Vector3.INF
+	var room_id: String = str(room.get("id", ""))
+	var cell_key_value: String = "%d|%d|%d" % [deck, int(cell[0]), int(cell[1])]
+	var plan: Variant = layout.get("structural_plan", {})
+	if plan is Dictionary:
+		var floors_v: Variant = (plan as Dictionary).get("floor_placements", [])
+		if floors_v is Array:
+			for floor_v in (floors_v as Array):
+				if typeof(floor_v) != TYPE_DICTIONARY:
+					continue
+				var floor: Dictionary = floor_v
+				if str(floor.get("cell_key", "")) != cell_key_value:
+					continue
+				if not room_id.is_empty() and str(floor.get("room_id", "")) != room_id:
+					continue
+				var pos_v: Variant = floor.get("world_position", floor.get("position", null))
+				if pos_v is Array and (pos_v as Array).size() >= 3:
+					var a: Array = pos_v
+					return Vector3(float(a[0]), float(a[1]) + 0.12, float(a[2]))
+				if pos_v is Vector3:
+					var v: Vector3 = pos_v
+					return Vector3(v.x, v.y + 0.12, v.z)
+	var want_names: PackedStringArray = PackedStringArray()
+	want_names.append("floor_cell_x%d_z%d" % [int(cell[0]), int(cell[1])])
+	want_names.append("floor_cell_d%d_x%d_z%d" % [deck, int(cell[0]), int(cell[1])])
+	for p_v in room.get("structural_placements", []):
+		if typeof(p_v) != TYPE_DICTIONARY:
+			continue
+		var pname: String = str((p_v as Dictionary).get("name", ""))
+		if not want_names.has(pname):
+			continue
+		var pos_v2: Variant = (p_v as Dictionary).get("world_position", null)
+		if pos_v2 is Array and (pos_v2 as Array).size() >= 3:
+			var a2: Array = pos_v2
+			return Vector3(float(a2[0]), float(a2[1]) + 0.12, float(a2[2]))
+	return Vector3(float(cell[0]) * 4.0, float(deck) * 4.0 + 0.12, float(cell[1]) * 4.0)
 
 
 func _room_world_centers(layout: Dictionary) -> Dictionary:
@@ -4291,16 +4435,21 @@ func _nearest_damaged_wall_module(layout: Dictionary, player_pos: Vector3, max_r
 			var st2: String = str(module_integrity_map.get_state(id))
 			if st2 not in ["damaged", "breached"]:
 				continue
-			var rid: String = id.get_slice("/", 0)
-			var pos: Vector3 = room_centers.get(rid, Vector3.ZERO) as Vector3
-			if room_centers.has(rid):
+			var m = module_integrity_map.call("get_module", id) if module_integrity_map.has_method("get_module") else null
+			var pos: Vector3 = _compiled_wrapper_world_position(id)
+			if pos == Vector3.INF:
+				var rid: String = str(m.get("room_id")) if m != null else ""
+				if rid.is_empty():
+					var prefix: String = id.get_slice("/", 0)
+					if prefix == "floor" or prefix == "edge" or prefix == "ceiling":
+						continue
+					rid = prefix
+				if not room_centers.has(rid):
+					continue
 				pos = room_centers[rid] as Vector3
-			else:
-				continue
 			var d: float = player_pos.distance_to(pos)
 			if d <= best_d:
 				best_d = d
-				var m = module_integrity_map.call("get_module", id) if module_integrity_map.has_method("get_module") else null
 				var kind: String = str(m.get("kind")) if m != null else "wall"
 				best = {"module_id": id, "kind": kind, "distance": d}
 	return best
@@ -4652,16 +4801,34 @@ func _apply_module_integrity_scene(module_ids: Array) -> void:
 		var st: String = str(module_integrity_map.get_state(mid))
 		var node: Node = _find_structural_module_node(root, mid)
 		if node is Node3D:
+			IntegrityVisualResolverScript.apply_visual_state(node as Node3D, st)
 			ModuleIntegrityConsequencesScript.apply_to_node(node as Node3D, st)
 
 
 func _find_structural_module_node(root: Node, module_key: String) -> Node:
-	# module_key format: room_id/placement_name → node name room_id_placement_name
+	if root == null or module_key.is_empty():
+		return null
+	var by_meta: Node = _scan_structural_module_meta(root, module_key)
+	if by_meta != null:
+		return by_meta
+	# Legacy goldens: room_id/placement_name → node name room_id_placement_name
 	var parts: PackedStringArray = module_key.split("/")
 	if parts.size() < 2:
 		return root.find_child(module_key, true, false)
 	var expected: String = "%s_%s" % [parts[0], parts[1]]
 	return root.find_child(expected, true, false)
+
+
+func _scan_structural_module_meta(node: Node, module_key: String) -> Node:
+	if node.has_meta("module_key") and str(node.get_meta("module_key")) == module_key:
+		return node
+	if node.has_meta("structural_placement_id") and str(node.get_meta("structural_placement_id")) == module_key:
+		return node
+	for child in node.get_children():
+		var found: Node = _scan_structural_module_meta(child, module_key)
+		if found != null:
+			return found
+	return null
 
 func _build_fire_zones() -> void:
 	_clear_fire_zones()
@@ -4910,7 +5077,7 @@ func _apply_decompression_module_damage(compartment_id: String) -> void:
 	if layout.is_empty() and module_integrity_map.size() == 0:
 		return
 	if module_integrity_map.size() == 0 and not layout.is_empty():
-		ModuleIntegrityConsequencesScript.seed_map_from_layout(module_integrity_map, layout)
+		ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(module_integrity_map, layout)
 	var resist: float = _hub_structure_damage_resist()
 	var amount: float = ModuleDamageRouterScript.DEFAULT_DECOMPRESSION_AMOUNT * (1.0 - resist)
 	var changed: Array = ModuleDamageRouterScript.apply_decompression_to_compartment(
@@ -6762,12 +6929,17 @@ func _sync_current_ship_pillar_summaries() -> void:
 	if current_ship == null:
 		return
 	if module_integrity_map != null and module_integrity_map.has_method("get_summary"):
-		var mi: Dictionary = module_integrity_map.get_summary()
-		var deltas: Array = mi.get("deltas", []) as Array if typeof(mi.get("deltas", [])) == TYPE_ARRAY else []
-		if deltas.is_empty():
-			current_ship.module_integrity_summary = {}
-		else:
-			current_ship.module_integrity_summary = mi.duplicate(true)
+		# Hub DAMAGED/WRECKED `_on_ship_loaded` may never have seeded the map.
+		# Packing an empty-delta summary then would look initialized and skip
+		# wreck restamp on restore. Seed first when live deltas are also empty.
+		if current_ship.module_integrity_summary.is_empty():
+			var live: Dictionary = module_integrity_map.get_summary()
+			var live_d: Variant = live.get("deltas", [])
+			if not (live_d is Array) or (live_d as Array).is_empty():
+				_restore_module_integrity_for_current_ship()
+		# Persist even when deltas are empty so a fully repaired ship is not
+		# treated as a first visit (which would restamp layout.module_damage).
+		current_ship.module_integrity_summary = module_integrity_map.get_summary().duplicate(true)
 	if component_placement_state != null and component_placement_state.has_method("get_summary"):
 		var cp: Dictionary = component_placement_state.get_summary()
 		var placed: Array = cp.get("placed", []) as Array if typeof(cp.get("placed", [])) == TYPE_ARRAY else []
@@ -6781,10 +6953,22 @@ func _restore_module_integrity_for_current_ship() -> void:
 	module_integrity_map = ModuleIntegrityMapScript.new()
 	if current_ship == null:
 		return
+	var layout: Dictionary = {}
+	if current_ship.built_layout is Dictionary:
+		layout = current_ship.built_layout
+	elif is_instance_valid(loader) and loader.has_method("get_layout_copy"):
+		layout = loader.get_layout_copy()
 	var packed: Dictionary = current_ship.module_integrity_summary
-	if typeof(packed) == TYPE_DICTIONARY and not packed.is_empty():
-		if module_integrity_map.has_method("apply_summary"):
-			module_integrity_map.apply_summary(packed)
+	var has_deltas: bool = typeof(packed) == TYPE_DICTIONARY and not packed.is_empty()
+	if not layout.is_empty():
+		# Revisit: register every compiled module, skip wreck restamp so
+		# persisted deltas win. First visit applies layout.module_damage.
+		ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(
+			module_integrity_map, layout, not has_deltas)
+	if has_deltas and module_integrity_map.has_method("apply_sparse_deltas"):
+		var deltas_v: Variant = packed.get("deltas", [])
+		if deltas_v is Array:
+			module_integrity_map.apply_sparse_deltas(deltas_v as Array)
 	_apply_module_integrity_state_to_scene()
 
 
@@ -6804,7 +6988,7 @@ func _restore_or_populate_component_placement_for_current_ship() -> void:
 		_clear_component_markers()
 		return
 	var seed_v: int = _component_placement_seed_for_current_ship()
-	component_placement_state.populate(layout, component_catalog, seed_v)
+	component_placement_state.populate(layout, component_catalog, seed_v, _slot_occupancy_from_loader())
 	# REQ-CMP-002: map systems.json subcomponents onto physical placements.
 	var systems_doc: Dictionary = _load_json_dict("res://data/ship_systems/systems.json")
 	if not systems_doc.is_empty():
@@ -6849,6 +7033,7 @@ func _configure_threat_runtime_for_current_ship() -> void:
 			threat_manager.configure_nav_graph(_combat_layout_for_current_ship())
 	else:
 		threat_manager.configure_for_layout(_combat_layout_for_current_ship(), _combat_markers_for_current_ship(), anchor)
+	_apply_integrity_nav_gaps()
 	_refresh_weapon_hotbar()
 
 func _refresh_weapon_hotbar() -> void:
@@ -6996,6 +7181,37 @@ func _refresh_threat_nav_costs() -> void:
 				and not str(h.compartment_a).is_empty() and not str(h.compartment_b).is_empty():
 			bulkheads.append([str(h.compartment_a), str(h.compartment_b)])
 	threat_manager.update_nav_dynamic_costs(fire_rooms, bulkheads)
+	# reset_dynamic_costs copies _base_edges; re-apply integrity gaps after that.
+	_apply_integrity_nav_gaps()
+
+func _apply_integrity_nav_gaps() -> void:
+	if module_integrity_map == null or threat_manager == null:
+		return
+	if not ("nav_graph" in threat_manager):
+		return
+	var nav = threat_manager.nav_graph
+	if nav == null or not (nav is RefCounted) or not (nav as RefCounted).has_method("set_edge_cost_multiplier"):
+		return
+	if not module_integrity_map.has_method("rooms_with_nav_gaps"):
+		return
+	var gap_rooms: PackedStringArray = module_integrity_map.rooms_with_nav_gaps()
+	ModuleIntegrityConsequencesScript.apply_nav_gaps(nav as RefCounted, gap_rooms)
+
+
+func _compiled_wrapper_world_position(module_key: String) -> Vector3:
+	if module_key.is_empty():
+		return Vector3.INF
+	var root: Node = null
+	if current_ship != null and is_instance_valid(current_ship.scene_root):
+		root = current_ship.scene_root
+	elif is_instance_valid(loader):
+		root = loader
+	if root == null:
+		return Vector3.INF
+	var node: Node = _find_structural_module_node(root, module_key)
+	if node is Node3D:
+		return (node as Node3D).global_position
+	return Vector3.INF
 
 func _consumable_pipeline_context() -> Dictionary:
 	return {
@@ -9997,11 +10213,27 @@ func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	if utility_item_state != null and not snapshot.utility_summary.is_empty():
 		utility_item_state.apply_summary(snapshot.utility_summary)
 	# PKG-D6.1 / D2.6 / D8: restore pillar + ship-mod models after reload rebuild.
-	if module_integrity_map != null and not snapshot.module_integrity_summary.is_empty():
-		module_integrity_map.apply_summary(snapshot.module_integrity_summary)
-		_apply_module_integrity_state_to_scene()
-		if current_ship != null:
-			current_ship.module_integrity_summary = snapshot.module_integrity_summary.duplicate(true)
+	# apply_summary() clears then restores sparse deltas; seed compiled first so
+	# fire/decomp still find pristine walls in the same room.
+	if module_integrity_map != null:
+		var snap_layout: Dictionary = {}
+		if current_ship != null and current_ship.built_layout is Dictionary:
+			snap_layout = current_ship.built_layout
+		elif is_instance_valid(loader) and loader.has_method("get_layout_copy"):
+			snap_layout = loader.get_layout_copy()
+		if not snap_layout.is_empty():
+			ModuleIntegrityConsequencesScript.seed_map_from_compiled_layout(
+				module_integrity_map, snap_layout, false)
+		if not snapshot.module_integrity_summary.is_empty():
+			var packed: Dictionary = snapshot.module_integrity_summary
+			var deltas_v: Variant = packed.get("deltas", [])
+			if module_integrity_map.has_method("apply_sparse_deltas") and deltas_v is Array:
+				module_integrity_map.apply_sparse_deltas(deltas_v as Array)
+			else:
+				module_integrity_map.apply_summary(packed)
+			_apply_module_integrity_state_to_scene()
+			if current_ship != null:
+				current_ship.module_integrity_summary = packed.duplicate(true)
 	if component_placement_state != null and not snapshot.component_placement_summary.is_empty():
 		component_placement_state.apply_summary(snapshot.component_placement_summary)
 		if current_ship != null:

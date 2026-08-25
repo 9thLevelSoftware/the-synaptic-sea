@@ -4,6 +4,12 @@ class_name GeneratedShipLoader
 const GameplayObjectiveVolumeScript := preload("res://scripts/procgen/gameplay_objective_volume.gd")
 const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
 const SliceAtmosphereApplierScript := preload("res://scripts/procgen/slice_atmosphere_applier.gd")
+const IntegrityVisualResolverScript := preload("res://scripts/systems/integrity_visual_resolver.gd")
+const LayoutSerializerScript := preload("res://scripts/procgen/layout_serializer.gd")
+const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
+const ComponentPlacementStateScript := preload("res://scripts/systems/component_placement_state.gd")
+
+const DRESSING_PROP_KINDS: Array[String] = ["crate", "pipe", "growth"]
 
 signal ship_loaded(summary: Dictionary)
 signal load_failed(reason: String)
@@ -160,6 +166,7 @@ func load_from_documents(layout: Dictionary, kit: Dictionary, gameplay_slice: Di
 	if instantiated_count < 0:
 		clear_loaded_ship()
 		return _fail_load("failed to instantiate structural wrapper scenes")
+	_apply_module_damage_visuals(layout_doc, structural_root)
 
 	var nav_region: NavigationRegion3D = _build_navigation_region(rooms, structural_root)
 	if nav_region == null:
@@ -470,6 +477,7 @@ func _build_objective_specs(layout_doc: Dictionary, gameplay_doc: Dictionary, ga
 			"type": str(objective.get("type", "unknown")),
 			"kind": kind,
 			"room_id": room_id,
+			"approach_cell": approach_cell.duplicate(),
 			"position": target_position,
 			"radius": OBJECTIVE_TRIGGER_RADIUS,
 			"steps": step_specs,
@@ -507,13 +515,18 @@ func _build_loot_container_specs(layout_doc: Dictionary, gameplay_doc: Dictionar
 		var pos: Vector3 = _room_cell_world(room, approach_variant as Array)
 		if pos == Vector3.INF:
 			continue
-		out.append({
+		var loot_spec: Dictionary = {
 			"id": cid,
 			"kind": str(c.get("kind", "generic_crate")),
 			"room_id": room_id,
 			"loot_table": str(c.get("loot_table", "generic_crate")),
 			"position": pos,
-		})
+			"approach_cell": (approach_variant as Array).duplicate(),
+		}
+		if c.has("slot_kind"):
+			loot_spec["slot_kind"] = str(c.get("slot_kind", ""))
+			loot_spec["slot_index"] = int(c.get("slot_index", 0))
+		out.append(loot_spec)
 	return out
 
 
@@ -628,7 +641,7 @@ func _free_cached_prototypes(scene_cache: Dictionary) -> void:
 func _instantiate_structural_record(
 		record_variant: Variant,
 		module_to_scene: Dictionary,
-		record_kind: String,
+		layer: String,
 		scene_cache: Dictionary) -> Node3D:
 	if typeof(record_variant) != TYPE_DICTIONARY:
 		return null
@@ -666,20 +679,21 @@ func _instantiate_structural_record(
 		return null
 	wrapper.position = Vector3(float(placement_pos[0]), float(placement_pos[1]), float(placement_pos[2]))
 	wrapper.rotation_degrees.y = float(record.get("yaw_degrees", 0.0))
-	if record_kind == "floor":
+	var placement_id: String = str(record.get("placement_id", record.get("id", "")))
+	if layer == "floor":
 		var cell_key_value: String = str(record.get("cell_key", ""))
 		wrapper.name = "Floor_%s" % cell_key_value.replace("|", "_")
-		wrapper.set_meta("structural_floor_placement_id", str(record.get("placement_id", record.get("id", ""))))
+		wrapper.set_meta("structural_floor_placement_id", placement_id)
 		wrapper.set_meta("structural_cell_key", cell_key_value)
 		wrapper.set_meta("structural_room_id", str(record.get("room_id", "")))
 		wrapper.set_meta("structural_kind", "FLOOR")
 		wrapper.set_meta("module_kind", module_id)
 		wrapper.set_meta("module_key", "floor/%s" % cell_key_value)
 		wrapper.set_meta("room_id", str(record.get("room_id", "")))
-	elif record_kind == "ceiling":
+	elif layer == "ceiling":
 		var ceiling_key: String = str(record.get("cell_key", ""))
 		wrapper.name = "Ceiling_%s" % ceiling_key.replace("|", "_")
-		wrapper.set_meta("structural_ceiling_placement_id", str(record.get("placement_id", record.get("id", ""))))
+		wrapper.set_meta("structural_ceiling_placement_id", placement_id)
 		wrapper.set_meta("structural_ceiling_cell_key", ceiling_key)
 		wrapper.set_meta("structural_room_id", str(record.get("room_id", "")))
 		wrapper.set_meta("structural_kind", "CEILING")
@@ -691,7 +705,7 @@ func _instantiate_structural_record(
 		wrapper.name = "StructuralEdge_%s" % edge_key_value.replace("|", "_")
 		wrapper.set_meta("structural_edge_key", edge_key_value)
 		wrapper.set_meta("structural_kind", str(record.get("kind", "")))
-		wrapper.set_meta("structural_placement_id", str(record.get("placement_id", record.get("id", ""))))
+		wrapper.set_meta("structural_placement_id", placement_id)
 		wrapper.set_meta("structural_room_ids", (record.get("room_ids", []) as Array).duplicate(true))
 		wrapper.set_meta("module_kind", module_id)
 		wrapper.set_meta("module_key", "edge/%s" % edge_key_value)
@@ -699,6 +713,55 @@ func _instantiate_structural_record(
 		wrapper.set_meta("room_id", str(room_ids[0]) if not room_ids.is_empty() else "")
 	wrapper.set_meta("integrity_state", "intact")
 	return wrapper
+
+
+func _apply_module_damage_visuals(layout: Dictionary, ship_root: Node3D) -> void:
+	if ship_root == null:
+		return
+	var lookup: Dictionary = _module_damage_lookup(layout)
+	if lookup.is_empty():
+		return
+	_apply_module_damage_visuals_in_tree(ship_root, lookup)
+
+
+func _module_damage_lookup(layout: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	var md_v: Variant = layout.get("module_damage", [])
+	if typeof(md_v) != TYPE_ARRAY:
+		return out
+	for row_v in (md_v as Array):
+		if typeof(row_v) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = row_v
+		var key: String = str(row.get("module_key", row.get("module_id", "")))
+		if not key.is_empty():
+			out[key] = row
+		var placement_id: String = str(row.get("placement_id", ""))
+		if not placement_id.is_empty():
+			out[placement_id] = row
+	return out
+
+
+func _apply_module_damage_visuals_in_tree(node: Node, lookup: Dictionary) -> void:
+	if node is Node3D and node.has_meta("module_key"):
+		var module_key: String = str(node.get_meta("module_key"))
+		var placement_id: String = ""
+		if node.has_meta("structural_placement_id"):
+			placement_id = str(node.get_meta("structural_placement_id"))
+		elif node.has_meta("structural_floor_placement_id"):
+			placement_id = str(node.get_meta("structural_floor_placement_id"))
+		elif node.has_meta("structural_ceiling_placement_id"):
+			placement_id = str(node.get_meta("structural_ceiling_placement_id"))
+		var row_v: Variant = lookup.get(module_key, lookup.get(placement_id, {}))
+		if row_v is Dictionary and not (row_v as Dictionary).is_empty():
+			var state: String = str((row_v as Dictionary).get("state", "intact"))
+			if state.is_empty():
+				state = "intact"
+			(node as Node3D).set_meta("integrity_state", state)
+			if state != "intact":
+				IntegrityVisualResolverScript.apply_visual_state(node as Node3D, state)
+	for child in node.get_children():
+		_apply_module_damage_visuals_in_tree(child, lookup)
 
 
 func _parse_prefixed_int(value: String, prefix: String) -> int:
@@ -1059,8 +1122,8 @@ func _build_room_variant_descriptors() -> void:
 		room_variant_descriptors[rid] = entry
 
 
-## PKG-B5.1: per-room OmniLight + fog volume markers driven by dressing presets.
-## Deterministic positions from room centers; no RNG.
+## PKG-B5.1: per-room OmniLight + fog at room centers; REQ-FILL-001 dressing
+## props occupy unused wall_slots. Lights/fog stay at the room center.
 func _apply_dressing_visuals(layout_doc: Dictionary, ship_root: Node3D) -> void:
 	if ship_root == null or room_variant_descriptors.is_empty():
 		return
@@ -1070,16 +1133,31 @@ func _apply_dressing_visuals(layout_doc: Dictionary, ship_root: Node3D) -> void:
 	var dressing_root := Node3D.new()
 	dressing_root.name = "DressingVisuals"
 	ship_root.add_child(dressing_root)
-	for rid in room_variant_descriptors.keys():
+	var occupied: Dictionary = _dressing_occupied_cells(layout_doc, rooms_variant as Array)
+	var seed_value: int = _seed_from_layout_doc(layout_doc)
+	var room_index: int = 0
+	for room_variant in (rooms_variant as Array):
+		if typeof(room_variant) != TYPE_DICTIONARY:
+			room_index += 1
+			continue
+		var room: Dictionary = room_variant
+		var rid: String = str(room.get("id", ""))
+		if rid.is_empty() or not room_variant_descriptors.has(rid):
+			room_index += 1
+			continue
 		var desc: Dictionary = room_variant_descriptors[rid]
 		var dressing: String = str(desc.get("dressing", ""))
 		if dressing.is_empty():
+			room_index += 1
 			continue
-		var center: Vector3 = _room_center(rooms_variant as Array, str(rid))
+		var center: Vector3 = _room_center(rooms_variant as Array, rid)
 		if center == Vector3.INF:
+			center = _room_center_from_cells(room)
+		if center == Vector3.INF:
+			room_index += 1
 			continue
 		var light := OmniLight3D.new()
-		light.name = "DressingLight_%s" % str(rid)
+		light.name = "DressingLight_%s" % rid
 		light.position = center + Vector3(0.0, 2.0, 0.0)
 		light.light_energy = float(desc.get("light_energy", 0.5))
 		light.omni_range = 6.0
@@ -1097,7 +1175,7 @@ func _apply_dressing_visuals(layout_doc: Dictionary, ship_root: Node3D) -> void:
 		var fog_density: float = float(desc.get("fog_density", 0.0))
 		if fog_density > 0.001:
 			var fog_marker := MeshInstance3D.new()
-			fog_marker.name = "DressingFog_%s" % str(rid)
+			fog_marker.name = "DressingFog_%s" % rid
 			var sphere := SphereMesh.new()
 			sphere.radius = 1.5 + fog_density * 20.0
 			sphere.height = sphere.radius * 2.0
@@ -1114,6 +1192,259 @@ func _apply_dressing_visuals(layout_doc: Dictionary, ship_root: Node3D) -> void:
 			fog_marker.set_meta("dressing", dressing)
 			fog_marker.set_meta("fog_density", fog_density)
 			dressing_root.add_child(fog_marker)
+		_place_dressing_props(
+			dressing_root,
+			room,
+			rid,
+			dressing,
+			float(desc.get("prop_density", 1.0)),
+			occupied,
+			seed_value,
+			room_index
+		)
+		room_index += 1
+
+
+func _room_center_from_cells(room: Dictionary) -> Vector3:
+	var cells: Variant = room.get("cells", [])
+	if not (cells is Array) or (cells as Array).is_empty():
+		return Vector3.INF
+	var total := Vector3.ZERO
+	var n: int = 0
+	var deck: int = int(room.get("deck", 0))
+	for cell_v in (cells as Array):
+		var parsed: Array = LayoutSerializerScript.parse_slot_cell(cell_v)
+		if parsed.size() < 2:
+			continue
+		total += Vector3(float(parsed[0]) * CELL_SIZE, float(deck) * 4.0 + FLOOR_Y_OFFSET, float(parsed[1]) * CELL_SIZE)
+		n += 1
+	if n <= 0:
+		return Vector3.INF
+	return total / float(n)
+
+
+func _seed_from_layout_doc(layout: Dictionary) -> int:
+	if layout.has("seed_value"):
+		return int(layout.get("seed_value", 0))
+	var pid: String = str(layout.get("program_id", ""))
+	var idx: int = pid.rfind("seed-")
+	if idx < 0:
+		return 0
+	var tail: String = pid.substr(idx + 5)
+	var digits: String = ""
+	for i in range(tail.length()):
+		var ch: String = tail.substr(i, 1)
+		if ch.is_valid_int():
+			digits += ch
+		else:
+			break
+	return int(digits) if digits.is_valid_int() else 0
+
+
+func _dressing_occupied_cells(layout_doc: Dictionary, rooms: Array) -> Dictionary:
+	var occupied: Dictionary = {}
+	var start_room: String = str(layout_doc.get("prototype", {}).get("start_room", "")) if typeof(layout_doc.get("prototype", {})) == TYPE_DICTIONARY else ""
+	if start_room.is_empty():
+		start_room = str(gameplay_doc.get("start_room", ""))
+	for room_variant in rooms:
+		if typeof(room_variant) != TYPE_DICTIONARY:
+			continue
+		var room: Dictionary = room_variant
+		var rid: String = str(room.get("id", ""))
+		var interior: Variant = room.get("interior_zones", {})
+		if interior is Dictionary:
+			var reserved_v: Variant = (interior as Dictionary).get("reserved_cells", [])
+			if reserved_v is Array:
+				for cell_v in (reserved_v as Array):
+					var parsed: Array = LayoutSerializerScript.parse_slot_cell(cell_v)
+					if parsed.size() >= 2:
+						occupied["%s|%d|%d" % [rid, int(parsed[0]), int(parsed[1])]] = true
+		if rid == start_room:
+			var boarding: Array = GameplaySliceBuilderScript.boarding_cell_xz(room)
+			if boarding.size() >= 2:
+				occupied["%s|%d|%d" % [rid, int(boarding[0]), int(boarding[1])]] = true
+	for loot_variant in loot_container_specs:
+		if typeof(loot_variant) != TYPE_DICTIONARY:
+			continue
+		var loot: Dictionary = loot_variant
+		var cell_v: Variant = loot.get("approach_cell", [])
+		var parsed: Array = LayoutSerializerScript.parse_slot_cell(cell_v)
+		if parsed.size() >= 2:
+			occupied["%s|%d|%d" % [str(loot.get("room_id", "")), int(parsed[0]), int(parsed[1])]] = true
+	var objectives_v: Variant = gameplay_doc.get("objectives", [])
+	if objectives_v is Array:
+		for obj_v in (objectives_v as Array):
+			if typeof(obj_v) != TYPE_DICTIONARY:
+				continue
+			var obj: Dictionary = obj_v
+			_occupy_approach(occupied, str(obj.get("room_id", "")), obj.get("approach_cell", []))
+			var steps_v: Variant = obj.get("steps", [])
+			if steps_v is Array:
+				for step_v in (steps_v as Array):
+					if typeof(step_v) != TYPE_DICTIONARY:
+						continue
+					var step: Dictionary = step_v
+					_occupy_approach(
+						occupied,
+						str(step.get("room_id", obj.get("room_id", ""))),
+						step.get("approach_cell", []))
+	_reserve_component_slots(rooms, occupied)
+	return occupied
+
+
+func _occupy_approach(occupied: Dictionary, room_id: String, cell_v: Variant) -> void:
+	var parsed: Array = LayoutSerializerScript.parse_slot_cell(cell_v)
+	if parsed.size() < 2 or room_id.is_empty():
+		return
+	occupied["%s|%d|%d" % [room_id, int(parsed[0]), int(parsed[1])]] = true
+
+
+func _reserve_component_slots(rooms: Array, occupied: Dictionary) -> void:
+	# Components populate after dressing; hold the same 3 wall + 1 center cap
+	# those fills will take so clutter cannot steal machine slots.
+	# Small rooms (≤ MAX_WALL_FILLS free walls) keep one wall for dressing.
+	for room_variant in rooms:
+		if typeof(room_variant) != TYPE_DICTIONARY:
+			continue
+		var room: Dictionary = room_variant
+		var rid: String = str(room.get("id", ""))
+		if rid.is_empty():
+			continue
+		var interior: Variant = room.get("interior_zones", {})
+		if not (interior is Dictionary):
+			continue
+		var walls: Dictionary = interior as Dictionary
+		var wall_free: int = _unoccupied_slot_count(rid, walls, "wall_slots", occupied)
+		var wall_cap: int = ComponentPlacementStateScript.MAX_WALL_FILLS
+		if wall_free > 0 and wall_free <= ComponentPlacementStateScript.MAX_WALL_FILLS:
+			wall_cap = maxi(0, wall_free - 1)
+		_reserve_slot_kind(rid, walls, "wall_slots", wall_cap, occupied)
+		_reserve_slot_kind(rid, walls, "center_slots", ComponentPlacementStateScript.MAX_CENTER_FILLS, occupied)
+
+
+func _unoccupied_slot_count(rid: String, interior: Dictionary, slot_key: String, occupied: Dictionary) -> int:
+	var slots_v: Variant = interior.get(slot_key, [])
+	if not (slots_v is Array):
+		return 0
+	var n: int = 0
+	for item in (slots_v as Array):
+		var parsed: Array = LayoutSerializerScript.parse_slot_cell(item)
+		if parsed.size() < 2:
+			continue
+		var key: String = "%s|%d|%d" % [rid, int(parsed[0]), int(parsed[1])]
+		if occupied.has(key):
+			continue
+		n += 1
+	return n
+
+
+func _reserve_slot_kind(rid: String, interior: Dictionary, slot_key: String, max_count: int, occupied: Dictionary) -> void:
+	var slots_v: Variant = interior.get(slot_key, [])
+	if not (slots_v is Array):
+		return
+	var kept: int = 0
+	for item in (slots_v as Array):
+		if kept >= max_count:
+			break
+		var parsed: Array = LayoutSerializerScript.parse_slot_cell(item)
+		if parsed.size() < 2:
+			continue
+		var key: String = "%s|%d|%d" % [rid, int(parsed[0]), int(parsed[1])]
+		if occupied.has(key):
+			continue
+		occupied[key] = true
+		kept += 1
+
+
+func _place_dressing_props(
+		dressing_root: Node3D,
+		room: Dictionary,
+		rid: String,
+		dressing: String,
+		prop_density: float,
+		occupied: Dictionary,
+		seed_value: int,
+		room_index: int) -> void:
+	var interior: Variant = room.get("interior_zones", {})
+	if not (interior is Dictionary):
+		return
+	var wall_v: Variant = (interior as Dictionary).get("wall_slots", [])
+	if not (wall_v is Array) or (wall_v as Array).is_empty():
+		return
+	var available: Array = []
+	for i in range((wall_v as Array).size()):
+		var parsed: Array = LayoutSerializerScript.parse_slot_cell((wall_v as Array)[i])
+		if parsed.size() < 2:
+			continue
+		var key: String = "%s|%d|%d" % [rid, int(parsed[0]), int(parsed[1])]
+		if occupied.has(key):
+			continue
+		available.append({"cell": parsed, "index": i})
+	if available.is_empty():
+		return
+	var count: int = clampi(int(round(float(available.size()) * prop_density)), 0, available.size())
+	if prop_density > 0.001 and not available.is_empty():
+		count = maxi(1, count)
+	if count <= 0:
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = (int(seed_value) ^ int(room_index)) & 0x7FFFFFFF
+	if rng.seed == 0:
+		rng.seed = 1
+	var deck: int = int(room.get("deck", 0))
+	for p in range(count):
+		var slot: Dictionary = available[p]
+		var cell: Array = slot.get("cell", [])
+		var world: Vector3 = _room_cell_world(room, [int(cell[0]), int(cell[1]), deck])
+		if world == Vector3.INF:
+			world = Vector3(float(cell[0]) * CELL_SIZE, float(deck) * 4.0 + FLOOR_Y_OFFSET, float(cell[1]) * CELL_SIZE)
+		var kind: String = DRESSING_PROP_KINDS[rng.randi_range(0, DRESSING_PROP_KINDS.size() - 1)]
+		var prop: Node3D = _create_dressing_prop(rid, p, kind)
+		prop.position = world
+		prop.set_meta("dressing", dressing)
+		prop.set_meta("slot_kind", "wall")
+		prop.set_meta("slot_index", int(slot.get("index", p)))
+		prop.set_meta("slot_cell", cell.duplicate())
+		dressing_root.add_child(prop)
+		occupied["%s|%d|%d" % [rid, int(cell[0]), int(cell[1])]] = true
+
+
+func _create_dressing_prop(room_id: String, index: int, kind: String) -> Node3D:
+	var root := Node3D.new()
+	root.name = "DressingProp_%s_%d" % [room_id, index]
+	root.set_meta("collision_policy", "none_visual_only")
+	root.set_meta("dressing_kind", kind)
+	root.set_meta("normal_mode_visual", true)
+	var mesh_i := MeshInstance3D.new()
+	mesh_i.name = "DressingMesh"
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	match kind:
+		"pipe":
+			var cyl := CylinderMesh.new()
+			cyl.top_radius = 0.12
+			cyl.bottom_radius = 0.12
+			cyl.height = 1.4
+			mesh_i.mesh = cyl
+			mesh_i.position = Vector3(0.0, 0.7, 0.0)
+			mesh_i.rotation_degrees = Vector3(0.0, 0.0, 90.0)
+			mat.albedo_color = Color(0.45, 0.48, 0.42)
+		"growth":
+			var sphere := SphereMesh.new()
+			sphere.radius = 0.28
+			sphere.height = 0.56
+			mesh_i.mesh = sphere
+			mesh_i.position = Vector3(0.0, 0.28, 0.0)
+			mat.albedo_color = Color(0.42, 0.16, 0.22)
+		_:
+			var box := BoxMesh.new()
+			box.size = Vector3(0.55, 0.45, 0.55)
+			mesh_i.mesh = box
+			mesh_i.position = Vector3(0.0, 0.225, 0.0)
+			mat.albedo_color = Color(0.55, 0.42, 0.28)
+	mesh_i.material_override = mat
+	root.add_child(mesh_i)
+	return root
 
 
 func _add_fire_zone_markers(layout_doc: Dictionary, ship_root: Node3D) -> void:

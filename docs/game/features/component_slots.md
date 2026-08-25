@@ -5,6 +5,11 @@
 In implementation — B2.3a population + B2.3b mount/dismount pure WorkActions landed;
 scene interactables / home reinstall UI still open.
 
+Live generated rooms now feed those slots through `room.interior_zones`
+(REQ-FILL-001 / `features/enclosed_slot_fill.md`). `_extract_slots` reads
+`interior_zones` before `room[slot_key]` / `room.zones`; synthesis remains
+goldens-only when `interior_zones` is missing or empty.
+
 ## Design pillar alignment
 
 - Pillar: Salvage / Craft / Repair + Procgen dressing (pre-polish plan Parts 2.3, 5.2)

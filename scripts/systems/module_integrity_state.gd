@@ -22,6 +22,8 @@ var base_integrity: float = 1.0
 var tool_class_required: String = ""
 ## Owning room (optional; used for fire/nav routing).
 var room_id: String = ""
+## All rooms sharing this compiled module (shared walls).
+var owner_rooms: PackedStringArray = PackedStringArray()
 
 
 func configure(config: Dictionary = {}) -> void:

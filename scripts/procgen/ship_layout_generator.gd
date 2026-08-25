@@ -25,8 +25,10 @@ const BiomeProfileScript := preload("res://scripts/procgen/biome_profile.gd")
 const DifficultyProfileScript := preload("res://scripts/procgen/difficulty_profile.gd")
 const EncounterInjectorScript := preload("res://scripts/procgen/encounter_injector.gd")
 const StructuralEdgePlanScript := preload("res://scripts/procgen/structural_edge_plan.gd")
+const LayoutMutatorScript := preload("res://scripts/procgen/layout_mutator.gd")
 const StructuralEdgeCompilerScript := preload("res://scripts/procgen/structural_edge_compiler.gd")
 const StructuralPlanValidatorScript := preload("res://scripts/procgen/structural_plan_validator.gd")
+const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 
 var template_selector: RefCounted = TemplateSelectorScript.new()
 var room_assigner: RefCounted = RoomAssignerScript.new()
@@ -156,9 +158,15 @@ func _generate_once(
 		var injector: RefCounted = EncounterInjectorScript.new()
 		layout = injector.inject(layout, biome, difficulty, int(blueprint.seed_value))
 
+	# Stamp template_id here (not in LayoutSerializer) so golden schema-key
+	# coherence stays on serializer output. Hive binds biomatter independent of biome.
+	layout["template_id"] = str(template.id)
 	# Stamp biome / difficulty / kit_id / hazard authority on the layout.
 	if not biome_id.is_empty():
 		layout["biome_id"] = biome_id
+	if str(template.id) == "hive":
+		layout["kit_id"] = "ship_structural_biomatter"
+	elif not biome_id.is_empty():
 		# E3: biome-biased structural kit preference (loader still uses module ids).
 		layout["kit_id"] = _kit_id_for_biome(biome_id)
 	elif str(layout.get("kit_id", "")).is_empty():
@@ -169,13 +177,55 @@ func _generate_once(
 	# remain optional overlays (goldens may still author markers).
 	layout["hazard_source"] = "runtime"
 
+	# Overlay locks/breaches before compile so the plan sees LOCKED/BREACH kinds.
 	# Recompile after stamp / kit_id so occupancy, ceilings, and socket_bindings
 	# match the solved footprints rather than the serializer's first pass.
+	# Wreck module_damage is keyed by compiler module_key and must land after
+	# the last compile (quality-gate never calls ShipGenerator).
+	_apply_condition_mutators(layout, blueprint)
 	if not _stamp_structural_plan(layout):
 		push_error("SHIP LAYOUT GENERATOR FAIL structural plan validation failed")
 		return {}
+	_apply_wreck_to_compiled_plan(layout, blueprint)
 
 	return layout
+
+
+func _apply_condition_mutators(layout: Dictionary, blueprint: RefCounted) -> void:
+	if blueprint == null:
+		return
+	var condition: int = int(blueprint.condition)
+	if condition == ShipBlueprintScript.Condition.PRISTINE:
+		return
+	var seed_value: int = int(blueprint.seed_value)
+	LayoutMutatorScript.apply_branch_overlays(layout, seed_value)
+	var wrecked: bool = condition == ShipBlueprintScript.Condition.WRECKED
+	LayoutMutatorScript.apply_portal_overlays(layout, seed_value, wrecked)
+
+
+func _stamp_structural_plan(layout: Dictionary) -> bool:
+	var compiler: RefCounted = StructuralEdgeCompilerScript.new()
+	var structural_plan: Dictionary = compiler.compile(layout)
+	var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout)
+	if not bool(verdict.get("ok", false)):
+		push_error("SHIP LAYOUT GENERATOR FAIL structural plan validation failed: %s" % JSON.stringify(verdict.get("errors", [])))
+		layout["structural_plan_validated"] = false
+		return false
+	layout["structural_plan"] = structural_plan
+	layout["structural_plan_validated"] = true
+	return true
+
+
+func _apply_wreck_to_compiled_plan(layout: Dictionary, blueprint: RefCounted) -> void:
+	if blueprint == null:
+		return
+	var condition: int = int(blueprint.condition)
+	if condition == ShipBlueprintScript.Condition.PRISTINE:
+		return
+	var frac: float = 0.35
+	if condition == ShipBlueprintScript.Condition.WRECKED:
+		frac = 0.55
+	LayoutMutatorScript.apply_wreck_to_compiled_plan(layout, int(blueprint.seed_value), null, frac)
 
 
 func _stamp_explicit_structural_layout(layout: Dictionary, cell_grid: Dictionary) -> bool:
@@ -399,17 +449,6 @@ func _layout_is_connected(layout: Dictionary) -> bool:
 			seen[n] = true
 			q.append(n)
 	return seen.size() >= room_ids.size()
-
-
-func _stamp_structural_plan(layout: Dictionary) -> bool:
-	var compiler: RefCounted = StructuralEdgeCompilerScript.new()
-	var structural_plan: Dictionary = compiler.compile(layout)
-	var verdict: Dictionary = StructuralPlanValidatorScript.new().validate(structural_plan, layout)
-	if not bool(verdict.get("ok", false)):
-		push_error("SHIP LAYOUT GENERATOR FAIL structural plan validation failed: %s" % str(verdict.get("errors", [])))
-		return false
-	layout["structural_plan"] = structural_plan
-	return true
 
 
 func _kit_id_for_biome(biome: String) -> String:

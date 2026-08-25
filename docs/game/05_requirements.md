@@ -1539,6 +1539,60 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - Future prop validator with `--check-index`.
   - Future structural audit where structural records participate in the derived view.
 
+## REQ-WALK-001: Compiler-edge walkability and nav
+
+- Source: `features/compiler_walkability.md`, ADR-0054
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Enclosure flood must stay watertight including `LOCKED`/`BREACH`; standing play and production `ShipNavGraph` must not tunnel `SOLID`, `LOCKED`, or `BREACH`.
+- Acceptance criteria:
+  - Two floods: enclosure = non-SOLID all occupied cells; standing-play = OPEN/DOOR/HATCH + `vertical_connections`, start→goal only.
+  - `ShipNavGraph` standing path cannot cross `SOLID`, `LOCKED`, or `BREACH`.
+  - `LOCKED`/`BREACH` exist in `_base_edges` at `BLOCKED_COST` for the life of this stack (no `unlock_edge`).
+  - Walkability Stage A capsule-sweeps SOLID (must hit 0.20 m slab) and DOOR (must pass 0.80×1.70 opening).
+  - `coherent_ship_001` biomatter shortcut is standing-blocked.
+  - Stacked `vertical_connections` path.
+- Verification:
+  - `procgen_walkability_smoke.gd`
+  - `ship_nav_graph_smoke.gd`
+  - `procgen_quality_gate_smoke.gd`
+
+## REQ-DECAY-001: Live wreck stamps
+
+- Source: `features/live_decay_stamping.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: DAMAGED/WRECKED generation must overlay locked doors and pre-damaged modules on the live compile path without deleting `room_links`.
+- Acceptance criteria:
+  - `Condition.DAMAGED` / `WRECKED` layouts overlay `blocked_links` without removing `room_links`.
+  - Matching portals are `LOCKED` (optional existing-DOOR `BREACH` on WRECKED). Never insert a portal.
+  - `wreck_applied=true` and `module_damage` keyed by loader `module_key` after the last compile.
+  - At least one wrapper is not `intact`, with the Damaged or Breached child visible.
+  - Imports emit no unclassified ERROR/WARNING. `_layout_is_connected` remains true. Standing start→goal remains.
+- Verification:
+  - `live_decay_stamp_smoke.gd`
+  - `structural_variant_wrapper_smoke.gd`
+  - `procgen_quality_gate_smoke.gd`
+
+## REQ-DECAY-002: Structural wrapper collision matches walkability contract
+
+- Source: `features/structural_wrapper_collision.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Live wall/door proxies must be 0.20 m slabs and a posts+header opening, not 1×1×1 cubes, so the player capsule matches Stage A walkability numbers.
+- Acceptance criteria:
+  - `wall_straight_1x1` / `wall_end_cap` one `BoxShape3D(4, 3, 0.2)`.
+  - Inner/outer corner two wing slabs (not a 4×3×4 AABB); T-junction three wing slabs.
+  - `doorway_frame_open_1x1` posts at X ±1.3 m plus header bottom at Y=2.2 m; standing 0.80×1.70 opening is clear.
+  - `doorway_frame_blocked_1x1` full `BoxShape3D(4, 3.2, 0.2)` slab.
+  - `bulkhead_portal_2x1` unchanged.
+  - Numbers match `walkability_contract.gd`.
+- Verification:
+  - `structural_wrapper_collision_footprint_smoke.gd`
+
 ## REQ-AVB-009: Explicit derived refresh preserves authored extensions
 
 - Source: `features/asset_metadata_pipeline.md`, ADR-0052
@@ -1557,6 +1611,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
     a blind destructive rewrite or add a timestamp.
 - Verification:
   - Future prop validator refresh-preservation check.
+  - Future prop visual binding smoke with an extension/provenance fixture.
 
 ---
 
@@ -1626,3 +1681,66 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Verification:
   - `socketed_enclosure_smoke.gd`
   - `kit_catalog_smoke.gd` remains green
+
+---
+
+# Enclosed slot fill (remaining procgen play stack WP3)
+
+## REQ-FILL-001: Slot-native interior fill
+
+- Source: `features/enclosed_slot_fill.md`, `features/remaining_procgen_play_stack.md` WP3
+- Type: gameplay / technical
+- Priority: must
+- Status: Implemented
+- Rationale: Enclosed rooms already expose `wall_slots` / `center_slots`; dumping loot on the first `floor_cell_*` is the remaining empty-box tell.
+- Acceptance criteria:
+  - Consumers read `room.interior_zones.{wall_slots,center_slots,reserved_cells}` with `[x, z]` cells (one-release parse of `"(x, y)"` strings).
+  - Generated loot / salvage / components / dressing use those slots; no live dump on the first `floor_cell_*` unless that cell is the chosen slot.
+  - Dressing clutter is not `ReadabilityPropFactory` unique affordance names; props are `DressingProp_<room>_<index>` with `collision_policy=none_visual_only`.
+  - Slots stay compile-time SOLID-wall cells; do not re-resolve after BREACH overlay.
+- Verification:
+  - `scripts/validation/enclosed_slot_fill_smoke.gd` marker `ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true`
+  - Existing component slot smokes remain green
+
+---
+
+# Hive topology + biomatter kit remap
+
+## REQ-HIVE-001: Hive template + biomatter kit remap
+
+- Source: `features/hive_biomatter_kit.md`
+- Type: technical / procgen
+- Priority: should
+- Status: Approved
+- Rationale: Hive flavour is occupancy topology plus a kit-id stamp on the same sockets. Unique meshes and a fourth biome are later content.
+- Acceptance criteria:
+  - `hive.json` loads through `CellLayoutEngine` (shared cardinal edges, integer occupancy).
+  - Generator stamps `template_id` after serialize (not in `LayoutSerializer`).
+  - When `template_id == "hive"`, `kit_id = ship_structural_biomatter`, independent of biome.
+  - That kit’s `modules[].godot_wrapper_scene` may be v0 paths (intentional first milestone, not a visual remap).
+  - Compiler sockets fall back to v0 contracts. `ShipGenerator` passes a kit file that contains wrapper scenes.
+  - `"hive"` is in `EXTENDED_TEMPLATES` only — not a derelict guaranteed template, not forced into the 16-seed quality-gate pool.
+- Verification:
+  - `hive_biomatter_kit_smoke.gd` (`HIVE BIOMATTER KIT PASS template=true kit=true sockets_fallback=true occupancy=true v0_paths=true`)
+  - `kit_catalog_smoke.gd` remains green
+  - `template_selector_smoke.gd` legacy three unchanged
+
+---
+
+# Boarded generated-seed slice
+
+## REQ-SLICE-001: Boarded generated-seed play proof
+
+- Source: `features/generated_seed_boarded_slice.md`, `features/vertical_slice_v1.md`
+- Type: gameplay / technical
+- Priority: must
+- Status: Validated
+- Rationale: Walkability, live decay, wrapper collision, and slot fill are only play once a production `travel_to` boarding attaches `current_ship` and enters the away `_process` branch. `generate_from_seed` alone does not board.
+- Acceptance criteria:
+  - Headless `travel_to_marker_id` boarding of a generated wreck (not `coherent_ship_001`), copied from `away_branch_integrity_smoke.gd`.
+  - `away_from_start` is true as a result of `_attach_derelict_active`.
+  - Standing nav start→goal, slot-placed loot, wreck overlay when the boarded condition is DAMAGED/WRECKED, at least one objective, `away_ticks=30`.
+  - No extract requirement. Bundle pin does not include `seed=42`.
+- Verification:
+  - `scripts/validation/generated_seed_boarded_slice_smoke.gd` — registered in the bundle in the same PR after GREEN
+

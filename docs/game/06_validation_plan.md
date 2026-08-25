@@ -31,8 +31,8 @@ Requirements: REQ-ENC-001..004.
 Registered in the regression bundle after GREEN.
 
 ```bash
-ROOT="${ROOT:-/Users/christopherwilloughby/the-synaptic-sea-of-stars}"
-GODOT="${GODOT:-/Users/christopherwilloughby/.local/bin/godot-4.6.2}"
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
 "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/socketed_enclosure_smoke.gd
 ```
 
@@ -40,12 +40,58 @@ Expected:
 
 - `SOCKETED ENCLOSURE PASS no_floor_only=true no_room_gap=true sockets_consumed=true watertight=true corners_used=true floor_socket_axes=true hub_plan=true`
 
+## Enclosed slot fill (REQ-FILL-001) — GREEN
+
+Feature: `docs/game/features/enclosed_slot_fill.md`.
+
+```bash
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/enclosed_slot_fill_smoke.gd
+```
+
+Expected:
+
+- `ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true`
+
+## Hive template + biomatter kit remap (REQ-HIVE-001) — GREEN
+
+Feature: `docs/game/features/hive_biomatter_kit.md`.
+Requirement: REQ-HIVE-001.
+Registered in the regression bundle after GREEN.
+
+```bash
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hive_biomatter_kit_smoke.gd
+```
+
+Expected:
+
+- `HIVE BIOMATTER KIT PASS template=true kit=true sockets_fallback=true occupancy=true v0_paths=true`
+
+## Boarded generated-seed slice (REQ-SLICE-001) — GREEN
+
+Feature: `docs/game/features/generated_seed_boarded_slice.md`. Hub remains golden `coherent_ship_001`.
+
+```bash
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/generated_seed_boarded_slice_smoke.gd
+```
+
+Expected:
+
+- `GENERATED SEED BOARDED SLICE PASS away=true nav=true slots=true wreck=true objectives=true away_ticks=30`
+
+`seed=` on the same line is informational. Do not pin `seed=42`.
+
 ## Regression bundle
 
 ```bash
 set -euo pipefail
-ROOT="${ROOT:-/Users/christopherwilloughby/the-synaptic-sea-of-stars}"
-GODOT="${GODOT:-/Users/christopherwilloughby/.local/bin/godot-4.6.2}"
+ROOT="${ROOT:-.}"
+GODOT="${GODOT:-/opt/homebrew/bin/godot}"
 # Known baseline Godot shutdown lines that appear identically in every
 # unchanged smoke (route-control, completion, input, readability, oxygen,
 # hazard, ship-systems) and are NOT introduced by the Synaptic Sea hazard code
@@ -126,9 +172,9 @@ ENCOUNTER_TABLE_WARNING="^WARNING: EncounterInjector: encounter table file missi
 # zone pools can host the archetype's guaranteed "dock" — the assigner's
 # guarantee post-pass (Tranche 5 enforcement) correctly reports the skip.
 # The dock itself is guaranteed by the v3 RoomGraphGenerator layer (the same
-# smoke asserts dock_count==1) and by the derelict_a/b templates; production
-# derelict travel passes an empty archetype, so this diagnostic never fires
-# in play.
+# smoke asserts dock_count==1) and by the derelict_a/b templates. Production
+# generate_from_seed (travel_to / generated_seed_boarded_slice_smoke) can emit
+# the same skip when the selected template has no dock zone.
 DOCK_GUARANTEE_WARNING="^WARNING: RoomAssigner: guaranteed role 'dock' has no eligible zone in this template; guarantee skipped\$"
 # Soft-fail when all salted connectivity retries still produce a disconnected layout
 # (best-effort ship still returned; quality gate fails hard on disconnect).
@@ -383,6 +429,7 @@ run_clean 'template selector smoke' 'TEMPLATE SELECTOR PASS explicit=true determ
 run_clean 'marker generator smoke' 'MARKER GENERATOR PASS deterministic=true per_cell=3 round_trip=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/marker_generator_smoke.gd
 run_clean 'wall door resolver smoke' 'WALL DOOR RESOLVER PASS walls=true portals=true interior=true no_conflict=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/wall_door_resolver_smoke.gd
 run_clean 'socketed enclosure smoke' 'SOCKETED ENCLOSURE PASS no_floor_only=true no_room_gap=true sockets_consumed=true watertight=true corners_used=true floor_socket_axes=true hub_plan=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/socketed_enclosure_smoke.gd
+run_clean 'enclosed slot fill smoke' 'ENCLOSED SLOT FILL PASS loot_on_slot=true no_floor_dump=true components_on_cell=true dressing=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/enclosed_slot_fill_smoke.gd
 # seed_determinism's marker ends with the pipeline-output hash, which is
 # stable per code version but changes with ANY legitimate pipeline change —
 # the pin stops at `hash=` on purpose.
@@ -405,12 +452,14 @@ run_clean 'load from blueprint smoke' 'LOAD FROM BLUEPRINT INTEGRATION PASS size
 run_clean 'ship generator smoke' 'SHIP GENERATOR PASS life_boat=true small=true deterministic=true life_rooms=10 small_rooms=12' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_generator_smoke.gd
 run_clean 'procgen playable ship smoke' 'PLAYABLE SHIP SMOKE PASS player_spawned=true collision_checked=true interaction_completed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_playable_ship_smoke.gd
 run_clean 'procgen runtime demo smoke' 'RUNTIME GAMEPLAY DEMO PASS objectives=4 interactions=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_runtime_demo_smoke.gd
-run_clean 'procgen walkability smoke' 'WALKABILITY PASS spine_seed_42' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_walkability_smoke.gd
+run_clean 'procgen walkability smoke' 'WALKABILITY PASS spine_seed_42 compiler_walls=true doorway=true no_void=true no_wall_through=true nav_kinds=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_walkability_smoke.gd
 run_clean 'interior aabb smoke' 'INTERIOR AABB PASS nondegenerate=true positioned=true contains=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interior_aabb_smoke.gd
-run_clean 'kit catalog smoke' 'KIT CATALOG PASS loaded=3 default=ship_structural_v0 airlock=3 eng=3 breach_select=ok fallback=ok real_stems=true default_role_module=floor_1x1 ids_sorted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/kit_catalog_smoke.gd
+run_clean 'kit catalog smoke' 'KIT CATALOG PASS loaded=6 default=ship_structural_v0 airlock=3 eng=3 breach_select=ok fallback=ok real_stems=true default_role_module=floor_1x1 ids_sorted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/kit_catalog_smoke.gd
+run_clean 'hive biomatter kit smoke' 'HIVE BIOMATTER KIT PASS template=true kit=true sockets_fallback=true occupancy=true v0_paths=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hive_biomatter_kit_smoke.gd
 run_clean 'floor wrapper collision footprint smoke' 'FLOOR WRAPPER COLLISION FOOTPRINT PASS checked=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/floor_wrapper_collision_footprint_smoke.gd
+run_clean 'structural wrapper collision footprint smoke' 'STRUCTURAL WRAPPER COLLISION FOOTPRINT PASS walls=true corners=true doors=true aperture=true thickness=0.2 hatch_skipped=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_wrapper_collision_footprint_smoke.gd
 run_clean 'readability prop factory smoke' 'READABILITY PROP FACTORY PASS props=9' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/readability_prop_factory_smoke.gd
-run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=136 structural_live=true edge_wrappers=84 floor_wrappers=51' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
+run_clean 'procgen loader playable contract smoke' 'PROCGEN LOADER PLAYABLE CONTRACT PASS loaded=true objectives=4 collision_shapes=156 structural_live=true edge_wrappers=84 floor_wrappers=51' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_loader_playable_contract_smoke.gd
 run_clean 'Task 1.3 structural live loader smoke' 'STRUCTURAL LIVE LOADER PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_live_loader_smoke.gd
 # --- Tranche 6 (2026-07-07): demo gate wiring + unlock triggers + the promoted gate model smoke ---
 run_clean 'Tranche 6 demo scope gate model smoke' 'DEMO SCOPE GATE PASS build_kind=release blocked=5 allowed=0 unknown_rejected=true params=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/demo_scope_gate_smoke.gd
@@ -449,6 +498,9 @@ run_clean 'Archetype behavior modifiers smoke' 'ARCHETYPE BEHAVIOR PASS ambush=t
 run_clean 'Manifestation pool schema smoke' 'MANIFESTATION POOL PASS schema=true kinds=true force_room=true force_log=true no_code_entry=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/manifestation_pool_smoke.gd
 run_clean 'Sea graph pure smoke' 'SEA GRAPH PASS nodes=true route=true cost=true biomes=true extract=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sea_graph_smoke.gd
 run_clean 'Templates wreck mutator smoke' 'TEMPLATES WRECK MUTATOR PASS catalog=true load=true zone=true branch=true wreck=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/templates_wreck_mutator_smoke.gd
+run_clean 'Live decay stamp smoke' 'LIVE DECAY STAMP PASS locked=true wreck=true integrity=true links_kept=true quiet_import=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/live_decay_stamp_smoke.gd
+run_clean 'generated seed boarded slice smoke' 'GENERATED SEED BOARDED SLICE PASS away=true nav=true slots=true wreck=true objectives=true away_ticks=30' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/generated_seed_boarded_slice_smoke.gd
+run_clean 'Structural variant wrapper smoke' 'STRUCTURAL VARIANT WRAPPER PASS wrappers=8 intact=true damaged=true breached=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/structural_variant_wrapper_smoke.gd
 run_clean 'Food sustenance closure smoke' 'FOOD CLOSURE PASS spoil_eat=true harvest=true travel=true loop=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/food_closure_smoke.gd
 run_clean 'Skill effects consumers smoke' 'SKILL EFFECTS PASS audit=true work=true craft=true heal=true travel=true class_kit=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/skill_effects_smoke.gd
 run_clean 'Pillar persistence smoke' 'PILLAR PERSISTENCE PASS integrity=true components=true work=true fuzz=true snapshot=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/pillar_persistence_smoke.gd
@@ -832,7 +884,7 @@ run_clean 'Hangar denied SFX smoke' 'HANGAR DENIED SFX PASS deny=true sfx=true' 
 run_clean 'Hangar denied away smoke' 'HANGAR DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/hangar_denied_away_smoke.gd
 run_clean 'Medbay surgery denied SFX smoke' 'MEDBAY SURGERY DENIED SFX PASS deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_sfx_smoke.gd
 run_clean 'Medbay surgery denied away smoke' 'MEDBAY SURGERY DENIED AWAY PASS away=true deny=true sfx=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/medbay_surgery_denied_away_smoke.gd
-echo 'SYNAPTIC_SEA REGRESSION PASS commands=627 clean_output=true'
+echo 'SYNAPTIC_SEA REGRESSION PASS commands=632 clean_output=true'
 # Note: ShipRuntime smoke marker grew snapshot=true multi=true (PKG-A1b); prefix match above still holds.
 ```
 

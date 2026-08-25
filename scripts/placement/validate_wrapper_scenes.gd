@@ -470,11 +470,11 @@ func _validate_bundle(scene_path: String, errors: Array[String]) -> void:
 					errors.append("%s: %s references missing PackedScene resource" % [scene_path, visual_name])
 
 	var collision_root: Dictionary = nodes_by_name.get("CollisionRoot", {})
-	var collision_shape: Dictionary = nodes_by_name.get("CollisionShape3D", {})
+	var collision_shapes: Array = _collision_shape_nodes(nodes)
 	if expected_root_type.is_empty():
 		if not collision_root.is_empty():
 			errors.append("%s: collision root is forbidden for collision kind %s" % [scene_path, str(collision_policy.get("kind", ""))])
-		if not collision_shape.is_empty():
+		if not collision_shapes.is_empty():
 			errors.append("%s: collision shape is forbidden for collision kind %s" % [scene_path, str(collision_policy.get("kind", ""))])
 	else:
 		if collision_root.is_empty():
@@ -491,28 +491,31 @@ func _validate_bundle(scene_path: String, errors: Array[String]) -> void:
 					errors.append("%s: CollisionRoot missing collision_layer = 1" % scene_path)
 				if not collision_props.has("collision_mask = 1"):
 					errors.append("%s: CollisionRoot missing collision_mask = 1" % scene_path)
-		if collision_shape.is_empty():
+		if collision_shapes.is_empty():
 			errors.append("%s: missing CollisionShape3D node" % scene_path)
 		else:
-			if str(collision_shape.get("parent", "")) != "CollisionRoot":
-				errors.append("%s: CollisionShape3D must be parented to CollisionRoot" % scene_path)
-			var shape_subresource_id: String = ""
-			var shape_props_variant: Variant = collision_shape.get("props", [])
-			if typeof(shape_props_variant) == TYPE_ARRAY:
-				for prop_variant in shape_props_variant:
-					var prop_line: String = str(prop_variant)
-					if prop_line.begins_with("shape = SubResource("):
-						var start: int = prop_line.find("\"")
-						var finish: int = prop_line.find("\"", start + 1)
-						if start != -1 and finish != -1:
-							shape_subresource_id = prop_line.substr(start + 1, finish - start - 1)
-							break
-				if shape_subresource_id.is_empty():
-					errors.append("%s: CollisionShape3D missing shape subresource" % scene_path)
-				else:
-					var shape_type: String = str(subresources.get(shape_subresource_id, ""))
-					if not expected_shape_type.is_empty() and shape_type != expected_shape_type:
-						errors.append("%s: CollisionShape3D must use %s, got %s" % [scene_path, expected_shape_type, shape_type])
+			for collision_shape_v in collision_shapes:
+				var collision_shape: Dictionary = collision_shape_v
+				var shape_name: String = str(collision_shape.get("name", "CollisionShape3D"))
+				if str(collision_shape.get("parent", "")) != "CollisionRoot":
+					errors.append("%s: %s must be parented to CollisionRoot" % [scene_path, shape_name])
+				var shape_subresource_id: String = ""
+				var shape_props_variant: Variant = collision_shape.get("props", [])
+				if typeof(shape_props_variant) == TYPE_ARRAY:
+					for prop_variant in shape_props_variant:
+						var prop_line: String = str(prop_variant)
+						if prop_line.begins_with("shape = SubResource("):
+							var start: int = prop_line.find("\"")
+							var finish: int = prop_line.find("\"", start + 1)
+							if start != -1 and finish != -1:
+								shape_subresource_id = prop_line.substr(start + 1, finish - start - 1)
+								break
+					if shape_subresource_id.is_empty():
+						errors.append("%s: %s missing shape subresource" % [scene_path, shape_name])
+					else:
+						var shape_type: String = str(subresources.get(shape_subresource_id, ""))
+						if not expected_shape_type.is_empty() and shape_type != expected_shape_type:
+							errors.append("%s: %s must use %s, got %s" % [scene_path, shape_name, expected_shape_type, shape_type])
 
 	if category == "structural" and expected_root_type != "StaticBody3D":
 		errors.append("%s: structural wrappers must use a StaticBody3D collision root" % scene_path)
@@ -522,3 +525,15 @@ func _validate_bundle(scene_path: String, errors: Array[String]) -> void:
 		errors.append("%s: character wrappers must use a CharacterBody3D collision root" % scene_path)
 	if category == "dressing" and not expected_root_type.is_empty():
 		errors.append("%s: dressing wrappers must not declare a collision root" % scene_path)
+
+
+func _collision_shape_nodes(nodes: Array) -> Array:
+	var out: Array = []
+	for node_variant in nodes:
+		if typeof(node_variant) != TYPE_DICTIONARY:
+			continue
+		var node: Dictionary = node_variant
+		if str(node.get("type", "")) != "CollisionShape3D":
+			continue
+		out.append(node)
+	return out
