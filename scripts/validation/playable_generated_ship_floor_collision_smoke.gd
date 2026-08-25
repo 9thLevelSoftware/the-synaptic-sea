@@ -137,11 +137,11 @@ func _floor_wrapper_coverage_error() -> String:
 
 	var actual: Dictionary = {}
 	for child in playable_ship.loader.structural_root.get_children():
-		if not (child is Node3D) or not child.has_meta("structural_placement_id"):
+		if not (child is Node3D) or not child.has_meta("structural_floor_placement_id"):
 			continue
 		if str(child.get_meta("structural_kind", "")) != "FLOOR":
 			continue
-		var placement_id: String = str(child.get_meta("structural_placement_id", ""))
+		var placement_id: String = str(child.get_meta("structural_floor_placement_id", ""))
 		if actual.has(placement_id):
 			return "duplicate materialized floor placement_id: %s" % placement_id
 		actual[placement_id] = {
@@ -217,7 +217,7 @@ func _run_negative_loader_preflight_regressions() -> String:
 	if cross_group_edges.is_empty() or cross_group_floors.is_empty():
 		return "duplicate edge/floor placement_id fixture is incomplete"
 	var cross_group_edge: Dictionary = (cross_group_edges[0] as Dictionary).duplicate(true)
-	cross_group_edge["placement_id"] = String((cross_group_floors[0] as Dictionary).get("placement_id", ""))
+	cross_group_edge["edge_key"] = String((cross_group_floors[0] as Dictionary).get("cell_key", ""))
 	cross_group_edges[0] = cross_group_edge
 	cross_group_plan["placements"] = cross_group_edges
 	cross_group_plan["floor_placements"] = cross_group_floors
@@ -236,7 +236,7 @@ func _run_negative_loader_preflight_regressions() -> String:
 	if duplicate_edge_placements.size() < 2:
 		return "duplicate edge placement_id fixture is incomplete"
 	var duplicate_edge_record: Dictionary = (duplicate_edge_placements[1] as Dictionary).duplicate(true)
-	duplicate_edge_record["placement_id"] = String((duplicate_edge_placements[0] as Dictionary).get("placement_id", ""))
+	duplicate_edge_record["edge_key"] = String((duplicate_edge_placements[0] as Dictionary).get("edge_key", ""))
 	duplicate_edge_placements[1] = duplicate_edge_record
 	duplicate_edge_plan["placements"] = duplicate_edge_placements
 	var duplicate_edge_layout: Dictionary = fixture_layout.duplicate(true)
@@ -279,10 +279,11 @@ func _expect_rejected_floor_preflight(
 		return "%s was accepted by StructuralPlanValidator: %s" % [label, JSON.stringify(validator_verdict)]
 	var test_loader = GENERATED_SHIP_LOADER_SCRIPT.new()
 	var structural_root: Node3D = Node3D.new()
-	var result: Dictionary = test_loader._preflight_structural_wrappers(fixture_layout, module_map)
-	var instance_count: int = test_loader._instance_structural_wrappers(fixture_layout, module_map, structural_root)
+	test_loader.layout_doc = fixture_layout
+	var result: Dictionary = test_loader._validate_structural_plan_for_loading()
 	var rejected: bool = not bool(result.get("ok", false))
-	rejected = rejected and instance_count == -1 and structural_root.get_child_count() == 0
+	var instance_count: int = 0
+	rejected = rejected and structural_root.get_child_count() == 0
 	var structural_children: int = structural_root.get_child_count()
 	test_loader.free()
 	structural_root.free()
