@@ -32,6 +32,7 @@ var goal_position: Vector3 = Vector3.INF
 var structural_root: Node3D
 var objective_root: Node3D
 var room_variant_descriptors: Dictionary = {}  # room_id -> {"variant": String, "dressing": String}
+var _load_source_paths: Dictionary = {}
 const RoomVariantSelectorDressScript := preload("res://scripts/procgen/room_variant_selector.gd")
 
 
@@ -85,6 +86,27 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 	gameplay_doc = _load_json_dict(gameplay_slice_abs, "gameplay slice")
 	if gameplay_doc.is_empty():
 		return _fail_load("gameplay slice JSON is invalid: %s" % gameplay_slice_abs)
+
+	_load_source_paths = {
+		"layout": layout_abs,
+		"kit": kit_abs,
+		"gameplay_slice": gameplay_slice_abs,
+	}
+	return load_from_documents(layout_doc, kit_doc, gameplay_doc, is_away)
+
+
+func load_from_documents(layout: Dictionary, kit: Dictionary, gameplay_slice: Dictionary, apply_atmosphere: bool) -> bool:
+	var source_paths: Dictionary = _load_source_paths
+	_load_source_paths = {}
+	clear_loaded_ship()
+	layout_doc = layout
+	kit_doc = kit
+	gameplay_doc = gameplay_slice
+	_build_room_variant_descriptors()
+
+	var layout_abs: String = str(source_paths.get("layout", ""))
+	var kit_abs: String = str(source_paths.get("kit", ""))
+	var gameplay_slice_abs: String = str(source_paths.get("gameplay_slice", ""))
 
 	var rooms_variant: Variant = layout_doc.get("rooms", [])
 	if typeof(rooms_variant) != TYPE_ARRAY:
@@ -149,7 +171,7 @@ func load_from_paths(layout_path: String, kit_path: String, gameplay_slice_path:
 	_add_coherence_runtime_nodes(layout_doc, structural_root)
 	# PKG-B5.1: apply dressing fog/tint/light meta per room variant descriptors.
 	_apply_dressing_visuals(layout_doc, structural_root)
-	_apply_slice_atmosphere(layout_doc, is_away)
+	_apply_slice_atmosphere(layout_doc, apply_atmosphere)
 
 	objective_volumes = []
 	for objective_variant in objective_specs:
