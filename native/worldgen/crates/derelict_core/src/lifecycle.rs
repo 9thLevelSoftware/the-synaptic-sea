@@ -42,8 +42,11 @@ pub enum LifecycleEvent {
 pub struct LifecycleResult {
     pub schema_version: String,
     pub status: LifecycleStatus,
+    #[serde(default)]
     pub request_id: Option<i64>,
+    #[serde(default)]
     pub bundle: Option<ProcgenBundle>,
+    #[serde(default)]
     pub failure: Option<ProcgenFailure>,
     #[schemars(length(min = 1, max = 32))]
     pub events: Vec<LifecycleEvent>,
@@ -59,6 +62,33 @@ impl LifecycleResult {
     pub fn accepted(request_id: i64, events: Vec<LifecycleEvent>) -> Self {
         Self::new(
             LifecycleStatus::Accepted,
+            Some(request_id),
+            None,
+            None,
+            events,
+        )
+    }
+    pub fn queued(request_id: i64, events: Vec<LifecycleEvent>) -> Self {
+        Self::new(
+            LifecycleStatus::Queued,
+            Some(request_id),
+            None,
+            None,
+            events,
+        )
+    }
+    pub fn running(request_id: i64, events: Vec<LifecycleEvent>) -> Self {
+        Self::new(
+            LifecycleStatus::Running,
+            Some(request_id),
+            None,
+            None,
+            events,
+        )
+    }
+    pub fn cancel_requested(request_id: i64, events: Vec<LifecycleEvent>) -> Self {
+        Self::new(
+            LifecycleStatus::CancelRequested,
             Some(request_id),
             None,
             None,
@@ -211,6 +241,12 @@ pub struct ProcgenCapabilities {
     pub schemas: AdapterSchemas,
 }
 impl ProcgenCapabilities {
+    pub fn from_json(json: &str) -> Result<Self, LifecycleError> {
+        let value: Self = serde_json::from_str(json)?;
+        value.validate()?;
+        Ok(value)
+    }
+
     pub fn validate(&self) -> Result<(), LifecycleError> {
         if self.schema_version != PROCGEN_CAPABILITIES_SCHEMA || self.target.is_empty() {
             return Err(LifecycleError::Invalid("identity"));
@@ -225,6 +261,8 @@ impl ProcgenCapabilities {
             || self.max_trace_entries == 0
             || self.max_events == 0
             || self.deadline_ms == 0
+            || self.max_events > 32
+            || self.max_trace_entries > 4096
         {
             return Err(LifecycleError::Invalid("limits"));
         }

@@ -1,6 +1,24 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "worker_mode": {
+            "const": "thread_pool"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "worker_count": {
+            "minimum": 1
+          }
+        }
+      }
+    }
+  ],
   "definitions": {
     "AdapterKind": {
       "enum": [
@@ -61,7 +79,7 @@
       "type": "integer"
     },
     "max_events": {
-      "format": "uint32",
+      "maximum": 32,
       "minimum": 1,
       "type": "integer"
     },
@@ -71,7 +89,7 @@
       "type": "integer"
     },
     "max_trace_entries": {
-      "format": "uint32",
+      "maximum": 4096,
       "minimum": 1,
       "type": "integer"
     },

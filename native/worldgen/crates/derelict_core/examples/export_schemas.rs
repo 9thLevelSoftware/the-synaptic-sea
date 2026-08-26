@@ -251,11 +251,10 @@ fn enrich(name: &str, root: &mut Value) {
         ] {
             def(root, "ExportSchemas")["properties"][field] = serde_json::json!({"const":value});
         }
-        root["properties"]["request_id"] =
-            serde_json::json!({"anyOf":[{"type":"integer","minimum":1},{"type":"null"}]});
+        root["properties"]["request_id"] = serde_json::json!({"anyOf":[{"type":"integer","minimum":1,"maximum":9223372036854775807i64},{"type":"null"}]});
         let mut rules = Vec::new();
         for status in ["accepted", "queued", "running", "cancel_requested"] {
-            rules.push(serde_json::json!({"if":{"properties":{"status":{"const":status}}},"then":{"required":["request_id"],"properties":{"bundle":{"const":null},"failure":{"const":null}}}}));
+            rules.push(serde_json::json!({"if":{"properties":{"status":{"const":status}}},"then":{"required":["request_id"],"properties":{"request_id":{"type":"integer","minimum":1,"maximum":9223372036854775807i64},"bundle":{"const":null},"failure":{"const":null}}}}));
         }
         rules.push(serde_json::json!({"if":{"properties":{"status":{"const":"completed"}}},"then":{"required":["bundle"],"properties":{"bundle":{"not":{"const":null}},"failure":{"const":null}}}}));
         rules.push(serde_json::json!({"if":{"properties":{"status":{"const":"failed"}}},"then":{"required":["failure"],"properties":{"bundle":{"const":null},"failure":{"not":{"const":null}}}}}));
@@ -278,6 +277,11 @@ fn enrich(name: &str, root: &mut Value) {
         capabilities["properties"]["target"] = serde_json::json!({"type":"string","minLength":1});
         capabilities["properties"]["supported_domains"] =
             serde_json::json!({"const":["world","site","gameplay","presentation"]});
+        capabilities["properties"]["max_events"] =
+            serde_json::json!({"type":"integer","minimum":1,"maximum":32});
+        capabilities["properties"]["max_trace_entries"] =
+            serde_json::json!({"type":"integer","minimum":1,"maximum":4096});
+        root["allOf"] = serde_json::json!([{"if":{"properties":{"worker_mode":{"const":"thread_pool"}}},"then":{"properties":{"worker_count":{"minimum":1}}}}]);
         for (field, value) in [
             ("lifecycle_result", "procgen-lifecycle-result-1"),
             ("capabilities", "procgen-capabilities-1"),

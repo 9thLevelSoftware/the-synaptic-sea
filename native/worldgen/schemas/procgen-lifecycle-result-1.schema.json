@@ -17,6 +17,11 @@
           },
           "failure": {
             "const": null
+          },
+          "request_id": {
+            "maximum": 9223372036854775807,
+            "minimum": 1,
+            "type": "integer"
           }
         },
         "required": [
@@ -39,6 +44,11 @@
           },
           "failure": {
             "const": null
+          },
+          "request_id": {
+            "maximum": 9223372036854775807,
+            "minimum": 1,
+            "type": "integer"
           }
         },
         "required": [
@@ -61,6 +71,11 @@
           },
           "failure": {
             "const": null
+          },
+          "request_id": {
+            "maximum": 9223372036854775807,
+            "minimum": 1,
+            "type": "integer"
           }
         },
         "required": [
@@ -83,6 +98,11 @@
           },
           "failure": {
             "const": null
+          },
+          "request_id": {
+            "maximum": 9223372036854775807,
+            "minimum": 1,
+            "type": "integer"
           }
         },
         "required": [
@@ -1993,7 +2013,8 @@
         {
           "type": "null"
         }
-      ]
+      ],
+      "default": null
     },
     "events": {
       "items": {
@@ -2011,11 +2032,13 @@
         {
           "type": "null"
         }
-      ]
+      ],
+      "default": null
     },
     "request_id": {
       "anyOf": [
         {
+          "maximum": 9223372036854775807,
           "minimum": 1,
           "type": "integer"
         },
