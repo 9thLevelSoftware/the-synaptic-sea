@@ -27,7 +27,10 @@ func _valid_operation(raw: Variant) -> bool:
 	if typeof(raw) != TYPE_DICTIONARY:
 		return false
 	var op: Dictionary = raw
-	if op.size() != 4 or not OPS.has(str(op.get("operation", ""))) or not KINDS.has(str(op.get("target_kind", ""))):
+	var operation := str(op.get("operation", ""))
+	var target_kind := str(op.get("target_kind", ""))
+	var expected_kind := {"door_lock":"door", "door_open":"door", "container_inventory":"container", "entity_remove":"entity", "objective":"objective", "hazard":"hazard", "system_state":"system"}
+	if op.size() != 4 or not OPS.has(operation) or not KINDS.has(target_kind) or expected_kind.get(operation, "") != target_kind:
 		return false
 	var id := str(op.get("target_id", ""))
 	if id.is_empty() or id.length() > MAX_ID or typeof(op.get("payload")) != TYPE_DICTIONARY:
