@@ -1,1 +1,1 @@
-{"schema_version":"world-fallback-1","platform_version":3,"fallback_id":"safe-world-v3","archetype_id":"derelict","biome_id":"abyssal_synaptic_sea","hazard_id":"none","landmarks":["hub","extraction"],"extraction_path":["site","hub","extraction"],"route_cost_bp":1000}
+{"schema_version":"world-fallback-1","platform_version":3,"fallback_id":"safe-world-v3","biome_id":"abyssal_synaptic_sea","hazard_id":"none","landmarks":["relay"],"route_cost_bp":1000}
