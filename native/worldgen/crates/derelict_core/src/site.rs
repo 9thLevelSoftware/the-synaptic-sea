@@ -268,6 +268,36 @@ pub fn validate_site(site: &SiteIR) -> Result<(), ValidationError> {
             "structural generator identity mismatch".into(),
         ));
     }
+    let projected = project_navigation(&site.ship)?;
+    if site.navigation.nodes != projected.nodes {
+        return Err(ValidationError("navigation room identity mismatch".into()));
+    }
+    if site.navigation.edges.len() != projected.edges.len() {
+        return Err(ValidationError(
+            "navigation directed edge count mismatch".into(),
+        ));
+    }
+    for actual in &site.navigation.edges {
+        let expected = projected
+            .edges
+            .iter()
+            .find(|e| e.id == actual.id)
+            .ok_or_else(|| ValidationError("navigation edge identity mismatch".into()))?;
+        if actual.structural_ref != expected.structural_ref
+            || actual.from_room != expected.from_room
+            || actual.to_room != expected.to_room
+            || actual.from_cell != expected.from_cell
+            || actual.to_cell != expected.to_cell
+            || actual.cost != expected.cost
+            || actual.clearance != expected.clearance
+        {
+            return Err(ValidationError("navigation projection mismatch".into()));
+        }
+    }
+    let spatial = compute_spatial(&site.ship)?;
+    if site.spatial_annotations != spatial {
+        return Err(ValidationError("spatial projection mismatch".into()));
+    }
     let cells = room_cells(&site.ship);
     let g = &site.mission_graph;
     let mut ids = BTreeSet::new();
@@ -406,18 +436,40 @@ pub fn validate_site(site: &SiteIR) -> Result<(), ValidationError> {
 }
 
 /// Deterministically project structural portals and verticals into navigation.
-pub fn project_navigation(ship: &Ship) -> Navigation {
+pub fn canonical_vertical_ref(from: (u8, i32, i32, u16), to: (u8, i32, i32, u16)) -> String {
+    let a = format!("{}|{}|{}|{}", from.0, from.1, from.2, from.3);
+    let b = format!("{}|{}|{}|{}", to.0, to.1, to.2, to.3);
+    if a <= b {
+        format!("vertical:{a}:{b}")
+    } else {
+        format!("vertical:{b}:{a}")
+    }
+}
+
+pub fn project_navigation(ship: &Ship) -> Result<Navigation, ValidationError> {
     let mut edges = Vec::new();
     for p in &ship.topology.portals {
         if p.exterior || p.to_room == NO_ROOM {
             continue;
         }
-        let r = edge_key(
-            p.from_cell,
-            crate::structural::plan::Dir::between(p.from_cell, p.to_cell)
-                .unwrap_or(crate::structural::plan::Dir::North),
-        );
-        let blocked = p.state == EdgeKind::Locked;
+        let dir = crate::structural::plan::Dir::between(p.from_cell, p.to_cell)
+            .ok_or_else(|| ValidationError("portal non-cardinal adjacency".into()))?;
+        let r = edge_key(p.from_cell, dir);
+        let plan = ship
+            .plan
+            .edges
+            .get(&r)
+            .ok_or_else(|| ValidationError("portal structural ref missing".into()))?;
+        if plan.room_ids != (p.from_room, p.to_room) && plan.room_ids != (p.to_room, p.from_room) {
+            return Err(ValidationError("portal structural rooms mismatch".into()));
+        }
+        if plan.source_cells[0] != p.from_cell && plan.source_cells[1] != p.from_cell {
+            return Err(ValidationError("portal source cell mismatch".into()));
+        }
+        if matches!(plan.kind, EdgeKind::Solid | EdgeKind::Open) {
+            return Err(ValidationError("invalid portal effective kind".into()));
+        }
+        let blocked = plan.kind == EdgeKind::Locked;
         for (a, b, ca, cb) in [
             (p.from_room, p.to_room, p.from_cell, p.to_cell),
             (p.to_room, p.from_room, p.to_cell, p.from_cell),
@@ -438,19 +490,10 @@ pub fn project_navigation(ship: &Ship) -> Navigation {
         }
     }
     for v in &ship.topology.verticals {
-        let a = format!(
-            "{}|{}|{}|{}",
-            v.from_cell.deck, v.from_cell.x, v.from_cell.y, v.from_room
+        let reference = canonical_vertical_ref(
+            (v.from_cell.deck, v.from_cell.x, v.from_cell.y, v.from_room),
+            (v.to_cell.deck, v.to_cell.x, v.to_cell.y, v.to_room),
         );
-        let b = format!(
-            "{}|{}|{}|{}",
-            v.to_cell.deck, v.to_cell.x, v.to_cell.y, v.to_room
-        );
-        let reference = if a <= b {
-            format!("vertical:{}:{}", a, b)
-        } else {
-            format!("vertical:{}:{}", b, a)
-        };
         for (x, y, cx, cy) in [
             (v.from_room, v.to_room, v.from_cell, v.to_cell),
             (v.to_room, v.from_room, v.to_cell, v.from_cell),
@@ -471,7 +514,7 @@ pub fn project_navigation(ship: &Ship) -> Navigation {
         }
     }
     edges.sort_by(|a, b| a.id.cmp(&b.id));
-    Navigation {
+    Ok(Navigation {
         schema_version: NAVIGATION_SCHEMA_VERSION.into(),
         nodes: ship
             .topology
@@ -480,7 +523,103 @@ pub fn project_navigation(ship: &Ship) -> Navigation {
             .map(|r| NavigationNode { room: r.id })
             .collect(),
         edges,
+    })
+}
+
+pub fn compute_spatial(ship: &Ship) -> Result<SpatialAnnotations, ValidationError> {
+    let rooms = room_cells(ship);
+    let mut out = Vec::new();
+    for room in &ship.topology.rooms {
+        let cells = rooms
+            .get(&room.id)
+            .ok_or_else(|| ValidationError("spatial room missing".into()))?;
+        let mut cover = BTreeSet::new();
+        for edge in ship
+            .plan
+            .edges
+            .values()
+            .filter(|e| e.kind == EdgeKind::Solid)
+        {
+            for c in edge.source_cells {
+                if cells.contains(&c) {
+                    cover.insert(c);
+                }
+            }
+        }
+        let mut pairs = BTreeSet::new();
+        let ordered: Vec<_> = cells.iter().copied().collect();
+        for &a in &ordered {
+            for &b in &ordered {
+                if a >= b || a.deck != b.deck {
+                    continue;
+                }
+                let d = (a.x - b.x).abs() + (a.y - b.y).abs();
+                if d == 0 || d > 8 || !(a.x == b.x || a.y == b.y) {
+                    continue;
+                }
+                let (lo, hi) = if a < b { (a, b) } else { (b, a) };
+                let mut clear = true;
+                if a.x == b.x {
+                    for y in (a.y.min(b.y) + 1)..b.y.max(a.y) {
+                        if !cells.contains(&Cell::new(a.deck, a.x, y)) {
+                            clear = false;
+                        }
+                    }
+                } else {
+                    for x in (a.x.min(b.x) + 1)..b.x.max(a.x) {
+                        if !cells.contains(&Cell::new(a.deck, x, a.y)) {
+                            clear = false;
+                        }
+                    }
+                }
+                if clear {
+                    pairs.insert((lo, hi));
+                }
+            }
+        }
+        out.push(SpatialAnnotation {
+            room: room.id,
+            minimum_clearance: 1,
+            cover_cells: cover.into_iter().take(64).collect(),
+            los_pairs: pairs
+                .into_iter()
+                .take(128)
+                .map(|(a, b)| LosPair { a, b })
+                .collect(),
+        });
     }
+    out.sort_by_key(|r| r.room);
+    Ok(SpatialAnnotations {
+        schema_version: SPATIAL_SCHEMA_VERSION.into(),
+        rooms: out,
+    })
+}
+
+pub fn run_progression_agent(site: &SiteIR) -> Result<(), ValidationError> {
+    let mut reached = BTreeSet::new();
+    reached.insert(site.ship.entry_room);
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for e in &site.navigation.edges {
+            if e.passable && reached.contains(&e.from_room) && reached.insert(e.to_room) {
+                changed = true;
+            }
+        }
+    }
+    for id in &site.mission_graph.required_objectives {
+        let n = node(&site.mission_graph, id)
+            .ok_or_else(|| ValidationError("objective missing".into()))?;
+        if !reached.contains(&n.room) {
+            return Err(ValidationError("objective unreachable".into()));
+        }
+    }
+    let ex = node(&site.mission_graph, &site.mission_graph.extraction_node)
+        .ok_or_else(|| ValidationError("extraction missing".into()))?;
+    if !reached.contains(&ex.room) {
+        return Err(ValidationError("extraction unreachable".into()));
+    }
+    Ok(())
 }
 
 pub fn site_json(site: &SiteIR) -> Result<String, serde_json::Error> {
@@ -632,7 +771,7 @@ pub fn generate_site(
         repair_id: None,
         extraction_portal_ref: Some(extraction_ref),
     });
-    let navigation = project_navigation(&ship);
+    let navigation = project_navigation(&ship).map_err(|e| SiteError::Validation(e.0))?;
     let spatial = SpatialAnnotations {
         schema_version: SPATIAL_SCHEMA_VERSION.into(),
         rooms: ship
