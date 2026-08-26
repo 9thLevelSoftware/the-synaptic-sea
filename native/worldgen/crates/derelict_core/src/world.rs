@@ -586,6 +586,7 @@ impl WorldIRv2 {
             || self.x != req.x
             || self.y != req.y
             || self.archetype_id != req.archetype_id
+            || self.site_seed != self.markers[0].site_seed
         {
             return Err(WorldError::Invalid("request_identity"));
         }
