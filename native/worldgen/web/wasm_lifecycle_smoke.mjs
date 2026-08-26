@@ -14,18 +14,18 @@ const manifest = parse(binding.generator_manifest());
 const vectors = JSON.parse(fs.readFileSync(corpusPath, 'utf8'));
 const expectedDomains = ['world', 'site', 'gameplay', 'presentation'];
 const expectedAdapterSchemas = {
-  lifecycle_result: 'procgen-lifecycle-result-2',
-  capabilities: 'procgen-capabilities-1',
-  generator_manifest: 'procgen-generator-manifest-1',
+  lifecycle_result: 'procgen-lifecycle-result-3',
+  capabilities: 'procgen-capabilities-2',
+  generator_manifest: 'procgen-generator-manifest-2',
 };
 const expectedExportSchemas = {
   procgen_request: 'procgen-request-1',
-  procgen_bundle: 'procgen-bundle-2',
+  procgen_bundle: 'procgen-bundle-3',
   world_ir: 'world-ir-2',
-  site_ir: 'site-ir-1',
+  site_ir: 'site-ir-2',
   gameplay_ir: 'gameplay-ir-1',
   presentation_ir: 'presentation-ir-1',
-  generation_trace: 'generation-trace-1',
+  generation_trace: 'generation-trace-2',
   adaptive_proposal: 'adaptive-proposal-1',
 };
 const canonical = (value) => {
@@ -36,7 +36,22 @@ const canonical = (value) => {
   return value;
 };
 const equal = (left, right) => JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
-if (cap.schema_version !== 'procgen-capabilities-1' || cap.adapter_kind !== 'web'
+const assertBundleContract = (bundle, name) => {
+  if (bundle?.schema_version !== 'procgen-bundle-3'
+      || bundle.world_ir?.schema_version !== 'world-ir-2'
+      || bundle.site_ir?.schema_version !== 'site-ir-2'
+      || bundle.gameplay_ir?.schema_version !== 'gameplay-ir-1'
+      || bundle.presentation_ir?.schema_version !== 'presentation-ir-1'
+      || bundle.trace?.schema_version !== 'generation-trace-2') {
+    throw new Error(`${name} bundle schema contract mismatch`);
+  }
+  const site = bundle.site_ir;
+  if (!Object.hasOwn(site, 'mission_graph') || !Object.hasOwn(site, 'navigation')
+      || !Object.hasOwn(site, 'functional_props') || !Object.hasOwn(site, 'spatial_annotations')) {
+    throw new Error(`${name} SiteIR v2 overlay missing`);
+  }
+};
+if (cap.schema_version !== 'procgen-capabilities-2' || cap.adapter_kind !== 'web'
     || cap.target !== 'wasm32-unknown-unknown' || cap.supports_sync !== true
     || cap.supports_async !== true || cap.supports_cancel !== true
     || cap.worker_mode !== 'cooperative' || cap.worker_count !== 0
@@ -45,7 +60,7 @@ if (cap.schema_version !== 'procgen-capabilities-1' || cap.adapter_kind !== 'web
     || cap.max_trace_entries !== 4096 || cap.max_events !== 32
     || cap.deadline_ms !== 2000 || !equal(cap.supported_domains, expectedDomains)
     || !equal(cap.schemas, expectedAdapterSchemas)) throw new Error('capabilities contract mismatch');
-if (manifest.schema_version !== 'procgen-generator-manifest-1'
+if (manifest.schema_version !== 'procgen-generator-manifest-2'
     || !/^[0-9a-f]{40}$/.test(manifest.rust_source_commit)
     || manifest.generator_version !== 3
     || manifest.content_manifest_hash !== vectors[0].request.content_manifest_hash
@@ -70,6 +85,7 @@ const overload = parse(binding.generate_bundle_async(JSON.stringify(vectors[0].r
 if (overload.request_id !== null || overload.failure?.code !== 'overload'
     || !equal(overload.events, ['rejected', 'overloaded'])) throw new Error('overload contract mismatch');
 const recovered = parse(binding.poll(ids[0]));
+assertBundleContract(recovered.bundle, 'recovered');
 if (recovered.bundle?.semantic_hash !== vectors[0].expected_semantic_hash) {
   throw new Error(`queue recovery mismatch: actual=${recovered.bundle?.semantic_hash ?? 'none'} expected=${vectors[0].expected_semantic_hash}`);
 }
@@ -89,10 +105,12 @@ for (let index = 1; index < ids.length; index += 1) {
 for (const vector of vectors) {
   const raw = JSON.stringify(vector.request);
   const sync = parse(binding.generate_bundle(raw));
+  assertBundleContract(sync.bundle, `${vector.name} sync`);
   if (sync.bundle?.semantic_hash !== vector.expected_semantic_hash) throw new Error(`${vector.name} sync hash mismatch`);
   const accepted = parse(binding.generate_bundle_async(raw));
   const id = BigInt(accepted.request_id);
   const terminal = parse(binding.poll(id));
+  assertBundleContract(terminal.bundle, `${vector.name} async`);
   if (terminal.bundle?.semantic_hash !== vector.expected_semantic_hash) throw new Error(`${vector.name} async hash mismatch`);
   const consumed = parse(binding.poll(id));
   if (consumed.failure?.code !== 'result_consumed') throw new Error(`${vector.name} consumed contract mismatch`);

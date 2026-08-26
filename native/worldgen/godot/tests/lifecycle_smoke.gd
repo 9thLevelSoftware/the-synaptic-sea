@@ -5,20 +5,20 @@ extends SceneTree
 ## the GDExtension.  The script is source/contract validation until the rebuilt
 ## adapter is installed in the sample project.
 
-const LIFECYCLE_SCHEMA := "procgen-lifecycle-result-2"
-const CAPABILITIES_SCHEMA := "procgen-capabilities-1"
-const MANIFEST_SCHEMA := "procgen-generator-manifest-1"
+const LIFECYCLE_SCHEMA := "procgen-lifecycle-result-3"
+const CAPABILITIES_SCHEMA := "procgen-capabilities-2"
+const MANIFEST_SCHEMA := "procgen-generator-manifest-2"
 const REQUEST_SCHEMA := "procgen-request-1"
 const GENERATOR_VERSION := 3
 const DOMAINS := ["world", "site", "gameplay", "presentation"]
 const EXPORT_SCHEMAS := {
 	"procgen_request": "procgen-request-1",
-	"procgen_bundle": "procgen-bundle-2",
+	"procgen_bundle": "procgen-bundle-3",
 	"world_ir": "world-ir-2",
-	"site_ir": "site-ir-1",
+	"site_ir": "site-ir-2",
 	"gameplay_ir": "gameplay-ir-1",
 	"presentation_ir": "presentation-ir-1",
-	"generation_trace": "generation-trace-1",
+	"generation_trace": "generation-trace-2",
 	"adaptive_proposal": "adaptive-proposal-1",
 }
 const ADAPTER_SCHEMAS := {
@@ -109,6 +109,7 @@ func _initialize() -> void:
 	_expect(sync_result.get("schema_version") == LIFECYCLE_SCHEMA, "sync_schema")
 	_expect(sync_result.get("status") == "completed", "sync_completed")
 	var sync_bundle: Dictionary = sync_result.get("bundle", {})
+	_assert_bundle_contract(sync_bundle, "sync")
 	_sync_hash = str(sync_bundle.get("semantic_hash", ""))
 	_expect(_sync_hash.length() > 0, "sync_semantic_hash")
 
@@ -136,6 +137,7 @@ func _process(_delta: float) -> bool:
 		_expect(["accepted", "queued", "running"].has(status), "poll_state")
 		return false
 	var bundle: Dictionary = result.get("bundle", {})
+	_assert_bundle_contract(bundle, "async")
 	_expect(str(bundle.get("semantic_hash", "")) == _sync_hash, "semantic_hash_match")
 	var consumed := _read_object(_generator_b.call("poll", _async_id), "consumed_json")
 	_expect(consumed.get("status") == "failed", "consumed_status")
@@ -160,6 +162,21 @@ func _read_object(raw: Variant, code: String) -> Dictionary:
 	var parsed: Variant = JSON.parse_string(raw as String)
 	_expect(parsed is Dictionary, code + "_object")
 	return parsed as Dictionary
+
+func _assert_bundle_contract(bundle: Dictionary, prefix: String) -> void:
+	_expect(bundle.get("schema_version") == "procgen-bundle-3", prefix + "_bundle_schema")
+	var world_ir: Dictionary = bundle.get("world_ir", {})
+	var site_ir: Dictionary = bundle.get("site_ir", {})
+	var gameplay_ir: Dictionary = bundle.get("gameplay_ir", {})
+	var presentation_ir: Dictionary = bundle.get("presentation_ir", {})
+	var trace: Dictionary = bundle.get("trace", {})
+	_expect(world_ir.get("schema_version") == "world-ir-2", prefix + "_world_schema")
+	_expect(site_ir.get("schema_version") == "site-ir-2", prefix + "_site_schema")
+	_expect(gameplay_ir.get("schema_version") == "gameplay-ir-1", prefix + "_gameplay_schema")
+	_expect(presentation_ir.get("schema_version") == "presentation-ir-1", prefix + "_presentation_schema")
+	_expect(trace.get("schema_version") == "generation-trace-2", prefix + "_trace_schema")
+	_expect(site_ir.has("mission_graph") and site_ir.has("navigation")
+			and site_ir.has("functional_props") and site_ir.has("spatial_annotations"), prefix + "_site_overlay")
 
 func _is_lower_hex(value: String, expected_length: int) -> bool:
 	if value.length() != expected_length:
