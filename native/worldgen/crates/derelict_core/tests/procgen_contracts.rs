@@ -124,6 +124,7 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
         ("presentation-ir-1", serde_json::to_value(&bundle.presentation_ir).unwrap()),
         ("generation-trace-1", serde_json::to_value(&bundle.trace).unwrap()),
         ("generation-metrics-1", serde_json::to_value(&bundle.metrics).unwrap()),
+        ("player-model-1", serde_json::to_value(&bundle.request.player_model).unwrap()),
     ];
     for (name, document) in docs {
         let schema: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(format!("{}/../../schemas/{name}.schema.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
