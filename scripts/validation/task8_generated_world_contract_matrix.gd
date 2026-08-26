@@ -19,6 +19,7 @@ class Provider extends RefCounted:
 	func regenerate_site(identity: RefCounted):
 		calls += 1
 		if mode == "null": return null
+		if mode == "mutate_input": identity.site_id = "provider-mutated"
 		if mode == "object": return BundleObject.new(identity)
 		if mode == "object_missing": return RefCounted.new()
 		if mode == "object_bad_identity": return BadBundleObject.new(identity, "identity")
@@ -103,7 +104,7 @@ func _init() -> void:
 	for mismatch in ["site_id", "x", "y", "site_seed", "structural_generator_version", "semantic_hash"]:
 		var p := Provider.new(); p.mode = mismatch; var a := Applier.new(); var result: Variant = _compat(p, a).evaluate(envelope.to_dict())
 		_expect(result.status == Result.NEW_WORLD_REQUIRED and a.batch_calls == 0, "bundle identity mismatch " + mismatch)
-	for mode in ["null", "wrong_variant", "dict_missing", "dict_extra", "dict_wrong_type", "object_missing", "object_bad_identity", "object_bad_targets"]:
+	for mode in ["null", "wrong_variant", "dict_missing", "dict_extra", "dict_wrong_type", "object_missing", "object_bad_identity", "object_bad_targets", "mutate_input"]:
 		var p := Provider.new(); p.mode = mode; var a := Applier.new(); var result: Variant = _compat(p, a).evaluate(envelope.to_dict())
 		_expect(result.status == Result.NEW_WORLD_REQUIRED and a.batch_calls == 0, "provider malformed " + mode)
 	_expect(_compat(null, Applier.new()).evaluate(envelope.to_dict()).status == Result.IO_FAILURE, "provider null")

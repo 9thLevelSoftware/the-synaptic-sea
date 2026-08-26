@@ -35,7 +35,11 @@ func evaluate(document: Variant, source_path: String = ""):
 		var identity: Variant = Site.from_dict(entry.identity)
 		var delta: Variant = Delta.from_dict(entry.mutation_delta)
 		if identity == null or delta == null: return Result.make(Result.CORRUPT, "malformed_site", source_path, summary)
-		var bundle: Variant = bundle_provider.regenerate_site(identity)
+		# The provider receives a disposable copy. The original remains the
+		# immutable expectation, so a provider cannot rewrite what it must match.
+		var provider_identity: Variant = Site.from_dict(identity.to_dict())
+		if provider_identity == null: return Result.make(Result.CORRUPT, "malformed_site", source_path, summary)
+		var bundle: Variant = bundle_provider.regenerate_site(provider_identity)
 		var normalized: Variant = _normalize_bundle(bundle)
 		if normalized == null: return Result.make(Result.NEW_WORLD_REQUIRED, "bundle_unavailable", source_path, summary)
 		if not _identity_matches(normalized.identity, identity): return Result.make(Result.NEW_WORLD_REQUIRED, "bundle_identity_mismatch", source_path, summary)

@@ -11,6 +11,7 @@ var storage_directory: String = DIRECTORY
 var failpoint: String = ""
 var failpoint_hits: Dictionary = {}
 var token_queue: Array[String] = []
+var _request_counter: int = 0
 
 func path_for(slot_id: Variant = "world") -> String:
 	if not _safe_directory() or typeof(slot_id) != TYPE_STRING: return ""
@@ -23,11 +24,18 @@ func load_and_validate(slot_id: String, compatibility: RefCounted):
 	if not FileAccess.file_exists(path): return Result.make(Result.IO_FAILURE, "missing_file", path)
 	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null: return Result.make(Result.IO_FAILURE, "open_failed", path)
-	if f.get_length() > MAX_BYTES: f.close(); return Result.make(Result.CORRUPT, "document_too_large", path)
-	var parsed: Variant = JSON.parse_string(f.get_as_text()); f.close()
-	if parsed == null: return Result.make(Result.CORRUPT, "json_parse_failed", path)
+	var length := f.get_length()
+	if length > MAX_BYTES: f.close(); return Result.make(Result.CORRUPT, "document_too_large", path)
+	var bytes := f.get_buffer(length); f.close()
+	if bytes.size() != length: return Result.make(Result.IO_FAILURE, "read_failed", path)
+	var parser := JSON.new()
+	if parser.parse(bytes.get_string_from_utf8()) != OK: return Result.make(Result.CORRUPT, "json_parse_failed", path)
+	var parsed: Variant = parser.data
 	if compatibility == null or not compatibility.has_method("evaluate"): return Result.make(Result.IO_FAILURE, "compatibility_unavailable", path)
-	return compatibility.evaluate(parsed, path)
+	var evaluated: Variant = compatibility.evaluate(parsed, path)
+	if typeof(evaluated) != TYPE_OBJECT or not is_instance_valid(evaluated) or not (evaluated is Result) or not evaluated.validate():
+		return Result.make(Result.IO_FAILURE, "compatibility_unavailable", path)
+	return evaluated
 
 func save(slot_id: String, envelope: RefCounted) -> bool:
 	var final := path_for(slot_id)
@@ -84,8 +92,12 @@ func _recover(final: String, stage: String, backup: String, had_final: bool) -> 
 		if src != null: src.close()
 		if dst != null: dst.close()
 		return false
-	dst.store_buffer(src.get_buffer(src.get_length())); dst.flush(); src.close(); dst.close()
-	return _same_bytes(final, backup) and false
+	var source_length := src.get_length(); var source_bytes := src.get_buffer(source_length); src.close()
+	if source_bytes.size() != source_length: dst.close(); _remove(final); return false
+	dst.store_buffer(source_bytes); dst.flush(); dst.close()
+	if _same_bytes(final, backup): _remove(backup)
+	else: _remove(final)
+	return false
 
 func _same_file(path: String, expected: String) -> bool:
 	var f := FileAccess.open(path, FileAccess.READ); if f == null: return false
@@ -104,14 +116,31 @@ func _remove(path: String) -> void:
 
 func _unique_token(final: String) -> String:
 	for _i in 32:
-		var token: String = token_queue.pop_front() if not token_queue.is_empty() else Crypto.new().generate_random_bytes(16).hex_encode()
-		if token.length() != 32 or not token.is_valid_filename() or token.to_lower() != token or token.contains("-") or token.contains("_"): continue
+		var token: String = token_queue.pop_front() if not token_queue.is_empty() else _crypto_token()
+		if not _valid_token(token): continue
 		if not FileAccess.file_exists(final + ".stage." + token) and not FileAccess.file_exists(final + ".backup." + token): return token
 	return ""
+
+func _crypto_token() -> String:
+	_request_counter += 1
+	var random_hex := Crypto.new().generate_random_bytes(12).hex_encode()
+	return random_hex + ("%08x" % (_request_counter & 0xffffffff))
+
+func _valid_token(token: String) -> bool:
+	if token.length() != 32: return false
+	for character in token:
+		if not (character >= "0" and character <= "9" or character >= "a" and character <= "f"): return false
+	return true
 
 func _failed(name: String) -> bool:
 	failpoint_hits[name] = int(failpoint_hits.get(name, 0)) + 1
 	return failpoint == name or failpoint.split(",").has(name)
 
 func _safe_directory() -> bool:
-	return typeof(storage_directory) == TYPE_STRING and storage_directory.begins_with("user://") and storage_directory.length() > 7 and not storage_directory.contains("..")
+	if typeof(storage_directory) != TYPE_STRING or not storage_directory.begins_with("user://"): return false
+	var relative := storage_directory.trim_prefix("user://").trim_suffix("/")
+	if relative.is_empty() or relative.contains("\\"): return false
+	var segment_re := RegEx.new(); segment_re.compile("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+	for segment in relative.split("/", false):
+		if segment in [".", ".."] or segment_re.search(segment) == null: return false
+	return true
