@@ -1,8 +1,187 @@
 {
   "schema_version": "presentation-catalogue-2",
-  "manifest_entries": ["asset:primitive:structural", "asset:audio:ambient"],
+  "manifest_entries": [
+    "asset:primitive:structural",
+    "asset:audio:ambient",
+    "asset:primitive:creature_brute",
+    "asset:primitive:creature_drone",
+    "asset:primitive:creature_siren",
+    "asset:primitive:item_armor",
+    "asset:primitive:item_tool",
+    "asset:primitive:item_weapon",
+    "asset:primitive:objective"
+  ],
   "assets": [
-    {"kind":"primitive","asset_id":"asset:primitive:structural","tags":["structural.default"],"compatible_tags":["structural.default"],"compatible_subject_kinds":["ship","environment"],"adapter_binding_id":"binding:primitive:structural","provenance":{"source":"authored/primitive","license":"CC0","tool_or_model_version":"godot-4.7.1","inputs":["authored primitive specification"],"parameters_or_seed":"seed:0","human_changes":"authored safe primitive","technical_validation":"schema-and-render-smoke","art_approval":"approved","promoted_content_manifest_entry":"asset:primitive:structural"}},
-    {"kind":"audio","asset_id":"asset:audio:ambient","tags":["ambient.default"],"compatible_tags":["ambient.default"],"compatible_subject_kinds":["environment"],"adapter_binding_id":"binding:audio:ambient","provenance":{"source":"authored/audio/ambient","license":"CC0","tool_or_model_version":"audacity-3","inputs":["project-original recording"],"parameters_or_seed":"seed:0","human_changes":"trimmed and normalized","technical_validation":"audio-import-smoke","art_approval":"approved","promoted_content_manifest_entry":"asset:audio:ambient"}}
+    {
+      "kind": "primitive",
+      "asset_id": "asset:primitive:structural",
+      "tags": ["structural.default"],
+      "compatible_tags": ["structural.default"],
+      "compatible_subject_kinds": ["ship", "environment"],
+      "adapter_binding_id": "binding:primitive:structural",
+      "provenance": {
+        "source": "authored/primitive/structural",
+        "license": "CC0",
+        "tool_or_model_version": "godot-4.7.2",
+        "inputs": ["project structural primitive specification"],
+        "parameters_or_seed": "seed:0",
+        "human_changes": "authored safe structural primitive",
+        "technical_validation": "schema and runtime render smoke",
+        "art_approval": "approved",
+        "promoted_content_manifest_entry": "asset:primitive:structural"
+      }
+    },
+    {
+      "kind": "audio",
+      "asset_id": "asset:audio:ambient",
+      "tags": ["ambient.default"],
+      "compatible_tags": ["ambient.default"],
+      "compatible_subject_kinds": ["environment"],
+      "adapter_binding_id": "binding:audio:ambient",
+      "provenance": {
+        "source": "authored/audio/ambient",
+        "license": "CC0",
+        "tool_or_model_version": "audacity-3",
+        "inputs": ["project original ambient recording"],
+        "parameters_or_seed": "seed:0",
+        "human_changes": "trimmed and normalized",
+        "technical_validation": "audio import and event coverage smoke",
+        "art_approval": "approved",
+        "promoted_content_manifest_entry": "asset:audio:ambient"
+      }
+    },
+    {
+      "kind": "primitive",
+      "asset_id": "asset:primitive:creature_brute",
+      "tags": ["creature.brute"],
+      "compatible_tags": ["creature.brute"],
+      "compatible_subject_kinds": ["creature"],
+      "adapter_binding_id": "binding:threat:brute",
+      "provenance": {
+        "source": "authored/primitive/threat_brute",
+        "license": "CC0",
+        "tool_or_model_version": "godot-4.7.2",
+        "inputs": ["approved armored brute body specification"],
+        "parameters_or_seed": "seed:0",
+        "human_changes": "scaled and colored for readable tank silhouette",
+        "technical_validation": "threat visual catalog and render smoke",
+        "art_approval": "approved",
+        "promoted_content_manifest_entry": "asset:primitive:creature_brute"
+      }
+    },
+    {
+      "kind": "primitive",
+      "asset_id": "asset:primitive:creature_drone",
+      "tags": ["creature.drone"],
+      "compatible_tags": ["creature.drone"],
+      "compatible_subject_kinds": ["creature"],
+      "adapter_binding_id": "binding:threat:drone",
+      "provenance": {
+        "source": "authored/primitive/threat_drone",
+        "license": "CC0",
+        "tool_or_model_version": "godot-4.7.2",
+        "inputs": ["approved scout drone body specification"],
+        "parameters_or_seed": "seed:0",
+        "human_changes": "scaled and colored for readable scout silhouette",
+        "technical_validation": "threat visual catalog and render smoke",
+        "art_approval": "approved",
+        "promoted_content_manifest_entry": "asset:primitive:creature_drone"
+      }
+    },
+    {
+      "kind": "primitive",
+      "asset_id": "asset:primitive:creature_siren",
+      "tags": ["creature.siren"],
+      "compatible_tags": ["creature.siren"],
+      "compatible_subject_kinds": ["creature"],
+      "adapter_binding_id": "binding:threat:siren",
+      "provenance": {
+        "source": "authored/primitive/threat_siren",
+        "license": "CC0",
+        "tool_or_model_version": "godot-4.7.2",
+        "inputs": ["approved controller siren body specification"],
+        "parameters_or_seed": "seed:0",
+        "human_changes": "scaled and colored for readable controller silhouette",
+        "technical_validation": "threat visual catalog and render smoke",
+        "art_approval": "approved",
+        "promoted_content_manifest_entry": "asset:primitive:creature_siren"
+      }
+    },
+    {
+      "kind": "primitive",
+      "asset_id": "asset:primitive:item_armor",
+      "tags": ["item.armor"],
+      "compatible_tags": ["item.armor"],
+      "compatible_subject_kinds": ["item"],
+      "adapter_binding_id": "binding:item:armor",
+      "provenance": {
+        "source": "authored/primitive/item_armor",
+        "license": "CC0",
+        "tool_or_model_version": "godot-4.7.2",
+        "inputs": ["approved armor pickup specification"],
+        "parameters_or_seed": "seed:0",
+        "human_changes": "authored pickup silhouette and material",
+        "technical_validation": "item binding and render smoke",
+        "art_approval": "approved",
+        "promoted_content_manifest_entry": "asset:primitive:item_armor"
+      }
+    },
+    {
+      "kind": "primitive",
+      "asset_id": "asset:primitive:item_tool",
+      "tags": ["item.tool"],
+      "compatible_tags": ["item.tool"],
+      "compatible_subject_kinds": ["item"],
+      "adapter_binding_id": "binding:item:tool",
+      "provenance": {
+        "source": "authored/primitive/item_tool",
+        "license": "CC0",
+        "tool_or_model_version": "godot-4.7.2",
+        "inputs": ["approved tool pickup specification"],
+        "parameters_or_seed": "seed:0",
+        "human_changes": "authored pickup silhouette and material",
+        "technical_validation": "item binding and render smoke",
+        "art_approval": "approved",
+        "promoted_content_manifest_entry": "asset:primitive:item_tool"
+      }
+    },
+    {
+      "kind": "primitive",
+      "asset_id": "asset:primitive:item_weapon",
+      "tags": ["item.weapon"],
+      "compatible_tags": ["item.weapon"],
+      "compatible_subject_kinds": ["item"],
+      "adapter_binding_id": "binding:item:weapon",
+      "provenance": {
+        "source": "authored/primitive/item_weapon",
+        "license": "CC0",
+        "tool_or_model_version": "godot-4.7.2",
+        "inputs": ["approved weapon pickup specification"],
+        "parameters_or_seed": "seed:0",
+        "human_changes": "authored pickup silhouette and material",
+        "technical_validation": "item binding and render smoke",
+        "art_approval": "approved",
+        "promoted_content_manifest_entry": "asset:primitive:item_weapon"
+      }
+    },
+    {
+      "kind": "primitive",
+      "asset_id": "asset:primitive:objective",
+      "tags": ["objective.default"],
+      "compatible_tags": ["objective.default"],
+      "compatible_subject_kinds": ["objective"],
+      "adapter_binding_id": "binding:objective:default",
+      "provenance": {
+        "source": "authored/primitive/objective_console",
+        "license": "CC0",
+        "tool_or_model_version": "godot-4.7.2",
+        "inputs": ["approved functional objective specification"],
+        "parameters_or_seed": "seed:0",
+        "human_changes": "authored interaction silhouette and emissive cue",
+        "technical_validation": "objective interaction and render smoke",
+        "art_approval": "approved",
+        "promoted_content_manifest_entry": "asset:primitive:objective"
+      }
+    }
   ]
 }

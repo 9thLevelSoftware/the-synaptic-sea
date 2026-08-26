@@ -238,3 +238,66 @@ fn catalogue_requires_approved_subject_kind_compatibility() {
     }
     assert!(cat.validate().is_err());
 }
+
+#[test]
+fn bundled_catalogue_covers_runtime_ship_creature_item_objective_and_audio_subjects() {
+    let mut c = context();
+    c.subjects = vec![
+        PresentationSubject {
+            subject_id: "subject:creature:brute".into(),
+            subject_kind: SubjectKind::Creature,
+            binding_tags: vec!["creature.brute".into()],
+        },
+        PresentationSubject {
+            subject_id: "subject:creature:drone".into(),
+            subject_kind: SubjectKind::Creature,
+            binding_tags: vec!["creature.drone".into()],
+        },
+        PresentationSubject {
+            subject_id: "subject:creature:siren".into(),
+            subject_kind: SubjectKind::Creature,
+            binding_tags: vec!["creature.siren".into()],
+        },
+        PresentationSubject {
+            subject_id: "subject:environment:ambient".into(),
+            subject_kind: SubjectKind::Environment,
+            binding_tags: vec!["ambient.default".into()],
+        },
+        PresentationSubject {
+            subject_id: "subject:item:armor".into(),
+            subject_kind: SubjectKind::Item,
+            binding_tags: vec!["item.armor".into()],
+        },
+        PresentationSubject {
+            subject_id: "subject:item:tool".into(),
+            subject_kind: SubjectKind::Item,
+            binding_tags: vec!["item.tool".into()],
+        },
+        PresentationSubject {
+            subject_id: "subject:item:weapon".into(),
+            subject_kind: SubjectKind::Item,
+            binding_tags: vec!["item.weapon".into()],
+        },
+        PresentationSubject {
+            subject_id: "subject:objective".into(),
+            subject_kind: SubjectKind::Objective,
+            binding_tags: vec!["objective.default".into()],
+        },
+        PresentationSubject {
+            subject_id: "subject:ship".into(),
+            subject_kind: SubjectKind::Ship,
+            binding_tags: vec!["structural.default".into()],
+        },
+    ];
+    let catalogue = PresentationCatalogue::bundled().unwrap();
+    let output = assemble(&c, &catalogue).unwrap();
+    assert_eq!(output.instructions.len(), c.subjects.len());
+    assert!(output.fallback_subjects.is_empty());
+    output.validate(&c, &catalogue).unwrap();
+    let selected: std::collections::BTreeSet<_> = output
+        .instructions
+        .iter()
+        .flat_map(|instruction| instruction.asset_ids.iter())
+        .collect();
+    assert_eq!(selected.len(), c.subjects.len());
+}
