@@ -3,7 +3,7 @@ extends SceneTree
 const ValidatorScript := preload("res://scripts/procgen/procgen_manifest_validator.gd")
 
 class FakeGenerator extends RefCounted:
-	var version: int = 2
+	var version: int = 3
 	func generator_version() -> int: return version
 
 func _init() -> void:
@@ -53,7 +53,7 @@ func _init() -> void:
 	_expect(failures, stats, validator.validate(manifest, generator, "x86_64-pc-windows-msvc", bytes_bad_io) == ValidatorScript.CONTENT_HASH_MISMATCH, "content bytes mismatch")
 	var aggregate_bad_io: Dictionary = base_io.duplicate(true); var aggregate_bad: Dictionary = content.duplicate(true); aggregate_bad["content_manifest_hash"] = "0".repeat(64); aggregate_bad_io["files"][content_path] = JSON.stringify(aggregate_bad)
 	_expect(failures, stats, validator.validate(manifest, generator, "x86_64-pc-windows-msvc", aggregate_bad_io) == ValidatorScript.CONTENT_HASH_MISMATCH, "aggregate mismatch")
-	var bad_generator := FakeGenerator.new(); bad_generator.version = 1
+	var bad_generator := FakeGenerator.new(); bad_generator.version = 2
 	_expect(failures, stats, validator.validate(manifest, bad_generator, "x86_64-pc-windows-msvc", base_io) == ValidatorScript.GENERATOR_VERSION_MISMATCH, "generator")
 	_expect(failures, stats, validator.validate(manifest, generator, "linux", base_io) == ValidatorScript.TARGET_MISMATCH, "target")
 	var unknown_major: Dictionary = manifest.duplicate(true); unknown_major["manifest_schema"] = "procgen-build-manifest-2"

@@ -4,11 +4,11 @@ const CanonicalScript: GDScript = preload("res://scripts/procgen/procgen_canonic
 
 func _init() -> void:
 	var helper: RefCounted = CanonicalScript.new()
-	var raw := '{"bundle":{"gameplay_ir":{"z":40.0,"a":1e+2},"request":{"presentation":{"ignored":true},"b":"x\\u0021","a":[40,40.0,-2.50e-1]},"version":"v","site_ir":{"escaped":"\\u0061"},"world_ir":{"n":null,"f":false}}}'
-	var expected := '{"gameplay_ir":{"a":1e+2,"z":40.0},"request":{"a":[40,40.0,-2.50e-1],"b":"x!"},"site_ir":{"escaped":"a"},"version":"v","world_ir":{"f":false,"n":null}}'
+	var raw := '{"bundle":{"gameplay_ir":{"z":40.0,"a":1e+2},"request":{"presentation":{"ignored":true},"requested_domains":["world","site","gameplay","presentation"],"b":"x\\u0021","a":[40,40.0,-2.50e-1]},"version":"v","site_ir":{"escaped":"\\u0061"},"world_ir":{"n":null,"f":false}}}'
+	var expected := '{"gameplay_ir":{"a":1e+2,"z":40.0},"request":{"a":[40,40.0,-2.50e-1],"b":"x!","requested_domains":["gameplay","presentation","site","world"]},"site_ir":{"escaped":"a"},"version":"v","world_ir":{"f":false,"n":null}}'
 	_expect(helper.canonicalize(raw) == expected, "canonical bytes")
 	_expect(helper.semantic_hash(raw) == _sha256(expected), "canonical sha256")
-	var reordered := '{"bundle":{"version":"v","world_ir":{"f":false,"n":null},"site_ir":{"escaped":"a"},"gameplay_ir":{"a":1e+2,"z":40.0},"request":{"b":"x!","a":[40,40.0,-2.50e-1],"presentation":0}}}'
+	var reordered := '{"bundle":{"version":"v","world_ir":{"f":false,"n":null},"site_ir":{"escaped":"a"},"gameplay_ir":{"a":1e+2,"z":40.0},"request":{"requested_domains":["site","presentation","world","gameplay"],"b":"x!","a":[40,40.0,-2.50e-1],"presentation":0}}}'
 	_expect(helper.canonicalize(reordered) == expected, "key reordering")
 	for bad in [
 		'{"bundle":{"version":1,"request":{"a":1,"a":2},"world_ir":{},"site_ir":{},"gameplay_ir":{}}}',

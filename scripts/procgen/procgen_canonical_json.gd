@@ -30,7 +30,7 @@ func canonicalize(raw: String) -> String:
 		if key == "request":
 			if not _is_object(child):
 				return _fail("bundle request must be an object")
-			child = _without_key(child, "presentation")
+			child = _mechanical_request(child)
 		projection.append([key, child])
 	return _serialize_object(projection)
 
@@ -181,10 +181,17 @@ func _object_get(value: Variant, key: String) -> Variant:
 	for entry in value["v"]:
 		if entry[0] == key: return entry[1]
 	return null
-func _without_key(value: Variant, unwanted: String) -> Variant:
+func _mechanical_request(value: Variant) -> Variant:
 	var entries: Array = []
 	for entry in value["v"]:
-		if entry[0] != unwanted: entries.append(entry)
+		if entry[0] == "presentation": continue
+		var child: Variant = entry[1]
+		if entry[0] == "requested_domains" and child is Dictionary and child.get("t", "") == "a":
+			var domains: Array = child["v"].duplicate()
+			domains.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+				return str(a.get("v", "")) < str(b.get("v", "")))
+			child = {"t": "a", "v": domains}
+		entries.append([entry[0], child])
 	return {"t": "o", "v": entries}
 
 func _serialize_object(entries: Array) -> String:

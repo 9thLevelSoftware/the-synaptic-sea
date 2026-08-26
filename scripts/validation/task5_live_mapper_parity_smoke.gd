@@ -8,10 +8,13 @@ func _init() -> void:
 	if generator == null:
 		print("TASK5 LIVE MAPPER BLOCKED adapter_missing=true"); quit(1); return
 	var consumer: RefCounted = ConsumerScript.new()
-	var cases: Array = [{"label":"intact", "seed":42, "size":0, "condition":0}, {"label":"damaged", "seed":77, "size":1, "condition":1}, {"label":"fractured", "seed":12, "size":2, "condition":2}]
+	var cases: Array = [{"label":"intact", "seed":42, "size":0, "condition":0}, {"label":"damaged", "seed":77, "size":1, "condition":1}, {"label":"fractured", "seed":1, "size":2, "condition":2}]
 	var failures: Array[String] = []
 	for item in cases:
 		var request: Dictionary = consumer.build_request(int(item.seed), int(item.size), int(item.condition))
+		# The legacy export methods intentionally build the explicit migration-oracle
+		# request identity. Compare the mapper against that same one-pass bundle.
+		request.site.site_id = "legacy-site"
 		if item.label == "fractured": request.site.archetype_id = "frigate"
 		var lifecycle: Dictionary = JSON.parse_string(str(generator.generate_bundle(JSON.stringify(request))))
 		if str(lifecycle.get("status", "")) != "completed": failures.append("%s lifecycle" % item.label); continue
