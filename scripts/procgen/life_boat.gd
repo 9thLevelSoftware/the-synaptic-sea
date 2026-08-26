@@ -184,6 +184,37 @@ static func build_layout(biome: String = "") -> Dictionary:
 	return layout
 
 
+## Closed authored gameplay document for the fixed life boat. The life boat is
+## not procedurally generated, so its single launch-console objective is data,
+## not a post-generation gameplay selection.
+static func build_gameplay_document() -> Dictionary:
+	return {
+		"schema_version": "1.1.0",
+		"document_kind": "ship_gameplay_slice",
+		"program_id": "life_boat_fixed",
+		"start_room": "airlock_01",
+		"goal_room": "cockpit_01",
+		"critical_path": ["airlock_01", "cockpit_01"],
+		"objectives": [{
+			"id": "lifeboat_launch_console",
+			"sequence": 1,
+			"type": "interact",
+			"kind": "single",
+			"room_id": "cockpit_01",
+			"room_role": "bridge",
+			"semantic": "launch_console",
+			"cell": [1, 0, 0],
+			"approach_cell": [1, 0, 0],
+			"approach_distance_cells": 1,
+			"interactable": true,
+		}],
+		"loot_containers": [],
+		"fire_zones": [],
+		"arc_zones": [],
+		"breach_zones": [],
+	}
+
+
 # Returns the RoomGraph for the life boat. Useful for tests and for
 # the start scene combiner to inspect room roles without building
 # the full Node3D tree.

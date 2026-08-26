@@ -1,6 +1,8 @@
 extends RefCounted
 class_name RunSnapshot
 
+const ProcgenRequestCodecScript := preload("res://scripts/procgen/procgen_request_codec.gd")
+
 ## REQ-012 current-run save snapshot.
 ##
 ## Pure data class. Holds only current-run state explicitly allowed by
@@ -26,6 +28,10 @@ class_name RunSnapshot
 var layout_path: String = ""
 var kit_path: String = ""
 var gameplay_slice_path: String = ""
+# ADR-0069: production bundle replay identity. Path fields above remain only
+# for explicit authored-fixture/migration snapshots.
+var procgen_request: Dictionary = {}
+var procgen_semantic_hash: String = ""
 var player_position: Array = [0.0, 0.0, 0.0]
 var current_objective_sequence: int = 1
 var ship_systems_summary: Dictionary = {}
@@ -146,6 +152,8 @@ func to_dict() -> Dictionary:
 		"layout_path": layout_path,
 		"kit_path": kit_path,
 		"gameplay_slice_path": gameplay_slice_path,
+		"procgen_request": procgen_request.duplicate(true),
+		"procgen_semantic_hash": procgen_semantic_hash,
 		"player_position": player_position.duplicate(),
 		"current_objective_sequence": current_objective_sequence,
 		"ship_systems_summary": ship_systems_summary.duplicate(true),
@@ -213,6 +221,22 @@ static func from_dict(data: Variant, expected_slice_version: String, expected_go
 	snapshot.layout_path = str(dict.get("layout_path", ""))
 	snapshot.kit_path = str(dict.get("kit_path", ""))
 	snapshot.gameplay_slice_path = str(dict.get("gameplay_slice_path", ""))
+	if not dict.has("procgen_request") or not dict.has("procgen_semantic_hash"):
+		return null
+	var procgen_request_variant: Variant = dict.procgen_request
+	var procgen_hash_variant: Variant = dict.procgen_semantic_hash
+	if not procgen_request_variant is Dictionary or not procgen_hash_variant is String:
+		return null
+	if not (procgen_request_variant as Dictionary).is_empty():
+		snapshot.procgen_request = ProcgenRequestCodecScript.normalize(procgen_request_variant)
+		if snapshot.procgen_request.is_empty():
+			return null
+	snapshot.procgen_semantic_hash = procgen_hash_variant
+	if snapshot.procgen_request.is_empty() != snapshot.procgen_semantic_hash.is_empty():
+		return null
+	if not snapshot.procgen_semantic_hash.is_empty() \
+			and not _is_lower_hex(snapshot.procgen_semantic_hash, 64):
+		return null
 	var pos = dict.get("player_position", [0.0, 0.0, 0.0])
 	if typeof(pos) == TYPE_ARRAY and (pos as Array).size() >= 3:
 		var pos_array: Array = pos as Array
@@ -269,3 +293,13 @@ static func _deep_copy_dict(src: Variant) -> Dictionary:
 	if typeof(src) != TYPE_DICTIONARY:
 		return {}
 	return (src as Dictionary).duplicate(true)
+
+
+static func _is_lower_hex(value: String, length: int) -> bool:
+	if value.length() != length:
+		return false
+	for character: String in value:
+		if not ((character >= "0" and character <= "9") \
+				or (character >= "a" and character <= "f")):
+			return false
+	return true

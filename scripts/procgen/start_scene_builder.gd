@@ -1,35 +1,23 @@
 extends RefCounted
 class_name StartSceneBuilder
 
-# Builds the combined start scene: a randomized derelict with a fixed
-# life boat attached at the dock.
+# Builds the combined start scene: an authoritative-bundle derelict with a
+# fixed authored life boat attached at the dock.
 #
 # Pipeline:
-#   1. Generate derelict layout via ShipLayoutGenerator.generate().
-#   2. Generate life boat layout via LifeBoatBuilder.build_layout().
-#   3. Build gameplay slices for both via GameplaySliceBuilder.build().
-#   4. Write layout + gameplay pairs to temp files under user://start_scenario/.
-#   5. Load both via GeneratedShipLoader.load_from_paths().
-#   6. Position life boat adjacent to derelict's dock room.
-#   7. Return a root Node3D containing both loaders.
+#   1. Generate and validate one complete Rust ProcgenBundle in memory.
+#   2. Map that bundle once to loader documents.
+#   3. Build the fixed life boat's authored layout/gameplay documents.
+#   4. Load both from in-memory documents.
+#   5. Position life boat adjacent to derelict's dock room.
+#   6. Return a root Node3D containing both loaders.
 #
 # The root is NOT attached to the scene tree — the caller decides
 # where to add it (playable scene, test scene, etc.).
 
-const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
-const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_generator.gd")
-const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
+const ShipGeneratorScript := preload("res://scripts/procgen/ship_generator.gd")
 const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
 const GeneratedShipLoaderScript := preload("res://scripts/procgen/generated_ship_loader.gd")
-
-# Default derelict archetype path.
-const DERELICT_ARCHETYPE_PATH: String = "res://data/procgen/archetypes/derelict.json"
-
-# Structural kit used by GeneratedShipLoader.
-const KIT_PATH: String = "res://data/kits/ship_structural_v0.json"
-
-# Temp directory for layout + gameplay slice files.
-const TEMP_DIR: String = "user://start_scenario"
 
 # Gap between the derelict dock and the life boat airlock (world units).
 const DOCK_GAP: float = 6.0
@@ -39,27 +27,16 @@ const DOCK_GAP: float = 6.0
 # Returns a Node3D named "StartScene" containing both the derelict
 # GeneratedShipLoader and the life boat GeneratedShipLoader, or null on failure.
 static func build(seed_value: int) -> Node3D:
-	# Load derelict archetype.
-	var archetype: Dictionary = _load_archetype(DERELICT_ARCHETYPE_PATH)
-	if archetype.is_empty():
-		push_error("StartSceneBuilder: could not load derelict archetype")
+	# ---- Step 1: Generate one complete derelict bundle ----
+	var generator: RefCounted = ShipGeneratorScript.new()
+	generator.configure_run_context("", "standard")
+	generator.configure_procgen_site("", 0, 0)
+	var documents: Dictionary = generator.generate_documents_from_seed(
+		seed_value, 1, 2, "freighter")
+	if documents.is_empty():
+		push_error("StartSceneBuilder: derelict bundle generation failed: %s" % generator.last_error)
 		return null
-
-	# Ensure temp directory exists.
-	if not DirAccess.dir_exists_absolute(TEMP_DIR):
-		DirAccess.make_dir_absolute(TEMP_DIR)
-
-	# ---- Step 1: Generate derelict layout ----
-	var blueprint: ShipBlueprintScript = _build_blueprint(archetype, seed_value)
-	if blueprint == null:
-		push_error("StartSceneBuilder: could not build derelict blueprint")
-		return null
-
-	var layout_gen: ShipLayoutGeneratorScript = ShipLayoutGeneratorScript.new()
-	var derelict_layout: Dictionary = layout_gen.generate(blueprint, archetype)
-	if derelict_layout.is_empty():
-		push_error("StartSceneBuilder: derelict layout generation failed")
-		return null
+	var derelict_layout: Dictionary = (documents.layout as Dictionary).duplicate(true)
 
 	# ---- Step 2: Generate life boat layout ----
 	var lb_layout: Dictionary = LifeBoatBuilderScript.build_layout()
@@ -67,56 +44,34 @@ static func build(seed_value: int) -> Node3D:
 		push_error("StartSceneBuilder: life boat layout generation failed")
 		return null
 
-	# ---- Step 3: Build gameplay slices ----
-	var slice_builder: GameplaySliceBuilderScript = GameplaySliceBuilderScript.new()
-	var derelict_gameplay: Dictionary = slice_builder.build(derelict_layout)
-	if derelict_gameplay.is_empty():
-		push_error("StartSceneBuilder: derelict gameplay slice build failed")
-		return null
-
-	var lb_gameplay: Dictionary = slice_builder.build(lb_layout)
+	# ---- Step 3: Use bundle gameplay + fixed authored life boat gameplay ----
+	var derelict_gameplay: Dictionary = (documents.gameplay_slice as Dictionary).duplicate(true)
+	var lb_gameplay: Dictionary = LifeBoatBuilderScript.build_gameplay_document()
 	if lb_gameplay.is_empty():
-		push_error("StartSceneBuilder: life boat gameplay slice build failed")
+		push_error("StartSceneBuilder: life boat gameplay document missing")
 		return null
 
-	# ---- Step 4: Write layouts + gameplay slices to temp files ----
-	var derelict_layout_path: String = TEMP_DIR + "/derelict_layout.json"
-	var derelict_gameplay_path: String = TEMP_DIR + "/derelict_gameplay.json"
-	var lb_layout_path: String = TEMP_DIR + "/lifeboat_layout.json"
-	var lb_gameplay_path: String = TEMP_DIR + "/lifeboat_gameplay.json"
-
-	if not _write_json(derelict_layout_path, derelict_layout):
-		push_error("StartSceneBuilder: could not write derelict layout")
+	# ---- Step 4: Load both from in-memory documents ----
+	var derelict: Node3D = generator.instantiate_documents(documents, false)
+	if derelict == null:
+		push_error("StartSceneBuilder: derelict document assembly failed")
 		return null
-	if not _write_json(derelict_gameplay_path, derelict_gameplay):
-		push_error("StartSceneBuilder: could not write derelict gameplay slice")
-		return null
-	if not _write_json(lb_layout_path, lb_layout):
-		push_error("StartSceneBuilder: could not write life boat layout")
-		return null
-	if not _write_json(lb_gameplay_path, lb_gameplay):
-		push_error("StartSceneBuilder: could not write life boat gameplay slice")
-		return null
-
-	# ---- Step 5: Load both via GeneratedShipLoader ----
-	var derelict: GeneratedShipLoaderScript = GeneratedShipLoaderScript.new()
 	derelict.name = "Derelict"
-	var derelict_ok: bool = derelict.load_from_paths(derelict_layout_path, KIT_PATH, derelict_gameplay_path)
-	if not derelict_ok:
-		push_error("StartSceneBuilder: derelict load_from_paths failed")
-		derelict.queue_free()
-		return null
 
 	var life_boat: GeneratedShipLoaderScript = GeneratedShipLoaderScript.new()
 	life_boat.name = "LifeBoat"
-	var lb_ok: bool = life_boat.load_from_paths(lb_layout_path, KIT_PATH, lb_gameplay_path)
+	var lb_ok: bool = life_boat.load_from_documents(
+		lb_layout,
+		(documents.kit as Dictionary).duplicate(true),
+		lb_gameplay,
+		false)
 	if not lb_ok:
-		push_error("StartSceneBuilder: life boat load_from_paths failed")
+		push_error("StartSceneBuilder: life boat document assembly failed")
 		derelict.queue_free()
 		life_boat.queue_free()
 		return null
 
-	# ---- Step 6: Position life boat adjacent to derelict's dock room ----
+	# ---- Step 5: Position life boat adjacent to derelict's dock room ----
 	var dock_pos: Vector3 = _find_dock_position(derelict_layout)
 	if dock_pos == Vector3.INF:
 		push_error("StartSceneBuilder: no dock room found in derelict layout; cannot position life boat")
@@ -125,22 +80,15 @@ static func build(seed_value: int) -> Node3D:
 		return null
 	life_boat.position = dock_pos + Vector3(0.0, 0.0, DOCK_GAP)
 
-	# ---- Step 7: Combine under a single root ----
+	# ---- Step 6: Combine under a single root ----
 	var root: Node3D = Node3D.new()
 	root.name = "StartScene"
+	root.set_meta("procgen_request", (documents.request as Dictionary).duplicate(true))
+	root.set_meta("procgen_semantic_hash", str(documents.semantic_hash))
 	root.add_child(derelict)
 	root.add_child(life_boat)
 
 	return root
-
-
-# Builds a ShipBlueprint from the archetype's blueprint dict, overriding seed.
-static func _build_blueprint(archetype: Dictionary, seed_value: int) -> ShipBlueprintScript:
-	var bp_data: Dictionary = archetype.get("blueprint", {})
-	var size: int = int(bp_data.get("size", ShipBlueprintScript.Size.MEDIUM))
-	var condition: int = int(bp_data.get("condition", ShipBlueprintScript.Condition.WRECKED))
-	return ShipBlueprintScript.new(size, condition, seed_value)
-
 
 # Finds the center of the dock room in the derelict layout.
 # Returns the average position of all floor cells (floor_1x1, corridor_floor_1x1)
@@ -154,7 +102,8 @@ static func _find_dock_position(layout: Dictionary) -> Vector3:
 		var room: Dictionary = room_variant
 		var role: String = str(room.get("room_role", ""))
 		var rid: String = str(room.get("id", ""))
-		if role != "dock" and not rid.begins_with("dock"):
+		if role not in ["dock", "airlock"] \
+				and not rid.begins_with("dock") and not rid.begins_with("airlock"):
 			continue
 		# Compute the average position of all floor cells in this room.
 		var placements: Array = room.get("structural_placements", [])
@@ -178,31 +127,3 @@ static func _find_dock_position(layout: Dictionary) -> Vector3:
 		if count > 0:
 			return sum / float(count)
 	return Vector3.INF
-
-
-# Writes a Dictionary to a JSON file. Returns true on success.
-static func _write_json(path: String, data: Dictionary) -> bool:
-	var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
-	if file == null:
-		push_error("StartSceneBuilder: cannot open for write: %s" % path)
-		return false
-	file.store_string(JSON.stringify(data, "  "))
-	file.close()
-	return true
-
-
-# Loads an archetype JSON file and returns its contents as a Dictionary.
-static func _load_archetype(path: String) -> Dictionary:
-	if not ResourceLoader.exists(path):
-		return {}
-	var file := FileAccess.open(path, FileAccess.READ)
-	if file == null:
-		return {}
-	var json_text: String = file.get_as_text()
-	file.close()
-	var json := JSON.new()
-	if json.parse(json_text) != OK:
-		return {}
-	if json.data is Dictionary:
-		return json.data
-	return {}

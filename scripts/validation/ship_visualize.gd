@@ -5,7 +5,6 @@ extends SceneTree
 const StartSceneBuilderScript := preload("res://scripts/procgen/start_scene_builder.gd")
 const LifeBoatBuilderScript := preload("res://scripts/procgen/life_boat.gd")
 const ShipGeneratorScript := preload("res://scripts/procgen/ship_generator.gd")
-const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 
 const OUTPUT_DIR: String = "res://scenes/generated/"
 
@@ -28,20 +27,19 @@ func _initialize() -> void:
 		_add_camera(lb)
 		_save(lb, "life_boat.tscn")
 
-	# Standalone derelict.
-	var file := FileAccess.open("res://data/procgen/archetypes/derelict.json", FileAccess.READ)
-	var json := JSON.new()
-	json.parse(file.get_as_text())
-	file.close()
-	var archetype: Dictionary = json.data
-	var bp_data: Dictionary = archetype.get("blueprint", {})
-	bp_data["seed_value"] = 42
-	var bp = ShipBlueprintScript.from_dict(bp_data)
+	# Standalone derelict from the same authoritative in-memory bundle used by
+	# production entry points.
 	var gen: ShipGeneratorScript = ShipGeneratorScript.new()
-	var derelict: Node3D = gen.generate_migration_oracle(bp, archetype)
+	gen.configure_run_context("breach_field", "standard")
+	gen.configure_procgen_site("visualizer-42", 0, 0)
+	var documents: Dictionary = gen.generate_documents_from_seed(42, 1, 2, "freighter")
+	var derelict: Node3D = gen.instantiate_documents(documents, false) \
+		if not documents.is_empty() else null
 	if derelict != null:
 		_add_camera(derelict)
 		_save(derelict, "derelict_seed_42.tscn")
+	else:
+		push_error("Failed standalone derelict bundle: %s" % str(gen.last_error))
 
 	print("Done. Scenes saved to %s" % OUTPUT_DIR)
 	quit(0)
@@ -99,3 +97,5 @@ func _save(root: Node3D, filename: String) -> void:
 		push_error("Save failed for %s: %d" % [filename, err])
 		return
 	print("Saved: %s" % path)
+	get_root().remove_child(root)
+	root.free()

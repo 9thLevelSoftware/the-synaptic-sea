@@ -295,8 +295,23 @@ performance are Gate 6 evidence and remain unverified here.
 
 ### Gate 6 production and scale evidence
 
-- Register `worldgen_wired_travel_smoke.gd` and new bundle/parity smokes in the
-  canonical `run_clean` bundle only after their output is clean.
+- The Windows companion runner registers wired travel and every Gate 5/6
+  bundle, entry-point, save-replay, consumer, generated-world, and adaptive
+  smoke after each focused output is clean:
+
+```powershell
+powershell -NoProfile -File tools/run_procgen_gate6_regression.ps1
+powershell -NoProfile -File tools/run_procgen_gate6_regression.ps1 -FullSuite
+```
+
+  Required aggregate markers are
+  `PROCGEN GATE6 REGRESSION PASS smokes=14 full_suite=False` and
+  `PROCGEN GATE6 REGRESSION PASS smokes=32 full_suite=True`. The script uses the
+  exact Godot 4.7.2 Mono console under Downloads by default, invokes only
+  `SceneTree` runners, removes its request-scoped log in `finally`, and rejects
+  every unexpected case-sensitive `ERROR:`, `WARNING:`, `FAIL`, or `BLOCKED`
+  line. In particular, `procgen_bundle_consumer.gd` is preloaded by runners and
+  is never passed directly to `--script`.
 - PR: at least 10,000 deterministic composite cases across domains, versions,
   archetypes, difficulties, damage states, and adapters.
 - Nightly: at least 1,000,000 domain cases, promoted failure replay,
@@ -311,22 +326,48 @@ performance are Gate 6 evidence and remain unverified here.
   stop, runtime 60 fps target / 30 fps stop, plus declared per-stage latency,
   queue, entity, instance, navigation, and Web build-size limits.
 
-Current baseline (2026-08-26): Gate 4 Rust artifact source commit
-`29720efecfc8b9dd3f6959870639061f43203b8f`,
-content-manifest SHA-256
-`0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385`, native
-artifact SHA-256
-`f8d3aab1c4643749e38c1a9a3f0c75ab7d8a968e937c92534d4e35db119ebd87`, and Web
-artifact SHA-256
-`ef8ff3861225c99ca0a2cdb190b4d4a27631b1d4f824c2e9c8fd12065d41c1f2`.
-Rust formatting, strict Clippy, all 318 workspace tests, schema/export checks,
-manifest checks, the 1,800-ship stress sweep, Windows Godot 4.7.2 adaptive,
-consumer, mapper, fallback, build, travel, and native-lifecycle smokes, and the
-Node WASM lifecycle/parity smoke pass with no unexpected warnings or errors.
-These focused smokes remain separate from the canonical `run_clean` bundle
-until Gate 6. Canonical Godot 4.7.1, macOS/Linux exports, final exported-Web
-parity, windowed performance, and RoboGodot/manual editor review remain
-unverified.
+The deterministic composite campaign is invoked explicitly so the requested
+floor and resulting accounting are visible:
+
+```powershell
+cargo run --release -p derelict_cli -- --campaign 10000
+cargo run --release -p derelict_cli -- --campaign 1000000
+```
+
+Valid bundles and validated, replay-identical typed fail-closed outcomes both
+count as evaluated domain cases; partial content never counts. The runner
+rejects zero or more than one million requested cases, checks exact accounting,
+and enforces a one-percent (`100` basis-point) ceiling on deterministic
+fail-closed outcomes. It records generated/failure/attempt/check/group counts,
+the supported-version rejection, adapter, archetype, difficulty, damage, and
+locale coverage. The million-case command is the nightly profile and is not
+claimed from the PR run.
+
+Current Windows-local baseline (2026-08-26):
+
+- source commit `264880670d05645e746aae390bbb1e7f93d6cc6d`;
+- content-manifest SHA-256
+  `0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385`;
+- Windows artifact SHA-256
+  `615ebf7c9b86129b82eebaf160109da62e3ea147def80826eea33737cccaf1ad`;
+- Web artifact SHA-256
+  `60a6c1c1f214ddd1ea042aaca2e4bc8bc91442bd3155f8355ca9622cba8d6c56`;
+- `CAMPAIGN PASS cases=10000 generated=9992 deterministic_failures=8
+  attempts=11436 checks=10000 groups=1436 failure_budget_bp=100 ...`;
+- Rust format, strict Clippy, all 322 workspace tests, unchanged structural-v2
+  golden hashes, schema/export and both build-manifest checks, the 1,800-ship
+  release stress sweep, Node WASM lifecycle/parity, and both Godot Gate 6
+  profiles pass;
+- `save_migration_service_smoke.gd`, `save_migration_world_smoke.gd`,
+  `save_load_service_smoke.gd`, and `world_save_service_smoke.gd` pass. Their
+  deliberate newer-version/null-save warnings remain covered by the existing
+  exact allowlist in the canonical regression bundle.
+
+Gate 6 is not complete. Production still uses transitional `WorldSnapshot`
+loading instead of the closed `generated-world-save-1` envelope with a live
+Rust provider and atomic typed mutation applier. The million-case nightly run,
+macOS/Linux exports, final exported-Web parity, windowed performance, and
+RoboGodot/manual editor review also remain unverified.
 
 ## Regression bundle
 
@@ -693,7 +734,7 @@ run_clean 'procgen layout stress smoke' 'PROCGEN LAYOUT STRESS PASS total=60/60'
 run_clean 'load from blueprint smoke' 'LOAD FROM BLUEPRINT INTEGRATION PASS sizes=3 room_count=10 null_rejected=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/load_from_blueprint_smoke.gd
 run_clean 'ship generator smoke' 'SHIP GENERATOR PASS life_boat=true small=true deterministic=true life_rooms=10 small_rooms=12' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/ship_generator_smoke.gd
 run_clean 'procgen playable ship smoke' 'PLAYABLE SHIP SMOKE PASS player_spawned=true collision_checked=true interaction_completed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_playable_ship_smoke.gd
-run_clean 'procgen runtime demo smoke' 'RUNTIME GAMEPLAY DEMO PASS objectives=4 interactions=4' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_runtime_demo_smoke.gd
+run_clean 'procgen runtime demo smoke' 'RUNTIME GAMEPLAY DEMO PASS objectives=3 interactions=3' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_runtime_demo_smoke.gd
 run_clean 'procgen walkability smoke' 'WALKABILITY PASS spine_seed_42 compiler_walls=true doorway=true no_void=true no_wall_through=true nav_kinds=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_walkability_smoke.gd
 run_clean 'interior aabb smoke' 'INTERIOR AABB PASS nondegenerate=true positioned=true contains=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/interior_aabb_smoke.gd
 run_clean 'kit catalog smoke' 'KIT CATALOG PASS loaded=6 default=ship_structural_v0 airlock=3 eng=3 breach_select=ok fallback=ok real_stems=true default_role_module=floor_1x1 ids_sorted=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/kit_catalog_smoke.gd
@@ -716,7 +757,20 @@ run_clean 'ADR-0049 threat path follow smoke' 'THREAT PATH FOLLOW PASS advanced=
 run_clean 'ADR-0049 main playable threat pathfinding smoke' 'MAIN PLAYABLE THREAT PATHFINDING PASS graph=true advanced=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_threat_pathfinding_smoke.gd
 run_clean 'Procgen quality gate smoke' 'PROCGEN QUALITY GATE PASS' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_quality_gate_smoke.gd
 run_clean 'Procgen golden parity smoke' 'PROCGEN GOLDEN PARITY PASS goldens=3 nav=true schema=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_golden_parity_smoke.gd
-run_clean 'Procgen derelict pipeline contract smoke' 'MAIN PLAYABLE DERELICT PIPELINE CONTRACT PASS layout=true nav=true biome=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_derelict_pipeline_contract_smoke.gd
+run_clean 'Procgen derelict pipeline contract smoke' 'MAIN PLAYABLE DERELICT PIPELINE CONTRACT PASS layout=true nav=true bundle_authoritative=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/main_playable_derelict_pipeline_contract_smoke.gd
+# --- Unified procgen Gate 5/6 production bundle and regression evidence ---
+run_clean 'Procgen diagnostic bundle smoke' 'PROCGEN DIAGNOSTIC BUNDLE PASS deterministic=true timing_capture=true caps=true privacy=true conflict=true live=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_diagnostic_bundle_smoke.gd
+run_clean 'Procgen promotion store smoke' 'PROCGEN PROMOTION STORE PASS schema=true privacy=true conflict=true readback=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_promotion_store_smoke.gd
+run_clean 'Procgen seed lab graph view smoke' 'PROCGEN SEED LAB GRAPH VIEW PASS permutation=true malformed_rejected=true selection=true domains=7 clamp=true draw=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_seed_lab_graph_view_smoke.gd
+run_clean 'Procgen seed lab model smoke' 'PROCGEN SEED LAB MODEL PASS graphs=7 compare=true locks=13 selective=true isolation=true trace=true promotion=3 controller_exact_one=true failure_state=true live=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_seed_lab_model_smoke.gd
+run_clean 'Procgen seed lab scene smoke' 'PROCGEN SEED LAB SCENE PASS live_generation=true slots=2 compare=true graphs=7 locks=13 selective=true diagnostic=true promotion=true frame=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_seed_lab_scene_smoke.gd
+run_clean 'Procgen regression corpus smoke' 'PROCGEN REGRESSION CORPUS PASS entries=3 classifications=3 diagnostics=true live=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_regression_corpus_smoke.gd
+run_clean 'Procgen Gate 6 in-memory documents smoke' 'PROCGEN GATE6 DOCUMENTS PASS bundle=true single_execution=true replay=true loader=true start_scene=true no_temp_files=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_gate6_documents_smoke.gd
+run_clean 'Procgen Gate 6 source cutover smoke' 'PROCGEN GATE6 SOURCE PASS sources=11 save_identity=true temp_dirs=true title_order=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_gate6_source_smoke.gd
+run_clean 'Procgen Gate 6 save replay smoke' 'PROCGEN GATE6 SAVE REPLAY PASS version=gate2-current-run-5 request=true hash=true paths_empty=true roundtrip=true replay=true mismatch_rejected=true new_world_required=true prompt=true clean_break=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_gate6_save_replay_smoke.gd
+run_clean 'Procgen wired travel smoke' 'WORLDGEN WIRED TRAVEL PASS cases=9 difficulty=deep_dive deterministic=true bundle_authoritative=true oracle_invocations=0' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/worldgen_wired_travel_smoke.gd
+run_clean 'Procgen top-down bundle smoke' 'E2E smoke: pass_count=16 failure_count=0' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/topdown_e2e_smoke.gd
+run_clean 'Procgen build-manifest smoke' 'PROCGEN BUILD MANIFEST PASS negative_cases=45 fail_closed=true' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_build_manifest_smoke.gd
 # --- Pre-polish foundations (2026-07-22 Wave 0): SimKeys + TuningCatalog shells ---
 run_clean 'SimKeys contract smoke' 'SIM KEYS PASS hot=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/sim_keys_smoke.gd
 run_clean 'TuningCatalog shell smoke' 'TUNING CATALOG PASS shell=true dir_loaded=' "$GODOT" --headless --path "$ROOT" --script res://scripts/validation/tuning_catalog_smoke.gd

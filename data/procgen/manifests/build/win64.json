@@ -1,6 +1,6 @@
 {
   "manifest_schema": "procgen-build-manifest-4",
-  "rust_source_commit": "29720efecfc8b9dd3f6959870639061f43203b8f",
+  "rust_source_commit": "264880670d05645e746aae390bbb1e7f93d6cc6d",
   "generator_version": 3,
   "content_manifest_path": "data/procgen/manifests/content_manifest.json",
   "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
@@ -8,7 +8,7 @@
   "artifact": {
     "kind": "gdextension",
     "path": "addons/derelict/bin/win64/derelict_godot.dll",
-    "sha256": "f8d3aab1c4643749e38c1a9a3f0c75ab7d8a968e937c92534d4e35db119ebd87"
+    "sha256": "615ebf7c9b86129b82eebaf160109da62e3ea147def80826eea33737cccaf1ad"
   },
   "export_schemas": {
     "procgen_request": "procgen-request-2",

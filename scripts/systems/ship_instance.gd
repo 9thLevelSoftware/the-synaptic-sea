@@ -1,6 +1,8 @@
 extends RefCounted
 class_name ShipInstance
 
+const ProcgenRequestCodecScript := preload("res://scripts/procgen/procgen_request_codec.gd")
+
 ## Lightweight per-ship handle. Bundles the identity + data + systems + scene
 ## root that genuinely must be per-ship for multi-ship travel/docking. Pure
 ## data plus a systems handle and a Node3D reference; it never adds or frees
@@ -28,6 +30,8 @@ var blueprint                       # ShipBlueprint
 var systems_manager                 # ShipSystemsManager (this ship's own systems)
 var scene_root: Node3D = null       # generated/loaded tree; null when not instantiated
 var built_layout: Dictionary = {}   # the layout dict scene_root was built from (for dock-port derivation)
+var procgen_request: Dictionary = {}
+var procgen_semantic_hash: String = ""
 
 # 5a: `ship_root` is the ship's positioned root — it IS scene_root, exposed
 # under the docking-domain name. Alias so DockingManager/occupancy read
@@ -182,11 +186,20 @@ func get_summary() -> Dictionary:
 		result["module_integrity"] = module_integrity_summary.duplicate(true)
 	if not component_placement_summary.is_empty():
 		result["component_placement"] = component_placement_summary.duplicate(true)
+	if not procgen_request.is_empty() and not procgen_semantic_hash.is_empty():
+		result["procgen_request"] = procgen_request.duplicate(true)
+		result["procgen_semantic_hash"] = procgen_semantic_hash
 	return result
 
 func apply_summary(summary) -> bool:
 	if typeof(summary) != TYPE_DICTIONARY or (summary as Dictionary).is_empty():
 		return false
+	var normalized_procgen_request: Dictionary = {}
+	var raw_procgen_request: Variant = summary.get("procgen_request", {})
+	if raw_procgen_request is Dictionary and not (raw_procgen_request as Dictionary).is_empty():
+		normalized_procgen_request = ProcgenRequestCodecScript.normalize(raw_procgen_request)
+		if normalized_procgen_request.is_empty():
+			return false
 	ship_id = str(summary.get("ship_id", ship_id))
 	marker_id = str(summary.get("marker_id", marker_id))
 	var bp_dict: Variant = summary.get("blueprint", null)
@@ -198,6 +211,8 @@ func apply_summary(summary) -> bool:
 			systems_manager = ShipSystemsManagerScript.new()
 			systems_manager.configure(systems_manager.load_definitions(), 0, 0)
 		systems_manager.apply_summary(sys_dict)
+	procgen_request = normalized_procgen_request
+	procgen_semantic_hash = str(summary.get("procgen_semantic_hash", ""))
 	var obj_summary: Variant = summary.get("objective", null)
 	if typeof(obj_summary) == TYPE_DICTIONARY and not (obj_summary as Dictionary).is_empty():
 		if objective_controller == null:

@@ -3,52 +3,7 @@
   "entries": [
     {
       "schema_version": "procgen-promotion-candidate-1",
-      "candidate_id": "5e3d67db049dc86c738ffdd675f9b096795f5eb3e075a89dd40a0d40e7e44b17",
-      "classification": "authored_fallback",
-      "approval_ref": "synaptic-sea-stage-gate:t_bdced4e5",
-      "request": {
-        "schema_version": "procgen-request-2",
-        "world_seed": 1,
-        "site": {
-          "site_id": "gate5-frigate-1",
-          "x": 4096,
-          "y": -4096,
-          "archetype_id": "frigate",
-          "kit_id": "ship_structural_v0",
-          "intactness_override_bp": 2000,
-          "cause_of_loss": null,
-          "loot_richness_bp": 5000
-        },
-        "difficulty_id": "standard",
-        "player_model": {"schema_version": "player-model-2", "signals": []},
-        "requested_domains": ["world", "site", "gameplay", "presentation"],
-        "generator_version": 3,
-        "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
-        "presentation": {"seed": 42, "locale": "it-IT"}
-      },
-      "expected": {
-        "semantic_hash": "7ebccc2270368d5872211eb8f6816d4537cb257cc6c5ad3f8f991aad1e3dd52a",
-        "failure_code": null,
-        "fallback_id": "site:authored-safe-return",
-        "trace_code": "site:selected_fallback"
-      },
-      "source_diagnostic": {
-        "identity_hash": "1011e9ccaec42aa252dace29f5b6ffc1443cd8ae665c00a495614017456f07ff",
-        "capture_hash": "1ffe0e8645a527dff72e0834aaf4c4d740f45953e139c87adb9e746d0e4c3c73"
-      },
-      "provenance": {
-        "tool_version": "seed-lab-1",
-        "generator_version": 3,
-        "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
-        "rust_source_commit": "29720efecfc8b9dd3f6959870639061f43203b8f",
-        "build_target": "x86_64-pc-windows-msvc",
-        "artifact_sha256": "f8d3aab1c4643749e38c1a9a3f0c75ab7d8a968e937c92534d4e35db119ebd87",
-        "technical_validation_codes": ["bundle_valid", "replay_valid"]
-      }
-    },
-    {
-      "schema_version": "procgen-promotion-candidate-1",
-      "candidate_id": "609f7cd1a47764623e39c72e244df1b74be79882c902dd7c25aa0cbe5f8a75a1",
+      "candidate_id": "7421c8d58ea16a32f40047a328f23ee45b0e8f13cf661508d0b9d61e268a9c18",
       "classification": "approved_candidate",
       "approval_ref": "synaptic-sea-stage-gate:t_bdced4e5",
       "request": {
@@ -78,22 +33,67 @@
         "trace_code": null
       },
       "source_diagnostic": {
-        "identity_hash": "47dab3ac97bc4ced502624e87ed50c44068c7ac1d6bf4755749e35e64c934003",
-        "capture_hash": "abbb45c93d2d20920b2e4292fd8a2cbc9963a6bee7e95e189b1da320d896ab60"
+        "identity_hash": "c2a0c1951cfb9487ba5ce53d264105c6cc8cd6b696b6f449b9c3c52cd4ef60eb",
+        "capture_hash": "03d7bab38bd9455070db25ebcbfefb615d123bb0a3ed23064b0dccc90570d732"
       },
       "provenance": {
         "tool_version": "seed-lab-1",
         "generator_version": 3,
         "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
-        "rust_source_commit": "29720efecfc8b9dd3f6959870639061f43203b8f",
+        "rust_source_commit": "264880670d05645e746aae390bbb1e7f93d6cc6d",
         "build_target": "x86_64-pc-windows-msvc",
-        "artifact_sha256": "f8d3aab1c4643749e38c1a9a3f0c75ab7d8a968e937c92534d4e35db119ebd87",
+        "artifact_sha256": "615ebf7c9b86129b82eebaf160109da62e3ea147def80826eea33737cccaf1ad",
         "technical_validation_codes": ["bundle_valid", "replay_valid"]
       }
     },
     {
       "schema_version": "procgen-promotion-candidate-1",
-      "candidate_id": "bd99ddcec9e2f734fd31230dd018e719936f4565847889c5dbbff1df7e65d925",
+      "candidate_id": "a273eec27472c591154d7733b31a8a55bdfd5b8977ea44e578fe1acf96732ebe",
+      "classification": "authored_fallback",
+      "approval_ref": "synaptic-sea-stage-gate:t_bdced4e5",
+      "request": {
+        "schema_version": "procgen-request-2",
+        "world_seed": 1,
+        "site": {
+          "site_id": "gate5-frigate-1",
+          "x": 4096,
+          "y": -4096,
+          "archetype_id": "frigate",
+          "kit_id": "ship_structural_v0",
+          "intactness_override_bp": 2000,
+          "cause_of_loss": null,
+          "loot_richness_bp": 5000
+        },
+        "difficulty_id": "standard",
+        "player_model": {"schema_version": "player-model-2", "signals": []},
+        "requested_domains": ["world", "site", "gameplay", "presentation"],
+        "generator_version": 3,
+        "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
+        "presentation": {"seed": 42, "locale": "it-IT"}
+      },
+      "expected": {
+        "semantic_hash": "7ebccc2270368d5872211eb8f6816d4537cb257cc6c5ad3f8f991aad1e3dd52a",
+        "failure_code": null,
+        "fallback_id": "site:authored-safe-return",
+        "trace_code": "site:selected_fallback"
+      },
+      "source_diagnostic": {
+        "identity_hash": "1a390695fd6aa723e8f3ed3b186054ec04a2729607391ee1cc226f01f59fa5ab",
+        "capture_hash": "343503b919c8f5978b8c77e6b9d121e02682c0ddde9c64f4d1e9cfdb63a4b68a"
+      },
+      "provenance": {
+        "tool_version": "seed-lab-1",
+        "generator_version": 3,
+        "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
+        "rust_source_commit": "264880670d05645e746aae390bbb1e7f93d6cc6d",
+        "build_target": "x86_64-pc-windows-msvc",
+        "artifact_sha256": "615ebf7c9b86129b82eebaf160109da62e3ea147def80826eea33737cccaf1ad",
+        "technical_validation_codes": ["bundle_valid", "replay_valid"]
+      }
+    },
+    {
+      "schema_version": "procgen-promotion-candidate-1",
+      "candidate_id": "f0b8ec014fede6c6e054a04205ad047a16409f5f58e91058a5c43e74b4c9e23f",
       "classification": "failure_seed",
       "approval_ref": "synaptic-sea-stage-gate:t_bdced4e5",
       "request": {
@@ -123,16 +123,16 @@
         "trace_code": "reconciled:fragment_metadata"
       },
       "source_diagnostic": {
-        "identity_hash": "badf6611c7786de432b9301572bd0b6890ff51519d263c8a4c9afbf70e0c8ed8",
-        "capture_hash": "636e937451341fc23c6b2753b6fc449b467b5ba804d3527bf653bc097085e930"
+        "identity_hash": "ac125a6635d045e3aa5b1473a78bab2538a9a4482cb27a3f377afb043eea04b1",
+        "capture_hash": "bfccf833e9604a2a3a6317b2d2b32057ebde7285a356b4b1d306a43566c5f3fc"
       },
       "provenance": {
         "tool_version": "seed-lab-1",
         "generator_version": 3,
         "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
-        "rust_source_commit": "29720efecfc8b9dd3f6959870639061f43203b8f",
+        "rust_source_commit": "264880670d05645e746aae390bbb1e7f93d6cc6d",
         "build_target": "x86_64-pc-windows-msvc",
-        "artifact_sha256": "f8d3aab1c4643749e38c1a9a3f0c75ab7d8a968e937c92534d4e35db119ebd87",
+        "artifact_sha256": "615ebf7c9b86129b82eebaf160109da62e3ea147def80826eea33737cccaf1ad",
         "technical_validation_codes": ["bundle_valid", "replay_valid"]
       }
     }

@@ -18,7 +18,7 @@ func _init() -> void:
 		failures,
 		stats,
 		ship_source.contains("if not USE_WORLDGEN or not ClassDB.class_exists(\"DerelictGenerator\"):")
-			and ship_source.contains("_generation_fail(\"native_adapter_unavailable\"")
+			and ship_source.contains("_documents_fail(\"native_adapter_unavailable\"")
 			and ship_source.contains("func generate_migration_oracle("),
 		"ship generator fail closed",
 	)

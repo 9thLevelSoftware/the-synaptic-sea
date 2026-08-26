@@ -21,6 +21,9 @@ func _initialize() -> void:
 		push_error("START_SCENARIO FAIL cannot load derelict archetype")
 		quit(1)
 		return
+	# This smoke exercises the authored derelict contract specifically. Pin its
+	# matching template so the dock guarantee is applicable and warning-free.
+	(archetype as Dictionary)["template"] = "derelict_a"
 
 	var bp: ShipBlueprintScript = ShipBlueprintScript.new(
 		ShipBlueprintScript.Size.MEDIUM,
@@ -61,28 +64,26 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	# Test 3: Layout can be loaded by GeneratedShipLoader
-	var temp_dir: String = "user://start_scenario_smoke_temp"
-	if not DirAccess.dir_exists_absolute(temp_dir):
-		DirAccess.make_dir_absolute(temp_dir)
-
-	var layout_path: String = temp_dir + "/layout.json"
-	var gameplay_path: String = temp_dir + "/gameplay_slice.json"
+	# Test 3: Layout can be loaded by GeneratedShipLoader entirely in memory.
 	var kit_path: String = "res://data/kits/ship_structural_v0.json"
-
-	var lf: FileAccess = FileAccess.open(layout_path, FileAccess.WRITE)
-	lf.store_string(JSON.stringify(layout, "  "))
-	lf.close()
-	var gf: FileAccess = FileAccess.open(gameplay_path, FileAccess.WRITE)
-	gf.store_string(JSON.stringify(gameplay, "  "))
-	gf.close()
+	var kit_variant: Variant = JSON.parse_string(FileAccess.get_file_as_string(kit_path))
+	if not kit_variant is Dictionary:
+		push_error("START_SCENARIO FAIL structural kit malformed")
+		quit(1)
+		return
 
 	var LoaderScript := preload("res://scripts/procgen/generated_ship_loader.gd")
 	var loader: Node3D = LoaderScript.new()
-	var success: bool = loader.load_from_paths(layout_path, kit_path, gameplay_path)
+	var success: bool = loader.load_from_documents(
+		layout.duplicate(true),
+		(kit_variant as Dictionary).duplicate(true),
+		gameplay.duplicate(true),
+		false,
+		{"kit": kit_path},
+	)
 	if not success:
 		loader.free()
-		push_error("START_SCENARIO FAIL GeneratedShipLoader.load_from_paths returned false")
+		push_error("START_SCENARIO FAIL GeneratedShipLoader.load_from_documents returned false")
 		quit(1)
 		return
 	var expected_loot_tables: Dictionary = {}
@@ -163,10 +164,6 @@ func _initialize() -> void:
 		push_error("START_SCENARIO FAIL life boat expected 3 rooms, got %d" % lb_rooms.size())
 		quit(1)
 		return
-
-	# Clean up temp files
-	DirAccess.remove_absolute(layout_path)
-	DirAccess.remove_absolute(gameplay_path)
 
 	print("START_SCENARIO PASS derelict=%d_rooms life_boat=3_rooms floor_cells=%d nav_polys=%d objectives=%d" % [
 		rooms.size(), floor_count, nav_mesh.get_polygon_count(), gameplay.get("objectives", []).size()

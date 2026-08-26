@@ -2,12 +2,13 @@
 
 ## Status
 
-Approved; Gates 0 through 4 are complete. Gate 5 implementation and focused
-local evidence are complete on the Windows Godot 4.7.2 Mono toolchain. Gate 5
-is not a cross-platform or interactive-editor exit: RoboGodot/manual review,
-macOS/Linux/Web exports, and windowed performance remain unverified. No later
-gate is considered complete until its scoped card, acceptance evidence, and
-regression evidence are current.
+Approved; Gates 0 through 5 are complete. Gate 6 has a verified Windows-local
+production-entry-point cutover, committed native/Web artifacts, and PR-scale
+campaign evidence on the Godot 4.7.2 Mono toolchain, but its final exit remains
+open. Production generated-world-envelope wiring, the nightly million-case run,
+macOS/Linux/exported-Web parity, windowed performance, and RoboGodot/manual
+review remain unverified. No gate is considered complete until its scoped card,
+acceptance evidence, and regression evidence are current.
 
 This specification is canonical for procedural generation. It supersedes the
 GDScript-authority assumptions in
@@ -350,6 +351,40 @@ portion remains explicitly unverified.
 - The legacy GDScript generation authority is deleted only after all fallback,
   save-reset, export, visual, performance, and gameplay regression gates pass.
 
+Windows-local Gate 6 evidence (2026-08-26) establishes the production cutover
+without claiming the final cross-platform exit:
+
+- travel, project-title New Game/Continue and its configured main startup, top-down mode,
+  starting-scene generation, captures, exports, and debug tooling consume one
+  in-memory bundle result through `ShipGenerator`; no production call silently
+  selects the migration oracle or uses a shared procgen temporary filename;
+- run snapshots carry the normalized exact request and semantic hash, replay
+  before state application, and reject missing or mismatched bundle identity;
+  current-world summaries preflight that identity and show the same clear
+  new-world-required result, while atomic multi-site replay remains open below;
+- `cargo run --release -p derelict_cli -- --campaign 10000` passed exactly
+  10,000 evaluated cases with 9,992 bundles, eight replay-identical typed
+  fail-closed outcomes, 10,000 checks, and a 0.08% failure rate under the 1%
+  ceiling; structural-v2 golden output remains unchanged;
+- the dedicated PowerShell gate passed 14 production smokes and 32 expanded
+  contract smokes with no unexpected uppercase `ERROR:`, `WARNING:`, `FAIL`, or
+  `BLOCKED` output; the Node WebAssembly lifecycle smoke, all Rust workspace
+  tests, schema checks, and the 1,800-ship release sweep also pass;
+- the checked Windows and Web artifacts bind source commit
+  `264880670d05645e746aae390bbb1e7f93d6cc6d`, content hash
+  `0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385`,
+  Windows DLL hash
+  `615ebf7c9b86129b82eebaf160109da62e3ea147def80826eea33737cccaf1ad`,
+  and WebAssembly hash
+  `60a6c1c1f214ddd1ea042aaca2e4bc8bc91442bd3155f8355ca9622cba8d6c56`.
+
+Gate 6 remains open because the `generated-world-save-1` compatibility service
+is still isolated from the production `WorldSnapshot` loader. Wiring it needs a
+real Rust-backed multi-site provider and an atomic typed mutation applier; broad
+summary application or an empty-delta shim is not acceptable. The legacy
+GDScript migration oracle therefore remains intentionally present until that
+work and the external platform/performance/manual evidence pass.
+
 ## Validation
 
 Fresh evidence is required for every completion claim:
@@ -372,19 +407,12 @@ peak memory under 512 MB target / 1 GB stop, and 60 fps target / 30 fps stop.
 Per-stage latency, queue depth, entities, instances, navigation, and Web build
 size receive explicit budgets before their gate closes.
 
-Current Windows Gate 4 artifacts are bound to Rust source commit
-`29720efecfc8b9dd3f6959870639061f43203b8f`, content-manifest SHA-256
-`0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385`, native
-SHA-256 `f8d3aab1c4643749e38c1a9a3f0c75ab7d8a968e937c92534d4e35db119ebd87`,
-and Web SHA-256
-`ef8ff3861225c99ca0a2cdb190b4d4a27631b1d4f824c2e9c8fd12065d41c1f2`.
-Rust formatting, strict Clippy, all 318 workspace tests, schema and manifest
-checks, the 1,800-ship release stress sweep, and the Web lifecycle/parity smoke
-pass. The exact Godot 4.7.2 Mono console in Downloads passes adaptive trace,
-live consumer, mapper, fallback, build-manifest, wired-travel, and native
-lifecycle smokes with no unexpected warnings or errors. Canonical Godot 4.7.1,
-macOS/Linux exports, final exported-Web parity, windowed performance, and
-RoboGodot/manual editor review remain later-gate evidence and are not verified.
+Current Gate 6 Windows/Web artifacts and verification are recorded above and in
+`docs/game/06_validation_plan.md`. The exact Godot 4.7.2 Mono console in
+Downloads is the verified Windows runner. macOS/Linux exports, final
+exported-Web parity, windowed performance, the nightly million-case campaign,
+production generated-world-envelope wiring, and RoboGodot/manual editor review
+remain open and are not inferred from the Windows evidence.
 
 ## Risks
 
@@ -405,3 +433,4 @@ See `RISK-002` and `RISK-034` through `RISK-040` in
 - `docs/game/adr/0066-gate3-generation-trace-channel-versioning.md`
 - `docs/game/adr/0067-gate4-adaptive-trace-and-wrapper-versioning.md`
 - `docs/game/adr/0068-bounded-procgen-diagnostics-corpora-and-seed-lab.md`
+- `docs/game/adr/0069-procgen-production-cutover-and-retirement-gates.md`

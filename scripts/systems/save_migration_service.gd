@@ -21,9 +21,10 @@ const KNOWN_VERSIONS: Array = [
 	"gate2-current-run-2",  # added player_progression_summary (Phase 3)
 	"gate2-current-run-3",  # added slot_id / slot_kind / parent_world_slot metadata (Task 11)
 	"gate2-current-run-4",  # added play_time_seconds / current_location / world_seed (ADR-0046)
+	"gate2-current-run-5",  # added exact procgen request / semantic replay identity (ADR-0069)
 ]
 
-const TARGET_VERSION: String = "gate2-current-run-4"
+const TARGET_VERSION: String = "gate2-current-run-5"
 const WORLD_TARGET_VERSION: String = "world-4"
 
 func migrate_run(parsed: Variant) -> Dictionary:
@@ -106,6 +107,8 @@ func _step(from_version: String) -> Callable:
 			return _migrate_v2_to_v3
 		"gate2-current-run-3":
 			return _migrate_v3_to_v4
+		"gate2-current-run-4":
+			return _migrate_v4_to_v5
 	return Callable()
 
 func _world_step(from_version: String) -> Callable:
@@ -176,6 +179,18 @@ func _migrate_v3_to_v4(dict: Dictionary) -> Dictionary:
 		out["current_location"] = ""
 	if not out.has("world_seed"):
 		out["world_seed"] = 0
+	return out
+
+
+func _migrate_v4_to_v5(dict: Dictionary) -> Dictionary:
+	# ADR-0069: old snapshots are explicitly classified path-based migration
+	# fixtures. New production snapshots carry both fields and never need the
+	# three generated-document paths to replay their ship.
+	var out: Dictionary = dict.duplicate(true)
+	if not out.has("procgen_request"):
+		out["procgen_request"] = {}
+	if not out.has("procgen_semantic_hash"):
+		out["procgen_semantic_hash"] = ""
 	return out
 
 func _migrate_world_legacy_to_world_4(dict: Dictionary) -> Dictionary:

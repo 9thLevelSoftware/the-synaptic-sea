@@ -12,11 +12,10 @@ extends SceneTree
 ## Continue fixture (Important review finding 1): a fresh New Game boot always
 ## starts at current_objective_sequence=1, so round-tripping the smoke's own
 ## just-created save would pass even if request_load() applied nothing. Before
-## driving Continue we overwrite world.json's embedded home_ship snapshot with
-## a different saved slice plus current_objective_sequence=3 (mutating the REAL
-## on-disk save the live New Game instance just wrote) and assert the Continue'd
-## instance's current_objective_sequence equals 3 -- a value a fresh boot can
-## never produce.
+## driving Continue we overwrite only current_objective_sequence=3 in the REAL
+## on-disk save the live New Game instance just wrote. The exact production
+## procgen request/hash remain intact and must replay; the continued instance's
+## sequence 3 is a value a fresh boot can never produce.
 ##
 ## Quit signal (Important review finding 2): rather than self-emitting
 ## return_to_title_requested, we drive the REAL producer chain: open the live
@@ -35,15 +34,12 @@ const SaveLoadServiceScript := preload("res://scripts/systems/save_load_service.
 const PermadeathResolverScript := preload("res://scripts/systems/permadeath_resolver.gd")
 const TIMEOUT_FRAMES: int = 900
 const FIXTURE_OBJECTIVE_SEQUENCE: int = 3
-const CONTINUE_LAYOUT_PATH: String = "res://data/procgen/golden/coherent_ship_002/layout.json"
-const CONTINUE_KIT_PATH: String = "res://data/kits/ship_structural_v0.json"
-const CONTINUE_GAMEPLAY_SLICE_PATH: String = "res://data/procgen/golden/coherent_ship_002/gameplay_slice.json"
-const CONTINUE_LOGICAL_OBJECTIVE_COUNT: int = 5
 
 var title_node: Node
 var frame_count: int = 0
 var finished: bool = false
 var _stage: String = "new_game_boot"
+var _expected_continue_objective_count: int = 0
 ## GDScript lambdas capture locals BY VALUE at creation time, not by
 ## reference -- a `var received := false` local mutated inside a signal
 ## callback lambda never updates the outer local's copy. Must be a
@@ -107,6 +103,11 @@ func _await_new_game_playable() -> void:
 	if not ui.menu_state.is_in_play():
 		_fail("child menu still open after New Game handoff: current_menu=%s" % ui.get_current_menu())
 		return
+	_expected_continue_objective_count = int(
+		playable.get_playable_summary().get("objective_sequence_count", 0))
+	if _expected_continue_objective_count <= 0:
+		_fail("New Game bundle has no logical objectives")
+		return
 	# Save a real world.json through the live instance so Continue (later
 	# stage, after a fresh title rebuild) has something to load.
 	if not playable.request_save():
@@ -122,11 +123,8 @@ func _await_new_game_playable() -> void:
 		return
 	_stage = "return_to_title"
 
-## Overwrites the on-disk world.json's embedded home_ship.current_objective_sequence
-## with FIXTURE_OBJECTIVE_SEQUENCE, reusing the real layout_path/kit_path/
-## gameplay_slice_path the live New Game instance already wrote (so the loader
-## still succeeds) -- only the objective sequence is distinguished from a
-## fresh boot.
+## Overwrites only the on-disk world.json embedded objective sequence. The
+## exact bundle request/hash remain the production replay identity.
 func _seed_continue_fixture(playable: PlayableGeneratedShip) -> bool:
 	var service := playable.get_save_load_service()
 	if service == null:
@@ -137,9 +135,13 @@ func _seed_continue_fixture(playable: PlayableGeneratedShip) -> bool:
 	var home_ship: Dictionary = ws.home_ship.duplicate(true)
 	if home_ship.is_empty():
 		return false
-	home_ship["layout_path"] = CONTINUE_LAYOUT_PATH
-	home_ship["kit_path"] = CONTINUE_KIT_PATH
-	home_ship["gameplay_slice_path"] = CONTINUE_GAMEPLAY_SLICE_PATH
+	if (home_ship.get("procgen_request", {}) as Dictionary).is_empty() \
+			or str(home_ship.get("procgen_semantic_hash", "")).is_empty():
+		return false
+	if not str(home_ship.get("layout_path", "")).is_empty() \
+			or not str(home_ship.get("kit_path", "")).is_empty() \
+			or not str(home_ship.get("gameplay_slice_path", "")).is_empty():
+		return false
 	home_ship["current_objective_sequence"] = FIXTURE_OBJECTIVE_SEQUENCE
 	ws.home_ship = home_ship
 	return service.save_world(ws)
@@ -193,17 +195,17 @@ func _await_continue_playable() -> void:
 		return
 	var live_summary: Dictionary = playable.get_playable_summary()
 	var live_sequence_count: int = int(live_summary.get("objective_sequence_count", 0))
-	if live_sequence_count != CONTINUE_LOGICAL_OBJECTIVE_COUNT:
+	if live_sequence_count != _expected_continue_objective_count:
 		_fail("Continue loaded unexpected logical objective count=%d expected=%d" % [
 			live_sequence_count,
-			CONTINUE_LOGICAL_OBJECTIVE_COUNT,
+			_expected_continue_objective_count,
 		])
 		return
 	var title_summary: Dictionary = title_node.get("_last_playable_summary")
-	if int(title_summary.get("objective_sequence_count", 0)) != CONTINUE_LOGICAL_OBJECTIVE_COUNT:
+	if int(title_summary.get("objective_sequence_count", 0)) != _expected_continue_objective_count:
 		_fail("title cached stale playable summary after Continue: objective_sequence_count=%d expected=%d" % [
 			int(title_summary.get("objective_sequence_count", 0)),
-			CONTINUE_LOGICAL_OBJECTIVE_COUNT,
+			_expected_continue_objective_count,
 		])
 		return
 	if not playable.teleport_player_to_objective_for_validation(FIXTURE_OBJECTIVE_SEQUENCE):
@@ -214,10 +216,12 @@ func _await_continue_playable() -> void:
 		_fail("Continue fixture objective %d interactable missing" % FIXTURE_OBJECTIVE_SEQUENCE)
 		return
 	interactable.set_validation_player_in_range(playable.player)
-	playable.player.request_interact()
+	if not interactable.try_interact(playable.player):
+		_fail("Continue fixture objective %d interaction failed" % FIXTURE_OBJECTIVE_SEQUENCE)
+		return
 	var expected_progress: String = "objectives %d/%d" % [
 		FIXTURE_OBJECTIVE_SEQUENCE,
-		CONTINUE_LOGICAL_OBJECTIVE_COUNT,
+		_expected_continue_objective_count,
 	]
 	var actual_progress: String = String(title_node.get("_last_run_progress"))
 	if actual_progress != expected_progress:

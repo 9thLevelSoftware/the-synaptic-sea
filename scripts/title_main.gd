@@ -134,7 +134,29 @@ func _instantiate_gameplay(should_load: bool) -> void:
 	_clear_run_results_panel()
 	_last_boot_error = ""
 	_failure_handled = false
+	var replay_request: Dictionary = {}
+	var replay_semantic_hash: String = ""
+	if should_load:
+		var saved_world = _save_load_service.load_world()
+		if saved_world == null:
+			_last_boot_error = "Saved world could not be loaded. Start a new world; profile and settings are preserved."
+			_refresh_panel()
+			return
+		var home_summary: Variant = saved_world.home_ship
+		if home_summary is Dictionary:
+			var request_variant: Variant = (home_summary as Dictionary).get("procgen_request", {})
+			if request_variant is Dictionary:
+				replay_request = (request_variant as Dictionary).duplicate(true)
+			replay_semantic_hash = str((home_summary as Dictionary).get("procgen_semantic_hash", ""))
+		if replay_request.is_empty() or replay_semantic_hash.is_empty():
+			_last_boot_error = _display_boot_error("new_world_required_legacy_generator")
+			_refresh_panel()
+			return
 	main_node = MAIN_SCENE.instantiate()
+	if should_load and main_node.has_method("configure_procgen_replay"):
+		main_node.configure_procgen_replay(replay_request, replay_semantic_hash)
+	elif main_node.has_method("configure_procgen_start"):
+		main_node.configure_procgen_start(17, 2, 1)
 	add_child(main_node)
 	if is_instance_valid(menu_panel):
 		menu_panel.visible = false
@@ -187,6 +209,12 @@ func _poll_for_playable_started(should_load: bool) -> void:
 			# Consume the loaded-run summary through the same ready handler as a
 			# fresh boot so stale previous-run outcome/progress are cleared too.
 			_on_gameplay_ready(playable_instance.get_playable_summary())
+		else:
+			var load_reason: String = str(playable_instance.last_failure_reason)
+			if load_reason.is_empty():
+				load_reason = "save_restore_failed"
+			_on_gameplay_failed(load_reason)
+			return
 	# Dirty-flag handoff (spec 3.7): only push title-local settings into the fresh
 	# session when the player actually touched them at the title screen — otherwise
 	# an untouched title would clobber whatever request_load() just restored.
@@ -217,9 +245,14 @@ func _on_gameplay_failed(reason: String) -> void:
 	if _failure_handled:
 		return
 	_failure_handled = true
-	push_warning("TitleMain: gameplay boot failed (%s) — returning to title" % reason)
-	_last_boot_error = reason
+	_last_boot_error = _display_boot_error(reason)
 	_on_gameplay_return_to_title()
+
+
+func _display_boot_error(reason: String) -> String:
+	if reason.begins_with("new_world_required_") or reason == "semantic_hash_mismatch":
+		return "Generated world is incompatible with this build. Start a new world; profile and settings are preserved."
+	return reason
 
 func _on_gameplay_return_to_title() -> void:
 	_clear_run_results_panel()

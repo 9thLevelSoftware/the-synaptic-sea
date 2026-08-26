@@ -1168,7 +1168,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Source: `docs/game/features/unified_procgen_platform.md`
 - Type: release / performance / persistence
 - Priority: must
-- Status: Approved
+- Status: Implemented for Windows-local production entry points; Gate 6 exit open
 - Rationale: The platform is complete only when every production entry point and
   supported target uses the bundle with compatible saves and production budgets.
 - Acceptance criteria:
@@ -1197,6 +1197,15 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - Composite/nightly/simulation/adversarial suites, full canonical Godot
     regression with no unclassified warnings/errors, windowed performance,
     visual review, and representative gameplay evidence.
+  - Windows-local evidence on 2026-08-26: the exact Godot 4.7.2 Mono console
+    passed the 14-smoke production runner and 32-smoke expanded runner; the
+    10,000-case Rust campaign passed with 9,992 bundles and eight deterministic
+    typed fail-closed outcomes; committed Windows/Web artifacts and manifests
+    bind source commit `264880670d05645e746aae390bbb1e7f93d6cc6d`.
+  - Open before validation: production must load through the closed
+    `generated-world-save-1` envelope with a live Rust provider and atomic typed
+    delta applier; the nightly million-case campaign, macOS/Linux/exported-Web
+    parity, windowed performance, and RoboGodot/manual evidence must pass.
 
 ## REQ-RL-001: Distribution, store, achievements, demo, localization, post-launch ops (REQ-RL-001)
 

@@ -23,8 +23,6 @@ const AudioManagerScript = preload("res://scripts/audio/audio_manager.gd")
 const CraftingStateScript = preload("res://scripts/systems/crafting_state.gd")
 const DamagePipelineScript = preload("res://scripts/systems/damage_pipeline.gd")
 const ShipGeneratorScript = preload("res://scripts/procgen/ship_generator.gd")
-const GameplaySliceBuilderScript = preload("res://scripts/procgen/gameplay_slice_builder.gd")
-const ShipBlueprintScript = preload("res://scripts/procgen/ship_blueprint.gd")
 const FirstRunContractScript = preload("res://scripts/procgen/first_run_contract.gd")
 
 # Scene nodes
@@ -49,11 +47,12 @@ var vitals_panel  # PlayerVitalsPanel
 # Procgen
 var layout_adapter = LayoutTilemapAdapterScript.new()
 var ship_generator = ShipGeneratorScript.new()
-var gameplay_slice_builder = GameplaySliceBuilderScript.new()
 
 # State
 var current_layout: Dictionary = {}
 var current_gameplay_slice: Dictionary = {}
+var current_procgen_request: Dictionary = {}
+var current_procgen_semantic_hash: String = ""
 var room_centers: Dictionary = {}
 var playable_started: bool = false
 var away_from_start: bool = false
@@ -134,15 +133,19 @@ func _init_systems() -> void:
 
 func generate_hub(seed_value: int = 42) -> Dictionary:
 	## Generate and display the hub ship layout.
-	var blueprint = ShipBlueprintScript.new(ShipBlueprintScript.Size.MEDIUM, ShipBlueprintScript.Condition.DAMAGED, seed_value)
-	blueprint.room_count_range = Vector2i(6, 8)
-
-	var layout = ship_generator.generate_layout_migration_oracle(blueprint)
-	current_layout = layout
-	current_gameplay_slice = gameplay_slice_builder.build(layout)
+	ship_generator.configure_run_context("", "standard")
+	ship_generator.configure_procgen_site("", 0, 0)
+	var documents: Dictionary = ship_generator.generate_documents_from_seed(seed_value, 1, 1)
+	if documents.is_empty():
+		push_error("TOPDOWN PROCGEN FAIL hub %s" % ship_generator.last_error)
+		return {}
+	current_layout = (documents.layout as Dictionary).duplicate(true)
+	current_gameplay_slice = (documents.gameplay_slice as Dictionary).duplicate(true)
+	current_procgen_request = (documents.request as Dictionary).duplicate(true)
+	current_procgen_semantic_hash = str(documents.semantic_hash)
 
 	# Build tilemap from layout
-	var build_info = layout_adapter.build(tilemap, layout)
+	var build_info = layout_adapter.build(tilemap, current_layout)
 	room_centers = build_info.get("room_centers", {})
 
 	# Place player at start room center
@@ -165,16 +168,19 @@ func generate_hub(seed_value: int = 42) -> Dictionary:
 
 func generate_derelict(seed_value: int = 777, biome_id: String = "breach_field") -> Dictionary:
 	## Generate and display a derelict layout.
-	var blueprint = ShipBlueprintScript.new(ShipBlueprintScript.Size.SMALL, ShipBlueprintScript.Condition.DAMAGED, seed_value)
-	blueprint.room_count_range = Vector2i(4, 6)
-
 	ship_generator.configure_run_context(biome_id, "standard")
-	var layout = ship_generator.generate_layout_migration_oracle(blueprint)
-	current_layout = layout
-	current_gameplay_slice = gameplay_slice_builder.build(layout)
+	ship_generator.configure_procgen_site("", 0, 0)
+	var documents: Dictionary = ship_generator.generate_documents_from_seed(seed_value, 0, 1)
+	if documents.is_empty():
+		push_error("TOPDOWN PROCGEN FAIL derelict %s" % ship_generator.last_error)
+		return {}
+	current_layout = (documents.layout as Dictionary).duplicate(true)
+	current_gameplay_slice = (documents.gameplay_slice as Dictionary).duplicate(true)
+	current_procgen_request = (documents.request as Dictionary).duplicate(true)
+	current_procgen_semantic_hash = str(documents.semantic_hash)
 
 	# Rebuild tilemap
-	var build_info = layout_adapter.build(tilemap, layout)
+	var build_info = layout_adapter.build(tilemap, current_layout)
 	room_centers = build_info.get("room_centers", {})
 
 	# Place player at start

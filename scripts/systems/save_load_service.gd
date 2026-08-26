@@ -23,7 +23,7 @@ class_name SaveLoadService
 ## permadeath freezes a slot via user://saves/<slot_id>.death.json.
 
 const SAVE_PATH: String = "user://saves/current_run.json"
-const CURRENT_SLICE_VERSION: String = "gate2-current-run-4"
+const CURRENT_SLICE_VERSION: String = "gate2-current-run-5"
 const SAVES_DIR: String = "user://saves"
 const INDEX_PATH: String = "user://saves/index.json"
 const CORRUPT_DIR: String = "user://saves/.corrupt"

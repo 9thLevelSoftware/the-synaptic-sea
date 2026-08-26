@@ -26,8 +26,11 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTENT_HASH = json.loads(
     (ROOT / "data/procgen/manifests/content_manifest.json").read_text()
 )["content_manifest_hash"]
-SOURCE_COMMIT = "29720efecfc8b9dd3f6959870639061f43203b8f"
-ARTIFACT_HASH = json.loads((ROOT / "data/procgen/manifests/build/win64.json").read_text())["artifact"]["sha256"]
+BUILD_MANIFEST = json.loads(
+    (ROOT / "data/procgen/manifests/build/win64.json").read_text()
+)
+SOURCE_COMMIT = BUILD_MANIFEST["rust_source_commit"]
+ARTIFACT_HASH = BUILD_MANIFEST["artifact"]["sha256"]
 
 
 def request():

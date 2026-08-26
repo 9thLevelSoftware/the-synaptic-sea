@@ -1,13 +1,15 @@
 extends SceneTree
 
-## V3: production travel path generates a derelict with layout, nav graph, encounters.
-## Marker: MAIN PLAYABLE DERELICT PIPELINE CONTRACT PASS layout=true nav=true biome=true
+## Gate 6: production generation exposes bundle-owned layout, navigation, and
+## gameplay without re-stamping biome or encounters in the Godot bridge.
+## Marker: MAIN PLAYABLE DERELICT PIPELINE CONTRACT PASS layout=true nav=true bundle_authoritative=true
 
 const MAIN_SCENE: PackedScene = preload("res://scenes/main.tscn")
 const TIMEOUT_FRAMES: int = 400
 
 var main_node: Node
 var playable: PlayableGeneratedShip
+var probe_root: Node3D
 var frame_count: int = 0
 var finished: bool = false
 
@@ -41,31 +43,29 @@ func _validate() -> void:
 	playable.ship_generator.configure_run_context(biome, diff)
 	var ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
 	var bp = ShipBlueprintScript.new(1, 2, 4242)
-	var root: Node3D = playable.ship_generator.generate(bp, {})
-	if root == null:
+	probe_root = playable.ship_generator.generate(bp, {})
+	if probe_root == null:
 		_fail("generate returned null")
 		return
-	# Read layout via temp file the generator wrote, or from loader on root.
-	var layout_path: String = "user://procgen_temp/layout.json"
-	var layout: Dictionary = {}
-	if FileAccess.file_exists(layout_path):
-		var f := FileAccess.open(layout_path, FileAccess.READ)
-		if f != null:
-			var p: Variant = JSON.parse_string(f.get_as_text())
-			f.close()
-			if p is Dictionary:
-				layout = p
+	var layout: Dictionary = probe_root.get_layout_copy() if probe_root.has_method("get_layout_copy") else {}
 	if layout.is_empty():
-		_fail("temp layout empty after generate")
+		_fail("in-memory layout empty after generate")
 		return
-	var stamped_biome: String = str(layout.get("biome_id", ""))
-	if biome.is_empty():
-		pass
-	elif stamped_biome.is_empty():
-		_fail("biome_id not stamped (expected %s)" % biome)
+	if not str(layout.get("biome_id", "")).is_empty():
+		_fail("Godot bridge re-stamped authoritative biome")
 		return
-	elif stamped_biome != biome:
-		_fail("biome_id mismatch stamped=%s expected=%s" % [stamped_biome, biome])
+	if str(layout.get("difficulty_id", "")) != diff:
+		_fail("Rust request difficulty missing expected=%s actual=%s" % [diff, str(layout.get("difficulty_id", ""))])
+		return
+	var site_ir: Variant = probe_root.get_meta("procgen_site_ir", null)
+	if not site_ir is Dictionary or str((site_ir as Dictionary).get("schema_version", "")) != "site-ir-2":
+		_fail("validated SiteIR metadata missing")
+		return
+	if str(probe_root.get_meta("procgen_semantic_hash", "")).is_empty():
+		_fail("semantic hash metadata missing")
+		return
+	if playable.ship_generator.migration_oracle_invocations != 0:
+		_fail("migration oracle invoked")
 		return
 	var rooms: Array = layout.get("rooms", []) as Array
 	if rooms.size() < 3:
@@ -97,8 +97,7 @@ func _validate() -> void:
 	if playable.ship_generator._extended_for(diff) != true:
 		_fail("extended templates should unlock for difficulty=%s" % diff)
 		return
-	root.queue_free()
-	print("MAIN PLAYABLE DERELICT PIPELINE CONTRACT PASS layout=true nav=true biome=true rooms=%d nodes=%d enc=%d" % [
+	print("MAIN PLAYABLE DERELICT PIPELINE CONTRACT PASS layout=true nav=true bundle_authoritative=true rooms=%d nodes=%d enc=%d" % [
 		rooms.size(), n, enc.size()])
 	_cleanup(0)
 
@@ -117,6 +116,10 @@ func _fail(reason: String) -> void:
 	_cleanup(1)
 
 func _cleanup(code: int) -> void:
+	if probe_root != null and is_instance_valid(probe_root):
+		probe_root.free()
+	probe_root = null
 	if main_node != null and is_instance_valid(main_node):
-		main_node.queue_free()
+		main_node.free()
+	main_node = null
 	quit(code)

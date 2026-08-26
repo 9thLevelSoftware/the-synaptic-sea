@@ -50,8 +50,7 @@ const AchievementStateScript := preload("res://scripts/systems/achievement_state
 const WorldSnapshotScript := preload("res://scripts/systems/world_snapshot.gd")
 const ShipSystemsManagerScript := preload("res://scripts/systems/ship_systems_manager.gd")
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
-const ShipLayoutGeneratorScript := preload("res://scripts/procgen/ship_layout_generator.gd")
-const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd")
+const GameplaySliceBuilderScript := preload("res://scripts/procgen/gameplay_slice_builder.gd") # migration loader utility only
 const LayoutSerializerScript := preload("res://scripts/procgen/layout_serializer.gd")
 const FirstRunContractScript := preload("res://scripts/procgen/first_run_contract.gd")
 const PlayerProgressionScript := preload("res://scripts/systems/player_progression_state.gd")
@@ -205,6 +204,15 @@ const OBJECTIVE_REPAIR_MAP: Dictionary = {
 @export var gameplay_slice_path: String = DEFAULT_GAMEPLAY_SLICE_PATH
 @export var blueprint_path: String = "res://data/procgen/golden/coherent_ship_001/blueprint.json"
 @export var starting_class_id: String = "engineer"
+var procgen_start_enabled: bool = false
+var procgen_start_seed: int = 17
+var procgen_start_size: int = 2
+var procgen_start_condition: int = 1
+var procgen_replay_request: Dictionary = {}
+var procgen_replay_semantic_hash: String = ""
+var active_procgen_request: Dictionary = {}
+var active_procgen_semantic_hash: String = ""
+var active_procgen_documents: Dictionary = {}
 var loader
 var player
 var camera_rig
@@ -522,17 +530,81 @@ var demo_scope_gate               # DemoScopeGate
 var _last_derelict_hazard_budget: int = -1   # validation seam: hazard cap applied on last derelict travel (-1 unlimited)
 var _last_derelict_hazards_seeded: Array = []  # validation seam: hazard kinds whose seeding RAN on last travel
 
-## NOTE: This scene relies on GeneratedShipLoader.load_from_paths() being
+## NOTE: This scene relies on GeneratedShipLoader document loading being
 ## SYNCHRONOUS and emitting `ship_loaded` on the same call stack — the
 ## _on_ship_loaded handler (and therefore _spawn_player / _spawn_camera /
 ## _build_interactables) depends on that ordering. If the loader is ever
 ## refactored to run on a thread, use call_deferred(), or otherwise defer
 ## emission of `ship_loaded`, this scene must be adjusted (e.g. move
 ## ready-signal logic out of _ready and gate it on ship_loaded explicitly).
+## Enables the production bundle start before this node enters the scene tree.
+## Direct authored-fixture scenes intentionally leave it disabled.
+func configure_procgen_start(seed_value: int, size: int = 2, condition: int = 1) -> void:
+	procgen_start_enabled = true
+	procgen_start_seed = seed_value
+	procgen_start_size = size
+	procgen_start_condition = condition
+	procgen_replay_request = {}
+	procgen_replay_semantic_hash = ""
+
+
+## Continue configures the exact persisted identity before this node enters the
+## tree. This prevents a throwaway default world from being generated first.
+func configure_procgen_replay(request: Dictionary, semantic_hash: String) -> void:
+	procgen_start_enabled = true
+	procgen_replay_request = request.duplicate(true)
+	procgen_replay_semantic_hash = semantic_hash
+	procgen_start_seed = int(request.get("world_seed", procgen_start_seed))
+
+
 func _ready() -> void:
 	ensure_default_input_actions()
 	_build_runtime_nodes()
-	loader.load_from_paths(layout_path, kit_path, gameplay_slice_path)
+	if not procgen_replay_request.is_empty():
+		_load_procgen_replay_start()
+	elif procgen_start_enabled:
+		_load_procgen_start()
+	else:
+		# Explicit authored-fixture/migration path. Production title boot always
+		# calls configure_procgen_start before the node enters the tree.
+		loader.load_from_paths(layout_path, kit_path, gameplay_slice_path)
+
+
+func _load_procgen_start() -> void:
+	ship_generator.configure_run_context("", "standard")
+	ship_generator.configure_procgen_site("home-%d" % procgen_start_seed, 0, 0)
+	var documents: Dictionary = ship_generator.generate_documents_from_seed(
+		procgen_start_seed, procgen_start_size, procgen_start_condition)
+	if documents.is_empty():
+		_on_loader_failed("procgen_start_%s" % str(ship_generator.last_error))
+		return
+	active_procgen_request = (documents.request as Dictionary).duplicate(true)
+	active_procgen_semantic_hash = str(documents.semantic_hash)
+	active_procgen_documents = documents.duplicate(true)
+	if not loader.load_from_documents(
+			(documents.layout as Dictionary).duplicate(true),
+			(documents.kit as Dictionary).duplicate(true),
+			(documents.gameplay_slice as Dictionary).duplicate(true),
+		false):
+		return
+
+
+func _load_procgen_replay_start() -> void:
+	var documents: Dictionary = ship_generator.generate_documents_from_request(
+		procgen_replay_request, procgen_replay_semantic_hash)
+	if documents.is_empty():
+		last_failure_reason = str(ship_generator.last_error)
+		emit_signal("playable_failed", last_failure_reason)
+		return
+	active_procgen_request = (documents.request as Dictionary).duplicate(true)
+	active_procgen_semantic_hash = str(documents.semantic_hash)
+	active_procgen_documents = documents.duplicate(true)
+	if not loader.load_from_documents(
+			(documents.layout as Dictionary).duplicate(true),
+			(documents.kit as Dictionary).duplicate(true),
+			(documents.gameplay_slice as Dictionary).duplicate(true),
+			false):
+		return
 
 # A11Y-P1-002 (P1 accessibility: alternate keyboard bindings): movement,
 # interaction, and manual save/load expose at least one alternate keyboard
@@ -1464,19 +1536,23 @@ func _apply_first_run_contract_to_marker(marker) -> bool:
 		return false
 	if not visited_ships.is_empty() or String(marker.marker_id).is_empty():
 		return false
-	var layout_generator = ShipLayoutGeneratorScript.new()
-	var slice_builder = GameplaySliceBuilderScript.new()
 	var candidates: Dictionary = {}
 	var biome_id: String = str(first_run_contract.contract.get("biome_id", ""))
 	var difficulty_id: String = str(first_run_contract.contract.get("difficulty_id", ""))
+	var marker_parts: PackedStringArray = String(marker.marker_id).split(":")
+	var site_x: int = int(marker_parts[0]) if marker_parts.size() >= 2 else 0
+	var site_y: int = int(marker_parts[1]) if marker_parts.size() >= 2 else 0
+	ship_generator.configure_run_context(biome_id, difficulty_id)
+	ship_generator.configure_procgen_site(String(marker.marker_id), site_x, site_y)
 	for seed_variant in first_run_contract.contract.get("preferred_seeds", []):
 		var seed_value: int = int(seed_variant)
-		var blueprint = ShipBlueprintScript.new(int(marker.size_class), int(marker.condition), seed_value)
-		var layout: Dictionary = layout_generator.generate_with_options(
-			blueprint, {}, biome_id, difficulty_id, true)
+		var documents: Dictionary = ship_generator.generate_documents_from_seed(
+			seed_value, int(marker.size_class), int(marker.condition))
+		if documents.is_empty():
+			continue
 		candidates[seed_value] = {
-			"layout": layout,
-			"gameplay_slice": slice_builder.build(layout),
+			"layout": (documents.layout as Dictionary).duplicate(true),
+			"gameplay_slice": (documents.gameplay_slice as Dictionary).duplicate(true),
 		}
 	var chosen_seed: int = first_run_contract.pick_seed(candidates)
 	marker.seed_value = chosen_seed
@@ -1530,6 +1606,9 @@ func _configure_player_progression() -> void:
 ## when the sidecar is absent or malformed.
 func _load_blueprint_for_systems():
 	var fallback = ShipBlueprintScript.new(ShipBlueprintScript.Size.MEDIUM, ShipBlueprintScript.Condition.DAMAGED, 17)
+	if procgen_start_enabled:
+		return ShipBlueprintScript.new(
+			procgen_start_size, procgen_start_condition, procgen_start_seed)
 	if blueprint_path.is_empty() or not FileAccess.file_exists(blueprint_path):
 		push_warning("PlayableGeneratedShip: blueprint sidecar missing at %s; using DAMAGED/seed=17 default" % blueprint_path)
 		return fallback
@@ -6301,6 +6380,10 @@ func travel_to(marker) -> Dictionary:
 			"difficulty": str(first_run_contract.contract.get("difficulty_id", run_ctx.get("difficulty", ""))),
 		}
 	ship_generator.configure_run_context(str(run_ctx.get("biome", "")), str(run_ctx.get("difficulty", "")))
+	var marker_parts: PackedStringArray = String(marker.marker_id).split(":")
+	var marker_x: int = int(marker_parts[0]) if marker_parts.size() >= 2 else 0
+	var marker_y: int = int(marker_parts[1]) if marker_parts.size() >= 2 else 0
+	ship_generator.configure_procgen_site(String(marker.marker_id), marker_x, marker_y)
 	var result: Dictionary = travel_controller.attempt_travel(
 		marker, ops_t, synaptic_sea_world, ship_generator, scanner_state.range_radius)
 	if not bool(result.get("success", false)):
@@ -6366,6 +6449,9 @@ func travel_to(marker) -> Dictionary:
 		var new_mgr = ShipSystemsManagerScript.new()
 		new_mgr.configure(new_mgr.load_definitions(), new_bp.condition, new_bp.seed_value)
 		inst = ShipInstanceScript.create("ship_%s" % mid, mid, new_bp, new_mgr, null)
+		if new_root.has_meta("procgen_request"):
+			inst.procgen_request = (new_root.get_meta("procgen_request", {}) as Dictionary).duplicate(true)
+			inst.procgen_semantic_hash = str(new_root.get_meta("procgen_semantic_hash", ""))
 		visited_ships[mid] = inst
 		_seed_ship_models(inst)
 
@@ -7452,6 +7538,9 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	# slice's systems are untouched). marker_id "" marks it as the home ship.
 	if current_ship == null:
 		current_ship = ShipInstanceScript.create("ship_start", "", _load_blueprint_for_systems(), ship_systems_manager, loader)
+		if not active_procgen_request.is_empty():
+			current_ship.procgen_request = active_procgen_request.duplicate(true)
+			current_ship.procgen_semantic_hash = active_procgen_semantic_hash
 		# Sub-project #1: keep a stable reference to the home ship so travel_home
 		# and world-load can restore it.
 		home_ship = current_ship
@@ -9685,9 +9774,15 @@ func _build_run_snapshot(use_home_arc_summary: bool = false) -> RunSnapshot:
 	if save_load_service == null:
 		return null
 	var snapshot := RunSnapshotScript.new()
-	snapshot.layout_path = layout_path
-	snapshot.kit_path = kit_path
-	snapshot.gameplay_slice_path = gameplay_slice_path
+	if not active_procgen_request.is_empty():
+		snapshot.procgen_request = active_procgen_request.duplicate(true)
+		snapshot.procgen_semantic_hash = active_procgen_semantic_hash
+	else:
+		# Explicit migration-fixture snapshot. Production bundle saves leave
+		# generated-document paths empty and replay the request/hash above.
+		snapshot.layout_path = layout_path
+		snapshot.kit_path = kit_path
+		snapshot.gameplay_slice_path = gameplay_slice_path
 	if player != null and player is Node3D:
 		var pos: Vector3 = (player as Node3D).global_position
 		snapshot.player_position = [pos.x, pos.y, pos.z]
@@ -10058,10 +10153,11 @@ func is_load_available() -> bool:
 ## (home ship + visited-ship registry + active location + in-ship position).
 func request_load() -> bool:
 	if save_load_service == null:
+		last_failure_reason = "save_service_unavailable"
 		return false
 	var ws = save_load_service.load_world()
 	if ws == null:
-		push_warning("PlayableGeneratedShip: no compatible world save to load")
+		last_failure_reason = "save_missing_or_incompatible"
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 		return false
@@ -10083,6 +10179,8 @@ func request_load() -> bool:
 		if is_instance_valid(menu_coordinator):
 			menu_coordinator.set_load_available(true)
 	else:
+		if last_failure_reason.is_empty():
+			last_failure_reason = "save_restore_failed"
 		if is_instance_valid(audio_manager) and audio_manager.has_method("play_sfx"):
 			audio_manager.play_sfx(AudioEventSeamScript.UI_PANEL_CLOSE)
 	return loaded
@@ -10094,24 +10192,60 @@ func request_load() -> bool:
 func _apply_run_snapshot(snapshot: RunSnapshot) -> bool:
 	if snapshot == null or not playable_started:
 		return false
+	# Production sessions never cross back into the path-based migration seam.
+	# Reject before resetting live state so manual-slot loads have the same clean
+	# break as title Continue and whole-world reloads. Direct authored-fixture
+	# scenes leave procgen_start_enabled false and retain their regression path.
+	if procgen_start_enabled and (snapshot.procgen_request.is_empty() \
+			or not _valid_saved_semantic_hash(snapshot.procgen_semantic_hash)):
+		last_failure_reason = "new_world_required_legacy_generator"
+		return false
 	# Reset the live slice to a fresh state. _ready() will be re-driven
 	# by resetting the loader and asking it to reload from the saved
 	# paths synchronously.
 	_is_reloading = true
 	_reset_runtime_for_reload()
-	layout_path = snapshot.layout_path
-	kit_path = snapshot.kit_path
-	gameplay_slice_path = snapshot.gameplay_slice_path
 	# The loader is sync; ship_loaded fires on the same call stack, but
 	# we guard _on_ship_loaded with a reload-aware flag so the first
 	# _on_ship_loaded after a reload does NOT mark playable_started
 	# prematurely (it must re-emit).
 	playable_started = false
-	loader.load_from_paths(layout_path, kit_path, gameplay_slice_path)
+	if not snapshot.procgen_request.is_empty():
+		var documents: Dictionary = {}
+		if snapshot.procgen_request == active_procgen_request \
+				and snapshot.procgen_semantic_hash == active_procgen_semantic_hash \
+				and not active_procgen_documents.is_empty():
+			documents = active_procgen_documents.duplicate(true)
+		else:
+			documents = ship_generator.generate_documents_from_request(
+				snapshot.procgen_request, snapshot.procgen_semantic_hash)
+		if documents.is_empty():
+			_is_reloading = false
+			last_failure_reason = str(ship_generator.last_error)
+			return false
+		active_procgen_request = (documents.request as Dictionary).duplicate(true)
+		active_procgen_semantic_hash = str(documents.semantic_hash)
+		active_procgen_documents = documents.duplicate(true)
+		procgen_start_enabled = true
+		procgen_start_seed = int(active_procgen_request.get("world_seed", procgen_start_seed))
+		loader.load_from_documents(
+			(documents.layout as Dictionary).duplicate(true),
+			(documents.kit as Dictionary).duplicate(true),
+			(documents.gameplay_slice as Dictionary).duplicate(true),
+			false)
+	else:
+		active_procgen_request = {}
+		active_procgen_semantic_hash = ""
+		active_procgen_documents = {}
+		layout_path = snapshot.layout_path
+		kit_path = snapshot.kit_path
+		gameplay_slice_path = snapshot.gameplay_slice_path
+		loader.load_from_paths(layout_path, kit_path, gameplay_slice_path)
 	if not playable_started:
 		# Loader must have failed; _on_ship_loaded bailed out.
 		_is_reloading = false
-		push_error("PlayableGeneratedShip: load failed because slice did not start")
+		if last_failure_reason.is_empty():
+			last_failure_reason = "save_restore_slice_not_started"
 		return false
 	# ADR-0046: resume the accumulated play-time clock from the save.
 	# current_location/world_seed are stamped-at-save metadata: location is
@@ -10564,10 +10698,7 @@ func load_world_for_validation() -> bool:
 func _activate_derelict_from_instance(inst, pos_in_ship: Array) -> bool:
 	if inst == null or ship_generator == null:
 		return false
-	# Rebuild from this derelict's OWN seed/size/condition so a save-reload reproduces
-	# its injected encounters + biome/difficulty stamps (not empty / a stale marker's).
-	_apply_run_context_from_blueprint(inst.blueprint)
-	var new_root: Node3D = ship_generator.generate(inst.blueprint)
+	var new_root: Node3D = _regenerate_ship_instance(inst)
 	if new_root == null:
 		return false
 	_attach_derelict_active(inst, new_root)
@@ -10589,9 +10720,7 @@ func _ensure_derelict_geometry(inst) -> void:
 		return
 	if String(inst.marker_id) == "" or is_instance_valid(inst.scene_root):
 		return
-	# Regenerate from this derelict's OWN context (see _apply_run_context_from_blueprint).
-	_apply_run_context_from_blueprint(inst.blueprint)
-	var new_root: Node3D = ship_generator.generate(inst.blueprint)
+	var new_root: Node3D = _regenerate_ship_instance(inst)
 	if new_root == null:
 		return
 	inst.scene_root = new_root
@@ -10604,12 +10733,30 @@ func _ensure_derelict_geometry(inst) -> void:
 	_spawn_cargo_hold_control(inst)
 	_spawn_cart_controls_for_ship(inst)
 
+
+func _regenerate_ship_instance(inst) -> Node3D:
+	if inst == null or ship_generator == null:
+		return null
+	if not inst.procgen_request.is_empty():
+		var documents: Dictionary = ship_generator.generate_documents_from_request(
+			inst.procgen_request, inst.procgen_semantic_hash)
+		if documents.is_empty():
+			return null
+		return ship_generator.instantiate_documents(documents, true)
+	# Explicit migration-fixture branch for pre-ADR-0069 visited ships.
+	_apply_run_context_from_blueprint(inst.blueprint)
+	return ship_generator.generate(inst.blueprint)
+
 ## Applies a WorldSnapshot: rebuilds the home ship first (this resets the runtime
 ## and returns to home if currently away), restores the SynapticSeaWorld and the
 ## visited-ships registry, then re-activates the saved derelict if the snapshot
 ## was taken aboard one. Returns false on any hard failure.
 func _apply_world_snapshot(ws) -> bool:
 	if ws == null:
+		return false
+	var incompatibility: String = _world_snapshot_procgen_incompatibility(ws)
+	if not incompatibility.is_empty():
+		last_failure_reason = incompatibility
 		return false
 	# 1. Home ship via the existing single-ship reload path. Reconstruct a
 	#    RunSnapshot object from the embedded dict (version-gated like a disk load).
@@ -10718,6 +10865,51 @@ func _apply_world_snapshot(ws) -> bool:
 	# the source of truth, not the implicit current_location-driven rebuild. Idempotent
 	# (a no-op confirm when step 4 already re-docked 5b's single mobile ship).
 	_apply_docking_snapshot(ws)
+	return true
+
+
+## Production worlds are a clean break from the pre-Rust save format. Inspect
+## every persisted generated site before mutating live state; authored fixture
+## scenes keep their explicit path-based migration branch for regression use.
+func _world_snapshot_procgen_incompatibility(ws) -> String:
+	if not procgen_start_enabled:
+		return ""
+	if not ws.home_ship is Dictionary:
+		return "new_world_required_legacy_generator"
+	var home_summary: Dictionary = ws.home_ship
+	var home_request: Variant = home_summary.get("procgen_request", {})
+	var home_hash: String = str(home_summary.get("procgen_semantic_hash", ""))
+	if not home_request is Dictionary or (home_request as Dictionary).is_empty() \
+			or not _valid_saved_semantic_hash(home_hash):
+		return "new_world_required_legacy_generator"
+	var home_compatibility: String = ship_generator.persisted_request_incompatibility(
+		home_request as Dictionary)
+	if not home_compatibility.is_empty():
+		return home_compatibility
+	for marker_id: Variant in ws.visited_ships:
+		var summary_variant: Variant = ws.visited_ships[marker_id]
+		if not summary_variant is Dictionary:
+			return "new_world_required_legacy_generator"
+		var summary: Dictionary = summary_variant
+		var request_variant: Variant = summary.get("procgen_request", {})
+		var semantic_hash: String = str(summary.get("procgen_semantic_hash", ""))
+		if not request_variant is Dictionary or (request_variant as Dictionary).is_empty() \
+				or not _valid_saved_semantic_hash(semantic_hash):
+			return "new_world_required_legacy_generator"
+		var compatibility: String = ship_generator.persisted_request_incompatibility(
+			request_variant as Dictionary)
+		if not compatibility.is_empty():
+			return compatibility
+	return ""
+
+
+func _valid_saved_semantic_hash(value: String) -> bool:
+	if value.length() != 64:
+		return false
+	for character: String in value:
+		if not ((character >= "0" and character <= "9") \
+				or (character >= "a" and character <= "f")):
+			return false
 	return true
 
 ## Restores the piloted pointer, dock-edge set, and occupancy from the snapshot

@@ -2,15 +2,14 @@ extends Node3D
 class_name GeneratedShipDemo
 
 const GeneratedShipLoaderScript := preload("res://scripts/procgen/generated_ship_loader.gd")
+const ShipGeneratorScript := preload("res://scripts/procgen/ship_generator.gd")
 const ProcgenDebugRunnerScript := preload("res://scripts/procgen/procgen_debug_runner.gd")
 const ObjectiveTrackerScript := preload("res://scripts/ui/objective_tracker.gd")
 
 signal demo_completed(objective_count: int, interaction_count: int, frame_count: int, final_distance: float)
 signal demo_failed(reason: String)
 
-const DEFAULT_LAYOUT_PATH: String = "res://data/procgen/smoke/seed_000017/layout.json"
-const DEFAULT_KIT_PATH: String = "res://data/kits/ship_structural_v0.json"
-const DEFAULT_GAMEPLAY_SLICE_PATH: String = "res://data/procgen/smoke/seed_000017/gameplay_slice.json"
+const DEFAULT_SEED: int = 17
 const DEFAULT_TIMEOUT_FRAMES: int = 9000
 
 var timeout_frames: int = DEFAULT_TIMEOUT_FRAMES
@@ -52,7 +51,20 @@ func _ready() -> void:
 	light.light_energy = 1.5
 	add_child(light)
 
-	loader.load_from_paths(DEFAULT_LAYOUT_PATH, DEFAULT_KIT_PATH, DEFAULT_GAMEPLAY_SLICE_PATH)
+	var generator: RefCounted = ShipGeneratorScript.new()
+	generator.configure_run_context("breach_field", "standard")
+	generator.configure_procgen_site("debug-demo-%d" % DEFAULT_SEED, 0, 0)
+	var documents: Dictionary = generator.generate_documents_from_seed(DEFAULT_SEED, 2, 1)
+	if documents.is_empty():
+		_on_loader_failed("bundle generation: %s" % str(generator.last_error))
+		return
+	loader.set_meta("procgen_request", (documents.request as Dictionary).duplicate(true))
+	loader.set_meta("procgen_semantic_hash", str(documents.semantic_hash))
+	loader.load_from_documents(
+		(documents.layout as Dictionary).duplicate(true),
+		(documents.kit as Dictionary).duplicate(true),
+		(documents.gameplay_slice as Dictionary).duplicate(true),
+		true)
 
 
 func _on_ship_loaded(summary: Dictionary) -> void:

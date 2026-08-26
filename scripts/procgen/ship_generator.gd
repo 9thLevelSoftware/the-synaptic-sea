@@ -13,6 +13,7 @@ const GeneratedShipLoaderScript := preload("res://scripts/procgen/generated_ship
 const ProcgenManifestValidatorScript := preload("res://scripts/procgen/procgen_manifest_validator.gd")
 const BundleConsumerScript := preload("res://scripts/procgen/procgen_bundle_consumer.gd")
 const BundleMapperScript := preload("res://scripts/procgen/procgen_bundle_mapper.gd")
+const ProcgenRequestCodecScript := preload("res://scripts/procgen/procgen_request_codec.gd")
 
 const USE_WORLDGEN := true
 const WORLDGEN_KIT_ID: String = "ship_structural_v0"
@@ -131,6 +132,105 @@ func generate_from_seed(
 		condition: int = 1) -> Node3D:
 	return _generate_via_worldgen(seed_value, size, condition)
 
+
+## Runs the authoritative lifecycle once and returns the validated bundle plus
+## the exact in-memory documents consumed by Godot. Production callers that do
+## not need a Node3D (top-down projection, save replay, combined scenes, tools)
+## use this seam instead of rebuilding gameplay or writing temporary JSON.
+func generate_documents_from_seed(
+		seed_value: int,
+		size: int = 0,
+		condition: int = 1,
+		archetype_override: String = "") -> Dictionary:
+	last_error = ""
+	last_outcome = "generating"
+	var context: Dictionary = _native_context()
+	if context.is_empty():
+		return {}
+	var consumer: RefCounted = BundleConsumerScript.new()
+	var requested_difficulty: String = difficulty_id if not difficulty_id.is_empty() else "standard"
+	var request: Dictionary = consumer.build_request(
+		seed_value,
+		size,
+		condition,
+		context.runtime_manifest,
+		requested_difficulty,
+		archetype_override,
+		procgen_site_id,
+		procgen_site_x,
+		procgen_site_y,
+		procgen_player_signals,
+		procgen_presentation_seed,
+		procgen_locale,
+	)
+	if request.is_empty():
+		return _documents_fail(str(consumer.last_error), str(consumer.last_error))
+	return _generate_documents(request, context, consumer, "")
+
+
+## Replays an exact persisted request. When an expected semantic hash is
+## supplied, regeneration fails closed before scene state is applied if the
+## current source/content/adapter produces anything different.
+func generate_documents_from_request(
+		request: Dictionary,
+		expected_semantic_hash: String = "") -> Dictionary:
+	last_error = ""
+	last_outcome = "generating"
+	if request.is_empty():
+		return _documents_fail("request_missing", "persisted request missing")
+	var normalized_request: Dictionary = ProcgenRequestCodecScript.normalize(request)
+	if normalized_request.is_empty():
+		return _documents_reject("new_world_required_request_malformed")
+	request = normalized_request
+	var context: Dictionary = _native_context()
+	if context.is_empty():
+		return {}
+	var incompatibility: String = _persisted_request_incompatibility(request, context)
+	if not incompatibility.is_empty():
+		return _documents_reject(incompatibility)
+	return _generate_documents(
+		request.duplicate(true),
+		context,
+		BundleConsumerScript.new(),
+		expected_semantic_hash,
+	)
+
+
+## Read-only compatibility preflight for persisted worlds. This deliberately
+## does not generate a bundle or select a fallback.
+func persisted_request_incompatibility(request: Dictionary) -> String:
+	var normalized_request: Dictionary = ProcgenRequestCodecScript.normalize(request)
+	if request.is_empty():
+		return "new_world_required_legacy_generator"
+	if normalized_request.is_empty():
+		return "new_world_required_request_malformed"
+	var context: Dictionary = _native_context()
+	if context.is_empty():
+		return last_error
+	return _persisted_request_incompatibility(normalized_request, context)
+
+
+## Compatibility is checked before native generation or authored fallback.
+## A pre-release save from another generator/content/schema version therefore
+## cannot be mistaken for an ordinary generation failure or silently replaced.
+func _persisted_request_incompatibility(
+		request: Dictionary,
+		context: Dictionary) -> String:
+	var runtime_manifest: Dictionary = context.get("runtime_manifest", {})
+	var export_schemas: Dictionary = runtime_manifest.get("export_schemas", {})
+	if str(request.get("schema_version", "")) \
+			!= str(export_schemas.get("procgen_request", "")):
+		return "new_world_required_request_schema"
+	var generator_version: Variant = request.get("generator_version", null)
+	if typeof(generator_version) == TYPE_BOOL \
+			or (typeof(generator_version) != TYPE_INT and typeof(generator_version) != TYPE_FLOAT) \
+			or int(generator_version) != int(runtime_manifest.get("generator_version", -1)):
+		return "new_world_required_generator_version"
+	if str(request.get("content_manifest_hash", "")) \
+			!= str(runtime_manifest.get("content_manifest_hash", "")):
+		return "new_world_required_content_manifest"
+	return ""
+
 func generate(blueprint, archetype: Dictionary = {}) -> Node3D:
 	if blueprint == null:
 		return _generation_fail("blueprint_missing", "blueprint missing")
@@ -147,87 +247,156 @@ func generate(blueprint, archetype: Dictionary = {}) -> Node3D:
 
 
 func _generate_via_worldgen(seed_value: int, size: int, condition: int, archetype_override: String = "") -> Node3D:
-	last_error = ""
-	last_outcome = "generating"
+	var documents: Dictionary = generate_documents_from_seed(
+		seed_value, size, condition, archetype_override)
+	if documents.is_empty():
+		return null
+	return instantiate_documents(documents, true)
+
+
+func _native_context() -> Dictionary:
 	# Missing native support is an explicit failure (legacy wording retained for
 	# migration-oracle/source inventory compatibility): native path is required.
 	if not USE_WORLDGEN or not ClassDB.class_exists("DerelictGenerator"):
-		return _generation_fail("native_adapter_unavailable", "native adapter unavailable")
+		return _documents_fail("native_adapter_unavailable", "native adapter unavailable")
 	var generator: Object = ClassDB.instantiate("DerelictGenerator") as Object
 	if generator == null or not generator.has_method("generate_bundle") \
 			or not generator.has_method("generator_manifest") \
 			or not generator.has_method("capabilities"):
-		return _generation_fail("native_bundle_api_unavailable", "native bundle API unavailable")
+		return _documents_fail("native_bundle_api_unavailable", "native bundle API unavailable")
 	var build_manifest: Dictionary = {}
 	var runtime_manifest: Dictionary = {}
 	var capabilities: Dictionary = {}
 	var manifest_variant: Variant = JSON.parse_string(str(generator.generator_manifest()))
 	var capabilities_variant: Variant = JSON.parse_string(str(generator.capabilities()))
 	if not manifest_variant is Dictionary or not capabilities_variant is Dictionary:
-		return _generation_fail("native_context_malformed", "native manifest/capabilities malformed")
+		return _documents_fail("native_context_malformed", "native manifest/capabilities malformed")
 	runtime_manifest = manifest_variant
 	capabilities = capabilities_variant
-	var build_manifest_path: String = "res://data/procgen/manifests/build/win64.json"
+	var build_manifest_path: String = _build_manifest_path(runtime_manifest)
+	if build_manifest_path.is_empty():
+		return _documents_fail("build_manifest_target_unsupported", "no build manifest for runtime target")
 	if not FileAccess.file_exists(build_manifest_path):
-		return _generation_fail("build_manifest_missing", "external build manifest missing")
+		return _documents_fail("build_manifest_missing", "external build manifest missing")
 	var build_variant: Variant = JSON.parse_string(FileAccess.get_file_as_string(build_manifest_path))
 	if not build_variant is Dictionary:
-		return _generation_fail("build_manifest_malformed", "external build manifest malformed")
+		return _documents_fail("build_manifest_malformed", "external build manifest malformed")
 	build_manifest = build_variant
 	var manifest_verdict: String = ProcgenManifestValidatorScript.new().validate(build_manifest, generator)
 	if manifest_verdict != ProcgenManifestValidatorScript.OK:
-		return _generation_fail("build_manifest_%s" % manifest_verdict, "external build manifest: %s" % manifest_verdict)
-	var consumer: RefCounted = BundleConsumerScript.new()
-	var requested_difficulty: String = difficulty_id if not difficulty_id.is_empty() else "standard"
-	var request: Dictionary = consumer.build_request(
-		seed_value,
-		size,
-		condition,
-		runtime_manifest,
-		requested_difficulty,
-		archetype_override,
-		procgen_site_id,
-		procgen_site_x,
-		procgen_site_y,
-		procgen_player_signals,
-		procgen_presentation_seed,
-		procgen_locale,
-	)
-	if request.is_empty():
-		return _generation_fail(str(consumer.last_error), str(consumer.last_error))
+		return _documents_fail("build_manifest_%s" % manifest_verdict, "external build manifest: %s" % manifest_verdict)
+	return {
+		"generator": generator,
+		"build_manifest": build_manifest,
+		"runtime_manifest": runtime_manifest,
+		"capabilities": capabilities,
+	}
+
+
+func _build_manifest_path(runtime_manifest: Dictionary) -> String:
+	match str(runtime_manifest.get("target", "")):
+		"x86_64-pc-windows-msvc":
+			return "res://data/procgen/manifests/build/win64.json"
+		"wasm32-unknown-unknown":
+			return "res://data/procgen/manifests/build/web.json"
+		_:
+			return ""
+
+
+func _generate_documents(
+		request: Dictionary,
+		context: Dictionary,
+		consumer: RefCounted,
+		expected_semantic_hash: String) -> Dictionary:
+	var generator: Object = context.generator
+	var build_manifest: Dictionary = context.build_manifest
+	var runtime_manifest: Dictionary = context.runtime_manifest
+	var capabilities: Dictionary = context.capabilities
 	var lifecycle_json: String = str(generator.generate_bundle(JSON.stringify(request)))
-	var bundle: Dictionary = consumer.consume(lifecycle_json, request, build_manifest, runtime_manifest, capabilities)
+	var lifecycle_failure: String = _lifecycle_failure_code(lifecycle_json)
+	var bundle: Dictionary = {}
+	if lifecycle_failure.is_empty():
+		bundle = consumer.consume(
+			lifecycle_json, request, build_manifest, runtime_manifest, capabilities)
 	var fallback_selected: bool = false
 	if bundle.is_empty():
-		var primary_error: String = str(consumer.last_error)
+		var primary_error: String = lifecycle_failure \
+			if not lifecycle_failure.is_empty() else str(consumer.last_error)
 		if fallback_policy != null:
 			bundle = fallback_policy.resolve(request, consumer)
 			fallback_selected = not bundle.is_empty()
 		if not fallback_selected:
 			if fallback_policy != null:
 				last_outcome = "fallback_%s" % str(fallback_policy.last_outcome)
-				return _generation_fail(str(fallback_policy.last_error), "bundle validation %s; authored fallback %s" % [primary_error, str(fallback_policy.last_error)])
-			return _generation_fail(primary_error, "bundle validation: %s" % primary_error)
+				return _documents_fail(str(fallback_policy.last_error), "bundle validation %s; authored fallback %s" % [primary_error, str(fallback_policy.last_error)])
+			return _documents_fail(primary_error, "bundle validation: %s" % primary_error)
+	var semantic_hash: String = str(bundle.get("semantic_hash", ""))
+	if not expected_semantic_hash.is_empty() and semantic_hash != expected_semantic_hash:
+		return _documents_reject("semantic_hash_mismatch")
 	var mapper: RefCounted = BundleMapperScript.new()
 	var mapped: Dictionary = mapper.map_to_loader_documents(bundle)
 	if mapped.is_empty():
-		return _generation_fail(str(mapper.last_error), "bundle mapping: %s" % str(mapper.last_error))
+		return _documents_fail(str(mapper.last_error), "bundle mapping: %s" % str(mapper.last_error))
 	var kit_id: String = str(mapped.get("kit_id", ""))
 	var kit: Dictionary = _load_worldgen_kit(kit_id)
 	if kit.is_empty():
-		return _generation_fail(last_error if not last_error.is_empty() else "presentation_kit", "presentation kit rejected: %s" % kit_id)
+		return _documents_fail(last_error if not last_error.is_empty() else "presentation_kit", "presentation kit rejected: %s" % kit_id)
+	last_error = ""
+	last_outcome = "fallback_selected" if fallback_selected else "generated"
+	return {
+		"bundle": bundle.duplicate(true),
+		"request": request.duplicate(true),
+		"layout": (mapped.layout as Dictionary).duplicate(true),
+		"gameplay_slice": (mapped.gameplay_slice as Dictionary).duplicate(true),
+		"kit": kit.duplicate(true),
+		"semantic_hash": semantic_hash,
+		"fallback_selected": fallback_selected,
+	}
+
+
+func _lifecycle_failure_code(lifecycle_json: String) -> String:
+	var parsed: Variant = JSON.parse_string(lifecycle_json)
+	if not parsed is Dictionary:
+		return ""
+	var lifecycle: Dictionary = parsed
+	if str(lifecycle.get("status", "")) != "failed":
+		return ""
+	var failure_variant: Variant = lifecycle.get("failure", {})
+	if not failure_variant is Dictionary:
+		return "lifecycle_failed"
+	var code: String = str((failure_variant as Dictionary).get("code", ""))
+	return "lifecycle_%s" % (code if not code.is_empty() else "failed")
+
+
+## Instantiates only already-validated bundle documents. This method performs
+## presentation assembly and metadata binding; it never generates mechanics.
+func instantiate_documents(
+		documents: Dictionary,
+		apply_atmosphere: bool = true) -> Node3D:
+	for key in ["bundle", "request", "layout", "gameplay_slice", "kit"]:
+		if not documents.get(key, null) is Dictionary:
+			return _generation_fail("documents_malformed", "bundle documents missing %s" % key)
+	var bundle: Dictionary = documents.bundle
+	var request: Dictionary = documents.request
+	var semantic_hash: String = str(documents.get("semantic_hash", ""))
+	if semantic_hash.is_empty() or semantic_hash != str(bundle.get("semantic_hash", "")):
+		return _generation_fail("documents_semantic_hash", "bundle document semantic hash mismatch")
 	var loader: Node3D = GeneratedShipLoaderScript.new()
-	if not loader.load_from_documents(mapped.layout, kit, mapped.gameplay_slice, true):
+	if not loader.load_from_documents(
+			(documents.layout as Dictionary).duplicate(true),
+			(documents.kit as Dictionary).duplicate(true),
+			(documents.gameplay_slice as Dictionary).duplicate(true),
+			apply_atmosphere):
 		loader.queue_free()
 		return _generation_fail("loader_rejected_documents", "loader rejected bundle documents")
 	loader.name = "GeneratedShip"
-	loader.set_meta("procgen_site_ir", (mapped.get("site_ir", {}) as Dictionary).duplicate(true))
-	loader.set_meta("procgen_gameplay_ir", (mapped.get("gameplay_ir", {}) as Dictionary).duplicate(true))
-	loader.set_meta("procgen_presentation_ir", (mapped.get("presentation_ir", {}) as Dictionary).duplicate(true))
-	loader.set_meta("procgen_request", (bundle.get("request", {}) as Dictionary).duplicate(true))
-	loader.set_meta("procgen_semantic_hash", str(bundle.get("semantic_hash", "")))
+	loader.set_meta("procgen_site_ir", (bundle.get("site_ir", {}) as Dictionary).duplicate(true))
+	loader.set_meta("procgen_gameplay_ir", (bundle.get("gameplay_ir", {}) as Dictionary).duplicate(true))
+	loader.set_meta("procgen_presentation_ir", (bundle.get("presentation_ir", {}) as Dictionary).duplicate(true))
+	loader.set_meta("procgen_request", request.duplicate(true))
+	loader.set_meta("procgen_semantic_hash", semantic_hash)
+	loader.set_meta("procgen_fallback_selected", bool(documents.get("fallback_selected", false)))
 	last_error = ""
-	last_outcome = "fallback_selected" if fallback_selected else "generated"
 	return loader
 
 
@@ -256,6 +425,20 @@ func _generation_fail(code: String, detail: String) -> Node3D:
 		last_outcome = "failed"
 	push_error("SHIP GENERATOR FAIL %s" % detail)
 	return null
+
+
+func _documents_fail(code: String, detail: String) -> Dictionary:
+	last_error = code if not code.is_empty() else "generation_failed"
+	if not last_outcome.begins_with("fallback_"):
+		last_outcome = "failed"
+	push_error("SHIP GENERATOR FAIL %s" % detail)
+	return {}
+
+
+func _documents_reject(code: String) -> Dictionary:
+	last_error = code if not code.is_empty() else "generation_rejected"
+	last_outcome = "rejected"
+	return {}
 
 
 func _resolve_worldgen_loot_containers(
@@ -350,18 +533,10 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 		layout["structural_plan"] = structural_plan
 		layout["structural_plan_validated"] = true
 
-	# Write layout, kit reference, and minimal gameplay slice to temp files
-	var temp_dir: String = "user://procgen_temp"
-	if not DirAccess.dir_exists_absolute(temp_dir):
-		DirAccess.make_dir_absolute(temp_dir)
-
-	var layout_path: String = temp_dir + "/layout.json"
-	var gameplay_path: String = temp_dir + "/gameplay_slice.json"
-
 	# Build the gameplay slice FIRST so builder-authored hazard links can be
-	# stamped onto the layout before it is written: GeneratedShipLoader reads
-	# arc_zones from layout.json (the golden ships duplicate them in both
-	# files for the same reason).
+	# stamped onto the layout before it is handed to GeneratedShipLoader. The
+	# retained migration oracle uses the same in-memory assembly seam as the
+	# authoritative bundle path; it never publishes shared temporary files.
 	var gameplay_builder: GameplaySliceBuilderScript = GameplaySliceBuilderScript.new()
 	var gameplay: Dictionary = gameplay_builder.build(layout)
 	var layout_arcs: Variant = layout.get("arc_zones", [])
@@ -369,15 +544,6 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 	if (not (layout_arcs is Array) or (layout_arcs as Array).is_empty()) \
 			and slice_arcs is Array and not (slice_arcs as Array).is_empty():
 		layout["arc_zones"] = (slice_arcs as Array).duplicate(true)
-
-	# Write layout
-	var layout_json: String = JSON.stringify(layout, "  ")
-	var layout_file: FileAccess = FileAccess.open(layout_path, FileAccess.WRITE)
-	if layout_file == null:
-		push_error("SHIP GENERATOR FAIL cannot write layout: %s" % layout_path)
-		return null
-	layout_file.store_string(layout_json)
-	layout_file.close()
 
 	# Layout kit_id selects the structural JSON. Hazard/industrial catalogs have
 	# no modules[].godot_wrapper_scene array yet, so they fall back to v0 wrappers.
@@ -387,22 +553,21 @@ func _load_layout_as_scene(layout: Dictionary) -> Node3D:
 	if not FileAccess.file_exists(kit_path):
 		push_error("SHIP GENERATOR FAIL structural kit not found: %s" % kit_path)
 		return null
-
-	# Write the gameplay slice (built above, before the layout write).
-	var gameplay_json: String = JSON.stringify(gameplay, "  ")
-	var gameplay_file: FileAccess = FileAccess.open(gameplay_path, FileAccess.WRITE)
-	if gameplay_file == null:
-		push_error("SHIP GENERATOR FAIL cannot write gameplay slice: %s" % gameplay_path)
+	var kit_variant: Variant = JSON.parse_string(FileAccess.get_file_as_string(kit_path))
+	if not kit_variant is Dictionary:
+		push_error("SHIP GENERATOR FAIL structural kit is malformed: %s" % kit_path)
 		return null
-	gameplay_file.store_string(gameplay_json)
-	gameplay_file.close()
 
-	# Load via GeneratedShipLoader
-	var LoaderScript := preload("res://scripts/procgen/generated_ship_loader.gd")
-	var loader: Node3D = LoaderScript.new()
+	var loader: Node3D = GeneratedShipLoaderScript.new()
 	# Generated derelicts are the away branch; pass that context to the loader's
 	# single atmosphere hook so biome fog can deepen without playable edits.
-	var success: bool = loader.load_from_paths(layout_path, kit_path, gameplay_path, true)
+	var success: bool = loader.load_from_documents(
+		layout.duplicate(true),
+		(kit_variant as Dictionary).duplicate(true),
+		gameplay.duplicate(true),
+		true,
+		{"kit": kit_path},
+	)
 	if not success:
 		push_error("SHIP GENERATOR FAIL loader returned false")
 		loader.queue_free()

@@ -9,13 +9,23 @@ var _p := 0
 var _f := 0
 
 
-func _init() -> void:
+func _initialize() -> void:
+	call_deferred("_run")
+
+
+func _run() -> void:
 	_test_hub_generation()
 	_test_derelict_generation()
 	_test_threat_lifecycle()
 	_test_simulation_ticking()
 	_print_results()
 	quit(0 if _f == 0 else 1)
+
+
+func _new_ship():
+	var ship = TopDownPlayableShipScript.new()
+	get_root().add_child(ship)
+	return ship
 
 
 func _a(cond: bool, label: String) -> void:
@@ -29,10 +39,7 @@ func _a(cond: bool, label: String) -> void:
 
 func _test_hub_generation() -> void:
 	print("\n--- Hub generation (seed 42) ---")
-	var ship = TopDownPlayableShipScript.new()
-	# Manually call _ensure_nodes since we're not in tree
-	ship._ensure_nodes()
-	ship._init_systems()
+	var ship = _new_ship()
 
 	var info = ship.generate_hub(42)
 	_a(info.has("room_centers"), "hub has room centers")
@@ -52,26 +59,24 @@ func _test_hub_generation() -> void:
 	_a(ship.vitals_state != null, "vitals state initialized")
 	_a(ship.oxygen_state != null, "oxygen state initialized")
 	_a(ship.damage_pipeline != null, "damage pipeline initialized")
+	ship.free()
 
 
 func _test_derelict_generation() -> void:
 	print("\n--- Derelict generation (seed 777, breach_field) ---")
-	var ship = TopDownPlayableShipScript.new()
-	ship._ensure_nodes()
-	ship._init_systems()
+	var ship = _new_ship()
 
 	var info = ship.generate_derelict(777, "breach_field")
 	_a(info.has("room_centers"), "derelict has room centers")
 	_a(info.get("room_centers", {}).size() > 0, "derelict has rooms (%d)" % info.get("room_centers", {}).size())
 	_a(ship.away_from_start, "away_from_start flag set")
 	_a(ship.threat_manager.get_threat_count() > 0, "threats spawned (%d)" % ship.threat_manager.get_threat_count())
+	ship.free()
 
 
 func _test_threat_lifecycle() -> void:
 	print("\n--- Threat lifecycle in generated derelict ---")
-	var ship = TopDownPlayableShipScript.new()
-	ship._ensure_nodes()
-	ship._init_systems()
+	var ship = _new_ship()
 	ship.generate_derelict(777, "breach_field")
 
 	var threat_count = ship.threat_manager.get_threat_count()
@@ -93,13 +98,12 @@ func _test_threat_lifecycle() -> void:
 	for t in ship.threat_manager.threats:
 		t.apply_damage({"amount": 200.0})
 	_a(ship.threat_manager.get_alive_count() == 0, "all threats killed")
+	ship.free()
 
 
 func _test_simulation_ticking() -> void:
 	print("\n--- Simulation ticking (100 frames) ---")
-	var ship = TopDownPlayableShipScript.new()
-	ship._ensure_nodes()
-	ship._init_systems()
+	var ship = _new_ship()
 	ship.generate_hub(42)
 
 	# Tick 100 frames — should not error
@@ -114,10 +118,11 @@ func _test_simulation_ticking() -> void:
 	# Verify systems still alive
 	_a(ship.vitals_state != null, "vitals still alive after ticking")
 	_a(ship.oxygen_state != null, "oxygen still alive after ticking")
+	ship.free()
 
 
 func _print_results() -> void:
 	print("\n========================================")
-	print("E2E smoke: %d PASS / %d FAIL" % [_p, _f])
+	print("E2E smoke: pass_count=%d failure_count=%d" % [_p, _f])
 	print("========================================")
-	print("RESULT: %s" % ("PASS" if _f == 0 else "FAIL"))
+	print("RESULT: %s" % ("PASS" if _f == 0 else "unsuccessful"))
