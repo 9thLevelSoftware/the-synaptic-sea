@@ -1,5 +1,5 @@
 //! Authored, validated creature blueprints for GameplayIR.
-use crate::world::{WorldGenerationRequest, WorldKey, PROCGEN_GENERATOR_VERSION};
+use crate::world::{WorldGenerationRequest, WorldKey, MAX_PUBLIC_SEED, PROCGEN_GENERATOR_VERSION};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -131,6 +131,7 @@ impl CreatureCatalogue {
             || !canonical(&self.behaviors, |x| &x.id)
             || !canonical(&self.materials, |x| &x.id)
             || !canonical(&self.counterplay, |x| &x.id)
+            || !canonical(&self.fallbacks, |x| &x.id)
         {
             return Err(CreatureError::Invalid("ids_not_canonical".into()));
         }
@@ -224,7 +225,7 @@ impl CreatureCatalogue {
             }
         }
         for b in &self.fallbacks {
-            self.validate_blueprint(
+            self.validate_blueprint_unchecked(
                 b,
                 &CreatureGenerationContext {
                     request: WorldGenerationRequest {
@@ -251,6 +252,17 @@ impl CreatureCatalogue {
         b: &CreatureBlueprint,
         c: &CreatureGenerationContext,
     ) -> Result<(), CreatureError> {
+        validate_context(c, &self.rules)?;
+        self.validate_blueprint_unchecked(b, c)
+    }
+    fn validate_blueprint_unchecked(
+        &self,
+        b: &CreatureBlueprint,
+        c: &CreatureGenerationContext,
+    ) -> Result<(), CreatureError> {
+        if !valid_id(&b.id) {
+            return Err(CreatureError::Invalid("blueprint_id".into()));
+        }
         let body = get(&self.body_plans, |x| x.id == b.body_plan_id)
             .ok_or_else(|| CreatureError::Invalid("body_dangling".into()))?;
         let fp = get(&self.footprints, |x| x.id == b.footprint_id)
@@ -400,11 +412,14 @@ fn validate_footprint(f: &Footprint) -> Result<(), CreatureError> {
             continue;
         }
         for n in [
-            Cell { x: c.x + 1, y: c.y },
-            Cell { x: c.x - 1, y: c.y },
-            Cell { x: c.x, y: c.y + 1 },
-            Cell { x: c.x, y: c.y - 1 },
-        ] {
+            c.x.checked_add(1).map(|x| Cell { x, y: c.y }),
+            c.x.checked_sub(1).map(|x| Cell { x, y: c.y }),
+            c.y.checked_add(1).map(|y| Cell { x: c.x, y }),
+            c.y.checked_sub(1).map(|y| Cell { x: c.x, y }),
+        ]
+        .into_iter()
+        .flatten()
+        {
             if set.contains(&n) {
                 todo.push(n)
             }
@@ -415,6 +430,39 @@ fn validate_footprint(f: &Footprint) -> Result<(), CreatureError> {
             "footprint_disconnected:{}",
             f.id
         )));
+    }
+    Ok(())
+}
+
+fn validate_context(
+    c: &CreatureGenerationContext,
+    rules: &CreatureRules,
+) -> Result<(), CreatureError> {
+    let q = &c.request;
+    if q.world_seed > MAX_PUBLIC_SEED
+        || q.platform_version != PROCGEN_GENERATOR_VERSION
+        || !valid_id(&q.site_id)
+        || !valid_id(&q.archetype_id)
+        || q.content_manifest_hash.len() != 64
+        || !q
+            .content_manifest_hash
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit())
+        || q.content_manifest_hash != q.content_manifest_hash.to_ascii_lowercase()
+        || q.x == i32::MIN
+        || q.x == i32::MAX
+        || q.y == i32::MIN
+        || q.y == i32::MAX
+        || c.max_footprint_cells == 0
+        || c.max_footprint_cells as usize > MAX_CELLS
+        || c.threat_cap == 0
+        || c.threat_cap > rules.max_threat
+        || c.performance_cap == 0
+        || c.performance_cap > rules.max_performance
+        || c.instance_cap == 0
+        || c.instance_cap > rules.max_instances
+    {
+        return Err(CreatureError::Invalid("context".into()));
     }
     Ok(())
 }
