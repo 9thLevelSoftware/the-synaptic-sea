@@ -369,7 +369,23 @@ impl WorldGenerationOutcome {
         {
             return Err(WorldError::Invalid("trace_bounds"));
         }
-        self.world_ir.validate_for_request(request, rules)
+        if self.fallback.is_none() {
+            self.world_ir.validate_for_request(request, rules)
+        } else {
+            Err(WorldError::Invalid("fallback_context"))
+        }
+    }
+    pub fn validate_with_fallback(
+        &self,
+        rules: &WorldRules,
+        request: &WorldGenerationRequest,
+        fallback: &WorldFallback,
+    ) -> Result<(), WorldError> {
+        if self.fallback.as_deref() != Some(fallback.fallback_id.as_str()) {
+            return Err(WorldError::Invalid("fallback_context"));
+        }
+        self.world_ir
+            .validate_for_fallback(request, rules, fallback)
     }
 }
 
@@ -398,6 +414,13 @@ impl WorldGenerationRequest {
             || self.y == i32::MAX
         {
             return Err(WorldError::Invalid("request"));
+        }
+        if radius_one_coordinates(self.x, self.y)
+            .map_err(WorldError::Invalid)?
+            .iter()
+            .any(|(x, y)| self.site_id == format!("site:{x}:{y}"))
+        {
+            return Err(WorldError::Invalid("site_collision"));
         }
         Ok(())
     }
@@ -664,7 +687,7 @@ pub fn resolve_world(
         repairs: vec![],
         fallback: Some(fallback.fallback_id.clone()),
     };
-    out.validate(rules, req)?;
+    out.validate_with_fallback(rules, req, fallback)?;
     Ok(out)
 }
 
@@ -798,7 +821,7 @@ fn bind_fallback(
             ],
         },
     };
-    world.validate_for_request(req, rules)?;
+    world.validate_for_fallback(req, rules, fallback)?;
     Ok(world)
 }
 
@@ -874,6 +897,25 @@ impl WorldIRv2 {
         req: &WorldGenerationRequest,
         rules: &WorldRules,
     ) -> Result<(), WorldError> {
+        self.validate_for_request_mode(req, rules, None)
+    }
+
+    fn validate_for_fallback(
+        &self,
+        req: &WorldGenerationRequest,
+        rules: &WorldRules,
+        fallback: &WorldFallback,
+    ) -> Result<(), WorldError> {
+        fallback.validate(rules)?;
+        self.validate_for_request_mode(req, rules, Some(fallback))
+    }
+
+    fn validate_for_request_mode(
+        &self,
+        req: &WorldGenerationRequest,
+        rules: &WorldRules,
+        fallback: Option<&WorldFallback>,
+    ) -> Result<(), WorldError> {
         req.validate(rules)?;
         self.validate_with_rules(rules)?;
         if self.world_seed != req.world_seed
@@ -889,22 +931,6 @@ impl WorldIRv2 {
         // than generated channel rolls. Their references and bounds were
         // checked by validate_with_rules; identity, topology and routes still
         // undergo the complete request-key validation below.
-        let authored_fallback = self.markers.len() == 9
-            && self.markers[1..]
-                .iter()
-                .all(|m| m.archetype_id == self.markers[1].archetype_id)
-            && self
-                .biome_fields
-                .windows(2)
-                .all(|w| w[0].biome_id == w[1].biome_id)
-            && self
-                .hazard_fields
-                .windows(2)
-                .all(|w| w[0].hazard_id == w[1].hazard_id)
-            && self
-                .resource_pressures
-                .windows(2)
-                .all(|w| w[0].resource_id == w[1].resource_id);
         for (i, marker) in self.markers.iter().enumerate() {
             let (x, y, site_id, archetype) = if i == 0 {
                 (req.x, req.y, req.site_id.clone(), req.archetype_id.clone())
@@ -916,7 +942,14 @@ impl WorldIRv2 {
                     .seed()
                     .map_err(WorldError::Key)?;
                 let expected = &rules.archetypes[seed as usize % rules.archetypes.len()];
-                if !authored_fallback && marker.archetype_id != *expected {
+                if fallback.is_none() && marker.archetype_id != *expected {
+                    return Err(WorldError::Invalid("marker_archetype"));
+                }
+                if let Some(f) = fallback {
+                    if marker.archetype_id != f.neighbor_archetype_id {
+                        return Err(WorldError::Invalid("fallback_archetype"));
+                    }
+                } else if marker.archetype_id != *expected {
                     return Err(WorldError::Invalid("marker_archetype"));
                 }
                 (x, y, sid, expected.clone())
@@ -924,7 +957,7 @@ impl WorldIRv2 {
             if marker.x != x
                 || marker.y != y
                 || marker.site_id != site_id
-                || (!authored_fallback && marker.archetype_id != archetype)
+                || (fallback.is_none() && marker.archetype_id != archetype)
                 || marker.selected != (i == 0)
                 || marker.site_seed
                     != key(req, "site", "site.structural", 0, x, y, &site_id)?
@@ -944,34 +977,46 @@ impl WorldIRv2 {
                     .seed()
                     .map_err(WorldError::Key)?;
                 match kind {
-                    0 if !authored_fallback
+                    0 if fallback.is_none()
                         && (self.biome_fields[i].biome_id
                             != rules.biomes[seed as usize % rules.biomes.len()]
                             || self.biome_fields[i].intensity_bp != (seed % 10001) as u32) =>
                     {
                         return Err(WorldError::Invalid("biome"))
                     }
-                    1 if !authored_fallback
+                    1 if fallback.is_none()
                         && (self.hazard_fields[i].hazard_id
                             != rules.hazards[seed as usize % rules.hazards.len()]
                             || self.hazard_fields[i].severity_bp != (seed % 10001) as u32) =>
                     {
                         return Err(WorldError::Invalid("hazard"))
                     }
-                    2 if !authored_fallback
+                    2 if fallback.is_none()
                         && (self.resource_pressures[i].resource_id
                             != rules.resources[seed as usize % rules.resources.len()]
                             || self.resource_pressures[i].pressure_bp != (seed % 10001) as u32) =>
                     {
                         return Err(WorldError::Invalid("resource"))
                     }
-                    3 if !authored_fallback
+                    3 if fallback.is_none()
                         && self.landmarks[i].kind
                             != rules.landmarks[seed as usize % rules.landmarks.len()] =>
                     {
                         return Err(WorldError::Invalid("landmark"))
                     }
                     _ => {}
+                }
+                if let Some(f) = fallback {
+                    if self.biome_fields[i].biome_id != f.biome_id
+                        || self.biome_fields[i].intensity_bp != 5000
+                        || self.hazard_fields[i].hazard_id != f.hazard_id
+                        || self.hazard_fields[i].severity_bp != 1000
+                        || self.resource_pressures[i].resource_id != f.resource_id
+                        || self.resource_pressures[i].pressure_bp != 5000
+                        || self.landmarks[i].kind != f.landmarks[i % f.landmarks.len()]
+                    {
+                        return Err(WorldError::Invalid("fallback_content"));
+                    }
                 }
             }
         }
@@ -1005,7 +1050,8 @@ impl WorldIRv2 {
                 .map_err(WorldError::Key)?;
             if edge.from != from
                 || edge.to != to
-                || (!authored_fallback && edge.cost_bp != in_range(seed, &rules.route_cost_bp))
+                || (fallback.is_none() && edge.cost_bp != in_range(seed, &rules.route_cost_bp))
+                || (fallback.is_some_and(|f| edge.cost_bp != f.route_cost_bp))
             {
                 return Err(WorldError::Invalid("route"));
             }

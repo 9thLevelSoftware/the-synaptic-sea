@@ -47,7 +47,7 @@ fn missing_selected_hub_edge_is_repaired_once() {
     let out = resolve_world(&req, candidate, &rules, &fallback).unwrap();
     assert_eq!(out.repairs, ["repair_missing_selected_hub_route"]);
     assert!(out.fallback.is_none());
-    out.world_ir.validate_for_request(&req, &rules).unwrap();
+    out.validate_with_fallback(&rules, &req, &fallback).unwrap();
 }
 
 #[test]
@@ -62,7 +62,7 @@ fn unrelated_candidate_defect_selects_complete_fallback() {
     assert!(out.repairs.is_empty());
     assert_eq!(out.world_ir.archetype_id, req.archetype_id);
     assert_eq!(out.world_ir.markers.len(), 9);
-    out.world_ir.validate_for_request(&req, &rules).unwrap();
+    out.validate_with_fallback(&rules, &req, &fallback).unwrap();
 }
 
 #[test]
@@ -74,7 +74,7 @@ fn bundled_generation_is_deterministic() {
 #[test]
 fn fallback_handles_selected_site_id_matching_neighbor_shape() {
     let mut req = request();
-    req.site_id = "site:3:6".into();
+    req.site_id = "selected:site".into();
     let rules = WorldRules::bundled().unwrap();
     let fallback = WorldFallback::bundled().unwrap();
     let mut candidate = generate_candidate(&req, &rules).unwrap();
@@ -83,4 +83,11 @@ fn fallback_handles_selected_site_id_matching_neighbor_shape() {
     assert_eq!(out.world_ir.markers.len(), 9);
     assert_eq!(out.world_ir.markers[0].site_id, req.site_id);
     out.world_ir.validate_for_request(&req, &rules).unwrap();
+}
+
+#[test]
+fn synthesized_neighbor_site_id_collision_is_rejected() {
+    let mut req = request();
+    req.site_id = "site:3:6".into();
+    assert!(generate_world(&req).is_err());
 }
