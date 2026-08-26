@@ -62,6 +62,54 @@ fn require_commit(root: &Path, source: &str) {
         fail("source commit is not present in Git");
     }
 }
+struct CommandProbe {
+    root: PathBuf,
+}
+impl build_support::GitProbe for CommandProbe {
+    fn diff_exit(&self) -> Result<i32, String> {
+        Command::new("git")
+            .args([
+                "-C",
+                self.root.to_str().unwrap(),
+                "diff",
+                "--quiet",
+                "HEAD",
+                "--",
+                "native/worldgen",
+            ])
+            .status()
+            .map(|s| s.code().unwrap_or(-1))
+            .map_err(|e| e.to_string())
+    }
+    fn status(&self) -> Result<(i32, bool), String> {
+        let o = Command::new("git")
+            .args([
+                "-C",
+                self.root.to_str().unwrap(),
+                "status",
+                "--porcelain",
+                "--untracked-files=all",
+                "--",
+                "native/worldgen",
+            ])
+            .output()
+            .map_err(|e| e.to_string())?;
+        Ok((o.status.code().unwrap_or(-1), !o.stdout.is_empty()))
+    }
+    fn commit_exists(&self, source: &str) -> Result<bool, String> {
+        Command::new("git")
+            .args([
+                "-C",
+                self.root.to_str().unwrap(),
+                "cat-file",
+                "-e",
+                &format!("{source}^{{commit}}"),
+            ])
+            .status()
+            .map(|s| s.success())
+            .map_err(|e| e.to_string())
+    }
+}
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
@@ -79,6 +127,27 @@ fn main() {
     let target = env::var("TARGET").unwrap_or_else(|_| fail("TARGET is missing"));
     let source_env = env::var("SYNAPTIC_PROCGEN_RUST_SOURCE_COMMIT").ok();
     let content_env = env::var("SYNAPTIC_PROCGEN_CONTENT_MANIFEST_HASH").ok();
+    let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../../../../");
+    let checked_text = if target == TARGET {
+        fs::read_to_string(&manifest_path).ok()
+    } else {
+        None
+    };
+    let probe = CommandProbe { root: root.clone() };
+    let selected = build_support::select(
+        build_support::Inputs {
+            target: &target,
+            source_override: source_env.as_deref(),
+            content_override: content_env.as_deref(),
+            dirty_override: env::var("SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT")
+                .ok()
+                .as_deref(),
+            checked_manifest: checked_text.as_deref(),
+        },
+        &probe,
+    )
+    .unwrap_or_else(|e| fail(&e));
+    let _selected_identity = (&selected.source, &selected.content);
     let (source, content) = if target != TARGET {
         match (source_env, content_env) {
             (Some(source), Some(content)) => (source, content),
@@ -137,7 +206,6 @@ fn main() {
     if !build_support::valid_hex(&content, 64) {
         fail("content manifest hash must be 64 lowercase hexadecimal characters");
     }
-    let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../../../../");
     require_commit(&root, &source);
     let dirty = match build_support::parse_dirty_override(
         env::var("SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT")

@@ -34,7 +34,7 @@ pub struct Selected {
     pub dirty_override: Option<bool>,
 }
 
-pub fn select(input: Inputs<'_>) -> Result<Selected, String> {
+pub fn select<P: GitProbe>(input: Inputs<'_>, probe: &P) -> Result<Selected, String> {
     let (source, content) = if input.target != WIN_TARGET {
         match (input.source_override, input.content_override) { (Some(s), Some(c)) => (s.to_owned(), c.to_owned()), _ => return Err("source and content identity overrides must be supplied together for non-win64 targets".into()) }
     } else if let (Some(s), Some(c)) = (input.source_override, input.content_override) {
@@ -65,6 +65,9 @@ pub fn select(input: Inputs<'_>) -> Result<Selected, String> {
     if !valid_hex(&content, 64) {
         return Err("content manifest hash must be 64 lowercase hexadecimal characters".into());
     }
+    if !probe.commit_exists(&source)? {
+        return Err("source commit is not present in Git".into());
+    }
     Ok(Selected {
         source,
         content,
@@ -75,6 +78,7 @@ pub fn select(input: Inputs<'_>) -> Result<Selected, String> {
 pub trait GitProbe {
     fn diff_exit(&self) -> Result<i32, String>;
     fn status(&self) -> Result<(i32, bool), String>;
+    fn commit_exists(&self, source: &str) -> Result<bool, String>;
 }
 pub fn classify_dirty<P: GitProbe>(probe: &P) -> Result<bool, String> {
     let diff = match probe.diff_exit()? {
@@ -94,6 +98,31 @@ mod tests {
     use super::*;
     const SOURCE: &str = "b78fedf2624c2d54f0f42b6c0ad3c488fbd9e6a9";
     const HASH: &str = "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2";
+    struct Probe {
+        diff: i32,
+        status: i32,
+        changes: bool,
+        commit: bool,
+    }
+    impl GitProbe for Probe {
+        fn diff_exit(&self) -> Result<i32, String> {
+            Ok(self.diff)
+        }
+        fn status(&self) -> Result<(i32, bool), String> {
+            Ok((self.status, self.changes))
+        }
+        fn commit_exists(&self, _: &str) -> Result<bool, String> {
+            Ok(self.commit)
+        }
+    }
+    fn probe() -> Probe {
+        Probe {
+            diff: 0,
+            status: 0,
+            changes: false,
+            commit: true,
+        }
+    }
     fn manifest() -> String {
         format!(
             r#"{{"manifest_schema":"procgen-build-manifest-1","rust_source_commit":"{SOURCE}","generator_version":2,"content_manifest_path":"data/procgen/manifests/content_manifest.json","content_manifest_hash":"{HASH}","target":"x86_64-pc-windows-msvc","artifact":{{"kind":"gdextension","path":"addons/derelict/bin/win64/derelict_godot.dll","sha256":"{HASH}"}},"export_schemas":{{"procgen_request":"procgen-request-1","procgen_bundle":"procgen-bundle-1","world_ir":"world-ir-1","site_ir":"site-ir-1","gameplay_ir":"gameplay-ir-1","presentation_ir":"presentation-ir-1","generation_trace":"generation-trace-1","adaptive_proposal":"adaptive-proposal-1"}}}}"#
@@ -103,110 +132,120 @@ mod tests {
     fn override_matrix_and_validation_are_deterministic() {
         let checked = manifest();
         assert_eq!(
-            select(Inputs {
-                target: WIN_TARGET,
-                source_override: None,
-                content_override: None,
-                dirty_override: Some("false"),
-                checked_manifest: Some(&checked)
-            })
+            select(
+                Inputs {
+                    target: WIN_TARGET,
+                    source_override: None,
+                    content_override: None,
+                    dirty_override: Some("false"),
+                    checked_manifest: Some(&checked)
+                },
+                &probe()
+            )
             .unwrap()
             .source,
             SOURCE
         );
         assert_eq!(
-            select(Inputs {
-                target: WIN_TARGET,
-                source_override: Some(SOURCE),
-                content_override: None,
-                dirty_override: None,
-                checked_manifest: Some(&checked)
-            })
+            select(
+                Inputs {
+                    target: WIN_TARGET,
+                    source_override: Some(SOURCE),
+                    content_override: None,
+                    dirty_override: None,
+                    checked_manifest: Some(&checked)
+                },
+                &probe()
+            )
             .unwrap()
             .content,
             HASH
         );
-        assert!(select(Inputs {
-            target: "aarch64-unknown-linux-gnu",
-            source_override: None,
-            content_override: None,
-            dirty_override: None,
-            checked_manifest: None
-        })
+        assert!(select(
+            Inputs {
+                target: "aarch64-unknown-linux-gnu",
+                source_override: None,
+                content_override: None,
+                dirty_override: None,
+                checked_manifest: None
+            },
+            &probe()
+        )
         .is_err());
-        assert!(select(Inputs {
-            target: WIN_TARGET,
-            source_override: Some("A"),
-            content_override: Some(HASH),
-            dirty_override: None,
-            checked_manifest: Some(&checked)
-        })
+        assert!(select(
+            Inputs {
+                target: WIN_TARGET,
+                source_override: Some("A"),
+                content_override: Some(HASH),
+                dirty_override: None,
+                checked_manifest: Some(&checked)
+            },
+            &probe()
+        )
         .is_err());
-        assert!(select(Inputs {
-            target: WIN_TARGET,
-            source_override: Some("0".repeat(39).leak()),
-            content_override: Some(HASH),
-            dirty_override: None,
-            checked_manifest: Some(&checked)
-        })
+        assert!(select(
+            Inputs {
+                target: WIN_TARGET,
+                source_override: Some("0".repeat(39).leak()),
+                content_override: Some(HASH),
+                dirty_override: None,
+                checked_manifest: Some(&checked)
+            },
+            &probe()
+        )
         .is_err());
         assert!(parse_dirty_override(Some("maybe")).is_err());
         assert_eq!(
-            select(Inputs {
-                target: WIN_TARGET,
-                source_override: Some(SOURCE),
-                content_override: Some(HASH),
-                dirty_override: Some("true"),
-                checked_manifest: Some(&checked)
-            })
+            select(
+                Inputs {
+                    target: WIN_TARGET,
+                    source_override: Some(SOURCE),
+                    content_override: Some(HASH),
+                    dirty_override: Some("true"),
+                    checked_manifest: Some(&checked)
+                },
+                &probe()
+            )
             .unwrap()
             .dirty_override,
             Some(true)
         );
-    }
-    struct Probe {
-        diff: i32,
-        status: i32,
-        changes: bool,
-    }
-    impl GitProbe for Probe {
-        fn diff_exit(&self) -> Result<i32, String> {
-            Ok(self.diff)
-        }
-        fn status(&self) -> Result<(i32, bool), String> {
-            Ok((self.status, self.changes))
-        }
     }
     #[test]
     fn dirty_classification_covers_clean_tracked_staged_untracked_and_failures() {
         assert!(!classify_dirty(&Probe {
             diff: 0,
             status: 0,
-            changes: false
+            changes: false,
+            commit: true
         })
         .unwrap());
         assert!(classify_dirty(&Probe {
             diff: 1,
             status: 0,
-            changes: false
+            changes: false,
+            commit: true
         })
         .unwrap());
         assert!(classify_dirty(&Probe {
             diff: 0,
             status: 0,
-            changes: true
+            changes: true,
+            commit: true
         })
         .unwrap());
         assert!(classify_dirty(&Probe {
             diff: 2,
             status: 0,
-            changes: false
+            changes: false,
+            commit: true
         })
         .is_err());
         assert!(classify_dirty(&Probe {
             diff: 0,
             status: 1,
-            changes: false
+            changes: false,
+            commit: true
         })
         .is_err());
     }
@@ -214,13 +253,16 @@ mod tests {
     fn malformed_checked_manifest_fails_full_contract() {
         let mut text = manifest();
         text = text.replace("procgen-build-manifest-1", "bad");
-        assert!(select(Inputs {
-            target: WIN_TARGET,
-            source_override: None,
-            content_override: None,
-            dirty_override: None,
-            checked_manifest: Some(&text)
-        })
+        assert!(select(
+            Inputs {
+                target: WIN_TARGET,
+                source_override: None,
+                content_override: None,
+                dirty_override: None,
+                checked_manifest: Some(&text)
+            },
+            &probe()
+        )
         .is_err());
     }
 }
