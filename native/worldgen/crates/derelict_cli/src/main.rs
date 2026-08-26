@@ -2,7 +2,13 @@
 //! ASCII (edge-walls at 2x resolution) or top-down PNG without any engine.
 
 use clap::Parser;
+use derelict_core::model::CauseOfLoss;
 use derelict_core::model::{decal, EntityKind, FloorTile, WallEdge, NO_ROOM};
+use derelict_core::procgen::{
+    generate_bundle, semantic_hash, Domain, PlayerModel, PresentationRequest, ProcgenBundle,
+    ProcgenFailureCode, ProcgenRequest, SiteRequest, PLAYER_MODEL_SCHEMA, PROCGEN_REQUEST_SCHEMA,
+};
+use derelict_core::world::PROCGEN_GENERATOR_VERSION;
 use derelict_core::{GenData, GenParams, Ship};
 
 #[derive(Parser)]
@@ -45,11 +51,23 @@ struct Args {
     /// (1,800 ships), all fail-closed validated. Non-zero exit on any error.
     #[arg(long)]
     stress: bool,
+    /// Run the deterministic composite Gate 6 campaign for exactly N evaluated
+    /// domain cases. Valid bundles and deterministic fail-closed outcomes both
+    /// count; the campaign enforces a bounded failure-rate budget. With no value
+    /// this runs the 10,000-case PR gate; pass 1000000 for the nightly gate.
+    #[arg(long, default_missing_value = "10000", num_args = 0..=1)]
+    campaign: Option<u64>,
 }
 
 fn main() {
     let args = Args::parse();
     let data = GenData::default_bundle().expect("embedded content data");
+
+    if let Some(cases) = args.campaign {
+        run_campaign(cases, &data);
+        return;
+    }
+
     let mut params = GenParams::new(&args.archetype);
     if let Some(f) = args.intactness {
         params.intactness_override = Some((f.clamp(0.0, 1.0) * 10_000.0) as u16);
@@ -167,6 +185,278 @@ fn main() {
         img.save(path).expect("failed to write png");
         println!("wrote {path}");
     }
+}
+
+const CAMPAIGN_CONTENT_HASH: &str =
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const CAMPAIGN_ARCHETYPES: [&str; 4] = ["shuttle", "corvette", "freighter", "frigate"];
+const CAMPAIGN_DIFFICULTIES: [&str; 3] = ["standard", "hardened", "deep_dive"];
+const CAMPAIGN_LOCALES: [&str; 3] = ["en-US", "fr-FR", "de-DE"];
+const CAMPAIGN_CAUSES: [Option<CauseOfLoss>; 4] = [
+    None,
+    Some(CauseOfLoss::ReactorBreach),
+    Some(CauseOfLoss::Depressurization),
+    Some(CauseOfLoss::PirateBoarding),
+];
+const CAMPAIGN_INTACTNESS: [Option<u16>; 4] = [None, Some(9_500), Some(5_000), Some(1_000)];
+
+fn campaign_request(
+    case: u64,
+    difficulty: &str,
+    richness: u16,
+    presentation_seed: u64,
+    locale: &str,
+) -> ProcgenRequest {
+    let archetype = CAMPAIGN_ARCHETYPES[(case as usize) % CAMPAIGN_ARCHETYPES.len()];
+    let damage = (case / CAMPAIGN_ARCHETYPES.len() as u64) as usize;
+    ProcgenRequest {
+        schema_version: PROCGEN_REQUEST_SCHEMA.into(),
+        world_seed: case.saturating_mul(17).saturating_add(13),
+        site: SiteRequest {
+            site_id: format!("campaign-site-{case}"),
+            x: (case % 10_000) as i32 - 5_000,
+            y: ((case / 10_000) % 10_000) as i32 - 5_000,
+            archetype_id: archetype.into(),
+            kit_id: "default".into(),
+            intactness_override_bp: CAMPAIGN_INTACTNESS[damage % CAMPAIGN_INTACTNESS.len()],
+            cause_of_loss: CAMPAIGN_CAUSES[damage % CAMPAIGN_CAUSES.len()],
+            loot_richness_bp: richness,
+        },
+        difficulty_id: difficulty.into(),
+        player_model: PlayerModel {
+            schema_version: PLAYER_MODEL_SCHEMA.into(),
+            signals: vec![],
+        },
+        requested_domains: vec![
+            Domain::World,
+            Domain::Site,
+            Domain::Gameplay,
+            Domain::Presentation,
+        ],
+        generator_version: PROCGEN_GENERATOR_VERSION,
+        content_manifest_hash: CAMPAIGN_CONTENT_HASH.into(),
+        presentation: PresentationRequest {
+            seed: presentation_seed,
+            locale: locale.into(),
+        },
+    }
+}
+
+fn mechanical_projection(bundle: &ProcgenBundle) -> serde_json::Value {
+    serde_json::json!({
+        "world": bundle.world_ir,
+        "site": bundle.site_ir,
+        "gameplay": bundle.gameplay_ir,
+    })
+}
+
+fn run_campaign(cases: u64, data: &GenData) {
+    if cases == 0 || cases > 1_000_000 {
+        eprintln!("campaign case count must be in 1..=1000000");
+        std::process::exit(2);
+    }
+    let mut checks = 0u64;
+    let mut generated = 0u64;
+    let mut deterministic_failures = 0u64;
+    let mut attempts = 0u64;
+    let mut processed = 0u64;
+    let mut groups = 0u64;
+    let fail = |case: u64, check: &str, detail: String| -> ! {
+        eprintln!("CAMPAIGN FAIL case={case} check={check}: {detail}");
+        std::process::exit(1);
+    };
+    while processed < cases {
+        let case = groups;
+        groups += 1;
+        let base_request = campaign_request(case, "standard", 10_000, case ^ 0x55aa, "en-US");
+        let base_result = generate_bundle(base_request.clone(), data);
+        attempts += 1;
+        processed += 1;
+        let base = match base_result {
+            Ok(bundle) => {
+                generated += 1;
+                bundle
+            }
+            Err(error) => {
+                if let Err(contract_error) = error.validate() {
+                    fail(
+                        case,
+                        "failure_contract",
+                        format!("{error:?}: {contract_error:?}"),
+                    );
+                }
+                let replay = generate_bundle(base_request, data);
+                attempts += 1;
+                checks += 1;
+                if replay != Err(error.clone()) {
+                    fail(
+                        case,
+                        "deterministic_failure_replay",
+                        format!("first={error:?} replay={replay:?}"),
+                    );
+                }
+                deterministic_failures += 1;
+                continue;
+            }
+        };
+
+        if processed < cases {
+            let replay = generate_bundle(base_request.clone(), data)
+                .unwrap_or_else(|error| fail(case, "replay_generation", format!("{error:?}")));
+            attempts += 1;
+            processed += 1;
+            generated += 1;
+            let base_hash = semantic_hash(&base)
+                .unwrap_or_else(|error| fail(case, "hash", format!("{error:?}")));
+            let replay_hash = semantic_hash(&replay)
+                .unwrap_or_else(|error| fail(case, "replay_hash", format!("{error:?}")));
+            checks += 1;
+            if base_hash != replay_hash || base.semantic_hash != replay.semantic_hash {
+                fail(
+                    case,
+                    "identical_request_hash",
+                    format!("{base_hash} != {replay_hash}"),
+                );
+            }
+        }
+
+        let mut previous_threat = base.gameplay_ir.encounter.total_threat;
+        for difficulty in CAMPAIGN_DIFFICULTIES.iter().skip(1) {
+            if processed >= cases {
+                break;
+            }
+            let request = campaign_request(case, difficulty, 10_000, case ^ 0x55aa, "en-US");
+            let bundle = generate_bundle(request, data)
+                .unwrap_or_else(|error| fail(case, "difficulty_generation", format!("{error:?}")));
+            attempts += 1;
+            processed += 1;
+            generated += 1;
+            checks += 1;
+            let threat = bundle.gameplay_ir.encounter.total_threat;
+            if threat < previous_threat {
+                fail(
+                    case,
+                    "difficulty_threat_monotonic",
+                    format!("{difficulty}: {threat} < {previous_threat}"),
+                );
+            }
+            previous_threat = threat;
+        }
+
+        if processed < cases {
+            let richer_request = campaign_request(case, "standard", 30_000, case ^ 0x55aa, "en-US");
+            let richer = generate_bundle(richer_request, data)
+                .unwrap_or_else(|error| fail(case, "loot_generation", format!("{error:?}")));
+            attempts += 1;
+            processed += 1;
+            generated += 1;
+            let base_value: u64 = base
+                .gameplay_ir
+                .items
+                .iter()
+                .map(|item| u64::from(item.economy_value))
+                .sum::<u64>()
+                + u64::from(base.gameplay_ir.encounter.total_reward_value);
+            let richer_value: u64 = richer
+                .gameplay_ir
+                .items
+                .iter()
+                .map(|item| u64::from(item.economy_value))
+                .sum::<u64>()
+                + u64::from(richer.gameplay_ir.encounter.total_reward_value);
+            checks += 1;
+            if richer_value < base_value {
+                fail(
+                    case,
+                    "loot_value_monotonic",
+                    format!("{richer_value} < {base_value}"),
+                );
+            }
+        }
+
+        if processed < cases {
+            let cosmetic_request =
+                campaign_request(case, "standard", 10_000, case ^ 0x1234_5678, "en-US");
+            let cosmetic = generate_bundle(cosmetic_request, data).unwrap_or_else(|error| {
+                fail(case, "presentation_generation", format!("{error:?}"))
+            });
+            attempts += 1;
+            processed += 1;
+            generated += 1;
+            checks += 1;
+            if mechanical_projection(&base) != mechanical_projection(&cosmetic)
+                || base.semantic_hash != cosmetic.semantic_hash
+            {
+                fail(
+                    case,
+                    "presentation_mechanical_invariance",
+                    "mechanical projection changed".into(),
+                );
+            }
+        }
+
+        if processed < cases {
+            let locale_request = campaign_request(
+                case,
+                "standard",
+                10_000,
+                case ^ 0x55aa,
+                CAMPAIGN_LOCALES[(case as usize) % CAMPAIGN_LOCALES.len()],
+            );
+            let localized = generate_bundle(locale_request, data)
+                .unwrap_or_else(|error| fail(case, "locale_generation", format!("{error:?}")));
+            attempts += 1;
+            processed += 1;
+            generated += 1;
+            checks += 1;
+            if mechanical_projection(&base) != mechanical_projection(&localized)
+                || base.semantic_hash != localized.semantic_hash
+            {
+                fail(
+                    case,
+                    "locale_mechanical_invariance",
+                    "mechanical projection changed".into(),
+                );
+            }
+        }
+
+        let mut incompatible = base_request;
+        incompatible.generator_version = PROCGEN_GENERATOR_VERSION.saturating_add(1);
+        attempts += 1;
+        checks += 1;
+        match generate_bundle(incompatible, data) {
+            Err(error) if error.code == ProcgenFailureCode::InvalidRequest => {}
+            Err(error) => fail(
+                case,
+                "incompatible_version_rejection",
+                format!("unexpected failure code {:?}", error.code),
+            ),
+            Ok(_) => fail(
+                case,
+                "incompatible_version_rejection",
+                "incompatible generator version was accepted".into(),
+            ),
+        }
+    }
+    if generated + deterministic_failures != cases {
+        fail(
+            cases,
+            "case_accounting",
+            format!("generated={generated} deterministic_failures={deterministic_failures}"),
+        );
+    }
+    // Explicit fail-closed outcomes are valid coverage, but a spike still fails
+    // the release gate. One percent is deliberately tighter than the runtime
+    // retry budget and is reported as a basis-point ceiling.
+    const FAILURE_BUDGET_BP: u64 = 100;
+    if deterministic_failures.saturating_mul(10_000) > cases.saturating_mul(FAILURE_BUDGET_BP) {
+        fail(
+            cases,
+            "failure_rate_budget",
+            format!("failures={deterministic_failures} budget_bp={FAILURE_BUDGET_BP}"),
+        );
+    }
+    println!("CAMPAIGN PASS cases={cases} generated={generated} deterministic_failures={deterministic_failures} attempts={attempts} checks={checks} groups={groups} failure_budget_bp={FAILURE_BUDGET_BP} supported_versions=1 incompatible_versions_rejected=true adapter=core archetypes=4 difficulties=3 damage_states=4 locales=3");
 }
 
 fn summary_line(seed: u64, ship: &Ship) -> String {

@@ -1,9 +1,10 @@
 use derelict_core::adaptive::{AdaptiveActionV2, AdaptiveDecisionKind};
 use derelict_core::manifest::ExportSchemas;
+use derelict_core::model::CauseOfLoss;
 use derelict_core::player_model::{PlayerSignal, PlayerSignalKind, PLAYER_MODEL_SCHEMA_V2};
 use derelict_core::procgen::{
-    generate_bundle, Domain, PlayerModel, PresentationRequest, ProcgenBundle, ProcgenRequest,
-    SiteRequest, PROCGEN_BUNDLE_SCHEMA,
+    generate_bundle, Domain, PlayerModel, PresentationRequest, ProcgenBundle, ProcgenFailureCode,
+    ProcgenRequest, SiteRequest, PROCGEN_BUNDLE_SCHEMA,
 };
 use derelict_core::{GenData, PROCGEN_GENERATOR_VERSION};
 
@@ -51,6 +52,80 @@ fn request(seed: u64) -> ProcgenRequest {
 
 fn bundle(request: ProcgenRequest) -> ProcgenBundle {
     generate_bundle(request, &GenData::default_bundle().unwrap()).unwrap()
+}
+
+#[test]
+fn extraction_failures_are_typed_replayable_and_preserve_structural_v2() {
+    // Gate 6 found these exact requests while scaling the composite campaign.
+    // Repairing either would alter the structural-v2 byte contract. Until an
+    // explicit structural-v3 migration, the safe result is a stable typed
+    // failure and no partially valid SiteIR.
+    let cases = [
+        (194, 3_311, -4_806, None, None),
+        (
+            230,
+            3_923,
+            -4_770,
+            Some(9_500),
+            Some(CauseOfLoss::ReactorBreach),
+        ),
+    ];
+    let data = GenData::default_bundle().unwrap();
+    for (case, seed, x, intactness, cause) in cases {
+        let mut regression = request(seed);
+        regression.site = SiteRequest {
+            site_id: format!("campaign-site-{case}"),
+            x,
+            y: -5_000,
+            archetype_id: "freighter".into(),
+            kit_id: "default".into(),
+            intactness_override_bp: intactness,
+            cause_of_loss: cause,
+            loot_richness_bp: 10_000,
+        };
+        regression.player_model.signals.clear();
+        regression.presentation.seed = case ^ 0x55aa;
+
+        let first = generate_bundle(regression.clone(), &data).unwrap_err();
+        let replay = generate_bundle(regression, &data).unwrap_err();
+        first.validate().unwrap();
+        assert_eq!(first, replay, "case={case}");
+        assert_eq!(first.code, ProcgenFailureCode::FallbackFailure);
+        assert_eq!(first.stage, "site");
+        assert!(!first.retryable);
+        assert_eq!(first.fallback_id.as_deref(), Some("authored-safe-return"));
+    }
+}
+
+#[test]
+fn exhausted_structural_retries_return_a_replayable_fail_closed_result() {
+    // Gate 6's composite campaign found this exact request. The structural
+    // compiler exhausts its bounded placement retries, so the public contract
+    // must expose a deterministic typed failure instead of partial content.
+    let mut regression = request(6_269);
+    regression.site = SiteRequest {
+        site_id: "campaign-site-368".into(),
+        x: -4_632,
+        y: -5_000,
+        archetype_id: "shuttle".into(),
+        kit_id: "default".into(),
+        intactness_override_bp: None,
+        cause_of_loss: None,
+        loot_richness_bp: 10_000,
+    };
+    regression.player_model.signals.clear();
+    regression.presentation.seed = 368 ^ 0x55aa;
+
+    let data = GenData::default_bundle().unwrap();
+    let first = generate_bundle(regression.clone(), &data).unwrap_err();
+    let replay = generate_bundle(regression, &data).unwrap_err();
+
+    first.validate().unwrap();
+    assert_eq!(first, replay);
+    assert_eq!(first.code, ProcgenFailureCode::GenerationFailure);
+    assert_eq!(first.stage, "generation");
+    assert!(first.retryable);
+    assert_eq!(first.fallback_id, None);
 }
 
 #[test]
