@@ -213,13 +213,16 @@ fn lifecycle_string_helpers_have_typed_shapes_and_shared_runtime() {
 #[test]
 fn legacy_bundle_converts_both_documents_after_one_generation() {
     let data = derelict_core::GenData::default_bundle().unwrap();
+    let content_manifest_hash = runtime_manifest()
+        .expect("compiled manifest")
+        .content_manifest_hash;
     let count = Arc::new(AtomicUsize::new(0));
     let calls = count.clone();
     let data_for_generator = data.clone();
     let service = super::service::Service::new(
         super::service::Limits::default(),
         Arc::new(super::service::SystemClock::default()),
-        "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2".into(),
+        content_manifest_hash,
         Arc::new(move |request| {
             calls.fetch_add(1, Ordering::SeqCst);
             derelict_core::procgen::generate_bundle(request, &data_for_generator)
