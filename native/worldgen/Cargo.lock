@@ -353,6 +353,7 @@ version = "0.1.0"
 dependencies = [
  "derelict_core",
  "godot",
+ "serde",
  "serde_json",
 ]
 

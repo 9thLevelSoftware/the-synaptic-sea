@@ -12,6 +12,8 @@ mod generator;
 mod service;
 
 #[cfg(test)]
+mod generator_tests;
+#[cfg(test)]
 mod service_tests;
 
 struct DerelictExtension;
