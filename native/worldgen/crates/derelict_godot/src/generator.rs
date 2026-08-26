@@ -133,6 +133,37 @@ pub(crate) fn runtime() -> Result<&'static Runtime, ProcgenFailure> {
         .map_err(Clone::clone)
 }
 
+pub(crate) fn sync_json(request: &str) -> String {
+    runtime()
+        .map(|r| serialize_string(&r.service.generate_sync_json(request)))
+        .unwrap_or_else(lifecycle_failure)
+}
+pub(crate) fn submit_json(request: &str) -> String {
+    runtime()
+        .map(|r| serialize_string(&r.service.submit_json(request)))
+        .unwrap_or_else(lifecycle_failure)
+}
+pub(crate) fn poll_json(id: i64) -> String {
+    runtime()
+        .map(|r| serialize_string(&r.service.poll(id)))
+        .unwrap_or_else(lifecycle_failure)
+}
+pub(crate) fn cancel_json(id: i64) -> String {
+    runtime()
+        .map(|r| serialize_string(&r.service.cancel(id)))
+        .unwrap_or_else(lifecycle_failure)
+}
+pub(crate) fn capabilities_json() -> String {
+    runtime()
+        .map(|r| serialize_string(&r.capabilities))
+        .unwrap_or_else(lifecycle_failure)
+}
+pub(crate) fn manifest_json() -> String {
+    runtime()
+        .map(|r| serialize_string(&r.manifest))
+        .unwrap_or_else(lifecycle_failure)
+}
+
 pub(crate) fn serialize_json<T, F>(value: &T, serializer: F) -> String
 where
     T: Serialize,
@@ -143,8 +174,8 @@ where
         Err(_) => serde_json::to_string(&LifecycleResult::failed(None, adapter_failure("response serialization failed"), vec![LifecycleEvent::Failed])).unwrap_or_else(|_| "{\"schema_version\":\"procgen-lifecycle-result-1\",\"status\":\"failed\",\"request_id\":null,\"bundle\":null,\"failure\":{\"schema_version\":\"procgen-failure-1\",\"code\":\"adapter_failure\",\"stage\":\"adapter\",\"message\":\"response serialization failed\",\"retryable\":false,\"fallback_id\":null},\"events\":[\"failed\"]}".into()),
     }
 }
-fn serialize<T: Serialize>(value: &T) -> GString {
-    GString::from(serialize_json(value, serde_json::to_string).as_str())
+fn serialize_string<T: Serialize>(value: &T) -> String {
+    serialize_json(value, serde_json::to_string)
 }
 fn lifecycle_failure(failure: ProcgenFailure) -> String {
     serialize_json(
@@ -245,48 +276,27 @@ impl DerelictGenerator {
 impl DerelictGenerator {
     #[func]
     fn generate_bundle(&self, request_json: GString) -> GString {
-        match self.runtime() {
-            Ok(r) => serialize(
-                &r.service
-                    .generate_sync_json(request_json.to_string().as_str()),
-            ),
-            Err(e) => GString::from(lifecycle_failure(e).as_str()),
-        }
+        GString::from(sync_json(request_json.to_string().as_str()).as_str())
     }
     #[func]
     fn generate_bundle_async(&self, request_json: GString) -> GString {
-        match self.runtime() {
-            Ok(r) => serialize(&r.service.submit_json(request_json.to_string().as_str())),
-            Err(e) => GString::from(lifecycle_failure(e).as_str()),
-        }
+        GString::from(submit_json(request_json.to_string().as_str()).as_str())
     }
     #[func]
     fn poll(&self, request_id: i64) -> GString {
-        match self.runtime() {
-            Ok(r) => serialize(&r.service.poll(request_id)),
-            Err(e) => GString::from(lifecycle_failure(e).as_str()),
-        }
+        GString::from(poll_json(request_id).as_str())
     }
     #[func]
     fn cancel(&self, request_id: i64) -> GString {
-        match self.runtime() {
-            Ok(r) => serialize(&r.service.cancel(request_id)),
-            Err(e) => GString::from(lifecycle_failure(e).as_str()),
-        }
+        GString::from(cancel_json(request_id).as_str())
     }
     #[func]
     fn capabilities(&self) -> GString {
-        match self.runtime() {
-            Ok(r) => serialize(&r.capabilities),
-            Err(e) => GString::from(lifecycle_failure(e).as_str()),
-        }
+        GString::from(capabilities_json().as_str())
     }
     #[func]
     fn generator_manifest(&self) -> GString {
-        match self.runtime() {
-            Ok(r) => serialize(&r.manifest),
-            Err(e) => GString::from(lifecycle_failure(e).as_str()),
-        }
+        GString::from(manifest_json().as_str())
     }
     #[func]
     fn generate(&self, seed: i64, params: VarDictionary) -> VarDictionary {
@@ -383,10 +393,9 @@ impl DerelictGenerator {
         kit_id: &str,
         layout: bool,
     ) -> GString {
-        let Ok(r) = self.runtime() else {
-            return GString::from(
-                lifecycle_failure(manifest_failure("runtime initialization failed")).as_str(),
-            );
+        let r = match self.runtime() {
+            Ok(r) => r,
+            Err(e) => return GString::from(lifecycle_failure(e).as_str()),
         };
         let result = r.service.generate_sync(legacy_request(
             seed as u64,

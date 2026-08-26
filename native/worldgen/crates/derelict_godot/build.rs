@@ -19,7 +19,7 @@ fn valid_hex(value: &str, len: usize) -> bool {
 fn fail(message: &str) -> ! {
     panic!("derelict_godot build metadata: {message}")
 }
-fn git_dirty(root: &Path, source: &str) -> bool {
+fn git_dirty(root: &Path, source: &str) -> Result<bool, String> {
     let diff = Command::new("git")
         .args([
             "-C",
@@ -31,8 +31,12 @@ fn git_dirty(root: &Path, source: &str) -> bool {
             "native/worldgen",
         ])
         .status()
-        .map(|s| !s.success())
-        .unwrap_or(true);
+        .map_err(|e| e.to_string())?;
+    let diff_dirty = match diff.code() {
+        Some(0) => false,
+        Some(1) => true,
+        _ => return Err("git diff failed".into()),
+    };
     let status = Command::new("git")
         .args([
             "-C",
@@ -44,9 +48,11 @@ fn git_dirty(root: &Path, source: &str) -> bool {
             "native/worldgen",
         ])
         .output()
-        .map(|o| !o.stdout.is_empty())
-        .unwrap_or(true);
-    diff || status
+        .map_err(|e| e.to_string())?;
+    if !status.status.success() {
+        return Err("git status failed".into());
+    }
+    Ok(diff_dirty || !status.stdout.is_empty())
 }
 fn require_commit(root: &Path, source: &str) {
     let status = Command::new("git")
@@ -144,7 +150,7 @@ fn main() {
         Ok(value) if value == "true" => true,
         Ok(value) if value == "false" => false,
         Ok(_) => fail("dirty-development override must be true or false"),
-        Err(_) => git_dirty(&root, &source),
+        Err(_) => git_dirty(&root, &source).unwrap_or_else(|e| fail(&e)),
     };
     println!("cargo:rustc-env=SYNAPTIC_PROCGEN_RUST_SOURCE_COMMIT={source}");
     println!("cargo:rustc-env=SYNAPTIC_PROCGEN_CONTENT_MANIFEST_HASH={content}");

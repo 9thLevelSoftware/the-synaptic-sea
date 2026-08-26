@@ -1,5 +1,9 @@
 use super::generator::{legacy_request, runtime_capabilities, runtime_manifest, serialize_json};
 use derelict_core::lifecycle::AdapterKind;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
 #[test]
 fn compiled_identity_constructs_valid_manifest_and_exact_capabilities() {
@@ -83,6 +87,61 @@ fn legacy_export_failures_are_valid_lifecycle_documents() {
             .code,
         derelict_core::procgen::ProcgenFailureCode::GenerationFailure
     );
+    let bundle = derelict_core::procgen::generate_bundle(
+        legacy_request(903, &derelict_core::model::GenParams::new("shuttle"), ""),
+        &derelict_core::GenData::default_bundle().unwrap(),
+    )
+    .unwrap();
+    let completed = derelict_core::lifecycle::LifecycleResult::completed(
+        None,
+        bundle.clone(),
+        vec![derelict_core::lifecycle::LifecycleEvent::Completed],
+    );
+    let conversion_failed = super::generator::export_result_json(
+        completed,
+        |_| Err(derelict_core::procgen::ProcgenError::InvalidRequest("test")),
+        serde_json::to_string,
+    );
+    assert_eq!(
+        derelict_core::lifecycle::LifecycleResult::from_json(&conversion_failed)
+            .unwrap()
+            .failure
+            .unwrap()
+            .code,
+        derelict_core::procgen::ProcgenFailureCode::AdapterFailure
+    );
+    let completed = derelict_core::lifecycle::LifecycleResult::completed(
+        None,
+        bundle,
+        vec![derelict_core::lifecycle::LifecycleEvent::Completed],
+    );
+    let serialization_failed = super::generator::export_result_json(
+        completed,
+        derelict_core::procgen::migration_layout,
+        |_| Err(serde_json::Error::io(std::io::Error::other("test"))),
+    );
+    assert_eq!(
+        derelict_core::lifecycle::LifecycleResult::from_json(&serialization_failed)
+            .unwrap()
+            .failure
+            .unwrap()
+            .code,
+        derelict_core::procgen::ProcgenFailureCode::AdapterFailure
+    );
+    let success = super::generator::export_result_json(
+        derelict_core::lifecycle::LifecycleResult::completed(
+            None,
+            derelict_core::procgen::generate_bundle(
+                legacy_request(904, &derelict_core::model::GenParams::new("shuttle"), ""),
+                &derelict_core::GenData::default_bundle().unwrap(),
+            )
+            .unwrap(),
+            vec![derelict_core::lifecycle::LifecycleEvent::Completed],
+        ),
+        derelict_core::procgen::migration_gameplay,
+        serde_json::to_string,
+    );
+    assert!(!success.is_empty());
 }
 
 #[test]
@@ -90,6 +149,91 @@ fn runtime_access_reuses_identical_service() {
     let first = super::generator::runtime().unwrap();
     let second = super::generator::runtime().unwrap();
     assert!(std::sync::Arc::ptr_eq(&first.service, &second.service));
+}
+
+#[test]
+fn lifecycle_string_helpers_have_typed_shapes_and_shared_runtime() {
+    let request = legacy_request(901, &derelict_core::model::GenParams::new("shuttle"), "");
+    let request_json = serde_json::to_string(&request).unwrap();
+    let sync = derelict_core::lifecycle::LifecycleResult::from_json(&super::generator::sync_json(
+        &request_json,
+    ))
+    .unwrap();
+    assert_eq!(
+        sync.status,
+        derelict_core::lifecycle::LifecycleStatus::Completed
+    );
+    assert!(sync.request_id.is_none() && sync.bundle.is_some() && sync.failure.is_none());
+    let accepted = derelict_core::lifecycle::LifecycleResult::from_json(
+        &super::generator::submit_json(&request_json),
+    )
+    .unwrap();
+    assert_eq!(
+        accepted.status,
+        derelict_core::lifecycle::LifecycleStatus::Accepted
+    );
+    let id = accepted.request_id.unwrap();
+    let runtime = super::generator::runtime().unwrap();
+    assert!(runtime
+        .service
+        .wait_terminal_for_test(id, std::time::Duration::from_secs(2)));
+    let completed =
+        derelict_core::lifecycle::LifecycleResult::from_json(&super::generator::poll_json(id))
+            .unwrap();
+    assert_eq!(
+        completed.status,
+        derelict_core::lifecycle::LifecycleStatus::Completed
+    );
+    let consumed =
+        derelict_core::lifecycle::LifecycleResult::from_json(&super::generator::poll_json(id))
+            .unwrap();
+    assert_eq!(
+        consumed.failure.unwrap().code,
+        derelict_core::procgen::ProcgenFailureCode::ResultConsumed
+    );
+    let unknown =
+        derelict_core::lifecycle::LifecycleResult::from_json(&super::generator::cancel_json(0))
+            .unwrap();
+    assert_eq!(
+        unknown.failure.unwrap().code,
+        derelict_core::procgen::ProcgenFailureCode::UnknownRequest
+    );
+    assert!(derelict_core::lifecycle::ProcgenCapabilities::from_json(
+        &super::generator::capabilities_json()
+    )
+    .is_ok());
+    assert!(derelict_core::lifecycle::GeneratorManifest::from_json(
+        &super::generator::manifest_json()
+    )
+    .is_ok());
+    let second = super::generator::runtime().unwrap();
+    assert!(Arc::ptr_eq(&runtime.service, &second.service));
+}
+
+#[test]
+fn legacy_bundle_converts_both_documents_after_one_generation() {
+    let data = derelict_core::GenData::default_bundle().unwrap();
+    let count = Arc::new(AtomicUsize::new(0));
+    let calls = count.clone();
+    let data_for_generator = data.clone();
+    let service = super::service::Service::new(
+        super::service::Limits::default(),
+        Arc::new(super::service::SystemClock::default()),
+        "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2".into(),
+        Arc::new(move |request| {
+            calls.fetch_add(1, Ordering::SeqCst);
+            derelict_core::procgen::generate_bundle(request, &data_for_generator)
+        }),
+    );
+    let request = legacy_request(902, &derelict_core::model::GenParams::new("shuttle"), "");
+    let id = service.submit(request).request_id.unwrap();
+    assert!(service.wait_terminal_for_test(id, std::time::Duration::from_secs(2)));
+    let bundle = service.poll(id).bundle.unwrap();
+    let layout = derelict_core::procgen::migration_layout(&bundle).unwrap();
+    let gameplay = derelict_core::procgen::migration_gameplay(&bundle).unwrap();
+    assert!(!layout.to_string().is_empty() && !gameplay.to_string().is_empty());
+    assert_eq!(count.load(Ordering::SeqCst), 1);
+    service.shutdown();
 }
 
 #[test]
