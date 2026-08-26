@@ -1,10 +1,10 @@
 //! Build-manifest contract shared by native adapters and tooling.
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub const MANIFEST_SCHEMA: &str = "procgen-build-manifest-1";
 pub const CONTENT_MANIFEST_SCHEMA: &str = "procgen-content-manifest-1";
 
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct BuildManifest {
     pub manifest_schema: String,
@@ -17,11 +17,11 @@ pub struct BuildManifest {
     pub export_schemas: ExportSchemas,
 }
 
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Artifact { pub kind: String, pub path: String, pub sha256: String }
 
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ExportSchemas {
     pub procgen_request: String,
@@ -32,6 +32,16 @@ pub struct ExportSchemas {
     pub presentation_ir: String,
     pub generation_trace: String,
     pub adaptive_proposal: String,
+}
+
+impl ExportSchemas {
+    pub fn v1() -> Self {
+        Self {
+            procgen_request: "procgen-request-1".into(), procgen_bundle: "procgen-bundle-1".into(),
+            world_ir: "world-ir-1".into(), site_ir: "site-ir-1".into(), gameplay_ir: "gameplay-ir-1".into(),
+            presentation_ir: "presentation-ir-1".into(), generation_trace: "generation-trace-1".into(), adaptive_proposal: "adaptive-proposal-1".into(),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]

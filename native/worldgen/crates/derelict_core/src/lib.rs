@@ -14,6 +14,7 @@ pub mod role;
 pub mod stages;
 pub mod structural;
 pub mod topology;
+pub mod procgen;
 
 pub use archetype::GenData;
 pub use model::{

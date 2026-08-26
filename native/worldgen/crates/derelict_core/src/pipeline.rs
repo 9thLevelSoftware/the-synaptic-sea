@@ -77,6 +77,9 @@ impl std::error::Error for GenError {}
 pub struct GenReport {
     pub ship: Ship,
     pub stage_micros: Vec<(&'static str, u128)>,
+    pub candidate_decisions: Vec<String>,
+    pub failed_constraints: Vec<String>,
+    pub retries: Vec<String>,
 }
 
 pub fn generate_ship(seed: u64, params: &GenParams, data: &GenData) -> Result<Ship, GenError> {
@@ -167,16 +170,22 @@ pub fn generate_ship_timed(
     // --- Topology placement + compile + pre-damage validation (retries) -----
     let mut placed = None;
     let mut last_err: Option<GenError> = None;
+    let mut candidate_decisions = Vec::new();
+    let mut failed_constraints = Vec::new();
+    let mut retries = Vec::new();
     let mut template = template;
     let mut failed_templates: Vec<String> = Vec::new();
     for attempt in 0..TOPOLOGY_ATTEMPTS {
         template = pick_template(attempt, &failed_templates)?;
+        candidate_decisions.push(format!("topology_template:{}:attempt={attempt}", template.id));
         let mut trng = rng::stream(seed, "topology", attempt);
         let mut candidate =
             match place_topology(&mut trng, template, &hull_plan.deck_masks, &role_params) {
                 Ok(p) => p,
                 Err(e) => {
                     last_err = Some(GenError::TopologyFailed(e.to_string()));
+                    failed_constraints.push(format!("topology:{e}"));
+                    retries.push(format!("topology:attempt={attempt}"));
                     failed_templates.push(template.id.clone());
                     continue;
                 }
@@ -191,6 +200,8 @@ pub fn generate_ship_timed(
         let plan = compile(&candidate.topology, &DefaultModulePicker);
         if !plan.errors.is_empty() {
             last_err = Some(GenError::StructuralCompileFailed(plan.errors.clone()));
+            failed_constraints.extend(plan.errors.iter().map(|e| format!("compile:{e}")));
+            retries.push(format!("topology:attempt={attempt}"));
             continue;
         }
         let policy = ValidationPolicy::pre_damage(candidate.critical_path.clone());
@@ -200,6 +211,8 @@ pub fn generate_ship_timed(
                 break;
             }
             Err(issues) => {
+                failed_constraints.extend(issues.iter().map(|i| i.to_string()));
+                retries.push(format!("topology:attempt={attempt}"));
                 last_err = Some(GenError::StructuralValidationFailed {
                     stage: ValidationStage::PreDamage,
                     issues: issues.iter().map(|i| i.to_string()).collect(),
@@ -240,6 +253,7 @@ pub fn generate_ship_timed(
     let mut committed = None;
     let mut last_err: Option<GenError> = None;
     for attempt in 0..DAMAGE_ATTEMPTS {
+        candidate_decisions.push(format!("damage:attempt={attempt}"));
         let mut topo2 = placed.topology.clone();
         let mut entities2 = entities.clone();
         let mut next_id2 = next_entity_id;
@@ -257,6 +271,8 @@ pub fn generate_ship_timed(
         let mut plan2 = compile(&topo2, &DefaultModulePicker);
         if !plan2.errors.is_empty() {
             last_err = Some(GenError::StructuralCompileFailed(plan2.errors.clone()));
+            failed_constraints.extend(plan2.errors.iter().map(|e| format!("compile:{e}")));
+            retries.push(format!("damage:attempt={attempt}"));
             continue;
         }
         apply_overlays(&mut plan2, &outcome);
@@ -294,6 +310,8 @@ pub fn generate_ship_timed(
                 stage: ValidationStage::PostDamage,
                 issues: vec!["critical path destroyed by damage".into()],
             });
+            failed_constraints.push("damage:critical path destroyed".into());
+            retries.push(format!("damage:attempt={attempt}"));
             continue;
         }
         let policy = ValidationPolicy::post_damage(
@@ -311,6 +329,8 @@ pub fn generate_ship_timed(
                 break;
             }
             Err(issues) => {
+                failed_constraints.extend(issues.iter().map(|i| i.to_string()));
+                retries.push(format!("damage:attempt={attempt}"));
                 if std::env::var("DERELICT_DEBUG").is_ok() {
                     eprintln!(
                         "[damage attempt {attempt}] validation: {:?}",
@@ -396,6 +416,9 @@ pub fn generate_ship_timed(
     Ok(GenReport {
         ship,
         stage_micros: timings,
+        candidate_decisions,
+        failed_constraints,
+        retries,
     })
 }
 
