@@ -91,10 +91,13 @@ fn put_i32(h: &mut Sha256, value: i32) {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CoordinateMarker {
+    pub marker_id: String,
+    pub site_id: String,
     pub x: i32,
     pub y: i32,
-    pub kind: String,
-    pub value: i32,
+    pub archetype_id: String,
+    pub site_seed: u64,
+    pub selected: bool,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -117,18 +120,21 @@ pub struct SiteRecord {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BiomeField {
-    pub id: String,
+    pub marker_id: String,
+    pub biome_id: String,
     pub intensity_bp: u32,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct HazardField {
-    pub id: String,
+    pub marker_id: String,
+    pub hazard_id: String,
     pub severity_bp: u32,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ResourcePressure {
+    pub marker_id: String,
     pub resource_id: String,
     pub pressure_bp: u32,
 }
@@ -136,20 +142,26 @@ pub struct ResourcePressure {
 #[serde(deny_unknown_fields)]
 pub struct LandmarkRecord {
     pub id: String,
-    pub x: i32,
-    pub y: i32,
+    pub marker_id: String,
     pub kind: String,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct WorldAnchor {
     pub id: String,
-    pub x: i32,
-    pub y: i32,
+    pub kind: String,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExtractionGuarantee {
+    pub selected_marker_id: String,
+    pub hub_anchor_id: String,
+    pub extraction_anchor_id: String,
+    pub path: Vec<String>,
 }
 
 /// Canonical radius-one sector: center first, then row-major neighbors.
-pub fn radius_one_coordinates(x: i32, y: i32) -> Vec<(i32, i32)> {
+pub fn radius_one_coordinates(x: i32, y: i32) -> Result<Vec<(i32, i32)>, &'static str> {
     [
         (-1, -1),
         (0, -1),
@@ -161,8 +173,9 @@ pub fn radius_one_coordinates(x: i32, y: i32) -> Vec<(i32, i32)> {
         (1, 1),
     ]
     .into_iter()
-    .map(|(dx, dy)| (x + dx, y + dy))
-    .collect()
+    .map(|(dx, dy)| Some((x.checked_add(dx)?, y.checked_add(dy)?)))
+    .collect::<Option<Vec<_>>>()
+    .ok_or("coordinate_boundary")
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -176,11 +189,12 @@ pub struct WorldIRv2 {
     pub site_seed: u64,
     pub markers: Vec<CoordinateMarker>,
     pub routes: Vec<RouteEdge>,
-    pub biome_id: String,
-    pub hazard_id: String,
-    pub resource_pressure_bp: u32,
-    pub landmarks: Vec<String>,
-    pub extraction_path: Vec<String>,
+    pub biome_fields: Vec<BiomeField>,
+    pub hazard_fields: Vec<HazardField>,
+    pub resource_pressures: Vec<ResourcePressure>,
+    pub landmarks: Vec<LandmarkRecord>,
+    pub anchors: Vec<WorldAnchor>,
+    pub extraction: ExtractionGuarantee,
 }
 
 /// Current platform world document. The explicit v2 suffix above makes the
@@ -194,12 +208,36 @@ impl WorldIRv2 {
             || self.world_seed > MAX_PUBLIC_SEED
             || self.site_id.is_empty()
             || self.archetype_id.is_empty()
-            || self.biome_id.is_empty()
-            || self.hazard_id.is_empty()
-            || self.extraction_path.len() < 3
-            || self.resource_pressure_bp > 100_000
+            || self.markers.len() != 9
+            || self.biome_fields.len() != 9
+            || self.hazard_fields.len() != 9
+            || self.resource_pressures.len() != 9
+            || self.anchors.len() != 2
+            || self.extraction.path != vec!["marker:0", "anchor:hub", "anchor:extraction"]
         {
             return Err("world_identity");
+        }
+        if self.anchors
+            != vec![
+                WorldAnchor {
+                    id: "anchor:hub".into(),
+                    kind: "hub".into(),
+                },
+                WorldAnchor {
+                    id: "anchor:extraction".into(),
+                    kind: "extraction".into(),
+                },
+            ]
+        {
+            return Err("anchors");
+        }
+        if self
+            .markers
+            .iter()
+            .enumerate()
+            .any(|(i, m)| m.marker_id != format!("marker:{i}") || m.site_seed > MAX_PUBLIC_SEED)
+        {
+            return Err("markers");
         }
         let mut endpoints = BTreeSet::new();
         for edge in &self.routes {
@@ -213,7 +251,7 @@ impl WorldIRv2 {
                 return Err("routes");
             }
         }
-        if self.extraction_path.windows(2).any(|pair| {
+        if self.extraction.path.windows(2).any(|pair| {
             !endpoints.contains(&(pair[0].clone(), pair[1].clone()))
                 && !endpoints.contains(&(pair[1].clone(), pair[0].clone()))
         }) {
@@ -297,7 +335,7 @@ mod tests {
     #[test]
     fn radius_one_is_canonical_and_excludes_center() {
         assert_eq!(
-            radius_one_coordinates(4, 7),
+            radius_one_coordinates(4, 7).unwrap(),
             vec![
                 (3, 6),
                 (4, 6),
