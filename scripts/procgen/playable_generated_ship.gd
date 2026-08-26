@@ -3007,16 +3007,8 @@ func _build_loot_containers() -> void:
 			continue
 		var lc = LootContainerScript.new()
 		var seed_source: String = "%s:%s" % [String(current_ship.marker_id), cid]
-		var table_key: String = str(spec.get("loot_table", "generic_crate"))
-		var tables: Dictionary = _loot_tables
-		var context: Dictionary = _build_loot_context(spec)
-		if context.has("contents"):
-			# Explicit stacks replace table rolls; an empty table makes roll()
-			# return [] so _on_loot_container_searched can grant contents as-is.
-			tables = { "_authored_explicit": { "rolls": 1, "entries": [] } }
-			table_key = "_authored_explicit"
-		lc.configure(cid, table_key, seed_source,
-			inventory_state, tables, pos_variant, 1.8, context)
+		lc.configure(cid, str(spec.get("loot_table", "generic_crate")), seed_source,
+			inventory_state, _loot_tables, pos_variant, 1.8, _build_loot_context(spec))
 		if looted.has(cid):
 			lc.set_searched(true)
 		# Bind the container node so the handler can pass its world position
@@ -3440,8 +3432,17 @@ func _seed_derelict_fire() -> void:
 				lit += 1
 	# Authored overlay AFTER seed/configure. configure() cleared active_fires, so
 	# ignite-before-seed is discarded; never configure() again on this instance.
+	# Skip vacuum-snuffed cids (vented / hull-breached) — presence-gate already
+	# excluded those; overlay must too or cargo/vented fires flash then die.
+	var overlay_hull = current_ship.get_hull()
 	for cid in _authored_mapped_hazard_compartments("fire"):
-		fs.ignite(str(cid), 1.0)
+		var cid_s: String = str(cid)
+		if fs.is_vented(cid_s):
+			continue
+		if overlay_hull != null and overlay_hull.compartments.has(cid_s):
+			if bool((overlay_hull.compartments[cid_s] as Dictionary).get("breach_open", false)):
+				continue
+		fs.ignite(cid_s, 1.0)
 
 ## Away-branch only: force-breaches compartments of rooms carrying a breach-kind
 ## variant on the boarded derelict — on the DERELICT'S OWN hull model
@@ -4943,26 +4944,52 @@ func _build_fire_zones() -> void:
 		and lifeboat_ship.scene_root != null and is_instance_valid(lifeboat_ship.scene_root)
 	# Tranche 5 (2026-07-06 audit HIGH): the loader's get_fire_zone_markers() /
 	# get_fire_zone_specs() had zero callers while the arc/breach siblings
-	# already consume theirs. Away branch only: the boarded derelict's
-	# layout-declared fire zones position (and annotate) the first N burning
-	# compartments' visuals; distributed positions cover the rest. Home stays
-	# lifeboat-local (Codex P1) — home-loader-frame markers would regress it.
+	# already consume theirs. Away branch only: layout specs with a mapped
+	# compartment_id pin that burning cid's visual; leftover markers then
+	# unmatched fires by remaining index, then distributed positions. Home
+	# stays lifeboat-local (Codex P1) — home-loader-frame markers would regress it.
 	var layout_zones: Array = [] if use_lifeboat else _away_fire_layout_zones()
 	var positions: Array = _lifeboat_local_repair_positions() if use_lifeboat else _distributed_room_positions()
 	if positions.is_empty() and layout_zones.is_empty():
 		return
-	var idx: int = 0
+	var assigned: Dictionary = {}
+	var claimed: Dictionary = {}
 	for cid in burning:
+		var cid_s: String = str(cid)
+		for zi in range(layout_zones.size()):
+			if claimed.has(zi):
+				continue
+			var row: Dictionary = layout_zones[zi]
+			var spec: Dictionary = row["spec"] if row.get("spec") is Dictionary else {}
+			var spec_cid: String = _mapped_authored_compartment_id(str(spec.get("compartment_id", "")))
+			if spec_cid.is_empty() or spec_cid != cid_s:
+				continue
+			assigned[cid_s] = {"position": row["position"], "spec": spec}
+			claimed[zi] = true
+			break
+	var leftover_idx: int = 0
+	var fallback_i: int = 0
+	for cid in burning:
+		var cid_s: String = str(cid)
 		var pos: Vector3
 		var layout_spec: Dictionary = {}
-		if idx < layout_zones.size():
-			pos = layout_zones[idx]["position"]
-			layout_spec = layout_zones[idx]["spec"]
+		if assigned.has(cid_s):
+			pos = assigned[cid_s]["position"]
+			layout_spec = assigned[cid_s]["spec"]
 		else:
-			if positions.is_empty():
-				break
-			pos = positions[(idx - layout_zones.size()) % positions.size()]
-		idx += 1
+			while leftover_idx < layout_zones.size() and claimed.has(leftover_idx):
+				leftover_idx += 1
+			if leftover_idx < layout_zones.size():
+				var row: Dictionary = layout_zones[leftover_idx]
+				pos = row["position"]
+				layout_spec = row["spec"] if row.get("spec") is Dictionary else {}
+				claimed[leftover_idx] = true
+				leftover_idx += 1
+			else:
+				if positions.is_empty():
+					continue
+				pos = positions[fallback_i % positions.size()]
+				fallback_i += 1
 		var zone := Area3D.new()
 		zone.name = "FireZone_%s" % str(cid)
 		# Passable: monitoring/monitorable off — these are visual + lookup nodes,
@@ -6000,7 +6027,6 @@ func _apply_lifeboat_opening_damage() -> void:
 ## `source` is the emitting LootContainer node (bound at connect time); null for
 ## callers without a scene position (objective loot, legacy validation seams).
 func _on_loot_container_searched(container_id: String, granted: Array, source: Node3D = null) -> void:
-	_apply_authored_loot_contents(source, granted)
 	if current_ship != null and not current_ship.looted_container_ids.has(container_id):
 		current_ship.looted_container_ids.append(container_id)
 	# Combat corpses leave pending_corpse_loot once searched so they do not
@@ -10875,43 +10901,6 @@ func _find_ship_by_id_or_marker(key: String):
 		if String((visited_ships[mid]).marker_id) == key: return visited_ships[mid]
 	return _find_ship_by_id(key)
 
-func _normalized_authored_loot_contents(spec: Dictionary) -> Array:
-	var raw: Variant = spec.get("contents", [])
-	if not (raw is Array):
-		return []
-	var out: Array = []
-	for stack_v in (raw as Array):
-		if not (stack_v is Dictionary):
-			continue
-		var stack: Dictionary = stack_v
-		var item_id: String = str(stack.get("item_id", ""))
-		var qty: int = int(stack.get("qty", stack.get("quantity", 0)))
-		if item_id.is_empty() or qty <= 0:
-			continue
-		out.append({"item_id": item_id, "qty": qty, "quantity": qty})
-	return out
-
-func _apply_authored_loot_contents(source, granted: Array) -> void:
-	if not granted.is_empty() or inventory_state == null or not is_instance_valid(source):
-		return
-	var ctx_v: Variant = source.get("loot_context")
-	if not (ctx_v is Dictionary):
-		return
-	var contents_v: Variant = (ctx_v as Dictionary).get("contents", [])
-	if not (contents_v is Array) or (contents_v as Array).is_empty():
-		return
-	for stack_v in (contents_v as Array):
-		if not (stack_v is Dictionary):
-			continue
-		var stack: Dictionary = stack_v
-		var item_id: String = str(stack.get("item_id", ""))
-		var qty: int = int(stack.get("quantity", stack.get("qty", 0)))
-		if item_id.is_empty() or qty <= 0:
-			continue
-		var added: int = inventory_state.add_item(item_id, qty)
-		if added > 0:
-			granted.append({"item_id": item_id, "quantity": added})
-
 func _build_loot_context(spec: Dictionary) -> Dictionary:
 	var ctx: Dictionary = {
 		"biome_id": _resolve_current_loot_biome_id(),
@@ -10922,7 +10911,7 @@ func _build_loot_context(spec: Dictionary) -> Dictionary:
 		"item_definitions": ItemDefsScript.load_definitions(),
 		"unique_state": unique_item_state,
 	}
-	var contents: Array = _normalized_authored_loot_contents(spec)
+	var contents: Array = LootContainerScript.normalized_contents(spec)
 	if not contents.is_empty():
 		ctx["contents"] = contents
 	return ctx
