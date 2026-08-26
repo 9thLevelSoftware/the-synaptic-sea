@@ -16,11 +16,11 @@ func map_to_loader_documents(bundle: Dictionary) -> Dictionary:
 		last_error = "migration_documents_missing"
 		return {}
 	var presentation: Dictionary = bundle.get("presentation_ir", {})
-	var layout: Dictionary = _layout(ship as Dictionary, presentation)
+	var layout: Dictionary = _layout(ship as Dictionary, presentation, bundle.get("request", {}))
 	if layout.is_empty(): return {}
 	return {"layout": layout, "kit_id": str(presentation.get("kit_id", "")), "gameplay_slice": (gameplay as Dictionary).duplicate(true)}
 
-func _layout(ship: Dictionary, presentation: Dictionary) -> Dictionary:
+func _layout(ship: Dictionary, presentation: Dictionary, request: Dictionary) -> Dictionary:
 	var topology: Dictionary = ship.get("topology", {})
 	var plan: Dictionary = ship.get("plan", {})
 	var rooms: Array = []
@@ -29,7 +29,7 @@ func _layout(ship: Dictionary, presentation: Dictionary) -> Dictionary:
 		if not room_v is Dictionary: continue
 		var room: Dictionary = room_v
 		var rid: int = int(room.get("id", rooms.size()))
-		var role: String = _name(room.get("role", room.get("room_role", "room")))
+		var role: String = _role_name(room.get("role", room.get("room_role", "room")))
 		var name: String = "%s_%02d" % [role, rid]
 		names[rid] = name
 		var cells: Array = []
@@ -39,7 +39,8 @@ func _layout(ship: Dictionary, presentation: Dictionary) -> Dictionary:
 			var key: String = _cell_key(c)
 			var occ: Dictionary = plan.get("occupancy", {}).get(key, {})
 			if not occ.is_empty(): placements.append({"name": "floor_cell_x%s_z%s" % [str(_coord(c,"x")), str(_coord(c,"y"))], "module": str(occ.get("module_id", "")), "world_position": _position(c)})
-		rooms.append({"id": name, "room_role": role, "deck": int(room.get("deck", 0)), "cells": cells, "footprint": _footprint(cells), "structural_placements": placements, "reserved_cells": [], "wall_slots": [], "center_slots": [], "interior_zones": {"reserved_cells": [], "wall_slots": [], "center_slots": []}})
+		var zones: Dictionary = room.get("interior_zones", {})
+		rooms.append({"id": name, "room_role": role, "deck": int(room.get("deck", 0)), "cells": cells, "footprint": _footprint(cells), "structural_placements": placements, "reserved_cells": zones.get("reserved_cells", []), "wall_slots": zones.get("wall_slots", []), "center_slots": zones.get("center_slots", []), "interior_zones": zones})
 	var room_links: Array = []
 	var portals: Array = []
 	for portal_v in topology.get("portals", []):
@@ -52,9 +53,10 @@ func _layout(ship: Dictionary, presentation: Dictionary) -> Dictionary:
 		var from_cell: Variant = p.get("from_cell", {})
 		var to_cell: Variant = p.get("to_cell", {})
 		var edge_key: String = _portal_edge_key(plan.get("edges", {}), from_cell, to_cell)
-		var rec: Dictionary = {"id": id, "from_room": from_name, "to_room": to_name, "from_cell": _cell2(from_cell), "to_cell": _cell2(to_cell), "state": _name(p.get("state", "open")), "module_id": str(plan.get("edges", {}).get(edge_key, {}).get("module_id", "")), "edge_key": edge_key, "required": true}
+		var direction: String = _direction(from_cell, to_cell)
+		var rec: Dictionary = {"id": id, "from_room": from_name, "to_room": to_name, "from_cell": _cell2(from_cell), "to_cell": _cell2(to_cell), "state": str(p.get("state", "OPEN")).to_upper(), "module_id": str(plan.get("edges", {}).get(edge_key, {}).get("module_id", "")), "edge_key": edge_key, "deck": _coord(from_cell, "deck"), "direction": direction, "opposite_direction": _opposite(direction), "required": true}
 		portals.append(rec)
-		room_links.append({"id": id, "from_room": from_name, "to_room": to_name, "from_cell": _cell3(from_cell), "to_cell": _cell3(to_cell), "module_id": ""})
+		room_links.append({"id": id, "from_room": from_name, "to_room": to_name, "from_cell": _cell3(from_cell), "to_cell": _cell3(to_cell), "module_id": str(plan.get("edges", {}).get(edge_key, {}).get("module_id", ""))})
 	var critical: Array = []
 	for rid_v in ship.get("critical_path", []): critical.append(names.get(int(rid_v), str(rid_v)))
 	var occupancy: Dictionary = {}
@@ -83,7 +85,12 @@ func _layout(ship: Dictionary, presentation: Dictionary) -> Dictionary:
 			var vertical: Dictionary = vertical_v
 			structural["vertical_connections"] = structural.get("vertical_connections", [])
 			(structural["vertical_connections"] as Array).append({"id": "%s_to_%s" % [names.get(int(vertical.get("from_room", -1)), ""), names.get(int(vertical.get("to_room", -1)), "")], "type": "ladder", "module_id": "", "from_room": names.get(int(vertical.get("from_room", -1)), ""), "to_room": names.get(int(vertical.get("to_room", -1)), ""), "from_cell": _cell3(vertical.get("from_cell", {})), "to_cell": _cell3(vertical.get("to_cell", {}))})
-	return {"schema_version": "1.2.0", "document_kind": "ship_layout", "program_id": "worldgen-%s-%s" % [str(ship.get("archetype_id", "")), str(ship.get("seed", 0))], "generator": {"name": "worldgen", "generator_version": int(ship.get("generator_version", 2)), "seed": int(ship.get("seed", 0)), "archetype_id": str(ship.get("archetype_id", "")), "template_id": str(ship.get("template_id", "")), "intactness_bp": int(ship.get("intactness", 0)), "cause_of_loss": _name(ship.get("cause_of_loss", "Unknown")), "fractured": bool(ship.get("fractured", false))}, "cell_size": 4.0, "kit_id": str(presentation.get("kit_id", "")), "biome_id": "", "difficulty_id": "standard", "hazard_source": "runtime", "rooms": rooms, "portals": portals, "room_links": room_links, "vertical_connections": [], "critical_path": critical, "prototype": {"start_room": names.get(int(ship.get("entry_room", -1)), ""), "goal_room": names.get(int(ship.get("goal_room", -1)), "")}, "landmarks": [], "encounters": [], "blocked_links": [], "fire_zones": [], "arc_zones": [], "breach_zones": [], "structural_plan": structural}
+	var vertical_connections: Array = []
+	for vertical_v in topology.get("verticals", []):
+		if vertical_v is Dictionary:
+			var vertical: Dictionary = vertical_v
+			vertical_connections.append({"id": "%s_to_%s" % [names.get(int(vertical.get("from_room", -1)), ""), names.get(int(vertical.get("to_room", -1)), "")], "type": "ladder", "module_id": "", "from_room": names.get(int(vertical.get("from_room", -1)), ""), "to_room": names.get(int(vertical.get("to_room", -1)), ""), "from_cell": _cell3(vertical.get("from_cell", {})), "to_cell": _cell3(vertical.get("to_cell", {}))})
+	return {"schema_version": "1.2.0", "document_kind": "ship_layout", "program_id": "worldgen-%s-%s" % [str(ship.get("archetype_id", "")), str(ship.get("seed", 0))], "generator": {"name": "worldgen", "generator_version": int(ship.get("generator_version", 2)), "seed": int(ship.get("seed", 0)), "archetype_id": str(ship.get("archetype_id", "")), "template_id": str(ship.get("template_id", "")), "intactness_bp": int(ship.get("intactness", 0)), "cause_of_loss": str(ship.get("cause_of_loss", "Unknown")), "fractured": bool(ship.get("fractured", false))}, "cell_size": 4.0, "kit_id": str(presentation.get("kit_id", "")), "biome_id": "", "difficulty_id": str(request.get("difficulty_id", "standard")), "hazard_source": "runtime", "rooms": rooms, "portals": portals, "room_links": room_links, "vertical_connections": vertical_connections, "critical_path": critical, "prototype": {"start_room": names.get(int(ship.get("entry_room", -1)), ""), "goal_room": names.get(int(ship.get("goal_room", -1)), "")}, "landmarks": [], "encounters": [], "blocked_links": [], "fire_zones": [], "arc_zones": [], "breach_zones": [], "structural_plan": structural}
 
 func _coord(value: Variant, axis: String) -> int:
 	if value is Dictionary: return int((value as Dictionary).get(axis, 0))
@@ -101,6 +108,22 @@ func _footprint(cells: Array) -> Array:
 func _name(value: Variant) -> String:
 	var text: String = str(value)
 	return text.to_lower() if text != "" else "unknown"
+
+func _role_name(value: Variant) -> String:
+	var text: String = str(value)
+	var known: Dictionary = {"Airlock": "airlock", "Corridor": "corridor", "CrewQuarters": "crew_quarters", "Cargo": "cargo", "Reactor": "reactor", "Storage": "storage", "Compartment": "compartment", "MainSpine": "main_spine", "Bridge": "bridge", "Hangar": "hangar"}
+	return str(known.get(text, text.to_snake_case()))
+
+func _direction(from_cell: Variant, to_cell: Variant) -> String:
+	var dx: int = _coord(to_cell, "x") - _coord(from_cell, "x")
+	var dy: int = _coord(to_cell, "y") - _coord(from_cell, "y")
+	if dx > 0: return "east"
+	if dx < 0: return "west"
+	if dy > 0: return "south"
+	return "north"
+
+func _opposite(direction: String) -> String:
+	return {"east": "west", "west": "east", "north": "south", "south": "north"}.get(direction, "")
 
 func _floor(value: Dictionary, names: Dictionary) -> Dictionary:
 	var cell: Dictionary = value.get("cell", {})
