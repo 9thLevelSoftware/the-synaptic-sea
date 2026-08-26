@@ -112,6 +112,15 @@ impl BuildManifest {
     /// Validate the additive Gate-2 platform manifest without weakening the
     /// established v1 manifest validator used by structural artifacts.
     pub fn validate_platform_v3(&self) -> Result<(), ManifestError> {
+        if self.manifest_schema != MANIFEST_SCHEMA {
+            return Err(
+                if self.manifest_schema.starts_with("procgen-build-manifest-") {
+                    ManifestError::UnknownSchemaMajor(self.manifest_schema.clone())
+                } else {
+                    ManifestError::InvalidField("manifest_schema")
+                },
+            );
+        }
         if self.generator_version != 3 {
             return Err(ManifestError::InvalidField("generator_version"));
         }
@@ -121,7 +130,6 @@ impl BuildManifest {
         if self.rust_source_commit.len() != 40
             || !is_hex(&self.rust_source_commit)
             || self.rust_source_commit != self.rust_source_commit.to_ascii_lowercase()
-            || self.manifest_schema != MANIFEST_SCHEMA
             || self.content_manifest_path != "data/procgen/manifests/content_manifest.json"
             || !is_sha256(&self.content_manifest_hash)
             || !is_sha256(&self.artifact.sha256)
