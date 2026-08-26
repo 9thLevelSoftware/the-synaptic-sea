@@ -2,6 +2,7 @@ extends Node3D
 class_name PlayableGeneratedShip
 
 const GeneratedShipLoaderScript := preload("res://scripts/procgen/generated_ship_loader.gd")
+const CeilingFadeControllerScript := preload("res://scripts/procgen/ceiling_fade_controller.gd")
 const ShipGeneratorScript := preload("res://scripts/procgen/ship_generator.gd")
 const PlayerControllerScript := preload("res://scripts/player/player_controller.gd")
 const IsoCameraRigScript := preload("res://scripts/camera/iso_camera_rig.gd")
@@ -7421,6 +7422,7 @@ func _on_ship_loaded(summary: Dictionary) -> void:
 	_build_hud_layer()
 	_spawn_player()
 	_spawn_camera()
+	_attach_ceiling_fade_controller()
 	_refresh_ui_shell_runtime()
 	# Phase 4.5: wrap the freshly-loaded starting ship as current_ship. Reuses
 	# the coordinator's existing ship_systems_manager (Approach A: the starting
@@ -7599,6 +7601,15 @@ func _ship_condition_class(inst) -> int:
 	if inst != null and inst.blueprint != null and ("condition" in inst.blueprint):
 		return int(inst.blueprint.condition)
 	return 0
+
+
+func _attach_ceiling_fade_controller() -> void:
+	if player == null or loader == null:
+		return
+	var controller = CeilingFadeControllerScript.new()
+	controller.name = "CeilingFadeController"
+	add_child(controller)
+	controller.configure(loader, player)
 
 func _spawn_player() -> void:
 	player = PlayerControllerScript.new()
