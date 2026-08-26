@@ -180,19 +180,41 @@ func _init() -> void:
 	for target in [{"target_kind":"unknown", "target_id":"x"}, {"target_kind":"door"}, {"target_kind":"door", "target_id":"x", "extra":1}, {"target_kind":"door", "target_id":"A"}]: _expect(delta_a.validate_targets([target]) == false, "target malformed")
 	var target_dup: Array = targets.duplicate(true); target_dup.append(targets[0]); _expect(delta_a.validate_targets(target_dup) == false, "target duplicate")
 
-	for status in [Result.COMPATIBLE, Result.NEW_WORLD_REQUIRED, Result.CORRUPT, Result.IO_FAILURE]:
-		var load: Variant = Result.make(status, "reason", "user://preserved"); var prompt: Variant = Prompt.from_result(load); _expect(prompt.status == status and prompt.preserved_path == "user://preserved", "prompt status " + status)
-	_expect(Prompt.from_result(Result.make(Result.NEW_WORLD_REQUIRED, "reason", "p")).available_actions == ["start_new_world", "back"], "prompt new-world actions")
-	_expect(Prompt.from_result(Result.make(Result.CORRUPT, "reason", "p")).available_actions == ["back"], "prompt corrupt actions")
-	_expect(Prompt.from_result(Result.make(Result.IO_FAILURE, "reason", "p")).available_actions == ["back"], "prompt io actions")
-	_expect(Prompt.from_result(Result.make(Result.COMPATIBLE, "reason")).available_actions.is_empty(), "prompt compatible actions")
-	for reason in ["", "r".repeat(97)]: _expect(Result.make(Result.COMPATIBLE, reason).reason_code == "malformed", "result reason bound")
-	_expect(Result.make("unknown", "reason").status == Result.CORRUPT, "result unknown status")
+	var reasons_by_status := {Result.COMPATIBLE:["validated"], Result.NEW_WORLD_REQUIRED:["platform_generator_mismatch","content_manifest_mismatch","export_schema_mismatch","bundle_unavailable","bundle_identity_mismatch","mutation_target_mismatch","mutation_rejected"], Result.CORRUPT:["malformed_envelope","malformed_site","invalid_slot","json_parse_failed","document_too_large","malformed_result"], Result.IO_FAILURE:["configuration_invalid","provider_unavailable","provider_contract_missing","mutation_apply_failed","missing_file","open_failed","read_failed","compatibility_unavailable"]}
+	for status in reasons_by_status.keys():
+		for reason in reasons_by_status[status]:
+			var load: Variant = Result.make(status, reason, "user://preserved"); var prompt: Variant = Prompt.from_result(load); _expect(load is Result and load.validate() and prompt.status == status and prompt.reason_code == reason, "valid pair " + status + ":" + reason)
+	for status in reasons_by_status.keys():
+		for other_status in reasons_by_status.keys():
+			if status == other_status: continue
+			for reason in reasons_by_status[other_status]:
+				var result_rejected: Variant = Result.make(status, reason); _expect(result_rejected.status == Result.CORRUPT and result_rejected.reason_code == "malformed_result" and result_rejected.validate(), "cross-status default")
+	_expect(Prompt.from_result(Result.make(Result.NEW_WORLD_REQUIRED, "platform_generator_mismatch", "p")).available_actions == ["start_new_world", "back"], "prompt new-world actions")
+	_expect(Prompt.from_result(Result.make(Result.CORRUPT, "malformed_envelope", "p")).available_actions == ["back"], "prompt corrupt actions")
+	_expect(Prompt.from_result(Result.make(Result.IO_FAILURE, "provider_unavailable", "p")).available_actions == ["back"], "prompt io actions")
+	_expect(Prompt.from_result(Result.make(Result.COMPATIBLE, "validated")).available_actions.is_empty(), "prompt compatible actions")
+	for reason in ["", "reason", "r".repeat(97), true, null]: var invalid_reason: Variant = Result.make(Result.COMPATIBLE, reason); _expect(invalid_reason.status == Result.CORRUPT and invalid_reason.reason_code == "malformed_result", "invalid reason default")
+	_expect(Result.make("unknown", "validated").status == Result.CORRUPT, "result unknown status")
 	var summary_result: Variant = Result.make(Result.NEW_WORLD_REQUIRED, "platform_generator_mismatch", "p", {"world_seed":7, "platform_generator_version":3, "content_manifest_hash":HASH_A, "export_schema_map":MAP})
 	_expect(summary_result.identity_summary.world_seed == 7, "result identity summary preserved")
 	_expect(Result.make(Result.COMPATIBLE, "validated", "p", {"nested":true}).identity_summary.is_empty(), "result summary type bound")
-	for path in ["", "user://x", "p".repeat(1024)]: _expect(Result.make(Result.COMPATIBLE, "reason", path).preserved_path == path, "result path accepted")
-	_expect(Result.make(Result.COMPATIBLE, "reason", "p".repeat(1025)).preserved_path == "", "result path bound")
+	for path in ["", "user://x", "p".repeat(1024)]: _expect(Result.make(Result.COMPATIBLE, "validated", path).preserved_path == path, "result path accepted")
+	_expect(Result.make(Result.COMPATIBLE, "validated", "p".repeat(1025)).preserved_path == "", "result path bound")
+	var rd: Dictionary = summary_result.to_dict(); _expect(Result.from_dict(rd) != null and Result.from_dict(rd).to_dict() == rd, "result exact roundtrip")
+	for key in rd.keys(): var rm: Dictionary = rd.duplicate(true); rm.erase(key); _expect(Result.from_dict(rm) == null, "result missing " + key)
+	var re: Dictionary = rd.duplicate(true); re.extra = true; _expect(Result.from_dict(re) == null, "result extra")
+	var rw: Dictionary = rd.duplicate(true); rw.schema_version = "wrong"; _expect(Result.from_dict(rw) == null, "result wrong schema")
+	for bad in [null, {}, [], "result"]: _expect(Prompt.from_result(bad).status == "", "prompt rejects input")
+	var foreign := RefCounted.new(); _expect(Prompt.from_result(foreign).status == "", "prompt rejects foreign object")
+	var invalid_prompt: Variant = Result.make(Result.COMPATIBLE, "validated"); invalid_prompt.status = "bad"; _expect(Prompt.from_result(invalid_prompt).status == "", "prompt rejects invalid result")
+	var stable_site: Variant = _site("stable", 1, 2, 3, 4, HASH_A); _expect(stable_site.configure("stable", 1, 2, 3, 4, HASH_A) and not stable_site.configure("bad", true, 2, 3, 4, HASH_A) and stable_site.site_id == "stable", "site failed reconfigure preserves")
+	var stable_delta: RefCounted = _delta(site_a, 1); var stable_delta_site: String = stable_delta.base_site_id; var stable_delta_hash: String = stable_delta.base_semantic_hash; var stable_delta_ops: int = stable_delta.operations.size(); _expect(not stable_delta.configure("", HASH_A, []) and stable_delta.base_site_id == stable_delta_site and stable_delta.base_semantic_hash == stable_delta_hash and stable_delta.operations.size() == stable_delta_ops, "delta failed reconfigure preserves")
+	var stable_envelope: RefCounted = _envelope(site_a, delta_a, site_b, delta_b); var stable_envelope_dict: Dictionary = stable_envelope.to_dict(); _expect(not stable_envelope.configure(-1, 3, HASH_B, MAP, []) and stable_envelope.to_dict() == stable_envelope_dict, "envelope failed reconfigure preserves")
+	var stable_compat := _compat(Provider.new(), Applier.new()); var old_platform: Variant = stable_compat.current_platform; _expect(not stable_compat.configure(0, HASH_A, MAP, Provider.new(), Applier.new()) and stable_compat.current_platform == old_platform, "compat failed reconfigure preserves")
+	var payload_wide: Array = []; for i in 64: payload_wide.append({"item_id":"item-%03d-%s" % [i, "x".repeat(100)], "quantity":1})
+	var payload_op: Dictionary = _op("container_inventory", "container", "wide", {"items":payload_wide}); _expect(Delta.new().configure("site-a", HASH_A, [payload_op]) == false, "payload oversize")
+	var deep: Variant = {"items":[]}; var cursor: Dictionary = deep; for i in 10: cursor.n = {}; cursor = cursor.n; _expect(Delta.new().configure("site-a", HASH_A, [_op("container_inventory", "container", "deep", deep)]) == false, "payload deep pre-serialization")
+	var target_count: Array = []; target_count.resize(Delta.MAX_TARGETS + 1); _expect(delta_a.validate_targets(target_count) == false, "target count cap")
 	for source in ["generated_world_site_identity.gd", "procgen_mutation_delta.gd", "generated_world_save_envelope.gd", "generated_world_compatibility.gd", "procgen_load_result.gd", "generated_world_prompt_state.gd"]:
 		var source_text := FileAccess.get_file_as_string("res://scripts/ui/" + source) if source == "generated_world_prompt_state.gd" else FileAccess.get_file_as_string("res://scripts/systems/" + source)
 		for forbidden in ["FileAccess.", "DirAccess.", ".remove(", ".rename(", ".delete(", ".migrate("]: _expect(not source_text.to_lower().contains(forbidden.to_lower()), "pure source no " + forbidden)
@@ -240,5 +262,5 @@ func _expect(condition: bool, label: String) -> void:
 func _finish() -> void:
 	if finished: return
 	finished = true
-	if failures.is_empty() and cases >= 70: print("TASK8_GENERATED_WORLD_CONTRACT_PASS cases=%d" % cases); quit(0)
+	if failures.is_empty() and cases >= 230: print("TASK8_GENERATED_WORLD_CONTRACT_PASS cases=%d" % cases); quit(0)
 	else: print("TASK8_GENERATED_WORLD_CONTRACT_FAIL cases=%d failures=%s" % [cases, ",".join(failures)]); quit(1)

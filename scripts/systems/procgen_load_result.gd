@@ -20,8 +20,8 @@ var envelope: RefCounted = null
 static func make(value: Variant, reason: Variant, path: Variant = "", identity: Variant = {}):
 	var result = load("res://scripts/systems/procgen_load_result.gd").new()
 	if typeof(value) != TYPE_STRING or not STATUSES.has(value) or typeof(reason) != TYPE_STRING or not REASONS.has(reason) or typeof(path) != TYPE_STRING or path.length() > MAX_PATH or typeof(identity) != TYPE_DICTIONARY or not _valid_summary(identity): return result
-	if (value == COMPATIBLE and reason != "validated") or (value == CORRUPT and reason in ["validated", "platform_generator_mismatch", "content_manifest_mismatch", "export_schema_mismatch"]): return result
-	result.status = value; result.reason_code = reason; result.preserved_path = path; result.identity_summary = identity.duplicate(true); return result
+	result.status = value; result.reason_code = reason; result.preserved_path = path; result.identity_summary = identity.duplicate(true)
+	return result if result.validate() else load("res://scripts/systems/procgen_load_result.gd").new()
 
 static func _valid_summary(value: Dictionary) -> bool:
 	if value.is_empty(): return true
@@ -34,6 +34,7 @@ static func _valid_summary(value: Dictionary) -> bool:
 	return true
 
 func validate() -> bool:
+	if typeof(schema_version) != TYPE_STRING or typeof(status) != TYPE_STRING or typeof(reason_code) != TYPE_STRING or typeof(preserved_path) != TYPE_STRING or typeof(identity_summary) != TYPE_DICTIONARY: return false
 	if schema_version != SCHEMA or status not in STATUSES or reason_code not in REASONS or not _valid_summary(identity_summary) or preserved_path.length() > MAX_PATH: return false
 	var compatible_reasons := ["validated"]
 	var new_world_reasons := ["platform_generator_mismatch", "content_manifest_mismatch", "export_schema_mismatch", "bundle_unavailable", "bundle_identity_mismatch", "mutation_target_mismatch", "mutation_rejected"]

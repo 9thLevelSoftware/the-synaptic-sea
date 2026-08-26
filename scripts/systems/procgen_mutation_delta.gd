@@ -49,6 +49,7 @@ func _validated_operation(raw: Variant, seen: Dictionary) -> Variant:
 	var identity: String = op.operation + ":" + op.target_kind + ":" + op.target_id
 	if seen.has(identity): return null
 	var payload: Dictionary = op.payload
+	if _bounded(payload, 0) > MAX_VALUES: return null
 	var valid := false
 	match op.operation:
 		"door_lock": valid = payload.size() == 1 and payload.has("locked") and typeof(payload.locked) == TYPE_BOOL
@@ -59,6 +60,7 @@ func _validated_operation(raw: Variant, seen: Dictionary) -> Variant:
 		"hazard": valid = payload.size() == 1 and payload.has("active") and typeof(payload.active) == TYPE_BOOL
 		"system_state": valid = payload.size() == 1 and payload.has("state") and Site.valid_id(payload.state)
 	if not valid: return null
+	if JSON.stringify(payload).to_utf8_buffer().size() > MAX_PAYLOAD_BYTES: return null
 	seen[identity] = true
 	return op.duplicate(true)
 
@@ -73,6 +75,7 @@ func _valid_items(payload: Dictionary) -> bool:
 
 func validate_targets(targets: Variant) -> bool:
 	if typeof(targets) != TYPE_ARRAY or targets.size() > MAX_TARGETS: return false
+	if not _within_depth(targets, 0): return false
 	var seen := {}
 	for target in targets:
 		if typeof(target) != TYPE_DICTIONARY or target.size() != 2 or not target.has_all(["target_kind", "target_id"]): return false
@@ -80,9 +83,19 @@ func validate_targets(targets: Variant) -> bool:
 		var identity: String = target.target_kind + ":" + target.target_id
 		if seen.has(identity): return false
 		seen[identity] = true
-	if JSON.stringify(seen).to_utf8_buffer().size() > MAX_TARGET_BYTES: return false
+	if JSON.stringify(targets).to_utf8_buffer().size() > MAX_TARGET_BYTES: return false
 	for operation in operations:
 		if not seen.has(operation.target_kind + ":" + operation.target_id): return false
+	return true
+
+func _within_depth(value: Variant, depth: int) -> bool:
+	if depth > MAX_DEPTH: return false
+	if typeof(value) == TYPE_DICTIONARY:
+		for key in value.keys():
+			if not _within_depth(key, depth + 1) or not _within_depth(value[key], depth + 1): return false
+	elif typeof(value) == TYPE_ARRAY:
+		for item in value:
+			if not _within_depth(item, depth + 1): return false
 	return true
 
 func to_dict() -> Dictionary:

@@ -13,8 +13,11 @@ var current_schema_map: Variant = {}
 var bundle_provider: Object = null
 var applier: Object = null
 
-func configure(platform: Variant, content_hash: Variant, schemas: Variant, provider: Object, mutation_applier: Object) -> void:
-	current_platform = platform; current_content_hash = content_hash; current_schema_map = schemas.duplicate(true) if typeof(schemas) == TYPE_DICTIONARY else {}; bundle_provider = provider; applier = mutation_applier
+func configure(platform: Variant, content_hash: Variant, schemas: Variant, provider: Object, mutation_applier: Object) -> bool:
+	if typeof(platform) != TYPE_INT or platform <= 0 or typeof(content_hash) != TYPE_STRING or not Site.valid_hash(content_hash) or not _valid_schema_map(schemas): return false
+	if not is_instance_valid(provider) or not is_instance_valid(mutation_applier): return false
+	current_platform = platform; current_content_hash = content_hash; current_schema_map = schemas.duplicate(true); bundle_provider = provider; applier = mutation_applier
+	return true
 
 func evaluate(document: Variant, source_path: String = ""):
 	var envelope: Variant = Envelope.from_dict(document)
