@@ -291,6 +291,52 @@ Task 2 contract decisions:
 - Owned files: native lifecycle/core queue and GDExtension adapter/tests. Preserve
   migration API names but route them through the single-pass bundle.
 
+Task 3 lifecycle decisions (ADR-0060):
+
+- Keep the core generator free of Godot values. Add target-neutral lifecycle,
+  capabilities, and generator-manifest DTOs, then expose a UTF-8 JSON `GString`
+  ABI: `generate_bundle(request_json)`, `generate_bundle_async(request_json)`,
+  `poll(request_id)`, `cancel(request_id)`, `capabilities()`, and
+  `generator_manifest()`.
+- Lifecycle statuses are exactly `accepted`, `queued`, `running`,
+  `cancel_requested`, `completed`, and `failed`. Completion contains exactly one
+  bundle; failure contains exactly one `ProcgenFailure`. Extend stable failures
+  with unknown request, consumed result, expired result, shutdown, and too-late
+  cancellation codes; callers never parse messages for state. Each result also
+  carries at most 32 ordered stable lifecycle-event codes covering rejection,
+  admission, queue/start, cancel, timeout, completion, and failure without
+  wall-clock values.
+- One process-wide native service backs all `DerelictGenerator` instances;
+  isolated test services inject limits, a monotonic clock, and a generator.
+  Defaults are two workers, eight queued requests, sixteen retained terminal
+  results, 64 KiB request JSON, 4,096 entities, 4,096 entries per bundle trace
+  list, 32 lifecycle events, and 2,000 ms from admission through completion.
+- Parse, validate, and cap before assigning a positive monotonic signed-64-bit
+  request ID. Admission is serialized; when the queue is full, the later call
+  returns overload without consuming an ID. Synchronous generation observes the
+  same document/entity/deadline caps but does not enter the async queue.
+- Queued cancellation immediately retains a cancellation failure. Running
+  cancellation sets `cancel_requested`; generation may finish, but the output is
+  discarded. Repeated cancellation is idempotent. Terminal cancellation returns
+  too-late without consuming the terminal result.
+- The deadline starts at admission. Pre-start and post-generation expiry both
+  return timeout, and workers are never force-killed. Completion/failure is
+  consumed exactly once by `poll`. Retention evicts the lowest accepted terminal
+  ID; bounded tombstones classify recent consumed/expired IDs, and older admitted
+  IDs deterministically decay to expired.
+- Shutdown rejects admission, resolves queued work, wakes and joins all workers,
+  and leaves no detached thread. Capabilities report schemas, domains, target,
+  sync/async/cancel support, worker availability, and every effective limit.
+- Generator manifest metadata is compiled from the checked source/content/schema
+  identity plus target and dirty-development state. Artifact path/hash stay in
+  the external build manifest to avoid a self-hash cycle.
+- Legacy native generation/export methods remain migration APIs, but each routes
+  through `generate_bundle` and bundle-only converters. Unit/GDExtension tests
+  cover saturation order/recovery, queued/running/done cancellation, timeout,
+  unknown/consumed/expired IDs, deterministic eviction, shutdown/join, caps,
+  malformed JSON, bounded event sequences, six-method registration, shared
+  service, and legacy routing.
+
 ### Task 4: Gate 1 WebAssembly adapter and adapter parity
 
 - Add a WebAssembly package built from the same Rust core, with lifecycle

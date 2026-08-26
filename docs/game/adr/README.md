@@ -44,6 +44,7 @@ Validated by: Task 15 (`t_c7ac4d08`) plus `REQ-DOC-009` architecture-diagram val
 | 0057 | docs/game/adr/0057-rust-authoritative-procgen-native-web.md | Rust-only production generation on native and Web; no silent GDScript fallback |
 | 0058 | docs/game/adr/0058-procgen-ir-versioning-save-fallback.md | layered IR, semantic versions/hashes, save reset, and authored fallbacks |
 | 0059 | docs/game/adr/0059-deterministic-adaptive-proposals.md | deterministic adaptive proposal boundary before optional embedded inference |
+| 0060 | docs/game/adr/0060-deterministic-bounded-procgen-lifecycle.md | bounded native lifecycle, explicit cancellation/timeouts, and native/Web adapter contract |
 
 ## Notes
 
