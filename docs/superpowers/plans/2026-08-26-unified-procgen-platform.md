@@ -219,6 +219,66 @@ history import at `native/worldgen/`.
 - Owned files: Rust core contract/bundle/schema modules and focused tests. Do not
   change async or Godot call sites.
 
+Task 2 contract decisions:
+
+- Schema constants are exactly `procgen-request-1`, `procgen-bundle-1`,
+  `world-ir-1`, `site-ir-1`, `gameplay-ir-1`, `presentation-ir-1`,
+  `generation-trace-1`, `adaptive-proposal-1`, `player-model-1`, and
+  `procgen-failure-1`. Serde structs deny unknown fields.
+- `ProcgenRequest` fields are: `schema_version`, `world_seed: u64`, `site`
+  (`site_id`, integer `x`/`y`, `archetype_id`, `kit_id`, optional
+  `intactness_override_bp`, optional existing `CauseOfLoss`, and
+  `loot_richness_bp`), `difficulty_id`, `player_model` (`schema_version` plus
+  ordered integer signals), ordered `requested_domains` (`world`, `site`,
+  `gameplay`, `presentation`), `generator_version`, 64-lowercase-hex
+  `content_manifest_hash`, and `presentation` (`seed: u64`, `locale`).
+- Request validation requires exact schema/generator, nonempty site/archetype/
+  kit/difficulty, `intactness_override_bp <= 10000`,
+  `loot_richness_bp <= 30000`, exact player schema, nonempty domains, and a
+  lowercase SHA-256 content hash. Task 12 adds tighter player-signal caps.
+- `ProcgenBundle` fields are: `schema_version`, `version`, the normalized
+  `request`, non-optional `world_ir`, `site_ir`, `gameplay_ir`,
+  `presentation_ir`, `semantic_hash`, `metrics`, and `trace`. `WorldIR` carries
+  the requested world/site identity in v1. `SiteIR` carries the authoritative
+  `Ship`. `GameplayIR` carries the legacy gameplay-slice JSON derived from that
+  same ship. `PresentationIR` carries kit, locale, presentation seed, and an
+  ordered approved-binding map ready for later domains.
+- `VersionEnvelope` contains generator version, content-manifest hash, and all
+  eight exact `ExportSchemas` from Task 1. Add a `v1()` constructor rather than
+  duplicating schema strings.
+- `GenerationTrace` contains ordered named RNG channels, candidate decisions,
+  failed constraints, repairs, retries, optional fallback, and stage timings.
+  Instrument successful/rejected topology-template attempts and damage retries
+  in the existing timed pipeline so trace data is truthful; do not perturb RNG
+  consumption or generated `Ship` bytes. No fallback/repair is recorded unless
+  one actually occurred.
+- `GenerationMetrics` records pipeline executions (exactly one), room/entity/
+  structural placement counts, and diagnostic stage timings. Timings are never
+  semantic input.
+- `AdaptiveProposal` is constrained data with schema, signed integer score,
+  ordered rationale codes, confidence basis points, rule/model version, and an
+  action enum limited to no-op, select an already-identified candidate, or
+  adjust an identified encounter by a signed pacing delta. Task 12 implements
+  selection policy.
+- Failures use serializable `ProcgenFailure {schema_version, code, stage,
+  message, retryable, fallback_id}` and a stable snake-case code enum covering
+  invalid request, unsupported schema/domain, generator/content mismatch,
+  generation/validation/fallback failure, adapter/manifest failure, capacity,
+  overload, cancellation, timeout, and internal failure.
+- `generate_bundle(request, data)` validates then invokes the existing timed
+  ship pipeline exactly once. Migration layout/gameplay helpers accept the
+  completed bundle and never regenerate. New bundle generation may keep the
+  existing v2 seed behavior (`world_seed` feeds the ship pipeline); Task 6 owns
+  the coordinate-key algorithm and its intentional generator-version decision.
+- The semantic SHA-256 projection includes the mechanical request with
+  presentation seed/locale removed, the version envelope, `WorldIR`, `SiteIR`,
+  and `GameplayIR`. It excludes all `PresentationIR`, metrics, trace, timings,
+  target paths, and locale. Canonicalization recursively sorts JSON object keys
+  before hashing.
+- Ship one JSON Schema file per manifest-listed public contract under
+  `native/worldgen/schemas/`; shared `$defs` are allowed, but all required fields
+  and `additionalProperties: false` must agree with Rust validation.
+
 ### Task 3: Gate 1 bounded native lifecycle and GDExtension surface
 
 - Replace thread-per-request with a fixed bounded worker pool, bounded queue,
