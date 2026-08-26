@@ -355,6 +355,10 @@ impl WorldGenerationOutcome {
         rules: &WorldRules,
         request: &WorldGenerationRequest,
     ) -> Result<(), WorldError> {
+        self.validate_trace(None)?;
+        self.world_ir.validate_for_request(request, rules)
+    }
+    fn validate_trace(&self, fallback: Option<&WorldFallback>) -> Result<(), WorldError> {
         if self.candidate_decisions.len() > 128
             || self.repairs.len() > 1
             || self
@@ -369,10 +373,15 @@ impl WorldGenerationOutcome {
         {
             return Err(WorldError::Invalid("trace_bounds"));
         }
-        if self.fallback.is_none() {
-            self.world_ir.validate_for_request(request, rules)
-        } else {
-            Err(WorldError::Invalid("fallback_context"))
+        match fallback {
+            None if self.fallback.is_some() => Err(WorldError::Invalid("fallback_context")),
+            Some(f)
+                if self.fallback.as_deref() != Some(f.fallback_id.as_str())
+                    || !self.repairs.is_empty() =>
+            {
+                Err(WorldError::Invalid("fallback_context"))
+            }
+            _ => Ok(()),
         }
     }
     pub fn validate_with_fallback(
@@ -381,9 +390,7 @@ impl WorldGenerationOutcome {
         request: &WorldGenerationRequest,
         fallback: &WorldFallback,
     ) -> Result<(), WorldError> {
-        if self.fallback.as_deref() != Some(fallback.fallback_id.as_str()) {
-            return Err(WorldError::Invalid("fallback_context"));
-        }
+        self.validate_trace(Some(fallback))?;
         self.world_ir
             .validate_for_fallback(request, rules, fallback)
     }
