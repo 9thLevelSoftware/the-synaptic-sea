@@ -1790,6 +1790,28 @@ fn repair_one_gate(site: &mut SiteIR) -> Result<bool, SiteError> {
         return Ok(false);
     };
     let gate_id = site.mission_graph.gates[index].id.clone();
+    let existing_bound: Vec<_> = site
+        .navigation
+        .edges
+        .iter()
+        .filter(|edge| edge.gate_id.as_deref() == Some(gate_id.as_str()))
+        .collect();
+    if existing_bound.len() == 2
+        && existing_bound[0].structural_ref == existing_bound[1].structural_ref
+        && existing_bound[0].from_room == existing_bound[1].to_room
+        && existing_bound[0].to_room == existing_bound[1].from_room
+        && existing_bound.iter().all(|edge| !edge.passable)
+        && !existing_bound
+            .iter()
+            .any(|edge| edge.id == site.mission_graph.gates[index].navigation_edge)
+    {
+        site.mission_graph.gates[index].navigation_edge = existing_bound
+            .iter()
+            .map(|edge| edge.id.clone())
+            .min()
+            .ok_or_else(|| SiteError::Validation("gate repair unavailable".into()))?;
+        return Ok(true);
+    }
     for edge in &mut site.navigation.edges {
         if edge.gate_id.as_deref() == Some(gate_id.as_str()) {
             if let Some(expected) = projected

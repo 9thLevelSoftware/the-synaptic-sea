@@ -97,8 +97,8 @@ fn overlapping_required_prop_is_relocated_with_one_named_repair() {
 
 #[test]
 fn invalid_gate_navigation_binding_is_repaired_with_one_named_repair() {
-    let mut repaired = None;
-    'seeds: for seed in 0..192 {
+    let mut repaired_count = 0;
+    for seed in 0..192 {
         let req = request(seed);
         let Ok(site) = try_fixture_for(&req) else {
             continue;
@@ -106,18 +106,23 @@ fn invalid_gate_navigation_binding_is_repaired_with_one_named_repair() {
         for index in 0..site.mission_graph.gates.len() {
             let mut malformed = site.clone();
             malformed.mission_graph.gates[index].navigation_edge = "missing-edge".into();
-            if let Ok(outcome) = resolve_site_candidate(malformed, &req) {
-                if outcome.trace.repairs == ["replace_gate_binding"] {
-                    repaired = Some((req, outcome));
-                    break 'seeds;
-                }
-            }
+            let outcome = resolve_site_candidate(malformed, &req).unwrap_or_else(|error| {
+                panic!("seed {seed} gate {index} was not repairable: {error}")
+            });
+            assert_eq!(
+                outcome.trace.repairs,
+                ["replace_gate_binding"],
+                "seed {seed} gate {index} used the wrong repair"
+            );
+            assert!(
+                outcome.trace.fallback.is_none(),
+                "seed {seed} gate {index} fell back instead of repairing the stale edge id"
+            );
+            validate_site_for_request(&outcome.site, &req).unwrap();
+            repaired_count += 1;
         }
     }
-    let (req, outcome) = repaired.expect("no repairable gated fixture");
-    assert_eq!(outcome.trace.repairs, vec!["replace_gate_binding"]);
-    assert!(outcome.trace.fallback.is_none());
-    validate_site_for_request(&outcome.site, &req).unwrap();
+    assert!(repaired_count > 0, "no repairable gated fixture");
 }
 
 #[test]
