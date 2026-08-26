@@ -3007,8 +3007,16 @@ func _build_loot_containers() -> void:
 			continue
 		var lc = LootContainerScript.new()
 		var seed_source: String = "%s:%s" % [String(current_ship.marker_id), cid]
-		lc.configure(cid, str(spec.get("loot_table", "generic_crate")), seed_source,
-			inventory_state, _loot_tables, pos_variant, 1.8, _build_loot_context(spec))
+		var table_key: String = str(spec.get("loot_table", "generic_crate"))
+		var tables: Dictionary = _loot_tables
+		var context: Dictionary = _build_loot_context(spec)
+		if context.has("contents"):
+			# Explicit stacks replace table rolls; an empty table makes roll()
+			# return [] so _on_loot_container_searched can grant contents as-is.
+			tables = { "_authored_explicit": { "rolls": 1, "entries": [] } }
+			table_key = "_authored_explicit"
+		lc.configure(cid, table_key, seed_source,
+			inventory_state, tables, pos_variant, 1.8, context)
 		if looted.has(cid):
 			lc.set_searched(true)
 		# Bind the container node so the handler can pass its world position
@@ -3258,10 +3266,20 @@ func _fire_tuning() -> Dictionary:
 
 ## Configures a per-ship derelict FireSuppressionState from shared tuning (compartments,
 ## adjacency, rates). Required before seeding or after restoring from a summary so spread
-## topology exists.
+## topology exists. configure() clears active_fires AND vented_compartments, so authored
+## vents are folded into this dict (never applied before configure, never configure again
+## after ignite).
 func _configure_derelict_fire(fs) -> void:
-	if fs != null:
-		fs.configure(_fire_tuning())
+	if fs == null:
+		return
+	var tuning_v: Variant = _fire_tuning()
+	var tuning: Dictionary = {}
+	if typeof(tuning_v) == TYPE_DICTIONARY:
+		tuning = (tuning_v as Dictionary).duplicate(true)
+	var vented: Array = _authored_vented_compartments()
+	if not vented.is_empty():
+		tuning["vented_compartments"] = vented
+	fs.configure(tuning)
 
 ## Scans the boarded derelict's built layout for rooms whose variant carries a
 ## hazard of `kind` ("fire" or "breach") AND whose role maps to a real
@@ -3296,6 +3314,77 @@ func _variant_hazard_compartments(kind: String) -> Array:
 	result.sort()
 	return result
 
+## Maps an authored compartment_id or room role onto a live hull/fire compartment.
+## Unmapped roles (airlock, corridor, …) return "" — visual overlay only.
+func _mapped_authored_compartment_id(raw: String) -> String:
+	var token: String = raw.strip_edges()
+	if token.is_empty():
+		return ""
+	if FIRE_COMPARTMENT_SYSTEM.has(token):
+		return token
+	return str(COMPARTMENT_FOR_ROLE.get(token, ""))
+
+func _append_zone_dicts(out: Array, raw: Variant) -> void:
+	if not (raw is Array):
+		return
+	for zone_v in (raw as Array):
+		if zone_v is Dictionary:
+			out.append(zone_v)
+
+## Layout + slice zone records for the boarded derelict. Does not read
+## hazard_source — authored overlays apply even when the stamp is "runtime".
+func _authored_hazard_zone_dicts(zone_key: String) -> Array:
+	var out: Array = []
+	if current_ship != null and typeof(current_ship.built_layout) == TYPE_DICTIONARY:
+		_append_zone_dicts(out, current_ship.built_layout.get(zone_key, []))
+	var root = current_ship.scene_root if current_ship != null else null
+	if is_instance_valid(root):
+		if typeof(root.get("layout_doc")) == TYPE_DICTIONARY:
+			_append_zone_dicts(out, root.layout_doc.get(zone_key, []))
+		if typeof(root.get("gameplay_doc")) == TYPE_DICTIONARY:
+			_append_zone_dicts(out, root.gameplay_doc.get(zone_key, []))
+		if zone_key == "fire_zones" and root.has_method("get_fire_zone_specs"):
+			_append_zone_dicts(out, root.get_fire_zone_specs())
+	return out
+
+## De-duplicated, sorted compartment ids from authored fire_zones / breach_zones
+## that carry a mapped compartment_id. Zones without that field stay visual-only
+## so existing goldens (link shape, no cid) do not suddenly ignite.
+func _authored_mapped_hazard_compartments(kind: String) -> Array:
+	var zone_key: String = "fire_zones" if kind == "fire" else "breach_zones"
+	var found: Dictionary = {}
+	for zone_v in _authored_hazard_zone_dicts(zone_key):
+		var zone: Dictionary = zone_v
+		var cid: String = _mapped_authored_compartment_id(str(zone.get("compartment_id", "")))
+		if cid.is_empty():
+			continue
+		found[cid] = true
+	var result: Array = found.keys()
+	result.sort()
+	return result
+
+func _authored_vented_compartments() -> Array:
+	var found: Dictionary = {}
+	var sources: Array = []
+	if current_ship != null and typeof(current_ship.built_layout) == TYPE_DICTIONARY:
+		sources.append(current_ship.built_layout.get("vented_compartments", []))
+	var root = current_ship.scene_root if current_ship != null else null
+	if is_instance_valid(root):
+		if typeof(root.get("layout_doc")) == TYPE_DICTIONARY:
+			sources.append(root.layout_doc.get("vented_compartments", []))
+		if typeof(root.get("gameplay_doc")) == TYPE_DICTIONARY:
+			sources.append(root.gameplay_doc.get("vented_compartments", []))
+	for raw in sources:
+		if not (raw is Array):
+			continue
+		for cid_v in (raw as Array):
+			var cid: String = _mapped_authored_compartment_id(str(cid_v))
+			if not cid.is_empty():
+				found[cid] = true
+	var result: Array = found.keys()
+	result.sort()
+	return result
+
 ## Pre-seeds environmental fire on a freshly built derelict. Deterministic, RNG-free:
 ## a per-seed presence gate (FIRE_PRESENCE_PERCENT) decides whether THIS derelict burns at
 ## all; when it does, ignites up to a condition-scaled cap of compartments whose mapped
@@ -3320,36 +3409,39 @@ func _seed_derelict_fire() -> void:
 	for cid in forced_fire:
 		fs.ignite(str(cid), 1.0)
 	# Presence gate — most derelicts board fire-free (variant fires already lit).
-	if (abs(hash("%d:fire_presence" % seed_int)) % 100) >= FIRE_PRESENCE_PERCENT:
-		return
-	var mgr = _active_systems_manager()
-	if mgr == null:
-		return
-	# Candidate compartments: mapped system damaged, not breached. Deterministic order.
-	# Read the ACTIVE hull (derelict's own hull when away) so the exclusion sees
-	# the derelict's breaches, not the home hull singleton.
-	var active_hull = _active_hull()
-	var breached := {}
-	if active_hull != null:
-		for cid in active_hull.compartments:
-			if bool((active_hull.compartments[cid] as Dictionary).get("breach_open", false)):
-				breached[str(cid)] = true
-	var candidates: Array = []
-	for cid in FIRE_COMPARTMENT_SYSTEM:
-		var sid: String = str(FIRE_COMPARTMENT_SYSTEM[cid])
-		if sid.is_empty() or breached.has(str(cid)):
-			continue
-		var sys = mgr.get_system(sid)
-		if sys != null and not sys.is_self_functional():
-			candidates.append(str(cid))
-	candidates.sort()
-	var cap: int = 2 + (1 if _ship_condition_class(current_ship) == ShipBlueprint.Condition.WRECKED else 0)
-	var lit: int = 0
-	for cid in candidates:
-		if lit >= cap:
-			break
-		fs.ignite(cid, 1.0)
-		lit += 1
+	# Do not return here: authored overlay ignite must still run after this seed.
+	if (abs(hash("%d:fire_presence" % seed_int)) % 100) < FIRE_PRESENCE_PERCENT:
+		var mgr = _active_systems_manager()
+		if mgr != null:
+			# Candidate compartments: mapped system damaged, not breached. Deterministic order.
+			# Read the ACTIVE hull (derelict's own hull when away) so the exclusion sees
+			# the derelict's breaches, not the home hull singleton.
+			var active_hull = _active_hull()
+			var breached := {}
+			if active_hull != null:
+				for cid in active_hull.compartments:
+					if bool((active_hull.compartments[cid] as Dictionary).get("breach_open", false)):
+						breached[str(cid)] = true
+			var candidates: Array = []
+			for cid in FIRE_COMPARTMENT_SYSTEM:
+				var sid: String = str(FIRE_COMPARTMENT_SYSTEM[cid])
+				if sid.is_empty() or breached.has(str(cid)):
+					continue
+				var sys = mgr.get_system(sid)
+				if sys != null and not sys.is_self_functional():
+					candidates.append(str(cid))
+			candidates.sort()
+			var cap: int = 2 + (1 if _ship_condition_class(current_ship) == ShipBlueprint.Condition.WRECKED else 0)
+			var lit: int = 0
+			for cid in candidates:
+				if lit >= cap:
+					break
+				fs.ignite(cid, 1.0)
+				lit += 1
+	# Authored overlay AFTER seed/configure. configure() cleared active_fires, so
+	# ignite-before-seed is discarded; never configure() again on this instance.
+	for cid in _authored_mapped_hazard_compartments("fire"):
+		fs.ignite(str(cid), 1.0)
 
 ## Away-branch only: force-breaches compartments of rooms carrying a breach-kind
 ## variant on the boarded derelict — on the DERELICT'S OWN hull model
@@ -3369,6 +3461,12 @@ func _seed_derelict_breaches() -> void:
 		return
 	var seeded_any: bool = false
 	for cid in _variant_hazard_compartments("breach"):
+		if hull.compartments.has(str(cid)):
+			hull.damage_compartment(str(cid), 1.0, true)
+			seeded_any = true
+	# Authored overlay AFTER the variant seeder. damage_compartment does not
+	# wipe other compartments; unmapped roles stay visual-only.
+	for cid in _authored_mapped_hazard_compartments("breach"):
 		if hull.compartments.has(str(cid)):
 			hull.damage_compartment(str(cid), 1.0, true)
 			seeded_any = true
@@ -5902,6 +6000,7 @@ func _apply_lifeboat_opening_damage() -> void:
 ## `source` is the emitting LootContainer node (bound at connect time); null for
 ## callers without a scene position (objective loot, legacy validation seams).
 func _on_loot_container_searched(container_id: String, granted: Array, source: Node3D = null) -> void:
+	_apply_authored_loot_contents(source, granted)
 	if current_ship != null and not current_ship.looted_container_ids.has(container_id):
 		current_ship.looted_container_ids.append(container_id)
 	# Combat corpses leave pending_corpse_loot once searched so they do not
@@ -10776,8 +10875,45 @@ func _find_ship_by_id_or_marker(key: String):
 		if String((visited_ships[mid]).marker_id) == key: return visited_ships[mid]
 	return _find_ship_by_id(key)
 
+func _normalized_authored_loot_contents(spec: Dictionary) -> Array:
+	var raw: Variant = spec.get("contents", [])
+	if not (raw is Array):
+		return []
+	var out: Array = []
+	for stack_v in (raw as Array):
+		if not (stack_v is Dictionary):
+			continue
+		var stack: Dictionary = stack_v
+		var item_id: String = str(stack.get("item_id", ""))
+		var qty: int = int(stack.get("qty", stack.get("quantity", 0)))
+		if item_id.is_empty() or qty <= 0:
+			continue
+		out.append({"item_id": item_id, "qty": qty, "quantity": qty})
+	return out
+
+func _apply_authored_loot_contents(source, granted: Array) -> void:
+	if not granted.is_empty() or inventory_state == null or not is_instance_valid(source):
+		return
+	var ctx_v: Variant = source.get("loot_context")
+	if not (ctx_v is Dictionary):
+		return
+	var contents_v: Variant = (ctx_v as Dictionary).get("contents", [])
+	if not (contents_v is Array) or (contents_v as Array).is_empty():
+		return
+	for stack_v in (contents_v as Array):
+		if not (stack_v is Dictionary):
+			continue
+		var stack: Dictionary = stack_v
+		var item_id: String = str(stack.get("item_id", ""))
+		var qty: int = int(stack.get("quantity", stack.get("qty", 0)))
+		if item_id.is_empty() or qty <= 0:
+			continue
+		var added: int = inventory_state.add_item(item_id, qty)
+		if added > 0:
+			granted.append({"item_id": item_id, "quantity": added})
+
 func _build_loot_context(spec: Dictionary) -> Dictionary:
-	return {
+	var ctx: Dictionary = {
 		"biome_id": _resolve_current_loot_biome_id(),
 		"loot_quality_modifier": _resolve_current_loot_quality_modifier(),
 		"depth": _resolve_current_loot_depth(),
@@ -10786,6 +10922,10 @@ func _build_loot_context(spec: Dictionary) -> Dictionary:
 		"item_definitions": ItemDefsScript.load_definitions(),
 		"unique_state": unique_item_state,
 	}
+	var contents: Array = _normalized_authored_loot_contents(spec)
+	if not contents.is_empty():
+		ctx["contents"] = contents
+	return ctx
 
 func _resolve_current_loot_quality_modifier() -> float:
 	var biome_id: String = _resolve_current_loot_biome_id()
