@@ -103,6 +103,67 @@ pub struct RouteEdge {
     pub to: String,
     pub cost_bp: u32,
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SiteRecord {
+    pub site_id: String,
+    pub x: i32,
+    pub y: i32,
+    pub archetype_id: String,
+    pub site_seed: u64,
+    pub selected: bool,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BiomeField {
+    pub id: String,
+    pub intensity_bp: u32,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HazardField {
+    pub id: String,
+    pub severity_bp: u32,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ResourcePressure {
+    pub resource_id: String,
+    pub pressure_bp: u32,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LandmarkRecord {
+    pub id: String,
+    pub x: i32,
+    pub y: i32,
+    pub kind: String,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WorldAnchor {
+    pub id: String,
+    pub x: i32,
+    pub y: i32,
+}
+
+/// Canonical radius-one sector: center first, then row-major neighbors.
+pub fn radius_one_coordinates(x: i32, y: i32) -> Vec<(i32, i32)> {
+    [
+        (-1, -1),
+        (0, -1),
+        (1, -1),
+        (-1, 0),
+        (1, 0),
+        (-1, 1),
+        (0, 1),
+        (1, 1),
+    ]
+    .into_iter()
+    .map(|(dx, dy)| (x + dx, y + dy))
+    .collect()
+}
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct WorldIRv2 {
@@ -199,5 +260,56 @@ mod tests {
         let mut b = a.clone();
         b.x = 1;
         assert_ne!(a.seed(), b.seed());
+    }
+    #[test]
+    fn every_key_component_is_addressed() {
+        let base = key().seed().unwrap();
+        let mut variants = Vec::new();
+        let mut k = key();
+        k.world_seed += 1;
+        variants.push(k);
+        let mut k = key();
+        k.platform_version = 4;
+        variants.push(k);
+        let mut k = key();
+        k.content_manifest_hash = "b".repeat(64);
+        variants.push(k);
+        let mut k = key();
+        k.site_id = "other".into();
+        variants.push(k);
+        let mut k = key();
+        k.x += 1;
+        variants.push(k);
+        let mut k = key();
+        k.y += 1;
+        variants.push(k);
+        let mut k = key();
+        k.domain = "site".into();
+        variants.push(k);
+        let mut k = key();
+        k.channel = "hazard".into();
+        variants.push(k);
+        let mut k = key();
+        k.sub_index = 1;
+        variants.push(k);
+        assert!(variants
+            .into_iter()
+            .all(|k| k.seed().map_or(true, |seed| seed != base)));
+    }
+    #[test]
+    fn radius_one_is_canonical_and_excludes_center() {
+        assert_eq!(
+            radius_one_coordinates(4, 7),
+            vec![
+                (3, 6),
+                (4, 6),
+                (5, 6),
+                (3, 7),
+                (5, 7),
+                (3, 8),
+                (4, 8),
+                (5, 8)
+            ]
+        );
     }
 }
