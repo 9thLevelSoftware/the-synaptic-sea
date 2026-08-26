@@ -37,8 +37,10 @@ func configure(seed: Variant, platform: Variant, content: Variant, schemas: Vari
 		if identity == null or delta == null or identities.has(identity.site_id) or delta.base_site_id != identity.site_id or delta.base_semantic_hash != identity.base_bundle_semantic_hash: return false
 		identities[identity.site_id] = true
 		parsed_sites.append({"identity": identity.to_dict(), "mutation_delta": delta.to_dict()})
+	var candidate := {"schema_version": SCHEMA, "world_seed": world, "platform_generator_version": version, "content_manifest_hash": content, "export_schema_map": schemas, "sites": parsed_sites}
+	if JSON.stringify(candidate).to_utf8_buffer().size() > MAX_BYTES: return false
 	world_seed = world; platform_generator_version = version; content_manifest_hash = content; export_schema_map = schemas.duplicate(true); sites = parsed_sites
-	return JSON.stringify(to_dict()).to_utf8_buffer().size() <= MAX_BYTES
+	return true
 
 func to_dict() -> Dictionary:
 	return {"schema_version": SCHEMA, "world_seed": world_seed, "platform_generator_version": platform_generator_version, "content_manifest_hash": content_manifest_hash, "export_schema_map": export_schema_map.duplicate(true), "sites": sites.duplicate(true)}

@@ -188,9 +188,9 @@ func _init() -> void:
 	_expect(Prompt.from_result(Result.make(Result.COMPATIBLE, "reason")).available_actions.is_empty(), "prompt compatible actions")
 	for reason in ["", "r".repeat(97)]: _expect(Result.make(Result.COMPATIBLE, reason).reason_code == "malformed", "result reason bound")
 	_expect(Result.make("unknown", "reason").status == Result.CORRUPT, "result unknown status")
-	var summary_result: Variant = Result.make(Result.NEW_WORLD_REQUIRED, "reason", "p", {"world_seed":7, "nested":{"safe":true}})
-	_expect(summary_result.identity_summary.world_seed == 7 and summary_result.identity_summary.nested.safe, "result identity summary preserved")
-	_expect(Result.make(Result.COMPATIBLE, "reason", "p", "wrong").identity_summary.is_empty(), "result summary type bound")
+	var summary_result: Variant = Result.make(Result.NEW_WORLD_REQUIRED, "platform_generator_mismatch", "p", {"world_seed":7, "platform_generator_version":3, "content_manifest_hash":HASH_A, "export_schema_map":MAP})
+	_expect(summary_result.identity_summary.world_seed == 7, "result identity summary preserved")
+	_expect(Result.make(Result.COMPATIBLE, "validated", "p", {"nested":true}).identity_summary.is_empty(), "result summary type bound")
 	for path in ["", "user://x", "p".repeat(1024)]: _expect(Result.make(Result.COMPATIBLE, "reason", path).preserved_path == path, "result path accepted")
 	_expect(Result.make(Result.COMPATIBLE, "reason", "p".repeat(1025)).preserved_path == "", "result path bound")
 	for source in ["generated_world_site_identity.gd", "procgen_mutation_delta.gd", "generated_world_save_envelope.gd", "generated_world_compatibility.gd", "procgen_load_result.gd", "generated_world_prompt_state.gd"]:
