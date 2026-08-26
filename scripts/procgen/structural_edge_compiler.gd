@@ -17,6 +17,10 @@ const FLOOR_MODULE: String = "floor_1x1"
 const CORRIDOR_FLOOR_MODULE: String = "corridor_floor_1x1"
 const CEILING_MODULE: String = "ceiling_cap_1x1"
 const WALL_MODULE: String = "wall_straight_1x1"
+const WALL_END_CAP_MODULE: String = "wall_end_cap"
+const WALL_INNER_CORNER_MODULE: String = "wall_inner_corner"
+const WALL_OUTER_CORNER_MODULE: String = "wall_outer_corner"
+const WALL_T_JUNCTION_MODULE: String = "wall_t_junction"
 const DEFAULT_PORTAL_MODULE: String = "doorway_frame_open_1x1"
 const DOOR_MODULE: String = "doorway_frame_open_1x1"
 const LOCKED_MODULE: String = "doorway_frame_blocked_1x1"
@@ -279,6 +283,8 @@ func compile(layout: Dictionary) -> Dictionary:
 			var placement: Dictionary = edge_record.duplicate(true)
 			placement["placement_id"] = "edge:%s" % edge_key_value
 			edge_placements.append(placement)
+
+	_refine_wall_modules(edge_map, edge_placements)
 
 	var socket_bindings: Array = _emit_socket_bindings(
 		catalog,
@@ -544,6 +550,186 @@ func _as_vector3(value: Variant) -> Vector3:
 		if values.size() >= 3:
 			return Vector3(float(values[0]), float(values[1]), float(values[2]))
 	return Vector3.ZERO
+
+
+func _refine_wall_modules(edge_map: Dictionary, edge_placements: Array) -> void:
+	## Post-pass: replace wall_straight_1x1 with corner/end-cap/t-junction
+	## based on neighboring SOLID edge topology at each endpoint.
+	for placement in edge_placements:
+		var kind: String = str(placement.get("kind", ""))
+		if kind != "SOLID":
+			continue
+		var module_id: String = str(placement.get("module_id", ""))
+		if module_id != WALL_MODULE:
+			continue  # already a portal or special module
+		var ek: String = str(placement.get("edge_key", ""))
+		if ek.is_empty():
+			continue
+		var parsed: Dictionary = _parse_edge_key(ek)
+		if not bool(parsed.get("ok", false)):
+			continue
+		var connections: int = _count_perpendicular_connections(edge_map, parsed)
+		var new_module: String = _wall_module_for_connections(connections, parsed, edge_map, placement)
+		if new_module != WALL_MODULE:
+			placement["module_id"] = new_module
+			# Also update the edge_map record
+			if edge_map.has(ek):
+				edge_map[ek]["module_id"] = new_module
+
+
+func _parse_edge_key(ek: String) -> Dictionary:
+	## Parse edge key into structured data.
+	## Horizontal: "{deck}|h|{y}|{x}" — edge between rows y and y+1, at column x
+	## Vertical:   "{deck}|v|{y}|{x}" — edge between columns x and x+1, at row y
+	var parts: PackedStringArray = ek.split("|")
+	if parts.size() < 4:
+		return {"ok": false}
+	var deck: int = int(parts[0])
+	var axis: String = parts[1]
+	var a: int = int(parts[2])
+	var b: int = int(parts[3])
+	if axis == "h":
+		# Horizontal edge at grid point (b, a) to (b+1, a)
+		return {"ok": true, "axis": "h", "deck": deck, "x": b, "y": a}
+	elif axis == "v":
+		# Vertical edge at grid point (b, a) to (b, a+1)
+		return {"ok": true, "axis": "v", "deck": deck, "x": b, "y": a}
+	return {"ok": false}
+
+
+func _count_perpendicular_connections(edge_map: Dictionary, parsed: Dictionary) -> int:
+	## Count how many SOLID perpendicular edges connect at the endpoints
+	## of the given edge. Returns a bitmask:
+	##   bit 0 (1): connection at endpoint A, side 1
+	##   bit 1 (2): connection at endpoint A, side 2
+	##   bit 2 (4): connection at endpoint B, side 1
+	##   bit 3 (8): connection at endpoint B, side 2
+	##
+	## Edge key formats:
+	##   Horizontal h|Y|X: boundary between rows Y and Y+1, at column X.
+	##     Runs from grid-point (X, Y+1) to (X+1, Y+1).
+	##     West endpoint (X, Y+1): perpendicular = v|Y|X-1 (north), v|Y+1|X-1 (south)
+	##     East endpoint (X+1, Y+1): perpendicular = v|Y|X (north), v|Y+1|X (south)
+	##   Vertical v|Y|X: east boundary of cell (X, Y).
+	##     Runs from grid-point (X+1, Y) to (X+1, Y+1).
+	##     North endpoint (X+1, Y): perpendicular = h|Y-1|X (west), h|Y-1|X+1 (east)
+	##     South endpoint (X+1, Y+1): perpendicular = h|Y|X (west), h|Y|X+1 (east)
+	var axis: String = parsed["axis"]
+	var deck: int = parsed["deck"]
+	var x: int = parsed["x"]
+	var y: int = parsed["y"]
+	var mask: int = 0
+
+	if axis == "h":
+		# West endpoint (x, y+1): vertical edges at x-1
+		var vn_key: String = "%d|v|%d|%d" % [deck, y, x - 1]
+		var vs_key: String = "%d|v|%d|%d" % [deck, y + 1, x - 1]
+		if edge_map.has(vn_key) and str(edge_map[vn_key].get("kind", "")) == "SOLID":
+			mask |= 1
+		if edge_map.has(vs_key) and str(edge_map[vs_key].get("kind", "")) == "SOLID":
+			mask |= 2
+		# East endpoint (x+1, y+1): vertical edges at x
+		var ven_key: String = "%d|v|%d|%d" % [deck, y, x]
+		var ves_key: String = "%d|v|%d|%d" % [deck, y + 1, x]
+		if edge_map.has(ven_key) and str(edge_map[ven_key].get("kind", "")) == "SOLID":
+			mask |= 4
+		if edge_map.has(ves_key) and str(edge_map[ves_key].get("kind", "")) == "SOLID":
+			mask |= 8
+	else:
+		# North endpoint (x+1, y): horizontal edges at y-1
+		var hw_key: String = "%d|h|%d|%d" % [deck, y - 1, x]
+		var he_key: String = "%d|h|%d|%d" % [deck, y - 1, x + 1]
+		if edge_map.has(hw_key) and str(edge_map[hw_key].get("kind", "")) == "SOLID":
+			mask |= 1
+		if edge_map.has(he_key) and str(edge_map[he_key].get("kind", "")) == "SOLID":
+			mask |= 2
+		# South endpoint (x+1, y+1): horizontal edges at y
+		var hsw_key: String = "%d|h|%d|%d" % [deck, y, x]
+		var hse_key: String = "%d|h|%d|%d" % [deck, y, x + 1]
+		if edge_map.has(hsw_key) and str(edge_map[hsw_key].get("kind", "")) == "SOLID":
+			mask |= 4
+		if edge_map.has(hse_key) and str(edge_map[hse_key].get("kind", "")) == "SOLID":
+			mask |= 8
+
+	return mask
+
+
+func _wall_module_for_connections(mask: int, parsed: Dictionary, edge_map: Dictionary, placement: Dictionary) -> String:
+	## Select wall module based on connection bitmask.
+	## mask bits: 0-1 = endpoint A connections, 2-3 = endpoint B connections
+	## For horizontal edges: A=west, B=east; bits 0=north, 1=south
+	## For vertical edges: A=north, B=south; bits 0=west, 1=east
+	var count: int = 0
+	for i in range(4):
+		if mask & (1 << i):
+			count += 1
+
+	if count == 0:
+		# Isolated wall — end cap
+		return WALL_END_CAP_MODULE
+
+	if count == 1:
+		# One perpendicular connection at an endpoint — this is a corner
+		# (two walls meeting at a room corner each have count=1)
+		return _pick_corner_type(mask, parsed, edge_map, placement)
+
+	# Check if connections are at same endpoint or different
+	var a_connections: int = mask & 3   # bits 0-1 (endpoint A)
+	var b_connections: int = mask & 12  # bits 2-3 (endpoint B)
+	var a_count: int = 0
+	var b_count: int = 0
+	if a_connections & 1: a_count += 1
+	if a_connections & 2: a_count += 1
+	if b_connections & 4: b_count += 1
+	if b_connections & 8: b_count += 1
+
+	if count == 2:
+		if a_count == 2 or b_count == 2:
+			# Both connections at same endpoint — T-junction
+			return WALL_T_JUNCTION_MODULE
+		if a_count == 1 and b_count == 1:
+			# Connections at different endpoints
+			# Check if same side (straight) or different sides (corner)
+			var axis: String = parsed["axis"]
+			if axis == "h":
+				# Horizontal: bit 0=north, bit 1=south at A; bit 4=north, bit 8=south at B
+				var a_north: bool = (mask & 1) != 0
+				var b_north: bool = (mask & 4) != 0
+				if a_north == b_north:
+					return WALL_MODULE  # straight — same side
+				else:
+					return _pick_corner_type(mask, parsed, edge_map, placement)
+			else:
+				# Vertical: bit 0=west, bit 1=east at A; bit 4=west, bit 8=east at B
+				var a_west: bool = (mask & 1) != 0
+				var b_west: bool = (mask & 4) != 0
+				if a_west == b_west:
+					return WALL_MODULE  # straight — same side
+				else:
+					return _pick_corner_type(mask, parsed, edge_map, placement)
+
+	if count == 3:
+		# Three connections — T-junction
+		return WALL_T_JUNCTION_MODULE
+
+	# Four connections — cross (no cross module, use T-junction as best fit)
+	return WALL_T_JUNCTION_MODULE
+
+
+func _pick_corner_type(mask: int, parsed: Dictionary, edge_map: Dictionary, placement: Dictionary) -> String:
+	## Determine inner vs outer corner based on which side of the wall
+	## the room interior is on. The owner_room side is the interior.
+	## If the corner L opens toward the interior → inner corner
+	## If the corner L opens away from the interior → outer corner
+	var axis: String = parsed["axis"]
+	var owner_room: String = str(placement.get("owner_room", ""))
+	var other_room: String = str(placement.get("other_room", ""))
+
+	# For simplicity: if the edge is exterior (no other room), use outer corner.
+	# If it's between two rooms, use inner corner (the L opens into the owner room).
+	if other_room.is_empty():
+		return WALL_OUTER_CORNER_MODULE
+	return WALL_INNER_CORNER_MODULE
 
 
 func _index_portals(layout: Dictionary, room_by_id: Dictionary, room_by_cell: Dictionary, errors: Array[String]) -> Dictionary:
