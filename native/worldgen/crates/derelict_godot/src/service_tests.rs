@@ -3,8 +3,8 @@ use super::service::{Generator, Limits, MonotonicClock, Service};
 use derelict_core::lifecycle::{LifecycleEvent, LifecycleResult, LifecycleStatus};
 use derelict_core::model::GENERATOR_VERSION;
 use derelict_core::procgen::{
-    Domain, PlayerModel, PresentationRequest, ProcgenBundle, ProcgenFailureCode, ProcgenRequest,
-    SiteRequest,
+    Domain, PlayerModel, PresentationRequest, ProcgenBundle, ProcgenFailure, ProcgenFailureCode,
+    ProcgenRequest, SiteRequest, FAILURE_SCHEMA,
 };
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -87,6 +87,16 @@ fn service(l: Limits, c: Arc<Clock>, g: Generator) -> Arc<Service> {
 }
 fn code(r: &LifecycleResult) -> ProcgenFailureCode {
     r.failure.as_ref().unwrap().code.clone()
+}
+fn generated_failure(code: ProcgenFailureCode) -> ProcgenFailure {
+    ProcgenFailure {
+        schema_version: FAILURE_SCHEMA.into(),
+        code,
+        stage: "generation".into(),
+        message: "generated failure".into(),
+        retryable: false,
+        fallback_id: None,
+    }
 }
 fn poll_terminal(s: &Service, id: i64) -> LifecycleResult {
     let until = Instant::now() + WAIT;
@@ -577,4 +587,117 @@ fn sync_bypasses_async_queue() {
     assert_eq!(code(&s.submit(req(4))), ProcgenFailureCode::Overload);
     release_tx.send(()).unwrap();
     s.shutdown()
+}
+
+#[test]
+fn shutdown_sync_and_nonpositive_cancel_return_valid_stable_failures() {
+    let s = service(lim(), Arc::new(Clock::default()), fixed(bundle()));
+    s.shutdown();
+
+    let sync = s.generate_sync(req(1));
+    assert_eq!(code(&sync), ProcgenFailureCode::Shutdown);
+    assert!(sync.validate().is_ok());
+
+    for id in [0, -1] {
+        let cancelled = s.cancel(id);
+        assert_eq!(code(&cancelled), ProcgenFailureCode::UnknownRequest);
+        assert!(cancelled.request_id.is_none());
+        assert!(cancelled.validate().is_ok());
+    }
+}
+
+#[test]
+fn consumed_poll_and_cancel_use_consumed_code_and_event() {
+    let s = service(lim(), Arc::new(Clock::default()), fixed(bundle()));
+    let id = s.submit(req(1)).request_id.unwrap();
+    assert_eq!(poll_terminal(&s, id).status, LifecycleStatus::Completed);
+
+    let consumed_poll = s.poll(id);
+    assert_eq!(code(&consumed_poll), ProcgenFailureCode::ResultConsumed);
+    assert_eq!(
+        consumed_poll.events.last(),
+        Some(&LifecycleEvent::ResultConsumed)
+    );
+    assert!(consumed_poll.validate().is_ok());
+
+    let consumed_cancel = s.cancel(id);
+    assert_eq!(code(&consumed_cancel), ProcgenFailureCode::ResultConsumed);
+    assert!(consumed_cancel.validate().is_ok());
+    s.shutdown();
+}
+
+#[test]
+fn effective_event_cap_covers_overload_and_shutdown_rejections() {
+    let (g, started, gates) = gated(bundle());
+    let mut l = lim();
+    l.max_events = 1;
+    let s = service(l, Arc::new(Clock::default()), g);
+    s.submit(req(1));
+    assert_eq!(recv(&started, "event-cap running"), 1);
+    s.submit(req(2));
+
+    let overload = s.submit(req(3));
+    assert_eq!(code(&overload), ProcgenFailureCode::Overload);
+    assert_eq!(overload.events, vec![LifecycleEvent::Overloaded]);
+    assert!(overload.validate().is_ok());
+
+    let s_for_shutdown = s.clone();
+    let (joined_tx, joined_rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        s_for_shutdown.shutdown();
+        joined_tx.send(()).unwrap();
+    });
+    assert_eq!(code(&poll_terminal(&s, 2)), ProcgenFailureCode::Shutdown);
+    let shutdown = s.submit(req(4));
+    assert_eq!(code(&shutdown), ProcgenFailureCode::Shutdown);
+    assert_eq!(shutdown.events, vec![LifecycleEvent::Shutdown]);
+    assert!(shutdown.validate().is_ok());
+    release(&gates, 1).send(()).unwrap();
+    recv(&joined_rx, "event-cap shutdown join");
+}
+
+#[test]
+fn sync_deadline_precedes_generator_error_or_panic() {
+    for panic_after_deadline in [false, true] {
+        let clock = Arc::new(Clock::default());
+        let generator_clock = clock.clone();
+        let generator = Arc::new(move |_| {
+            generator_clock.set(10);
+            if panic_after_deadline {
+                panic!("late panic");
+            }
+            Err(generated_failure(ProcgenFailureCode::GenerationFailure))
+        }) as Generator;
+        let mut l = lim();
+        l.deadline_ms = 10;
+        let s = service(l, clock, generator);
+        let result = s.generate_sync(req(1));
+        assert_eq!(code(&result), ProcgenFailureCode::Timeout);
+        assert!(result.validate().is_ok());
+        s.shutdown();
+    }
+}
+
+#[test]
+fn malformed_generator_failures_are_sanitized_sync_and_async() {
+    let invalid_failure = ProcgenFailure {
+        schema_version: FAILURE_SCHEMA.into(),
+        code: ProcgenFailureCode::GenerationFailure,
+        stage: String::new(),
+        message: String::new(),
+        retryable: false,
+        fallback_id: None,
+    };
+    let generator = Arc::new(move |_| Err(invalid_failure.clone())) as Generator;
+    let s = service(lim(), Arc::new(Clock::default()), generator);
+
+    let sync = s.generate_sync(req(1));
+    assert_eq!(code(&sync), ProcgenFailureCode::InternalFailure);
+    assert!(sync.validate().is_ok());
+
+    let id = s.submit(req(2)).request_id.unwrap();
+    let asynchronous = poll_terminal(&s, id);
+    assert_eq!(code(&asynchronous), ProcgenFailureCode::InternalFailure);
+    assert!(asynchronous.validate().is_ok());
+    s.shutdown();
 }

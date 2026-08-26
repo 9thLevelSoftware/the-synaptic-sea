@@ -95,6 +95,7 @@ struct Shared {
 }
 pub struct Service {
     shared: Arc<Shared>,
+    admission: Mutex<()>,
     limits: Limits,
     clock: Arc<dyn MonotonicClock>,
     expected_content_hash: String,
@@ -112,14 +113,19 @@ fn failure(code: ProcgenFailureCode, message: impl Into<String>) -> ProcgenFailu
     }
 }
 fn events(mut e: Vec<LifecycleEvent>, max: usize, x: LifecycleEvent) -> Vec<LifecycleEvent> {
-    if max == 0 {
-        return e;
-    }
-    if e.len() >= max {
-        e.remove(0);
-    }
     e.push(x);
+    if e.len() > max {
+        let excess = e.len() - max;
+        e.drain(..excess);
+    }
     e
+}
+fn limit_events(mut events: Vec<LifecycleEvent>, max: usize) -> Vec<LifecycleEvent> {
+    if events.len() > max {
+        let excess = events.len() - max;
+        events.drain(..excess);
+    }
+    events
 }
 fn lifecycle_events(max: usize, final_event: LifecycleEvent) -> Vec<LifecycleEvent> {
     events(
@@ -138,6 +144,20 @@ fn bundle_ok(b: &ProcgenBundle, l: &Limits) -> bool {
         && b.trace.retries.len() <= l.max_trace_entries
         && b.trace.stage_timings_micros.len() <= l.max_trace_entries
 }
+fn sanitize_failure(value: ProcgenFailure) -> ProcgenFailure {
+    if value.validate().is_ok() {
+        value
+    } else {
+        failure(
+            ProcgenFailureCode::InternalFailure,
+            "generator returned an invalid failure contract",
+        )
+    }
+}
+fn record_tombstone(s: &mut State, l: &Limits, id: i64, kind: Tombstone) {
+    s.tombstones.insert(id, kind);
+    prune_tombstones(s, l);
+}
 fn retain(s: &mut State, l: &Limits, id: i64, result: LifecycleResult) {
     s.entries.insert(id, Entry::Terminal(result));
     while s
@@ -154,12 +174,7 @@ fn retain(s: &mut State, l: &Limits, id: i64, result: LifecycleResult) {
             .find(|k| matches!(s.entries.get(k), Some(Entry::Terminal(_))))
         {
             s.entries.remove(&old);
-            s.tombstones.insert(old, Tombstone::Expired);
-        }
-    }
-    while s.tombstones.len() > l.retained_results {
-        if let Some(old) = s.tombstones.keys().next().copied() {
-            s.tombstones.remove(&old);
+            record_tombstone(s, l, old, Tombstone::Expired);
         }
     }
 }
@@ -203,6 +218,7 @@ impl Service {
                 }),
                 wake: Condvar::new(),
             }),
+            admission: Mutex::new(()),
             limits,
             clock,
             expected_content_hash,
@@ -230,7 +246,7 @@ impl Service {
         f: ProcgenFailure,
         e: Vec<LifecycleEvent>,
     ) -> LifecycleResult {
-        LifecycleResult::failed(id, f, e)
+        LifecycleResult::failed(id, f, limit_events(e, self.limits.max_events))
     }
     fn validate_request(
         &self,
@@ -250,6 +266,9 @@ impl Service {
             ));
         }
         Ok(())
+    }
+    fn is_shutdown(&self) -> bool {
+        self.shared.state.lock().unwrap().shutdown
     }
     fn admit(&self, request: ProcgenRequest, raw_len: usize) -> LifecycleResult {
         let mut s = self.shared.state.lock().unwrap();
@@ -299,9 +318,16 @@ impl Service {
         self.shared.wake.notify_one();
         LifecycleResult::accepted(id, ev)
     }
-    #[allow(clippy::needless_as_bytes)]
     pub fn submit_json(&self, json: &str) -> LifecycleResult {
-        if json.as_bytes().len() > self.limits.max_request_bytes {
+        let _admission = self.admission.lock().unwrap();
+        if self.is_shutdown() {
+            return self.failed(
+                None,
+                failure(ProcgenFailureCode::Shutdown, "service is shut down"),
+                vec![LifecycleEvent::Rejected, LifecycleEvent::Shutdown],
+            );
+        }
+        if json.len() > self.limits.max_request_bytes {
             return self.failed(
                 None,
                 failure(ProcgenFailureCode::Capacity, "request too large"),
@@ -309,7 +335,7 @@ impl Service {
             );
         }
         match ProcgenRequest::from_json(json) {
-            Ok(r) => self.admit(r, json.as_bytes().len()),
+            Ok(r) => self.admit(r, json.len()),
             Err(e) => self.failed(
                 None,
                 failure(ProcgenFailureCode::InvalidRequest, e.to_string()),
@@ -317,15 +343,23 @@ impl Service {
             ),
         }
     }
-    pub fn submit(&self, request: ProcgenRequest) -> LifecycleResult {
+    pub(crate) fn submit(&self, request: ProcgenRequest) -> LifecycleResult {
+        let _admission = self.admission.lock().unwrap();
         let raw_len = serde_json::to_vec(&request)
             .map(|v| v.len())
             .unwrap_or(usize::MAX);
         self.admit(request, raw_len)
     }
-    #[allow(clippy::needless_as_bytes)]
     pub fn generate_sync_json(&self, json: &str) -> LifecycleResult {
-        if json.as_bytes().len() > self.limits.max_request_bytes {
+        let _admission = self.admission.lock().unwrap();
+        if self.is_shutdown() {
+            return self.failed(
+                None,
+                failure(ProcgenFailureCode::Shutdown, "service is shut down"),
+                vec![LifecycleEvent::Rejected, LifecycleEvent::Shutdown],
+            );
+        }
+        if json.len() > self.limits.max_request_bytes {
             return self.failed(
                 None,
                 failure(ProcgenFailureCode::Capacity, "request too large"),
@@ -333,7 +367,13 @@ impl Service {
             );
         }
         match ProcgenRequest::from_json(json) {
-            Ok(r) => self.generate_sync_with_len(r, json.as_bytes().len()),
+            Ok(r) => match self.validate_request(&r, json.len()) {
+                Ok(()) => {
+                    drop(_admission);
+                    self.generate_sync_validated(r)
+                }
+                Err(failure) => self.failed(None, failure, vec![LifecycleEvent::Rejected]),
+            },
             Err(e) => self.failed(
                 None,
                 failure(ProcgenFailureCode::InvalidRequest, e.to_string()),
@@ -341,18 +381,36 @@ impl Service {
             ),
         }
     }
-    pub fn generate_sync(&self, request: ProcgenRequest) -> LifecycleResult {
+    pub(crate) fn generate_sync(&self, request: ProcgenRequest) -> LifecycleResult {
+        let admission = self.admission.lock().unwrap();
+        if self.is_shutdown() {
+            return self.failed(
+                None,
+                failure(ProcgenFailureCode::Shutdown, "service is shut down"),
+                vec![LifecycleEvent::Rejected, LifecycleEvent::Shutdown],
+            );
+        }
         let raw_len = serde_json::to_vec(&request)
             .map(|v| v.len())
             .unwrap_or(usize::MAX);
-        self.generate_sync_with_len(request, raw_len)
-    }
-    fn generate_sync_with_len(&self, request: ProcgenRequest, raw_len: usize) -> LifecycleResult {
-        if let Err(f) = self.validate_request(&request, raw_len) {
-            return self.failed(None, f, vec![LifecycleEvent::Rejected]);
+        match self.validate_request(&request, raw_len) {
+            Ok(()) => {
+                drop(admission);
+                self.generate_sync_validated(request)
+            }
+            Err(failure) => self.failed(None, failure, vec![LifecycleEvent::Rejected]),
         }
+    }
+    fn generate_sync_validated(&self, request: ProcgenRequest) -> LifecycleResult {
         let start = self.clock.now_ms();
         let result = std::panic::catch_unwind(AssertUnwindSafe(|| (self.generator)(request)));
+        if self.clock.now_ms().saturating_sub(start) >= self.limits.deadline_ms {
+            return self.failed(
+                None,
+                failure(ProcgenFailureCode::Timeout, "completion deadline exceeded"),
+                lifecycle_events(self.limits.max_events, LifecycleEvent::TimedOut),
+            );
+        }
         match result {
             Ok(Ok(bundle)) => {
                 if !bundle_ok(&bundle, &self.limits) {
@@ -360,12 +418,6 @@ impl Service {
                         None,
                         failure(ProcgenFailureCode::ValidationFailure, "invalid output"),
                         lifecycle_events(self.limits.max_events, LifecycleEvent::Failed),
-                    )
-                } else if self.clock.now_ms().saturating_sub(start) >= self.limits.deadline_ms {
-                    self.failed(
-                        None,
-                        failure(ProcgenFailureCode::Timeout, "completion deadline exceeded"),
-                        lifecycle_events(self.limits.max_events, LifecycleEvent::TimedOut),
                     )
                 } else {
                     LifecycleResult::completed(
@@ -377,7 +429,7 @@ impl Service {
             }
             Ok(Err(f)) => self.failed(
                 None,
-                f,
+                sanitize_failure(f),
                 lifecycle_events(self.limits.max_events, LifecycleEvent::Failed),
             ),
             Err(_) => self.failed(
@@ -403,8 +455,7 @@ impl Service {
                     self.limits.max_events,
                     LifecycleEvent::ResultConsumed,
                 );
-                s.tombstones.insert(id, Tombstone::Consumed);
-                prune_tombstones(&mut s, &self.limits);
+                record_tombstone(&mut s, &self.limits, id, Tombstone::Consumed);
                 r
             }
             Some(entry @ Entry::Queued(_)) => {
@@ -423,41 +474,29 @@ impl Service {
                 let visible_events = job.events.clone();
                 s.entries.insert(id, Entry::Running(job));
                 if cancel {
-                    LifecycleResult::cancel_requested(
-                        id,
-                        events(
-                            visible_events,
-                            self.limits.max_events,
-                            LifecycleEvent::CancelRequested,
-                        ),
-                    )
+                    LifecycleResult::cancel_requested(id, visible_events)
                 } else {
                     LifecycleResult::running(id, visible_events)
                 }
             }
             None => {
                 let tombstone = s.tombstones.get(&id).copied();
-                let expired = tombstone.is_some()
-                    || s.first_admitted
+                let admitted_but_aged = tombstone.is_none()
+                    && s.first_admitted
                         .is_some_and(|first| id >= first && id <= s.highest_admitted);
-                self.failed(
-                    Some(id),
-                    failure(
-                        if matches!(tombstone, Some(Tombstone::Consumed)) {
-                            ProcgenFailureCode::ResultConsumed
-                        } else if expired {
-                            ProcgenFailureCode::ResultExpired
-                        } else {
-                            ProcgenFailureCode::UnknownRequest
-                        },
-                        "request unavailable",
-                    ),
-                    vec![if expired {
-                        LifecycleEvent::ResultExpired
-                    } else {
-                        LifecycleEvent::Rejected
-                    }],
-                )
+                let code = if matches!(tombstone, Some(Tombstone::Consumed)) {
+                    ProcgenFailureCode::ResultConsumed
+                } else if matches!(tombstone, Some(Tombstone::Expired)) || admitted_but_aged {
+                    ProcgenFailureCode::ResultExpired
+                } else {
+                    ProcgenFailureCode::UnknownRequest
+                };
+                let event = match code {
+                    ProcgenFailureCode::ResultConsumed => LifecycleEvent::ResultConsumed,
+                    ProcgenFailureCode::ResultExpired => LifecycleEvent::ResultExpired,
+                    _ => LifecycleEvent::Rejected,
+                };
+                self.failed(Some(id), failure(code, "request unavailable"), vec![event])
             }
         }
     }
@@ -465,17 +504,8 @@ impl Service {
         let mut s = self.shared.state.lock().unwrap();
         if id <= 0 {
             return self.failed(
-                Some(id),
-                failure(
-                    if matches!(s.tombstones.get(&id), Some(Tombstone::Consumed)) {
-                        ProcgenFailureCode::ResultConsumed
-                    } else if s.tombstones.contains_key(&id) {
-                        ProcgenFailureCode::ResultExpired
-                    } else {
-                        ProcgenFailureCode::UnknownRequest
-                    },
-                    "unknown request",
-                ),
+                None,
+                failure(ProcgenFailureCode::UnknownRequest, "unknown request"),
                 vec![LifecycleEvent::Rejected],
             );
         }
@@ -537,24 +567,33 @@ impl Service {
                     out
                 }
             }
-            None => self.failed(
-                Some(id),
-                failure(
-                    if s.tombstones.contains_key(&id) {
-                        ProcgenFailureCode::ResultExpired
-                    } else {
-                        ProcgenFailureCode::UnknownRequest
-                    },
-                    "unknown request",
-                ),
-                vec![LifecycleEvent::Rejected],
-            ),
+            None => {
+                let tombstone = s.tombstones.get(&id).copied();
+                let admitted_but_aged = tombstone.is_none()
+                    && s.first_admitted
+                        .is_some_and(|first| id >= first && id <= s.highest_admitted);
+                let code = if matches!(tombstone, Some(Tombstone::Consumed)) {
+                    ProcgenFailureCode::ResultConsumed
+                } else if matches!(tombstone, Some(Tombstone::Expired)) || admitted_but_aged {
+                    ProcgenFailureCode::ResultExpired
+                } else {
+                    ProcgenFailureCode::UnknownRequest
+                };
+                let event = match code {
+                    ProcgenFailureCode::ResultConsumed => LifecycleEvent::ResultConsumed,
+                    ProcgenFailureCode::ResultExpired => LifecycleEvent::ResultExpired,
+                    _ => LifecycleEvent::Rejected,
+                };
+                self.failed(Some(id), failure(code, "request unavailable"), vec![event])
+            }
         }
     }
     pub fn shutdown(&self) {
+        let admission = self.admission.lock().unwrap();
         let mut s = self.shared.state.lock().unwrap();
         if s.shutdown {
             drop(s);
+            drop(admission);
             self.join_workers();
             return;
         }
@@ -575,6 +614,7 @@ impl Service {
         }
         self.shared.wake.notify_all();
         drop(s);
+        drop(admission);
         self.join_workers();
     }
     fn join_workers(&self) {
@@ -674,7 +714,7 @@ fn worker(
                 ),
                 Ok(Err(f)) => LifecycleResult::failed(
                     Some(id),
-                    f,
+                    sanitize_failure(f),
                     events(
                         current.events.clone(),
                         limits.max_events,
