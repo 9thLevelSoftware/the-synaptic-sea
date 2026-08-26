@@ -43,13 +43,13 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
+      "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
       "presentation": {
         "seed": 9,
         "locale": "en-US"
       }
     },
-    "expected_semantic_hash": "4bc8593d91f12db8bbbcd4ca528043404bb782ad8adcf2e6b3fd76fc4de03a17"
+    "expected_semantic_hash": "d690067d3cdd59a8d3265a534458f132a63c4d56e38e8accf094216ce139d79f"
   },
   {
     "name": "shuttle_intact_standard_presentation_variant",
@@ -95,13 +95,13 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
+      "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
       "presentation": {
         "seed": 901,
         "locale": "fr-FR"
       }
     },
-    "expected_semantic_hash": "4bc8593d91f12db8bbbcd4ca528043404bb782ad8adcf2e6b3fd76fc4de03a17",
+    "expected_semantic_hash": "d690067d3cdd59a8d3265a534458f132a63c4d56e38e8accf094216ce139d79f",
     "same_semantics_as": "shuttle_intact_standard_skilled"
   },
   {
@@ -148,13 +148,13 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
+      "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
       "presentation": {
         "seed": 77,
         "locale": "en-GB"
       }
     },
-    "expected_semantic_hash": "34252ce9ed9f97896a94b02a232b56360e66ce889dfa2b4f93131ea4f84cc385"
+    "expected_semantic_hash": "674e95e818a3a92e7fd461e38a82f0c9fefe32ca47b65b5f46feffb2b883957b"
   },
   {
     "name": "freighter_damaged_deep_dive_pressured",
@@ -200,13 +200,13 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
+      "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
       "presentation": {
         "seed": 1200,
         "locale": "de-DE"
       }
     },
-    "expected_semantic_hash": "c000053d0a270cd23f1d1123f9fdabf1d6ffe3e50fe207f0859ab8f5e1d077ad"
+    "expected_semantic_hash": "74b12c87146bb46d093d856944d0b62546872213d2d0ecb2a5a08be432a8b0b5"
   },
   {
     "name": "frigate_damaged_deep_dive_veteran",
@@ -252,13 +252,13 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
+      "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
       "presentation": {
         "seed": 2718,
         "locale": "ja-JP"
       }
     },
-    "expected_semantic_hash": "2e88c003eba27958158e3c3f9056636472c8b9af3c213b99f70b3eda55f63fa6"
+    "expected_semantic_hash": "92ee4650c720d2b12f5aa2566487166f1a4d72653798e76146895e8e8d7de15b"
   },
   {
     "name": "corvette_intact_standard_max",
@@ -287,13 +287,13 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
+      "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
       "presentation": {
         "seed": 0,
         "locale": "en-US"
       }
     },
-    "expected_semantic_hash": "52e6c3fd1974b3109247e5ab53678683621dc6566ee86759f2f4aa931ddb0fc1"
+    "expected_semantic_hash": "64c3d584d2b85fd8514a006a7694462206289c661525cc44f3587d5552118e14"
   },
   {
     "name": "freighter_damaged_hardened_min",
@@ -339,16 +339,16 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
+      "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
       "presentation": {
         "seed": 9007199254740991,
         "locale": "es-ES"
       }
     },
-    "expected_semantic_hash": "e68a4c0cb4a38f35952ee896f70d8a821ec5d51fa8923daea106f26f2fc9bc97"
+    "expected_semantic_hash": "ba668a355f676c4b2acc7fe0935e9c6686c7ac5af7921941c251123eb446ebf1"
   },
   {
-    "name": "frigate_fractured_standard_baseline",
+    "name": "frigate_gate3_seed1_migration",
     "request": {
       "schema_version": "procgen-request-2",
       "world_seed": 1,
@@ -374,12 +374,47 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
+      "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
       "presentation": {
         "seed": 42,
         "locale": "it-IT"
       }
     },
-    "expected_semantic_hash": "3a0faede2ab3ef6e7c5c61e39ea5a91ed3da68fa1e21fcc9e1a2794f165fe071"
+    "expected_semantic_hash": "b26f1ea14c086b768d45a7fc11ff5c1c034000e178a526ef77145f587579db3c"
+  },
+  {
+    "name": "frigate_fractured_standard_baseline_seed6",
+    "request": {
+      "schema_version": "procgen-request-2",
+      "world_seed": 6,
+      "site": {
+        "site_id": "parity-frigate-fractured",
+        "x": 4096,
+        "y": -4096,
+        "archetype_id": "frigate",
+        "kit_id": "default",
+        "intactness_override_bp": null,
+        "cause_of_loss": null,
+        "loot_richness_bp": 15000
+      },
+      "difficulty_id": "standard",
+      "player_model": {
+        "schema_version": "player-model-2",
+        "signals": []
+      },
+      "requested_domains": [
+        "world",
+        "site",
+        "gameplay",
+        "presentation"
+      ],
+      "generator_version": 3,
+      "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
+      "presentation": {
+        "seed": 42,
+        "locale": "it-IT"
+      }
+    },
+    "expected_semantic_hash": "1f41c49e367bc8975bea46878c607b670585d2aad44479b1abf811a4b79cbb8d"
   }
 ]

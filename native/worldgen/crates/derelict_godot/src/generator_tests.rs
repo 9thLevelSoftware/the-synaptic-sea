@@ -70,13 +70,35 @@ fn legacy_request_is_explicitly_normalized() {
 }
 
 #[test]
-fn legacy_request_with_damage_sealed_portal_uses_complete_safe_fallback() {
+fn legacy_seed_12_remains_valid_under_adaptive_site_ranking() {
     let request = legacy_request(12, &derelict_core::model::GenParams::new("frigate"), "");
     let bundle = derelict_core::procgen::generate_bundle(
         request,
         &derelict_core::GenData::default_bundle().unwrap(),
     )
-    .expect("valid legacy request must not fail when authored fallback sees a structural lock");
+    .expect("Gate 3 legacy seed must remain valid after adaptive site ranking");
+
+    assert!(bundle.validate().is_ok());
+    assert_eq!(bundle.trace.fallback, None);
+    assert_eq!(bundle.site_ir.mission_graph.mission_id, "repair_recovery");
+    let site_decision = &bundle.trace.adaptive_decisions[1];
+    assert!(site_decision.applied);
+    assert_eq!(
+        site_decision.selected_candidate_id.as_deref(),
+        Some("repair_recovery")
+    );
+}
+
+#[test]
+fn legacy_request_with_severed_damage_uses_complete_safe_fallback() {
+    let mut params = derelict_core::model::GenParams::new("corvette");
+    params.intactness_override = Some(2_000);
+    let request = legacy_request(1, &params, "");
+    let bundle = derelict_core::procgen::generate_bundle(
+        request,
+        &derelict_core::GenData::default_bundle().unwrap(),
+    )
+    .expect("valid legacy request must not fail when a severed site needs authored fallback");
 
     assert!(bundle.validate().is_ok());
     assert_eq!(

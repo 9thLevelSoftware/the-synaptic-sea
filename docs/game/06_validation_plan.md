@@ -203,9 +203,48 @@ Godot-side gameplay authority.
   validated-candidate-only tests.
 - Difficulty cannot systematically reduce expected threat; encounter actions
   stay inside threat/economy/fairness/accessibility/performance envelopes.
-- Optional embedded experiment remains disabled until separately promoted;
-  forced timeout, unsupported capability, invalid output, error, and disabled
-  paths exactly match deterministic fallback behavior.
+- The shipped implementation is deterministic classical scoring only; no
+  embedded inference model is included. Any future model must remain behind a
+  separate promotion gate and the same constrained proposal/fallback contract.
+
+Focused commands (each Rust/Node command must pass; each Godot command requires
+its PASS marker and no unexpected `ERROR:`, `WARNING:`, `FAIL`, or `BLOCKED`
+line):
+
+```bash
+cargo test --manifest-path "$ROOT/native/worldgen/Cargo.toml" -p derelict_core --test adaptive_v1
+cargo test --manifest-path "$ROOT/native/worldgen/Cargo.toml" -p derelict_core --test site_v2_adaptive_ranker
+cargo test --manifest-path "$ROOT/native/worldgen/Cargo.toml" -p derelict_core --test encounter_v3_adaptive_director
+cargo test --manifest-path "$ROOT/native/worldgen/Cargo.toml" -p derelict_core --test procgen_v5_adaptive_integration
+cargo test --manifest-path "$ROOT/native/worldgen/Cargo.toml" -p derelict_core --test gate4_wrapper_versions
+cargo fmt --manifest-path "$ROOT/native/worldgen/Cargo.toml" --all -- --check
+cargo clippy --manifest-path "$ROOT/native/worldgen/Cargo.toml" --workspace --all-targets -- -D warnings
+cargo test --manifest-path "$ROOT/native/worldgen/Cargo.toml" --workspace
+cargo run --manifest-path "$ROOT/native/worldgen/Cargo.toml" -p derelict_core --example export_schemas -- --check
+cargo run --manifest-path "$ROOT/native/worldgen/Cargo.toml" --release -p derelict_cli -- --stress
+python -m unittest "$ROOT/scripts/validation/test_validate_procgen_build_manifest.py"
+python "$ROOT/scripts/validation/validate_procgen_build_manifest.py" --check --target windows
+python "$ROOT/scripts/validation/validate_procgen_build_manifest.py" --check --target web
+python "$ROOT/tools/build_system_inventory.py" --check
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_adaptive_trace_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/task5_live_consumer_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/task5_live_mapper_parity_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/task5_consumer_negative_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/task5_fallback_policy_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/task5_mapper_fixture_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/procgen_build_manifest_smoke.gd
+"$GODOT" --headless --path "$ROOT" --script res://scripts/validation/worldgen_wired_travel_smoke.gd
+"$GODOT" --headless --path "$ROOT/native/worldgen/godot" --script res://tests/lifecycle_smoke.gd
+node "$ROOT/native/worldgen/web/wasm_lifecycle_smoke.mjs"
+```
+
+The Gate 4 trace smoke must prove deterministic replay, tamper and reorder
+rejection, invalid-action rejection, and exactly three bounded adaptive
+decisions. The consumer and mapper smokes must prove that Godot applies the
+bundle without restoring an authoritative post-generation gameplay path.
+The adapter corpus retains Gate 3 frigate seed 1 as an explicit migration
+vector and promotes seed 6 as the current fractured fixture because the
+content-manifest-keyed Gate 4 selection no longer fractures seed 1.
 
 ### Gate 5 focused evidence
 
@@ -234,18 +273,22 @@ Godot-side gameplay authority.
   stop, runtime 60 fps target / 30 fps stop, plus declared per-stage latency,
   queue, entity, instance, navigation, and Web build-size limits.
 
-Current baseline (2026-08-26): Gate 3 Rust source commit
-`c330e77929961be44cae1edcd347417f16ca89d0`, native artifact SHA-256
-`8d63a1e8bd8cd687bfaa8830e183e12eae83be940e35ebf5557a03ed725aa1a2`,
-and Web artifact SHA-256
-`724eb96e0b244162ea178028dbdc53d6a220dfdcf9e8a68ae8cbffcf8ca549e8`.
-Rust fmt, strict clippy, all 295 workspace tests, and the 1,800-ship stress
-sweep pass. Windows Godot 4.7.2 passes the fourteen root-project Gate 3 commands
-plus the native lifecycle smoke, including `WORLDGEN WIRED TRAVEL PASS`, with no
-unexpected warnings or errors. The installed WASM package passes the Node
-lifecycle/shared-parity smoke. These smokes remain intentionally unregistered
-until Gate 6 updates the canonical regression bundle. Canonical Godot 4.7.1,
-macOS/Linux exports, and final exported-Web parity remain unverified.
+Current baseline (2026-08-26): Gate 4 Rust artifact source commit
+`29720efecfc8b9dd3f6959870639061f43203b8f`,
+content-manifest SHA-256
+`0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385`, native
+artifact SHA-256
+`f8d3aab1c4643749e38c1a9a3f0c75ab7d8a968e937c92534d4e35db119ebd87`, and Web
+artifact SHA-256
+`ef8ff3861225c99ca0a2cdb190b4d4a27631b1d4f824c2e9c8fd12065d41c1f2`.
+Rust formatting, strict Clippy, all 318 workspace tests, schema/export checks,
+manifest checks, the 1,800-ship stress sweep, Windows Godot 4.7.2 adaptive,
+consumer, mapper, fallback, build, travel, and native-lifecycle smokes, and the
+Node WASM lifecycle/parity smoke pass with no unexpected warnings or errors.
+These focused smokes remain separate from the canonical `run_clean` bundle
+until Gate 6. Canonical Godot 4.7.1, macOS/Linux exports, final exported-Web
+parity, windowed performance, and RoboGodot/manual editor review remain
+unverified.
 
 ## Regression bundle
 

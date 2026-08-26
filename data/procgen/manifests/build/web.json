@@ -1,23 +1,23 @@
 {
-  "manifest_schema": "procgen-build-manifest-3",
-  "rust_source_commit": "c330e77929961be44cae1edcd347417f16ca89d0",
+  "manifest_schema": "procgen-build-manifest-4",
+  "rust_source_commit": "29720efecfc8b9dd3f6959870639061f43203b8f",
   "generator_version": 3,
   "content_manifest_path": "data/procgen/manifests/content_manifest.json",
-  "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
+  "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385",
   "target": "wasm32-unknown-unknown",
   "artifact": {
     "kind": "wasm",
     "path": "addons/derelict/bin/web/derelict_wasm_bg.wasm",
-    "sha256": "724eb96e0b244162ea178028dbdc53d6a220dfdcf9e8a68ae8cbffcf8ca549e8"
+    "sha256": "ef8ff3861225c99ca0a2cdb190b4d4a27631b1d4f824c2e9c8fd12065d41c1f2"
   },
   "export_schemas": {
     "procgen_request": "procgen-request-2",
-    "procgen_bundle": "procgen-bundle-4",
+    "procgen_bundle": "procgen-bundle-5",
     "world_ir": "world-ir-2",
     "site_ir": "site-ir-2",
-    "gameplay_ir": "gameplay-ir-2",
+    "gameplay_ir": "gameplay-ir-3",
     "presentation_ir": "presentation-ir-2",
-    "generation_trace": "generation-trace-3",
-    "adaptive_proposal": "adaptive-proposal-1"
+    "generation_trace": "generation-trace-4",
+    "adaptive_proposal": "adaptive-proposal-2"
   }
 }

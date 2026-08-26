@@ -27,7 +27,7 @@ fn is_lower_sha256(value: &str) -> bool {
 fn corpus_vectors_recompute_expected_hashes() {
     let data = derelict_core::GenData::default_bundle().unwrap();
     let vectors = vectors();
-    assert_eq!(vectors.len(), 8);
+    assert_eq!(vectors.len(), 9);
     let manifest: serde_json::Value = serde_json::from_str(include_str!(
         "../../../../../data/procgen/manifests/content_manifest.json"
     ))
@@ -50,6 +50,7 @@ fn corpus_vectors_recompute_expected_hashes() {
     let mut saw_intact = false;
     let mut saw_damaged = false;
     let mut saw_fractured = false;
+    let mut saw_gate3_seed1_migration = false;
     for vector in vectors {
         assert!(names.insert(vector.name.clone()), "duplicate vector name");
         assert!(requests.insert(serde_json::to_string(&vector.request).unwrap()));
@@ -77,6 +78,7 @@ fn corpus_vectors_recompute_expected_hashes() {
         saw_empty_player |= vector.request.player_model.signals.is_empty();
         saw_nonempty_player |= !vector.request.player_model.signals.is_empty();
 
+        let world_seed = vector.request.world_seed;
         let bundle = generate_bundle(vector.request, &data)
             .unwrap_or_else(|error| panic!("{} failed: {error:?}", vector.name));
         let hash = semantic_hash(&bundle).unwrap();
@@ -98,6 +100,11 @@ fn corpus_vectors_recompute_expected_hashes() {
         if vector.name.contains("_fractured_") {
             assert!(bundle.site_ir.ship.fractured, "{}", vector.name);
             saw_fractured = true;
+        }
+        if vector.name == "frigate_gate3_seed1_migration" {
+            assert_eq!(world_seed, 1);
+            assert!(!bundle.site_ir.ship.fractured);
+            saw_gate3_seed1_migration = true;
         }
         if let Some(parent) = vector.same_semantics_as {
             assert_ne!(parent, vector.name);
@@ -125,4 +132,5 @@ fn corpus_vectors_recompute_expected_hashes() {
     assert!(saw_positive_coordinate && saw_negative_coordinate && saw_origin);
     assert!(saw_empty_player && saw_nonempty_player);
     assert!(saw_intact && saw_damaged && saw_fractured);
+    assert!(saw_gate3_seed1_migration);
 }

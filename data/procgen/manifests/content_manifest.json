@@ -126,6 +126,10 @@
       "sha256": "77a21762d44d6dafd8ac8a7cdc13ac35702d667181a75b30c2d8e4b2fe382986"
     },
     {
+      "path": "native/worldgen/crates/derelict_core/assets/adaptive/classical_v1.json",
+      "sha256": "c197f5a69165c34621a1f414a3e6108e898918842009501fb5cff85c2a9de00e"
+    },
+    {
       "path": "native/worldgen/crates/derelict_core/assets/archetypes/corvette.ron",
       "sha256": "8da1bf7e64a521b107d3af4b88930dbe3efe407e27cf161640125944ed653059"
     },
@@ -238,5 +242,5 @@
       "sha256": "988d3d023a552188b0400843940f5724dc99e953b86049c7e2b70018e25990b1"
     }
   ],
-  "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407"
+  "content_manifest_hash": "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385"
 }

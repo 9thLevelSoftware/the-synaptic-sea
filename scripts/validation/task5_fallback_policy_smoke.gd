@@ -74,15 +74,23 @@ func _init() -> void:
 
 func _find_safe_return_fixture(generator: Object, consumer: RefCounted, build: Dictionary, runtime: Dictionary, caps: Dictionary) -> Dictionary:
 	for seed_value in 192:
-		var request: Dictionary = consumer.build_request(seed_value, 0, 1, runtime, "standard")
+		# Select the ungated survey profile deterministically so its graph can be
+		# replaced by the mechanically identical authored safe-return layer.
+		var request: Dictionary = consumer.build_request(seed_value, 0, 1, runtime, "standard", "", "", 0, 0, [
+			{"kind": "combat_mastery", "value_bp": 3500},
+			{"kind": "resource_pressure", "value_bp": 3000},
+			{"kind": "objective_pace", "value_bp": 4000},
+		])
 		if request.is_empty():
 			continue
 		var raw: String = str(generator.generate_bundle(JSON.stringify(request)))
-		if consumer.consume(raw, request, build, runtime, caps).is_empty():
+		var baseline: Dictionary = consumer.consume(raw, request, build, runtime, caps)
+		if baseline.is_empty():
 			continue
 		var fallback_raw: String = _safe_return_fixture(raw)
-		if not fallback_raw.is_empty() and not consumer.consume(fallback_raw, request, build, runtime, caps).is_empty():
-			return {"request": request, "lifecycle": fallback_raw}
+		if not fallback_raw.is_empty():
+			if not consumer.consume(fallback_raw, request, build, runtime, caps).is_empty():
+				return {"request": request, "lifecycle": fallback_raw}
 	return {}
 
 
@@ -122,6 +130,32 @@ func _safe_return_fixture(raw: String) -> String:
 	decisions.append("site:rejected_candidate")
 	decisions.append("site:selected_fallback")
 	trace.fallback = SAFE_RETURN_ID
+	var adaptive_value: Variant = trace.get("adaptive_decisions", null)
+	if not adaptive_value is Array or (adaptive_value as Array).size() != 3 \
+			or not (adaptive_value as Array)[1] is Dictionary:
+		return ""
+	var player_values: Variant = ((adaptive_value as Array)[1] as Dictionary).get("player_values_bp", null)
+	if not player_values is Array or (player_values as Array).size() != 4:
+		return ""
+	(adaptive_value as Array)[1] = {
+		"schema_version": "adaptive-decision-trace-1",
+		"decision_id": "decision:site-ranker",
+		"kind": "site_ranker",
+		"rule_version": "adaptive-classical-1",
+		"player_values_bp": (player_values as Array).duplicate(),
+		"candidates": [],
+		"proposal": {
+			"schema_version": "adaptive-proposal-2",
+			"score": 0,
+			"rationale_codes": ["no_validated_candidate", "classical_fallback"],
+			"confidence_bp": 0,
+			"rule_model_version": "adaptive-classical-1",
+			"action": "no_op",
+		},
+		"selected_candidate_id": null,
+		"applied": false,
+		"fallback": "no_validated_candidate",
+	}
 
 	# The semantic projection excludes trace diagnostics but includes SiteIR.
 	# Recompute it after selecting the complete authored layer.

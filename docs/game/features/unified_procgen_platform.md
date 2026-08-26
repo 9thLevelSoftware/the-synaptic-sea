@@ -2,10 +2,9 @@
 
 ## Status
 
-Approved; Gates 0 through 3 are complete and Gate 4 implementation is in
-progress.
-No later gate is considered complete until its scoped card, acceptance evidence,
-and regression evidence are current.
+Approved; Gates 0 through 4 are complete. Gate 5 is next. No later gate is
+considered complete until its scoped card,
+acceptance evidence, and regression evidence are current.
 
 This specification is canonical for procedural generation. It supersedes the
 GDScript-authority assumptions in
@@ -87,10 +86,10 @@ versions.
 
 The bounded trace records named RNG channels, considered and rejected
 candidates, failed constraints, repairs, retries, fallback use, per-stage
-timings, and stable failure/rationale codes. Gate 3 advances this contract to
-`generation-trace-3`, whose exact ordered 37-channel set includes the new
-authoritative creature, encounter, item, and presentation streams without
-mutating the checked Gate 2 trace. It contains no personal data. See ADR-0066.
+timings, and stable failure/rationale codes. Gate 4 advances this contract to
+`generation-trace-4`, adding bounded adaptive decisions for the world ranker,
+site ranker, and encounter director without mutating earlier trace versions.
+It contains no personal data. See ADR-0066 and ADR-0067.
 
 ### `AdaptiveProposal`
 
@@ -253,6 +252,12 @@ promoted content-manifest entry.
   layers. Its expanded named RNG-channel set advances independently to
   `generation-trace-3`; trace 2 remains immutable. See ADR-0064 through
   ADR-0066.
+- Adaptive contract: Gate 4 advances the public bundle to `procgen-bundle-5`,
+  gameplay to `gameplay-ir-3`, lifecycle to `procgen-lifecycle-result-5`,
+  capabilities to `procgen-capabilities-4`, generator/build manifests to
+  versions 4, and proposals to `adaptive-proposal-2`. The shipped rule version
+  is `adaptive-classical-1`; no embedded inference model ships in Gate 4. See
+  ADR-0067.
 
 ## Gate acceptance criteria
 
@@ -300,8 +305,9 @@ promoted content-manifest entry.
 - Classical ranking/directing is deterministic, bounded, traceable, and cannot
   bypass validation.
 - Player input is bounded, versioned, run-local, and offline.
-- Any embedded experiment is disabled by default and deterministically falls
-  back on timeout, unsupported hardware, invalid output, or configuration.
+- The shipped implementation is classical utility scoring only. No embedded
+  inference experiment is present; any future model must use the same proposal
+  interface and deterministic fallback and pass a separate promotion gate.
 
 ### Gate 5 — authoring and observability
 
@@ -346,19 +352,19 @@ peak memory under 512 MB target / 1 GB stop, and 60 fps target / 30 fps stop.
 Per-stage latency, queue depth, entities, instances, navigation, and Web build
 size receive explicit budgets before their gate closes.
 
-Current Windows Gate 3 evidence is bound to Rust source commit
-`c330e77929961be44cae1edcd347417f16ca89d0`, native SHA-256
-`8d63a1e8bd8cd687bfaa8830e183e12eae83be940e35ebf5557a03ed725aa1a2`,
+Current Windows Gate 4 artifacts are bound to Rust source commit
+`29720efecfc8b9dd3f6959870639061f43203b8f`, content-manifest SHA-256
+`0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385`, native
+SHA-256 `f8d3aab1c4643749e38c1a9a3f0c75ab7d8a968e937c92534d4e35db119ebd87`,
 and Web SHA-256
-`724eb96e0b244162ea178028dbdc53d6a220dfdcf9e8a68ae8cbffcf8ca549e8`.
-Rust fmt, strict clippy, all 295 workspace tests, and the 1,800-ship release
-stress sweep pass. The exact Godot 4.7.2 Mono console in the Downloads directory
-passes the fourteen-script root-project Gate 3 suite plus the native lifecycle
-smoke with
-no unexpected warnings or errors. The installed WebAssembly package passes its
-Node lifecycle and shared parity corpus. Canonical Godot 4.7.1, macOS/Linux
-exports, and final exported-Web parity remain explicit Gate 6 evidence and are
-not yet verified.
+`ef8ff3861225c99ca0a2cdb190b4d4a27631b1d4f824c2e9c8fd12065d41c1f2`.
+Rust formatting, strict Clippy, all 318 workspace tests, schema and manifest
+checks, the 1,800-ship release stress sweep, and the Web lifecycle/parity smoke
+pass. The exact Godot 4.7.2 Mono console in Downloads passes adaptive trace,
+live consumer, mapper, fallback, build-manifest, wired-travel, and native
+lifecycle smokes with no unexpected warnings or errors. Canonical Godot 4.7.1,
+macOS/Linux exports, final exported-Web parity, windowed performance, and
+RoboGodot/manual editor review remain later-gate evidence and are not verified.
 
 ## Risks
 

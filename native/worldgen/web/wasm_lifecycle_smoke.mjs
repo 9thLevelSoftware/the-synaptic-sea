@@ -46,6 +46,12 @@ const canonical = (value) => {
   return value;
 };
 const equal = (left, right) => JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
+const withoutTimings = (bundle) => {
+  const copy = structuredClone(bundle);
+  delete copy.metrics?.stage_timings_micros;
+  delete copy.trace?.stage_timings_micros;
+  return copy;
+};
 const parseLifecycle = (raw, name) => {
   const result = parse(raw);
   const statuses = ['accepted', 'queued', 'running', 'cancel_requested', 'completed', 'failed'];
@@ -92,7 +98,7 @@ const assertBundleContract = (bundle, name) => {
   boundedArray(gameplay.items, 64, `${name} items`);
   boundedArray(gameplay.drops, 4096, `${name} drops`);
   boundedArray(gameplay.decisions, 4096, `${name} gameplay decisions`);
-  if (gameplay.encounter?.schema_version !== 'encounter-output-2'
+  if (gameplay.encounter?.schema_version !== 'encounter-output-3'
       || !Array.isArray(gameplay.encounter.spawns) || gameplay.encounter.spawns.length > 4096
       || gameplay.encounter.total_threat > 100000 || gameplay.encounter.total_performance > 100000
       || gameplay.encounter.total_reward_value > 1000000
@@ -133,7 +139,7 @@ const assertBundleContract = (bundle, name) => {
   const adaptiveIds = ['decision:world-ranker', 'decision:site-ranker', 'decision:encounter-director'];
   bundle.trace.adaptive_decisions.forEach((decision, index) => {
     const keys = Object.keys(decision).sort().join(',');
-    if (keys !== 'applied,candidates,decision_id,fallback,kind,player_values_bp,proposal,rule_version,schema_version'
+    if (keys !== 'applied,candidates,decision_id,fallback,kind,player_values_bp,proposal,rule_version,schema_version,selected_candidate_id'
         || decision.schema_version !== 'adaptive-decision-trace-1'
         || decision.kind !== adaptiveKinds[index] || decision.decision_id !== adaptiveIds[index]
         || decision.rule_version !== 'adaptive-classical-1'
@@ -226,7 +232,7 @@ const repeatRaw = JSON.stringify(vectors[0].request);
 const repeatA = parseLifecycle(binding.generate_bundle(repeatRaw), 'repeat A');
 const repeatB = parseLifecycle(binding.generate_bundle(repeatRaw), 'repeat B');
 if (repeatA.bundle?.semantic_hash !== repeatB.bundle?.semantic_hash
-    || JSON.stringify(repeatA.bundle) !== JSON.stringify(repeatB.bundle)) {
+    || !equal(withoutTimings(repeatA.bundle), withoutTimings(repeatB.bundle))) {
   throw new Error('deterministic repeated output mismatch');
 }
 console.log('WASM_LIFECYCLE_SMOKE: PASS');

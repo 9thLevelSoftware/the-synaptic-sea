@@ -1121,7 +1121,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Source: `docs/game/features/unified_procgen_platform.md`
 - Type: gameplay / technical
 - Priority: must
-- Status: Approved
+- Status: Implemented / Gate 4 verified
 - Rationale: Adaptation must improve pacing without hidden rule changes,
   validator bypass, network dependency, or irreproducible decisions.
 - Acceptance criteria:
@@ -1132,12 +1132,15 @@ and the Task 15 documentation-currency deliverable. They are validated by
     account identity and free-form personal data.
   - Inputs, candidates, scores, action, rationale, version, and fallback are
     sufficient to replay the decision.
-  - Any later embedded model is disabled by default, uses `AdaptiveProposal`,
-    cannot bypass validation, and deterministically falls back on timeout,
-    unsupported hardware, invalid output, error, or disabled configuration.
+  - No embedded model ships in Gate 4. Any later model must be disabled by
+    default, use `AdaptiveProposal`, cannot bypass validation, and
+    deterministically fall back on timeout, unsupported hardware, invalid
+    output, error, or disabled configuration before promotion.
 - Verification:
-  - Golden scoring/tie-break tests, replay tests, difficulty/threat monotonicity,
-    envelope properties, and forced model-fallback tests.
+  - Golden scoring/tie-break tests, replay and tamper-rejection tests,
+    difficulty/threat monotonicity, validated-candidate-only checks, and
+    authored-envelope properties. Model-fallback tests are deferred until an
+    embedded model is separately proposed and enabled.
 
 ## REQ-PG-011: Seed laboratory, diagnostics, and promoted regression corpus
 

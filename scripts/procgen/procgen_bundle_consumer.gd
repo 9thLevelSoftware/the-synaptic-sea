@@ -6,7 +6,7 @@ const CanonicalJsonScript := preload("res://scripts/procgen/procgen_canonical_js
 const GENERATOR_VERSION: int = 3
 const STRUCTURAL_GENERATOR_VERSION: int = 2
 const MAX_SAFE_JSON_INTEGER: int = 9007199254740991
-const CONTENT_HASH: String = "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407"
+const CONTENT_HASH: String = "0923a378b923021172606f0c678383a5ca14c261e20b498369d3768b852e7385"
 const DOMAINS: Array[String] = ["world", "site", "gameplay", "presentation"]
 const SUPPORTED_ARCHETYPES: Array[String] = ["shuttle", "corvette", "freighter", "frigate"]
 const SUPPORTED_DIFFICULTIES: Array[String] = ["standard", "hardened", "deep_dive"]
@@ -1273,8 +1273,7 @@ func _validate_encounter_budgets(value: Variant, request: Dictionary, player_val
 	}
 	if not authored.has(difficulty_id): return false
 	var base: Dictionary = authored[difficulty_id]
-	var adjustment: int = int(player_values[0]) - 5000 - _trunc_div(int(player_values[1]) - 5000, 2) - _trunc_div(int(player_values[2]) - 5000, 2) + _trunc_div(int(player_values[3]) - 5000, 4)
-	var factor: int = clampi(10000 + adjustment, 7500, 12500)
+	var factor: int = 10000 + _adaptive_encounter_delta(player_values)
 	var loot_richness: int = int(request.get("site", {}).get("loot_richness_bp", 0))
 	var expected: Dictionary = {
 		"difficulty_id":difficulty_id,
@@ -1286,9 +1285,6 @@ func _validate_encounter_budgets(value: Variant, request: Dictionary, player_val
 		"minimum_reward_value":25,
 	}
 	return _same_json(value, expected)
-
-func _trunc_div(value: int, divisor: int) -> int:
-	return int(float(value) / float(divisor))
 
 func _validate_encounter_rationales(value: Variant) -> bool:
 	if not value is Array or (value as Array).is_empty(): return false
