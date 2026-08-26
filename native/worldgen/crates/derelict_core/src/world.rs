@@ -108,6 +108,11 @@ fn in_range(seed: u64, range: &RouteRange) -> u32 {
     range.min_bp + (seed % span) as u32
 }
 
+fn stable_index(seed: u64, len: usize) -> usize {
+    debug_assert!(len > 0);
+    (seed % len as u64) as usize
+}
+
 fn canonical_edge(from: &str, to: &str) -> (String, String) {
     if from < to {
         (from.into(), to.into())
@@ -464,12 +469,11 @@ pub fn generate_candidate(
         let seed = key(req, "site", "site.structural", 0, *x, *y, &sid)?
             .seed()
             .map_err(WorldError::Key)?;
+        let archetype_seed = key(req, "world", "world.archetype", i as u32, *x, *y, &sid)?
+            .seed()
+            .map_err(WorldError::Key)?;
         let archetype =
-            rules.archetypes[(key(req, "world", "world.archetype", i as u32, *x, *y, &sid)?
-                .seed()
-                .map_err(WorldError::Key)? as usize)
-                % rules.archetypes.len()]
-            .clone();
+            rules.archetypes[stable_index(archetype_seed, rules.archetypes.len())].clone();
         markers.push(CoordinateMarker {
             marker_id: format!("marker:{}", i + 1),
             site_id: sid,
@@ -570,23 +574,24 @@ pub fn generate_candidate(
         .map_err(WorldError::Key)?;
         biome_fields.push(BiomeField {
             marker_id: m.marker_id.clone(),
-            biome_id: rules.biomes[biome_seed as usize % rules.biomes.len()].clone(),
+            biome_id: rules.biomes[stable_index(biome_seed, rules.biomes.len())].clone(),
             intensity_bp: (biome_seed % 10001) as u32,
         });
         hazard_fields.push(HazardField {
             marker_id: m.marker_id.clone(),
-            hazard_id: rules.hazards[hazard_seed as usize % rules.hazards.len()].clone(),
+            hazard_id: rules.hazards[stable_index(hazard_seed, rules.hazards.len())].clone(),
             severity_bp: (hazard_seed % 10001) as u32,
         });
         resource_pressures.push(ResourcePressure {
             marker_id: m.marker_id.clone(),
-            resource_id: rules.resources[resource_seed as usize % rules.resources.len()].clone(),
+            resource_id: rules.resources[stable_index(resource_seed, rules.resources.len())]
+                .clone(),
             pressure_bp: (resource_seed % 10001) as u32,
         });
         landmarks.push(LandmarkRecord {
             id: format!("landmark:{i}"),
             marker_id: m.marker_id.clone(),
-            kind: rules.landmarks[landmark_seed as usize % rules.landmarks.len()].clone(),
+            kind: rules.landmarks[stable_index(landmark_seed, rules.landmarks.len())].clone(),
         });
     }
     let world = WorldIRv2 {
@@ -948,7 +953,7 @@ impl WorldIRv2 {
                 let seed = key(req, "world", "world.archetype", (i - 1) as u32, x, y, &sid)?
                     .seed()
                     .map_err(WorldError::Key)?;
-                let expected = &rules.archetypes[seed as usize % rules.archetypes.len()];
+                let expected = &rules.archetypes[stable_index(seed, rules.archetypes.len())];
                 if fallback.is_none() && marker.archetype_id != *expected {
                     return Err(WorldError::Invalid("marker_archetype"));
                 }
@@ -986,28 +991,28 @@ impl WorldIRv2 {
                 match kind {
                     0 if fallback.is_none()
                         && (self.biome_fields[i].biome_id
-                            != rules.biomes[seed as usize % rules.biomes.len()]
+                            != rules.biomes[stable_index(seed, rules.biomes.len())]
                             || self.biome_fields[i].intensity_bp != (seed % 10001) as u32) =>
                     {
                         return Err(WorldError::Invalid("biome"))
                     }
                     1 if fallback.is_none()
                         && (self.hazard_fields[i].hazard_id
-                            != rules.hazards[seed as usize % rules.hazards.len()]
+                            != rules.hazards[stable_index(seed, rules.hazards.len())]
                             || self.hazard_fields[i].severity_bp != (seed % 10001) as u32) =>
                     {
                         return Err(WorldError::Invalid("hazard"))
                     }
                     2 if fallback.is_none()
                         && (self.resource_pressures[i].resource_id
-                            != rules.resources[seed as usize % rules.resources.len()]
+                            != rules.resources[stable_index(seed, rules.resources.len())]
                             || self.resource_pressures[i].pressure_bp != (seed % 10001) as u32) =>
                     {
                         return Err(WorldError::Invalid("resource"))
                     }
                     3 if fallback.is_none()
                         && self.landmarks[i].kind
-                            != rules.landmarks[seed as usize % rules.landmarks.len()] =>
+                            != rules.landmarks[stable_index(seed, rules.landmarks.len())] =>
                     {
                         return Err(WorldError::Invalid("landmark"))
                     }
@@ -1233,6 +1238,12 @@ mod tests {
         let mut b = a.clone();
         b.x = 1;
         assert_ne!(a.seed(), b.seed());
+    }
+    #[test]
+    fn content_selection_preserves_seed_bits_above_wasm_usize() {
+        let seed = 1_u64 << 32;
+        assert_eq!(stable_index(seed, 3), 1);
+        assert_ne!(stable_index(seed, 3), (seed as u32 as usize) % 3);
     }
     #[test]
     fn every_key_component_is_addressed() {

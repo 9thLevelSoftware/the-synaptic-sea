@@ -70,7 +70,9 @@ const overload = parse(binding.generate_bundle_async(JSON.stringify(vectors[0].r
 if (overload.request_id !== null || overload.failure?.code !== 'overload'
     || !equal(overload.events, ['rejected', 'overloaded'])) throw new Error('overload contract mismatch');
 const recovered = parse(binding.poll(ids[0]));
-if (recovered.bundle?.semantic_hash !== vectors[0].expected_semantic_hash) throw new Error('queue recovery mismatch');
+if (recovered.bundle?.semantic_hash !== vectors[0].expected_semantic_hash) {
+  throw new Error(`queue recovery mismatch: actual=${recovered.bundle?.semantic_hash ?? 'none'} expected=${vectors[0].expected_semantic_hash}`);
+}
 const cancelled = parse(binding.generate_bundle_async(JSON.stringify(vectors[0].request)));
 const cancelId = BigInt(cancelled.request_id);
 if (cancelId !== 9n) throw new Error(`recovery id mismatch: ${cancelId}`);
