@@ -27,7 +27,22 @@ try {
     $localBin = Join-Path $addonRoot "bin\win64"
     New-Item -ItemType Directory -Force $localBin | Out-Null
     Copy-Item $builtDll $localBin -Force
+    $projectData = Join-Path $root "godot\.godot"
+    $extensionList = Join-Path $projectData "extension_list.cfg"
+    $extensionResource = "res://addons/derelict/derelict.gdextension"
+    New-Item -ItemType Directory -Force $projectData | Out-Null
+    $registeredExtensions = @()
+    if (Test-Path -LiteralPath $extensionList -PathType Leaf) {
+        $registeredExtensions = @(Get-Content -LiteralPath $extensionList | Where-Object { $_.Trim() })
+    }
+    $registeredExtensions = @($registeredExtensions + $extensionResource | Sort-Object -Unique)
+    [System.IO.File]::WriteAllLines(
+        $extensionList,
+        [string[]]$registeredExtensions,
+        [System.Text.UTF8Encoding]::new($false)
+    )
     Write-Host "Installed derelict_godot.dll ($profileDir) -> $localBin"
+    Write-Host "Registered DerelictGenerator addon -> $extensionList"
 
     if ($DestRepo) {
         $destAddon = Join-Path $DestRepo "addons\derelict"

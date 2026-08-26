@@ -85,6 +85,37 @@ fn semantic_hash_is_order_and_presentation_invariant() {
 }
 
 #[test]
+fn fractured_bundle_reconciles_rooms_removed_by_connectivity_repair() {
+    let data = derelict_core::GenData::default_bundle().unwrap();
+    let mut fractured = request();
+    fractured.world_seed = 12;
+    fractured.site.archetype_id = "frigate".into();
+    let bundle = generate_bundle(fractured, &data).unwrap();
+    assert!(bundle.site_ir.ship.fractured);
+    assert_eq!(
+        bundle.trace.repairs,
+        ["reconciled:fragment_metadata".to_owned()]
+    );
+
+    let live_rooms: std::collections::BTreeSet<_> = bundle
+        .site_ir
+        .ship
+        .topology
+        .rooms
+        .iter()
+        .map(|room| room.id)
+        .collect();
+    let fragment_rooms: std::collections::BTreeSet<_> = bundle
+        .site_ir
+        .ship
+        .fragments
+        .iter()
+        .flat_map(|fragment| fragment.rooms.iter().copied())
+        .collect();
+    assert_eq!(fragment_rooms, live_rooms);
+}
+
+#[test]
 fn contracts_validate_actions_domains_and_bundle_unknown_fields() {
     let mut duplicate = request();
     duplicate.requested_domains.push(Domain::Site);

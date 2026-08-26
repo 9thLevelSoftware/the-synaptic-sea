@@ -143,8 +143,14 @@ func _process(_delta: float) -> bool:
 	_expect(failure.get("code") == "result_consumed", "consumed_code")
 
 	var legacy: Variant = _generator_a.call("generate", 12, {"archetype_id": "frigate"})
+	if legacy is Dictionary and (legacy as Dictionary).has("error"):
+		print("LIFECYCLE_SMOKE:LEGACY_ERROR:", JSON.stringify(legacy))
 	_expect(legacy is Dictionary, "legacy_dictionary")
+	if _failed:
+		return true
 	_expect(not (legacy as Dictionary).has("error"), "legacy_ship")
+	if _failed:
+		return true
 	print("LIFECYCLE_SMOKE: PASS")
 	quit(0)
 	return true

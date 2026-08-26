@@ -565,6 +565,34 @@ impl AdaptiveProposal {
     }
 }
 
+/// The established v2 ship pipeline records fracture membership before its
+/// bounded connectivity repair may destroy isolated rooms. The layered bundle
+/// contract removes only those stale references; it does not rerun or mutate
+/// topology. This preserves the v2 structural generator while making the new
+/// IR fail-closed and self-consistent.
+fn reconcile_bundle_fragments(ship: &mut Ship) -> bool {
+    if !ship.fractured {
+        return false;
+    }
+    let original = ship.fragments.clone();
+    let live_rooms: BTreeSet<_> = ship.topology.rooms.iter().map(|room| room.id).collect();
+    for fragment in &mut ship.fragments {
+        fragment.rooms.retain(|room| live_rooms.contains(room));
+    }
+    ship.fragments.retain(|fragment| !fragment.rooms.is_empty());
+
+    let covered_rooms: BTreeSet<_> = ship
+        .fragments
+        .iter()
+        .flat_map(|fragment| fragment.rooms.iter().copied())
+        .collect();
+    if ship.fragments.len() == 1 && covered_rooms == live_rooms {
+        ship.fractured = false;
+        ship.fragments.clear();
+    }
+    ship.fragments != original
+}
+
 pub fn generate_bundle(
     request: ProcgenRequest,
     data: &GenData,
@@ -604,7 +632,8 @@ where
             true,
         )
     })?;
-    let ship = report.ship;
+    let mut ship = report.ship;
+    let repaired_fragments = reconcile_bundle_fragments(&mut ship);
     if ship.generator_version != request.generator_version
         || ship.seed != request.world_seed
         || ship.archetype_id != request.site.archetype_id
@@ -700,6 +729,11 @@ where
         rng_channels: RNG_CHANNELS.iter().map(|s| (*s).into()).collect(),
         candidate_decisions: report.candidate_decisions,
         failed_constraints: report.failed_constraints,
+        repairs: if repaired_fragments {
+            vec!["reconciled:fragment_metadata".into()]
+        } else {
+            Vec::new()
+        },
         retries: report.retries,
         stage_timings_micros: metrics.stage_timings_micros.clone(),
         ..Default::default()
