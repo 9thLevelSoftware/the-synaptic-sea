@@ -137,7 +137,7 @@ func generate_hub(seed_value: int = 42) -> Dictionary:
 	var blueprint = ShipBlueprintScript.new(ShipBlueprintScript.Size.MEDIUM, ShipBlueprintScript.Condition.DAMAGED, seed_value)
 	blueprint.room_count_range = Vector2i(6, 8)
 
-	var layout = ship_generator.generate_layout(blueprint)
+	var layout = ship_generator.generate_layout_migration_oracle(blueprint)
 	current_layout = layout
 	current_gameplay_slice = gameplay_slice_builder.build(layout)
 
@@ -169,7 +169,7 @@ func generate_derelict(seed_value: int = 777, biome_id: String = "breach_field")
 	blueprint.room_count_range = Vector2i(4, 6)
 
 	ship_generator.configure_run_context(biome_id, "standard")
-	var layout = ship_generator.generate_layout(blueprint)
+	var layout = ship_generator.generate_layout_migration_oracle(blueprint)
 	current_layout = layout
 	current_gameplay_slice = gameplay_slice_builder.build(layout)
 

@@ -13,8 +13,8 @@ const SCHEMAS: Dictionary = {
 
 var last_error: String = ""
 
-func build_request(seed_value: int, size: int, condition: int) -> Dictionary:
-	if seed_value < 0 or seed_value > 0x7fffffffffffffff:
+func build_request(seed_value: int, size: int, condition: int, runtime_manifest: Dictionary = {}) -> Dictionary:
+	if seed_value < 0 or seed_value > 9007199254740991:
 		last_error = "json_unsafe_seed"
 		return {}
 	var archetypes: Dictionary = {0: "shuttle", 1: "corvette", 2: "freighter"}
@@ -24,15 +24,17 @@ func build_request(seed_value: int, size: int, condition: int) -> Dictionary:
 		return {}
 	var unsigned_seed: int = seed_value
 	var site_id: String = "site_%s_%s_%s" % [str(unsigned_seed), str(size), str(condition)]
+	var generator_version: int = int(runtime_manifest.get("generator_version", GENERATOR_VERSION))
+	var content_hash: String = str(runtime_manifest.get("content_manifest_hash", CONTENT_HASH))
 	return {"schema_version": "procgen-request-1", "world_seed": unsigned_seed,
 		"site": {"site_id": site_id, "x": 0, "y": 0, "archetype_id": archetypes[size],
 			"kit_id": "ship_structural_v0", "intactness_override_bp": intactness[condition],
 			"cause_of_loss": null, "loot_richness_bp": 5000},
 		"difficulty_id": "standard", "player_model": {"schema_version": "player-model-1", "signals": []},
-		"requested_domains": DOMAINS.duplicate(), "generator_version": GENERATOR_VERSION,
-		"content_manifest_hash": CONTENT_HASH, "presentation": {"seed": unsigned_seed, "locale": "en-US"}}
+		"requested_domains": DOMAINS.duplicate(), "generator_version": generator_version,
+		"content_manifest_hash": content_hash, "presentation": {"seed": unsigned_seed, "locale": "en-US"}}
 
-func consume(result_json: String, request: Dictionary, manifest: Dictionary = {}, capabilities: Dictionary = {}) -> Dictionary:
+func consume(result_json: String, request: Dictionary, build_manifest: Dictionary = {}, runtime_manifest: Dictionary = {}, capabilities: Dictionary = {}) -> Dictionary:
 	last_error = ""
 	if request.is_empty() or result_json.is_empty(): return _fail("missing_bundle")
 	var parsed: Variant = JSON.parse_string(result_json)
@@ -43,9 +45,14 @@ func consume(result_json: String, request: Dictionary, manifest: Dictionary = {}
 	var bundle: Variant = lifecycle.get("bundle", null)
 	if not bundle is Dictionary: return _fail("missing_bundle")
 	var doc: Dictionary = bundle
-	if not manifest.is_empty() and (str(manifest.get("manifest_schema", "")) != "procgen-build-manifest-1" or int(manifest.get("generator_version", -1)) != GENERATOR_VERSION): return _fail("manifest_mismatch")
+	if build_manifest.is_empty() or str(build_manifest.get("manifest_schema", "")) != "procgen-build-manifest-1": return _fail("build_manifest_mismatch")
+	if runtime_manifest.is_empty() or str(runtime_manifest.get("schema_version", "")) != "procgen-generator-manifest-1": return _fail("runtime_manifest_mismatch")
 	if not capabilities.is_empty() and str(capabilities.get("schema_version", "")) != "procgen-capabilities-1": return _fail("capabilities_schema")
-	if not _validate(doc, request, manifest, capabilities): return {}
+	if int(runtime_manifest.get("generator_version", -1)) != int(build_manifest.get("generator_version", -2)) or str(runtime_manifest.get("content_manifest_hash", "")) != str(build_manifest.get("content_manifest_hash", "")): return _fail("manifest_identity")
+	if bool(runtime_manifest.get("dirty_development", true)): return _fail("dirty_runtime")
+	if str(runtime_manifest.get("target", "")) != str(build_manifest.get("target", "")): return _fail("target_mismatch")
+	if not _validate_capabilities(capabilities, runtime_manifest): return {}
+	if not _validate(doc, request, build_manifest, capabilities): return {}
 	return doc.duplicate(true)
 
 func _validate(bundle: Dictionary, request: Dictionary, manifest: Dictionary, capabilities: Dictionary) -> bool:
@@ -53,7 +60,7 @@ func _validate(bundle: Dictionary, request: Dictionary, manifest: Dictionary, ca
 		if not bundle.has(field): return _fail("missing_%s" % field) == {}
 	if str(bundle.schema_version) != SCHEMAS.procgen_bundle: return _fail("bundle_schema") == {}
 	var version: Dictionary = bundle.version
-	if int(version.get("generator_version", -1)) != GENERATOR_VERSION or str(version.get("content_manifest_hash", "")) != CONTENT_HASH: return _fail("version_mismatch") == {}
+	if int(version.get("generator_version", -1)) != int(request.get("generator_version", -2)) or str(version.get("content_manifest_hash", "")) != str(request.get("content_manifest_hash", "")): return _fail("version_mismatch") == {}
 	for layer in ["world_ir", "site_ir", "gameplay_ir", "presentation_ir"]:
 		if str((bundle[layer] as Dictionary).get("schema_version", "")) != SCHEMAS[layer]: return _fail("%s_schema" % layer) == {}
 	if str((bundle.metrics as Dictionary).get("schema_version", "")) != SCHEMAS.metrics or str((bundle.trace as Dictionary).get("schema_version", "")) != SCHEMAS.generation_trace: return _fail("diagnostic_schema") == {}
@@ -68,6 +75,18 @@ func _validate(bundle: Dictionary, request: Dictionary, manifest: Dictionary, ca
 	var trace: Dictionary = bundle.trace
 	if trace.get("rng_channels", []).size() != 16: return _fail("trace_channels") == {}
 	if not _verify_hash(bundle): return false
+	return true
+
+func _validate_capabilities(caps: Dictionary, runtime_manifest: Dictionary) -> bool:
+	if caps.is_empty() or str(caps.get("adapter_kind", "")) != "native" or not bool(caps.get("supports_sync", false)): return _fail("capability_sync") == {}
+	if str(caps.get("target", "")) != str(runtime_manifest.get("target", "")): return _fail("capability_target") == {}
+	if str(caps.get("worker_mode", "")) != "thread_pool": return _fail("capability_worker_mode") == {}
+	var domains: Variant = caps.get("supported_domains", [])
+	if domains is not Array or (domains as Array) != DOMAINS: return _fail("capability_domains") == {}
+	var schemas: Variant = caps.get("schemas", {})
+	if not schemas is Dictionary or str((schemas as Dictionary).get("procgen_bundle", "")) != SCHEMAS.procgen_bundle: return _fail("capability_schemas") == {}
+	for key in ["max_request_bytes", "max_entities", "max_trace_entries", "max_events", "deadline_ms"]:
+		if int(caps.get(key, 0)) <= 0: return _fail("capability_%s" % key) == {}
 	return true
 
 func _verify_hash(bundle: Dictionary) -> bool:

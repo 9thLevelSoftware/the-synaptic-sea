@@ -28,5 +28,3 @@ data/training/**/output/
 .claude/
 .grok/
 .legion/
-# Task-local validation evidence (kept out of source history)
-task-5-report.md

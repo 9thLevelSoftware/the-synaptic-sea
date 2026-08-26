@@ -51,6 +51,10 @@ var difficulty_id: String = ""
 var _wrapper_map_cache: Dictionary = {}
 var fallback_policy: RefCounted = null
 
+func configure_authored_fallback(fallback_id: String, provider: Callable) -> void:
+	fallback_policy = preload("res://scripts/procgen/procgen_fallback_policy.gd").new()
+	fallback_policy.configure(fallback_id, provider)
+
 
 # Sets the biome / difficulty applied to the NEXT generate()/generate_from_seed()
 # call. The coordinator resolves these deterministically from the target marker's
@@ -118,7 +122,7 @@ func generate(blueprint, archetype: Dictionary = {}) -> Node3D:
 	if blueprint == null:
 		push_error("SHIP GENERATOR FAIL blueprint missing")
 		return null
-	var seed_value: int = int(blueprint.get("seed", 0)) if blueprint is Dictionary else int(blueprint.seed)
+	var seed_value: int = int(blueprint.get("seed_value", blueprint.get("seed", 0))) if blueprint is Dictionary else int(blueprint.seed_value)
 	var size: int = int(blueprint.get("size", 0)) if blueprint is Dictionary else int(blueprint.size)
 	var condition: int = int(blueprint.get("condition", 1)) if blueprint is Dictionary else int(blueprint.condition)
 	return _generate_via_worldgen(seed_value, size, condition)
@@ -134,7 +138,8 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int) -> Node3
 	if generator == null or not generator.has_method("generate_bundle"):
 		push_error("SHIP GENERATOR FAIL native bundle API unavailable")
 		return null
-	var manifest: Dictionary = {}
+	var build_manifest: Dictionary = {}
+	var runtime_manifest: Dictionary = {}
 	var capabilities: Dictionary = {}
 	if generator.has_method("generator_manifest") and generator.has_method("capabilities"):
 		var manifest_variant: Variant = JSON.parse_string(str(generator.generator_manifest()))
@@ -142,23 +147,42 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int) -> Node3
 		if not manifest_variant is Dictionary or not capabilities_variant is Dictionary:
 			push_error("SHIP GENERATOR FAIL native manifest/capabilities malformed")
 			return null
-		manifest = manifest_variant
+		runtime_manifest = manifest_variant
 		capabilities = capabilities_variant
+	var build_manifest_path: String = "res://data/procgen/manifests/build/win64.json"
+	if not FileAccess.file_exists(build_manifest_path):
+		push_error("SHIP GENERATOR FAIL external build manifest missing")
+		return null
+	var build_variant: Variant = JSON.parse_string(FileAccess.get_file_as_string(build_manifest_path))
+	if not build_variant is Dictionary:
+		push_error("SHIP GENERATOR FAIL external build manifest malformed")
+		return null
+	build_manifest = build_variant
+	var manifest_verdict: String = ProcgenManifestValidatorScript.new().validate(build_manifest, generator)
+	if manifest_verdict != ProcgenManifestValidatorScript.OK:
+		push_error("SHIP GENERATOR FAIL external build manifest: %s" % manifest_verdict)
+		return null
 	var consumer: RefCounted = BundleConsumerScript.new()
-	var request: Dictionary = consumer.build_request(seed_value, size, condition)
+	var request: Dictionary = consumer.build_request(seed_value, size, condition, runtime_manifest)
 	if request.is_empty():
 		push_error("SHIP GENERATOR FAIL %s" % consumer.last_error)
 		return null
 	var lifecycle_json: String = str(generator.generate_bundle(JSON.stringify(request)))
-	var bundle: Dictionary = consumer.consume(lifecycle_json, request, manifest as Dictionary, capabilities as Dictionary)
+	var bundle: Dictionary = consumer.consume(lifecycle_json, request, build_manifest, runtime_manifest, capabilities)
 	if bundle.is_empty():
-		push_error("SHIP GENERATOR FAIL bundle validation: %s" % consumer.last_error)
-		return null
+		if fallback_policy != null:
+			bundle = fallback_policy.resolve(request, consumer)
+		if not bundle.is_empty():
+			lifecycle_json = ""
+		else:
+			push_error("SHIP GENERATOR FAIL bundle validation: %s" % consumer.last_error)
+			return null
 	var mapped: Dictionary = BundleMapperScript.new().map_to_loader_documents(bundle)
 	if mapped.is_empty():
 		push_error("SHIP GENERATOR FAIL bundle mapping")
 		return null
-	var kit: Dictionary = _load_worldgen_kit()
+	var kit_id: String = str((bundle.get("presentation_ir", {}) as Dictionary).get("kit_id", ""))
+	var kit: Dictionary = _load_worldgen_kit(kit_id)
 	var loader: Node3D = GeneratedShipLoaderScript.new()
 	if not loader.load_from_documents(mapped.layout, kit, mapped.gameplay_slice, true):
 		loader.queue_free()
@@ -167,16 +191,20 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int) -> Node3
 	return loader
 
 
-func _load_worldgen_kit() -> Dictionary:
+func _load_worldgen_kit(kit_id: String = WORLDGEN_KIT_ID) -> Dictionary:
+	if kit_id != WORLDGEN_KIT_ID:
+		push_error("SHIP GENERATOR FAIL unsupported presentation kit: %s" % kit_id)
+		return {}
 	if _worldgen_kit_loaded:
 		return _worldgen_kit_doc.duplicate(true)
 	_worldgen_kit_loaded = true
-	if not FileAccess.file_exists(WORLDGEN_KIT_PATH):
-		push_error("SHIP GENERATOR FAIL structural kit not found: %s" % WORLDGEN_KIT_PATH)
+	var kit_path: String = "res://data/kits/%s.json" % kit_id
+	if not FileAccess.file_exists(kit_path):
+		push_error("SHIP GENERATOR FAIL structural kit not found: %s" % kit_path)
 		return {}
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(WORLDGEN_KIT_PATH))
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(kit_path))
 	if not (parsed is Dictionary):
-		push_error("SHIP GENERATOR FAIL structural kit JSON is invalid: %s" % WORLDGEN_KIT_PATH)
+		push_error("SHIP GENERATOR FAIL structural kit JSON is invalid: %s" % kit_path)
 		return {}
 	_worldgen_kit_doc = (parsed as Dictionary).duplicate(true)
 	return _worldgen_kit_doc.duplicate(true)
