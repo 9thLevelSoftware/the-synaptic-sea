@@ -300,12 +300,13 @@ impl ItemCatalogue {
 impl ItemGenerationContext {
     fn validate(&self, c: &ItemCatalogue) -> Result<()> {
         c.validate()?;
+        let source_state_valid = (self.eligible_sources.is_empty() && self.max_count == 0)
+            || (!self.eligible_sources.is_empty() && self.max_count > 0);
         if self.request.platform_version != PROCGEN_GENERATOR_VERSION
             || !id(&self.difficulty_id)
             || self.loot_richness_bp > MAX_LOOT_RICHNESS_BP
-            || self.eligible_sources.is_empty()
             || self.eligible_sources.len() > MAX_SOURCES
-            || self.max_count == 0
+            || !source_state_valid
             || self.max_count as usize > MAX_ITEMS
             || self.max_total_value == 0
         {
@@ -331,6 +332,20 @@ impl ItemGenerationOutcome {
             || self.trace.considered.len() > 128
         {
             return Err(ItemError::Invalid("outcome_bounds"));
+        }
+        if c.eligible_sources.is_empty() {
+            if !self.items.is_empty()
+                || !self.drops.is_empty()
+                || !self.trace.considered.is_empty()
+                || !self.trace.selected.is_empty()
+                || self.trace.fallback.as_deref() != Some("authored_safe_empty")
+            {
+                return Err(ItemError::Invalid("safe_empty"));
+            }
+            return Ok(());
+        }
+        if self.trace.fallback.as_deref() == Some("authored_safe_empty") {
+            return Err(ItemError::Invalid("safe_empty"));
         }
         let mut seen = BTreeSet::new();
         let mut value = 0u32;
@@ -421,6 +436,20 @@ pub fn generate_items(
     cat: &ItemCatalogue,
 ) -> Result<ItemGenerationOutcome> {
     c.validate(cat)?;
+    if c.eligible_sources.is_empty() {
+        let outcome = ItemGenerationOutcome {
+            items: Vec::new(),
+            drops: Vec::new(),
+            trace: ItemGenerationTrace {
+                considered: Vec::new(),
+                repairs: Vec::new(),
+                fallback: Some("authored_safe_empty".into()),
+                selected: Vec::new(),
+            },
+        };
+        outcome.validate(c, cat)?;
+        return Ok(outcome);
+    }
     let mut k = WorldKey {
         world_seed: c.request.world_seed,
         platform_version: c.request.platform_version,

@@ -249,3 +249,20 @@ fn closed_enums_reject_unknown_values() {
     assert!(serde_json::from_str::<StatKind>("\"unknown\"").is_err());
     assert!(serde_json::from_str::<SourceKind>("\"unknown\"").is_err());
 }
+
+#[test]
+fn no_existing_drop_source_exports_complete_safe_empty_outcome() {
+    let mut context = context();
+    context.eligible_sources.clear();
+    context.max_count = 0;
+    let catalogue = catalogue();
+    let outcome = generate_items(&context, &catalogue).unwrap();
+    assert!(outcome.items.is_empty());
+    assert!(outcome.drops.is_empty());
+    assert!(outcome.trace.selected.is_empty());
+    assert_eq!(
+        outcome.trace.fallback.as_deref(),
+        Some("authored_safe_empty")
+    );
+    outcome.validate(&context, &catalogue).unwrap();
+}
