@@ -1,0 +1,45 @@
+{
+  "schema_version": "encounter-catalogue-2",
+  "rules_version": "encounter-rules-2",
+  "factions": [
+    {
+      "id": "biomatter",
+      "roles": ["scout", "controller"],
+      "ability_ids": ["ability_dash", "ability_pulse"],
+      "blueprint_ids": ["creature_drone", "creature_siren"]
+    },
+    {
+      "id": "raiders",
+      "roles": ["scout", "tank"],
+      "ability_ids": ["ability_bash", "ability_dash"],
+      "blueprint_ids": ["creature_brute", "creature_drone"]
+    }
+  ],
+  "difficulty": [
+    {
+      "id": "standard",
+      "threat_budget": 1000,
+      "performance_budget": 800,
+      "economy_budget": 400,
+      "group_cap": 4
+    },
+    {
+      "id": "hardened",
+      "threat_budget": 1600,
+      "performance_budget": 1200,
+      "economy_budget": 600,
+      "group_cap": 6
+    },
+    {
+      "id": "deep_dive",
+      "threat_budget": 2400,
+      "performance_budget": 1800,
+      "economy_budget": 800,
+      "group_cap": 8
+    }
+  ],
+  "max_candidates": 128,
+  "max_decisions": 128,
+  "safe_empty_fallback_id": "encounter-safe-empty",
+  "reward_values": [25, 50, 100]
+}

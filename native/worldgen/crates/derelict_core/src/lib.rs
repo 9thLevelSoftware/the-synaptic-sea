@@ -7,6 +7,7 @@
 
 pub mod archetype;
 pub mod creature;
+pub mod encounter;
 pub mod item_generation;
 pub mod lifecycle;
 pub mod manifest;
