@@ -21,9 +21,21 @@ func _init() -> void:
 	var baseline: Dictionary = consumer.consume(raw, request, build, runtime, caps)
 	count += 1
 	if baseline.is_empty(): failures.append("baseline:%s" % consumer.last_error)
+	var baseline_world: Dictionary = baseline.get("world_ir", {})
+	var baseline_markers: Array = baseline_world.get("markers", [])
+	count += 1
+	_expect(baseline_markers.size() == 9 \
+			and str((baseline_markers[1] as Dictionary).get("site_id", "")) != str(baseline_world.get("site_id", "")) \
+			and str((baseline_markers[1] as Dictionary).get("archetype_id", "")) != "" \
+			and not bool((baseline_markers[1] as Dictionary).get("selected", true)), failures, "neighbor_identity_accepted")
+	var baseline_ship: Dictionary = (baseline.get("site_ir", {}) as Dictionary).get("ship", {})
+	count += 1
+	_expect(int(baseline.get("version", {}).get("generator_version", -1)) == 3 \
+			and int(baseline_ship.get("generator_version", -1)) == 2 \
+			and consumer._same_json(baseline_ship.get("seed", null), baseline_world.get("site_seed", null)), failures, "platform_v3_structural_v2")
 	count += 1; _expect(consumer.consume("not-json", request, build, runtime, caps).is_empty() and consumer.last_error == "malformed_bundle_json", failures, "malformed_json")
 	var original: Dictionary = JSON.parse_string(raw)
-	var cases: Array = [["lifecycle_schema", "schema_version", "wrong", "lifecycle_schema"], ["lifecycle_status", "status", "failed", "lifecycle_not_completed"], ["missing_bundle", "bundle", null, "missing_bundle"], ["bundle_schema", "bundle.schema_version", "procgen-bundle-1", "bundle_schema"], ["hash", "bundle.semantic_hash", "0".repeat(64), "semantic_hash"], ["world_schema", "bundle.world_ir.schema_version", "world-ir-1", "world_ir_schema"], ["world_identity", "bundle.world_ir.site_id", "wrong-site", "world_identity"], ["ship_seed_identity", "bundle.site_ir.ship.seed", 42, "ship_identity"], ["presentation_identity", "bundle.presentation_ir.locale", "fr-FR", "presentation_identity"], ["pipeline_count", "bundle.metrics.pipeline_executions", 2, "pipeline_count"], ["trace_schema", "bundle.trace.schema_version", "wrong", "diagnostic_schema"]]
+	var cases: Array = [["lifecycle_schema", "schema_version", "wrong", "lifecycle_schema"], ["lifecycle_v1", "schema_version", "procgen-lifecycle-result-1", "lifecycle_schema"], ["lifecycle_status", "status", "failed", "lifecycle_not_completed"], ["missing_bundle", "bundle", null, "missing_bundle"], ["bundle_schema", "bundle.schema_version", "procgen-bundle-1", "bundle_schema"], ["hash", "bundle.semantic_hash", "0".repeat(64), "semantic_hash"], ["world_schema", "bundle.world_ir.schema_version", "world-ir-1", "world_ir_schema"], ["world_identity", "bundle.world_ir.site_id", "wrong-site", "world_identity"], ["ship_seed_identity", "bundle.site_ir.ship.seed", 42, "ship_identity"], ["ship_platform_version", "bundle.site_ir.ship.generator_version", 3, "ship_identity"], ["presentation_identity", "bundle.presentation_ir.locale", "fr-FR", "presentation_identity"], ["pipeline_count", "bundle.metrics.pipeline_executions", 2, "pipeline_count"], ["trace_schema", "bundle.trace.schema_version", "wrong", "diagnostic_schema"]]
 	for item in cases:
 		var mutated: Dictionary = original.duplicate(true)
 		_set_path(mutated, str(item[1]), item[2])
@@ -82,6 +94,42 @@ func _set_path(root: Dictionary, path: String, value: Variant) -> void:
 
 func _nested_bundle_cases(original: Dictionary) -> Array:
 	var cases: Array = []
+	var marker_count_case: Dictionary = original.duplicate(true)
+	(marker_count_case.bundle.world_ir.markers as Array).pop_back()
+	cases.append(["world_marker_count", marker_count_case, "world_markers"])
+	var marker_identity_case: Dictionary = original.duplicate(true)
+	(marker_identity_case.bundle.world_ir.markers as Array)[1].site_id = str(marker_identity_case.bundle.world_ir.site_id)
+	cases.append(["world_neighbor_identity", marker_identity_case, "world_markers"])
+	var marker_selected_case: Dictionary = original.duplicate(true)
+	(marker_selected_case.bundle.world_ir.markers as Array)[0].selected = false
+	cases.append(["world_selected_marker", marker_selected_case, "world_markers"])
+	var anchors_case: Dictionary = original.duplicate(true)
+	(anchors_case.bundle.world_ir.anchors as Array)[0].kind = "extraction"
+	cases.append(["world_anchors", anchors_case, "world_anchors"])
+	var biome_case: Dictionary = original.duplicate(true)
+	(biome_case.bundle.world_ir.biome_fields as Array)[1].marker_id = "marker:0"
+	cases.append(["world_biome_alignment", biome_case, "world_biomes"])
+	var hazard_case: Dictionary = original.duplicate(true)
+	(hazard_case.bundle.world_ir.hazard_fields as Array)[0].severity_bp = 10001
+	cases.append(["world_hazard_budget", hazard_case, "world_hazards"])
+	var resource_case: Dictionary = original.duplicate(true)
+	(resource_case.bundle.world_ir.resource_pressures as Array)[0].resource_id = "INVALID"
+	cases.append(["world_resource_id", resource_case, "world_resources"])
+	var landmark_case: Dictionary = original.duplicate(true)
+	(landmark_case.bundle.world_ir.landmarks as Array)[2].id = "landmark:1"
+	cases.append(["world_landmark_alignment", landmark_case, "world_landmarks"])
+	var route_cost_case: Dictionary = original.duplicate(true)
+	(route_cost_case.bundle.world_ir.routes as Array)[0].cost_bp = 0
+	cases.append(["world_route_cost", route_cost_case, "world_routes"])
+	var route_endpoint_case: Dictionary = original.duplicate(true)
+	(route_endpoint_case.bundle.world_ir.routes as Array)[0].from = "missing"
+	cases.append(["world_route_endpoint", route_endpoint_case, "world_routes"])
+	var route_duplicate_case: Dictionary = original.duplicate(true)
+	(route_duplicate_case.bundle.world_ir.routes as Array)[1] = (route_duplicate_case.bundle.world_ir.routes as Array)[0].duplicate(true)
+	cases.append(["world_route_duplicate", route_duplicate_case, "world_routes"])
+	var extraction_case: Dictionary = original.duplicate(true)
+	extraction_case.bundle.world_ir.extraction.path = ["marker:0", "anchor:extraction"]
+	cases.append(["world_extraction_path", extraction_case, "world_extraction"])
 	var occupancy_case: Dictionary = original.duplicate(true)
 	var occupancy: Dictionary = occupancy_case.bundle.site_ir.ship.plan.occupancy
 	occupancy[occupancy.keys()[0]] = "not-an-occupancy-record"

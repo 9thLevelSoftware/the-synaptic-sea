@@ -4,6 +4,7 @@ class_name ProcgenBundleConsumer
 const CanonicalJsonScript := preload("res://scripts/procgen/procgen_canonical_json.gd")
 
 const GENERATOR_VERSION: int = 3
+const STRUCTURAL_GENERATOR_VERSION: int = 2
 const MAX_SAFE_JSON_INTEGER: int = 9007199254740991
 const CONTENT_HASH: String = "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2"
 const DOMAINS: Array[String] = ["world", "site", "gameplay", "presentation"]
@@ -32,7 +33,7 @@ const EXPORT_SCHEMAS: Dictionary = {
 	"adaptive_proposal": "adaptive-proposal-1",
 }
 const ADAPTER_SCHEMAS: Dictionary = {
-	"lifecycle_result": "procgen-lifecycle-result-1",
+	"lifecycle_result": "procgen-lifecycle-result-2",
 	"capabilities": "procgen-capabilities-1",
 	"generator_manifest": "procgen-generator-manifest-1",
 }
@@ -266,7 +267,7 @@ func _validate_bundle(bundle: Dictionary, request: Dictionary, manifest: Diction
 	var ship_value: Variant = site_ir.get("ship", null)
 	if not ship_value is Dictionary or not _validate_ship_shape(ship_value as Dictionary): return false
 	var ship: Dictionary = ship_value
-	if not _same_json(ship.get("generator_version", null), request.get("generator_version", null)) or not _same_json(ship.get("seed", null), world.get("site_seed", null)) \
+	if not _same_json(ship.get("generator_version", null), STRUCTURAL_GENERATOR_VERSION) or not _same_json(ship.get("seed", null), world.get("site_seed", null)) \
 			or str(ship.get("archetype_id", "")) != str(site_request.get("archetype_id", "")): return _reject("ship_identity")
 	if (ship.entities as Array).size() > int(caps.get("max_entities", 0)): return _reject("entity_cap")
 	var gameplay_value: Variant = bundle.get("gameplay_ir", null)
@@ -287,28 +288,110 @@ func _validate_world_ir(world: Dictionary, request: Dictionary) -> bool:
 			or str(world.get("archetype_id", "")) != str(site.get("archetype_id", "")): return _reject("world_identity")
 	for key in ["markers", "anchors", "biome_fields", "hazard_fields", "resource_pressures", "landmarks", "routes"]:
 		if not world.get(key, null) is Array: return _reject("world_shape")
-	for entry in world.get("markers", []):
+	var markers: Array = world.get("markers", [])
+	if markers.size() != 9: return _reject("world_markers")
+	var offsets: Array[Vector2i] = [
+		Vector2i(0, 0), Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1),
+		Vector2i(-1, 0), Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, 1),
+		Vector2i(1, 1),
+	]
+	for index in markers.size():
+		var entry: Variant = markers[index]
 		if not entry is Dictionary or not _has_exact_keys(entry, ["archetype_id", "marker_id", "selected", "site_id", "site_seed", "x", "y"]): return _reject("world_markers")
-		if not entry.get("selected", null) is bool or not _is_bounded_integer(entry.get("site_seed", null), 0, MAX_SAFE_JSON_INTEGER) \
-				or not _same_json(entry.get("site_seed", null), world.get("site_seed", null)) \
-				or str(entry.get("marker_id", "")).is_empty() or str(entry.get("site_id", "")) != str(world.get("site_id", "")) or str(entry.get("archetype_id", "")) != str(world.get("archetype_id", "")): return _reject("world_markers")
-	for entry in world.get("anchors", []):
-		if not entry is Dictionary or not _has_exact_keys(entry, ["id", "kind"]): return _reject("world_anchors")
-	for entry in world.get("biome_fields", []):
-		if not entry is Dictionary or not _has_exact_keys(entry, ["biome_id", "intensity_bp", "marker_id"]) or not _is_bounded_integer(entry.get("intensity_bp", null), 0, 4294967295): return _reject("world_biomes")
-	for entry in world.get("hazard_fields", []):
-		if not entry is Dictionary or not _has_exact_keys(entry, ["hazard_id", "marker_id", "severity_bp"]) or not _is_bounded_integer(entry.get("severity_bp", null), 0, 4294967295): return _reject("world_hazards")
-	for entry in world.get("resource_pressures", []):
-		if not entry is Dictionary or not _has_exact_keys(entry, ["marker_id", "pressure_bp", "resource_id"]) or not _is_bounded_integer(entry.get("pressure_bp", null), 0, 4294967295): return _reject("world_resources")
-	for entry in world.get("landmarks", []):
-		if not entry is Dictionary or not _has_exact_keys(entry, ["id", "kind", "marker_id"]): return _reject("world_landmarks")
-	for entry in world.get("routes", []):
-		if not entry is Dictionary or not _has_exact_keys(entry, ["cost_bp", "from", "to"]) or not _is_bounded_integer(entry.get("cost_bp", null), 0, 4294967295): return _reject("world_routes")
+		var marker: Dictionary = entry
+		var expected_x: int = int(world.get("x", 0)) + offsets[index].x
+		var expected_y: int = int(world.get("y", 0)) + offsets[index].y
+		var expected_site_id: String = str(world.get("site_id", "")) if index == 0 else "site:%d:%d" % [expected_x, expected_y]
+		if str(marker.get("marker_id", "")) != "marker:%d" % index \
+				or not _is_valid_world_id(str(marker.get("marker_id", ""))) \
+				or not _is_valid_world_id(str(marker.get("site_id", ""))) \
+				or not _is_valid_world_id(str(marker.get("archetype_id", ""))) \
+				or not SUPPORTED_ARCHETYPES.has(str(marker.get("archetype_id", ""))) \
+				or not marker.get("selected", null) is bool \
+				or bool(marker.get("selected", false)) != (index == 0) \
+				or not _is_bounded_integer(marker.get("site_seed", null), 0, MAX_SAFE_JSON_INTEGER) \
+				or not _is_bounded_integer(marker.get("x", null), -2147483648, 2147483647) \
+				or not _is_bounded_integer(marker.get("y", null), -2147483648, 2147483647) \
+				or int(marker.get("x", 0)) != expected_x or int(marker.get("y", 0)) != expected_y \
+				or str(marker.get("site_id", "")) != expected_site_id: return _reject("world_markers")
+		if index == 0 and (not _same_json(marker.get("site_seed", null), world.get("site_seed", null)) \
+				or str(marker.get("archetype_id", "")) != str(world.get("archetype_id", ""))): return _reject("world_markers")
+
+	var anchors: Array = world.get("anchors", [])
+	if anchors.size() != 2 \
+			or not _same_json(anchors[0], {"id": "anchor:hub", "kind": "hub"}) \
+			or not _same_json(anchors[1], {"id": "anchor:extraction", "kind": "extraction"}): return _reject("world_anchors")
+
+	var biome_fields: Array = world.get("biome_fields", [])
+	var hazard_fields: Array = world.get("hazard_fields", [])
+	var resource_pressures: Array = world.get("resource_pressures", [])
+	var landmarks: Array = world.get("landmarks", [])
+	if biome_fields.size() != 9: return _reject("world_biomes")
+	if hazard_fields.size() != 9: return _reject("world_hazards")
+	if resource_pressures.size() != 9: return _reject("world_resources")
+	if landmarks.size() != 9: return _reject("world_landmarks")
+	for index in markers.size():
+		var marker_id: String = "marker:%d" % index
+		var biome: Variant = biome_fields[index]
+		if not biome is Dictionary or not _has_exact_keys(biome, ["biome_id", "intensity_bp", "marker_id"]) \
+				or str(biome.get("marker_id", "")) != marker_id \
+				or not _is_valid_world_id(str(biome.get("biome_id", ""))) \
+				or not _is_bounded_integer(biome.get("intensity_bp", null), 0, 10000): return _reject("world_biomes")
+		var hazard: Variant = hazard_fields[index]
+		if not hazard is Dictionary or not _has_exact_keys(hazard, ["hazard_id", "marker_id", "severity_bp"]) \
+				or str(hazard.get("marker_id", "")) != marker_id \
+				or not _is_valid_world_id(str(hazard.get("hazard_id", ""))) \
+				or not _is_bounded_integer(hazard.get("severity_bp", null), 0, 10000): return _reject("world_hazards")
+		var resource: Variant = resource_pressures[index]
+		if not resource is Dictionary or not _has_exact_keys(resource, ["marker_id", "pressure_bp", "resource_id"]) \
+				or str(resource.get("marker_id", "")) != marker_id \
+				or not _is_valid_world_id(str(resource.get("resource_id", ""))) \
+				or not _is_bounded_integer(resource.get("pressure_bp", null), 0, 10000): return _reject("world_resources")
+		var landmark: Variant = landmarks[index]
+		if not landmark is Dictionary or not _has_exact_keys(landmark, ["id", "kind", "marker_id"]) \
+				or str(landmark.get("id", "")) != "landmark:%d" % index \
+				or str(landmark.get("marker_id", "")) != marker_id \
+				or not _is_valid_world_id(str(landmark.get("id", ""))) \
+				or not _is_valid_world_id(str(landmark.get("kind", ""))): return _reject("world_landmarks")
+
+	var known_endpoints: Dictionary = {"anchor:hub": true, "anchor:extraction": true}
+	for index in markers.size(): known_endpoints["marker:%d" % index] = true
+	var routes: Array = world.get("routes", [])
+	if routes.size() != 10: return _reject("world_routes")
+	var route_keys: Dictionary = {}
+	var previous_route_key: String = ""
+	for route_value in routes:
+		if not route_value is Dictionary or not _has_exact_keys(route_value, ["cost_bp", "from", "to"]): return _reject("world_routes")
+		var route: Dictionary = route_value
+		var from_id: String = str(route.get("from", ""))
+		var to_id: String = str(route.get("to", ""))
+		var route_key: String = _world_edge_key(from_id, to_id)
+		if not known_endpoints.has(from_id) or not known_endpoints.has(to_id) \
+				or from_id >= to_id \
+				or not _is_bounded_integer(route.get("cost_bp", null), 1, 10000) \
+				or route_keys.has(route_key) \
+				or (not previous_route_key.is_empty() and previous_route_key >= route_key): return _reject("world_routes")
+		route_keys[route_key] = true
+		previous_route_key = route_key
 	var extraction: Variant = world.get("extraction", null)
 	if not extraction is Dictionary or not _has_exact_keys(extraction, ["extraction_anchor_id", "hub_anchor_id", "path", "selected_marker_id"]) \
-			or not extraction.get("path", null) is Array: return _reject("world_extraction")
-	for part in extraction.get("path", []):
-		if not part is String or str(part).is_empty(): return _reject("world_extraction")
+			or str(extraction.get("selected_marker_id", "")) != "marker:0" \
+			or str(extraction.get("hub_anchor_id", "")) != "anchor:hub" \
+			or str(extraction.get("extraction_anchor_id", "")) != "anchor:extraction" \
+			or not _same_json(extraction.get("path", null), ["marker:0", "anchor:hub", "anchor:extraction"]): return _reject("world_extraction")
+	var path: Array = extraction.get("path", [])
+	for index in range(path.size() - 1):
+		if not route_keys.has(_world_edge_key(str(path[index]), str(path[index + 1]))): return _reject("world_extraction")
+	return true
+
+func _world_edge_key(left: String, right: String) -> String:
+	return left + "\u001f" + right if left < right else right + "\u001f" + left
+
+func _is_valid_world_id(value: String) -> bool:
+	if value.is_empty() or value.length() > 64: return false
+	for code in value.to_ascii_buffer():
+		if not ((code >= 97 and code <= 122) or (code >= 48 and code <= 57) \
+				or code == 58 or code == 95 or code == 45 or code == 46): return false
 	return true
 
 func _validate_ship_shape(ship: Dictionary) -> bool:
