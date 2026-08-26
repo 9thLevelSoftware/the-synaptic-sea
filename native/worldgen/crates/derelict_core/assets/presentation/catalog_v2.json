@@ -1,0 +1,8 @@
+{
+  "schema_version": "presentation-catalogue-2",
+  "manifest_entries": ["asset:primitive:structural", "asset:audio:ambient"],
+  "assets": [
+    {"kind":"primitive","asset_id":"asset:primitive:structural","tags":["structural.default"],"compatible_tags":["structural.default"],"compatible_subject_kinds":["ship","environment"],"adapter_binding_id":"binding:primitive:structural","provenance":{"source":"authored/primitive","license":"CC0","tool_or_model_version":"godot-4.7.1","inputs":["authored primitive specification"],"parameters_or_seed":"seed:0","human_changes":"authored safe primitive","technical_validation":"schema-and-render-smoke","art_approval":"approved","promoted_content_manifest_entry":"asset:primitive:structural"}},
+    {"kind":"audio","asset_id":"asset:audio:ambient","tags":["ambient.default"],"compatible_tags":["ambient.default"],"compatible_subject_kinds":["environment"],"adapter_binding_id":"binding:audio:ambient","provenance":{"source":"authored/audio/ambient","license":"CC0","tool_or_model_version":"audacity-3","inputs":["project-original recording"],"parameters_or_seed":"seed:0","human_changes":"trimmed and normalized","technical_validation":"audio-import-smoke","art_approval":"approved","promoted_content_manifest_entry":"asset:audio:ambient"}}
+  ]
+}
