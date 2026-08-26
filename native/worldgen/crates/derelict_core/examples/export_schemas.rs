@@ -8,6 +8,7 @@ use schemars::{
     JsonSchema,
 };
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::{env, fs, path::PathBuf, process};
 
 fn schema<T: JsonSchema>() -> Value {
@@ -392,6 +393,7 @@ fn enrich(name: &str, root: &mut Value) {
 
 fn main() {
     let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schemas");
+    verify_immutable_v1(&out);
     let mut items: Vec<(&str, Value)> = vec![
         ("procgen-request-1", schema::<ProcgenRequest>()),
         // procgen-bundle-1 and world-ir-1 are immutable migration evidence;
@@ -464,6 +466,35 @@ fn main() {
                 eprintln!("schema drift: {}", path.display());
                 process::exit(1);
             }
+        }
+    }
+}
+
+fn verify_immutable_v1(schema_dir: &std::path::Path) {
+    for (name, expected) in [
+        (
+            "procgen-bundle-1.schema.json",
+            "B99DCF19B4F1D515CCE8A0602ACAE41325B5E35ACACEE226D0ABCAA1AE063FBC",
+        ),
+        (
+            "world-ir-1.schema.json",
+            "6B61E97D569744DBAA46541244D16233F7F0DBA619D2322A5BEC0ACA84780F96",
+        ),
+        (
+            "procgen-lifecycle-result-1.schema.json",
+            "C1B31FC1CB6F859D57250B4A9770E303D4DF21B7B4E23B1858DBA104B761109D",
+        ),
+    ] {
+        let path = schema_dir.join(name);
+        let bytes =
+            fs::read(&path).unwrap_or_else(|e| panic!("immutable schema {}: {e}", path.display()));
+        let actual = Sha256::digest(bytes);
+        let actual = actual
+            .iter()
+            .map(|b| format!("{b:02X}"))
+            .collect::<String>();
+        if actual != expected {
+            panic!("immutable schema drift: {}", path.display());
         }
     }
 }
