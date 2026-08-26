@@ -1,46 +1,77 @@
 extends RefCounted
 class_name ProcgenMutationDelta
-const SCHEMA:="procgen-mutation-delta-1"
-const OPS:={"door_lock":"door","door_open":"door","container_inventory":"container","entity_remove":"entity","objective":"objective","hazard":"hazard","system_state":"system"}
-var base_site_id: String="";var base_semantic_hash:String="";var operations:Array[Dictionary]=[]
-func configure(site_id:String,semantic:String,values:Array)->bool:
-	if site_id.is_empty() or semantic.length()!=64 or values.size()>128:return false
-	base_site_id=site_id;base_semantic_hash=semantic;operations.clear();var seen={}
+
+const SCHEMA := "procgen-mutation-delta-1"
+const Site := preload("res://scripts/systems/generated_world_site_identity.gd")
+const MAX_OPERATIONS := 128
+const MAX_PAYLOAD_BYTES := 4096
+const OPS := {"door_lock":"door", "door_open":"door", "container_inventory":"container", "entity_remove":"entity", "objective":"objective", "hazard":"hazard", "system_state":"system"}
+const TARGET_KINDS := {"door": true, "container": true, "entity": true, "objective": true, "hazard": true, "system": true}
+var base_site_id: String = ""
+var base_semantic_hash: String = ""
+var operations: Array[Dictionary] = []
+
+func configure(site_id: Variant, semantic: Variant, values: Variant) -> bool:
+	if not Site.valid_id(site_id) or not Site.valid_hash(semantic) or typeof(values) != TYPE_ARRAY or values.size() > MAX_OPERATIONS: return false
+	var seen := {}
+	var parsed: Array[Dictionary] = []
 	for raw in values:
-		if not _valid(raw,seen):operations.clear();return false
-		var op:Dictionary=raw;operations.append(op.duplicate(true));seen[str(op.target_kind)+":"+str(op.target_id)]=true
-	return JSON.stringify(to_dict()).to_utf8_buffer().size()<=16384
-func _valid(raw:Variant,seen:Dictionary)->bool:
-	if typeof(raw)!=TYPE_DICTIONARY:return false
-	var o:Dictionary=raw;var n=str(o.get("operation",""));var k=str(o.get("target_kind",""));var id=o.get("target_id")
-	if o.size()!=4 or not OPS.has(n) or OPS[n]!=k or typeof(id)!=TYPE_STRING or str(id).is_empty() or str(id).length()>128 or seen.has(k+":"+str(id)) or typeof(o.get("payload"))!=TYPE_DICTIONARY:return false
-	var p:Dictionary=o.payload
-	if JSON.stringify(p).to_utf8_buffer().size()>4096:return false
-	match n:
-		"door_lock":return p.size()==1 and typeof(p.get("locked"))==TYPE_BOOL
-		"door_open":return p.size()==1 and typeof(p.get("open"))==TYPE_BOOL
-		"container_inventory":
-			if p.size()!=1 or typeof(p.get("items"))!=TYPE_ARRAY or p.items.size()>64:return false
-			var items={}
-			for i in p.items:
-				if typeof(i)!=TYPE_DICTIONARY or i.size()!=2 or typeof(i.get("item_id"))!=TYPE_STRING or items.has(i.get("item_id")) or typeof(i.get("quantity"))!=TYPE_INT or i.quantity<0 or i.quantity>65535:return false
-				items[i.item_id]=true
-			return true
-		"entity_remove":return p.size()==1 and p.get("removed",null)==true
-		"objective":return p.size()==1 and typeof(p.get("completed"))==TYPE_BOOL
-		"hazard":return p.size()==1 and typeof(p.get("active"))==TYPE_BOOL
-		"system_state":return p.size()==1 and typeof(p.get("state"))==TYPE_STRING and str(p.state).length()<=128 and str(p.state).is_valid_identifier()
-	return false
-func validate_targets(targets:Array)->bool:
-	var seen={}
-	for t in targets:
-		if typeof(t)!=TYPE_DICTIONARY or t.size()!=2 or typeof(t.get("target_kind"))!=TYPE_STRING or typeof(t.get("target_id"))!=TYPE_STRING:return false
-		seen[str(t.target_kind)+":"+str(t.target_id)]=true
-	for o in operations:
-		if not seen.has(str(o.target_kind)+":"+str(o.target_id)):return false
+		var operation: Variant = _validated_operation(raw, seen)
+		if operation == null: return false
+		parsed.append(operation)
+	base_site_id = site_id; base_semantic_hash = semantic; operations = parsed
+	return JSON.stringify(to_dict()).to_utf8_buffer().size() <= 16384
+
+func _validated_operation(raw: Variant, seen: Dictionary) -> Variant:
+	if typeof(raw) != TYPE_DICTIONARY: return null
+	var op: Dictionary = raw
+	if op.size() != 4 or not op.has_all(["operation", "target_kind", "target_id", "payload"]): return null
+	if typeof(op.operation) != TYPE_STRING or typeof(op.target_kind) != TYPE_STRING or typeof(op.target_id) != TYPE_STRING or typeof(op.payload) != TYPE_DICTIONARY: return null
+	if not OPS.has(op.operation) or OPS[op.operation] != op.target_kind or not Site.valid_id(op.target_id): return null
+	var identity: String = op.target_kind + ":" + op.target_id
+	if seen.has(identity) or JSON.stringify(op.payload).to_utf8_buffer().size() > MAX_PAYLOAD_BYTES: return null
+	var payload: Dictionary = op.payload
+	var valid := false
+	match op.operation:
+		"door_lock": valid = payload.size() == 1 and payload.has("locked") and typeof(payload.locked) == TYPE_BOOL
+		"door_open": valid = payload.size() == 1 and payload.has("open") and typeof(payload.open) == TYPE_BOOL
+		"container_inventory": valid = _valid_items(payload)
+		"entity_remove": valid = payload.size() == 1 and payload.has("removed") and payload.removed == true and typeof(payload.removed) == TYPE_BOOL
+		"objective": valid = payload.size() == 1 and payload.has("completed") and typeof(payload.completed) == TYPE_BOOL
+		"hazard": valid = payload.size() == 1 and payload.has("active") and typeof(payload.active) == TYPE_BOOL
+		"system_state": valid = payload.size() == 1 and payload.has("state") and Site.valid_id(payload.state)
+	if not valid: return null
+	seen[identity] = true
+	return op.duplicate(true)
+
+func _valid_items(payload: Dictionary) -> bool:
+	if payload.size() != 1 or not payload.has("items") or typeof(payload.items) != TYPE_ARRAY or payload.items.size() > 64: return false
+	var seen := {}
+	for raw in payload.items:
+		if typeof(raw) != TYPE_DICTIONARY or raw.size() != 2 or not raw.has_all(["item_id", "quantity"]): return false
+		if not Site.valid_id(raw.item_id) or seen.has(raw.item_id) or typeof(raw.quantity) != TYPE_INT or raw.quantity < 0 or raw.quantity > 65535: return false
+		seen[raw.item_id] = true
 	return true
-func to_dict()->Dictionary:return {"schema_version":SCHEMA,"base_site_id":base_site_id,"base_semantic_hash":base_semantic_hash,"operations":operations.duplicate(true)}
-static func from_dict(v:Variant):
-	if typeof(v)!=TYPE_DICTIONARY:return null
-	var d:Dictionary=v;if d.size()!=4 or d.get("schema_version")!=SCHEMA or typeof(d.get("operations"))!=TYPE_ARRAY:return null
-	var r=load("res://scripts/systems/procgen_mutation_delta.gd").new();return r if r.configure(d.get("base_site_id",""),d.get("base_semantic_hash",""),d.operations) else null
+
+func validate_targets(targets: Variant) -> bool:
+	if typeof(targets) != TYPE_ARRAY: return false
+	var seen := {}
+	for target in targets:
+		if typeof(target) != TYPE_DICTIONARY or target.size() != 2 or not target.has_all(["target_kind", "target_id"]): return false
+		if typeof(target.target_kind) != TYPE_STRING or typeof(target.target_id) != TYPE_STRING or not TARGET_KINDS.has(target.target_kind) or not Site.valid_id(target.target_id): return false
+		var identity: String = target.target_kind + ":" + target.target_id
+		if seen.has(identity): return false
+		seen[identity] = true
+	for operation in operations:
+		if not seen.has(operation.target_kind + ":" + operation.target_id): return false
+	return true
+
+func to_dict() -> Dictionary:
+	return {"schema_version": SCHEMA, "base_site_id": base_site_id, "base_semantic_hash": base_semantic_hash, "operations": operations.duplicate(true)}
+
+static func from_dict(value: Variant):
+	if typeof(value) != TYPE_DICTIONARY: return null
+	var data: Dictionary = value
+	if data.size() != 4 or not data.has_all(["schema_version", "base_site_id", "base_semantic_hash", "operations"]) or data.schema_version != SCHEMA: return null
+	var result = load("res://scripts/systems/procgen_mutation_delta.gd").new()
+	return result if result.configure(data.base_site_id, data.base_semantic_hash, data.operations) else null

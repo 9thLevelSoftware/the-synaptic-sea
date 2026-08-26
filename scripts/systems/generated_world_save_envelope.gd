@@ -3,58 +3,52 @@ class_name GeneratedWorldSaveEnvelope
 
 const SiteIdentityScript := preload("res://scripts/systems/generated_world_site_identity.gd")
 const MutationDeltaScript := preload("res://scripts/systems/procgen_mutation_delta.gd")
-
 const SCHEMA := "generated-world-save-1"
+const MAX_SEED := 9007199254740991
 const MAX_SITES := 256
 const MAX_BYTES := 1048576
-const MAX_HASH := 256
-const MAX_SEED := 9007199254740991
-const MAX_KEYS := 128
-const EXPORT_KEYS := ["procgen_request","procgen_bundle","world_ir","site_ir","gameplay_ir","presentation_ir","generation_trace","adaptive_proposal"]
+const EXPORT_KEYS := ["procgen_request", "procgen_bundle", "world_ir", "site_ir", "gameplay_ir", "presentation_ir", "generation_trace", "adaptive_proposal"]
 
 var world_seed: int = 0
-var platform_generator_version := 3
-var content_manifest_hash := ""
+var platform_generator_version: int = 1
+var content_manifest_hash: String = ""
 var export_schema_map: Dictionary = {}
 var sites: Array[Dictionary] = []
 
-func configure(seed: int, platform: Variant, content: String, schemas: Dictionary, site_values: Array) -> bool:
-	if seed < 0 or seed > MAX_SEED or typeof(platform) == TYPE_BOOL or (typeof(platform) != TYPE_INT and typeof(platform) != TYPE_FLOAT) or not is_finite(float(platform)) or float(platform) <= 0 or float(platform) > MAX_SEED or not _hash64(content):
-		return false
-	if schemas.size() != 8 or site_values.size() > MAX_SITES:
-		return false
+static func integer(value: Variant, minimum: int, maximum: int) -> Variant:
+	if typeof(value) == TYPE_BOOL or (typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT): return null
+	if typeof(value) == TYPE_FLOAT and (not is_finite(value) or value != floor(value)): return null
+	var number := int(value)
+	return number if number >= minimum and number <= maximum else null
+
+func configure(seed: Variant, platform: Variant, content: Variant, schemas: Variant, site_values: Variant) -> bool:
+	var world: Variant = integer(seed, 0, MAX_SEED)
+	var version: Variant = integer(platform, 1, MAX_SEED)
+	if world == null or version == null or not SiteIdentityScript.valid_hash(content) or typeof(schemas) != TYPE_DICTIONARY or typeof(site_values) != TYPE_ARRAY: return false
+	if schemas.size() != EXPORT_KEYS.size() or site_values.size() > MAX_SITES: return false
 	for key in EXPORT_KEYS:
-		if not schemas.has(key) or typeof(schemas[key]) != TYPE_STRING or str(schemas[key]).is_empty() or str(schemas[key]).length() > 128: return false
-	world_seed = seed; platform_generator_version = platform; content_manifest_hash = content
-	export_schema_map = schemas.duplicate(true); sites.clear()
-	var ids := {}
+		if not schemas.has(key) or not SiteIdentityScript.valid_id(schemas[key]): return false
+	var identities := {}
+	var parsed_sites: Array[Dictionary] = []
 	for raw in site_values:
-		if typeof(raw) != TYPE_DICTIONARY or raw.size() != 2:
-			return false
-		var identity = SiteIdentityScript.from_dict(raw.get("identity"))
-		var delta = MutationDeltaScript.from_dict(raw.get("mutation_delta"))
-		if identity == null or delta == null or ids.has(identity.site_id) or delta.base_site_id != identity.site_id or delta.base_semantic_hash != identity.base_bundle_semantic_hash:
-			return false
-		ids[identity.site_id] = true
-		sites.append({"identity": identity.to_dict(), "mutation_delta": delta.to_dict()})
+		if typeof(raw) != TYPE_DICTIONARY or raw.size() != 2 or not raw.has("identity") or not raw.has("mutation_delta"): return false
+		var identity: Variant = SiteIdentityScript.from_dict(raw.identity)
+		var delta: Variant = MutationDeltaScript.from_dict(raw.mutation_delta)
+		if identity == null or delta == null or identities.has(identity.site_id) or delta.base_site_id != identity.site_id or delta.base_semantic_hash != identity.base_bundle_semantic_hash: return false
+		identities[identity.site_id] = true
+		parsed_sites.append({"identity": identity.to_dict(), "mutation_delta": delta.to_dict()})
+	world_seed = world; platform_generator_version = version; content_manifest_hash = content; export_schema_map = schemas.duplicate(true); sites = parsed_sites
 	return JSON.stringify(to_dict()).to_utf8_buffer().size() <= MAX_BYTES
 
-static func _hash64(v: String) -> bool:
-	if v.length() != 64: return false
-	for c in v:
-		if not c in "0123456789abcdef": return false
-	return true
-
 func to_dict() -> Dictionary:
-	return {"schema_version": SCHEMA, "world_seed": world_seed, "platform_generator_version": platform_generator_version,
-		"content_manifest_hash": content_manifest_hash, "export_schema_map": export_schema_map.duplicate(true), "sites": sites.duplicate(true)}
+	return {"schema_version": SCHEMA, "world_seed": world_seed, "platform_generator_version": platform_generator_version, "content_manifest_hash": content_manifest_hash, "export_schema_map": export_schema_map.duplicate(true), "sites": sites.duplicate(true)}
 
 static func from_dict(value: Variant):
-	if typeof(value) != TYPE_DICTIONARY:
-		return null
-	var d: Dictionary = value
-	if d.size() != 6 or d.get("schema_version") != SCHEMA or typeof(d.get("world_seed")) != TYPE_INT or typeof(d.get("platform_generator_version")) == TYPE_BOOL or (typeof(d.get("platform_generator_version")) != TYPE_INT and typeof(d.get("platform_generator_version")) != TYPE_FLOAT) or typeof(d.get("content_manifest_hash")) != TYPE_STRING or typeof(d.get("sites")) != TYPE_ARRAY or typeof(d.get("export_schema_map")) != TYPE_DICTIONARY:
-		return null
+	if typeof(value) != TYPE_DICTIONARY: return null
+	var data: Dictionary = value
+	var required := ["schema_version", "world_seed", "platform_generator_version", "content_manifest_hash", "export_schema_map", "sites"]
+	for key in required:
+		if not data.has(key): return null
+	if data.size() != required.size() or data.schema_version != SCHEMA: return null
 	var result = load("res://scripts/systems/generated_world_save_envelope.gd").new()
-	if not result.configure(d.world_seed, d.platform_generator_version, d.content_manifest_hash, d.export_schema_map, d.sites): return null
-	return result
+	return result if result.configure(data.world_seed, data.platform_generator_version, data.content_manifest_hash, data.export_schema_map, data.sites) else null
