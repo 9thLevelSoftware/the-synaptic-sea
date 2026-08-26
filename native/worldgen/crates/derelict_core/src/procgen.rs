@@ -10,7 +10,7 @@ use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::time::Instant;
+use web_time::Instant;
 
 pub const PROCGEN_REQUEST_SCHEMA: &str = crate::manifest::PROCGEN_REQUEST_SCHEMA;
 pub const PROCGEN_BUNDLE_SCHEMA: &str = crate::manifest::PROCGEN_BUNDLE_SCHEMA_V3;
