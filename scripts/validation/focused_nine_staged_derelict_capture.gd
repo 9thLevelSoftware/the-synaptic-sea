@@ -46,7 +46,7 @@ func _ready() -> void:
 	# seed-17 choice is a ten-zone template and cannot satisfy that lane.
 	derelict_archetype["template"] = "compact"
 	var generator = ShipGeneratorScript.new()
-	var generated: Node3D = generator.generate(blueprint, derelict_archetype)
+	var generated: Node3D = generator.generate_migration_oracle(blueprint, derelict_archetype)
 	if generated == null:
 		_fail("ShipGenerator returned null")
 		return

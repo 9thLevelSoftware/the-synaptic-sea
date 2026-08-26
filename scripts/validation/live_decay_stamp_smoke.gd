@@ -59,7 +59,7 @@ func _initialize() -> void:
 
 	var ship_gen := ShipGeneratorScript.new()
 	ship_gen.configure_run_context(BIOME_ID, DIFFICULTY_ID)
-	var ship: Node3D = ship_gen.generate(wrecked_bp, archetype)
+	var ship: Node3D = ship_gen.generate_migration_oracle(wrecked_bp, archetype)
 	if ship == null:
 		_fail("ShipGenerator returned null for WRECKED seed")
 		return

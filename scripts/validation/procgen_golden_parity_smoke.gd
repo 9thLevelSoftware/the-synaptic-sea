@@ -91,7 +91,7 @@ func _generate_live_wrappers(seed_value: int) -> Dictionary:
 	archetype["guaranteed_roles"] = []
 	archetype["template"] = "compact"
 	var generator = ShipGeneratorScript.new()
-	var generated: Node3D = generator.generate(blueprint, archetype)
+	var generated: Node3D = generator.generate_migration_oracle(blueprint, archetype)
 	if generated == null:
 		return {"ok": false, "error": "ShipGenerator returned null for live wrapper path"}
 	var loader := generated as GeneratedShipLoaderScript

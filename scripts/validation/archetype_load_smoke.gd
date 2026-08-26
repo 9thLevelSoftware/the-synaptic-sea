@@ -119,7 +119,7 @@ func _initialize() -> void:
 		# ShipLayoutGenerator pipeline (which does not consume role_weights),
 		# so we validate it produces a fully-loaded ship rather than a
 		# graph-matching room count.
-		var ship: Node3D = generator.generate(bp, data)
+		var ship: Node3D = generator.generate_migration_oracle(bp, data)
 		if ship == null:
 			push_error("ARCHETYPE SMOKE FAIL %s ShipGenerator returned null" % name_str)
 			quit(1)

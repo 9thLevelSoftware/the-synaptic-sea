@@ -1,6 +1,6 @@
 extends SceneTree
 
-## Acceptance gate for the live ShipGenerator -> DerelictGenerator path.
+## Acceptance gate for the live ShipGenerator -> one ProcgenBundle -> loader path.
 ## Marker: WORLDGEN WIRED TRAVEL PASS
 
 const ShipBlueprintScript := preload("res://scripts/procgen/ship_blueprint.gd")
@@ -19,14 +19,6 @@ const CONDITIONS: Array[int] = [
 	ShipBlueprintScript.Condition.DAMAGED,
 	ShipBlueprintScript.Condition.WRECKED,
 ]
-const REAL_ENCOUNTER_KINDS: Array[String] = [
-	"biomatter_lurker",
-	"drone_scout",
-	"drone_swarm",
-	"breach_lurker",
-]
-
-
 func _initialize() -> void:
 	if not ClassDB.class_exists("DerelictGenerator"):
 		_fail("DerelictGenerator class unavailable")
@@ -43,6 +35,10 @@ func _initialize() -> void:
 			var label: String = "size=%d condition=%d seed=%d" % [size, condition, seed_value]
 			var ship: Node3D = generator.generate_from_seed(seed_value, size, condition)
 			if not _assert_ship(label, ship):
+				_free_ship(ship)
+				return
+			if generator.last_outcome != "generated" or not generator.last_error.is_empty():
+				_fail("%s generator outcome=%s error=%s" % [label, generator.last_outcome, generator.last_error])
 				_free_ship(ship)
 				return
 			generated_cases += 1
@@ -65,15 +61,20 @@ func _initialize() -> void:
 		return
 	var first_layout: String = JSON.stringify(first.get_layout_copy())
 	var second_layout: String = JSON.stringify(second.get_layout_copy())
+	var first_gameplay: String = JSON.stringify(first.gameplay_doc)
+	var second_gameplay: String = JSON.stringify(second.gameplay_doc)
 	_free_ship(first)
 	_free_ship(second)
-	if first_layout != second_layout:
-		_fail("same seed produced different loaded layout documents")
+	if first_layout != second_layout or first_gameplay != second_gameplay:
+		_fail("same seed produced different bundle-derived loader documents")
+		return
+	if generator.migration_oracle_invocations != 0:
+		_fail("production generation invoked migration oracle count=%d" % generator.migration_oracle_invocations)
 		return
 
 	print(
-		"WORLDGEN WIRED TRAVEL PASS cases=%d biome=%s difficulty=%s deterministic=true rich_objectives=true injected_encounters=true"
-		% [generated_cases, TEST_BIOME, TEST_DIFFICULTY]
+		"WORLDGEN WIRED TRAVEL PASS cases=%d difficulty=%s deterministic=true bundle_authoritative=true oracle_invocations=0"
+		% [generated_cases, TEST_DIFFICULTY]
 	)
 	quit(0)
 
@@ -95,28 +96,24 @@ func _assert_ship(label: String, ship: Node3D) -> bool:
 		_fail("%s has invalid start/goal start=%s goal=%s" % [label, str(start), str(goal)])
 		return false
 	var objectives: Array = ship.get_objective_specs_copy()
-	if objectives.size() <= 1:
-		_fail("%s lacks rich gameplay objectives count=%d" % [label, objectives.size()])
+	var gameplay_objectives: Variant = ship.gameplay_doc.get("objectives", null)
+	if objectives.is_empty() or not gameplay_objectives is Array \
+			or objectives.size() != (gameplay_objectives as Array).size():
+		_fail("%s changed authoritative objective count loaded=%d bundle=%s" % [label, objectives.size(), str(gameplay_objectives)])
 		return false
 	var layout: Dictionary = ship.get_layout_copy()
-	if str(layout.get("biome_id", "")) != TEST_BIOME or str(layout.get("difficulty_id", "")) != TEST_DIFFICULTY:
-		_fail("%s lost run context biome=%s difficulty=%s" % [
+	if not str(layout.get("biome_id", "")).is_empty() or str(layout.get("difficulty_id", "")) != TEST_DIFFICULTY:
+		_fail("%s bridge mutated biome or lost Rust request difficulty biome=%s difficulty=%s" % [
 			label, str(layout.get("biome_id", "")), str(layout.get("difficulty_id", ""))])
 		return false
 	var encounters_variant: Variant = layout.get("encounters", null)
-	if not (encounters_variant is Array) or (encounters_variant as Array).is_empty():
-		_fail("%s has no injected encounters" % label)
+	if not encounters_variant is Array or not (encounters_variant as Array).is_empty():
+		_fail("%s contains Godot-authored post-generation encounters" % label)
 		return false
-	for encounter_variant in encounters_variant as Array:
-		if not (encounter_variant is Dictionary):
-			_fail("%s has a malformed encounter marker" % label)
-			return false
-		var encounter: Dictionary = encounter_variant
-		var instance_id: String = str(encounter.get("id", ""))
-		var encounter_kind: String = str(encounter.get("encounter_kind", ""))
-		if not instance_id.begins_with("enc_") or not REAL_ENCOUNTER_KINDS.has(encounter_kind):
-			_fail("%s contains fallback encounter marker id=%s kind=%s" % [label, instance_id, encounter_kind])
-			return false
+	var gameplay_loot: Variant = ship.gameplay_doc.get("loot_containers", null)
+	if not gameplay_loot is Array or ship.get_loot_container_specs_copy().size() != (gameplay_loot as Array).size():
+		_fail("%s changed authoritative loot-container count" % label)
+		return false
 	return true
 
 

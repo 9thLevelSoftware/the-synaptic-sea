@@ -12,7 +12,14 @@ func _init() -> void:
 	var validator: RefCounted = ValidatorScript.new()
 	var generator := FakeGenerator.new()
 	var ship_source: String = FileAccess.get_file_as_string("res://scripts/procgen/ship_generator.gd")
-	_expect(failures, stats, ship_source.contains("DerelictGenerator class unavailable; native path is required") and ship_source.contains("if USE_WORLDGEN:\n\t\tpush_error"), "ship generator fail closed")
+	_expect(
+		failures,
+		stats,
+		ship_source.contains("if not USE_WORLDGEN or not ClassDB.class_exists(\"DerelictGenerator\"):")
+			and ship_source.contains("_generation_fail(\"native_adapter_unavailable\"")
+			and ship_source.contains("func generate_migration_oracle("),
+		"ship generator fail closed",
+	)
 	var manifest: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/procgen/manifests/build/win64.json"))
 	var content_path: String = "data/procgen/manifests/content_manifest.json"
 	var artifact_path: String = str(manifest["artifact"]["path"])
