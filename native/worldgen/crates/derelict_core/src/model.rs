@@ -20,7 +20,19 @@ pub const INTACT_MAX: Intactness = 10_000;
 
 pub type TileCoord = i32;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Debug,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(deny_unknown_fields)]
 pub struct GridPos {
     pub x: TileCoord,
@@ -34,7 +46,9 @@ impl GridPos {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[repr(u8)]
 pub enum FloorTile {
     /// Open space / no floor (outside hull, or a breach hole).
@@ -51,7 +65,9 @@ impl FloorTile {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[repr(u8)]
 pub enum WallEdge {
     #[default]
@@ -77,7 +93,9 @@ impl WallEdge {
 
 /// PZ-style: walls live on tile EDGES. Each tile stores its north and west
 /// edges; a tile's south edge is its south neighbor's north edge, etc.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(deny_unknown_fields)]
 pub struct TileWalls {
     pub north: WallEdge,
@@ -239,7 +257,9 @@ impl RoomGraph {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub enum EntityKind {
     Door,
     Container,
@@ -250,7 +270,9 @@ pub enum EntityKind {
     ItemPile,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(deny_unknown_fields)]
 pub struct ItemStack {
     pub item_id: u32,

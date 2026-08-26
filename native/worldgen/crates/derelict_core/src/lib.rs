@@ -6,15 +6,15 @@
 //! and `GENERATOR_VERSION` produce byte-identical ships on any platform.
 
 pub mod archetype;
-pub mod model;
 pub mod manifest;
+pub mod model;
 pub mod pipeline;
+pub mod procgen;
 pub mod rng;
 pub mod role;
 pub mod stages;
 pub mod structural;
 pub mod topology;
-pub mod procgen;
 
 pub use archetype::GenData;
 pub use model::{

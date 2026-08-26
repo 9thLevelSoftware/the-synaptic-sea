@@ -20,12 +20,18 @@ fn valid_manifest_parses_and_validates() {
 #[test]
 fn unknown_major_is_rejected() {
     let json = VALID.replace("procgen-build-manifest-1", "procgen-build-manifest-2");
-    assert!(matches!(BuildManifest::from_json(&json), Err(ManifestError::UnknownSchemaMajor(_))));
+    assert!(matches!(
+        BuildManifest::from_json(&json),
+        Err(ManifestError::UnknownSchemaMajor(_))
+    ));
 }
 
 #[test]
 fn malformed_hash_is_rejected() {
-    let json = VALID.replace("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bad");
+    let json = VALID.replace(
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bad",
+    );
     assert!(BuildManifest::from_json(&json).is_err());
 }
 
@@ -46,20 +52,44 @@ fn content_manifest_requires_sorted_entries_and_no_unknown_fields() {
 #[test]
 fn every_required_build_field_is_enforced() {
     let cases = [
-        ("b78fedf2624c2d54f0f42b6c0ad3c488fbd9e6a9", "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"),
+        (
+            "b78fedf2624c2d54f0f42b6c0ad3c488fbd9e6a9",
+            "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        ),
         ("data/procgen/manifests/content_manifest.json", "wrong.json"),
         ("x86_64-pc-windows-msvc", "linux"),
         ("procgen-request-1", "wrong-schema"),
     ];
     for (needle, replacement) in cases {
         let json = VALID.replace(needle, replacement);
-        assert!(BuildManifest::from_json(&json).is_err(), "tampered field {needle}");
+        assert!(
+            BuildManifest::from_json(&json).is_err(),
+            "tampered field {needle}"
+        );
     }
-    for schema in ["procgen_request", "procgen_bundle", "world_ir", "site_ir", "gameplay_ir", "presentation_ir", "generation_trace", "adaptive_proposal"] {
+    for schema in [
+        "procgen_request",
+        "procgen_bundle",
+        "world_ir",
+        "site_ir",
+        "gameplay_ir",
+        "presentation_ir",
+        "generation_trace",
+        "adaptive_proposal",
+    ] {
         let marker = match schema {
-            "procgen_request" => "procgen-request-1", "procgen_bundle" => "procgen-bundle-1", "world_ir" => "world-ir-1", "site_ir" => "site-ir-1",
-            "gameplay_ir" => "gameplay-ir-1", "presentation_ir" => "presentation-ir-1", "generation_trace" => "generation-trace-1", _ => "adaptive-proposal-1",
+            "procgen_request" => "procgen-request-1",
+            "procgen_bundle" => "procgen-bundle-1",
+            "world_ir" => "world-ir-1",
+            "site_ir" => "site-ir-1",
+            "gameplay_ir" => "gameplay-ir-1",
+            "presentation_ir" => "presentation-ir-1",
+            "generation_trace" => "generation-trace-1",
+            _ => "adaptive-proposal-1",
         };
-        assert!(BuildManifest::from_json(&VALID.replace(marker, "wrong-schema")).is_err(), "tampered schema {schema}");
+        assert!(
+            BuildManifest::from_json(&VALID.replace(marker, "wrong-schema")).is_err(),
+            "tampered schema {schema}"
+        );
     }
 }

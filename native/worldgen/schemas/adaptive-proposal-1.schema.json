@@ -17,6 +17,7 @@
               "additionalProperties": false,
               "properties": {
                 "candidate_id": {
+                  "minLength": 1,
                   "type": "string"
                 }
               },
@@ -38,6 +39,7 @@
               "additionalProperties": false,
               "properties": {
                 "encounter_id": {
+                  "minLength": 1,
                   "type": "string"
                 },
                 "pacing_delta": {

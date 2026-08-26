@@ -177,14 +177,20 @@ pub fn generate_ship_timed(
     let mut failed_templates: Vec<String> = Vec::new();
     for attempt in 0..TOPOLOGY_ATTEMPTS {
         template = pick_template(attempt, &failed_templates)?;
-        candidate_decisions.push(format!("considered:topology_template:{}:attempt={attempt}", template.id));
+        candidate_decisions.push(format!(
+            "considered:topology_template:{}:attempt={attempt}",
+            template.id
+        ));
         let mut trng = rng::stream(seed, "topology", attempt);
         let mut candidate =
             match place_topology(&mut trng, template, &hull_plan.deck_masks, &role_params) {
                 Ok(p) => p,
                 Err(e) => {
                     last_err = Some(GenError::TopologyFailed(e.to_string()));
-                    candidate_decisions.push(format!("rejected:topology_template:{}:attempt={attempt}", template.id));
+                    candidate_decisions.push(format!(
+                        "rejected:topology_template:{}:attempt={attempt}",
+                        template.id
+                    ));
                     failed_constraints.push(format!("topology:{e}"));
                     retries.push(format!("topology:attempt={attempt}"));
                     failed_templates.push(template.id.clone());
@@ -201,7 +207,10 @@ pub fn generate_ship_timed(
         let plan = compile(&candidate.topology, &DefaultModulePicker);
         if !plan.errors.is_empty() {
             last_err = Some(GenError::StructuralCompileFailed(plan.errors.clone()));
-            candidate_decisions.push(format!("rejected:topology_template:{}:attempt={attempt}", template.id));
+            candidate_decisions.push(format!(
+                "rejected:topology_template:{}:attempt={attempt}",
+                template.id
+            ));
             failed_constraints.extend(plan.errors.iter().map(|e| format!("compile:{e}")));
             retries.push(format!("topology:attempt={attempt}"));
             continue;
@@ -209,12 +218,18 @@ pub fn generate_ship_timed(
         let policy = ValidationPolicy::pre_damage(candidate.critical_path.clone());
         match validate(&plan, &candidate.topology, &policy) {
             Ok(_) => {
-                candidate_decisions.push(format!("selected:topology_template:{}:attempt={attempt}", template.id));
+                candidate_decisions.push(format!(
+                    "selected:topology_template:{}:attempt={attempt}",
+                    template.id
+                ));
                 placed = Some((candidate, plan));
                 break;
             }
             Err(issues) => {
-                candidate_decisions.push(format!("rejected:topology_template:{}:attempt={attempt}", template.id));
+                candidate_decisions.push(format!(
+                    "rejected:topology_template:{}:attempt={attempt}",
+                    template.id
+                ));
                 failed_constraints.extend(issues.iter().map(|i| i.to_string()));
                 retries.push(format!("topology:attempt={attempt}"));
                 last_err = Some(GenError::StructuralValidationFailed {

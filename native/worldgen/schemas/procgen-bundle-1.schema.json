@@ -551,6 +551,7 @@
           "type": "array"
         },
         "goal_room": {
+          "minLength": 1,
           "type": "string"
         },
         "loot_containers": {
@@ -566,15 +567,18 @@
           "type": "array"
         },
         "program_id": {
+          "minLength": 1,
           "type": "string"
         },
         "schema_version": {
           "const": "1.1.0"
         },
         "start_room": {
+          "minLength": 1,
           "type": "string"
         },
         "summary": {
+          "minLength": 1,
           "type": "string"
         }
       },
@@ -878,7 +882,7 @@
       "additionalProperties": false,
       "properties": {
         "schema_version": {
-          "type": "string"
+          "const": "player-model-1"
         },
         "signals": {
           "items": {
@@ -969,6 +973,7 @@
       "additionalProperties": false,
       "properties": {
         "locale": {
+          "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
           "type": "string"
         },
         "seed": {
@@ -987,15 +992,15 @@
       "additionalProperties": false,
       "properties": {
         "content_manifest_hash": {
+          "pattern": "^[a-f0-9]{64}$",
           "type": "string"
         },
         "difficulty_id": {
+          "minLength": 1,
           "type": "string"
         },
         "generator_version": {
-          "format": "uint32",
-          "minimum": 0.0,
-          "type": "integer"
+          "const": 2
         },
         "player_model": {
           "$ref": "#/definitions/PlayerModel"
@@ -1007,10 +1012,12 @@
           "items": {
             "$ref": "#/definitions/Domain"
           },
-          "type": "array"
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
         },
         "schema_version": {
-          "type": "string"
+          "const": "procgen-request-1"
         },
         "site": {
           "$ref": "#/definitions/SiteRequest"
@@ -1384,6 +1391,7 @@
       "additionalProperties": false,
       "properties": {
         "archetype_id": {
+          "minLength": 1,
           "type": "string"
         },
         "cause_of_loss": {
@@ -1397,22 +1405,28 @@
           ]
         },
         "intactness_override_bp": {
-          "format": "uint16",
-          "minimum": 0.0,
-          "type": [
-            "integer",
-            "null"
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            }
           ]
         },
         "kit_id": {
+          "minLength": 1,
           "type": "string"
         },
         "loot_richness_bp": {
-          "format": "uint16",
-          "minimum": 0.0,
+          "maximum": 30000,
+          "minimum": 0,
           "type": "integer"
         },
         "site_id": {
+          "minLength": 1,
           "type": "string"
         },
         "x": {
