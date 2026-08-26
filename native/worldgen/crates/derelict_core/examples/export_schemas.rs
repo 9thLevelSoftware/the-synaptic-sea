@@ -30,25 +30,29 @@ fn def<'a>(root: &'a mut Value, name: &str) -> &'a mut Value {
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_owned();
-    let standalone_title = root_title.starts_with("procgen-")
-        || root_title.starts_with("world-ir-")
-        || root_title.starts_with("site-ir-")
-        || root_title.starts_with("gameplay-ir-")
-        || root_title.starts_with("presentation-ir-")
-        || root_title.starts_with("generation-")
-        || root_title.starts_with("adaptive-");
-    if (root_title == name
-        || standalone_title
-            && !root
-                .get("definitions")
-                .and_then(Value::as_object)
-                .is_some_and(|defs| defs.contains_key(name)))
-        || (name == "WorldIRv2" && root.get("title").and_then(Value::as_str) == Some("world-ir-2"))
-        || (name == "ProcgenBundle"
-            && root.get("title").and_then(Value::as_str) == Some("procgen-bundle-2"))
-        || (name == "LifecycleResult"
-            && root.get("title").and_then(Value::as_str) == Some("procgen-lifecycle-result-2"))
-    {
+    let root_is_definition = root_title == name
+        || matches!(
+            (root_title.as_str(), name),
+            ("procgen-request-1", "ProcgenRequest")
+                | ("procgen-bundle-1" | "procgen-bundle-2", "ProcgenBundle")
+                | ("world-ir-1", "WorldIR")
+                | ("world-ir-2", "WorldIRv2")
+                | ("site-ir-1", "SiteIR")
+                | ("gameplay-ir-1", "GameplayIR")
+                | ("presentation-ir-1", "PresentationIR")
+                | ("generation-trace-1", "GenerationTrace")
+                | ("adaptive-proposal-1", "AdaptiveProposal")
+                | ("player-model-1", "PlayerModel")
+                | ("procgen-failure-1", "ProcgenFailure")
+                | ("generation-metrics-1", "GenerationMetrics")
+                | (
+                    "procgen-lifecycle-result-1" | "procgen-lifecycle-result-2",
+                    "LifecycleResult"
+                )
+                | ("procgen-capabilities-1", "ProcgenCapabilities")
+                | ("procgen-generator-manifest-1", "GeneratorManifest")
+        );
+    if root_is_definition {
         return root;
     }
     root.get_mut("definitions")
