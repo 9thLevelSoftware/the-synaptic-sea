@@ -38,7 +38,7 @@ func _initialize() -> void:
 	bp_data["seed_value"] = 42
 	var bp = ShipBlueprintScript.from_dict(bp_data)
 	var gen: ShipGeneratorScript = ShipGeneratorScript.new()
-	var derelict: Node3D = gen.generate(bp, archetype)
+	var derelict: Node3D = gen.generate_migration_oracle(bp, archetype)
 	if derelict != null:
 		_add_camera(derelict)
 		_save(derelict, "derelict_seed_42.tscn")

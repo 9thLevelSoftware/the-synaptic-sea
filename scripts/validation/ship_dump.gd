@@ -28,7 +28,7 @@ func _initialize() -> void:
 		var data: Dictionary = json.data
 		var bp = ShipBlueprintScript.from_dict(data["blueprint"])
 		var graph: RoomGraphScript = graph_gen.generate(bp, data)
-		var ship: Node3D = gen.generate(bp, data)
+		var ship: Node3D = gen.generate_migration_oracle(bp, data)
 
 		print("=== %s ===" % archetype_def["name"])
 		print("  Rooms: %d  Links: %d  Connected: %s" % [

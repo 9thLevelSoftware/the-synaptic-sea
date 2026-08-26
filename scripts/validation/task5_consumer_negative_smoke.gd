@@ -1,6 +1,7 @@
 extends SceneTree
 
 const ConsumerScript := preload("res://scripts/procgen/procgen_bundle_consumer.gd")
+const CanonicalJsonScript := preload("res://scripts/procgen/procgen_canonical_json.gd")
 const ValidatorScript := preload("res://scripts/procgen/procgen_manifest_validator.gd")
 
 func _init() -> void:
@@ -53,6 +54,12 @@ func _init() -> void:
 		count += 1
 		var result: Dictionary = consumer.consume(raw, request_case, build, runtime, caps)
 		_expect(result.is_empty() and consumer.last_error == str(item[3]), failures, str(item[0]) + ":" + consumer.last_error)
+	var nested_cases: Array = _nested_bundle_cases(original)
+	for item in nested_cases:
+		count += 1
+		var nested_raw: String = _rehash_lifecycle(item[1] as Dictionary)
+		var result: Dictionary = consumer.consume(nested_raw, request, build, runtime, caps)
+		_expect(result.is_empty() and consumer.last_error == str(item[2]), failures, str(item[0]) + ":" + consumer.last_error)
 	count += 1; _expect(consumer._same_json(42, 42.0), failures, "safe_mixed_numeric_identity")
 	count += 1; _expect(not consumer._same_json(9007199254740992, 9007199254740993), failures, "unsafe_integer_identity")
 	count += 1; _expect(consumer.build_request(9007199254740992, 0, 1, runtime).is_empty() and consumer.last_error == "json_unsafe_seed", failures, "unsafe_seed")
@@ -72,6 +79,62 @@ func _set_path(root: Dictionary, path: String, value: Variant) -> void:
 		if not current.has(parts[index]) or not current[parts[index]] is Dictionary: return
 		current = current[parts[index]]
 	current[parts[-1]] = value
+
+func _nested_bundle_cases(original: Dictionary) -> Array:
+	var cases: Array = []
+	var occupancy_case: Dictionary = original.duplicate(true)
+	var occupancy: Dictionary = occupancy_case.bundle.site_ir.ship.plan.occupancy
+	occupancy[occupancy.keys()[0]] = "not-an-occupancy-record"
+	cases.append(["nested_occupancy", occupancy_case, "ship_plan_shape"])
+	var edge_case: Dictionary = original.duplicate(true)
+	var edges: Dictionary = edge_case.bundle.site_ir.ship.plan.edges
+	edges[edges.keys()[0]] = "not-an-edge-record"
+	cases.append(["nested_edge", edge_case, "ship_plan_shape"])
+	var room_case: Dictionary = original.duplicate(true)
+	(room_case.bundle.site_ir.ship.topology.rooms as Array)[0] = "not-a-room"
+	cases.append(["nested_room", room_case, "ship_topology_shape"])
+	var room_cell_case: Dictionary = original.duplicate(true)
+	(((room_cell_case.bundle.site_ir.ship.topology.rooms as Array)[0] as Dictionary).cells as Array)[0] = "not-a-cell"
+	cases.append(["nested_room_cell", room_cell_case, "ship_topology_shape"])
+	var portal_case: Dictionary = original.duplicate(true)
+	var portals: Array = portal_case.bundle.site_ir.ship.topology.portals
+	if portals.is_empty(): portals.append("not-a-portal")
+	else: portals[0] = "not-a-portal"
+	cases.append(["nested_portal", portal_case, "ship_topology_shape"])
+	var vertical_case: Dictionary = original.duplicate(true)
+	var verticals: Array = vertical_case.bundle.site_ir.ship.topology.verticals
+	verticals.append("not-a-vertical")
+	cases.append(["nested_vertical", vertical_case, "ship_topology_shape"])
+	var path_case: Dictionary = original.duplicate(true)
+	(path_case.bundle.site_ir.ship.critical_path as Array)[0] = "not-a-room-id"
+	cases.append(["nested_critical_path", path_case, "ship_path_shape"])
+	var placement_case: Dictionary = original.duplicate(true)
+	var placements: Array = placement_case.bundle.site_ir.ship.plan.placements
+	if placements.is_empty(): placements.append("not-a-placement")
+	else: placements[0] = "not-a-placement"
+	cases.append(["nested_placement", placement_case, "ship_plan_shape"])
+	var floor_case: Dictionary = original.duplicate(true)
+	(floor_case.bundle.site_ir.ship.plan.floor_placements as Array)[0] = "not-a-floor-placement"
+	cases.append(["nested_floor", floor_case, "ship_plan_shape"])
+	var socket_case: Dictionary = original.duplicate(true)
+	var bindings: Array = socket_case.bundle.site_ir.ship.plan.socket_bindings
+	if bindings.is_empty(): bindings.append({"kind": "incomplete"})
+	else: bindings[0] = {"kind": "incomplete"}
+	cases.append(["nested_socket_binding", socket_case, "ship_plan_shape"])
+	var errors_case: Dictionary = original.duplicate(true)
+	(errors_case.bundle.site_ir.ship.plan.errors as Array).append(7)
+	cases.append(["nested_plan_error", errors_case, "ship_plan_shape"])
+	var gameplay_case: Dictionary = original.duplicate(true)
+	(gameplay_case.bundle.gameplay_ir.legacy_slice.objectives as Array)[0] = "not-an-objective"
+	cases.append(["nested_gameplay", gameplay_case, "gameplay_slice_shape"])
+	return cases
+
+func _rehash_lifecycle(lifecycle: Dictionary) -> String:
+	lifecycle.bundle.semantic_hash = "0".repeat(64)
+	var raw: String = JSON.stringify(lifecycle)
+	var semantic_hash: String = CanonicalJsonScript.new().semantic_hash(raw)
+	lifecycle.bundle.semantic_hash = semantic_hash
+	return JSON.stringify(lifecycle)
 
 func _expect(ok: bool, failures: Array[String], label: String) -> void:
 	if not ok: failures.append(label)

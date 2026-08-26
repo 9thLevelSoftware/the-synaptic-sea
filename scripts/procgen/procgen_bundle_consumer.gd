@@ -9,6 +9,17 @@ const CONTENT_HASH: String = "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3a
 const DOMAINS: Array[String] = ["world", "site", "gameplay", "presentation"]
 const SUPPORTED_ARCHETYPES: Array[String] = ["shuttle", "corvette", "freighter", "frigate"]
 const SUPPORTED_DIFFICULTIES: Array[String] = ["standard", "hardened", "deep_dive"]
+const ROOM_ROLES: Array[String] = [
+	"Airlock", "Dock", "Corridor", "MainSpine", "Hub", "Ramp", "Elevator", "Bridge",
+	"Engineering", "Reactor", "LifeSupport", "Maintenance", "Cargo", "Hangar", "Storage",
+	"Armory", "Security", "Medical", "CrewQuarters", "MessHall", "Compartment",
+]
+const EDGE_KINDS: Array[String] = ["Solid", "Open", "Door", "Locked", "Hatch", "Breach"]
+const DIRECTIONS: Array[String] = ["North", "South", "East", "West"]
+const DAMAGE_VARIANTS: Array[String] = ["Intact", "Damaged", "Breached"]
+const CAUSES_OF_LOSS: Array[String] = [
+	"ReactorBreach", "Depressurization", "PirateBoarding", "Plague", "DriveMisjump", "Unknown",
+]
 const RNG_CHANNELS: Array[String] = [
 	"meta", "hull", "template", "topology", "residual_fill", "door", "furnish", "story",
 	"intact", "breach", "scorch", "seal", "bodies", "fracture", "debris", "loot",
@@ -266,10 +277,15 @@ func _validate_bundle(bundle: Dictionary, request: Dictionary, manifest: Diction
 
 func _validate_ship_shape(ship: Dictionary) -> bool:
 	if not _has_exact_keys(ship, SHIP_FIELDS): return _reject("ship_shape")
-	for key in ["generator_version", "seed", "intactness", "entry_room", "goal_room"]:
-		if not _is_json_integer(ship.get(key, null)): return _reject("ship_shape")
-	for key in ["archetype_id", "template_id", "cause_of_loss"]:
+	if not _is_bounded_integer(ship.get("generator_version", null), 0, 4294967295) \
+			or not _is_bounded_integer(ship.get("seed", null), 0, MAX_SAFE_JSON_INTEGER) \
+			or not _is_bounded_integer(ship.get("intactness", null), 0, 10000) \
+			or not _is_bounded_integer(ship.get("entry_room", null), 0, 65535) \
+			or not _is_bounded_integer(ship.get("goal_room", null), 0, 65535): return _reject("ship_shape")
+	for key in ["archetype_id", "template_id"]:
 		if not ship.get(key, null) is String or str(ship.get(key, "")).is_empty(): return _reject("ship_shape")
+	if not ship.get("cause_of_loss", null) is String \
+			or not CAUSES_OF_LOSS.has(str(ship.get("cause_of_loss", ""))): return _reject("ship_shape")
 	if ship.get("fractured", null) is not bool: return _reject("ship_shape")
 	for key in ["critical_path", "decks", "entities", "damage_events", "fragments"]:
 		if not ship.get(key, null) is Array: return _reject("ship_shape")
@@ -277,15 +293,141 @@ func _validate_ship_shape(ship: Dictionary) -> bool:
 	if not topology is Dictionary or not _has_exact_keys(topology, ["rooms", "portals", "verticals"]): return _reject("topology_shape")
 	for key in ["rooms", "portals", "verticals"]:
 		if not (topology as Dictionary).get(key, null) is Array: return _reject("topology_shape")
+	var room_ids: Dictionary = {}
+	if not _validate_topology(topology as Dictionary, room_ids): return _reject("ship_topology_shape")
+	if not room_ids.has(int(ship.get("entry_room", -1))) or not room_ids.has(int(ship.get("goal_room", -1))): return _reject("ship_path_shape")
+	for room_id in ship.get("critical_path", []):
+		if not _is_bounded_integer(room_id, 0, 65535) or not room_ids.has(int(room_id)): return _reject("ship_path_shape")
 	var plan: Variant = ship.get("plan", null)
 	if not plan is Dictionary or not _has_exact_keys(plan, ["occupancy", "edges", "placements", "floor_placements", "ceiling_placements", "socket_bindings", "errors"]): return _reject("structural_plan_shape")
 	for key in ["occupancy", "edges"]:
 		if not (plan as Dictionary).get(key, null) is Dictionary: return _reject("structural_plan_shape")
 	for key in ["placements", "floor_placements", "ceiling_placements", "socket_bindings", "errors"]:
 		if not (plan as Dictionary).get(key, null) is Array: return _reject("structural_plan_shape")
+	if not _validate_structural_plan(plan as Dictionary, room_ids): return _reject("ship_plan_shape")
 	var graph: Variant = ship.get("room_graph", null)
 	if not graph is Dictionary or not _has_exact_keys(graph, ["nodes", "edges"]): return _reject("room_graph_shape")
 	if not (graph as Dictionary).get("nodes", null) is Array or not (graph as Dictionary).get("edges", null) is Array: return _reject("room_graph_shape")
+	return true
+
+func _validate_topology(topology: Dictionary, room_ids: Dictionary) -> bool:
+	for room_value in topology.get("rooms", []):
+		if not room_value is Dictionary: return false
+		var room: Dictionary = room_value
+		if not _has_exact_keys(room, ["id", "role", "deck", "cells"]) \
+				or not _is_bounded_integer(room.get("id", null), 0, 65535) \
+				or not ROOM_ROLES.has(str(room.get("role", ""))) \
+				or not _is_bounded_integer(room.get("deck", null), 0, 255) \
+				or not room.get("cells", null) is Array \
+				or (room.get("cells", []) as Array).is_empty(): return false
+		var room_id: int = int(room.get("id", -1))
+		if room_ids.has(room_id): return false
+		room_ids[room_id] = true
+		for cell in room.get("cells", []):
+			if not _validate_cell(cell) or int((cell as Dictionary).get("deck", -1)) != int(room.get("deck", -2)): return false
+	for portal_value in topology.get("portals", []):
+		if not portal_value is Dictionary: return false
+		var portal: Dictionary = portal_value
+		if not _has_exact_keys(portal, ["from_room", "to_room", "from_cell", "to_cell", "state", "exterior"]) \
+				or not _is_bounded_integer(portal.get("from_room", null), 0, 65535) \
+				or not _is_bounded_integer(portal.get("to_room", null), 0, 65535) \
+				or not _validate_cell(portal.get("from_cell", null)) \
+				or not _validate_cell(portal.get("to_cell", null)) \
+				or not EDGE_KINDS.has(str(portal.get("state", ""))) \
+				or portal.get("exterior", null) is not bool: return false
+		if not room_ids.has(int(portal.get("from_room", -1))): return false
+		if not bool(portal.get("exterior", false)) and not room_ids.has(int(portal.get("to_room", -1))): return false
+		if not _are_cardinal_neighbors(portal.from_cell, portal.to_cell): return false
+	for vertical_value in topology.get("verticals", []):
+		if not vertical_value is Dictionary: return false
+		var vertical: Dictionary = vertical_value
+		if not _has_exact_keys(vertical, ["from_room", "to_room", "from_cell", "to_cell"]) \
+				or not _is_bounded_integer(vertical.get("from_room", null), 0, 65535) \
+				or not _is_bounded_integer(vertical.get("to_room", null), 0, 65535) \
+				or not room_ids.has(int(vertical.get("from_room", -1))) \
+				or not room_ids.has(int(vertical.get("to_room", -1))) \
+				or not _validate_cell(vertical.get("from_cell", null)) \
+				or not _validate_cell(vertical.get("to_cell", null)): return false
+	return not room_ids.is_empty()
+
+func _validate_structural_plan(plan: Dictionary, room_ids: Dictionary) -> bool:
+	var occupancy: Dictionary = plan.get("occupancy", {})
+	for key in occupancy.keys():
+		var record: Variant = occupancy[key]
+		if not key is String or str(key).is_empty() or not _validate_cell_record(record, room_ids): return false
+		if str(key) != _cell_identity((record as Dictionary).get("cell", {})): return false
+	var edges: Dictionary = plan.get("edges", {})
+	for key in edges.keys():
+		var edge: Variant = edges[key]
+		if not key is String or str(key).is_empty() or not _validate_edge_record(edge): return false
+		if str(key) != str((edge as Dictionary).get("edge_key", "")): return false
+	for edge in plan.get("placements", []):
+		if not _validate_edge_record(edge): return false
+	for placement in plan.get("floor_placements", []):
+		if not _validate_floor_placement(placement, room_ids): return false
+	for placement in plan.get("ceiling_placements", []):
+		if not _validate_floor_placement(placement, room_ids): return false
+	for binding in plan.get("socket_bindings", []):
+		if not _validate_socket_binding(binding): return false
+	for error in plan.get("errors", []):
+		if not error is String or str(error).is_empty(): return false
+	return (plan.get("errors", []) as Array).is_empty()
+
+func _validate_cell_record(value: Variant, room_ids: Dictionary) -> bool:
+	if not value is Dictionary: return false
+	var record: Dictionary = value
+	return _has_exact_keys(record, ["cell", "room_id", "module_id", "decal", "variant"]) \
+			and _validate_cell(record.get("cell", null)) \
+			and _is_bounded_integer(record.get("room_id", null), 0, 65535) \
+			and room_ids.has(int(record.get("room_id", -1))) \
+			and record.get("module_id", null) is String and not str(record.get("module_id", "")).is_empty() \
+			and _is_bounded_integer(record.get("decal", null), 0, 255) \
+			and DAMAGE_VARIANTS.has(str(record.get("variant", "")))
+
+func _validate_edge_record(value: Variant) -> bool:
+	if not value is Dictionary: return false
+	var edge: Dictionary = value
+	var keys: Array[String] = [
+		"edge_key", "kind", "module_id", "variant", "position", "yaw_degrees", "cell",
+		"direction", "room_ids", "source_cells", "portal", "exterior", "wrapper_required",
+	]
+	if not _has_exact_keys(edge, keys) or str(edge.get("edge_key", "")).is_empty() \
+			or not EDGE_KINDS.has(str(edge.get("kind", ""))) \
+			or not edge.get("module_id", null) is String \
+			or not DAMAGE_VARIANTS.has(str(edge.get("variant", ""))) \
+			or not _validate_number_array(edge.get("position", null), 3, false, 0, 0) \
+			or not _is_bounded_integer(edge.get("yaw_degrees", null), 0, 65535) \
+			or not _validate_cell(edge.get("cell", null)) \
+			or not DIRECTIONS.has(str(edge.get("direction", ""))) \
+			or not _validate_number_array(edge.get("room_ids", null), 2, true, 0, 65535) \
+			or not edge.get("source_cells", null) is Array or (edge.get("source_cells", []) as Array).size() != 2 \
+			or edge.get("portal", null) is not bool or edge.get("exterior", null) is not bool \
+			or edge.get("wrapper_required", null) is not bool: return false
+	for cell in edge.get("source_cells", []):
+		if not _validate_cell(cell): return false
+	return true
+
+func _validate_floor_placement(value: Variant, room_ids: Dictionary) -> bool:
+	if not value is Dictionary: return false
+	var placement: Dictionary = value
+	return _has_exact_keys(placement, ["id", "cell", "cell_key", "room_id", "module_id", "position", "yaw_degrees", "variant"]) \
+			and placement.get("id", null) is String and not str(placement.get("id", "")).is_empty() \
+			and _validate_cell(placement.get("cell", null)) \
+			and placement.get("cell_key", null) is String \
+			and str(placement.get("cell_key", "")) == _cell_identity(placement.get("cell", {})) \
+			and _is_bounded_integer(placement.get("room_id", null), 0, 65535) \
+			and room_ids.has(int(placement.get("room_id", -1))) \
+			and placement.get("module_id", null) is String and not str(placement.get("module_id", "")).is_empty() \
+			and _validate_number_array(placement.get("position", null), 3, false, 0, 0) \
+			and _is_bounded_integer(placement.get("yaw_degrees", null), 0, 65535) \
+			and DAMAGE_VARIANTS.has(str(placement.get("variant", "")))
+
+func _validate_socket_binding(value: Variant) -> bool:
+	if not value is Dictionary: return false
+	var binding: Dictionary = value
+	if not _has_exact_keys(binding, ["placement_id", "socket_id", "neighbor_placement_id", "neighbor_socket_id", "kind"]): return false
+	for key in binding.keys():
+		if not binding[key] is String or str(binding[key]).is_empty(): return false
 	return true
 
 func _validate_gameplay(value: Variant, ship: Dictionary) -> bool:
@@ -300,7 +442,39 @@ func _validate_gameplay(value: Variant, ship: Dictionary) -> bool:
 		if not gameplay.get(key, null) is String or str(gameplay.get(key, "")).is_empty(): return _reject("gameplay_slice_shape")
 	for key in ["critical_path", "fire_zones", "objectives", "loot_containers"]:
 		if not gameplay.get(key, null) is Array: return _reject("gameplay_slice_shape")
+	for room_id in gameplay.get("critical_path", []):
+		if not room_id is String or str(room_id).is_empty(): return _reject("gameplay_slice_shape")
+	for fire_zone in gameplay.get("fire_zones", []):
+		if not fire_zone is Dictionary or not (fire_zone as Dictionary).is_empty(): return _reject("gameplay_slice_shape")
+	for objective in gameplay.get("objectives", []):
+		if not _validate_objective(objective): return _reject("gameplay_slice_shape")
+	for container in gameplay.get("loot_containers", []):
+		if not _validate_loot_container(container): return _reject("gameplay_slice_shape")
 	return true
+
+func _validate_objective(value: Variant) -> bool:
+	if not value is Dictionary: return false
+	var objective: Dictionary = value
+	var keys: Array[String] = [
+		"id", "sequence", "type", "kind", "room_id", "room_role", "semantic", "cell",
+		"approach_cell", "approach_distance_cells", "interactable",
+	]
+	if not _has_exact_keys(objective, keys): return false
+	for key in ["id", "type", "kind", "room_id", "room_role", "semantic"]:
+		if not objective.get(key, null) is String or str(objective.get(key, "")).is_empty(): return false
+	return _is_bounded_integer(objective.get("sequence", null), 0, 4294967295) \
+			and _validate_number_array(objective.get("cell", null), 3, true, -2147483648, 2147483647) \
+			and _validate_number_array(objective.get("approach_cell", null), 3, true, -2147483648, 2147483647) \
+			and _is_bounded_integer(objective.get("approach_distance_cells", null), 0, 4294967295) \
+			and objective.get("interactable", null) is bool
+
+func _validate_loot_container(value: Variant) -> bool:
+	if not value is Dictionary: return false
+	var container: Dictionary = value
+	if not _has_exact_keys(container, ["id", "kind", "room_id", "approach_cell", "loot_table"]): return false
+	for key in ["id", "kind", "room_id", "loot_table"]:
+		if not container.get(key, null) is String or str(container.get(key, "")).is_empty(): return false
+	return _validate_number_array(container.get("approach_cell", null), 3, true, -2147483648, 2147483647)
 
 func _validate_metrics_trace(metrics_value: Variant, trace_value: Variant, ship: Dictionary, caps: Dictionary) -> bool:
 	if not metrics_value is Dictionary or not trace_value is Dictionary: return _reject("diagnostic_shape")
@@ -346,6 +520,39 @@ func _has_exact_keys(value: Variant, expected: Array) -> bool:
 	for key in expected:
 		if not (value as Dictionary).has(key): return false
 	return true
+
+func _validate_cell(value: Variant) -> bool:
+	if not value is Dictionary: return false
+	var cell: Dictionary = value
+	return _has_exact_keys(cell, ["deck", "x", "y"]) \
+			and _is_bounded_integer(cell.get("deck", null), 0, 255) \
+			and _is_bounded_integer(cell.get("x", null), -2147483648, 2147483647) \
+			and _is_bounded_integer(cell.get("y", null), -2147483648, 2147483647)
+
+func _are_cardinal_neighbors(from_cell: Dictionary, to_cell: Dictionary) -> bool:
+	if int(from_cell.get("deck", -1)) != int(to_cell.get("deck", -2)): return false
+	var dx: int = absi(int(from_cell.get("x", 0)) - int(to_cell.get("x", 0)))
+	var dy: int = absi(int(from_cell.get("y", 0)) - int(to_cell.get("y", 0)))
+	return dx + dy == 1
+
+func _cell_identity(value: Dictionary) -> String:
+	return "%d|%d|%d" % [int(value.get("deck", 0)), int(value.get("x", 0)), int(value.get("y", 0))]
+
+func _validate_number_array(value: Variant, expected_size: int, integers: bool, minimum: int, maximum: int) -> bool:
+	if not value is Array or (value as Array).size() != expected_size: return false
+	for number in value:
+		if integers:
+			if not _is_bounded_integer(number, minimum, maximum): return false
+		elif not _is_finite_number(number):
+			return false
+	return true
+
+func _is_finite_number(value: Variant) -> bool:
+	if value is int: return int(value) >= -MAX_SAFE_JSON_INTEGER and int(value) <= MAX_SAFE_JSON_INTEGER
+	return value is float and is_finite(float(value))
+
+func _is_bounded_integer(value: Variant, minimum: int, maximum: int) -> bool:
+	return _is_json_integer(value) and int(value) >= minimum and int(value) <= maximum
 
 func _is_json_integer(value: Variant) -> bool:
 	if value is int: return int(value) >= -MAX_SAFE_JSON_INTEGER and int(value) <= MAX_SAFE_JSON_INTEGER
