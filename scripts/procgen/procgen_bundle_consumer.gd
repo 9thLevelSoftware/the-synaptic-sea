@@ -1,0 +1,99 @@
+extends RefCounted
+class_name ProcgenBundleConsumer
+
+const GENERATOR_VERSION: int = 2
+const CONTENT_HASH: String = "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2"
+const DOMAINS: Array[String] = ["world", "site", "gameplay", "presentation"]
+const SCHEMAS: Dictionary = {
+	"procgen_bundle": "procgen-bundle-1", "world_ir": "world-ir-1",
+	"site_ir": "site-ir-1", "gameplay_ir": "gameplay-ir-1",
+	"presentation_ir": "presentation-ir-1", "generation_trace": "generation-trace-1",
+	"metrics": "generation-metrics-1", "request": "procgen-request-1"
+}
+
+var last_error: String = ""
+
+func build_request(seed_value: int, size: int, condition: int) -> Dictionary:
+	if seed_value < 0 or seed_value > 0x7fffffffffffffff:
+		last_error = "json_unsafe_seed"
+		return {}
+	var archetypes: Dictionary = {0: "shuttle", 1: "corvette", 2: "freighter"}
+	var intactness: Dictionary = {0: 9500, 1: 6000, 2: 2000}
+	if not archetypes.has(size) or not intactness.has(condition):
+		last_error = "unsupported_ship_parameters"
+		return {}
+	var unsigned_seed: int = seed_value
+	var site_id: String = "site_%s_%s_%s" % [str(unsigned_seed), str(size), str(condition)]
+	return {"schema_version": "procgen-request-1", "world_seed": unsigned_seed,
+		"site": {"site_id": site_id, "x": 0, "y": 0, "archetype_id": archetypes[size],
+			"kit_id": "ship_structural_v0", "intactness_override_bp": intactness[condition],
+			"cause_of_loss": null, "loot_richness_bp": 5000},
+		"difficulty_id": "standard", "player_model": {"schema_version": "player-model-1", "signals": []},
+		"requested_domains": DOMAINS.duplicate(), "generator_version": GENERATOR_VERSION,
+		"content_manifest_hash": CONTENT_HASH, "presentation": {"seed": unsigned_seed, "locale": "en-US"}}
+
+func consume(result_json: String, request: Dictionary, manifest: Dictionary = {}, capabilities: Dictionary = {}) -> Dictionary:
+	last_error = ""
+	if request.is_empty() or result_json.is_empty(): return _fail("missing_bundle")
+	var parsed: Variant = JSON.parse_string(result_json)
+	if not parsed is Dictionary: return _fail("malformed_bundle_json")
+	var lifecycle: Dictionary = parsed
+	if str(lifecycle.get("status", "")) != "completed": return _fail("lifecycle_not_completed")
+	if lifecycle.get("failure", null) != null: return _fail("unexpected_failure_payload")
+	var bundle: Variant = lifecycle.get("bundle", null)
+	if not bundle is Dictionary: return _fail("missing_bundle")
+	var doc: Dictionary = bundle
+	if not manifest.is_empty() and (str(manifest.get("manifest_schema", "")) != "procgen-build-manifest-1" or int(manifest.get("generator_version", -1)) != GENERATOR_VERSION): return _fail("manifest_mismatch")
+	if not capabilities.is_empty() and str(capabilities.get("schema_version", "")) != "procgen-capabilities-1": return _fail("capabilities_schema")
+	if not _validate(doc, request, manifest, capabilities): return {}
+	return doc.duplicate(true)
+
+func _validate(bundle: Dictionary, request: Dictionary, manifest: Dictionary, capabilities: Dictionary) -> bool:
+	for field in ["schema_version", "version", "request", "world_ir", "site_ir", "gameplay_ir", "presentation_ir", "semantic_hash", "metrics", "trace"]:
+		if not bundle.has(field): return _fail("missing_%s" % field) == {}
+	if str(bundle.schema_version) != SCHEMAS.procgen_bundle: return _fail("bundle_schema") == {}
+	var version: Dictionary = bundle.version
+	if int(version.get("generator_version", -1)) != GENERATOR_VERSION or str(version.get("content_manifest_hash", "")) != CONTENT_HASH: return _fail("version_mismatch") == {}
+	for layer in ["world_ir", "site_ir", "gameplay_ir", "presentation_ir"]:
+		if str((bundle[layer] as Dictionary).get("schema_version", "")) != SCHEMAS[layer]: return _fail("%s_schema" % layer) == {}
+	if str((bundle.metrics as Dictionary).get("schema_version", "")) != SCHEMAS.metrics or str((bundle.trace as Dictionary).get("schema_version", "")) != SCHEMAS.generation_trace: return _fail("diagnostic_schema") == {}
+	var returned_request: Dictionary = bundle.request
+	if JSON.stringify(returned_request) != JSON.stringify(request): return _fail("request_identity") == {}
+	var world: Dictionary = bundle.world_ir
+	var site: Dictionary = request.site
+	if str(world.get("site_id", "")) != str(site.site_id) or int(world.get("world_seed", -1)) != int(request.world_seed) or int(world.get("x", 99)) != 0 or int(world.get("y", 99)) != 0: return _fail("world_identity") == {}
+	var presentation: Dictionary = bundle.presentation_ir
+	if str(presentation.get("kit_id", "")) != "ship_structural_v0" or str(presentation.get("locale", "")) != "en-US" or int(presentation.get("seed", -1)) != int(request.world_seed): return _fail("presentation_identity") == {}
+	if int((bundle.metrics as Dictionary).get("pipeline_executions", 0)) != 1: return _fail("pipeline_count") == {}
+	var trace: Dictionary = bundle.trace
+	if trace.get("rng_channels", []).size() != 16: return _fail("trace_channels") == {}
+	if not _verify_hash(bundle): return false
+	return true
+
+func _verify_hash(bundle: Dictionary) -> bool:
+	var mechanical: Dictionary = {"version": bundle.version.duplicate(true), "request": bundle.request.duplicate(true), "world_ir": bundle.world_ir.duplicate(true), "site_ir": bundle.site_ir.duplicate(true), "gameplay_ir": bundle.gameplay_ir.duplicate(true)}
+	(mechanical.request as Dictionary).erase("presentation")
+	var context := HashingContext.new()
+	context.start(HashingContext.HASH_SHA256)
+	context.update(JSON.stringify(_canonical(mechanical)).to_utf8_buffer())
+	var actual: String = context.finish().hex_encode()
+	if actual != str(bundle.semantic_hash): return _fail("semantic_hash") == {}
+	return true
+
+func _canonical(value: Variant) -> Variant:
+	if value is Dictionary:
+		var result: Dictionary = {}
+		var keys: Array[String] = []
+		for key in value.keys(): keys.append(str(key))
+		keys.sort()
+		for key in keys: result[key] = _canonical(value[key])
+		return result
+	if value is Array:
+		var output: Array = []
+		for item in value: output.append(_canonical(item))
+		return output
+	return value
+
+func _fail(code: String) -> Dictionary:
+	last_error = code
+	return {}
