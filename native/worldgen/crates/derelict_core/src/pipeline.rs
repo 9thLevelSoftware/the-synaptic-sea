@@ -184,6 +184,7 @@ pub fn generate_ship_timed(
                 Ok(p) => p,
                 Err(e) => {
                     last_err = Some(GenError::TopologyFailed(e.to_string()));
+                    candidate_decisions.push(format!("rejected:topology_template:{}:attempt={attempt}", template.id));
                     failed_constraints.push(format!("topology:{e}"));
                     retries.push(format!("topology:attempt={attempt}"));
                     failed_templates.push(template.id.clone());
@@ -200,6 +201,7 @@ pub fn generate_ship_timed(
         let plan = compile(&candidate.topology, &DefaultModulePicker);
         if !plan.errors.is_empty() {
             last_err = Some(GenError::StructuralCompileFailed(plan.errors.clone()));
+            candidate_decisions.push(format!("rejected:topology_template:{}:attempt={attempt}", template.id));
             failed_constraints.extend(plan.errors.iter().map(|e| format!("compile:{e}")));
             retries.push(format!("topology:attempt={attempt}"));
             continue;
@@ -207,10 +209,12 @@ pub fn generate_ship_timed(
         let policy = ValidationPolicy::pre_damage(candidate.critical_path.clone());
         match validate(&plan, &candidate.topology, &policy) {
             Ok(_) => {
+                candidate_decisions.push(format!("selected:topology_template:{}:attempt={attempt}", template.id));
                 placed = Some((candidate, plan));
                 break;
             }
             Err(issues) => {
+                candidate_decisions.push(format!("rejected:topology_template:{}:attempt={attempt}", template.id));
                 failed_constraints.extend(issues.iter().map(|i| i.to_string()));
                 retries.push(format!("topology:attempt={attempt}"));
                 last_err = Some(GenError::StructuralValidationFailed {
@@ -271,6 +275,7 @@ pub fn generate_ship_timed(
         let mut plan2 = compile(&topo2, &DefaultModulePicker);
         if !plan2.errors.is_empty() {
             last_err = Some(GenError::StructuralCompileFailed(plan2.errors.clone()));
+            candidate_decisions.push(format!("rejected:damage:attempt={attempt}"));
             failed_constraints.extend(plan2.errors.iter().map(|e| format!("compile:{e}")));
             retries.push(format!("damage:attempt={attempt}"));
             continue;
@@ -325,10 +330,12 @@ pub fn generate_ship_timed(
         );
         match validate(&plan2, &topo2, &policy) {
             Ok(_) => {
+                candidate_decisions.push(format!("selected:damage:attempt={attempt}"));
                 committed = Some((topo2, plan2, entities2, next_id2, outcome, critical_path));
                 break;
             }
             Err(issues) => {
+                candidate_decisions.push(format!("rejected:damage:attempt={attempt}"));
                 failed_constraints.extend(issues.iter().map(|i| i.to_string()));
                 retries.push(format!("damage:attempt={attempt}"));
                 if std::env::var("DERELICT_DEBUG").is_ok() {

@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"site-ir-1","type":"object","additionalProperties":false,"required":["schema_version","ship"],"properties":{"schema_version":{"const":"site-ir-1"},"ship":{"type":"object","additionalProperties":false}}}

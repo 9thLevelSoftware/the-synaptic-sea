@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"gameplay-ir-1","type":"object","additionalProperties":false,"required":["schema_version","legacy_slice"],"properties":{"schema_version":{"const":"gameplay-ir-1"},"legacy_slice":{"type":"object"}}}

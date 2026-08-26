@@ -18,7 +18,7 @@ pub const ADAPTIVE_PROPOSAL_SCHEMA: &str = "adaptive-proposal-1";
 pub const PLAYER_MODEL_SCHEMA: &str = "player-model-1";
 pub const FAILURE_SCHEMA: &str = "procgen-failure-1";
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Domain { World, Site, Gameplay, Presentation }
 
@@ -77,12 +77,41 @@ pub struct ProcgenBundle {
     pub semantic_hash: String, pub metrics: GenerationMetrics, pub trace: GenerationTrace,
 }
 
+impl ProcgenBundle {
+    pub fn from_json(json: &str) -> Result<Self, ProcgenError> {
+        let value: Value = serde_json::from_str(json)?;
+        let Some(schema) = value.get("schema_version").and_then(Value::as_str) else { return Err(ProcgenError::InvalidRequest("schema_version")); };
+        check_schema(schema, PROCGEN_BUNDLE_SCHEMA)?;
+        reject_unknown_bundle_fields(&value)?;
+        let bundle: Self = serde_json::from_value(value)?;
+        bundle.validate()?;
+        Ok(bundle)
+    }
+    pub fn validate(&self) -> Result<(), ProcgenError> {
+        check_schema(&self.schema_version, PROCGEN_BUNDLE_SCHEMA)?;
+        self.request.validate()?;
+        check_schema(&self.world_ir.schema_version, WORLD_IR_SCHEMA)?;
+        check_schema(&self.site_ir.schema_version, SITE_IR_SCHEMA)?;
+        check_schema(&self.gameplay_ir.schema_version, GAMEPLAY_IR_SCHEMA)?;
+        check_schema(&self.presentation_ir.schema_version, PRESENTATION_IR_SCHEMA)?;
+        if self.version.generator_version != self.request.generator_version || self.version.content_manifest_hash != self.request.content_manifest_hash { return Err(ProcgenError::InvalidRequest("version")); }
+        if self.version.export_schemas != ExportSchemas::v1() { return Err(ProcgenError::InvalidRequest("export_schemas")); }
+        if self.semantic_hash != semantic_hash(self)? { return Err(ProcgenError::InvalidRequest("semantic_hash")); }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProcgenFailureCode { InvalidRequest, UnsupportedSchema, UnsupportedDomain, GeneratorContentMismatch, GenerationFailure, ValidationFailure, FallbackFailure, AdapterFailure, ManifestFailure, Capacity, Overload, Cancellation, Timeout, InternalFailure }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProcgenFailure { pub schema_version: String, pub code: ProcgenFailureCode, pub stage: String, pub message: String, pub retryable: bool, pub fallback_id: Option<String> }
+
+impl ProcgenFailure {
+    pub fn from_json(json: &str) -> Result<Self, ProcgenError> { let value: Value = serde_json::from_str(json)?; if let Some(schema) = value.get("schema_version").and_then(Value::as_str) { check_schema(schema, FAILURE_SCHEMA)?; } let failure: Self = serde_json::from_value(value)?; failure.validate()?; Ok(failure) }
+    pub fn validate(&self) -> Result<(), ProcgenError> { check_schema(&self.schema_version, FAILURE_SCHEMA)?; if self.stage.is_empty() || self.message.is_empty() { return Err(ProcgenError::InvalidRequest("failure")); } Ok(()) }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -107,15 +136,34 @@ impl ProcgenRequest {
         if self.site.intactness_override_bp.map_or(false, |v| v > 10_000) || self.site.loot_richness_bp > 30_000 { return Err(ProcgenError::InvalidRequest("bounds")); }
         check_schema(&self.player_model.schema_version, PLAYER_MODEL_SCHEMA)?;
         if self.requested_domains.is_empty() || self.requested_domains.iter().any(|d| !matches!(d, Domain::World | Domain::Site | Domain::Gameplay | Domain::Presentation)) { return Err(ProcgenError::InvalidRequest("requested_domains")); }
+        let mut unique = std::collections::BTreeSet::new();
+        if self.requested_domains.iter().any(|d| !unique.insert(d)) { return Err(ProcgenError::InvalidRequest("requested_domains")); }
         if !is_sha256(&self.content_manifest_hash) { return Err(ProcgenError::InvalidRequest("content_manifest_hash")); }
+        if self.presentation.locale.is_empty() || !self.presentation.locale.is_ascii() { return Err(ProcgenError::InvalidRequest("presentation.locale")); }
+        Ok(())
+    }
+}
+
+impl AdaptiveProposal {
+    pub fn validate(&self) -> Result<(), ProcgenError> {
+        check_schema(&self.schema_version, ADAPTIVE_PROPOSAL_SCHEMA)?;
+        if self.rationale_codes.is_empty() || self.rationale_codes.iter().any(|s| s.is_empty()) || self.rule_model_version.is_empty() { return Err(ProcgenError::InvalidRequest("adaptive_proposal.identifiers")); }
+        if self.confidence_bp > 10_000 { return Err(ProcgenError::InvalidRequest("adaptive_proposal.confidence_bp")); }
+        match &self.action { AdaptiveAction::NoOp => {}, AdaptiveAction::SelectCandidate { candidate_id } if candidate_id.is_empty() => return Err(ProcgenError::InvalidRequest("candidate_id")), AdaptiveAction::AdjustEncounter { encounter_id, .. } if encounter_id.is_empty() => return Err(ProcgenError::InvalidRequest("encounter_id")), _ => {} }
         Ok(())
     }
 }
 
 pub fn generate_bundle(request: ProcgenRequest, data: &GenData) -> Result<ProcgenBundle, ProcgenFailure> {
-    request.validate().map_err(|e| failure(ProcgenFailureCode::InvalidRequest, "request", e.to_string(), false))?;
+    let seed = request.world_seed;
     let params = GenParams { archetype_id: request.site.archetype_id.clone(), intactness_override: request.site.intactness_override_bp, cause_override: request.site.cause_of_loss, loot_richness: request.site.loot_richness_bp };
-    let report = generate_ship_timed(request.world_seed, &params, data).map_err(|e| failure(ProcgenFailureCode::GenerationFailure, "generation", e.to_string(), true))?;
+    generate_bundle_with_pipeline(request, data, || generate_ship_timed(seed, &params, data))
+}
+
+pub fn generate_bundle_with_pipeline<F>(request: ProcgenRequest, _data: &GenData, pipeline: F) -> Result<ProcgenBundle, ProcgenFailure>
+where F: FnOnce() -> Result<crate::pipeline::GenReport, crate::pipeline::GenError> {
+    request.validate().map_err(|e| failure(ProcgenFailureCode::InvalidRequest, "request", e.to_string(), false))?;
+    let report = pipeline().map_err(|e| failure(ProcgenFailureCode::GenerationFailure, "generation", e.to_string(), true))?;
     let ship = report.ship;
     let legacy_slice = crate::structural::export::to_gameplay_slice_json(&ship);
     let world_ir = WorldIR { schema_version: WORLD_IR_SCHEMA.into(), world_seed: request.world_seed, site_id: request.site.site_id.clone(), x: request.site.x, y: request.site.y, archetype_id: request.site.archetype_id.clone() };
@@ -123,11 +171,18 @@ pub fn generate_bundle(request: ProcgenRequest, data: &GenData) -> Result<Procge
     let gameplay_ir = GameplayIR { schema_version: GAMEPLAY_IR_SCHEMA.into(), legacy_slice };
     let presentation_ir = PresentationIR { schema_version: PRESENTATION_IR_SCHEMA.into(), kit_id: request.site.kit_id.clone(), locale: request.presentation.locale.clone(), seed: request.presentation.seed, approved_bindings: BTreeMap::new() };
     let version = VersionEnvelope { generator_version: request.generator_version, content_manifest_hash: request.content_manifest_hash.clone(), export_schemas: ExportSchemas::v1() };
-    let metrics = GenerationMetrics { pipeline_executions: 1, room_count: ship.room_graph.nodes.len() as u32, entity_count: ship.entities.len() as u32, structural_placement_count: ship.plan.placements.len() as u32, stage_timings_micros: report.stage_micros.iter().map(|(k,v)| ((*k).into(), *v)).collect() };
-    let trace = GenerationTrace { schema_version: GENERATION_TRACE_SCHEMA.into(), rng_channels: vec!["meta".into(), "hull".into(), "template".into(), "topology".into(), "residual_fill".into(), "story".into(), "intact".into(), "damage".into(), "loot".into()], candidate_decisions: report.candidate_decisions, failed_constraints: report.failed_constraints, retries: report.retries, stage_timings_micros: metrics.stage_timings_micros.clone(), ..Default::default() };
+    let room_count = u32::try_from(ship.room_graph.nodes.len()).map_err(|_| failure(ProcgenFailureCode::Capacity, "metrics", "room count exceeds u32".into(), false))?;
+    let entity_count = u32::try_from(ship.entities.len()).map_err(|_| failure(ProcgenFailureCode::Capacity, "metrics", "entity count exceeds u32".into(), false))?;
+    let structural_placement_count = ship.plan.placements.len().checked_add(ship.plan.floor_placements.len()).and_then(|n| n.checked_add(ship.plan.ceiling_placements.len())).and_then(|n| u32::try_from(n).ok()).ok_or_else(|| failure(ProcgenFailureCode::Capacity, "metrics", "placement count exceeds u32".into(), false))?;
+    let metrics = GenerationMetrics { pipeline_executions: 1, room_count, entity_count, structural_placement_count, stage_timings_micros: report.stage_micros.iter().map(|(k,v)| ((*k).into(), *v)).collect() };
+    let trace = GenerationTrace { schema_version: GENERATION_TRACE_SCHEMA.into(), rng_channels: vec!["meta".into(), "hull".into(), "template".into(), "topology".into(), "residual_fill".into(), "door".into(), "furnish".into(), "story".into(), "intact".into(), "breach".into(), "scorch".into(), "seal".into(), "bodies".into(), "fracture".into(), "debris".into(), "loot".into()], candidate_decisions: report.candidate_decisions, failed_constraints: report.failed_constraints, retries: report.retries, stage_timings_micros: metrics.stage_timings_micros.clone(), ..Default::default() };
     let mut bundle = ProcgenBundle { schema_version: PROCGEN_BUNDLE_SCHEMA.into(), version, request, world_ir, site_ir, gameplay_ir, presentation_ir, semantic_hash: String::new(), metrics, trace };
     bundle.semantic_hash = semantic_hash(&bundle).map_err(|e| failure(ProcgenFailureCode::InternalFailure, "hash", e.to_string(), false))?; Ok(bundle)
 }
+
+pub fn migration_layout(bundle: &ProcgenBundle) -> Result<Value, ProcgenError> { bundle.validate()?; Ok(crate::structural::export::to_layout_json(&bundle.site_ir.ship, &crate::structural::export::ExportOptions { kit_id: bundle.presentation_ir.kit_id.clone(), ..Default::default() })) }
+pub fn migration_gameplay(bundle: &ProcgenBundle) -> Result<Value, ProcgenError> { bundle.validate()?; Ok(bundle.gameplay_ir.legacy_slice.clone()) }
+pub fn canonical_json_hash(value: &Value) -> Result<String, ProcgenError> { let bytes = serde_json::to_vec(&canonical(value.clone()))?; let digest = Sha256::digest(bytes); Ok(digest.iter().map(|b| format!("{b:02x}")).collect()) }
 
 pub fn semantic_hash(bundle: &ProcgenBundle) -> Result<String, ProcgenError> {
     let mut projection = Map::new(); projection.insert("version".into(), serde_json::to_value(&bundle.version)?); projection.insert("request".into(), mechanical_request(&bundle.request)); projection.insert("world_ir".into(), serde_json::to_value(&bundle.world_ir)?); projection.insert("site_ir".into(), serde_json::to_value(&bundle.site_ir)?); projection.insert("gameplay_ir".into(), serde_json::to_value(&bundle.gameplay_ir)?);
@@ -138,3 +193,17 @@ fn canonical(v: Value) -> Value { match v { Value::Object(o) => Value::Object(o.
 fn check_schema(actual: &str, expected: &str) -> Result<(), ProcgenError> { if actual == expected { Ok(()) } else if actual.starts_with(&expected[..expected.rfind('-').unwrap()+1]) { Err(ProcgenError::UnknownSchemaMajor(actual.into())) } else { Err(ProcgenError::InvalidRequest("schema_version")) } }
 fn is_sha256(s: &str) -> bool { s.len() == 64 && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) }
 fn failure(code: ProcgenFailureCode, stage: &str, message: String, retryable: bool) -> ProcgenFailure { ProcgenFailure { schema_version: FAILURE_SCHEMA.into(), code, stage: stage.into(), message, retryable, fallback_id: None } }
+
+fn reject_unknown_bundle_fields(value: &Value) -> Result<(), ProcgenError> {
+    let allowed = ["schema_version", "version", "request", "world_ir", "site_ir", "gameplay_ir", "presentation_ir", "semantic_hash", "metrics", "trace"];
+    let Some(obj) = value.as_object() else { return Err(ProcgenError::InvalidRequest("bundle")); };
+    if obj.keys().any(|k| !allowed.contains(&k.as_str())) { return Err(ProcgenError::InvalidRequest("bundle.unknown_field")); }
+    if let Some(ship) = obj.get("site_ir").and_then(|v| v.get("ship")).and_then(Value::as_object) {
+        let fields = ["generator_version","seed","archetype_id","template_id","intactness","cause_of_loss","topology","plan","entry_room","goal_room","critical_path","decks","room_graph","entities","damage_events","fractured","fragments"];
+        if ship.keys().any(|k| !fields.contains(&k.as_str())) { return Err(ProcgenError::InvalidRequest("site_ir.ship.unknown_field")); }
+    }
+    let nested = [("version", ["generator_version", "content_manifest_hash", "export_schemas"].as_slice()), ("world_ir", ["schema_version", "world_seed", "site_id", "x", "y", "archetype_id"].as_slice()), ("site_ir", ["schema_version", "ship"].as_slice()), ("gameplay_ir", ["schema_version", "legacy_slice"].as_slice()), ("presentation_ir", ["schema_version", "kit_id", "locale", "seed", "approved_bindings"].as_slice()), ("metrics", ["pipeline_executions", "room_count", "entity_count", "structural_placement_count", "stage_timings_micros"].as_slice()), ("trace", ["schema_version", "rng_channels", "candidate_decisions", "failed_constraints", "repairs", "retries", "fallback", "stage_timings_micros"].as_slice())];
+    for (name, fields) in nested { if let Some(child) = obj.get(name).and_then(Value::as_object) { if child.keys().any(|k| !fields.contains(&k.as_str())) { return Err(ProcgenError::InvalidRequest("bundle.nested_unknown_field")); } } }
+    if let Some(slice) = obj.get("gameplay_ir").and_then(|v| v.get("legacy_slice")).and_then(Value::as_object) { let fields = ["schema_version", "document_kind", "program_id", "start_room", "goal_room", "critical_path", "fire_zones", "objectives", "loot_containers", "summary"]; if slice.keys().any(|k| !fields.contains(&k.as_str())) { return Err(ProcgenError::InvalidRequest("gameplay_ir.legacy_slice.unknown_field")); } }
+    Ok(())
+}
