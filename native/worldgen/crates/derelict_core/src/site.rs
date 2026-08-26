@@ -268,6 +268,11 @@ pub fn validate_site(site: &SiteIR) -> Result<(), ValidationError> {
             "structural generator identity mismatch".into(),
         ));
     }
+    // The request identity is checked by generate_site; this guard still rejects
+    // malformed hand-authored overlays without attempting to infer identity.
+    if site.ship.seed > crate::world::MAX_PUBLIC_SEED {
+        return Err(ValidationError("ship seed out of range".into()));
+    }
     let projected = project_navigation(&site.ship)?;
     if site.navigation.nodes != projected.nodes {
         return Err(ValidationError("navigation room identity mismatch".into()));
@@ -292,6 +297,11 @@ pub fn validate_site(site: &SiteIR) -> Result<(), ValidationError> {
             || actual.clearance != expected.clearance
         {
             return Err(ValidationError("navigation projection mismatch".into()));
+        }
+        if actual.gate_id.is_some() && (actual.passable || actual.clearance != 1) {
+            return Err(ValidationError(
+                "gated navigation edge must be blocked".into(),
+            ));
         }
     }
     let spatial = compute_spatial(&site.ship)?;
@@ -375,6 +385,21 @@ pub fn validate_site(site: &SiteIR) -> Result<(), ValidationError> {
                 }
             }
         }
+        let bound: Vec<_> = site
+            .navigation
+            .edges
+            .iter()
+            .filter(|e| e.gate_id.as_deref() == Some(&gate.id))
+            .collect();
+        if bound.len() != 2
+            || bound[0].from_room != bound[1].to_room
+            || bound[0].to_room != bound[1].from_room
+        {
+            return Err(ValidationError("gate must bind both directions".into()));
+        }
+        if bound.iter().any(|e| e.passable) {
+            return Err(ValidationError("gate edge is passable".into()));
+        }
     }
     let mut prop_sockets = BTreeSet::new();
     let mut prop_cells = BTreeSet::new();
@@ -394,6 +419,32 @@ pub fn validate_site(site: &SiteIR) -> Result<(), ValidationError> {
         if node(g, &p.mission_node_id).is_none() {
             return Err(ValidationError("prop missing mission node".into()));
         }
+        let n = node(g, &p.mission_node_id).unwrap();
+        if n.room != p.room || n.cell != p.anchor {
+            return Err(ValidationError("prop/node room mismatch".into()));
+        }
+        match p.kind {
+            PropKind::KeyPickup => {
+                if p.key_id.is_none() || p.repair_id.is_some() {
+                    return Err(ValidationError("key prop binding".into()));
+                }
+            }
+            PropKind::RepairPanel => {
+                if p.repair_id.is_none() || p.key_id.is_some() {
+                    return Err(ValidationError("repair prop binding".into()));
+                }
+            }
+            PropKind::ObjectiveConsole => {
+                if p.key_id.is_some() || p.repair_id.is_some() {
+                    return Err(ValidationError("objective prop binding".into()));
+                }
+            }
+            PropKind::ExtractionConsole => {
+                if p.key_id.is_some() || p.repair_id.is_some() {
+                    return Err(ValidationError("extraction prop binding".into()));
+                }
+            }
+        }
         if matches!(p.kind, PropKind::ExtractionConsole) {
             extracts += 1;
         }
@@ -402,6 +453,42 @@ pub fn validate_site(site: &SiteIR) -> Result<(), ValidationError> {
         return Err(ValidationError(
             "exactly one extraction console required".into(),
         ));
+    }
+    let extraction = site
+        .functional_props
+        .iter()
+        .find(|p| matches!(p.kind, PropKind::ExtractionConsole))
+        .unwrap();
+    let entry_portals: Vec<_> = site
+        .ship
+        .topology
+        .portals
+        .iter()
+        .filter(|p| p.exterior && p.from_room == site.ship.entry_room && p.state == EdgeKind::Door)
+        .collect();
+    if entry_portals.len() != 1 {
+        return Err(ValidationError("entry exterior door cardinality".into()));
+    }
+    let ep = entry_portals[0];
+    let edir = crate::structural::plan::Dir::between(ep.from_cell, ep.to_cell)
+        .ok_or_else(|| ValidationError("entry door direction".into()))?;
+    let eref = edge_key(ep.from_cell, edir);
+    if extraction.extraction_portal_ref.as_deref() != Some(eref.as_str()) {
+        return Err(ValidationError("extraction portal binding".into()));
+    }
+    for p in &site.ship.topology.portals {
+        if p.state == EdgeKind::Locked
+            && !site.navigation.edges.iter().any(|e| {
+                e.structural_ref
+                    == edge_key(
+                        p.from_cell,
+                        crate::structural::plan::Dir::between(p.from_cell, p.to_cell).unwrap(),
+                    )
+                    && e.gate_id.is_some()
+            })
+        {
+            return Err(ValidationError("unbound locked portal".into()));
+        }
     }
     // Bounded reachability of mission graph (cycles are rejected by requiring a topological order).
     let mut indeg: BTreeMap<&str, usize> = g.nodes.iter().map(|n| (n.id.as_str(), 0)).collect();
@@ -432,6 +519,7 @@ pub fn validate_site(site: &SiteIR) -> Result<(), ValidationError> {
     if seen != g.nodes.len() {
         return Err(ValidationError("cyclic mission progression".into()));
     }
+    run_progression_agent(site)?;
     Ok(())
 }
 
@@ -596,14 +684,40 @@ pub fn compute_spatial(ship: &Ship) -> Result<SpatialAnnotations, ValidationErro
 }
 
 pub fn run_progression_agent(site: &SiteIR) -> Result<(), ValidationError> {
-    let mut reached = BTreeSet::new();
-    reached.insert(site.ship.entry_room);
+    let mut reached = BTreeSet::from([site.ship.entry_room]);
+    let mut completed = BTreeSet::new();
     let mut changed = true;
     while changed {
         changed = false;
         for e in &site.navigation.edges {
-            if e.passable && reached.contains(&e.from_room) && reached.insert(e.to_room) {
+            let open = e.passable
+                || e.gate_id.as_ref().is_some_and(|gid| {
+                    site.mission_graph
+                        .gates
+                        .iter()
+                        .any(|g| &g.id == gid && completed.contains(&g.prerequisite_node))
+                });
+            if open && reached.contains(&e.from_room) && reached.insert(e.to_room) {
                 changed = true;
+            }
+        }
+        for id in site
+            .mission_graph
+            .required_objectives
+            .iter()
+            .chain(std::iter::once(&site.mission_graph.extraction_node))
+        {
+            if let Some(n) = node(&site.mission_graph, id) {
+                if reached.contains(&n.room) {
+                    completed.insert(id.clone());
+                }
+            }
+        }
+        for g in &site.mission_graph.gates {
+            if let Some(n) = node(&site.mission_graph, &g.prerequisite_node) {
+                if reached.contains(&n.room) {
+                    completed.insert(g.prerequisite_node.clone());
+                }
             }
         }
     }
@@ -639,42 +753,57 @@ pub fn generate_site(
     {
         return Err(SiteError::Invalid("request identity".into()));
     }
+    let structural_key = crate::world::WorldKey {
+        world_seed: request.world_seed,
+        platform_version: request.platform_version,
+        content_manifest_hash: request.content_manifest_hash.clone(),
+        site_id: request.site_id.clone(),
+        x: request.x,
+        y: request.y,
+        domain: "site".into(),
+        channel: "site.structural".into(),
+        sub_index: 0,
+    };
+    if ship.seed
+        != structural_key
+            .seed()
+            .map_err(|e| SiteError::Invalid(e.into()))?
+    {
+        return Err(SiteError::Invalid("ship seed identity".into()));
+    }
     let rules = SiteRules::bundled()?;
     rules.validate()?;
-    let mut decisions = Vec::new();
-    let mut selected = None;
-    for (i, t) in rules.templates.iter().enumerate() {
-        let key = crate::world::WorldKey {
-            world_seed: request.world_seed,
-            platform_version: request.platform_version,
-            content_manifest_hash: request.content_manifest_hash.clone(),
-            site_id: request.site_id.clone(),
-            x: request.x,
-            y: request.y,
-            domain: "site".into(),
-            channel: "site.mission_template".into(),
-            sub_index: i as u32,
-        };
-        let ok = t.archetypes.iter().any(|a| a == &request.archetype_id);
-        let mark = key.seed().unwrap_or(0) % 3 == i as u64;
-        decisions.push(format!(
-            "{}:{}",
-            t.id,
-            if ok && mark { "selected" } else { "rejected" }
-        ));
-        if ok && mark {
-            selected = Some(t.clone());
-        }
+    let compatible: Vec<_> = rules
+        .templates
+        .iter()
+        .filter(|t| t.archetypes.iter().any(|a| a == &request.archetype_id))
+        .cloned()
+        .collect();
+    if compatible.is_empty() {
+        return Err(SiteError::Rules("no compatible template".into()));
     }
-    let template = selected
-        .or_else(|| {
-            rules
-                .templates
-                .iter()
-                .find(|t| t.archetypes.iter().any(|a| a == &request.archetype_id))
-                .cloned()
+    let template_key = crate::world::WorldKey {
+        domain: "site".into(),
+        channel: "site.template".into(),
+        sub_index: 0,
+        ..structural_key.clone()
+    };
+    let pick = (template_key
+        .seed()
+        .map_err(|e| SiteError::Invalid(e.into()))? as usize)
+        % compatible.len();
+    let template = compatible[pick].clone();
+    let decisions = compatible
+        .iter()
+        .enumerate()
+        .map(|(i, t)| {
+            format!(
+                "{}:{}",
+                t.id,
+                if i == pick { "selected" } else { "rejected" }
+            )
         })
-        .ok_or_else(|| SiteError::Rules("no compatible template".into()))?;
+        .collect();
     let rooms = ship.critical_path.clone();
     if rooms.is_empty() {
         return Err(SiteError::Invalid("empty critical path".into()));
@@ -687,6 +816,7 @@ pub fn generate_site(
     };
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
+    let mut props = Vec::new();
     let start = cell_for(rooms[0])?;
     nodes.push(MissionNode {
         id: "start".into(),
@@ -697,6 +827,32 @@ pub fn generate_site(
         repair_id: None,
     });
     let goal = cell_for(*rooms.last().unwrap())?;
+    let mut navigation = project_navigation(&ship).map_err(|e| SiteError::Validation(e.0))?;
+    let gated = template.gate;
+    let prereq_room = if rooms.len() > 1 {
+        rooms[rooms.len() - 2]
+    } else {
+        rooms[0]
+    };
+    if gated.is_some() {
+        let pc = cell_for(prereq_room)?;
+        let (kind, key_id, repair_id) = match gated {
+            Some(GateKind::KeyLock) => (NodeKind::AcquireKey, Some("key-0".into()), None),
+            _ => (NodeKind::Repair, None, Some("repair-0".into())),
+        };
+        nodes.push(MissionNode {
+            id: "prerequisite".into(),
+            kind,
+            room: prereq_room,
+            cell: pc,
+            key_id: key_id.clone(),
+            repair_id: repair_id.clone(),
+        });
+        edges.push(MissionEdge {
+            from: "start".into(),
+            to: "prerequisite".into(),
+        });
+    }
     nodes.push(MissionNode {
         id: "objective-0".into(),
         kind: NodeKind::Objective,
@@ -713,34 +869,121 @@ pub fn generate_site(
         key_id: None,
         repair_id: None,
     });
-    edges.push(MissionEdge {
-        from: "start".into(),
-        to: "objective-0".into(),
-    });
+    if gated.is_none() {
+        edges.push(MissionEdge {
+            from: "start".into(),
+            to: "objective-0".into(),
+        });
+    }
     edges.push(MissionEdge {
         from: "objective-0".into(),
         to: "extract".into(),
     });
-    let mut props = Vec::new();
-    let approach = Cell::new(start.deck, start.x + 1, start.y);
-    if rooms.len() > 0
-        && ship
+    let pair = |room: u16, used: &BTreeSet<Cell>| -> Result<(Cell, Cell), SiteError> {
+        let cs = ship
             .topology
-            .room(rooms[0])
-            .unwrap()
+            .room(room)
+            .ok_or_else(|| SiteError::Invalid("room".into()))?
             .cells
-            .contains(&approach)
-    {
+            .clone();
+        for a in &cs {
+            for b in &cs {
+                if (a.x - b.x).abs() + (a.y - b.y).abs() == 1
+                    && !used.contains(a)
+                    && !used.contains(b)
+                {
+                    return Ok((*a, *b));
+                }
+            }
+        }
+        Err(SiteError::Invalid("socket".into()))
+    };
+    let mut used = BTreeSet::new();
+    let (oa, op) = pair(*rooms.last().unwrap(), &used)?;
+    used.insert(oa);
+    used.insert(op);
+    props.push(FunctionalProp {
+        id: "prop-objective".into(),
+        kind: PropKind::ObjectiveConsole,
+        room: *rooms.last().unwrap(),
+        anchor: oa,
+        approach: op,
+        mission_node_id: "objective-0".into(),
+        key_id: None,
+        repair_id: None,
+        extraction_portal_ref: None,
+    });
+    if let Some(n) = nodes.iter_mut().find(|n| n.id == "objective-0") {
+        n.cell = oa;
+    }
+    let mut gates = Vec::new();
+    if let Some(gk) = gated {
+        let (pa, pp) = pair(prereq_room, &used)?;
+        used.insert(pa);
+        used.insert(pp);
         props.push(FunctionalProp {
-            id: "prop-objective".into(),
-            kind: PropKind::ObjectiveConsole,
-            room: rooms[0],
-            anchor: start,
-            approach,
-            mission_node_id: "objective-0".into(),
-            key_id: None,
-            repair_id: None,
+            id: "prop-prerequisite".into(),
+            kind: if gk == GateKind::KeyLock {
+                PropKind::KeyPickup
+            } else {
+                PropKind::RepairPanel
+            },
+            room: prereq_room,
+            anchor: pa,
+            approach: pp,
+            mission_node_id: "prerequisite".into(),
+            key_id: if gk == GateKind::KeyLock {
+                Some("key-0".into())
+            } else {
+                None
+            },
+            repair_id: if gk == GateKind::Repair {
+                Some("repair-0".into())
+            } else {
+                None
+            },
             extraction_portal_ref: None,
+        });
+        if let Some(n) = nodes.iter_mut().find(|n| n.id == "prerequisite") {
+            n.cell = pa;
+        }
+        let nav = project_navigation(&ship).map_err(|e| SiteError::Validation(e.0))?;
+        let target = nav
+            .edges
+            .iter()
+            .find(|e| {
+                e.from_room == prereq_room
+                    && e.to_room == *rooms.last().unwrap()
+                    && e.kind == NavigationKind::Portal
+            })
+            .or_else(|| nav.edges.iter().find(|e| e.kind == NavigationKind::Portal))
+            .ok_or_else(|| SiteError::Invalid("gate edge".into()))?;
+        for e in &mut navigation.edges {
+            if e.structural_ref == target.structural_ref {
+                e.gate_id = Some("gate-0".into());
+                e.passable = false;
+            }
+        }
+        gates.push(MissionGate {
+            id: "gate-0".into(),
+            kind: gk,
+            navigation_edge: target.id.clone(),
+            prerequisite_node: "prerequisite".into(),
+            unlock_node: "objective-0".into(),
+            key_id: if gk == GateKind::KeyLock {
+                Some("key-0".into())
+            } else {
+                None
+            },
+            repair_id: if gk == GateKind::Repair {
+                Some("repair-0".into())
+            } else {
+                None
+            },
+        });
+        edges.push(MissionEdge {
+            from: "prerequisite".into(),
+            to: "objective-0".into(),
         });
     }
     let extraction_ref = ship
@@ -756,36 +999,22 @@ pub fn generate_site(
             )
         })
         .ok_or_else(|| SiteError::Invalid("entry extraction portal".into()))?;
+    let (ea, ep) = pair(ship.entry_room, &used)?;
     props.push(FunctionalProp {
         id: "prop-extraction".into(),
         kind: PropKind::ExtractionConsole,
         room: ship.entry_room,
-        anchor: cell_for(ship.entry_room)?,
-        approach: Cell::new(
-            cell_for(ship.entry_room)?.deck,
-            cell_for(ship.entry_room)?.x + 1,
-            cell_for(ship.entry_room)?.y,
-        ),
+        anchor: ea,
+        approach: ep,
         mission_node_id: "extract".into(),
         key_id: None,
         repair_id: None,
         extraction_portal_ref: Some(extraction_ref),
     });
-    let navigation = project_navigation(&ship).map_err(|e| SiteError::Validation(e.0))?;
-    let spatial = SpatialAnnotations {
-        schema_version: SPATIAL_SCHEMA_VERSION.into(),
-        rooms: ship
-            .topology
-            .rooms
-            .iter()
-            .map(|r| SpatialAnnotation {
-                room: r.id,
-                minimum_clearance: 1,
-                cover_cells: Vec::new(),
-                los_pairs: Vec::new(),
-            })
-            .collect(),
-    };
+    if let Some(n) = nodes.iter_mut().find(|n| n.id == "extract") {
+        n.cell = ea;
+    }
+    let spatial = compute_spatial(&ship).map_err(|e| SiteError::Validation(e.0))?;
     let site = SiteIR {
         schema_version: SITE_SCHEMA_VERSION.into(),
         ship,
@@ -797,7 +1026,7 @@ pub fn generate_site(
             extraction_node: "extract".into(),
             nodes,
             edges,
-            gates: Vec::new(),
+            gates,
         },
         navigation,
         functional_props: props,
