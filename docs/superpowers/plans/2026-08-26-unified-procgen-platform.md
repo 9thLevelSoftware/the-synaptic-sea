@@ -366,6 +366,9 @@ Task 3 lifecycle decisions (ADR-0060):
 
 ### Task 6: Gate 2 coordinate-stable WorldIR
 
+- Apply ADR-0061's clean break: platform/bundle generator version 3 with
+  immutable v2 ship topology/compiler identity, `world-ir-2`,
+  `procgen-bundle-2`, lifecycle-result v2, and exact 53-bit public seeds.
 - Generate coordinate markers, routes, biome/hazard fields, archetypes,
   resource pressure, landmarks, and required extraction reachability.
 - Derive named streams from the full stable key; optional domains, iteration,

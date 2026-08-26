@@ -98,7 +98,7 @@ Expected:
 ## Unified procedural-generation platform (REQ-PG-001..012)
 
 Feature: `docs/game/features/unified_procgen_platform.md`.
-Architecture: ADR-0057, ADR-0058, and ADR-0059.
+Architecture: ADR-0057 through ADR-0061.
 
 No unified-platform gate is GREEN merely because a pass marker appears. Rust,
 Godot, target-export, semantic-parity, performance, and warning/error evidence

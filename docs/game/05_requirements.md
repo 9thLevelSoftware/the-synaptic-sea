@@ -954,6 +954,9 @@ and the Task 15 documentation-currency deliverable. They are validated by
     manifest hash.
   - `ProcgenBundle` contains `WorldIR`, `SiteIR`, `GameplayIR`, `PresentationIR`,
     semantic hash, metrics, bounded `GenerationTrace`, and a version envelope.
+  - Platform/bundle generator identity is independent from the nested structural
+    ship generator identity; incompatible schema definitions receive new IDs
+    rather than mutating an existing schema ID.
   - `AdaptiveProposal` contains constrained action, score, rationale codes,
     confidence, and rule/model version and cannot bypass validators.
   - Unknown major schema versions fail closed; supported versions round-trip.
@@ -1016,6 +1019,8 @@ and the Task 15 documentation-currency deliverable. They are validated by
     site archetypes, resources, landmarks, and extraction guarantees.
   - Every site derives from `(world_seed, generator_version,
     content_manifest_hash, coordinate/site_id, domain, named_channel)`.
+  - Public numeric seeds remain exact across Rust, Godot, and JavaScript; values
+    outside the declared exact-integer range fail closed.
   - Discovery order, parallel scheduling, optional domain requests, locale, and
     presentation-only seeds do not change mechanical output.
   - Routes and at least one required extraction path validate or fail closed.
