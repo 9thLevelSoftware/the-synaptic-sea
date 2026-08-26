@@ -10,6 +10,8 @@ BUILD_MANIFESTS = {
     "windows": (ROOT / "data/procgen/manifests/build/win64.json", "x86_64-pc-windows-msvc", "gdextension", ROOT / "addons/derelict/bin/win64/derelict_godot.dll", "addons/derelict/bin/win64/derelict_godot.dll"),
     "web": (ROOT / "data/procgen/manifests/build/web.json", "wasm32-unknown-unknown", "wasm", ROOT / "addons/derelict/bin/web/derelict_wasm_bg.wasm", "addons/derelict/bin/web/derelict_wasm_bg.wasm"),
 }
+# Backwards-compatible aliases used by focused tests and downstream tooling.
+BUILD_MANIFEST = BUILD_MANIFESTS["windows"][0]
 ARTIFACT = ROOT / "addons/derelict/bin/win64/derelict_godot.dll"
 CONTENT_ROOTS = [
     ROOT / "native/worldgen/crates/derelict_core/assets",
@@ -51,7 +53,12 @@ def canonical(value: dict) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(); parser.add_argument("--check", action="store_true"); parser.add_argument("--source-commit"); parser.add_argument("--target", choices=sorted(BUILD_MANIFESTS), default="windows"); args = parser.parse_args()
-    build_manifest, target, kind, artifact, artifact_path = BUILD_MANIFESTS[args.target]
+    selected = BUILD_MANIFESTS[args.target]
+    build_manifest, target, kind, artifact, artifact_path = selected
+    if args.target == "windows" and BUILD_MANIFEST != BUILD_MANIFESTS["windows"][0]:
+        build_manifest = BUILD_MANIFEST
+    if args.target == "windows" and ARTIFACT != BUILD_MANIFESTS["windows"][3]:
+        artifact = ARTIFACT
     source_commit = args.source_commit
     if source_commit is None and build_manifest.exists():
         try: source_commit = json.loads(build_manifest.read_text(encoding="utf-8"))["rust_source_commit"]

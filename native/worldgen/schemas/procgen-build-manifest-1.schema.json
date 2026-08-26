@@ -3,16 +3,16 @@
   "$id": "procgen-build-manifest-1",
   "type": "object",
   "required": ["manifest_schema", "rust_source_commit", "generator_version", "content_manifest_path", "content_manifest_hash", "target", "artifact", "export_schemas"],
+  "oneOf": [
+    {"properties":{"target":{"const":"x86_64-pc-windows-msvc"},"artifact":{"type":"object","required":["kind","path","sha256"],"properties":{"kind":{"const":"gdextension"},"path":{"const":"addons/derelict/bin/win64/derelict_godot.dll"},"sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}},"additionalProperties":false}},"required":["target","artifact"]},
+    {"properties":{"target":{"const":"wasm32-unknown-unknown"},"artifact":{"type":"object","required":["kind","path","sha256"],"properties":{"kind":{"const":"wasm"},"path":{"const":"addons/derelict/bin/web/derelict_wasm_bg.wasm"},"sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}},"additionalProperties":false}},"required":["target","artifact"]}
+  ],
   "properties": {
     "manifest_schema": {"const": "procgen-build-manifest-1"},
     "rust_source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "generator_version": {"const": 2},
     "content_manifest_path": {"const": "data/procgen/manifests/content_manifest.json"},
     "content_manifest_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "oneOf": [
-      {"properties":{"target":{"const":"x86_64-pc-windows-msvc"},"artifact":{"type":"object","required":["kind","path","sha256"],"properties":{"kind":{"const":"gdextension"},"path":{"const":"addons/derelict/bin/win64/derelict_godot.dll"},"sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}},"additionalProperties":false}}},
-      {"properties":{"target":{"const":"wasm32-unknown-unknown"},"artifact":{"type":"object","required":["kind","path","sha256"],"properties":{"kind":{"const":"wasm"},"path":{"const":"addons/derelict/bin/web/derelict_wasm_bg.wasm"},"sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}},"additionalProperties":false}}}
-    ],
     "export_schemas": {"type":"object", "additionalProperties":false, "required":["procgen_request","procgen_bundle","world_ir","site_ir","gameplay_ir","presentation_ir","generation_trace","adaptive_proposal"], "properties":{"procgen_request":{"const":"procgen-request-1"},"procgen_bundle":{"const":"procgen-bundle-1"},"world_ir":{"const":"world-ir-1"},"site_ir":{"const":"site-ir-1"},"gameplay_ir":{"const":"gameplay-ir-1"},"presentation_ir":{"const":"presentation-ir-1"},"generation_trace":{"const":"generation-trace-1"},"adaptive_proposal":{"const":"adaptive-proposal-1"}}}
   },
   "additionalProperties": false

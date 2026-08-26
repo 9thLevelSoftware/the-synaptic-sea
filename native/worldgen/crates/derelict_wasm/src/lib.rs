@@ -13,6 +13,8 @@ use derelict_core::GenData;
 use serde_json::to_string;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
+use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 
 const MAX_REQUEST: usize = 64 * 1024;
@@ -23,6 +25,52 @@ const QUEUE: usize = 8;
 const RETAINED: usize = 16;
 const CONTENT_HASH: &str = env!("SYNAPTIC_PROCGEN_CONTENT_MANIFEST_HASH");
 const SOURCE_COMMIT: &str = env!("SYNAPTIC_PROCGEN_RUST_SOURCE_COMMIT");
+
+pub trait Clock: Send + Sync {
+    fn now_ms(&self) -> u64;
+}
+pub trait DataProvider: Send + Sync {
+    fn data(&self) -> Result<GenData, String>;
+}
+pub trait Generator: Send + Sync {
+    fn generate(
+        &self,
+        request: ProcgenRequest,
+        data: &GenData,
+    ) -> Result<derelict_core::procgen::ProcgenBundle, ProcgenFailure>;
+}
+pub trait Serializer: Send + Sync {
+    fn serialize(&self, result: &LifecycleResult) -> Result<String, String>;
+}
+
+struct DefaultClock;
+impl Clock for DefaultClock {
+    fn now_ms(&self) -> u64 {
+        0
+    }
+}
+struct DefaultData;
+impl DataProvider for DefaultData {
+    fn data(&self) -> Result<GenData, String> {
+        GenData::default_bundle().map_err(|e| e.to_string())
+    }
+}
+struct DefaultGenerator;
+impl Generator for DefaultGenerator {
+    fn generate(
+        &self,
+        request: ProcgenRequest,
+        data: &GenData,
+    ) -> Result<derelict_core::procgen::ProcgenBundle, ProcgenFailure> {
+        core_generate_bundle(request, data)
+    }
+}
+struct JsonSerializer;
+impl Serializer for JsonSerializer {
+    fn serialize(&self, result: &LifecycleResult) -> Result<String, String> {
+        to_string(result).map_err(|e| e.to_string())
+    }
+}
 
 #[derive(Clone)]
 enum Entry {
@@ -35,6 +83,8 @@ struct State {
     entries: BTreeMap<i64, Entry>,
     tombstones: BTreeMap<i64, ProcgenFailureCode>,
     data: Option<GenData>,
+    highest_admitted: i64,
+    admitted_at: BTreeMap<i64, u64>,
 }
 impl Default for State {
     fn default() -> Self {
@@ -44,10 +94,53 @@ impl Default for State {
             entries: BTreeMap::new(),
             tombstones: BTreeMap::new(),
             data: None,
+            highest_admitted: 0,
+            admitted_at: BTreeMap::new(),
         }
     }
 }
 thread_local! { static STATE: RefCell<State> = RefCell::new(State::default()); }
+thread_local! { static SERVICE: WasmService = WasmService::default(); }
+
+pub struct WasmService {
+    clock: Arc<dyn Clock>,
+    data: Arc<dyn DataProvider>,
+    generator: Arc<dyn Generator>,
+    serializer: Arc<dyn Serializer>,
+}
+impl Default for WasmService {
+    fn default() -> Self {
+        Self {
+            clock: Arc::new(DefaultClock),
+            data: Arc::new(DefaultData),
+            generator: Arc::new(DefaultGenerator),
+            serializer: Arc::new(JsonSerializer),
+        }
+    }
+}
+impl WasmService {
+    pub fn new(
+        clock: Arc<dyn Clock>,
+        data: Arc<dyn DataProvider>,
+        generator: Arc<dyn Generator>,
+        serializer: Arc<dyn Serializer>,
+    ) -> Self {
+        Self {
+            clock,
+            data,
+            generator,
+            serializer,
+        }
+    }
+    fn encode(&self, result: LifecycleResult) -> String {
+        self.serializer
+            .serialize(&result)
+            .unwrap_or_else(|_| json_fallback())
+    }
+}
+fn json_fallback() -> String {
+    r#"{"schema_version":"procgen-lifecycle-result-1","status":"failed","request_id":null,"bundle":null,"failure":{"schema_version":"procgen-failure-1","code":"internal_failure","stage":"adapter","message":"serialization failure","retryable":false,"fallback_id":null},"events":["failed"]}"#.into()
+}
 
 fn failure(
     id: Option<i64>,
@@ -69,7 +162,39 @@ fn failure(
     )
 }
 fn json(result: LifecycleResult) -> String {
-    to_string(&result).expect("lifecycle result serializes")
+    to_string(&result).unwrap_or_else(|_| json_fallback())
+}
+fn tombstone(state: &mut State, id: i64, code: ProcgenFailureCode) {
+    state.tombstones.insert(id, code);
+    while state.tombstones.len() > RETAINED {
+        if let Some(old) = state.tombstones.keys().next().copied() {
+            state.tombstones.remove(&old);
+        }
+    }
+}
+fn unavailable(state: &State, id: i64) -> (ProcgenFailureCode, &'static str, LifecycleEvent) {
+    match state.tombstones.get(&id) {
+        Some(ProcgenFailureCode::ResultConsumed) => (
+            ProcgenFailureCode::ResultConsumed,
+            "result already consumed",
+            LifecycleEvent::ResultConsumed,
+        ),
+        Some(ProcgenFailureCode::ResultExpired) => (
+            ProcgenFailureCode::ResultExpired,
+            "result expired",
+            LifecycleEvent::ResultExpired,
+        ),
+        _ if id > state.highest_admitted => (
+            ProcgenFailureCode::UnknownRequest,
+            "future request id",
+            LifecycleEvent::Rejected,
+        ),
+        _ => (
+            ProcgenFailureCode::UnknownRequest,
+            "unknown request",
+            LifecycleEvent::Rejected,
+        ),
+    }
 }
 fn retain_cancelled(state: &mut State, id: i64, result: LifecycleResult) {
     let cancelled = state
@@ -80,9 +205,7 @@ fn retain_cancelled(state: &mut State, id: i64, result: LifecycleResult) {
     if cancelled.len() >= RETAINED {
         if let Some(oldest) = cancelled.first() {
             state.entries.remove(oldest);
-            state
-                .tombstones
-                .insert(*oldest, ProcgenFailureCode::ResultExpired);
+            tombstone(state, *oldest, ProcgenFailureCode::ResultExpired);
         }
     }
     state.entries.insert(id, Entry::Cancelled(Box::new(result)));
@@ -152,11 +275,27 @@ fn manifest_value() -> GeneratorManifest {
         dirty_development: env!("SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT") == "true",
     }
 }
-fn generate(req: ProcgenRequest) -> LifecycleResult {
+fn generate(
+    service: &WasmService,
+    req: ProcgenRequest,
+    admitted_at: Option<u64>,
+    request_id: Option<i64>,
+) -> LifecycleResult {
     STATE.with(|cell| {
         let mut state = cell.borrow_mut();
+        let start = service.clock.now_ms();
+        if let Some(at) = admitted_at {
+            if start.saturating_sub(at) >= 2_000 {
+                return failure(
+                    request_id,
+                    ProcgenFailureCode::Timeout,
+                    "deadline exceeded",
+                    LifecycleEvent::TimedOut,
+                );
+            }
+        }
         if state.data.is_none() {
-            state.data = GenData::default_bundle().ok();
+            state.data = service.data.data().ok();
         }
         let Some(data) = state.data.as_ref() else {
             return failure(
@@ -166,7 +305,38 @@ fn generate(req: ProcgenRequest) -> LifecycleResult {
                 LifecycleEvent::Failed,
             );
         };
-        match core_generate_bundle(req, data) {
+        let generated = catch_unwind(AssertUnwindSafe(|| service.generator.generate(req, data)));
+        match generated {
+            Err(_) => failure(
+                request_id,
+                ProcgenFailureCode::InternalFailure,
+                "generator panicked",
+                LifecycleEvent::Failed,
+            ),
+            Ok(Err(f)) => LifecycleResult::failed(request_id, f, vec![LifecycleEvent::Failed]),
+            Ok(Ok(bundle))
+                if bundle.validate().is_ok()
+                    && bundle.site_ir.ship.entities.len() <= MAX_ENTITIES
+                    && bundle.trace.rng_channels.len() <= MAX_TRACE
+                    && bundle.trace.candidate_decisions.len() <= MAX_TRACE
+                    && bundle.trace.failed_constraints.len() <= MAX_TRACE
+                    && bundle.trace.repairs.len() <= MAX_TRACE
+                    && bundle.trace.retries.len() <= MAX_TRACE
+                    && bundle.trace.stage_timings_micros.len() <= MAX_TRACE =>
+            {
+                LifecycleResult::completed(
+                    request_id,
+                    bundle,
+                    vec![LifecycleEvent::Started, LifecycleEvent::Completed],
+                )
+            }
+            Ok(Ok(_)) => failure(
+                request_id,
+                ProcgenFailureCode::Capacity,
+                "output exceeds adapter limits",
+                LifecycleEvent::Failed,
+            ),
+            /*
             Ok(bundle)
                 if bundle.site_ir.ship.entities.len() <= MAX_ENTITIES
                     && bundle.trace.candidate_decisions.len() <= MAX_TRACE
@@ -182,50 +352,54 @@ fn generate(req: ProcgenRequest) -> LifecycleResult {
                 "output exceeds adapter limits",
                 LifecycleEvent::Failed,
             ),
-            Err(f) => LifecycleResult::failed(None, f, vec![LifecycleEvent::Failed]),
+            Err(f) => LifecycleResult::failed(request_id, f, vec![LifecycleEvent::Failed]), */
         }
     })
 }
 
 #[wasm_bindgen]
 pub fn generate_bundle(request_json: &str) -> String {
-    match validate_request(request_json) {
-        Ok(req) => json(generate(req)),
-        Err(result) => json(*result),
-    }
+    SERVICE.with(|service| match validate_request(request_json) {
+        Ok(req) => service.encode(generate(service, req, None, None)),
+        Err(result) => service.encode(*result),
+    })
 }
 #[wasm_bindgen]
 pub fn generate_bundle_async(request_json: &str) -> String {
-    let req = match validate_request(request_json) {
-        Ok(r) => r,
-        Err(result) => return json(*result),
-    };
-    STATE.with(|cell| {
-        let mut s = cell.borrow_mut();
-        if s.queue.len() >= QUEUE {
-            return json(failure(
-                None,
-                ProcgenFailureCode::Overload,
-                "queue full",
-                LifecycleEvent::Overloaded,
-            ));
-        }
-        let id = s.next_id;
-        let Some(next_id) = s.next_id.checked_add(1) else {
-            return json(failure(
-                None,
-                ProcgenFailureCode::Capacity,
-                "request id space exhausted",
-                LifecycleEvent::Rejected,
-            ));
+    SERVICE.with(|service| {
+        let req = match validate_request(request_json) {
+            Ok(r) => r,
+            Err(result) => return service.encode(*result),
         };
-        s.next_id = next_id;
-        s.queue.push_back(id);
-        s.entries.insert(id, Entry::Queued(Box::new(req)));
-        json(LifecycleResult::accepted(
-            id,
-            vec![LifecycleEvent::Admitted, LifecycleEvent::Queued],
-        ))
+        STATE.with(|cell| {
+            let mut s = cell.borrow_mut();
+            if s.queue.len() >= QUEUE {
+                return json(failure(
+                    None,
+                    ProcgenFailureCode::Overload,
+                    "queue full",
+                    LifecycleEvent::Overloaded,
+                ));
+            }
+            let id = s.next_id;
+            let Some(next_id) = s.next_id.checked_add(1) else {
+                return json(failure(
+                    None,
+                    ProcgenFailureCode::Capacity,
+                    "request id space exhausted",
+                    LifecycleEvent::Rejected,
+                ));
+            };
+            s.next_id = next_id;
+            s.highest_admitted = id;
+            s.admitted_at.insert(id, service.clock.now_ms());
+            s.queue.push_back(id);
+            s.entries.insert(id, Entry::Queued(Box::new(req)));
+            service.encode(LifecycleResult::accepted(
+                id,
+                vec![LifecycleEvent::Admitted, LifecycleEvent::Queued],
+            ))
+        })
     })
 }
 #[wasm_bindgen]
@@ -238,36 +412,34 @@ pub fn poll(request_id: i64) -> String {
             LifecycleEvent::Rejected,
         ));
     }
-    STATE.with(|cell| {
-        let mut s = cell.borrow_mut();
-        match s.entries.remove(&request_id) {
-            Some(Entry::Cancelled(result)) => {
-                s.tombstones
-                    .insert(request_id, ProcgenFailureCode::ResultConsumed);
-                json(*result)
+    SERVICE.with(|service| {
+        STATE.with(|cell| {
+            let mut s = cell.borrow_mut();
+            match s.entries.remove(&request_id) {
+                Some(Entry::Cancelled(result)) => {
+                    tombstone(&mut s, request_id, ProcgenFailureCode::ResultConsumed);
+                    service.encode(*result)
+                }
+                Some(Entry::Queued(req)) => {
+                    s.queue.retain(|id| *id != request_id);
+                    let admitted = s.admitted_at.remove(&request_id);
+                    drop(s);
+                    let result = generate(service, *req, admitted, Some(request_id));
+                    STATE.with(|cell| {
+                        tombstone(
+                            &mut cell.borrow_mut(),
+                            request_id,
+                            ProcgenFailureCode::ResultConsumed,
+                        );
+                    });
+                    service.encode(result)
+                }
+                None => {
+                    let (code, message, event) = unavailable(&s, request_id);
+                    service.encode(failure(Some(request_id), code, message, event))
+                }
             }
-            Some(Entry::Queued(req)) => {
-                s.queue.retain(|id| *id != request_id);
-                drop(s);
-                let mut result = generate(*req);
-                result.request_id = Some(request_id);
-                STATE.with(|cell| {
-                    cell.borrow_mut()
-                        .tombstones
-                        .insert(request_id, ProcgenFailureCode::ResultConsumed);
-                });
-                json(result)
-            }
-            None => json(failure(
-                Some(request_id),
-                s.tombstones
-                    .get(&request_id)
-                    .cloned()
-                    .unwrap_or(ProcgenFailureCode::UnknownRequest),
-                "request unavailable",
-                LifecycleEvent::Rejected,
-            )),
-        }
+        })
     })
 }
 #[wasm_bindgen]
@@ -280,31 +452,29 @@ pub fn cancel(request_id: i64) -> String {
             LifecycleEvent::Rejected,
         ));
     }
-    STATE.with(|cell| {
-        let mut s = cell.borrow_mut();
-        match s.entries.get(&request_id).cloned() {
-            Some(Entry::Cancelled(result)) => json(*result),
-            Some(Entry::Queued(_)) => {
-                s.queue.retain(|id| *id != request_id);
-                let result = failure(
-                    Some(request_id),
-                    ProcgenFailureCode::Cancellation,
-                    "cancelled",
-                    LifecycleEvent::Cancelled,
-                );
-                retain_cancelled(&mut s, request_id, result.clone());
-                json(result)
+    SERVICE.with(|service| {
+        STATE.with(|cell| {
+            let mut s = cell.borrow_mut();
+            match s.entries.get(&request_id).cloned() {
+                Some(Entry::Cancelled(result)) => service.encode(*result),
+                Some(Entry::Queued(_)) => {
+                    s.queue.retain(|id| *id != request_id);
+                    let result = failure(
+                        Some(request_id),
+                        ProcgenFailureCode::Cancellation,
+                        "cancelled",
+                        LifecycleEvent::Cancelled,
+                    );
+                    s.admitted_at.remove(&request_id);
+                    retain_cancelled(&mut s, request_id, result.clone());
+                    service.encode(result)
+                }
+                None => {
+                    let (code, message, event) = unavailable(&s, request_id);
+                    service.encode(failure(Some(request_id), code, message, event))
+                }
             }
-            None => json(failure(
-                Some(request_id),
-                s.tombstones
-                    .get(&request_id)
-                    .cloned()
-                    .unwrap_or(ProcgenFailureCode::UnknownRequest),
-                "request unavailable",
-                LifecycleEvent::Rejected,
-            )),
-        }
+        })
     })
 }
 #[wasm_bindgen]

@@ -1,14 +1,18 @@
 use std::env;
 
-fn required(name: &str) -> String {
-    let value = env::var(name).unwrap_or_else(|_| panic!("missing required build identity {name}"));
+fn required(name: &str, allow_host_default: bool, default: &str) -> String {
+    let value = match env::var(name) {
+        Ok(value) => value,
+        Err(_) if allow_host_default => default.to_owned(),
+        Err(_) => panic!("missing required build identity {name}"),
+    };
     if value.is_empty() {
         panic!("empty required build identity {name}");
     }
     value
 }
-fn hex(name: &str, len: usize) -> String {
-    let value = required(name);
+fn hex(name: &str, len: usize, allow_host_default: bool, default: &str) -> String {
+    let value = required(name, allow_host_default, default);
     if value.len() != len
         || !value
             .bytes()
@@ -20,13 +24,33 @@ fn hex(name: &str, len: usize) -> String {
 }
 
 fn main() {
+    for name in [
+        "SYNAPTIC_PROCGEN_RUST_SOURCE_COMMIT",
+        "SYNAPTIC_PROCGEN_CONTENT_MANIFEST_HASH",
+        "SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT",
+    ] {
+        println!("cargo:rerun-if-env-changed={name}");
+    }
+    let wasm_target = env::var("TARGET").as_deref() == Ok("wasm32-unknown-unknown");
+    // Host unit tests may use visibly dirty identities; wasm builds must always
+    // receive explicit release identity so it cannot leak into Web artifacts.
     println!(
         "cargo:rustc-env=SYNAPTIC_PROCGEN_RUST_SOURCE_COMMIT={}",
-        hex("SYNAPTIC_PROCGEN_RUST_SOURCE_COMMIT", 40)
+        hex(
+            "SYNAPTIC_PROCGEN_RUST_SOURCE_COMMIT",
+            40,
+            !wasm_target,
+            "0000000000000000000000000000000000000000"
+        )
     );
     println!(
         "cargo:rustc-env=SYNAPTIC_PROCGEN_CONTENT_MANIFEST_HASH={}",
-        hex("SYNAPTIC_PROCGEN_CONTENT_MANIFEST_HASH", 64)
+        hex(
+            "SYNAPTIC_PROCGEN_CONTENT_MANIFEST_HASH",
+            64,
+            !wasm_target,
+            "0000000000000000000000000000000000000000000000000000000000000000"
+        )
     );
     println!("cargo:rustc-env=SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT={}", {
         let dirty =
