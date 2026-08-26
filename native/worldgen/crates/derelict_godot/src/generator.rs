@@ -172,7 +172,7 @@ where
 {
     match serializer(value) {
         Ok(json) => json,
-        Err(_) => serde_json::to_string(&LifecycleResult::failed(None, adapter_failure("response serialization failed"), vec![LifecycleEvent::Failed])).unwrap_or_else(|_| "{\"schema_version\":\"procgen-lifecycle-result-2\",\"status\":\"failed\",\"request_id\":null,\"bundle\":null,\"failure\":{\"schema_version\":\"procgen-failure-1\",\"code\":\"adapter_failure\",\"stage\":\"adapter\",\"message\":\"response serialization failed\",\"retryable\":false,\"fallback_id\":null},\"events\":[\"failed\"]}".into()),
+        Err(_) => serde_json::to_string(&LifecycleResult::failed(None, adapter_failure("response serialization failed"), vec![LifecycleEvent::Failed])).unwrap_or_else(|_| "{\"schema_version\":\"procgen-lifecycle-result-3\",\"status\":\"failed\",\"request_id\":null,\"bundle\":null,\"failure\":{\"schema_version\":\"procgen-failure-1\",\"code\":\"adapter_failure\",\"stage\":\"adapter\",\"message\":\"response serialization failed\",\"retryable\":false,\"fallback_id\":null},\"events\":[\"failed\"]}".into()),
     }
 }
 fn serialize_string<T: Serialize>(value: &T) -> String {

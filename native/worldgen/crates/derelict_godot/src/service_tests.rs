@@ -35,8 +35,8 @@ fn req(seed: u64) -> ProcgenRequest {
         world_seed: seed,
         site: SiteRequest {
             site_id: format!("site-{seed}"),
-            x: 1,
-            y: 2,
+            x: 0,
+            y: 0,
             archetype_id: "shuttle".into(),
             kit_id: "ship_structural_v0".into(),
             intactness_override_bp: None,

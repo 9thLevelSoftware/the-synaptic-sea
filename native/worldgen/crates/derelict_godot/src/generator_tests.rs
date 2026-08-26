@@ -97,7 +97,7 @@ fn legacy_export_failures_are_valid_lifecycle_documents() {
         derelict_core::procgen::ProcgenFailureCode::GenerationFailure
     );
     let bundle = derelict_core::procgen::generate_bundle(
-        legacy_request(903, &derelict_core::model::GenParams::new("shuttle"), ""),
+        legacy_request(42, &derelict_core::model::GenParams::new("shuttle"), ""),
         &derelict_core::GenData::default_bundle().unwrap(),
     )
     .unwrap();
