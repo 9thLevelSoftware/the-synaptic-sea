@@ -20,6 +20,24 @@ pub const SITE_RNG_CHANNELS: [&str; 4] = [
 ];
 const MAX_SITE_DECISIONS: usize = 64;
 
+fn deterministic_index(seed: u64, len: usize) -> usize {
+    debug_assert!(len > 0);
+    let modulus = u64::try_from(len).expect("site candidate count fits u64");
+    usize::try_from(seed % modulus).expect("site candidate index fits usize")
+}
+
+#[cfg(test)]
+mod platform_parity_tests {
+    use super::*;
+
+    #[test]
+    fn deterministic_index_preserves_seed_bits_above_wasm_usize() {
+        let seed = u64::from(u32::MAX) + 1;
+        assert_eq!(deterministic_index(seed, 3), 1);
+        assert_ne!(deterministic_index(seed, 3), (seed as u32 as usize) % 3);
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SiteTemplate {
@@ -1379,7 +1397,7 @@ fn allocate_socket(
     let seed = site_key(request, "site.functional_props", sub_index)?
         .seed()
         .map_err(|field| SiteError::Invalid(field.into()))?;
-    let offset = (seed as usize) % pairs.len();
+    let offset = deterministic_index(seed, pairs.len());
     for index in 0..pairs.len() {
         let (anchor, approach) = pairs[(offset + index) % pairs.len()];
         if !used.contains(&anchor) && !used.contains(&approach) {
@@ -1508,7 +1526,7 @@ fn build_site_candidate(
         .map_err(|field| SiteError::Invalid(field.into()))?;
     if !gate_candidates.is_empty() {
         let gate_len = gate_candidates.len();
-        gate_candidates.rotate_left((gate_seed as usize) % gate_len);
+        gate_candidates.rotate_left(deterministic_index(gate_seed, gate_len));
     }
 
     let entry = ship.entry_room;
@@ -1542,7 +1560,7 @@ fn build_site_candidate(
         };
         refs.sort();
         let refs_len = refs.len();
-        refs.rotate_left((gate_seed as usize) % refs_len);
+        refs.rotate_left(deterministic_index(gate_seed, refs_len));
         for (index, reference) in refs.into_iter().enumerate() {
             let gate_id = format!("gate:{index:02}");
             let navigation_edge = bind_gate(&mut navigation, &reference, &gate_id)?;
@@ -1957,7 +1975,7 @@ pub fn generate_site(
     }
     compatible.sort_by(|left, right| left.id.cmp(&right.id));
     let compatible_len = compatible.len();
-    compatible.rotate_left((template_seed as usize) % compatible_len);
+    compatible.rotate_left(deterministic_index(template_seed, compatible_len));
     let mut decisions = SITE_RNG_CHANNELS
         .iter()
         .enumerate()
