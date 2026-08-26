@@ -1,0 +1,23 @@
+{
+  "schema_version": "item-catalogue-2",
+  "families": [
+    {"id":"armor","socket_kinds":["defense"],"base_value":40,"stat_budget":200,"drop_frequency_bp":5000,"visual_tag":"item_armor"},
+    {"id":"tool","socket_kinds":["utility"],"base_value":25,"stat_budget":200,"drop_frequency_bp":7000,"visual_tag":"item_tool"},
+    {"id":"weapon","socket_kinds":["weapon"],"base_value":60,"stat_budget":200,"drop_frequency_bp":3500,"visual_tag":"item_weapon"}
+  ],
+  "sockets": [
+    {"id":"socket_armor","kind":"defense","family_ids":["armor"],"max_affixes":1},
+    {"id":"socket_tool","kind":"utility","family_ids":["tool"],"max_affixes":1},
+    {"id":"socket_weapon","kind":"weapon","family_ids":["weapon"],"max_affixes":1}
+  ],
+  "affixes": [
+    {"id":"affix_armor","socket_kind":"defense","stat":"armor","min_value":10,"max_value":50,"cost_per_value":1,"value_per_point":2},
+    {"id":"affix_capacity","socket_kind":"utility","stat":"capacity","min_value":10,"max_value":50,"cost_per_value":1,"value_per_point":2},
+    {"id":"affix_damage","socket_kind":"weapon","stat":"damage","min_value":10,"max_value":50,"cost_per_value":1,"value_per_point":2}
+  ],
+  "rarities": [
+    {"id":"common","min_budget":1,"max_budget":200,"value_multiplier_bp":10000,"max_affixes":1}
+  ],
+  "fallback":{"id":"item_baseline","family_id":"tool","rarity_id":"common","visual_tag":"item_tool","base_value":25},
+  "caps":{"max_total_value":10000,"max_per_item_value":1000,"max_count":64,"max_drop_frequency_bp":10000}
+}
