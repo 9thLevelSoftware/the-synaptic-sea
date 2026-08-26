@@ -16,7 +16,7 @@ const expectedDomains = ['world', 'site', 'gameplay', 'presentation'];
 const expectedAdapterSchemas = {
   lifecycle_result: 'procgen-lifecycle-result-2',
   capabilities: 'procgen-capabilities-1',
-  generator_manifest: 'procgen-generator-manifest-3',
+  generator_manifest: 'procgen-generator-manifest-1',
 };
 const expectedExportSchemas = {
   procgen_request: 'procgen-request-1',
@@ -45,7 +45,7 @@ if (cap.schema_version !== 'procgen-capabilities-1' || cap.adapter_kind !== 'web
     || cap.max_trace_entries !== 4096 || cap.max_events !== 32
     || cap.deadline_ms !== 2000 || !equal(cap.supported_domains, expectedDomains)
     || !equal(cap.schemas, expectedAdapterSchemas)) throw new Error('capabilities contract mismatch');
-if (manifest.schema_version !== 'procgen-generator-manifest-3'
+if (manifest.schema_version !== 'procgen-generator-manifest-1'
     || !/^[0-9a-f]{40}$/.test(manifest.rust_source_commit)
     || manifest.generator_version !== 3
     || manifest.content_manifest_hash !== vectors[0].request.content_manifest_hash

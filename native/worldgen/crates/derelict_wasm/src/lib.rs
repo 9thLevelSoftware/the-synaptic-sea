@@ -1,7 +1,7 @@
 //! Cooperative WebAssembly adapter over the shared deterministic procgen core.
 use derelict_core::lifecycle::{
     AdapterKind, AdapterSchemas, GeneratorManifest, LifecycleEvent, LifecycleResult,
-    ProcgenCapabilities, WorkerMode,
+    ProcgenCapabilities, WorkerMode, PROCGEN_GENERATOR_MANIFEST_SCHEMA,
 };
 use derelict_core::manifest::ExportSchemas;
 use derelict_core::procgen::{
@@ -328,7 +328,7 @@ fn capabilities_value() -> ProcgenCapabilities {
 }
 fn manifest_value() -> GeneratorManifest {
     GeneratorManifest {
-        schema_version: "procgen-generator-manifest-3".into(),
+        schema_version: PROCGEN_GENERATOR_MANIFEST_SCHEMA.into(),
         rust_source_commit: SOURCE_COMMIT.into(),
         generator_version: PROCGEN_GENERATOR_VERSION,
         content_manifest_hash: CONTENT_HASH.into(),
@@ -644,7 +644,7 @@ fn json_capabilities(value: ProcgenCapabilities) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use derelict_core::model::EntityKind;
+    use derelict_core::model::{EntityKind, GENERATOR_VERSION};
     use derelict_core::procgen::{
         semantic_hash, PlayerModel, PresentationRequest, ProcgenBundle, SiteRequest,
         PROCGEN_REQUEST_SCHEMA,
@@ -778,14 +778,15 @@ mod tests {
     fn manifest_round_trips() {
         let m = manifest_value();
         assert_eq!(m.target, "wasm32-unknown-unknown");
-        assert_eq!(m.schema_version, "procgen-generator-manifest-3");
+        assert_eq!(m.schema_version, PROCGEN_GENERATOR_MANIFEST_SCHEMA);
         assert_eq!(m.generator_version, PROCGEN_GENERATOR_VERSION);
         assert_eq!(m.export_schemas, ExportSchemas::platform_v3());
+        assert_eq!(m.adapter_schemas, AdapterSchemas::platform_v3());
         let capabilities_json = json_capabilities(capabilities_value());
         ProcgenCapabilities::from_json(&capabilities_json).unwrap();
-        let manifest_json = serde_json::to_string(&m).unwrap();
-        let parsed: GeneratorManifest = serde_json::from_str(&manifest_json).unwrap();
-        assert_eq!(parsed.schema_version, "procgen-generator-manifest-3");
+        let parsed = GeneratorManifest::from_json(&generator_manifest()).unwrap();
+        assert_eq!(parsed.schema_version, PROCGEN_GENERATOR_MANIFEST_SCHEMA);
+        assert_eq!(parsed.generator_version, PROCGEN_GENERATOR_VERSION);
     }
 
     #[test]
@@ -854,6 +855,17 @@ mod tests {
             Arc::new(JsonSerializer),
         );
         let sync = parse(&service.sync(&request_json()));
+        let sync_bundle = sync.bundle.as_ref().expect("sync bundle");
+        assert_eq!(sync_bundle.schema_version, "procgen-bundle-2");
+        assert_eq!(sync_bundle.world_ir.schema_version, "world-ir-2");
+        assert_eq!(
+            sync_bundle.site_ir.ship.generator_version,
+            GENERATOR_VERSION
+        );
+        assert_eq!(
+            sync_bundle.site_ir.ship.seed,
+            sync_bundle.world_ir.site_seed
+        );
         assert_eq!(
             sync.events,
             vec![
@@ -869,6 +881,17 @@ mod tests {
         );
         assert_eq!(calls.load(Ordering::SeqCst), 1);
         let terminal = parse(&service.poll_request(1));
+        let terminal_bundle = terminal.bundle.as_ref().expect("terminal bundle");
+        assert_eq!(terminal_bundle.schema_version, "procgen-bundle-2");
+        assert_eq!(terminal_bundle.world_ir.schema_version, "world-ir-2");
+        assert_eq!(
+            terminal_bundle.site_ir.ship.generator_version,
+            GENERATOR_VERSION
+        );
+        assert_eq!(
+            terminal_bundle.site_ir.ship.seed,
+            terminal_bundle.world_ir.site_seed
+        );
         assert_eq!(calls.load(Ordering::SeqCst), 2);
         assert_eq!(
             terminal.events,
@@ -880,10 +903,7 @@ mod tests {
                 LifecycleEvent::ResultConsumed
             ]
         );
-        assert_eq!(
-            sync.bundle.unwrap().semantic_hash,
-            terminal.bundle.unwrap().semantic_hash
-        );
+        assert_eq!(sync_bundle.semantic_hash, terminal_bundle.semantic_hash);
         let consumed = parse(&service.poll_request(1));
         assert_eq!(
             failure_code(&consumed),
