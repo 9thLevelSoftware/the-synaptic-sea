@@ -331,6 +331,29 @@ pub struct Topology {
 }
 
 impl Topology {
+    pub fn validate(&self) -> Result<(), String> {
+        let mut rooms = std::collections::BTreeSet::new();
+        let mut cells = std::collections::BTreeSet::new();
+        for room in &self.rooms {
+            if room.cells.is_empty() || !rooms.insert(room.id) {
+                return Err("topology room identity".into());
+            }
+            for cell in &room.cells {
+                if !cells.insert(*cell) {
+                    return Err("topology cell overlap".into());
+                }
+            }
+        }
+        for portal in &self.portals {
+            if !rooms.contains(&portal.from_room)
+                || (portal.to_room != NO_ROOM && !rooms.contains(&portal.to_room))
+            {
+                return Err("topology portal room".into());
+            }
+        }
+        Ok(())
+    }
+
     pub fn room(&self, id: RoomId) -> Option<&RoomSpec> {
         self.rooms.iter().find(|r| r.id == id)
     }

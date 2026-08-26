@@ -319,6 +319,40 @@ fn injected_valid_ship_with_invalid_bundle_trace_fails_at_bundle_validation() {
 }
 
 #[test]
+fn injected_identity_valid_ship_with_malformed_plan_fails_at_bundle_validation() {
+    let data = derelict_core::GenData::default_bundle().unwrap();
+    let mut report =
+        derelict_core::generate_ship_timed(42, &derelict_core::GenParams::new("shuttle"), &data)
+            .unwrap();
+    report.ship.plan.occupancy.clear();
+    let result = generate_bundle_with_pipeline(request(), &data, || Ok(report));
+    assert!(
+        matches!(result, Err(ProcgenFailure { code: ProcgenFailureCode::ValidationFailure, stage, .. }) if stage == "bundle")
+    );
+}
+
+#[test]
+fn fractured_bundle_round_trips_and_validates() {
+    let data = derelict_core::GenData::default_bundle().unwrap();
+    let mut found = false;
+    for seed in 0..512u64 {
+        let mut req = request();
+        req.world_seed = seed;
+        if let Ok(bundle) = generate_bundle(req, &data) {
+            if bundle.site_ir.ship.fractured {
+                bundle.validate().unwrap();
+                let decoded =
+                    ProcgenBundle::from_json(&serde_json::to_string(&bundle).unwrap()).unwrap();
+                assert_eq!(decoded, bundle);
+                found = true;
+                break;
+            }
+        }
+    }
+    assert!(found, "no deterministic fractured fixture found");
+}
+
+#[test]
 fn draft_schema_accepts_serialized_bundle_and_all_actions() {
     let data = derelict_core::GenData::default_bundle().unwrap();
     let bundle = generate_bundle(request(), &data).unwrap();

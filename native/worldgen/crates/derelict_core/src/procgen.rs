@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 pub const PROCGEN_REQUEST_SCHEMA: &str = crate::manifest::PROCGEN_REQUEST_SCHEMA;
 pub const PROCGEN_BUNDLE_SCHEMA: &str = crate::manifest::PROCGEN_BUNDLE_SCHEMA;
@@ -258,6 +259,57 @@ impl ProcgenBundle {
         {
             return Err(ProcgenError::InvalidRequest("ship_identity"));
         }
+        self.site_ir
+            .ship
+            .topology
+            .validate()
+            .map_err(|_| ProcgenError::InvalidRequest("topology"))?;
+        let profile = crate::stages::story::profile_for(self.site_ir.ship.cause_of_loss);
+        let fragment_of = if self.site_ir.ship.fractured {
+            if self.site_ir.ship.fragments.is_empty() {
+                return Err(ProcgenError::InvalidRequest("fragments"));
+            }
+            let room_ids: BTreeSet<_> = self
+                .site_ir
+                .ship
+                .topology
+                .rooms
+                .iter()
+                .map(|room| room.id)
+                .collect();
+            let mut seen = BTreeSet::new();
+            let mut mapping = BTreeMap::new();
+            for fragment in &self.site_ir.ship.fragments {
+                if fragment.rooms.is_empty() || !seen.insert(fragment.id) {
+                    return Err(ProcgenError::InvalidRequest("fragments"));
+                }
+                for room in &fragment.rooms {
+                    if !room_ids.contains(room) || mapping.insert(*room, fragment.id).is_some() {
+                        return Err(ProcgenError::InvalidRequest("fragments"));
+                    }
+                }
+            }
+            if mapping.len() != room_ids.len() {
+                return Err(ProcgenError::InvalidRequest("fragments"));
+            }
+            Some(mapping)
+        } else {
+            if !self.site_ir.ship.fragments.is_empty() {
+                return Err(ProcgenError::InvalidRequest("fragments"));
+            }
+            None
+        };
+        let policy = crate::structural::validate::ValidationPolicy::post_damage(
+            self.site_ir.ship.critical_path.clone(),
+            fragment_of,
+            profile.allows_fragment_split,
+        );
+        crate::structural::validate::validate(
+            &self.site_ir.ship.plan,
+            &self.site_ir.ship.topology,
+            &policy,
+        )
+        .map_err(|_| ProcgenError::InvalidRequest("structural"))?;
         let expected_placements = self
             .site_ir
             .ship
