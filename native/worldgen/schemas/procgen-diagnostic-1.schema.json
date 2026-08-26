@@ -1,0 +1,197 @@
+{
+  "$id": "procgen-diagnostic-1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "identity_hash", "capture_hash", "identity",
+    "versions", "hashes", "counts", "adaptive_decisions", "candidate_decisions",
+    "failed_constraints", "repairs", "retries", "rng_channels", "metrics",
+    "timings", "fallbacks", "failures"
+  ],
+  "properties": {
+    "schema_version": {"const": "procgen-diagnostic-1"},
+    "kind": {"enum": ["bundle", "lifecycle_failure"]},
+    "identity_hash": {"$ref": "#/$defs/sha256"},
+    "capture_hash": {"$ref": "#/$defs/sha256"},
+    "identity": {"$ref": "#/$defs/identity"},
+    "versions": {"type": "object"},
+    "hashes": {"type": "object"},
+    "counts": {"$ref": "#/$defs/counts"},
+    "adaptive_decisions": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/adaptiveDecision"}},
+    "candidate_decisions": {"$ref": "#/$defs/codeArray"},
+    "failed_constraints": {"$ref": "#/$defs/codeArray"},
+    "repairs": {"$ref": "#/$defs/codeArray"},
+    "retries": {"$ref": "#/$defs/codeArray"},
+    "rng_channels": {"$ref": "#/$defs/codeArray"},
+    "metrics": {"type": "object"},
+    "timings": {"$ref": "#/$defs/timings"},
+    "fallbacks": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/fallback"}},
+    "failures": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/failure"}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"kind": {"const": "bundle"}}},
+      "then": {"properties": {
+        "versions": {"$ref": "#/$defs/bundleVersions"},
+        "hashes": {"$ref": "#/$defs/bundleHashes"},
+        "metrics": {"$ref": "#/$defs/metrics"},
+        "failures": {"maxItems": 0}
+      }}
+    },
+    {
+      "if": {"properties": {"kind": {"const": "lifecycle_failure"}}},
+      "then": {"properties": {
+        "versions": {"$ref": "#/$defs/failureVersions"},
+        "hashes": {"$ref": "#/$defs/failureHashes"},
+        "counts": {"$ref": "#/$defs/zeroCounts"},
+        "adaptive_decisions": {"maxItems": 0},
+        "candidate_decisions": {"maxItems": 0},
+        "failed_constraints": {"maxItems": 0},
+        "repairs": {"maxItems": 0},
+        "retries": {"maxItems": 0},
+        "rng_channels": {"maxItems": 0},
+        "metrics": {"type": "object", "maxProperties": 0},
+        "timings": {"maxProperties": 0},
+        "fallbacks": {"maxItems": 1},
+        "failures": {"minItems": 1, "maxItems": 1}
+      }}
+    }
+  ],
+  "$defs": {
+    "code": {"type": "string", "pattern": "^[a-z0-9_.:-]{1,128}$"},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "sourceCommit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "fallback": {"type": "string", "maxLength": 128, "pattern": "^(?:[a-z0-9_.:-]+|world:[a-z0-9_.:-]+\\|site:[a-z0-9_.:-]+)$"},
+    "codeArray": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/code"}},
+    "identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["world_seed", "site_id", "site_x", "site_y", "archetype_id", "difficulty_id", "generator_version", "content_manifest_hash", "requested_domains"],
+      "properties": {
+        "world_seed": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "site_id": {"$ref": "#/$defs/code"},
+        "site_x": {"type": "integer", "minimum": -2147483647, "maximum": 2147483646},
+        "site_y": {"type": "integer", "minimum": -2147483647, "maximum": 2147483646},
+        "archetype_id": {"$ref": "#/$defs/code"},
+        "difficulty_id": {"$ref": "#/$defs/code"},
+        "generator_version": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "content_manifest_hash": {"$ref": "#/$defs/sha256"},
+        "requested_domains": {"type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": true, "items": {"enum": ["world", "site", "gameplay", "presentation"]}}
+      }
+    },
+    "exportSchemas": {
+      "type": "object", "additionalProperties": false,
+      "required": ["procgen_request", "procgen_bundle", "world_ir", "site_ir", "gameplay_ir", "presentation_ir", "generation_trace", "adaptive_proposal"],
+      "properties": {
+        "procgen_request": {"const": "procgen-request-2"},
+        "procgen_bundle": {"const": "procgen-bundle-5"},
+        "world_ir": {"const": "world-ir-2"},
+        "site_ir": {"const": "site-ir-2"},
+        "gameplay_ir": {"const": "gameplay-ir-3"},
+        "presentation_ir": {"const": "presentation-ir-2"},
+        "generation_trace": {"const": "generation-trace-4"},
+        "adaptive_proposal": {"const": "adaptive-proposal-2"}
+      }
+    },
+    "bundleVersions": {
+      "type": "object", "additionalProperties": false,
+      "required": ["generator_version", "bundle_schema", "trace_schema", "export_schemas", "build_manifest_schema", "runtime_manifest_schema", "capabilities_schema", "build_target", "runtime_target", "capabilities_target"],
+      "properties": {
+        "generator_version": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "bundle_schema": {"const": "procgen-bundle-5"},
+        "trace_schema": {"const": "generation-trace-4"},
+        "export_schemas": {"$ref": "#/$defs/exportSchemas"},
+        "build_manifest_schema": {"const": "procgen-build-manifest-4"},
+        "runtime_manifest_schema": {"const": "procgen-generator-manifest-4"},
+        "capabilities_schema": {"const": "procgen-capabilities-4"},
+        "build_target": {"$ref": "#/$defs/code"},
+        "runtime_target": {"$ref": "#/$defs/code"},
+        "capabilities_target": {"$ref": "#/$defs/code"}
+      }
+    },
+    "failureVersions": {
+      "type": "object", "additionalProperties": false,
+      "required": ["generator_version", "lifecycle_schema"],
+      "properties": {
+        "generator_version": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+        "lifecycle_schema": {"const": "procgen-lifecycle-result-5"}
+      }
+    },
+    "bundleHashes": {
+      "type": "object", "additionalProperties": false,
+      "required": ["semantic_hash", "content_manifest_hash", "build_source_commit", "runtime_source_commit", "artifact_sha256"],
+      "properties": {
+        "semantic_hash": {"$ref": "#/$defs/sha256"},
+        "content_manifest_hash": {"$ref": "#/$defs/sha256"},
+        "build_source_commit": {"$ref": "#/$defs/sourceCommit"},
+        "runtime_source_commit": {"$ref": "#/$defs/sourceCommit"},
+        "artifact_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "failureHashes": {
+      "type": "object", "additionalProperties": false,
+      "required": ["content_manifest_hash"],
+      "properties": {"content_manifest_hash": {"$ref": "#/$defs/sha256"}}
+    },
+    "counts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["world_markers", "mission_nodes", "mission_edges", "topology_rooms", "topology_portals", "topology_verticals", "navigation_nodes", "navigation_edges", "encounter_spawns", "items", "creature_blueprints", "candidate_decisions", "failed_constraints", "repairs", "retries", "rng_channels"],
+      "properties": {
+        "world_markers": {"$ref": "#/$defs/count"}, "mission_nodes": {"$ref": "#/$defs/count"},
+        "mission_edges": {"$ref": "#/$defs/count"}, "topology_rooms": {"$ref": "#/$defs/count"},
+        "topology_portals": {"$ref": "#/$defs/count"}, "topology_verticals": {"$ref": "#/$defs/count"},
+        "navigation_nodes": {"$ref": "#/$defs/count"}, "navigation_edges": {"$ref": "#/$defs/count"},
+        "encounter_spawns": {"$ref": "#/$defs/count"}, "items": {"$ref": "#/$defs/count"},
+        "creature_blueprints": {"$ref": "#/$defs/count"}, "candidate_decisions": {"$ref": "#/$defs/count"},
+        "failed_constraints": {"$ref": "#/$defs/count"}, "repairs": {"$ref": "#/$defs/count"},
+        "retries": {"$ref": "#/$defs/count"}, "rng_channels": {"$ref": "#/$defs/count"}
+      }
+    },
+    "zeroCounts": {
+      "type": "object",
+      "properties": {
+        "world_markers": {"const": 0}, "mission_nodes": {"const": 0}, "mission_edges": {"const": 0},
+        "topology_rooms": {"const": 0}, "topology_portals": {"const": 0}, "topology_verticals": {"const": 0},
+        "navigation_nodes": {"const": 0}, "navigation_edges": {"const": 0}, "encounter_spawns": {"const": 0},
+        "items": {"const": 0}, "creature_blueprints": {"const": 0}, "candidate_decisions": {"const": 0},
+        "failed_constraints": {"const": 0}, "repairs": {"const": 0}, "retries": {"const": 0}, "rng_channels": {"const": 0}
+      }
+    },
+    "count": {"type": "integer", "minimum": 0, "maximum": 1000000},
+    "adaptiveDecision": {
+      "type": "object", "additionalProperties": false,
+      "required": ["decision_id", "kind", "rule_version", "selected_candidate_id", "applied", "fallback", "proposal_action", "proposal_score", "proposal_confidence_bp", "rationale_codes"],
+      "properties": {
+        "decision_id": {"$ref": "#/$defs/code"}, "kind": {"$ref": "#/$defs/code"},
+        "rule_version": {"$ref": "#/$defs/code"},
+        "selected_candidate_id": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/code"}]},
+        "applied": {"type": "boolean"},
+        "fallback": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/code"}]},
+        "proposal_action": {"enum": ["no_op", "select_candidate", "adjust_encounter"]},
+        "proposal_score": {"type": "integer", "minimum": -10000, "maximum": 10000},
+        "proposal_confidence_bp": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "rationale_codes": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"$ref": "#/$defs/code"}}
+      }
+    },
+    "metrics": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "pipeline_executions", "room_count", "entity_count", "structural_placement_count", "stage_timings_micros"],
+      "properties": {
+        "schema_version": {"const": "generation-metrics-1"}, "pipeline_executions": {"const": 1},
+        "room_count": {"$ref": "#/$defs/count"}, "entity_count": {"$ref": "#/$defs/count"},
+        "structural_placement_count": {"$ref": "#/$defs/count"},
+        "stage_timings_micros": {"$ref": "#/$defs/timings"}
+      }
+    },
+    "timings": {
+      "type": "object", "maxProperties": 64,
+      "propertyNames": {"$ref": "#/$defs/code"},
+      "additionalProperties": {"type": "integer", "minimum": 0, "maximum": 3600000000}
+    },
+    "failure": {
+      "type": "object", "additionalProperties": false,
+      "required": ["code", "stage", "retryable"],
+      "properties": {"code": {"$ref": "#/$defs/code"}, "stage": {"$ref": "#/$defs/code"}, "retryable": {"type": "boolean"}}
+    }
+  }
+}

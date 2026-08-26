@@ -1,0 +1,10 @@
+{
+  "$id": "procgen-regression-corpus-1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "entries"],
+  "properties": {
+    "schema_version": {"const": "procgen-regression-corpus-1"},
+    "entries": {"type": "array", "maxItems": 4096, "items": {"allOf": [{"$ref": "procgen-promotion-candidate-1.schema.json"}, {"required": ["approval_ref"], "properties": {"approval_ref": {"type": "string", "pattern": "^synaptic-sea-stage-gate:t_[a-z0-9]+$"}}}]}}
+  }
+}

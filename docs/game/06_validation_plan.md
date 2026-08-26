@@ -255,6 +255,44 @@ content-manifest-keyed Gate 4 selection no longer fractures seed 1.
 - Promoted failure/approval corpus replay and source-freshness checks.
 - Diagnostic bundle size/cap tests and personal-data field audit.
 
+The 2026-08-26 Windows-local Gate 5 run uses Godot 4.7.2 Mono from Downloads:
+
+```powershell
+$godot = 'C:\Users\dasbl\Downloads\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe'
+foreach ($smoke in @(
+  'procgen_diagnostic_bundle_smoke.gd',
+  'procgen_promotion_store_smoke.gd',
+  'procgen_seed_lab_graph_view_smoke.gd',
+  'procgen_seed_lab_model_smoke.gd',
+  'procgen_seed_lab_scene_smoke.gd',
+  'procgen_regression_corpus_smoke.gd')) {
+  & $godot --headless --path . --script "res://scripts/validation/$smoke"
+}
+python tools/test_promote_procgen_candidate.py
+python -m py_compile tools/promote_procgen_candidate.py tools/test_promote_procgen_candidate.py
+python tools/promote_procgen_candidate.py --corpus data/procgen/corpora/procgen_regression_v1.json --root . --check
+```
+
+Required markers are, respectively:
+
+```text
+PROCGEN DIAGNOSTIC BUNDLE PASS deterministic=true timing_capture=true caps=true privacy=true conflict=true live=true
+PROCGEN PROMOTION STORE PASS schema=true privacy=true conflict=true readback=true
+PROCGEN SEED LAB GRAPH VIEW PASS permutation=true malformed_rejected=true selection=true domains=7 clamp=true draw=true
+PROCGEN SEED LAB MODEL PASS graphs=7 compare=true locks=13 selective=true isolation=true trace=true promotion=3 controller_exact_one=true failure_state=true live=true
+PROCGEN SEED LAB SCENE PASS live_generation=true slots=2 compare=true graphs=7 locks=13 selective=true diagnostic=true promotion=true frame=true
+PROCGEN REGRESSION CORPUS PASS entries=3 classifications=3 diagnostics=true live=true
+PROCGEN PROMOTION CORPUS PASS entries=3
+```
+
+Each Godot invocation must contain its required marker and no unexpected
+`ERROR:`, `WARNING:`, `FAIL`, or `BLOCKED` line. The model and scene scripts
+are exercised only through their dedicated `SceneTree` runners; they are not
+passed directly to Godot as `--script`. RoboGodot/manual interaction is
+explicitly unverified because no callable RoboGodot MCP is exposed in this
+environment. macOS/Linux/Web exports, exported-Web parity, and windowed
+performance are Gate 6 evidence and remain unverified here.
+
 ### Gate 6 production and scale evidence
 
 - Register `worldgen_wired_travel_smoke.gd` and new bundle/parity smokes in the

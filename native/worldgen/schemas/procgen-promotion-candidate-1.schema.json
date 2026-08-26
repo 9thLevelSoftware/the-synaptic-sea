@@ -1,0 +1,38 @@
+{
+  "$id": "procgen-promotion-candidate-1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "type": "object",
+  "required": ["schema_version", "candidate_id", "classification", "request", "expected", "source_diagnostic", "provenance"],
+  "properties": {
+    "schema_version": {"const": "procgen-promotion-candidate-1"},
+    "candidate_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "classification": {"enum": ["approved_candidate", "failure_seed", "authored_fallback"]},
+    "request": {"$ref": "procgen-request-2.schema.json"},
+    "expected": {
+      "type": "object", "additionalProperties": false,
+      "required": ["semantic_hash", "failure_code", "fallback_id", "trace_code"],
+      "properties": {
+        "semantic_hash": {"anyOf": [{"type": "null"}, {"type": "string", "pattern": "^[a-f0-9]{64}$"}]},
+        "failure_code": {"anyOf": [{"type": "null"}, {"type": "string", "pattern": "^[a-z0-9_.:-]{1,128}$"}]},
+        "fallback_id": {"anyOf": [{"type": "null"}, {"type": "string", "maxLength": 128, "pattern": "^(?:[a-z0-9_.:-]+|world:[a-z0-9_.:-]+\\|site:[a-z0-9_.:-]+)$"}]},
+        "trace_code": {"anyOf": [{"type": "null"}, {"type": "string", "pattern": "^[a-z0-9_.:-]{1,128}$"}]}
+      }
+    },
+    "source_diagnostic": {
+      "type": "object", "additionalProperties": false, "required": ["identity_hash", "capture_hash"],
+      "properties": {"identity_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "capture_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}
+    },
+    "provenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["tool_version", "generator_version", "content_manifest_hash", "rust_source_commit", "build_target", "artifact_sha256", "technical_validation_codes"],
+      "properties": {
+        "tool_version": {"const": "seed-lab-1"}, "generator_version": {"const": 3},
+        "content_manifest_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "rust_source_commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "build_target": {"enum": ["x86_64-pc-windows-msvc", "wasm32-unknown-unknown"]}, "artifact_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "technical_validation_codes": {"type": "array", "maxItems": 64, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9_.:-]{1,128}$"}}
+      }
+    },
+    "approval_ref": {"type": "string", "pattern": "^synaptic-sea-stage-gate:t_[a-z0-9]+$"}
+  }
+}

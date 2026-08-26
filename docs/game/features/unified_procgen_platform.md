@@ -2,9 +2,12 @@
 
 ## Status
 
-Approved; Gates 0 through 4 are complete. Gate 5 implementation is in
-progress. No later gate is considered complete until its scoped card,
-acceptance evidence, and regression evidence are current.
+Approved; Gates 0 through 4 are complete. Gate 5 implementation and focused
+local evidence are complete on the Windows Godot 4.7.2 Mono toolchain. Gate 5
+is not a cross-platform or interactive-editor exit: RoboGodot/manual review,
+macOS/Linux/Web exports, and windowed performance remain unverified. No later
+gate is considered complete until its scoped card, acceptance evidence, and
+regression evidence are current.
 
 This specification is canonical for procedural generation. It supersedes the
 GDScript-authority assumptions in
@@ -316,6 +319,23 @@ promoted content-manifest entry.
   promotion flows.
 - Failure seeds and approved candidates are source-controlled regression data.
 - Diagnostic bundles are bounded, local-only, and contain no personal data.
+
+Focused Gate 5 evidence (2026-08-26) is recorded by the following dedicated
+SceneTree smokes and Python checks. These use the exact Godot console executable
+in Downloads and do not execute `RefCounted`/`Control` scripts directly:
+
+- `procgen_diagnostic_bundle_smoke.gd` — `PROCGEN DIAGNOSTIC BUNDLE PASS deterministic=true timing_capture=true caps=true privacy=true conflict=true live=true`
+- `procgen_promotion_store_smoke.gd` — `PROCGEN PROMOTION STORE PASS schema=true privacy=true conflict=true readback=true`
+- `procgen_seed_lab_graph_view_smoke.gd` — `PROCGEN SEED LAB GRAPH VIEW PASS permutation=true malformed_rejected=true selection=true domains=7 clamp=true draw=true`
+- `procgen_seed_lab_model_smoke.gd` — `PROCGEN SEED LAB MODEL PASS graphs=7 compare=true locks=13 selective=true isolation=true trace=true promotion=3 controller_exact_one=true failure_state=true live=true`
+- `procgen_seed_lab_scene_smoke.gd` — `PROCGEN SEED LAB SCENE PASS live_generation=true slots=2 compare=true graphs=7 locks=13 selective=true diagnostic=true promotion=true frame=true`
+- `procgen_regression_corpus_smoke.gd` — `PROCGEN REGRESSION CORPUS PASS entries=3 classifications=3 diagnostics=true live=true`
+- `python tools/test_promote_procgen_candidate.py` — 13 tests pass; `python -m py_compile tools/promote_procgen_candidate.py tools/test_promote_procgen_candidate.py`; `python tools/promote_procgen_candidate.py --corpus data/procgen/corpora/procgen_regression_v1.json --root . --check` — `PROCGEN PROMOTION CORPUS PASS entries=3`.
+
+The complete command lines and strict output policy are maintained in
+`docs/game/06_validation_plan.md`. The current evidence is Windows-local;
+RoboGodot is not callable in this environment, so the manual interaction
+portion remains explicitly unverified.
 
 ### Gate 6 — cutover and retirement
 

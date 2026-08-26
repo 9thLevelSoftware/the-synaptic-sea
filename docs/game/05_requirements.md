@@ -1147,7 +1147,7 @@ and the Task 15 documentation-currency deliverable. They are validated by
 - Source: `docs/game/features/unified_procgen_platform.md`
 - Type: tooling / observability
 - Priority: must
-- Status: Approved
+- Status: Implemented; focused Windows-local validation recorded (Gate 5)
 - Rationale: Designers need to inspect why a seed passed, failed, repaired, or was
   selected without reading raw logs or collecting player data.
 - Acceptance criteria:
