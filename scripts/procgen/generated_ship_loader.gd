@@ -530,6 +530,12 @@ func _build_loot_container_specs(layout_doc: Dictionary, gameplay_doc: Dictionar
 			"position": pos,
 			"approach_cell": (approach_variant as Array).duplicate(),
 		}
+		# Keep provider-authored exact drops opaque and isolated from the source
+		# document. LootContainer validates this seam before deciding whether to
+		# consume it; malformed explicit data must not silently become a random roll.
+		if c.has("generated_items"):
+			var generated_items: Variant = c.get("generated_items")
+			loot_spec["generated_items"] = generated_items.duplicate(true) if generated_items is Array else generated_items
 		if c.has("slot_kind"):
 			loot_spec["slot_kind"] = str(c.get("slot_kind", ""))
 			loot_spec["slot_index"] = int(c.get("slot_index", 0))

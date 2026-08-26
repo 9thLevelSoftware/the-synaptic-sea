@@ -14,7 +14,7 @@ func _init() -> void:
 	if verdict != ValidatorScript.OK:
 		print("TASK5 LIVE CONSUMER FAIL build_manifest=%s" % verdict); quit(1); return
 	var consumer: RefCounted = ConsumerScript.new()
-	var request: Dictionary = consumer.build_request(42, 0, 1, runtime)
+	var request: Dictionary = consumer.build_request(42, 0, 1, runtime, "standard", "", "", 0, 0, [{"kind":"combat_mastery", "value_bp":5000}, {"kind":"objective_pace", "value_bp":5000}])
 	var lifecycle: String = str(generator.generate_bundle(JSON.stringify(request)))
 	var bundle: Dictionary = consumer.consume(lifecycle, request, build, runtime, caps)
 	if bundle.is_empty():

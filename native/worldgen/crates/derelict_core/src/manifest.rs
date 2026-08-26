@@ -4,22 +4,25 @@ use serde::{Deserialize, Serialize};
 pub const MANIFEST_SCHEMA_V1: &str = "procgen-build-manifest-1";
 pub const MANIFEST_SCHEMA_V2: &str = "procgen-build-manifest-2";
 pub const MANIFEST_SCHEMA_V3: &str = "procgen-build-manifest-3";
-pub const MANIFEST_SCHEMA: &str = MANIFEST_SCHEMA_V2;
+pub const MANIFEST_SCHEMA: &str = MANIFEST_SCHEMA_V3;
 pub const CONTENT_MANIFEST_SCHEMA: &str = "procgen-content-manifest-1";
-pub const PROCGEN_REQUEST_SCHEMA: &str = "procgen-request-1";
+pub const PROCGEN_REQUEST_SCHEMA_V1: &str = "procgen-request-1";
 pub const PROCGEN_REQUEST_SCHEMA_V2: &str = "procgen-request-2";
+pub const PROCGEN_REQUEST_SCHEMA: &str = PROCGEN_REQUEST_SCHEMA_V2;
 pub const PROCGEN_BUNDLE_SCHEMA_V1: &str = "procgen-bundle-1";
 pub const WORLD_IR_SCHEMA_V1: &str = "world-ir-1";
 pub const SITE_IR_SCHEMA_V1: &str = "site-ir-1";
-pub const PROCGEN_BUNDLE_SCHEMA: &str = PROCGEN_BUNDLE_SCHEMA_V3;
+pub const PROCGEN_BUNDLE_SCHEMA: &str = PROCGEN_BUNDLE_SCHEMA_V4;
 pub const WORLD_IR_SCHEMA: &str = WORLD_IR_SCHEMA_V2;
 pub const SITE_IR_SCHEMA: &str = SITE_IR_SCHEMA_V2;
-pub const GAMEPLAY_IR_SCHEMA: &str = "gameplay-ir-1";
+pub const GAMEPLAY_IR_SCHEMA_V1: &str = "gameplay-ir-1";
 pub const GAMEPLAY_IR_SCHEMA_V2: &str = "gameplay-ir-2";
-pub const PRESENTATION_IR_SCHEMA: &str = "presentation-ir-1";
+pub const GAMEPLAY_IR_SCHEMA: &str = GAMEPLAY_IR_SCHEMA_V2;
+pub const PRESENTATION_IR_SCHEMA_V1: &str = "presentation-ir-1";
 pub const PRESENTATION_IR_SCHEMA_V2: &str = "presentation-ir-2";
+pub const PRESENTATION_IR_SCHEMA: &str = PRESENTATION_IR_SCHEMA_V2;
 pub const GENERATION_TRACE_SCHEMA_V1: &str = "generation-trace-1";
-pub const GENERATION_TRACE_SCHEMA: &str = GENERATION_TRACE_SCHEMA_V2;
+pub const GENERATION_TRACE_SCHEMA: &str = GENERATION_TRACE_SCHEMA_V3;
 pub const ADAPTIVE_PROPOSAL_SCHEMA: &str = "adaptive-proposal-1";
 pub const PROCGEN_BUNDLE_SCHEMA_V2: &str = "procgen-bundle-2";
 pub const WORLD_IR_SCHEMA_V2: &str = "world-ir-2";
@@ -29,6 +32,7 @@ pub const PROCGEN_BUNDLE_SCHEMA_V3: &str = "procgen-bundle-3";
 pub const PROCGEN_BUNDLE_SCHEMA_V4: &str = "procgen-bundle-4";
 pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3: &str = "procgen-lifecycle-result-3";
 pub const GENERATION_TRACE_SCHEMA_V2: &str = "generation-trace-2";
+pub const GENERATION_TRACE_SCHEMA_V3: &str = "generation-trace-3";
 pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4: &str = "procgen-lifecycle-result-4";
 
 #[derive(Debug, Deserialize, Serialize, schemars::JsonSchema, Clone, PartialEq, Eq)]
@@ -69,12 +73,12 @@ pub struct ExportSchemas {
 impl ExportSchemas {
     pub fn v1() -> Self {
         Self {
-            procgen_request: PROCGEN_REQUEST_SCHEMA.into(),
+            procgen_request: PROCGEN_REQUEST_SCHEMA_V1.into(),
             procgen_bundle: PROCGEN_BUNDLE_SCHEMA_V1.into(),
             world_ir: WORLD_IR_SCHEMA_V1.into(),
             site_ir: SITE_IR_SCHEMA_V1.into(),
-            gameplay_ir: GAMEPLAY_IR_SCHEMA.into(),
-            presentation_ir: PRESENTATION_IR_SCHEMA.into(),
+            gameplay_ir: GAMEPLAY_IR_SCHEMA_V1.into(),
+            presentation_ir: PRESENTATION_IR_SCHEMA_V1.into(),
             generation_trace: GENERATION_TRACE_SCHEMA_V1.into(),
             adaptive_proposal: ADAPTIVE_PROPOSAL_SCHEMA.into(),
         }
@@ -84,13 +88,13 @@ impl ExportSchemas {
     /// Gate 2's mission overlay advances only the site and containing bundle.
     pub fn platform_v3() -> Self {
         Self {
-            procgen_request: PROCGEN_REQUEST_SCHEMA.into(),
+            procgen_request: PROCGEN_REQUEST_SCHEMA_V1.into(),
             procgen_bundle: PROCGEN_BUNDLE_SCHEMA_V3.into(),
             world_ir: WORLD_IR_SCHEMA_V2.into(),
             site_ir: SITE_IR_SCHEMA_V2.into(),
-            gameplay_ir: GAMEPLAY_IR_SCHEMA.into(),
-            presentation_ir: PRESENTATION_IR_SCHEMA.into(),
-            generation_trace: GENERATION_TRACE_SCHEMA.into(),
+            gameplay_ir: GAMEPLAY_IR_SCHEMA_V1.into(),
+            presentation_ir: PRESENTATION_IR_SCHEMA_V1.into(),
+            generation_trace: GENERATION_TRACE_SCHEMA_V2.into(),
             adaptive_proposal: ADAPTIVE_PROPOSAL_SCHEMA.into(),
         }
     }
@@ -103,7 +107,7 @@ impl ExportSchemas {
             site_ir: SITE_IR_SCHEMA_V2.into(),
             gameplay_ir: GAMEPLAY_IR_SCHEMA_V2.into(),
             presentation_ir: PRESENTATION_IR_SCHEMA_V2.into(),
-            generation_trace: GENERATION_TRACE_SCHEMA_V2.into(),
+            generation_trace: GENERATION_TRACE_SCHEMA_V3.into(),
             adaptive_proposal: ADAPTIVE_PROPOSAL_SCHEMA.into(),
         }
     }
@@ -138,7 +142,7 @@ impl BuildManifest {
     /// Validate the additive Gate-2 platform manifest without weakening the
     /// established v1 manifest validator used by structural artifacts.
     pub fn validate_platform_v3(&self) -> Result<(), ManifestError> {
-        if self.manifest_schema != MANIFEST_SCHEMA {
+        if self.manifest_schema != MANIFEST_SCHEMA_V2 {
             return Err(
                 if self.manifest_schema.starts_with("procgen-build-manifest-") {
                     ManifestError::UnknownSchemaMajor(self.manifest_schema.clone())

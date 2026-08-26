@@ -1,0 +1,204 @@
+{
+  "$id": "procgen-request-2",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "CauseOfLoss": {
+      "enum": [
+        "ReactorBreach",
+        "Depressurization",
+        "PirateBoarding",
+        "Plague",
+        "DriveMisjump",
+        "Unknown"
+      ],
+      "type": "string"
+    },
+    "Domain": {
+      "enum": [
+        "world",
+        "site",
+        "gameplay",
+        "presentation"
+      ],
+      "type": "string"
+    },
+    "PlayerModelV2": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "player-model-2"
+        },
+        "signals": {
+          "items": {
+            "$ref": "#/definitions/PlayerSignal"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "signals"
+      ],
+      "type": "object"
+    },
+    "PlayerSignal": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/PlayerSignalKind"
+        },
+        "value_bp": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "value_bp"
+      ],
+      "type": "object"
+    },
+    "PlayerSignalKind": {
+      "enum": [
+        "combat_mastery",
+        "damage_pressure",
+        "resource_pressure",
+        "objective_pace"
+      ],
+      "type": "string"
+    },
+    "PresentationRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "locale": {
+          "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
+          "type": "string"
+        },
+        "seed": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "locale",
+        "seed"
+      ],
+      "type": "object"
+    },
+    "SiteRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "archetype_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "cause_of_loss": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CauseOfLoss"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "intactness_override_bp": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          ]
+        },
+        "kit_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "loot_richness_bp": {
+          "maximum": 30000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "site_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "archetype_id",
+        "kit_id",
+        "loot_richness_bp",
+        "site_id",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "content_manifest_hash": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "difficulty_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "generator_version": {
+      "const": 3
+    },
+    "player_model": {
+      "$ref": "#/definitions/PlayerModelV2"
+    },
+    "presentation": {
+      "$ref": "#/definitions/PresentationRequest"
+    },
+    "requested_domains": {
+      "items": {
+        "$ref": "#/definitions/Domain"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schema_version": {
+      "const": "procgen-request-2"
+    },
+    "site": {
+      "$ref": "#/definitions/SiteRequest"
+    },
+    "world_seed": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "content_manifest_hash",
+    "difficulty_id",
+    "generator_version",
+    "player_model",
+    "presentation",
+    "requested_domains",
+    "schema_version",
+    "site",
+    "world_seed"
+  ],
+  "title": "procgen-request-2",
+  "type": "object"
+}

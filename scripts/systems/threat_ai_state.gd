@@ -57,6 +57,18 @@ var anchored: bool = false
 var telegraph_seconds: float = 0.0
 var telegraph_remaining: float = 0.0
 var player_verb: String = "fight"     # distinct player response verb
+## Gate 3: authoritative Rust encounter identity and exact reward/presentation
+## metadata. Empty values preserve legacy hand-authored marker compatibility.
+var spawn_id: String = ""
+var blueprint_id: String = ""
+var creature_blueprint: Dictionary = {}
+var faction_id: String = ""
+var threat_role: String = ""
+var ability_id: String = ""
+var reward_source_id: String = ""
+var generated_items: Array = []
+var asset_ids: Array = []
+var presentation_binding_ids: Array = []
 
 func configure(config: Dictionary = {}) -> void:
 	instance_id = str(config.get("instance_id", instance_id))
@@ -115,6 +127,24 @@ func configure(config: Dictionary = {}) -> void:
 	player_verb = str(config.get("player_verb", beh.get("player_verb", player_verb)))
 	if player_verb.is_empty():
 		player_verb = "fight"
+	spawn_id = str(config.get("spawn_id", spawn_id))
+	blueprint_id = str(config.get("blueprint_id", blueprint_id))
+	var raw_blueprint: Variant = config.get("creature_blueprint", creature_blueprint)
+	if raw_blueprint is Dictionary:
+		creature_blueprint = (raw_blueprint as Dictionary).duplicate(true)
+	faction_id = str(config.get("faction_id", faction_id))
+	threat_role = str(config.get("threat_role", threat_role))
+	ability_id = str(config.get("ability_id", ability_id))
+	reward_source_id = str(config.get("reward_source_id", reward_source_id))
+	var raw_generated_items: Variant = config.get("generated_items", generated_items)
+	if raw_generated_items is Array:
+		generated_items = (raw_generated_items as Array).duplicate(true)
+	var raw_assets: Variant = config.get("asset_ids", asset_ids)
+	if raw_assets is Array:
+		asset_ids = (raw_assets as Array).duplicate(true)
+	var raw_bindings: Variant = config.get("presentation_binding_ids", presentation_binding_ids)
+	if raw_bindings is Array:
+		presentation_binding_ids = (raw_bindings as Array).duplicate(true)
 
 func tick(delta: float, context: Dictionary = {}) -> bool:
 	if delta < 0.0:
@@ -263,6 +293,16 @@ func get_summary() -> Dictionary:
 		"telegraph_seconds": telegraph_seconds,
 		"telegraph_remaining": telegraph_remaining,
 		"player_verb": player_verb,
+		"spawn_id": spawn_id,
+		"blueprint_id": blueprint_id,
+		"creature_blueprint": creature_blueprint.duplicate(true),
+		"faction_id": faction_id,
+		"threat_role": threat_role,
+		"ability_id": ability_id,
+		"reward_source_id": reward_source_id,
+		"generated_items": generated_items.duplicate(true),
+		"asset_ids": asset_ids.duplicate(true),
+		"presentation_binding_ids": presentation_binding_ids.duplicate(true),
 	}
 
 func effective_move_speed() -> float:

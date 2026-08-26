@@ -2,6 +2,22 @@
   "manifest_schema": "procgen-content-manifest-1",
   "files": [
     {
+      "path": "data/combat/threat_archetypes.json",
+      "sha256": "b257b0def845ce47667c8fc96902251ffa0c2b1971d95cdb6571924703e14b9c"
+    },
+    {
+      "path": "data/combat/threat_visual_catalog.json",
+      "sha256": "d2ef7d7b75f7d02838495b003f1490ce8ba6ce7adec827e154e55bb1180ae5e8"
+    },
+    {
+      "path": "data/items/item_definitions.json",
+      "sha256": "895055dd085768e67f91fe5dbc01e71a62d0c5fe788f94db9738118267f8a311"
+    },
+    {
+      "path": "data/kits/ship_structural_v0.json",
+      "sha256": "c9d5eaaf333cf4beedb8af6caa383528e84da98285fc5279d34e65a6db287ae8"
+    },
+    {
       "path": "data/procgen/archetypes/derelict.json",
       "sha256": "9bed7992e00fee9c6b5ce663f0fa15711b55de15f9f87d91a64aa25413a5944e"
     },
@@ -134,6 +150,10 @@
       "sha256": "9defccccc9bff1437f348b60c53945b5578bb044cdabd8da2a77194718b99967"
     },
     {
+      "path": "native/worldgen/crates/derelict_core/assets/gameplay/encounters_v2.json",
+      "sha256": "2ed1d76c4ef61b0b8bc955d1d6196ac11094f4c5ee7e58278134fdff85e86475"
+    },
+    {
       "path": "native/worldgen/crates/derelict_core/assets/gameplay/items_v2.json",
       "sha256": "2fcc265e876fd960429e2e80ad541546cf85d5ee6ba0aa2fa0c88cfa29df91d0"
     },
@@ -147,7 +167,7 @@
     },
     {
       "path": "native/worldgen/crates/derelict_core/assets/presentation/catalog_v2.json",
-      "sha256": "ef797b8b21927590bf09e7ba0d06395717a030070c2d81c395548dbc6df29bd7"
+      "sha256": "06bfbeb6c62a80e1c0811c65daab726597a775799be440558d3afd575ae2e2e7"
     },
     {
       "path": "native/worldgen/crates/derelict_core/assets/site/rules_v2.json",
@@ -218,5 +238,5 @@
       "sha256": "988d3d023a552188b0400843940f5724dc99e953b86049c7e2b70018e25990b1"
     }
   ],
-  "content_manifest_hash": "a7cfda584051097f43c09d9aaf8494f97c492641efa7b4ec518dee65e9c36ee7"
+  "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407"
 }

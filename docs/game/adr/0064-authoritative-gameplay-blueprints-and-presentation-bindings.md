@@ -12,6 +12,11 @@
 > change, and corrects the retained trace identifier to the accepted
 > `generation-trace-2`. The gameplay decisions below are unchanged.
 
+> **Later correction:** ADR-0066 advances the expanded Gate 3 channel list to
+> `generation-trace-3` because trace 2 fixes the earlier ordered channel set.
+> This supersedes only the retained trace identifier, not the gameplay or
+> presentation decisions in this ADR.
+
 ## Context
 
 The Gate 2 bundle owns the world, structural ship, mission, navigation, and

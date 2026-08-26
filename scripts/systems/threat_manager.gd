@@ -8,6 +8,7 @@ const ShipNavGraphScript := preload("res://scripts/systems/ship_nav_graph.gd")
 const ThreatPathfinderScript := preload("res://scripts/systems/threat_pathfinder.gd")
 const SpatialPerceptionStateScript := preload("res://scripts/systems/spatial_perception_state.gd")
 const THREAT_ARCHETYPE_PATH: String = "res://data/combat/threat_archetypes.json"
+const THREAT_VISUAL_CATALOG_PATH: String = "res://data/combat/threat_visual_catalog.json"
 const WEAPON_DEFINITIONS_PATH: String = "res://data/combat/weapon_definitions.json"
 const AMMO_DEFINITIONS_PATH: String = "res://data/combat/ammo_definitions.json"
 const SIGHT_RANGE: float = 12.0
@@ -17,6 +18,7 @@ const REPATH_TARGET_MOVE: float = 1.25
 signal threat_killed(record: Dictionary)
 
 var threat_archetypes: Dictionary = {}
+var threat_visual_catalog: Dictionary = {}
 var weapon_definitions: Dictionary = {}
 var ammo_definitions: Dictionary = {}
 var encounter_markers: Array = []
@@ -48,6 +50,7 @@ var on_structure_attack: Callable = Callable()
 
 func _ready() -> void:
 	threat_archetypes = _load_json_dict(THREAT_ARCHETYPE_PATH)
+	threat_visual_catalog = _load_json_dict(THREAT_VISUAL_CATALOG_PATH)
 	weapon_definitions = _load_json_dict(WEAPON_DEFINITIONS_PATH)
 	ammo_definitions = _load_json_dict(AMMO_DEFINITIONS_PATH)
 	damage_pipeline.configure({})
@@ -305,7 +308,16 @@ func _spawn_from_markers(markers: Array, anchor: Vector3) -> void:
 	for marker in markers:
 		if not (marker is Dictionary):
 			continue
-		var encounter_kind: String = _normalize_encounter_kind(str((marker as Dictionary).get("encounter_kind", "biomatter_swarm")))
+		var marker_dict: Dictionary = marker as Dictionary
+		var authoritative: Dictionary = _authoritative_marker_metadata(marker_dict)
+		if marker_dict.has("spawn_id") or marker_dict.has("blueprint_id") or marker_dict.has("creature_blueprint") or marker_dict.has("faction_id") \
+				or marker_dict.has("threat_role") or marker_dict.has("ability_id") \
+				or marker_dict.has("reward_source_id") or marker_dict.has("generated_items") \
+				or marker_dict.has("asset_ids") or marker_dict.has("presentation_binding_ids"):
+			if authoritative.is_empty():
+				# Provider records are never downgraded to a random/legacy threat.
+				continue
+		var encounter_kind: String = _normalize_encounter_kind(str(authoritative.get("blueprint_id", marker_dict.get("encounter_kind", "biomatter_swarm"))))
 		var count: int = max(1, int((marker as Dictionary).get("count", 1)))
 		var local_pos: Variant = (marker as Dictionary).get("local_position", null)
 		for i in range(count):
@@ -314,10 +326,12 @@ func _spawn_from_markers(markers: Array, anchor: Vector3) -> void:
 				continue
 			var threat = ThreatAIStateScript.new()
 			var merged: Dictionary = def.duplicate(true)
-			merged["instance_id"] = "%s_%d" % [str((marker as Dictionary).get("id", encounter_kind)), i]
+			merged["instance_id"] = "%s_%d" % [str(marker_dict.get("id", encounter_kind)), i]
 			merged["archetype_id"] = encounter_kind
-			merged["room_id"] = str((marker as Dictionary).get("room_id", ""))
-			merged["cell"] = (marker as Dictionary).get("cell", [0, 0])
+			merged["room_id"] = str(marker_dict.get("room_id", ""))
+			merged["cell"] = marker_dict.get("cell", [0, 0])
+			if not authoritative.is_empty():
+				merged.merge(authoritative, true)
 			if local_pos is Array and (local_pos as Array).size() >= 3:
 				# EncounterInjector markers carry the rolled room's floor-cell
 				# offset — spawn the threat IN its room. Multiple threats on
@@ -397,6 +411,16 @@ func _sweep_dead_threats() -> void:
 		emit_signal("threat_killed", {
 			"instance_id": threat.instance_id,
 			"archetype_id": threat.archetype_id,
+			"spawn_id": threat.spawn_id,
+			"blueprint_id": threat.blueprint_id,
+			"creature_blueprint": threat.creature_blueprint.duplicate(true),
+			"faction_id": threat.faction_id,
+			"threat_role": threat.threat_role,
+			"ability_id": threat.ability_id,
+			"reward_source_id": threat.reward_source_id,
+			"generated_items": threat.generated_items.duplicate(true),
+			"asset_ids": threat.asset_ids.duplicate(true),
+			"presentation_binding_ids": threat.presentation_binding_ids.duplicate(true),
 			"position": Vector3(float(threat.world_position[0]), float(threat.world_position[1]), float(threat.world_position[2])),
 			"loot_table": str((threat_archetypes.get(threat.archetype_id, {}) as Dictionary).get("loot_table", "combat_drop_common")),
 			"weapon_id": _last_attack_weapon_id,
@@ -411,6 +435,90 @@ func _remove_threat(threat) -> void:
 		node.queue_free()
 	placeholder_nodes.erase(threat.instance_id)
 	threats.erase(threat)
+
+## Validate the authoritative Rust encounter projection without selecting or
+## rerolling any composition. A non-authoritative marker returns an empty dict.
+func _authoritative_marker_metadata(marker: Dictionary) -> Dictionary:
+	var required: Array[String] = ["spawn_id", "blueprint_id", "faction_id", "threat_role", "ability_id", "reward_source_id"]
+	var has_provider_fields: bool = false
+	for key in required + ["creature_blueprint", "generated_items", "asset_ids", "presentation_binding_ids"]:
+		if marker.has(key):
+			has_provider_fields = true
+	if not has_provider_fields:
+		return {}
+	for key in required:
+		if not (marker.get(key, "") is String) or str(marker.get(key, "")).is_empty():
+			return {}
+	var spawn_id: String = str(marker.get("spawn_id", ""))
+	var blueprint_id: String = str(marker.get("blueprint_id", ""))
+	if str(marker.get("id", "")) != spawn_id \
+			or str(marker.get("encounter_kind", "")) != blueprint_id \
+			or typeof(marker.get("count", null)) != TYPE_INT or int(marker.get("count", 0)) != 1 \
+			or str(marker.get("room_id", "")).is_empty() \
+			or not marker.get("cell", null) is Array or (marker.get("cell", []) as Array).size() != 2 \
+			or not marker.get("local_position", null) is Array or (marker.get("local_position", []) as Array).size() != 3:
+		return {}
+	var raw_blueprint: Variant = marker.get("creature_blueprint", null)
+	if not raw_blueprint is Dictionary:
+		return {}
+	var blueprint: Dictionary = raw_blueprint as Dictionary
+	if str(blueprint.get("id", "")) != blueprint_id \
+			or str(blueprint.get("ability_id", "")) != str(marker.get("ability_id", "")) \
+			or str(blueprint.get("threat_role", "")) != str(marker.get("threat_role", "")):
+		return {}
+	var raw_items: Variant = marker.get("generated_items", null)
+	var raw_assets: Variant = marker.get("asset_ids", null)
+	var raw_bindings: Variant = marker.get("presentation_binding_ids", null)
+	if not (raw_items is Array) or not (raw_assets is Array) or not (raw_bindings is Array):
+		return {}
+	var items: Array = []
+	for item_value in raw_items as Array:
+		if not (item_value is Dictionary):
+			return {}
+		var item: Dictionary = item_value as Dictionary
+		if str(item.get("item_id", "")).is_empty() \
+				or typeof(item.get("quantity", null)) != TYPE_INT or int(item.get("quantity", 0)) != 1 \
+				or not item.get("blueprint", null) is Dictionary \
+				or str((item.get("blueprint", {}) as Dictionary).get("id", "")) != str(item.get("item_id", "")):
+			return {}
+		items.append(item.duplicate(true))
+	var assets: Array = []
+	for asset_value in raw_assets as Array:
+		if not (asset_value is String) or str(asset_value).is_empty():
+			return {}
+		assets.append(str(asset_value))
+	var bindings: Array = []
+	for binding_value in raw_bindings as Array:
+		if not (binding_value is String) or str(binding_value).is_empty():
+			return {}
+		bindings.append(str(binding_value))
+	if assets.size() != 1 or bindings.size() != 1 \
+			or not _visual_binding_matches(blueprint_id, str(assets[0]), str(bindings[0])):
+		return {}
+	return {
+		"spawn_id": spawn_id,
+		"blueprint_id": blueprint_id,
+		"creature_blueprint": blueprint.duplicate(true),
+		"faction_id": str(marker["faction_id"]),
+		"threat_role": str(marker["threat_role"]),
+		"ability_id": str(marker["ability_id"]),
+		"reward_source_id": str(marker["reward_source_id"]),
+		"generated_items": items,
+		"asset_ids": assets,
+		"presentation_binding_ids": bindings,
+	}
+
+
+func _visual_binding_matches(blueprint_id: String, asset_id: String, binding_id: String) -> bool:
+	var archetypes_value: Variant = threat_visual_catalog.get("archetypes", null)
+	if not archetypes_value is Dictionary:
+		return false
+	var visual_value: Variant = (archetypes_value as Dictionary).get(blueprint_id, null)
+	if not visual_value is Dictionary:
+		return false
+	var visual: Dictionary = visual_value
+	return str(visual.get("asset_id", "")) == asset_id \
+			and str(visual.get("binding_id", "")) == binding_id
 
 ## Domain 2 (BP1): visibility falls off with world distance, so a closer threat
 ## perceives more of the player's emitted visibility than a far one.

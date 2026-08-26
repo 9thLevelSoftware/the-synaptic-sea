@@ -5,6 +5,10 @@ const OK: String = "ok"
 const MANIFEST_MISSING: String = "manifest_missing"
 const MANIFEST_INVALID: String = "manifest_invalid"
 const SCHEMA_MAJOR_UNKNOWN: String = "schema_major_unknown"
+const RUNTIME_MANIFEST_INVALID: String = "runtime_manifest_invalid"
+const SOURCE_MISMATCH: String = "source_mismatch"
+const SCHEMA_MAP_MISMATCH: String = "schema_map_mismatch"
+const DIRTY_DEVELOPMENT: String = "dirty_development"
 const TARGET_MISMATCH: String = "target_mismatch"
 const GENERATOR_VERSION_MISMATCH: String = "generator_version_mismatch"
 const CONTENT_HASH_MISMATCH: String = "content_hash_mismatch"
@@ -21,7 +25,7 @@ func validate(manifest: Dictionary, generator: Object, target_override: String =
 	for key in required:
 		if not manifest.has(key): return MANIFEST_INVALID
 	var schema: String = str(manifest.get("manifest_schema", ""))
-	if schema != "procgen-build-manifest-2":
+	if schema != "procgen-build-manifest-3":
 		return SCHEMA_MAJOR_UNKNOWN if schema.begins_with("procgen-build-manifest-") else MANIFEST_INVALID
 	if int(manifest.get("generator_version", -1)) != 3: return GENERATOR_VERSION_MISMATCH
 	var source_commit: String = str(manifest.get("rust_source_commit", ""))
@@ -59,13 +63,38 @@ func validate(manifest: Dictionary, generator: Object, target_override: String =
 	var artifact_path: String = str((artifact as Dictionary).get("path", ""))
 	if not _io_exists(artifact_path, io_override): return ARTIFACT_MISSING
 	if _io_sha256(artifact_path, io_override) != str((artifact as Dictionary).get("sha256", "")): return ARTIFACT_HASH_MISMATCH
-	var schemas: Dictionary = {"procgen_request":"procgen-request-1", "procgen_bundle":"procgen-bundle-3", "world_ir":"world-ir-2", "site_ir":"site-ir-2", "gameplay_ir":"gameplay-ir-1", "presentation_ir":"presentation-ir-1", "generation_trace":"generation-trace-2", "adaptive_proposal":"adaptive-proposal-1"}
+	var schemas: Dictionary = {"procgen_request":"procgen-request-2", "procgen_bundle":"procgen-bundle-4", "world_ir":"world-ir-2", "site_ir":"site-ir-2", "gameplay_ir":"gameplay-ir-2", "presentation_ir":"presentation-ir-2", "generation_trace":"generation-trace-3", "adaptive_proposal":"adaptive-proposal-1"}
 	var schema_block: Variant = manifest.get("export_schemas", {})
-	if not schema_block is Dictionary: return MANIFEST_INVALID
+	if not schema_block is Dictionary: return SCHEMA_MAP_MISMATCH
 	for key in schema_block.keys():
-		if not schemas.has(str(key)): return MANIFEST_INVALID
+		if not schemas.has(str(key)): return SCHEMA_MAP_MISMATCH
 	for key in schemas.keys():
-		if str(schema_block.get(key, "")) != str(schemas[key]): return MANIFEST_INVALID
+		if str(schema_block.get(key, "")) != str(schemas[key]): return SCHEMA_MAP_MISMATCH
+	if generator == null or not generator.has_method("generator_manifest"):
+		return RUNTIME_MANIFEST_INVALID
+	var runtime_parser := JSON.new()
+	if runtime_parser.parse(str(generator.generator_manifest())) != 0 or not runtime_parser.data is Dictionary:
+		return RUNTIME_MANIFEST_INVALID
+	var runtime: Dictionary = runtime_parser.data
+	var runtime_keys: Array[String] = ["schema_version", "rust_source_commit", "generator_version", "content_manifest_hash", "export_schemas", "adapter_schemas", "target", "dirty_development"]
+	for key in runtime.keys():
+		if not runtime_keys.has(str(key)): return RUNTIME_MANIFEST_INVALID
+	for key in runtime_keys:
+		if not runtime.has(key): return RUNTIME_MANIFEST_INVALID
+	if str(runtime.get("schema_version", "")) != "procgen-generator-manifest-3" \
+			or int(runtime.get("generator_version", -1)) != int(manifest.get("generator_version", -2)) \
+			or str(runtime.get("content_manifest_hash", "")) != str(manifest.get("content_manifest_hash", "")) \
+			or str(runtime.get("target", "")) != str(manifest.get("target", "")):
+		return RUNTIME_MANIFEST_INVALID
+	if str(runtime.get("rust_source_commit", "")) != source_commit:
+		return SOURCE_MISMATCH
+	if runtime.get("dirty_development", null) is not bool or bool(runtime.get("dirty_development", true)):
+		return DIRTY_DEVELOPMENT
+	if not runtime.get("export_schemas", null) is Dictionary or not _same_json(runtime.export_schemas, schemas):
+		return SCHEMA_MAP_MISMATCH
+	var adapters: Dictionary = {"lifecycle_result":"procgen-lifecycle-result-4", "capabilities":"procgen-capabilities-3", "generator_manifest":"procgen-generator-manifest-3"}
+	if not runtime.get("adapter_schemas", null) is Dictionary or not _same_json(runtime.adapter_schemas, adapters):
+		return SCHEMA_MAP_MISMATCH
 	return OK
 
 func _is_hex(value: String) -> bool:
@@ -84,6 +113,8 @@ func _content_digest(entries: Array, io_override: Dictionary = {}) -> String:
 		var allowed: bool = false
 		for prefix in ["native/worldgen/crates/derelict_core/assets/", "data/procgen/archetypes/", "data/procgen/biomes/", "data/procgen/difficulty/", "data/procgen/encounter_tables/", "data/procgen/templates/"]:
 			if path.begins_with(prefix): allowed = true
+		for exact_path in ["data/combat/threat_archetypes.json", "data/combat/threat_visual_catalog.json", "data/items/item_definitions.json", "data/kits/ship_structural_v0.json"]:
+			if path == exact_path: allowed = true
 		if path.is_empty() or path.contains("\\") or path.contains(":") or path.begins_with("/") or not allowed: return ""
 		for segment in path.split("/"):
 			if segment.is_empty() or segment == "." or segment == "..": return ""
@@ -97,6 +128,19 @@ func _content_digest(entries: Array, io_override: Dictionary = {}) -> String:
 	for path in paths:
 		context.update(path.to_utf8_buffer()); context.update(PackedByteArray([0])); context.update(_io_bytes(path, io_override)); context.update(PackedByteArray([0]))
 	return context.finish().hex_encode()
+
+func _same_json(left: Variant, right: Variant) -> bool:
+	if left is Dictionary and right is Dictionary:
+		if left.size() != right.size(): return false
+		for key in left.keys():
+			if not right.has(key) or not _same_json(left[key], right[key]): return false
+		return true
+	if left is Array and right is Array:
+		if left.size() != right.size(): return false
+		for index in left.size():
+			if not _same_json(left[index], right[index]): return false
+		return true
+	return left == right
 
 func _io_exists(path: String, override: Dictionary) -> bool:
 	if override.has("missing") and (override["missing"] as Array).has(path): return false

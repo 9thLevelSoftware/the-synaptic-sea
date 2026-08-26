@@ -56,10 +56,10 @@ func _init() -> void:
 	count += 1
 	_expect(int(baseline.get("version", {}).get("generator_version", -1)) == 3 \
 			and int(baseline_ship.get("generator_version", -1)) == 2 \
-			and consumer._same_json(baseline_ship.get("seed", null), baseline_world.get("site_seed", null)), failures, "platform_v3_structural_v2")
+			and consumer._same_json(baseline_ship.get("seed", null), baseline_world.get("site_seed", null)), failures, "platform_v4_structural_v2")
 	count += 1; _expect(consumer.consume("not-json", request, build, runtime, caps).is_empty() and consumer.last_error == "malformed_bundle_json", failures, "malformed_json")
 	var original: Dictionary = JSON.parse_string(raw)
-	var cases: Array = [["lifecycle_schema", "schema_version", "wrong", "lifecycle_schema"], ["lifecycle_v1", "schema_version", "procgen-lifecycle-result-1", "lifecycle_schema"], ["lifecycle_status", "status", "failed", "lifecycle_not_completed"], ["missing_bundle", "bundle", null, "missing_bundle"], ["bundle_schema", "bundle.schema_version", "procgen-bundle-1", "bundle_schema"], ["hash", "bundle.semantic_hash", "0".repeat(64), "semantic_hash"], ["world_schema", "bundle.world_ir.schema_version", "world-ir-1", "world_ir_schema"], ["world_identity", "bundle.world_ir.site_id", "wrong-site", "world_identity"], ["ship_seed_identity", "bundle.site_ir.ship.seed", 42, "ship_identity"], ["ship_platform_version", "bundle.site_ir.ship.generator_version", 3, "ship_identity"], ["presentation_identity", "bundle.presentation_ir.locale", "fr-FR", "presentation_identity"], ["pipeline_count", "bundle.metrics.pipeline_executions", 2, "pipeline_count"], ["trace_schema", "bundle.trace.schema_version", "wrong", "diagnostic_schema"]]
+	var cases: Array = [["lifecycle_schema", "schema_version", "wrong", "lifecycle_schema"], ["lifecycle_v1", "schema_version", "procgen-lifecycle-result-1", "lifecycle_schema"], ["lifecycle_status", "status", "failed", "lifecycle_not_completed"], ["missing_bundle", "bundle", null, "missing_bundle"], ["bundle_schema", "bundle.schema_version", "procgen-bundle-1", "bundle_schema"], ["hash", "bundle.semantic_hash", "0".repeat(64), "semantic_hash"], ["world_schema", "bundle.world_ir.schema_version", "world-ir-1", "world_ir_schema"], ["world_identity", "bundle.world_ir.site_id", "wrong-site", "world_identity"], ["ship_seed_identity", "bundle.site_ir.ship.seed", 42, "ship_identity"], ["ship_platform_version", "bundle.site_ir.ship.generator_version", 3, "ship_identity"], ["presentation_shape", "bundle.presentation_ir.repairs", "invalid", "presentation_shape"], ["pipeline_count", "bundle.metrics.pipeline_executions", 2, "pipeline_count"], ["trace_schema", "bundle.trace.schema_version", "wrong", "diagnostic_schema"]]
 	var site_marker_decisions: Array = (original.bundle.trace.candidate_decisions as Array).duplicate()
 	site_marker_decisions.append("site:selected_fallback")
 	cases.append(["site_fallback_without_evidence", "bundle.trace.candidate_decisions", site_marker_decisions, "site_fallback_trace"])
@@ -105,7 +105,7 @@ func _init() -> void:
 		_expect(result.is_empty() and consumer.last_error == str(item[3]), failures, str(item[0]) + ":" + consumer.last_error)
 	var coordinate_request: Dictionary = consumer.build_request(
 		42, 0, 0, runtime, "standard", "shuttle", "parity-shuttle-intact",
-		3, -2, [1, -2, 3], 9, "en-US")
+		3, -2, [{"kind":"combat_mastery", "value_bp":1000}, {"kind":"objective_pace", "value_bp":7000}], 9, "en-US")
 	coordinate_request.site.intactness_override_bp = 10000
 	coordinate_request.requested_domains = ["site", "world", "gameplay", "presentation"]
 	var coordinate_raw: String = str(generator.generate_bundle(JSON.stringify(coordinate_request)))
@@ -126,7 +126,7 @@ func _init() -> void:
 	count += 1; _expect(consumer.build_request(9007199254740992, 0, 1, runtime).is_empty() and consumer.last_error == "json_unsafe_seed", failures, "unsafe_seed")
 	count += 1; _expect(consumer.build_request(-1, 0, 1, runtime).is_empty() and consumer.last_error == "json_unsafe_seed", failures, "negative_seed")
 	count += 1; _expect(consumer.build_request(42, 0, 1, runtime, "standard", "", "site:edge", -2147483648, 0).is_empty() and consumer.last_error == "request_bounds", failures, "coordinate_min")
-	count += 1; _expect(consumer.build_request(42, 0, 1, runtime, "standard", "", "site:signals", 0, 0, range(65)).is_empty() and consumer.last_error == "request_player_model", failures, "player_signal_cap")
+	count += 1; _expect(consumer.build_request(42, 0, 1, runtime, "standard", "", "site:signals", 0, 0, [{"kind":"combat_mastery", "value_bp":10001}]).is_empty() and consumer.last_error == "request_player_model", failures, "player_signal_bounds")
 	count += 1; _expect(consumer.build_request(42, 99, 1, runtime).is_empty() and consumer.last_error == "unsupported_ship_parameters", failures, "unsupported_size")
 	count += 1; _expect(consumer.build_request(42, 0, 99, runtime).is_empty() and consumer.last_error == "unsupported_ship_parameters", failures, "unsupported_condition")
 	if not failures.is_empty():

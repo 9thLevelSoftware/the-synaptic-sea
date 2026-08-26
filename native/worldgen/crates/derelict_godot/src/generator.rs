@@ -59,8 +59,8 @@ pub(crate) fn runtime_manifest() -> Result<GeneratorManifest, ProcgenFailure> {
         rust_source_commit: SOURCE_COMMIT.into(),
         generator_version: PROCGEN_GENERATOR_VERSION,
         content_manifest_hash: CONTENT_HASH.into(),
-        export_schemas: ExportSchemas::platform_v3(),
-        adapter_schemas: AdapterSchemas::platform_v3(),
+        export_schemas: ExportSchemas::platform_v4(),
+        adapter_schemas: AdapterSchemas::platform_v4(),
         target: TARGET.into(),
         dirty_development: dirty_development(),
     };
@@ -94,7 +94,7 @@ pub(crate) fn runtime_capabilities() -> Result<ProcgenCapabilities, ProcgenFailu
             Domain::Gameplay,
             Domain::Presentation,
         ],
-        schemas: AdapterSchemas::platform_v3(),
+        schemas: AdapterSchemas::platform_v4(),
     };
     capabilities
         .validate()
@@ -173,7 +173,7 @@ where
 {
     match serializer(value) {
         Ok(json) => json,
-        Err(_) => serde_json::to_string(&LifecycleResult::failed(None, adapter_failure("response serialization failed"), vec![LifecycleEvent::Failed])).unwrap_or_else(|_| "{\"schema_version\":\"procgen-lifecycle-result-3\",\"status\":\"failed\",\"request_id\":null,\"bundle\":null,\"failure\":{\"schema_version\":\"procgen-failure-1\",\"code\":\"adapter_failure\",\"stage\":\"adapter\",\"message\":\"response serialization failed\",\"retryable\":false,\"fallback_id\":null},\"events\":[\"failed\"]}".into()),
+        Err(_) => serde_json::to_string(&LifecycleResult::failed(None, adapter_failure("response serialization failed"), vec![LifecycleEvent::Failed])).unwrap_or_else(|_| "{\"schema_version\":\"procgen-lifecycle-result-4\",\"status\":\"failed\",\"request_id\":null,\"bundle\":null,\"failure\":{\"schema_version\":\"procgen-failure-1\",\"code\":\"adapter_failure\",\"stage\":\"adapter\",\"message\":\"response serialization failed\",\"retryable\":false,\"fallback_id\":null},\"events\":[\"failed\"]}".into()),
     }
 }
 fn serialize_string<T: Serialize>(value: &T) -> String {
@@ -226,7 +226,7 @@ pub(crate) fn legacy_request(seed: u64, params: &GenParams, kit_id: &str) -> Pro
         kit_id.trim()
     };
     ProcgenRequest {
-        schema_version: "procgen-request-1".into(),
+        schema_version: "procgen-request-2".into(),
         world_seed: seed,
         site: SiteRequest {
             site_id: "legacy-site".into(),
@@ -240,7 +240,7 @@ pub(crate) fn legacy_request(seed: u64, params: &GenParams, kit_id: &str) -> Pro
         },
         difficulty_id: "standard".into(),
         player_model: PlayerModel {
-            schema_version: "player-model-1".into(),
+            schema_version: "player-model-2".into(),
             signals: Vec::new(),
         },
         requested_domains: vec![

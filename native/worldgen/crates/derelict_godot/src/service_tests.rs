@@ -31,7 +31,7 @@ impl MonotonicClock for Clock {
 }
 fn req(seed: u64) -> ProcgenRequest {
     ProcgenRequest {
-        schema_version: "procgen-request-1".into(),
+        schema_version: "procgen-request-2".into(),
         world_seed: seed,
         site: SiteRequest {
             site_id: format!("site-{seed}"),
@@ -43,9 +43,9 @@ fn req(seed: u64) -> ProcgenRequest {
             cause_of_loss: None,
             loot_richness_bp: 5000,
         },
-        difficulty_id: "normal".into(),
+        difficulty_id: "standard".into(),
         player_model: PlayerModel {
-            schema_version: "player-model-1".into(),
+            schema_version: "player-model-2".into(),
             signals: vec![],
         },
         requested_domains: vec![

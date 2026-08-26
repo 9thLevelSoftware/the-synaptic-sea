@@ -1,5 +1,9 @@
 # ADR-0065: Propagate Gate 3 contracts through immutable adapter wrappers
 
+> **Trace-version amendment:** ADR-0066 supersedes Decision 3 only. Gate 3
+> advances the expanded named-channel contract to `generation-trace-3`; all
+> other wrapper and structural-version decisions below remain accepted.
+
 - **Status:** Accepted
 - **Date:** 2026-08-26
 - **Related:** ADR-0057, ADR-0058, ADR-0060, ADR-0061, ADR-0063,

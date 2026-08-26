@@ -6079,24 +6079,39 @@ func _on_threat_killed(record: Dictionary) -> void:
 		return
 	var loot_table: String = str(record.get("loot_table", "combat_drop_common"))
 	var seed_source: String = "kill:%s" % cid
+	# A Rust-authored reward source is already resolved into exact item records.
+	# Preserve even an empty array: empty means "no reward", never "roll again".
+	var generated_items: Variant = null
+	if not str(record.get("reward_source_id", "")).is_empty():
+		var reward_items: Variant = record.get("generated_items", null)
+		generated_items = (reward_items as Array).duplicate(true) if reward_items is Array else []
 	# Persist for revisit/save before spawning the live node.
 	if current_ship != null:
-		_register_pending_corpse_loot(current_ship, cid, loot_table, seed_source, local_pos)
-	_spawn_corpse_loot_container(cid, loot_table, seed_source, local_pos, parent_node)
+		_register_pending_corpse_loot(current_ship, cid, loot_table, seed_source, local_pos, generated_items)
+	_spawn_corpse_loot_container(cid, loot_table, seed_source, local_pos, parent_node, generated_items)
 
 ## Records an unsearched combat corpse on the ship so leave/revisit re-spawns it.
-func _register_pending_corpse_loot(ship, container_id: String, loot_table: String, seed_source: String, local_pos: Vector3) -> void:
+func _register_pending_corpse_loot(
+		ship,
+		container_id: String,
+		loot_table: String,
+		seed_source: String,
+		local_pos: Vector3,
+		generated_items: Variant = null) -> void:
 	if ship == null or container_id.is_empty():
 		return
 	for entry in ship.pending_corpse_loot:
 		if typeof(entry) == TYPE_DICTIONARY and str(entry.get("container_id", "")) == container_id:
 			return
-	ship.pending_corpse_loot.append({
+	var pending: Dictionary = {
 		"container_id": container_id,
 		"loot_table": loot_table,
 		"seed_source": seed_source,
 		"position": [local_pos.x, local_pos.y, local_pos.z],
-	})
+	}
+	if generated_items is Array:
+		pending["generated_items"] = (generated_items as Array).duplicate(true)
+	ship.pending_corpse_loot.append(pending)
 
 ## Drops a pending corpse record once searched (looted_container_ids is the authority
 ## for "already searched"; pending list is only for unsearched re-spawns).
@@ -6112,7 +6127,13 @@ func _clear_pending_corpse_loot(ship, container_id: String) -> void:
 		kept.append(entry)
 	ship.pending_corpse_loot = kept
 
-func _spawn_corpse_loot_container(container_id: String, loot_table: String, seed_source: String, local_pos: Vector3, parent_node: Node) -> void:
+func _spawn_corpse_loot_container(
+		container_id: String,
+		loot_table: String,
+		seed_source: String,
+		local_pos: Vector3,
+		parent_node: Node,
+		generated_items: Variant = null) -> void:
 	if parent_node == null or not is_instance_valid(parent_node) or inventory_state == null:
 		return
 	# Skip if already live in the current array.
@@ -6120,7 +6141,10 @@ func _spawn_corpse_loot_container(container_id: String, loot_table: String, seed
 		if is_instance_valid(existing) and String(existing.container_id) == container_id:
 			return
 	var lc = LootContainerScript.new()
-	lc.configure(container_id, loot_table, seed_source, inventory_state, _loot_tables, local_pos, 1.8, {})
+	var loot_context: Dictionary = {}
+	if generated_items is Array:
+		loot_context["generated_items"] = (generated_items as Array).duplicate(true)
+	lc.configure(container_id, loot_table, seed_source, inventory_state, _loot_tables, local_pos, 1.8, loot_context)
 	var searched_cb: Callable = _on_loot_container_searched.bind(lc)
 	if not lc.container_searched.is_connected(searched_cb):
 		lc.container_searched.connect(searched_cb)
@@ -6153,7 +6177,8 @@ func _spawn_pending_corpse_loot_containers() -> void:
 			str(entry.get("loot_table", "combat_drop_common")),
 			str(entry.get("seed_source", "kill:%s" % cid)),
 			local_pos,
-			parent_node
+			parent_node,
+			(entry.get("generated_items", []) as Array).duplicate(true) if entry.get("generated_items", null) is Array else null
 		)
 
 ## Validation seam: search a loot container by id through the real interaction path.
@@ -10777,7 +10802,7 @@ func _find_ship_by_id_or_marker(key: String):
 	return _find_ship_by_id(key)
 
 func _build_loot_context(spec: Dictionary) -> Dictionary:
-	return {
+	var context: Dictionary = {
 		"biome_id": _resolve_current_loot_biome_id(),
 		"loot_quality_modifier": _resolve_current_loot_quality_modifier(),
 		"depth": _resolve_current_loot_depth(),
@@ -10786,6 +10811,10 @@ func _build_loot_context(spec: Dictionary) -> Dictionary:
 		"item_definitions": ItemDefsScript.load_definitions(),
 		"unique_state": unique_item_state,
 	}
+	if spec.has("generated_items"):
+		var generated_items: Variant = spec.get("generated_items")
+		context["generated_items"] = (generated_items as Array).duplicate(true) if generated_items is Array else generated_items
+	return context
 
 func _resolve_current_loot_quality_modifier() -> float:
 	var biome_id: String = _resolve_current_loot_biome_id()

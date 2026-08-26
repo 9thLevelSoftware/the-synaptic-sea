@@ -117,7 +117,7 @@ fn corpus_vectors_recompute_expected_hashes() {
     );
     assert_eq!(
         difficulties,
-        ["easy", "extreme", "hard", "nightmare", "standard"]
+        ["deep_dive", "hardened", "standard"]
             .into_iter()
             .map(String::from)
             .collect()

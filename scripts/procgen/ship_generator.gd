@@ -212,7 +212,7 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int, archetyp
 	var mapped: Dictionary = mapper.map_to_loader_documents(bundle)
 	if mapped.is_empty():
 		return _generation_fail(str(mapper.last_error), "bundle mapping: %s" % str(mapper.last_error))
-	var kit_id: String = str((bundle.get("presentation_ir", {}) as Dictionary).get("kit_id", ""))
+	var kit_id: String = str(mapped.get("kit_id", ""))
 	var kit: Dictionary = _load_worldgen_kit(kit_id)
 	if kit.is_empty():
 		return _generation_fail(last_error if not last_error.is_empty() else "presentation_kit", "presentation kit rejected: %s" % kit_id)
@@ -222,6 +222,9 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int, archetyp
 		return _generation_fail("loader_rejected_documents", "loader rejected bundle documents")
 	loader.name = "GeneratedShip"
 	loader.set_meta("procgen_site_ir", (mapped.get("site_ir", {}) as Dictionary).duplicate(true))
+	loader.set_meta("procgen_gameplay_ir", (mapped.get("gameplay_ir", {}) as Dictionary).duplicate(true))
+	loader.set_meta("procgen_presentation_ir", (mapped.get("presentation_ir", {}) as Dictionary).duplicate(true))
+	loader.set_meta("procgen_request", (bundle.get("request", {}) as Dictionary).duplicate(true))
 	loader.set_meta("procgen_semantic_hash", str(bundle.get("semantic_hash", "")))
 	last_error = ""
 	last_outcome = "fallback_selected" if fallback_selected else "generated"

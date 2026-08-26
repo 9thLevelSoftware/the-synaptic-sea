@@ -7,7 +7,9 @@ use std::collections::BTreeSet;
 
 pub const MAX_ITEMS: usize = 64;
 pub const MAX_AFFIXES: usize = 3;
-pub const MAX_SOURCES: usize = 64;
+/// Candidate reward sources are bounded by the public adapter entity ceiling;
+/// generated item output remains independently capped by `MAX_ITEMS`.
+pub const MAX_SOURCES: usize = 4_096;
 pub const MAX_BP: u32 = 10_000;
 pub const MAX_LOOT_RICHNESS_BP: u32 = 30_000;
 type Result<T> = std::result::Result<T, ItemError>;

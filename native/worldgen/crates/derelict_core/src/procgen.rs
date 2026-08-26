@@ -1,6 +1,22 @@
 //! Versioned contracts and the single-pass generation bundle.
+use crate::creature::{
+    CreatureBlueprint, CreatureBlueprintSetOutcome, CreatureCatalogue, CreatureGenerationContext,
+};
+use crate::encounter::{
+    DifficultyBand, EncounterCatalogue, EncounterGenerationContext, EncounterGenerationOutcome,
+    EncounterRationale,
+};
+use crate::item_generation::{
+    DropBinding, ItemBlueprint, ItemCatalogue, ItemGenerationContext, ItemGenerationOutcome,
+    SourceBinding, SourceKind, MAX_ITEMS,
+};
 use crate::manifest::ExportSchemas;
 use crate::model::{CauseOfLoss, Ship, GENERATOR_VERSION};
+pub use crate::player_model::PlayerModelV2 as PlayerModel;
+use crate::presentation::{
+    PresentationCatalogue, PresentationContext, PresentationOutput, PresentationSubject,
+    SubjectKind,
+};
 pub use crate::site::SiteIR;
 pub use crate::world::WorldIR;
 use crate::world::{WorldGenerationRequest, WorldRules};
@@ -12,18 +28,18 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use web_time::Instant;
 
-pub const PROCGEN_REQUEST_SCHEMA: &str = crate::manifest::PROCGEN_REQUEST_SCHEMA;
-pub const PROCGEN_BUNDLE_SCHEMA: &str = crate::manifest::PROCGEN_BUNDLE_SCHEMA_V3;
+pub const PROCGEN_REQUEST_SCHEMA: &str = crate::manifest::PROCGEN_REQUEST_SCHEMA_V2;
+pub const PROCGEN_BUNDLE_SCHEMA: &str = crate::manifest::PROCGEN_BUNDLE_SCHEMA_V4;
 pub const WORLD_IR_SCHEMA: &str = crate::manifest::WORLD_IR_SCHEMA_V2;
 pub const SITE_IR_SCHEMA: &str = crate::manifest::SITE_IR_SCHEMA;
-pub const GAMEPLAY_IR_SCHEMA: &str = crate::manifest::GAMEPLAY_IR_SCHEMA;
-pub const PRESENTATION_IR_SCHEMA: &str = crate::manifest::PRESENTATION_IR_SCHEMA;
+pub const GAMEPLAY_IR_SCHEMA: &str = crate::manifest::GAMEPLAY_IR_SCHEMA_V2;
+pub const PRESENTATION_IR_SCHEMA: &str = crate::manifest::PRESENTATION_IR_SCHEMA_V2;
 pub const GENERATION_TRACE_SCHEMA: &str = crate::manifest::GENERATION_TRACE_SCHEMA;
 pub const ADAPTIVE_PROPOSAL_SCHEMA: &str = crate::manifest::ADAPTIVE_PROPOSAL_SCHEMA;
-pub const PLAYER_MODEL_SCHEMA: &str = "player-model-1";
+pub const PLAYER_MODEL_SCHEMA: &str = crate::player_model::PLAYER_MODEL_SCHEMA_V2;
 pub const FAILURE_SCHEMA: &str = "procgen-failure-1";
 pub const GENERATION_METRICS_SCHEMA: &str = "generation-metrics-1";
-const RNG_CHANNELS: [&str; 27] = [
+pub const RNG_CHANNELS: [&str; 37] = [
     "world.archetype",
     "world.biome",
     "world.hazard",
@@ -51,6 +67,16 @@ const RNG_CHANNELS: [&str; 27] = [
     "fracture",
     "debris",
     "loot",
+    "gameplay.creature_blueprint",
+    "gameplay.creature_ability",
+    "gameplay.creature_material",
+    "gameplay.encounter_candidate",
+    "gameplay.encounter_faction",
+    "gameplay.encounter_reward",
+    "gameplay.encounter_selection",
+    "gameplay.item_family",
+    "gameplay.item_affix",
+    "presentation.asset_assembly",
 ];
 
 #[derive(
@@ -75,12 +101,6 @@ pub struct SiteRequest {
     pub intactness_override_bp: Option<u16>,
     pub cause_of_loss: Option<CauseOfLoss>,
     pub loot_richness_bp: u16,
-}
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct PlayerModel {
-    pub schema_version: String,
-    pub signals: Vec<i32>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -115,6 +135,55 @@ pub struct VersionEnvelope {
 pub struct GameplayIR {
     pub schema_version: String,
     pub legacy_slice: GameplaySlice,
+    pub creature_blueprints: Vec<CreatureBlueprint>,
+    pub encounter: EncounterGenerationOutcome,
+    pub items: Vec<ItemBlueprint>,
+    pub drops: Vec<DropBinding>,
+    pub decisions: Vec<GameplayDecisionRecord>,
+}
+
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum GameplayDecisionDomain {
+    Creature,
+    Encounter,
+    Item,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(
+    tag = "code",
+    content = "detail",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
+pub enum GameplayRationaleCode {
+    CreatureValidated,
+    CreatureIncompatible,
+    CreatureSelected,
+    ItemAuthoredCompatible,
+    ItemNoCompatibleAffix,
+    ItemArithmeticOverflow,
+    ItemIncompatible,
+    ItemEconomyCap,
+    ItemAuthoredBaseline,
+    ItemSafeEmpty,
+    Encounter(EncounterRationale),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GameplayDecisionRecord {
+    pub decision_id: String,
+    pub channel_id: String,
+    pub domain: GameplayDecisionDomain,
+    pub candidate_id: String,
+    pub score_bp: u16,
+    pub accepted: bool,
+    pub rationale_codes: Vec<GameplayRationaleCode>,
+    pub selected_id: Option<String>,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -158,15 +227,7 @@ pub struct LootContainer {
     pub approach_cell: [i32; 3],
     pub loot_table: String,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct PresentationIR {
-    pub schema_version: String,
-    pub kit_id: String,
-    pub locale: String,
-    pub seed: u64,
-    pub approved_bindings: BTreeMap<String, String>,
-}
+pub type PresentationIR = PresentationOutput;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema, Default)]
 #[serde(deny_unknown_fields)]
@@ -268,7 +329,7 @@ impl ProcgenBundle {
         {
             return Err(ProcgenError::InvalidRequest("version"));
         }
-        if self.version.export_schemas != ExportSchemas::platform_v3() {
+        if self.version.export_schemas != ExportSchemas::platform_v4() {
             return Err(ProcgenError::InvalidRequest("export_schemas"));
         }
         let world_request = WorldGenerationRequest {
@@ -361,12 +422,6 @@ impl ProcgenBundle {
                 && !selected_site_fallback => {}
             _ => return Err(ProcgenError::InvalidRequest("site_fallback_trace")),
         }
-        if self.presentation_ir.kit_id != self.request.site.kit_id
-            || self.presentation_ir.locale != self.request.presentation.locale
-            || self.presentation_ir.seed != self.request.presentation.seed
-        {
-            return Err(ProcgenError::InvalidRequest("presentation_identity"));
-        }
         if self.site_ir.ship.seed != self.world_ir.site_seed
             || self.site_ir.ship.archetype_id != self.request.site.archetype_id
         {
@@ -382,12 +437,19 @@ impl ProcgenBundle {
             .and_then(|n| n.checked_add(self.site_ir.ship.plan.ceiling_placements.len()))
             .and_then(|n| u32::try_from(n).ok())
             .ok_or(ProcgenError::InvalidRequest("metrics"))?;
+        let expected_entities = self
+            .site_ir
+            .ship
+            .entities
+            .len()
+            .checked_add(self.gameplay_ir.encounter.spawns.len())
+            .and_then(|count| count.checked_add(self.gameplay_ir.items.len()))
+            .and_then(|count| u32::try_from(count).ok())
+            .ok_or(ProcgenError::InvalidRequest("metrics"))?;
         if self.metrics.room_count
             != u32::try_from(self.site_ir.ship.room_graph.nodes.len())
                 .map_err(|_| ProcgenError::InvalidRequest("metrics"))?
-            || self.metrics.entity_count
-                != u32::try_from(self.site_ir.ship.entities.len())
-                    .map_err(|_| ProcgenError::InvalidRequest("metrics"))?
+            || self.metrics.entity_count != expected_entities
             || self.metrics.structural_placement_count != expected_placements
         {
             return Err(ProcgenError::InvalidRequest("metrics"));
@@ -439,6 +501,20 @@ impl ProcgenBundle {
             || actual_gameplay != expected_gameplay
         {
             return Err(ProcgenError::InvalidRequest("gameplay_identity"));
+        }
+        let expected_gameplay_ir = build_gameplay_ir(
+            &self.request,
+            &self.site_ir,
+            self.gameplay_ir.legacy_slice.clone(),
+        )?;
+        if self.gameplay_ir != expected_gameplay_ir {
+            return Err(ProcgenError::InvalidRequest("gameplay_identity"));
+        }
+        validate_gameplay_decisions(&self.gameplay_ir.decisions)?;
+        let expected_presentation_ir =
+            build_presentation_ir(&self.request, &self.site_ir, &expected_gameplay_ir)?;
+        if self.presentation_ir != expected_presentation_ir {
+            return Err(ProcgenError::InvalidRequest("presentation_identity"));
         }
         if self.semantic_hash != semantic_hash(self)? {
             return Err(ProcgenError::InvalidRequest("semantic_hash"));
@@ -560,7 +636,7 @@ impl ProcgenRequest {
         if self.site.site_id.is_empty()
             || self.site.archetype_id.is_empty()
             || self.site.kit_id.is_empty()
-            || self.difficulty_id.is_empty()
+            || difficulty_band(&self.difficulty_id).is_err()
         {
             return Err(ProcgenError::InvalidRequest("identity"));
         }
@@ -569,7 +645,9 @@ impl ProcgenRequest {
         {
             return Err(ProcgenError::InvalidRequest("bounds"));
         }
-        check_schema(&self.player_model.schema_version, PLAYER_MODEL_SCHEMA)?;
+        self.player_model
+            .validate()
+            .map_err(|_| ProcgenError::InvalidRequest("player_model"))?;
         if self.requested_domains.is_empty()
             || self.requested_domains.iter().any(|d| {
                 !matches!(
@@ -589,6 +667,9 @@ impl ProcgenRequest {
         }
         if !is_locale(&self.presentation.locale) {
             return Err(ProcgenError::InvalidRequest("presentation.locale"));
+        }
+        if self.presentation.seed > crate::world::MAX_PUBLIC_SEED {
+            return Err(ProcgenError::InvalidRequest("presentation.seed"));
         }
         Ok(())
     }
@@ -658,10 +739,375 @@ fn reconcile_bundle_fragments(ship: &mut Ship) -> bool {
     ship.fragments != original
 }
 
+fn world_request_for(request: &ProcgenRequest) -> WorldGenerationRequest {
+    WorldGenerationRequest {
+        world_seed: request.world_seed,
+        platform_version: request.generator_version,
+        content_manifest_hash: request.content_manifest_hash.clone(),
+        site_id: request.site.site_id.clone(),
+        x: request.site.x,
+        y: request.site.y,
+        archetype_id: request.site.archetype_id.clone(),
+    }
+}
+
+fn difficulty_band(difficulty_id: &str) -> Result<DifficultyBand, ProcgenError> {
+    match difficulty_id {
+        "standard" => Ok(DifficultyBand::Standard),
+        "hardened" => Ok(DifficultyBand::Hardened),
+        "deep_dive" => Ok(DifficultyBand::DeepDive),
+        _ => Err(ProcgenError::InvalidRequest("difficulty_id")),
+    }
+}
+
+fn gameplay_identifier(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value.bytes().all(|byte| {
+            byte.is_ascii_lowercase()
+                || byte.is_ascii_digit()
+                || matches!(byte, b':' | b'_' | b'-' | b'.')
+        })
+}
+
+fn item_rationale(value: &str) -> Result<GameplayRationaleCode, ProcgenError> {
+    match value {
+        "authored_compatible" => Ok(GameplayRationaleCode::ItemAuthoredCompatible),
+        "rejected_no_compatible_affix" => Ok(GameplayRationaleCode::ItemNoCompatibleAffix),
+        "rejected_arithmetic_overflow" => Ok(GameplayRationaleCode::ItemArithmeticOverflow),
+        "rejected_item_incompatible" => Ok(GameplayRationaleCode::ItemIncompatible),
+        "rejected_economy_cap" => Ok(GameplayRationaleCode::ItemEconomyCap),
+        _ => Err(ProcgenError::Generation(format!(
+            "item decision uses unknown rationale: {value}"
+        ))),
+    }
+}
+
+fn gameplay_decisions(
+    creature_set: &CreatureBlueprintSetOutcome,
+    encounter: &EncounterGenerationOutcome,
+    items: &ItemGenerationOutcome,
+) -> Result<Vec<GameplayDecisionRecord>, ProcgenError> {
+    let mut decisions = Vec::new();
+    for (trace_index, trace) in creature_set.traces.iter().enumerate() {
+        let channel_id = trace
+            .channel_ids
+            .first()
+            .ok_or_else(|| ProcgenError::Generation("creature trace has no channel".into()))?;
+        for (candidate_index, candidate) in trace.considered.iter().enumerate() {
+            let selected = trace.selected.as_deref() == Some(candidate.candidate_id.as_str());
+            let rationale = if selected {
+                GameplayRationaleCode::CreatureSelected
+            } else if candidate.accepted {
+                GameplayRationaleCode::CreatureValidated
+            } else {
+                GameplayRationaleCode::CreatureIncompatible
+            };
+            decisions.push(GameplayDecisionRecord {
+                decision_id: format!("creature:{trace_index:02}:{candidate_index:02}"),
+                channel_id: channel_id.clone(),
+                domain: GameplayDecisionDomain::Creature,
+                candidate_id: candidate.candidate_id.clone(),
+                score_bp: u16::try_from(candidate.score)
+                    .map_err(|_| ProcgenError::Generation("creature score exceeds u16".into()))?,
+                accepted: candidate.accepted,
+                rationale_codes: vec![rationale],
+                selected_id: selected.then(|| candidate.candidate_id.clone()),
+            });
+        }
+    }
+    for decision in &encounter.trace.decisions {
+        decisions.push(GameplayDecisionRecord {
+            decision_id: format!("encounter:{}", decision.decision_id),
+            channel_id: decision.channel_id.clone(),
+            domain: GameplayDecisionDomain::Encounter,
+            candidate_id: decision.candidate_id.clone(),
+            score_bp: decision.score_bp,
+            accepted: decision.accepted,
+            rationale_codes: decision
+                .rationale_codes
+                .iter()
+                .copied()
+                .map(GameplayRationaleCode::Encounter)
+                .collect(),
+            selected_id: decision.selected_spawn_id.clone(),
+        });
+    }
+    for (index, candidate) in items.trace.considered.iter().enumerate() {
+        let selected = candidate.accepted
+            && items
+                .trace
+                .selected
+                .iter()
+                .any(|selected| selected == &candidate.candidate_id);
+        decisions.push(GameplayDecisionRecord {
+            decision_id: format!("item:{index:02}"),
+            channel_id: "gameplay.item_affix".into(),
+            domain: GameplayDecisionDomain::Item,
+            candidate_id: candidate.candidate_id.clone(),
+            score_bp: u16::try_from(candidate.score_bp)
+                .map_err(|_| ProcgenError::Generation("item score exceeds u16".into()))?,
+            accepted: candidate.accepted,
+            rationale_codes: vec![item_rationale(&candidate.rationale)?],
+            selected_id: selected.then(|| candidate.candidate_id.clone()),
+        });
+    }
+    match items.trace.fallback.as_deref() {
+        None => {}
+        Some("authored_baseline") => {
+            let selected =
+                items.trace.selected.first().ok_or_else(|| {
+                    ProcgenError::Generation("item fallback has no selection".into())
+                })?;
+            decisions.push(GameplayDecisionRecord {
+                decision_id: "item:fallback".into(),
+                channel_id: "gameplay.item_family".into(),
+                domain: GameplayDecisionDomain::Item,
+                candidate_id: selected.clone(),
+                score_bp: 0,
+                accepted: true,
+                rationale_codes: vec![GameplayRationaleCode::ItemAuthoredBaseline],
+                selected_id: Some(selected.clone()),
+            });
+        }
+        Some("authored_safe_empty") => decisions.push(GameplayDecisionRecord {
+            decision_id: "item:safe_empty".into(),
+            channel_id: "gameplay.item_family".into(),
+            domain: GameplayDecisionDomain::Item,
+            candidate_id: "authored_safe_empty".into(),
+            score_bp: 0,
+            accepted: false,
+            rationale_codes: vec![GameplayRationaleCode::ItemSafeEmpty],
+            selected_id: None,
+        }),
+        Some(_) => {
+            return Err(ProcgenError::Generation(
+                "item trace uses unknown fallback".into(),
+            ))
+        }
+    }
+    validate_gameplay_decisions(&decisions)?;
+    Ok(decisions)
+}
+
+fn validate_gameplay_decisions(decisions: &[GameplayDecisionRecord]) -> Result<(), ProcgenError> {
+    if decisions.is_empty() || decisions.len() > 512 {
+        return Err(ProcgenError::InvalidRequest("gameplay_decisions"));
+    }
+    let mut decision_ids = BTreeSet::new();
+    for decision in decisions {
+        if !gameplay_identifier(&decision.decision_id)
+            || !gameplay_identifier(&decision.channel_id)
+            || !gameplay_identifier(&decision.candidate_id)
+            || decision.score_bp > 10_000
+            || decision.rationale_codes.is_empty()
+            || !decision_ids.insert(&decision.decision_id)
+            || decision.accepted != decision.selected_id.is_some()
+            || decision
+                .selected_id
+                .as_deref()
+                .is_some_and(|selected| !gameplay_identifier(selected))
+        {
+            return Err(ProcgenError::InvalidRequest("gameplay_decisions"));
+        }
+    }
+    Ok(())
+}
+
+fn build_gameplay_ir(
+    request: &ProcgenRequest,
+    site_ir: &SiteIR,
+    legacy_slice: GameplaySlice,
+) -> Result<GameplayIR, ProcgenError> {
+    let world_request = world_request_for(request);
+    let creature_catalogue = CreatureCatalogue::bundled()
+        .map_err(|error| ProcgenError::Generation(error.to_string()))?;
+    let min_clearance = site_ir
+        .spatial_annotations
+        .rooms
+        .iter()
+        .map(|room| room.minimum_clearance)
+        .min()
+        .ok_or(ProcgenError::InvalidRequest("spatial_annotations"))?;
+    let creature_context = CreatureGenerationContext {
+        request: world_request.clone(),
+        min_clearance,
+        max_footprint_cells: u16::try_from(crate::creature::MAX_CELLS)
+            .map_err(|_| ProcgenError::Generation("creature footprint capacity".into()))?,
+        threat_cap: creature_catalogue.rules.max_threat,
+        performance_cap: creature_catalogue.rules.max_performance,
+        instance_cap: creature_catalogue.rules.max_instances,
+    };
+    let creature_set =
+        crate::creature::generate_creature_blueprint_set(&creature_context, &creature_catalogue)
+            .map_err(|error| ProcgenError::Generation(error.to_string()))?;
+    creature_set
+        .validate(&creature_context, &creature_catalogue)
+        .map_err(|error| ProcgenError::Generation(error.to_string()))?;
+
+    let encounter_catalogue = EncounterCatalogue::bundled()
+        .map_err(|error| ProcgenError::Generation(error.to_string()))?;
+    let encounter_context = EncounterGenerationContext {
+        request: world_request.clone(),
+        difficulty_id: difficulty_band(&request.difficulty_id)?,
+        player: request.player_model.clone(),
+        loot_richness_bp: request.site.loot_richness_bp,
+        threat_cap: 3_000,
+        performance_cap: 3_000,
+        economy_cap: 2_000,
+    };
+    let encounter = crate::encounter::generate_encounters(
+        &encounter_context,
+        &encounter_catalogue,
+        site_ir,
+        &creature_set.blueprints,
+    )
+    .map_err(|error| ProcgenError::Generation(error.to_string()))?;
+
+    let mut sources: Vec<SourceBinding> = legacy_slice
+        .loot_containers
+        .iter()
+        .map(|container| SourceBinding {
+            source_id: container.id.clone(),
+            source_kind: SourceKind::Container,
+        })
+        .chain(encounter.spawns.iter().map(|spawn| SourceBinding {
+            source_id: spawn.reward_source_id.clone(),
+            source_kind: SourceKind::EncounterReward,
+        }))
+        .collect();
+    sources.sort_by(|left, right| left.source_id.cmp(&right.source_id));
+    if sources
+        .windows(2)
+        .any(|pair| pair[0].source_id == pair[1].source_id)
+    {
+        return Err(ProcgenError::Generation(
+            "duplicate gameplay reward source".into(),
+        ));
+    }
+    let item_catalogue =
+        ItemCatalogue::bundled().map_err(|error| ProcgenError::Generation(error.to_string()))?;
+    let max_count = u16::try_from(sources.len().min(MAX_ITEMS))
+        .map_err(|_| ProcgenError::Generation("item source capacity".into()))?;
+    let item_context = ItemGenerationContext {
+        request: world_request,
+        difficulty_id: request.difficulty_id.clone(),
+        loot_richness_bp: u32::from(request.site.loot_richness_bp),
+        eligible_sources: sources,
+        max_total_value: item_catalogue.caps.max_total_value,
+        max_count,
+    };
+    let item_outcome = crate::item_generation::generate_items(&item_context, &item_catalogue)
+        .map_err(|error| ProcgenError::Generation(error.to_string()))?;
+    item_outcome
+        .validate(&item_context, &item_catalogue)
+        .map_err(|error| ProcgenError::Generation(error.to_string()))?;
+    let decisions = gameplay_decisions(&creature_set, &encounter, &item_outcome)?;
+
+    Ok(GameplayIR {
+        schema_version: GAMEPLAY_IR_SCHEMA.into(),
+        legacy_slice,
+        creature_blueprints: creature_set.blueprints,
+        encounter,
+        items: item_outcome.items,
+        drops: item_outcome.drops,
+        decisions,
+    })
+}
+
+fn build_presentation_ir(
+    request: &ProcgenRequest,
+    site_ir: &SiteIR,
+    gameplay_ir: &GameplayIR,
+) -> Result<PresentationIR, ProcgenError> {
+    let mut subjects = vec![
+        PresentationSubject {
+            subject_id: "environment:ambient".into(),
+            subject_kind: SubjectKind::Environment,
+            binding_tags: vec!["ambient.default".into()],
+        },
+        PresentationSubject {
+            subject_id: "ship:structural".into(),
+            subject_kind: SubjectKind::Ship,
+            binding_tags: vec!["structural.default".into()],
+        },
+    ];
+    for blueprint in &gameplay_ir.creature_blueprints {
+        let family = blueprint
+            .id
+            .strip_prefix("creature_")
+            .ok_or_else(|| ProcgenError::Generation("unknown creature visual family".into()))?;
+        subjects.push(PresentationSubject {
+            subject_id: format!("creature:{}", blueprint.id),
+            subject_kind: SubjectKind::Creature,
+            binding_tags: vec![format!("creature.{family}")],
+        });
+    }
+    for item in &gameplay_ir.items {
+        let family = item
+            .visual_tag
+            .strip_prefix("item_")
+            .ok_or_else(|| ProcgenError::Generation("unknown item visual family".into()))?;
+        subjects.push(PresentationSubject {
+            subject_id: format!("item:{}", item.id),
+            subject_kind: SubjectKind::Item,
+            binding_tags: vec![format!("item.{family}")],
+        });
+    }
+    for (index, _) in site_ir.functional_props.iter().enumerate() {
+        subjects.push(PresentationSubject {
+            subject_id: format!("objective:{index:02}"),
+            subject_kind: SubjectKind::Objective,
+            binding_tags: vec!["objective.default".into()],
+        });
+    }
+    subjects.sort_by(|left, right| left.subject_id.cmp(&right.subject_id));
+    if subjects.len() > 128
+        || subjects
+            .windows(2)
+            .any(|pair| pair[0].subject_id == pair[1].subject_id)
+    {
+        return Err(ProcgenError::Generation(
+            "presentation subject capacity".into(),
+        ));
+    }
+    let context = PresentationContext {
+        request: world_request_for(request),
+        presentation_seed: request.presentation.seed,
+        locale: request.presentation.locale.clone(),
+        subjects,
+    };
+    let catalogue = PresentationCatalogue::bundled()
+        .map_err(|error| ProcgenError::Generation(error.to_string()))?;
+    let output = crate::presentation::assemble(&context, &catalogue)
+        .map_err(|error| ProcgenError::Generation(error.to_string()))?;
+    output
+        .validate(&context, &catalogue)
+        .map_err(|error| ProcgenError::Generation(error.to_string()))?;
+    Ok(output)
+}
+
 pub fn generate_bundle(
     request: ProcgenRequest,
     data: &GenData,
 ) -> Result<ProcgenBundle, ProcgenFailure> {
+    generate_bundle_with_site_transform(request, data, |outcome, _| Ok(outcome))
+}
+
+/// Fault-injection seam for exercising the complete post-site pipeline.
+/// Production adapters expose only [`generate_bundle`].
+#[doc(hidden)]
+pub fn generate_bundle_with_site_transform<S>(
+    request: ProcgenRequest,
+    data: &GenData,
+    site_transform: S,
+) -> Result<ProcgenBundle, ProcgenFailure>
+where
+    S: FnOnce(
+        crate::site::SiteGenerationOutcome,
+        &WorldGenerationRequest,
+    ) -> Result<crate::site::SiteGenerationOutcome, crate::site::SiteError>,
+{
     request.validate().map_err(|e| {
         failure(
             ProcgenFailureCode::InvalidRequest,
@@ -695,9 +1141,13 @@ pub fn generate_bundle(
         cause_override: request.site.cause_of_loss,
         loot_richness: request.site.loot_richness_bp,
     };
-    generate_bundle_with_world_pipeline(request, data, world, || {
-        generate_ship_timed(seed, &params, data)
-    })
+    generate_bundle_with_world_and_site_transform(
+        request,
+        data,
+        world,
+        || generate_ship_timed(seed, &params, data),
+        site_transform,
+    )
 }
 
 #[doc(hidden)]
@@ -731,12 +1181,31 @@ where
 
 fn generate_bundle_with_world_pipeline<F>(
     request: ProcgenRequest,
-    _data: &GenData,
+    data: &GenData,
     world: crate::world::WorldGenerationOutcome,
     pipeline: F,
 ) -> Result<ProcgenBundle, ProcgenFailure>
 where
     F: FnOnce() -> Result<crate::pipeline::GenReport, crate::pipeline::GenError>,
+{
+    generate_bundle_with_world_and_site_transform(request, data, world, pipeline, |outcome, _| {
+        Ok(outcome)
+    })
+}
+
+fn generate_bundle_with_world_and_site_transform<F, S>(
+    request: ProcgenRequest,
+    _data: &GenData,
+    world: crate::world::WorldGenerationOutcome,
+    pipeline: F,
+    site_transform: S,
+) -> Result<ProcgenBundle, ProcgenFailure>
+where
+    F: FnOnce() -> Result<crate::pipeline::GenReport, crate::pipeline::GenError>,
+    S: FnOnce(
+        crate::site::SiteGenerationOutcome,
+        &WorldGenerationRequest,
+    ) -> Result<crate::site::SiteGenerationOutcome, crate::site::SiteError>,
 {
     request.validate().map_err(|e| {
         failure(
@@ -783,16 +1252,18 @@ where
         archetype_id: request.site.archetype_id.clone(),
     };
     let site_started = Instant::now();
-    let site_outcome = crate::site::generate_site(ship, &world_request).map_err(|error| {
-        let mut failure = failure(
-            ProcgenFailureCode::FallbackFailure,
-            "site",
-            error.to_string(),
-            false,
-        );
-        failure.fallback_id = Some("authored-safe-return".into());
-        failure
-    })?;
+    let site_outcome = crate::site::generate_site(ship, &world_request)
+        .and_then(|outcome| site_transform(outcome, &world_request))
+        .map_err(|error| {
+            let mut failure = failure(
+                ProcgenFailureCode::FallbackFailure,
+                "site",
+                error.to_string(),
+                false,
+            );
+            failure.fallback_id = Some("authored-safe-return".into());
+            failure
+        })?;
     let site_micros = site_started.elapsed().as_micros();
     let crate::site::SiteGenerationOutcome {
         site: site_ir,
@@ -800,28 +1271,39 @@ where
     } = site_outcome;
     let ship = &site_ir.ship;
     let legacy_slice = crate::structural::export::to_gameplay_slice_json(ship);
-    let gameplay_ir = GameplayIR {
-        schema_version: GAMEPLAY_IR_SCHEMA.into(),
-        legacy_slice: serde_json::from_value(legacy_slice).map_err(|e| {
+    let legacy_slice: GameplaySlice = serde_json::from_value(legacy_slice).map_err(|error| {
+        failure(
+            ProcgenFailureCode::InternalFailure,
+            "gameplay",
+            error.to_string(),
+            false,
+        )
+    })?;
+    let gameplay_started = Instant::now();
+    let gameplay_ir = build_gameplay_ir(&request, &site_ir, legacy_slice).map_err(|error| {
+        failure(
+            ProcgenFailureCode::GenerationFailure,
+            "gameplay",
+            error.to_string(),
+            false,
+        )
+    })?;
+    let gameplay_micros = gameplay_started.elapsed().as_micros();
+    let presentation_started = Instant::now();
+    let presentation_ir =
+        build_presentation_ir(&request, &site_ir, &gameplay_ir).map_err(|error| {
             failure(
-                ProcgenFailureCode::InternalFailure,
-                "gameplay",
-                e.to_string(),
+                ProcgenFailureCode::GenerationFailure,
+                "presentation",
+                error.to_string(),
                 false,
             )
-        })?,
-    };
-    let presentation_ir = PresentationIR {
-        schema_version: PRESENTATION_IR_SCHEMA.into(),
-        kit_id: request.site.kit_id.clone(),
-        locale: request.presentation.locale.clone(),
-        seed: request.presentation.seed,
-        approved_bindings: BTreeMap::new(),
-    };
+        })?;
+    let presentation_micros = presentation_started.elapsed().as_micros();
     let version = VersionEnvelope {
         generator_version: request.generator_version,
         content_manifest_hash: request.content_manifest_hash.clone(),
-        export_schemas: ExportSchemas::platform_v3(),
+        export_schemas: ExportSchemas::platform_v4(),
     };
     let room_count = u32::try_from(ship.room_graph.nodes.len()).map_err(|_| {
         failure(
@@ -831,14 +1313,20 @@ where
             false,
         )
     })?;
-    let entity_count = u32::try_from(ship.entities.len()).map_err(|_| {
-        failure(
-            ProcgenFailureCode::Capacity,
-            "metrics",
-            "entity count exceeds u32".into(),
-            false,
-        )
-    })?;
+    let entity_count = ship
+        .entities
+        .len()
+        .checked_add(gameplay_ir.encounter.spawns.len())
+        .and_then(|count| count.checked_add(gameplay_ir.items.len()))
+        .and_then(|count| u32::try_from(count).ok())
+        .ok_or_else(|| {
+            failure(
+                ProcgenFailureCode::Capacity,
+                "metrics",
+                "entity count exceeds u32".into(),
+                false,
+            )
+        })?;
     let structural_placement_count = ship
         .plan
         .placements
@@ -860,6 +1348,8 @@ where
         .map(|(key, value)| ((*key).into(), *value))
         .collect();
     stage_timings_micros.insert("site_overlay".into(), site_micros);
+    stage_timings_micros.insert("gameplay_compile".into(), gameplay_micros);
+    stage_timings_micros.insert("presentation_assembly".into(), presentation_micros);
     let metrics = GenerationMetrics {
         schema_version: GENERATION_METRICS_SCHEMA.into(),
         pipeline_executions: 1,
@@ -888,6 +1378,12 @@ where
                     .candidate_decisions
                     .into_iter()
                     .map(|decision| format!("site:{decision}")),
+            )
+            .chain(
+                gameplay_ir
+                    .decisions
+                    .iter()
+                    .map(|decision| format!("gameplay:{}", decision.decision_id)),
             )
             .collect(),
         failed_constraints: report.failed_constraints,
@@ -932,7 +1428,7 @@ pub fn migration_layout(bundle: &ProcgenBundle) -> Result<Value, ProcgenError> {
     Ok(crate::structural::export::to_layout_json(
         &bundle.site_ir.ship,
         &crate::structural::export::ExportOptions {
-            kit_id: bundle.presentation_ir.kit_id.clone(),
+            kit_id: bundle.request.site.kit_id.clone(),
             difficulty_id: bundle.request.difficulty_id.clone(),
             ..Default::default()
         },

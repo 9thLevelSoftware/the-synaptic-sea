@@ -23,7 +23,7 @@ fn platform_v4_maps_are_exact() {
             site_ir: "site-ir-2".into(),
             gameplay_ir: "gameplay-ir-2".into(),
             presentation_ir: "presentation-ir-2".into(),
-            generation_trace: "generation-trace-2".into(),
+            generation_trace: "generation-trace-3".into(),
             adaptive_proposal: "adaptive-proposal-1".into(),
         }
     );
@@ -124,6 +124,82 @@ fn platform_v4_accepts_native_and_web_pairs() {
     )
     .validate_platform_v4()
     .unwrap();
+}
+
+#[test]
+fn checked_manifest_schema_v3_accepts_pairs_and_rejects_boundary_tampering() {
+    let schema: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../schemas/procgen-build-manifest-3.schema.json"
+    ))
+    .unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+
+    let native: serde_json::Value = serde_json::to_value(manifest(
+        "x86_64-pc-windows-msvc",
+        "gdextension",
+        "addons/derelict/bin/win64/derelict_godot.dll",
+    ))
+    .unwrap();
+    let web: serde_json::Value = serde_json::to_value(manifest(
+        "wasm32-unknown-unknown",
+        "wasm",
+        "addons/derelict/bin/web/derelict_wasm_bg.wasm",
+    ))
+    .unwrap();
+    assert!(validator.is_valid(&native));
+    assert!(validator.is_valid(&web));
+
+    let mut invalid = native.clone();
+    invalid["export_schemas"]["generation_trace"] = "generation-trace-2".into();
+    assert!(
+        !validator.is_valid(&invalid),
+        "trace map v2 must be rejected"
+    );
+
+    for (field, value) in [
+        ("target", serde_json::json!("wasm32-unknown-unknown")),
+        ("artifact.kind", serde_json::json!("wasm")),
+        (
+            "artifact.path",
+            serde_json::json!("addons/derelict/bin/web/derelict_wasm_bg.wasm"),
+        ),
+    ] {
+        let mut invalid = native.clone();
+        match field {
+            "target" => invalid["target"] = value,
+            "artifact.kind" => invalid["artifact"]["kind"] = value,
+            "artifact.path" => invalid["artifact"]["path"] = value,
+            _ => unreachable!(),
+        }
+        assert!(
+            !validator.is_valid(&invalid),
+            "wrong {field} must be rejected"
+        );
+    }
+
+    for (field, value) in [
+        ("content_manifest_hash", serde_json::json!("bad")),
+        ("artifact.sha256", serde_json::json!("BAD")),
+        ("rust_source_commit", serde_json::json!("bad")),
+    ] {
+        let mut invalid = native.clone();
+        match field {
+            "content_manifest_hash" | "rust_source_commit" => invalid[field] = value,
+            "artifact.sha256" => invalid["artifact"]["sha256"] = value,
+            _ => unreachable!(),
+        }
+        assert!(
+            !validator.is_valid(&invalid),
+            "malformed {field} must be rejected"
+        );
+    }
+
+    let mut unknown_root = native.clone();
+    unknown_root["unexpected"] = true.into();
+    assert!(!validator.is_valid(&unknown_root));
+    let mut unknown_nested = native;
+    unknown_nested["artifact"]["unexpected"] = true.into();
+    assert!(!validator.is_valid(&unknown_nested));
 }
 
 #[test]

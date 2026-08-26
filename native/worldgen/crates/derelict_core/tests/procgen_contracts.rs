@@ -17,7 +17,7 @@ fn request() -> ProcgenRequest {
         difficulty_id: "standard".into(),
         player_model: PlayerModel {
             schema_version: PLAYER_MODEL_SCHEMA.into(),
-            signals: vec![1, -2],
+            signals: vec![],
         },
         requested_domains: vec![
             Domain::World,
@@ -54,7 +54,7 @@ fn request_round_trips_and_unknown_major_is_rejected() {
     let req = request();
     let json = serde_json::to_string(&req).unwrap();
     assert_eq!(serde_json::from_str::<ProcgenRequest>(&json).unwrap(), req);
-    let bad = json.replace(PROCGEN_REQUEST_SCHEMA, "procgen-request-2");
+    let bad = json.replace(PROCGEN_REQUEST_SCHEMA, "procgen-request-1");
     assert!(matches!(
         ProcgenRequest::from_json(&bad),
         Err(ProcgenError::UnknownSchemaMajor(_))
@@ -189,18 +189,24 @@ fn migration_helpers_do_not_generate_again_and_json_key_order_is_irrelevant() {
 fn every_public_schema_is_json_and_closed_at_root() {
     let names = [
         "procgen-request-1",
+        "procgen-request-2",
         "procgen-bundle-2",
         "procgen-bundle-3",
+        "procgen-bundle-4",
         "world-ir-2",
         "site-ir-1",
         "site-ir-2",
         "gameplay-ir-1",
+        "gameplay-ir-2",
         "presentation-ir-1",
+        "presentation-ir-2",
         "generation-trace-1",
         "generation-trace-2",
+        "generation-trace-3",
         "generation-metrics-1",
         "adaptive-proposal-1",
         "player-model-1",
+        "player-model-2",
         "procgen-failure-1",
     ];
     for name in names {
@@ -224,7 +230,7 @@ fn embedded_request_constraints_match_rust_and_bundle_schema() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-3.schema.json",
+            "{}/../../schemas/procgen-bundle-4.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),
@@ -232,10 +238,10 @@ fn embedded_request_constraints_match_rust_and_bundle_schema() {
     .unwrap();
     let validator = jsonschema::validator_for(&schema).unwrap();
     let mutations = [
-        ("schema_version", serde_json::json!("procgen-request-2")),
+        ("schema_version", serde_json::json!("procgen-request-1")),
         (
             "player_model.schema_version",
-            serde_json::json!("player-model-2"),
+            serde_json::json!("player-model-1"),
         ),
         ("generator_version", serde_json::json!(2)),
         ("content_manifest_hash", serde_json::json!("bad")),
@@ -280,7 +286,7 @@ fn current_site_and_bundle_schemas_enforce_nested_ship_and_hash_identity() {
     )
     .unwrap();
     let bundle_schema: serde_json::Value = serde_json::from_str(
-        &std::fs::read_to_string(format!("{schema_dir}/procgen-bundle-3.schema.json")).unwrap(),
+        &std::fs::read_to_string(format!("{schema_dir}/procgen-bundle-4.schema.json")).unwrap(),
     )
     .unwrap();
     let site_validator = jsonschema::validator_for(&site_schema).unwrap();
@@ -313,7 +319,7 @@ fn embedded_gameplay_constraints_match_standalone_and_rust() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-3.schema.json",
+            "{}/../../schemas/procgen-bundle-4.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),
@@ -466,7 +472,7 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-3.schema.json",
+            "{}/../../schemas/procgen-bundle-4.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),
@@ -547,7 +553,7 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
     }
     let docs = [
         (
-            "procgen-request-1",
+            "procgen-request-2",
             serde_json::to_value(&bundle.request).unwrap(),
         ),
         (
@@ -556,15 +562,15 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
         ),
         ("site-ir-2", serde_json::to_value(&bundle.site_ir).unwrap()),
         (
-            "gameplay-ir-1",
+            "gameplay-ir-2",
             serde_json::to_value(&bundle.gameplay_ir).unwrap(),
         ),
         (
-            "presentation-ir-1",
+            "presentation-ir-2",
             serde_json::to_value(&bundle.presentation_ir).unwrap(),
         ),
         (
-            "generation-trace-2",
+            "generation-trace-3",
             serde_json::to_value(&bundle.trace).unwrap(),
         ),
         (
@@ -572,7 +578,7 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
             serde_json::to_value(&bundle.metrics).unwrap(),
         ),
         (
-            "player-model-1",
+            "player-model-2",
             serde_json::to_value(&bundle.request.player_model).unwrap(),
         ),
     ];
@@ -644,7 +650,7 @@ fn nested_unknown_fields_fail_at_serde_and_schema_boundaries() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-3.schema.json",
+            "{}/../../schemas/procgen-bundle-4.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),

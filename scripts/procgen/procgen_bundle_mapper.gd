@@ -11,9 +11,16 @@ func map_to_loader_documents(bundle: Dictionary) -> Dictionary:
 	last_error = ""
 	var site: Dictionary = bundle.get("site_ir", {})
 	var gameplay_ir: Dictionary = bundle.get("gameplay_ir", {})
+	var presentation: Dictionary = bundle.get("presentation_ir", {})
+	var request: Dictionary = bundle.get("request", {})
+	var request_site: Variant = request.get("site", null)
 	var ship: Variant = site.get("ship", null)
 	var gameplay: Variant = gameplay_ir.get("legacy_slice", null)
 	if str(site.get("schema_version", "")) != "site-ir-2" \
+			or str(gameplay_ir.get("schema_version", "")) != "gameplay-ir-2" \
+			or str(presentation.get("schema_version", "")) != "presentation-ir-2" \
+			or str(request.get("schema_version", "")) != "procgen-request-2" \
+			or not request_site is Dictionary \
 			or not ship is Dictionary or not gameplay is Dictionary \
 			or not site.get("mission_graph", null) is Dictionary \
 			or not site.get("navigation", null) is Dictionary \
@@ -21,20 +28,210 @@ func map_to_loader_documents(bundle: Dictionary) -> Dictionary:
 			or not site.get("spatial_annotations", null) is Dictionary:
 		last_error = "migration_documents_missing"
 		return {}
-	var presentation: Dictionary = bundle.get("presentation_ir", {})
-	var layout: Dictionary = _layout(ship as Dictionary, presentation, bundle.get("request", {}))
+	var kit_id: String = str((request_site as Dictionary).get("kit_id", ""))
+	if kit_id.is_empty():
+		last_error = "presentation_kit_missing"
+		return {}
+	var presentation_index: Dictionary = _presentation_index(presentation)
+	if presentation_index.is_empty():
+		return {}
+	var source_items: Dictionary = _source_items(gameplay_ir, presentation_index)
+	if source_items.is_empty() and not (gameplay_ir.get("items", []) as Array).is_empty():
+		return {}
+	var layout: Dictionary = _layout(ship as Dictionary, kit_id, request)
 	if layout.is_empty(): return {}
 	var names: Dictionary = _room_names(ship as Dictionary)
 	if not _apply_site_blocked_links(layout, site, names, (ship as Dictionary).get("plan", {})):
 		return {}
 	var runtime_gameplay: Dictionary = _site_gameplay_slice(gameplay as Dictionary, site, ship as Dictionary, names)
 	if runtime_gameplay.is_empty(): return {}
+	if not _apply_authoritative_gameplay(layout, runtime_gameplay, gameplay_ir, names, source_items, presentation_index):
+		return {}
+	layout["presentation_assembly"] = presentation.duplicate(true)
 	return {
 		"layout": layout,
-		"kit_id": str(presentation.get("kit_id", "")),
+		"kit_id": kit_id,
 		"gameplay_slice": runtime_gameplay,
 		"site_ir": site.duplicate(true),
+		"gameplay_ir": gameplay_ir.duplicate(true),
+		"presentation_ir": presentation.duplicate(true),
 	}
+
+
+func _presentation_index(presentation: Dictionary) -> Dictionary:
+	var instructions: Variant = presentation.get("instructions", null)
+	if not instructions is Array:
+		last_error = "presentation_instruction_mapping"
+		return {}
+	var index: Dictionary = {}
+	for instruction_value in instructions:
+		if not instruction_value is Dictionary:
+			last_error = "presentation_instruction_mapping"
+			return {}
+		var instruction: Dictionary = instruction_value
+		var subject_id: String = str(instruction.get("subject_id", ""))
+		var asset_ids: Variant = instruction.get("asset_ids", null)
+		var binding_ids: Variant = instruction.get("adapter_binding_ids", null)
+		if subject_id.is_empty() or index.has(subject_id) \
+				or not asset_ids is Array or (asset_ids as Array).is_empty() \
+				or not binding_ids is Array or (binding_ids as Array).is_empty():
+			last_error = "presentation_instruction_mapping"
+			return {}
+		index[subject_id] = instruction.duplicate(true)
+	# These two subjects are required by the current presentation contract even
+	# when the generated gameplay happens to contain no rewards or spawns.
+	if not index.has("environment:ambient") or not index.has("ship:structural"):
+		last_error = "presentation_instruction_mapping"
+		return {}
+	return index
+
+
+func _source_items(gameplay_ir: Dictionary, presentation_index: Dictionary) -> Dictionary:
+	var items_value: Variant = gameplay_ir.get("items", null)
+	var drops_value: Variant = gameplay_ir.get("drops", null)
+	if not items_value is Array or not drops_value is Array:
+		last_error = "generated_item_mapping"
+		return {}
+	var items: Dictionary = {}
+	for item_value in items_value:
+		if not item_value is Dictionary:
+			last_error = "generated_item_mapping"
+			return {}
+		var item: Dictionary = item_value
+		var item_id: String = str(item.get("id", ""))
+		var subject_id: String = "item:%s" % item_id
+		if item_id.is_empty() or items.has(item_id) or not presentation_index.has(subject_id):
+			last_error = "generated_item_mapping"
+			return {}
+		items[item_id] = item
+	var by_source: Dictionary = {}
+	var bound_items: Dictionary = {}
+	for drop_value in drops_value:
+		if not drop_value is Dictionary:
+			last_error = "generated_item_mapping"
+			return {}
+		var drop: Dictionary = drop_value
+		var item_id: String = str(drop.get("item_id", ""))
+		var source_id: String = str(drop.get("source_id", ""))
+		if item_id.is_empty() or source_id.is_empty() or not items.has(item_id) \
+				or bound_items.has(item_id):
+			last_error = "generated_item_mapping"
+			return {}
+		bound_items[item_id] = true
+		var instruction: Dictionary = presentation_index["item:%s" % item_id]
+		var exact_item: Dictionary = {
+			"item_id": item_id,
+			"quantity": 1,
+			"frequency_bp": int(drop.get("frequency_bp", 0)),
+			"blueprint": (items[item_id] as Dictionary).duplicate(true),
+			"asset_ids": (instruction.get("asset_ids", []) as Array).duplicate(true),
+			"presentation_binding_ids": (instruction.get("adapter_binding_ids", []) as Array).duplicate(true),
+		}
+		if not by_source.has(source_id):
+			by_source[source_id] = []
+		(by_source[source_id] as Array).append(exact_item)
+	if bound_items.size() != items.size():
+		last_error = "generated_item_mapping"
+		return {}
+	return by_source
+
+
+func _apply_authoritative_gameplay(
+		layout: Dictionary,
+		runtime_gameplay: Dictionary,
+		gameplay_ir: Dictionary,
+		names: Dictionary,
+		source_items: Dictionary,
+		presentation_index: Dictionary) -> bool:
+	var encounter_value: Variant = gameplay_ir.get("encounter", null)
+	var blueprints_value: Variant = gameplay_ir.get("creature_blueprints", null)
+	var decisions_value: Variant = gameplay_ir.get("decisions", null)
+	if not encounter_value is Dictionary or not blueprints_value is Array or not decisions_value is Array:
+		last_error = "authoritative_gameplay_mapping"
+		return false
+	var blueprints: Dictionary = {}
+	for blueprint_value in blueprints_value:
+		if not blueprint_value is Dictionary:
+			last_error = "authoritative_gameplay_mapping"
+			return false
+		var blueprint_id: String = str((blueprint_value as Dictionary).get("id", ""))
+		if blueprint_id.is_empty() or blueprints.has(blueprint_id):
+			last_error = "authoritative_gameplay_mapping"
+			return false
+		blueprints[blueprint_id] = blueprint_value
+	var known_sources: Dictionary = {}
+	var markers: Array = []
+	var spawns_value: Variant = (encounter_value as Dictionary).get("spawns", null)
+	if not spawns_value is Array:
+		last_error = "encounter_mapping"
+		return false
+	for spawn_value in spawns_value:
+		if not spawn_value is Dictionary:
+			last_error = "encounter_mapping"
+			return false
+		var spawn: Dictionary = spawn_value
+		var spawn_id: String = str(spawn.get("spawn_id", ""))
+		var blueprint_id: String = str(spawn.get("blueprint_id", ""))
+		var reward_source_id: String = str(spawn.get("reward_source_id", ""))
+		var room_id: int = int(spawn.get("room", -1))
+		var cell: Variant = spawn.get("cell", null)
+		var subject_id: String = "creature:%s" % blueprint_id
+		if spawn_id.is_empty() or blueprint_id.is_empty() or reward_source_id.is_empty() \
+				or known_sources.has(reward_source_id) or not blueprints.has(blueprint_id) \
+				or not names.has(room_id) or not cell is Dictionary \
+				or not presentation_index.has(subject_id):
+			last_error = "encounter_mapping"
+			return false
+		known_sources[reward_source_id] = true
+		var instruction: Dictionary = presentation_index[subject_id]
+		markers.append({
+			"id": spawn_id,
+			"spawn_id": spawn_id,
+			"decision_id": str(spawn.get("decision_id", "")),
+			"room_id": str(names[room_id]),
+			"deck": _coord(cell, "deck"),
+			"cell": _cell2(cell),
+			"local_position": _position(cell),
+			"encounter_kind": blueprint_id,
+			"blueprint_id": blueprint_id,
+			"creature_blueprint": (blueprints[blueprint_id] as Dictionary).duplicate(true),
+			"faction_id": str(spawn.get("faction_id", "")),
+			"threat_role": str(spawn.get("threat_role", "")),
+			"ability_id": str(spawn.get("ability_id", "")),
+			"reward_source_id": reward_source_id,
+			"threat_cost": int(spawn.get("threat_cost", 0)),
+			"performance_cost": int(spawn.get("performance_cost", 0)),
+			"reward_value": int(spawn.get("reward_value", 0)),
+			"count": 1,
+			"asset_ids": (instruction.get("asset_ids", []) as Array).duplicate(true),
+			"presentation_binding_ids": (instruction.get("adapter_binding_ids", []) as Array).duplicate(true),
+			"generated_items": (source_items.get(reward_source_id, []) as Array).duplicate(true),
+		})
+	layout["encounters"] = markers
+	var containers_value: Variant = runtime_gameplay.get("loot_containers", null)
+	if not containers_value is Array:
+		last_error = "generated_item_source_mapping"
+		return false
+	for container_value in containers_value:
+		if not container_value is Dictionary:
+			last_error = "generated_item_source_mapping"
+			return false
+		var container: Dictionary = container_value
+		var source_id: String = str(container.get("id", ""))
+		if source_id.is_empty() or known_sources.has(source_id):
+			last_error = "generated_item_source_mapping"
+			return false
+		known_sources[source_id] = true
+		container["generated_items"] = (source_items.get(source_id, []) as Array).duplicate(true)
+	for source_id in source_items:
+		if not known_sources.has(source_id):
+			last_error = "generated_item_source_mapping"
+			return false
+	runtime_gameplay["creature_blueprints"] = (blueprints_value as Array).duplicate(true)
+	runtime_gameplay["generated_item_blueprints"] = (gameplay_ir.get("items", []) as Array).duplicate(true)
+	runtime_gameplay["gameplay_decisions"] = (decisions_value as Array).duplicate(true)
+	runtime_gameplay["encounter_composition_id"] = str((encounter_value as Dictionary).get("composition_id", ""))
+	return true
 
 func _room_names(ship: Dictionary) -> Dictionary:
 	var names: Dictionary = {}
@@ -140,7 +337,7 @@ func _site_gameplay_slice(legacy: Dictionary, site: Dictionary, ship: Dictionary
 	result["objectives"] = objectives
 	return result
 
-func _layout(ship: Dictionary, presentation: Dictionary, request: Dictionary) -> Dictionary:
+func _layout(ship: Dictionary, kit_id: String, request: Dictionary) -> Dictionary:
 	var topology: Dictionary = ship.get("topology", {})
 	var plan: Dictionary = ship.get("plan", {})
 	var vertical_cells: Dictionary = {}
@@ -210,7 +407,7 @@ func _layout(ship: Dictionary, presentation: Dictionary, request: Dictionary) ->
 		if vertical_v is Dictionary:
 			var vertical: Dictionary = vertical_v
 			vertical_connections.append({"id": "%s_to_%s" % [names.get(int(vertical.get("from_room", -1)), ""), names.get(int(vertical.get("to_room", -1)), "")], "type": "ladder", "module_id": "", "from_room": names.get(int(vertical.get("from_room", -1)), ""), "to_room": names.get(int(vertical.get("to_room", -1)), ""), "from_cell": _cell3(vertical.get("from_cell", {})), "to_cell": _cell3(vertical.get("to_cell", {}))})
-	return {"schema_version": "1.2.0", "document_kind": "ship_layout", "program_id": "worldgen-%s-%d" % [str(ship.get("archetype_id", "")), int(ship.get("seed", 0))], "generator": {"name": "worldgen", "generator_version": int(ship.get("generator_version", 2)), "seed": int(ship.get("seed", 0)), "archetype_id": str(ship.get("archetype_id", "")), "template_id": str(ship.get("template_id", "")), "intactness_bp": int(ship.get("intactness", 0)), "cause_of_loss": str(ship.get("cause_of_loss", "Unknown")), "fractured": bool(ship.get("fractured", false))}, "cell_size": 4.0, "kit_id": str(presentation.get("kit_id", "")), "biome_id": "", "difficulty_id": str(request.get("difficulty_id", "standard")), "hazard_source": "runtime", "rooms": rooms, "portals": portals, "room_links": room_links, "vertical_connections": vertical_connections, "critical_path": critical, "prototype": {"start_room": names.get(int(ship.get("entry_room", -1)), ""), "goal_room": names.get(int(ship.get("goal_room", -1)), "")}, "landmarks": [], "encounters": [], "blocked_links": [], "fire_zones": [], "arc_zones": [], "breach_zones": [], "structural_plan": structural}
+	return {"schema_version": "1.2.0", "document_kind": "ship_layout", "program_id": "worldgen-%s-%d" % [str(ship.get("archetype_id", "")), int(ship.get("seed", 0))], "generator": {"name": "worldgen", "generator_version": int(ship.get("generator_version", 2)), "seed": int(ship.get("seed", 0)), "archetype_id": str(ship.get("archetype_id", "")), "template_id": str(ship.get("template_id", "")), "intactness_bp": int(ship.get("intactness", 0)), "cause_of_loss": str(ship.get("cause_of_loss", "Unknown")), "fractured": bool(ship.get("fractured", false))}, "cell_size": 4.0, "kit_id": kit_id, "biome_id": "", "difficulty_id": str(request.get("difficulty_id", "standard")), "hazard_source": "runtime", "rooms": rooms, "portals": portals, "room_links": room_links, "vertical_connections": vertical_connections, "critical_path": critical, "prototype": {"start_room": names.get(int(ship.get("entry_room", -1)), ""), "goal_room": names.get(int(ship.get("goal_room", -1)), "")}, "landmarks": [], "encounters": [], "blocked_links": [], "fire_zones": [], "arc_zones": [], "breach_zones": [], "structural_plan": structural}
 
 func _coord(value: Variant, axis: String) -> int:
 	if value is Dictionary: return int((value as Dictionary).get(axis, 0))

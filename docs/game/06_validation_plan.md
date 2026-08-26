@@ -98,7 +98,7 @@ Expected:
 ## Unified procedural-generation platform (REQ-PG-001..012)
 
 Feature: `docs/game/features/unified_procgen_platform.md`.
-Architecture: ADR-0057 through ADR-0064.
+Architecture: ADR-0057 through ADR-0066.
 
 No unified-platform gate is GREEN merely because a pass marker appears. Rust,
 Godot, target-export, semantic-parity, performance, and warning/error evidence
@@ -162,6 +162,10 @@ node "$ROOT/native/worldgen/web/wasm_lifecycle_smoke.mjs"
 
 ### Gate 3 focused evidence
 
+- Additive Gate 3 schemas export deterministically; earlier schemas remain
+  hash-pinned and byte-immutable. Standalone trace 3, nested bundle 4, lifecycle
+  4, capability 3, generator-manifest 3, and build-manifest 3 all require the
+  same exact 37-channel/export map and reject trace-2 substitution.
 - Encounter fairness/budget/navigation/visibility properties and combat
   simulation.
 - Item compatibility/stat/economy/rarity/drop-frequency properties and economy

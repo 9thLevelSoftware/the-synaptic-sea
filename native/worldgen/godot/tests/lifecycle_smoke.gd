@@ -5,20 +5,31 @@ extends SceneTree
 ## the GDExtension.  The script is source/contract validation until the rebuilt
 ## adapter is installed in the sample project.
 
-const LIFECYCLE_SCHEMA := "procgen-lifecycle-result-3"
-const CAPABILITIES_SCHEMA := "procgen-capabilities-2"
-const MANIFEST_SCHEMA := "procgen-generator-manifest-2"
-const REQUEST_SCHEMA := "procgen-request-1"
+const LIFECYCLE_SCHEMA := "procgen-lifecycle-result-4"
+const CAPABILITIES_SCHEMA := "procgen-capabilities-3"
+const MANIFEST_SCHEMA := "procgen-generator-manifest-3"
+const REQUEST_SCHEMA := "procgen-request-2"
 const GENERATOR_VERSION := 3
 const DOMAINS := ["world", "site", "gameplay", "presentation"]
+const RNG_CHANNELS := [
+	"world.archetype", "world.biome", "world.hazard", "world.resource",
+	"world.landmark", "world.route_cost", "site.structural", "site.mission_template",
+	"site.gate_order", "site.functional_props", "site.spatial_annotations", "meta",
+	"hull", "template", "topology", "residual_fill", "door", "furnish", "story",
+	"intact", "breach", "scorch", "seal", "bodies", "fracture", "debris", "loot",
+	"gameplay.creature_blueprint", "gameplay.creature_ability", "gameplay.creature_material",
+	"gameplay.encounter_candidate", "gameplay.encounter_faction", "gameplay.encounter_reward",
+	"gameplay.encounter_selection", "gameplay.item_family", "gameplay.item_affix",
+	"presentation.asset_assembly",
+]
 const EXPORT_SCHEMAS := {
-	"procgen_request": "procgen-request-1",
-	"procgen_bundle": "procgen-bundle-3",
+	"procgen_request": "procgen-request-2",
+	"procgen_bundle": "procgen-bundle-4",
 	"world_ir": "world-ir-2",
 	"site_ir": "site-ir-2",
-	"gameplay_ir": "gameplay-ir-1",
-	"presentation_ir": "presentation-ir-1",
-	"generation_trace": "generation-trace-2",
+	"gameplay_ir": "gameplay-ir-2",
+	"presentation_ir": "presentation-ir-2",
+	"generation_trace": "generation-trace-3",
 	"adaptive_proposal": "adaptive-proposal-1",
 }
 const ADAPTER_SCHEMAS := {
@@ -98,7 +109,7 @@ func _initialize() -> void:
 			"loot_richness_bp": 1000,
 		},
 		"difficulty_id": "standard",
-		"player_model": {"schema_version": "player-model-1", "signals": []},
+		"player_model": {"schema_version": "player-model-2", "signals": []},
 		"requested_domains": DOMAINS,
 		"generator_version": GENERATOR_VERSION,
 		"content_manifest_hash": content_hash,
@@ -116,6 +127,8 @@ func _initialize() -> void:
 	var accepted := _read_object(_generator_a.call("generate_bundle_async", _request_json), "async_accept_json")
 	_expect(accepted.get("schema_version") == LIFECYCLE_SCHEMA, "async_schema")
 	_expect(["accepted", "queued", "running"].has(accepted.get("status")), "async_accepted")
+	_expect(accepted.get("events", []).has("admitted"), "async_admitted")
+	_expect(accepted.get("events", []).has("queued"), "async_queued")
 	_async_id = int(accepted.get("request_id", 0))
 	_expect(_async_id > 0, "async_request_id")
 	_phase = "poll"
@@ -164,7 +177,12 @@ func _read_object(raw: Variant, code: String) -> Dictionary:
 	return parsed as Dictionary
 
 func _assert_bundle_contract(bundle: Dictionary, prefix: String) -> void:
-	_expect(bundle.get("schema_version") == "procgen-bundle-3", prefix + "_bundle_schema")
+	_expect(bundle.get("schema_version") == "procgen-bundle-4", prefix + "_bundle_schema")
+	_expect(bundle.get("version", {}).get("generator_version") == GENERATOR_VERSION, prefix + "_version_generator")
+	_expect(bundle.get("version", {}).get("export_schemas") == EXPORT_SCHEMAS, prefix + "_version_schemas")
+	var request: Dictionary = bundle.get("request", {})
+	_expect(request.get("schema_version") == REQUEST_SCHEMA, prefix + "_request_schema")
+	_expect(request.get("player_model", {}).get("schema_version") == "player-model-2", prefix + "_player_model_schema")
 	var world_ir: Dictionary = bundle.get("world_ir", {})
 	var site_ir: Dictionary = bundle.get("site_ir", {})
 	var gameplay_ir: Dictionary = bundle.get("gameplay_ir", {})
@@ -172,11 +190,46 @@ func _assert_bundle_contract(bundle: Dictionary, prefix: String) -> void:
 	var trace: Dictionary = bundle.get("trace", {})
 	_expect(world_ir.get("schema_version") == "world-ir-2", prefix + "_world_schema")
 	_expect(site_ir.get("schema_version") == "site-ir-2", prefix + "_site_schema")
-	_expect(gameplay_ir.get("schema_version") == "gameplay-ir-1", prefix + "_gameplay_schema")
-	_expect(presentation_ir.get("schema_version") == "presentation-ir-1", prefix + "_presentation_schema")
-	_expect(trace.get("schema_version") == "generation-trace-2", prefix + "_trace_schema")
+	_expect(gameplay_ir.get("schema_version") == "gameplay-ir-2", prefix + "_gameplay_schema")
+	_expect(presentation_ir.get("schema_version") == "presentation-ir-2", prefix + "_presentation_schema")
+	_expect(trace.get("schema_version") == "generation-trace-3", prefix + "_trace_schema")
+	_expect(trace.get("rng_channels") == RNG_CHANNELS, prefix + "_trace_channels")
 	_expect(site_ir.has("mission_graph") and site_ir.has("navigation")
 			and site_ir.has("functional_props") and site_ir.has("spatial_annotations"), prefix + "_site_overlay")
+
+	var creature_blueprints: Array = gameplay_ir.get("creature_blueprints", [])
+	var encounter: Dictionary = gameplay_ir.get("encounter", {})
+	var items: Array = gameplay_ir.get("items", [])
+	var drops: Array = gameplay_ir.get("drops", [])
+	var decisions: Array = gameplay_ir.get("decisions", [])
+	_expect(creature_blueprints.size() == 3, prefix + "_creature_count")
+	_expect(_is_sorted_by_id(creature_blueprints), prefix + "_creature_order")
+	var creature_ids := {}
+	for blueprint in creature_blueprints:
+		_expect(blueprint is Dictionary and str(blueprint.get("id", "")).length() > 0, prefix + "_creature_identity")
+		creature_ids[blueprint.get("id")] = true
+	for spawn in encounter.get("spawns", []):
+		_expect(creature_ids.has(spawn.get("blueprint_id")), prefix + "_encounter_creature_ref")
+	_expect(items.size() == drops.size(), prefix + "_item_drop_alignment")
+	_expect(decisions.size() > 0, prefix + "_gameplay_decisions")
+	_expect(_has_accepted_domain(decisions, "creature"), prefix + "_creature_decision")
+	_expect(_has_accepted_domain(decisions, "item"), prefix + "_item_decision")
+	var instructions: Array = presentation_ir.get("instructions", [])
+	_expect(instructions.size() > 0, prefix + "_presentation_instructions")
+	for instruction in instructions:
+		_expect(instruction.get("asset_ids", []).size() > 0 and instruction.get("adapter_binding_ids", []).size() > 0, prefix + "_presentation_bindings")
+
+func _is_sorted_by_id(values: Array) -> bool:
+	for index in range(1, values.size()):
+		if str(values[index - 1].get("id", "")) >= str(values[index].get("id", "")):
+			return false
+	return true
+
+func _has_accepted_domain(decisions: Array, domain: String) -> bool:
+	for decision in decisions:
+		if decision.get("domain") == domain and decision.get("accepted") == true:
+			return true
+	return false
 
 func _is_lower_hex(value: String, expected_length: int) -> bool:
 	if value.length() != expected_length:

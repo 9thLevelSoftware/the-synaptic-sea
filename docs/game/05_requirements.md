@@ -957,11 +957,16 @@ and the Task 15 documentation-currency deliverable. They are validated by
   - Platform/bundle generator identity is independent from the nested structural
     ship generator identity; incompatible schema definitions receive new IDs
     rather than mutating an existing schema ID.
+  - Gate 3 uses `generation-trace-3` for its exact ordered 37-channel world,
+    site, structural, gameplay, and presentation stream set;
+    `generation-trace-2` remains byte-immutable Gate 2 evidence.
   - `AdaptiveProposal` contains constrained action, score, rationale codes,
     confidence, and rule/model version and cannot bypass validators.
   - Unknown major schema versions fail closed; supported versions round-trip.
 - Verification:
   - Schema round-trip and unknown-major rejection tests.
+  - Exact trace-channel order, mixed-version rejection, and historical-schema
+    hash-pin tests.
   - Canonical semantic-hash tests over all IR layers.
 
 ## REQ-PG-003: Single-pass lifecycle API with bounded asynchronous execution

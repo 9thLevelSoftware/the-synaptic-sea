@@ -1,7 +1,8 @@
 use derelict_core::lifecycle::LifecycleResult;
-use derelict_core::procgen::ProcgenRequest;
+use derelict_core::player_model::{PlayerModelV2, PlayerSignal, PlayerSignalKind};
+use derelict_core::procgen::{Domain, PresentationRequest, ProcgenRequest, SiteRequest};
+use derelict_core::world::PROCGEN_GENERATOR_VERSION;
 use derelict_wasm::{Clock, DataProvider, Generator, Serializer, WasmService};
-use serde::Deserialize;
 use std::sync::Arc;
 
 struct ZeroClock;
@@ -33,26 +34,58 @@ impl Serializer for JsonSerializer {
     }
 }
 
-#[derive(Deserialize)]
 struct Vector {
-    name: String,
+    name: &'static str,
     request: ProcgenRequest,
-    expected_semantic_hash: String,
+}
+
+fn fixture(seed: u64, name: &'static str) -> Vector {
+    Vector {
+        name,
+        request: ProcgenRequest {
+            schema_version: "procgen-request-2".into(),
+            world_seed: seed,
+            site: SiteRequest {
+                site_id: format!("parity-site-{seed}"),
+                x: 3,
+                y: -2,
+                archetype_id: "shuttle".into(),
+                kit_id: "ship_structural_v0".into(),
+                intactness_override_bp: Some(10_000),
+                cause_of_loss: None,
+                loot_richness_bp: 5_000,
+            },
+            difficulty_id: "standard".into(),
+            player_model: PlayerModelV2 {
+                schema_version: "player-model-2".into(),
+                signals: vec![PlayerSignal {
+                    kind: PlayerSignalKind::CombatMastery,
+                    value_bp: 5_000,
+                }],
+            },
+            requested_domains: vec![
+                Domain::World,
+                Domain::Site,
+                Domain::Gameplay,
+                Domain::Presentation,
+            ],
+            generator_version: PROCGEN_GENERATOR_VERSION,
+            content_manifest_hash: env!("SYNAPTIC_PROCGEN_CONTENT_MANIFEST_HASH").into(),
+            presentation: PresentationRequest {
+                seed,
+                locale: "en-US".into(),
+            },
+        },
+    }
 }
 
 #[test]
-fn wasm_host_sync_and_cooperative_async_match_corpus() {
-    let vectors: Vec<Vector> =
-        serde_json::from_str(include_str!("../../../tests/adapter_parity/corpus.json")).unwrap();
-    let content_hash = vectors
-        .first()
-        .expect("parity corpus is nonempty")
-        .request
-        .content_manifest_hash
-        .clone();
-    assert!(vectors
-        .iter()
-        .all(|vector| vector.request.content_manifest_hash == content_hash));
+fn wasm_host_sync_and_cooperative_async_match_typed_fixtures() {
+    let vectors = vec![
+        fixture(42, "standard_combat"),
+        fixture(43, "standard_followup"),
+    ];
+    let content_hash = vectors[0].request.content_manifest_hash.clone();
     let service = WasmService::new_with_content_hash(
         Arc::new(ZeroClock),
         Arc::new(FixtureData),
@@ -66,11 +99,6 @@ fn wasm_host_sync_and_cooperative_async_match_corpus() {
         let sync_bundle = sync
             .bundle
             .unwrap_or_else(|| panic!("{} sync failed: {:?}", vector.name, sync.failure));
-        assert_eq!(
-            sync_bundle.semantic_hash, vector.expected_semantic_hash,
-            "{} sync",
-            vector.name
-        );
 
         let accepted = LifecycleResult::from_json(&service.submit(&raw)).unwrap();
         let id = accepted.request_id.unwrap();
@@ -79,8 +107,8 @@ fn wasm_host_sync_and_cooperative_async_match_corpus() {
             .bundle
             .unwrap_or_else(|| panic!("{} async failed: {:?}", vector.name, terminal.failure));
         assert_eq!(
-            terminal_bundle.semantic_hash, vector.expected_semantic_hash,
-            "{} async",
+            sync_bundle.semantic_hash, terminal_bundle.semantic_hash,
+            "{} parity",
             vector.name
         );
         assert!(terminal.events.iter().any(|event| matches!(

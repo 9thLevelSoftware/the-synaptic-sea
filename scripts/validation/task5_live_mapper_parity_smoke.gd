@@ -14,16 +14,16 @@ func _init() -> void:
 	if fractured_case.is_empty(): failures.append("bounded fractured fixture unavailable")
 	else: cases.append(fractured_case)
 	for item in cases:
-		var request: Dictionary = consumer.build_request(int(item.seed), int(item.size), int(item.condition))
+		var request: Dictionary = consumer.build_request(int(item.seed), int(item.size), int(item.condition), {}, "standard", "", "", 0, 0, [{"kind":"combat_mastery", "value_bp":5000}, {"kind":"objective_pace", "value_bp":5000}])
 		# The legacy export methods intentionally build the explicit migration-oracle
 		# request identity. Compare the mapper against that same one-pass bundle.
 		request.site.site_id = "legacy-site"
 		if item.label == "fractured": request.site.archetype_id = "frigate"
 		var lifecycle: Dictionary = JSON.parse_string(str(generator.generate_bundle(JSON.stringify(request))))
-		if str(lifecycle.get("schema_version", "")) != "procgen-lifecycle-result-3" or str(lifecycle.get("status", "")) != "completed":
-			failures.append("%s lifecycle_v3" % item.label); continue
+		if str(lifecycle.get("schema_version", "")) != "procgen-lifecycle-result-4" or str(lifecycle.get("status", "")) != "completed":
+			failures.append("%s lifecycle_v4" % item.label); continue
 		var bundle: Dictionary = lifecycle.get("bundle", {})
-		if str(bundle.get("schema_version", "")) != "procgen-bundle-3": failures.append("%s bundle_v3" % item.label); continue
+		if str(bundle.get("schema_version", "")) != "procgen-bundle-4": failures.append("%s bundle_v4" % item.label); continue
 		if str((bundle.get("site_ir", {}) as Dictionary).get("schema_version", "")) != "site-ir-2": failures.append("%s site_ir_v2" % item.label); continue
 		if item.label == "fractured" and not bool((bundle.get("site_ir", {}).get("ship", {}) as Dictionary).get("fractured", false)):
 			failures.append("fractured fixture was not confirmed fractured")
@@ -47,7 +47,7 @@ func _init() -> void:
 
 func _find_legacy_fractured_case(consumer: RefCounted, generator: Object) -> Dictionary:
 	for seed in range(256):
-		var request: Dictionary = consumer.build_request(seed, 2, 2)
+		var request: Dictionary = consumer.build_request(seed, 2, 2, {}, "standard", "", "", 0, 0, [{"kind":"combat_mastery", "value_bp":5000}, {"kind":"objective_pace", "value_bp":5000}])
 		request.site.site_id = "legacy-site"
 		request.site.archetype_id = "frigate"
 		var lifecycle_value: Variant = JSON.parse_string(str(generator.generate_bundle(JSON.stringify(request))))

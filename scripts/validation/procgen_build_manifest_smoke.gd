@@ -4,7 +4,9 @@ const ValidatorScript := preload("res://scripts/procgen/procgen_manifest_validat
 
 class FakeGenerator extends RefCounted:
 	var version: int = 3
+	var runtime: Dictionary = {}
 	func generator_version() -> int: return version
+	func generator_manifest() -> String: return JSON.stringify(runtime)
 
 func _init() -> void:
 	var failures: Array[String] = []
@@ -25,6 +27,16 @@ func _init() -> void:
 	var artifact_path: String = str(manifest["artifact"]["path"])
 	var content: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://" + content_path))
 	var base_io: Dictionary = {"files": {content_path: FileAccess.get_file_as_string("res://" + content_path), artifact_path: FileAccess.get_file_as_bytes("res://" + artifact_path)}}
+	generator.runtime = {
+		"schema_version": "procgen-generator-manifest-3",
+		"rust_source_commit": str(manifest.get("rust_source_commit", "")),
+		"generator_version": 3,
+		"content_manifest_hash": str(manifest.get("content_manifest_hash", "")),
+		"export_schemas": manifest.get("export_schemas", {}).duplicate(true),
+		"adapter_schemas": {"lifecycle_result":"procgen-lifecycle-result-4", "capabilities":"procgen-capabilities-3", "generator_manifest":"procgen-generator-manifest-3"},
+		"target": str(manifest.get("target", "")),
+		"dirty_development": false,
+	}
 	_expect(failures, stats, validator.validate(manifest, generator, "x86_64-pc-windows-msvc", base_io) == ValidatorScript.OK, "valid")
 	var cases: Dictionary = {"manifest_schema":"wrong", "rust_source_commit":"wrong", "generator_version":1, "content_manifest_path":"wrong", "content_manifest_hash":"0".repeat(64), "target":"linux", "artifact":"wrong", "export_schemas":"wrong"}
 	for case_name in cases:
@@ -56,8 +68,33 @@ func _init() -> void:
 	var bad_generator := FakeGenerator.new(); bad_generator.version = 2
 	_expect(failures, stats, validator.validate(manifest, bad_generator, "x86_64-pc-windows-msvc", base_io) == ValidatorScript.GENERATOR_VERSION_MISMATCH, "generator")
 	_expect(failures, stats, validator.validate(manifest, generator, "linux", base_io) == ValidatorScript.TARGET_MISMATCH, "target")
-	var unknown_major: Dictionary = manifest.duplicate(true); unknown_major["manifest_schema"] = "procgen-build-manifest-3"
+	var unknown_major: Dictionary = manifest.duplicate(true); unknown_major["manifest_schema"] = "procgen-build-manifest-99"
 	_expect(failures, stats, validator.validate(unknown_major, generator, "x86_64-pc-windows-msvc", base_io) == ValidatorScript.SCHEMA_MAJOR_UNKNOWN, "unknown major")
+	var runtime_cases: Dictionary = {
+		"schema": ["schema_version", "future-generator-manifest"],
+		"source": ["rust_source_commit", "0".repeat(40)],
+		"content": ["content_manifest_hash", "0".repeat(64)],
+		"target": ["target", "linux"],
+		"export": ["export_schemas", {"procgen_request":"wrong"}],
+		"adapter": ["adapter_schemas", {"capabilities":"wrong"}],
+		"dirty": ["dirty_development", true],
+	}
+	for case_name in runtime_cases:
+		var tampered_generator := FakeGenerator.new()
+		tampered_generator.runtime = generator.runtime.duplicate(true)
+		var mutation: Array = runtime_cases[case_name]
+		tampered_generator.runtime[mutation[0]] = mutation[1]
+		var expected: String = ValidatorScript.DIRTY_DEVELOPMENT if case_name == "dirty" else (ValidatorScript.SOURCE_MISMATCH if case_name == "source" else (ValidatorScript.SCHEMA_MAP_MISMATCH if case_name == "export" or case_name == "adapter" else ValidatorScript.RUNTIME_MANIFEST_INVALID))
+		_expect(failures, stats, validator.validate(manifest, tampered_generator, "x86_64-pc-windows-msvc", base_io) == expected, "runtime " + case_name)
+	var exact_content_paths: Array[String] = ["data/combat/threat_archetypes.json", "data/combat/threat_visual_catalog.json", "data/items/item_definitions.json", "data/kits/ship_structural_v0.json"]
+	for exact_path in exact_content_paths:
+		var exact_entry: Dictionary = {}
+		for entry in content.get("files", []):
+			if str(entry.get("path", "")) == exact_path: exact_entry = entry
+		_expect(failures, stats, not exact_entry.is_empty(), "exact content listed " + exact_path)
+		var exact_bad_io: Dictionary = base_io.duplicate(true)
+		exact_bad_io["files"][exact_path] = PackedByteArray([9, 8, 7])
+		_expect(failures, stats, validator.validate(manifest, generator, "x86_64-pc-windows-msvc", exact_bad_io) == ValidatorScript.CONTENT_HASH_MISMATCH, "exact content tamper " + exact_path)
 	if not failures.is_empty():
 		for failure in failures: print("PROCGEN BUILD MANIFEST FAIL:%s" % failure)
 		quit(1); return

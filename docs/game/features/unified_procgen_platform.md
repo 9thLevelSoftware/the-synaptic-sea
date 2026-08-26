@@ -87,7 +87,10 @@ versions.
 
 The bounded trace records named RNG channels, considered and rejected
 candidates, failed constraints, repairs, retries, fallback use, per-stage
-timings, and stable failure/rationale codes. It contains no personal data.
+timings, and stable failure/rationale codes. Gate 3 advances this contract to
+`generation-trace-3`, whose exact ordered 37-channel set includes the new
+authoritative creature, encounter, item, and presentation streams without
+mutating the checked Gate 2 trace. It contains no personal data. See ADR-0066.
 
 ### `AdaptiveProposal`
 
@@ -247,7 +250,9 @@ promoted content-manifest entry.
 - Gameplay/presentation contract: Gate 3 advances the typed player snapshot,
   request, gameplay, presentation, complete-bundle, and lifecycle schemas while
   retaining the validated platform-v3, structural-v2, WorldIR-v2, and SiteIR-v2
-  layers. See ADR-0064.
+  layers. Its expanded named RNG-channel set advances independently to
+  `generation-trace-3`; trace 2 remains immutable. See ADR-0064 through
+  ADR-0066.
 
 ## Gate acceptance criteria
 

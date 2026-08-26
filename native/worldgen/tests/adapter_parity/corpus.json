@@ -1,8 +1,8 @@
 [
   {
-    "name": "shuttle_intact_easy_positive",
+    "name": "shuttle_intact_standard_skilled",
     "request": {
-      "schema_version": "procgen-request-1",
+      "schema_version": "procgen-request-2",
       "world_seed": 42,
       "site": {
         "site_id": "parity-shuttle-intact",
@@ -14,13 +14,26 @@
         "cause_of_loss": null,
         "loot_richness_bp": 5000
       },
-      "difficulty_id": "easy",
+      "difficulty_id": "standard",
       "player_model": {
-        "schema_version": "player-model-1",
+        "schema_version": "player-model-2",
         "signals": [
-          1,
-          -2,
-          3
+          {
+            "kind": "combat_mastery",
+            "value_bp": 6500
+          },
+          {
+            "kind": "damage_pressure",
+            "value_bp": 3500
+          },
+          {
+            "kind": "resource_pressure",
+            "value_bp": 4000
+          },
+          {
+            "kind": "objective_pace",
+            "value_bp": 6000
+          }
         ]
       },
       "requested_domains": [
@@ -30,18 +43,18 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "a7cfda584051097f43c09d9aaf8494f97c492641efa7b4ec518dee65e9c36ee7",
+      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
       "presentation": {
         "seed": 9,
         "locale": "en-US"
       }
     },
-    "expected_semantic_hash": "76261698cea1d1ffc1067505307f96c38e075f5377d6c031e261720ff811e5fe"
+    "expected_semantic_hash": "4bc8593d91f12db8bbbcd4ca528043404bb782ad8adcf2e6b3fd76fc4de03a17"
   },
   {
-    "name": "shuttle_intact_easy_presentation_variant",
+    "name": "shuttle_intact_standard_presentation_variant",
     "request": {
-      "schema_version": "procgen-request-1",
+      "schema_version": "procgen-request-2",
       "world_seed": 42,
       "site": {
         "site_id": "parity-shuttle-intact",
@@ -53,13 +66,26 @@
         "cause_of_loss": null,
         "loot_richness_bp": 5000
       },
-      "difficulty_id": "easy",
+      "difficulty_id": "standard",
       "player_model": {
-        "schema_version": "player-model-1",
+        "schema_version": "player-model-2",
         "signals": [
-          1,
-          -2,
-          3
+          {
+            "kind": "combat_mastery",
+            "value_bp": 6500
+          },
+          {
+            "kind": "damage_pressure",
+            "value_bp": 3500
+          },
+          {
+            "kind": "resource_pressure",
+            "value_bp": 4000
+          },
+          {
+            "kind": "objective_pace",
+            "value_bp": 6000
+          }
         ]
       },
       "requested_domains": [
@@ -69,19 +95,19 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "a7cfda584051097f43c09d9aaf8494f97c492641efa7b4ec518dee65e9c36ee7",
+      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
       "presentation": {
         "seed": 901,
         "locale": "fr-FR"
       }
     },
-    "expected_semantic_hash": "76261698cea1d1ffc1067505307f96c38e075f5377d6c031e261720ff811e5fe",
-    "same_semantics_as": "shuttle_intact_easy_positive"
+    "expected_semantic_hash": "4bc8593d91f12db8bbbcd4ca528043404bb782ad8adcf2e6b3fd76fc4de03a17",
+    "same_semantics_as": "shuttle_intact_standard_skilled"
   },
   {
-    "name": "corvette_damaged_negative",
+    "name": "corvette_damaged_hardened_pressured",
     "request": {
-      "schema_version": "procgen-request-1",
+      "schema_version": "procgen-request-2",
       "world_seed": 77,
       "site": {
         "site_id": "parity-corvette-damaged",
@@ -93,13 +119,26 @@
         "cause_of_loss": "ReactorBreach",
         "loot_richness_bp": 12000
       },
-      "difficulty_id": "hard",
+      "difficulty_id": "hardened",
       "player_model": {
-        "schema_version": "player-model-1",
+        "schema_version": "player-model-2",
         "signals": [
-          -7,
-          0,
-          11
+          {
+            "kind": "combat_mastery",
+            "value_bp": 3000
+          },
+          {
+            "kind": "damage_pressure",
+            "value_bp": 8000
+          },
+          {
+            "kind": "resource_pressure",
+            "value_bp": 7500
+          },
+          {
+            "kind": "objective_pace",
+            "value_bp": 3500
+          }
         ]
       },
       "requested_domains": [
@@ -109,18 +148,18 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "a7cfda584051097f43c09d9aaf8494f97c492641efa7b4ec518dee65e9c36ee7",
+      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
       "presentation": {
         "seed": 77,
         "locale": "en-GB"
       }
     },
-    "expected_semantic_hash": "9632982181e5e63bfc63746210623b8ddbeddc1235a8f0ffb151c86bf8af6b04"
+    "expected_semantic_hash": "34252ce9ed9f97896a94b02a232b56360e66ce889dfa2b4f93131ea4f84cc385"
   },
   {
-    "name": "freighter_damaged_extreme",
+    "name": "freighter_damaged_deep_dive_pressured",
     "request": {
-      "schema_version": "procgen-request-1",
+      "schema_version": "procgen-request-2",
       "world_seed": 12,
       "site": {
         "site_id": "parity-freighter-fractured",
@@ -132,12 +171,26 @@
         "cause_of_loss": "ReactorBreach",
         "loot_richness_bp": 30000
       },
-      "difficulty_id": "extreme",
+      "difficulty_id": "deep_dive",
       "player_model": {
-        "schema_version": "player-model-1",
+        "schema_version": "player-model-2",
         "signals": [
-          99,
-          -99
+          {
+            "kind": "combat_mastery",
+            "value_bp": 7500
+          },
+          {
+            "kind": "damage_pressure",
+            "value_bp": 9000
+          },
+          {
+            "kind": "resource_pressure",
+            "value_bp": 8500
+          },
+          {
+            "kind": "objective_pace",
+            "value_bp": 4500
+          }
         ]
       },
       "requested_domains": [
@@ -147,18 +200,18 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "a7cfda584051097f43c09d9aaf8494f97c492641efa7b4ec518dee65e9c36ee7",
+      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
       "presentation": {
         "seed": 1200,
         "locale": "de-DE"
       }
     },
-    "expected_semantic_hash": "c9c5dc1ea14f476b8aefbb5ab486cda2c18a9b54d7c7da636a3b1ad2ea952996"
+    "expected_semantic_hash": "c000053d0a270cd23f1d1123f9fdabf1d6ffe3e50fe207f0859ab8f5e1d077ad"
   },
   {
-    "name": "frigate_damaged_origin",
+    "name": "frigate_damaged_deep_dive_veteran",
     "request": {
-      "schema_version": "procgen-request-1",
+      "schema_version": "procgen-request-2",
       "world_seed": 314159,
       "site": {
         "site_id": "parity-frigate-damaged",
@@ -170,14 +223,26 @@
         "cause_of_loss": "PirateBoarding",
         "loot_richness_bp": 20000
       },
-      "difficulty_id": "nightmare",
+      "difficulty_id": "deep_dive",
       "player_model": {
-        "schema_version": "player-model-1",
+        "schema_version": "player-model-2",
         "signals": [
-          2,
-          4,
-          8,
-          16
+          {
+            "kind": "combat_mastery",
+            "value_bp": 9000
+          },
+          {
+            "kind": "damage_pressure",
+            "value_bp": 8500
+          },
+          {
+            "kind": "resource_pressure",
+            "value_bp": 8000
+          },
+          {
+            "kind": "objective_pace",
+            "value_bp": 7000
+          }
         ]
       },
       "requested_domains": [
@@ -187,18 +252,18 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "a7cfda584051097f43c09d9aaf8494f97c492641efa7b4ec518dee65e9c36ee7",
+      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
       "presentation": {
         "seed": 2718,
         "locale": "ja-JP"
       }
     },
-    "expected_semantic_hash": "b06004636ef857b54072387198c231772218b40aa8c39d146ea8183a1ff18e41"
+    "expected_semantic_hash": "2e88c003eba27958158e3c3f9056636472c8b9af3c213b99f70b3eda55f63fa6"
   },
   {
-    "name": "corvette_intact_max_positive",
+    "name": "corvette_intact_standard_max",
     "request": {
-      "schema_version": "procgen-request-1",
+      "schema_version": "procgen-request-2",
       "world_seed": 987654321,
       "site": {
         "site_id": "parity-corvette-max",
@@ -212,7 +277,7 @@
       },
       "difficulty_id": "standard",
       "player_model": {
-        "schema_version": "player-model-1",
+        "schema_version": "player-model-2",
         "signals": []
       },
       "requested_domains": [
@@ -222,18 +287,18 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "a7cfda584051097f43c09d9aaf8494f97c492641efa7b4ec518dee65e9c36ee7",
+      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
       "presentation": {
         "seed": 0,
         "locale": "en-US"
       }
     },
-    "expected_semantic_hash": "2f1200f8a767d536b7bb20d04706d7a76d98ac5df08ff829dc2e78acee49235a"
+    "expected_semantic_hash": "52e6c3fd1974b3109247e5ab53678683621dc6566ee86759f2f4aa931ddb0fc1"
   },
   {
-    "name": "freighter_damaged_min_negative",
+    "name": "freighter_damaged_hardened_min",
     "request": {
-      "schema_version": "procgen-request-1",
+      "schema_version": "procgen-request-2",
       "world_seed": 9007199254740991,
       "site": {
         "site_id": "parity-freighter-min",
@@ -245,13 +310,26 @@
         "cause_of_loss": "Depressurization",
         "loot_richness_bp": 7500
       },
-      "difficulty_id": "hard",
+      "difficulty_id": "hardened",
       "player_model": {
-        "schema_version": "player-model-1",
+        "schema_version": "player-model-2",
         "signals": [
-          -1,
-          -3,
-          -5
+          {
+            "kind": "combat_mastery",
+            "value_bp": 0
+          },
+          {
+            "kind": "damage_pressure",
+            "value_bp": 0
+          },
+          {
+            "kind": "resource_pressure",
+            "value_bp": 0
+          },
+          {
+            "kind": "objective_pace",
+            "value_bp": 0
+          }
         ]
       },
       "requested_domains": [
@@ -261,18 +339,18 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "a7cfda584051097f43c09d9aaf8494f97c492641efa7b4ec518dee65e9c36ee7",
+      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
       "presentation": {
         "seed": 9007199254740991,
         "locale": "es-ES"
       }
     },
-    "expected_semantic_hash": "6910b79bf00df3345fea08795813b22813d282be0d368cc8c380aa971b022e7c"
+    "expected_semantic_hash": "e68a4c0cb4a38f35952ee896f70d8a821ec5d51fa8923daea106f26f2fc9bc97"
   },
   {
-    "name": "frigate_fractured_seed1",
+    "name": "frigate_fractured_standard_baseline",
     "request": {
-      "schema_version": "procgen-request-1",
+      "schema_version": "procgen-request-2",
       "world_seed": 1,
       "site": {
         "site_id": "parity-frigate-fractured",
@@ -284,12 +362,10 @@
         "cause_of_loss": null,
         "loot_richness_bp": 15000
       },
-      "difficulty_id": "easy",
+      "difficulty_id": "standard",
       "player_model": {
-        "schema_version": "player-model-1",
-        "signals": [
-          5
-        ]
+        "schema_version": "player-model-2",
+        "signals": []
       },
       "requested_domains": [
         "world",
@@ -298,12 +374,12 @@
         "presentation"
       ],
       "generator_version": 3,
-      "content_manifest_hash": "a7cfda584051097f43c09d9aaf8494f97c492641efa7b4ec518dee65e9c36ee7",
+      "content_manifest_hash": "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407",
       "presentation": {
         "seed": 42,
         "locale": "it-IT"
       }
     },
-    "expected_semantic_hash": "bb06e7d9dd025c9b42f7641b6475cf20cedf8426cb890291630dd1ec962d5853"
+    "expected_semantic_hash": "3a0faede2ab3ef6e7c5c61e39ea5a91ed3da68fa1e21fcc9e1a2794f165fe071"
   }
 ]

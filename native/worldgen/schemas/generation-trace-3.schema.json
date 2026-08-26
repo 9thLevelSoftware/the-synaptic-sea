@@ -1,0 +1,117 @@
+{
+  "$id": "generation-trace-3",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "candidate_decisions": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 4096,
+      "type": "array"
+    },
+    "failed_constraints": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 4096,
+      "type": "array"
+    },
+    "fallback": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "pattern": "^(?:world:[a-z0-9_.:-]+(?:\\|site:[a-z0-9_.:-]+)?|site:[a-z0-9_.:-]+)$",
+          "type": "string"
+        }
+      ]
+    },
+    "repairs": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 4096,
+      "type": "array"
+    },
+    "retries": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 4096,
+      "type": "array"
+    },
+    "rng_channels": {
+      "const": [
+        "world.archetype",
+        "world.biome",
+        "world.hazard",
+        "world.resource",
+        "world.landmark",
+        "world.route_cost",
+        "site.structural",
+        "site.mission_template",
+        "site.gate_order",
+        "site.functional_props",
+        "site.spatial_annotations",
+        "meta",
+        "hull",
+        "template",
+        "topology",
+        "residual_fill",
+        "door",
+        "furnish",
+        "story",
+        "intact",
+        "breach",
+        "scorch",
+        "seal",
+        "bodies",
+        "fracture",
+        "debris",
+        "loot",
+        "gameplay.creature_blueprint",
+        "gameplay.creature_ability",
+        "gameplay.creature_material",
+        "gameplay.encounter_candidate",
+        "gameplay.encounter_faction",
+        "gameplay.encounter_reward",
+        "gameplay.encounter_selection",
+        "gameplay.item_family",
+        "gameplay.item_affix",
+        "presentation.asset_assembly"
+      ]
+    },
+    "schema_version": {
+      "const": "generation-trace-3"
+    },
+    "stage_timings_micros": {
+      "additionalProperties": {
+        "maximum": 3600000000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "maxProperties": 4096,
+      "propertyNames": {
+        "minLength": 1
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "candidate_decisions",
+    "failed_constraints",
+    "repairs",
+    "retries",
+    "rng_channels",
+    "schema_version",
+    "stage_timings_micros"
+  ],
+  "title": "generation-trace-3",
+  "type": "object"
+}

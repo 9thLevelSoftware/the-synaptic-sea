@@ -24,6 +24,8 @@ class ManifestToolTests(unittest.TestCase):
         self.content_root.mkdir()
         self.content_file = self.content_root / "catalog.json"
         self.content_file.write_bytes(b"catalog-v1")
+        self.explicit_content_file = self.root / "standalone-content.json"
+        self.explicit_content_file.write_bytes(b"standalone-v1")
 
         self.content_manifest = self.root / "data/procgen/manifests/content_manifest.json"
         self.windows_manifest = self.root / "data/procgen/manifests/build/win64.json"
@@ -64,7 +66,7 @@ class ManifestToolTests(unittest.TestCase):
         }
         TOOL.BUILD_MANIFEST = self.windows_manifest
         TOOL.ARTIFACT = self.windows_artifact
-        TOOL.CONTENT_ROOTS = [self.content_root]
+        TOOL.CONTENT_ROOTS = [self.content_root, self.explicit_content_file]
         TOOL.subprocess.run = lambda *args, **kwargs: subprocess.CompletedProcess(args, 0)
 
     def tearDown(self):
@@ -110,12 +112,18 @@ class ManifestToolTests(unittest.TestCase):
         self.assertEqual(windows["target"], "x86_64-pc-windows-msvc")
         self.assertEqual(windows["artifact"]["kind"], "gdextension")
         self.assertEqual(windows["generator_version"], 3)
-        self.assertEqual(windows["manifest_schema"], "procgen-build-manifest-2")
-        self.assertEqual(windows["export_schemas"]["procgen_bundle"], "procgen-bundle-3")
+        self.assertEqual(windows["manifest_schema"], "procgen-build-manifest-3")
+        self.assertEqual(windows["export_schemas"]["procgen_request"], "procgen-request-2")
+        self.assertEqual(windows["export_schemas"]["procgen_bundle"], "procgen-bundle-4")
         self.assertEqual(windows["export_schemas"]["world_ir"], "world-ir-2")
         self.assertEqual(windows["export_schemas"]["site_ir"], "site-ir-2")
+        self.assertEqual(windows["export_schemas"]["gameplay_ir"], "gameplay-ir-2")
+        self.assertEqual(windows["export_schemas"]["presentation_ir"], "presentation-ir-2")
         self.assertEqual(
-            windows["export_schemas"]["generation_trace"], "generation-trace-2"
+            windows["export_schemas"]["generation_trace"], "generation-trace-3"
+        )
+        self.assertEqual(
+            windows["export_schemas"]["adaptive_proposal"], "adaptive-proposal-1"
         )
         self.assertEqual(
             windows["artifact"]["path"],
@@ -132,13 +140,26 @@ class ManifestToolTests(unittest.TestCase):
         self.assertEqual(web["target"], "wasm32-unknown-unknown")
         self.assertEqual(web["artifact"]["kind"], "wasm")
         self.assertEqual(web["generator_version"], 3)
-        self.assertEqual(web["manifest_schema"], "procgen-build-manifest-2")
-        self.assertEqual(web["export_schemas"]["procgen_bundle"], "procgen-bundle-3")
+        self.assertEqual(web["manifest_schema"], "procgen-build-manifest-3")
+        self.assertEqual(web["export_schemas"]["procgen_request"], "procgen-request-2")
+        self.assertEqual(web["export_schemas"]["procgen_bundle"], "procgen-bundle-4")
         self.assertEqual(web["export_schemas"]["site_ir"], "site-ir-2")
+        self.assertEqual(web["export_schemas"]["gameplay_ir"], "gameplay-ir-2")
+        self.assertEqual(web["export_schemas"]["presentation_ir"], "presentation-ir-2")
         self.assertEqual(
             web["artifact"]["path"],
             "addons/derelict/bin/web/derelict_wasm_bg.wasm",
         )
+
+    def test_content_manifest_includes_explicit_files_alongside_directories(self):
+        paths = TOOL.files()
+        self.assertEqual(paths, sorted(paths, key=TOOL.rel))
+        self.assertIn(self.content_file, paths)
+        self.assertIn(self.explicit_content_file, paths)
+
+        first = TOOL.content_hash(paths)
+        self.explicit_content_file.write_bytes(b"standalone-v2")
+        self.assertNotEqual(first, TOOL.content_hash(TOOL.files()))
 
     def test_web_check_detects_artifact_tamper_without_writing(self):
         result, _, error = self.run_tool(

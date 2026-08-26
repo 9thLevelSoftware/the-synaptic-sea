@@ -1,0 +1,51 @@
+{
+  "$id": "player-model-2",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "PlayerSignal": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/PlayerSignalKind"
+        },
+        "value_bp": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "value_bp"
+      ],
+      "type": "object"
+    },
+    "PlayerSignalKind": {
+      "enum": [
+        "combat_mastery",
+        "damage_pressure",
+        "resource_pressure",
+        "objective_pace"
+      ],
+      "type": "string"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "player-model-2"
+    },
+    "signals": {
+      "items": {
+        "$ref": "#/definitions/PlayerSignal"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "signals"
+  ],
+  "title": "player-model-2",
+  "type": "object"
+}

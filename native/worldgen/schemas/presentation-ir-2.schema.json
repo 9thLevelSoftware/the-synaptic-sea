@@ -1,0 +1,125 @@
+{
+  "$id": "presentation-ir-2",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "AssemblyInstruction": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter_binding_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "asset_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "subject_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "adapter_binding_ids",
+        "asset_ids",
+        "subject_id"
+      ],
+      "type": "object"
+    },
+    "CandidateRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "asset_id": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "accepted",
+        "asset_id",
+        "rationale"
+      ],
+      "type": "object"
+    },
+    "Decision": {
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "considered": {
+          "items": {
+            "$ref": "#/definitions/CandidateRecord"
+          },
+          "type": "array"
+        },
+        "decision_id": {
+          "type": "string"
+        },
+        "rejected": {
+          "items": {
+            "$ref": "#/definitions/CandidateRecord"
+          },
+          "type": "array"
+        },
+        "selected": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "channel",
+        "considered",
+        "decision_id",
+        "rejected",
+        "selected"
+      ],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "decisions": {
+      "items": {
+        "$ref": "#/definitions/Decision"
+      },
+      "type": "array"
+    },
+    "fallback_subjects": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "instructions": {
+      "items": {
+        "$ref": "#/definitions/AssemblyInstruction"
+      },
+      "type": "array"
+    },
+    "repairs": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "presentation-ir-2"
+    }
+  },
+  "required": [
+    "decisions",
+    "fallback_subjects",
+    "instructions",
+    "repairs",
+    "schema_version"
+  ],
+  "title": "presentation-ir-2",
+  "type": "object"
+}

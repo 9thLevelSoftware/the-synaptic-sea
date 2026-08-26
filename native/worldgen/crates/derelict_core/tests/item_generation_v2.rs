@@ -233,6 +233,27 @@ fn invalid_context_and_malformed_authored_data_fail_closed() {
 }
 
 #[test]
+fn source_pool_uses_adapter_bound_while_generated_output_stays_capped() {
+    let catalogue = catalogue();
+    let mut bounded = context();
+    bounded.eligible_sources = (0..MAX_SOURCES)
+        .map(|index| SourceBinding {
+            source_id: format!("container:{index:04}"),
+            source_kind: SourceKind::Container,
+        })
+        .collect();
+    bounded.max_count = MAX_ITEMS as u16;
+    let outcome = generate_items(&bounded, &catalogue).unwrap();
+    assert!(outcome.items.len() <= MAX_ITEMS);
+
+    bounded.eligible_sources.push(SourceBinding {
+        source_id: format!("container:{MAX_SOURCES:04}"),
+        source_kind: SourceKind::Container,
+    });
+    assert!(generate_items(&bounded, &catalogue).is_err());
+}
+
+#[test]
 fn drop_bindings_are_unique_and_match_items() {
     let (_, _, outcome) = generated(10_000);
     let source_ids: std::collections::BTreeSet<_> =

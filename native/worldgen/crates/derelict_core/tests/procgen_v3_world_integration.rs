@@ -8,11 +8,12 @@ use derelict_core::lifecycle::{
     PROCGEN_CAPABILITIES_SCHEMA, PROCGEN_GENERATOR_MANIFEST_SCHEMA,
 };
 use derelict_core::manifest::{
-    ExportSchemas, PROCGEN_BUNDLE_SCHEMA_V3, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3, WORLD_IR_SCHEMA_V2,
+    ExportSchemas, PROCGEN_BUNDLE_SCHEMA_V4, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4, WORLD_IR_SCHEMA_V2,
 };
 use derelict_core::procgen::{
-    generate_bundle, semantic_hash, Domain, PlayerModel, PresentationRequest, ProcgenBundle,
-    ProcgenError, ProcgenRequest, SiteRequest, PLAYER_MODEL_SCHEMA, PROCGEN_REQUEST_SCHEMA,
+    generate_bundle, generate_bundle_with_site_transform, semantic_hash, Domain, PlayerModel,
+    PresentationRequest, ProcgenBundle, ProcgenError, ProcgenRequest, SiteRequest,
+    PLAYER_MODEL_SCHEMA, PROCGEN_REQUEST_SCHEMA,
 };
 use derelict_core::site::resolve_site_candidate;
 use derelict_core::world::{
@@ -41,7 +42,7 @@ fn request() -> ProcgenRequest {
         difficulty_id: "standard".into(),
         player_model: PlayerModel {
             schema_version: PLAYER_MODEL_SCHEMA.into(),
-            signals: vec![1, -2],
+            signals: vec![],
         },
         requested_domains: vec![
             Domain::World,
@@ -84,19 +85,19 @@ fn public_schema(name: &str) -> Value {
 }
 
 #[test]
-fn platform_v3_request_envelope_and_seed_bounds_are_strict() {
+fn platform_v4_request_envelope_and_seed_bounds_are_strict() {
     let req = request();
     assert_eq!(req.generator_version, 3);
     assert_eq!(req.schema_version, PROCGEN_REQUEST_SCHEMA);
     assert_eq!(req.content_manifest_hash.len(), 64);
     assert!(req.validate().is_ok(), "v3 request should be admissible");
     assert_eq!(
-        ExportSchemas::platform_v3().procgen_request,
+        ExportSchemas::platform_v4().procgen_request,
         PROCGEN_REQUEST_SCHEMA
     );
 
     for schema in [
-        "procgen-request-2",
+        "procgen-request-1",
         "procgen-request-3",
         "procgen-request-9",
     ] {
@@ -160,9 +161,9 @@ fn complete_bundle_embeds_public_world_and_runs_structural_pipeline_once() {
     let expected_outcome = generate_world(&world_request(&req)).unwrap();
     let expected_world = expected_outcome.world_ir;
     let bundle = generate_bundle(req.clone(), &GenData::default_bundle().unwrap()).unwrap();
-    assert_eq!(bundle.schema_version, PROCGEN_BUNDLE_SCHEMA_V3);
+    assert_eq!(bundle.schema_version, PROCGEN_BUNDLE_SCHEMA_V4);
     assert_eq!(bundle.version.generator_version, 3);
-    assert_eq!(bundle.version.export_schemas, ExportSchemas::platform_v3());
+    assert_eq!(bundle.version.export_schemas, ExportSchemas::platform_v4());
     assert_eq!(
         serde_json::to_value(&bundle.world_ir).unwrap(),
         serde_json::to_value(&expected_world).unwrap()
@@ -238,15 +239,14 @@ fn requested_domain_order_and_locale_do_not_change_world_or_mechanics() {
     assert_eq!(a.site_ir, b.site_ir);
     assert_eq!(a.gameplay_ir, b.gameplay_ir);
     assert_eq!(a.semantic_hash, b.semantic_hash);
-    assert_ne!(a.presentation_ir.locale, b.presentation_ir.locale);
-    assert_ne!(a.presentation_ir.seed, b.presentation_ir.seed);
+    assert_ne!(a.request.presentation, b.request.presentation);
 }
 
 #[test]
 fn expanded_nested_documents_reject_unknown_fields_and_schema_substitution() {
     let data = GenData::default_bundle().unwrap();
     let bundle = generate_bundle(request(), &data).unwrap();
-    let bundle_schema = public_schema(PROCGEN_BUNDLE_SCHEMA_V3);
+    let bundle_schema = public_schema(PROCGEN_BUNDLE_SCHEMA_V4);
     let bundle_validator = jsonschema::validator_for(&bundle_schema).unwrap();
     let bundle_value = serde_json::to_value(&bundle).unwrap();
     assert!(bundle_validator.is_valid(&bundle_value));
@@ -290,16 +290,16 @@ fn expanded_nested_documents_reject_unknown_fields_and_schema_substitution() {
 }
 
 #[test]
-fn lifecycle_result_and_generator_manifest_are_platform_v3_contracts() {
+fn lifecycle_result_and_generator_manifest_are_platform_v4_contracts() {
     let data = GenData::default_bundle().unwrap();
     let bundle = generate_bundle(request(), &data).unwrap();
     let result =
         LifecycleResult::completed(Some(1), bundle.clone(), vec![LifecycleEvent::Completed]);
-    assert_eq!(result.schema_version, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3);
+    assert_eq!(result.schema_version, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4);
     assert!(result.validate().is_ok());
     let json = serde_json::to_string(&result).unwrap();
     assert!(LifecycleResult::from_json(&json).is_ok());
-    let lifecycle_schema = public_schema(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3);
+    let lifecycle_schema = public_schema(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4);
     let lifecycle_validator = jsonschema::validator_for(&lifecycle_schema).unwrap();
     let lifecycle_value: Value = serde_json::from_str(&json).unwrap();
     assert!(lifecycle_validator.is_valid(&lifecycle_value));
@@ -308,7 +308,7 @@ fn lifecycle_result_and_generator_manifest_are_platform_v3_contracts() {
         "procgen-lifecycle-result-2",
         "procgen-lifecycle-result-9",
     ] {
-        let substituted = json.replace(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3, schema);
+        let substituted = json.replace(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4, schema);
         assert!(
             LifecycleResult::from_json(&substituted).is_err(),
             "accepted {schema}"
@@ -335,9 +335,9 @@ fn lifecycle_result_and_generator_manifest_are_platform_v3_contracts() {
         rust_source_commit: "a".repeat(40),
         generator_version: 3,
         content_manifest_hash: CONTENT_HASH.into(),
-        export_schemas: ExportSchemas::platform_v3(),
+        export_schemas: ExportSchemas::platform_v4(),
         adapter_schemas: AdapterSchemas {
-            lifecycle_result: PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3.into(),
+            lifecycle_result: PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4.into(),
             capabilities: PROCGEN_CAPABILITIES_SCHEMA.into(),
             generator_manifest: PROCGEN_GENERATOR_MANIFEST_SCHEMA.into(),
         },
@@ -386,54 +386,25 @@ fn invalid_identity_and_version_substitutions_fail_closed() {
 #[test]
 fn authored_site_fallback_requires_stage_bound_candidate_evidence() {
     let data = GenData::default_bundle().unwrap();
-    let (mut bundle, outcome) = (0..192)
+    let bundle = (0..192)
         .find_map(|seed| {
             let mut req = request();
             req.world_seed = seed;
-            let bundle = generate_bundle(req, &data).ok()?;
-            let mut malformed = bundle.site_ir.clone();
-            malformed.mission_graph.mission_id.clear();
-            let outcome =
-                resolve_site_candidate(malformed, &world_request(&bundle.request)).ok()?;
-            (outcome.trace.fallback.is_some()).then_some((bundle, outcome))
+            let bundle =
+                generate_bundle_with_site_transform(req, &data, |generated, world_request| {
+                    let mut malformed = generated.site;
+                    malformed.mission_graph.mission_id.clear();
+                    resolve_site_candidate(malformed, world_request)
+                })
+                .ok()?;
+            bundle
+                .trace
+                .fallback
+                .as_deref()
+                .is_some_and(|fallback| fallback.ends_with("site:authored-safe-return"))
+                .then_some(bundle)
         })
         .expect("bounded corpus contains an authored site fallback fixture");
-    assert_eq!(
-        outcome.trace.fallback.as_deref(),
-        Some("authored-safe-return")
-    );
-
-    bundle.site_ir = outcome.site;
-    bundle
-        .trace
-        .candidate_decisions
-        .retain(|decision| !decision.starts_with("site:"));
-    bundle.trace.candidate_decisions.extend(
-        outcome
-            .trace
-            .candidate_decisions
-            .into_iter()
-            .map(|decision| format!("site:{decision}")),
-    );
-    bundle
-        .trace
-        .repairs
-        .retain(|repair| !repair.starts_with("site:"));
-    bundle.trace.repairs.extend(
-        outcome
-            .trace
-            .repairs
-            .into_iter()
-            .map(|repair| format!("site:{repair}")),
-    );
-    bundle.trace.fallback = Some(match bundle.trace.fallback.take() {
-        Some(world) if world.starts_with("world:") => {
-            format!("{world}|site:authored-safe-return")
-        }
-        None => "site:authored-safe-return".into(),
-        other => panic!("unexpected original fallback: {other:?}"),
-    });
-    bundle.semantic_hash = semantic_hash(&bundle).unwrap();
     bundle.validate().unwrap();
 
     for missing in ["site:rejected_candidate", "site:selected_fallback"] {
@@ -443,7 +414,10 @@ fn authored_site_fallback_requires_stage_bound_candidate_evidence() {
             .candidate_decisions
             .retain(|decision| decision != missing);
         assert!(
-            mutation.validate().is_err(),
+            matches!(
+                mutation.validate(),
+                Err(ProcgenError::InvalidRequest("site_fallback_trace"))
+            ),
             "accepted fallback without {missing}"
         );
     }

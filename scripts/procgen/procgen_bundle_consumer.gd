@@ -6,10 +6,13 @@ const CanonicalJsonScript := preload("res://scripts/procgen/procgen_canonical_js
 const GENERATOR_VERSION: int = 3
 const STRUCTURAL_GENERATOR_VERSION: int = 2
 const MAX_SAFE_JSON_INTEGER: int = 9007199254740991
-const CONTENT_HASH: String = "a7cfda584051097f43c09d9aaf8494f97c492641efa7b4ec518dee65e9c36ee7"
+const CONTENT_HASH: String = "cb59dae2f3ebcea96dad8cb870d98c1fbc34a2834f6571823b6350767b343407"
 const DOMAINS: Array[String] = ["world", "site", "gameplay", "presentation"]
 const SUPPORTED_ARCHETYPES: Array[String] = ["shuttle", "corvette", "freighter", "frigate"]
 const SUPPORTED_DIFFICULTIES: Array[String] = ["standard", "hardened", "deep_dive"]
+const PLAYER_SIGNAL_KINDS: Array[String] = [
+	"combat_mastery", "damage_pressure", "resource_pressure", "objective_pace",
+]
 const ROOM_ROLES: Array[String] = [
 	"Airlock", "Dock", "Corridor", "MainSpine", "Hub", "Ramp", "Elevator", "Bridge",
 	"Engineering", "Reactor", "LifeSupport", "Maintenance", "Cargo", "Hangar", "Storage",
@@ -26,17 +29,56 @@ const RNG_CHANNELS: Array[String] = [
 	"site.mission_template", "site.gate_order", "site.functional_props", "site.spatial_annotations",
 	"meta", "hull", "template", "topology", "residual_fill", "door", "furnish", "story",
 	"intact", "breach", "scorch", "seal", "bodies", "fracture", "debris", "loot",
+	"gameplay.creature_blueprint", "gameplay.creature_ability", "gameplay.creature_material",
+	"gameplay.encounter_candidate", "gameplay.encounter_faction", "gameplay.encounter_reward",
+	"gameplay.encounter_selection", "gameplay.item_family", "gameplay.item_affix",
+	"presentation.asset_assembly",
 ]
 const EXPORT_SCHEMAS: Dictionary = {
-	"procgen_request": "procgen-request-1", "procgen_bundle": "procgen-bundle-3",
-	"world_ir": "world-ir-2", "site_ir": "site-ir-2", "gameplay_ir": "gameplay-ir-1",
-	"presentation_ir": "presentation-ir-1", "generation_trace": "generation-trace-2",
+	"procgen_request": "procgen-request-2", "procgen_bundle": "procgen-bundle-4",
+	"world_ir": "world-ir-2", "site_ir": "site-ir-2", "gameplay_ir": "gameplay-ir-2",
+	"presentation_ir": "presentation-ir-2", "generation_trace": "generation-trace-3",
 	"adaptive_proposal": "adaptive-proposal-1",
 }
 const ADAPTER_SCHEMAS: Dictionary = {
-	"lifecycle_result": "procgen-lifecycle-result-3",
-	"capabilities": "procgen-capabilities-2",
-	"generator_manifest": "procgen-generator-manifest-2",
+	"lifecycle_result": "procgen-lifecycle-result-4",
+	"capabilities": "procgen-capabilities-3",
+	"generator_manifest": "procgen-generator-manifest-3",
+}
+const ENCOUNTER_RNG_CHANNELS: Array[String] = [
+	"gameplay.encounter_candidate", "gameplay.encounter_faction", "gameplay.encounter_reward",
+]
+const ENCOUNTER_RATIONALES: Array[String] = [
+	"accepted", "incompatible_faction", "incompatible_role", "protected_room",
+	"protected_cell", "no_clearance", "footprint_out_of_room", "occupied",
+	"navigation_unreachable", "exposed_los", "no_cover", "threat_budget_exceeded",
+	"performance_budget_exceeded", "economy_budget_exceeded", "group_cap_exceeded",
+	"instance_cap_exceeded", "no_fair_spawn",
+]
+const CREATURE_SPECS: Dictionary = {
+	"creature_brute": {"body_plan_id":"body_brute", "footprint_id":"fp_large", "rig_id":"rig_brute", "animation_set_id":"anim_brute", "ability_id":"ability_bash", "behavior_id":"behavior_guard", "material_id":"material_armor", "counterplay_id":"counter_armor", "threat_role":"tank", "threat_cost":500, "performance_cost":300, "instance_cap":4, "clearance":2, "footprint":[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]},
+	"creature_drone": {"body_plan_id":"body_drone", "footprint_id":"fp_small", "rig_id":"rig_drone", "animation_set_id":"anim_drone", "ability_id":"ability_dash", "behavior_id":"behavior_patrol", "material_id":"material_chitin", "counterplay_id":"counter_evade", "threat_role":"scout", "threat_cost":200, "performance_cost":150, "instance_cap":12, "clearance":1, "footprint":[Vector2i(0, 0)]},
+	"creature_siren": {"body_plan_id":"body_siren", "footprint_id":"fp_small", "rig_id":"rig_siren", "animation_set_id":"anim_siren", "ability_id":"ability_pulse", "behavior_id":"behavior_ambush", "material_id":"material_synthetic", "counterplay_id":"counter_interrupt", "threat_role":"controller", "threat_cost":400, "performance_cost":250, "instance_cap":6, "clearance":1, "footprint":[Vector2i(0, 0)]},
+}
+const ENCOUNTER_FACTIONS: Dictionary = {
+	"biomatter": {"blueprints":["creature_drone", "creature_siren"], "roles":["scout", "controller"], "abilities":["ability_dash", "ability_pulse"]},
+	"raiders": {"blueprints":["creature_brute", "creature_drone"], "roles":["scout", "tank"], "abilities":["ability_bash", "ability_dash"]},
+}
+const ITEM_FAMILIES: Dictionary = {
+	"armor": {"socket_id":"socket_armor", "visual_tag":"item_armor", "affix_id":"affix_armor", "stat":"armor", "base_value":40, "frequency_bp":5000},
+	"tool": {"socket_id":"socket_tool", "visual_tag":"item_tool", "affix_id":"affix_capacity", "stat":"capacity", "base_value":25, "frequency_bp":7000},
+	"weapon": {"socket_id":"socket_weapon", "visual_tag":"item_weapon", "affix_id":"affix_damage", "stat":"damage", "base_value":60, "frequency_bp":3500},
+}
+const PRESENTATION_ASSET_BINDINGS: Dictionary = {
+	"asset:primitive:structural":"binding:primitive:structural",
+	"asset:audio:ambient":"binding:audio:ambient",
+	"asset:primitive:creature_brute":"binding:threat:brute",
+	"asset:primitive:creature_drone":"binding:threat:drone",
+	"asset:primitive:creature_siren":"binding:threat:siren",
+	"asset:primitive:item_armor":"binding:item:armor",
+	"asset:primitive:item_tool":"binding:item:tool",
+	"asset:primitive:item_weapon":"binding:item:weapon",
+	"asset:primitive:objective":"binding:objective:default",
 }
 const PLATFORM_ADAPTERS: Dictionary = {
 	"x86_64-pc-windows-msvc": {
@@ -109,7 +151,7 @@ func build_request(
 			"kit_id": "ship_structural_v0", "intactness_override_bp": int(intactness[condition]),
 			"cause_of_loss": null, "loot_richness_bp": 5000},
 		"difficulty_id": difficulty_value,
-		"player_model": {"schema_version": "player-model-1", "signals": player_signals.duplicate()},
+		"player_model": {"schema_version": "player-model-2", "signals": player_signals.duplicate(true)},
 		"requested_domains": DOMAINS.duplicate(), "generator_version": generator_version,
 		"content_manifest_hash": content_hash,
 		"presentation": {"seed": presentation_seed, "locale": locale_value},
@@ -179,11 +221,19 @@ func _validate_request(request: Dictionary) -> bool:
 	var player_value: Variant = request.get("player_model", null)
 	if not player_value is Dictionary or not _has_exact_keys(player_value, ["schema_version", "signals"]): return _reject("request_player_model")
 	var player: Dictionary = player_value
-	if str(player.get("schema_version", "")) != "player-model-1" \
+	if str(player.get("schema_version", "")) != "player-model-2" \
 			or not player.get("signals", null) is Array \
-			or (player.get("signals", []) as Array).size() > 64: return _reject("request_player_model")
+			or (player.get("signals", []) as Array).size() > 4: return _reject("request_player_model")
+	var previous_signal_index: int = -1
 	for signal_value in player.get("signals", []):
-		if not _is_bounded_integer(signal_value, -2147483648, 2147483647): return _reject("request_player_model")
+		if not signal_value is Dictionary or not _has_exact_keys(signal_value, ["kind", "value_bp"]): return _reject("request_player_model")
+		var signal_record: Dictionary = signal_value
+		var kind: String = str(signal_record.get("kind", ""))
+		var signal_index: int = PLAYER_SIGNAL_KINDS.find(kind)
+		if signal_index < 0 \
+				or not _is_bounded_integer(signal_record.get("value_bp", null), 0, 10000) \
+				or signal_index <= previous_signal_index: return _reject("request_player_model")
+		previous_signal_index = signal_index
 	var domains_value: Variant = request.get("requested_domains", null)
 	if not domains_value is Array or (domains_value as Array).is_empty(): return _reject("request_domains")
 	var seen_domains: Dictionary = {}
@@ -205,7 +255,7 @@ func _validate_request(request: Dictionary) -> bool:
 func _validate_context(request: Dictionary, build: Dictionary, runtime: Dictionary, caps: Dictionary) -> bool:
 	var build_keys: Array[String] = ["manifest_schema", "rust_source_commit", "generator_version", "content_manifest_path", "content_manifest_hash", "target", "artifact", "export_schemas"]
 	if not _has_exact_keys(build, build_keys): return _reject("build_manifest_shape")
-	if str(build.get("manifest_schema", "")) != "procgen-build-manifest-2": return _reject("build_manifest_schema")
+	if str(build.get("manifest_schema", "")) != "procgen-build-manifest-3": return _reject("build_manifest_schema")
 	if str(build.get("content_manifest_path", "")) != "data/procgen/manifests/content_manifest.json": return _reject("build_manifest_path")
 	if not _is_lower_hex(str(build.get("rust_source_commit", "")), 40): return _reject("build_manifest_source")
 	if not _is_sha256(str(build.get("content_manifest_hash", ""))) \
@@ -288,11 +338,8 @@ func _validate_bundle(bundle: Dictionary, request: Dictionary, manifest: Diction
 	var presentation_value: Variant = bundle.get("presentation_ir", null)
 	if not presentation_value is Dictionary: return _reject("presentation_shape")
 	var presentation: Dictionary = presentation_value
-	if not _has_exact_keys(presentation, ["schema_version", "kit_id", "locale", "seed", "approved_bindings"]): return _reject("presentation_shape")
+	if not _has_exact_keys(presentation, ["schema_version", "instructions", "decisions", "repairs", "fallback_subjects"]): return _reject("presentation_shape")
 	if str(presentation.get("schema_version", "")) != EXPORT_SCHEMAS.presentation_ir: return _reject("presentation_ir_schema")
-	var presentation_request: Dictionary = request.get("presentation", {})
-	if str(presentation.get("kit_id", "")) != str(site_request.get("kit_id", "")) or str(presentation.get("locale", "")) != str(presentation_request.get("locale", "")) \
-			or not _same_json(presentation.get("seed", null), presentation_request.get("seed", null)) or not presentation.get("approved_bindings", null) is Dictionary: return _reject("presentation_identity")
 	var site_value: Variant = bundle.get("site_ir", null)
 	if not site_value is Dictionary or not _has_exact_keys(site_value, ["schema_version", "ship", "mission_graph", "navigation", "functional_props", "spatial_annotations"]): return _reject("site_shape")
 	var site_ir: Dictionary = site_value
@@ -305,11 +352,12 @@ func _validate_bundle(bundle: Dictionary, request: Dictionary, manifest: Diction
 	if not _validate_site_overlay(site_ir, ship): return false
 	if (ship.entities as Array).size() > int(caps.get("max_entities", 0)): return _reject("entity_cap")
 	var gameplay_value: Variant = bundle.get("gameplay_ir", null)
-	if not gameplay_value is Dictionary or not _has_exact_keys(gameplay_value, ["schema_version", "legacy_slice"]): return _reject("gameplay_shape")
+	if not gameplay_value is Dictionary: return _reject("gameplay_shape")
 	var gameplay_ir: Dictionary = gameplay_value
 	if str(gameplay_ir.get("schema_version", "")) != EXPORT_SCHEMAS.gameplay_ir: return _reject("gameplay_ir_schema")
-	if not _validate_gameplay(gameplay_ir.get("legacy_slice", null), ship): return false
-	if not _validate_metrics_trace(bundle.get("metrics", null), bundle.get("trace", null), site_ir, ship, caps): return false
+	if not _validate_gameplay_ir(gameplay_ir, ship, site_ir, request, caps): return false
+	if not _validate_presentation(presentation, gameplay_ir, site_ir): return false
+	if not _validate_metrics_trace(bundle.get("metrics", null), bundle.get("trace", null), site_ir, ship, gameplay_ir, caps): return false
 	if not _is_sha256(str(bundle.get("semantic_hash", ""))): return _reject("semantic_hash_shape")
 	return true
 
@@ -998,6 +1046,277 @@ func _validate_socket_binding(value: Variant) -> bool:
 		if not binding[key] is String or str(binding[key]).is_empty(): return false
 	return true
 
+func _validate_gameplay_ir(gameplay: Dictionary, ship: Dictionary, site_ir: Dictionary, request: Dictionary, caps: Dictionary) -> bool:
+	if not _has_exact_keys(gameplay, ["schema_version", "legacy_slice", "creature_blueprints", "encounter", "items", "drops", "decisions"]): return _reject("gameplay_shape")
+	if not _validate_gameplay(gameplay.get("legacy_slice", null), ship): return false
+	var blueprints: Variant = gameplay.get("creature_blueprints", null)
+	if not blueprints is Array or (blueprints as Array).size() != 3: return _reject("creature_blueprints")
+	var blueprint_ids: Dictionary = {}
+	var previous_blueprint_id: String = ""
+	for value in blueprints:
+		if not value is Dictionary or not _validate_creature_blueprint(value): return _reject("creature_blueprints")
+		var id: String = str((value as Dictionary).get("id", ""))
+		if blueprint_ids.has(id) or (not previous_blueprint_id.is_empty() and previous_blueprint_id >= id): return _reject("creature_blueprints")
+		blueprint_ids[id] = (value as Dictionary).duplicate(true)
+		previous_blueprint_id = id
+	if not _validate_encounter(gameplay.get("encounter", null), blueprint_ids, site_ir, request): return false
+	if not _validate_items(gameplay.get("items", null), gameplay.get("drops", null), gameplay.get("encounter", null), gameplay.get("legacy_slice", {}).get("loot_containers", [])): return false
+	var gameplay_entity_count: int = (gameplay.get("encounter", {}).get("spawns", []) as Array).size() + (gameplay.get("items", []) as Array).size()
+	if (ship.get("entities", []) as Array).size() + gameplay_entity_count > int(caps.get("max_entities", 0)): return _reject("entity_cap")
+	var decisions: Variant = gameplay.get("decisions", null)
+	if not decisions is Array or (decisions as Array).is_empty() or (decisions as Array).size() > 512: return _reject("gameplay_decisions")
+	var decision_ids: Dictionary = {}
+	var selected_creatures: Dictionary = {}
+	var selected_items: Dictionary = {}
+	var encounter_decisions: Dictionary = {}
+	for encounter_decision_value in gameplay.get("encounter", {}).get("trace", {}).get("decisions", []):
+		if encounter_decision_value is Dictionary:
+			encounter_decisions["encounter:%s" % str((encounter_decision_value as Dictionary).get("decision_id", ""))] = encounter_decision_value
+	for value in decisions:
+		if not value is Dictionary or not _has_exact_keys(value, ["decision_id", "channel_id", "domain", "candidate_id", "score_bp", "accepted", "rationale_codes", "selected_id"]): return _reject("gameplay_decisions")
+		var d: Dictionary = value
+		var domain: String = str(d.domain)
+		if decision_ids.has(str(d.decision_id)) or not _is_gameplay_id(str(d.decision_id)) or not _is_gameplay_id(str(d.channel_id)) or not _is_gameplay_id(str(d.candidate_id)) or not ["creature", "encounter", "item"].has(domain) or not _is_bounded_integer(d.score_bp, 0, 10000) or d.accepted is not bool or not d.rationale_codes is Array or (d.rationale_codes as Array).is_empty(): return _reject("gameplay_decisions")
+		if bool(d.accepted) != (d.selected_id != null) or (d.selected_id != null and not _is_valid_world_id(str(d.selected_id))): return _reject("gameplay_decisions")
+		if not _validate_gameplay_rationales(d.rationale_codes, domain): return _reject("gameplay_decisions")
+		if domain == "creature":
+			if str(d.channel_id) != "gameplay.creature_blueprint": return _reject("gameplay_decisions")
+			if bool(d.accepted): selected_creatures[str(d.selected_id)] = true
+		elif domain == "item":
+			if not ["gameplay.item_affix", "gameplay.item_family"].has(str(d.channel_id)): return _reject("gameplay_decisions")
+			if bool(d.accepted): selected_items[str(d.selected_id)] = true
+		else:
+			var encounter_decision: Variant = encounter_decisions.get(str(d.decision_id), null)
+			if not encounter_decision is Dictionary or str(d.channel_id) != str((encounter_decision as Dictionary).get("channel_id", "")) or str(d.candidate_id) != str((encounter_decision as Dictionary).get("candidate_id", "")) or int(d.score_bp) != int((encounter_decision as Dictionary).get("score_bp", -1)) or bool(d.accepted) != bool((encounter_decision as Dictionary).get("accepted", false)) or not _same_json(d.selected_id, (encounter_decision as Dictionary).get("selected_spawn_id", null)): return _reject("gameplay_decisions")
+		decision_ids[str(d.decision_id)] = true
+	for blueprint_id in blueprint_ids:
+		if not selected_creatures.has(str(blueprint_id)): return _reject("gameplay_decisions")
+	for item_value in gameplay.get("items", []):
+		if item_value is Dictionary and not selected_items.has(str((item_value as Dictionary).get("id", ""))): return _reject("gameplay_decisions")
+	if encounter_decisions.size() > 0:
+		for decision_id in encounter_decisions:
+			if not decision_ids.has(str(decision_id)): return _reject("gameplay_decisions")
+	return true
+
+func _validate_creature_blueprint(value: Variant) -> bool:
+	if not value is Dictionary: return false
+	var b: Dictionary = value
+	var keys: Array[String] = ["id", "body_plan_id", "footprint_id", "rig_id", "animation_set_id", "ability_id", "behavior_id", "material_id", "counterplay_id", "threat_role", "threat_cost", "performance_cost", "instance_cap"]
+	if not _has_exact_keys(b, keys): return false
+	var id: String = str(b.get("id", ""))
+	var spec_value: Variant = CREATURE_SPECS.get(id, null)
+	if not spec_value is Dictionary: return false
+	var spec: Dictionary = spec_value
+	for key in keys.slice(1):
+		if not _same_json(b.get(key, null), spec.get(key, null)): return false
+	return true
+
+func _validate_encounter(value: Variant, blueprint_ids: Dictionary, site_ir: Dictionary, request: Dictionary) -> bool:
+	if not value is Dictionary: return _reject("encounter_shape")
+	var e: Dictionary = value
+	if not _has_exact_keys(e, ["schema_version", "composition_id", "spawns", "total_threat", "total_performance", "total_reward_value", "trace"]): return _reject("encounter_shape")
+	if str(e.schema_version) != "encounter-output-2" or not _is_valid_world_id(str(e.composition_id)) or not e.spawns is Array or (e.spawns as Array).size() > 128: return _reject("encounter_schema")
+	for key in ["total_threat", "total_performance", "total_reward_value"]:
+		if not _is_bounded_integer(e[key], 0, 1000000): return _reject("encounter_budget")
+	var rooms: Dictionary = {}
+	for room in (site_ir.get("ship", {}).get("topology", {}).get("rooms", []) as Array):
+		if room is Dictionary: rooms[int((room as Dictionary).get("id", -1))] = room
+	var protected_rooms: Dictionary = {int(site_ir.get("ship", {}).get("entry_room", -1)):true, int(site_ir.get("ship", {}).get("goal_room", -1)):true}
+	for room_id in site_ir.get("ship", {}).get("critical_path", []): protected_rooms[int(room_id)] = true
+	var decisions_by_id: Dictionary = {}
+	var trace_value: Variant = e.get("trace", null)
+	if not _validate_encounter_trace(trace_value, blueprint_ids, request): return false
+	for decision_value in (trace_value as Dictionary).get("decisions", []):
+		decisions_by_id[str((decision_value as Dictionary).get("decision_id", ""))] = decision_value
+	var spawn_ids: Dictionary = {}
+	var reward_sources: Dictionary = {}
+	var occupied_cells: Dictionary = {}
+	var instance_counts: Dictionary = {}
+	var selected_spawn_ids: Array = []
+	var threat_total: int = 0
+	var performance_total: int = 0
+	var reward_total: int = 0
+	for spawn_value in e.spawns:
+		if not spawn_value is Dictionary: return _reject("encounter_spawns")
+		var s: Dictionary = spawn_value
+		if not _has_exact_keys(s, ["spawn_id", "decision_id", "reward_source_id", "room", "cell", "blueprint_id", "faction_id", "threat_role", "ability_id", "threat_cost", "performance_cost", "reward_value"]): return _reject("encounter_spawns")
+		var spawn_id: String = str(s.spawn_id)
+		var reward_source: String = str(s.reward_source_id)
+		var blueprint_id: String = str(s.blueprint_id)
+		var faction_id: String = str(s.faction_id)
+		if not blueprint_ids.has(blueprint_id) or not rooms.has(int(s.room)) or protected_rooms.has(int(s.room)) or not _validate_cell_xy(s.cell) or not _is_valid_world_id(spawn_id) or not _is_valid_world_id(str(s.decision_id)) or not _is_valid_world_id(reward_source) or not ENCOUNTER_FACTIONS.has(faction_id) or spawn_ids.has(spawn_id) or reward_sources.has(reward_source): return _reject("encounter_spawns")
+		for key in ["threat_cost", "performance_cost", "reward_value"]:
+			if not _is_bounded_integer(s[key], 0, 10000): return _reject("encounter_spawns")
+		var blueprint: Dictionary = blueprint_ids[blueprint_id]
+		var faction: Dictionary = ENCOUNTER_FACTIONS[faction_id]
+		if str(s.threat_role) != str(blueprint.threat_role) or str(s.ability_id) != str(blueprint.ability_id) or int(s.threat_cost) != int(blueprint.threat_cost) or int(s.performance_cost) != int(blueprint.performance_cost) or not (faction.blueprints as Array).has(blueprint_id) or not (faction.roles as Array).has(str(s.threat_role)) or not (faction.abilities as Array).has(str(s.ability_id)) or not [25, 50, 100].has(int(s.reward_value)): return _reject("encounter_spawns")
+		var decision: Variant = decisions_by_id.get(str(s.decision_id), null)
+		if not decision is Dictionary or not bool((decision as Dictionary).get("accepted", false)) or str((decision as Dictionary).get("selected_spawn_id", "")) != spawn_id: return _reject("encounter_spawns")
+		var room_cells: Dictionary = {}
+		for cell_value in (rooms[int(s.room)] as Dictionary).get("cells", []):
+			if cell_value is Dictionary: room_cells[_cell_identity(cell_value)] = true
+		var spec: Dictionary = CREATURE_SPECS[blueprint_id]
+		for offset_value in spec.footprint:
+			var offset: Vector2i = offset_value
+			var footprint_cell: Dictionary = {"deck":int(s.cell.deck), "x":int(s.cell.x) + offset.x, "y":int(s.cell.y) + offset.y}
+			var cell_key: String = _cell_identity(footprint_cell)
+			if not room_cells.has(cell_key) or occupied_cells.has(cell_key): return _reject("encounter_spawns")
+			occupied_cells[cell_key] = true
+		instance_counts[blueprint_id] = int(instance_counts.get(blueprint_id, 0)) + 1
+		if int(instance_counts[blueprint_id]) > int(blueprint.instance_cap): return _reject("encounter_spawns")
+		spawn_ids[spawn_id] = true
+		reward_sources[reward_source] = true
+		selected_spawn_ids.append(spawn_id)
+		threat_total += int(s.threat_cost)
+		performance_total += int(s.performance_cost)
+		reward_total += int(s.reward_value)
+	var trace: Dictionary = trace_value
+	if not _same_json(trace.selected_spawn_ids, selected_spawn_ids): return _reject("encounter_spawns")
+	var budgets: Dictionary = trace.budgets
+	if threat_total != int(e.total_threat) or performance_total != int(e.total_performance) or reward_total != int(e.total_reward_value) or threat_total > int(budgets.threat_limit) or performance_total > int(budgets.performance_limit) or reward_total > int(budgets.economy_limit) or (e.spawns as Array).size() > int(budgets.group_cap): return _reject("encounter_budget")
+	if (e.spawns as Array).is_empty():
+		if int(e.total_threat) != 0 or int(e.total_performance) != 0 or int(e.total_reward_value) != 0 or str(trace.fallback) != "encounter-safe-empty" or str(trace.fallback_rationale) != "no_fair_spawn": return _reject("encounter_fallback")
+	elif trace.fallback != null or trace.fallback_rationale != null:
+		return _reject("encounter_fallback")
+	return true
+
+func _validate_encounter_trace(value: Variant, blueprint_ids: Dictionary, request: Dictionary) -> bool:
+	if not value is Dictionary: return _reject("encounter_trace")
+	var t: Dictionary = value
+	var keys: Array[String] = ["rules_version", "channel_ids", "player_values_bp", "budgets", "candidates", "decisions", "selected_spawn_ids", "fallback", "fallback_rationale"]
+	if not _has_exact_keys(t, keys) or str(t.rules_version) != "encounter-rules-2" or not _same_json(t.channel_ids, ENCOUNTER_RNG_CHANNELS) or not _validate_number_array(t.player_values_bp, 4, true, 0, 10000) or not t.candidates is Array or not t.decisions is Array or not t.selected_spawn_ids is Array or (t.candidates as Array).size() != (t.decisions as Array).size() or (t.candidates as Array).size() > 128: return _reject("encounter_trace")
+	var expected_values: Array = [5000, 5000, 5000, 5000]
+	for signal_value in request.get("player_model", {}).get("signals", []):
+		if signal_value is Dictionary:
+			var index: int = PLAYER_SIGNAL_KINDS.find(str((signal_value as Dictionary).get("kind", "")))
+			if index >= 0: expected_values[index] = int((signal_value as Dictionary).get("value_bp", 5000))
+	if not _same_json(t.player_values_bp, expected_values) or not _validate_encounter_budgets(t.budgets, request, expected_values): return _reject("encounter_trace")
+	var candidate_ids: Dictionary = {}
+	var decision_ids: Dictionary = {}
+	var decision_selected_ids: Array = []
+	for index in (t.candidates as Array).size():
+		var candidate_value: Variant = (t.candidates as Array)[index]
+		var decision_value: Variant = (t.decisions as Array)[index]
+		if not candidate_value is Dictionary or not decision_value is Dictionary: return _reject("encounter_trace")
+		var candidate: Dictionary = candidate_value
+		var decision: Dictionary = decision_value
+		if not _has_exact_keys(candidate, ["candidate_id", "channel_id", "room", "cell", "blueprint_id", "faction_id", "score_bp", "navigation_distance", "has_cover", "accepted", "rationale_codes"]) or not _has_exact_keys(decision, ["decision_id", "channel_id", "candidate_id", "score_bp", "accepted", "rationale_codes", "selected_spawn_id"]): return _reject("encounter_trace")
+		if not _is_valid_world_id(str(candidate.candidate_id)) or candidate_ids.has(str(candidate.candidate_id)) or str(candidate.channel_id) != "gameplay.encounter_candidate" or not blueprint_ids.has(str(candidate.blueprint_id)) or not ENCOUNTER_FACTIONS.has(str(candidate.faction_id)) or not _validate_cell_xy(candidate.cell) or not _is_bounded_integer(candidate.room, 0, 65535) or not _is_bounded_integer(candidate.score_bp, 0, 10000) or not _is_bounded_integer(candidate.navigation_distance, 0, 65535) or candidate.has_cover is not bool or candidate.accepted is not bool or not _validate_encounter_rationales(candidate.rationale_codes): return _reject("encounter_trace")
+		if not _is_valid_world_id(str(decision.decision_id)) or decision_ids.has(str(decision.decision_id)) or str(decision.channel_id) != "gameplay.encounter_selection" or str(decision.candidate_id) != str(candidate.candidate_id) or int(decision.score_bp) != int(candidate.score_bp) or bool(decision.accepted) != bool(candidate.accepted) or not _same_json(decision.rationale_codes, candidate.rationale_codes): return _reject("encounter_trace")
+		if bool(candidate.accepted) != (decision.selected_spawn_id != null) or (bool(candidate.accepted) and (not decision.selected_spawn_id is String or not _is_valid_world_id(str(decision.selected_spawn_id)) or not _same_json(candidate.rationale_codes, ["accepted"]))) or (not bool(candidate.accepted) and (candidate.rationale_codes as Array).has("accepted")): return _reject("encounter_trace")
+		if bool(candidate.accepted): decision_selected_ids.append(str(decision.selected_spawn_id))
+		candidate_ids[str(candidate.candidate_id)] = true
+		decision_ids[str(decision.decision_id)] = true
+	for selected_id in t.selected_spawn_ids:
+		if not selected_id is String or not _is_valid_world_id(str(selected_id)): return _reject("encounter_trace")
+	if not _same_json(t.selected_spawn_ids, decision_selected_ids): return _reject("encounter_trace")
+	if t.fallback != null and (not t.fallback is String or str(t.fallback) != "encounter-safe-empty"): return _reject("encounter_trace")
+	if t.fallback_rationale != null and (not t.fallback_rationale is String or not ENCOUNTER_RATIONALES.has(str(t.fallback_rationale))): return _reject("encounter_trace")
+	return true
+
+func _validate_items(items_value: Variant, drops_value: Variant, encounter: Variant, containers: Variant) -> bool:
+	if not items_value is Array or not drops_value is Array or not encounter is Dictionary or not containers is Array or (items_value as Array).size() != (drops_value as Array).size() or (items_value as Array).size() > 64: return _reject("items_shape")
+	var eligible_sources: Dictionary = {}
+	for container_value in containers:
+		if not container_value is Dictionary: return _reject("items_shape")
+		eligible_sources[str((container_value as Dictionary).get("id", ""))] = true
+	for spawn_value in (encounter as Dictionary).get("spawns", []):
+		if not spawn_value is Dictionary: return _reject("items_shape")
+		eligible_sources[str((spawn_value as Dictionary).get("reward_source_id", ""))] = true
+	var item_ids: Dictionary = {}
+	var drop_sources: Dictionary = {}
+	var economy_total: int = 0
+	for index in (items_value as Array).size():
+		var value: Variant = (items_value as Array)[index]
+		var drop_value: Variant = (drops_value as Array)[index]
+		if not value is Dictionary or not _has_exact_keys(value, ["id", "family_id", "rarity_id", "socket_id", "affixes", "stat_budget", "economy_value", "visual_tag"]): return _reject("items_shape")
+		if not drop_value is Dictionary or not _has_exact_keys(drop_value, ["item_id", "source_id", "frequency_bp"]): return _reject("drops_shape")
+		var item: Dictionary = value
+		var drop: Dictionary = drop_value
+		var family_value: Variant = ITEM_FAMILIES.get(str(item.family_id), null)
+		if not family_value is Dictionary or item_ids.has(str(item.id)) or not _is_valid_world_id(str(item.id)) or str(item.rarity_id) != "common" or not item.affixes is Array or (item.affixes as Array).size() > 1: return _reject("items_shape")
+		var family: Dictionary = family_value
+		if str(item.socket_id) != str(family.socket_id) or str(item.visual_tag) != str(family.visual_tag) or not _is_bounded_integer(item.stat_budget, 0, 200) or not _is_bounded_integer(item.economy_value, 0, 1000): return _reject("items_shape")
+		var expected_budget: int = 0
+		for affix_value in item.affixes:
+			if not affix_value is Dictionary or not _has_exact_keys(affix_value, ["affix_id", "stat", "value"]): return _reject("items_shape")
+			var affix: Dictionary = affix_value
+			if str(affix.affix_id) != str(family.affix_id) or str(affix.stat) != str(family.stat) or not _is_bounded_integer(affix.value, 10, 50): return _reject("items_shape")
+			expected_budget += int(affix.value)
+		var fallback_item: bool = str(item.id) == "item_baseline"
+		var expected_economy: int = int(family.base_value) + expected_budget * 2
+		var expected_frequency: int = 0 if fallback_item else int(family.frequency_bp)
+		if int(item.stat_budget) != expected_budget or int(item.economy_value) != expected_economy or (fallback_item and (str(item.family_id) != "tool" or not (item.affixes as Array).is_empty())): return _reject("items_shape")
+		if str(drop.item_id) != str(item.id) or not eligible_sources.has(str(drop.source_id)) or drop_sources.has(str(drop.source_id)) or not _is_bounded_integer(drop.frequency_bp, 0, 10000) or int(drop.frequency_bp) != expected_frequency: return _reject("drops_shape")
+		item_ids[str(item.id)] = true
+		drop_sources[str(drop.source_id)] = true
+		economy_total += int(item.economy_value)
+	if economy_total > 10000: return _reject("items_economy")
+	return true
+
+func _validate_encounter_budgets(value: Variant, request: Dictionary, player_values: Array) -> bool:
+	if not value is Dictionary or not _has_exact_keys(value, ["difficulty_id", "player_factor_bp", "threat_limit", "performance_limit", "economy_limit", "group_cap", "minimum_reward_value"]): return false
+	var difficulty_id: String = str(request.get("difficulty_id", ""))
+	var authored: Dictionary = {
+		"standard":{"threat":1000, "performance":800, "economy":400, "group":4},
+		"hardened":{"threat":1600, "performance":1200, "economy":600, "group":6},
+		"deep_dive":{"threat":2400, "performance":1800, "economy":800, "group":8},
+	}
+	if not authored.has(difficulty_id): return false
+	var base: Dictionary = authored[difficulty_id]
+	var adjustment: int = int(player_values[0]) - 5000 - _trunc_div(int(player_values[1]) - 5000, 2) - _trunc_div(int(player_values[2]) - 5000, 2) + _trunc_div(int(player_values[3]) - 5000, 4)
+	var factor: int = clampi(10000 + adjustment, 7500, 12500)
+	var loot_richness: int = int(request.get("site", {}).get("loot_richness_bp", 0))
+	var expected: Dictionary = {
+		"difficulty_id":difficulty_id,
+		"player_factor_bp":factor,
+		"threat_limit":mini(int(int(base.threat) * factor / 10000.0), 3000),
+		"performance_limit":mini(int(base.performance), 3000),
+		"economy_limit":mini(int(int(base.economy) * (30000 + loot_richness) / 30000.0), 2000),
+		"group_cap":int(base.group),
+		"minimum_reward_value":25,
+	}
+	return _same_json(value, expected)
+
+func _trunc_div(value: int, divisor: int) -> int:
+	return int(float(value) / float(divisor))
+
+func _validate_encounter_rationales(value: Variant) -> bool:
+	if not value is Array or (value as Array).is_empty(): return false
+	for rationale in value:
+		if not rationale is String or not ENCOUNTER_RATIONALES.has(str(rationale)): return false
+	return true
+
+func _validate_gameplay_rationales(value: Variant, domain: String) -> bool:
+	if not value is Array or (value as Array).is_empty(): return false
+	var unit_codes: Dictionary = {
+		"creature":["creature_validated", "creature_incompatible", "creature_selected"],
+		"item":["item_authored_compatible", "item_no_compatible_affix", "item_arithmetic_overflow", "item_incompatible", "item_economy_cap", "item_authored_baseline", "item_safe_empty"],
+	}
+	for rationale_value in value:
+		if not rationale_value is Dictionary: return false
+		var rationale: Dictionary = rationale_value
+		if domain == "encounter":
+			if not _has_exact_keys(rationale, ["code", "detail"]) or str(rationale.get("code", "")) != "encounter" or not ENCOUNTER_RATIONALES.has(str(rationale.get("detail", ""))): return false
+		elif not unit_codes.has(domain) or not _has_exact_keys(rationale, ["code"]) or not (unit_codes[domain] as Array).has(str(rationale.get("code", ""))):
+			return false
+	return true
+
+func _is_gameplay_id(value: String) -> bool:
+	return _is_bounded_contract_id(value, 128)
+
+func _is_presentation_id(value: String) -> bool:
+	return _is_bounded_contract_id(value, 96)
+
+func _is_bounded_contract_id(value: String, maximum: int) -> bool:
+	if value.is_empty() or value.length() > maximum: return false
+	for code in value.to_ascii_buffer():
+		if not ((code >= 97 and code <= 122) or (code >= 48 and code <= 57) or code in [58, 95, 45, 46]): return false
+	return true
+
+func _validate_cell_xy(value: Variant) -> bool:
+	return value is Dictionary and _has_exact_keys(value, ["x", "y"]) and _is_bounded_integer(value.x, -128, 127) and _is_bounded_integer(value.y, -128, 127)
+
 func _validate_gameplay(value: Variant, ship: Dictionary) -> bool:
 	if not value is Dictionary: return _reject("gameplay_slice_shape")
 	var gameplay: Dictionary = value
@@ -1018,6 +1337,58 @@ func _validate_gameplay(value: Variant, ship: Dictionary) -> bool:
 		if not _validate_objective(objective): return _reject("gameplay_slice_shape")
 	for container in gameplay.get("loot_containers", []):
 		if not _validate_loot_container(container): return _reject("gameplay_slice_shape")
+	return true
+
+func _validate_presentation(value: Dictionary, gameplay: Dictionary, site_ir: Dictionary) -> bool:
+	if not value.instructions is Array or not value.decisions is Array or not value.repairs is Array or not value.fallback_subjects is Array or value.instructions.is_empty() or value.instructions.size() != value.decisions.size() or value.instructions.size() > 128 or value.repairs.size() > 1: return _reject("presentation_shape")
+	var expected_assets: Dictionary = {
+		"environment:ambient":"asset:audio:ambient",
+		"ship:structural":"asset:primitive:structural",
+	}
+	for blueprint_value in gameplay.get("creature_blueprints", []):
+		if not blueprint_value is Dictionary: return _reject("presentation_shape")
+		var blueprint_id: String = str((blueprint_value as Dictionary).get("id", ""))
+		expected_assets["creature:%s" % blueprint_id] = "asset:primitive:%s" % blueprint_id
+	for item_value in gameplay.get("items", []):
+		if not item_value is Dictionary: return _reject("presentation_shape")
+		var item: Dictionary = item_value
+		var family: String = str(item.get("family_id", ""))
+		expected_assets["item:%s" % str(item.get("id", ""))] = "asset:primitive:item_%s" % family
+	for index in (site_ir.get("functional_props", []) as Array).size():
+		expected_assets["objective:%02d" % index] = "asset:primitive:objective"
+	var expected_subjects: Array = expected_assets.keys()
+	expected_subjects.sort()
+	if value.instructions.size() != expected_subjects.size() or not (value.fallback_subjects as Array).is_empty(): return _reject("presentation_shape")
+	var catalogue_assets: Array = PRESENTATION_ASSET_BINDINGS.keys()
+	catalogue_assets.sort()
+	for i in value.instructions.size():
+		var instruction: Variant = value.instructions[i]
+		var decision: Variant = value.decisions[i]
+		if not instruction is Dictionary or not decision is Dictionary or not _has_exact_keys(instruction, ["subject_id", "asset_ids", "adapter_binding_ids"]) or not _has_exact_keys(decision, ["decision_id", "channel", "considered", "rejected", "selected"]): return _reject("presentation_shape")
+		var subject_id: String = str((instruction as Dictionary).get("subject_id", ""))
+		var assets: Variant = (instruction as Dictionary).get("asset_ids", null)
+		var bindings: Variant = (instruction as Dictionary).get("adapter_binding_ids", null)
+		if subject_id != str(expected_subjects[i]) or not _is_presentation_id(subject_id) or not assets is Array or (assets as Array).size() != 1 or not bindings is Array or (bindings as Array).size() != 1: return _reject("presentation_instruction")
+		var asset_id: String = str((assets as Array)[0])
+		var binding_id: String = str((bindings as Array)[0])
+		if asset_id != str(expected_assets[subject_id]) or not PRESENTATION_ASSET_BINDINGS.has(asset_id) or binding_id != str(PRESENTATION_ASSET_BINDINGS[asset_id]): return _reject("presentation_binding")
+		var d: Dictionary = decision
+		if str(d.get("decision_id", "")) != "decision:%d" % i or str(d.get("channel", "")) != "presentation.asset_assembly" or str(d.get("selected", "")) != asset_id or not d.get("considered", null) is Array or not d.get("rejected", null) is Array or (d.considered as Array).size() + (d.rejected as Array).size() != catalogue_assets.size(): return _reject("presentation_decision")
+		var candidate_assets: Dictionary = {}
+		var selected_accepted: bool = false
+		for accepted_group in [true, false]:
+			var records: Array = d.considered if accepted_group else d.rejected
+			for record_value in records:
+				if not record_value is Dictionary or not _has_exact_keys(record_value, ["asset_id", "accepted", "rationale"]): return _reject("presentation_decision")
+				var record: Dictionary = record_value
+				var candidate_asset: String = str(record.get("asset_id", ""))
+				var rationale: String = str(record.get("rationale", ""))
+				if not PRESENTATION_ASSET_BINDINGS.has(candidate_asset) or candidate_assets.has(candidate_asset) or record.get("accepted", null) is not bool or bool(record.accepted) != accepted_group or (accepted_group and rationale != "eligible") or (not accepted_group and not ["incompatible_subject_kind", "missing_compatible_tag"].has(rationale)): return _reject("presentation_decision")
+				candidate_assets[candidate_asset] = true
+				if accepted_group and candidate_asset == asset_id: selected_accepted = true
+		if candidate_assets.size() != catalogue_assets.size() or not selected_accepted: return _reject("presentation_decision")
+	for repair in value.repairs:
+		if not repair is String or str(repair).is_empty(): return _reject("presentation_shape")
 	return true
 
 func _validate_objective(value: Variant) -> bool:
@@ -1044,7 +1415,7 @@ func _validate_loot_container(value: Variant) -> bool:
 		if not container.get(key, null) is String or str(container.get(key, "")).is_empty(): return false
 	return _validate_number_array(container.get("approach_cell", null), 3, true, -2147483648, 2147483647)
 
-func _validate_metrics_trace(metrics_value: Variant, trace_value: Variant, site_ir: Dictionary, ship: Dictionary, caps: Dictionary) -> bool:
+func _validate_metrics_trace(metrics_value: Variant, trace_value: Variant, site_ir: Dictionary, ship: Dictionary, gameplay_ir: Dictionary, caps: Dictionary) -> bool:
 	if not metrics_value is Dictionary or not trace_value is Dictionary: return _reject("diagnostic_shape")
 	var metrics: Dictionary = metrics_value
 	var trace: Dictionary = trace_value
@@ -1057,7 +1428,8 @@ func _validate_metrics_trace(metrics_value: Variant, trace_value: Variant, site_
 	var graph: Dictionary = ship.get("room_graph", {})
 	var plan: Dictionary = ship.get("plan", {})
 	var placements: int = (plan.get("placements", []) as Array).size() + (plan.get("floor_placements", []) as Array).size() + (plan.get("ceiling_placements", []) as Array).size()
-	if int(metrics.get("room_count", -1)) != (graph.get("nodes", []) as Array).size() or int(metrics.get("entity_count", -1)) != (ship.get("entities", []) as Array).size() \
+	var gameplay_entities: int = (gameplay_ir.get("encounter", {}).get("spawns", []) as Array).size() + (gameplay_ir.get("items", []) as Array).size()
+	if int(metrics.get("room_count", -1)) != (graph.get("nodes", []) as Array).size() or int(metrics.get("entity_count", -1)) != (ship.get("entities", []) as Array).size() + gameplay_entities \
 			or int(metrics.get("structural_placement_count", -1)) != placements: return _reject("metrics_identity")
 	var trace_cap: int = int(caps.get("max_trace_entries", 0))
 	for key in ["rng_channels", "candidate_decisions", "failed_constraints", "repairs", "retries"]:

@@ -23,6 +23,9 @@ var collision_shape: CollisionShape3D
 var marker: MeshInstance3D
 var marker_visible: bool = true
 
+const MAX_EXACT_DROP_ENTRIES: int = 64
+
+
 func _ready() -> void:
 	monitoring = true
 	monitorable = true
@@ -73,12 +76,16 @@ func try_interact(player_body: Node) -> bool:
 	# container is single-use, and the validation seam also relies on this pattern.
 	if candidate_player != player_body and not _is_player_in_direct_range(player_body):
 		return false
-	var rolled: Array = LootDistributionScript.roll(loot_table, seed_source, tables, loot_context)
+	var explicit: Dictionary = _explicit_generated_items()
+	var rolled: Array = explicit.items if bool(explicit.present) else LootDistributionScript.roll(loot_table, seed_source, tables, loot_context)
 	var granted: Array = []
 	for entry in rolled:
 		var item_id: String = str((entry as Dictionary).get("item_id", ""))
 		var qty: int = int((entry as Dictionary).get("quantity", 0))
 		if item_id.is_empty() or qty <= 0:
+			continue
+		if bool(explicit.present) and inventory_state.has_method("register_generated_item") \
+				and not bool(inventory_state.call("register_generated_item", entry)):
 			continue
 		var added: int = inventory_state.add_item(item_id, qty)
 		if added > 0:
@@ -89,6 +96,28 @@ func try_interact(player_body: Node) -> bool:
 	set_searched(true)
 	emit_signal("container_searched", container_id, granted)
 	return true
+
+func _explicit_generated_items() -> Dictionary:
+	if not loot_context.has("generated_items"):
+		return {"present": false, "items": []}
+	var raw: Variant = loot_context.get("generated_items")
+	if typeof(raw) != TYPE_ARRAY:
+		return {"present": true, "items": []}
+	var entries: Array = raw as Array
+	if entries.size() > MAX_EXACT_DROP_ENTRIES:
+		return {"present": true, "items": []}
+	var validated: Array = []
+	for raw_entry in entries:
+		if typeof(raw_entry) != TYPE_DICTIONARY:
+			return {"present": true, "items": []}
+		var entry: Dictionary = raw_entry as Dictionary
+		if typeof(entry.get("item_id", null)) != TYPE_STRING or str(entry.get("item_id", "")).is_empty():
+			return {"present": true, "items": []}
+		var quantity: Variant = entry.get("quantity", null)
+		if typeof(quantity) != TYPE_INT or int(quantity) != 1:
+			return {"present": true, "items": []}
+		validated.append(entry.duplicate(true))
+	return {"present": true, "items": validated}
 
 func _interaction_radius() -> float:
 	if collision_shape != null and collision_shape.shape is SphereShape3D:

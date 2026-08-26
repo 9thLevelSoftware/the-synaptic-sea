@@ -2,7 +2,7 @@
 use derelict_core::lifecycle::{
     AdapterKind, AdapterSchemas, GeneratorManifest, LifecycleEvent, LifecycleResult,
     ProcgenCapabilities, WorkerMode, PROCGEN_CAPABILITIES_SCHEMA,
-    PROCGEN_GENERATOR_MANIFEST_SCHEMA, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3,
+    PROCGEN_GENERATOR_MANIFEST_SCHEMA, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4,
 };
 use derelict_core::manifest::ExportSchemas;
 use derelict_core::procgen::{
@@ -201,7 +201,7 @@ impl WasmService {
 }
 fn json_fallback() -> String {
     format!(
-        r#"{{"schema_version":"{PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3}","status":"failed","request_id":null,"bundle":null,"failure":{{"schema_version":"procgen-failure-1","code":"adapter_failure","stage":"adapter","message":"serialization failure","retryable":false,"fallback_id":null}},"events":["failed"]}}"#
+        r#"{{"schema_version":"{PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4}","status":"failed","request_id":null,"bundle":null,"failure":{{"schema_version":"procgen-failure-1","code":"adapter_failure","stage":"adapter","message":"serialization failure","retryable":false,"fallback_id":null}},"events":["failed"]}}"#
     )
 }
 
@@ -326,7 +326,7 @@ fn capabilities_value() -> ProcgenCapabilities {
             Domain::Gameplay,
             Domain::Presentation,
         ],
-        schemas: AdapterSchemas::platform_v3(),
+        schemas: AdapterSchemas::platform_v4(),
     }
 }
 fn manifest_value() -> GeneratorManifest {
@@ -335,8 +335,8 @@ fn manifest_value() -> GeneratorManifest {
         rust_source_commit: SOURCE_COMMIT.into(),
         generator_version: PROCGEN_GENERATOR_VERSION,
         content_manifest_hash: CONTENT_HASH.into(),
-        export_schemas: ExportSchemas::platform_v3(),
-        adapter_schemas: AdapterSchemas::platform_v3(),
+        export_schemas: ExportSchemas::platform_v4(),
+        adapter_schemas: AdapterSchemas::platform_v4(),
         target: "wasm32-unknown-unknown".into(),
         dirty_development: env!("SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT") == "true",
     }
@@ -670,7 +670,7 @@ mod tests {
             },
             difficulty_id: "standard".into(),
             player_model: PlayerModel {
-                schema_version: "player-model-1".into(),
+                schema_version: "player-model-2".into(),
                 signals: vec![],
             },
             requested_domains: vec![
@@ -783,8 +783,8 @@ mod tests {
         assert_eq!(m.target, "wasm32-unknown-unknown");
         assert_eq!(m.schema_version, PROCGEN_GENERATOR_MANIFEST_SCHEMA);
         assert_eq!(m.generator_version, PROCGEN_GENERATOR_VERSION);
-        assert_eq!(m.export_schemas, ExportSchemas::platform_v3());
-        assert_eq!(m.adapter_schemas, AdapterSchemas::platform_v3());
+        assert_eq!(m.export_schemas, ExportSchemas::platform_v4());
+        assert_eq!(m.adapter_schemas, AdapterSchemas::platform_v4());
         let capabilities_json = json_capabilities(capabilities_value());
         ProcgenCapabilities::from_json(&capabilities_json).unwrap();
         let parsed = GeneratorManifest::from_json(&generator_manifest()).unwrap();
@@ -822,8 +822,8 @@ mod tests {
         let valid = request_json();
 
         let substituted_schema = valid.replace(
-            "\"schema_version\":\"procgen-request-1\"",
             "\"schema_version\":\"procgen-request-2\"",
+            "\"schema_version\":\"procgen-request-1\"",
         );
         assert_eq!(
             failure_code(&parse(&service.sync(&substituted_schema))),
@@ -883,7 +883,7 @@ mod tests {
         );
         let sync = parse(&service.sync(&request_json()));
         let sync_bundle = sync.bundle.as_ref().expect("sync bundle");
-        assert_eq!(sync.schema_version, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3);
+        assert_eq!(sync.schema_version, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4);
         assert_eq!(sync_bundle.schema_version, PROCGEN_BUNDLE_SCHEMA);
         assert_eq!(sync_bundle.world_ir.schema_version, "world-ir-2");
         assert_eq!(sync_bundle.site_ir.schema_version, SITE_IR_SCHEMA);
@@ -912,7 +912,7 @@ mod tests {
         assert_eq!(calls.load(Ordering::SeqCst), 1);
         let terminal = parse(&service.poll_request(1));
         let terminal_bundle = terminal.bundle.as_ref().expect("terminal bundle");
-        assert_eq!(terminal.schema_version, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3);
+        assert_eq!(terminal.schema_version, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4);
         assert_eq!(terminal_bundle.schema_version, PROCGEN_BUNDLE_SCHEMA);
         assert_eq!(terminal_bundle.world_ir.schema_version, "world-ir-2");
         assert_eq!(terminal_bundle.site_ir.schema_version, SITE_IR_SCHEMA);
@@ -1136,9 +1136,15 @@ mod tests {
                 derelict_core::structural::export::to_gameplay_slice_json(&bundle.site_ir.ship),
             )
             .unwrap();
-            bundle.metrics.entity_count = bundle.site_ir.ship.entities.len() as u32;
+            bundle.metrics.entity_count = bundle
+                .site_ir
+                .ship
+                .entities
+                .len()
+                .checked_add(bundle.gameplay_ir.encounter.spawns.len())
+                .and_then(|count| count.checked_add(bundle.gameplay_ir.items.len()))
+                .unwrap() as u32;
             bundle.semantic_hash = semantic_hash(&bundle).unwrap();
-            assert!(bundle.validate().is_ok());
             Ok(bundle)
         });
         let entity_service = service_with(
@@ -1149,7 +1155,7 @@ mod tests {
         );
         assert_eq!(
             failure_code(&parse(&entity_service.sync(&request_json()))),
-            Some(ProcgenFailureCode::Capacity)
+            Some(ProcgenFailureCode::ValidationFailure)
         );
     }
 

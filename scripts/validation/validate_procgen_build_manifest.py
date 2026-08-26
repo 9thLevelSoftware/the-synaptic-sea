@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate/check the deterministic Gate 0 procgen build manifest (stdlib only)."""
+"""Generate/check the deterministic unified procgen build manifest (stdlib only)."""
 from __future__ import annotations
 import argparse, hashlib, json, os, subprocess, sys
 from pathlib import Path
@@ -16,6 +16,12 @@ ARTIFACT = ROOT / "addons/derelict/bin/win64/derelict_godot.dll"
 CONTENT_ROOTS = [
     ROOT / "native/worldgen/crates/derelict_core/assets",
     *(ROOT / "data/procgen" / name for name in ("archetypes", "biomes", "difficulty", "encounter_tables", "templates")),
+    # Runtime adapters are part of the same authored-content identity as the
+    # Rust catalogues they bind. A binary/catalog mismatch must fail startup.
+    ROOT / "data/combat/threat_archetypes.json",
+    ROOT / "data/combat/threat_visual_catalog.json",
+    ROOT / "data/items/item_definitions.json",
+    ROOT / "data/kits/ship_structural_v0.json",
 ]
 
 def rel(path: Path) -> str:
@@ -24,7 +30,9 @@ def rel(path: Path) -> str:
 def files() -> list[Path]:
     result = []
     for base in CONTENT_ROOTS:
-        if base.exists():
+        if base.is_file():
+            result.append(base)
+        elif base.exists():
             result.extend(p for p in base.rglob("*") if p.is_file())
     return sorted(result, key=rel)
 
@@ -41,11 +49,11 @@ def content_document(paths: list[Path]) -> dict:
 
 def build_document(content_digest: str, source_commit: str, target: str, kind: str, artifact_path: str, artifact: Path) -> dict:
     return {
-        "manifest_schema": "procgen-build-manifest-2", "rust_source_commit": source_commit,
+        "manifest_schema": "procgen-build-manifest-3", "rust_source_commit": source_commit,
         "generator_version": 3, "content_manifest_path": "data/procgen/manifests/content_manifest.json",
         "content_manifest_hash": content_digest, "target": target,
         "artifact": {"kind": kind, "path": artifact_path, "sha256": hashlib.sha256(artifact.read_bytes()).hexdigest()},
-        "export_schemas": {"procgen_request":"procgen-request-1", "procgen_bundle":"procgen-bundle-3", "world_ir":"world-ir-2", "site_ir":"site-ir-2", "gameplay_ir":"gameplay-ir-1", "presentation_ir":"presentation-ir-1", "generation_trace":"generation-trace-2", "adaptive_proposal":"adaptive-proposal-1"},
+        "export_schemas": {"procgen_request":"procgen-request-2", "procgen_bundle":"procgen-bundle-4", "world_ir":"world-ir-2", "site_ir":"site-ir-2", "gameplay_ir":"gameplay-ir-2", "presentation_ir":"presentation-ir-2", "generation_trace":"generation-trace-3", "adaptive_proposal":"adaptive-proposal-1"},
     }
 
 def canonical(value: dict) -> str:

@@ -42,6 +42,33 @@
       "y_offset": 0.0,
       "scale": 0.85,
       "albedo": "#ff5959"
+    },
+    "creature_brute": {
+	  "asset_id": "asset:primitive:creature_brute",
+      "mesh_path": "",
+      "primitive": "box",
+      "y_offset": 0.0,
+      "scale": 1.35,
+      "albedo": "#b26b4b",
+      "binding_id": "binding:threat:brute"
+    },
+    "creature_drone": {
+	  "asset_id": "asset:primitive:creature_drone",
+      "mesh_path": "",
+      "primitive": "sphere",
+      "y_offset": 0.1,
+      "scale": 0.7,
+      "albedo": "#72d6c2",
+      "binding_id": "binding:threat:drone"
+    },
+    "creature_siren": {
+	  "asset_id": "asset:primitive:creature_siren",
+      "mesh_path": "",
+      "primitive": "cylinder",
+      "y_offset": 0.0,
+      "scale": 1.1,
+      "albedo": "#c782e8",
+      "binding_id": "binding:threat:siren"
     }
   }
 }
