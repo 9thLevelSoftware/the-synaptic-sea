@@ -654,4 +654,16 @@ mod tests {
             ]
         );
     }
+    #[test]
+    fn bundled_rules_parse_and_generate_complete_candidate() {
+        let rules = WorldRules::bundled().unwrap(); rules.validate().unwrap();
+        let req = WorldGenerationRequest { world_seed: 42, platform_version: 3, content_manifest_hash: "a".repeat(64), site_id: "selected".into(), x: 4, y: 7, archetype_id: "shuttle".into() };
+        let world = generate_candidate(&req, &rules).unwrap(); assert_eq!(world.markers.len(), 9); assert_eq!(world.biome_fields.len(), 9); world.validate_with_rules(&rules).unwrap();
+    }
+    #[test]
+    fn request_boundary_and_closed_json_are_rejected() {
+        let rules=WorldRules::bundled().unwrap(); let mut req=WorldGenerationRequest { world_seed: MAX_PUBLIC_SEED+1, platform_version:3, content_manifest_hash:"a".repeat(64), site_id:"s".into(),x:1,y:1,archetype_id:"shuttle".into() }; assert!(generate_candidate(&req,&rules).is_err()); req.world_seed=1; let bad=serde_json::to_string(&rules).unwrap().replace("}",",\"extra\":1}"); assert!(serde_json::from_str::<WorldRules>(&bad).is_err());
+    }
+    #[test]
+    fn fallback_is_closed_and_does_not_force_archetype() { let fallback=WorldFallback::bundled().unwrap(); assert_eq!(fallback.platform_version,3); assert!(serde_json::from_str::<WorldFallback>("{\"schema_version\":\"world-fallback-1\",\"platform_version\":3,\"fallback_id\":\"x\",\"biome_id\":\"b\",\"hazard_id\":\"h\",\"landmarks\":[],\"route_cost_bp\":1,\"extra\":1}").is_err()); }
 }
