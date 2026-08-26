@@ -114,6 +114,13 @@ fn apply_trace_constraints(root: &mut Value) {
     trace["properties"]["stage_timings_micros"] = serde_json::json!({"type":"object","maxProperties":4096,"propertyNames":{"minLength":1},"additionalProperties":{"type":"integer","minimum":0,"maximum":3600000000u64}});
 }
 
+fn apply_metrics_constraints(root: &mut Value) {
+    let metrics = def(root, "GenerationMetrics");
+    metrics["properties"]["schema_version"] = serde_json::json!({"const":"generation-metrics-1"});
+    metrics["properties"]["pipeline_executions"] = serde_json::json!({"const":1});
+    metrics["properties"]["stage_timings_micros"] = serde_json::json!({"type":"object","maxProperties":4096,"propertyNames":{"minLength":1},"additionalProperties":{"type":"integer","minimum":0,"maximum":3600000000u64}});
+}
+
 fn upgrade_draft2020(value: &mut Value) {
     match value {
         Value::Object(map) => {
@@ -191,48 +198,10 @@ fn enrich(name: &str, root: &mut Value) {
     if matches!(name, "generation-trace-1" | "procgen-bundle-1") {
         apply_trace_constraints(root);
     }
-    if name == "procgen-request-1" {
-        let request = def(root, definition);
-        let props = request["properties"].as_object_mut().unwrap();
-        props["content_manifest_hash"] =
-            serde_json::json!({"type":"string","pattern":"^[a-f0-9]{64}$"});
-        props["generator_version"] = serde_json::json!({"const":2});
-        props["difficulty_id"] = serde_json::json!({"type":"string","minLength":1});
-        let site = def(root, "SiteRequest");
-        let site_props = site["properties"].as_object_mut().unwrap();
-        site_props["intactness_override_bp"] = serde_json::json!({"anyOf":[{"type":"null"},{"type":"integer","minimum":0,"maximum":10000}]});
-        site_props["loot_richness_bp"] =
-            serde_json::json!({"type":"integer","minimum":0,"maximum":30000});
-        site_props["site_id"] = serde_json::json!({"type":"string","minLength":1});
-        site_props["archetype_id"] = serde_json::json!({"type":"string","minLength":1});
-        site_props["kit_id"] = serde_json::json!({"type":"string","minLength":1});
-        let pres = def(root, "PresentationRequest");
-        pres["properties"]["locale"] =
-            serde_json::json!({"type":"string","pattern":"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"});
-        let domains = def(root, "ProcgenRequest")["properties"]["requested_domains"]
-            .as_object_mut()
-            .unwrap();
-        domains.insert("minItems".into(), serde_json::json!(1));
-        domains.insert("uniqueItems".into(), serde_json::json!(true));
-        let player = def(root, "PlayerModel");
-        player["properties"]["schema_version"] = serde_json::json!({"const":"player-model-1"});
-    } else if name == "gameplay-ir-1" {
-        let slice = def(root, "GameplaySlice");
-        slice["properties"]["schema_version"] = serde_json::json!({"const":"1.1.0"});
-        slice["properties"]["document_kind"] = serde_json::json!({"const":"ship_gameplay_slice"});
-        slice["properties"]["program_id"] = serde_json::json!({"type":"string","minLength":1});
-        slice["properties"]["start_room"] = serde_json::json!({"type":"string","minLength":1});
-        slice["properties"]["goal_room"] = serde_json::json!({"type":"string","minLength":1});
-        slice["properties"]["summary"] = serde_json::json!({"type":"string","minLength":1});
-        slice["properties"]["fire_zones"] = serde_json::json!({"type":"array","maxItems":0});
-    } else if name == "adaptive-proposal-1" {
-        let proposal = def(root, "AdaptiveProposal");
-        proposal["properties"]["confidence_bp"] =
-            serde_json::json!({"type":"integer","minimum":0,"maximum":10000});
-        proposal["properties"]["rationale_codes"] = serde_json::json!({"type":"array","minItems":1,"items":{"type":"string","minLength":1}});
-        proposal["properties"]["rule_model_version"] =
-            serde_json::json!({"type":"string","minLength":1});
-    } else if name == "procgen-bundle-1" {
+    if matches!(name, "generation-metrics-1" | "procgen-bundle-1") {
+        apply_metrics_constraints(root);
+    }
+    if name == "procgen-bundle-1" {
         for (nested, nested_version) in [
             ("WorldIR", "world-ir-1"),
             ("SiteIR", "site-ir-1"),
@@ -243,27 +212,11 @@ fn enrich(name: &str, root: &mut Value) {
         ] {
             const_field(root, nested, "schema_version", nested_version);
         }
-        def(root, "GameplaySlice")["properties"]["schema_version"] =
-            serde_json::json!({"const":"1.1.0"});
-        def(root, "GameplaySlice")["properties"]["document_kind"] =
-            serde_json::json!({"const":"ship_gameplay_slice"});
-        def(root, "GameplaySlice")["properties"]["fire_zones"] =
-            serde_json::json!({"type":"array","maxItems":0});
-        def(root, "GenerationMetrics")["properties"]["pipeline_executions"] =
-            serde_json::json!({"const":1});
-        def(root, "GenerationTrace")["properties"]["rng_channels"] = serde_json::json!({"const":["meta","hull","template","topology","residual_fill","door","furnish","story","intact","breach","scorch","seal","bodies","fracture","debris","loot"]});
-        for field in [
-            "candidate_decisions",
-            "failed_constraints",
-            "repairs",
-            "retries",
-        ] {
-            def(root, "GenerationTrace")["properties"][field] = serde_json::json!({"type":"array","maxItems":4096,"items":{"type":"string","minLength":1}});
-        }
-        def(root, "GenerationTrace")["properties"]["fallback"] =
-            serde_json::json!({"anyOf":[{"type":"null"},{"type":"string","minLength":1}]});
-        def(root, "GenerationTrace")["properties"]["stage_timings_micros"] = serde_json::json!({"type":"object","maxProperties":4096,"propertyNames":{"minLength":1},"additionalProperties":{"type":"integer","minimum":0,"maximum":3600000000u64}});
         def(root, "VersionEnvelope")["properties"]["content_manifest_hash"] =
+            serde_json::json!({"type":"string","pattern":"^[a-f0-9]{64}$"});
+        def(root, "VersionEnvelope")["properties"]["generator_version"] =
+            serde_json::json!({"const":2});
+        def(root, "ProcgenBundle")["properties"]["semantic_hash"] =
             serde_json::json!({"type":"string","pattern":"^[a-f0-9]{64}$"});
         let exports = def(root, "ExportSchemas")["properties"]
             .as_object_mut()
@@ -280,23 +233,6 @@ fn enrich(name: &str, root: &mut Value) {
         ] {
             exports[field] = serde_json::json!({"const":value});
         }
-    } else if name == "generation-metrics-1" {
-        def(root, "GenerationMetrics")["properties"]["pipeline_executions"] =
-            serde_json::json!({"const":1});
-    } else if name == "generation-trace-1" {
-        let trace = def(root, "GenerationTrace");
-        trace["properties"]["rng_channels"] = serde_json::json!({"const":["meta","hull","template","topology","residual_fill","door","furnish","story","intact","breach","scorch","seal","bodies","fracture","debris","loot"]});
-        for field in [
-            "candidate_decisions",
-            "failed_constraints",
-            "repairs",
-            "retries",
-        ] {
-            trace["properties"][field] = serde_json::json!({"type":"array","maxItems":4096,"items":{"type":"string","minLength":1}});
-        }
-        trace["properties"]["fallback"] =
-            serde_json::json!({"anyOf":[{"type":"null"},{"type":"string","minLength":1}]});
-        trace["properties"]["stage_timings_micros"] = serde_json::json!({"type":"object","maxProperties":4096,"propertyNames":{"minLength":1},"additionalProperties":{"type":"integer","minimum":0,"maximum":3600000000u64}});
     } else if name == "procgen-failure-1" {
         let failure = def(root, "ProcgenFailure");
         failure["properties"]["stage"] = serde_json::json!({"type":"string","minLength":1});

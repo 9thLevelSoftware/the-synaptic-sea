@@ -617,9 +617,13 @@
         },
         "stage_timings_micros": {
           "additionalProperties": {
-            "format": "uint128",
-            "minimum": 0.0,
+            "maximum": 3600000000,
+            "minimum": 0,
             "type": "integer"
+          },
+          "maxProperties": 4096,
+          "propertyNames": {
+            "minLength": 1
           },
           "type": "object"
         },
@@ -1593,9 +1597,7 @@
           "$ref": "#/definitions/ExportSchemas"
         },
         "generator_version": {
-          "format": "uint32",
-          "minimum": 0.0,
-          "type": "integer"
+          "const": 2
         }
       },
       "required": [
@@ -1725,6 +1727,7 @@
       "const": "procgen-bundle-1"
     },
     "semantic_hash": {
+      "pattern": "^[a-f0-9]{64}$",
       "type": "string"
     },
     "site_ir": {

@@ -299,6 +299,26 @@ fn injected_invalid_ship_fails_closed_before_bundle() {
 }
 
 #[test]
+fn injected_valid_ship_with_invalid_bundle_trace_fails_at_bundle_validation() {
+    let data = derelict_core::GenData::default_bundle().unwrap();
+    let mut report =
+        derelict_core::generate_ship_timed(42, &derelict_core::GenParams::new("shuttle"), &data)
+            .unwrap();
+    report.candidate_decisions = vec!["candidate".into(); 4097];
+    let result = generate_bundle_with_pipeline(request(), &data, || Ok(report));
+    assert!(matches!(
+        result,
+        Err(ProcgenFailure {
+            code: ProcgenFailureCode::ValidationFailure,
+            ..
+        })
+    ));
+    if let Err(failure) = result {
+        assert_eq!(failure.stage, "bundle");
+    }
+}
+
+#[test]
 fn draft_schema_accepts_serialized_bundle_and_all_actions() {
     let data = derelict_core::GenData::default_bundle().unwrap();
     let bundle = generate_bundle(request(), &data).unwrap();

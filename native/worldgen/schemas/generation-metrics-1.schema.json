@@ -20,9 +20,13 @@
     },
     "stage_timings_micros": {
       "additionalProperties": {
-        "format": "uint128",
-        "minimum": 0.0,
+        "maximum": 3600000000,
+        "minimum": 0,
         "type": "integer"
+      },
+      "maxProperties": 4096,
+      "propertyNames": {
+        "minLength": 1
       },
       "type": "object"
     },
