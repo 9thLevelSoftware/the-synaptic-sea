@@ -9,11 +9,15 @@ pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA: &str =
 pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2: &str =
     crate::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2;
 pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3: &str = PROCGEN_LIFECYCLE_RESULT_SCHEMA;
+pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4: &str =
+    crate::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4;
 pub const PROCGEN_CAPABILITIES_SCHEMA_V1: &str = "procgen-capabilities-1";
 pub const PROCGEN_CAPABILITIES_SCHEMA_V2: &str = "procgen-capabilities-2";
+pub const PROCGEN_CAPABILITIES_SCHEMA_V3: &str = "procgen-capabilities-3";
 pub const PROCGEN_CAPABILITIES_SCHEMA: &str = PROCGEN_CAPABILITIES_SCHEMA_V2;
 pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA_V1: &str = "procgen-generator-manifest-1";
 pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA_V2: &str = "procgen-generator-manifest-2";
+pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA_V3: &str = "procgen-generator-manifest-3";
 pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA: &str = PROCGEN_GENERATOR_MANIFEST_SCHEMA_V2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -217,6 +221,14 @@ impl AdapterSchemas {
             lifecycle_result: PROCGEN_LIFECYCLE_RESULT_SCHEMA.into(),
             capabilities: PROCGEN_CAPABILITIES_SCHEMA.into(),
             generator_manifest: PROCGEN_GENERATOR_MANIFEST_SCHEMA.into(),
+        }
+    }
+
+    pub fn platform_v4() -> Self {
+        Self {
+            lifecycle_result: PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4.into(),
+            capabilities: PROCGEN_CAPABILITIES_SCHEMA_V3.into(),
+            generator_manifest: PROCGEN_GENERATOR_MANIFEST_SCHEMA_V3.into(),
         }
     }
 }
