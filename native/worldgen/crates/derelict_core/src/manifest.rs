@@ -96,7 +96,7 @@ impl BuildManifest {
         }
         let mut previous = None;
         for file in &content.files {
-            if !file.path.is_ascii() || file.path.contains('\\') || file.path.starts_with('/') || !is_sha256(&file.sha256) {
+            if !file.path.is_ascii() || file.path.contains('\\') || file.path.contains(':') || file.path.starts_with('/') || file.path.split('/').any(|part| part.is_empty() || part == "." || part == "..") || !is_sha256(&file.sha256) {
                 return Err(ManifestError::InvalidField("content_manifest.files"));
             }
             if let Some(prev) = previous { if prev >= file.path.as_str() { return Err(ManifestError::InvalidField("content_manifest.files")); } }
@@ -106,5 +106,5 @@ impl BuildManifest {
     }
 }
 
-fn is_hex(value: &str) -> bool { value.bytes().all(|b| b.is_ascii_hexdigit()) }
+fn is_hex(value: &str) -> bool { value.bytes().all(|b| b.is_ascii_digit() || (b >= b'a' && b <= b'f')) }
 fn is_sha256(value: &str) -> bool { value.len() == 64 && is_hex(value) && value == value.to_ascii_lowercase() }

@@ -55,4 +55,11 @@ fn every_required_build_field_is_enforced() {
         let json = VALID.replace(needle, replacement);
         assert!(BuildManifest::from_json(&json).is_err(), "tampered field {needle}");
     }
+    for schema in ["procgen_request", "procgen_bundle", "world_ir", "site_ir", "gameplay_ir", "presentation_ir", "generation_trace", "adaptive_proposal"] {
+        let marker = match schema {
+            "procgen_request" => "procgen-request-1", "procgen_bundle" => "procgen-bundle-1", "world_ir" => "world-ir-1", "site_ir" => "site-ir-1",
+            "gameplay_ir" => "gameplay-ir-1", "presentation_ir" => "presentation-ir-1", "generation_trace" => "generation-trace-1", _ => "adaptive-proposal-1",
+        };
+        assert!(BuildManifest::from_json(&VALID.replace(marker, "wrong-schema")).is_err(), "tampered schema {schema}");
+    }
 }

@@ -27,7 +27,7 @@ class ManifestToolTests(unittest.TestCase):
     def test_check_rejects_stale_content_without_writing(self):
         with tempfile.TemporaryDirectory() as root:
             base = Path(root); (base / "data/procgen/manifests/build").mkdir(parents=True)
-            (base / "data/procgen/manifests/content_manifest.json").write_text("stale", encoding="utf-8")
+            stale = base / "data/procgen/manifests/content_manifest.json"; stale.write_bytes(b"stale")
             (base / "addons/derelict/bin/win64").mkdir(parents=True)
             artifact = base / "addons/derelict/bin/win64/derelict_godot.dll"; artifact.write_bytes(b"dll")
             old = (TOOL.ROOT, TOOL.CONTENT_MANIFEST, TOOL.BUILD_MANIFEST, TOOL.ARTIFACT, TOOL.CONTENT_ROOTS)
@@ -37,8 +37,19 @@ class ManifestToolTests(unittest.TestCase):
                 old_argv = sys.argv; sys.argv = [str(SCRIPT), "--check"]
                 try:
                     with redirect_stderr(io.StringIO()): self.assertEqual(TOOL.main(), 1)
+                    self.assertEqual(stale.read_bytes(), b"stale")
                 finally: sys.argv = old_argv; TOOL.subprocess.run = old_run
             finally:
                 TOOL.ROOT, TOOL.CONTENT_MANIFEST, TOOL.BUILD_MANIFEST, TOOL.ARTIFACT, TOOL.CONTENT_ROOTS = old
+
+    def test_source_commit_must_be_lowercase_and_present(self):
+        old_argv = sys.argv
+        try:
+            sys.argv = [str(SCRIPT), "--check", "--source-commit", "Z" * 40]
+            self.assertEqual(TOOL.main(), 1)
+            sys.argv = [str(SCRIPT), "--check", "--source-commit", "0" * 40]
+            self.assertEqual(TOOL.main(), 1)
+        finally:
+            sys.argv = old_argv
 
 if __name__ == "__main__": unittest.main()

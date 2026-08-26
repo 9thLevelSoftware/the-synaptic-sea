@@ -79,7 +79,9 @@ func _content_digest(entries: Array) -> String:
 		var allowed: bool = false
 		for prefix in ["native/worldgen/crates/derelict_core/assets/", "data/procgen/archetypes/", "data/procgen/biomes/", "data/procgen/difficulty/", "data/procgen/encounter_tables/", "data/procgen/templates/"]:
 			if path.begins_with(prefix): allowed = true
-		if path.is_empty() or path.contains("\\") or path.begins_with("/") or not allowed: return ""
+		if path.is_empty() or path.contains("\\") or path.contains(":") or path.begins_with("/") or not allowed: return ""
+		for segment in path.split("/"):
+			if segment.is_empty() or segment == "." or segment == "..": return ""
 		if paths.has(path) or (not paths.is_empty() and paths[-1] >= path): return ""
 		paths.append(path)
 		var absolute: String = "res://" + path
