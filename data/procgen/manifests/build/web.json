@@ -1,0 +1,23 @@
+{
+  "manifest_schema": "procgen-build-manifest-1",
+  "rust_source_commit": "6692b3c1089db94f1ed8d1d6bca20c19ce5d6543",
+  "generator_version": 2,
+  "content_manifest_path": "data/procgen/manifests/content_manifest.json",
+  "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2",
+  "target": "wasm32-unknown-unknown",
+  "artifact": {
+    "kind": "wasm",
+    "path": "addons/derelict/bin/web/derelict_wasm_bg.wasm",
+    "sha256": "f1a9f68646104b7aff0147149e91daa4604dd84b26b1ae00de7ac4c21e70aaf9"
+  },
+  "export_schemas": {
+    "procgen_request": "procgen-request-1",
+    "procgen_bundle": "procgen-bundle-1",
+    "world_ir": "world-ir-1",
+    "site_ir": "site-ir-1",
+    "gameplay_ir": "gameplay-ir-1",
+    "presentation_ir": "presentation-ir-1",
+    "generation_trace": "generation-trace-1",
+    "adaptive_proposal": "adaptive-proposal-1"
+  }
+}
