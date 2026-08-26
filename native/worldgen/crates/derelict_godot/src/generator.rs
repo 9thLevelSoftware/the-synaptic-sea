@@ -4,7 +4,8 @@ use crate::convert::{gen_params_from_dict, ship_to_dictionary};
 use crate::service::{Limits, Service, SystemClock};
 use derelict_core::lifecycle::{
     AdapterKind, AdapterSchemas, GeneratorManifest, LifecycleEvent, LifecycleResult,
-    ProcgenCapabilities, WorkerMode,
+    ProcgenCapabilities, WorkerMode, PROCGEN_CAPABILITIES_SCHEMA,
+    PROCGEN_GENERATOR_MANIFEST_SCHEMA,
 };
 use derelict_core::manifest::ExportSchemas;
 use derelict_core::model::GenParams;
@@ -54,7 +55,7 @@ fn manifest_failure(message: &str) -> ProcgenFailure {
 
 pub(crate) fn runtime_manifest() -> Result<GeneratorManifest, ProcgenFailure> {
     let manifest = GeneratorManifest {
-        schema_version: "procgen-generator-manifest-1".into(),
+        schema_version: PROCGEN_GENERATOR_MANIFEST_SCHEMA.into(),
         rust_source_commit: SOURCE_COMMIT.into(),
         generator_version: PROCGEN_GENERATOR_VERSION,
         content_manifest_hash: CONTENT_HASH.into(),
@@ -72,7 +73,7 @@ pub(crate) fn runtime_manifest() -> Result<GeneratorManifest, ProcgenFailure> {
 pub(crate) fn runtime_capabilities() -> Result<ProcgenCapabilities, ProcgenFailure> {
     let limits = Limits::default();
     let capabilities = ProcgenCapabilities {
-        schema_version: "procgen-capabilities-1".into(),
+        schema_version: PROCGEN_CAPABILITIES_SCHEMA.into(),
         adapter_kind: AdapterKind::Native,
         target: TARGET.into(),
         supports_sync: true,

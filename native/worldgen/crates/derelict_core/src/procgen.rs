@@ -1,6 +1,7 @@
 //! Versioned contracts and the single-pass generation bundle.
 use crate::manifest::ExportSchemas;
 use crate::model::{CauseOfLoss, Ship, GENERATOR_VERSION};
+pub use crate::site::SiteIR;
 pub use crate::world::WorldIR;
 use crate::world::{WorldGenerationRequest, WorldRules};
 use crate::{generate_ship_timed, GenData, GenParams};
@@ -9,9 +10,10 @@ use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::time::Instant;
 
 pub const PROCGEN_REQUEST_SCHEMA: &str = crate::manifest::PROCGEN_REQUEST_SCHEMA;
-pub const PROCGEN_BUNDLE_SCHEMA: &str = crate::manifest::PROCGEN_BUNDLE_SCHEMA_V2;
+pub const PROCGEN_BUNDLE_SCHEMA: &str = crate::manifest::PROCGEN_BUNDLE_SCHEMA_V3;
 pub const WORLD_IR_SCHEMA: &str = crate::manifest::WORLD_IR_SCHEMA_V2;
 pub const SITE_IR_SCHEMA: &str = crate::manifest::SITE_IR_SCHEMA;
 pub const GAMEPLAY_IR_SCHEMA: &str = crate::manifest::GAMEPLAY_IR_SCHEMA;
@@ -21,7 +23,7 @@ pub const ADAPTIVE_PROPOSAL_SCHEMA: &str = crate::manifest::ADAPTIVE_PROPOSAL_SC
 pub const PLAYER_MODEL_SCHEMA: &str = "player-model-1";
 pub const FAILURE_SCHEMA: &str = "procgen-failure-1";
 pub const GENERATION_METRICS_SCHEMA: &str = "generation-metrics-1";
-const RNG_CHANNELS: [&str; 23] = [
+const RNG_CHANNELS: [&str; 27] = [
     "world.archetype",
     "world.biome",
     "world.hazard",
@@ -29,6 +31,10 @@ const RNG_CHANNELS: [&str; 23] = [
     "world.landmark",
     "world.route_cost",
     "site.structural",
+    "site.mission_template",
+    "site.gate_order",
+    "site.functional_props",
+    "site.spatial_annotations",
     "meta",
     "hull",
     "template",
@@ -104,12 +110,6 @@ pub struct VersionEnvelope {
     pub export_schemas: ExportSchemas,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct SiteIR {
-    pub schema_version: String,
-    pub ship: Ship,
-}
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GameplayIR {
@@ -205,6 +205,39 @@ pub struct ProcgenBundle {
     pub trace: GenerationTrace,
 }
 
+fn parse_stage_fallbacks(
+    fallback: Option<&str>,
+) -> Result<(Option<&str>, Option<&str>), ProcgenError> {
+    let Some(fallback) = fallback else {
+        return Ok((None, None));
+    };
+    let mut world = None;
+    let mut site = None;
+    for part in fallback.split('|') {
+        if let Some(id) = part.strip_prefix("world:") {
+            if id.is_empty() || world.replace(id).is_some() || site.is_some() {
+                return Err(ProcgenError::InvalidRequest("fallback"));
+            }
+        } else if let Some(id) = part.strip_prefix("site:") {
+            if id.is_empty() || site.replace(id).is_some() {
+                return Err(ProcgenError::InvalidRequest("fallback"));
+            }
+        } else {
+            return Err(ProcgenError::InvalidRequest("fallback"));
+        }
+    }
+    Ok((world, site))
+}
+
+fn compose_stage_fallbacks(world: Option<String>, site: Option<String>) -> Option<String> {
+    match (world, site) {
+        (None, None) => None,
+        (Some(world), None) => Some(format!("world:{world}")),
+        (None, Some(site)) => Some(format!("site:{site}")),
+        (Some(world), Some(site)) => Some(format!("world:{world}|site:{site}")),
+    }
+}
+
 impl ProcgenBundle {
     pub fn from_json(json: &str) -> Result<Self, ProcgenError> {
         let value: Value = serde_json::from_str(json)?;
@@ -249,15 +282,15 @@ impl ProcgenBundle {
         };
         let rules =
             WorldRules::bundled().map_err(|_| ProcgenError::InvalidRequest("world_rules"))?;
-        let valid_world = if self.trace.fallback.is_some() {
+        let (world_fallback_id, site_fallback_id) =
+            parse_stage_fallbacks(self.trace.fallback.as_deref())?;
+        let valid_world = if let Some(world_fallback_id) = world_fallback_id {
             let fallback = crate::world::WorldFallback::bundled()
                 .map_err(|_| ProcgenError::InvalidRequest("world_fallback"))?;
-            if self.trace.fallback.as_deref() != Some(fallback.fallback_id.as_str())
-                || self
-                    .trace
-                    .repairs
-                    .iter()
-                    .any(|r| r != "reconciled:fragment_metadata")
+            if world_fallback_id != fallback.fallback_id
+                || self.trace.repairs.iter().any(|repair| {
+                    repair != "reconciled:fragment_metadata" && !repair.starts_with("site:")
+                })
                 || !self
                     .trace
                     .candidate_decisions
@@ -293,69 +326,52 @@ impl ProcgenBundle {
         {
             return Err(ProcgenError::InvalidRequest("world_identity"));
         }
+        crate::site::validate_site_for_request(&self.site_ir, &world_request)
+            .map_err(|_| ProcgenError::InvalidRequest("site"))?;
+        let site_repairs = self
+            .trace
+            .repairs
+            .iter()
+            .filter_map(|repair| repair.strip_prefix("site:"))
+            .collect::<Vec<_>>();
+        if site_repairs.len() > 2
+            || site_repairs
+                .iter()
+                .any(|repair| !matches!(*repair, "relocate_required_prop" | "replace_gate_binding"))
+        {
+            return Err(ProcgenError::InvalidRequest("site_repairs"));
+        }
+        let rejected_site_candidate = self
+            .trace
+            .candidate_decisions
+            .iter()
+            .any(|decision| decision == "site:rejected_candidate");
+        let selected_site_fallback = self
+            .trace
+            .candidate_decisions
+            .iter()
+            .any(|decision| decision == "site:selected_fallback");
+        match site_fallback_id {
+            Some("authored-safe-return")
+                if self.site_ir.mission_graph.mission_id == "authored-safe-return"
+                    && rejected_site_candidate
+                    && selected_site_fallback => {}
+            None if self.site_ir.mission_graph.mission_id != "authored-safe-return"
+                && !rejected_site_candidate
+                && !selected_site_fallback => {}
+            _ => return Err(ProcgenError::InvalidRequest("site_fallback_trace")),
+        }
         if self.presentation_ir.kit_id != self.request.site.kit_id
             || self.presentation_ir.locale != self.request.presentation.locale
             || self.presentation_ir.seed != self.request.presentation.seed
         {
             return Err(ProcgenError::InvalidRequest("presentation_identity"));
         }
-        if self.site_ir.ship.generator_version != GENERATOR_VERSION
-            || self.site_ir.ship.seed != self.world_ir.site_seed
+        if self.site_ir.ship.seed != self.world_ir.site_seed
             || self.site_ir.ship.archetype_id != self.request.site.archetype_id
         {
             return Err(ProcgenError::InvalidRequest("ship_identity"));
         }
-        self.site_ir
-            .ship
-            .topology
-            .validate()
-            .map_err(|_| ProcgenError::InvalidRequest("topology"))?;
-        let profile = crate::stages::story::profile_for(self.site_ir.ship.cause_of_loss);
-        let fragment_of = if self.site_ir.ship.fractured {
-            if self.site_ir.ship.fragments.is_empty() {
-                return Err(ProcgenError::InvalidRequest("fragments"));
-            }
-            let room_ids: BTreeSet<_> = self
-                .site_ir
-                .ship
-                .topology
-                .rooms
-                .iter()
-                .map(|room| room.id)
-                .collect();
-            let mut seen = BTreeSet::new();
-            let mut mapping = BTreeMap::new();
-            for fragment in &self.site_ir.ship.fragments {
-                if fragment.rooms.is_empty() || !seen.insert(fragment.id) {
-                    return Err(ProcgenError::InvalidRequest("fragments"));
-                }
-                for room in &fragment.rooms {
-                    if !room_ids.contains(room) || mapping.insert(*room, fragment.id).is_some() {
-                        return Err(ProcgenError::InvalidRequest("fragments"));
-                    }
-                }
-            }
-            if mapping.len() != room_ids.len() {
-                return Err(ProcgenError::InvalidRequest("fragments"));
-            }
-            Some(mapping)
-        } else {
-            if !self.site_ir.ship.fragments.is_empty() {
-                return Err(ProcgenError::InvalidRequest("fragments"));
-            }
-            None
-        };
-        let policy = crate::structural::validate::ValidationPolicy::post_damage(
-            self.site_ir.ship.critical_path.clone(),
-            fragment_of,
-            profile.allows_fragment_split,
-        );
-        crate::structural::validate::validate(
-            &self.site_ir.ship.plan,
-            &self.site_ir.ship.topology,
-            &policy,
-        )
-        .map_err(|_| ProcgenError::InvalidRequest("structural"))?;
         let expected_placements = self
             .site_ir
             .ship
@@ -751,17 +767,39 @@ where
             false,
         ));
     }
-    let legacy_slice = crate::structural::export::to_gameplay_slice_json(&ship);
     let crate::world::WorldGenerationOutcome {
         world_ir,
         candidate_decisions: world_decisions,
         repairs: world_repairs,
         fallback: world_fallback,
     } = world;
-    let site_ir = SiteIR {
-        schema_version: SITE_IR_SCHEMA.into(),
-        ship: ship.clone(),
+    let world_request = WorldGenerationRequest {
+        world_seed: request.world_seed,
+        platform_version: request.generator_version,
+        content_manifest_hash: request.content_manifest_hash.clone(),
+        site_id: request.site.site_id.clone(),
+        x: request.site.x,
+        y: request.site.y,
+        archetype_id: request.site.archetype_id.clone(),
     };
+    let site_started = Instant::now();
+    let site_outcome = crate::site::generate_site(ship, &world_request).map_err(|error| {
+        let mut failure = failure(
+            ProcgenFailureCode::FallbackFailure,
+            "site",
+            error.to_string(),
+            false,
+        );
+        failure.fallback_id = Some("authored-safe-return".into());
+        failure
+    })?;
+    let site_micros = site_started.elapsed().as_micros();
+    let crate::site::SiteGenerationOutcome {
+        site: site_ir,
+        trace: site_trace,
+    } = site_outcome;
+    let ship = &site_ir.ship;
+    let legacy_slice = crate::structural::export::to_gameplay_slice_json(ship);
     let gameplay_ir = GameplayIR {
         schema_version: GAMEPLAY_IR_SCHEMA.into(),
         legacy_slice: serde_json::from_value(legacy_slice).map_err(|e| {
@@ -816,37 +854,47 @@ where
                 false,
             )
         })?;
+    let mut stage_timings_micros: BTreeMap<String, u128> = report
+        .stage_micros
+        .iter()
+        .map(|(key, value)| ((*key).into(), *value))
+        .collect();
+    stage_timings_micros.insert("site_overlay".into(), site_micros);
     let metrics = GenerationMetrics {
         schema_version: GENERATION_METRICS_SCHEMA.into(),
         pipeline_executions: 1,
         room_count,
         entity_count,
         structural_placement_count,
-        stage_timings_micros: report
-            .stage_micros
-            .iter()
-            .map(|(k, v)| ((*k).into(), *v))
-            .collect(),
+        stage_timings_micros,
     };
+    let site_repairs = site_trace
+        .repairs
+        .into_iter()
+        .map(|repair| format!("site:{repair}"));
+    let repairs = world_repairs
+        .into_iter()
+        .chain(repaired_fragments.then_some("reconciled:fragment_metadata".into()))
+        .chain(site_repairs)
+        .collect();
     let trace = GenerationTrace {
         schema_version: GENERATION_TRACE_SCHEMA.into(),
         rng_channels: RNG_CHANNELS.iter().map(|s| (*s).into()).collect(),
         candidate_decisions: world_decisions
             .into_iter()
             .chain(report.candidate_decisions)
+            .chain(
+                site_trace
+                    .candidate_decisions
+                    .into_iter()
+                    .map(|decision| format!("site:{decision}")),
+            )
             .collect(),
         failed_constraints: report.failed_constraints,
-        repairs: if repaired_fragments {
-            world_repairs
-                .into_iter()
-                .chain(["reconciled:fragment_metadata".into()])
-                .collect()
-        } else {
-            world_repairs
-        },
+        repairs,
         retries: report.retries,
         stage_timings_micros: metrics.stage_timings_micros.clone(),
-        fallback: world_fallback,
+        fallback: compose_stage_fallbacks(world_fallback, site_trace.fallback),
     };
     let mut bundle = ProcgenBundle {
         schema_version: PROCGEN_BUNDLE_SCHEMA.into(),

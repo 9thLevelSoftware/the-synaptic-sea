@@ -4,8 +4,6 @@ use derelict_wasm::{Clock, DataProvider, Generator, Serializer, WasmService};
 use serde::Deserialize;
 use std::sync::Arc;
 
-const CONTENT_HASH: &str = "e0364ba52fbf0b1c629c676d622fdc2ffd6964bee47c11cad58c320de22a7c1a";
-
 struct ZeroClock;
 impl Clock for ZeroClock {
     fn now_ms(&self) -> u64 {
@@ -46,12 +44,21 @@ struct Vector {
 fn wasm_host_sync_and_cooperative_async_match_corpus() {
     let vectors: Vec<Vector> =
         serde_json::from_str(include_str!("../../../tests/adapter_parity/corpus.json")).unwrap();
+    let content_hash = vectors
+        .first()
+        .expect("parity corpus is nonempty")
+        .request
+        .content_manifest_hash
+        .clone();
+    assert!(vectors
+        .iter()
+        .all(|vector| vector.request.content_manifest_hash == content_hash));
     let service = WasmService::new_with_content_hash(
         Arc::new(ZeroClock),
         Arc::new(FixtureData),
         Arc::new(FixtureGenerator),
         Arc::new(JsonSerializer),
-        CONTENT_HASH.into(),
+        content_hash,
     );
     for vector in vectors {
         let raw = serde_json::to_string(&vector.request).unwrap();

@@ -225,7 +225,7 @@ impl ItemCatalogue {
         for s in &self.sockets {
             if s.family_ids.iter().any(|family_id| {
                 let family = self.families.iter().find(|f| f.id == *family_id);
-                family.map_or(true, |f| !f.socket_kinds.contains(&s.kind))
+                family.is_none_or(|f| !f.socket_kinds.contains(&s.kind))
             }) {
                 return Err(ItemError::Invalid("family_socket_kind"));
             }

@@ -36,6 +36,20 @@ func _init() -> void:
 	count += 1; _expect(consumer.consume("not-json", request, build, runtime, caps).is_empty() and consumer.last_error == "malformed_bundle_json", failures, "malformed_json")
 	var original: Dictionary = JSON.parse_string(raw)
 	var cases: Array = [["lifecycle_schema", "schema_version", "wrong", "lifecycle_schema"], ["lifecycle_v1", "schema_version", "procgen-lifecycle-result-1", "lifecycle_schema"], ["lifecycle_status", "status", "failed", "lifecycle_not_completed"], ["missing_bundle", "bundle", null, "missing_bundle"], ["bundle_schema", "bundle.schema_version", "procgen-bundle-1", "bundle_schema"], ["hash", "bundle.semantic_hash", "0".repeat(64), "semantic_hash"], ["world_schema", "bundle.world_ir.schema_version", "world-ir-1", "world_ir_schema"], ["world_identity", "bundle.world_ir.site_id", "wrong-site", "world_identity"], ["ship_seed_identity", "bundle.site_ir.ship.seed", 42, "ship_identity"], ["ship_platform_version", "bundle.site_ir.ship.generator_version", 3, "ship_identity"], ["presentation_identity", "bundle.presentation_ir.locale", "fr-FR", "presentation_identity"], ["pipeline_count", "bundle.metrics.pipeline_executions", 2, "pipeline_count"], ["trace_schema", "bundle.trace.schema_version", "wrong", "diagnostic_schema"]]
+	var site_marker_decisions: Array = (original.bundle.trace.candidate_decisions as Array).duplicate()
+	site_marker_decisions.append("site:selected_fallback")
+	cases.append(["site_fallback_without_evidence", "bundle.trace.candidate_decisions", site_marker_decisions, "site_fallback_trace"])
+	var world_marker_decisions: Array = (original.bundle.trace.candidate_decisions as Array).duplicate()
+	world_marker_decisions.append("selected_fallback")
+	cases.append(["world_fallback_without_evidence", "bundle.trace.candidate_decisions", world_marker_decisions, "world_fallback_trace"])
+	# SiteIR v2 is a closed authoritative overlay; reject malformed mission,
+	# navigation, prop, and spatial records independently of structural Ship v2.
+	var site_overlay_cases: Array = _site_overlay_cases(original)
+	for item in site_overlay_cases:
+		count += 1
+		var overlay_raw: String = _rehash_lifecycle(item[1] as Dictionary)
+		var result: Dictionary = consumer.consume(overlay_raw, request, build, runtime, caps)
+		_expect(result.is_empty() and consumer.last_error == str(item[2]), failures, str(item[0]) + ":" + consumer.last_error)
 	for item in cases:
 		var mutated: Dictionary = original.duplicate(true)
 		_set_path(mutated, str(item[1]), item[2])
@@ -55,10 +69,9 @@ func _init() -> void:
 		["request_schema", "schema_version", "wrong", "request_schema"],
 		["request_seed_bounds", "world_seed", 9007199254740992, "request_bounds"],
 		["request_coordinate_bounds", "site.x", 9007199254740992, "request_bounds"],
-		["request_coordinate_v1", "site.y", 1, "request_coordinates"],
-		["request_player_signals", "player_model.signals", [1], "request_player_model"],
-		["request_domains_order", "requested_domains", ["site", "world", "gameplay", "presentation"], "request_domains"],
-		["request_presentation_seed", "presentation.seed", 43, "request_presentation"],
+		["request_player_signals", "player_model.signals", ["bad"], "request_player_model"],
+		["request_domains_duplicate", "requested_domains", ["world", "world"], "request_domains"],
+		["request_presentation_seed", "presentation.seed", 9007199254740992, "request_presentation"],
 	]
 	for item in request_cases:
 		var request_case: Dictionary = request.duplicate(true)
@@ -66,6 +79,18 @@ func _init() -> void:
 		count += 1
 		var result: Dictionary = consumer.consume(raw, request_case, build, runtime, caps)
 		_expect(result.is_empty() and consumer.last_error == str(item[3]), failures, str(item[0]) + ":" + consumer.last_error)
+	var coordinate_request: Dictionary = consumer.build_request(
+		42, 0, 0, runtime, "standard", "shuttle", "parity-shuttle-intact",
+		3, -2, [1, -2, 3], 9, "en-US")
+	coordinate_request.site.intactness_override_bp = 10000
+	coordinate_request.requested_domains = ["site", "world", "gameplay", "presentation"]
+	var coordinate_raw: String = str(generator.generate_bundle(JSON.stringify(coordinate_request)))
+	var coordinate_bundle: Dictionary = consumer.consume(coordinate_raw, coordinate_request, build, runtime, caps)
+	count += 1
+	_expect(not coordinate_bundle.is_empty() \
+			and int((coordinate_bundle.world_ir as Dictionary).get("x", 0)) == 3 \
+			and int((coordinate_bundle.world_ir as Dictionary).get("y", 0)) == -2,
+			failures, "coordinate_request:" + consumer.last_error)
 	var nested_cases: Array = _nested_bundle_cases(original)
 	for item in nested_cases:
 		count += 1
@@ -76,6 +101,8 @@ func _init() -> void:
 	count += 1; _expect(not consumer._same_json(9007199254740992, 9007199254740993), failures, "unsafe_integer_identity")
 	count += 1; _expect(consumer.build_request(9007199254740992, 0, 1, runtime).is_empty() and consumer.last_error == "json_unsafe_seed", failures, "unsafe_seed")
 	count += 1; _expect(consumer.build_request(-1, 0, 1, runtime).is_empty() and consumer.last_error == "json_unsafe_seed", failures, "negative_seed")
+	count += 1; _expect(consumer.build_request(42, 0, 1, runtime, "standard", "", "site:edge", -2147483648, 0).is_empty() and consumer.last_error == "request_bounds", failures, "coordinate_min")
+	count += 1; _expect(consumer.build_request(42, 0, 1, runtime, "standard", "", "site:signals", 0, 0, range(65)).is_empty() and consumer.last_error == "request_player_model", failures, "player_signal_cap")
 	count += 1; _expect(consumer.build_request(42, 99, 1, runtime).is_empty() and consumer.last_error == "unsupported_ship_parameters", failures, "unsupported_size")
 	count += 1; _expect(consumer.build_request(42, 0, 99, runtime).is_empty() and consumer.last_error == "unsupported_ship_parameters", failures, "unsupported_condition")
 	if not failures.is_empty():
@@ -175,6 +202,23 @@ func _nested_bundle_cases(original: Dictionary) -> Array:
 	var gameplay_case: Dictionary = original.duplicate(true)
 	(gameplay_case.bundle.gameplay_ir.legacy_slice.objectives as Array)[0] = "not-an-objective"
 	cases.append(["nested_gameplay", gameplay_case, "gameplay_slice_shape"])
+	return cases
+
+func _site_overlay_cases(original: Dictionary) -> Array:
+	var cases: Array = []
+	var mission_case: Dictionary = original.duplicate(true)
+	(mission_case.bundle.site_ir.mission_graph.nodes as Array)[1].kind = "invalid"
+	cases.append(["site_mission_kind", mission_case, "site_mission_nodes"])
+	var navigation_case: Dictionary = original.duplicate(true)
+	(navigation_case.bundle.site_ir.navigation.nodes as Array)[1].room = int((navigation_case.bundle.site_ir.navigation.nodes as Array)[0].room)
+	cases.append(["site_navigation_duplicate_room", navigation_case, "site_navigation_nodes"])
+	var prop_case: Dictionary = original.duplicate(true)
+	var first_prop: Dictionary = (prop_case.bundle.site_ir.functional_props as Array)[0]
+	first_prop.approach = first_prop.anchor
+	cases.append(["site_prop_non_adjacent", prop_case, "site_prop_shape"])
+	var spatial_case: Dictionary = original.duplicate(true)
+	(spatial_case.bundle.site_ir.spatial_annotations.rooms as Array)[0].minimum_clearance = 2
+	cases.append(["site_spatial_clearance", spatial_case, "site_spatial_shape"])
 	return cases
 
 func _rehash_lifecycle(lifecycle: Dictionary) -> String:

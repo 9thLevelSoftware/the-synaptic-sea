@@ -31,6 +31,12 @@ var fallback_policy: RefCounted = null
 var last_error: String = ""
 var last_outcome: String = "idle"
 var migration_oracle_invocations: int = 0
+var procgen_site_id: String = ""
+var procgen_site_x: int = 0
+var procgen_site_y: int = 0
+var procgen_player_signals: Array = []
+var procgen_presentation_seed: int = -1
+var procgen_locale: String = "en-US"
 
 func configure_authored_fallback(fallback_id: String, provider: Callable) -> void:
 	fallback_policy = preload("res://scripts/procgen/procgen_fallback_policy.gd").new()
@@ -45,6 +51,24 @@ func clear_authored_fallback() -> void:
 func configure_run_context(p_biome_id: String, p_difficulty_id: String) -> void:
 	biome_id = p_biome_id
 	difficulty_id = p_difficulty_id
+
+
+# Supplies the coordinate-addressed identity consumed by WorldIR/SiteIR. The
+# empty default keeps legacy callers stable while travel/save systems can bind
+# a discovered site without relying on generation order.
+func configure_procgen_site(
+		p_site_id: String,
+		p_x: int,
+		p_y: int,
+		p_player_signals: Array = [],
+		p_presentation_seed: int = -1,
+		p_locale: String = "en-US") -> void:
+	procgen_site_id = p_site_id
+	procgen_site_x = p_x
+	procgen_site_y = p_y
+	procgen_player_signals = p_player_signals.duplicate()
+	procgen_presentation_seed = p_presentation_seed
+	procgen_locale = p_locale
 
 
 # Builds the full Node3D tree for the given blueprint.
@@ -155,7 +179,20 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int, archetyp
 		return _generation_fail("build_manifest_%s" % manifest_verdict, "external build manifest: %s" % manifest_verdict)
 	var consumer: RefCounted = BundleConsumerScript.new()
 	var requested_difficulty: String = difficulty_id if not difficulty_id.is_empty() else "standard"
-	var request: Dictionary = consumer.build_request(seed_value, size, condition, runtime_manifest, requested_difficulty, archetype_override)
+	var request: Dictionary = consumer.build_request(
+		seed_value,
+		size,
+		condition,
+		runtime_manifest,
+		requested_difficulty,
+		archetype_override,
+		procgen_site_id,
+		procgen_site_x,
+		procgen_site_y,
+		procgen_player_signals,
+		procgen_presentation_seed,
+		procgen_locale,
+	)
 	if request.is_empty():
 		return _generation_fail(str(consumer.last_error), str(consumer.last_error))
 	var lifecycle_json: String = str(generator.generate_bundle(JSON.stringify(request)))
@@ -184,6 +221,8 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int, archetyp
 		loader.queue_free()
 		return _generation_fail("loader_rejected_documents", "loader rejected bundle documents")
 	loader.name = "GeneratedShip"
+	loader.set_meta("procgen_site_ir", (mapped.get("site_ir", {}) as Dictionary).duplicate(true))
+	loader.set_meta("procgen_semantic_hash", str(bundle.get("semantic_hash", "")))
 	last_error = ""
 	last_outcome = "fallback_selected" if fallback_selected else "generated"
 	return loader

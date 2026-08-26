@@ -21,7 +21,7 @@ func validate(manifest: Dictionary, generator: Object, target_override: String =
 	for key in required:
 		if not manifest.has(key): return MANIFEST_INVALID
 	var schema: String = str(manifest.get("manifest_schema", ""))
-	if schema != "procgen-build-manifest-1":
+	if schema != "procgen-build-manifest-2":
 		return SCHEMA_MAJOR_UNKNOWN if schema.begins_with("procgen-build-manifest-") else MANIFEST_INVALID
 	if int(manifest.get("generator_version", -1)) != 3: return GENERATOR_VERSION_MISMATCH
 	var source_commit: String = str(manifest.get("rust_source_commit", ""))
@@ -59,7 +59,7 @@ func validate(manifest: Dictionary, generator: Object, target_override: String =
 	var artifact_path: String = str((artifact as Dictionary).get("path", ""))
 	if not _io_exists(artifact_path, io_override): return ARTIFACT_MISSING
 	if _io_sha256(artifact_path, io_override) != str((artifact as Dictionary).get("sha256", "")): return ARTIFACT_HASH_MISMATCH
-	var schemas: Dictionary = {"procgen_request":"procgen-request-1", "procgen_bundle":"procgen-bundle-2", "world_ir":"world-ir-2", "site_ir":"site-ir-1", "gameplay_ir":"gameplay-ir-1", "presentation_ir":"presentation-ir-1", "generation_trace":"generation-trace-1", "adaptive_proposal":"adaptive-proposal-1"}
+	var schemas: Dictionary = {"procgen_request":"procgen-request-1", "procgen_bundle":"procgen-bundle-3", "world_ir":"world-ir-2", "site_ir":"site-ir-2", "gameplay_ir":"gameplay-ir-1", "presentation_ir":"presentation-ir-1", "generation_trace":"generation-trace-2", "adaptive_proposal":"adaptive-proposal-1"}
 	var schema_block: Variant = manifest.get("export_schemas", {})
 	if not schema_block is Dictionary: return MANIFEST_INVALID
 	for key in schema_block.keys():

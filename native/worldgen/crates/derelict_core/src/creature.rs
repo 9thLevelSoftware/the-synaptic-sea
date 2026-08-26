@@ -104,7 +104,7 @@ fn valid_id(s: &str) -> bool {
 fn canonical<T>(xs: &[T], f: impl Fn(&T) -> &String) -> bool {
     xs.windows(2).all(|w| f(&w[0]) < f(&w[1]))
 }
-fn get<'a, T>(xs: &'a [T], f: impl Fn(&T) -> bool) -> Option<&'a T> {
+fn get<T>(xs: &[T], f: impl Fn(&T) -> bool) -> Option<&T> {
     xs.iter().find(|x| f(x))
 }
 

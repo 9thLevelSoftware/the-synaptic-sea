@@ -268,6 +268,46 @@ fn embedded_request_constraints_match_rust_and_bundle_schema() {
 }
 
 #[test]
+fn current_site_and_bundle_schemas_enforce_nested_ship_and_hash_identity() {
+    let bundle = generate_bundle(
+        request(),
+        &derelict_core::GenData::default_bundle().unwrap(),
+    )
+    .unwrap();
+    let schema_dir = format!("{}/../../schemas", env!("CARGO_MANIFEST_DIR"));
+    let site_schema: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(format!("{schema_dir}/site-ir-2.schema.json")).unwrap(),
+    )
+    .unwrap();
+    let bundle_schema: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(format!("{schema_dir}/procgen-bundle-3.schema.json")).unwrap(),
+    )
+    .unwrap();
+    let site_validator = jsonschema::validator_for(&site_schema).unwrap();
+    let bundle_validator = jsonschema::validator_for(&bundle_schema).unwrap();
+    let site_value = serde_json::to_value(&bundle.site_ir).unwrap();
+    let bundle_value = serde_json::to_value(&bundle).unwrap();
+    assert!(site_validator.is_valid(&site_value));
+    assert!(bundle_validator.is_valid(&bundle_value));
+
+    let mut wrong_standalone_ship = site_value;
+    wrong_standalone_ship["ship"]["generator_version"] = 3.into();
+    assert!(!site_validator.is_valid(&wrong_standalone_ship));
+
+    let mut wrong_embedded_ship = bundle_value.clone();
+    wrong_embedded_ship["site_ir"]["ship"]["generator_version"] = 3.into();
+    assert!(!bundle_validator.is_valid(&wrong_embedded_ship));
+    assert!(ProcgenBundle::from_json(&wrong_embedded_ship.to_string()).is_err());
+
+    for invalid_hash in ["short".into(), "A".repeat(64)] {
+        let mut wrong_hash = bundle_value.clone();
+        wrong_hash["semantic_hash"] = invalid_hash.into();
+        assert!(!bundle_validator.is_valid(&wrong_hash));
+        assert!(ProcgenBundle::from_json(&wrong_hash.to_string()).is_err());
+    }
+}
+
+#[test]
 fn embedded_gameplay_constraints_match_standalone_and_rust() {
     let data = derelict_core::GenData::default_bundle().unwrap();
     let bundle = generate_bundle(request(), &data).unwrap();

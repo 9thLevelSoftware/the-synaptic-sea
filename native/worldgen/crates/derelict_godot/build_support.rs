@@ -236,7 +236,7 @@ mod tests {
 
     fn manifest() -> String {
         format!(
-            r#"{{"manifest_schema":"procgen-build-manifest-1","rust_source_commit":"{SOURCE}","generator_version":3,"content_manifest_path":"data/procgen/manifests/content_manifest.json","content_manifest_hash":"{HASH}","target":"x86_64-pc-windows-msvc","artifact":{{"kind":"gdextension","path":"addons/derelict/bin/win64/derelict_godot.dll","sha256":"{HASH}"}},"export_schemas":{{"procgen_request":"procgen-request-1","procgen_bundle":"procgen-bundle-3","world_ir":"world-ir-2","site_ir":"site-ir-2","gameplay_ir":"gameplay-ir-1","presentation_ir":"presentation-ir-1","generation_trace":"generation-trace-2","adaptive_proposal":"adaptive-proposal-1"}}}}"#
+            r#"{{"manifest_schema":"procgen-build-manifest-2","rust_source_commit":"{SOURCE}","generator_version":3,"content_manifest_path":"data/procgen/manifests/content_manifest.json","content_manifest_hash":"{HASH}","target":"x86_64-pc-windows-msvc","artifact":{{"kind":"gdextension","path":"addons/derelict/bin/win64/derelict_godot.dll","sha256":"{HASH}"}},"export_schemas":{{"procgen_request":"procgen-request-1","procgen_bundle":"procgen-bundle-3","world_ir":"world-ir-2","site_ir":"site-ir-2","gameplay_ir":"gameplay-ir-1","presentation_ir":"presentation-ir-1","generation_trace":"generation-trace-2","adaptive_proposal":"adaptive-proposal-1"}}}}"#
         )
     }
 
@@ -322,7 +322,7 @@ mod tests {
     fn malformed_manifest_identity_dirty_and_commit_fail_closed() {
         let checked = manifest();
         for malformed in [
-            checked.replace("procgen-build-manifest-1", "bad-schema"),
+            checked.replace("procgen-build-manifest-2", "bad-schema"),
             checked.replace("\"generator_version\":3", "\"generator_version\":2"),
             checked.replace("procgen-request-1", "bad-request-schema"),
             checked.replacen('{', "{\"unknown\":true,", 1),

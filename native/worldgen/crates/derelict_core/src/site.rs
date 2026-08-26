@@ -1737,6 +1737,7 @@ fn resolve_site_candidate_with_trace(
     }
     let fallback = build_fallback(original_ship, request)?;
     validate_site_for_request(&fallback, request)?;
+    let candidate_decisions = fallback_candidate_decisions(candidate_decisions);
     Ok(SiteGenerationOutcome {
         site: fallback,
         trace: SiteTrace {
@@ -1745,6 +1746,15 @@ fn resolve_site_candidate_with_trace(
             fallback: Some("authored-safe-return".into()),
         },
     })
+}
+
+fn fallback_candidate_decisions(mut decisions: Vec<String>) -> Vec<String> {
+    decisions
+        .retain(|decision| decision != "rejected_candidate" && decision != "selected_fallback");
+    decisions.truncate(MAX_SITE_DECISIONS.saturating_sub(2));
+    decisions.push("rejected_candidate".into());
+    decisions.push("selected_fallback".into());
+    decisions
 }
 
 pub fn resolve_site_candidate(
@@ -1799,7 +1809,7 @@ pub fn generate_site(
             }
         }
     }
-    decisions.truncate(MAX_SITE_DECISIONS);
+    let decisions = fallback_candidate_decisions(decisions);
     let fallback = build_fallback(ship, request)?;
     validate_site_for_request(&fallback, request)?;
     Ok(SiteGenerationOutcome {

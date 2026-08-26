@@ -162,7 +162,9 @@ fn runtime_access_reuses_identical_service() {
 
 #[test]
 fn lifecycle_string_helpers_have_typed_shapes_and_shared_runtime() {
-    let request = legacy_request(901, &derelict_core::model::GenParams::new("shuttle"), "");
+    // Seed 42 is a checked connected structural fixture. A structurally legal
+    // fracture may intentionally fail the stricter SiteIR reachability gate.
+    let request = legacy_request(42, &derelict_core::model::GenParams::new("shuttle"), "");
     let request_json = serde_json::to_string(&request).unwrap();
     let sync = derelict_core::lifecycle::LifecycleResult::from_json(&super::generator::sync_json(
         &request_json,
@@ -170,7 +172,9 @@ fn lifecycle_string_helpers_have_typed_shapes_and_shared_runtime() {
     .unwrap();
     assert_eq!(
         sync.status,
-        derelict_core::lifecycle::LifecycleStatus::Completed
+        derelict_core::lifecycle::LifecycleStatus::Completed,
+        "sync failure: {:?}",
+        sync.failure
     );
     assert!(sync.request_id.is_none() && sync.bundle.is_some() && sync.failure.is_none());
     let accepted = derelict_core::lifecycle::LifecycleResult::from_json(

@@ -16,7 +16,9 @@ fn id(s: &str) -> bool {
 fn text(s: &str) -> bool {
     !s.is_empty() && s.len() <= 512
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum AssetKind {
     Mesh,
@@ -28,7 +30,9 @@ pub enum AssetKind {
     Caption,
     Primitive,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum SubjectKind {
     Ship,

@@ -1,0 +1,2440 @@
+{
+  "$id": "procgen-bundle-3",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "BiomeField": {
+      "additionalProperties": false,
+      "properties": {
+        "biome_id": {
+          "type": "string"
+        },
+        "intensity_bp": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "marker_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "biome_id",
+        "intensity_bp",
+        "marker_id"
+      ],
+      "type": "object"
+    },
+    "CauseOfLoss": {
+      "enum": [
+        "ReactorBreach",
+        "Depressurization",
+        "PirateBoarding",
+        "Plague",
+        "DriveMisjump",
+        "Unknown"
+      ],
+      "type": "string"
+    },
+    "Cell": {
+      "additionalProperties": false,
+      "properties": {
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deck",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "CellRecord": {
+      "additionalProperties": false,
+      "description": "One occupied cell.",
+      "properties": {
+        "cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "decal": {
+          "description": "Cosmetic damage decal id (never affects validation/topology).",
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "module_id": {
+          "type": "string"
+        },
+        "room_id": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "variant": {
+          "$ref": "#/definitions/DamageVariant"
+        }
+      },
+      "required": [
+        "cell",
+        "decal",
+        "module_id",
+        "room_id",
+        "variant"
+      ],
+      "type": "object"
+    },
+    "CoordinateMarker": {
+      "additionalProperties": false,
+      "properties": {
+        "archetype_id": {
+          "type": "string"
+        },
+        "marker_id": {
+          "type": "string"
+        },
+        "selected": {
+          "type": "boolean"
+        },
+        "site_id": {
+          "type": "string"
+        },
+        "site_seed": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "archetype_id",
+        "marker_id",
+        "selected",
+        "site_id",
+        "site_seed",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "DamageEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/definitions/DamageEventKind"
+        },
+        "origin": {
+          "items": true,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "int32",
+              "type": "integer"
+            },
+            {
+              "format": "int32",
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "radius": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deck",
+        "kind",
+        "origin",
+        "radius"
+      ],
+      "type": "object"
+    },
+    "DamageEventKind": {
+      "enum": [
+        "Breach",
+        "ScorchZone",
+        "StructuralFracture",
+        "DebrisField"
+      ],
+      "type": "string"
+    },
+    "DamageVariant": {
+      "description": "Asset damage variant, resolved at export time against the kit's intact/damaged/breached module variants. Structural role (`module_id`) stays stable; only the rendered asset changes.",
+      "enum": [
+        "Intact",
+        "Damaged",
+        "Breached"
+      ],
+      "type": "string"
+    },
+    "Deck": {
+      "additionalProperties": false,
+      "properties": {
+        "layer": {
+          "$ref": "#/definitions/DeckLayer"
+        }
+      },
+      "required": [
+        "layer"
+      ],
+      "type": "object"
+    },
+    "DeckLayer": {
+      "additionalProperties": false,
+      "description": "One deck's tile data as flat row-major arrays (index = y * width + x).",
+      "properties": {
+        "decal": {
+          "items": {
+            "format": "uint8",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "floor": {
+          "items": {
+            "$ref": "#/definitions/FloorTile"
+          },
+          "type": "array"
+        },
+        "height": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "room_id": {
+          "description": "Room id per tile; NO_ROOM (0) = not part of any room (void/space).",
+          "items": {
+            "format": "uint16",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "walls": {
+          "items": {
+            "$ref": "#/definitions/TileWalls"
+          },
+          "type": "array"
+        },
+        "width": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "decal",
+        "floor",
+        "height",
+        "room_id",
+        "walls",
+        "width"
+      ],
+      "type": "object"
+    },
+    "Dir": {
+      "enum": [
+        "North",
+        "South",
+        "East",
+        "West"
+      ],
+      "type": "string"
+    },
+    "Domain": {
+      "enum": [
+        "world",
+        "site",
+        "gameplay",
+        "presentation"
+      ],
+      "type": "string"
+    },
+    "EdgeKind": {
+      "oneOf": [
+        {
+          "enum": [
+            "Solid",
+            "Door",
+            "Locked",
+            "Hatch",
+            "Breach"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Interior of a multi-cell room: no wall, never materialized.",
+          "enum": [
+            "Open"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "EdgeKind2": {
+      "enum": [
+        "Door",
+        "OpenCorridor",
+        "VerticalShaft",
+        "Breach"
+      ],
+      "type": "string"
+    },
+    "EdgeRecord": {
+      "additionalProperties": false,
+      "description": "One canonical boundary.",
+      "properties": {
+        "cell": {
+          "$ref": "#/definitions/Cell",
+          "description": "The cell/direction this edge was first derived from (either side is valid; edge_key is what's canonical)."
+        },
+        "direction": {
+          "$ref": "#/definitions/Dir"
+        },
+        "edge_key": {
+          "type": "string"
+        },
+        "exterior": {
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/definitions/EdgeKind"
+        },
+        "module_id": {
+          "type": "string"
+        },
+        "portal": {
+          "type": "boolean"
+        },
+        "position": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "room_ids": {
+          "description": "(owning-side room, other-side room); NO_ROOM = exterior/void.",
+          "items": true,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "uint16",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            {
+              "format": "uint16",
+              "minimum": 0.0,
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "source_cells": {
+          "items": {
+            "$ref": "#/definitions/Cell"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "variant": {
+          "$ref": "#/definitions/DamageVariant"
+        },
+        "wrapper_required": {
+          "description": "Whether this edge demands a materialized placement (Open and BREACH holes don't).",
+          "type": "boolean"
+        },
+        "yaw_degrees": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cell",
+        "direction",
+        "edge_key",
+        "exterior",
+        "kind",
+        "module_id",
+        "portal",
+        "position",
+        "room_ids",
+        "source_cells",
+        "variant",
+        "wrapper_required",
+        "yaw_degrees"
+      ],
+      "type": "object"
+    },
+    "EntityKind": {
+      "enum": [
+        "Door",
+        "Container",
+        "Terminal",
+        "Furniture",
+        "Debris",
+        "Body",
+        "ItemPile"
+      ],
+      "type": "string"
+    },
+    "EntitySpec": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Stable within this ship; assigned in deterministic order. Save diffs and co-op mutation replication address entities by this id.",
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "inventory": {
+          "items": {
+            "$ref": "#/definitions/ItemStack"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/definitions/EntityKind"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "open": {
+          "type": "boolean"
+        },
+        "pos": {
+          "$ref": "#/definitions/GridPos"
+        },
+        "proto": {
+          "description": "Prototype key, maps to a scene/visual on the Godot side (\"bed\", \"locker\", \"helm_console\", \"hull_plate_debris\", ...).",
+          "type": "string"
+        },
+        "rotation": {
+          "description": "0..=3, 90-degree steps. For doors: 0 = sits on north edge of pos, 1 = west edge.",
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "inventory",
+        "kind",
+        "locked",
+        "open",
+        "pos",
+        "proto",
+        "rotation",
+        "tags"
+      ],
+      "type": "object"
+    },
+    "ExportSchemas": {
+      "additionalProperties": false,
+      "properties": {
+        "adaptive_proposal": {
+          "type": "string"
+        },
+        "gameplay_ir": {
+          "type": "string"
+        },
+        "generation_trace": {
+          "const": "generation-trace-2"
+        },
+        "presentation_ir": {
+          "type": "string"
+        },
+        "procgen_bundle": {
+          "const": "procgen-bundle-3"
+        },
+        "procgen_request": {
+          "type": "string"
+        },
+        "site_ir": {
+          "const": "site-ir-2"
+        },
+        "world_ir": {
+          "const": "world-ir-2"
+        }
+      },
+      "required": [
+        "adaptive_proposal",
+        "gameplay_ir",
+        "generation_trace",
+        "presentation_ir",
+        "procgen_bundle",
+        "procgen_request",
+        "site_ir",
+        "world_ir"
+      ],
+      "type": "object"
+    },
+    "ExtractionGuarantee": {
+      "additionalProperties": false,
+      "properties": {
+        "extraction_anchor_id": {
+          "type": "string"
+        },
+        "hub_anchor_id": {
+          "type": "string"
+        },
+        "path": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "selected_marker_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "extraction_anchor_id",
+        "hub_anchor_id",
+        "path",
+        "selected_marker_id"
+      ],
+      "type": "object"
+    },
+    "FireZone": {
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "FloorPlacement": {
+      "additionalProperties": false,
+      "properties": {
+        "cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "cell_key": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "module_id": {
+          "type": "string"
+        },
+        "position": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "room_id": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "variant": {
+          "$ref": "#/definitions/DamageVariant"
+        },
+        "yaw_degrees": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cell",
+        "cell_key",
+        "id",
+        "module_id",
+        "position",
+        "room_id",
+        "variant",
+        "yaw_degrees"
+      ],
+      "type": "object"
+    },
+    "FloorTile": {
+      "oneOf": [
+        {
+          "enum": [
+            "Deck",
+            "Grated",
+            "DamagedDeck"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Open space / no floor (outside hull, or a breach hole).",
+          "enum": [
+            "Void"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "FunctionalProp": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "$ref": "#/definitions/Cell"
+        },
+        "approach": {
+          "$ref": "#/definitions/Cell"
+        },
+        "extraction_portal_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "key_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/definitions/PropKind"
+        },
+        "mission_node_id": {
+          "type": "string"
+        },
+        "repair_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "anchor",
+        "approach",
+        "id",
+        "kind",
+        "mission_node_id",
+        "room"
+      ],
+      "type": "object"
+    },
+    "GameplayIR": {
+      "additionalProperties": false,
+      "properties": {
+        "legacy_slice": {
+          "$ref": "#/definitions/GameplaySlice"
+        },
+        "schema_version": {
+          "const": "gameplay-ir-1"
+        }
+      },
+      "required": [
+        "legacy_slice",
+        "schema_version"
+      ],
+      "type": "object"
+    },
+    "GameplaySlice": {
+      "additionalProperties": false,
+      "properties": {
+        "critical_path": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "document_kind": {
+          "const": "ship_gameplay_slice"
+        },
+        "fire_zones": {
+          "maxItems": 0,
+          "type": "array"
+        },
+        "goal_room": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "loot_containers": {
+          "items": {
+            "$ref": "#/definitions/LootContainer"
+          },
+          "type": "array"
+        },
+        "objectives": {
+          "items": {
+            "$ref": "#/definitions/Objective"
+          },
+          "type": "array"
+        },
+        "program_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.1.0"
+        },
+        "start_room": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "summary": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "critical_path",
+        "document_kind",
+        "fire_zones",
+        "goal_room",
+        "loot_containers",
+        "objectives",
+        "program_id",
+        "schema_version",
+        "start_room",
+        "summary"
+      ],
+      "type": "object"
+    },
+    "GateKind": {
+      "enum": [
+        "key_lock",
+        "repair"
+      ],
+      "type": "string"
+    },
+    "GenerationMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "entity_count": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "pipeline_executions": {
+          "const": 1
+        },
+        "room_count": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "generation-metrics-1"
+        },
+        "stage_timings_micros": {
+          "additionalProperties": {
+            "maximum": 3600000000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxProperties": 4096,
+          "propertyNames": {
+            "minLength": 1
+          },
+          "type": "object"
+        },
+        "structural_placement_count": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "entity_count",
+        "pipeline_executions",
+        "room_count",
+        "schema_version",
+        "stage_timings_micros",
+        "structural_placement_count"
+      ],
+      "type": "object"
+    },
+    "GenerationTrace": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_decisions": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 4096,
+          "type": "array"
+        },
+        "failed_constraints": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 4096,
+          "type": "array"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "pattern": "^(?:world:[a-z0-9_.:-]+(?:\\|site:[a-z0-9_.:-]+)?|site:[a-z0-9_.:-]+)$",
+              "type": "string"
+            }
+          ]
+        },
+        "repairs": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 4096,
+          "type": "array"
+        },
+        "retries": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 4096,
+          "type": "array"
+        },
+        "rng_channels": {
+          "const": [
+            "world.archetype",
+            "world.biome",
+            "world.hazard",
+            "world.resource",
+            "world.landmark",
+            "world.route_cost",
+            "site.structural",
+            "site.mission_template",
+            "site.gate_order",
+            "site.functional_props",
+            "site.spatial_annotations",
+            "meta",
+            "hull",
+            "template",
+            "topology",
+            "residual_fill",
+            "door",
+            "furnish",
+            "story",
+            "intact",
+            "breach",
+            "scorch",
+            "seal",
+            "bodies",
+            "fracture",
+            "debris",
+            "loot"
+          ]
+        },
+        "schema_version": {
+          "const": "generation-trace-2"
+        },
+        "stage_timings_micros": {
+          "additionalProperties": {
+            "maximum": 3600000000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxProperties": 4096,
+          "propertyNames": {
+            "minLength": 1
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "candidate_decisions",
+        "failed_constraints",
+        "repairs",
+        "retries",
+        "rng_channels",
+        "schema_version",
+        "stage_timings_micros"
+      ],
+      "type": "object"
+    },
+    "GridPos": {
+      "additionalProperties": false,
+      "properties": {
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deck",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "HazardField": {
+      "additionalProperties": false,
+      "properties": {
+        "hazard_id": {
+          "type": "string"
+        },
+        "marker_id": {
+          "type": "string"
+        },
+        "severity_bp": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "hazard_id",
+        "marker_id",
+        "severity_bp"
+      ],
+      "type": "object"
+    },
+    "ItemStack": {
+      "additionalProperties": false,
+      "properties": {
+        "item_id": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "qty": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "item_id",
+        "qty"
+      ],
+      "type": "object"
+    },
+    "LandmarkRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "marker_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "marker_id"
+      ],
+      "type": "object"
+    },
+    "LootContainer": {
+      "additionalProperties": false,
+      "properties": {
+        "approach_cell": {
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "loot_table": {
+          "type": "string"
+        },
+        "room_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "approach_cell",
+        "id",
+        "kind",
+        "loot_table",
+        "room_id"
+      ],
+      "type": "object"
+    },
+    "LosPair": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "$ref": "#/definitions/Cell"
+        },
+        "b": {
+          "$ref": "#/definitions/Cell"
+        }
+      },
+      "required": [
+        "a",
+        "b"
+      ],
+      "type": "object"
+    },
+    "MissionEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "MissionGate": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "key_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/definitions/GateKind"
+        },
+        "navigation_edge": {
+          "type": "string"
+        },
+        "prerequisite_node": {
+          "type": "string"
+        },
+        "repair_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unlock_node": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "navigation_edge",
+        "prerequisite_node",
+        "unlock_node"
+      ],
+      "type": "object"
+    },
+    "MissionGraph": {
+      "additionalProperties": false,
+      "properties": {
+        "edges": {
+          "items": {
+            "$ref": "#/definitions/MissionEdge"
+          },
+          "type": "array"
+        },
+        "extraction_node": {
+          "type": "string"
+        },
+        "gates": {
+          "items": {
+            "$ref": "#/definitions/MissionGate"
+          },
+          "type": "array"
+        },
+        "mission_id": {
+          "type": "string"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/definitions/MissionNode"
+          },
+          "type": "array"
+        },
+        "required_objectives": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "schema_version": {
+          "type": "string"
+        },
+        "start_node": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "edges",
+        "extraction_node",
+        "gates",
+        "mission_id",
+        "nodes",
+        "required_objectives",
+        "schema_version",
+        "start_node"
+      ],
+      "type": "object"
+    },
+    "MissionNode": {
+      "additionalProperties": false,
+      "properties": {
+        "cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "id": {
+          "type": "string"
+        },
+        "key_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/definitions/NodeKind"
+        },
+        "repair_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cell",
+        "id",
+        "kind",
+        "room"
+      ],
+      "type": "object"
+    },
+    "Navigation": {
+      "additionalProperties": false,
+      "properties": {
+        "edges": {
+          "items": {
+            "$ref": "#/definitions/NavigationEdge"
+          },
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/definitions/NavigationNode"
+          },
+          "type": "array"
+        },
+        "schema_version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "edges",
+        "nodes",
+        "schema_version"
+      ],
+      "type": "object"
+    },
+    "NavigationEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "clearance": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "cost": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "from_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "from_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "gate_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/NavigationKind"
+        },
+        "passable": {
+          "type": "boolean"
+        },
+        "structural_ref": {
+          "type": "string"
+        },
+        "to_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "to_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "clearance",
+        "cost",
+        "from_cell",
+        "from_room",
+        "id",
+        "kind",
+        "passable",
+        "structural_ref",
+        "to_cell",
+        "to_room"
+      ],
+      "type": "object"
+    },
+    "NavigationKind": {
+      "enum": [
+        "portal",
+        "vertical"
+      ],
+      "type": "string"
+    },
+    "NavigationNode": {
+      "additionalProperties": false,
+      "properties": {
+        "room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "room"
+      ],
+      "type": "object"
+    },
+    "NodeKind": {
+      "enum": [
+        "start",
+        "acquire_key",
+        "repair",
+        "objective",
+        "extraction"
+      ],
+      "type": "string"
+    },
+    "Objective": {
+      "additionalProperties": false,
+      "properties": {
+        "approach_cell": {
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "approach_distance_cells": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "cell": {
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "interactable": {
+          "type": "boolean"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "room_id": {
+          "type": "string"
+        },
+        "room_role": {
+          "type": "string"
+        },
+        "semantic": {
+          "type": "string"
+        },
+        "sequence": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "approach_cell",
+        "approach_distance_cells",
+        "cell",
+        "id",
+        "interactable",
+        "kind",
+        "room_id",
+        "room_role",
+        "semantic",
+        "sequence",
+        "type"
+      ],
+      "type": "object"
+    },
+    "PlayerModel": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "player-model-1"
+        },
+        "signals": {
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "signals"
+      ],
+      "type": "object"
+    },
+    "PortalIntent": {
+      "additionalProperties": false,
+      "description": "Authored doorway between two rooms sharing a real cardinal cell edge. Created at placement time by the topology stage — never derived post-hoc.",
+      "properties": {
+        "exterior": {
+          "description": "Exterior door (to_room == NO_ROOM): airlock onto space.",
+          "type": "boolean"
+        },
+        "from_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "from_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "state": {
+          "$ref": "#/definitions/EdgeKind"
+        },
+        "to_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "to_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "exterior",
+        "from_cell",
+        "from_room",
+        "state",
+        "to_cell",
+        "to_room"
+      ],
+      "type": "object"
+    },
+    "PresentationIR": {
+      "additionalProperties": false,
+      "properties": {
+        "approved_bindings": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "kit_id": {
+          "type": "string"
+        },
+        "locale": {
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "presentation-ir-1"
+        },
+        "seed": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "approved_bindings",
+        "kit_id",
+        "locale",
+        "schema_version",
+        "seed"
+      ],
+      "type": "object"
+    },
+    "PresentationRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "locale": {
+          "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
+          "type": "string"
+        },
+        "seed": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "locale",
+        "seed"
+      ],
+      "type": "object"
+    },
+    "ProcgenRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "content_manifest_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "difficulty_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "generator_version": {
+          "const": 3
+        },
+        "player_model": {
+          "$ref": "#/definitions/PlayerModel"
+        },
+        "presentation": {
+          "$ref": "#/definitions/PresentationRequest"
+        },
+        "requested_domains": {
+          "items": {
+            "$ref": "#/definitions/Domain"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "schema_version": {
+          "const": "procgen-request-1"
+        },
+        "site": {
+          "$ref": "#/definitions/SiteRequest"
+        },
+        "world_seed": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "content_manifest_hash",
+        "difficulty_id",
+        "generator_version",
+        "player_model",
+        "presentation",
+        "requested_domains",
+        "schema_version",
+        "site",
+        "world_seed"
+      ],
+      "type": "object"
+    },
+    "PropKind": {
+      "enum": [
+        "key_pickup",
+        "repair_panel",
+        "objective_console",
+        "extraction_console"
+      ],
+      "type": "string"
+    },
+    "ResourcePressure": {
+      "additionalProperties": false,
+      "properties": {
+        "marker_id": {
+          "type": "string"
+        },
+        "pressure_bp": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "resource_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "marker_id",
+        "pressure_bp",
+        "resource_id"
+      ],
+      "type": "object"
+    },
+    "Role": {
+      "enum": [
+        "Airlock",
+        "Dock",
+        "Corridor",
+        "MainSpine",
+        "Hub",
+        "Ramp",
+        "Elevator",
+        "Bridge",
+        "Engineering",
+        "Reactor",
+        "LifeSupport",
+        "Maintenance",
+        "Cargo",
+        "Hangar",
+        "Storage",
+        "Armory",
+        "Security",
+        "Medical",
+        "CrewQuarters",
+        "MessHall",
+        "Compartment"
+      ],
+      "type": "string"
+    },
+    "RoomEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "b": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/definitions/EdgeKind2"
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "RoomGraph": {
+      "additionalProperties": false,
+      "properties": {
+        "edges": {
+          "items": {
+            "$ref": "#/definitions/RoomEdge"
+          },
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/definitions/RoomNode"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "edges",
+        "nodes"
+      ],
+      "type": "object"
+    },
+    "RoomNode": {
+      "additionalProperties": false,
+      "properties": {
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "depressurized": {
+          "type": "boolean"
+        },
+        "id": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/definitions/Role"
+        },
+        "max": {
+          "items": true,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "int32",
+              "type": "integer"
+            },
+            {
+              "format": "int32",
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "min": {
+          "description": "AABB in deck-local tile coords (min inclusive, max inclusive).",
+          "items": true,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "int32",
+              "type": "integer"
+            },
+            {
+              "format": "int32",
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "spans_room_id": {
+          "description": "For multi-deck logical systems (engineering spanning decks): the room id of the same logical room on the deck below, if any.",
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tile_count": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deck",
+        "depressurized",
+        "id",
+        "kind",
+        "max",
+        "min",
+        "tile_count"
+      ],
+      "type": "object"
+    },
+    "RoomSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "cells": {
+          "items": {
+            "$ref": "#/definitions/Cell"
+          },
+          "type": "array"
+        },
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "id": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "role": {
+          "$ref": "#/definitions/Role"
+        }
+      },
+      "required": [
+        "cells",
+        "deck",
+        "id",
+        "role"
+      ],
+      "type": "object"
+    },
+    "RouteEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "cost_bp": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cost_bp",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "Ship": {
+      "additionalProperties": false,
+      "properties": {
+        "archetype_id": {
+          "type": "string"
+        },
+        "cause_of_loss": {
+          "$ref": "#/definitions/CauseOfLoss"
+        },
+        "critical_path": {
+          "items": {
+            "format": "uint16",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "damage_events": {
+          "items": {
+            "$ref": "#/definitions/DamageEvent"
+          },
+          "type": "array"
+        },
+        "decks": {
+          "items": {
+            "$ref": "#/definitions/Deck"
+          },
+          "type": "array"
+        },
+        "entities": {
+          "items": {
+            "$ref": "#/definitions/EntitySpec"
+          },
+          "type": "array"
+        },
+        "entry_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "fractured": {
+          "type": "boolean"
+        },
+        "fragments": {
+          "items": {
+            "$ref": "#/definitions/ShipFragment"
+          },
+          "type": "array"
+        },
+        "generator_version": {
+          "const": 2
+        },
+        "goal_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "intactness": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "plan": {
+          "$ref": "#/definitions/StructuralPlan",
+          "description": "The canonical structural plan — the AUTHORITATIVE geometry. Deck raster layers below are a derived projection of this."
+        },
+        "room_graph": {
+          "$ref": "#/definitions/RoomGraph"
+        },
+        "seed": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "template_id": {
+          "description": "Topology template that authored this ship.",
+          "type": "string"
+        },
+        "topology": {
+          "$ref": "#/definitions/Topology",
+          "description": "Authored topology (rooms with explicit occupancy, portal intents, vertical connections) — the compile input, kept for validation and export cross-checks."
+        }
+      },
+      "required": [
+        "archetype_id",
+        "cause_of_loss",
+        "critical_path",
+        "damage_events",
+        "decks",
+        "entities",
+        "entry_room",
+        "fractured",
+        "fragments",
+        "generator_version",
+        "goal_room",
+        "intactness",
+        "plan",
+        "room_graph",
+        "seed",
+        "template_id",
+        "topology"
+      ],
+      "type": "object"
+    },
+    "ShipFragment": {
+      "additionalProperties": false,
+      "description": "Metadata about one hull piece after a structural fracture. Tile data is already laid out in final world-local coordinates (fragments are baked apart into the shared deck grid), so this exists for debugging/AI hints, not for rendering math.",
+      "properties": {
+        "drift": {
+          "description": "Translation that was applied to this fragment when baking it apart.",
+          "items": true,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "int32",
+              "type": "integer"
+            },
+            {
+              "format": "int32",
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "id": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "rooms": {
+          "description": "Room ids belonging to this fragment.",
+          "items": {
+            "format": "uint16",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "drift",
+        "id",
+        "rooms"
+      ],
+      "type": "object"
+    },
+    "SiteIR": {
+      "additionalProperties": false,
+      "properties": {
+        "functional_props": {
+          "items": {
+            "$ref": "#/definitions/FunctionalProp"
+          },
+          "type": "array"
+        },
+        "mission_graph": {
+          "$ref": "#/definitions/MissionGraph"
+        },
+        "navigation": {
+          "$ref": "#/definitions/Navigation"
+        },
+        "schema_version": {
+          "const": "site-ir-2"
+        },
+        "ship": {
+          "$ref": "#/definitions/Ship"
+        },
+        "spatial_annotations": {
+          "$ref": "#/definitions/SpatialAnnotations"
+        }
+      },
+      "required": [
+        "functional_props",
+        "mission_graph",
+        "navigation",
+        "schema_version",
+        "ship",
+        "spatial_annotations"
+      ],
+      "type": "object"
+    },
+    "SiteRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "archetype_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "cause_of_loss": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CauseOfLoss"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "intactness_override_bp": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          ]
+        },
+        "kit_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "loot_richness_bp": {
+          "maximum": 30000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "site_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "archetype_id",
+        "kit_id",
+        "loot_richness_bp",
+        "site_id",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "SocketBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "neighbor_placement_id": {
+          "type": "string"
+        },
+        "neighbor_socket_id": {
+          "type": "string"
+        },
+        "placement_id": {
+          "type": "string"
+        },
+        "socket_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "neighbor_placement_id",
+        "neighbor_socket_id",
+        "placement_id",
+        "socket_id"
+      ],
+      "type": "object"
+    },
+    "SpatialAnnotation": {
+      "additionalProperties": false,
+      "properties": {
+        "cover_cells": {
+          "items": {
+            "$ref": "#/definitions/Cell"
+          },
+          "type": "array"
+        },
+        "los_pairs": {
+          "items": {
+            "$ref": "#/definitions/LosPair"
+          },
+          "type": "array"
+        },
+        "minimum_clearance": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cover_cells",
+        "los_pairs",
+        "minimum_clearance",
+        "room"
+      ],
+      "type": "object"
+    },
+    "SpatialAnnotations": {
+      "additionalProperties": false,
+      "properties": {
+        "rooms": {
+          "items": {
+            "$ref": "#/definitions/SpatialAnnotation"
+          },
+          "type": "array"
+        },
+        "schema_version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "rooms",
+        "schema_version"
+      ],
+      "type": "object"
+    },
+    "StructuralPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "ceiling_placements": {
+          "items": {
+            "$ref": "#/definitions/FloorPlacement"
+          },
+          "type": "array"
+        },
+        "edges": {
+          "additionalProperties": {
+            "$ref": "#/definitions/EdgeRecord"
+          },
+          "type": "object"
+        },
+        "errors": {
+          "description": "Compiler diagnostics; non-empty fails validation.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "floor_placements": {
+          "items": {
+            "$ref": "#/definitions/FloorPlacement"
+          },
+          "type": "array"
+        },
+        "occupancy": {
+          "additionalProperties": {
+            "$ref": "#/definitions/CellRecord"
+          },
+          "type": "object"
+        },
+        "placements": {
+          "description": "Materialized non-Open, wrapper-required edges (sorted by edge_key).",
+          "items": {
+            "$ref": "#/definitions/EdgeRecord"
+          },
+          "type": "array"
+        },
+        "socket_bindings": {
+          "items": {
+            "$ref": "#/definitions/SocketBinding"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "ceiling_placements",
+        "edges",
+        "errors",
+        "floor_placements",
+        "occupancy",
+        "placements",
+        "socket_bindings"
+      ],
+      "type": "object"
+    },
+    "TileWalls": {
+      "additionalProperties": false,
+      "description": "PZ-style: walls live on tile EDGES. Each tile stores its north and west edges; a tile's south edge is its south neighbor's north edge, etc.",
+      "properties": {
+        "north": {
+          "$ref": "#/definitions/WallEdge"
+        },
+        "west": {
+          "$ref": "#/definitions/WallEdge"
+        }
+      },
+      "required": [
+        "north",
+        "west"
+      ],
+      "type": "object"
+    },
+    "Topology": {
+      "additionalProperties": false,
+      "description": "Everything the structural compiler consumes.",
+      "properties": {
+        "portals": {
+          "items": {
+            "$ref": "#/definitions/PortalIntent"
+          },
+          "type": "array"
+        },
+        "rooms": {
+          "items": {
+            "$ref": "#/definitions/RoomSpec"
+          },
+          "type": "array"
+        },
+        "verticals": {
+          "items": {
+            "$ref": "#/definitions/VerticalConnection"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "portals",
+        "rooms",
+        "verticals"
+      ],
+      "type": "object"
+    },
+    "VersionEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "content_manifest_hash": {
+          "type": "string"
+        },
+        "export_schemas": {
+          "$ref": "#/definitions/ExportSchemas"
+        },
+        "generator_version": {
+          "const": 3
+        }
+      },
+      "required": [
+        "content_manifest_hash",
+        "export_schemas",
+        "generator_version"
+      ],
+      "type": "object"
+    },
+    "VerticalConnection": {
+      "additionalProperties": false,
+      "properties": {
+        "from_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "from_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "to_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "to_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "from_cell",
+        "from_room",
+        "to_cell",
+        "to_room"
+      ],
+      "type": "object"
+    },
+    "WallEdge": {
+      "oneOf": [
+        {
+          "enum": [
+            "None"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Exterior hull wall.",
+          "enum": [
+            "Hull"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Interior partition wall.",
+          "enum": [
+            "Interior"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Door frame opening (a Door entity sits on this edge).",
+          "enum": [
+            "Doorway"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Wall destroyed by damage; passable, jagged.",
+          "enum": [
+            "Breached"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "WorldAnchor": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "WorldIRv2": {
+      "additionalProperties": false,
+      "properties": {
+        "anchors": {
+          "items": {
+            "$ref": "#/definitions/WorldAnchor"
+          },
+          "type": "array"
+        },
+        "archetype_id": {
+          "type": "string"
+        },
+        "biome_fields": {
+          "items": {
+            "$ref": "#/definitions/BiomeField"
+          },
+          "type": "array"
+        },
+        "extraction": {
+          "$ref": "#/definitions/ExtractionGuarantee"
+        },
+        "hazard_fields": {
+          "items": {
+            "$ref": "#/definitions/HazardField"
+          },
+          "type": "array"
+        },
+        "landmarks": {
+          "items": {
+            "$ref": "#/definitions/LandmarkRecord"
+          },
+          "type": "array"
+        },
+        "markers": {
+          "items": {
+            "$ref": "#/definitions/CoordinateMarker"
+          },
+          "type": "array"
+        },
+        "resource_pressures": {
+          "items": {
+            "$ref": "#/definitions/ResourcePressure"
+          },
+          "type": "array"
+        },
+        "routes": {
+          "items": {
+            "$ref": "#/definitions/RouteEdge"
+          },
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "world-ir-2"
+        },
+        "site_id": {
+          "type": "string"
+        },
+        "site_seed": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "world_seed": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "anchors",
+        "archetype_id",
+        "biome_fields",
+        "extraction",
+        "hazard_fields",
+        "landmarks",
+        "markers",
+        "resource_pressures",
+        "routes",
+        "schema_version",
+        "site_id",
+        "site_seed",
+        "world_seed",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "gameplay_ir": {
+      "$ref": "#/definitions/GameplayIR"
+    },
+    "metrics": {
+      "$ref": "#/definitions/GenerationMetrics"
+    },
+    "presentation_ir": {
+      "$ref": "#/definitions/PresentationIR"
+    },
+    "request": {
+      "$ref": "#/definitions/ProcgenRequest"
+    },
+    "schema_version": {
+      "const": "procgen-bundle-3"
+    },
+    "semantic_hash": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "site_ir": {
+      "$ref": "#/definitions/SiteIR"
+    },
+    "trace": {
+      "$ref": "#/definitions/GenerationTrace"
+    },
+    "version": {
+      "$ref": "#/definitions/VersionEnvelope"
+    },
+    "world_ir": {
+      "$ref": "#/definitions/WorldIRv2"
+    }
+  },
+  "required": [
+    "gameplay_ir",
+    "metrics",
+    "presentation_ir",
+    "request",
+    "schema_version",
+    "semantic_hash",
+    "site_ir",
+    "trace",
+    "version",
+    "world_ir"
+  ],
+  "title": "procgen-bundle-3",
+  "type": "object"
+}

@@ -5,7 +5,7 @@
 
 use derelict_core::lifecycle::{
     AdapterSchemas, GeneratorManifest, LifecycleEvent, LifecycleResult,
-    PROCGEN_GENERATOR_MANIFEST_SCHEMA,
+    PROCGEN_CAPABILITIES_SCHEMA, PROCGEN_GENERATOR_MANIFEST_SCHEMA,
 };
 use derelict_core::manifest::{
     ExportSchemas, PROCGEN_BUNDLE_SCHEMA_V3, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3, WORLD_IR_SCHEMA_V2,
@@ -14,6 +14,7 @@ use derelict_core::procgen::{
     generate_bundle, semantic_hash, Domain, PlayerModel, PresentationRequest, ProcgenBundle,
     ProcgenError, ProcgenRequest, SiteRequest, PLAYER_MODEL_SCHEMA, PROCGEN_REQUEST_SCHEMA,
 };
+use derelict_core::site::resolve_site_candidate;
 use derelict_core::world::{
     derive_site_seed_v3, generate_world, WorldGenerationRequest, MAX_PUBLIC_SEED,
     PROCGEN_GENERATOR_VERSION,
@@ -337,7 +338,7 @@ fn lifecycle_result_and_generator_manifest_are_platform_v3_contracts() {
         export_schemas: ExportSchemas::platform_v3(),
         adapter_schemas: AdapterSchemas {
             lifecycle_result: PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3.into(),
-            capabilities: "procgen-capabilities-1".into(),
+            capabilities: PROCGEN_CAPABILITIES_SCHEMA.into(),
             generator_manifest: PROCGEN_GENERATOR_MANIFEST_SCHEMA.into(),
         },
         target: "native".into(),
@@ -380,6 +381,72 @@ fn invalid_identity_and_version_substitutions_fail_closed() {
         v["request"]["site"]["site_id"] = "other".into()
     });
     assert!(ProcgenBundle::from_json(&mismatched).is_err());
+}
+
+#[test]
+fn authored_site_fallback_requires_stage_bound_candidate_evidence() {
+    let data = GenData::default_bundle().unwrap();
+    let (mut bundle, outcome) = (0..192)
+        .find_map(|seed| {
+            let mut req = request();
+            req.world_seed = seed;
+            let bundle = generate_bundle(req, &data).ok()?;
+            let mut malformed = bundle.site_ir.clone();
+            malformed.mission_graph.mission_id.clear();
+            let outcome =
+                resolve_site_candidate(malformed, &world_request(&bundle.request)).ok()?;
+            (outcome.trace.fallback.is_some()).then_some((bundle, outcome))
+        })
+        .expect("bounded corpus contains an authored site fallback fixture");
+    assert_eq!(
+        outcome.trace.fallback.as_deref(),
+        Some("authored-safe-return")
+    );
+
+    bundle.site_ir = outcome.site;
+    bundle
+        .trace
+        .candidate_decisions
+        .retain(|decision| !decision.starts_with("site:"));
+    bundle.trace.candidate_decisions.extend(
+        outcome
+            .trace
+            .candidate_decisions
+            .into_iter()
+            .map(|decision| format!("site:{decision}")),
+    );
+    bundle
+        .trace
+        .repairs
+        .retain(|repair| !repair.starts_with("site:"));
+    bundle.trace.repairs.extend(
+        outcome
+            .trace
+            .repairs
+            .into_iter()
+            .map(|repair| format!("site:{repair}")),
+    );
+    bundle.trace.fallback = Some(match bundle.trace.fallback.take() {
+        Some(world) if world.starts_with("world:") => {
+            format!("{world}|site:authored-safe-return")
+        }
+        None => "site:authored-safe-return".into(),
+        other => panic!("unexpected original fallback: {other:?}"),
+    });
+    bundle.semantic_hash = semantic_hash(&bundle).unwrap();
+    bundle.validate().unwrap();
+
+    for missing in ["site:rejected_candidate", "site:selected_fallback"] {
+        let mut mutation = bundle.clone();
+        mutation
+            .trace
+            .candidate_decisions
+            .retain(|decision| decision != missing);
+        assert!(
+            mutation.validate().is_err(),
+            "accepted fallback without {missing}"
+        );
+    }
 }
 
 #[allow(dead_code)]

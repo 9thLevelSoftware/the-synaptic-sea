@@ -43,7 +43,9 @@ fn try_fixture_for(
 fn survey_fixture() -> (WorldGenerationRequest, derelict_core::site::SiteIR) {
     for seed in 0..192 {
         let req = request(seed);
-        let Ok(site) = try_fixture_for(&req) else { continue };
+        let Ok(site) = try_fixture_for(&req) else {
+            continue;
+        };
         if site.mission_graph.gates.is_empty() {
             validate_site_for_request(&site, &req).unwrap();
             return (req, site);
@@ -68,7 +70,9 @@ fn overlapping_required_prop_is_relocated_with_one_named_repair() {
     let mut repaired = None;
     'seeds: for seed in 0..192 {
         let req = request(seed);
-        let Ok(site) = try_fixture_for(&req) else { continue };
+        let Ok(site) = try_fixture_for(&req) else {
+            continue;
+        };
         if site.mission_graph.gates.is_empty() {
             for index in 0..site.functional_props.len() {
                 let mut malformed = site.clone();
@@ -96,7 +100,9 @@ fn invalid_gate_navigation_binding_is_repaired_with_one_named_repair() {
     let mut repaired = None;
     'seeds: for seed in 0..192 {
         let req = request(seed);
-        let Ok(site) = try_fixture_for(&req) else { continue };
+        let Ok(site) = try_fixture_for(&req) else {
+            continue;
+        };
         for index in 0..site.mission_graph.gates.len() {
             let mut malformed = site.clone();
             malformed.mission_graph.gates[index].navigation_edge = "missing-edge".into();
@@ -121,8 +127,18 @@ fn irreparable_candidate_uses_complete_authored_fallback() {
     let expected_path = fallback_return_path(&site);
     let outcome = resolve_site_candidate(site, &req).unwrap();
     assert_eq!(outcome.trace.repairs.len(), 0);
-    assert_eq!(outcome.trace.fallback.as_deref(), Some("authored-safe-return"));
-    assert_eq!(outcome.site.mission_graph.mission_id, "authored-safe-return");
+    assert_eq!(
+        outcome.trace.fallback.as_deref(),
+        Some("authored-safe-return")
+    );
+    assert_eq!(
+        outcome.site.mission_graph.mission_id,
+        "authored-safe-return"
+    );
+    assert_eq!(
+        outcome.trace.candidate_decisions,
+        vec!["rejected_candidate", "selected_fallback"]
+    );
     assert!(outcome.site.mission_graph.gates.is_empty());
     assert_eq!(fallback_return_path(&outcome.site), expected_path);
     validate_site_for_request(&outcome.site, &req).unwrap();
@@ -149,6 +165,9 @@ fn repair_count_and_trace_are_bounded() {
     assert!(outcome.trace.repairs.len() <= 2);
     assert!(outcome.trace.candidate_decisions.len() <= 64);
     assert!(outcome.trace.repairs.iter().all(|repair| {
-        matches!(repair.as_str(), "relocate_required_prop" | "replace_gate_binding")
+        matches!(
+            repair.as_str(),
+            "relocate_required_prop" | "replace_gate_binding"
+        )
     }));
 }

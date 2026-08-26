@@ -47,7 +47,12 @@ fn gated_fixture(kind: GateKind) -> (WorldGenerationRequest, derelict_core::site
     for seed in 0..192 {
         let request = request(seed);
         let site = fixture_for(&request);
-        if site.mission_graph.gates.iter().any(|gate| gate.kind == kind) {
+        if site
+            .mission_graph
+            .gates
+            .iter()
+            .any(|gate| gate.kind == kind)
+        {
             validate_site_for_request(&site, &request).unwrap();
             return (request, site);
         }
@@ -85,10 +90,12 @@ fn rejects_mission_cycle() {
     let (request, mut site) = fixture();
     let start = site.mission_graph.start_node.clone();
     let extraction = site.mission_graph.extraction_node.clone();
-    site.mission_graph.edges.push(derelict_core::site::MissionEdge {
-        from: extraction,
-        to: start,
-    });
+    site.mission_graph
+        .edges
+        .push(derelict_core::site::MissionEdge {
+            from: extraction,
+            to: start,
+        });
     rejects(&request, site);
 }
 
@@ -219,10 +226,12 @@ fn rejects_spatial_cover_tampering() {
 #[test]
 fn rejects_spatial_los_tampering() {
     let (request, mut site) = fixture();
-    site.spatial_annotations.rooms[0].los_pairs.push(derelict_core::site::LosPair {
-        a: Cell::new(99, 999, 999),
-        b: Cell::new(99, 998, 999),
-    });
+    site.spatial_annotations.rooms[0]
+        .los_pairs
+        .push(derelict_core::site::LosPair {
+            a: Cell::new(99, 999, 999),
+            b: Cell::new(99, 998, 999),
+        });
     rejects(&request, site);
 }
 

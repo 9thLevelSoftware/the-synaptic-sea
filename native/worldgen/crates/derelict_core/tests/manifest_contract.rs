@@ -1,7 +1,7 @@
 use derelict_core::manifest::{BuildManifest, ManifestError};
 
 const VALID: &str = r#"{
-  "manifest_schema":"procgen-build-manifest-1",
+  "manifest_schema":"procgen-build-manifest-2",
   "rust_source_commit":"b78fedf2624c2d54f0f42b6c0ad3c488fbd9e6a9",
   "generator_version":3,
   "content_manifest_path":"data/procgen/manifests/content_manifest.json",
@@ -19,7 +19,7 @@ fn valid_manifest_parses_and_validates() {
 
 #[test]
 fn unknown_major_is_rejected() {
-    let json = VALID.replace("procgen-build-manifest-1", "procgen-build-manifest-2");
+    let json = VALID.replace("procgen-build-manifest-2", "procgen-build-manifest-3");
     assert!(matches!(
         BuildManifest::from_json_platform_v3(&json),
         Err(ManifestError::UnknownSchemaMajor(_))
@@ -96,20 +96,21 @@ fn every_required_build_field_is_enforced() {
 
 #[test]
 fn draft_2020_schema_enforces_both_exact_target_artifact_pairs() {
-    let schema: serde_json::Value = serde_json::from_str(include_str!(
+    let legacy_schema: serde_json::Value = serde_json::from_str(include_str!(
         "../../../schemas/procgen-build-manifest-1.schema.json"
     ))
     .unwrap();
-    let validator = jsonschema::validator_for(&schema).unwrap();
+    let legacy_validator = jsonschema::validator_for(&legacy_schema).unwrap();
     // The published build-manifest-1 schema is an immutable structural
     // contract; validate its historical export map separately from the
     // current platform-v3 map exercised above.
     let legacy = VALID
+        .replace("procgen-build-manifest-2", "procgen-build-manifest-1")
         .replace("procgen-bundle-3", "procgen-bundle-2")
         .replace("site-ir-2", "site-ir-1")
         .replace("generation-trace-2", "generation-trace-1");
     let windows: serde_json::Value = serde_json::from_str(&legacy).unwrap();
-    assert!(validator.is_valid(&windows));
+    assert!(legacy_validator.is_valid(&windows));
     let web = legacy
         .to_string()
         .replace("x86_64-pc-windows-msvc", "wasm32-unknown-unknown")
@@ -118,9 +119,24 @@ fn draft_2020_schema_enforces_both_exact_target_artifact_pairs() {
             "addons/derelict/bin/win64/derelict_godot.dll",
             "addons/derelict/bin/web/derelict_wasm_bg.wasm",
         );
-    assert!(validator.is_valid(&serde_json::from_str::<serde_json::Value>(&web).unwrap()));
+    assert!(legacy_validator.is_valid(&serde_json::from_str::<serde_json::Value>(&web).unwrap()));
     let mismatch = legacy.replace("gdextension", "wasm");
-    assert!(!validator.is_valid(&serde_json::from_str::<serde_json::Value>(&mismatch).unwrap()));
+    assert!(
+        !legacy_validator.is_valid(&serde_json::from_str::<serde_json::Value>(&mismatch).unwrap())
+    );
     let unknown = legacy.replace("\n}", ",\n  \"unexpected\": true\n}");
-    assert!(!validator.is_valid(&serde_json::from_str::<serde_json::Value>(&unknown).unwrap()));
+    assert!(
+        !legacy_validator.is_valid(&serde_json::from_str::<serde_json::Value>(&unknown).unwrap())
+    );
+
+    let current_schema: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../schemas/procgen-build-manifest-2.schema.json"
+    ))
+    .unwrap();
+    let current_validator = jsonschema::validator_for(&current_schema).unwrap();
+    let current: serde_json::Value = serde_json::from_str(VALID).unwrap();
+    assert!(current_validator.is_valid(&current));
+    let substituted = VALID.replace("site-ir-2", "site-ir-1");
+    assert!(!current_validator
+        .is_valid(&serde_json::from_str::<serde_json::Value>(&substituted).unwrap()));
 }

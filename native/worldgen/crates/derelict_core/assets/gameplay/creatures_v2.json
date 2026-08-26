@@ -7,8 +7,8 @@
     {"id":"body_siren","family":"controller","max_mass":180,"footprint_id":"fp_small","rig_ids":["rig_siren"]}
   ],
   "footprints":[
-    {"id":"fp_small","cells":[{"x":0,"y":0}],"clearance":1,"traversal_bp":10000},
-    {"id":"fp_large","cells":[{"x":0,"y":0},{"x":1,"y":0},{"x":0,"y":1},{"x":1,"y":1}],"clearance":2,"traversal_bp":7000}
+    {"id":"fp_large","cells":[{"x":0,"y":0},{"x":1,"y":0},{"x":0,"y":1},{"x":1,"y":1}],"clearance":2,"traversal_bp":7000},
+    {"id":"fp_small","cells":[{"x":0,"y":0}],"clearance":1,"traversal_bp":10000}
   ],
   "rigs":[
     {"id":"rig_brute","body_ids":["body_brute"],"animation_set_ids":["anim_brute"]},

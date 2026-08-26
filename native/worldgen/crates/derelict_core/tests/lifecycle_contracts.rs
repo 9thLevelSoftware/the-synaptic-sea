@@ -160,12 +160,15 @@ fn capabilities_and_manifest_reject_bad_identity_and_limits() {
     manifest.validate().unwrap();
     let manifest_value = serde_json::to_value(&manifest).unwrap();
     assert!(schema_valid(
-        "procgen-generator-manifest-1",
+        PROCGEN_GENERATOR_MANIFEST_SCHEMA,
         &manifest_value
     ));
     let mut bad_schema = manifest_value.clone();
     bad_schema["adapter_schemas"]["capabilities"] = "wrong".into();
-    assert!(!schema_valid("procgen-generator-manifest-1", &bad_schema));
+    assert!(!schema_valid(
+        PROCGEN_GENERATOR_MANIFEST_SCHEMA,
+        &bad_schema
+    ));
     let bad = serde_json::to_string(&manifest)
         .unwrap()
         .replace("dirty_development", "unknown");
@@ -245,20 +248,20 @@ fn lifecycle_schema_and_rust_matrix_match_for_states_ids_and_events() {
 #[test]
 fn capability_limits_and_all_failure_codes_validate_at_both_boundaries() {
     let caps = serde_json::to_value(capabilities()).unwrap();
-    assert!(schema_valid("procgen-capabilities-1", &caps));
+    assert!(schema_valid(PROCGEN_CAPABILITIES_SCHEMA, &caps));
     for (field, value) in [("max_events", 33), ("max_trace_entries", 4097)] {
         let mut invalid = caps.clone();
         invalid[field] = value.into();
-        assert!(!schema_valid("procgen-capabilities-1", &invalid));
+        assert!(!schema_valid(PROCGEN_CAPABILITIES_SCHEMA, &invalid));
         assert!(ProcgenCapabilities::from_json(&serde_json::to_string(&invalid).unwrap()).is_err());
     }
     let mut zero_workers = caps.clone();
     zero_workers["worker_count"] = 0.into();
-    assert!(!schema_valid("procgen-capabilities-1", &zero_workers));
+    assert!(!schema_valid(PROCGEN_CAPABILITIES_SCHEMA, &zero_workers));
     let mut cooperative = caps.clone();
     cooperative["worker_mode"] = "cooperative".into();
     cooperative["worker_count"] = 0.into();
-    assert!(schema_valid("procgen-capabilities-1", &cooperative));
+    assert!(schema_valid(PROCGEN_CAPABILITIES_SCHEMA, &cooperative));
     for code in [
         ProcgenFailureCode::InvalidRequest,
         ProcgenFailureCode::UnsupportedSchema,

@@ -130,12 +130,32 @@
       "sha256": "8c7c91491d77855df8876672c41545007250c0cf0562bde1c1f6a6db0dd17816"
     },
     {
+      "path": "native/worldgen/crates/derelict_core/assets/gameplay/creatures_v2.json",
+      "sha256": "9defccccc9bff1437f348b60c53945b5578bb044cdabd8da2a77194718b99967"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/gameplay/items_v2.json",
+      "sha256": "2fcc265e876fd960429e2e80ad541546cf85d5ee6ba0aa2fa0c88cfa29df91d0"
+    },
+    {
       "path": "native/worldgen/crates/derelict_core/assets/items.ron",
       "sha256": "860263efdbed917e503d75acd6c40b7d5ae577856e994b604fe9a317bf456420"
     },
     {
       "path": "native/worldgen/crates/derelict_core/assets/loot_tables/default.ron",
       "sha256": "90766bc993eb90fe6b786bad1bbc07bda9c3a5758661d44947b9d9ecab3d8e23"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/presentation/catalog_v2.json",
+      "sha256": "ef797b8b21927590bf09e7ba0d06395717a030070c2d81c395548dbc6df29bd7"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/site/rules_v2.json",
+      "sha256": "b68b7311024690be939f4acef1830e07a86e87a99e624d788f950b163454c660"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/site/safe_fallback_v2.json",
+      "sha256": "0ceff0d1f12a4b8fab8faf1bc147b185e300ba1a298fc1f44ecea0cd95f25a84"
     },
     {
       "path": "native/worldgen/crates/derelict_core/assets/topology_templates/bifurcated.ron",
@@ -198,5 +218,5 @@
       "sha256": "988d3d023a552188b0400843940f5724dc99e953b86049c7e2b70018e25990b1"
     }
   ],
-  "content_manifest_hash": "e0364ba52fbf0b1c629c676d622fdc2ffd6964bee47c11cad58c320de22a7c1a"
+  "content_manifest_hash": "a7cfda584051097f43c09d9aaf8494f97c492641efa7b4ec518dee65e9c36ee7"
 }

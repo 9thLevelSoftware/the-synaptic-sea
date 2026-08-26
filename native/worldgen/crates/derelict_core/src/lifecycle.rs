@@ -5,10 +5,16 @@ use crate::world::PROCGEN_GENERATOR_VERSION;
 use serde::{Deserialize, Serialize};
 
 pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA: &str =
+    crate::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3;
+pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2: &str =
     crate::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2;
-pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2: &str = PROCGEN_LIFECYCLE_RESULT_SCHEMA;
-pub const PROCGEN_CAPABILITIES_SCHEMA: &str = "procgen-capabilities-1";
-pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA: &str = "procgen-generator-manifest-1";
+pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3: &str = PROCGEN_LIFECYCLE_RESULT_SCHEMA;
+pub const PROCGEN_CAPABILITIES_SCHEMA_V1: &str = "procgen-capabilities-1";
+pub const PROCGEN_CAPABILITIES_SCHEMA_V2: &str = "procgen-capabilities-2";
+pub const PROCGEN_CAPABILITIES_SCHEMA: &str = PROCGEN_CAPABILITIES_SCHEMA_V2;
+pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA_V1: &str = "procgen-generator-manifest-1";
+pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA_V2: &str = "procgen-generator-manifest-2";
+pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA: &str = PROCGEN_GENERATOR_MANIFEST_SCHEMA_V2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -195,8 +201,8 @@ impl AdapterSchemas {
     pub fn v1() -> Self {
         Self {
             lifecycle_result: "procgen-lifecycle-result-1".into(),
-            capabilities: PROCGEN_CAPABILITIES_SCHEMA.into(),
-            generator_manifest: PROCGEN_GENERATOR_MANIFEST_SCHEMA.into(),
+            capabilities: PROCGEN_CAPABILITIES_SCHEMA_V1.into(),
+            generator_manifest: PROCGEN_GENERATOR_MANIFEST_SCHEMA_V1.into(),
         }
     }
     fn validate(&self) -> Result<(), LifecycleError> {

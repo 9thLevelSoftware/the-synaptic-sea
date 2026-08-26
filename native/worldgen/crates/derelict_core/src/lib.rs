@@ -24,7 +24,8 @@ pub mod world;
 
 pub use archetype::GenData;
 pub use manifest::{
-    PROCGEN_BUNDLE_SCHEMA_V2, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2, WORLD_IR_SCHEMA_V2,
+    PROCGEN_BUNDLE_SCHEMA_V2, PROCGEN_BUNDLE_SCHEMA_V3, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2,
+    PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3, SITE_IR_SCHEMA_V1, SITE_IR_SCHEMA_V2, WORLD_IR_SCHEMA_V2,
 };
 pub use model::{
     apply_diff, CauseOfLoss, Deck, DeckLayer, EntityKind, EntitySpec, FloorTile, GenParams,

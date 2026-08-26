@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "worker_mode": {
+            "const": "thread_pool"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "worker_count": {
+            "minimum": 1
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "AdapterKind": {
+      "enum": [
+        "native",
+        "web"
+      ],
+      "type": "string"
+    },
+    "AdapterSchemas": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "const": "procgen-capabilities-2"
+        },
+        "generator_manifest": {
+          "const": "procgen-generator-manifest-2"
+        },
+        "lifecycle_result": {
+          "const": "procgen-lifecycle-result-3"
+        }
+      },
+      "required": [
+        "capabilities",
+        "generator_manifest",
+        "lifecycle_result"
+      ],
+      "type": "object"
+    },
+    "Domain": {
+      "enum": [
+        "world",
+        "site",
+        "gameplay",
+        "presentation"
+      ],
+      "type": "string"
+    },
+    "WorkerMode": {
+      "enum": [
+        "thread_pool",
+        "cooperative"
+      ],
+      "type": "string"
+    }
+  },
+  "properties": {
+    "adapter_kind": {
+      "$ref": "#/definitions/AdapterKind"
+    },
+    "deadline_ms": {
+      "format": "uint64",
+      "minimum": 1,
+      "type": "integer"
+    },
+    "max_entities": {
+      "format": "uint32",
+      "minimum": 1,
+      "type": "integer"
+    },
+    "max_events": {
+      "maximum": 32,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "max_request_bytes": {
+      "format": "uint64",
+      "minimum": 1,
+      "type": "integer"
+    },
+    "max_trace_entries": {
+      "maximum": 4096,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "queue_capacity": {
+      "format": "uint32",
+      "minimum": 1,
+      "type": "integer"
+    },
+    "retained_results": {
+      "format": "uint32",
+      "minimum": 1,
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "procgen-capabilities-2"
+    },
+    "schemas": {
+      "$ref": "#/definitions/AdapterSchemas"
+    },
+    "supported_domains": {
+      "const": [
+        "world",
+        "site",
+        "gameplay",
+        "presentation"
+      ]
+    },
+    "supports_async": {
+      "type": "boolean"
+    },
+    "supports_cancel": {
+      "type": "boolean"
+    },
+    "supports_sync": {
+      "type": "boolean"
+    },
+    "target": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "worker_count": {
+      "format": "uint32",
+      "minimum": 0.0,
+      "type": "integer"
+    },
+    "worker_mode": {
+      "$ref": "#/definitions/WorkerMode"
+    }
+  },
+  "required": [
+    "adapter_kind",
+    "deadline_ms",
+    "max_entities",
+    "max_events",
+    "max_request_bytes",
+    "max_trace_entries",
+    "queue_capacity",
+    "retained_results",
+    "schema_version",
+    "schemas",
+    "supported_domains",
+    "supports_async",
+    "supports_cancel",
+    "supports_sync",
+    "target",
+    "worker_count",
+    "worker_mode"
+  ],
+  "title": "procgen-capabilities-2",
+  "type": "object"
+}

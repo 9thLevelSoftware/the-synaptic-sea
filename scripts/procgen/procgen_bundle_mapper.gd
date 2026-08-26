@@ -3,22 +3,142 @@ class_name ProcgenBundleMapper
 
 var last_error: String = ""
 
-## Mechanical port of structural::export::to_layout_json. The input is the
-## serialized Rust Ship; values are copied/renamed only. Gameplay is copied
-## verbatim from GameplayIR.legacy_slice.
+## Mechanical port of structural::export::to_layout_json plus a deterministic
+## projection of authoritative SiteIR mission consequences into the existing
+## loader documents. The mapper never selects encounters, loot, gates, or
+## objectives; it only translates already validated Rust records.
 func map_to_loader_documents(bundle: Dictionary) -> Dictionary:
 	last_error = ""
 	var site: Dictionary = bundle.get("site_ir", {})
 	var gameplay_ir: Dictionary = bundle.get("gameplay_ir", {})
 	var ship: Variant = site.get("ship", null)
 	var gameplay: Variant = gameplay_ir.get("legacy_slice", null)
-	if not ship is Dictionary or not gameplay is Dictionary:
+	if str(site.get("schema_version", "")) != "site-ir-2" \
+			or not ship is Dictionary or not gameplay is Dictionary \
+			or not site.get("mission_graph", null) is Dictionary \
+			or not site.get("navigation", null) is Dictionary \
+			or not site.get("functional_props", null) is Array \
+			or not site.get("spatial_annotations", null) is Dictionary:
 		last_error = "migration_documents_missing"
 		return {}
 	var presentation: Dictionary = bundle.get("presentation_ir", {})
 	var layout: Dictionary = _layout(ship as Dictionary, presentation, bundle.get("request", {}))
 	if layout.is_empty(): return {}
-	return {"layout": layout, "kit_id": str(presentation.get("kit_id", "")), "gameplay_slice": (gameplay as Dictionary).duplicate(true)}
+	var names: Dictionary = _room_names(ship as Dictionary)
+	if not _apply_site_blocked_links(layout, site, names, (ship as Dictionary).get("plan", {})):
+		return {}
+	var runtime_gameplay: Dictionary = _site_gameplay_slice(gameplay as Dictionary, site, ship as Dictionary, names)
+	if runtime_gameplay.is_empty(): return {}
+	return {
+		"layout": layout,
+		"kit_id": str(presentation.get("kit_id", "")),
+		"gameplay_slice": runtime_gameplay,
+		"site_ir": site.duplicate(true),
+	}
+
+func _room_names(ship: Dictionary) -> Dictionary:
+	var names: Dictionary = {}
+	for room_value in (ship.get("topology", {}) as Dictionary).get("rooms", []):
+		if not room_value is Dictionary: continue
+		var room: Dictionary = room_value
+		var room_id: int = int(room.get("id", -1))
+		names[room_id] = "%s_%02d" % [_role_name(room.get("role", room.get("room_role", "room"))), room_id]
+	return names
+
+func _apply_site_blocked_links(layout: Dictionary, site: Dictionary, names: Dictionary, plan: Dictionary) -> bool:
+	var navigation: Dictionary = site.get("navigation", {})
+	var edge_index: Dictionary = {}
+	for edge_value in navigation.get("edges", []):
+		if edge_value is Dictionary: edge_index[str((edge_value as Dictionary).get("id", ""))] = edge_value
+	var blocked: Array = []
+	for gate_value in (site.get("mission_graph", {}) as Dictionary).get("gates", []):
+		if not gate_value is Dictionary:
+			last_error = "site_gate_mapping"
+			return false
+		var gate: Dictionary = gate_value
+		var edge_id: String = str(gate.get("navigation_edge", ""))
+		if not edge_index.has(edge_id):
+			last_error = "site_gate_mapping"
+			return false
+		var edge: Dictionary = edge_index[edge_id]
+		var reference: String = str(edge.get("structural_ref", ""))
+		var structural: Dictionary = plan.get("edges", {}).get(reference, {})
+		blocked.append({
+			"id": str(gate.get("id", "")),
+			"from_room": str(names.get(int(edge.get("from_room", -1)), "")),
+			"to_room": str(names.get(int(edge.get("to_room", -1)), "")),
+			"from_cell": _cell3(edge.get("from_cell", {})),
+			"to_cell": _cell3(edge.get("to_cell", {})),
+			"module_id": str(structural.get("module_id", "")),
+			"reason": str(gate.get("kind", "")),
+		})
+		for portal_value in layout.get("portals", []):
+			if portal_value is Dictionary and str((portal_value as Dictionary).get("edge_key", "")) == reference:
+				(portal_value as Dictionary)["state"] = "LOCKED"
+	layout["blocked_links"] = blocked
+	return true
+
+func _site_gameplay_slice(legacy: Dictionary, site: Dictionary, ship: Dictionary, names: Dictionary) -> Dictionary:
+	var mission: Dictionary = site.get("mission_graph", {})
+	var node_index: Dictionary = {}
+	for node_value in mission.get("nodes", []):
+		if node_value is Dictionary: node_index[str((node_value as Dictionary).get("id", ""))] = node_value
+	var prop_index: Dictionary = {}
+	for prop_value in site.get("functional_props", []):
+		if prop_value is Dictionary: prop_index[str((prop_value as Dictionary).get("mission_node_id", ""))] = prop_value
+	var roles: Dictionary = {}
+	for room_value in (ship.get("topology", {}) as Dictionary).get("rooms", []):
+		if room_value is Dictionary:
+			roles[int((room_value as Dictionary).get("id", -1))] = _role_name((room_value as Dictionary).get("role", "room"))
+	var objectives: Array = []
+	var sequence: int = 1
+	for node_value in mission.get("nodes", []):
+		if not node_value is Dictionary: continue
+		var node: Dictionary = node_value
+		if str(node.get("kind", "")) == "start": continue
+		var node_id: String = str(node.get("id", ""))
+		if not prop_index.has(node_id):
+			last_error = "site_prop_mapping"
+			return {}
+		var prop: Dictionary = prop_index[node_id]
+		var prop_kind: String = str(prop.get("kind", ""))
+		var objective_type: String = {
+			"key_pickup": "recover_supplies",
+			"repair_panel": "restore_systems",
+			"objective_console": "download_logs",
+			"extraction_console": "extract_site",
+		}.get(prop_kind, "")
+		var room_id: int = int(node.get("room", -1))
+		if objective_type.is_empty() or not names.has(room_id):
+			last_error = "site_objective_mapping"
+			return {}
+		objectives.append({
+			"id": node_id,
+			"sequence": sequence,
+			"type": objective_type,
+			"kind": "single",
+			"room_id": str(names[room_id]),
+			"room_role": str(roles.get(room_id, "room")),
+			"semantic": prop_kind,
+			"cell": _cell3(prop.get("anchor", {})),
+			"approach_cell": _cell3(prop.get("approach", {})),
+			"approach_distance_cells": 1,
+			"interactable": true,
+		})
+		sequence += 1
+	if objectives.is_empty():
+		last_error = "site_objective_mapping"
+		return {}
+	var start_node: Dictionary = node_index.get(str(mission.get("start_node", "")), {})
+	var extraction_node: Dictionary = node_index.get(str(mission.get("extraction_node", "")), {})
+	if start_node.is_empty() or extraction_node.is_empty():
+		last_error = "site_objective_mapping"
+		return {}
+	var result: Dictionary = legacy.duplicate(true)
+	result["start_room"] = str(names.get(int(start_node.get("room", -1)), ""))
+	result["goal_room"] = str(names.get(int(extraction_node.get("room", -1)), ""))
+	result["objectives"] = objectives
+	return result
 
 func _layout(ship: Dictionary, presentation: Dictionary, request: Dictionary) -> Dictionary:
 	var topology: Dictionary = ship.get("topology", {})

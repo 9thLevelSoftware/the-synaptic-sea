@@ -26,11 +26,16 @@ the bundle returns without violating Rust authority.
    migration evidence. `SiteIR` v2 contains the unchanged structural-v2 `Ship`
    plus closed typed mission, functional-prop, navigation, clearance,
    line-of-sight/cover, and objective-reachability records.
-2. Because the site definition is embedded in the complete contract, Task 7
-   advances the complete bundle to `procgen-bundle-3` and lifecycle result to
-   `procgen-lifecycle-result-3`. The Task 6 `world-ir-2` definition and all
-   other unchanged schema IDs remain stable. Every earlier schema file remains
-   checked and unmodified.
+2. Because the site definition and its four named channels/stage-qualified
+   fallback identity are embedded in the complete contract, Task 7 advances
+   the site to `site-ir-2`, trace to `generation-trace-2`, complete bundle to
+   `procgen-bundle-3`, and lifecycle result to
+   `procgen-lifecycle-result-3`. Because capability, runtime-manifest, and
+   build-manifest envelopes constrain those nested schema maps, they advance to
+   `procgen-capabilities-2`, `procgen-generator-manifest-2`, and
+   `procgen-build-manifest-2` rather than rewriting their v1 definitions. The
+   Task 6 `world-ir-2` definition and all other unchanged schema IDs remain
+   stable. Every earlier schema file remains checked and unmodified.
 3. The platform generator remains version 3 and the nested structural ship
    remains version 2. The bundle envelope's export-schema map and changed
    content-manifest hash distinguish the Task 7 contract/content. Validation

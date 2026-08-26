@@ -1,8 +1,8 @@
 //! Cooperative WebAssembly adapter over the shared deterministic procgen core.
 use derelict_core::lifecycle::{
     AdapterKind, AdapterSchemas, GeneratorManifest, LifecycleEvent, LifecycleResult,
-    ProcgenCapabilities, WorkerMode, PROCGEN_GENERATOR_MANIFEST_SCHEMA,
-    PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3,
+    ProcgenCapabilities, WorkerMode, PROCGEN_CAPABILITIES_SCHEMA,
+    PROCGEN_GENERATOR_MANIFEST_SCHEMA, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3,
 };
 use derelict_core::manifest::ExportSchemas;
 use derelict_core::procgen::{
@@ -305,7 +305,7 @@ fn validate_request(
 }
 fn capabilities_value() -> ProcgenCapabilities {
     ProcgenCapabilities {
-        schema_version: "procgen-capabilities-1".into(),
+        schema_version: PROCGEN_CAPABILITIES_SCHEMA.into(),
         adapter_kind: AdapterKind::Web,
         target: "wasm32-unknown-unknown".into(),
         supports_sync: true,

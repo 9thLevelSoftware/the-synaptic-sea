@@ -130,8 +130,10 @@ fn executable_adapter_binding_is_rejected() {
 }
 #[test]
 fn provenance_mutation_is_rejected() {
-    let mut p = Provenance::default();
-    p.source = "x".into();
+    let p = Provenance {
+        source: "x".into(),
+        ..Provenance::default()
+    };
     assert!(p.validate().is_err());
 }
 #[test]

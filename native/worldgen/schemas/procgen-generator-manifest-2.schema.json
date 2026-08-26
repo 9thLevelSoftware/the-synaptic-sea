@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "AdapterSchemas": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "const": "procgen-capabilities-2"
+        },
+        "generator_manifest": {
+          "const": "procgen-generator-manifest-2"
+        },
+        "lifecycle_result": {
+          "const": "procgen-lifecycle-result-3"
+        }
+      },
+      "required": [
+        "capabilities",
+        "generator_manifest",
+        "lifecycle_result"
+      ],
+      "type": "object"
+    },
+    "ExportSchemas": {
+      "additionalProperties": false,
+      "properties": {
+        "adaptive_proposal": {
+          "const": "adaptive-proposal-1"
+        },
+        "gameplay_ir": {
+          "const": "gameplay-ir-1"
+        },
+        "generation_trace": {
+          "const": "generation-trace-2"
+        },
+        "presentation_ir": {
+          "const": "presentation-ir-1"
+        },
+        "procgen_bundle": {
+          "const": "procgen-bundle-3"
+        },
+        "procgen_request": {
+          "const": "procgen-request-1"
+        },
+        "site_ir": {
+          "const": "site-ir-2"
+        },
+        "world_ir": {
+          "const": "world-ir-2"
+        }
+      },
+      "required": [
+        "adaptive_proposal",
+        "gameplay_ir",
+        "generation_trace",
+        "presentation_ir",
+        "procgen_bundle",
+        "procgen_request",
+        "site_ir",
+        "world_ir"
+      ],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "adapter_schemas": {
+      "$ref": "#/definitions/AdapterSchemas"
+    },
+    "content_manifest_hash": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "dirty_development": {
+      "type": "boolean"
+    },
+    "export_schemas": {
+      "$ref": "#/definitions/ExportSchemas"
+    },
+    "generator_version": {
+      "const": 3
+    },
+    "rust_source_commit": {
+      "pattern": "^[a-f0-9]{40}$",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "procgen-generator-manifest-2"
+    },
+    "target": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "adapter_schemas",
+    "content_manifest_hash",
+    "dirty_development",
+    "export_schemas",
+    "generator_version",
+    "rust_source_commit",
+    "schema_version",
+    "target"
+  ],
+  "title": "procgen-generator-manifest-2",
+  "type": "object"
+}

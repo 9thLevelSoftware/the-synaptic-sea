@@ -41,11 +41,11 @@ def content_document(paths: list[Path]) -> dict:
 
 def build_document(content_digest: str, source_commit: str, target: str, kind: str, artifact_path: str, artifact: Path) -> dict:
     return {
-        "manifest_schema": "procgen-build-manifest-1", "rust_source_commit": source_commit,
+        "manifest_schema": "procgen-build-manifest-2", "rust_source_commit": source_commit,
         "generator_version": 3, "content_manifest_path": "data/procgen/manifests/content_manifest.json",
         "content_manifest_hash": content_digest, "target": target,
         "artifact": {"kind": kind, "path": artifact_path, "sha256": hashlib.sha256(artifact.read_bytes()).hexdigest()},
-        "export_schemas": {"procgen_request":"procgen-request-1", "procgen_bundle":"procgen-bundle-2", "world_ir":"world-ir-2", "site_ir":"site-ir-1", "gameplay_ir":"gameplay-ir-1", "presentation_ir":"presentation-ir-1", "generation_trace":"generation-trace-1", "adaptive_proposal":"adaptive-proposal-1"},
+        "export_schemas": {"procgen_request":"procgen-request-1", "procgen_bundle":"procgen-bundle-3", "world_ir":"world-ir-2", "site_ir":"site-ir-2", "gameplay_ir":"gameplay-ir-1", "presentation_ir":"presentation-ir-1", "generation_trace":"generation-trace-2", "adaptive_proposal":"adaptive-proposal-1"},
     }
 
 def canonical(value: dict) -> str:
