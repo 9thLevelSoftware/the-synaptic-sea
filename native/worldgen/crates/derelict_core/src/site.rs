@@ -1236,6 +1236,10 @@ fn legal_split_fragment_map(ship: &Ship) -> Option<BTreeMap<u16, u8>> {
     if entry_fragment == goal_fragment {
         return None;
     }
+    let room_links = structural_room_links(ship)?;
+    if crate::topology::room_path(ship.entry_room, ship.goal_room, &room_links).is_some() {
+        return None;
+    }
     let policy = crate::structural::validate::ValidationPolicy::post_damage(
         Vec::new(),
         Some(fragment_of.clone()),
@@ -1244,6 +1248,69 @@ fn legal_split_fragment_map(ship: &Ship) -> Option<BTreeMap<u16, u8>> {
     crate::structural::validate::validate(&ship.plan, &ship.topology, &policy)
         .ok()
         .map(|_| fragment_of)
+}
+
+/// Room adjacency projected from the compiled structural plan rather than raw
+/// topology intent. Exterior edges are excluded; locked boundaries remain
+/// physical links because the mission layer may bind their authored unlock.
+fn structural_room_links(ship: &Ship) -> Option<Vec<(u16, u16)>> {
+    let mut links = Vec::new();
+    for edge in ship.plan.edges.values() {
+        if edge.exterior || !edge.kind.passable() {
+            continue;
+        }
+        let left = ship.plan.occupancy.get(&edge.source_cells[0].key())?;
+        let right = ship.plan.occupancy.get(&edge.source_cells[1].key())?;
+        if left.room_id != right.room_id && left.room_id != NO_ROOM && right.room_id != NO_ROOM {
+            links.push((
+                left.room_id.min(right.room_id),
+                left.room_id.max(right.room_id),
+            ));
+        }
+    }
+    for vertical in &ship.topology.verticals {
+        let left = ship.plan.occupancy.get(&vertical.from_cell.key())?;
+        let right = ship.plan.occupancy.get(&vertical.to_cell.key())?;
+        if left.room_id != vertical.from_room
+            || right.room_id != vertical.to_room
+            || left.room_id == right.room_id
+        {
+            return None;
+        }
+        links.push((
+            left.room_id.min(right.room_id),
+            left.room_id.max(right.room_id),
+        ));
+    }
+    links.sort_unstable();
+    links.dedup();
+    Some(links)
+}
+
+fn room_paths_from(start: u16, links: &[(u16, u16)]) -> BTreeMap<u16, Vec<u16>> {
+    let mut adjacency: BTreeMap<u16, Vec<u16>> = BTreeMap::new();
+    for (left, right) in links {
+        adjacency.entry(*left).or_default().push(*right);
+        adjacency.entry(*right).or_default().push(*left);
+    }
+    for neighbors in adjacency.values_mut() {
+        neighbors.sort_unstable();
+        neighbors.dedup();
+    }
+    let mut paths = BTreeMap::from([(start, vec![start])]);
+    let mut queue = VecDeque::from([start]);
+    while let Some(room) = queue.pop_front() {
+        for neighbor in adjacency.get(&room).into_iter().flatten() {
+            if paths.contains_key(neighbor) {
+                continue;
+            }
+            let mut path = paths.get(&room).cloned().unwrap_or_default();
+            path.push(*neighbor);
+            paths.insert(*neighbor, path);
+            queue.push_back(*neighbor);
+        }
+    }
+    paths
 }
 
 pub fn validate_site_for_request(
@@ -1789,27 +1856,15 @@ fn safe_return_goal_candidates(ship: &Ship) -> Result<Vec<(u16, Vec<u16>)>, Site
     let entry_fragment = *fragment_of
         .get(&ship.entry_room)
         .ok_or_else(|| SiteError::Invalid("entry fragment".into()))?;
-    let mut links: Vec<(u16, u16)> = ship
-        .topology
-        .portals
-        .iter()
-        .filter(|portal| !portal.exterior && portal.to_room != NO_ROOM)
-        .map(|portal| (portal.from_room, portal.to_room))
-        .chain(
-            ship.topology
-                .verticals
-                .iter()
-                .map(|vertical| (vertical.from_room, vertical.to_room)),
-        )
-        .collect();
-    links.sort_unstable();
-    links.dedup();
+    let links = structural_room_links(ship)
+        .ok_or_else(|| SiteError::Validation("fallback structural links".into()))?;
+    let paths = room_paths_from(ship.entry_room, &links);
 
     let mut goals: Vec<(usize, u16, Vec<u16>)> = fragment_of
         .iter()
         .filter_map(|(room, fragment)| {
             (*fragment == entry_fragment)
-                .then(|| crate::topology::room_path(ship.entry_room, *room, &links))
+                .then(|| paths.get(room).cloned())
                 .flatten()
                 .map(|path| (path.len(), *room, path))
         })
@@ -1936,4 +1991,79 @@ pub fn generate_site(
             fallback: Some("authored-safe-return".into()),
         },
     })
+}
+
+#[cfg(test)]
+mod split_admission_tests {
+    use super::*;
+    use crate::procgen::{
+        generate_bundle, Domain, PlayerModel, PresentationRequest, ProcgenRequest, SiteRequest,
+        PLAYER_MODEL_SCHEMA, PROCGEN_REQUEST_SCHEMA,
+    };
+    use crate::world::PROCGEN_GENERATOR_VERSION;
+    use crate::GenData;
+
+    #[test]
+    fn connected_endpoints_cannot_masquerade_as_separate_fragments() {
+        let request = ProcgenRequest {
+            schema_version: PROCGEN_REQUEST_SCHEMA.into(),
+            world_seed: 42,
+            site: SiteRequest {
+                site_id: "connected-fragment-mutation".into(),
+                x: 0,
+                y: 0,
+                archetype_id: "shuttle".into(),
+                kit_id: "default".into(),
+                intactness_override_bp: Some(9_500),
+                cause_of_loss: None,
+                loot_richness_bp: 10_000,
+            },
+            difficulty_id: "standard".into(),
+            player_model: PlayerModel {
+                schema_version: PLAYER_MODEL_SCHEMA.into(),
+                signals: Vec::new(),
+            },
+            requested_domains: vec![
+                Domain::World,
+                Domain::Site,
+                Domain::Gameplay,
+                Domain::Presentation,
+            ],
+            generator_version: PROCGEN_GENERATOR_VERSION,
+            content_manifest_hash: "a".repeat(64),
+            presentation: PresentationRequest {
+                seed: 42,
+                locale: "en-US".into(),
+            },
+        };
+        let mut ship = generate_bundle(request, &GenData::default_bundle().unwrap())
+            .unwrap()
+            .site_ir
+            .ship;
+        assert_ne!(ship.entry_room, ship.goal_room);
+        ship.critical_path.clear();
+        ship.fractured = true;
+        ship.fragments = ship
+            .topology
+            .rooms
+            .iter()
+            .enumerate()
+            .map(|(index, room)| crate::model::ShipFragment {
+                id: u8::try_from(index).unwrap(),
+                rooms: vec![room.id],
+                drift: (0, 0),
+            })
+            .collect();
+
+        let fragment_of = complete_fragment_map(&ship).unwrap();
+        let policy = crate::structural::validate::ValidationPolicy::post_damage(
+            Vec::new(),
+            Some(fragment_of),
+            true,
+        );
+        crate::structural::validate::validate(&ship.plan, &ship.topology, &policy).unwrap();
+        let links = structural_room_links(&ship).unwrap();
+        assert!(crate::topology::room_path(ship.entry_room, ship.goal_room, &links).is_some());
+        assert!(legal_split_fragment_map(&ship).is_none());
+    }
 }
