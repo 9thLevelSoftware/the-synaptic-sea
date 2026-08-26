@@ -3,8 +3,14 @@
 - **Status:** Accepted
 - **Date:** 2026-08-26
 - **Related:** ADR-0047, ADR-0052, ADR-0057, ADR-0058, ADR-0059,
-  ADR-0061, ADR-0063; `docs/game/features/unified_procgen_platform.md`;
+  ADR-0061, ADR-0063, ADR-0065;
+  `docs/game/features/unified_procgen_platform.md`;
   REQ-PG-002, REQ-PG-007..009, REQ-PG-012; Gate 3 card `t_c01fdb84`
+
+> **Wrapper propagation clarification:** ADR-0065 advances the capability,
+> generator-manifest, and build-manifest wrappers whose exact nested maps
+> change, and corrects the retained trace identifier to the accepted
+> `generation-trace-2`. The gameplay decisions below are unchanged.
 
 ## Context
 
@@ -29,8 +35,8 @@ because later gameplay layers now consume them.
    `presentation-ir-2`, the complete bundle to `procgen-bundle-4`, and the
    lifecycle result to `procgen-lifecycle-result-4`. Task 7 owns
    `procgen-bundle-3`/lifecycle 3. Every earlier schema file remains immutable.
-   `world-ir-2`, `site-ir-2`, `generation-trace-1`, and unchanged adapter
-   schemas retain their identifiers.
+   `world-ir-2`, `site-ir-2`, and `generation-trace-2` retain their identifiers;
+   wrappers whose embedded maps change advance as specified by ADR-0065.
 2. The platform generator remains version 3 and the nested structural ship
    remains version 2. New authored gameplay and presentation catalogues change
    the content-manifest hash; the schema map and content identity provide the

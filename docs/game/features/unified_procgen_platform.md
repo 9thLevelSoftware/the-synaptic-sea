@@ -2,7 +2,8 @@
 
 ## Status
 
-Approved; Gates 0 and 1 are complete and Gate 2 implementation is in progress.
+Approved; Gates 0 through 2 are complete and Gate 3 implementation is in
+progress.
 No later gate is considered complete until its scoped card, acceptance evidence,
 and regression evidence are current.
 
@@ -365,3 +366,4 @@ See `RISK-002` and `RISK-034` through `RISK-040` in
 - `docs/game/adr/0062-generated-world-save-envelope-and-clean-break.md`
 - `docs/game/adr/0063-site-mission-overlay-and-contract-versioning.md`
 - `docs/game/adr/0064-authoritative-gameplay-blueprints-and-presentation-bindings.md`
+- `docs/game/adr/0065-gate3-contract-wrapper-version-propagation.md`
