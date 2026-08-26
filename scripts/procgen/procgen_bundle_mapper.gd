@@ -171,7 +171,7 @@ func _layout(ship: Dictionary, presentation: Dictionary, request: Dictionary) ->
 	for portal_v in topology.get("portals", []):
 		if not portal_v is Dictionary: continue
 		var p: Dictionary = portal_v
-		if bool(p.get("exterior", false)) or int(p.get("to_room", -1)) in [-1, 65535]: continue
+		if bool(p.get("exterior", false)) or int(p.get("to_room", -1)) in [-1, 0]: continue
 		var from_name: String = names.get(int(p.get("from_room", -1)), "")
 		var to_name: String = names.get(int(p.get("to_room", -1)), "")
 		var id: String = "%s_to_%s" % [from_name, to_name]

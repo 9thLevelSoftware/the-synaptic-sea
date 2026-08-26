@@ -56,7 +56,7 @@ func _init() -> void:
 	var bad_generator := FakeGenerator.new(); bad_generator.version = 2
 	_expect(failures, stats, validator.validate(manifest, bad_generator, "x86_64-pc-windows-msvc", base_io) == ValidatorScript.GENERATOR_VERSION_MISMATCH, "generator")
 	_expect(failures, stats, validator.validate(manifest, generator, "linux", base_io) == ValidatorScript.TARGET_MISMATCH, "target")
-	var unknown_major: Dictionary = manifest.duplicate(true); unknown_major["manifest_schema"] = "procgen-build-manifest-2"
+	var unknown_major: Dictionary = manifest.duplicate(true); unknown_major["manifest_schema"] = "procgen-build-manifest-3"
 	_expect(failures, stats, validator.validate(unknown_major, generator, "x86_64-pc-windows-msvc", base_io) == ValidatorScript.SCHEMA_MAJOR_UNKNOWN, "unknown major")
 	if not failures.is_empty():
 		for failure in failures: print("PROCGEN BUILD MANIFEST FAIL:%s" % failure)

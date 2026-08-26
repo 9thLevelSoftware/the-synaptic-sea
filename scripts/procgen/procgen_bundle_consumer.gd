@@ -38,6 +38,22 @@ const ADAPTER_SCHEMAS: Dictionary = {
 	"capabilities": "procgen-capabilities-2",
 	"generator_manifest": "procgen-generator-manifest-2",
 }
+const PLATFORM_ADAPTERS: Dictionary = {
+	"x86_64-pc-windows-msvc": {
+		"artifact_kind": "gdextension",
+		"artifact_path": "addons/derelict/bin/win64/derelict_godot.dll",
+		"adapter_kind": "native",
+		"worker_mode": "thread_pool",
+		"worker_count": 2,
+	},
+	"wasm32-unknown-unknown": {
+		"artifact_kind": "wasm",
+		"artifact_path": "addons/derelict/bin/web/derelict_wasm_bg.wasm",
+		"adapter_kind": "web",
+		"worker_mode": "cooperative",
+		"worker_count": 0,
+	},
+}
 const MISSION_NODE_KINDS: Array[String] = ["start", "acquire_key", "repair", "objective", "extraction"]
 const MISSION_GATE_KINDS: Array[String] = ["key_lock", "repair"]
 const NAVIGATION_KINDS: Array[String] = ["portal", "vertical"]
@@ -195,11 +211,13 @@ func _validate_context(request: Dictionary, build: Dictionary, runtime: Dictiona
 	if not _is_sha256(str(build.get("content_manifest_hash", ""))) \
 			or str(build.get("content_manifest_hash", "")) != CONTENT_HASH: return _reject("build_manifest_content")
 	if not _is_json_integer(build.get("generator_version", null)) or int(build.get("generator_version", -1)) != GENERATOR_VERSION: return _reject("build_manifest_version")
-	if str(build.get("target", "")).is_empty(): return _reject("build_manifest_target")
+	var build_target: String = str(build.get("target", ""))
+	if not PLATFORM_ADAPTERS.has(build_target): return _reject("build_manifest_target")
+	var platform: Dictionary = PLATFORM_ADAPTERS[build_target]
 	var artifact: Variant = build.get("artifact", null)
 	if not artifact is Dictionary or not _has_exact_keys(artifact, ["kind", "path", "sha256"]): return _reject("build_manifest_artifact")
-	if str((artifact as Dictionary).get("kind", "")) != "gdextension" \
-			or str((artifact as Dictionary).get("path", "")).is_empty() \
+	if str((artifact as Dictionary).get("kind", "")) != str(platform.artifact_kind) \
+			or str((artifact as Dictionary).get("path", "")) != str(platform.artifact_path) \
 			or not _is_sha256(str((artifact as Dictionary).get("sha256", ""))): return _reject("build_manifest_artifact")
 	var runtime_keys: Array[String] = ["schema_version", "rust_source_commit", "generator_version", "content_manifest_hash", "export_schemas", "adapter_schemas", "target", "dirty_development"]
 	if not _has_exact_keys(runtime, runtime_keys): return _reject("runtime_manifest_shape")
@@ -223,11 +241,17 @@ func _validate_capabilities(caps: Dictionary, runtime_manifest: Dictionary) -> b
 	var keys: Array[String] = ["schema_version", "adapter_kind", "target", "supports_sync", "supports_async", "supports_cancel", "worker_mode", "worker_count", "queue_capacity", "retained_results", "max_request_bytes", "max_entities", "max_trace_entries", "max_events", "deadline_ms", "supported_domains", "schemas"]
 	if not _has_exact_keys(caps, keys): return _reject("capability_shape")
 	if str(caps.get("schema_version", "")) != ADAPTER_SCHEMAS.capabilities: return _reject("capability_schema")
-	if str(caps.get("adapter_kind", "")) != "native" or str(caps.get("worker_mode", "")) != "thread_pool": return _reject("capability_adapter")
+	var target: String = str(runtime_manifest.get("target", ""))
+	if not PLATFORM_ADAPTERS.has(target): return _reject("capability_target")
+	var platform: Dictionary = PLATFORM_ADAPTERS[target]
+	if str(caps.get("adapter_kind", "")) != str(platform.adapter_kind) \
+			or str(caps.get("worker_mode", "")) != str(platform.worker_mode): return _reject("capability_adapter")
 	if str(caps.get("target", "")) != str(runtime_manifest.get("target", "")): return _reject("capability_target")
+	if not _is_json_integer(caps.get("worker_count", null)) \
+			or int(caps.get("worker_count", -1)) != int(platform.worker_count): return _reject("capability_worker_count")
 	for flag in ["supports_sync", "supports_async", "supports_cancel"]:
 		if caps.get(flag, null) is not bool or not bool(caps.get(flag, false)): return _reject("capability_%s" % flag)
-	var maximums: Dictionary = {"worker_count": 2, "queue_capacity": 8, "retained_results": 16, "max_request_bytes": 65536, "max_entities": 4096, "max_trace_entries": 4096, "max_events": 32, "deadline_ms": 2000}
+	var maximums: Dictionary = {"queue_capacity": 8, "retained_results": 16, "max_request_bytes": 65536, "max_entities": 4096, "max_trace_entries": 4096, "max_events": 32, "deadline_ms": 2000}
 	for key in maximums.keys():
 		if not _is_json_integer(caps.get(key, null)) or int(caps.get(key, 0)) <= 0 or int(caps.get(key, 0)) > int(maximums[key]): return _reject("capability_%s" % key)
 	if not _same_json(caps.get("supported_domains", []), DOMAINS): return _reject("capability_domains")
@@ -759,7 +783,7 @@ func _validate_extraction_ref(ship: Dictionary, room_id: int, expected_ref: Stri
 	for portal_value in (ship.get("topology", {}) as Dictionary).get("portals", []):
 		if not portal_value is Dictionary: return false
 		var portal: Dictionary = portal_value
-		if int(portal.get("from_room", -1)) == room_id and int(portal.get("to_room", -1)) == 65535 \
+		if int(portal.get("from_room", -1)) == room_id and int(portal.get("to_room", -1)) == 0 \
 				and bool(portal.get("exterior", false)) and str(portal.get("state", "")) == "Door":
 			matches.append(_portal_edge_key(portal.get("from_cell", {}), portal.get("to_cell", {})))
 	return matches.size() == 1 and matches[0] == expected_ref
@@ -1058,9 +1082,15 @@ func _validate_metrics_trace(metrics_value: Variant, trace_value: Variant, site_
 			else:
 				return _reject("trace_fallback")
 	var decisions: Array = trace.get("candidate_decisions", [])
-	if world_fallback != (decisions.has("rejected_candidate") and decisions.has("selected_fallback")):
+	var rejected_world_candidate: bool = decisions.has("rejected_candidate")
+	var selected_world_fallback: bool = decisions.has("selected_fallback")
+	if (world_fallback and (not rejected_world_candidate or not selected_world_fallback)) \
+			or (not world_fallback and (rejected_world_candidate or selected_world_fallback)):
 		return _reject("world_fallback_trace")
-	if site_fallback != (decisions.has("site:rejected_candidate") and decisions.has("site:selected_fallback")):
+	var rejected_site_candidate: bool = decisions.has("site:rejected_candidate")
+	var selected_site_fallback: bool = decisions.has("site:selected_fallback")
+	if (site_fallback and (not rejected_site_candidate or not selected_site_fallback)) \
+			or (not site_fallback and (rejected_site_candidate or selected_site_fallback)):
 		return _reject("site_fallback_trace")
 	var mission_graph: Dictionary = site_ir.get("mission_graph", {})
 	if site_fallback != (str(mission_graph.get("mission_id", "")) == "authored-safe-return"):

@@ -21,6 +21,30 @@ func _init() -> void:
 	var baseline: Dictionary = consumer.consume(raw, request, build, runtime, caps)
 	count += 1
 	if baseline.is_empty(): failures.append("baseline:%s" % consumer.last_error)
+	var web_build: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/procgen/manifests/build/web.json"))
+	var web_runtime: Dictionary = runtime.duplicate(true)
+	web_runtime.target = "wasm32-unknown-unknown"
+	var web_caps: Dictionary = caps.duplicate(true)
+	web_caps.adapter_kind = "web"
+	web_caps.target = "wasm32-unknown-unknown"
+	web_caps.worker_mode = "cooperative"
+	web_caps.worker_count = 0
+	count += 1
+	_expect(not consumer.consume(raw, request, web_build, web_runtime, web_caps).is_empty(), failures, "web_context:" + consumer.last_error)
+	var forged_build: Dictionary = build.duplicate(true)
+	var forged_runtime: Dictionary = runtime.duplicate(true)
+	var forged_caps: Dictionary = caps.duplicate(true)
+	forged_build.target = "forged-target"
+	forged_runtime.target = "forged-target"
+	forged_caps.target = "forged-target"
+	count += 1
+	_expect(consumer.consume(raw, request, forged_build, forged_runtime, forged_caps).is_empty() \
+			and consumer.last_error == "build_manifest_target", failures, "forged_target:" + consumer.last_error)
+	var forged_artifact: Dictionary = build.duplicate(true)
+	forged_artifact.artifact.path = "addons/derelict/bin/win64/forged.dll"
+	count += 1
+	_expect(consumer.consume(raw, request, forged_artifact, runtime, caps).is_empty() \
+			and consumer.last_error == "build_manifest_artifact", failures, "forged_artifact:" + consumer.last_error)
 	var baseline_world: Dictionary = baseline.get("world_ir", {})
 	var baseline_markers: Array = baseline_world.get("markers", [])
 	count += 1
@@ -56,7 +80,7 @@ func _init() -> void:
 		count += 1
 		var result: Dictionary = consumer.consume(JSON.stringify(mutated), request, build, runtime, caps)
 		_expect(result.is_empty() and consumer.last_error == str(item[3]), failures, str(item[0]) + ":" + consumer.last_error)
-	var contexts: Array = [["build_extra", "build", "extra", true, true, "build_manifest_shape"], ["build_schema", "build", "manifest_schema", "wrong", true, "build_manifest_schema"], ["build_source", "build", "rust_source_commit", "0".repeat(40), true, "manifest_source"], ["build_version", "build", "generator_version", 9, true, "build_manifest_version"], ["build_content", "build", "content_manifest_hash", "0".repeat(64), true, "build_manifest_content"], ["build_target", "build", "target", "linux", true, "manifest_target"], ["build_exports", "build", "export_schemas", {}, true, "manifest_export_schemas"], ["runtime_extra", "runtime", "extra", true, true, "runtime_manifest_shape"], ["runtime_schema", "runtime", "schema_version", "wrong", true, "runtime_manifest_schema"], ["runtime_source", "runtime", "rust_source_commit", "0".repeat(40), true, "manifest_source"], ["runtime_dirty", "runtime", "dirty_development", true, true, "dirty_runtime"], ["runtime_adapter", "runtime", "adapter_schemas", {}, true, "manifest_adapter_schemas"], ["caps_extra", "caps", "extra", true, true, "capability_shape"], ["caps_schema", "caps", "schema_version", "wrong", true, "capability_schema"], ["caps_adapter", "caps", "adapter_kind", "web", true, "capability_adapter"], ["caps_worker", "caps", "worker_count", 0, true, "capability_worker_count"], ["caps_sync", "caps", "supports_sync", false, true, "capability_supports_sync"], ["caps_events", "caps", "max_events", 33, true, "capability_max_events"], ["caps_domains", "caps", "supported_domains", ["site"], true, "capability_domains"], ["caps_schemas", "caps", "schemas", {}, true, "capability_schemas"]]
+	var contexts: Array = [["build_extra", "build", "extra", true, true, "build_manifest_shape"], ["build_schema", "build", "manifest_schema", "wrong", true, "build_manifest_schema"], ["build_source", "build", "rust_source_commit", "0".repeat(40), true, "manifest_source"], ["build_version", "build", "generator_version", 9, true, "build_manifest_version"], ["build_content", "build", "content_manifest_hash", "0".repeat(64), true, "build_manifest_content"], ["build_target", "build", "target", "linux", true, "build_manifest_target"], ["build_exports", "build", "export_schemas", {}, true, "manifest_export_schemas"], ["runtime_extra", "runtime", "extra", true, true, "runtime_manifest_shape"], ["runtime_schema", "runtime", "schema_version", "wrong", true, "runtime_manifest_schema"], ["runtime_source", "runtime", "rust_source_commit", "0".repeat(40), true, "manifest_source"], ["runtime_dirty", "runtime", "dirty_development", true, true, "dirty_runtime"], ["runtime_adapter", "runtime", "adapter_schemas", {}, true, "manifest_adapter_schemas"], ["caps_extra", "caps", "extra", true, true, "capability_shape"], ["caps_schema", "caps", "schema_version", "wrong", true, "capability_schema"], ["caps_adapter", "caps", "adapter_kind", "web", true, "capability_adapter"], ["caps_worker", "caps", "worker_count", 0, true, "capability_worker_count"], ["caps_sync", "caps", "supports_sync", false, true, "capability_supports_sync"], ["caps_events", "caps", "max_events", 33, true, "capability_max_events"], ["caps_domains", "caps", "supported_domains", ["site"], true, "capability_domains"], ["caps_schemas", "caps", "schemas", {}, true, "capability_schemas"]]
 	for item in contexts:
 		var build_case: Dictionary = build.duplicate(true); var runtime_case: Dictionary = runtime.duplicate(true); var caps_case: Dictionary = caps.duplicate(true)
 		var target: Dictionary = build_case if str(item[1]) == "build" else (runtime_case if str(item[1]) == "runtime" else caps_case)
@@ -108,7 +132,7 @@ func _init() -> void:
 	if not failures.is_empty():
 		for failure in failures: print("TASK5 CONSUMER FAIL:%s" % failure)
 		quit(1); return
-	print("TASK5 CONSUMER PASS live=true cases=%d baseline=true hash=true lifecycle=true identity=true build_context=true runtime_context=true caps_context=true request_bounds=true" % count)
+	print("TASK5 CONSUMER PASS live=true cases=%d baseline=true hash=true lifecycle=true identity=true build_context=true runtime_context=true caps_context=true platform_context=true request_bounds=true" % count)
 	quit(0)
 
 func _set_path(root: Dictionary, path: String, value: Variant) -> void:

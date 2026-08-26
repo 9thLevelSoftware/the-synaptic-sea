@@ -18,8 +18,11 @@ func _init() -> void:
 	var lifecycle: String = str(generator.generate_bundle(JSON.stringify(request)))
 	var bundle: Dictionary = consumer.consume(lifecycle, request, build, runtime, caps)
 	if bundle.is_empty():
-		var returned: Variant = (JSON.parse_string(lifecycle) as Dictionary).get("bundle", {}).get("request", {})
-		print("TASK5 LIVE CONSUMER FAIL valid=%s request=%s returned=%s" % [consumer.last_error, JSON.stringify(request), JSON.stringify(returned)]); quit(1); return
+		var returned_bundle: Dictionary = (JSON.parse_string(lifecycle) as Dictionary).get("bundle", {})
+		var returned: Variant = returned_bundle.get("request", {})
+		var returned_site: Dictionary = returned_bundle.get("site_ir", {})
+		var returned_ship: Dictionary = returned_site.get("ship", {})
+		print("TASK5 LIVE CONSUMER FAIL valid=%s request=%s returned=%s props=%s entry=%s portals=%s" % [consumer.last_error, JSON.stringify(request), JSON.stringify(returned), JSON.stringify(returned_site.get("functional_props", [])), str(returned_ship.get("entry_room", null)), JSON.stringify((returned_ship.get("topology", {}) as Dictionary).get("portals", []))]); quit(1); return
 	var tampered: Dictionary = JSON.parse_string(lifecycle)
 	(tampered["bundle"] as Dictionary)["semantic_hash"] = "0".repeat(64)
 	var rejected: Dictionary = consumer.consume(JSON.stringify(tampered), request, build, runtime, caps)
