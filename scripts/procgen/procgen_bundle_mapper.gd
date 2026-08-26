@@ -80,11 +80,6 @@ func _layout(ship: Dictionary, presentation: Dictionary, request: Dictionary) ->
 	for binding_v in plan.get("socket_bindings", []):
 		if binding_v is Dictionary: socket_bindings.append((binding_v as Dictionary).duplicate(true))
 	var structural: Dictionary = {"occupancy": occupancy, "edges": edges, "placements": placements, "floor_placements": floor_placements, "ceiling_placements": ceiling_placements, "socket_bindings": socket_bindings, "errors": plan.get("errors", [])}
-	for vertical_v in topology.get("verticals", []):
-		if vertical_v is Dictionary:
-			var vertical: Dictionary = vertical_v
-			structural["vertical_connections"] = structural.get("vertical_connections", [])
-			(structural["vertical_connections"] as Array).append({"id": "%s_to_%s" % [names.get(int(vertical.get("from_room", -1)), ""), names.get(int(vertical.get("to_room", -1)), "")], "type": "ladder", "module_id": "", "from_room": names.get(int(vertical.get("from_room", -1)), ""), "to_room": names.get(int(vertical.get("to_room", -1)), ""), "from_cell": _cell3(vertical.get("from_cell", {})), "to_cell": _cell3(vertical.get("to_cell", {}))})
 	var vertical_connections: Array = []
 	for vertical_v in topology.get("verticals", []):
 		if vertical_v is Dictionary:
@@ -111,7 +106,7 @@ func _name(value: Variant) -> String:
 
 func _role_name(value: Variant) -> String:
 	var text: String = str(value)
-	var known: Dictionary = {"Airlock": "airlock", "Corridor": "corridor", "CrewQuarters": "crew_quarters", "Cargo": "cargo", "Reactor": "reactor", "Storage": "storage", "Compartment": "compartment", "MainSpine": "main_spine", "Bridge": "bridge", "Hangar": "hangar"}
+	var known: Dictionary = {"Airlock":"airlock", "Dock":"dock", "Corridor":"corridor", "MainSpine":"main_spine", "Hub":"hub", "Ramp":"ramp", "Elevator":"elevator", "Bridge":"bridge", "Engineering":"engineering", "Reactor":"reactor", "LifeSupport":"life_support", "Maintenance":"maintenance", "Cargo":"cargo", "Hangar":"hangar", "Storage":"storage", "Armory":"armory", "Security":"security", "Medical":"medical", "CrewQuarters":"crew_quarters", "MessHall":"mess_hall", "Compartment":"compartment"}
 	return str(known.get(text, text.to_snake_case()))
 
 func _direction(from_cell: Variant, to_cell: Variant) -> String:
