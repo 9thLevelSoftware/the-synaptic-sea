@@ -12,7 +12,7 @@ use derelict_core::manifest::{
 };
 use derelict_core::procgen::{
     generate_bundle, semantic_hash, Domain, PlayerModel, PresentationRequest, ProcgenBundle,
-    ProcgenError, ProcgenRequest, SiteRequest, PLAYER_MODEL_SCHEMA,
+    ProcgenError, ProcgenRequest, SiteRequest, PLAYER_MODEL_SCHEMA, PROCGEN_REQUEST_SCHEMA,
 };
 use derelict_core::world::{
     derive_site_seed_v3, generate_world, WorldGenerationRequest, MAX_PUBLIC_SEED,
@@ -25,7 +25,7 @@ const CONTENT_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 fn request() -> ProcgenRequest {
     ProcgenRequest {
-        schema_version: "procgen-request-3".into(),
+        schema_version: PROCGEN_REQUEST_SCHEMA.into(),
         world_seed: 42,
         site: SiteRequest {
             site_id: "site-a".into(),
@@ -79,17 +79,28 @@ fn with_json_mutation<T: serde::Serialize>(value: &T, f: impl FnOnce(&mut Value)
 fn platform_v3_request_envelope_and_seed_bounds_are_strict() {
     let req = request();
     assert_eq!(req.generator_version, 3);
-    assert_eq!(req.schema_version, "procgen-request-3");
+    assert_eq!(req.schema_version, PROCGEN_REQUEST_SCHEMA);
     assert_eq!(req.content_manifest_hash.len(), 64);
     assert!(req.validate().is_ok(), "v3 request should be admissible");
+    assert_eq!(
+        ExportSchemas::platform_v3().procgen_request,
+        PROCGEN_REQUEST_SCHEMA
+    );
 
-    for schema in ["procgen-request-1", "procgen-request-2"] {
+    for schema in [
+        "procgen-request-2",
+        "procgen-request-3",
+        "procgen-request-9",
+    ] {
         let json = with_json_mutation(&req, |v| v["schema_version"] = schema.into());
         assert!(
             ProcgenRequest::from_json(&json).is_err(),
             "accepted {schema}"
         );
     }
+    let mut different_site = req.clone();
+    different_site.site.site_id = "site-b".into();
+    assert!(ProcgenRequest::from_json(&serde_json::to_string(&different_site).unwrap()).is_ok());
     let over = with_json_mutation(&req, |v| v["world_seed"] = (MAX_PUBLIC_SEED + 1).into());
     assert!(
         ProcgenRequest::from_json(&over).is_err(),
@@ -227,8 +238,15 @@ fn requested_domain_order_and_locale_do_not_change_world_or_mechanics() {
 fn expanded_nested_documents_reject_unknown_fields_and_schema_substitution() {
     let data = GenData::default_bundle().unwrap();
     let bundle = generate_bundle(request(), &data).unwrap();
-    for schema in ["procgen-bundle-1", "procgen-bundle-2"] {
+    for schema in ["procgen-bundle-1", "procgen-bundle-3", "procgen-bundle-9"] {
         let json = with_json_mutation(&bundle, |v| v["schema_version"] = schema.into());
+        assert!(
+            ProcgenBundle::from_json(&json).is_err(),
+            "accepted {schema}"
+        );
+    }
+    for schema in ["world-ir-1", "world-ir-3", "world-ir-9"] {
+        let json = with_json_mutation(&bundle, |v| v["world_ir"]["schema_version"] = schema.into());
         assert!(
             ProcgenBundle::from_json(&json).is_err(),
             "accepted {schema}"
@@ -252,7 +270,11 @@ fn lifecycle_result_and_generator_manifest_are_platform_v3_contracts() {
     assert!(result.validate().is_ok());
     let json = serde_json::to_string(&result).unwrap();
     assert!(LifecycleResult::from_json(&json).is_ok());
-    for schema in ["procgen-lifecycle-result-1", "procgen-lifecycle-result-2"] {
+    for schema in [
+        "procgen-lifecycle-result-1",
+        "procgen-lifecycle-result-3",
+        "procgen-lifecycle-result-9",
+    ] {
         let substituted = json.replace(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2, schema);
         assert!(
             LifecycleResult::from_json(&substituted).is_err(),
@@ -290,7 +312,6 @@ fn invalid_identity_and_version_substitutions_fail_closed() {
     for (field, value) in [
         ("generator_version", json!(2)),
         ("content_manifest_hash", json!("B".repeat(64))),
-        ("site_id", json!("other")),
     ] {
         let json = with_json_mutation(&req, |v| {
             if field == "site_id" {
@@ -310,6 +331,12 @@ fn invalid_identity_and_version_substitutions_fail_closed() {
     key.platform_version = 3;
     key.world_seed = MAX_PUBLIC_SEED + 1;
     assert!(generate_world(&key).is_err());
+
+    let bundle = generate_bundle(req, &GenData::default_bundle().unwrap()).unwrap();
+    let mismatched = with_json_mutation(&bundle, |v| {
+        v["request"]["site"]["site_id"] = "other".into()
+    });
+    assert!(ProcgenBundle::from_json(&mismatched).is_err());
 }
 
 #[allow(dead_code)]
