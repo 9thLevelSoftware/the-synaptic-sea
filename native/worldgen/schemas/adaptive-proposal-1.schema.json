@@ -14,6 +14,7 @@
           "additionalProperties": false,
           "properties": {
             "select_candidate": {
+              "additionalProperties": false,
               "properties": {
                 "candidate_id": {
                   "type": "string"
@@ -34,6 +35,7 @@
           "additionalProperties": false,
           "properties": {
             "adjust_encounter": {
+              "additionalProperties": false,
               "properties": {
                 "encounter_id": {
                   "type": "string"
@@ -63,17 +65,20 @@
       "$ref": "#/definitions/AdaptiveAction"
     },
     "confidence_bp": {
-      "format": "uint16",
-      "minimum": 0.0,
+      "maximum": 10000,
+      "minimum": 0,
       "type": "integer"
     },
     "rationale_codes": {
       "items": {
+        "minLength": 1,
         "type": "string"
       },
+      "minItems": 1,
       "type": "array"
     },
     "rule_model_version": {
+      "minLength": 1,
       "type": "string"
     },
     "schema_version": {

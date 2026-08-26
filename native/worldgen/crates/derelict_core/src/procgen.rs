@@ -96,7 +96,6 @@ impl ProcgenBundle {
         let value: Value = serde_json::from_str(json)?;
         let Some(schema) = value.get("schema_version").and_then(Value::as_str) else { return Err(ProcgenError::InvalidRequest("schema_version")); };
         check_schema(schema, PROCGEN_BUNDLE_SCHEMA)?;
-        reject_unknown_bundle_fields(&value)?;
         let bundle: Self = serde_json::from_value(value)?;
         bundle.validate()?;
         Ok(bundle)
@@ -110,7 +109,7 @@ impl ProcgenBundle {
         check_schema(&self.presentation_ir.schema_version, PRESENTATION_IR_SCHEMA)?;
         check_schema(&self.trace.schema_version, GENERATION_TRACE_SCHEMA)?;
         check_schema(&self.metrics.schema_version, GENERATION_METRICS_SCHEMA)?;
-        if self.metrics.pipeline_executions != 1 || self.trace.rng_channels.is_empty() { return Err(ProcgenError::InvalidRequest("metrics_trace")); }
+        if self.metrics.pipeline_executions != 1 || self.trace.rng_channels.as_slice() != RNG_CHANNELS { return Err(ProcgenError::InvalidRequest("metrics_trace")); }
         if self.version.generator_version != self.request.generator_version || self.version.content_manifest_hash != self.request.content_manifest_hash { return Err(ProcgenError::InvalidRequest("version")); }
         if self.version.export_schemas != ExportSchemas::v1() { return Err(ProcgenError::InvalidRequest("export_schemas")); }
         if self.world_ir.world_seed != self.request.world_seed || self.world_ir.site_id != self.request.site.site_id || self.world_ir.x != self.request.site.x || self.world_ir.y != self.request.site.y || self.world_ir.archetype_id != self.request.site.archetype_id { return Err(ProcgenError::InvalidRequest("world_identity")); }
@@ -120,6 +119,11 @@ impl ProcgenBundle {
         if self.metrics.room_count != u32::try_from(self.site_ir.ship.room_graph.nodes.len()).map_err(|_| ProcgenError::InvalidRequest("metrics"))? || self.metrics.entity_count != u32::try_from(self.site_ir.ship.entities.len()).map_err(|_| ProcgenError::InvalidRequest("metrics"))? || self.metrics.structural_placement_count != expected_placements { return Err(ProcgenError::InvalidRequest("metrics")); }
         if self.trace.rng_channels.iter().map(String::as_str).collect::<Vec<_>>() != RNG_CHANNELS { return Err(ProcgenError::InvalidRequest("rng_channels")); }
         if self.trace.candidate_decisions.len() > 4096 || self.trace.failed_constraints.len() > 4096 || self.trace.retries.len() > 4096 { return Err(ProcgenError::InvalidRequest("trace_bounds")); }
+        if self.trace.repairs.len() > 4096 || self.trace.stage_timings_micros.len() > 4096 || self.trace.stage_timings_micros.keys().any(|k| k.is_empty()) || self.trace.stage_timings_micros.values().any(|v| *v > 3_600_000_000) || self.trace.fallback.as_ref().is_some_and(String::is_empty) || self.trace.candidate_decisions.iter().chain(self.trace.failed_constraints.iter()).chain(self.trace.repairs.iter()).chain(self.trace.retries.iter()).any(|s| s.is_empty()) { return Err(ProcgenError::InvalidRequest("trace_bounds")); }
+        if self.trace.stage_timings_micros != self.metrics.stage_timings_micros { return Err(ProcgenError::InvalidRequest("trace_metrics_timings")); }
+        let expected_gameplay = crate::structural::export::to_gameplay_slice_json(&self.site_ir.ship);
+        let actual_gameplay = serde_json::to_value(&self.gameplay_ir.legacy_slice)?;
+        if self.gameplay_ir.legacy_slice.schema_version != "1.1.0" || self.gameplay_ir.legacy_slice.document_kind != "ship_gameplay_slice" || actual_gameplay != expected_gameplay { return Err(ProcgenError::InvalidRequest("gameplay_identity")); }
         if self.semantic_hash != semantic_hash(self)? { return Err(ProcgenError::InvalidRequest("semantic_hash")); }
         Ok(())
     }
@@ -134,10 +138,11 @@ pub struct ProcgenFailure { pub schema_version: String, pub code: ProcgenFailure
 
 impl ProcgenFailure {
     pub fn from_json(json: &str) -> Result<Self, ProcgenError> { let value: Value = serde_json::from_str(json)?; if let Some(schema) = value.get("schema_version").and_then(Value::as_str) { check_schema(schema, FAILURE_SCHEMA)?; } let failure: Self = serde_json::from_value(value)?; failure.validate()?; Ok(failure) }
-    pub fn validate(&self) -> Result<(), ProcgenError> { check_schema(&self.schema_version, FAILURE_SCHEMA)?; if self.stage.is_empty() || self.message.is_empty() { return Err(ProcgenError::InvalidRequest("failure")); } Ok(()) }
+    pub fn validate(&self) -> Result<(), ProcgenError> { check_schema(&self.schema_version, FAILURE_SCHEMA)?; if self.stage.is_empty() || self.message.is_empty() || self.fallback_id.as_ref().is_some_and(String::is_empty) { return Err(ProcgenError::InvalidRequest("failure")); } Ok(()) }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 #[serde(rename_all = "snake_case")]
 pub enum AdaptiveAction { NoOp, SelectCandidate { candidate_id: String }, AdjustEncounter { encounter_id: String, pacing_delta: i32 } }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -163,7 +168,7 @@ impl ProcgenRequest {
         let mut unique = std::collections::BTreeSet::new();
         if self.requested_domains.iter().any(|d| !unique.insert(d)) { return Err(ProcgenError::InvalidRequest("requested_domains")); }
         if !is_sha256(&self.content_manifest_hash) { return Err(ProcgenError::InvalidRequest("content_manifest_hash")); }
-        if self.presentation.locale.is_empty() || !self.presentation.locale.is_ascii() { return Err(ProcgenError::InvalidRequest("presentation.locale")); }
+        if !is_locale(&self.presentation.locale) { return Err(ProcgenError::InvalidRequest("presentation.locale")); }
         Ok(())
     }
 }
@@ -185,11 +190,15 @@ pub fn generate_bundle(request: ProcgenRequest, data: &GenData) -> Result<Procge
     generate_bundle_with_pipeline(request, data, || generate_ship_timed(seed, &params, data))
 }
 
+#[doc(hidden)]
 pub fn generate_bundle_with_pipeline<F>(request: ProcgenRequest, _data: &GenData, pipeline: F) -> Result<ProcgenBundle, ProcgenFailure>
 where F: FnOnce() -> Result<crate::pipeline::GenReport, crate::pipeline::GenError> {
     request.validate().map_err(|e| failure(ProcgenFailureCode::InvalidRequest, "request", e.to_string(), false))?;
     let report = pipeline().map_err(|e| failure(ProcgenFailureCode::GenerationFailure, "generation", e.to_string(), true))?;
     let ship = report.ship;
+    if ship.generator_version != request.generator_version || ship.seed != request.world_seed || ship.archetype_id != request.site.archetype_id {
+        return Err(failure(ProcgenFailureCode::ValidationFailure, "generation", "pipeline ship does not match request identity".into(), false));
+    }
     let legacy_slice = crate::structural::export::to_gameplay_slice_json(&ship);
     let world_ir = WorldIR { schema_version: WORLD_IR_SCHEMA.into(), world_seed: request.world_seed, site_id: request.site.site_id.clone(), x: request.site.x, y: request.site.y, archetype_id: request.site.archetype_id.clone() };
     let site_ir = SiteIR { schema_version: SITE_IR_SCHEMA.into(), ship: ship.clone() };
@@ -205,7 +214,7 @@ where F: FnOnce() -> Result<crate::pipeline::GenReport, crate::pipeline::GenErro
     bundle.semantic_hash = semantic_hash(&bundle).map_err(|e| failure(ProcgenFailureCode::InternalFailure, "hash", e.to_string(), false))?; Ok(bundle)
 }
 
-pub fn migration_layout(bundle: &ProcgenBundle) -> Result<Value, ProcgenError> { bundle.validate()?; Ok(crate::structural::export::to_layout_json(&bundle.site_ir.ship, &crate::structural::export::ExportOptions { kit_id: bundle.presentation_ir.kit_id.clone(), ..Default::default() })) }
+pub fn migration_layout(bundle: &ProcgenBundle) -> Result<Value, ProcgenError> { bundle.validate()?; Ok(crate::structural::export::to_layout_json(&bundle.site_ir.ship, &crate::structural::export::ExportOptions { kit_id: bundle.presentation_ir.kit_id.clone(), difficulty_id: bundle.request.difficulty_id.clone(), ..Default::default() })) }
 pub fn migration_gameplay(bundle: &ProcgenBundle) -> Result<Value, ProcgenError> { bundle.validate()?; Ok(serde_json::to_value(&bundle.gameplay_ir.legacy_slice)?) }
 pub fn canonical_json_hash(value: &Value) -> Result<String, ProcgenError> { let bytes = serde_json::to_vec(&canonical(value.clone()))?; let digest = Sha256::digest(bytes); Ok(digest.iter().map(|b| format!("{b:02x}")).collect()) }
 
@@ -217,17 +226,10 @@ fn mechanical_request(req: &ProcgenRequest) -> Value { let mut v = serde_json::t
 fn canonical(v: Value) -> Value { match v { Value::Object(o) => Value::Object(o.into_iter().map(|(k,v)|(k,canonical(v))).collect()), Value::Array(a) => Value::Array(a.into_iter().map(canonical).collect()), v => v } }
 fn check_schema(actual: &str, expected: &str) -> Result<(), ProcgenError> { if actual == expected { Ok(()) } else if actual.starts_with(&expected[..expected.rfind('-').unwrap()+1]) { Err(ProcgenError::UnknownSchemaMajor(actual.into())) } else { Err(ProcgenError::InvalidRequest("schema_version")) } }
 fn is_sha256(s: &str) -> bool { s.len() == 64 && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) }
-fn failure(code: ProcgenFailureCode, stage: &str, message: String, retryable: bool) -> ProcgenFailure { ProcgenFailure { schema_version: FAILURE_SCHEMA.into(), code, stage: stage.into(), message, retryable, fallback_id: None } }
-
-fn reject_unknown_bundle_fields(value: &Value) -> Result<(), ProcgenError> {
-    let allowed = ["schema_version", "version", "request", "world_ir", "site_ir", "gameplay_ir", "presentation_ir", "semantic_hash", "metrics", "trace"];
-    let Some(obj) = value.as_object() else { return Err(ProcgenError::InvalidRequest("bundle")); };
-    if obj.keys().any(|k| !allowed.contains(&k.as_str())) { return Err(ProcgenError::InvalidRequest("bundle.unknown_field")); }
-    if let Some(ship) = obj.get("site_ir").and_then(|v| v.get("ship")).and_then(Value::as_object) {
-        let fields = ["generator_version","seed","archetype_id","template_id","intactness","cause_of_loss","topology","plan","entry_room","goal_room","critical_path","decks","room_graph","entities","damage_events","fractured","fragments"];
-        if ship.keys().any(|k| !fields.contains(&k.as_str())) { return Err(ProcgenError::InvalidRequest("site_ir.ship.unknown_field")); }
-    }
-    let nested = [("version", ["generator_version", "content_manifest_hash", "export_schemas"].as_slice()), ("world_ir", ["schema_version", "world_seed", "site_id", "x", "y", "archetype_id"].as_slice()), ("site_ir", ["schema_version", "ship"].as_slice()), ("gameplay_ir", ["schema_version", "legacy_slice"].as_slice()), ("presentation_ir", ["schema_version", "kit_id", "locale", "seed", "approved_bindings"].as_slice()), ("metrics", ["pipeline_executions", "room_count", "entity_count", "structural_placement_count", "stage_timings_micros"].as_slice()), ("trace", ["schema_version", "rng_channels", "candidate_decisions", "failed_constraints", "repairs", "retries", "fallback", "stage_timings_micros"].as_slice())];
-    for (name, fields) in nested { if let Some(child) = obj.get(name).and_then(Value::as_object) { if child.keys().any(|k| !fields.contains(&k.as_str())) { return Err(ProcgenError::InvalidRequest("bundle.nested_unknown_field")); } } }
-    Ok(())
+fn is_locale(s: &str) -> bool {
+    let mut parts = s.split('-');
+    let Some(language) = parts.next() else { return false; };
+    (2..=3).contains(&language.len()) && language.bytes().all(|b| b.is_ascii_alphabetic())
+        && parts.all(|part| (2..=8).contains(&part.len()) && part.bytes().all(|b| b.is_ascii_alphanumeric()))
 }
+fn failure(code: ProcgenFailureCode, stage: &str, message: String, retryable: bool) -> ProcgenFailure { ProcgenFailure { schema_version: FAILURE_SCHEMA.into(), code, stage: stage.into(), message, retryable, fallback_id: None } }

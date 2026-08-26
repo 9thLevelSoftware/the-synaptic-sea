@@ -27,12 +27,18 @@
       "$ref": "#/definitions/ProcgenFailureCode"
     },
     "fallback_id": {
-      "type": [
-        "string",
-        "null"
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "minLength": 1,
+          "type": "string"
+        }
       ]
     },
     "message": {
+      "minLength": 1,
       "type": "string"
     },
     "retryable": {
@@ -42,6 +48,7 @@
       "const": "procgen-failure-1"
     },
     "stage": {
+      "minLength": 1,
       "type": "string"
     }
   },

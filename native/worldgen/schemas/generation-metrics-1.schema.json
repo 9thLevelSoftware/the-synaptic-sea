@@ -8,9 +8,7 @@
       "type": "integer"
     },
     "pipeline_executions": {
-      "format": "uint32",
-      "minimum": 0.0,
-      "type": "integer"
+      "const": 1
     },
     "room_count": {
       "format": "uint32",

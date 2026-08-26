@@ -177,7 +177,7 @@ pub fn generate_ship_timed(
     let mut failed_templates: Vec<String> = Vec::new();
     for attempt in 0..TOPOLOGY_ATTEMPTS {
         template = pick_template(attempt, &failed_templates)?;
-        candidate_decisions.push(format!("topology_template:{}:attempt={attempt}", template.id));
+        candidate_decisions.push(format!("considered:topology_template:{}:attempt={attempt}", template.id));
         let mut trng = rng::stream(seed, "topology", attempt);
         let mut candidate =
             match place_topology(&mut trng, template, &hull_plan.deck_masks, &role_params) {
@@ -257,7 +257,7 @@ pub fn generate_ship_timed(
     let mut committed = None;
     let mut last_err: Option<GenError> = None;
     for attempt in 0..DAMAGE_ATTEMPTS {
-        candidate_decisions.push(format!("damage:attempt={attempt}"));
+        candidate_decisions.push(format!("considered:damage:attempt={attempt}"));
         let mut topo2 = placed.topology.clone();
         let mut entities2 = entities.clone();
         let mut next_id2 = next_entity_id;
@@ -316,6 +316,7 @@ pub fn generate_ship_timed(
                 issues: vec!["critical path destroyed by damage".into()],
             });
             failed_constraints.push("damage:critical path destroyed".into());
+            candidate_decisions.push(format!("rejected:damage:attempt={attempt}"));
             retries.push(format!("damage:attempt={attempt}"));
             continue;
         }

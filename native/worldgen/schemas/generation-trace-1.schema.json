@@ -4,48 +4,79 @@
   "properties": {
     "candidate_decisions": {
       "items": {
+        "minLength": 1,
         "type": "string"
       },
+      "maxItems": 4096,
       "type": "array"
     },
     "failed_constraints": {
       "items": {
+        "minLength": 1,
         "type": "string"
       },
+      "maxItems": 4096,
       "type": "array"
     },
     "fallback": {
-      "type": [
-        "string",
-        "null"
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "minLength": 1,
+          "type": "string"
+        }
       ]
     },
     "repairs": {
       "items": {
+        "minLength": 1,
         "type": "string"
       },
+      "maxItems": 4096,
       "type": "array"
     },
     "retries": {
       "items": {
+        "minLength": 1,
         "type": "string"
       },
+      "maxItems": 4096,
       "type": "array"
     },
     "rng_channels": {
-      "items": {
-        "type": "string"
-      },
-      "type": "array"
+      "const": [
+        "meta",
+        "hull",
+        "template",
+        "topology",
+        "residual_fill",
+        "door",
+        "furnish",
+        "story",
+        "intact",
+        "breach",
+        "scorch",
+        "seal",
+        "bodies",
+        "fracture",
+        "debris",
+        "loot"
+      ]
     },
     "schema_version": {
       "const": "generation-trace-1"
     },
     "stage_timings_micros": {
       "additionalProperties": {
-        "format": "uint128",
-        "minimum": 0.0,
+        "maximum": 3600000000,
+        "minimum": 0,
         "type": "integer"
+      },
+      "maxProperties": 4096,
+      "propertyNames": {
+        "minLength": 1
       },
       "type": "object"
     }

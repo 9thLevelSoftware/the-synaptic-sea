@@ -30,6 +30,12 @@ fn request_round_trips_and_unknown_major_is_rejected() {
     assert_eq!(serde_json::from_str::<ProcgenRequest>(&json).unwrap(), req);
     let bad = json.replace(PROCGEN_REQUEST_SCHEMA, "procgen-request-2");
     assert!(matches!(ProcgenRequest::from_json(&bad), Err(ProcgenError::UnknownSchemaMajor(_))));
+    let mut invalid = serde_json::to_value(req).unwrap();
+    invalid["site"]["loot_richness_bp"] = 30_001.into();
+    assert!(ProcgenRequest::from_json(&serde_json::to_string(&invalid).unwrap()).is_err());
+    invalid["site"]["loot_richness_bp"] = 1.into();
+    invalid["presentation"]["locale"] = "english".into();
+    assert!(ProcgenRequest::from_json(&serde_json::to_string(&invalid).unwrap()).is_err());
 }
 
 #[test]
@@ -41,6 +47,12 @@ fn semantic_hash_is_order_and_presentation_invariant() {
     let b = generate_bundle(other, &data).unwrap();
     assert_eq!(a.semantic_hash, b.semantic_hash);
     assert_eq!(a.metrics.pipeline_executions, 1);
+    assert!(a.trace.repairs.is_empty() && a.trace.fallback.is_none());
+    for (index, event) in a.trace.candidate_decisions.iter().enumerate().filter(|(_, event)| event.starts_with("considered:")) {
+        let key = event.strip_prefix("considered:").unwrap();
+        let dispositions: Vec<_> = a.trace.candidate_decisions[index + 1..].iter().filter(|later| later.ends_with(key) && (later.starts_with("selected:") || later.starts_with("rejected:"))).collect();
+        assert_eq!(dispositions.len(), 1, "{event} => {dispositions:?}");
+    }
 }
 
 #[test]
@@ -86,12 +98,72 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(format!("{}/../../schemas/procgen-bundle-1.schema.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
     let compiled = jsonschema::validator_for(&schema).unwrap();
-    let bundle_value = serde_json::to_value(bundle).unwrap();
+    let bundle_value = serde_json::to_value(&bundle).unwrap();
     let errors: Vec<_> = compiled.iter_errors(&bundle_value).map(|e| e.to_string()).collect();
     assert!(errors.is_empty(), "{errors:?}");
+    let round_trip = ProcgenBundle::from_json(&serde_json::to_string(&bundle_value).unwrap()).unwrap();
+    assert_eq!(round_trip, bundle);
     for action in [AdaptiveAction::NoOp, AdaptiveAction::SelectCandidate { candidate_id: "c".into() }, AdaptiveAction::AdjustEncounter { encounter_id: "e".into(), pacing_delta: -1 }] {
         let proposal = AdaptiveProposal { schema_version: ADAPTIVE_PROPOSAL_SCHEMA.into(), score: 0, rationale_codes: vec!["r".into()], confidence_bp: 1, rule_model_version: "v".into(), action };
         let schema: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(format!("{}/../../schemas/adaptive-proposal-1.schema.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
         let pv = serde_json::to_value(proposal).unwrap(); let av = jsonschema::validator_for(&schema).unwrap(); let es: Vec<_> = av.iter_errors(&pv).map(|e| e.to_string()).collect(); assert!(es.is_empty(), "{pv} {es:?}");
+    }
+    for action_key in ["select_candidate", "adjust_encounter"] {
+        let mut bad = serde_json::to_value(AdaptiveProposal { schema_version: ADAPTIVE_PROPOSAL_SCHEMA.into(), score: 0, rationale_codes: vec!["r".into()], confidence_bp: 1, rule_model_version: "v".into(), action: AdaptiveAction::SelectCandidate { candidate_id: "c".into() } }).unwrap();
+        if action_key == "select_candidate" { bad["action"]["select_candidate"]["unexpected"] = true.into(); }
+        else { bad["action"] = serde_json::json!({"adjust_encounter":{"encounter_id":"e","pacing_delta":1,"unexpected":true}}); }
+        assert!(AdaptiveProposal::from_json(&serde_json::to_string(&bad).unwrap()).is_err());
+        let schema: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(format!("{}/../../schemas/adaptive-proposal-1.schema.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
+        assert!(jsonschema::validator_for(&schema).unwrap().iter_errors(&bad).next().is_some());
+    }
+    let docs = [
+        ("procgen-request-1", serde_json::to_value(&bundle.request).unwrap()),
+        ("world-ir-1", serde_json::to_value(&bundle.world_ir).unwrap()),
+        ("site-ir-1", serde_json::to_value(&bundle.site_ir).unwrap()),
+        ("gameplay-ir-1", serde_json::to_value(&bundle.gameplay_ir).unwrap()),
+        ("presentation-ir-1", serde_json::to_value(&bundle.presentation_ir).unwrap()),
+        ("generation-trace-1", serde_json::to_value(&bundle.trace).unwrap()),
+        ("generation-metrics-1", serde_json::to_value(&bundle.metrics).unwrap()),
+    ];
+    for (name, document) in docs {
+        let schema: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(format!("{}/../../schemas/{name}.schema.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
+        let validator = jsonschema::validator_for(&schema).unwrap();
+        let errors: Vec<_> = validator.iter_errors(&document).map(|e| e.to_string()).collect();
+        assert!(errors.is_empty(), "{name}: {errors:?}");
+    }
+    let failure_codes = [ProcgenFailureCode::InvalidRequest, ProcgenFailureCode::UnsupportedSchema, ProcgenFailureCode::UnsupportedDomain, ProcgenFailureCode::GeneratorContentMismatch, ProcgenFailureCode::GenerationFailure, ProcgenFailureCode::ValidationFailure, ProcgenFailureCode::FallbackFailure, ProcgenFailureCode::AdapterFailure, ProcgenFailureCode::ManifestFailure, ProcgenFailureCode::Capacity, ProcgenFailureCode::Overload, ProcgenFailureCode::Cancellation, ProcgenFailureCode::Timeout, ProcgenFailureCode::InternalFailure];
+    let schema: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(format!("{}/../../schemas/procgen-failure-1.schema.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    for code in failure_codes {
+        let failure = ProcgenFailure { schema_version: FAILURE_SCHEMA.into(), code, stage: "stage".into(), message: "message".into(), retryable: false, fallback_id: Some("fallback".into()) };
+        let value = serde_json::to_value(&failure).unwrap();
+        assert!(validator.iter_errors(&value).next().is_none(), "failure schema rejected {value}");
+        assert_eq!(ProcgenFailure::from_json(&serde_json::to_string(&value).unwrap()).unwrap(), failure);
+    }
+}
+
+#[test]
+fn nested_unknown_fields_fail_at_serde_and_schema_boundaries() {
+    let data = derelict_core::GenData::default_bundle().unwrap();
+    let bundle = generate_bundle(request(), &data).unwrap();
+    let schema: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(format!("{}/../../schemas/procgen-bundle-1.schema.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    for path in [
+        vec!["version", "export_schemas"],
+        vec!["site_ir", "ship", "topology", "rooms", "0"],
+        vec!["site_ir", "ship", "plan", "placements", "0"],
+        vec!["site_ir", "ship", "entities", "0"],
+        vec!["gameplay_ir", "legacy_slice", "objectives", "0"],
+        vec!["gameplay_ir", "legacy_slice", "loot_containers", "0"],
+    ] {
+        let mut value = serde_json::to_value(&bundle).unwrap();
+        let mut cursor = &mut value;
+        for key in &path {
+            cursor = if let Ok(index) = key.parse::<usize>() { cursor.get_mut(index) } else { cursor.get_mut(key) }
+                .unwrap_or_else(|| panic!("missing fixture path {path:?}"));
+        }
+        cursor.as_object_mut().unwrap().insert("unexpected_nested_field".into(), true.into());
+        assert!(ProcgenBundle::from_json(&serde_json::to_string(&value).unwrap()).is_err(), "serde accepted {path:?}");
+        assert!(validator.iter_errors(&value).next().is_some(), "schema accepted {path:?}");
     }
 }
