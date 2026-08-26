@@ -5,6 +5,8 @@ const Envelope := preload("res://scripts/systems/generated_world_save_envelope.g
 const Site := preload("res://scripts/systems/generated_world_site_identity.gd")
 const Delta := preload("res://scripts/systems/procgen_mutation_delta.gd")
 const Result := preload("res://scripts/systems/procgen_load_result.gd")
+const PROVIDER_VERSION := "procgen-bundle-provider-1"
+const APPLIER_VERSION := "procgen-mutation-atomic-1"
 var current_platform: Variant = 1
 var current_content_hash: Variant = ""
 var current_schema_map: Variant = {}
@@ -23,7 +25,8 @@ func evaluate(document: Variant, source_path: String = ""):
 	if envelope.content_manifest_hash != current_content_hash: return Result.make(Result.NEW_WORLD_REQUIRED, "content_manifest_mismatch", source_path, summary)
 	if envelope.export_schema_map != current_schema_map: return Result.make(Result.NEW_WORLD_REQUIRED, "export_schema_mismatch", source_path, summary)
 	if not is_instance_valid(bundle_provider) or not is_instance_valid(applier): return Result.make(Result.IO_FAILURE, "provider_unavailable", source_path, summary)
-	if not bundle_provider.has_method("regenerate_site") or not applier.has_method("validate_mutation") or not applier.has_method("apply_batch"): return Result.make(Result.IO_FAILURE, "provider_contract_missing", source_path, summary)
+	if not bundle_provider.has_method("procgen_bundle_provider_version") or bundle_provider.procgen_bundle_provider_version() != PROVIDER_VERSION or not bundle_provider.has_method("regenerate_site"): return Result.make(Result.IO_FAILURE, "provider_contract_missing", source_path, summary)
+	if not applier.has_method("procgen_atomic_batch_version") or applier.procgen_atomic_batch_version() != APPLIER_VERSION or not applier.has_method("validate_mutation") or not applier.has_method("apply_batch_atomic"): return Result.make(Result.IO_FAILURE, "provider_contract_missing", source_path, summary)
 	var pending: Array[Dictionary] = []
 	for entry in envelope.sites:
 		var identity: Variant = Site.from_dict(entry.identity)
@@ -38,7 +41,7 @@ func evaluate(document: Variant, source_path: String = ""):
 			pending.append({"identity": identity, "operation": operation.duplicate(true), "bundle": normalized})
 	for item in pending:
 		if applier.validate_mutation(item.identity, item.operation, item.bundle) != true: return Result.make(Result.NEW_WORLD_REQUIRED, "mutation_rejected", source_path, summary)
-	if applier.apply_batch(pending) != true: return Result.make(Result.IO_FAILURE, "mutation_apply_failed", source_path, summary)
+	if applier.apply_batch_atomic(pending) != true: return Result.make(Result.IO_FAILURE, "mutation_apply_failed", source_path, summary)
 	var result: Variant = Result.make(Result.COMPATIBLE, "validated", source_path, summary)
 	result.envelope = envelope
 	return result

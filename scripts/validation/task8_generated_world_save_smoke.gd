@@ -10,14 +10,16 @@ const MAP := {"procgen_request":"a","procgen_bundle":"b","world_ir":"c","site_ir
 
 class Provider extends RefCounted:
 	var calls := 0
+	func procgen_bundle_provider_version() -> String: return "procgen-bundle-provider-1"
 	func regenerate_site(identity: RefCounted) -> Dictionary:
 		calls += 1
 		return {"site_id": identity.site_id, "x": identity.x, "y": identity.y, "site_seed": identity.derived_site_seed, "structural_generator_version": identity.structural_generator_version, "semantic_hash": identity.base_bundle_semantic_hash, "targets": [{"target_kind":"door", "target_id":"d1"}]}
 
 class Applier extends RefCounted:
 	var calls := 0
+	func procgen_atomic_batch_version() -> String: return "procgen-mutation-atomic-1"
 	func validate_mutation(_identity: RefCounted, _operation: Dictionary, _bundle: Variant) -> bool: return true
-	func apply_batch(_pending: Array) -> bool: calls += 1; return true
+	func apply_batch_atomic(_pending: Array) -> bool: calls += 1; return true
 
 var finished := false
 

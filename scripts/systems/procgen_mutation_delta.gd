@@ -5,6 +5,11 @@ const SCHEMA := "procgen-mutation-delta-1"
 const Site := preload("res://scripts/systems/generated_world_site_identity.gd")
 const MAX_OPERATIONS := 128
 const MAX_PAYLOAD_BYTES := 4096
+const MAX_DOCUMENT_BYTES := 16384
+const MAX_DEPTH := 8
+const MAX_VALUES := 2048
+const MAX_TARGETS := 4096
+const MAX_TARGET_BYTES := 524288
 const OPS := {"door_lock":"door", "door_open":"door", "container_inventory":"container", "entity_remove":"entity", "objective":"objective", "hazard":"hazard", "system_state":"system"}
 const TARGET_KINDS := {"door": true, "container": true, "entity": true, "objective": true, "hazard": true, "system": true}
 var base_site_id: String = ""
@@ -19,8 +24,20 @@ func configure(site_id: Variant, semantic: Variant, values: Variant) -> bool:
 		var operation: Variant = _validated_operation(raw, seen)
 		if operation == null: return false
 		parsed.append(operation)
+	if _bounded(parsed, 0, {}) > MAX_VALUES: return false
+	var candidate := {"schema_version": SCHEMA, "base_site_id": site_id, "base_semantic_hash": semantic, "operations": parsed}
+	if JSON.stringify(candidate).to_utf8_buffer().size() > MAX_DOCUMENT_BYTES: return false
 	base_site_id = site_id; base_semantic_hash = semantic; operations = parsed
-	return JSON.stringify(to_dict()).to_utf8_buffer().size() <= 16384
+	return true
+
+func _bounded(value: Variant, depth: int, seen: Dictionary) -> int:
+	if depth > MAX_DEPTH: return MAX_VALUES + 1
+	var total := 1
+	if typeof(value) == TYPE_DICTIONARY:
+		for key in value.keys(): total += _bounded(key, depth + 1, seen); total += _bounded(value[key], depth + 1, seen)
+	elif typeof(value) == TYPE_ARRAY:
+		for item in value: total += _bounded(item, depth + 1, seen)
+	return total
 
 func _validated_operation(raw: Variant, seen: Dictionary) -> Variant:
 	if typeof(raw) != TYPE_DICTIONARY: return null
@@ -28,7 +45,7 @@ func _validated_operation(raw: Variant, seen: Dictionary) -> Variant:
 	if op.size() != 4 or not op.has_all(["operation", "target_kind", "target_id", "payload"]): return null
 	if typeof(op.operation) != TYPE_STRING or typeof(op.target_kind) != TYPE_STRING or typeof(op.target_id) != TYPE_STRING or typeof(op.payload) != TYPE_DICTIONARY: return null
 	if not OPS.has(op.operation) or OPS[op.operation] != op.target_kind or not Site.valid_id(op.target_id): return null
-	var identity: String = op.target_kind + ":" + op.target_id
+	var identity: String = op.operation + ":" + op.target_kind + ":" + op.target_id
 	if seen.has(identity) or JSON.stringify(op.payload).to_utf8_buffer().size() > MAX_PAYLOAD_BYTES: return null
 	var payload: Dictionary = op.payload
 	var valid := false
@@ -54,7 +71,7 @@ func _valid_items(payload: Dictionary) -> bool:
 	return true
 
 func validate_targets(targets: Variant) -> bool:
-	if typeof(targets) != TYPE_ARRAY: return false
+	if typeof(targets) != TYPE_ARRAY or targets.size() > MAX_TARGETS or JSON.stringify(targets).to_utf8_buffer().size() > MAX_TARGET_BYTES: return false
 	var seen := {}
 	for target in targets:
 		if typeof(target) != TYPE_DICTIONARY or target.size() != 2 or not target.has_all(["target_kind", "target_id"]): return false

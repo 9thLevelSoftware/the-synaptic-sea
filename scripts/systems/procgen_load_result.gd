@@ -1,26 +1,42 @@
 extends RefCounted
 class_name ProcgenLoadResult
-
+const Site := preload("res://scripts/systems/generated_world_site_identity.gd")
+const SCHEMA := "procgen-load-result-1"
 const COMPATIBLE := "compatible"
 const NEW_WORLD_REQUIRED := "new_world_required"
 const CORRUPT := "corrupt"
 const IO_FAILURE := "io_failure"
 const STATUSES := [COMPATIBLE, NEW_WORLD_REQUIRED, CORRUPT, IO_FAILURE]
-const MAX_REASON := 96
+const REASONS := ["validated","malformed_envelope","configuration_invalid","platform_generator_mismatch","content_manifest_mismatch","export_schema_mismatch","provider_unavailable","provider_contract_missing","malformed_site","bundle_unavailable","bundle_identity_mismatch","mutation_target_mismatch","mutation_rejected","mutation_apply_failed","missing_file","invalid_slot","open_failed","read_failed","json_parse_failed","document_too_large","compatibility_unavailable","malformed_result"]
 const MAX_PATH := 1024
 var status: String = CORRUPT
-var reason_code: String = "malformed"
+var reason_code: String = "malformed_result"
 var preserved_path: String = ""
 var identity_summary: Dictionary = {}
 var envelope: RefCounted = null
 
 static func make(value: Variant, reason: Variant, path: Variant = "", identity: Variant = {}):
 	var result = load("res://scripts/systems/procgen_load_result.gd").new()
-	result.status = value if typeof(value) == TYPE_STRING and STATUSES.has(value) else CORRUPT
-	result.reason_code = reason if typeof(reason) == TYPE_STRING and reason.length() > 0 and reason.length() <= MAX_REASON else "malformed"
-	result.preserved_path = path if typeof(path) == TYPE_STRING and path.length() <= MAX_PATH else ""
-	result.identity_summary = identity.duplicate(true) if typeof(identity) == TYPE_DICTIONARY else {}
-	return result
+	if typeof(value) != TYPE_STRING or not STATUSES.has(value) or typeof(reason) != TYPE_STRING or not REASONS.has(reason) or typeof(path) != TYPE_STRING or path.length() > MAX_PATH or typeof(identity) != TYPE_DICTIONARY or not _valid_summary(identity): return result
+	if (value == COMPATIBLE and reason != "validated") or (value == CORRUPT and reason in ["validated", "platform_generator_mismatch", "content_manifest_mismatch", "export_schema_mismatch"]): return result
+	result.status = value; result.reason_code = reason; result.preserved_path = path; result.identity_summary = identity.duplicate(true); return result
 
-func is_compatible() -> bool:
-	return status == COMPATIBLE
+static func _valid_summary(value: Dictionary) -> bool:
+	if value.is_empty(): return true
+	if value.size() != 4 or not value.has_all(["world_seed", "platform_generator_version", "content_manifest_hash", "export_schema_map"]): return false
+	var seed = value.world_seed; var version = value.platform_generator_version
+	if typeof(seed) != TYPE_INT or seed < 0 or seed > 9007199254740991 or typeof(version) != TYPE_INT or version <= 0 or not Site.valid_hash(value.content_manifest_hash) or typeof(value.export_schema_map) != TYPE_DICTIONARY: return false
+	return true
+
+func validate() -> bool:
+	return status in STATUSES and reason_code in REASONS and _valid_summary(identity_summary) and preserved_path.length() <= MAX_PATH
+
+func to_dict() -> Dictionary:
+	return {"schema_version": SCHEMA, "status": status, "reason_code": reason_code, "preserved_path": preserved_path, "identity_summary": identity_summary.duplicate(true)}
+
+static func from_dict(value: Variant):
+	if typeof(value) != TYPE_DICTIONARY or value.size() != 5 or not value.has_all(["schema_version","status","reason_code","preserved_path","identity_summary"]) or value.schema_version != SCHEMA: return null
+	var result = make(value.status, value.reason_code, value.preserved_path, value.identity_summary)
+	return result if result.validate() and result.to_dict() == value else null
+
+func is_compatible() -> bool: return status == COMPATIBLE

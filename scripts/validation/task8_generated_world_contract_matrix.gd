@@ -15,6 +15,7 @@ const KINDS := ["door", "door", "container", "entity", "objective", "hazard", "s
 class Provider extends RefCounted:
 	var mode := "dictionary"
 	var calls := 0
+	func procgen_bundle_provider_version() -> String: return "procgen-bundle-provider-1"
 	func regenerate_site(identity: RefCounted):
 		calls += 1
 		if mode == "null": return null
@@ -69,8 +70,9 @@ class Applier extends RefCounted:
 	var validation_calls := 0
 	var batch_calls := 0
 	var applied := 0
+	func procgen_atomic_batch_version() -> String: return "procgen-mutation-atomic-1"
 	func validate_mutation(_identity: RefCounted, _operation: Dictionary, _bundle: Variant) -> bool: validation_calls += 1; return validate_ok
-	func apply_batch(pending: Array) -> bool:
+	func apply_batch_atomic(pending: Array) -> bool:
 		batch_calls += 1
 		if batch_ok: applied = pending.size()
 		return batch_ok
