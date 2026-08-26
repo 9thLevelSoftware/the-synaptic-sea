@@ -109,6 +109,9 @@ class ManifestToolTests(unittest.TestCase):
         windows = json.loads(self.windows_manifest.read_text(encoding="utf-8"))
         self.assertEqual(windows["target"], "x86_64-pc-windows-msvc")
         self.assertEqual(windows["artifact"]["kind"], "gdextension")
+        self.assertEqual(windows["generator_version"], 3)
+        self.assertEqual(windows["export_schemas"]["procgen_bundle"], "procgen-bundle-2")
+        self.assertEqual(windows["export_schemas"]["world_ir"], "world-ir-2")
         self.assertEqual(
             windows["artifact"]["path"],
             "addons/derelict/bin/win64/derelict_godot.dll",
@@ -123,6 +126,8 @@ class ManifestToolTests(unittest.TestCase):
         web = json.loads(self.web_manifest.read_text(encoding="utf-8"))
         self.assertEqual(web["target"], "wasm32-unknown-unknown")
         self.assertEqual(web["artifact"]["kind"], "wasm")
+        self.assertEqual(web["generator_version"], 3)
+        self.assertEqual(web["export_schemas"]["procgen_bundle"], "procgen-bundle-2")
         self.assertEqual(
             web["artifact"]["path"],
             "addons/derelict/bin/web/derelict_wasm_bg.wasm",

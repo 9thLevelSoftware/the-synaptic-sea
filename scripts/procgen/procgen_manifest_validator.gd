@@ -23,17 +23,17 @@ func validate(manifest: Dictionary, generator: Object, target_override: String =
 	var schema: String = str(manifest.get("manifest_schema", ""))
 	if schema != "procgen-build-manifest-1":
 		return SCHEMA_MAJOR_UNKNOWN if schema.begins_with("procgen-build-manifest-") else MANIFEST_INVALID
-	if int(manifest.get("generator_version", -1)) != 2: return GENERATOR_VERSION_MISMATCH
+	if int(manifest.get("generator_version", -1)) != 3: return GENERATOR_VERSION_MISMATCH
 	var source_commit: String = str(manifest.get("rust_source_commit", ""))
 	if source_commit.length() != 40 or source_commit != source_commit.to_lower() or not _is_hex(source_commit): return MANIFEST_INVALID
 	if str(manifest.get("content_manifest_path", "")) != "data/procgen/manifests/content_manifest.json": return MANIFEST_INVALID
 	var target: String = str(manifest.get("target", ""))
-	if target != "x86_64-pc-windows-msvc": return TARGET_MISMATCH
+	if target != "x86_64-pc-windows-msvc" and target != "wasm32-unknown-unknown": return TARGET_MISMATCH
 	var running_target: String = target_override
 	if running_target.is_empty():
 		running_target = "x86_64-pc-windows-msvc" if OS.get_name() == "Windows" and Engine.get_architecture_name() == "x86_64" else "unsupported"
 	if running_target != target: return TARGET_MISMATCH
-	if generator == null or not generator.has_method("generator_version") or int(generator.generator_version()) != 2:
+	if generator == null or not generator.has_method("generator_version") or int(generator.generator_version()) != 3:
 		return GENERATOR_VERSION_MISMATCH
 	var content_path: String = str(manifest.get("content_manifest_path", ""))
 	if not _io_exists(content_path, io_override): return CONTENT_MANIFEST_MISSING
@@ -53,11 +53,13 @@ func validate(manifest: Dictionary, generator: Object, target_override: String =
 	if not artifact is Dictionary: return MANIFEST_INVALID
 	for key in (artifact as Dictionary).keys():
 		if not ["kind", "path", "sha256"].has(str(key)): return MANIFEST_INVALID
-	if str((artifact as Dictionary).get("kind", "")) != "gdextension" or str((artifact as Dictionary).get("path", "")) != "addons/derelict/bin/win64/derelict_godot.dll": return MANIFEST_INVALID
+	var expected_kind := "gdextension" if target == "x86_64-pc-windows-msvc" else "wasm"
+	var expected_path := "addons/derelict/bin/win64/derelict_godot.dll" if target == "x86_64-pc-windows-msvc" else "addons/derelict/bin/web/derelict_wasm_bg.wasm"
+	if str((artifact as Dictionary).get("kind", "")) != expected_kind or str((artifact as Dictionary).get("path", "")) != expected_path: return MANIFEST_INVALID
 	var artifact_path: String = str((artifact as Dictionary).get("path", ""))
 	if not _io_exists(artifact_path, io_override): return ARTIFACT_MISSING
 	if _io_sha256(artifact_path, io_override) != str((artifact as Dictionary).get("sha256", "")): return ARTIFACT_HASH_MISMATCH
-	var schemas: Dictionary = {"procgen_request":"procgen-request-1", "procgen_bundle":"procgen-bundle-1", "world_ir":"world-ir-1", "site_ir":"site-ir-1", "gameplay_ir":"gameplay-ir-1", "presentation_ir":"presentation-ir-1", "generation_trace":"generation-trace-1", "adaptive_proposal":"adaptive-proposal-1"}
+	var schemas: Dictionary = {"procgen_request":"procgen-request-1", "procgen_bundle":"procgen-bundle-2", "world_ir":"world-ir-2", "site_ir":"site-ir-1", "gameplay_ir":"gameplay-ir-1", "presentation_ir":"presentation-ir-1", "generation_trace":"generation-trace-1", "adaptive_proposal":"adaptive-proposal-1"}
 	var schema_block: Variant = manifest.get("export_schemas", {})
 	if not schema_block is Dictionary: return MANIFEST_INVALID
 	for key in schema_block.keys():

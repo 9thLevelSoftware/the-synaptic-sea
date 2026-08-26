@@ -5,16 +5,16 @@ extends SceneTree
 ## the GDExtension.  The script is source/contract validation until the rebuilt
 ## adapter is installed in the sample project.
 
-const LIFECYCLE_SCHEMA := "procgen-lifecycle-result-1"
+const LIFECYCLE_SCHEMA := "procgen-lifecycle-result-2"
 const CAPABILITIES_SCHEMA := "procgen-capabilities-1"
 const MANIFEST_SCHEMA := "procgen-generator-manifest-1"
 const REQUEST_SCHEMA := "procgen-request-1"
-const GENERATOR_VERSION := 2
+const GENERATOR_VERSION := 3
 const DOMAINS := ["world", "site", "gameplay", "presentation"]
 const EXPORT_SCHEMAS := {
 	"procgen_request": "procgen-request-1",
-	"procgen_bundle": "procgen-bundle-1",
-	"world_ir": "world-ir-1",
+	"procgen_bundle": "procgen-bundle-2",
+	"world_ir": "world-ir-2",
 	"site_ir": "site-ir-1",
 	"gameplay_ir": "gameplay-ir-1",
 	"presentation_ir": "presentation-ir-1",

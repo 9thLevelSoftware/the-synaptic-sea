@@ -3,7 +3,7 @@ class_name ProcgenBundleConsumer
 
 const CanonicalJsonScript := preload("res://scripts/procgen/procgen_canonical_json.gd")
 
-const GENERATOR_VERSION: int = 2
+const GENERATOR_VERSION: int = 3
 const MAX_SAFE_JSON_INTEGER: int = 9007199254740991
 const CONTENT_HASH: String = "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2"
 const DOMAINS: Array[String] = ["world", "site", "gameplay", "presentation"]
@@ -21,12 +21,13 @@ const CAUSES_OF_LOSS: Array[String] = [
 	"ReactorBreach", "Depressurization", "PirateBoarding", "Plague", "DriveMisjump", "Unknown",
 ]
 const RNG_CHANNELS: Array[String] = [
+	"world.archetype", "world.biome", "world.hazard", "world.resource", "world.landmark", "world.route_cost", "site.structural",
 	"meta", "hull", "template", "topology", "residual_fill", "door", "furnish", "story",
 	"intact", "breach", "scorch", "seal", "bodies", "fracture", "debris", "loot",
 ]
 const EXPORT_SCHEMAS: Dictionary = {
-	"procgen_request": "procgen-request-1", "procgen_bundle": "procgen-bundle-1",
-	"world_ir": "world-ir-1", "site_ir": "site-ir-1", "gameplay_ir": "gameplay-ir-1",
+	"procgen_request": "procgen-request-1", "procgen_bundle": "procgen-bundle-2",
+	"world_ir": "world-ir-2", "site_ir": "site-ir-1", "gameplay_ir": "gameplay-ir-1",
 	"presentation_ir": "presentation-ir-1", "generation_trace": "generation-trace-1",
 	"adaptive_proposal": "adaptive-proposal-1",
 }
@@ -242,9 +243,11 @@ func _validate_bundle(bundle: Dictionary, request: Dictionary, manifest: Diction
 	var world_value: Variant = bundle.get("world_ir", null)
 	if not world_value is Dictionary: return _reject("world_shape")
 	var world: Dictionary = world_value
-	if not _has_exact_keys(world, ["schema_version", "world_seed", "site_id", "x", "y", "archetype_id"]): return _reject("world_shape")
+	if not _has_exact_keys(world, ["schema_version", "world_seed", "site_seed", "site_id", "x", "y", "archetype_id", "markers", "anchors", "biome_fields", "hazard_fields", "resource_pressures", "landmarks", "routes", "extraction"]): return _reject("world_shape")
 	if str(world.get("schema_version", "")) != EXPORT_SCHEMAS.world_ir: return _reject("world_ir_schema")
 	var site_request: Dictionary = request.get("site", {})
+	if not _is_json_integer(world.get("site_seed", null)) or int(world.get("site_seed", -1)) < 0 \
+			or not _validate_world_ir(world, request): return false
 	if not _same_json(world.get("world_seed", null), request.get("world_seed", null)) or str(world.get("site_id", "")) != str(site_request.get("site_id", "")) \
 			or not _same_json(world.get("x", null), site_request.get("x", null)) or not _same_json(world.get("y", null), site_request.get("y", null)) \
 			or str(world.get("archetype_id", "")) != str(site_request.get("archetype_id", "")): return _reject("world_identity")
@@ -263,7 +266,7 @@ func _validate_bundle(bundle: Dictionary, request: Dictionary, manifest: Diction
 	var ship_value: Variant = site_ir.get("ship", null)
 	if not ship_value is Dictionary or not _validate_ship_shape(ship_value as Dictionary): return false
 	var ship: Dictionary = ship_value
-	if not _same_json(ship.get("generator_version", null), request.get("generator_version", null)) or not _same_json(ship.get("seed", null), request.get("world_seed", null)) \
+	if not _same_json(ship.get("generator_version", null), request.get("generator_version", null)) or not _same_json(ship.get("seed", null), world.get("site_seed", null)) \
 			or str(ship.get("archetype_id", "")) != str(site_request.get("archetype_id", "")): return _reject("ship_identity")
 	if (ship.entities as Array).size() > int(caps.get("max_entities", 0)): return _reject("entity_cap")
 	var gameplay_value: Variant = bundle.get("gameplay_ir", null)
@@ -273,6 +276,39 @@ func _validate_bundle(bundle: Dictionary, request: Dictionary, manifest: Diction
 	if not _validate_gameplay(gameplay_ir.get("legacy_slice", null), ship): return false
 	if not _validate_metrics_trace(bundle.get("metrics", null), bundle.get("trace", null), ship, caps): return false
 	if not _is_sha256(str(bundle.get("semantic_hash", ""))): return _reject("semantic_hash_shape")
+	return true
+
+func _validate_world_ir(world: Dictionary, request: Dictionary) -> bool:
+	var site: Dictionary = request.get("site", {})
+	if not _same_json(world.get("world_seed", null), request.get("world_seed", null)) \
+			or not _same_json(world.get("x", null), site.get("x", null)) \
+			or not _same_json(world.get("y", null), site.get("y", null)) \
+			or str(world.get("site_id", "")) != str(site.get("site_id", "")) \
+			or str(world.get("archetype_id", "")) != str(site.get("archetype_id", "")): return _reject("world_identity")
+	for key in ["markers", "anchors", "biome_fields", "hazard_fields", "resource_pressures", "landmarks", "routes"]:
+		if not world.get(key, null) is Array: return _reject("world_shape")
+	for entry in world.get("markers", []):
+		if not entry is Dictionary or not _has_exact_keys(entry, ["archetype_id", "marker_id", "selected", "site_id", "site_seed", "x", "y"]): return _reject("world_markers")
+		if not entry.get("selected", null) is bool or not _is_bounded_integer(entry.get("site_seed", null), 0, MAX_SAFE_JSON_INTEGER) \
+				or not _same_json(entry.get("site_seed", null), world.get("site_seed", null)) \
+				or str(entry.get("marker_id", "")).is_empty() or str(entry.get("site_id", "")) != str(world.get("site_id", "")) or str(entry.get("archetype_id", "")) != str(world.get("archetype_id", "")): return _reject("world_markers")
+	for entry in world.get("anchors", []):
+		if not entry is Dictionary or not _has_exact_keys(entry, ["id", "kind"]): return _reject("world_anchors")
+	for entry in world.get("biome_fields", []):
+		if not entry is Dictionary or not _has_exact_keys(entry, ["biome_id", "intensity_bp", "marker_id"]) or not _is_bounded_integer(entry.get("intensity_bp", null), 0, 4294967295): return _reject("world_biomes")
+	for entry in world.get("hazard_fields", []):
+		if not entry is Dictionary or not _has_exact_keys(entry, ["hazard_id", "marker_id", "severity_bp"]) or not _is_bounded_integer(entry.get("severity_bp", null), 0, 4294967295): return _reject("world_hazards")
+	for entry in world.get("resource_pressures", []):
+		if not entry is Dictionary or not _has_exact_keys(entry, ["marker_id", "pressure_bp", "resource_id"]) or not _is_bounded_integer(entry.get("pressure_bp", null), 0, 4294967295): return _reject("world_resources")
+	for entry in world.get("landmarks", []):
+		if not entry is Dictionary or not _has_exact_keys(entry, ["id", "kind", "marker_id"]): return _reject("world_landmarks")
+	for entry in world.get("routes", []):
+		if not entry is Dictionary or not _has_exact_keys(entry, ["cost_bp", "from", "to"]) or not _is_bounded_integer(entry.get("cost_bp", null), 0, 4294967295): return _reject("world_routes")
+	var extraction: Variant = world.get("extraction", null)
+	if not extraction is Dictionary or not _has_exact_keys(extraction, ["extraction_anchor_id", "hub_anchor_id", "path", "selected_marker_id"]) \
+			or not extraction.get("path", null) is Array: return _reject("world_extraction")
+	for part in extraction.get("path", []):
+		if not part is String or str(part).is_empty(): return _reject("world_extraction")
 	return true
 
 func _validate_ship_shape(ship: Dictionary) -> bool:
