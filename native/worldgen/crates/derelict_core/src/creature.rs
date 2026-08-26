@@ -7,6 +7,7 @@ use std::collections::BTreeSet;
 pub const CREATURE_RULES_VERSION: &str = "creature-rules-1";
 pub const MAX_CANDIDATES: usize = 16;
 pub const MAX_CELLS: usize = 64;
+pub const CREATURE_BLUEPRINT_SET_SCHEMA: &str = "creature-blueprint-set-2";
 
 macro_rules! closed_enum { ($name:ident { $($v:ident),+ $(,)? }) => {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize, JsonSchema)]
@@ -84,6 +85,11 @@ dto!(CreatureTrace { channel_ids: Vec<String>, considered: Vec<CandidateRecord>,
 dto!(CreatureGenerationOutcome {
     blueprint: CreatureBlueprint,
     trace: CreatureTrace
+});
+dto!(CreatureBlueprintSetOutcome {
+    schema_version: String,
+    blueprints: Vec<CreatureBlueprint>,
+    traces: Vec<CreatureTrace>
 });
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
 pub enum CreatureError {
@@ -384,6 +390,159 @@ impl CreatureCatalogue {
             trace,
         })
     }
+
+    pub fn generate_set(
+        &self,
+        c: &CreatureGenerationContext,
+    ) -> Result<CreatureBlueprintSetOutcome, CreatureError> {
+        self.validate()?;
+        validate_context(c, &self.rules)?;
+        let roles = [ThreatRole::Scout, ThreatRole::Tank, ThreatRole::Controller];
+        let mut selected = Vec::with_capacity(roles.len());
+        for (sub_index, role) in roles.into_iter().enumerate() {
+            let role_sub_index = u32::try_from(sub_index)
+                .map_err(|_| CreatureError::Invalid("role_index".into()))?;
+            let (blueprint, trace) = self.generate_role(c, role, role_sub_index)?;
+            selected.push((blueprint, trace));
+        }
+        selected.sort_by(|a, b| a.0.id.cmp(&b.0.id));
+        let (blueprints, traces): (Vec<_>, Vec<_>) = selected.into_iter().unzip();
+        Ok(CreatureBlueprintSetOutcome {
+            schema_version: CREATURE_BLUEPRINT_SET_SCHEMA.into(),
+            blueprints,
+            traces,
+        })
+    }
+
+    fn generate_role(
+        &self,
+        c: &CreatureGenerationContext,
+        role: ThreatRole,
+        sub_index: u32,
+    ) -> Result<(CreatureBlueprint, CreatureTrace), CreatureError> {
+        let q = &c.request;
+        let key = WorldKey {
+            world_seed: q.world_seed,
+            platform_version: q.platform_version,
+            content_manifest_hash: q.content_manifest_hash.clone(),
+            site_id: q.site_id.clone(),
+            x: q.x,
+            y: q.y,
+            domain: "gameplay".into(),
+            channel: "gameplay.creature_blueprint".into(),
+            sub_index,
+        };
+        let seed = key.seed().map_err(CreatureError::Key)?;
+        let mut valid = Vec::new();
+        let mut rejected = Vec::new();
+        let mut all = self.fallbacks.clone();
+        all.sort_by(|a, b| a.id.cmp(&b.id));
+        for (i, b) in all.iter().take(MAX_CANDIDATES).enumerate() {
+            let ok = b.threat_role == role && self.validate_blueprint(b, c).is_ok();
+            let offset = u64::try_from(i)
+                .map_err(|_| CreatureError::Invalid("candidate_index".into()))?
+                .wrapping_mul(7919);
+            let rec = CandidateRecord {
+                candidate_id: b.id.clone(),
+                score: u32::try_from(seed.wrapping_add(offset) % 10_001)
+                    .map_err(|_| CreatureError::Invalid("candidate_score".into()))?,
+                accepted: ok,
+                rationale: if ok {
+                    "validated".into()
+                } else {
+                    "incompatible".into()
+                },
+            };
+            if ok {
+                valid.push((rec.score, b.clone(), rec));
+            } else {
+                rejected.push(rec);
+            }
+        }
+        valid.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.id.cmp(&b.1.id)));
+        let (_, blueprint, _) = valid
+            .first()
+            .cloned()
+            .ok_or(CreatureError::NoCompatibleBlueprint)?;
+        let trace = CreatureTrace {
+            channel_ids: vec![
+                key.channel,
+                "gameplay.creature_ability".into(),
+                "gameplay.creature_material".into(),
+            ],
+            considered: valid
+                .iter()
+                .map(|x| x.2.clone())
+                .chain(rejected.clone())
+                .collect(),
+            rejected,
+            selected: Some(blueprint.id.clone()),
+            repairs: Vec::new(),
+            fallback: None,
+        };
+        Ok((blueprint, trace))
+    }
+}
+
+impl CreatureBlueprintSetOutcome {
+    pub fn validate(
+        &self,
+        c: &CreatureGenerationContext,
+        catalogue: &CreatureCatalogue,
+    ) -> Result<(), CreatureError> {
+        catalogue.validate()?;
+        validate_context(c, &catalogue.rules)?;
+        if self.schema_version != CREATURE_BLUEPRINT_SET_SCHEMA
+            || self.blueprints.len() != 3
+            || self.traces.len() != self.blueprints.len()
+            || !canonical(&self.blueprints, |x| &x.id)
+        {
+            return Err(CreatureError::Invalid("set_bounds_or_order".into()));
+        }
+        let mut roles = BTreeSet::new();
+        let allowed = [
+            "gameplay.creature_blueprint",
+            "gameplay.creature_ability",
+            "gameplay.creature_material",
+        ];
+        for (blueprint, trace) in self.blueprints.iter().zip(&self.traces) {
+            catalogue.validate_blueprint(blueprint, c)?;
+            if !roles.insert(blueprint.threat_role)
+                || trace.selected.as_deref() != Some(blueprint.id.as_str())
+                || trace.channel_ids.len() != allowed.len()
+                || trace.channel_ids.iter().collect::<BTreeSet<_>>().len() != allowed.len()
+                || trace
+                    .channel_ids
+                    .iter()
+                    .any(|x| !allowed.contains(&x.as_str()))
+                || trace.considered.len() > MAX_CANDIDATES
+                || trace.rejected.len() > MAX_CANDIDATES
+                || trace.repairs.len() > 1
+                || trace.fallback.is_some()
+                || trace
+                    .considered
+                    .iter()
+                    .any(|record| !valid_id(&record.candidate_id) || record.score > 10_000)
+                || trace.rejected.iter().any(|record| record.accepted)
+                || trace
+                    .considered
+                    .iter()
+                    .filter(|record| record.accepted)
+                    .filter(|record| record.candidate_id == blueprint.id)
+                    .count()
+                    != 1
+            {
+                return Err(CreatureError::Invalid("set_trace_or_roles".into()));
+            }
+        }
+        if roles.len() != 3 {
+            return Err(CreatureError::Invalid("set_roles".into()));
+        }
+        if catalogue.generate_set(c)? != *self {
+            return Err(CreatureError::Invalid("set_replay".into()));
+        }
+        Ok(())
+    }
 }
 
 /// Convenience entry point used by adapters and focused callers.
@@ -392,6 +551,13 @@ pub fn generate_creature_blueprint(
     catalogue: &CreatureCatalogue,
 ) -> Result<CreatureGenerationOutcome, CreatureError> {
     catalogue.generate(context)
+}
+
+pub fn generate_creature_blueprint_set(
+    context: &CreatureGenerationContext,
+    catalogue: &CreatureCatalogue,
+) -> Result<CreatureBlueprintSetOutcome, CreatureError> {
+    catalogue.generate_set(context)
 }
 
 pub fn validate_creature_catalogue(catalogue: &CreatureCatalogue) -> Result<(), CreatureError> {
