@@ -3,88 +3,115 @@ class_name GeneratedWorldSaveService
 
 const Envelope := preload("res://scripts/systems/generated_world_save_envelope.gd")
 const Result := preload("res://scripts/systems/procgen_load_result.gd")
-const Compatibility := preload("res://scripts/systems/generated_world_compatibility.gd")
-
 const DIRECTORY := "user://generated-world-save-1"
 const FILE_NAME := "generated-world.save.json"
 const MAX_BYTES := 1048576
-const _SLOT_RE := "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
-var _request_counter: int = 0
-var failpoint: String = ""
+const SLOT_RE := "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
 var storage_directory: String = DIRECTORY
+var failpoint: String = ""
+var failpoint_hits: Dictionary = {}
 var token_queue: Array[String] = []
 
 func path_for(slot_id: Variant = "world") -> String:
-	if typeof(slot_id) != TYPE_STRING: return ""
-	var re := RegEx.new()
-	re.compile(_SLOT_RE)
-	if re.search(str(slot_id)) == null:
-		return ""
-	return storage_directory.path_join(str(slot_id) + "." + FILE_NAME)
+	if not _safe_directory() or typeof(slot_id) != TYPE_STRING: return ""
+	var re := RegEx.new(); re.compile(SLOT_RE)
+	return storage_directory.path_join(slot_id + "." + FILE_NAME) if re.search(slot_id) != null else ""
 
 func load_and_validate(slot_id: String, compatibility: RefCounted):
 	var path := path_for(slot_id)
 	if path.is_empty(): return Result.make(Result.CORRUPT, "invalid_slot", "")
-	if not FileAccess.file_exists(path):
-		return Result.make(Result.IO_FAILURE, "missing_file", path)
-	var file := FileAccess.open(path, FileAccess.READ)
-	if file == null: return Result.make(Result.IO_FAILURE, "open_failed", path)
-	if file.get_length() > MAX_BYTES:
-		file.close()
-		return Result.make(Result.CORRUPT, "document_too_large", path)
-	var text := file.get_as_text(); file.close()
-	var parsed: Variant = JSON.parse_string(text)
+	if not FileAccess.file_exists(path): return Result.make(Result.IO_FAILURE, "missing_file", path)
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null: return Result.make(Result.IO_FAILURE, "open_failed", path)
+	if f.get_length() > MAX_BYTES: f.close(); return Result.make(Result.CORRUPT, "document_too_large", path)
+	var parsed: Variant = JSON.parse_string(f.get_as_text()); f.close()
+	if parsed == null: return Result.make(Result.CORRUPT, "json_parse_failed", path)
 	if compatibility == null or not compatibility.has_method("evaluate"): return Result.make(Result.IO_FAILURE, "compatibility_unavailable", path)
-	var result: Variant = compatibility.evaluate(parsed, path)
-	return result
+	return compatibility.evaluate(parsed, path)
 
 func save(slot_id: String, envelope: RefCounted) -> bool:
-	if path_for(slot_id).is_empty() or envelope == null or not envelope is Envelope or Envelope.from_dict(envelope.to_dict()) == null: return false
-	var dir := DirAccess.open("user://")
-	var relative_dir := storage_directory.trim_prefix("user://")
-	if dir == null or _failed("directory") or dir.make_dir_recursive(relative_dir) != OK and not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(storage_directory)):
-		return false
-	var final_path := path_for(slot_id)
-	var token := _unique_token(final_path)
+	var final := path_for(slot_id)
+	if final.is_empty() or envelope == null or not envelope is Envelope: return false
+	var normalized: Variant = Envelope.from_dict(envelope.to_dict())
+	if normalized == null: return false
+	var document := JSON.stringify(normalized.to_dict())
+	if document.to_utf8_buffer().size() > MAX_BYTES or Envelope.from_dict(JSON.parse_string(document)) == null: return false
+	if _failed("directory") or not _ensure_directory(): return false
+	var token := _unique_token(final)
 	if token.is_empty(): return false
-	var stage_path := final_path + ".stage." + token
-	var backup_path := final_path + ".backup." + token
+	var stage := final + ".stage." + token; var backup := final + ".backup." + token
 	if _failed("stage_open"): return false
-	var file := FileAccess.open(stage_path, FileAccess.WRITE)
-	if file == null: return false
-	file.store_string(JSON.stringify(envelope.to_dict()))
-	if _failed("stage_write"): file.close(); DirAccess.remove_absolute(ProjectSettings.globalize_path(stage_path)); return false
-	file.flush(); file.close()
-	var check := FileAccess.open(stage_path, FileAccess.READ)
-	if _failed("stage_verify"): if check != null: check.close(); DirAccess.remove_absolute(ProjectSettings.globalize_path(stage_path)); return false
-	var valid := check != null and check.get_length() <= MAX_BYTES and Envelope.from_dict(JSON.parse_string(check.get_as_text())) != null
-	if check != null: check.close()
-	if not valid: DirAccess.remove_absolute(ProjectSettings.globalize_path(stage_path)); return false
-	var had_final := FileAccess.file_exists(final_path)
-	if had_final and (_failed("backup") or DirAccess.rename_absolute(ProjectSettings.globalize_path(final_path), ProjectSettings.globalize_path(backup_path)) != OK):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(stage_path)); return false
-	var rename_error := DirAccess.rename_absolute(ProjectSettings.globalize_path(stage_path), ProjectSettings.globalize_path(final_path)) if not _failed("promote") else ERR_CANT_CREATE
-	if rename_error != OK:
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(stage_path))
-		if had_final and not _failed("restore"): DirAccess.rename_absolute(ProjectSettings.globalize_path(backup_path), ProjectSettings.globalize_path(final_path))
-		return false
-	if had_final: DirAccess.remove_absolute(ProjectSettings.globalize_path(backup_path))
+	var f := FileAccess.open(stage, FileAccess.WRITE)
+	if f == null: return false
+	f.store_string(document)
+	if _failed("stage_write"): f.close(); _remove(stage); return false
+	f.flush(); f.close()
+	if _failed("stage_verify_open"): _remove(stage); return false
+	var check := FileAccess.open(stage, FileAccess.READ)
+	if check == null: _remove(stage); return false
+	var bytes := check.get_length(); var text := check.get_as_text(); check.close()
+	if _failed("stage_verify_content") or bytes > MAX_BYTES or text != document or Envelope.from_dict(JSON.parse_string(text)) == null:
+		_remove(stage); return false
+	var had_final := FileAccess.file_exists(final)
+	if had_final:
+		if _failed("backup_rename") or DirAccess.rename_absolute(ProjectSettings.globalize_path(final), ProjectSettings.globalize_path(backup)) != OK:
+			_remove(stage); return false
+	if _failed("promote_rename") or DirAccess.rename_absolute(ProjectSettings.globalize_path(stage), ProjectSettings.globalize_path(final)) != OK:
+		return _recover(final, stage, backup, had_final)
+	if _failed("final_verify") or not _same_file(final, document): return _recover(final, stage, backup, had_final)
+	if had_final:
+		if _failed("cleanup"): return _recover(final, "", backup, true)
+		_remove(backup)
 	return true
 
-func _request_token() -> String:
-	_request_counter += 1
-	if not token_queue.is_empty(): return token_queue.pop_front()
-	return "%s-%s-%s" % [str(Time.get_ticks_usec()), str(randi()), str(_request_counter)]
+func _ensure_directory() -> bool:
+	if not _safe_directory(): return false
+	var d := DirAccess.open("user://")
+	if d == null: return false
+	var rel := storage_directory.trim_prefix("user://")
+	return d.make_dir_recursive(rel) == OK or DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(storage_directory))
 
-func _unique_token(final_path: String) -> String:
-	for attempt in 32:
-		var token := _request_token()
-		if token.is_empty() or token.length() > 128: continue
-		var valid := true
-		for c in token:
-			if not (c >= "A" and c <= "Z" or c >= "a" and c <= "z" or c >= "0" and c <= "9" or c == "-" or c == "_"): valid = false
-		if valid and not FileAccess.file_exists(final_path + ".stage." + token) and not FileAccess.file_exists(final_path + ".backup." + token): return token
+func _recover(final: String, stage: String, backup: String, had_final: bool) -> bool:
+	_remove(stage)
+	if not had_final:
+		_remove(final)
+		return false
+	_remove(final)
+	if not _failed("restore_rename") and DirAccess.rename_absolute(ProjectSettings.globalize_path(backup), ProjectSettings.globalize_path(final)) == OK: return false
+	if _failed("restore_copy") or not FileAccess.file_exists(backup): return false
+	var src := FileAccess.open(backup, FileAccess.READ); var dst := FileAccess.open(final, FileAccess.WRITE)
+	if src == null or dst == null:
+		if src != null: src.close()
+		if dst != null: dst.close()
+		return false
+	dst.store_buffer(src.get_buffer(src.get_length())); dst.flush(); src.close(); dst.close()
+	return _same_bytes(final, backup) and false
+
+func _same_file(path: String, expected: String) -> bool:
+	var f := FileAccess.open(path, FileAccess.READ); if f == null: return false
+	var ok := f.get_length() <= MAX_BYTES and f.get_as_text() == expected; f.close(); return ok
+
+func _same_bytes(left: String, right: String) -> bool:
+	var a := FileAccess.open(left, FileAccess.READ); var b := FileAccess.open(right, FileAccess.READ)
+	if a == null or b == null:
+		if a != null: a.close()
+		if b != null: b.close()
+		return false
+	var ok := a.get_length() == b.get_length() and a.get_buffer(a.get_length()) == b.get_buffer(b.get_length()); a.close(); b.close(); return ok
+
+func _remove(path: String) -> void:
+	if not path.is_empty(): DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+func _unique_token(final: String) -> String:
+	for _i in 32:
+		var token: String = token_queue.pop_front() if not token_queue.is_empty() else Crypto.new().generate_random_bytes(16).hex_encode()
+		if token.length() != 32 or not token.is_valid_filename() or token.to_lower() != token or token.contains("-") or token.contains("_"): continue
+		if not FileAccess.file_exists(final + ".stage." + token) and not FileAccess.file_exists(final + ".backup." + token): return token
 	return ""
 
-func _failed(stage: String) -> bool:
-	return failpoint == stage
+func _failed(name: String) -> bool:
+	failpoint_hits[name] = int(failpoint_hits.get(name, 0)) + 1
+	return failpoint == name or failpoint.split(",").has(name)
+
+func _safe_directory() -> bool:
+	return typeof(storage_directory) == TYPE_STRING and storage_directory.begins_with("user://") and storage_directory.length() > 7 and not storage_directory.contains("..")
