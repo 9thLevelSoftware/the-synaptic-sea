@@ -19,6 +19,7 @@ use godot::meta::ToGodot;
 use godot::obj::Base;
 use godot::prelude::{godot_api, GodotClass};
 use serde::Serialize;
+use serde_json::Value;
 use std::sync::{Arc, OnceLock};
 
 const SOURCE_COMMIT: &str = env!("SYNAPTIC_PROCGEN_RUST_SOURCE_COMMIT");
@@ -99,14 +100,14 @@ pub(crate) fn runtime_capabilities() -> Result<ProcgenCapabilities, ProcgenFailu
         .map_err(|_| adapter_failure("compiled capabilities are invalid"))
 }
 
-struct Runtime {
+pub(crate) struct Runtime {
     data: GenData,
-    service: Arc<Service>,
+    pub(crate) service: Arc<Service>,
     manifest: GeneratorManifest,
     capabilities: ProcgenCapabilities,
 }
 static RUNTIME: OnceLock<Result<Runtime, ProcgenFailure>> = OnceLock::new();
-fn runtime() -> Result<&'static Runtime, ProcgenFailure> {
+pub(crate) fn runtime() -> Result<&'static Runtime, ProcgenFailure> {
     RUNTIME
         .get_or_init(|| {
             let manifest = runtime_manifest()?;
@@ -139,7 +140,7 @@ where
 {
     match serializer(value) {
         Ok(json) => json,
-        Err(_) => serde_json::to_string(&LifecycleResult::failed(None, adapter_failure("response serialization failed"), vec![LifecycleEvent::Failed])).unwrap_or_else(|_| "{\"schema_version\":\"procgen-lifecycle-result-1\",\"status\":\"failed\",\"failure\":{\"schema_version\":\"procgen-failure-1\",\"code\":\"adapter_failure\",\"stage\":\"adapter\",\"message\":\"response serialization failed\",\"retryable\":false},\"events\":[\"failed\"]}".into()),
+        Err(_) => serde_json::to_string(&LifecycleResult::failed(None, adapter_failure("response serialization failed"), vec![LifecycleEvent::Failed])).unwrap_or_else(|_| "{\"schema_version\":\"procgen-lifecycle-result-1\",\"status\":\"failed\",\"request_id\":null,\"bundle\":null,\"failure\":{\"schema_version\":\"procgen-failure-1\",\"code\":\"adapter_failure\",\"stage\":\"adapter\",\"message\":\"response serialization failed\",\"retryable\":false,\"fallback_id\":null},\"events\":[\"failed\"]}".into()),
     }
 }
 fn serialize<T: Serialize>(value: &T) -> GString {
@@ -152,7 +153,45 @@ fn lifecycle_failure(failure: ProcgenFailure) -> String {
     )
 }
 
+pub(crate) fn export_result_json<C, S>(
+    result: LifecycleResult,
+    converter: C,
+    serializer: S,
+) -> String
+where
+    C: FnOnce(
+        &derelict_core::procgen::ProcgenBundle,
+    ) -> Result<Value, derelict_core::procgen::ProcgenError>,
+    S: FnOnce(&Value) -> Result<String, serde_json::Error>,
+{
+    let Some(bundle) = result.bundle else {
+        return lifecycle_failure(
+            result
+                .failure
+                .unwrap_or_else(|| adapter_failure("legacy generation failed")),
+        );
+    };
+    let value = match converter(&bundle) {
+        Ok(value) => value,
+        Err(_) => return lifecycle_failure(adapter_failure("legacy bundle conversion failed")),
+    };
+    match serializer(&value) {
+        Ok(json) => json,
+        Err(_) => lifecycle_failure(adapter_failure("legacy JSON serialization failed")),
+    }
+}
+
 pub(crate) fn legacy_request(seed: u64, params: &GenParams, kit_id: &str) -> ProcgenRequest {
+    let archetype_id = if params.archetype_id.trim().is_empty() {
+        "corvette"
+    } else {
+        params.archetype_id.trim()
+    };
+    let kit_id = if kit_id.trim().is_empty() {
+        "ship_structural_v0"
+    } else {
+        kit_id.trim()
+    };
     ProcgenRequest {
         schema_version: "procgen-request-1".into(),
         world_seed: seed,
@@ -160,13 +199,13 @@ pub(crate) fn legacy_request(seed: u64, params: &GenParams, kit_id: &str) -> Pro
             site_id: "legacy-site".into(),
             x: 0,
             y: 0,
-            archetype_id: params.archetype_id.clone(),
+            archetype_id: archetype_id.into(),
             kit_id: kit_id.into(),
             intactness_override_bp: params.intactness_override,
             cause_of_loss: params.cause_override,
             loot_richness_bp: params.loot_richness,
         },
-        difficulty_id: "legacy".into(),
+        difficulty_id: "standard".into(),
         player_model: PlayerModel {
             schema_version: "player-model-1".into(),
             signals: Vec::new(),
@@ -259,7 +298,7 @@ impl DerelictGenerator {
         };
         let result = r
             .service
-            .generate_sync(legacy_request(seed as u64, &p, "legacy"));
+            .generate_sync(legacy_request(seed as u64, &p, "ship_structural_v0"));
         if result.status == derelict_core::lifecycle::LifecycleStatus::Completed {
             ship_to_dictionary(&result.bundle.unwrap().site_ir.ship)
         } else {
@@ -280,7 +319,11 @@ impl DerelictGenerator {
             return -1;
         };
         self.async_gen.start(
-            legacy_request(seed as u64, &gen_params_from_dict(&params), "legacy"),
+            legacy_request(
+                seed as u64,
+                &gen_params_from_dict(&params),
+                "ship_structural_v0",
+            ),
             &r.service,
         )
     }
@@ -329,7 +372,7 @@ impl DerelictGenerator {
     }
     #[func]
     fn export_gameplay_slice_json(&self, seed: i64, params: VarDictionary) -> GString {
-        self.export_bundle(seed, &params, "legacy", false)
+        self.export_bundle(seed, &params, "ship_structural_v0", false)
     }
 }
 impl DerelictGenerator {
@@ -341,27 +384,24 @@ impl DerelictGenerator {
         layout: bool,
     ) -> GString {
         let Ok(r) = self.runtime() else {
-            return GString::new();
+            return GString::from(
+                lifecycle_failure(manifest_failure("runtime initialization failed")).as_str(),
+            );
         };
         let result = r.service.generate_sync(legacy_request(
             seed as u64,
             &gen_params_from_dict(params),
             kit_id,
         ));
-        let Some(bundle) = result.bundle else {
-            return GString::new();
-        };
-        let value = if layout {
-            derelict_core::procgen::migration_layout(&bundle)
+        let json = if layout {
+            export_result_json(result, derelict_core::procgen::migration_layout, |v| {
+                serde_json::to_string_pretty(v)
+            })
         } else {
-            derelict_core::procgen::migration_gameplay(&bundle)
+            export_result_json(result, derelict_core::procgen::migration_gameplay, |v| {
+                serde_json::to_string_pretty(v)
+            })
         };
-        GString::from(
-            value
-                .ok()
-                .and_then(|v| serde_json::to_string_pretty(&v).ok())
-                .unwrap_or_default()
-                .as_str(),
-        )
+        GString::from(json.as_str())
     }
 }

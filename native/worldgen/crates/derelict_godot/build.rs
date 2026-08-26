@@ -1,3 +1,4 @@
+use derelict_core::manifest::BuildManifest;
 use serde_json::Value;
 use std::{
     env, fs,
@@ -47,6 +48,21 @@ fn git_dirty(root: &Path, source: &str) -> bool {
         .unwrap_or(true);
     diff || status
 }
+fn require_commit(root: &Path, source: &str) {
+    let status = Command::new("git")
+        .args([
+            "-C",
+            root.to_str().unwrap(),
+            "cat-file",
+            "-e",
+            &format!("{source}^{{commit}}"),
+        ])
+        .status()
+        .unwrap_or_else(|_| fail("unable to run git cat-file"));
+    if !status.success() {
+        fail("source commit is not present in Git");
+    }
+}
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
@@ -74,6 +90,8 @@ fn main() {
     } else {
         let text = fs::read_to_string(&manifest_path)
             .unwrap_or_else(|_| fail("checked win64 build manifest is missing"));
+        let manifest = BuildManifest::from_json(&text)
+            .unwrap_or_else(|_| fail("checked win64 build manifest violates the shared contract"));
         let value: Value = serde_json::from_str(&text)
             .unwrap_or_else(|_| fail("checked win64 build manifest is invalid JSON"));
         let manifest_source = value
@@ -86,9 +104,7 @@ fn main() {
             .and_then(Value::as_str)
             .unwrap_or_else(|| fail("manifest content hash missing"))
             .to_owned();
-        if value.get("generator_version").and_then(Value::as_u64) != Some(2)
-            || value.get("target").and_then(Value::as_str) != Some(TARGET)
-        {
+        if manifest.generator_version != 2 || manifest.target != TARGET {
             fail("checked win64 manifest identity mismatch");
         }
         let schemas = value
@@ -122,14 +138,13 @@ fn main() {
     if !valid_hex(&content, 64) {
         fail("content manifest hash must be 64 lowercase hexadecimal characters");
     }
+    let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../../../../");
+    require_commit(&root, &source);
     let dirty = match env::var("SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT") {
         Ok(value) if value == "true" => true,
         Ok(value) if value == "false" => false,
         Ok(_) => fail("dirty-development override must be true or false"),
-        Err(_) => {
-            let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../../../../");
-            git_dirty(&root, &source)
-        }
+        Err(_) => git_dirty(&root, &source),
     };
     println!("cargo:rustc-env=SYNAPTIC_PROCGEN_RUST_SOURCE_COMMIT={source}");
     println!("cargo:rustc-env=SYNAPTIC_PROCGEN_CONTENT_MANIFEST_HASH={content}");

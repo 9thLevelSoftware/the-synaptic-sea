@@ -30,20 +30,66 @@ fn compiled_identity_constructs_valid_manifest_and_exact_capabilities() {
 
 #[test]
 fn legacy_request_is_explicitly_normalized() {
-    let request = legacy_request(
-        42,
-        &derelict_core::model::GenParams::new("shuttle"),
-        "legacy",
-    );
+    let request = legacy_request(42, &derelict_core::model::GenParams::new("shuttle"), "");
     assert_eq!(request.schema_version, "procgen-request-1");
     assert_eq!(request.generator_version, 2);
     assert_eq!(request.site.site_id, "legacy-site");
-    assert_eq!(request.site.kit_id, "legacy");
-    assert_eq!(request.difficulty_id, "legacy");
+    assert_eq!(request.site.kit_id, "ship_structural_v0");
+    assert_eq!(request.difficulty_id, "standard");
     assert_eq!(request.presentation.locale, "en-US");
     assert_eq!(request.player_model.schema_version, "player-model-1");
     assert!(!request.content_manifest_hash.is_empty());
     assert!(request.validate().is_ok());
+}
+
+#[test]
+fn blank_legacy_identity_uses_authored_defaults() {
+    let mut params = derelict_core::model::GenParams::new("   ");
+    let request = super::generator::legacy_request(42, &params, "  ");
+    assert_eq!(request.site.archetype_id, "corvette");
+    assert_eq!(request.site.kit_id, "ship_structural_v0");
+    params.archetype_id = " shuttle ".into();
+    let explicit = super::generator::legacy_request(42, &params, " custom-kit ");
+    assert_eq!(explicit.site.archetype_id, "shuttle");
+    assert_eq!(explicit.site.kit_id, "custom-kit");
+}
+
+#[test]
+fn legacy_export_failures_are_valid_lifecycle_documents() {
+    let failure = derelict_core::procgen::ProcgenFailure {
+        schema_version: "procgen-failure-1".into(),
+        code: derelict_core::procgen::ProcgenFailureCode::GenerationFailure,
+        stage: "generation".into(),
+        message: "failed".into(),
+        retryable: false,
+        fallback_id: None,
+    };
+    let result = derelict_core::lifecycle::LifecycleResult::failed(
+        None,
+        failure,
+        vec![derelict_core::lifecycle::LifecycleEvent::Failed],
+    );
+    let json = super::generator::export_result_json(
+        result,
+        |_| Err(derelict_core::procgen::ProcgenError::InvalidRequest("test")),
+        serde_json::to_string,
+    );
+    assert!(derelict_core::lifecycle::LifecycleResult::from_json(&json).is_ok());
+    assert_eq!(
+        derelict_core::lifecycle::LifecycleResult::from_json(&json)
+            .unwrap()
+            .failure
+            .unwrap()
+            .code,
+        derelict_core::procgen::ProcgenFailureCode::GenerationFailure
+    );
+}
+
+#[test]
+fn runtime_access_reuses_identical_service() {
+    let first = super::generator::runtime().unwrap();
+    let second = super::generator::runtime().unwrap();
+    assert!(std::sync::Arc::ptr_eq(&first.service, &second.service));
 }
 
 #[test]
