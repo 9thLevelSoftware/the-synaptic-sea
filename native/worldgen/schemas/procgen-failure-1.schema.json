@@ -17,7 +17,12 @@
         "overload",
         "cancellation",
         "timeout",
-        "internal_failure"
+        "internal_failure",
+        "unknown_request",
+        "result_consumed",
+        "result_expired",
+        "shutdown",
+        "too_late_cancellation"
       ],
       "type": "string"
     }

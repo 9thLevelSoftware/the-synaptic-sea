@@ -1,3 +1,4 @@
+use derelict_core::lifecycle::{GeneratorManifest, LifecycleResult, ProcgenCapabilities};
 use derelict_core::procgen::{
     AdaptiveProposal, GameplayIR, GenerationMetrics, GenerationTrace, PlayerModel, PresentationIR,
     ProcgenBundle, ProcgenFailure, ProcgenRequest, SiteIR, WorldIR,
@@ -182,6 +183,9 @@ fn enrich(name: &str, root: &mut Value) {
         "player-model-1" => ("PlayerModel", "player-model-1"),
         "procgen-failure-1" => ("ProcgenFailure", "procgen-failure-1"),
         "generation-metrics-1" => ("GenerationMetrics", "generation-metrics-1"),
+        "procgen-lifecycle-result-1" => ("LifecycleResult", "procgen-lifecycle-result-1"),
+        "procgen-capabilities-1" => ("ProcgenCapabilities", "procgen-capabilities-1"),
+        "procgen-generator-manifest-1" => ("GeneratorManifest", "procgen-generator-manifest-1"),
         _ => return,
     };
     const_field(root, definition, "schema_version", version);
@@ -212,12 +216,86 @@ fn enrich(name: &str, root: &mut Value) {
         ] {
             const_field(root, nested, "schema_version", nested_version);
         }
-        def(root, "VersionEnvelope")["properties"]["content_manifest_hash"] =
-            serde_json::json!({"type":"string","pattern":"^[a-f0-9]{64}$"});
+    } else if name == "procgen-lifecycle-result-1" {
+        // The embedded bundle must retain the same constraints as the standalone
+        // bundle contract, including all nested trace/gameplay enrichment.
+        apply_request_constraints(root);
+        apply_gameplay_constraints(root);
+        apply_trace_constraints(root);
+        apply_metrics_constraints(root);
+        for (nested, nested_version) in [
+            ("WorldIR", "world-ir-1"),
+            ("SiteIR", "site-ir-1"),
+            ("GameplayIR", "gameplay-ir-1"),
+            ("PresentationIR", "presentation-ir-1"),
+            ("GenerationTrace", "generation-trace-1"),
+            ("GenerationMetrics", "generation-metrics-1"),
+        ] {
+            const_field(root, nested, "schema_version", nested_version);
+        }
         def(root, "VersionEnvelope")["properties"]["generator_version"] =
             serde_json::json!({"const":2});
+        def(root, "VersionEnvelope")["properties"]["content_manifest_hash"] =
+            serde_json::json!({"type":"string","pattern":"^[a-f0-9]{64}$"});
         def(root, "ProcgenBundle")["properties"]["semantic_hash"] =
             serde_json::json!({"type":"string","pattern":"^[a-f0-9]{64}$"});
+        for (field, value) in [
+            ("procgen_request", "procgen-request-1"),
+            ("procgen_bundle", "procgen-bundle-1"),
+            ("world_ir", "world-ir-1"),
+            ("site_ir", "site-ir-1"),
+            ("gameplay_ir", "gameplay-ir-1"),
+            ("presentation_ir", "presentation-ir-1"),
+            ("generation_trace", "generation-trace-1"),
+            ("adaptive_proposal", "adaptive-proposal-1"),
+        ] {
+            def(root, "ExportSchemas")["properties"][field] = serde_json::json!({"const":value});
+        }
+        root["properties"]["request_id"] =
+            serde_json::json!({"anyOf":[{"type":"integer","minimum":1},{"type":"null"}]});
+        let mut rules = Vec::new();
+        for status in ["accepted", "queued", "running", "cancel_requested"] {
+            rules.push(serde_json::json!({"if":{"properties":{"status":{"const":status}}},"then":{"required":["request_id"],"properties":{"bundle":{"const":null},"failure":{"const":null}}}}));
+        }
+        rules.push(serde_json::json!({"if":{"properties":{"status":{"const":"completed"}}},"then":{"required":["bundle"],"properties":{"bundle":{"not":{"const":null}},"failure":{"const":null}}}}));
+        rules.push(serde_json::json!({"if":{"properties":{"status":{"const":"failed"}}},"then":{"required":["failure"],"properties":{"bundle":{"const":null},"failure":{"not":{"const":null}}}}}));
+        root["allOf"] = Value::Array(rules);
+    } else if name == "procgen-capabilities-1" {
+        def(root, "ProcgenCapabilities")["properties"]["schema_version"] =
+            serde_json::json!({"const":"procgen-capabilities-1"});
+        let capabilities = def(root, "ProcgenCapabilities");
+        for field in [
+            "queue_capacity",
+            "retained_results",
+            "max_request_bytes",
+            "max_entities",
+            "max_trace_entries",
+            "max_events",
+            "deadline_ms",
+        ] {
+            capabilities["properties"][field]["minimum"] = serde_json::json!(1);
+        }
+        capabilities["properties"]["target"] = serde_json::json!({"type":"string","minLength":1});
+        capabilities["properties"]["supported_domains"] =
+            serde_json::json!({"const":["world","site","gameplay","presentation"]});
+        for (field, value) in [
+            ("lifecycle_result", "procgen-lifecycle-result-1"),
+            ("capabilities", "procgen-capabilities-1"),
+            ("generator_manifest", "procgen-generator-manifest-1"),
+        ] {
+            def(root, "AdapterSchemas")["properties"][field] = serde_json::json!({"const":value});
+        }
+    } else if name == "procgen-generator-manifest-1" {
+        def(root, "GeneratorManifest")["properties"]["schema_version"] =
+            serde_json::json!({"const":"procgen-generator-manifest-1"});
+        def(root, "GeneratorManifest")["properties"]["generator_version"] =
+            serde_json::json!({"const":2});
+        def(root, "GeneratorManifest")["properties"]["rust_source_commit"] =
+            serde_json::json!({"type":"string","pattern":"^[a-f0-9]{40}$"});
+        def(root, "GeneratorManifest")["properties"]["content_manifest_hash"] =
+            serde_json::json!({"type":"string","pattern":"^[a-f0-9]{64}$"});
+        let manifest = def(root, "GeneratorManifest");
+        manifest["properties"]["target"] = serde_json::json!({"type":"string","minLength":1});
         let exports = def(root, "ExportSchemas")["properties"]
             .as_object_mut()
             .unwrap();
@@ -233,6 +311,13 @@ fn enrich(name: &str, root: &mut Value) {
         ] {
             exports[field] = serde_json::json!({"const":value});
         }
+        for (field, value) in [
+            ("lifecycle_result", "procgen-lifecycle-result-1"),
+            ("capabilities", "procgen-capabilities-1"),
+            ("generator_manifest", "procgen-generator-manifest-1"),
+        ] {
+            def(root, "AdapterSchemas")["properties"][field] = serde_json::json!({"const":value});
+        }
     } else if name == "procgen-failure-1" {
         let failure = def(root, "ProcgenFailure");
         failure["properties"]["stage"] = serde_json::json!({"type":"string","minLength":1});
@@ -244,7 +329,7 @@ fn enrich(name: &str, root: &mut Value) {
 
 fn main() {
     let out = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schemas");
-    let items: [(&str, Value); 11] = [
+    let items: [(&str, Value); 14] = [
         ("procgen-request-1", schema::<ProcgenRequest>()),
         ("procgen-bundle-1", schema::<ProcgenBundle>()),
         ("world-ir-1", schema::<WorldIR>()),
@@ -256,6 +341,12 @@ fn main() {
         ("player-model-1", schema::<PlayerModel>()),
         ("procgen-failure-1", schema::<ProcgenFailure>()),
         ("generation-metrics-1", schema::<GenerationMetrics>()),
+        ("procgen-lifecycle-result-1", schema::<LifecycleResult>()),
+        ("procgen-capabilities-1", schema::<ProcgenCapabilities>()),
+        (
+            "procgen-generator-manifest-1",
+            schema::<GeneratorManifest>(),
+        ),
     ];
     let write = env::args().any(|arg| arg == "--write");
     let check = env::args().any(|arg| arg == "--check");

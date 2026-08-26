@@ -402,6 +402,11 @@ pub enum ProcgenFailureCode {
     Cancellation,
     Timeout,
     InternalFailure,
+    UnknownRequest,
+    ResultConsumed,
+    ResultExpired,
+    Shutdown,
+    TooLateCancellation,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]

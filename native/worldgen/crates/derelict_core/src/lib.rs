@@ -6,6 +6,7 @@
 //! and `GENERATOR_VERSION` produce byte-identical ships on any platform.
 
 pub mod archetype;
+pub mod lifecycle;
 pub mod manifest;
 pub mod model;
 pub mod pipeline;

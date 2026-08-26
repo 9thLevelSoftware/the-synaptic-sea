@@ -1,6 +1,144 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "accepted"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bundle": {
+            "const": null
+          },
+          "failure": {
+            "const": null
+          }
+        },
+        "required": [
+          "request_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "queued"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bundle": {
+            "const": null
+          },
+          "failure": {
+            "const": null
+          }
+        },
+        "required": [
+          "request_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "running"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bundle": {
+            "const": null
+          },
+          "failure": {
+            "const": null
+          }
+        },
+        "required": [
+          "request_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "cancel_requested"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bundle": {
+            "const": null
+          },
+          "failure": {
+            "const": null
+          }
+        },
+        "required": [
+          "request_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "completed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bundle": {
+            "not": {
+              "const": null
+            }
+          },
+          "failure": {
+            "const": null
+          }
+        },
+        "required": [
+          "bundle"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bundle": {
+            "const": null
+          },
+          "failure": {
+            "not": {
+              "const": null
+            }
+          }
+        },
+        "required": [
+          "failure"
+        ]
+      }
+    }
+  ],
   "definitions": {
     "CauseOfLoss": {
       "enum": [
@@ -409,28 +547,28 @@
       "additionalProperties": false,
       "properties": {
         "adaptive_proposal": {
-          "type": "string"
+          "const": "adaptive-proposal-1"
         },
         "gameplay_ir": {
-          "type": "string"
+          "const": "gameplay-ir-1"
         },
         "generation_trace": {
-          "type": "string"
+          "const": "generation-trace-1"
         },
         "presentation_ir": {
-          "type": "string"
+          "const": "presentation-ir-1"
         },
         "procgen_bundle": {
-          "type": "string"
+          "const": "procgen-bundle-1"
         },
         "procgen_request": {
-          "type": "string"
+          "const": "procgen-request-1"
         },
         "site_ir": {
-          "type": "string"
+          "const": "site-ir-1"
         },
         "world_ir": {
-          "type": "string"
+          "const": "world-ir-1"
         }
       },
       "required": [
@@ -780,6 +918,35 @@
       ],
       "type": "object"
     },
+    "LifecycleEvent": {
+      "enum": [
+        "rejected",
+        "admitted",
+        "queued",
+        "started",
+        "cancel_requested",
+        "cancelled",
+        "timed_out",
+        "completed",
+        "failed",
+        "overloaded",
+        "result_consumed",
+        "result_expired",
+        "shutdown"
+      ],
+      "type": "string"
+    },
+    "LifecycleStatus": {
+      "enum": [
+        "accepted",
+        "queued",
+        "running",
+        "cancel_requested",
+        "completed",
+        "failed"
+      ],
+      "type": "string"
+    },
     "LootContainer": {
       "additionalProperties": false,
       "properties": {
@@ -991,6 +1158,113 @@
         "seed"
       ],
       "type": "object"
+    },
+    "ProcgenBundle": {
+      "additionalProperties": false,
+      "properties": {
+        "gameplay_ir": {
+          "$ref": "#/definitions/GameplayIR"
+        },
+        "metrics": {
+          "$ref": "#/definitions/GenerationMetrics"
+        },
+        "presentation_ir": {
+          "$ref": "#/definitions/PresentationIR"
+        },
+        "request": {
+          "$ref": "#/definitions/ProcgenRequest"
+        },
+        "schema_version": {
+          "type": "string"
+        },
+        "semantic_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "site_ir": {
+          "$ref": "#/definitions/SiteIR"
+        },
+        "trace": {
+          "$ref": "#/definitions/GenerationTrace"
+        },
+        "version": {
+          "$ref": "#/definitions/VersionEnvelope"
+        },
+        "world_ir": {
+          "$ref": "#/definitions/WorldIR"
+        }
+      },
+      "required": [
+        "gameplay_ir",
+        "metrics",
+        "presentation_ir",
+        "request",
+        "schema_version",
+        "semantic_hash",
+        "site_ir",
+        "trace",
+        "version",
+        "world_ir"
+      ],
+      "type": "object"
+    },
+    "ProcgenFailure": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/definitions/ProcgenFailureCode"
+        },
+        "fallback_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "schema_version": {
+          "type": "string"
+        },
+        "stage": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retryable",
+        "schema_version",
+        "stage"
+      ],
+      "type": "object"
+    },
+    "ProcgenFailureCode": {
+      "enum": [
+        "invalid_request",
+        "unsupported_schema",
+        "unsupported_domain",
+        "generator_content_mismatch",
+        "generation_failure",
+        "validation_failure",
+        "fallback_failure",
+        "adapter_failure",
+        "manifest_failure",
+        "capacity",
+        "overload",
+        "cancellation",
+        "timeout",
+        "internal_failure",
+        "unknown_request",
+        "result_consumed",
+        "result_expired",
+        "shutdown",
+        "too_late_cancellation"
+      ],
+      "type": "string"
     },
     "ProcgenRequest": {
       "additionalProperties": false,
@@ -1590,15 +1864,14 @@
       "additionalProperties": false,
       "properties": {
         "content_manifest_hash": {
+          "pattern": "^[a-f0-9]{64}$",
           "type": "string"
         },
         "export_schemas": {
           "$ref": "#/definitions/ExportSchemas"
         },
         "generator_version": {
-          "format": "uint32",
-          "minimum": 0.0,
-          "type": "integer"
+          "const": 2
         }
       },
       "required": [
@@ -1712,49 +1985,57 @@
     }
   },
   "properties": {
-    "gameplay_ir": {
-      "$ref": "#/definitions/GameplayIR"
+    "bundle": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ProcgenBundle"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
-    "metrics": {
-      "$ref": "#/definitions/GenerationMetrics"
+    "events": {
+      "items": {
+        "$ref": "#/definitions/LifecycleEvent"
+      },
+      "maxItems": 32,
+      "minItems": 1,
+      "type": "array"
     },
-    "presentation_ir": {
-      "$ref": "#/definitions/PresentationIR"
+    "failure": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ProcgenFailure"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
-    "request": {
-      "$ref": "#/definitions/ProcgenRequest"
+    "request_id": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "schema_version": {
-      "const": "procgen-bundle-1"
+      "const": "procgen-lifecycle-result-1"
     },
-    "semantic_hash": {
-      "type": "string"
-    },
-    "site_ir": {
-      "$ref": "#/definitions/SiteIR"
-    },
-    "trace": {
-      "$ref": "#/definitions/GenerationTrace"
-    },
-    "version": {
-      "$ref": "#/definitions/VersionEnvelope"
-    },
-    "world_ir": {
-      "$ref": "#/definitions/WorldIR"
+    "status": {
+      "$ref": "#/definitions/LifecycleStatus"
     }
   },
   "required": [
-    "gameplay_ir",
-    "metrics",
-    "presentation_ir",
-    "request",
+    "events",
     "schema_version",
-    "semantic_hash",
-    "site_ir",
-    "trace",
-    "version",
-    "world_ir"
+    "status"
   ],
-  "title": "procgen-bundle-1",
+  "title": "procgen-lifecycle-result-1",
   "type": "object"
 }
