@@ -331,13 +331,17 @@ pub fn validate_site(site: &SiteIR) -> Result<(), ValidationError> {
     {
         return Err(ValidationError("critical path identity".into()));
     }
-    let fragment_of = site.ship.fractured.then(|| {
-        site.ship
-            .fragments
-            .iter()
-            .flat_map(|fragment| fragment.rooms.iter().map(move |room| (*room, fragment.id)))
-            .collect()
-    });
+    let fragment_of = if site.ship.fractured {
+        Some(
+            complete_fragment_map(&site.ship)
+                .ok_or_else(|| ValidationError("fragment identity".into()))?,
+        )
+    } else {
+        if !site.ship.fragments.is_empty() {
+            return Err(ValidationError("fragment identity".into()));
+        }
+        None
+    };
     let structural_policy = crate::structural::validate::ValidationPolicy::post_damage(
         site.ship.critical_path.clone(),
         fragment_of,
@@ -1167,6 +1171,12 @@ fn validate_request_ship(
     ship: &Ship,
     request: &crate::world::WorldGenerationRequest,
 ) -> Result<(), SiteError> {
+    let path_identity_valid = if ship.critical_path.is_empty() {
+        legal_split_fragment_map(ship).is_some()
+    } else {
+        ship.critical_path.first() == Some(&ship.entry_room)
+            && ship.critical_path.last() == Some(&ship.goal_room)
+    };
     if request.platform_version != crate::world::PROCGEN_GENERATOR_VERSION
         || request.archetype_id != ship.archetype_id
         || request.x == i32::MIN
@@ -1174,8 +1184,7 @@ fn validate_request_ship(
         || request.y == i32::MIN
         || request.y == i32::MAX
         || ship.generator_version != crate::model::GENERATOR_VERSION
-        || ship.critical_path.first() != Some(&ship.entry_room)
-        || ship.critical_path.last() != Some(&ship.goal_room)
+        || !path_identity_valid
     {
         return Err(SiteError::Invalid("request identity".into()));
     }
@@ -1187,6 +1196,54 @@ fn validate_request_ship(
     }
     project_navigation(ship).map_err(|error| SiteError::Validation(error.0))?;
     Ok(())
+}
+
+/// Closed fragment metadata shared by normal SiteIR validation and split-path
+/// fallback admission.
+fn complete_fragment_map(ship: &Ship) -> Option<BTreeMap<u16, u8>> {
+    if !ship.fractured || ship.fragments.len() < 2 {
+        return None;
+    }
+    let room_ids: BTreeSet<u16> = ship.topology.rooms.iter().map(|room| room.id).collect();
+    let mut fragment_ids = BTreeSet::new();
+    let mut fragment_of = BTreeMap::new();
+    for fragment in &ship.fragments {
+        if fragment.rooms.is_empty() || !fragment_ids.insert(fragment.id) {
+            return None;
+        }
+        for room in &fragment.rooms {
+            if !room_ids.contains(room) || fragment_of.insert(*room, fragment.id).is_some() {
+                return None;
+            }
+        }
+    }
+    (fragment_of.len() == room_ids.len()).then_some(fragment_of)
+}
+
+/// The structural generator may intentionally sever the original entry-to-goal
+/// path for a story-sanctioned fractured wreck. Accept that input only when the
+/// fragment metadata is a complete, non-overlapping partition, the endpoints
+/// are in different connected fragments, and the post-damage structural plan
+/// still validates under split-fragment policy. Site generation must then bind
+/// an authored safe-return goal inside the entry fragment before export.
+fn legal_split_fragment_map(ship: &Ship) -> Option<BTreeMap<u16, u8>> {
+    if !ship.critical_path.is_empty() {
+        return None;
+    }
+    let fragment_of = complete_fragment_map(ship)?;
+    let entry_fragment = fragment_of.get(&ship.entry_room)?;
+    let goal_fragment = fragment_of.get(&ship.goal_room)?;
+    if entry_fragment == goal_fragment {
+        return None;
+    }
+    let policy = crate::structural::validate::ValidationPolicy::post_damage(
+        Vec::new(),
+        Some(fragment_of.clone()),
+        true,
+    );
+    crate::structural::validate::validate(&ship.plan, &ship.topology, &policy)
+        .ok()
+        .map(|_| fragment_of)
 }
 
 pub fn validate_site_for_request(
@@ -1367,7 +1424,10 @@ fn build_site_candidate(
         .filter(|edge| !edge.passable)
         .map(|edge| edge.structural_ref.clone())
         .collect();
-    if template.gate != Some(GateKind::KeyLock) && !locked_refs.is_empty() {
+    if template.gate != Some(GateKind::KeyLock)
+        && template.id != "authored-safe-return"
+        && !locked_refs.is_empty()
+    {
         return Err(SiteError::Invalid(
             "template cannot bind structural lock".into(),
         ));
@@ -1684,28 +1744,84 @@ fn build_fallback(
 ) -> Result<SiteIR, SiteError> {
     let fallback = SiteFallback::bundled()?;
     fallback.validate()?;
-    let mut site = build_site_candidate(
-        ship,
-        request,
-        &SiteTemplate {
-            id: fallback.mission_id,
-            archetypes: vec![request.archetype_id.clone()],
-            gate: None,
-        },
-    )?;
-    if fallback_return_path(&site)
-        != site
-            .ship
-            .critical_path
-            .iter()
-            .rev()
-            .copied()
-            .collect::<Vec<_>>()
-    {
-        return Err(SiteError::Validation("fallback return path".into()));
+    let template = SiteTemplate {
+        id: fallback.mission_id,
+        archetypes: vec![request.archetype_id.clone()],
+        gate: None,
+    };
+    let mut last_error = SiteError::Validation("fallback candidate unavailable".into());
+    for (goal, path) in safe_return_goal_candidates(&ship)? {
+        let mut candidate_ship = ship.clone();
+        candidate_ship.goal_room = goal;
+        candidate_ship.critical_path = path;
+        match build_site_candidate(candidate_ship, request, &template) {
+            Ok(mut site) => {
+                site.mission_graph.mission_id = "authored-safe-return".into();
+                if fallback_return_path(&site)
+                    != site
+                        .ship
+                        .critical_path
+                        .iter()
+                        .rev()
+                        .copied()
+                        .collect::<Vec<_>>()
+                {
+                    last_error = SiteError::Validation("fallback return path".into());
+                    continue;
+                }
+                match validate_site_for_request(&site, request) {
+                    Ok(()) => return Ok(site),
+                    Err(error) => last_error = error,
+                }
+            }
+            Err(error) => last_error = error,
+        }
     }
-    site.mission_graph.mission_id = "authored-safe-return".into();
-    Ok(site)
+    Err(last_error)
+}
+
+fn safe_return_goal_candidates(ship: &Ship) -> Result<Vec<(u16, Vec<u16>)>, SiteError> {
+    if !ship.critical_path.is_empty() {
+        return Ok(vec![(ship.goal_room, ship.critical_path.clone())]);
+    }
+    let fragment_of = legal_split_fragment_map(ship)
+        .ok_or_else(|| SiteError::Invalid("split fragment identity".into()))?;
+    let entry_fragment = *fragment_of
+        .get(&ship.entry_room)
+        .ok_or_else(|| SiteError::Invalid("entry fragment".into()))?;
+    let mut links: Vec<(u16, u16)> = ship
+        .topology
+        .portals
+        .iter()
+        .filter(|portal| !portal.exterior && portal.to_room != NO_ROOM)
+        .map(|portal| (portal.from_room, portal.to_room))
+        .chain(
+            ship.topology
+                .verticals
+                .iter()
+                .map(|vertical| (vertical.from_room, vertical.to_room)),
+        )
+        .collect();
+    links.sort_unstable();
+    links.dedup();
+
+    let mut goals: Vec<(usize, u16, Vec<u16>)> = fragment_of
+        .iter()
+        .filter_map(|(room, fragment)| {
+            (*fragment == entry_fragment)
+                .then(|| crate::topology::room_path(ship.entry_room, *room, &links))
+                .flatten()
+                .map(|path| (path.len(), *room, path))
+        })
+        .collect();
+    goals.sort_by(|left, right| right.0.cmp(&left.0).then_with(|| left.1.cmp(&right.1)));
+    if goals.is_empty() {
+        return Err(SiteError::Validation("fallback entry fragment".into()));
+    }
+    Ok(goals
+        .into_iter()
+        .map(|(_, goal, path)| (goal, path))
+        .collect())
 }
 
 fn resolve_site_candidate_with_trace(

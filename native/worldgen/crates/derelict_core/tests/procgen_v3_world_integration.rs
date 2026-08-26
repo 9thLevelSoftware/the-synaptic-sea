@@ -449,6 +449,80 @@ fn authored_site_fallback_requires_stage_bound_candidate_evidence() {
     }
 }
 
+#[test]
+fn severed_fractured_site_selects_reachable_authored_safe_return() {
+    let mut req = request();
+    req.world_seed = 1902;
+    req.content_manifest_hash =
+        "a7cfda584051097f43c09d9aaf8494f97c492641efa7b4ec518dee65e9c36ee7".into();
+    req.site.site_id = "site_1902_1_2".into();
+    req.site.x = 0;
+    req.site.y = 0;
+    req.site.archetype_id = "corvette".into();
+    req.site.intactness_override_bp = Some(2_000);
+    req.site.loot_richness_bp = 5_000;
+    req.difficulty_id = "deep_dive".into();
+    req.presentation.seed = 1902;
+
+    let bundle = generate_bundle(req, &GenData::default_bundle().unwrap())
+        .expect("split-fragment wreck must select a complete safe-return site");
+    assert!(bundle.site_ir.ship.fractured);
+    assert_eq!(
+        bundle.trace.fallback.as_deref(),
+        Some("site:authored-safe-return")
+    );
+    assert_eq!(
+        bundle.site_ir.mission_graph.mission_id,
+        "authored-safe-return"
+    );
+    assert!(bundle
+        .trace
+        .candidate_decisions
+        .iter()
+        .any(|decision| decision == "site:rejected_candidate"));
+    assert!(bundle
+        .trace
+        .candidate_decisions
+        .iter()
+        .any(|decision| decision == "site:selected_fallback"));
+    assert_eq!(
+        bundle.site_ir.ship.critical_path.first(),
+        Some(&bundle.site_ir.ship.entry_room)
+    );
+    assert_eq!(
+        bundle.site_ir.ship.critical_path.last(),
+        Some(&bundle.site_ir.ship.goal_room)
+    );
+    let fragment_for = |room| {
+        bundle
+            .site_ir
+            .ship
+            .fragments
+            .iter()
+            .find(|fragment| fragment.rooms.contains(&room))
+            .map(|fragment| fragment.id)
+    };
+    assert_eq!(
+        fragment_for(bundle.site_ir.ship.entry_room),
+        fragment_for(bundle.site_ir.ship.goal_room),
+        "safe-return goal must be physically reachable inside the entry fragment"
+    );
+    bundle.validate().unwrap();
+
+    let mut missing_room = bundle.clone();
+    missing_room.site_ir.ship.fragments[0].rooms.pop();
+    missing_room.semantic_hash = semantic_hash(&missing_room).unwrap();
+    assert!(missing_room.validate().is_err());
+
+    let mut duplicate_room = bundle.clone();
+    let duplicated = duplicate_room.site_ir.ship.fragments[0].rooms[0];
+    duplicate_room.site_ir.ship.fragments[1]
+        .rooms
+        .push(duplicated);
+    duplicate_room.semantic_hash = semantic_hash(&duplicate_room).unwrap();
+    assert!(duplicate_room.validate().is_err());
+}
+
 #[allow(dead_code)]
 fn _error_shape_is_publicly_stable(error: ProcgenError) -> bool {
     matches!(
