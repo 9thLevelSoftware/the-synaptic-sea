@@ -25,13 +25,28 @@ fn request() -> ProcgenRequest {
             Domain::Gameplay,
             Domain::Presentation,
         ],
-        generator_version: 2,
+        generator_version: 3,
         content_manifest_hash: "a".repeat(64),
         presentation: PresentationRequest {
             seed: 9,
             locale: "en-US".into(),
         },
     }
+}
+
+fn site_seed() -> u64 {
+    derelict_core::derive_site_seed_v3(&derelict_core::WorldKey {
+        world_seed: 42,
+        platform_version: 3,
+        content_manifest_hash: "a".repeat(64),
+        site_id: "site-a".into(),
+        x: 3,
+        y: -2,
+        domain: "site".into(),
+        channel: "site.structural".into(),
+        sub_index: 0,
+    })
+    .unwrap()
 }
 
 #[test]
@@ -88,9 +103,15 @@ fn semantic_hash_is_order_and_presentation_invariant() {
 fn fractured_bundle_reconciles_rooms_removed_by_connectivity_repair() {
     let data = derelict_core::GenData::default_bundle().unwrap();
     let mut fractured = request();
-    fractured.world_seed = 12;
     fractured.site.archetype_id = "frigate".into();
-    let bundle = generate_bundle(fractured, &data).unwrap();
+    let bundle = (0..512u64)
+        .find_map(|seed| {
+            fractured.world_seed = seed;
+            generate_bundle(fractured.clone(), &data)
+                .ok()
+                .filter(|bundle| bundle.site_ir.ship.fractured)
+        })
+        .expect("no deterministic fractured fixture found");
     assert!(bundle.site_ir.ship.fractured);
     assert_eq!(
         bundle.trace.repairs,
@@ -142,17 +163,16 @@ fn contracts_validate_actions_domains_and_bundle_unknown_fields() {
 fn migration_helpers_do_not_generate_again_and_json_key_order_is_irrelevant() {
     let data = derelict_core::GenData::default_bundle().unwrap();
     let mut count = 0;
-    let bundle =
-        generate_bundle_with_pipeline(request(), &data, || {
-            count += 1;
-            Ok(derelict_core::generate_ship_timed(
-                42,
-                &derelict_core::GenParams::new("shuttle"),
-                &data,
-            )
-            .unwrap())
-        })
-        .unwrap();
+    let bundle = generate_bundle_with_pipeline(request(), &data, || {
+        count += 1;
+        Ok(derelict_core::generate_ship_timed(
+            site_seed(),
+            &derelict_core::GenParams::new("shuttle"),
+            &data,
+        )
+        .unwrap())
+    })
+    .unwrap();
     assert_eq!(count, 1);
     migration_layout(&bundle).unwrap();
     migration_gameplay(&bundle).unwrap();
@@ -169,8 +189,8 @@ fn migration_helpers_do_not_generate_again_and_json_key_order_is_irrelevant() {
 fn every_public_schema_is_json_and_closed_at_root() {
     let names = [
         "procgen-request-1",
-        "procgen-bundle-1",
-        "world-ir-1",
+        "procgen-bundle-2",
+        "world-ir-2",
         "site-ir-1",
         "gameplay-ir-1",
         "presentation-ir-1",
@@ -201,7 +221,7 @@ fn embedded_request_constraints_match_rust_and_bundle_schema() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-1.schema.json",
+            "{}/../../schemas/procgen-bundle-2.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),
@@ -214,7 +234,7 @@ fn embedded_request_constraints_match_rust_and_bundle_schema() {
             "player_model.schema_version",
             serde_json::json!("player-model-2"),
         ),
-        ("generator_version", serde_json::json!(3)),
+        ("generator_version", serde_json::json!(2)),
         ("content_manifest_hash", serde_json::json!("bad")),
         ("site.site_id", serde_json::json!("")),
         ("site.archetype_id", serde_json::json!("")),
@@ -250,7 +270,7 @@ fn embedded_gameplay_constraints_match_standalone_and_rust() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-1.schema.json",
+            "{}/../../schemas/procgen-bundle-2.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),
@@ -315,9 +335,12 @@ fn adaptive_empty_targets_fail_rust_and_schema() {
 #[test]
 fn injected_invalid_ship_fails_closed_before_bundle() {
     let data = derelict_core::GenData::default_bundle().unwrap();
-    let mut report =
-        derelict_core::generate_ship_timed(42, &derelict_core::GenParams::new("shuttle"), &data)
-            .unwrap();
+    let mut report = derelict_core::generate_ship_timed(
+        site_seed(),
+        &derelict_core::GenParams::new("shuttle"),
+        &data,
+    )
+    .unwrap();
     report.ship.archetype_id = "wrong-archetype".into();
     let result = generate_bundle_with_pipeline(request(), &data, || Ok(report));
     assert!(matches!(
@@ -332,9 +355,12 @@ fn injected_invalid_ship_fails_closed_before_bundle() {
 #[test]
 fn injected_valid_ship_with_invalid_bundle_trace_fails_at_bundle_validation() {
     let data = derelict_core::GenData::default_bundle().unwrap();
-    let mut report =
-        derelict_core::generate_ship_timed(42, &derelict_core::GenParams::new("shuttle"), &data)
-            .unwrap();
+    let mut report = derelict_core::generate_ship_timed(
+        site_seed(),
+        &derelict_core::GenParams::new("shuttle"),
+        &data,
+    )
+    .unwrap();
     report.candidate_decisions = vec!["candidate".into(); 4097];
     let result = generate_bundle_with_pipeline(request(), &data, || Ok(report));
     assert!(matches!(
@@ -352,9 +378,12 @@ fn injected_valid_ship_with_invalid_bundle_trace_fails_at_bundle_validation() {
 #[test]
 fn injected_identity_valid_ship_with_malformed_plan_fails_at_bundle_validation() {
     let data = derelict_core::GenData::default_bundle().unwrap();
-    let mut report =
-        derelict_core::generate_ship_timed(42, &derelict_core::GenParams::new("shuttle"), &data)
-            .unwrap();
+    let mut report = derelict_core::generate_ship_timed(
+        site_seed(),
+        &derelict_core::GenParams::new("shuttle"),
+        &data,
+    )
+    .unwrap();
     report.ship.plan.occupancy.clear();
     let result = generate_bundle_with_pipeline(request(), &data, || Ok(report));
     assert!(
@@ -389,7 +418,7 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-1.schema.json",
+            "{}/../../schemas/procgen-bundle-2.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),
@@ -474,7 +503,7 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
             serde_json::to_value(&bundle.request).unwrap(),
         ),
         (
-            "world-ir-1",
+            "world-ir-2",
             serde_json::to_value(&bundle.world_ir).unwrap(),
         ),
         ("site-ir-1", serde_json::to_value(&bundle.site_ir).unwrap()),
@@ -567,7 +596,7 @@ fn nested_unknown_fields_fail_at_serde_and_schema_boundaries() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-1.schema.json",
+            "{}/../../schemas/procgen-bundle-2.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),

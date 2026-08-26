@@ -2,6 +2,164 @@
   "$id": "procgen-lifecycle-result-2",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "accepted"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bundle": {
+            "const": null
+          },
+          "failure": {
+            "const": null
+          },
+          "request_id": {
+            "maximum": 9223372036854775807,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "request_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "queued"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bundle": {
+            "const": null
+          },
+          "failure": {
+            "const": null
+          },
+          "request_id": {
+            "maximum": 9223372036854775807,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "request_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "running"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bundle": {
+            "const": null
+          },
+          "failure": {
+            "const": null
+          },
+          "request_id": {
+            "maximum": 9223372036854775807,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "request_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "cancel_requested"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bundle": {
+            "const": null
+          },
+          "failure": {
+            "const": null
+          },
+          "request_id": {
+            "maximum": 9223372036854775807,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "request_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "completed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bundle": {
+            "not": {
+              "const": null
+            }
+          },
+          "failure": {
+            "const": null
+          }
+        },
+        "required": [
+          "bundle"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "bundle": {
+            "const": null
+          },
+          "failure": {
+            "not": {
+              "const": null
+            }
+          }
+        },
+        "required": [
+          "failure"
+        ]
+      }
+    }
+  ],
   "definitions": {
     "BiomeField": {
       "additionalProperties": false,
@@ -472,25 +630,25 @@
       "additionalProperties": false,
       "properties": {
         "adaptive_proposal": {
-          "type": "string"
+          "const": "adaptive-proposal-1"
         },
         "gameplay_ir": {
-          "type": "string"
+          "const": "gameplay-ir-1"
         },
         "generation_trace": {
-          "type": "string"
+          "const": "generation-trace-1"
         },
         "presentation_ir": {
-          "type": "string"
+          "const": "presentation-ir-1"
         },
         "procgen_bundle": {
           "const": "procgen-bundle-2"
         },
         "procgen_request": {
-          "type": "string"
+          "const": "procgen-request-1"
         },
         "site_ir": {
-          "type": "string"
+          "const": "site-ir-1"
         },
         "world_ir": {
           "const": "world-ir-2"
@@ -615,7 +773,7 @@
           "$ref": "#/definitions/GameplaySlice"
         },
         "schema_version": {
-          "type": "string"
+          "const": "gameplay-ir-1"
         }
       },
       "required": [
@@ -634,15 +792,14 @@
           "type": "array"
         },
         "document_kind": {
-          "type": "string"
+          "const": "ship_gameplay_slice"
         },
         "fire_zones": {
-          "items": {
-            "$ref": "#/definitions/FireZone"
-          },
+          "maxItems": 0,
           "type": "array"
         },
         "goal_room": {
+          "minLength": 1,
           "type": "string"
         },
         "loot_containers": {
@@ -658,15 +815,18 @@
           "type": "array"
         },
         "program_id": {
+          "minLength": 1,
           "type": "string"
         },
         "schema_version": {
-          "type": "string"
+          "const": "1.1.0"
         },
         "start_room": {
+          "minLength": 1,
           "type": "string"
         },
         "summary": {
+          "minLength": 1,
           "type": "string"
         }
       },
@@ -693,9 +853,7 @@
           "type": "integer"
         },
         "pipeline_executions": {
-          "format": "uint32",
-          "minimum": 0.0,
-          "type": "integer"
+          "const": 1
         },
         "room_count": {
           "format": "uint32",
@@ -703,13 +861,17 @@
           "type": "integer"
         },
         "schema_version": {
-          "type": "string"
+          "const": "generation-metrics-1"
         },
         "stage_timings_micros": {
           "additionalProperties": {
-            "format": "uint128",
-            "minimum": 0.0,
+            "maximum": 3600000000,
+            "minimum": 0,
             "type": "integer"
+          },
+          "maxProperties": 4096,
+          "propertyNames": {
+            "minLength": 1
           },
           "type": "object"
         },
@@ -734,32 +896,45 @@
       "properties": {
         "candidate_decisions": {
           "items": {
+            "minLength": 1,
             "type": "string"
           },
+          "maxItems": 4096,
           "type": "array"
         },
         "failed_constraints": {
           "items": {
+            "minLength": 1,
             "type": "string"
           },
+          "maxItems": 4096,
           "type": "array"
         },
         "fallback": {
-          "type": [
-            "string",
-            "null"
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "minLength": 1,
+              "type": "string"
+            }
           ]
         },
         "repairs": {
           "items": {
+            "minLength": 1,
             "type": "string"
           },
+          "maxItems": 4096,
           "type": "array"
         },
         "retries": {
           "items": {
+            "minLength": 1,
             "type": "string"
           },
+          "maxItems": 4096,
           "type": "array"
         },
         "rng_channels": {
@@ -790,13 +965,17 @@
           ]
         },
         "schema_version": {
-          "type": "string"
+          "const": "generation-trace-1"
         },
         "stage_timings_micros": {
           "additionalProperties": {
-            "format": "uint128",
-            "minimum": 0.0,
+            "maximum": 3600000000,
+            "minimum": 0,
             "type": "integer"
+          },
+          "maxProperties": 4096,
+          "propertyNames": {
+            "minLength": 1
           },
           "type": "object"
         }
@@ -1033,7 +1212,7 @@
       "additionalProperties": false,
       "properties": {
         "schema_version": {
-          "type": "string"
+          "const": "player-model-1"
         },
         "signals": {
           "items": {
@@ -1103,7 +1282,7 @@
           "type": "string"
         },
         "schema_version": {
-          "type": "string"
+          "const": "presentation-ir-1"
         },
         "seed": {
           "format": "uint64",
@@ -1124,6 +1303,7 @@
       "additionalProperties": false,
       "properties": {
         "locale": {
+          "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
           "type": "string"
         },
         "seed": {
@@ -1157,6 +1337,7 @@
           "type": "string"
         },
         "semantic_hash": {
+          "pattern": "^[a-f0-9]{64}$",
           "type": "string"
         },
         "site_ir": {
@@ -1248,9 +1429,11 @@
       "additionalProperties": false,
       "properties": {
         "content_manifest_hash": {
+          "pattern": "^[a-f0-9]{64}$",
           "type": "string"
         },
         "difficulty_id": {
+          "minLength": 1,
           "type": "string"
         },
         "generator_version": {
@@ -1266,10 +1449,12 @@
           "items": {
             "$ref": "#/definitions/Domain"
           },
-          "type": "array"
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
         },
         "schema_version": {
-          "type": "string"
+          "const": "procgen-request-1"
         },
         "site": {
           "$ref": "#/definitions/SiteRequest"
@@ -1671,7 +1856,7 @@
       "additionalProperties": false,
       "properties": {
         "schema_version": {
-          "type": "string"
+          "const": "site-ir-1"
         },
         "ship": {
           "$ref": "#/definitions/Ship"
@@ -1687,6 +1872,7 @@
       "additionalProperties": false,
       "properties": {
         "archetype_id": {
+          "minLength": 1,
           "type": "string"
         },
         "cause_of_loss": {
@@ -1700,22 +1886,28 @@
           ]
         },
         "intactness_override_bp": {
-          "format": "uint16",
-          "minimum": 0.0,
-          "type": [
-            "integer",
-            "null"
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            }
           ]
         },
         "kit_id": {
+          "minLength": 1,
           "type": "string"
         },
         "loot_richness_bp": {
-          "format": "uint16",
-          "minimum": 0.0,
+          "maximum": 30000,
+          "minimum": 0,
           "type": "integer"
         },
         "site_id": {
+          "minLength": 1,
           "type": "string"
         },
         "x": {
@@ -1875,6 +2067,7 @@
       "additionalProperties": false,
       "properties": {
         "content_manifest_hash": {
+          "pattern": "^[a-f0-9]{64}$",
           "type": "string"
         },
         "export_schemas": {
@@ -2101,15 +2294,19 @@
       "default": null
     },
     "request_id": {
-      "default": null,
-      "format": "int64",
-      "type": [
-        "integer",
-        "null"
+      "anyOf": [
+        {
+          "maximum": 9223372036854775807,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
     "schema_version": {
-      "type": "string"
+      "const": "procgen-lifecycle-result-2"
     },
     "site_seed": {
       "maximum": 9007199254740991,

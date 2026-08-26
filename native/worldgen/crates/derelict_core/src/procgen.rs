@@ -252,9 +252,36 @@ impl ProcgenBundle {
         let valid_world = if self.trace.fallback.is_some() {
             let fallback = crate::world::WorldFallback::bundled()
                 .map_err(|_| ProcgenError::InvalidRequest("world_fallback"))?;
+            if self.trace.fallback.as_deref() != Some(fallback.fallback_id.as_str())
+                || self
+                    .trace
+                    .repairs
+                    .iter()
+                    .any(|r| r != "reconciled:fragment_metadata")
+                || !self
+                    .trace
+                    .candidate_decisions
+                    .iter()
+                    .any(|d| d == "rejected_candidate")
+                || !self
+                    .trace
+                    .candidate_decisions
+                    .iter()
+                    .any(|d| d == "selected_fallback")
+            {
+                return Err(ProcgenError::InvalidRequest("world_fallback_trace"));
+            }
             self.world_ir
                 .validate_for_fallback(&world_request, &rules, &fallback)
         } else {
+            if self
+                .trace
+                .candidate_decisions
+                .iter()
+                .any(|d| d == "selected_fallback")
+            {
+                return Err(ProcgenError::InvalidRequest("world_fallback_trace"));
+            }
             self.world_ir.validate_for_request(&world_request, &rules)
         };
         valid_world.map_err(|_| ProcgenError::InvalidRequest("world"))?;
@@ -508,9 +535,10 @@ impl ProcgenRequest {
     }
     pub fn validate(&self) -> Result<(), ProcgenError> {
         check_schema(&self.schema_version, PROCGEN_REQUEST_SCHEMA)?;
-        if self.generator_version != crate::world::PROCGEN_GENERATOR_VERSION
-            || self.world_seed > crate::world::MAX_PUBLIC_SEED
-        {
+        if self.world_seed > crate::world::MAX_PUBLIC_SEED {
+            return Err(ProcgenError::InvalidRequest("world_seed"));
+        }
+        if self.generator_version != crate::world::PROCGEN_GENERATOR_VERSION {
             return Err(ProcgenError::InvalidRequest("generator_version"));
         }
         if self.site.site_id.is_empty()
@@ -636,12 +664,13 @@ pub fn generate_bundle(
         archetype_id: request.site.archetype_id.clone(),
     };
     let world = crate::world::generate_world(&world_request).map_err(|e| {
-        failure(
-            ProcgenFailureCode::GenerationFailure,
-            "world",
-            e.to_string(),
-            true,
-        )
+        let code = if matches!(e, crate::world::WorldError::Invalid(_)) {
+            ProcgenFailureCode::InvalidRequest
+        } else {
+            ProcgenFailureCode::GenerationFailure
+        };
+        let retryable = matches!(code, ProcgenFailureCode::GenerationFailure);
+        failure(code, "world", e.to_string(), retryable)
     })?;
     let seed = world.world_ir.site_seed;
     let params = GenParams {

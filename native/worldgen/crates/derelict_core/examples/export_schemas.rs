@@ -57,7 +57,9 @@ fn apply_request_constraints(root: &mut Value) {
     props["schema_version"] = serde_json::json!({"const":"procgen-request-1"});
     props["content_manifest_hash"] =
         serde_json::json!({"type":"string","pattern":"^[a-f0-9]{64}$"});
-    props["generator_version"] = serde_json::json!({"const":2});
+    props["generator_version"] = serde_json::json!({"const":3});
+    props["world_seed"] =
+        serde_json::json!({"type":"integer","minimum":0,"maximum":9007199254740991u64});
     props["difficulty_id"] = serde_json::json!({"type":"string","minLength":1});
     props["requested_domains"]["minItems"] = serde_json::json!(1);
     props["requested_domains"]["uniqueItems"] = serde_json::json!(true);
@@ -76,15 +78,28 @@ fn apply_request_constraints(root: &mut Value) {
 }
 
 fn apply_platform_v3_constraints(root: &mut Value) {
-    let request = def(root, "ProcgenRequest");
-    request["properties"]["generator_version"] = serde_json::json!({"const":3});
-    request["properties"]["world_seed"] =
-        serde_json::json!({"type":"integer","minimum":0,"maximum":9007199254740991u64});
-    let envelope = def(root, "VersionEnvelope");
-    envelope["properties"]["generator_version"] = serde_json::json!({"const":3});
-    let exports = def(root, "ExportSchemas");
-    exports["properties"]["procgen_bundle"] = serde_json::json!({"const":"procgen-bundle-2"});
-    exports["properties"]["world_ir"] = serde_json::json!({"const":"world-ir-2"});
+    if root.get("title").and_then(Value::as_str) == Some("world-ir-2") {
+        def(root, "WorldIR")["properties"]["schema_version"] =
+            serde_json::json!({"const":"world-ir-2"});
+    } else if root.get("title").and_then(Value::as_str) == Some("procgen-bundle-2") {
+        def(root, "ProcgenBundle")["properties"]["schema_version"] =
+            serde_json::json!({"const":"procgen-bundle-2"});
+    } else if root.get("title").and_then(Value::as_str) == Some("procgen-lifecycle-result-2") {
+        def(root, "LifecycleResult")["properties"]["schema_version"] =
+            serde_json::json!({"const":"procgen-lifecycle-result-2"});
+    }
+    let standalone_world = root.get("title").and_then(Value::as_str) == Some("world-ir-2");
+    if !standalone_world {
+        let request = def(root, "ProcgenRequest");
+        request["properties"]["generator_version"] = serde_json::json!({"const":3});
+        request["properties"]["world_seed"] =
+            serde_json::json!({"type":"integer","minimum":0,"maximum":9007199254740991u64});
+        let envelope = def(root, "VersionEnvelope");
+        envelope["properties"]["generator_version"] = serde_json::json!({"const":3});
+        let exports = def(root, "ExportSchemas");
+        exports["properties"]["procgen_bundle"] = serde_json::json!({"const":"procgen-bundle-2"});
+        exports["properties"]["world_ir"] = serde_json::json!({"const":"world-ir-2"});
+    }
     let world = def(root, "WorldIR");
     world["properties"]["world_seed"] =
         serde_json::json!({"type":"integer","minimum":0,"maximum":9007199254740991u64});
@@ -128,7 +143,7 @@ fn apply_adaptive_constraints(root: &mut Value) {
 
 fn apply_trace_constraints(root: &mut Value) {
     let trace = def(root, "GenerationTrace");
-    trace["properties"]["rng_channels"] = serde_json::json!({"const":["meta","hull","template","topology","residual_fill","door","furnish","story","intact","breach","scorch","seal","bodies","fracture","debris","loot"]});
+    trace["properties"]["rng_channels"] = serde_json::json!({"const":["world.archetype","world.biome","world.hazard","world.resource","world.landmark","world.route_cost","site.structural","meta","hull","template","topology","residual_fill","door","furnish","story","intact","breach","scorch","seal","bodies","fracture","debris","loot"]});
     for field in [
         "candidate_decisions",
         "failed_constraints",
@@ -200,8 +215,8 @@ fn require_nonempty_fields(value: &mut Value, fields: &[&str]) {
 fn enrich(name: &str, root: &mut Value) {
     let (definition, version) = match name {
         "procgen-request-1" => ("ProcgenRequest", "procgen-request-1"),
-        "procgen-bundle-1" => ("ProcgenBundle", "procgen-bundle-1"),
-        "world-ir-1" => ("WorldIR", "world-ir-1"),
+        "procgen-bundle-1" | "procgen-bundle-2" => ("ProcgenBundle", "procgen-bundle-1"),
+        "world-ir-1" | "world-ir-2" => ("WorldIR", "world-ir-1"),
         "site-ir-1" => ("SiteIR", "site-ir-1"),
         "gameplay-ir-1" => ("GameplayIR", "gameplay-ir-1"),
         "presentation-ir-1" => ("PresentationIR", "presentation-ir-1"),
@@ -210,29 +225,43 @@ fn enrich(name: &str, root: &mut Value) {
         "player-model-1" => ("PlayerModel", "player-model-1"),
         "procgen-failure-1" => ("ProcgenFailure", "procgen-failure-1"),
         "generation-metrics-1" => ("GenerationMetrics", "generation-metrics-1"),
-        "procgen-lifecycle-result-1" => ("LifecycleResult", "procgen-lifecycle-result-1"),
+        "procgen-lifecycle-result-1" | "procgen-lifecycle-result-2" => {
+            ("LifecycleResult", "procgen-lifecycle-result-1")
+        }
         "procgen-capabilities-1" => ("ProcgenCapabilities", "procgen-capabilities-1"),
         "procgen-generator-manifest-1" => ("GeneratorManifest", "procgen-generator-manifest-1"),
         _ => return,
     };
     const_field(root, definition, "schema_version", version);
     root["title"] = Value::String(name.into());
-    if matches!(name, "procgen-request-1" | "procgen-bundle-1") {
+    if matches!(
+        name,
+        "procgen-request-1" | "procgen-bundle-1" | "procgen-bundle-2"
+    ) {
         apply_request_constraints(root);
     }
-    if matches!(name, "gameplay-ir-1" | "procgen-bundle-1") {
+    if matches!(
+        name,
+        "gameplay-ir-1" | "procgen-bundle-1" | "procgen-bundle-2"
+    ) {
         apply_gameplay_constraints(root);
     }
     if name == "adaptive-proposal-1" {
         apply_adaptive_constraints(root);
     }
-    if matches!(name, "generation-trace-1" | "procgen-bundle-1") {
+    if matches!(
+        name,
+        "generation-trace-1" | "procgen-bundle-1" | "procgen-bundle-2"
+    ) {
         apply_trace_constraints(root);
     }
-    if matches!(name, "generation-metrics-1" | "procgen-bundle-1") {
+    if matches!(
+        name,
+        "generation-metrics-1" | "procgen-bundle-1" | "procgen-bundle-2"
+    ) {
         apply_metrics_constraints(root);
     }
-    if name == "procgen-bundle-1" {
+    if matches!(name, "procgen-bundle-1" | "procgen-bundle-2") {
         for (nested, nested_version) in [
             ("WorldIR", "world-ir-1"),
             ("SiteIR", "site-ir-1"),
@@ -243,7 +272,10 @@ fn enrich(name: &str, root: &mut Value) {
         ] {
             const_field(root, nested, "schema_version", nested_version);
         }
-    } else if name == "procgen-lifecycle-result-1" {
+    } else if matches!(
+        name,
+        "procgen-lifecycle-result-1" | "procgen-lifecycle-result-2"
+    ) {
         // The embedded bundle must retain the same constraints as the standalone
         // bundle contract, including all nested trace/gameplay enrichment.
         apply_request_constraints(root);
@@ -310,7 +342,7 @@ fn enrich(name: &str, root: &mut Value) {
             serde_json::json!({"type":"integer","minimum":1,"maximum":4096});
         root["allOf"] = serde_json::json!([{"if":{"properties":{"worker_mode":{"const":"thread_pool"}}},"then":{"properties":{"worker_count":{"minimum":1}}}}]);
         for (field, value) in [
-            ("lifecycle_result", "procgen-lifecycle-result-1"),
+            ("lifecycle_result", "procgen-lifecycle-result-2"),
             ("capabilities", "procgen-capabilities-1"),
             ("generator_manifest", "procgen-generator-manifest-1"),
         ] {
@@ -320,7 +352,7 @@ fn enrich(name: &str, root: &mut Value) {
         def(root, "GeneratorManifest")["properties"]["schema_version"] =
             serde_json::json!({"const":"procgen-generator-manifest-1"});
         def(root, "GeneratorManifest")["properties"]["generator_version"] =
-            serde_json::json!({"const":2});
+            serde_json::json!({"const":3});
         def(root, "GeneratorManifest")["properties"]["rust_source_commit"] =
             serde_json::json!({"type":"string","pattern":"^[a-f0-9]{40}$"});
         def(root, "GeneratorManifest")["properties"]["content_manifest_hash"] =
@@ -332,8 +364,8 @@ fn enrich(name: &str, root: &mut Value) {
             .unwrap();
         for (field, value) in [
             ("procgen_request", "procgen-request-1"),
-            ("procgen_bundle", "procgen-bundle-1"),
-            ("world_ir", "world-ir-1"),
+            ("procgen_bundle", "procgen-bundle-2"),
+            ("world_ir", "world-ir-2"),
             ("site_ir", "site-ir-1"),
             ("gameplay_ir", "gameplay-ir-1"),
             ("presentation_ir", "presentation-ir-1"),
@@ -343,7 +375,7 @@ fn enrich(name: &str, root: &mut Value) {
             exports[field] = serde_json::json!({"const":value});
         }
         for (field, value) in [
-            ("lifecycle_result", "procgen-lifecycle-result-1"),
+            ("lifecycle_result", "procgen-lifecycle-result-2"),
             ("capabilities", "procgen-capabilities-1"),
             ("generator_manifest", "procgen-generator-manifest-1"),
         ] {
@@ -414,6 +446,12 @@ fn main() {
     for (name, value) in items {
         let mut value = value;
         enrich(name, &mut value);
+        if matches!(
+            name,
+            "world-ir-2" | "procgen-bundle-2" | "procgen-lifecycle-result-2"
+        ) {
+            apply_platform_v3_constraints(&mut value);
+        }
         let path = out.join(format!("{name}.schema.json"));
         let bytes = serde_json::to_vec_pretty(&value).expect("schema JSON");
         let mut expected = bytes.clone();

@@ -37,7 +37,7 @@ fn request() -> ProcgenRequest {
             Domain::Gameplay,
             Domain::Presentation,
         ],
-        generator_version: 2,
+        generator_version: 3,
         content_manifest_hash: "a".repeat(64),
         presentation: PresentationRequest {
             seed: 9,
@@ -48,7 +48,7 @@ fn request() -> ProcgenRequest {
 
 #[test]
 fn accepted_omits_optional_payloads_and_capabilities_round_trip() {
-    let json = r#"{"schema_version":"procgen-lifecycle-result-1","status":"accepted","request_id":7,"events":["admitted"]}"#;
+    let json = r#"{"schema_version":"procgen-lifecycle-result-2","status":"accepted","request_id":7,"events":["admitted"]}"#;
     let accepted = LifecycleResult::from_json(json).unwrap();
     assert_eq!(accepted.bundle, None);
     assert_eq!(accepted.failure, None);
@@ -106,7 +106,7 @@ fn capabilities() -> ProcgenCapabilities {
             Domain::Gameplay,
             Domain::Presentation,
         ],
-        schemas: AdapterSchemas::v1(),
+        schemas: AdapterSchemas::platform_v3(),
     }
 }
 
@@ -150,10 +150,10 @@ fn capabilities_and_manifest_reject_bad_identity_and_limits() {
     let manifest = GeneratorManifest {
         schema_version: PROCGEN_GENERATOR_MANIFEST_SCHEMA.into(),
         rust_source_commit: "a".repeat(40),
-        generator_version: 2,
+        generator_version: 3,
         content_manifest_hash: "b".repeat(64),
-        export_schemas: ExportSchemas::v1(),
-        adapter_schemas: AdapterSchemas::v1(),
+        export_schemas: ExportSchemas::platform_v3(),
+        adapter_schemas: AdapterSchemas::platform_v3(),
         target: "wasm32-unknown-unknown".into(),
         dirty_development: false,
     };
@@ -202,7 +202,7 @@ fn lifecycle_schema_and_rust_matrix_match_for_states_ids_and_events() {
         LifecycleResult::cancel_requested(4, events.clone()),
     ] {
         let value = serde_json::to_value(&result).unwrap();
-        assert!(schema_valid("procgen-lifecycle-result-1", &value));
+        assert!(schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2, &value));
         assert!(LifecycleResult::from_json(&serde_json::to_string(&value).unwrap()).is_ok());
     }
     let bundle = generate_bundle(
@@ -212,11 +212,11 @@ fn lifecycle_schema_and_rust_matrix_match_for_states_ids_and_events() {
     .unwrap();
     let completed = LifecycleResult::completed(Some(5), bundle, events.clone());
     let value = serde_json::to_value(&completed).unwrap();
-    assert!(schema_valid("procgen-lifecycle-result-1", &value));
+    assert!(schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2, &value));
     assert!(LifecycleResult::from_json(&serde_json::to_string(&value).unwrap()).is_ok());
     let mut unknown = value.clone();
     unknown["unexpected"] = true.into();
-    assert!(!schema_valid("procgen-lifecycle-result-1", &unknown));
+    assert!(!schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2, &unknown));
     assert!(LifecycleResult::from_json(&serde_json::to_string(&unknown).unwrap()).is_err());
 
     for (field, bad) in [
@@ -230,14 +230,14 @@ fn lifecycle_schema_and_rust_matrix_match_for_states_ids_and_events() {
         let mut invalid =
             serde_json::to_value(LifecycleResult::accepted(1, events.clone())).unwrap();
         invalid[field] = bad;
-        assert!(!schema_valid("procgen-lifecycle-result-1", &invalid));
+        assert!(!schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2, &invalid));
         assert!(LifecycleResult::from_json(&serde_json::to_string(&invalid).unwrap()).is_err());
     }
     for count in [0, 33] {
         let mut invalid =
             serde_json::to_value(LifecycleResult::accepted(1, events.clone())).unwrap();
         invalid["events"] = serde_json::json!(vec!["admitted"; count]);
-        assert!(!schema_valid("procgen-lifecycle-result-1", &invalid));
+        assert!(!schema_valid(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2, &invalid));
         assert!(LifecycleResult::from_json(&serde_json::to_string(&invalid).unwrap()).is_err());
     }
 }
@@ -380,10 +380,10 @@ fn nested_unknown_fields_reject_at_rust_and_schema_boundaries() {
     let manifest = GeneratorManifest {
         schema_version: PROCGEN_GENERATOR_MANIFEST_SCHEMA.into(),
         rust_source_commit: "a".repeat(40),
-        generator_version: 2,
+        generator_version: 3,
         content_manifest_hash: "b".repeat(64),
-        export_schemas: ExportSchemas::v1(),
-        adapter_schemas: AdapterSchemas::v1(),
+        export_schemas: ExportSchemas::platform_v3(),
+        adapter_schemas: AdapterSchemas::platform_v3(),
         target: "wasm32-unknown-unknown".into(),
         dirty_development: false,
     };

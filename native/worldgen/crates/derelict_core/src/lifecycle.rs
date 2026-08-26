@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA: &str =
     crate::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2;
+pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2: &str = PROCGEN_LIFECYCLE_RESULT_SCHEMA;
 pub const PROCGEN_CAPABILITIES_SCHEMA: &str = "procgen-capabilities-1";
 pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA: &str = "procgen-generator-manifest-1";
 
@@ -193,7 +194,7 @@ pub struct AdapterSchemas {
 impl AdapterSchemas {
     pub fn v1() -> Self {
         Self {
-            lifecycle_result: PROCGEN_LIFECYCLE_RESULT_SCHEMA.into(),
+            lifecycle_result: "procgen-lifecycle-result-1".into(),
             capabilities: PROCGEN_CAPABILITIES_SCHEMA.into(),
             generator_manifest: PROCGEN_GENERATOR_MANIFEST_SCHEMA.into(),
         }

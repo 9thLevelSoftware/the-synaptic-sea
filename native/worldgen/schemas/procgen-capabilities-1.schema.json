@@ -37,7 +37,7 @@
           "const": "procgen-generator-manifest-1"
         },
         "lifecycle_result": {
-          "const": "procgen-lifecycle-result-1"
+          "const": "procgen-lifecycle-result-2"
         }
       },
       "required": [

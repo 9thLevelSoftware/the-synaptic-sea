@@ -214,9 +214,6 @@
     "extraction": {
       "$ref": "#/definitions/ExtractionGuarantee"
     },
-    "generator_version": {
-      "const": 3
-    },
     "hazard_fields": {
       "items": {
         "$ref": "#/definitions/HazardField"
@@ -234,9 +231,6 @@
         "$ref": "#/definitions/CoordinateMarker"
       },
       "type": "array"
-    },
-    "procgen_bundle": {
-      "const": "procgen-bundle-2"
     },
     "resource_pressures": {
       "items": {
@@ -278,7 +272,7 @@
       "type": "array"
     },
     "schema_version": {
-      "type": "string"
+      "const": "world-ir-2"
     },
     "site_id": {
       "type": "string"
@@ -287,9 +281,6 @@
       "maximum": 9007199254740991,
       "minimum": 0,
       "type": "integer"
-    },
-    "world_ir": {
-      "const": "world-ir-2"
     },
     "world_seed": {
       "maximum": 9007199254740991,

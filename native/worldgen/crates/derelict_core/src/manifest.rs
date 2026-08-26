@@ -56,8 +56,8 @@ impl ExportSchemas {
     pub fn v1() -> Self {
         Self {
             procgen_request: PROCGEN_REQUEST_SCHEMA.into(),
-            procgen_bundle: PROCGEN_BUNDLE_SCHEMA.into(),
-            world_ir: WORLD_IR_SCHEMA.into(),
+            procgen_bundle: PROCGEN_BUNDLE_SCHEMA_V1.into(),
+            world_ir: WORLD_IR_SCHEMA_V1.into(),
             site_ir: SITE_IR_SCHEMA.into(),
             gameplay_ir: GAMEPLAY_IR_SCHEMA.into(),
             presentation_ir: PRESENTATION_IR_SCHEMA.into(),
@@ -118,12 +118,34 @@ impl BuildManifest {
         if self.export_schemas != ExportSchemas::platform_v3() {
             return Err(ManifestError::InvalidField("export_schemas"));
         }
-        if self.manifest_schema != MANIFEST_SCHEMA
+        if self.rust_source_commit.len() != 40
+            || !is_hex(&self.rust_source_commit)
+            || self.rust_source_commit != self.rust_source_commit.to_ascii_lowercase()
+            || self.manifest_schema != MANIFEST_SCHEMA
             || self.content_manifest_path != "data/procgen/manifests/content_manifest.json"
             || !is_sha256(&self.content_manifest_hash)
             || !is_sha256(&self.artifact.sha256)
         {
             return Err(ManifestError::InvalidField("manifest"));
+        }
+        let valid_pair = matches!(
+            (
+                self.target.as_str(),
+                self.artifact.kind.as_str(),
+                self.artifact.path.as_str()
+            ),
+            (
+                "x86_64-pc-windows-msvc",
+                "gdextension",
+                "addons/derelict/bin/win64/derelict_godot.dll"
+            ) | (
+                "wasm32-unknown-unknown",
+                "wasm",
+                "addons/derelict/bin/web/derelict_wasm_bg.wasm"
+            )
+        );
+        if !valid_pair {
+            return Err(ManifestError::InvalidField("artifact"));
         }
         Ok(())
     }
@@ -131,6 +153,12 @@ impl BuildManifest {
     pub fn from_json(json: &str) -> Result<Self, ManifestError> {
         let manifest: Self = serde_json::from_str(json)?;
         manifest.validate()?;
+        Ok(manifest)
+    }
+
+    pub fn from_json_platform_v3(json: &str) -> Result<Self, ManifestError> {
+        let manifest: Self = serde_json::from_str(json)?;
+        manifest.validate_platform_v3()?;
         Ok(manifest)
     }
 

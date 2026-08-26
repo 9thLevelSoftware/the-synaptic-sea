@@ -12,7 +12,7 @@
           "const": "procgen-generator-manifest-1"
         },
         "lifecycle_result": {
-          "const": "procgen-lifecycle-result-1"
+          "const": "procgen-lifecycle-result-2"
         }
       },
       "required": [
@@ -38,7 +38,7 @@
           "const": "presentation-ir-1"
         },
         "procgen_bundle": {
-          "const": "procgen-bundle-1"
+          "const": "procgen-bundle-2"
         },
         "procgen_request": {
           "const": "procgen-request-1"
@@ -47,7 +47,7 @@
           "const": "site-ir-1"
         },
         "world_ir": {
-          "const": "world-ir-1"
+          "const": "world-ir-2"
         }
       },
       "required": [
@@ -78,7 +78,7 @@
       "$ref": "#/definitions/ExportSchemas"
     },
     "generator_version": {
-      "const": 2
+      "const": 3
     },
     "rust_source_commit": {
       "pattern": "^[a-f0-9]{40}$",
