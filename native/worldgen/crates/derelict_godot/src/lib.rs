@@ -11,6 +11,9 @@ mod convert;
 mod generator;
 mod service;
 
+#[cfg(test)]
+mod service_tests;
+
 struct DerelictExtension;
 
 #[gdextension]
