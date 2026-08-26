@@ -11,6 +11,7 @@ rand_pcg = "0.9"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 bincode = { version = "2", features = ["serde"] }
 serde_json = "1"
+thiserror = "2"
 
 [dev-dependencies]
 blake3 = "1"

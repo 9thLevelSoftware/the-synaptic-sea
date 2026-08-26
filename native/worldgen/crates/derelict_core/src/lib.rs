@@ -7,6 +7,7 @@
 
 pub mod archetype;
 pub mod model;
+pub mod manifest;
 pub mod pipeline;
 pub mod rng;
 pub mod role;

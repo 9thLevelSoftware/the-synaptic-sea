@@ -1,0 +1,194 @@
+{
+  "manifest_schema": "procgen-content-manifest-1",
+  "files": [
+    {
+      "path": "data/procgen/archetypes/derelict.json",
+      "sha256": "9bed7992e00fee9c6b5ce663f0fa15711b55de15f9f87d91a64aa25413a5944e"
+    },
+    {
+      "path": "data/procgen/archetypes/life_boat.json",
+      "sha256": "e5667a948aaa845767f59bdc698354ef444cf406a4fca8fc23e3207203dd6e7c"
+    },
+    {
+      "path": "data/procgen/archetypes/medium_cruiser.json",
+      "sha256": "969f6007303fcddeda4a5596d57a8bf4f07b2787375e8fb5be27bc3d0cbf35dc"
+    },
+    {
+      "path": "data/procgen/archetypes/small_freighter.json",
+      "sha256": "2eaa426debe234749ad062228efbd19803ebf5d248751d7867ee07d16e48a1b3"
+    },
+    {
+      "path": "data/procgen/biomes/abyssal_synaptic_sea.json",
+      "sha256": "7f7628659458da127973ac833506c28f1e1bf46b6f5919dcdf616cee74ec3a72"
+    },
+    {
+      "path": "data/procgen/biomes/breach_field.json",
+      "sha256": "5010988d3c0fab7600ba5b378a79a8cb1d57f7ec395a42e54cff5a3b0884bb68"
+    },
+    {
+      "path": "data/procgen/biomes/dead_fleet.json",
+      "sha256": "eda364822f792789899cf5c3d04ee41fd59f130adae541bef372c3522023b925"
+    },
+    {
+      "path": "data/procgen/difficulty/deep_dive.json",
+      "sha256": "ee7f4a87d6c9be01c510da26d402af385476981c04b9c7dc168fb395ea37a962"
+    },
+    {
+      "path": "data/procgen/difficulty/hardened.json",
+      "sha256": "5ac915eedba46b64d3cfdb306719288e8c9ea54eaae15ce0b194bf504129ca5a"
+    },
+    {
+      "path": "data/procgen/difficulty/standard.json",
+      "sha256": "be29f0bcb28809794c680ebd49de206f4163c89dac4d5a0892d612d2a3bdd3d4"
+    },
+    {
+      "path": "data/procgen/encounter_tables/biomatter_lurker.json",
+      "sha256": "1a9b972809a9aca1558a5d41100538556a6b1ec8c1bdfde50edf8aa94dc562e7"
+    },
+    {
+      "path": "data/procgen/encounter_tables/derelict_pirate.json",
+      "sha256": "8fc55dd00933ada577913c8e1b291f6760e8e8a193be9b716e1b1511ce4efda2"
+    },
+    {
+      "path": "data/procgen/encounter_tables/threat_drone_swarm.json",
+      "sha256": "b4a09fc594637f2acaa339039b1f865cc81d1d3ac8956e4ae6204d1babf2e0b9"
+    },
+    {
+      "path": "data/procgen/templates/bifurcated.json",
+      "sha256": "9417bfdbbe4039e394f2829b0985715bd544fdecae12d0459574a436c121cbfb"
+    },
+    {
+      "path": "data/procgen/templates/compact.json",
+      "sha256": "9f7917aced8b78aa77cc05fa1a85644c41a1a62f1c050b08174accb5d32d5bf1"
+    },
+    {
+      "path": "data/procgen/templates/derelict_a.json",
+      "sha256": "a13c048a5832a13cdebf3f703cc9ec9ad9b57a713f5ca61f4e06d706687f5034"
+    },
+    {
+      "path": "data/procgen/templates/derelict_b.json",
+      "sha256": "b6f5ff2bb8f97a743e59c3b5be18c91ca9cda5d08f88a9d16874dbc8bd036eed"
+    },
+    {
+      "path": "data/procgen/templates/dispersed.json",
+      "sha256": "82f2f271021e1712a84be2d4dcb82a9bae8f73dadba110806c6f5e7b54c7778a"
+    },
+    {
+      "path": "data/procgen/templates/double_spine.json",
+      "sha256": "e2ef972ccf071532fb863609897559de288df8d4498b437dc1d2b159c4615b28"
+    },
+    {
+      "path": "data/procgen/templates/hangar_wing.json",
+      "sha256": "9a83289c9c470e6cc4c45a728e4ecdb57d05e993b7427832bf7b18f79397c865"
+    },
+    {
+      "path": "data/procgen/templates/hive.json",
+      "sha256": "e728c75910f37e09c02727cf2542630bcdbd9032323ac51facd0308b94f2fdac"
+    },
+    {
+      "path": "data/procgen/templates/radial.json",
+      "sha256": "70387c6c0803fbaf06e38a75f92443a9897f30376ba30435022b0084979b2198"
+    },
+    {
+      "path": "data/procgen/templates/ring.json",
+      "sha256": "7acc1f0a927bc230b2eca499f81bf8b10da7eb5cf13aaed4764501d9a0265f51"
+    },
+    {
+      "path": "data/procgen/templates/spine.json",
+      "sha256": "a0b6f19a8b45aed35b0296876553c9aa67735365b606b71cb54aa7193d23078f"
+    },
+    {
+      "path": "data/procgen/templates/stacked.json",
+      "sha256": "f69d88220c6166baf584b27ca92dde5558a3a310a9b6854d1d143f78f738d6cc"
+    },
+    {
+      "path": "data/procgen/templates/stacked_v2.json",
+      "sha256": "bb7ce00c92f2505cebbb5f78ba796095d3b2b72728e5a659630fcd064c8698a1"
+    },
+    {
+      "path": "data/procgen/templates/vault.json",
+      "sha256": "77a21762d44d6dafd8ac8a7cdc13ac35702d667181a75b30c2d8e4b2fe382986"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/archetypes/corvette.ron",
+      "sha256": "8da1bf7e64a521b107d3af4b88930dbe3efe407e27cf161640125944ed653059"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/archetypes/freighter.ron",
+      "sha256": "0ab552055fc47cb6864b7652547cac360f169b0fcbc28f5765e2022be8b2dee3"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/archetypes/frigate.ron",
+      "sha256": "6980b177fc2962aecbe69e29334a1c85ea136026fd8b58c7c86959331d4651ca"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/archetypes/shuttle.ron",
+      "sha256": "6b1bf96dd6de91f074077b2ffc31da9f1c76ba981432476e08949b15e7351171"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/furnishing_rules/default.ron",
+      "sha256": "8c7c91491d77855df8876672c41545007250c0cf0562bde1c1f6a6db0dd17816"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/items.ron",
+      "sha256": "860263efdbed917e503d75acd6c40b7d5ae577856e994b604fe9a317bf456420"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/loot_tables/default.ron",
+      "sha256": "90766bc993eb90fe6b786bad1bbc07bda9c3a5758661d44947b9d9ecab3d8e23"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/topology_templates/bifurcated.ron",
+      "sha256": "67bef237a3c764f6fea67090ea9f2d7e187b071c495f5bc751b75ef9bc17be8d"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/topology_templates/compact.ron",
+      "sha256": "b37ae12f8fd48becbc07bfda91ca3bfbf1f11aae55b841c37567d9fefc640e6d"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/topology_templates/derelict_a.ron",
+      "sha256": "1e3e2b515525bb0f4b4df70b05c6180ee265113f42c6ca363d369d00275fad01"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/topology_templates/derelict_b.ron",
+      "sha256": "d2b8830d449834f784f5fb54b465715a4f88da6a15037803fa81642496a27e89"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/topology_templates/dispersed.ron",
+      "sha256": "b45abf2d78eac5546612fd8b07bb47d6790ed33b8e55ad9127b8dc74b6e2568d"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/topology_templates/double_spine.ron",
+      "sha256": "f52c53ddbb7716ac9e99ecb94109fb607e239384ba774565d6a3185be8ae2ff6"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/topology_templates/hangar_wing.ron",
+      "sha256": "b1ec50676df43eca8964a6507847986f3d92a3c1ec89ea5e32a96c85639028fc"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/topology_templates/radial.ron",
+      "sha256": "fae5b1c03032a98407c69800ff88da9276c6b934ab7dd75c90a0d327c32d9bd5"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/topology_templates/ring.ron",
+      "sha256": "2efde05a2a4b3897da1f53d2db6eac2c4caee9813d6fe47342b827962d165060"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/topology_templates/spine.ron",
+      "sha256": "6df2fb0d052066153cb63905014e434aedd6b66e98e1792cdc5a3c261535ab1a"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/topology_templates/stacked.ron",
+      "sha256": "f6dc7675a5ded1f021eca3e13c0b291d0a4f3078022ac932857c48b136dee7c2"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/topology_templates/stacked_v2.ron",
+      "sha256": "16eb8fae63e94498b092b74e2bf95824d5b35943d91125f691e72d3fd51d6429"
+    },
+    {
+      "path": "native/worldgen/crates/derelict_core/assets/topology_templates/vault.ron",
+      "sha256": "a3d5516d569a33801d4c6e42f85a1ed5f2acd5b0243a8fcde6a283a4981205cc"
+    }
+  ],
+  "content_manifest_hash": "e45770cf36ca296644b291a1c12d750281c8fcd3e520430b3ae2995d03ab14d2"
+}

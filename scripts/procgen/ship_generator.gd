@@ -18,6 +18,7 @@ const DifficultyProfileScript := preload("res://scripts/procgen/difficulty_profi
 const EncounterInjectorScript := preload("res://scripts/procgen/encounter_injector.gd")
 const GeneratedShipLoaderScript := preload("res://scripts/procgen/generated_ship_loader.gd")
 const LootRollerScript := preload("res://scripts/systems/loot_roller.gd")
+const ProcgenManifestValidatorScript := preload("res://scripts/procgen/procgen_manifest_validator.gd")
 
 const USE_WORLDGEN := true
 const WORLDGEN_VERSION: int = 2
@@ -125,6 +126,10 @@ func _generate_via_worldgen(seed_value: int, size: int, condition: int) -> Node3
 	var generator = ClassDB.instantiate("DerelictGenerator")
 	if generator == null:
 		push_error("SHIP GENERATOR FAIL DerelictGenerator instantiation failed")
+		return null
+	var manifest_verdict: String = ProcgenManifestValidatorScript.new().validate_from_files(generator)
+	if manifest_verdict != ProcgenManifestValidatorScript.OK:
+		push_error("SHIP GENERATOR FAIL procgen build manifest: %s" % manifest_verdict)
 		return null
 	if not generator.has_method("generator_version"):
 		push_error("SHIP GENERATOR FAIL DerelictGenerator generator_version() unavailable")

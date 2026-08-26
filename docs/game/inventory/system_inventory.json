@@ -8309,6 +8309,23 @@
         "achievement_state integration is opt-in (no per-run service attached by default), so that edge is dormant in the base run"
       ],
       "subsystems": []
+    },
+    {
+      "id": "procgen_manifest_validator",
+      "file": "scripts/procgen/procgen_manifest_validator.gd",
+      "name": "Procgen Build Manifest Integrity",
+      "domain": "travel",
+      "kind": "integrity-gate",
+      "model_exists": true,
+      "smoke": "scripts/validation/procgen_manifest_smoke.gd",
+      "reachable": true,
+      "driven": true,
+      "driven_at": "scripts/procgen/ship_generator.gd:_generate_via_worldgen",
+      "input": {"live": true, "desc": "checked build/content manifests, native artifact, and DerelictGenerator version", "at": "scripts/procgen/procgen_manifest_validator.gd:validate"},
+      "output": {"live": true, "desc": "stable result code; native generation stops on mismatch and cannot fall through to GDScript", "at": "scripts/procgen/ship_generator.gd:_generate_via_worldgen"},
+      "confidence": "V",
+      "loops": ["travel"],
+      "integrations": []
     }
   ],
   "loops": [
@@ -8683,6 +8700,10 @@
           "role": "orchestrator (configure_run_context -> generate)"
         },
         {
+          "system": "procgen_manifest_validator",
+          "role": "integrity gate (build/content/artifact manifest checks before native generation; rejects mismatch without GDScript fallback)"
+        },
+        {
           "system": "ship_layout_generator",
           "role": "5-stage layout pipeline + Stage-6 inject"
         },
@@ -8728,6 +8749,7 @@
         }
       ],
       "break_points": [
+        "Gate 0: procgen_manifest_validator checks the versioned build manifest, content hash, target, generator version, and shipped native artifact before the Rust path is allowed to proceed.",
         "Variant effects live in room_variant_selector.VARIANT_EFFECTS (effects_for); gameplay_slice_builder applies loot_bias to room loot_table (gameplay_slice_builder.gd:_loot_table_for_room); generated_ship_loader records dressing descriptors (generated_ship_loader.gd:get_room_variant_descriptors).",
         "Fire/breach variants on compartment-mapped rooms drive live derelict hazard state: _seed_derelict_fire forces ignition via current_ship.get_fire() (playable_generated_ship.gd) and _seed_derelict_breaches force-breaches hull via current_ship.get_hull() (playable_generated_ship.gd), away-branch, guarded by fire_seeded/breach_seeded.",
         "Extended structural templates enabled at deep_dive/hardened (ship_generator.gd:_extended_for); legacy room_graph_generator deprecated/test-only (excluded from completion %)."
