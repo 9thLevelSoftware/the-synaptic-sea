@@ -12,6 +12,8 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 const HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 const WAIT: Duration = Duration::from_secs(2);
+type GateReceivers = Arc<Mutex<BTreeMap<u64, mpsc::Receiver<()>>>>;
+type GatedGenerator = (Generator, mpsc::Receiver<u64>, GateReceivers);
 #[derive(Default)]
 struct Clock(AtomicU64);
 impl Clock {
@@ -104,13 +106,7 @@ fn recv<T>(r: &mpsc::Receiver<T>, what: &str) -> T {
     r.recv_timeout(WAIT)
         .unwrap_or_else(|_| panic!("timed out waiting for {what}"))
 }
-fn gated(
-    b: ProcgenBundle,
-) -> (
-    Generator,
-    mpsc::Receiver<u64>,
-    Arc<Mutex<BTreeMap<u64, mpsc::Receiver<()>>>>,
-) {
+fn gated(b: ProcgenBundle) -> GatedGenerator {
     let (tx, started_rx) = mpsc::channel();
     let gates = Arc::new(Mutex::new(BTreeMap::new()));
     let map = gates.clone();
@@ -129,7 +125,7 @@ fn gated(
     }) as Generator;
     (g, started_rx, gates)
 }
-fn release(g: &Arc<Mutex<BTreeMap<u64, mpsc::Receiver<()>>>>, seed: u64) -> mpsc::Sender<()> {
+fn release(g: &GateReceivers, seed: u64) -> mpsc::Sender<()> {
     let (tx, rx) = mpsc::channel();
     g.lock().unwrap().insert(seed, rx);
     tx
@@ -246,7 +242,7 @@ fn fake_clock_prestart_postrun_and_sync_deadlines() {
 fn raw_cap_content_and_malformed_reject_before_admission() {
     let exact = serde_json::to_string(&req(1)).unwrap();
     let mut l = lim();
-    l.max_request_bytes = exact.as_bytes().len();
+    l.max_request_bytes = exact.len();
     let s = service(l, Arc::new(Clock::default()), fixed(bundle()));
     assert_eq!(
         code(&s.submit_json("{")),
@@ -269,7 +265,7 @@ fn raw_cap_content_and_malformed_reject_before_admission() {
     unicode.site.site_id = "site-é".into();
     let unicode_json = serde_json::to_string(&unicode).unwrap();
     let mut l = lim();
-    l.max_request_bytes = unicode_json.as_bytes().len();
+    l.max_request_bytes = unicode_json.len();
     let s = service(l, Arc::new(Clock::default()), fixed(bundle()));
     assert_eq!(s.submit_json(&unicode_json).request_id, Some(1));
     s.shutdown()
