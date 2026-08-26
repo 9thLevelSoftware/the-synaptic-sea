@@ -88,6 +88,13 @@ fn locale_changes_cosmetics_not_subject_projection() {
         assemble(&c, &cat).unwrap().instructions[0].subject_id
     );
 }
+
+#[test]
+fn canonical_mixed_case_bcp47_locale_is_accepted() {
+    let mut c = context();
+    c.locale = "en-US".into();
+    assert!(assemble(&c, &PresentationCatalogue::bundled().unwrap()).is_ok());
+}
 #[test]
 fn presentation_seed_is_cosmetic_input() {
     let cat = PresentationCatalogue::bundled().unwrap();

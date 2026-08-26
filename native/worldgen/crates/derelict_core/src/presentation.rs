@@ -17,6 +17,17 @@ fn id(s: &str) -> bool {
 fn text(s: &str) -> bool {
     !s.is_empty() && s.len() <= 512
 }
+fn locale(s: &str) -> bool {
+    let mut parts = s.split('-');
+    let Some(language) = parts.next() else {
+        return false;
+    };
+    (2..=3).contains(&language.len())
+        && language.bytes().all(|byte| byte.is_ascii_alphabetic())
+        && parts.all(|part| {
+            (2..=8).contains(&part.len()) && part.bytes().all(|byte| byte.is_ascii_alphanumeric())
+        })
+}
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
 )]
@@ -367,7 +378,7 @@ impl PresentationContext {
     fn validate(&self) -> Result<(), PresentationError> {
         if self.subjects.is_empty()
             || self.subjects.len() > MAX_SUBJECTS
-            || !id(&self.locale)
+            || !locale(&self.locale)
             || self.locale.len() > 16
             || self.presentation_seed > crate::world::MAX_PUBLIC_SEED
             || self.request.platform_version != PROCGEN_GENERATOR_VERSION
