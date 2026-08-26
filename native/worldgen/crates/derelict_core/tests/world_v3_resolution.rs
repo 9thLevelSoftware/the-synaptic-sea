@@ -47,7 +47,7 @@ fn missing_selected_hub_edge_is_repaired_once() {
     let out = resolve_world(&req, candidate, &rules, &fallback).unwrap();
     assert_eq!(out.repairs, ["repair_missing_selected_hub_route"]);
     assert!(out.fallback.is_none());
-    out.validate_with_fallback(&rules, &req, &fallback).unwrap();
+    out.world_ir.validate_for_request(&req, &rules).unwrap();
 }
 
 #[test]
@@ -82,7 +82,7 @@ fn fallback_handles_selected_site_id_matching_neighbor_shape() {
     let out = resolve_world(&req, candidate, &rules, &fallback).unwrap();
     assert_eq!(out.world_ir.markers.len(), 9);
     assert_eq!(out.world_ir.markers[0].site_id, req.site_id);
-    out.world_ir.validate_for_request(&req, &rules).unwrap();
+    out.validate_with_fallback(&rules, &req, &fallback).unwrap();
 }
 
 #[test]
