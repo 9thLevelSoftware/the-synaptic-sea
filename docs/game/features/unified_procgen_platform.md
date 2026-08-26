@@ -2,8 +2,9 @@
 
 ## Status
 
-Approved; Gate 0 implementation in progress. No later gate is considered complete
-until its scoped card, acceptance evidence, and regression evidence are current.
+Approved; Gates 0 and 1 are complete and Gate 2 implementation is in progress.
+No later gate is considered complete until its scoped card, acceptance evidence,
+and regression evidence are current.
 
 This specification is canonical for procedural generation. It supersedes the
 GDScript-authority assumptions in
