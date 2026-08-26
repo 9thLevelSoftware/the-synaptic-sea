@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 pub const MANIFEST_SCHEMA_V1: &str = "procgen-build-manifest-1";
 pub const MANIFEST_SCHEMA_V2: &str = "procgen-build-manifest-2";
 pub const MANIFEST_SCHEMA_V3: &str = "procgen-build-manifest-3";
-pub const MANIFEST_SCHEMA: &str = MANIFEST_SCHEMA_V3;
+pub const MANIFEST_SCHEMA_V4: &str = "procgen-build-manifest-4";
+pub const MANIFEST_SCHEMA: &str = MANIFEST_SCHEMA_V4;
 pub const CONTENT_MANIFEST_SCHEMA: &str = "procgen-content-manifest-1";
 pub const PROCGEN_REQUEST_SCHEMA_V1: &str = "procgen-request-1";
 pub const PROCGEN_REQUEST_SCHEMA_V2: &str = "procgen-request-2";
@@ -12,28 +13,34 @@ pub const PROCGEN_REQUEST_SCHEMA: &str = PROCGEN_REQUEST_SCHEMA_V2;
 pub const PROCGEN_BUNDLE_SCHEMA_V1: &str = "procgen-bundle-1";
 pub const WORLD_IR_SCHEMA_V1: &str = "world-ir-1";
 pub const SITE_IR_SCHEMA_V1: &str = "site-ir-1";
-pub const PROCGEN_BUNDLE_SCHEMA: &str = PROCGEN_BUNDLE_SCHEMA_V4;
+pub const PROCGEN_BUNDLE_SCHEMA: &str = PROCGEN_BUNDLE_SCHEMA_V5;
 pub const WORLD_IR_SCHEMA: &str = WORLD_IR_SCHEMA_V2;
 pub const SITE_IR_SCHEMA: &str = SITE_IR_SCHEMA_V2;
 pub const GAMEPLAY_IR_SCHEMA_V1: &str = "gameplay-ir-1";
 pub const GAMEPLAY_IR_SCHEMA_V2: &str = "gameplay-ir-2";
-pub const GAMEPLAY_IR_SCHEMA: &str = GAMEPLAY_IR_SCHEMA_V2;
+pub const GAMEPLAY_IR_SCHEMA: &str = GAMEPLAY_IR_SCHEMA_V3;
 pub const PRESENTATION_IR_SCHEMA_V1: &str = "presentation-ir-1";
 pub const PRESENTATION_IR_SCHEMA_V2: &str = "presentation-ir-2";
 pub const PRESENTATION_IR_SCHEMA: &str = PRESENTATION_IR_SCHEMA_V2;
 pub const GENERATION_TRACE_SCHEMA_V1: &str = "generation-trace-1";
-pub const GENERATION_TRACE_SCHEMA: &str = GENERATION_TRACE_SCHEMA_V3;
-pub const ADAPTIVE_PROPOSAL_SCHEMA: &str = "adaptive-proposal-1";
+pub const GENERATION_TRACE_SCHEMA: &str = GENERATION_TRACE_SCHEMA_V4;
+pub const ADAPTIVE_PROPOSAL_SCHEMA: &str = ADAPTIVE_PROPOSAL_SCHEMA_V2;
 pub const PROCGEN_BUNDLE_SCHEMA_V2: &str = "procgen-bundle-2";
 pub const WORLD_IR_SCHEMA_V2: &str = "world-ir-2";
 pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2: &str = "procgen-lifecycle-result-2";
 pub const SITE_IR_SCHEMA_V2: &str = "site-ir-2";
 pub const PROCGEN_BUNDLE_SCHEMA_V3: &str = "procgen-bundle-3";
 pub const PROCGEN_BUNDLE_SCHEMA_V4: &str = "procgen-bundle-4";
+pub const PROCGEN_BUNDLE_SCHEMA_V5: &str = "procgen-bundle-5";
 pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3: &str = "procgen-lifecycle-result-3";
 pub const GENERATION_TRACE_SCHEMA_V2: &str = "generation-trace-2";
 pub const GENERATION_TRACE_SCHEMA_V3: &str = "generation-trace-3";
+pub const GENERATION_TRACE_SCHEMA_V4: &str = "generation-trace-4";
+pub const ADAPTIVE_PROPOSAL_SCHEMA_V1: &str = "adaptive-proposal-1";
+pub const ADAPTIVE_PROPOSAL_SCHEMA_V2: &str = "adaptive-proposal-2";
+pub const GAMEPLAY_IR_SCHEMA_V3: &str = "gameplay-ir-3";
 pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4: &str = "procgen-lifecycle-result-4";
+pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V5: &str = "procgen-lifecycle-result-5";
 
 #[derive(Debug, Deserialize, Serialize, schemars::JsonSchema, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -80,7 +87,7 @@ impl ExportSchemas {
             gameplay_ir: GAMEPLAY_IR_SCHEMA_V1.into(),
             presentation_ir: PRESENTATION_IR_SCHEMA_V1.into(),
             generation_trace: GENERATION_TRACE_SCHEMA_V1.into(),
-            adaptive_proposal: ADAPTIVE_PROPOSAL_SCHEMA.into(),
+            adaptive_proposal: ADAPTIVE_PROPOSAL_SCHEMA_V1.into(),
         }
     }
 
@@ -95,7 +102,7 @@ impl ExportSchemas {
             gameplay_ir: GAMEPLAY_IR_SCHEMA_V1.into(),
             presentation_ir: PRESENTATION_IR_SCHEMA_V1.into(),
             generation_trace: GENERATION_TRACE_SCHEMA_V2.into(),
-            adaptive_proposal: ADAPTIVE_PROPOSAL_SCHEMA.into(),
+            adaptive_proposal: ADAPTIVE_PROPOSAL_SCHEMA_V1.into(),
         }
     }
 
@@ -108,7 +115,20 @@ impl ExportSchemas {
             gameplay_ir: GAMEPLAY_IR_SCHEMA_V2.into(),
             presentation_ir: PRESENTATION_IR_SCHEMA_V2.into(),
             generation_trace: GENERATION_TRACE_SCHEMA_V3.into(),
-            adaptive_proposal: ADAPTIVE_PROPOSAL_SCHEMA.into(),
+            adaptive_proposal: ADAPTIVE_PROPOSAL_SCHEMA_V1.into(),
+        }
+    }
+
+    pub fn platform_v5() -> Self {
+        Self {
+            procgen_request: PROCGEN_REQUEST_SCHEMA_V2.into(),
+            procgen_bundle: PROCGEN_BUNDLE_SCHEMA_V5.into(),
+            world_ir: WORLD_IR_SCHEMA_V2.into(),
+            site_ir: SITE_IR_SCHEMA_V2.into(),
+            gameplay_ir: GAMEPLAY_IR_SCHEMA_V3.into(),
+            presentation_ir: PRESENTATION_IR_SCHEMA_V2.into(),
+            generation_trace: GENERATION_TRACE_SCHEMA_V4.into(),
+            adaptive_proposal: ADAPTIVE_PROPOSAL_SCHEMA_V2.into(),
         }
     }
 }
@@ -190,8 +210,18 @@ impl BuildManifest {
 
     pub fn from_json(json: &str) -> Result<Self, ManifestError> {
         let manifest: Self = serde_json::from_str(json)?;
-        manifest.validate()?;
+        manifest.validate_platform_v5()?;
         Ok(manifest)
+    }
+
+    pub fn from_json_platform_v1(json: &str) -> Result<Self, ManifestError> {
+        let manifest: Self = serde_json::from_str(json)?;
+        manifest.validate_platform_v1()?;
+        Ok(manifest)
+    }
+
+    pub fn validate(&self) -> Result<(), ManifestError> {
+        self.validate_platform_v5()
     }
 
     pub fn from_json_platform_v3(json: &str) -> Result<Self, ManifestError> {
@@ -253,7 +283,57 @@ impl BuildManifest {
         Ok(manifest)
     }
 
-    pub fn validate(&self) -> Result<(), ManifestError> {
+    pub fn validate_platform_v5(&self) -> Result<(), ManifestError> {
+        if self.manifest_schema != MANIFEST_SCHEMA_V4 {
+            return Err(
+                if self.manifest_schema.starts_with("procgen-build-manifest-") {
+                    ManifestError::UnknownSchemaMajor(self.manifest_schema.clone())
+                } else {
+                    ManifestError::InvalidField("manifest_schema")
+                },
+            );
+        }
+        if self.generator_version != 3 || self.export_schemas != ExportSchemas::platform_v5() {
+            return Err(ManifestError::InvalidField("export_schemas"));
+        }
+        if self.rust_source_commit.len() != 40
+            || !is_hex(&self.rust_source_commit)
+            || self.rust_source_commit != self.rust_source_commit.to_ascii_lowercase()
+            || self.content_manifest_path != "data/procgen/manifests/content_manifest.json"
+            || !is_sha256(&self.content_manifest_hash)
+            || !is_sha256(&self.artifact.sha256)
+        {
+            return Err(ManifestError::InvalidField("manifest"));
+        }
+        let valid_pair = matches!(
+            (
+                self.target.as_str(),
+                self.artifact.kind.as_str(),
+                self.artifact.path.as_str()
+            ),
+            (
+                "x86_64-pc-windows-msvc",
+                "gdextension",
+                "addons/derelict/bin/win64/derelict_godot.dll"
+            ) | (
+                "wasm32-unknown-unknown",
+                "wasm",
+                "addons/derelict/bin/web/derelict_wasm_bg.wasm"
+            )
+        );
+        if !valid_pair {
+            return Err(ManifestError::InvalidField("artifact"));
+        }
+        Ok(())
+    }
+
+    pub fn from_json_platform_v5(json: &str) -> Result<Self, ManifestError> {
+        let manifest: Self = serde_json::from_str(json)?;
+        manifest.validate_platform_v5()?;
+        Ok(manifest)
+    }
+
+    pub fn validate_platform_v1(&self) -> Result<(), ManifestError> {
         if self.manifest_schema != MANIFEST_SCHEMA_V1 {
             return Err(
                 if self.manifest_schema.starts_with("procgen-build-manifest-") {

@@ -5,9 +5,9 @@ extends SceneTree
 ## the GDExtension.  The script is source/contract validation until the rebuilt
 ## adapter is installed in the sample project.
 
-const LIFECYCLE_SCHEMA := "procgen-lifecycle-result-4"
-const CAPABILITIES_SCHEMA := "procgen-capabilities-3"
-const MANIFEST_SCHEMA := "procgen-generator-manifest-3"
+const LIFECYCLE_SCHEMA := "procgen-lifecycle-result-5"
+const CAPABILITIES_SCHEMA := "procgen-capabilities-4"
+const MANIFEST_SCHEMA := "procgen-generator-manifest-4"
 const REQUEST_SCHEMA := "procgen-request-2"
 const GENERATOR_VERSION := 3
 const DOMAINS := ["world", "site", "gameplay", "presentation"]
@@ -24,13 +24,13 @@ const RNG_CHANNELS := [
 ]
 const EXPORT_SCHEMAS := {
 	"procgen_request": "procgen-request-2",
-	"procgen_bundle": "procgen-bundle-4",
+	"procgen_bundle": "procgen-bundle-5",
 	"world_ir": "world-ir-2",
 	"site_ir": "site-ir-2",
-	"gameplay_ir": "gameplay-ir-2",
+	"gameplay_ir": "gameplay-ir-3",
 	"presentation_ir": "presentation-ir-2",
-	"generation_trace": "generation-trace-3",
-	"adaptive_proposal": "adaptive-proposal-1",
+	"generation_trace": "generation-trace-4",
+	"adaptive_proposal": "adaptive-proposal-2",
 }
 const ADAPTER_SCHEMAS := {
 	"lifecycle_result": LIFECYCLE_SCHEMA,
@@ -177,7 +177,7 @@ func _read_object(raw: Variant, code: String) -> Dictionary:
 	return parsed as Dictionary
 
 func _assert_bundle_contract(bundle: Dictionary, prefix: String) -> void:
-	_expect(bundle.get("schema_version") == "procgen-bundle-4", prefix + "_bundle_schema")
+	_expect(bundle.get("schema_version") == "procgen-bundle-5", prefix + "_bundle_schema")
 	_expect(bundle.get("version", {}).get("generator_version") == GENERATOR_VERSION, prefix + "_version_generator")
 	_expect(bundle.get("version", {}).get("export_schemas") == EXPORT_SCHEMAS, prefix + "_version_schemas")
 	var request: Dictionary = bundle.get("request", {})
@@ -190,10 +190,11 @@ func _assert_bundle_contract(bundle: Dictionary, prefix: String) -> void:
 	var trace: Dictionary = bundle.get("trace", {})
 	_expect(world_ir.get("schema_version") == "world-ir-2", prefix + "_world_schema")
 	_expect(site_ir.get("schema_version") == "site-ir-2", prefix + "_site_schema")
-	_expect(gameplay_ir.get("schema_version") == "gameplay-ir-2", prefix + "_gameplay_schema")
+	_expect(gameplay_ir.get("schema_version") == "gameplay-ir-3", prefix + "_gameplay_schema")
 	_expect(presentation_ir.get("schema_version") == "presentation-ir-2", prefix + "_presentation_schema")
-	_expect(trace.get("schema_version") == "generation-trace-3", prefix + "_trace_schema")
+	_expect(trace.get("schema_version") == "generation-trace-4", prefix + "_trace_schema")
 	_expect(trace.get("rng_channels") == RNG_CHANNELS, prefix + "_trace_channels")
+	_assert_adaptive_decisions(trace, gameplay_ir, prefix)
 	_expect(site_ir.has("mission_graph") and site_ir.has("navigation")
 			and site_ir.has("functional_props") and site_ir.has("spatial_annotations"), prefix + "_site_overlay")
 
@@ -218,6 +219,43 @@ func _assert_bundle_contract(bundle: Dictionary, prefix: String) -> void:
 	_expect(instructions.size() > 0, prefix + "_presentation_instructions")
 	for instruction in instructions:
 		_expect(instruction.get("asset_ids", []).size() > 0 and instruction.get("adapter_binding_ids", []).size() > 0, prefix + "_presentation_bindings")
+
+func _assert_adaptive_decisions(trace: Dictionary, gameplay_ir: Dictionary, prefix: String) -> void:
+	var decisions: Array = trace.get("adaptive_decisions", [])
+	_expect(decisions.size() == 3, prefix + "_adaptive_count")
+	if decisions.size() != 3:
+		return
+	var expected_kinds := ["world_ranker", "site_ranker", "encounter_director"]
+	var expected_ids := ["decision:world-ranker", "decision:site-ranker", "decision:encounter-director"]
+	for index in range(3):
+		if not decisions[index] is Dictionary:
+			_expect(false, prefix + "_adaptive_%d_object" % index)
+			return
+		var decision: Dictionary = decisions[index]
+		_expect(decision.get("schema_version") == "adaptive-decision-trace-1", prefix + "_adaptive_%d_schema" % index)
+		_expect(decision.get("kind") == expected_kinds[index], prefix + "_adaptive_%d_kind" % index)
+		_expect(decision.get("decision_id") == expected_ids[index], prefix + "_adaptive_%d_id" % index)
+		_expect(decision.get("rule_version") == "adaptive-classical-1", prefix + "_adaptive_%d_rule" % index)
+		var proposal: Dictionary = decision.get("proposal", {})
+		_expect(proposal.get("schema_version") == "adaptive-proposal-2", prefix + "_adaptive_%d_proposal_schema" % index)
+		_expect(proposal.get("rule_model_version") == "adaptive-classical-1", prefix + "_adaptive_%d_model" % index)
+		_expect(proposal.has("action") and proposal.has("score") and proposal.has("confidence_bp"), prefix + "_adaptive_%d_proposal_fields" % index)
+
+	var encounter: Dictionary = gameplay_ir.get("encounter", {})
+	var composition_id := str(encounter.get("composition_id", ""))
+	_expect(composition_id.length() > 0, prefix + "_encounter_composition_id")
+	var encounter_decision: Dictionary = decisions[2]
+	var encounter_proposal: Dictionary = encounter_decision.get("proposal", {})
+	var action: Variant = encounter_proposal.get("action")
+	_expect(action is Dictionary and (action as Dictionary).has("adjust_encounter"), prefix + "_encounter_adaptive_action")
+	if not action is Dictionary:
+		return
+	var adjustment: Dictionary = (action as Dictionary).get("adjust_encounter", {})
+	if not adjustment is Dictionary:
+		_expect(false, prefix + "_encounter_adaptive_adjustment")
+		return
+	_expect(adjustment.get("encounter_id") == composition_id, prefix + "_encounter_adaptive_binding")
+	_expect(adjustment.has("pacing_delta_bp"), prefix + "_encounter_adaptive_delta")
 
 func _is_sorted_by_id(values: Array) -> bool:
 	for index in range(1, values.size()):

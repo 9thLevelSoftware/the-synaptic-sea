@@ -40,7 +40,7 @@ func _init() -> void:
 			"economy_value": 60, "visual_tag": "item_weapon",
 		}
 		var gameplay_ir: Dictionary = {
-			"schema_version": "gameplay-ir-2",
+			"schema_version": "gameplay-ir-3",
 			"legacy_slice": {
 				"schema_version": "1.1.0", "document_kind": "ship_gameplay_slice",
 				"start_room":"crew_quarters_01", "goal_room":"crew_quarters_01",
@@ -54,7 +54,7 @@ func _init() -> void:
 			},
 			"creature_blueprints": [{"id":"creature_brute"}],
 			"encounter": {
-				"schema_version":"encounter-output-2", "composition_id":"composition:fixture",
+				"schema_version":"encounter-output-3", "composition_id":"composition:fixture",
 				"spawns":[{
 					"spawn_id":"spawn:fixture", "decision_id":"decision:fixture",
 					"reward_source_id":"reward:fixture", "room":1, "cell":cell,
@@ -68,7 +68,11 @@ func _init() -> void:
 				{"item_id":"item:container", "source_id":"container:fixture", "frequency_bp":7000},
 				{"item_id":"item:reward", "source_id":"reward:fixture", "frequency_bp":3500},
 			],
-			"decisions": [{"decision_id":"decision:fixture"}],
+			"decisions": [{
+				"accepted": true, "candidate_id":"candidate:fixture", "channel_id":"encounter:fixture",
+				"decision_id":"decision:fixture", "domain":"encounter", "score_bp":10000,
+				"rationale_codes":[{"code":"encounter", "detail":"accepted"}], "selected_id":"composition:fixture"
+			}],
 		}
 		var presentation_ir: Dictionary = {
 			"schema_version":"presentation-ir-2",

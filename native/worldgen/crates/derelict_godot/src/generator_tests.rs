@@ -11,11 +11,11 @@ fn compiled_identity_constructs_valid_manifest_and_exact_capabilities() {
     assert_eq!(manifest.generator_version, 3);
     assert_eq!(
         manifest.adapter_schemas,
-        derelict_core::lifecycle::AdapterSchemas::platform_v4()
+        derelict_core::lifecycle::AdapterSchemas::platform_v5()
     );
     assert_eq!(
         manifest.export_schemas,
-        derelict_core::manifest::ExportSchemas::platform_v4()
+        derelict_core::manifest::ExportSchemas::platform_v5()
     );
     assert!(manifest.validate().is_ok());
 
@@ -53,6 +53,20 @@ fn legacy_request_is_explicitly_normalized() {
     assert_eq!(bundle.version.generator_version, 3);
     assert_eq!(bundle.site_ir.ship.generator_version, 2);
     assert_eq!(bundle.site_ir.ship.seed, bundle.world_ir.site_seed);
+    assert_eq!(bundle.trace.adaptive_decisions.len(), 3);
+    assert_eq!(
+        bundle
+            .trace
+            .adaptive_decisions
+            .iter()
+            .map(|decision| decision.kind)
+            .collect::<Vec<_>>(),
+        vec![
+            derelict_core::adaptive::AdaptiveDecisionKind::WorldRanker,
+            derelict_core::adaptive::AdaptiveDecisionKind::SiteRanker,
+            derelict_core::adaptive::AdaptiveDecisionKind::EncounterDirector,
+        ]
+    );
 }
 
 #[test]

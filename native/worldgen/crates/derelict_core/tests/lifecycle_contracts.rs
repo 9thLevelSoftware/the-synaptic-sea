@@ -48,7 +48,7 @@ fn request() -> ProcgenRequest {
 
 #[test]
 fn accepted_omits_optional_payloads_and_capabilities_round_trip() {
-    let json = r#"{"schema_version":"procgen-lifecycle-result-4","status":"accepted","request_id":7,"events":["admitted"]}"#;
+    let json = r#"{"schema_version":"procgen-lifecycle-result-5","status":"accepted","request_id":7,"events":["admitted"]}"#;
     let accepted = LifecycleResult::from_json(json).unwrap();
     assert_eq!(accepted.bundle, None);
     assert_eq!(accepted.failure, None);
@@ -106,7 +106,7 @@ fn capabilities() -> ProcgenCapabilities {
             Domain::Gameplay,
             Domain::Presentation,
         ],
-        schemas: AdapterSchemas::platform_v4(),
+        schemas: AdapterSchemas::platform_v5(),
     }
 }
 
@@ -152,8 +152,8 @@ fn capabilities_and_manifest_reject_bad_identity_and_limits() {
         rust_source_commit: "a".repeat(40),
         generator_version: 3,
         content_manifest_hash: "b".repeat(64),
-        export_schemas: ExportSchemas::platform_v4(),
-        adapter_schemas: AdapterSchemas::platform_v4(),
+        export_schemas: ExportSchemas::platform_v5(),
+        adapter_schemas: AdapterSchemas::platform_v5(),
         target: "wasm32-unknown-unknown".into(),
         dirty_development: false,
     };
@@ -385,8 +385,8 @@ fn nested_unknown_fields_reject_at_rust_and_schema_boundaries() {
         rust_source_commit: "a".repeat(40),
         generator_version: 3,
         content_manifest_hash: "b".repeat(64),
-        export_schemas: ExportSchemas::platform_v4(),
-        adapter_schemas: AdapterSchemas::platform_v4(),
+        export_schemas: ExportSchemas::platform_v5(),
+        adapter_schemas: AdapterSchemas::platform_v5(),
         target: "wasm32-unknown-unknown".into(),
         dirty_development: false,
     };

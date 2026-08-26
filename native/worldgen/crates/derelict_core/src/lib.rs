@@ -5,6 +5,7 @@
 //! `generate_ship(seed, params, data)` is a pure function — identical inputs
 //! and `GENERATOR_VERSION` produce byte-identical ships on any platform.
 
+pub mod adaptive;
 pub mod archetype;
 pub mod creature;
 pub mod encounter;

@@ -2,7 +2,7 @@
 use derelict_core::lifecycle::{
     AdapterKind, AdapterSchemas, GeneratorManifest, LifecycleEvent, LifecycleResult,
     ProcgenCapabilities, WorkerMode, PROCGEN_CAPABILITIES_SCHEMA,
-    PROCGEN_GENERATOR_MANIFEST_SCHEMA, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4,
+    PROCGEN_GENERATOR_MANIFEST_SCHEMA, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V5,
 };
 use derelict_core::manifest::ExportSchemas;
 use derelict_core::procgen::{
@@ -201,7 +201,7 @@ impl WasmService {
 }
 fn json_fallback() -> String {
     format!(
-        r#"{{"schema_version":"{PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4}","status":"failed","request_id":null,"bundle":null,"failure":{{"schema_version":"procgen-failure-1","code":"adapter_failure","stage":"adapter","message":"serialization failure","retryable":false,"fallback_id":null}},"events":["failed"]}}"#
+        r#"{{"schema_version":"{PROCGEN_LIFECYCLE_RESULT_SCHEMA_V5}","status":"failed","request_id":null,"bundle":null,"failure":{{"schema_version":"procgen-failure-1","code":"adapter_failure","stage":"adapter","message":"serialization failure","retryable":false,"fallback_id":null}},"events":["failed"]}}"#
     )
 }
 
@@ -326,7 +326,7 @@ fn capabilities_value() -> ProcgenCapabilities {
             Domain::Gameplay,
             Domain::Presentation,
         ],
-        schemas: AdapterSchemas::platform_v4(),
+        schemas: AdapterSchemas::platform_v5(),
     }
 }
 fn manifest_value() -> GeneratorManifest {
@@ -335,8 +335,8 @@ fn manifest_value() -> GeneratorManifest {
         rust_source_commit: SOURCE_COMMIT.into(),
         generator_version: PROCGEN_GENERATOR_VERSION,
         content_manifest_hash: CONTENT_HASH.into(),
-        export_schemas: ExportSchemas::platform_v4(),
-        adapter_schemas: AdapterSchemas::platform_v4(),
+        export_schemas: ExportSchemas::platform_v5(),
+        adapter_schemas: AdapterSchemas::platform_v5(),
         target: "wasm32-unknown-unknown".into(),
         dirty_development: env!("SYNAPTIC_PROCGEN_DIRTY_DEVELOPMENT") == "true",
     }
@@ -647,6 +647,7 @@ fn json_capabilities(value: ProcgenCapabilities) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use derelict_core::adaptive::{AdaptiveActionV2, AdaptiveDecisionKind};
     use derelict_core::model::{EntityKind, GENERATOR_VERSION};
     use derelict_core::procgen::{
         semantic_hash, PlayerModel, PresentationRequest, ProcgenBundle, SiteRequest,
@@ -783,8 +784,8 @@ mod tests {
         assert_eq!(m.target, "wasm32-unknown-unknown");
         assert_eq!(m.schema_version, PROCGEN_GENERATOR_MANIFEST_SCHEMA);
         assert_eq!(m.generator_version, PROCGEN_GENERATOR_VERSION);
-        assert_eq!(m.export_schemas, ExportSchemas::platform_v4());
-        assert_eq!(m.adapter_schemas, AdapterSchemas::platform_v4());
+        assert_eq!(m.export_schemas, ExportSchemas::platform_v5());
+        assert_eq!(m.adapter_schemas, AdapterSchemas::platform_v5());
         let capabilities_json = json_capabilities(capabilities_value());
         ProcgenCapabilities::from_json(&capabilities_json).unwrap();
         let parsed = GeneratorManifest::from_json(&generator_manifest()).unwrap();
@@ -883,7 +884,7 @@ mod tests {
         );
         let sync = parse(&service.sync(&request_json()));
         let sync_bundle = sync.bundle.as_ref().expect("sync bundle");
-        assert_eq!(sync.schema_version, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4);
+        assert_eq!(sync.schema_version, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V5);
         assert_eq!(sync_bundle.schema_version, PROCGEN_BUNDLE_SCHEMA);
         assert_eq!(sync_bundle.world_ir.schema_version, "world-ir-2");
         assert_eq!(sync_bundle.site_ir.schema_version, SITE_IR_SCHEMA);
@@ -896,6 +897,48 @@ mod tests {
             sync_bundle.site_ir.ship.seed,
             sync_bundle.world_ir.site_seed
         );
+        assert_eq!(sync_bundle.trace.adaptive_decisions.len(), 3);
+        let adaptive = &sync_bundle.trace.adaptive_decisions;
+        assert_eq!(
+            adaptive
+                .iter()
+                .map(|decision| decision.kind)
+                .collect::<Vec<_>>(),
+            vec![
+                AdaptiveDecisionKind::WorldRanker,
+                AdaptiveDecisionKind::SiteRanker,
+                AdaptiveDecisionKind::EncounterDirector,
+            ]
+        );
+        assert_eq!(
+            adaptive
+                .iter()
+                .map(|decision| decision.decision_id.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "decision:world-ranker",
+                "decision:site-ranker",
+                "decision:encounter-director"
+            ]
+        );
+        for decision in adaptive {
+            assert!(decision.candidates.len() <= 64);
+            assert!(decision
+                .player_values_bp
+                .iter()
+                .all(|value| *value <= 10_000));
+            assert!(decision.proposal.rationale_codes.len() <= 64);
+            assert!((-10_000..=10_000).contains(&decision.proposal.score));
+        }
+        match &adaptive[2].proposal.action {
+            AdaptiveActionV2::AdjustEncounter { encounter_id, .. } => {
+                assert_eq!(
+                    encounter_id,
+                    &sync_bundle.gameplay_ir.encounter.composition_id
+                )
+            }
+            action => panic!("unexpected encounter adaptive action: {action:?}"),
+        }
         assert_eq!(
             sync.events,
             vec![
@@ -910,9 +953,15 @@ mod tests {
             vec![LifecycleEvent::Admitted, LifecycleEvent::Queued]
         );
         assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let repeated_service = WasmService::default();
+        let repeated = parse(&repeated_service.sync(&request_json()));
+        assert_eq!(
+            repeated.bundle.as_ref().unwrap().semantic_hash,
+            sync_bundle.semantic_hash
+        );
         let terminal = parse(&service.poll_request(1));
         let terminal_bundle = terminal.bundle.as_ref().expect("terminal bundle");
-        assert_eq!(terminal.schema_version, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4);
+        assert_eq!(terminal.schema_version, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V5);
         assert_eq!(terminal_bundle.schema_version, PROCGEN_BUNDLE_SCHEMA);
         assert_eq!(terminal_bundle.world_ir.schema_version, "world-ir-2");
         assert_eq!(terminal_bundle.site_ir.schema_version, SITE_IR_SCHEMA);

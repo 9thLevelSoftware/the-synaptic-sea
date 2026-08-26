@@ -8339,12 +8339,39 @@
       "driven": true,
       "driven_at": "native/worldgen/crates/derelict_core/src/procgen.rs:generate_bundle",
       "input": {"live": true, "desc": "Versioned ProcgenRequest drives one Rust pipeline for world, site, gameplay, and presentation domains", "at": "native/worldgen/crates/derelict_core/src/procgen.rs:generate_bundle"},
-      "output": {"live": true, "desc": "Validated ProcgenBundle with semantic hash, metrics, and trace is consumed unchanged by native and Web adapters", "at": "native/worldgen/crates/derelict_core/src/procgen.rs:generate_bundle"},
+      "output": {"live": true, "desc": "Validated ProcgenBundle with semantic hash, metrics, three ordered replayable adaptive traces, and trace is consumed unchanged by native and Web adapters", "at": "native/worldgen/crates/derelict_core/src/procgen.rs:generate_bundle"},
       "confidence": "V",
       "loops": ["travel"],
       "integrations": [
+        {"to": "procgen_adaptive", "via": "generate_bundle composes deterministic world/site ranker and encounter director decisions", "at": "native/worldgen/crates/derelict_core/src/procgen.rs:348-383", "health": "healthy"},
         {"to": "worldgen_gdextension", "via": "shared generate_bundle and bounded lifecycle core", "at": "native/worldgen/crates/derelict_godot/src/generator.rs", "health": "healthy"}
       ]
+    },
+    {
+      "id": "procgen_adaptive",
+      "file": "native/worldgen/crates/derelict_core/src/adaptive.rs",
+      "name": "Deterministic Classical Adaptive Ranker / Director",
+      "domain": "travel",
+      "kind": "simulation",
+      "model_exists": true,
+      "smoke": "native/worldgen/crates/derelict_core/tests/adaptive_v1.rs",
+      "reachable": true,
+      "driven": true,
+      "driven_at": "native/worldgen/crates/derelict_core/src/procgen.rs:generate_bundle",
+      "input": {"live": true, "desc": "Bounded versioned player-model values and only fully validated world/site candidates enter classical ranking; encounter director receives the same snapshot", "at": "native/worldgen/crates/derelict_core/src/adaptive.rs:rank_validated_candidates/direct_encounter"},
+      "output": {"live": true, "desc": "Produces authored-envelope select or threat-only pacing proposals with rationale, confidence, and replayable decision traces; invalid or empty candidate sets fail closed", "at": "native/worldgen/crates/derelict_core/src/adaptive.rs:AdaptiveDecisionTrace"},
+      "confidence": "V",
+      "loops": ["travel"],
+      "integrations": [
+        {"to": "worldgen_core", "via": "world/site generation and encounter validation replay adaptive decisions before bundle export", "at": "native/worldgen/crates/derelict_core/src/procgen.rs:407-539", "health": "healthy"}
+      ],
+      "content": "sufficient",
+      "content_note": "Authored classical rules are bundled in native/worldgen/crates/derelict_core/assets/adaptive/classical_v1.json. No embedded model or network/provider dependency is present.",
+      "functional": null,
+      "gaps": [
+        "Optional embedded inference remains a later evidence-gated experiment behind the same constrained proposal interface."
+      ],
+      "subsystems": []
     },
     {
       "id": "worldgen_gdextension",
@@ -8357,8 +8384,8 @@
       "reachable": true,
       "driven": true,
       "driven_at": "scripts/procgen/ship_generator.gd:_generate_via_worldgen",
-      "input": {"live": true, "desc": "Manifest-gated ProcgenRequest JSON enters the same bounded Rust lifecycle used by Web", "at": "native/worldgen/crates/derelict_godot/src/generator.rs"},
-      "output": {"live": true, "desc": "Complete ProcgenBundle JSON is validated by the Godot consumer before authored scene assembly", "at": "scripts/procgen/procgen_bundle_consumer.gd:consume"},
+      "input": {"live": true, "desc": "Manifest-gated ProcgenRequest JSON enters the same bounded Rust lifecycle used by Web; current platform v5 export maps are exposed by the adapter", "at": "native/worldgen/crates/derelict_godot/src/generator.rs:60-97"},
+      "output": {"live": true, "desc": "Complete ProcgenBundle v5 JSON, including the ordered world/site/encounter adaptive traces, is validated by the Godot consumer before authored scene assembly", "at": "scripts/procgen/procgen_bundle_consumer.gd:consume"},
       "confidence": "V",
       "loops": ["travel"],
       "integrations": [

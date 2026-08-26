@@ -1,7 +1,8 @@
 //! Authored, deterministic encounter composition for GameplayIR-2.
 
+use crate::adaptive::{direct_encounter, AdaptiveActionV2, AdaptiveDecisionTrace};
 use crate::creature::{CreatureBlueprint, CreatureCatalogue, ThreatRole, MAX_CELLS};
-use crate::player_model::{PlayerModelV2, PLAYER_SIGNAL_BASELINE_BP};
+use crate::player_model::PlayerModelV2;
 use crate::rng::stable_index;
 use crate::site::{validate_site_for_request, LosPair, SiteIR, SpatialAnnotation};
 use crate::structural::plan::Cell;
@@ -11,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 pub const ENCOUNTER_CATALOGUE_SCHEMA: &str = "encounter-catalogue-2";
-pub const ENCOUNTER_OUTPUT_SCHEMA: &str = "encounter-output-2";
+pub const ENCOUNTER_OUTPUT_SCHEMA: &str = "encounter-output-3";
 pub const ENCOUNTER_RULES_VERSION: &str = "encounter-rules-2";
 pub const COMBAT_SIMULATION_REQUEST_SCHEMA: &str = "combat-simulation-request-1";
 pub const COMBAT_SIMULATION_RESULT_SCHEMA: &str = "combat-simulation-result-1";
@@ -179,6 +180,7 @@ pub struct EncounterTrace {
     pub selected_spawn_ids: Vec<String>,
     pub fallback: Option<String>,
     pub fallback_rationale: Option<EncounterRationale>,
+    pub adaptive: AdaptiveDecisionTrace,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -477,24 +479,14 @@ fn encounter_key(
     .map_err(EncounterError::Key)
 }
 
-fn player_factor_bp(values: [u16; 4]) -> u16 {
-    let baseline = i64::from(PLAYER_SIGNAL_BASELINE_BP);
-    let mastery = i64::from(values[0]) - baseline;
-    let damage_pressure = i64::from(values[1]) - baseline;
-    let resource_pressure = i64::from(values[2]) - baseline;
-    let objective_pace = i64::from(values[3]) - baseline;
-    let adjustment = mastery - damage_pressure / 2 - resource_pressure / 2 + objective_pace / 4;
-    u16::try_from((10_000i64 + adjustment).clamp(7_500, 12_500)).unwrap_or(10_000)
-}
-
 fn budget_trace(
     context: &EncounterGenerationContext,
     budget: &DifficultyBudget,
     minimum_reward_value: u16,
+    player_factor_bp: u16,
 ) -> Result<EncounterBudgetTrace, EncounterError> {
-    let factor = player_factor_bp(context.player.normalized_values());
     let adjusted_threat = u64::from(budget.threat_budget)
-        .checked_mul(u64::from(factor))
+        .checked_mul(u64::from(player_factor_bp))
         .and_then(|value| value.checked_div(10_000))
         .and_then(|value| u32::try_from(value).ok())
         .ok_or_else(|| EncounterError::Invalid("threat_budget_overflow".into()))?;
@@ -506,13 +498,49 @@ fn budget_trace(
         .ok_or_else(|| EncounterError::Invalid("economy_budget_overflow".into()))?;
     Ok(EncounterBudgetTrace {
         difficulty_id: context.difficulty_id,
-        player_factor_bp: factor,
+        player_factor_bp,
         threat_limit: adjusted_threat.min(context.threat_cap),
         performance_limit: budget.performance_budget.min(context.performance_cap),
         economy_limit: adjusted_economy.min(context.economy_cap),
         group_cap: budget.group_cap,
         minimum_reward_value,
     })
+}
+
+fn adaptive_threat_factor(
+    adaptive: &AdaptiveDecisionTrace,
+    composition_id: &str,
+    player: &PlayerModelV2,
+) -> Result<u16, EncounterError> {
+    let replay = direct_encounter(
+        adaptive.decision_id.clone(),
+        composition_id.to_owned(),
+        player,
+    )
+    .map_err(|error| EncounterError::Validation(format!("adaptive_replay:{error}")))?;
+    if replay != *adaptive {
+        return Err(EncounterError::Validation(
+            "adaptive_replay_mismatch".into(),
+        ));
+    }
+    if adaptive.kind != crate::adaptive::AdaptiveDecisionKind::EncounterDirector
+        || adaptive.decision_id != "decision:encounter-director"
+        || adaptive.player_values_bp != player.normalized_values()
+    {
+        return Err(EncounterError::Validation("adaptive_trace_binding".into()));
+    }
+    let delta = match &adaptive.proposal.action {
+        AdaptiveActionV2::AdjustEncounter {
+            encounter_id,
+            pacing_delta_bp,
+        } if encounter_id == composition_id => *pacing_delta_bp,
+        _ => return Err(EncounterError::Validation("adaptive_action_binding".into())),
+    };
+    let factor = 10_000i32
+        .checked_add(delta)
+        .filter(|value| (7_500..=12_500).contains(value))
+        .ok_or_else(|| EncounterError::Validation("adaptive_threat_factor".into()))?;
+    u16::try_from(factor).map_err(|_| EncounterError::Validation("adaptive_threat_factor".into()))
 }
 
 fn navigation_distances(site: &SiteIR) -> BTreeMap<u16, u16> {
@@ -776,7 +804,16 @@ fn generate_unvalidated(
         .reward_values
         .first()
         .ok_or_else(|| EncounterError::Invalid("reward_values".into()))?;
-    let budgets = budget_trace(context, difficulty, minimum_reward)?;
+    let composition_seed = encounter_key(context, "gameplay.encounter_selection", 0)?;
+    let composition_id = format!("composition:{composition_seed:016x}");
+    let adaptive = direct_encounter(
+        "decision:encounter-director",
+        composition_id.clone(),
+        &context.player,
+    )
+    .map_err(|error| EncounterError::Invalid(format!("adaptive:{error}")))?;
+    let player_factor = adaptive_threat_factor(&adaptive, &composition_id, &context.player)?;
+    let budgets = budget_trace(context, difficulty, minimum_reward, player_factor)?;
     let composition_economy_limit = difficulty.economy_budget.min(context.economy_cap);
     let mut raw_candidates = build_candidates(context, catalogue, site, blueprints, creatures)?;
     let mut eligible = Vec::new();
@@ -909,11 +946,10 @@ fn generate_unvalidated(
         .is_empty()
         .then(|| catalogue.safe_empty_fallback_id.clone());
     let fallback_rationale = spawns.is_empty().then_some(EncounterRationale::NoFairSpawn);
-    let composition_seed = encounter_key(context, "gameplay.encounter_selection", 0)?;
     let selected_spawn_ids = spawns.iter().map(|spawn| spawn.spawn_id.clone()).collect();
     Ok(EncounterGenerationOutcome {
         schema_version: ENCOUNTER_OUTPUT_SCHEMA.into(),
-        composition_id: format!("composition:{composition_seed:016x}"),
+        composition_id,
         spawns,
         total_threat,
         total_performance,
@@ -931,6 +967,7 @@ fn generate_unvalidated(
             selected_spawn_ids,
             fallback,
             fallback_rationale,
+            adaptive,
         },
     })
 }
@@ -981,7 +1018,9 @@ impl EncounterGenerationOutcome {
             .reward_values
             .first()
             .ok_or_else(|| EncounterError::Validation("reward_values".into()))?;
-        if self.trace.budgets != budget_trace(context, difficulty, minimum_reward)? {
+        let player_factor =
+            adaptive_threat_factor(&self.trace.adaptive, &self.composition_id, &context.player)?;
+        if self.trace.budgets != budget_trace(context, difficulty, minimum_reward, player_factor)? {
             return Err(EncounterError::Validation("budget_trace".into()));
         }
 

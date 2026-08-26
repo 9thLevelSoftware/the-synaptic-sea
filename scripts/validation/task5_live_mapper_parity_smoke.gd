@@ -22,10 +22,10 @@ func _init() -> void:
 		request.site.site_id = "legacy-site"
 		if item.label == "fractured": request.site.archetype_id = "frigate"
 		var lifecycle: Dictionary = JSON.parse_string(str(generator.generate_bundle(JSON.stringify(request))))
-		if str(lifecycle.get("schema_version", "")) != "procgen-lifecycle-result-4" or str(lifecycle.get("status", "")) != "completed":
-			failures.append("%s lifecycle_v4" % item.label); continue
+		if str(lifecycle.get("schema_version", "")) != "procgen-lifecycle-result-5" or str(lifecycle.get("status", "")) != "completed":
+			failures.append("%s lifecycle_v5" % item.label); continue
 		var bundle: Dictionary = lifecycle.get("bundle", {})
-		if str(bundle.get("schema_version", "")) != "procgen-bundle-4": failures.append("%s bundle_v4" % item.label); continue
+		if str(bundle.get("schema_version", "")) != "procgen-bundle-5": failures.append("%s bundle_v5" % item.label); continue
 		if str((bundle.get("site_ir", {}) as Dictionary).get("schema_version", "")) != "site-ir-2": failures.append("%s site_ir_v2" % item.label); continue
 		if item.label == "fractured" and not bool((bundle.get("site_ir", {}).get("ship", {}) as Dictionary).get("fractured", false)):
 			failures.append("fractured fixture was not confirmed fractured")

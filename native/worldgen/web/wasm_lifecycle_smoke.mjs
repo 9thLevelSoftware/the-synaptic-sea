@@ -14,19 +14,19 @@ const manifest = parse(binding.generator_manifest());
 const vectors = JSON.parse(fs.readFileSync(corpusPath, 'utf8'));
 const expectedDomains = ['world', 'site', 'gameplay', 'presentation'];
 const expectedAdapterSchemas = {
-  lifecycle_result: 'procgen-lifecycle-result-4',
-  capabilities: 'procgen-capabilities-3',
-  generator_manifest: 'procgen-generator-manifest-3',
+  lifecycle_result: 'procgen-lifecycle-result-5',
+  capabilities: 'procgen-capabilities-4',
+  generator_manifest: 'procgen-generator-manifest-4',
 };
 const expectedExportSchemas = {
   procgen_request: 'procgen-request-2',
-  procgen_bundle: 'procgen-bundle-4',
+  procgen_bundle: 'procgen-bundle-5',
   world_ir: 'world-ir-2',
   site_ir: 'site-ir-2',
-  gameplay_ir: 'gameplay-ir-2',
+  gameplay_ir: 'gameplay-ir-3',
   presentation_ir: 'presentation-ir-2',
-  generation_trace: 'generation-trace-3',
-  adaptive_proposal: 'adaptive-proposal-1',
+  generation_trace: 'generation-trace-4',
+  adaptive_proposal: 'adaptive-proposal-2',
 };
 const expectedChannels = [
   'world.archetype', 'world.biome', 'world.hazard', 'world.resource', 'world.landmark',
@@ -51,7 +51,7 @@ const parseLifecycle = (raw, name) => {
   const statuses = ['accepted', 'queued', 'running', 'cancel_requested', 'completed', 'failed'];
   const events = ['rejected', 'admitted', 'queued', 'started', 'cancel_requested', 'cancelled',
     'timed_out', 'completed', 'failed', 'overloaded', 'result_consumed', 'result_expired', 'shutdown'];
-  if (result?.schema_version !== 'procgen-lifecycle-result-4'
+  if (result?.schema_version !== 'procgen-lifecycle-result-5'
       || !statuses.includes(result.status) || !Array.isArray(result.events)
       || result.events.length < 1 || result.events.length > 32
       || result.events.some((event) => !events.includes(event))) {
@@ -63,12 +63,12 @@ const boundedArray = (value, max, label) => {
   if (!Array.isArray(value) || value.length > max) throw new Error(`${label} bounds mismatch`);
 };
 const assertBundleContract = (bundle, name) => {
-  if (bundle?.schema_version !== 'procgen-bundle-4'
+  if (bundle?.schema_version !== 'procgen-bundle-5'
       || bundle.world_ir?.schema_version !== 'world-ir-2'
       || bundle.site_ir?.schema_version !== 'site-ir-2'
-      || bundle.gameplay_ir?.schema_version !== 'gameplay-ir-2'
+      || bundle.gameplay_ir?.schema_version !== 'gameplay-ir-3'
       || bundle.presentation_ir?.schema_version !== 'presentation-ir-2'
-      || bundle.trace?.schema_version !== 'generation-trace-3'
+      || bundle.trace?.schema_version !== 'generation-trace-4'
       || !equal(bundle.version?.export_schemas, expectedExportSchemas)) {
     throw new Error(`${name} bundle schema contract mismatch`);
   }
@@ -127,13 +127,38 @@ const assertBundleContract = (bundle, name) => {
   boundedArray(bundle.trace.failed_constraints, 4096, `${name} trace failures`);
   boundedArray(bundle.trace.repairs, 4096, `${name} trace repairs`);
   boundedArray(bundle.trace.retries, 4096, `${name} trace retries`);
+  boundedArray(bundle.trace.adaptive_decisions, 3, `${name} adaptive decisions`);
+  if (bundle.trace.adaptive_decisions.length !== 3) throw new Error(`${name} adaptive decision count mismatch`);
+  const adaptiveKinds = ['world_ranker', 'site_ranker', 'encounter_director'];
+  const adaptiveIds = ['decision:world-ranker', 'decision:site-ranker', 'decision:encounter-director'];
+  bundle.trace.adaptive_decisions.forEach((decision, index) => {
+    const keys = Object.keys(decision).sort().join(',');
+    if (keys !== 'applied,candidates,decision_id,fallback,kind,player_values_bp,proposal,rule_version,schema_version'
+        || decision.schema_version !== 'adaptive-decision-trace-1'
+        || decision.kind !== adaptiveKinds[index] || decision.decision_id !== adaptiveIds[index]
+        || decision.rule_version !== 'adaptive-classical-1'
+        || !Array.isArray(decision.player_values_bp) || decision.player_values_bp.length !== 4
+        || decision.candidates.length > 64 || !decision.proposal
+        || Object.keys(decision.proposal).sort().join(',') !== 'action,confidence_bp,rationale_codes,rule_model_version,schema_version,score'
+        || decision.proposal.schema_version !== 'adaptive-proposal-2'
+        || decision.proposal.rule_model_version !== 'adaptive-classical-1'
+        || !Array.isArray(decision.proposal.rationale_codes)
+        || decision.proposal.rationale_codes.length < 1 || decision.proposal.rationale_codes.length > 64
+        || decision.proposal.confidence_bp > 10000 || decision.proposal.score < -10000
+        || decision.proposal.score > 10000) {
+      throw new Error(`${name} adaptive decision shape mismatch`);
+    }
+  });
+  const encounterDecision = bundle.trace.adaptive_decisions[2];
+  if (encounterDecision.proposal.action?.adjust_encounter?.encounter_id
+      !== gameplay.encounter.composition_id) throw new Error(`${name} encounter action binding mismatch`);
   const site = bundle.site_ir;
   if (!Object.hasOwn(site, 'mission_graph') || !Object.hasOwn(site, 'navigation')
       || !Object.hasOwn(site, 'functional_props') || !Object.hasOwn(site, 'spatial_annotations')) {
     throw new Error(`${name} SiteIR v2 overlay missing`);
   }
 };
-if (cap.schema_version !== 'procgen-capabilities-3' || cap.adapter_kind !== 'web'
+if (cap.schema_version !== 'procgen-capabilities-4' || cap.adapter_kind !== 'web'
     || cap.target !== 'wasm32-unknown-unknown' || cap.supports_sync !== true
     || cap.supports_async !== true || cap.supports_cancel !== true
     || cap.worker_mode !== 'cooperative' || cap.worker_count !== 0
@@ -142,7 +167,7 @@ if (cap.schema_version !== 'procgen-capabilities-3' || cap.adapter_kind !== 'web
     || cap.max_trace_entries !== 4096 || cap.max_events !== 32
     || cap.deadline_ms !== 2000 || !equal(cap.supported_domains, expectedDomains)
     || !equal(cap.schemas, expectedAdapterSchemas)) throw new Error('capabilities contract mismatch');
-if (manifest.schema_version !== 'procgen-generator-manifest-3'
+if (manifest.schema_version !== 'procgen-generator-manifest-4'
     || !/^[0-9a-f]{40}$/.test(manifest.rust_source_commit)
     || manifest.generator_version !== 3
     || manifest.content_manifest_hash !== vectors[0].request.content_manifest_hash
@@ -196,5 +221,12 @@ for (const vector of vectors) {
   if (terminal.bundle?.semantic_hash !== vector.expected_semantic_hash) throw new Error(`${vector.name} async hash mismatch`);
   const consumed = parseLifecycle(binding.poll(id), `${vector.name} consumed`);
   if (consumed.failure?.code !== 'result_consumed') throw new Error(`${vector.name} consumed contract mismatch`);
+}
+const repeatRaw = JSON.stringify(vectors[0].request);
+const repeatA = parseLifecycle(binding.generate_bundle(repeatRaw), 'repeat A');
+const repeatB = parseLifecycle(binding.generate_bundle(repeatRaw), 'repeat B');
+if (repeatA.bundle?.semantic_hash !== repeatB.bundle?.semantic_hash
+    || JSON.stringify(repeatA.bundle) !== JSON.stringify(repeatB.bundle)) {
+  throw new Error('deterministic repeated output mismatch');
 }
 console.log('WASM_LIFECYCLE_SMOKE: PASS');

@@ -17,7 +17,7 @@ func map_to_loader_documents(bundle: Dictionary) -> Dictionary:
 	var ship: Variant = site.get("ship", null)
 	var gameplay: Variant = gameplay_ir.get("legacy_slice", null)
 	if str(site.get("schema_version", "")) != "site-ir-2" \
-			or str(gameplay_ir.get("schema_version", "")) != "gameplay-ir-2" \
+			or str(gameplay_ir.get("schema_version", "")) != "gameplay-ir-3" \
 			or str(presentation.get("schema_version", "")) != "presentation-ir-2" \
 			or str(request.get("schema_version", "")) != "procgen-request-2" \
 			or not request_site is Dictionary \

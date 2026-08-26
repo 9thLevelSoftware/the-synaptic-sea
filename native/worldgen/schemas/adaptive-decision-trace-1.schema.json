@@ -1,0 +1,309 @@
+{
+  "$id": "adaptive-decision-trace-1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "AdaptiveActionV2": {
+      "oneOf": [
+        {
+          "enum": [
+            "no_op"
+          ],
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "select_candidate": {
+              "additionalProperties": false,
+              "properties": {
+                "candidate_id": {
+                  "maxLength": 96,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9:_-]+$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "candidate_id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "select_candidate"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "adjust_encounter": {
+              "additionalProperties": false,
+              "properties": {
+                "encounter_id": {
+                  "maxLength": 96,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9:_-]+$",
+                  "type": "string"
+                },
+                "pacing_delta_bp": {
+                  "enum": [
+                    -2500,
+                    -1250,
+                    0,
+                    1250,
+                    2500
+                  ],
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "encounter_id",
+                "pacing_delta_bp"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "adjust_encounter"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AdaptiveCandidateRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/AdaptiveActionV2"
+        },
+        "candidate_id": {
+          "maxLength": 96,
+          "minLength": 1,
+          "pattern": "^[a-z0-9:_-]+$",
+          "type": "string"
+        },
+        "features": {
+          "$ref": "#/definitions/CandidateFeatures"
+        },
+        "rationale_codes": {
+          "items": {
+            "$ref": "#/definitions/AdaptiveRationaleCode"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "score": {
+          "maximum": 10000,
+          "minimum": -10000,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "action",
+        "candidate_id",
+        "features",
+        "rationale_codes",
+        "score"
+      ],
+      "type": "object"
+    },
+    "AdaptiveDecisionKind": {
+      "enum": [
+        "world_ranker",
+        "site_ranker",
+        "encounter_director"
+      ],
+      "type": "string"
+    },
+    "AdaptiveFallbackReason": {
+      "enum": [
+        "no_validated_candidate"
+      ],
+      "type": "string"
+    },
+    "AdaptiveProposalV2": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/AdaptiveActionV2"
+        },
+        "confidence_bp": {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rationale_codes": {
+          "items": {
+            "$ref": "#/definitions/AdaptiveRationaleCode"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "rule_model_version": {
+          "const": "adaptive-classical-1"
+        },
+        "schema_version": {
+          "const": "adaptive-proposal-2"
+        },
+        "score": {
+          "maximum": 10000,
+          "minimum": -10000,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "action",
+        "confidence_bp",
+        "rationale_codes",
+        "rule_model_version",
+        "schema_version",
+        "score"
+      ],
+      "type": "object"
+    },
+    "AdaptiveRationaleCode": {
+      "enum": [
+        "validated_candidate",
+        "challenge_fit",
+        "pace_fit",
+        "resource_pressure_fit",
+        "stable_tie_break",
+        "authored_envelope",
+        "combat_mastery",
+        "damage_pressure",
+        "resource_pressure",
+        "objective_pace",
+        "no_validated_candidate",
+        "classical_fallback"
+      ],
+      "type": "string"
+    },
+    "CandidateFeatures": {
+      "additionalProperties": false,
+      "properties": {
+        "challenge_bp": {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pace_bp": {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "resource_cost_bp": {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "challenge_bp",
+        "pace_bp",
+        "resource_cost_bp"
+      ],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "applied": {
+      "type": "boolean"
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/definitions/AdaptiveCandidateRecord"
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
+    "decision_id": {
+      "maxLength": 96,
+      "minLength": 1,
+      "pattern": "^[a-z0-9:_-]+$",
+      "type": "string"
+    },
+    "fallback": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/AdaptiveFallbackReason"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "kind": {
+      "$ref": "#/definitions/AdaptiveDecisionKind"
+    },
+    "player_values_bp": {
+      "items": false,
+      "maxItems": 4,
+      "minItems": 4,
+      "prefixItems": [
+        {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        }
+      ],
+      "type": "array"
+    },
+    "proposal": {
+      "$ref": "#/definitions/AdaptiveProposalV2"
+    },
+    "rule_version": {
+      "const": "adaptive-classical-1"
+    },
+    "schema_version": {
+      "const": "adaptive-decision-trace-1"
+    },
+    "selected_candidate_id": {
+      "anyOf": [
+        {
+          "maxLength": 96,
+          "minLength": 1,
+          "pattern": "^[a-z0-9:_-]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "applied",
+    "candidates",
+    "decision_id",
+    "kind",
+    "player_values_bp",
+    "proposal",
+    "rule_version",
+    "schema_version",
+    "selected_candidate_id",
+    "fallback"
+  ],
+  "title": "adaptive-decision-trace-1",
+  "type": "object"
+}

@@ -5,21 +5,25 @@ use crate::world::PROCGEN_GENERATOR_VERSION;
 use serde::{Deserialize, Serialize};
 
 pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA: &str =
-    crate::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4;
+    crate::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V5;
 pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2: &str =
     crate::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V2;
 pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3: &str =
     crate::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V3;
 pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4: &str =
     crate::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4;
+pub const PROCGEN_LIFECYCLE_RESULT_SCHEMA_V5: &str =
+    crate::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V5;
 pub const PROCGEN_CAPABILITIES_SCHEMA_V1: &str = "procgen-capabilities-1";
 pub const PROCGEN_CAPABILITIES_SCHEMA_V2: &str = "procgen-capabilities-2";
 pub const PROCGEN_CAPABILITIES_SCHEMA_V3: &str = "procgen-capabilities-3";
-pub const PROCGEN_CAPABILITIES_SCHEMA: &str = PROCGEN_CAPABILITIES_SCHEMA_V3;
+pub const PROCGEN_CAPABILITIES_SCHEMA_V4: &str = "procgen-capabilities-4";
+pub const PROCGEN_CAPABILITIES_SCHEMA: &str = PROCGEN_CAPABILITIES_SCHEMA_V4;
 pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA_V1: &str = "procgen-generator-manifest-1";
 pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA_V2: &str = "procgen-generator-manifest-2";
 pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA_V3: &str = "procgen-generator-manifest-3";
-pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA: &str = PROCGEN_GENERATOR_MANIFEST_SCHEMA_V3;
+pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA_V4: &str = "procgen-generator-manifest-4";
+pub const PROCGEN_GENERATOR_MANIFEST_SCHEMA: &str = PROCGEN_GENERATOR_MANIFEST_SCHEMA_V4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -211,7 +215,7 @@ impl AdapterSchemas {
         }
     }
     fn validate(&self) -> Result<(), LifecycleError> {
-        if self != &Self::platform_v4() {
+        if self != &Self::platform_v5() {
             Err(LifecycleError::Invalid("schemas"))
         } else {
             Ok(())
@@ -230,6 +234,14 @@ impl AdapterSchemas {
             lifecycle_result: PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4.into(),
             capabilities: PROCGEN_CAPABILITIES_SCHEMA_V3.into(),
             generator_manifest: PROCGEN_GENERATOR_MANIFEST_SCHEMA_V3.into(),
+        }
+    }
+
+    pub fn platform_v5() -> Self {
+        Self {
+            lifecycle_result: PROCGEN_LIFECYCLE_RESULT_SCHEMA_V5.into(),
+            capabilities: PROCGEN_CAPABILITIES_SCHEMA_V4.into(),
+            generator_manifest: PROCGEN_GENERATOR_MANIFEST_SCHEMA_V4.into(),
         }
     }
 }
@@ -334,7 +346,7 @@ impl GeneratorManifest {
             || !is_lower_hex(&self.rust_source_commit)
             || self.content_manifest_hash.len() != 64
             || !is_lower_hex(&self.content_manifest_hash)
-            || self.export_schemas != ExportSchemas::platform_v4()
+            || self.export_schemas != ExportSchemas::platform_v5()
         {
             return Err(LifecycleError::Invalid("manifest"));
         }

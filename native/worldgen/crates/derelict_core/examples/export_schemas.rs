@@ -1,3 +1,4 @@
+use derelict_core::adaptive::{AdaptiveDecisionTrace, AdaptiveProposalV2};
 use derelict_core::lifecycle::{GeneratorManifest, LifecycleResult, ProcgenCapabilities};
 use derelict_core::manifest::BuildManifest;
 use derelict_core::procgen::{
@@ -35,12 +36,12 @@ fn root_is_definition(root_title: &str, name: &str) -> bool {
                     "procgen-bundle-1" | "procgen-bundle-2" | "procgen-bundle-3",
                     "ProcgenBundle"
                 )
-                | ("procgen-bundle-4", "ProcgenBundle")
+                | ("procgen-bundle-4" | "procgen-bundle-5", "ProcgenBundle")
                 | ("world-ir-1", "WorldIR")
                 | ("world-ir-2", "WorldIRv2")
                 | ("site-ir-1" | "site-ir-2", "SiteIR")
                 | ("gameplay-ir-1", "GameplayIR")
-                | ("gameplay-ir-2", "GameplayIR")
+                | ("gameplay-ir-2" | "gameplay-ir-3", "GameplayIR")
                 | ("presentation-ir-1", "PresentationIR")
                 | ("presentation-ir-2", "PresentationIR")
                 | (
@@ -49,10 +50,15 @@ fn root_is_definition(root_title: &str, name: &str) -> bool {
                 )
                 | ("PresentationOutput", "PresentationIR")
                 | (
-                    "generation-trace-1" | "generation-trace-2" | "generation-trace-3",
+                    "generation-trace-1"
+                        | "generation-trace-2"
+                        | "generation-trace-3"
+                        | "generation-trace-4",
                     "GenerationTrace"
                 )
                 | ("adaptive-proposal-1", "AdaptiveProposal")
+                | ("adaptive-proposal-2", "AdaptiveProposalV2")
+                | ("adaptive-decision-trace-1", "AdaptiveDecisionTrace")
                 | ("player-model-1", "PlayerModel")
                 | ("player-model-2", "PlayerModel")
                 | ("PlayerModelV2", "PlayerModel")
@@ -64,18 +70,30 @@ fn root_is_definition(root_title: &str, name: &str) -> bool {
                         | "procgen-lifecycle-result-3",
                     "LifecycleResult"
                 )
-                | ("procgen-lifecycle-result-4", "LifecycleResult")
+                | (
+                    "procgen-lifecycle-result-4" | "procgen-lifecycle-result-5",
+                    "LifecycleResult"
+                )
                 | (
                     "procgen-capabilities-1" | "procgen-capabilities-2",
                     "ProcgenCapabilities"
                 )
-                | ("procgen-capabilities-3", "ProcgenCapabilities")
+                | (
+                    "procgen-capabilities-3" | "procgen-capabilities-4",
+                    "ProcgenCapabilities"
+                )
                 | (
                     "procgen-generator-manifest-1" | "procgen-generator-manifest-2",
                     "GeneratorManifest"
                 )
-                | ("procgen-generator-manifest-3", "GeneratorManifest")
-                | ("procgen-build-manifest-3", "BuildManifest")
+                | (
+                    "procgen-generator-manifest-3" | "procgen-generator-manifest-4",
+                    "GeneratorManifest"
+                )
+                | (
+                    "procgen-build-manifest-3" | "procgen-build-manifest-4",
+                    "BuildManifest"
+                )
         )
 }
 
@@ -260,6 +278,7 @@ fn apply_trace_constraints(root: &mut Value) {
     trace["properties"]["stage_timings_micros"] = serde_json::json!({"type":"object","maxProperties":4096,"propertyNames":{"minLength":1},"additionalProperties":{"type":"integer","minimum":0,"maximum":3600000000u64}});
 }
 
+#[allow(dead_code)]
 fn apply_gate3_trace_constraints(root: &mut Value) {
     let trace = def(root, "GenerationTrace");
     trace["properties"]["schema_version"] = serde_json::json!({"const":"generation-trace-3"});
@@ -303,6 +322,7 @@ fn has_def(root: &Value, key: &str) -> bool {
 
 /// Gate 3 is a new public contract family. Keep its bounds explicit in the
 /// exported JSON rather than relying on schemars' Rust integer representation.
+#[allow(dead_code)]
 fn apply_gate3_constraints(name: &str, root: &mut Value) {
     let definition = match name {
         "procgen-request-2" => "ProcgenRequest",
@@ -527,6 +547,208 @@ fn apply_gate3_constraints(name: &str, root: &mut Value) {
     }
 }
 
+/// Gate 4 contracts are additive siblings. Keep their bounded adaptive
+/// vocabulary explicit in the wire schema, including the fixed bundle trace.
+fn apply_gate4_constraints(name: &str, root: &mut Value) {
+    if let Some(gate3_baseline) = match name {
+        "gameplay-ir-3" => Some("gameplay-ir-2"),
+        "generation-trace-4" => Some("generation-trace-3"),
+        "procgen-bundle-5" => Some("procgen-bundle-4"),
+        "procgen-lifecycle-result-5" => Some("procgen-lifecycle-result-4"),
+        "procgen-capabilities-4" => Some("procgen-capabilities-3"),
+        "procgen-generator-manifest-4" => Some("procgen-generator-manifest-3"),
+        "procgen-build-manifest-4" => Some("procgen-build-manifest-3"),
+        _ => None,
+    } {
+        // Gate 4 is an additive sibling of the complete Gate 3 contract, not
+        // a relaxed re-export of the Rust field shapes. Reapply every Gate 3
+        // identity, bound, lifecycle-state, and nested-schema constraint,
+        // then override only the versions and adaptive additions below.
+        apply_gate3_constraints(gate3_baseline, root);
+    }
+    let definition = match name {
+        "adaptive-proposal-2" => "AdaptiveProposalV2",
+        "adaptive-decision-trace-1" => "AdaptiveDecisionTrace",
+        "gameplay-ir-3" => "GameplayIR",
+        "generation-trace-4" => "GenerationTrace",
+        "procgen-bundle-5" => "ProcgenBundle",
+        "procgen-lifecycle-result-5" => "LifecycleResult",
+        "procgen-capabilities-4" => "ProcgenCapabilities",
+        "procgen-generator-manifest-4" => "GeneratorManifest",
+        "procgen-build-manifest-4" => "BuildManifest",
+        _ => return,
+    };
+    if name == "procgen-build-manifest-4" {
+        def(root, definition)["properties"]["manifest_schema"] =
+            serde_json::json!({"const":"procgen-build-manifest-4"});
+    } else {
+        const_field(root, definition, "schema_version", name);
+    }
+    if has_def(root, "AdaptiveProposalV2") {
+        let p = def(root, "AdaptiveProposalV2");
+        p["properties"]["schema_version"] = serde_json::json!({"const":"adaptive-proposal-2"});
+        p["properties"]["score"] =
+            serde_json::json!({"type":"integer","minimum":-10000,"maximum":10000});
+        p["properties"]["confidence_bp"] =
+            serde_json::json!({"type":"integer","minimum":0,"maximum":10000});
+        p["properties"]["rationale_codes"]["minItems"] = serde_json::json!(1);
+        p["properties"]["rationale_codes"]["maxItems"] = serde_json::json!(64);
+        p["properties"]["rationale_codes"]["uniqueItems"] = serde_json::json!(true);
+        p["properties"]["rule_model_version"] = serde_json::json!({"const":"adaptive-classical-1"});
+    }
+    if has_def(root, "AdaptiveActionV2") {
+        let action = def(root, "AdaptiveActionV2");
+        replace_named_property(action, "candidate_id", adaptive_identifier_schema());
+        replace_named_property(action, "encounter_id", adaptive_identifier_schema());
+        replace_named_property(
+            action,
+            "pacing_delta_bp",
+            serde_json::json!({"type":"integer","enum":[-2500,-1250,0,1250,2500]}),
+        );
+    }
+    if has_def(root, "CandidateFeatures") {
+        let features = def(root, "CandidateFeatures");
+        for field in ["challenge_bp", "pace_bp", "resource_cost_bp"] {
+            features["properties"][field] =
+                serde_json::json!({"type":"integer","minimum":0,"maximum":10000});
+        }
+    }
+    if has_def(root, "AdaptiveCandidateRecord") {
+        let candidate = def(root, "AdaptiveCandidateRecord");
+        candidate["properties"]["candidate_id"] = adaptive_identifier_schema();
+        candidate["properties"]["score"] =
+            serde_json::json!({"type":"integer","minimum":-10000,"maximum":10000});
+        candidate["properties"]["rationale_codes"]["minItems"] = serde_json::json!(1);
+        candidate["properties"]["rationale_codes"]["maxItems"] = serde_json::json!(64);
+        candidate["properties"]["rationale_codes"]["uniqueItems"] = serde_json::json!(true);
+    }
+    if has_def(root, "AdaptiveDecisionTrace") {
+        let t = def(root, "AdaptiveDecisionTrace");
+        t["properties"]["schema_version"] =
+            serde_json::json!({"const":"adaptive-decision-trace-1"});
+        t["properties"]["player_values_bp"] = serde_json::json!({"type":"array","prefixItems":[{"type":"integer","minimum":0,"maximum":10000},{"type":"integer","minimum":0,"maximum":10000},{"type":"integer","minimum":0,"maximum":10000},{"type":"integer","minimum":0,"maximum":10000}],"items":false,"minItems":4,"maxItems":4});
+        t["properties"]["candidates"]["maxItems"] = serde_json::json!(64);
+        t["properties"]["decision_id"] = adaptive_identifier_schema();
+        t["properties"]["rule_version"] = serde_json::json!({"const":"adaptive-classical-1"});
+        t["properties"]["selected_candidate_id"] = serde_json::json!({
+            "anyOf":[adaptive_identifier_schema(),{"type":"null"}]
+        });
+        require_fields(t, &["selected_candidate_id", "fallback"]);
+    }
+    if has_def(root, "GenerationTrace") {
+        def(root, "GenerationTrace")["properties"]["adaptive_decisions"] = serde_json::json!({
+            "type":"array",
+            "prefixItems":[
+                {"allOf":[{"$ref":"#/definitions/AdaptiveDecisionTrace"},{"properties":{"decision_id":{"const":"decision:world-ranker"},"kind":{"const":"world_ranker"}}}]},
+                {"allOf":[{"$ref":"#/definitions/AdaptiveDecisionTrace"},{"properties":{"decision_id":{"const":"decision:site-ranker"},"kind":{"const":"site_ranker"}}}]},
+                {"allOf":[{"$ref":"#/definitions/AdaptiveDecisionTrace"},{"properties":{"decision_id":{"const":"decision:encounter-director"},"kind":{"const":"encounter_director"}}}]}
+            ],
+            "items":false,
+            "minItems":3,
+            "maxItems":3
+        });
+    }
+    if has_def(root, "ProcgenBundle") {
+        let b = def(root, "ProcgenBundle");
+        b["properties"]["schema_version"] = serde_json::json!({"const":"procgen-bundle-5"});
+        b["properties"]["semantic_hash"] =
+            serde_json::json!({"type":"string","pattern":"^[a-f0-9]{64}$"});
+        if has_def(root, "GenerationTrace") {
+            def(root, "GenerationTrace")["properties"]["schema_version"] =
+                serde_json::json!({"const":"generation-trace-4"});
+        }
+        if has_def(root, "GameplayIR") {
+            def(root, "GameplayIR")["properties"]["schema_version"] =
+                serde_json::json!({"const":"gameplay-ir-3"});
+        }
+        if has_def(root, "AdaptiveProposalV2") {
+            def(root, "AdaptiveProposalV2")["properties"]["schema_version"] =
+                serde_json::json!({"const":"adaptive-proposal-2"});
+        }
+    }
+    if has_def(root, "LifecycleResult") {
+        def(root, "LifecycleResult")["properties"]["schema_version"] =
+            serde_json::json!({"const":"procgen-lifecycle-result-5"});
+    }
+    if has_def(root, "ProcgenCapabilities") {
+        def(root, "ProcgenCapabilities")["properties"]["schema_version"] =
+            serde_json::json!({"const":"procgen-capabilities-4"});
+    }
+    if has_def(root, "GeneratorManifest") {
+        def(root, "GeneratorManifest")["properties"]["schema_version"] =
+            serde_json::json!({"const":"procgen-generator-manifest-4"});
+    }
+    if has_def(root, "ExportSchemas") {
+        let e = def(root, "ExportSchemas");
+        for (field, value) in [
+            ("procgen_request", "procgen-request-2"),
+            ("procgen_bundle", "procgen-bundle-5"),
+            ("world_ir", "world-ir-2"),
+            ("site_ir", "site-ir-2"),
+            ("gameplay_ir", "gameplay-ir-3"),
+            ("presentation_ir", "presentation-ir-2"),
+            ("generation_trace", "generation-trace-4"),
+            ("adaptive_proposal", "adaptive-proposal-2"),
+        ] {
+            e["properties"][field] = serde_json::json!({"const":value});
+        }
+    }
+    if has_def(root, "AdapterSchemas") {
+        let a = def(root, "AdapterSchemas");
+        for (field, value) in [
+            ("lifecycle_result", "procgen-lifecycle-result-5"),
+            ("capabilities", "procgen-capabilities-4"),
+            ("generator_manifest", "procgen-generator-manifest-4"),
+        ] {
+            a["properties"][field] = serde_json::json!({"const":value});
+        }
+    }
+}
+
+fn adaptive_identifier_schema() -> Value {
+    serde_json::json!({
+        "type":"string",
+        "minLength":1,
+        "maxLength":96,
+        "pattern":"^[a-z0-9:_-]+$"
+    })
+}
+
+fn replace_named_property(value: &mut Value, field: &str, replacement: Value) {
+    match value {
+        Value::Object(map) => {
+            if let Some(property) = map
+                .get_mut("properties")
+                .and_then(Value::as_object_mut)
+                .and_then(|properties| properties.get_mut(field))
+            {
+                *property = replacement.clone();
+            }
+            for child in map.values_mut() {
+                replace_named_property(child, field, replacement.clone());
+            }
+        }
+        Value::Array(values) => {
+            for child in values {
+                replace_named_property(child, field, replacement.clone());
+            }
+        }
+        _ => {}
+    }
+}
+
+fn require_fields(definition: &mut Value, fields: &[&str]) {
+    let required = definition["required"]
+        .as_array_mut()
+        .expect("object schema required array");
+    for field in fields {
+        let value = Value::String((*field).into());
+        if !required.contains(&value) {
+            required.push(value);
+        }
+    }
+}
+
 fn upgrade_draft2020(value: &mut Value) {
     match value {
         Value::Object(map) => {
@@ -583,16 +805,21 @@ fn enrich(name: &str, root: &mut Value) {
             ("ProcgenBundle", "procgen-bundle-1")
         }
         "procgen-bundle-4" => ("ProcgenBundle", "procgen-bundle-4"),
+        "procgen-bundle-5" => ("ProcgenBundle", "procgen-bundle-5"),
         "world-ir-1" => ("WorldIR", "world-ir-1"),
         "world-ir-2" => ("WorldIRv2", "world-ir-1"),
         "site-ir-1" | "site-ir-2" => ("SiteIR", "site-ir-1"),
         "gameplay-ir-1" => ("GameplayIR", "gameplay-ir-1"),
         "gameplay-ir-2" => ("GameplayIR", "gameplay-ir-2"),
+        "gameplay-ir-3" => ("GameplayIR", "gameplay-ir-3"),
         "presentation-ir-1" => ("PresentationIR", "presentation-ir-1"),
         "presentation-ir-2" => ("PresentationIR", "presentation-ir-2"),
         "generation-trace-1" | "generation-trace-2" => ("GenerationTrace", "generation-trace-1"),
         "generation-trace-3" => ("GenerationTrace", "generation-trace-3"),
+        "generation-trace-4" => ("GenerationTrace", "generation-trace-4"),
         "adaptive-proposal-1" => ("AdaptiveProposal", "adaptive-proposal-1"),
+        "adaptive-proposal-2" => ("AdaptiveProposalV2", "adaptive-proposal-2"),
+        "adaptive-decision-trace-1" => ("AdaptiveDecisionTrace", "adaptive-decision-trace-1"),
         "player-model-1" => ("PlayerModel", "player-model-1"),
         "player-model-2" => ("PlayerModel", "player-model-2"),
         "procgen-failure-1" => ("ProcgenFailure", "procgen-failure-1"),
@@ -601,20 +828,26 @@ fn enrich(name: &str, root: &mut Value) {
         | "procgen-lifecycle-result-2"
         | "procgen-lifecycle-result-3" => ("LifecycleResult", "procgen-lifecycle-result-1"),
         "procgen-lifecycle-result-4" => ("LifecycleResult", "procgen-lifecycle-result-4"),
+        "procgen-lifecycle-result-5" => ("LifecycleResult", "procgen-lifecycle-result-5"),
         "procgen-capabilities-1" | "procgen-capabilities-2" => ("ProcgenCapabilities", name),
         "procgen-capabilities-3" => ("ProcgenCapabilities", name),
+        "procgen-capabilities-4" => ("ProcgenCapabilities", name),
         "procgen-generator-manifest-1" | "procgen-generator-manifest-2" => {
             ("GeneratorManifest", name)
         }
         "procgen-generator-manifest-3" => ("GeneratorManifest", name),
+        "procgen-generator-manifest-4" => ("GeneratorManifest", name),
         "procgen-build-manifest-3" => ("BuildManifest", name),
+        "procgen-build-manifest-4" => ("BuildManifest", name),
         _ => return,
     };
-    if name != "procgen-build-manifest-3" {
+    if !matches!(
+        name,
+        "procgen-build-manifest-3" | "procgen-build-manifest-4"
+    ) {
         const_field(root, definition, "schema_version", version);
     } else {
-        def(root, definition)["properties"]["manifest_schema"] =
-            serde_json::json!({"const":"procgen-build-manifest-3"});
+        def(root, definition)["properties"]["manifest_schema"] = serde_json::json!({"const":name});
     }
     root["title"] = Value::String(name.into());
     root["$id"] = Value::String(name.into());
@@ -920,6 +1153,11 @@ fn main() {
         ("generation-trace-2", schema::<GenerationTrace>()),
         ("generation-trace-3", schema::<GenerationTrace>()),
         ("adaptive-proposal-1", schema::<AdaptiveProposal>()),
+        ("adaptive-proposal-2", schema::<AdaptiveProposalV2>()),
+        (
+            "adaptive-decision-trace-1",
+            schema::<AdaptiveDecisionTrace>(),
+        ),
         ("player-model-1", schema::<PlayerModel>()),
         ("player-model-2", schema::<PlayerModel>()),
         ("procgen-failure-1", schema::<ProcgenFailure>()),
@@ -936,6 +1174,16 @@ fn main() {
             schema::<GeneratorManifest>(),
         ),
         ("procgen-build-manifest-3", schema::<BuildManifest>()),
+        ("gameplay-ir-3", schema::<GameplayIR>()),
+        ("generation-trace-4", schema::<GenerationTrace>()),
+        ("procgen-bundle-5", schema::<ProcgenBundle>()),
+        ("procgen-lifecycle-result-5", schema::<LifecycleResult>()),
+        ("procgen-capabilities-4", schema::<ProcgenCapabilities>()),
+        (
+            "procgen-generator-manifest-4",
+            schema::<GeneratorManifest>(),
+        ),
+        ("procgen-build-manifest-4", schema::<BuildManifest>()),
     ];
     // Platform-v3 schemas are additive immutable siblings. Generate them from
     // the Rust contracts rather than maintaining hand-written JSON stubs.
@@ -969,20 +1217,19 @@ fn main() {
         process::exit(2);
     }
     for (name, value) in items {
-        // Historical v1/v2/v3 documents are immutable migration evidence;
-        // only Gate 3 siblings are writable/checkable from this exporter.
+        // Historical and Gate 3 documents are immutable migration evidence;
+        // only additive Gate 4 siblings are writable/checkable here.
         if !matches!(
             name,
-            "procgen-request-2"
-                | "player-model-2"
-                | "gameplay-ir-2"
-                | "presentation-ir-2"
-                | "generation-trace-3"
-                | "procgen-bundle-4"
-                | "procgen-lifecycle-result-4"
-                | "procgen-capabilities-3"
-                | "procgen-generator-manifest-3"
-                | "procgen-build-manifest-3"
+            "adaptive-proposal-2"
+                | "adaptive-decision-trace-1"
+                | "gameplay-ir-3"
+                | "generation-trace-4"
+                | "procgen-bundle-5"
+                | "procgen-lifecycle-result-5"
+                | "procgen-capabilities-4"
+                | "procgen-generator-manifest-4"
+                | "procgen-build-manifest-4"
         ) {
             continue;
         }
@@ -998,21 +1245,7 @@ fn main() {
         ) {
             apply_platform_v3_constraints(&mut value);
         }
-        if matches!(
-            name,
-            "procgen-request-2"
-                | "player-model-2"
-                | "gameplay-ir-2"
-                | "presentation-ir-2"
-                | "generation-trace-3"
-                | "procgen-bundle-4"
-                | "procgen-lifecycle-result-4"
-                | "procgen-capabilities-3"
-                | "procgen-generator-manifest-3"
-                | "procgen-build-manifest-3"
-        ) {
-            apply_gate3_constraints(name, &mut value);
-        }
+        apply_gate4_constraints(name, &mut value);
         let path = out.join(format!("{name}.schema.json"));
         let bytes = serde_json::to_vec_pretty(&value).expect("schema JSON");
         let mut expected = bytes.clone();
@@ -1130,6 +1363,46 @@ fn verify_immutable_pre_gate3(schema_dir: &std::path::Path) {
         (
             "world-ir-2.schema.json",
             "D091226A46031BAF75CAD3E834F8C2032F58CA37884F4FFBCEFD14F83DB1205E",
+        ),
+        (
+            "procgen-request-2.schema.json",
+            "85469ACB1EA34BDB6DE70DE5A84AE0A1405B058CD130319849625E159D3B441F",
+        ),
+        (
+            "player-model-2.schema.json",
+            "D1257FBEC874C11A55F20DE46AEF536EDB99888DF8EF39D6335DA1F21C4DEC99",
+        ),
+        (
+            "gameplay-ir-2.schema.json",
+            "E2FC8E487E4591BA1CABB3FB07C99C3C24C15D0979AA72A97EADD33F45068E59",
+        ),
+        (
+            "presentation-ir-2.schema.json",
+            "1EA09B89E8E3EDBD6BDA589FF8CEB54F76D198EB10CB96BD85BB02FDD5321FAA",
+        ),
+        (
+            "generation-trace-3.schema.json",
+            "5B09520D8476D780CE0852EADC7A7C0875B0AF144E9E774C0AE6C052B4281902",
+        ),
+        (
+            "procgen-bundle-4.schema.json",
+            "FF1CC0FA03E85ED274F42380778255475C8ED202AB2D6F3095E2414698EB8E70",
+        ),
+        (
+            "procgen-lifecycle-result-4.schema.json",
+            "6984A34AABBAE881BA0D68A53F44D5D192E597C123E4D1BC7E8D926FC08669ED",
+        ),
+        (
+            "procgen-capabilities-3.schema.json",
+            "A6338D1390DC7BFCC4A413A026762B9BF8DA3699796B3856F758F12CDFFFED1B",
+        ),
+        (
+            "procgen-generator-manifest-3.schema.json",
+            "55496C279227AE50A2ED0B7993B7C996BEA9F5BF8E139DBDB8B8DCAE6EDD0252",
+        ),
+        (
+            "procgen-build-manifest-3.schema.json",
+            "AB459DF6C4CC62472C611AD1828EF12F88F61554AB58C96082BF94D32EE226D6",
         ),
     ] {
         let path = schema_dir.join(name);

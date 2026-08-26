@@ -132,7 +132,7 @@ pub fn select<P: GitProbe>(input: Inputs<'_>, probe: &P) -> Result<Selected, Str
         let text = input
             .checked_manifest
             .ok_or("checked win64 build manifest is missing")?;
-        let manifest = BuildManifest::from_json_platform_v4(text)
+        let manifest = BuildManifest::from_json_platform_v5(text)
             .map_err(|_| "checked win64 build manifest violates the shared contract")?;
         if manifest.target != WIN_TARGET || manifest.generator_version != 3 {
             return Err("checked win64 manifest identity mismatch".into());
@@ -236,7 +236,7 @@ mod tests {
 
     fn manifest() -> String {
         format!(
-            r#"{{"manifest_schema":"procgen-build-manifest-3","rust_source_commit":"{SOURCE}","generator_version":3,"content_manifest_path":"data/procgen/manifests/content_manifest.json","content_manifest_hash":"{HASH}","target":"x86_64-pc-windows-msvc","artifact":{{"kind":"gdextension","path":"addons/derelict/bin/win64/derelict_godot.dll","sha256":"{HASH}"}},"export_schemas":{{"procgen_request":"procgen-request-2","procgen_bundle":"procgen-bundle-4","world_ir":"world-ir-2","site_ir":"site-ir-2","gameplay_ir":"gameplay-ir-2","presentation_ir":"presentation-ir-2","generation_trace":"generation-trace-3","adaptive_proposal":"adaptive-proposal-1"}}}}"#
+            r#"{{"manifest_schema":"procgen-build-manifest-4","rust_source_commit":"{SOURCE}","generator_version":3,"content_manifest_path":"data/procgen/manifests/content_manifest.json","content_manifest_hash":"{HASH}","target":"x86_64-pc-windows-msvc","artifact":{{"kind":"gdextension","path":"addons/derelict/bin/win64/derelict_godot.dll","sha256":"{HASH}"}},"export_schemas":{{"procgen_request":"procgen-request-2","procgen_bundle":"procgen-bundle-5","world_ir":"world-ir-2","site_ir":"site-ir-2","gameplay_ir":"gameplay-ir-3","presentation_ir":"presentation-ir-2","generation_trace":"generation-trace-4","adaptive_proposal":"adaptive-proposal-2"}}}}"#
         )
     }
 
@@ -322,7 +322,7 @@ mod tests {
     fn malformed_manifest_identity_dirty_and_commit_fail_closed() {
         let checked = manifest();
         for malformed in [
-            checked.replace("procgen-build-manifest-3", "bad-schema"),
+            checked.replace("procgen-build-manifest-4", "bad-schema"),
             checked.replace("\"generator_version\":3", "\"generator_version\":2"),
             checked.replace("procgen-request-2", "bad-request-schema"),
             checked.replacen('{', "{\"unknown\":true,", 1),

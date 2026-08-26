@@ -1,0 +1,11 @@
+{
+  "schema_version": "adaptive-proposal-2",
+  "rule_version": "adaptive-classical-1",
+  "site_profiles": [
+    {"id":"key_lock_salvage","challenge_bp":7000,"pace_bp":5000,"resource_cost_bp":6500},
+    {"id":"repair_recovery","challenge_bp":5500,"pace_bp":6500,"resource_cost_bp":5000},
+    {"id":"survey","challenge_bp":3500,"pace_bp":4000,"resource_cost_bp":3000}
+  ],
+  "encounter_pacing_deltas_bp": [-2500,-1250,0,1250,2500],
+  "max_pacing_delta_bp": 2500
+}

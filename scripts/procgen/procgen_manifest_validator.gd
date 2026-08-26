@@ -25,7 +25,7 @@ func validate(manifest: Dictionary, generator: Object, target_override: String =
 	for key in required:
 		if not manifest.has(key): return MANIFEST_INVALID
 	var schema: String = str(manifest.get("manifest_schema", ""))
-	if schema != "procgen-build-manifest-3":
+	if schema != "procgen-build-manifest-4":
 		return SCHEMA_MAJOR_UNKNOWN if schema.begins_with("procgen-build-manifest-") else MANIFEST_INVALID
 	if int(manifest.get("generator_version", -1)) != 3: return GENERATOR_VERSION_MISMATCH
 	var source_commit: String = str(manifest.get("rust_source_commit", ""))
@@ -63,7 +63,7 @@ func validate(manifest: Dictionary, generator: Object, target_override: String =
 	var artifact_path: String = str((artifact as Dictionary).get("path", ""))
 	if not _io_exists(artifact_path, io_override): return ARTIFACT_MISSING
 	if _io_sha256(artifact_path, io_override) != str((artifact as Dictionary).get("sha256", "")): return ARTIFACT_HASH_MISMATCH
-	var schemas: Dictionary = {"procgen_request":"procgen-request-2", "procgen_bundle":"procgen-bundle-4", "world_ir":"world-ir-2", "site_ir":"site-ir-2", "gameplay_ir":"gameplay-ir-2", "presentation_ir":"presentation-ir-2", "generation_trace":"generation-trace-3", "adaptive_proposal":"adaptive-proposal-1"}
+	var schemas: Dictionary = {"procgen_request":"procgen-request-2", "procgen_bundle":"procgen-bundle-5", "world_ir":"world-ir-2", "site_ir":"site-ir-2", "gameplay_ir":"gameplay-ir-3", "presentation_ir":"presentation-ir-2", "generation_trace":"generation-trace-4", "adaptive_proposal":"adaptive-proposal-2"}
 	var schema_block: Variant = manifest.get("export_schemas", {})
 	if not schema_block is Dictionary: return SCHEMA_MAP_MISMATCH
 	for key in schema_block.keys():
@@ -81,7 +81,7 @@ func validate(manifest: Dictionary, generator: Object, target_override: String =
 		if not runtime_keys.has(str(key)): return RUNTIME_MANIFEST_INVALID
 	for key in runtime_keys:
 		if not runtime.has(key): return RUNTIME_MANIFEST_INVALID
-	if str(runtime.get("schema_version", "")) != "procgen-generator-manifest-3" \
+	if str(runtime.get("schema_version", "")) != "procgen-generator-manifest-4" \
 			or int(runtime.get("generator_version", -1)) != int(manifest.get("generator_version", -2)) \
 			or str(runtime.get("content_manifest_hash", "")) != str(manifest.get("content_manifest_hash", "")) \
 			or str(runtime.get("target", "")) != str(manifest.get("target", "")):
@@ -92,7 +92,7 @@ func validate(manifest: Dictionary, generator: Object, target_override: String =
 		return DIRTY_DEVELOPMENT
 	if not runtime.get("export_schemas", null) is Dictionary or not _same_json(runtime.export_schemas, schemas):
 		return SCHEMA_MAP_MISMATCH
-	var adapters: Dictionary = {"lifecycle_result":"procgen-lifecycle-result-4", "capabilities":"procgen-capabilities-3", "generator_manifest":"procgen-generator-manifest-3"}
+	var adapters: Dictionary = {"lifecycle_result":"procgen-lifecycle-result-5", "capabilities":"procgen-capabilities-4", "generator_manifest":"procgen-generator-manifest-4"}
 	if not runtime.get("adapter_schemas", null) is Dictionary or not _same_json(runtime.adapter_schemas, adapters):
 		return SCHEMA_MAP_MISMATCH
 	return OK

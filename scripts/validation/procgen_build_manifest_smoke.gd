@@ -28,12 +28,12 @@ func _init() -> void:
 	var content: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://" + content_path))
 	var base_io: Dictionary = {"files": {content_path: FileAccess.get_file_as_string("res://" + content_path), artifact_path: FileAccess.get_file_as_bytes("res://" + artifact_path)}}
 	generator.runtime = {
-		"schema_version": "procgen-generator-manifest-3",
+		"schema_version": "procgen-generator-manifest-4",
 		"rust_source_commit": str(manifest.get("rust_source_commit", "")),
 		"generator_version": 3,
 		"content_manifest_hash": str(manifest.get("content_manifest_hash", "")),
 		"export_schemas": manifest.get("export_schemas", {}).duplicate(true),
-		"adapter_schemas": {"lifecycle_result":"procgen-lifecycle-result-4", "capabilities":"procgen-capabilities-3", "generator_manifest":"procgen-generator-manifest-3"},
+		"adapter_schemas": {"lifecycle_result":"procgen-lifecycle-result-5", "capabilities":"procgen-capabilities-4", "generator_manifest":"procgen-generator-manifest-4"},
 		"target": str(manifest.get("target", "")),
 		"dirty_development": false,
 	}

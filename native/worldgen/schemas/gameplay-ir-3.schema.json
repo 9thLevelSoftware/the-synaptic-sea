@@ -1,0 +1,1318 @@
+{
+  "$id": "gameplay-ir-3",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "AdaptiveActionV2": {
+      "oneOf": [
+        {
+          "enum": [
+            "no_op"
+          ],
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "select_candidate": {
+              "additionalProperties": false,
+              "properties": {
+                "candidate_id": {
+                  "maxLength": 96,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9:_-]+$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "candidate_id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "select_candidate"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "adjust_encounter": {
+              "additionalProperties": false,
+              "properties": {
+                "encounter_id": {
+                  "maxLength": 96,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9:_-]+$",
+                  "type": "string"
+                },
+                "pacing_delta_bp": {
+                  "enum": [
+                    -2500,
+                    -1250,
+                    0,
+                    1250,
+                    2500
+                  ],
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "encounter_id",
+                "pacing_delta_bp"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "adjust_encounter"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AdaptiveCandidateRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/AdaptiveActionV2"
+        },
+        "candidate_id": {
+          "maxLength": 96,
+          "minLength": 1,
+          "pattern": "^[a-z0-9:_-]+$",
+          "type": "string"
+        },
+        "features": {
+          "$ref": "#/definitions/CandidateFeatures"
+        },
+        "rationale_codes": {
+          "items": {
+            "$ref": "#/definitions/AdaptiveRationaleCode"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "score": {
+          "maximum": 10000,
+          "minimum": -10000,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "action",
+        "candidate_id",
+        "features",
+        "rationale_codes",
+        "score"
+      ],
+      "type": "object"
+    },
+    "AdaptiveDecisionKind": {
+      "enum": [
+        "world_ranker",
+        "site_ranker",
+        "encounter_director"
+      ],
+      "type": "string"
+    },
+    "AdaptiveDecisionTrace": {
+      "additionalProperties": false,
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "candidates": {
+          "items": {
+            "$ref": "#/definitions/AdaptiveCandidateRecord"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
+        "decision_id": {
+          "maxLength": 96,
+          "minLength": 1,
+          "pattern": "^[a-z0-9:_-]+$",
+          "type": "string"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AdaptiveFallbackReason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "$ref": "#/definitions/AdaptiveDecisionKind"
+        },
+        "player_values_bp": {
+          "items": false,
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "proposal": {
+          "$ref": "#/definitions/AdaptiveProposalV2"
+        },
+        "rule_version": {
+          "const": "adaptive-classical-1"
+        },
+        "schema_version": {
+          "const": "adaptive-decision-trace-1"
+        },
+        "selected_candidate_id": {
+          "anyOf": [
+            {
+              "maxLength": 96,
+              "minLength": 1,
+              "pattern": "^[a-z0-9:_-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "applied",
+        "candidates",
+        "decision_id",
+        "kind",
+        "player_values_bp",
+        "proposal",
+        "rule_version",
+        "schema_version",
+        "selected_candidate_id",
+        "fallback"
+      ],
+      "type": "object"
+    },
+    "AdaptiveFallbackReason": {
+      "enum": [
+        "no_validated_candidate"
+      ],
+      "type": "string"
+    },
+    "AdaptiveProposalV2": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/AdaptiveActionV2"
+        },
+        "confidence_bp": {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rationale_codes": {
+          "items": {
+            "$ref": "#/definitions/AdaptiveRationaleCode"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "rule_model_version": {
+          "const": "adaptive-classical-1"
+        },
+        "schema_version": {
+          "const": "adaptive-proposal-2"
+        },
+        "score": {
+          "maximum": 10000,
+          "minimum": -10000,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "action",
+        "confidence_bp",
+        "rationale_codes",
+        "rule_model_version",
+        "schema_version",
+        "score"
+      ],
+      "type": "object"
+    },
+    "AdaptiveRationaleCode": {
+      "enum": [
+        "validated_candidate",
+        "challenge_fit",
+        "pace_fit",
+        "resource_pressure_fit",
+        "stable_tie_break",
+        "authored_envelope",
+        "combat_mastery",
+        "damage_pressure",
+        "resource_pressure",
+        "objective_pace",
+        "no_validated_candidate",
+        "classical_fallback"
+      ],
+      "type": "string"
+    },
+    "AffixRoll": {
+      "additionalProperties": false,
+      "properties": {
+        "affix_id": {
+          "type": "string"
+        },
+        "stat": {
+          "$ref": "#/definitions/StatKind"
+        },
+        "value": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "affix_id",
+        "stat",
+        "value"
+      ],
+      "type": "object"
+    },
+    "CandidateFeatures": {
+      "additionalProperties": false,
+      "properties": {
+        "challenge_bp": {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pace_bp": {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "resource_cost_bp": {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "challenge_bp",
+        "pace_bp",
+        "resource_cost_bp"
+      ],
+      "type": "object"
+    },
+    "Cell": {
+      "additionalProperties": false,
+      "properties": {
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deck",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "CreatureBlueprint": {
+      "additionalProperties": false,
+      "properties": {
+        "ability_id": {
+          "type": "string"
+        },
+        "animation_set_id": {
+          "type": "string"
+        },
+        "behavior_id": {
+          "type": "string"
+        },
+        "body_plan_id": {
+          "type": "string"
+        },
+        "counterplay_id": {
+          "type": "string"
+        },
+        "footprint_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "instance_cap": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "material_id": {
+          "type": "string"
+        },
+        "performance_cost": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "rig_id": {
+          "type": "string"
+        },
+        "threat_cost": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "threat_role": {
+          "$ref": "#/definitions/ThreatRole"
+        }
+      },
+      "required": [
+        "ability_id",
+        "animation_set_id",
+        "behavior_id",
+        "body_plan_id",
+        "counterplay_id",
+        "footprint_id",
+        "id",
+        "instance_cap",
+        "material_id",
+        "performance_cost",
+        "rig_id",
+        "threat_cost",
+        "threat_role"
+      ],
+      "type": "object"
+    },
+    "DifficultyBand": {
+      "enum": [
+        "standard",
+        "hardened",
+        "deep_dive"
+      ],
+      "type": "string"
+    },
+    "DropBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "frequency_bp": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "item_id": {
+          "type": "string"
+        },
+        "source_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "frequency_bp",
+        "item_id",
+        "source_id"
+      ],
+      "type": "object"
+    },
+    "EncounterBudgetTrace": {
+      "additionalProperties": false,
+      "properties": {
+        "difficulty_id": {
+          "$ref": "#/definitions/DifficultyBand"
+        },
+        "economy_limit": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "group_cap": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "minimum_reward_value": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "performance_limit": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "player_factor_bp": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "threat_limit": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "difficulty_id",
+        "economy_limit",
+        "group_cap",
+        "minimum_reward_value",
+        "performance_limit",
+        "player_factor_bp",
+        "threat_limit"
+      ],
+      "type": "object"
+    },
+    "EncounterCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "blueprint_id": {
+          "type": "string"
+        },
+        "candidate_id": {
+          "type": "string"
+        },
+        "cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "channel_id": {
+          "type": "string"
+        },
+        "faction_id": {
+          "type": "string"
+        },
+        "has_cover": {
+          "type": "boolean"
+        },
+        "navigation_distance": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "rationale_codes": {
+          "items": {
+            "$ref": "#/definitions/EncounterRationale"
+          },
+          "type": "array"
+        },
+        "room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "score_bp": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "accepted",
+        "blueprint_id",
+        "candidate_id",
+        "cell",
+        "channel_id",
+        "faction_id",
+        "has_cover",
+        "navigation_distance",
+        "rationale_codes",
+        "room",
+        "score_bp"
+      ],
+      "type": "object"
+    },
+    "EncounterDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "candidate_id": {
+          "type": "string"
+        },
+        "channel_id": {
+          "type": "string"
+        },
+        "decision_id": {
+          "type": "string"
+        },
+        "rationale_codes": {
+          "items": {
+            "$ref": "#/definitions/EncounterRationale"
+          },
+          "type": "array"
+        },
+        "score_bp": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "selected_spawn_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "accepted",
+        "candidate_id",
+        "channel_id",
+        "decision_id",
+        "rationale_codes",
+        "score_bp"
+      ],
+      "type": "object"
+    },
+    "EncounterGenerationOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "composition_id": {
+          "type": "string"
+        },
+        "schema_version": {
+          "type": "string"
+        },
+        "spawns": {
+          "items": {
+            "$ref": "#/definitions/EncounterSpawn"
+          },
+          "type": "array"
+        },
+        "total_performance": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "total_reward_value": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "total_threat": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "trace": {
+          "$ref": "#/definitions/EncounterTrace"
+        }
+      },
+      "required": [
+        "composition_id",
+        "schema_version",
+        "spawns",
+        "total_performance",
+        "total_reward_value",
+        "total_threat",
+        "trace"
+      ],
+      "type": "object"
+    },
+    "EncounterRationale": {
+      "enum": [
+        "accepted",
+        "incompatible_faction",
+        "incompatible_role",
+        "protected_room",
+        "protected_cell",
+        "no_clearance",
+        "footprint_out_of_room",
+        "occupied",
+        "navigation_unreachable",
+        "exposed_los",
+        "no_cover",
+        "threat_budget_exceeded",
+        "performance_budget_exceeded",
+        "economy_budget_exceeded",
+        "group_cap_exceeded",
+        "instance_cap_exceeded",
+        "no_fair_spawn"
+      ],
+      "type": "string"
+    },
+    "EncounterSpawn": {
+      "additionalProperties": false,
+      "properties": {
+        "ability_id": {
+          "type": "string"
+        },
+        "blueprint_id": {
+          "type": "string"
+        },
+        "cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "decision_id": {
+          "type": "string"
+        },
+        "faction_id": {
+          "type": "string"
+        },
+        "performance_cost": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "reward_source_id": {
+          "type": "string"
+        },
+        "reward_value": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "spawn_id": {
+          "type": "string"
+        },
+        "threat_cost": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "threat_role": {
+          "$ref": "#/definitions/ThreatRole"
+        }
+      },
+      "required": [
+        "ability_id",
+        "blueprint_id",
+        "cell",
+        "decision_id",
+        "faction_id",
+        "performance_cost",
+        "reward_source_id",
+        "reward_value",
+        "room",
+        "spawn_id",
+        "threat_cost",
+        "threat_role"
+      ],
+      "type": "object"
+    },
+    "EncounterTrace": {
+      "additionalProperties": false,
+      "properties": {
+        "adaptive": {
+          "$ref": "#/definitions/AdaptiveDecisionTrace"
+        },
+        "budgets": {
+          "$ref": "#/definitions/EncounterBudgetTrace"
+        },
+        "candidates": {
+          "items": {
+            "$ref": "#/definitions/EncounterCandidate"
+          },
+          "type": "array"
+        },
+        "channel_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "decisions": {
+          "items": {
+            "$ref": "#/definitions/EncounterDecision"
+          },
+          "type": "array"
+        },
+        "fallback": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fallback_rationale": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/EncounterRationale"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "player_values_bp": {
+          "items": {
+            "format": "uint16",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "rules_version": {
+          "type": "string"
+        },
+        "selected_spawn_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "adaptive",
+        "budgets",
+        "candidates",
+        "channel_ids",
+        "decisions",
+        "player_values_bp",
+        "rules_version",
+        "selected_spawn_ids"
+      ],
+      "type": "object"
+    },
+    "FireZone": {
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "GameplayDecisionDomain": {
+      "enum": [
+        "creature",
+        "encounter",
+        "item"
+      ],
+      "type": "string"
+    },
+    "GameplayDecisionRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "candidate_id": {
+          "type": "string"
+        },
+        "channel_id": {
+          "type": "string"
+        },
+        "decision_id": {
+          "type": "string"
+        },
+        "domain": {
+          "$ref": "#/definitions/GameplayDecisionDomain"
+        },
+        "rationale_codes": {
+          "items": {
+            "$ref": "#/definitions/GameplayRationaleCode"
+          },
+          "type": "array"
+        },
+        "score_bp": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "selected_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "accepted",
+        "candidate_id",
+        "channel_id",
+        "decision_id",
+        "domain",
+        "rationale_codes",
+        "score_bp"
+      ],
+      "type": "object"
+    },
+    "GameplayRationaleCode": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "creature_validated"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "creature_incompatible"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "creature_selected"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "item_authored_compatible"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "item_no_compatible_affix"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "item_arithmetic_overflow"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "item_incompatible"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "item_economy_cap"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "item_authored_baseline"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "item_safe_empty"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "encounter"
+              ],
+              "type": "string"
+            },
+            "detail": {
+              "$ref": "#/definitions/EncounterRationale"
+            }
+          },
+          "required": [
+            "code",
+            "detail"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "GameplaySlice": {
+      "additionalProperties": false,
+      "properties": {
+        "critical_path": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "document_kind": {
+          "const": "ship_gameplay_slice"
+        },
+        "fire_zones": {
+          "maxItems": 0,
+          "type": "array"
+        },
+        "goal_room": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "loot_containers": {
+          "items": {
+            "$ref": "#/definitions/LootContainer"
+          },
+          "type": "array"
+        },
+        "objectives": {
+          "items": {
+            "$ref": "#/definitions/Objective"
+          },
+          "type": "array"
+        },
+        "program_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.1.0"
+        },
+        "start_room": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "summary": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "critical_path",
+        "document_kind",
+        "fire_zones",
+        "goal_room",
+        "loot_containers",
+        "objectives",
+        "program_id",
+        "schema_version",
+        "start_room",
+        "summary"
+      ],
+      "type": "object"
+    },
+    "ItemBlueprint": {
+      "additionalProperties": false,
+      "properties": {
+        "affixes": {
+          "items": {
+            "$ref": "#/definitions/AffixRoll"
+          },
+          "type": "array"
+        },
+        "economy_value": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "family_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "rarity_id": {
+          "type": "string"
+        },
+        "socket_id": {
+          "type": "string"
+        },
+        "stat_budget": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "visual_tag": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "affixes",
+        "economy_value",
+        "family_id",
+        "id",
+        "rarity_id",
+        "socket_id",
+        "stat_budget",
+        "visual_tag"
+      ],
+      "type": "object"
+    },
+    "LootContainer": {
+      "additionalProperties": false,
+      "properties": {
+        "approach_cell": {
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "loot_table": {
+          "type": "string"
+        },
+        "room_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "approach_cell",
+        "id",
+        "kind",
+        "loot_table",
+        "room_id"
+      ],
+      "type": "object"
+    },
+    "Objective": {
+      "additionalProperties": false,
+      "properties": {
+        "approach_cell": {
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "approach_distance_cells": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "cell": {
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "interactable": {
+          "type": "boolean"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "room_id": {
+          "type": "string"
+        },
+        "room_role": {
+          "type": "string"
+        },
+        "semantic": {
+          "type": "string"
+        },
+        "sequence": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "approach_cell",
+        "approach_distance_cells",
+        "cell",
+        "id",
+        "interactable",
+        "kind",
+        "room_id",
+        "room_role",
+        "semantic",
+        "sequence",
+        "type"
+      ],
+      "type": "object"
+    },
+    "StatKind": {
+      "enum": [
+        "damage",
+        "armor",
+        "capacity",
+        "repair",
+        "scan"
+      ],
+      "type": "string"
+    },
+    "ThreatRole": {
+      "enum": [
+        "scout",
+        "tank",
+        "controller"
+      ],
+      "type": "string"
+    }
+  },
+  "properties": {
+    "creature_blueprints": {
+      "items": {
+        "$ref": "#/definitions/CreatureBlueprint"
+      },
+      "type": "array"
+    },
+    "decisions": {
+      "items": {
+        "$ref": "#/definitions/GameplayDecisionRecord"
+      },
+      "type": "array"
+    },
+    "drops": {
+      "items": {
+        "$ref": "#/definitions/DropBinding"
+      },
+      "type": "array"
+    },
+    "encounter": {
+      "$ref": "#/definitions/EncounterGenerationOutcome"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/definitions/ItemBlueprint"
+      },
+      "type": "array"
+    },
+    "legacy_slice": {
+      "$ref": "#/definitions/GameplaySlice"
+    },
+    "schema_version": {
+      "const": "gameplay-ir-3"
+    }
+  },
+  "required": [
+    "creature_blueprints",
+    "decisions",
+    "drops",
+    "encounter",
+    "items",
+    "legacy_slice",
+    "schema_version"
+  ],
+  "title": "gameplay-ir-3",
+  "type": "object"
+}

@@ -1,4 +1,11 @@
 //! Versioned contracts and the single-pass generation bundle.
+use crate::adaptive::{
+    rank_validated_candidates, AdaptiveDecisionKind, AdaptiveDecisionTrace, CandidateFeatures,
+    ValidatedCandidateInput,
+};
+pub use crate::adaptive::{
+    AdaptiveActionV2 as AdaptiveAction, AdaptiveProposalV2 as AdaptiveProposal,
+};
 use crate::creature::{
     CreatureBlueprint, CreatureBlueprintSetOutcome, CreatureCatalogue, CreatureGenerationContext,
 };
@@ -29,10 +36,10 @@ use std::collections::BTreeSet;
 use web_time::Instant;
 
 pub const PROCGEN_REQUEST_SCHEMA: &str = crate::manifest::PROCGEN_REQUEST_SCHEMA_V2;
-pub const PROCGEN_BUNDLE_SCHEMA: &str = crate::manifest::PROCGEN_BUNDLE_SCHEMA_V4;
+pub const PROCGEN_BUNDLE_SCHEMA: &str = crate::manifest::PROCGEN_BUNDLE_SCHEMA_V5;
 pub const WORLD_IR_SCHEMA: &str = crate::manifest::WORLD_IR_SCHEMA_V2;
 pub const SITE_IR_SCHEMA: &str = crate::manifest::SITE_IR_SCHEMA;
-pub const GAMEPLAY_IR_SCHEMA: &str = crate::manifest::GAMEPLAY_IR_SCHEMA_V2;
+pub const GAMEPLAY_IR_SCHEMA: &str = crate::manifest::GAMEPLAY_IR_SCHEMA_V3;
 pub const PRESENTATION_IR_SCHEMA: &str = crate::manifest::PRESENTATION_IR_SCHEMA_V2;
 pub const GENERATION_TRACE_SCHEMA: &str = crate::manifest::GENERATION_TRACE_SCHEMA;
 pub const ADAPTIVE_PROPOSAL_SCHEMA: &str = crate::manifest::ADAPTIVE_PROPOSAL_SCHEMA;
@@ -239,6 +246,7 @@ pub struct GenerationTrace {
     pub repairs: Vec<String>,
     pub retries: Vec<String>,
     pub fallback: Option<String>,
+    pub adaptive_decisions: Vec<AdaptiveDecisionTrace>,
     pub stage_timings_micros: BTreeMap<String, u128>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema, Default)]
@@ -299,6 +307,73 @@ fn compose_stage_fallbacks(world: Option<String>, site: Option<String>) -> Optio
     }
 }
 
+fn adaptive_contract_error(_: crate::adaptive::AdaptiveError) -> ProcgenError {
+    ProcgenError::InvalidRequest("adaptive_trace")
+}
+
+fn world_candidate_features(world: &WorldIR) -> Result<CandidateFeatures, ProcgenError> {
+    let marker_id = &world.extraction.selected_marker_id;
+    let challenge_bp = world
+        .hazard_fields
+        .iter()
+        .find(|field| &field.marker_id == marker_id)
+        .and_then(|field| u16::try_from(field.severity_bp).ok())
+        .ok_or(ProcgenError::InvalidRequest("world_adaptive_features"))?;
+    let resource_cost_bp = world
+        .resource_pressures
+        .iter()
+        .find(|field| &field.marker_id == marker_id)
+        .and_then(|field| u16::try_from(field.pressure_bp).ok())
+        .ok_or(ProcgenError::InvalidRequest("world_adaptive_features"))?;
+    let pace_bp = world
+        .routes
+        .iter()
+        .find(|route| {
+            (&route.from == marker_id && route.to == world.extraction.hub_anchor_id)
+                || (route.from == world.extraction.hub_anchor_id && &route.to == marker_id)
+        })
+        .and_then(|route| u16::try_from(route.cost_bp).ok())
+        .ok_or(ProcgenError::InvalidRequest("world_adaptive_features"))?;
+    Ok(CandidateFeatures {
+        challenge_bp,
+        pace_bp,
+        resource_cost_bp,
+    })
+}
+
+fn world_adaptive_trace(
+    world: &WorldIR,
+    used_fallback: bool,
+    player: &PlayerModel,
+) -> Result<AdaptiveDecisionTrace, ProcgenError> {
+    let inputs = if used_fallback {
+        Vec::new()
+    } else {
+        vec![ValidatedCandidateInput::new(
+            world.archetype_id.clone(),
+            world_candidate_features(world)?,
+        )
+        .map_err(adaptive_contract_error)?]
+    };
+    rank_validated_candidates(
+        "decision:world-ranker",
+        AdaptiveDecisionKind::WorldRanker,
+        player,
+        &inputs,
+    )
+    .map_err(adaptive_contract_error)
+}
+
+fn empty_site_adaptive_trace(player: &PlayerModel) -> Result<AdaptiveDecisionTrace, ProcgenError> {
+    rank_validated_candidates(
+        "decision:site-ranker",
+        AdaptiveDecisionKind::SiteRanker,
+        player,
+        &[],
+    )
+    .map_err(adaptive_contract_error)
+}
+
 impl ProcgenBundle {
     pub fn from_json(json: &str) -> Result<Self, ProcgenError> {
         let value: Value = serde_json::from_str(json)?;
@@ -329,8 +404,28 @@ impl ProcgenBundle {
         {
             return Err(ProcgenError::InvalidRequest("version"));
         }
-        if self.version.export_schemas != ExportSchemas::platform_v4() {
+        if self.version.export_schemas != ExportSchemas::platform_v5() {
             return Err(ProcgenError::InvalidRequest("export_schemas"));
+        }
+        let [world_adaptive, site_adaptive, encounter_adaptive] =
+            self.trace.adaptive_decisions.as_slice()
+        else {
+            return Err(ProcgenError::InvalidRequest("adaptive_trace_order"));
+        };
+        if world_adaptive.kind != AdaptiveDecisionKind::WorldRanker
+            || world_adaptive.decision_id != "decision:world-ranker"
+            || site_adaptive.kind != AdaptiveDecisionKind::SiteRanker
+            || site_adaptive.decision_id != "decision:site-ranker"
+            || encounter_adaptive.kind != AdaptiveDecisionKind::EncounterDirector
+            || encounter_adaptive.decision_id != "decision:encounter-director"
+        {
+            return Err(ProcgenError::InvalidRequest("adaptive_trace_order"));
+        }
+        for decision in &self.trace.adaptive_decisions {
+            decision
+                .validate()
+                .and_then(|_| decision.replay(&self.request.player_model))
+                .map_err(adaptive_contract_error)?;
         }
         let world_request = WorldGenerationRequest {
             world_seed: self.request.world_seed,
@@ -387,6 +482,14 @@ impl ProcgenBundle {
         {
             return Err(ProcgenError::InvalidRequest("world_identity"));
         }
+        let expected_world_adaptive = world_adaptive_trace(
+            &self.world_ir,
+            world_fallback_id.is_some(),
+            &self.request.player_model,
+        )?;
+        if *world_adaptive != expected_world_adaptive {
+            return Err(ProcgenError::InvalidRequest("world_adaptive_trace"));
+        }
         crate::site::validate_site_for_request(&self.site_ir, &world_request)
             .map_err(|_| ProcgenError::InvalidRequest("site"))?;
         let site_repairs = self
@@ -421,6 +524,37 @@ impl ProcgenBundle {
                 && !rejected_site_candidate
                 && !selected_site_fallback => {}
             _ => return Err(ProcgenError::InvalidRequest("site_fallback_trace")),
+        }
+        if site_fallback_id.is_some() {
+            if *site_adaptive != empty_site_adaptive_trace(&self.request.player_model)? {
+                return Err(ProcgenError::InvalidRequest("site_adaptive_trace"));
+            }
+        } else {
+            let (expected_site, expected_site_adaptive) = crate::site::generate_site_adaptive(
+                self.site_ir.ship.clone(),
+                &world_request,
+                &self.request.player_model,
+            )
+            .map_err(|_| ProcgenError::InvalidRequest("site_adaptive_trace"))?;
+            if expected_site.site != self.site_ir || expected_site_adaptive != *site_adaptive {
+                return Err(ProcgenError::InvalidRequest("site_adaptive_trace"));
+            }
+            let actual_site_decisions = self
+                .trace
+                .candidate_decisions
+                .iter()
+                .filter_map(|decision| decision.strip_prefix("site:"))
+                .collect::<Vec<_>>();
+            if actual_site_decisions
+                != expected_site
+                    .trace
+                    .candidate_decisions
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>()
+            {
+                return Err(ProcgenError::InvalidRequest("site_adaptive_trace"));
+            }
         }
         if self.site_ir.ship.seed != self.world_ir.site_seed
             || self.site_ir.ship.archetype_id != self.request.site.archetype_id
@@ -510,6 +644,9 @@ impl ProcgenBundle {
         if self.gameplay_ir != expected_gameplay_ir {
             return Err(ProcgenError::InvalidRequest("gameplay_identity"));
         }
+        if expected_gameplay_ir.encounter.trace.adaptive != *encounter_adaptive {
+            return Err(ProcgenError::InvalidRequest("encounter_adaptive_trace"));
+        }
         validate_gameplay_decisions(&self.gameplay_ir.decisions)?;
         let expected_presentation_ir =
             build_presentation_ir(&self.request, &self.site_ir, &expected_gameplay_ir)?;
@@ -579,30 +716,6 @@ impl ProcgenFailure {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-#[serde(rename_all = "snake_case")]
-pub enum AdaptiveAction {
-    NoOp,
-    SelectCandidate {
-        candidate_id: String,
-    },
-    AdjustEncounter {
-        encounter_id: String,
-        pacing_delta: i32,
-    },
-}
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct AdaptiveProposal {
-    pub schema_version: String,
-    pub score: i32,
-    pub rationale_codes: Vec<String>,
-    pub confidence_bp: u16,
-    pub rule_model_version: String,
-    pub action: AdaptiveAction,
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum ProcgenError {
     #[error("contract JSON parse failed: {0}")]
@@ -670,42 +783,6 @@ impl ProcgenRequest {
         }
         if self.presentation.seed > crate::world::MAX_PUBLIC_SEED {
             return Err(ProcgenError::InvalidRequest("presentation.seed"));
-        }
-        Ok(())
-    }
-}
-
-impl AdaptiveProposal {
-    pub fn from_json(json: &str) -> Result<Self, ProcgenError> {
-        let value: Value = serde_json::from_str(json)?;
-        let proposal: Self = serde_json::from_value(value)?;
-        proposal.validate()?;
-        Ok(proposal)
-    }
-    pub fn validate(&self) -> Result<(), ProcgenError> {
-        check_schema(&self.schema_version, ADAPTIVE_PROPOSAL_SCHEMA)?;
-        if self.rationale_codes.is_empty()
-            || self.rationale_codes.iter().any(|s| s.is_empty())
-            || self.rule_model_version.is_empty()
-        {
-            return Err(ProcgenError::InvalidRequest(
-                "adaptive_proposal.identifiers",
-            ));
-        }
-        if self.confidence_bp > 10_000 {
-            return Err(ProcgenError::InvalidRequest(
-                "adaptive_proposal.confidence_bp",
-            ));
-        }
-        match &self.action {
-            AdaptiveAction::NoOp => {}
-            AdaptiveAction::SelectCandidate { candidate_id } if candidate_id.is_empty() => {
-                return Err(ProcgenError::InvalidRequest("candidate_id"))
-            }
-            AdaptiveAction::AdjustEncounter { encounter_id, .. } if encounter_id.is_empty() => {
-                return Err(ProcgenError::InvalidRequest("encounter_id"))
-            }
-            _ => {}
         }
         Ok(())
     }
@@ -1242,6 +1319,17 @@ where
         repairs: world_repairs,
         fallback: world_fallback,
     } = world;
+    let world_adaptive =
+        world_adaptive_trace(&world_ir, world_fallback.is_some(), &request.player_model).map_err(
+            |error| {
+                failure(
+                    ProcgenFailureCode::ValidationFailure,
+                    "world_adaptive",
+                    error.to_string(),
+                    false,
+                )
+            },
+        )?;
     let world_request = WorldGenerationRequest {
         world_seed: request.world_seed,
         platform_version: request.generator_version,
@@ -1252,18 +1340,48 @@ where
         archetype_id: request.site.archetype_id.clone(),
     };
     let site_started = Instant::now();
-    let site_outcome = crate::site::generate_site(ship, &world_request)
-        .and_then(|outcome| site_transform(outcome, &world_request))
-        .map_err(|error| {
-            let mut failure = failure(
-                ProcgenFailureCode::FallbackFailure,
-                "site",
+    let (generated_site, mut site_adaptive) =
+        crate::site::generate_site_adaptive(ship, &world_request, &request.player_model).map_err(
+            |error| {
+                let mut failure = failure(
+                    ProcgenFailureCode::FallbackFailure,
+                    "site",
+                    error.to_string(),
+                    false,
+                );
+                failure.fallback_id = Some("authored-safe-return".into());
+                failure
+            },
+        )?;
+    let site_outcome = site_transform(generated_site, &world_request).map_err(|error| {
+        let mut failure = failure(
+            ProcgenFailureCode::FallbackFailure,
+            "site",
+            error.to_string(),
+            false,
+        );
+        failure.fallback_id = Some("authored-safe-return".into());
+        failure
+    })?;
+    if site_outcome.trace.fallback.is_some() {
+        site_adaptive = empty_site_adaptive_trace(&request.player_model).map_err(|error| {
+            failure(
+                ProcgenFailureCode::ValidationFailure,
+                "site_adaptive",
                 error.to_string(),
                 false,
-            );
-            failure.fallback_id = Some("authored-safe-return".into());
-            failure
+            )
         })?;
+    } else if site_adaptive.selected_candidate_id.as_deref()
+        != Some(site_outcome.site.mission_graph.mission_id.as_str())
+    {
+        return Err(failure(
+            ProcgenFailureCode::ValidationFailure,
+            "site_adaptive",
+            "site transform changed the ranked candidate identity".into(),
+            false,
+        ));
+    }
     let site_micros = site_started.elapsed().as_micros();
     let crate::site::SiteGenerationOutcome {
         site: site_ir,
@@ -1303,7 +1421,7 @@ where
     let version = VersionEnvelope {
         generator_version: request.generator_version,
         content_manifest_hash: request.content_manifest_hash.clone(),
-        export_schemas: ExportSchemas::platform_v4(),
+        export_schemas: ExportSchemas::platform_v5(),
     };
     let room_count = u32::try_from(ship.room_graph.nodes.len()).map_err(|_| {
         failure(
@@ -1389,6 +1507,11 @@ where
         failed_constraints: report.failed_constraints,
         repairs,
         retries: report.retries,
+        adaptive_decisions: vec![
+            world_adaptive,
+            site_adaptive,
+            gameplay_ir.encounter.trace.adaptive.clone(),
+        ],
         stage_timings_micros: metrics.stage_timings_micros.clone(),
         fallback: compose_stage_fallbacks(world_fallback, site_trace.fallback),
     };

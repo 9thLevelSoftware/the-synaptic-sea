@@ -35,16 +35,24 @@ const RNG_CHANNELS: Array[String] = [
 	"presentation.asset_assembly",
 ]
 const EXPORT_SCHEMAS: Dictionary = {
-	"procgen_request": "procgen-request-2", "procgen_bundle": "procgen-bundle-4",
-	"world_ir": "world-ir-2", "site_ir": "site-ir-2", "gameplay_ir": "gameplay-ir-2",
-	"presentation_ir": "presentation-ir-2", "generation_trace": "generation-trace-3",
-	"adaptive_proposal": "adaptive-proposal-1",
+	"procgen_request": "procgen-request-2", "procgen_bundle": "procgen-bundle-5",
+	"world_ir": "world-ir-2", "site_ir": "site-ir-2", "gameplay_ir": "gameplay-ir-3",
+	"presentation_ir": "presentation-ir-2", "generation_trace": "generation-trace-4",
+	"adaptive_proposal": "adaptive-proposal-2",
 }
 const ADAPTER_SCHEMAS: Dictionary = {
-	"lifecycle_result": "procgen-lifecycle-result-4",
-	"capabilities": "procgen-capabilities-3",
-	"generator_manifest": "procgen-generator-manifest-3",
+	"lifecycle_result": "procgen-lifecycle-result-5",
+	"capabilities": "procgen-capabilities-4",
+	"generator_manifest": "procgen-generator-manifest-4",
 }
+const BUILD_MANIFEST_SCHEMA: String = "procgen-build-manifest-4"
+const ADAPTIVE_TRACE_SCHEMA: String = "adaptive-decision-trace-1"
+const ADAPTIVE_RULE_VERSION: String = "adaptive-classical-1"
+const ADAPTIVE_RATIONALES: Array[String] = [
+	"validated_candidate", "challenge_fit", "pace_fit", "resource_pressure_fit", "stable_tie_break",
+	"authored_envelope", "combat_mastery", "damage_pressure", "resource_pressure", "objective_pace",
+	"no_validated_candidate", "classical_fallback",
+]
 const ENCOUNTER_RNG_CHANNELS: Array[String] = [
 	"gameplay.encounter_candidate", "gameplay.encounter_faction", "gameplay.encounter_reward",
 ]
@@ -255,7 +263,7 @@ func _validate_request(request: Dictionary) -> bool:
 func _validate_context(request: Dictionary, build: Dictionary, runtime: Dictionary, caps: Dictionary) -> bool:
 	var build_keys: Array[String] = ["manifest_schema", "rust_source_commit", "generator_version", "content_manifest_path", "content_manifest_hash", "target", "artifact", "export_schemas"]
 	if not _has_exact_keys(build, build_keys): return _reject("build_manifest_shape")
-	if str(build.get("manifest_schema", "")) != "procgen-build-manifest-3": return _reject("build_manifest_schema")
+	if str(build.get("manifest_schema", "")) != BUILD_MANIFEST_SCHEMA: return _reject("build_manifest_schema")
 	if str(build.get("content_manifest_path", "")) != "data/procgen/manifests/content_manifest.json": return _reject("build_manifest_path")
 	if not _is_lower_hex(str(build.get("rust_source_commit", "")), 40): return _reject("build_manifest_source")
 	if not _is_sha256(str(build.get("content_manifest_hash", ""))) \
@@ -358,6 +366,7 @@ func _validate_bundle(bundle: Dictionary, request: Dictionary, manifest: Diction
 	if not _validate_gameplay_ir(gameplay_ir, ship, site_ir, request, caps): return false
 	if not _validate_presentation(presentation, gameplay_ir, site_ir): return false
 	if not _validate_metrics_trace(bundle.get("metrics", null), bundle.get("trace", null), site_ir, ship, gameplay_ir, caps): return false
+	if not _validate_adaptive_bundle(bundle.get("trace", null), world, site_ir, gameplay_ir, request): return false
 	if not _is_sha256(str(bundle.get("semantic_hash", ""))): return _reject("semantic_hash_shape")
 	return true
 
@@ -1115,7 +1124,7 @@ func _validate_encounter(value: Variant, blueprint_ids: Dictionary, site_ir: Dic
 	if not value is Dictionary: return _reject("encounter_shape")
 	var e: Dictionary = value
 	if not _has_exact_keys(e, ["schema_version", "composition_id", "spawns", "total_threat", "total_performance", "total_reward_value", "trace"]): return _reject("encounter_shape")
-	if str(e.schema_version) != "encounter-output-2" or not _is_valid_world_id(str(e.composition_id)) or not e.spawns is Array or (e.spawns as Array).size() > 128: return _reject("encounter_schema")
+	if str(e.schema_version) != "encounter-output-3" or not _is_valid_world_id(str(e.composition_id)) or not e.spawns is Array or (e.spawns as Array).size() > 128: return _reject("encounter_schema")
 	for key in ["total_threat", "total_performance", "total_reward_value"]:
 		if not _is_bounded_integer(e[key], 0, 1000000): return _reject("encounter_budget")
 	var rooms: Dictionary = {}
@@ -1183,7 +1192,7 @@ func _validate_encounter(value: Variant, blueprint_ids: Dictionary, site_ir: Dic
 func _validate_encounter_trace(value: Variant, blueprint_ids: Dictionary, request: Dictionary) -> bool:
 	if not value is Dictionary: return _reject("encounter_trace")
 	var t: Dictionary = value
-	var keys: Array[String] = ["rules_version", "channel_ids", "player_values_bp", "budgets", "candidates", "decisions", "selected_spawn_ids", "fallback", "fallback_rationale"]
+	var keys: Array[String] = ["rules_version", "channel_ids", "player_values_bp", "budgets", "candidates", "decisions", "selected_spawn_ids", "fallback", "fallback_rationale", "adaptive"]
 	if not _has_exact_keys(t, keys) or str(t.rules_version) != "encounter-rules-2" or not _same_json(t.channel_ids, ENCOUNTER_RNG_CHANNELS) or not _validate_number_array(t.player_values_bp, 4, true, 0, 10000) or not t.candidates is Array or not t.decisions is Array or not t.selected_spawn_ids is Array or (t.candidates as Array).size() != (t.decisions as Array).size() or (t.candidates as Array).size() > 128: return _reject("encounter_trace")
 	var expected_values: Array = [5000, 5000, 5000, 5000]
 	for signal_value in request.get("player_model", {}).get("signals", []):
@@ -1417,7 +1426,7 @@ func _validate_metrics_trace(metrics_value: Variant, trace_value: Variant, site_
 	var metrics: Dictionary = metrics_value
 	var trace: Dictionary = trace_value
 	if not _has_exact_keys(metrics, ["schema_version", "pipeline_executions", "room_count", "entity_count", "structural_placement_count", "stage_timings_micros"]): return _reject("metrics_shape")
-	if not _has_exact_keys(trace, ["schema_version", "rng_channels", "candidate_decisions", "failed_constraints", "repairs", "retries", "fallback", "stage_timings_micros"]): return _reject("trace_shape")
+	if not _has_exact_keys(trace, ["schema_version", "rng_channels", "candidate_decisions", "failed_constraints", "repairs", "retries", "fallback", "stage_timings_micros", "adaptive_decisions"]): return _reject("trace_shape")
 	if str(metrics.get("schema_version", "")) != "generation-metrics-1" or str(trace.get("schema_version", "")) != EXPORT_SCHEMAS.generation_trace: return _reject("diagnostic_schema")
 	for key in ["pipeline_executions", "room_count", "entity_count", "structural_placement_count"]:
 		if not _is_json_integer(metrics.get(key, null)) or int(metrics.get(key, -1)) < 0: return _reject("metrics_shape")
@@ -1471,6 +1480,165 @@ func _validate_metrics_trace(metrics_value: Variant, trace_value: Variant, site_
 		var timing: Variant = (trace_timings as Dictionary)[key]
 		if str(key).is_empty() or not _is_json_integer(timing) or int(timing) < 0 or int(timing) > 3600000000: return _reject("trace_timing_bounds")
 	return true
+
+func _validate_adaptive_bundle(trace_value: Variant, world: Dictionary, site_ir: Dictionary, gameplay: Dictionary, request: Dictionary) -> bool:
+	if not trace_value is Dictionary: return _reject("adaptive_trace_shape")
+	var traces: Variant = (trace_value as Dictionary).get("adaptive_decisions", null)
+	if not traces is Array or (traces as Array).size() != 3: return _reject("adaptive_trace_order")
+	for decision_value in traces:
+		if not decision_value is Dictionary: return _reject("adaptive_trace_shape")
+	var player_values: Array = [5000, 5000, 5000, 5000]
+	for signal_value in request.get("player_model", {}).get("signals", []):
+		if signal_value is Dictionary:
+			var index: int = PLAYER_SIGNAL_KINDS.find(str((signal_value as Dictionary).get("kind", "")))
+			if index >= 0: player_values[index] = int((signal_value as Dictionary).get("value_bp", 5000))
+	var world_trace: Dictionary = traces[0]
+	var site_trace: Dictionary = traces[1]
+	var encounter_trace: Dictionary = traces[2]
+	var fallback_value: Variant = (trace_value as Dictionary).get("fallback", null)
+	var fallback_summary: String = "" if fallback_value == null else str(fallback_value)
+	var expects_world_fallback: bool = fallback_summary.begins_with("world:")
+	var expects_site_fallback: bool = fallback_summary.begins_with("site:") or fallback_summary.contains("|site:")
+	if not _validate_adaptive_trace(world_trace, "world_ranker", "decision:world-ranker", player_values, world.get("archetype_id", ""), null): return false
+	if (world_trace.get("fallback", null) != null) != expects_world_fallback: return _reject("adaptive_world_fallback_binding")
+	if not expects_world_fallback and not _validate_world_adaptive_candidate(world_trace, world.get("archetype_id", ""), world): return false
+	if not _validate_adaptive_trace(site_trace, "site_ranker", "decision:site-ranker", player_values, site_ir.get("mission_graph", {}).get("mission_id", ""), null): return false
+	if (site_trace.get("fallback", null) != null) != expects_site_fallback: return _reject("adaptive_site_fallback_binding")
+	if expects_site_fallback and str(site_ir.get("mission_graph", {}).get("mission_id", "")) != "authored-safe-return": return _reject("adaptive_site_fallback_binding")
+	if not _validate_site_adaptive_candidates(site_trace): return false
+	var encounter_data: Dictionary = gameplay.get("encounter", {})
+	if not _validate_adaptive_trace(encounter_trace, "encounter_director", "decision:encounter-director", player_values, "", encounter_data.get("composition_id", "")): return false
+	if not _same_json(encounter_trace, encounter_data.get("trace", {}).get("adaptive", null)): return _reject("adaptive_encounter_binding")
+	return true
+
+func _validate_world_adaptive_candidate(trace: Dictionary, archetype_id: String, world: Dictionary) -> bool:
+	var candidates: Array = trace.get("candidates", [])
+	if candidates.size() != 1: return _reject("adaptive_world_candidates")
+	var marker_id: String = str(trace.get("selected_candidate_id", ""))
+	var candidate: Dictionary = candidates[0]
+	var features: Dictionary = candidate.get("features", {})
+	var extraction: Dictionary = world.get("extraction", {})
+	var selected_marker: String = str(extraction.get("selected_marker_id", ""))
+	var challenge: int = -1
+	var resource: int = -1
+	var pace: int = -1
+	for entry in world.get("hazard_fields", []):
+		if entry is Dictionary and str(entry.get("marker_id", "")) == selected_marker: challenge = int(entry.get("severity_bp", -1))
+	for entry in world.get("resource_pressures", []):
+		if entry is Dictionary and str(entry.get("marker_id", "")) == selected_marker: resource = int(entry.get("pressure_bp", -1))
+	for entry in world.get("routes", []):
+		if entry is Dictionary and ((str(entry.get("from", "")) == selected_marker and str(entry.get("to", "")) == str(extraction.get("hub_anchor_id", ""))) or (str(entry.get("to", "")) == selected_marker and str(entry.get("from", "")) == str(extraction.get("hub_anchor_id", "")))): pace = int(entry.get("cost_bp", -1))
+	return str(candidate.get("candidate_id", "")) == archetype_id and marker_id == archetype_id and features.get("challenge_bp", -1) == challenge and features.get("pace_bp", -1) == pace and features.get("resource_cost_bp", -1) == resource
+
+func _validate_site_adaptive_candidates(trace: Dictionary) -> bool:
+	var expected: Dictionary = {
+		"key_lock_salvage": [7000, 5000, 6500],
+		"repair_recovery": [5500, 6500, 5000],
+		"survey": [3500, 4000, 3000],
+	}
+	for candidate_value in trace.get("candidates", []):
+		if not candidate_value is Dictionary: return _reject("adaptive_site_candidates")
+		var candidate: Dictionary = candidate_value
+		var id: String = str(candidate.get("candidate_id", ""))
+		if not expected.has(id) or not _same_json(candidate.get("features", {}), {"challenge_bp": expected[id][0], "pace_bp": expected[id][1], "resource_cost_bp": expected[id][2]}): return _reject("adaptive_site_candidates")
+	return true
+
+func _validate_adaptive_trace(value: Variant, kind: String, decision_id: String, player_values: Array, selected_id: String, encounter_id: Variant) -> bool:
+	if not value is Dictionary: return _reject("adaptive_trace_shape")
+	var t: Dictionary = value
+	var keys: Array[String] = ["schema_version", "decision_id", "kind", "rule_version", "player_values_bp", "candidates", "proposal", "selected_candidate_id", "applied", "fallback"]
+	if not _has_exact_keys(t, keys) or str(t.schema_version) != ADAPTIVE_TRACE_SCHEMA or str(t.decision_id) != decision_id or str(t.kind) != kind or str(t.rule_version) != ADAPTIVE_RULE_VERSION: return _reject("adaptive_trace_shape")
+	if not _same_json(t.player_values_bp, player_values) or t.applied is not bool or not t.candidates is Array or (t.candidates as Array).size() > 64: return _reject("adaptive_trace_player")
+	var proposal: Variant = t.get("proposal", null)
+	if not proposal is Dictionary or not _validate_adaptive_proposal(proposal, kind, selected_id, encounter_id): return false
+	var candidate_ids: Dictionary = {}
+	var best_score: int = -10001
+	var best_id: String = ""
+	for candidate_value in t.candidates:
+		if not candidate_value is Dictionary: return _reject("adaptive_candidate")
+		var candidate: Dictionary = candidate_value
+		if not _has_exact_keys(candidate, ["candidate_id", "features", "score", "action", "rationale_codes"]): return _reject("adaptive_candidate")
+		var id: String = str(candidate.candidate_id)
+		var features: Variant = candidate.features
+		if candidate_ids.has(id) or not _is_bounded_contract_id(id, 96) or not features is Dictionary or not _has_exact_keys(features, ["challenge_bp", "pace_bp", "resource_cost_bp"]): return _reject("adaptive_candidate")
+		for key in ["challenge_bp", "pace_bp", "resource_cost_bp"]:
+			if not _is_bounded_integer(features.get(key, null), 0, 10000): return _reject("adaptive_candidate")
+		var score: int = _adaptive_score(features as Dictionary, player_values)
+		if int(candidate.score) != score or not _validate_adaptive_action(candidate.action, "select_candidate", id) or not _validate_adaptive_rationales(candidate.rationale_codes): return _reject("adaptive_candidate")
+		candidate_ids[id] = true
+		if score > best_score or (score == best_score and (best_id.is_empty() or id < best_id)):
+			best_score = score; best_id = id
+		if candidate_ids.size() > 1:
+			var previous_id: String = str(t.candidates[candidate_ids.size() - 2].get("candidate_id", ""))
+			if previous_id >= id: return _reject("adaptive_candidate_order")
+	if kind != "encounter_director":
+		if t.candidates.is_empty():
+			if t.selected_candidate_id != null or bool(t.applied) or t.fallback != "no_validated_candidate" or str(proposal.action) != "no_op" or int(proposal.score) != 0 or int(proposal.confidence_bp) != 0 or not _same_json(proposal.rationale_codes, ["no_validated_candidate", "classical_fallback"]): return _reject("adaptive_fallback")
+		else:
+			var best_count: int = 0
+			for tie_value in t.candidates:
+				if int(tie_value.get("score", -10001)) == best_score: best_count += 1
+			var tie: bool = best_count > 1
+			for candidate_check in t.candidates:
+				var check_features: Dictionary = candidate_check.get("features", {})
+				var expected_candidate_rationale: Array = ["validated_candidate"]
+				if _adaptive_fit(int(check_features.get("challenge_bp", 0)), int(player_values[0])) >= 9000: expected_candidate_rationale.append("challenge_fit")
+				if _adaptive_fit(int(check_features.get("pace_bp", 0)), int(player_values[3])) >= 9000: expected_candidate_rationale.append("pace_fit")
+				if _adaptive_fit(int(check_features.get("resource_cost_bp", 0)), int(player_values[2])) >= 9000: expected_candidate_rationale.append("resource_pressure_fit")
+				if tie and int(candidate_check.get("score", -10001)) == best_score: expected_candidate_rationale.append("stable_tie_break")
+				if not _same_json(candidate_check.get("rationale_codes", []), expected_candidate_rationale): return _reject("adaptive_candidate")
+			var expected_proposal_rationale: Array = ["validated_candidate"]
+			var winner_features: Dictionary = {}
+			for winner_value in t.candidates:
+				if str(winner_value.get("candidate_id", "")) == best_id: winner_features = winner_value.get("features", {})
+			if _adaptive_fit(int(winner_features.get("challenge_bp", 0)), int(player_values[0])) >= 9000: expected_proposal_rationale.append("challenge_fit")
+			if _adaptive_fit(int(winner_features.get("pace_bp", 0)), int(player_values[3])) >= 9000: expected_proposal_rationale.append("pace_fit")
+			if _adaptive_fit(int(winner_features.get("resource_cost_bp", 0)), int(player_values[2])) >= 9000: expected_proposal_rationale.append("resource_pressure_fit")
+			if tie: expected_proposal_rationale.append("stable_tie_break")
+			if t.fallback != null or t.selected_candidate_id != best_id or not bool(t.applied) or str(proposal.get("action", {}).get("select_candidate", {}).get("candidate_id", "")) != best_id or int(proposal.score) != best_score or int(proposal.confidence_bp) != clampi(5000 + int(float(best_score) / 2.0), 0, 10000) or not _same_json(proposal.rationale_codes, expected_proposal_rationale): return _reject("adaptive_binding")
+	else:
+		if not t.candidates.is_empty() or t.selected_candidate_id != null or t.fallback != null or not bool(t.applied): return _reject("adaptive_encounter_shape")
+		var expected_delta: int = _adaptive_encounter_delta(player_values)
+		if int(proposal.score) != expected_delta or int(proposal.confidence_bp) != clampi(5000 + int(float(expected_delta) / 2.0), 0, 10000) or not _same_json(proposal.rationale_codes, ["authored_envelope", "combat_mastery", "damage_pressure", "resource_pressure", "objective_pace"]) or int(proposal.action.get("adjust_encounter", {}).get("pacing_delta_bp", 99999)) != expected_delta or str(proposal.action.get("adjust_encounter", {}).get("encounter_id", "")) != str(encounter_id): return _reject("adaptive_encounter_binding")
+	return true
+
+func _validate_adaptive_proposal(value: Variant, kind: String, selected_id: String, encounter_id: Variant) -> bool:
+	var p: Dictionary = value
+	if not _has_exact_keys(p, ["schema_version", "score", "rationale_codes", "confidence_bp", "rule_model_version", "action"]): return _reject("adaptive_proposal")
+	if str(p.schema_version) != EXPORT_SCHEMAS.adaptive_proposal or str(p.rule_model_version) != ADAPTIVE_RULE_VERSION or not _is_bounded_integer(p.score, -10000, 10000) or not _is_bounded_integer(p.confidence_bp, 0, 10000) or not _validate_adaptive_rationales(p.rationale_codes): return _reject("adaptive_proposal")
+	if kind == "encounter_director": return _validate_adaptive_action(p.action, "adjust_encounter", str(encounter_id))
+	if p.action is String: return str(p.action) == "no_op"
+	return _validate_adaptive_action(p.action, "select_candidate", selected_id)
+
+func _validate_adaptive_action(value: Variant, expected: String, expected_id: String) -> bool:
+	if expected == "select_candidate":
+		return value is Dictionary and _has_exact_keys(value, ["select_candidate"]) and value.select_candidate is Dictionary and _has_exact_keys(value.select_candidate, ["candidate_id"]) and str(value.select_candidate.candidate_id) == expected_id and _is_bounded_contract_id(expected_id, 96)
+	if expected == "adjust_encounter":
+		return value is Dictionary and _has_exact_keys(value, ["adjust_encounter"]) and value.adjust_encounter is Dictionary and _has_exact_keys(value.adjust_encounter, ["encounter_id", "pacing_delta_bp"]) and str(value.adjust_encounter.encounter_id) == expected_id and _is_bounded_integer(value.adjust_encounter.pacing_delta_bp, -2500, 2500) and [-2500, -1250, 0, 1250, 2500].has(int(value.adjust_encounter.pacing_delta_bp))
+	return value is String and str(value) == "no_op"
+
+func _validate_adaptive_rationales(value: Variant) -> bool:
+	if not value is Array or (value as Array).is_empty() or (value as Array).size() > 64: return false
+	var seen: Dictionary = {}
+	for code in value:
+		if not code is String or not ADAPTIVE_RATIONALES.has(str(code)) or seen.has(str(code)): return false
+		seen[str(code)] = true
+	return true
+
+func _adaptive_score(features: Dictionary, player: Array) -> int:
+	return (_adaptive_fit(int(features.challenge_bp), int(player[0])) + _adaptive_fit(int(features.pace_bp), int(player[3])) + _adaptive_fit(int(features.resource_cost_bp), int(player[2]))) / 3
+
+func _adaptive_fit(actual: int, target: int) -> int: return 10000 - absi(actual - target)
+
+func _adaptive_encounter_delta(values: Array) -> int:
+	var utility: int = int(values[0]) - 5000 - int(float(int(values[1]) - 5000) / 2.0) - int(float(int(values[2]) - 5000) / 2.0) + int(float(int(values[3]) - 5000) / 4.0)
+	utility = clampi(utility, -2500, 2500)
+	var best: int = 0
+	var best_distance: int = 99999
+	for delta in [-2500, -1250, 0, 1250, 2500]:
+		var distance: int = absi(utility - delta)
+		if distance < best_distance or (distance == best_distance and delta < best): best = delta; best_distance = distance
+	return best
 
 func _verify_hash(result_json: String, bundle: Dictionary) -> bool:
 	var helper: RefCounted = CanonicalJsonScript.new()

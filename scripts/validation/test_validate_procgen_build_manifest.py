@@ -112,18 +112,18 @@ class ManifestToolTests(unittest.TestCase):
         self.assertEqual(windows["target"], "x86_64-pc-windows-msvc")
         self.assertEqual(windows["artifact"]["kind"], "gdextension")
         self.assertEqual(windows["generator_version"], 3)
-        self.assertEqual(windows["manifest_schema"], "procgen-build-manifest-3")
+        self.assertEqual(windows["manifest_schema"], "procgen-build-manifest-4")
         self.assertEqual(windows["export_schemas"]["procgen_request"], "procgen-request-2")
-        self.assertEqual(windows["export_schemas"]["procgen_bundle"], "procgen-bundle-4")
+        self.assertEqual(windows["export_schemas"]["procgen_bundle"], "procgen-bundle-5")
         self.assertEqual(windows["export_schemas"]["world_ir"], "world-ir-2")
         self.assertEqual(windows["export_schemas"]["site_ir"], "site-ir-2")
-        self.assertEqual(windows["export_schemas"]["gameplay_ir"], "gameplay-ir-2")
+        self.assertEqual(windows["export_schemas"]["gameplay_ir"], "gameplay-ir-3")
         self.assertEqual(windows["export_schemas"]["presentation_ir"], "presentation-ir-2")
         self.assertEqual(
-            windows["export_schemas"]["generation_trace"], "generation-trace-3"
+            windows["export_schemas"]["generation_trace"], "generation-trace-4"
         )
         self.assertEqual(
-            windows["export_schemas"]["adaptive_proposal"], "adaptive-proposal-1"
+            windows["export_schemas"]["adaptive_proposal"], "adaptive-proposal-2"
         )
         self.assertEqual(
             windows["artifact"]["path"],
@@ -140,11 +140,11 @@ class ManifestToolTests(unittest.TestCase):
         self.assertEqual(web["target"], "wasm32-unknown-unknown")
         self.assertEqual(web["artifact"]["kind"], "wasm")
         self.assertEqual(web["generator_version"], 3)
-        self.assertEqual(web["manifest_schema"], "procgen-build-manifest-3")
+        self.assertEqual(web["manifest_schema"], "procgen-build-manifest-4")
         self.assertEqual(web["export_schemas"]["procgen_request"], "procgen-request-2")
-        self.assertEqual(web["export_schemas"]["procgen_bundle"], "procgen-bundle-4")
+        self.assertEqual(web["export_schemas"]["procgen_bundle"], "procgen-bundle-5")
         self.assertEqual(web["export_schemas"]["site_ir"], "site-ir-2")
-        self.assertEqual(web["export_schemas"]["gameplay_ir"], "gameplay-ir-2")
+        self.assertEqual(web["export_schemas"]["gameplay_ir"], "gameplay-ir-3")
         self.assertEqual(web["export_schemas"]["presentation_ir"], "presentation-ir-2")
         self.assertEqual(
             web["artifact"]["path"],
@@ -214,6 +214,24 @@ class ManifestToolTests(unittest.TestCase):
         )
         self.assertEqual(result, 1)
         self.assertIn("source commit is not present", error)
+
+    def test_every_gate3_schema_substitution_is_rejected(self):
+        result, _, error = self.run_tool("--source-commit", self.SOURCE_COMMIT)
+        self.assertEqual(result, 0, error)
+        original = self.windows_manifest.read_text(encoding="utf-8")
+        substitutions = {
+            "procgen-build-manifest-4": "procgen-build-manifest-3",
+            "procgen-bundle-5": "procgen-bundle-4",
+            "gameplay-ir-3": "gameplay-ir-2",
+            "generation-trace-4": "generation-trace-3",
+            "adaptive-proposal-2": "adaptive-proposal-1",
+        }
+        for current, legacy in substitutions.items():
+            self.windows_manifest.write_text(original.replace(current, legacy), encoding="utf-8")
+            result, _, error = self.run_tool("--check", "--source-commit", self.SOURCE_COMMIT)
+            self.assertEqual(result, 1, f"accepted Gate 3 substitution {current}")
+            self.assertIn("win64.json is stale or missing", error)
+        self.windows_manifest.write_text(original, encoding="utf-8")
 
 
 if __name__ == "__main__":

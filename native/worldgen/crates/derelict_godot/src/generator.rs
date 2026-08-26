@@ -59,8 +59,8 @@ pub(crate) fn runtime_manifest() -> Result<GeneratorManifest, ProcgenFailure> {
         rust_source_commit: SOURCE_COMMIT.into(),
         generator_version: PROCGEN_GENERATOR_VERSION,
         content_manifest_hash: CONTENT_HASH.into(),
-        export_schemas: ExportSchemas::platform_v4(),
-        adapter_schemas: AdapterSchemas::platform_v4(),
+        export_schemas: ExportSchemas::platform_v5(),
+        adapter_schemas: AdapterSchemas::platform_v5(),
         target: TARGET.into(),
         dirty_development: dirty_development(),
     };
@@ -94,7 +94,7 @@ pub(crate) fn runtime_capabilities() -> Result<ProcgenCapabilities, ProcgenFailu
             Domain::Gameplay,
             Domain::Presentation,
         ],
-        schemas: AdapterSchemas::platform_v4(),
+        schemas: AdapterSchemas::platform_v5(),
     };
     capabilities
         .validate()
@@ -173,7 +173,7 @@ where
 {
     match serializer(value) {
         Ok(json) => json,
-        Err(_) => serde_json::to_string(&LifecycleResult::failed(None, adapter_failure("response serialization failed"), vec![LifecycleEvent::Failed])).unwrap_or_else(|_| "{\"schema_version\":\"procgen-lifecycle-result-4\",\"status\":\"failed\",\"request_id\":null,\"bundle\":null,\"failure\":{\"schema_version\":\"procgen-failure-1\",\"code\":\"adapter_failure\",\"stage\":\"adapter\",\"message\":\"response serialization failed\",\"retryable\":false,\"fallback_id\":null},\"events\":[\"failed\"]}".into()),
+        Err(_) => serde_json::to_string(&LifecycleResult::failed(None, adapter_failure("response serialization failed"), vec![LifecycleEvent::Failed])).unwrap_or_else(|_| "{\"schema_version\":\"procgen-lifecycle-result-5\",\"status\":\"failed\",\"request_id\":null,\"bundle\":null,\"failure\":{\"schema_version\":\"procgen-failure-1\",\"code\":\"adapter_failure\",\"stage\":\"adapter\",\"message\":\"response serialization failed\",\"retryable\":false,\"fallback_id\":null},\"events\":[\"failed\"]}".into()),
     }
 }
 fn serialize_string<T: Serialize>(value: &T) -> String {

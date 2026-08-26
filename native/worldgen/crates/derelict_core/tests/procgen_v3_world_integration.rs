@@ -3,13 +3,12 @@
 //! rather than private helpers; they may remain RED until the B2 implementation
 //! lands.
 
+use derelict_core::adaptive::AdaptiveDecisionKind;
 use derelict_core::lifecycle::{
     AdapterSchemas, GeneratorManifest, LifecycleEvent, LifecycleResult,
     PROCGEN_CAPABILITIES_SCHEMA, PROCGEN_GENERATOR_MANIFEST_SCHEMA,
 };
-use derelict_core::manifest::{
-    ExportSchemas, PROCGEN_BUNDLE_SCHEMA_V4, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4, WORLD_IR_SCHEMA_V2,
-};
+use derelict_core::manifest::{ExportSchemas, WORLD_IR_SCHEMA_V2};
 use derelict_core::procgen::{
     generate_bundle, generate_bundle_with_site_transform, semantic_hash, Domain, PlayerModel,
     PresentationRequest, ProcgenBundle, ProcgenError, ProcgenRequest, SiteRequest,
@@ -161,14 +160,34 @@ fn complete_bundle_embeds_public_world_and_runs_structural_pipeline_once() {
     let expected_outcome = generate_world(&world_request(&req)).unwrap();
     let expected_world = expected_outcome.world_ir;
     let bundle = generate_bundle(req.clone(), &GenData::default_bundle().unwrap()).unwrap();
-    assert_eq!(bundle.schema_version, PROCGEN_BUNDLE_SCHEMA_V4);
+    assert_eq!(
+        bundle.schema_version,
+        derelict_core::manifest::PROCGEN_BUNDLE_SCHEMA_V5
+    );
     assert_eq!(bundle.version.generator_version, 3);
-    assert_eq!(bundle.version.export_schemas, ExportSchemas::platform_v4());
+    assert_eq!(bundle.version.export_schemas, ExportSchemas::platform_v5());
     assert_eq!(
         serde_json::to_value(&bundle.world_ir).unwrap(),
         serde_json::to_value(&expected_world).unwrap()
     );
     assert_eq!(bundle.metrics.pipeline_executions, 1);
+    assert_eq!(bundle.trace.adaptive_decisions.len(), 3);
+    assert_eq!(
+        bundle
+            .trace
+            .adaptive_decisions
+            .iter()
+            .map(|decision| decision.kind)
+            .collect::<Vec<_>>(),
+        vec![
+            AdaptiveDecisionKind::WorldRanker,
+            AdaptiveDecisionKind::SiteRanker,
+            AdaptiveDecisionKind::EncounterDirector,
+        ]
+    );
+    for decision in &bundle.trace.adaptive_decisions {
+        decision.replay(&bundle.request.player_model).unwrap();
+    }
     assert_eq!(bundle.site_ir.ship.generator_version, GENERATOR_VERSION);
     assert_eq!(bundle.site_ir.ship.seed, expected_world.site_seed);
     for decision in &expected_outcome.candidate_decisions {
@@ -246,7 +265,7 @@ fn requested_domain_order_and_locale_do_not_change_world_or_mechanics() {
 fn expanded_nested_documents_reject_unknown_fields_and_schema_substitution() {
     let data = GenData::default_bundle().unwrap();
     let bundle = generate_bundle(request(), &data).unwrap();
-    let bundle_schema = public_schema(PROCGEN_BUNDLE_SCHEMA_V4);
+    let bundle_schema = public_schema(derelict_core::manifest::PROCGEN_BUNDLE_SCHEMA_V5);
     let bundle_validator = jsonschema::validator_for(&bundle_schema).unwrap();
     let bundle_value = serde_json::to_value(&bundle).unwrap();
     assert!(bundle_validator.is_valid(&bundle_value));
@@ -290,16 +309,20 @@ fn expanded_nested_documents_reject_unknown_fields_and_schema_substitution() {
 }
 
 #[test]
-fn lifecycle_result_and_generator_manifest_are_platform_v4_contracts() {
+fn lifecycle_result_and_generator_manifest_are_platform_v5_contracts() {
     let data = GenData::default_bundle().unwrap();
     let bundle = generate_bundle(request(), &data).unwrap();
     let result =
         LifecycleResult::completed(Some(1), bundle.clone(), vec![LifecycleEvent::Completed]);
-    assert_eq!(result.schema_version, PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4);
+    assert_eq!(
+        result.schema_version,
+        derelict_core::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V5
+    );
     assert!(result.validate().is_ok());
     let json = serde_json::to_string(&result).unwrap();
     assert!(LifecycleResult::from_json(&json).is_ok());
-    let lifecycle_schema = public_schema(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4);
+    let lifecycle_schema =
+        public_schema(derelict_core::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V5);
     let lifecycle_validator = jsonschema::validator_for(&lifecycle_schema).unwrap();
     let lifecycle_value: Value = serde_json::from_str(&json).unwrap();
     assert!(lifecycle_validator.is_valid(&lifecycle_value));
@@ -308,7 +331,10 @@ fn lifecycle_result_and_generator_manifest_are_platform_v4_contracts() {
         "procgen-lifecycle-result-2",
         "procgen-lifecycle-result-9",
     ] {
-        let substituted = json.replace(PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4, schema);
+        let substituted = json.replace(
+            derelict_core::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V5,
+            schema,
+        );
         assert!(
             LifecycleResult::from_json(&substituted).is_err(),
             "accepted {schema}"
@@ -335,9 +361,9 @@ fn lifecycle_result_and_generator_manifest_are_platform_v4_contracts() {
         rust_source_commit: "a".repeat(40),
         generator_version: 3,
         content_manifest_hash: CONTENT_HASH.into(),
-        export_schemas: ExportSchemas::platform_v4(),
+        export_schemas: ExportSchemas::platform_v5(),
         adapter_schemas: AdapterSchemas {
-            lifecycle_result: PROCGEN_LIFECYCLE_RESULT_SCHEMA_V4.into(),
+            lifecycle_result: derelict_core::manifest::PROCGEN_LIFECYCLE_RESULT_SCHEMA_V5.into(),
             capabilities: PROCGEN_CAPABILITIES_SCHEMA.into(),
             generator_manifest: PROCGEN_GENERATOR_MANIFEST_SCHEMA.into(),
         },

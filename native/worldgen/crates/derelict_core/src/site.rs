@@ -1,5 +1,9 @@
 //! Validated, deterministic mission overlay for an already-generated ship.
 //! This module deliberately owns no structural generation state.
+use crate::adaptive::{
+    rank_validated_candidates, AdaptiveDecisionKind, AdaptiveDecisionTrace, AdaptiveError,
+    CandidateFeatures, ClassicalRules, ValidatedCandidateInput,
+};
 use crate::model::Ship;
 use crate::structural::plan::{edge_key, Cell, Dir, EdgeKind, NO_ROOM};
 use schemars::JsonSchema;
@@ -2085,6 +2089,119 @@ pub fn generate_site(
             fallback: Some("authored-safe-return".into()),
         },
     })
+}
+
+/// Rank all independently validated authored site profiles without changing
+/// the legacy deterministic template-selection path above.
+pub fn generate_site_adaptive(
+    ship: Ship,
+    request: &crate::world::WorldGenerationRequest,
+    player: &crate::player_model::PlayerModelV2,
+) -> Result<(SiteGenerationOutcome, AdaptiveDecisionTrace), SiteError> {
+    validate_request_ship(&ship, request)?;
+    let rules = SiteRules::bundled()?;
+    rules.validate()?;
+    let classical = ClassicalRules::bundled().map_err(adaptive_site_error)?;
+    let mut templates: Vec<_> = rules
+        .templates
+        .iter()
+        .filter(|template| template.archetypes.contains(&request.archetype_id))
+        .cloned()
+        .collect();
+    templates.sort_by(|left, right| left.id.cmp(&right.id));
+    let mut candidates = Vec::new();
+    let mut outcomes = BTreeMap::new();
+    let mut explanations = SITE_RNG_CHANNELS
+        .iter()
+        .enumerate()
+        .map(|(index, channel)| {
+            let seed = site_key(request, channel, index as u32)
+                .and_then(|key| key.seed().map_err(|field| SiteError::Invalid(field.into())))?;
+            Ok(format!("channel:{channel}:{seed}"))
+        })
+        .collect::<Result<Vec<_>, SiteError>>()?;
+    for template in templates {
+        let template_id = template.id.clone();
+        let candidate = match build_site_candidate(ship.clone(), request, &template) {
+            Ok(candidate) => candidate,
+            Err(error) => {
+                explanations.push(format!("template:{template_id}:rejected:{error}"));
+                continue;
+            }
+        };
+        let outcome = match resolve_site_candidate(candidate, request) {
+            Ok(outcome) if outcome.trace.fallback.is_none() => outcome,
+            Ok(outcome) => {
+                explanations.push(format!("template:{template_id}:rejected:authored_fallback"));
+                let _ = outcome;
+                continue;
+            }
+            Err(error) => {
+                explanations.push(format!("template:{template_id}:rejected:{error}"));
+                continue;
+            }
+        };
+        if let Err(error) = validate_site_for_request(&outcome.site, request) {
+            explanations.push(format!("template:{template_id}:rejected:{error}"));
+            continue;
+        }
+        let profile = classical
+            .site_profiles
+            .iter()
+            .find(|profile| profile.id == outcome.site.mission_graph.mission_id)
+            .ok_or_else(|| SiteError::Validation("adaptive site profile missing".into()))?;
+        candidates.push(
+            ValidatedCandidateInput::new(
+                outcome.site.mission_graph.mission_id.clone(),
+                CandidateFeatures {
+                    challenge_bp: profile.challenge_bp,
+                    pace_bp: profile.pace_bp,
+                    resource_cost_bp: profile.resource_cost_bp,
+                },
+            )
+            .map_err(adaptive_site_error)?,
+        );
+        explanations.push(format!("template:{template_id}:validated"));
+        outcomes.insert(outcome.site.mission_graph.mission_id.clone(), outcome);
+    }
+    let trace = rank_validated_candidates(
+        "decision:site-ranker",
+        AdaptiveDecisionKind::SiteRanker,
+        player,
+        &candidates,
+    )
+    .map_err(adaptive_site_error)?;
+    if let Some(selected) = trace.selected_candidate_id.as_deref() {
+        let mut outcome = outcomes
+            .remove(selected)
+            .ok_or_else(|| SiteError::Validation("adaptive selected unknown site".into()))?;
+        explanations.push(format!("adaptive:selected:{selected}"));
+        outcome.trace.candidate_decisions.extend(explanations);
+        outcome
+            .trace
+            .candidate_decisions
+            .truncate(MAX_SITE_DECISIONS);
+        return Ok((outcome, trace));
+    }
+    let fallback = build_fallback(ship, request)?;
+    validate_site_for_request(&fallback, request)?;
+    explanations.push("adaptive:fallback:no_validated_candidate".into());
+    let explanations = fallback_candidate_decisions(explanations);
+    Ok((
+        SiteGenerationOutcome {
+            site: fallback,
+            trace: SiteTrace {
+                candidate_decisions: explanations,
+                repairs: Vec::new(),
+                fallback: Some("authored-safe-return".into()),
+            },
+        },
+        trace,
+    ))
+}
+
+fn adaptive_site_error(error: AdaptiveError) -> SiteError {
+    SiteError::Validation(format!("adaptive: {error}"))
 }
 
 #[cfg(test)]

@@ -1,4 +1,6 @@
+use derelict_core::adaptive::{AdaptiveRationaleCode, CLASSICAL_RULE_VERSION};
 use derelict_core::procgen::*;
+use sha2::Digest;
 
 fn request() -> ProcgenRequest {
     ProcgenRequest {
@@ -144,9 +146,9 @@ fn contracts_validate_actions_domains_and_bundle_unknown_fields() {
     let proposal = AdaptiveProposal {
         schema_version: ADAPTIVE_PROPOSAL_SCHEMA.into(),
         score: 1,
-        rationale_codes: vec!["pace".into()],
+        rationale_codes: vec![AdaptiveRationaleCode::PaceFit],
         confidence_bp: 10_000,
-        rule_model_version: "rules-1".into(),
+        rule_model_version: CLASSICAL_RULE_VERSION.into(),
         action: AdaptiveAction::SelectCandidate {
             candidate_id: "c1".into(),
         },
@@ -193,18 +195,22 @@ fn every_public_schema_is_json_and_closed_at_root() {
         "procgen-bundle-2",
         "procgen-bundle-3",
         "procgen-bundle-4",
+        "procgen-bundle-5",
         "world-ir-2",
         "site-ir-1",
         "site-ir-2",
         "gameplay-ir-1",
         "gameplay-ir-2",
+        "gameplay-ir-3",
         "presentation-ir-1",
         "presentation-ir-2",
         "generation-trace-1",
         "generation-trace-2",
         "generation-trace-3",
+        "generation-trace-4",
         "generation-metrics-1",
         "adaptive-proposal-1",
+        "adaptive-proposal-2",
         "player-model-1",
         "player-model-2",
         "procgen-failure-1",
@@ -230,7 +236,7 @@ fn embedded_request_constraints_match_rust_and_bundle_schema() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-4.schema.json",
+            "{}/../../schemas/procgen-bundle-5.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),
@@ -286,7 +292,7 @@ fn current_site_and_bundle_schemas_enforce_nested_ship_and_hash_identity() {
     )
     .unwrap();
     let bundle_schema: serde_json::Value = serde_json::from_str(
-        &std::fs::read_to_string(format!("{schema_dir}/procgen-bundle-4.schema.json")).unwrap(),
+        &std::fs::read_to_string(format!("{schema_dir}/procgen-bundle-5.schema.json")).unwrap(),
     )
     .unwrap();
     let site_validator = jsonschema::validator_for(&site_schema).unwrap();
@@ -319,7 +325,7 @@ fn embedded_gameplay_constraints_match_standalone_and_rust() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-4.schema.json",
+            "{}/../../schemas/procgen-bundle-5.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),
@@ -351,7 +357,7 @@ fn embedded_gameplay_constraints_match_standalone_and_rust() {
 fn adaptive_empty_targets_fail_rust_and_schema() {
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/adaptive-proposal-1.schema.json",
+            "{}/../../schemas/adaptive-proposal-2.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),
@@ -364,21 +370,42 @@ fn adaptive_empty_targets_fail_rust_and_schema() {
         },
         AdaptiveAction::AdjustEncounter {
             encounter_id: String::new(),
-            pacing_delta: 1,
+            pacing_delta_bp: 1,
         },
     ] {
         let proposal = AdaptiveProposal {
             schema_version: ADAPTIVE_PROPOSAL_SCHEMA.into(),
             score: 0,
-            rationale_codes: vec!["r".into()],
+            rationale_codes: vec![AdaptiveRationaleCode::ClassicalFallback],
             confidence_bp: 1,
-            rule_model_version: "v".into(),
+            rule_model_version: CLASSICAL_RULE_VERSION.into(),
             action,
         };
         let value = serde_json::to_value(&proposal).unwrap();
         assert!(AdaptiveProposal::from_json(&serde_json::to_string(&value).unwrap()).is_err());
         assert!(validator.iter_errors(&value).next().is_some());
     }
+}
+
+#[test]
+fn adaptive_v1_schema_remains_byte_immutable_migration_evidence() {
+    let bytes = std::fs::read(format!(
+        "{}/../../schemas/adaptive-proposal-1.schema.json",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    let digest = sha2::Sha256::digest(&bytes);
+    assert_eq!(
+        format!("{digest:x}"),
+        "9d92df4f8479a963e078e357f7553bbe26ef48dec862a3ee8c95faf7df6625e5"
+    );
+    let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(value["title"], "adaptive-proposal-1");
+    assert_eq!(
+        value["properties"]["schema_version"]["const"],
+        "adaptive-proposal-1"
+    );
+    assert_eq!(ADAPTIVE_PROPOSAL_SCHEMA, "adaptive-proposal-2");
 }
 
 #[test]
@@ -472,7 +499,7 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-4.schema.json",
+            "{}/../../schemas/procgen-bundle-5.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),
@@ -488,27 +515,34 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
     let round_trip =
         ProcgenBundle::from_json(&serde_json::to_string(&bundle_value).unwrap()).unwrap();
     assert_eq!(round_trip, bundle);
-    for action in [
-        AdaptiveAction::NoOp,
-        AdaptiveAction::SelectCandidate {
-            candidate_id: "c".into(),
-        },
-        AdaptiveAction::AdjustEncounter {
-            encounter_id: "e".into(),
-            pacing_delta: -1,
-        },
+    for (action, score) in [
+        (AdaptiveAction::NoOp, 0),
+        (
+            AdaptiveAction::SelectCandidate {
+                candidate_id: "c".into(),
+            },
+            5_000,
+        ),
+        (
+            AdaptiveAction::AdjustEncounter {
+                encounter_id: "e".into(),
+                pacing_delta_bp: -1_250,
+            },
+            -1_250,
+        ),
     ] {
         let proposal = AdaptiveProposal {
             schema_version: ADAPTIVE_PROPOSAL_SCHEMA.into(),
-            score: 0,
-            rationale_codes: vec!["r".into()],
+            score,
+            rationale_codes: vec![AdaptiveRationaleCode::ClassicalFallback],
             confidence_bp: 1,
-            rule_model_version: "v".into(),
+            rule_model_version: CLASSICAL_RULE_VERSION.into(),
             action,
         };
+        proposal.validate().unwrap();
         let schema: serde_json::Value = serde_json::from_str(
             &std::fs::read_to_string(format!(
-                "{}/../../schemas/adaptive-proposal-1.schema.json",
+                "{}/../../schemas/adaptive-proposal-2.schema.json",
                 env!("CARGO_MANIFEST_DIR")
             ))
             .unwrap(),
@@ -523,9 +557,9 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
         let mut bad = serde_json::to_value(AdaptiveProposal {
             schema_version: ADAPTIVE_PROPOSAL_SCHEMA.into(),
             score: 0,
-            rationale_codes: vec!["r".into()],
+            rationale_codes: vec![AdaptiveRationaleCode::ClassicalFallback],
             confidence_bp: 1,
-            rule_model_version: "v".into(),
+            rule_model_version: CLASSICAL_RULE_VERSION.into(),
             action: AdaptiveAction::SelectCandidate {
                 candidate_id: "c".into(),
             },
@@ -534,12 +568,12 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
         if action_key == "select_candidate" {
             bad["action"]["select_candidate"]["unexpected"] = true.into();
         } else {
-            bad["action"] = serde_json::json!({"adjust_encounter":{"encounter_id":"e","pacing_delta":1,"unexpected":true}});
+            bad["action"] = serde_json::json!({"adjust_encounter":{"encounter_id":"e","pacing_delta_bp":1,"unexpected":true}});
         }
         assert!(AdaptiveProposal::from_json(&serde_json::to_string(&bad).unwrap()).is_err());
         let schema: serde_json::Value = serde_json::from_str(
             &std::fs::read_to_string(format!(
-                "{}/../../schemas/adaptive-proposal-1.schema.json",
+                "{}/../../schemas/adaptive-proposal-2.schema.json",
                 env!("CARGO_MANIFEST_DIR")
             ))
             .unwrap(),
@@ -562,7 +596,7 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
         ),
         ("site-ir-2", serde_json::to_value(&bundle.site_ir).unwrap()),
         (
-            "gameplay-ir-2",
+            "gameplay-ir-3",
             serde_json::to_value(&bundle.gameplay_ir).unwrap(),
         ),
         (
@@ -570,7 +604,7 @@ fn draft_schema_accepts_serialized_bundle_and_all_actions() {
             serde_json::to_value(&bundle.presentation_ir).unwrap(),
         ),
         (
-            "generation-trace-3",
+            "generation-trace-4",
             serde_json::to_value(&bundle.trace).unwrap(),
         ),
         (
@@ -650,7 +684,7 @@ fn nested_unknown_fields_fail_at_serde_and_schema_boundaries() {
     let bundle = generate_bundle(request(), &data).unwrap();
     let schema: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(format!(
-            "{}/../../schemas/procgen-bundle-4.schema.json",
+            "{}/../../schemas/procgen-bundle-5.schema.json",
             env!("CARGO_MANIFEST_DIR")
         ))
         .unwrap(),

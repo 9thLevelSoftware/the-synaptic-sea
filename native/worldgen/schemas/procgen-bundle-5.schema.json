@@ -1,0 +1,3728 @@
+{
+  "$id": "procgen-bundle-5",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "AdaptiveActionV2": {
+      "oneOf": [
+        {
+          "enum": [
+            "no_op"
+          ],
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "select_candidate": {
+              "additionalProperties": false,
+              "properties": {
+                "candidate_id": {
+                  "maxLength": 96,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9:_-]+$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "candidate_id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "select_candidate"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "adjust_encounter": {
+              "additionalProperties": false,
+              "properties": {
+                "encounter_id": {
+                  "maxLength": 96,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9:_-]+$",
+                  "type": "string"
+                },
+                "pacing_delta_bp": {
+                  "enum": [
+                    -2500,
+                    -1250,
+                    0,
+                    1250,
+                    2500
+                  ],
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "encounter_id",
+                "pacing_delta_bp"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "adjust_encounter"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AdaptiveCandidateRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/AdaptiveActionV2"
+        },
+        "candidate_id": {
+          "maxLength": 96,
+          "minLength": 1,
+          "pattern": "^[a-z0-9:_-]+$",
+          "type": "string"
+        },
+        "features": {
+          "$ref": "#/definitions/CandidateFeatures"
+        },
+        "rationale_codes": {
+          "items": {
+            "$ref": "#/definitions/AdaptiveRationaleCode"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "score": {
+          "maximum": 10000,
+          "minimum": -10000,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "action",
+        "candidate_id",
+        "features",
+        "rationale_codes",
+        "score"
+      ],
+      "type": "object"
+    },
+    "AdaptiveDecisionKind": {
+      "enum": [
+        "world_ranker",
+        "site_ranker",
+        "encounter_director"
+      ],
+      "type": "string"
+    },
+    "AdaptiveDecisionTrace": {
+      "additionalProperties": false,
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "candidates": {
+          "items": {
+            "$ref": "#/definitions/AdaptiveCandidateRecord"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
+        "decision_id": {
+          "maxLength": 96,
+          "minLength": 1,
+          "pattern": "^[a-z0-9:_-]+$",
+          "type": "string"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AdaptiveFallbackReason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "$ref": "#/definitions/AdaptiveDecisionKind"
+        },
+        "player_values_bp": {
+          "items": false,
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "proposal": {
+          "$ref": "#/definitions/AdaptiveProposalV2"
+        },
+        "rule_version": {
+          "const": "adaptive-classical-1"
+        },
+        "schema_version": {
+          "const": "adaptive-decision-trace-1"
+        },
+        "selected_candidate_id": {
+          "anyOf": [
+            {
+              "maxLength": 96,
+              "minLength": 1,
+              "pattern": "^[a-z0-9:_-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "applied",
+        "candidates",
+        "decision_id",
+        "kind",
+        "player_values_bp",
+        "proposal",
+        "rule_version",
+        "schema_version",
+        "selected_candidate_id",
+        "fallback"
+      ],
+      "type": "object"
+    },
+    "AdaptiveFallbackReason": {
+      "enum": [
+        "no_validated_candidate"
+      ],
+      "type": "string"
+    },
+    "AdaptiveProposalV2": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/AdaptiveActionV2"
+        },
+        "confidence_bp": {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rationale_codes": {
+          "items": {
+            "$ref": "#/definitions/AdaptiveRationaleCode"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "rule_model_version": {
+          "const": "adaptive-classical-1"
+        },
+        "schema_version": {
+          "const": "adaptive-proposal-2"
+        },
+        "score": {
+          "maximum": 10000,
+          "minimum": -10000,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "action",
+        "confidence_bp",
+        "rationale_codes",
+        "rule_model_version",
+        "schema_version",
+        "score"
+      ],
+      "type": "object"
+    },
+    "AdaptiveRationaleCode": {
+      "enum": [
+        "validated_candidate",
+        "challenge_fit",
+        "pace_fit",
+        "resource_pressure_fit",
+        "stable_tie_break",
+        "authored_envelope",
+        "combat_mastery",
+        "damage_pressure",
+        "resource_pressure",
+        "objective_pace",
+        "no_validated_candidate",
+        "classical_fallback"
+      ],
+      "type": "string"
+    },
+    "AffixRoll": {
+      "additionalProperties": false,
+      "properties": {
+        "affix_id": {
+          "type": "string"
+        },
+        "stat": {
+          "$ref": "#/definitions/StatKind"
+        },
+        "value": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "affix_id",
+        "stat",
+        "value"
+      ],
+      "type": "object"
+    },
+    "AssemblyInstruction": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter_binding_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "asset_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "subject_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "adapter_binding_ids",
+        "asset_ids",
+        "subject_id"
+      ],
+      "type": "object"
+    },
+    "BiomeField": {
+      "additionalProperties": false,
+      "properties": {
+        "biome_id": {
+          "type": "string"
+        },
+        "intensity_bp": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "marker_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "biome_id",
+        "intensity_bp",
+        "marker_id"
+      ],
+      "type": "object"
+    },
+    "CandidateFeatures": {
+      "additionalProperties": false,
+      "properties": {
+        "challenge_bp": {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pace_bp": {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "resource_cost_bp": {
+          "maximum": 10000,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "challenge_bp",
+        "pace_bp",
+        "resource_cost_bp"
+      ],
+      "type": "object"
+    },
+    "CandidateRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "asset_id": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "accepted",
+        "asset_id",
+        "rationale"
+      ],
+      "type": "object"
+    },
+    "CauseOfLoss": {
+      "enum": [
+        "ReactorBreach",
+        "Depressurization",
+        "PirateBoarding",
+        "Plague",
+        "DriveMisjump",
+        "Unknown"
+      ],
+      "type": "string"
+    },
+    "Cell": {
+      "additionalProperties": false,
+      "properties": {
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deck",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "CellRecord": {
+      "additionalProperties": false,
+      "description": "One occupied cell.",
+      "properties": {
+        "cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "decal": {
+          "description": "Cosmetic damage decal id (never affects validation/topology).",
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "module_id": {
+          "type": "string"
+        },
+        "room_id": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "variant": {
+          "$ref": "#/definitions/DamageVariant"
+        }
+      },
+      "required": [
+        "cell",
+        "decal",
+        "module_id",
+        "room_id",
+        "variant"
+      ],
+      "type": "object"
+    },
+    "CoordinateMarker": {
+      "additionalProperties": false,
+      "properties": {
+        "archetype_id": {
+          "type": "string"
+        },
+        "marker_id": {
+          "type": "string"
+        },
+        "selected": {
+          "type": "boolean"
+        },
+        "site_id": {
+          "type": "string"
+        },
+        "site_seed": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "archetype_id",
+        "marker_id",
+        "selected",
+        "site_id",
+        "site_seed",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "CreatureBlueprint": {
+      "additionalProperties": false,
+      "properties": {
+        "ability_id": {
+          "type": "string"
+        },
+        "animation_set_id": {
+          "type": "string"
+        },
+        "behavior_id": {
+          "type": "string"
+        },
+        "body_plan_id": {
+          "type": "string"
+        },
+        "counterplay_id": {
+          "type": "string"
+        },
+        "footprint_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "instance_cap": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "material_id": {
+          "type": "string"
+        },
+        "performance_cost": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "rig_id": {
+          "type": "string"
+        },
+        "threat_cost": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "threat_role": {
+          "$ref": "#/definitions/ThreatRole"
+        }
+      },
+      "required": [
+        "ability_id",
+        "animation_set_id",
+        "behavior_id",
+        "body_plan_id",
+        "counterplay_id",
+        "footprint_id",
+        "id",
+        "instance_cap",
+        "material_id",
+        "performance_cost",
+        "rig_id",
+        "threat_cost",
+        "threat_role"
+      ],
+      "type": "object"
+    },
+    "DamageEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/definitions/DamageEventKind"
+        },
+        "origin": {
+          "items": true,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "int32",
+              "type": "integer"
+            },
+            {
+              "format": "int32",
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "radius": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deck",
+        "kind",
+        "origin",
+        "radius"
+      ],
+      "type": "object"
+    },
+    "DamageEventKind": {
+      "enum": [
+        "Breach",
+        "ScorchZone",
+        "StructuralFracture",
+        "DebrisField"
+      ],
+      "type": "string"
+    },
+    "DamageVariant": {
+      "description": "Asset damage variant, resolved at export time against the kit's intact/damaged/breached module variants. Structural role (`module_id`) stays stable; only the rendered asset changes.",
+      "enum": [
+        "Intact",
+        "Damaged",
+        "Breached"
+      ],
+      "type": "string"
+    },
+    "Decision": {
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "considered": {
+          "items": {
+            "$ref": "#/definitions/CandidateRecord"
+          },
+          "type": "array"
+        },
+        "decision_id": {
+          "type": "string"
+        },
+        "rejected": {
+          "items": {
+            "$ref": "#/definitions/CandidateRecord"
+          },
+          "type": "array"
+        },
+        "selected": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "channel",
+        "considered",
+        "decision_id",
+        "rejected",
+        "selected"
+      ],
+      "type": "object"
+    },
+    "Deck": {
+      "additionalProperties": false,
+      "properties": {
+        "layer": {
+          "$ref": "#/definitions/DeckLayer"
+        }
+      },
+      "required": [
+        "layer"
+      ],
+      "type": "object"
+    },
+    "DeckLayer": {
+      "additionalProperties": false,
+      "description": "One deck's tile data as flat row-major arrays (index = y * width + x).",
+      "properties": {
+        "decal": {
+          "items": {
+            "format": "uint8",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "floor": {
+          "items": {
+            "$ref": "#/definitions/FloorTile"
+          },
+          "type": "array"
+        },
+        "height": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "room_id": {
+          "description": "Room id per tile; NO_ROOM (0) = not part of any room (void/space).",
+          "items": {
+            "format": "uint16",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "walls": {
+          "items": {
+            "$ref": "#/definitions/TileWalls"
+          },
+          "type": "array"
+        },
+        "width": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "decal",
+        "floor",
+        "height",
+        "room_id",
+        "walls",
+        "width"
+      ],
+      "type": "object"
+    },
+    "DifficultyBand": {
+      "enum": [
+        "standard",
+        "hardened",
+        "deep_dive"
+      ],
+      "type": "string"
+    },
+    "Dir": {
+      "enum": [
+        "North",
+        "South",
+        "East",
+        "West"
+      ],
+      "type": "string"
+    },
+    "Domain": {
+      "enum": [
+        "world",
+        "site",
+        "gameplay",
+        "presentation"
+      ],
+      "type": "string"
+    },
+    "DropBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "frequency_bp": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "item_id": {
+          "type": "string"
+        },
+        "source_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "frequency_bp",
+        "item_id",
+        "source_id"
+      ],
+      "type": "object"
+    },
+    "EdgeKind": {
+      "oneOf": [
+        {
+          "enum": [
+            "Solid",
+            "Door",
+            "Locked",
+            "Hatch",
+            "Breach"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Interior of a multi-cell room: no wall, never materialized.",
+          "enum": [
+            "Open"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "EdgeKind2": {
+      "enum": [
+        "Door",
+        "OpenCorridor",
+        "VerticalShaft",
+        "Breach"
+      ],
+      "type": "string"
+    },
+    "EdgeRecord": {
+      "additionalProperties": false,
+      "description": "One canonical boundary.",
+      "properties": {
+        "cell": {
+          "$ref": "#/definitions/Cell",
+          "description": "The cell/direction this edge was first derived from (either side is valid; edge_key is what's canonical)."
+        },
+        "direction": {
+          "$ref": "#/definitions/Dir"
+        },
+        "edge_key": {
+          "type": "string"
+        },
+        "exterior": {
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/definitions/EdgeKind"
+        },
+        "module_id": {
+          "type": "string"
+        },
+        "portal": {
+          "type": "boolean"
+        },
+        "position": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "room_ids": {
+          "description": "(owning-side room, other-side room); NO_ROOM = exterior/void.",
+          "items": true,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "uint16",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            {
+              "format": "uint16",
+              "minimum": 0.0,
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "source_cells": {
+          "items": {
+            "$ref": "#/definitions/Cell"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "variant": {
+          "$ref": "#/definitions/DamageVariant"
+        },
+        "wrapper_required": {
+          "description": "Whether this edge demands a materialized placement (Open and BREACH holes don't).",
+          "type": "boolean"
+        },
+        "yaw_degrees": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cell",
+        "direction",
+        "edge_key",
+        "exterior",
+        "kind",
+        "module_id",
+        "portal",
+        "position",
+        "room_ids",
+        "source_cells",
+        "variant",
+        "wrapper_required",
+        "yaw_degrees"
+      ],
+      "type": "object"
+    },
+    "EncounterBudgetTrace": {
+      "additionalProperties": false,
+      "properties": {
+        "difficulty_id": {
+          "$ref": "#/definitions/DifficultyBand"
+        },
+        "economy_limit": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "group_cap": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "minimum_reward_value": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "performance_limit": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "player_factor_bp": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "threat_limit": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "difficulty_id",
+        "economy_limit",
+        "group_cap",
+        "minimum_reward_value",
+        "performance_limit",
+        "player_factor_bp",
+        "threat_limit"
+      ],
+      "type": "object"
+    },
+    "EncounterCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "blueprint_id": {
+          "type": "string"
+        },
+        "candidate_id": {
+          "type": "string"
+        },
+        "cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "channel_id": {
+          "type": "string"
+        },
+        "faction_id": {
+          "type": "string"
+        },
+        "has_cover": {
+          "type": "boolean"
+        },
+        "navigation_distance": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "rationale_codes": {
+          "items": {
+            "$ref": "#/definitions/EncounterRationale"
+          },
+          "type": "array"
+        },
+        "room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "score_bp": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "accepted",
+        "blueprint_id",
+        "candidate_id",
+        "cell",
+        "channel_id",
+        "faction_id",
+        "has_cover",
+        "navigation_distance",
+        "rationale_codes",
+        "room",
+        "score_bp"
+      ],
+      "type": "object"
+    },
+    "EncounterDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "candidate_id": {
+          "type": "string"
+        },
+        "channel_id": {
+          "type": "string"
+        },
+        "decision_id": {
+          "type": "string"
+        },
+        "rationale_codes": {
+          "items": {
+            "$ref": "#/definitions/EncounterRationale"
+          },
+          "type": "array"
+        },
+        "score_bp": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "selected_spawn_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "accepted",
+        "candidate_id",
+        "channel_id",
+        "decision_id",
+        "rationale_codes",
+        "score_bp"
+      ],
+      "type": "object"
+    },
+    "EncounterGenerationOutcome": {
+      "additionalProperties": false,
+      "properties": {
+        "composition_id": {
+          "type": "string"
+        },
+        "schema_version": {
+          "type": "string"
+        },
+        "spawns": {
+          "items": {
+            "$ref": "#/definitions/EncounterSpawn"
+          },
+          "type": "array"
+        },
+        "total_performance": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "total_reward_value": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "total_threat": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "trace": {
+          "$ref": "#/definitions/EncounterTrace"
+        }
+      },
+      "required": [
+        "composition_id",
+        "schema_version",
+        "spawns",
+        "total_performance",
+        "total_reward_value",
+        "total_threat",
+        "trace"
+      ],
+      "type": "object"
+    },
+    "EncounterRationale": {
+      "enum": [
+        "accepted",
+        "incompatible_faction",
+        "incompatible_role",
+        "protected_room",
+        "protected_cell",
+        "no_clearance",
+        "footprint_out_of_room",
+        "occupied",
+        "navigation_unreachable",
+        "exposed_los",
+        "no_cover",
+        "threat_budget_exceeded",
+        "performance_budget_exceeded",
+        "economy_budget_exceeded",
+        "group_cap_exceeded",
+        "instance_cap_exceeded",
+        "no_fair_spawn"
+      ],
+      "type": "string"
+    },
+    "EncounterSpawn": {
+      "additionalProperties": false,
+      "properties": {
+        "ability_id": {
+          "type": "string"
+        },
+        "blueprint_id": {
+          "type": "string"
+        },
+        "cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "decision_id": {
+          "type": "string"
+        },
+        "faction_id": {
+          "type": "string"
+        },
+        "performance_cost": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "reward_source_id": {
+          "type": "string"
+        },
+        "reward_value": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "spawn_id": {
+          "type": "string"
+        },
+        "threat_cost": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "threat_role": {
+          "$ref": "#/definitions/ThreatRole"
+        }
+      },
+      "required": [
+        "ability_id",
+        "blueprint_id",
+        "cell",
+        "decision_id",
+        "faction_id",
+        "performance_cost",
+        "reward_source_id",
+        "reward_value",
+        "room",
+        "spawn_id",
+        "threat_cost",
+        "threat_role"
+      ],
+      "type": "object"
+    },
+    "EncounterTrace": {
+      "additionalProperties": false,
+      "properties": {
+        "adaptive": {
+          "$ref": "#/definitions/AdaptiveDecisionTrace"
+        },
+        "budgets": {
+          "$ref": "#/definitions/EncounterBudgetTrace"
+        },
+        "candidates": {
+          "items": {
+            "$ref": "#/definitions/EncounterCandidate"
+          },
+          "type": "array"
+        },
+        "channel_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "decisions": {
+          "items": {
+            "$ref": "#/definitions/EncounterDecision"
+          },
+          "type": "array"
+        },
+        "fallback": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fallback_rationale": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/EncounterRationale"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "player_values_bp": {
+          "items": {
+            "format": "uint16",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "rules_version": {
+          "type": "string"
+        },
+        "selected_spawn_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "adaptive",
+        "budgets",
+        "candidates",
+        "channel_ids",
+        "decisions",
+        "player_values_bp",
+        "rules_version",
+        "selected_spawn_ids"
+      ],
+      "type": "object"
+    },
+    "EntityKind": {
+      "enum": [
+        "Door",
+        "Container",
+        "Terminal",
+        "Furniture",
+        "Debris",
+        "Body",
+        "ItemPile"
+      ],
+      "type": "string"
+    },
+    "EntitySpec": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Stable within this ship; assigned in deterministic order. Save diffs and co-op mutation replication address entities by this id.",
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "inventory": {
+          "items": {
+            "$ref": "#/definitions/ItemStack"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/definitions/EntityKind"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "open": {
+          "type": "boolean"
+        },
+        "pos": {
+          "$ref": "#/definitions/GridPos"
+        },
+        "proto": {
+          "description": "Prototype key, maps to a scene/visual on the Godot side (\"bed\", \"locker\", \"helm_console\", \"hull_plate_debris\", ...).",
+          "type": "string"
+        },
+        "rotation": {
+          "description": "0..=3, 90-degree steps. For doors: 0 = sits on north edge of pos, 1 = west edge.",
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "inventory",
+        "kind",
+        "locked",
+        "open",
+        "pos",
+        "proto",
+        "rotation",
+        "tags"
+      ],
+      "type": "object"
+    },
+    "ExportSchemas": {
+      "additionalProperties": false,
+      "properties": {
+        "adaptive_proposal": {
+          "const": "adaptive-proposal-2"
+        },
+        "gameplay_ir": {
+          "const": "gameplay-ir-3"
+        },
+        "generation_trace": {
+          "const": "generation-trace-4"
+        },
+        "presentation_ir": {
+          "const": "presentation-ir-2"
+        },
+        "procgen_bundle": {
+          "const": "procgen-bundle-5"
+        },
+        "procgen_request": {
+          "const": "procgen-request-2"
+        },
+        "site_ir": {
+          "const": "site-ir-2"
+        },
+        "world_ir": {
+          "const": "world-ir-2"
+        }
+      },
+      "required": [
+        "adaptive_proposal",
+        "gameplay_ir",
+        "generation_trace",
+        "presentation_ir",
+        "procgen_bundle",
+        "procgen_request",
+        "site_ir",
+        "world_ir"
+      ],
+      "type": "object"
+    },
+    "ExtractionGuarantee": {
+      "additionalProperties": false,
+      "properties": {
+        "extraction_anchor_id": {
+          "type": "string"
+        },
+        "hub_anchor_id": {
+          "type": "string"
+        },
+        "path": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "selected_marker_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "extraction_anchor_id",
+        "hub_anchor_id",
+        "path",
+        "selected_marker_id"
+      ],
+      "type": "object"
+    },
+    "FireZone": {
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "FloorPlacement": {
+      "additionalProperties": false,
+      "properties": {
+        "cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "cell_key": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "module_id": {
+          "type": "string"
+        },
+        "position": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "room_id": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "variant": {
+          "$ref": "#/definitions/DamageVariant"
+        },
+        "yaw_degrees": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cell",
+        "cell_key",
+        "id",
+        "module_id",
+        "position",
+        "room_id",
+        "variant",
+        "yaw_degrees"
+      ],
+      "type": "object"
+    },
+    "FloorTile": {
+      "oneOf": [
+        {
+          "enum": [
+            "Deck",
+            "Grated",
+            "DamagedDeck"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Open space / no floor (outside hull, or a breach hole).",
+          "enum": [
+            "Void"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "FunctionalProp": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "$ref": "#/definitions/Cell"
+        },
+        "approach": {
+          "$ref": "#/definitions/Cell"
+        },
+        "extraction_portal_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "key_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/definitions/PropKind"
+        },
+        "mission_node_id": {
+          "type": "string"
+        },
+        "repair_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "anchor",
+        "approach",
+        "id",
+        "kind",
+        "mission_node_id",
+        "room"
+      ],
+      "type": "object"
+    },
+    "GameplayDecisionDomain": {
+      "enum": [
+        "creature",
+        "encounter",
+        "item"
+      ],
+      "type": "string"
+    },
+    "GameplayDecisionRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        },
+        "candidate_id": {
+          "type": "string"
+        },
+        "channel_id": {
+          "type": "string"
+        },
+        "decision_id": {
+          "type": "string"
+        },
+        "domain": {
+          "$ref": "#/definitions/GameplayDecisionDomain"
+        },
+        "rationale_codes": {
+          "items": {
+            "$ref": "#/definitions/GameplayRationaleCode"
+          },
+          "type": "array"
+        },
+        "score_bp": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "selected_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "accepted",
+        "candidate_id",
+        "channel_id",
+        "decision_id",
+        "domain",
+        "rationale_codes",
+        "score_bp"
+      ],
+      "type": "object"
+    },
+    "GameplayIR": {
+      "additionalProperties": false,
+      "properties": {
+        "creature_blueprints": {
+          "items": {
+            "$ref": "#/definitions/CreatureBlueprint"
+          },
+          "type": "array"
+        },
+        "decisions": {
+          "items": {
+            "$ref": "#/definitions/GameplayDecisionRecord"
+          },
+          "type": "array"
+        },
+        "drops": {
+          "items": {
+            "$ref": "#/definitions/DropBinding"
+          },
+          "type": "array"
+        },
+        "encounter": {
+          "$ref": "#/definitions/EncounterGenerationOutcome"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/definitions/ItemBlueprint"
+          },
+          "type": "array"
+        },
+        "legacy_slice": {
+          "$ref": "#/definitions/GameplaySlice"
+        },
+        "schema_version": {
+          "const": "gameplay-ir-3"
+        }
+      },
+      "required": [
+        "creature_blueprints",
+        "decisions",
+        "drops",
+        "encounter",
+        "items",
+        "legacy_slice",
+        "schema_version"
+      ],
+      "type": "object"
+    },
+    "GameplayRationaleCode": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "creature_validated"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "creature_incompatible"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "creature_selected"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "item_authored_compatible"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "item_no_compatible_affix"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "item_arithmetic_overflow"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "item_incompatible"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "item_economy_cap"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "item_authored_baseline"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "item_safe_empty"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": [
+                "encounter"
+              ],
+              "type": "string"
+            },
+            "detail": {
+              "$ref": "#/definitions/EncounterRationale"
+            }
+          },
+          "required": [
+            "code",
+            "detail"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "GameplaySlice": {
+      "additionalProperties": false,
+      "properties": {
+        "critical_path": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "document_kind": {
+          "const": "ship_gameplay_slice"
+        },
+        "fire_zones": {
+          "maxItems": 0,
+          "type": "array"
+        },
+        "goal_room": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "loot_containers": {
+          "items": {
+            "$ref": "#/definitions/LootContainer"
+          },
+          "type": "array"
+        },
+        "objectives": {
+          "items": {
+            "$ref": "#/definitions/Objective"
+          },
+          "type": "array"
+        },
+        "program_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.1.0"
+        },
+        "start_room": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "summary": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "critical_path",
+        "document_kind",
+        "fire_zones",
+        "goal_room",
+        "loot_containers",
+        "objectives",
+        "program_id",
+        "schema_version",
+        "start_room",
+        "summary"
+      ],
+      "type": "object"
+    },
+    "GateKind": {
+      "enum": [
+        "key_lock",
+        "repair"
+      ],
+      "type": "string"
+    },
+    "GenerationMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "entity_count": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "pipeline_executions": {
+          "const": 1
+        },
+        "room_count": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "generation-metrics-1"
+        },
+        "stage_timings_micros": {
+          "additionalProperties": {
+            "maximum": 3600000000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxProperties": 4096,
+          "propertyNames": {
+            "minLength": 1
+          },
+          "type": "object"
+        },
+        "structural_placement_count": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "entity_count",
+        "pipeline_executions",
+        "room_count",
+        "schema_version",
+        "stage_timings_micros",
+        "structural_placement_count"
+      ],
+      "type": "object"
+    },
+    "GenerationTrace": {
+      "additionalProperties": false,
+      "properties": {
+        "adaptive_decisions": {
+          "items": false,
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/AdaptiveDecisionTrace"
+                },
+                {
+                  "properties": {
+                    "decision_id": {
+                      "const": "decision:world-ranker"
+                    },
+                    "kind": {
+                      "const": "world_ranker"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/AdaptiveDecisionTrace"
+                },
+                {
+                  "properties": {
+                    "decision_id": {
+                      "const": "decision:site-ranker"
+                    },
+                    "kind": {
+                      "const": "site_ranker"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/definitions/AdaptiveDecisionTrace"
+                },
+                {
+                  "properties": {
+                    "decision_id": {
+                      "const": "decision:encounter-director"
+                    },
+                    "kind": {
+                      "const": "encounter_director"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "type": "array"
+        },
+        "candidate_decisions": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 4096,
+          "type": "array"
+        },
+        "failed_constraints": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 4096,
+          "type": "array"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "pattern": "^(?:world:[a-z0-9_.:-]+(?:\\|site:[a-z0-9_.:-]+)?|site:[a-z0-9_.:-]+)$",
+              "type": "string"
+            }
+          ]
+        },
+        "repairs": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 4096,
+          "type": "array"
+        },
+        "retries": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 4096,
+          "type": "array"
+        },
+        "rng_channels": {
+          "const": [
+            "world.archetype",
+            "world.biome",
+            "world.hazard",
+            "world.resource",
+            "world.landmark",
+            "world.route_cost",
+            "site.structural",
+            "site.mission_template",
+            "site.gate_order",
+            "site.functional_props",
+            "site.spatial_annotations",
+            "meta",
+            "hull",
+            "template",
+            "topology",
+            "residual_fill",
+            "door",
+            "furnish",
+            "story",
+            "intact",
+            "breach",
+            "scorch",
+            "seal",
+            "bodies",
+            "fracture",
+            "debris",
+            "loot",
+            "gameplay.creature_blueprint",
+            "gameplay.creature_ability",
+            "gameplay.creature_material",
+            "gameplay.encounter_candidate",
+            "gameplay.encounter_faction",
+            "gameplay.encounter_reward",
+            "gameplay.encounter_selection",
+            "gameplay.item_family",
+            "gameplay.item_affix",
+            "presentation.asset_assembly"
+          ]
+        },
+        "schema_version": {
+          "const": "generation-trace-4"
+        },
+        "stage_timings_micros": {
+          "additionalProperties": {
+            "maximum": 3600000000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxProperties": 4096,
+          "propertyNames": {
+            "minLength": 1
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "adaptive_decisions",
+        "candidate_decisions",
+        "failed_constraints",
+        "repairs",
+        "retries",
+        "rng_channels",
+        "schema_version",
+        "stage_timings_micros"
+      ],
+      "type": "object"
+    },
+    "GridPos": {
+      "additionalProperties": false,
+      "properties": {
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deck",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "HazardField": {
+      "additionalProperties": false,
+      "properties": {
+        "hazard_id": {
+          "type": "string"
+        },
+        "marker_id": {
+          "type": "string"
+        },
+        "severity_bp": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "hazard_id",
+        "marker_id",
+        "severity_bp"
+      ],
+      "type": "object"
+    },
+    "ItemBlueprint": {
+      "additionalProperties": false,
+      "properties": {
+        "affixes": {
+          "items": {
+            "$ref": "#/definitions/AffixRoll"
+          },
+          "type": "array"
+        },
+        "economy_value": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "family_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "rarity_id": {
+          "type": "string"
+        },
+        "socket_id": {
+          "type": "string"
+        },
+        "stat_budget": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "visual_tag": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "affixes",
+        "economy_value",
+        "family_id",
+        "id",
+        "rarity_id",
+        "socket_id",
+        "stat_budget",
+        "visual_tag"
+      ],
+      "type": "object"
+    },
+    "ItemStack": {
+      "additionalProperties": false,
+      "properties": {
+        "item_id": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "qty": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "item_id",
+        "qty"
+      ],
+      "type": "object"
+    },
+    "LandmarkRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "marker_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "marker_id"
+      ],
+      "type": "object"
+    },
+    "LootContainer": {
+      "additionalProperties": false,
+      "properties": {
+        "approach_cell": {
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "loot_table": {
+          "type": "string"
+        },
+        "room_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "approach_cell",
+        "id",
+        "kind",
+        "loot_table",
+        "room_id"
+      ],
+      "type": "object"
+    },
+    "LosPair": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "$ref": "#/definitions/Cell"
+        },
+        "b": {
+          "$ref": "#/definitions/Cell"
+        }
+      },
+      "required": [
+        "a",
+        "b"
+      ],
+      "type": "object"
+    },
+    "MissionEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "MissionGate": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "key_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/definitions/GateKind"
+        },
+        "navigation_edge": {
+          "type": "string"
+        },
+        "prerequisite_node": {
+          "type": "string"
+        },
+        "repair_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unlock_node": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "navigation_edge",
+        "prerequisite_node",
+        "unlock_node"
+      ],
+      "type": "object"
+    },
+    "MissionGraph": {
+      "additionalProperties": false,
+      "properties": {
+        "edges": {
+          "items": {
+            "$ref": "#/definitions/MissionEdge"
+          },
+          "type": "array"
+        },
+        "extraction_node": {
+          "type": "string"
+        },
+        "gates": {
+          "items": {
+            "$ref": "#/definitions/MissionGate"
+          },
+          "type": "array"
+        },
+        "mission_id": {
+          "type": "string"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/definitions/MissionNode"
+          },
+          "type": "array"
+        },
+        "required_objectives": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "schema_version": {
+          "type": "string"
+        },
+        "start_node": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "edges",
+        "extraction_node",
+        "gates",
+        "mission_id",
+        "nodes",
+        "required_objectives",
+        "schema_version",
+        "start_node"
+      ],
+      "type": "object"
+    },
+    "MissionNode": {
+      "additionalProperties": false,
+      "properties": {
+        "cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "id": {
+          "type": "string"
+        },
+        "key_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/definitions/NodeKind"
+        },
+        "repair_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cell",
+        "id",
+        "kind",
+        "room"
+      ],
+      "type": "object"
+    },
+    "Navigation": {
+      "additionalProperties": false,
+      "properties": {
+        "edges": {
+          "items": {
+            "$ref": "#/definitions/NavigationEdge"
+          },
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/definitions/NavigationNode"
+          },
+          "type": "array"
+        },
+        "schema_version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "edges",
+        "nodes",
+        "schema_version"
+      ],
+      "type": "object"
+    },
+    "NavigationEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "clearance": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "cost": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "from_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "from_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "gate_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/NavigationKind"
+        },
+        "passable": {
+          "type": "boolean"
+        },
+        "structural_ref": {
+          "type": "string"
+        },
+        "to_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "to_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "clearance",
+        "cost",
+        "from_cell",
+        "from_room",
+        "id",
+        "kind",
+        "passable",
+        "structural_ref",
+        "to_cell",
+        "to_room"
+      ],
+      "type": "object"
+    },
+    "NavigationKind": {
+      "enum": [
+        "portal",
+        "vertical"
+      ],
+      "type": "string"
+    },
+    "NavigationNode": {
+      "additionalProperties": false,
+      "properties": {
+        "room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "room"
+      ],
+      "type": "object"
+    },
+    "NodeKind": {
+      "enum": [
+        "start",
+        "acquire_key",
+        "repair",
+        "objective",
+        "extraction"
+      ],
+      "type": "string"
+    },
+    "Objective": {
+      "additionalProperties": false,
+      "properties": {
+        "approach_cell": {
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "approach_distance_cells": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "cell": {
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "interactable": {
+          "type": "boolean"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "room_id": {
+          "type": "string"
+        },
+        "room_role": {
+          "type": "string"
+        },
+        "semantic": {
+          "type": "string"
+        },
+        "sequence": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "approach_cell",
+        "approach_distance_cells",
+        "cell",
+        "id",
+        "interactable",
+        "kind",
+        "room_id",
+        "room_role",
+        "semantic",
+        "sequence",
+        "type"
+      ],
+      "type": "object"
+    },
+    "PlayerModelV2": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "player-model-2"
+        },
+        "signals": {
+          "items": {
+            "$ref": "#/definitions/PlayerSignal"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "signals"
+      ],
+      "type": "object"
+    },
+    "PlayerSignal": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/PlayerSignalKind"
+        },
+        "value_bp": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "value_bp"
+      ],
+      "type": "object"
+    },
+    "PlayerSignalKind": {
+      "enum": [
+        "combat_mastery",
+        "damage_pressure",
+        "resource_pressure",
+        "objective_pace"
+      ],
+      "type": "string"
+    },
+    "PortalIntent": {
+      "additionalProperties": false,
+      "description": "Authored doorway between two rooms sharing a real cardinal cell edge. Created at placement time by the topology stage — never derived post-hoc.",
+      "properties": {
+        "exterior": {
+          "description": "Exterior door (to_room == NO_ROOM): airlock onto space.",
+          "type": "boolean"
+        },
+        "from_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "from_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "state": {
+          "$ref": "#/definitions/EdgeKind"
+        },
+        "to_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "to_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "exterior",
+        "from_cell",
+        "from_room",
+        "state",
+        "to_cell",
+        "to_room"
+      ],
+      "type": "object"
+    },
+    "PresentationOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "decisions": {
+          "items": {
+            "$ref": "#/definitions/Decision"
+          },
+          "type": "array"
+        },
+        "fallback_subjects": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "instructions": {
+          "items": {
+            "$ref": "#/definitions/AssemblyInstruction"
+          },
+          "type": "array"
+        },
+        "repairs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "presentation-ir-2"
+        }
+      },
+      "required": [
+        "decisions",
+        "fallback_subjects",
+        "instructions",
+        "repairs",
+        "schema_version"
+      ],
+      "type": "object"
+    },
+    "PresentationRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "locale": {
+          "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
+          "type": "string"
+        },
+        "seed": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "locale",
+        "seed"
+      ],
+      "type": "object"
+    },
+    "ProcgenRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "content_manifest_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "difficulty_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "generator_version": {
+          "const": 3
+        },
+        "player_model": {
+          "$ref": "#/definitions/PlayerModelV2"
+        },
+        "presentation": {
+          "$ref": "#/definitions/PresentationRequest"
+        },
+        "requested_domains": {
+          "items": {
+            "$ref": "#/definitions/Domain"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "schema_version": {
+          "const": "procgen-request-2"
+        },
+        "site": {
+          "$ref": "#/definitions/SiteRequest"
+        },
+        "world_seed": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "content_manifest_hash",
+        "difficulty_id",
+        "generator_version",
+        "player_model",
+        "presentation",
+        "requested_domains",
+        "schema_version",
+        "site",
+        "world_seed"
+      ],
+      "type": "object"
+    },
+    "PropKind": {
+      "enum": [
+        "key_pickup",
+        "repair_panel",
+        "objective_console",
+        "extraction_console"
+      ],
+      "type": "string"
+    },
+    "ResourcePressure": {
+      "additionalProperties": false,
+      "properties": {
+        "marker_id": {
+          "type": "string"
+        },
+        "pressure_bp": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "resource_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "marker_id",
+        "pressure_bp",
+        "resource_id"
+      ],
+      "type": "object"
+    },
+    "Role": {
+      "enum": [
+        "Airlock",
+        "Dock",
+        "Corridor",
+        "MainSpine",
+        "Hub",
+        "Ramp",
+        "Elevator",
+        "Bridge",
+        "Engineering",
+        "Reactor",
+        "LifeSupport",
+        "Maintenance",
+        "Cargo",
+        "Hangar",
+        "Storage",
+        "Armory",
+        "Security",
+        "Medical",
+        "CrewQuarters",
+        "MessHall",
+        "Compartment"
+      ],
+      "type": "string"
+    },
+    "RoomEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "b": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/definitions/EdgeKind2"
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "RoomGraph": {
+      "additionalProperties": false,
+      "properties": {
+        "edges": {
+          "items": {
+            "$ref": "#/definitions/RoomEdge"
+          },
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/definitions/RoomNode"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "edges",
+        "nodes"
+      ],
+      "type": "object"
+    },
+    "RoomNode": {
+      "additionalProperties": false,
+      "properties": {
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "depressurized": {
+          "type": "boolean"
+        },
+        "id": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/definitions/Role"
+        },
+        "max": {
+          "items": true,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "int32",
+              "type": "integer"
+            },
+            {
+              "format": "int32",
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "min": {
+          "description": "AABB in deck-local tile coords (min inclusive, max inclusive).",
+          "items": true,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "int32",
+              "type": "integer"
+            },
+            {
+              "format": "int32",
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "spans_room_id": {
+          "description": "For multi-deck logical systems (engineering spanning decks): the room id of the same logical room on the deck below, if any.",
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tile_count": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deck",
+        "depressurized",
+        "id",
+        "kind",
+        "max",
+        "min",
+        "tile_count"
+      ],
+      "type": "object"
+    },
+    "RoomSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "cells": {
+          "items": {
+            "$ref": "#/definitions/Cell"
+          },
+          "type": "array"
+        },
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "id": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "role": {
+          "$ref": "#/definitions/Role"
+        }
+      },
+      "required": [
+        "cells",
+        "deck",
+        "id",
+        "role"
+      ],
+      "type": "object"
+    },
+    "RouteEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "cost_bp": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cost_bp",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "Ship": {
+      "additionalProperties": false,
+      "properties": {
+        "archetype_id": {
+          "type": "string"
+        },
+        "cause_of_loss": {
+          "$ref": "#/definitions/CauseOfLoss"
+        },
+        "critical_path": {
+          "items": {
+            "format": "uint16",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "damage_events": {
+          "items": {
+            "$ref": "#/definitions/DamageEvent"
+          },
+          "type": "array"
+        },
+        "decks": {
+          "items": {
+            "$ref": "#/definitions/Deck"
+          },
+          "type": "array"
+        },
+        "entities": {
+          "items": {
+            "$ref": "#/definitions/EntitySpec"
+          },
+          "type": "array"
+        },
+        "entry_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "fractured": {
+          "type": "boolean"
+        },
+        "fragments": {
+          "items": {
+            "$ref": "#/definitions/ShipFragment"
+          },
+          "type": "array"
+        },
+        "generator_version": {
+          "const": 2
+        },
+        "goal_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "intactness": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "plan": {
+          "$ref": "#/definitions/StructuralPlan",
+          "description": "The canonical structural plan — the AUTHORITATIVE geometry. Deck raster layers below are a derived projection of this."
+        },
+        "room_graph": {
+          "$ref": "#/definitions/RoomGraph"
+        },
+        "seed": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "template_id": {
+          "description": "Topology template that authored this ship.",
+          "type": "string"
+        },
+        "topology": {
+          "$ref": "#/definitions/Topology",
+          "description": "Authored topology (rooms with explicit occupancy, portal intents, vertical connections) — the compile input, kept for validation and export cross-checks."
+        }
+      },
+      "required": [
+        "archetype_id",
+        "cause_of_loss",
+        "critical_path",
+        "damage_events",
+        "decks",
+        "entities",
+        "entry_room",
+        "fractured",
+        "fragments",
+        "generator_version",
+        "goal_room",
+        "intactness",
+        "plan",
+        "room_graph",
+        "seed",
+        "template_id",
+        "topology"
+      ],
+      "type": "object"
+    },
+    "ShipFragment": {
+      "additionalProperties": false,
+      "description": "Metadata about one hull piece after a structural fracture. Tile data is already laid out in final world-local coordinates (fragments are baked apart into the shared deck grid), so this exists for debugging/AI hints, not for rendering math.",
+      "properties": {
+        "drift": {
+          "description": "Translation that was applied to this fragment when baking it apart.",
+          "items": true,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "int32",
+              "type": "integer"
+            },
+            {
+              "format": "int32",
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "id": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "rooms": {
+          "description": "Room ids belonging to this fragment.",
+          "items": {
+            "format": "uint16",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "drift",
+        "id",
+        "rooms"
+      ],
+      "type": "object"
+    },
+    "SiteIR": {
+      "additionalProperties": false,
+      "properties": {
+        "functional_props": {
+          "items": {
+            "$ref": "#/definitions/FunctionalProp"
+          },
+          "type": "array"
+        },
+        "mission_graph": {
+          "$ref": "#/definitions/MissionGraph"
+        },
+        "navigation": {
+          "$ref": "#/definitions/Navigation"
+        },
+        "schema_version": {
+          "const": "site-ir-2"
+        },
+        "ship": {
+          "$ref": "#/definitions/Ship"
+        },
+        "spatial_annotations": {
+          "$ref": "#/definitions/SpatialAnnotations"
+        }
+      },
+      "required": [
+        "functional_props",
+        "mission_graph",
+        "navigation",
+        "schema_version",
+        "ship",
+        "spatial_annotations"
+      ],
+      "type": "object"
+    },
+    "SiteRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "archetype_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "cause_of_loss": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CauseOfLoss"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "intactness_override_bp": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          ]
+        },
+        "kit_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "loot_richness_bp": {
+          "maximum": 30000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "site_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "archetype_id",
+        "kit_id",
+        "loot_richness_bp",
+        "site_id",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "SocketBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "neighbor_placement_id": {
+          "type": "string"
+        },
+        "neighbor_socket_id": {
+          "type": "string"
+        },
+        "placement_id": {
+          "type": "string"
+        },
+        "socket_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "neighbor_placement_id",
+        "neighbor_socket_id",
+        "placement_id",
+        "socket_id"
+      ],
+      "type": "object"
+    },
+    "SpatialAnnotation": {
+      "additionalProperties": false,
+      "properties": {
+        "cover_cells": {
+          "items": {
+            "$ref": "#/definitions/Cell"
+          },
+          "type": "array"
+        },
+        "los_pairs": {
+          "items": {
+            "$ref": "#/definitions/LosPair"
+          },
+          "type": "array"
+        },
+        "minimum_clearance": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cover_cells",
+        "los_pairs",
+        "minimum_clearance",
+        "room"
+      ],
+      "type": "object"
+    },
+    "SpatialAnnotations": {
+      "additionalProperties": false,
+      "properties": {
+        "rooms": {
+          "items": {
+            "$ref": "#/definitions/SpatialAnnotation"
+          },
+          "type": "array"
+        },
+        "schema_version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "rooms",
+        "schema_version"
+      ],
+      "type": "object"
+    },
+    "StatKind": {
+      "enum": [
+        "damage",
+        "armor",
+        "capacity",
+        "repair",
+        "scan"
+      ],
+      "type": "string"
+    },
+    "StructuralPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "ceiling_placements": {
+          "items": {
+            "$ref": "#/definitions/FloorPlacement"
+          },
+          "type": "array"
+        },
+        "edges": {
+          "additionalProperties": {
+            "$ref": "#/definitions/EdgeRecord"
+          },
+          "type": "object"
+        },
+        "errors": {
+          "description": "Compiler diagnostics; non-empty fails validation.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "floor_placements": {
+          "items": {
+            "$ref": "#/definitions/FloorPlacement"
+          },
+          "type": "array"
+        },
+        "occupancy": {
+          "additionalProperties": {
+            "$ref": "#/definitions/CellRecord"
+          },
+          "type": "object"
+        },
+        "placements": {
+          "description": "Materialized non-Open, wrapper-required edges (sorted by edge_key).",
+          "items": {
+            "$ref": "#/definitions/EdgeRecord"
+          },
+          "type": "array"
+        },
+        "socket_bindings": {
+          "items": {
+            "$ref": "#/definitions/SocketBinding"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "ceiling_placements",
+        "edges",
+        "errors",
+        "floor_placements",
+        "occupancy",
+        "placements",
+        "socket_bindings"
+      ],
+      "type": "object"
+    },
+    "ThreatRole": {
+      "enum": [
+        "scout",
+        "tank",
+        "controller"
+      ],
+      "type": "string"
+    },
+    "TileWalls": {
+      "additionalProperties": false,
+      "description": "PZ-style: walls live on tile EDGES. Each tile stores its north and west edges; a tile's south edge is its south neighbor's north edge, etc.",
+      "properties": {
+        "north": {
+          "$ref": "#/definitions/WallEdge"
+        },
+        "west": {
+          "$ref": "#/definitions/WallEdge"
+        }
+      },
+      "required": [
+        "north",
+        "west"
+      ],
+      "type": "object"
+    },
+    "Topology": {
+      "additionalProperties": false,
+      "description": "Everything the structural compiler consumes.",
+      "properties": {
+        "portals": {
+          "items": {
+            "$ref": "#/definitions/PortalIntent"
+          },
+          "type": "array"
+        },
+        "rooms": {
+          "items": {
+            "$ref": "#/definitions/RoomSpec"
+          },
+          "type": "array"
+        },
+        "verticals": {
+          "items": {
+            "$ref": "#/definitions/VerticalConnection"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "portals",
+        "rooms",
+        "verticals"
+      ],
+      "type": "object"
+    },
+    "VersionEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "content_manifest_hash": {
+          "type": "string"
+        },
+        "export_schemas": {
+          "$ref": "#/definitions/ExportSchemas"
+        },
+        "generator_version": {
+          "const": 3
+        }
+      },
+      "required": [
+        "content_manifest_hash",
+        "export_schemas",
+        "generator_version"
+      ],
+      "type": "object"
+    },
+    "VerticalConnection": {
+      "additionalProperties": false,
+      "properties": {
+        "from_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "from_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "to_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "to_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "from_cell",
+        "from_room",
+        "to_cell",
+        "to_room"
+      ],
+      "type": "object"
+    },
+    "WallEdge": {
+      "oneOf": [
+        {
+          "enum": [
+            "None"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Exterior hull wall.",
+          "enum": [
+            "Hull"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Interior partition wall.",
+          "enum": [
+            "Interior"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Door frame opening (a Door entity sits on this edge).",
+          "enum": [
+            "Doorway"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Wall destroyed by damage; passable, jagged.",
+          "enum": [
+            "Breached"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "WorldAnchor": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "WorldIRv2": {
+      "additionalProperties": false,
+      "properties": {
+        "anchors": {
+          "items": {
+            "$ref": "#/definitions/WorldAnchor"
+          },
+          "type": "array"
+        },
+        "archetype_id": {
+          "type": "string"
+        },
+        "biome_fields": {
+          "items": {
+            "$ref": "#/definitions/BiomeField"
+          },
+          "type": "array"
+        },
+        "extraction": {
+          "$ref": "#/definitions/ExtractionGuarantee"
+        },
+        "hazard_fields": {
+          "items": {
+            "$ref": "#/definitions/HazardField"
+          },
+          "type": "array"
+        },
+        "landmarks": {
+          "items": {
+            "$ref": "#/definitions/LandmarkRecord"
+          },
+          "type": "array"
+        },
+        "markers": {
+          "items": {
+            "$ref": "#/definitions/CoordinateMarker"
+          },
+          "type": "array"
+        },
+        "resource_pressures": {
+          "items": {
+            "$ref": "#/definitions/ResourcePressure"
+          },
+          "type": "array"
+        },
+        "routes": {
+          "items": {
+            "$ref": "#/definitions/RouteEdge"
+          },
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "world-ir-2"
+        },
+        "site_id": {
+          "type": "string"
+        },
+        "site_seed": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "world_seed": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "anchors",
+        "archetype_id",
+        "biome_fields",
+        "extraction",
+        "hazard_fields",
+        "landmarks",
+        "markers",
+        "resource_pressures",
+        "routes",
+        "schema_version",
+        "site_id",
+        "site_seed",
+        "world_seed",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "gameplay_ir": {
+      "$ref": "#/definitions/GameplayIR"
+    },
+    "metrics": {
+      "$ref": "#/definitions/GenerationMetrics"
+    },
+    "presentation_ir": {
+      "$ref": "#/definitions/PresentationOutput"
+    },
+    "request": {
+      "$ref": "#/definitions/ProcgenRequest"
+    },
+    "schema_version": {
+      "const": "procgen-bundle-5"
+    },
+    "semantic_hash": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "site_ir": {
+      "$ref": "#/definitions/SiteIR"
+    },
+    "trace": {
+      "$ref": "#/definitions/GenerationTrace"
+    },
+    "version": {
+      "$ref": "#/definitions/VersionEnvelope"
+    },
+    "world_ir": {
+      "$ref": "#/definitions/WorldIRv2"
+    }
+  },
+  "required": [
+    "gameplay_ir",
+    "metrics",
+    "presentation_ir",
+    "request",
+    "schema_version",
+    "semantic_hash",
+    "site_ir",
+    "trace",
+    "version",
+    "world_ir"
+  ],
+  "title": "procgen-bundle-5",
+  "type": "object"
+}

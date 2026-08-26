@@ -1,3 +1,4 @@
+use derelict_core::adaptive::AdaptiveDecisionKind;
 use derelict_core::manifest::ExportSchemas;
 use derelict_core::player_model::{PlayerSignal, PlayerSignalKind, PLAYER_MODEL_SCHEMA_V2};
 use derelict_core::procgen::{
@@ -60,17 +61,34 @@ fn item_value(bundle: &ProcgenBundle) -> u32 {
 fn bundle_v4_exports_complete_validated_gameplay_and_presentation_layers() {
     let bundle = bundle(request(42));
     bundle.validate().unwrap();
-    assert_eq!(bundle.schema_version, "procgen-bundle-4");
+    assert_eq!(bundle.schema_version, "procgen-bundle-5");
     assert_eq!(bundle.request.schema_version, "procgen-request-2");
     assert_eq!(bundle.request.player_model.schema_version, "player-model-2");
-    assert_eq!(bundle.gameplay_ir.schema_version, "gameplay-ir-2");
+    assert_eq!(bundle.gameplay_ir.schema_version, "gameplay-ir-3");
     assert_eq!(bundle.presentation_ir.schema_version, "presentation-ir-2");
-    assert_eq!(bundle.version.export_schemas, ExportSchemas::platform_v4());
-    assert_eq!(PROCGEN_BUNDLE_SCHEMA, "procgen-bundle-4");
+    assert_eq!(bundle.version.export_schemas, ExportSchemas::platform_v5());
+    assert_eq!(PROCGEN_BUNDLE_SCHEMA, "procgen-bundle-5");
     assert_eq!(PROCGEN_REQUEST_SCHEMA, "procgen-request-2");
     assert_eq!(PLAYER_MODEL_SCHEMA, PLAYER_MODEL_SCHEMA_V2);
-    assert_eq!(GAMEPLAY_IR_SCHEMA, "gameplay-ir-2");
+    assert_eq!(GAMEPLAY_IR_SCHEMA, "gameplay-ir-3");
     assert_eq!(PRESENTATION_IR_SCHEMA, "presentation-ir-2");
+    assert_eq!(bundle.trace.adaptive_decisions.len(), 3);
+    assert_eq!(
+        bundle
+            .trace
+            .adaptive_decisions
+            .iter()
+            .map(|decision| decision.kind)
+            .collect::<Vec<_>>(),
+        vec![
+            AdaptiveDecisionKind::WorldRanker,
+            AdaptiveDecisionKind::SiteRanker,
+            AdaptiveDecisionKind::EncounterDirector,
+        ]
+    );
+    for decision in &bundle.trace.adaptive_decisions {
+        decision.replay(&bundle.request.player_model).unwrap();
+    }
 
     assert_eq!(bundle.gameplay_ir.creature_blueprints.len(), 3);
     assert!(bundle
