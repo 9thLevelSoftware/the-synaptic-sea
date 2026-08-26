@@ -292,9 +292,7 @@ mod tests {
         let mut k = key();
         k.sub_index = 1;
         variants.push(k);
-        assert!(variants
-            .into_iter()
-            .all(|k| k.seed().map_or(true, |seed| seed != base)));
+        assert!(variants.into_iter().all(|k| k.seed() != Ok(base)));
     }
     #[test]
     fn radius_one_is_canonical_and_excludes_center() {
