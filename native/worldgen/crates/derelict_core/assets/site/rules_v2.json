@@ -3,5 +3,10 @@
   "portal_cost": 1000,
   "vertical_cost": 1500,
   "clearance": 1,
-  "max_repairs": 2
+  "max_repairs": 2,
+  "templates": [
+    {"id":"survey","archetypes":["shuttle","corvette","freighter","frigate"],"gate":null},
+    {"id":"key_lock_salvage","archetypes":["shuttle","corvette","freighter","frigate"],"gate":"key_lock"},
+    {"id":"repair_recovery","archetypes":["shuttle","corvette","freighter","frigate"],"gate":"repair"}
+  ]
 }

@@ -13,6 +13,85 @@ pub const SPATIAL_SCHEMA_VERSION: &str = "site-spatial-1";
 pub const PORTAL_COST: u32 = 1_000;
 pub const VERTICAL_COST: u32 = 1_500;
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SiteTemplate {
+    pub id: String,
+    pub archetypes: Vec<String>,
+    pub gate: Option<GateKind>,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SiteRules {
+    pub schema_version: String,
+    pub templates: Vec<SiteTemplate>,
+    pub portal_cost: u32,
+    pub vertical_cost: u32,
+    pub clearance: u16,
+    pub max_repairs: u8,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SiteFallback {
+    pub schema_version: String,
+    pub mission_id: String,
+    pub mode: String,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SiteTrace {
+    pub candidate_decisions: Vec<String>,
+    pub repairs: Vec<String>,
+    pub fallback: Option<String>,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SiteGenerationOutcome {
+    pub site: SiteIR,
+    pub trace: SiteTrace,
+}
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum SiteError {
+    #[error("invalid site request: {0}")]
+    Invalid(String),
+    #[error("site validation: {0}")]
+    Validation(String),
+    #[error("site rules: {0}")]
+    Rules(String),
+}
+
+impl SiteRules {
+    pub fn bundled() -> Result<Self, SiteError> {
+        serde_json::from_str(include_str!("../assets/site/rules_v2.json"))
+            .map_err(|e| SiteError::Rules(e.to_string()))
+    }
+    pub fn validate(&self) -> Result<(), SiteError> {
+        if self.schema_version != "site-rules-1"
+            || self.templates.len() != 3
+            || self.portal_cost != PORTAL_COST
+            || self.vertical_cost != VERTICAL_COST
+            || self.clearance != 1
+            || self.max_repairs != 2
+        {
+            return Err(SiteError::Rules("closed rules mismatch".into()));
+        }
+        Ok(())
+    }
+}
+impl SiteFallback {
+    pub fn bundled() -> Result<Self, SiteError> {
+        serde_json::from_str(include_str!("../assets/site/safe_fallback_v2.json"))
+            .map_err(|e| SiteError::Rules(e.to_string()))
+    }
+    pub fn validate(&self) -> Result<(), SiteError> {
+        if self.schema_version != "site-fallback-1" || self.mode != "ungated-critical-path-reverse"
+        {
+            return Err(SiteError::Rules("fallback identity".into()));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SiteIR {
@@ -409,4 +488,189 @@ pub fn site_json(site: &SiteIR) -> Result<String, serde_json::Error> {
 }
 pub fn site_from_json(data: &str) -> Result<SiteIR, serde_json::Error> {
     serde_json::from_str(data)
+}
+
+/// Compile one deterministic overlay. Structural generation is never rerun.
+pub fn generate_site(
+    ship: Ship,
+    request: &crate::world::WorldGenerationRequest,
+) -> Result<SiteGenerationOutcome, SiteError> {
+    if request.platform_version != crate::world::PROCGEN_GENERATOR_VERSION
+        || request.archetype_id != ship.archetype_id
+    {
+        return Err(SiteError::Invalid("request identity".into()));
+    }
+    let rules = SiteRules::bundled()?;
+    rules.validate()?;
+    let mut decisions = Vec::new();
+    let mut selected = None;
+    for (i, t) in rules.templates.iter().enumerate() {
+        let key = crate::world::WorldKey {
+            world_seed: request.world_seed,
+            platform_version: request.platform_version,
+            content_manifest_hash: request.content_manifest_hash.clone(),
+            site_id: request.site_id.clone(),
+            x: request.x,
+            y: request.y,
+            domain: "site".into(),
+            channel: "site.mission_template".into(),
+            sub_index: i as u32,
+        };
+        let ok = t.archetypes.iter().any(|a| a == &request.archetype_id);
+        let mark = key.seed().unwrap_or(0) % 3 == i as u64;
+        decisions.push(format!(
+            "{}:{}",
+            t.id,
+            if ok && mark { "selected" } else { "rejected" }
+        ));
+        if ok && mark {
+            selected = Some(t.clone());
+        }
+    }
+    let template = selected
+        .or_else(|| {
+            rules
+                .templates
+                .iter()
+                .find(|t| t.archetypes.iter().any(|a| a == &request.archetype_id))
+                .cloned()
+        })
+        .ok_or_else(|| SiteError::Rules("no compatible template".into()))?;
+    let rooms = ship.critical_path.clone();
+    if rooms.is_empty() {
+        return Err(SiteError::Invalid("empty critical path".into()));
+    }
+    let cell_for = |id: u16| {
+        ship.topology
+            .room(id)
+            .and_then(|r| r.cells.iter().min().copied())
+            .ok_or_else(|| SiteError::Invalid("room cell".into()))
+    };
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+    let start = cell_for(rooms[0])?;
+    nodes.push(MissionNode {
+        id: "start".into(),
+        kind: NodeKind::Start,
+        room: rooms[0],
+        cell: start,
+        key_id: None,
+        repair_id: None,
+    });
+    let goal = cell_for(*rooms.last().unwrap())?;
+    nodes.push(MissionNode {
+        id: "objective-0".into(),
+        kind: NodeKind::Objective,
+        room: *rooms.last().unwrap(),
+        cell: goal,
+        key_id: None,
+        repair_id: None,
+    });
+    nodes.push(MissionNode {
+        id: "extract".into(),
+        kind: NodeKind::Extraction,
+        room: ship.entry_room,
+        cell: cell_for(ship.entry_room)?,
+        key_id: None,
+        repair_id: None,
+    });
+    edges.push(MissionEdge {
+        from: "start".into(),
+        to: "objective-0".into(),
+    });
+    edges.push(MissionEdge {
+        from: "objective-0".into(),
+        to: "extract".into(),
+    });
+    let mut props = Vec::new();
+    let approach = Cell::new(start.deck, start.x + 1, start.y);
+    if rooms.len() > 0
+        && ship
+            .topology
+            .room(rooms[0])
+            .unwrap()
+            .cells
+            .contains(&approach)
+    {
+        props.push(FunctionalProp {
+            id: "prop-objective".into(),
+            kind: PropKind::ObjectiveConsole,
+            room: rooms[0],
+            anchor: start,
+            approach,
+            mission_node_id: "objective-0".into(),
+            key_id: None,
+            repair_id: None,
+            extraction_portal_ref: None,
+        });
+    }
+    let extraction_ref = ship
+        .topology
+        .portals
+        .iter()
+        .find(|p| p.from_room == ship.entry_room && p.exterior && p.state == EdgeKind::Door)
+        .map(|p| {
+            edge_key(
+                p.from_cell,
+                crate::structural::plan::Dir::between(p.from_cell, p.to_cell)
+                    .unwrap_or(crate::structural::plan::Dir::North),
+            )
+        })
+        .ok_or_else(|| SiteError::Invalid("entry extraction portal".into()))?;
+    props.push(FunctionalProp {
+        id: "prop-extraction".into(),
+        kind: PropKind::ExtractionConsole,
+        room: ship.entry_room,
+        anchor: cell_for(ship.entry_room)?,
+        approach: Cell::new(
+            cell_for(ship.entry_room)?.deck,
+            cell_for(ship.entry_room)?.x + 1,
+            cell_for(ship.entry_room)?.y,
+        ),
+        mission_node_id: "extract".into(),
+        key_id: None,
+        repair_id: None,
+        extraction_portal_ref: Some(extraction_ref),
+    });
+    let navigation = project_navigation(&ship);
+    let spatial = SpatialAnnotations {
+        schema_version: SPATIAL_SCHEMA_VERSION.into(),
+        rooms: ship
+            .topology
+            .rooms
+            .iter()
+            .map(|r| SpatialAnnotation {
+                room: r.id,
+                minimum_clearance: 1,
+                cover_cells: Vec::new(),
+                los_pairs: Vec::new(),
+            })
+            .collect(),
+    };
+    let site = SiteIR {
+        schema_version: SITE_SCHEMA_VERSION.into(),
+        ship,
+        mission_graph: MissionGraph {
+            schema_version: MISSION_SCHEMA_VERSION.into(),
+            mission_id: template.id,
+            start_node: "start".into(),
+            required_objectives: vec!["objective-0".into()],
+            extraction_node: "extract".into(),
+            nodes,
+            edges,
+            gates: Vec::new(),
+        },
+        navigation,
+        functional_props: props,
+        spatial_annotations: spatial,
+    };
+    validate_site(&site).map_err(|e| SiteError::Validation(e.0))?;
+    Ok(SiteGenerationOutcome {
+        site,
+        trace: SiteTrace {
+            candidate_decisions: decisions,
+            repairs: Vec::new(),
+            fallback: None,
+        },
+    })
 }
