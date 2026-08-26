@@ -1,1 +1,174 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"procgen-request-1","type":"object","additionalProperties":false,"required":["schema_version","world_seed","site","difficulty_id","player_model","requested_domains","generator_version","content_manifest_hash","presentation"],"properties":{"schema_version":{"const":"procgen-request-1"},"world_seed":{"type":"integer","minimum":0},"site":{"type":"object","additionalProperties":false,"required":["site_id","x","y","archetype_id","kit_id","intactness_override_bp","cause_of_loss","loot_richness_bp"],"properties":{"site_id":{"type":"string","minLength":1},"x":{"type":"integer"},"y":{"type":"integer"},"archetype_id":{"type":"string","minLength":1},"kit_id":{"type":"string","minLength":1},"intactness_override_bp":{"type":["integer","null"]},"cause_of_loss":{},"loot_richness_bp":{"type":"integer","minimum":0,"maximum":30000}}},"difficulty_id":{"type":"string","minLength":1},"player_model":{"$ref":"player-model-1.schema.json"},"requested_domains":{"type":"array","minItems":1,"items":{"enum":["world","site","gameplay","presentation"]}},"generator_version":{"const":2},"content_manifest_hash":{"type":"string","pattern":"^[a-f0-9]{64}$"},"presentation":{"type":"object","additionalProperties":false,"required":["seed","locale"],"properties":{"seed":{"type":"integer","minimum":0},"locale":{"type":"string","minLength":1}}}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "CauseOfLoss": {
+      "enum": [
+        "ReactorBreach",
+        "Depressurization",
+        "PirateBoarding",
+        "Plague",
+        "DriveMisjump",
+        "Unknown"
+      ],
+      "type": "string"
+    },
+    "Domain": {
+      "enum": [
+        "world",
+        "site",
+        "gameplay",
+        "presentation"
+      ],
+      "type": "string"
+    },
+    "PlayerModel": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "type": "string"
+        },
+        "signals": {
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "signals"
+      ],
+      "type": "object"
+    },
+    "PresentationRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "locale": {
+          "pattern": "^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
+          "type": "string"
+        },
+        "seed": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "locale",
+        "seed"
+      ],
+      "type": "object"
+    },
+    "SiteRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "archetype_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "cause_of_loss": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CauseOfLoss"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "intactness_override_bp": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          ]
+        },
+        "kit_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "loot_richness_bp": {
+          "maximum": 30000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "site_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "archetype_id",
+        "kit_id",
+        "loot_richness_bp",
+        "site_id",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "content_manifest_hash": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "difficulty_id": {
+      "type": "string"
+    },
+    "generator_version": {
+      "const": 2
+    },
+    "player_model": {
+      "$ref": "#/definitions/PlayerModel"
+    },
+    "presentation": {
+      "$ref": "#/definitions/PresentationRequest"
+    },
+    "requested_domains": {
+      "items": {
+        "$ref": "#/definitions/Domain"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "procgen-request-1"
+    },
+    "site": {
+      "$ref": "#/definitions/SiteRequest"
+    },
+    "world_seed": {
+      "format": "uint64",
+      "minimum": 0.0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "content_manifest_hash",
+    "difficulty_id",
+    "generator_version",
+    "player_model",
+    "presentation",
+    "requested_domains",
+    "schema_version",
+    "site",
+    "world_seed"
+  ],
+  "title": "procgen-request-1",
+  "type": "object"
+}

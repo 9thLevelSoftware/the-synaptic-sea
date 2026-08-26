@@ -20,7 +20,8 @@ pub const DECK_HEIGHT_M: f32 = 4.0;
 pub type RoomId = u16;
 pub const NO_ROOM: RoomId = 0;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Cell {
     pub deck: u8,
     pub x: i32,
@@ -51,7 +52,7 @@ impl Cell {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum Dir {
     North,
     South,
@@ -140,7 +141,7 @@ pub fn edge_world_position(cell: Cell, dir: Dir) -> [f32; 3] {
     ]
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum EdgeKind {
     Solid,
     /// Interior of a multi-cell room: no wall, never materialized.
@@ -172,7 +173,7 @@ impl EdgeKind {
 /// Asset damage variant, resolved at export time against the kit's
 /// intact/damaged/breached module variants. Structural role (`module_id`)
 /// stays stable; only the rendered asset changes.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum DamageVariant {
     #[default]
     Intact,
@@ -181,7 +182,8 @@ pub enum DamageVariant {
 }
 
 /// One occupied cell.
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CellRecord {
     pub cell: Cell,
     pub room_id: RoomId,
@@ -192,7 +194,8 @@ pub struct CellRecord {
 }
 
 /// One canonical boundary.
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct EdgeRecord {
     pub edge_key: String,
     pub kind: EdgeKind,
@@ -214,7 +217,8 @@ pub struct EdgeRecord {
     pub wrapper_required: bool,
 }
 
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct FloorPlacement {
     pub id: String, // "floor:<cell_key>"
     pub cell: Cell,
@@ -228,7 +232,8 @@ pub struct FloorPlacement {
 
 pub type CeilingPlacement = FloorPlacement; // "ceiling:<cell_key>" ids
 
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SocketBinding {
     pub placement_id: String,
     pub socket_id: String,
@@ -237,7 +242,8 @@ pub struct SocketBinding {
     pub kind: String,
 }
 
-#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct StructuralPlan {
     pub occupancy: BTreeMap<String, CellRecord>,
     pub edges: BTreeMap<String, EdgeRecord>,
@@ -255,7 +261,8 @@ pub struct StructuralPlan {
 // intents, vertical connections).
 // ---------------------------------------------------------------------------
 
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct RoomSpec {
     pub id: RoomId,
     pub role: Role,
@@ -265,7 +272,8 @@ pub struct RoomSpec {
 
 /// Authored doorway between two rooms sharing a real cardinal cell edge.
 /// Created at placement time by the topology stage — never derived post-hoc.
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct PortalIntent {
     pub from_room: RoomId,
     pub to_room: RoomId,
@@ -276,7 +284,8 @@ pub struct PortalIntent {
     pub exterior: bool,
 }
 
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct VerticalConnection {
     pub from_room: RoomId,
     pub to_room: RoomId,
@@ -285,7 +294,8 @@ pub struct VerticalConnection {
 }
 
 /// Everything the structural compiler consumes.
-#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Topology {
     pub rooms: Vec<RoomSpec>,
     pub portals: Vec<PortalIntent>,

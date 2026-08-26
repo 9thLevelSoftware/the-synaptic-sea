@@ -79,3 +79,19 @@ fn every_public_schema_is_json_and_closed_at_root() {
         assert!(value["required"].as_array().map_or(false, |r| !r.is_empty()), "{name}");
     }
 }
+
+#[test]
+fn draft_schema_accepts_serialized_bundle_and_all_actions() {
+    let data = derelict_core::GenData::default_bundle().unwrap();
+    let bundle = generate_bundle(request(), &data).unwrap();
+    let schema: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(format!("{}/../../schemas/procgen-bundle-1.schema.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
+    let compiled = jsonschema::validator_for(&schema).unwrap();
+    let bundle_value = serde_json::to_value(bundle).unwrap();
+    let errors: Vec<_> = compiled.iter_errors(&bundle_value).map(|e| e.to_string()).collect();
+    assert!(errors.is_empty(), "{errors:?}");
+    for action in [AdaptiveAction::NoOp, AdaptiveAction::SelectCandidate { candidate_id: "c".into() }, AdaptiveAction::AdjustEncounter { encounter_id: "e".into(), pacing_delta: -1 }] {
+        let proposal = AdaptiveProposal { schema_version: ADAPTIVE_PROPOSAL_SCHEMA.into(), score: 0, rationale_codes: vec!["r".into()], confidence_bp: 1, rule_model_version: "v".into(), action };
+        let schema: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(format!("{}/../../schemas/adaptive-proposal-1.schema.json", env!("CARGO_MANIFEST_DIR"))).unwrap()).unwrap();
+        let pv = serde_json::to_value(proposal).unwrap(); let av = jsonschema::validator_for(&schema).unwrap(); let es: Vec<_> = av.iter_errors(&pv).map(|e| e.to_string()).collect(); assert!(es.is_empty(), "{pv} {es:?}");
+    }
+}

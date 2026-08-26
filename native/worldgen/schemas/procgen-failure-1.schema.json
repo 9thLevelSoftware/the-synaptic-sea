@@ -1,1 +1,57 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"procgen-failure-1","type":"object","additionalProperties":false,"required":["schema_version","code","stage","message","retryable","fallback_id"],"properties":{"schema_version":{"const":"procgen-failure-1"},"code":{"type":"string"},"stage":{"type":"string","minLength":1},"message":{"type":"string"},"retryable":{"type":"boolean"},"fallback_id":{"type":["string","null"]}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "ProcgenFailureCode": {
+      "enum": [
+        "invalid_request",
+        "unsupported_schema",
+        "unsupported_domain",
+        "generator_content_mismatch",
+        "generation_failure",
+        "validation_failure",
+        "fallback_failure",
+        "adapter_failure",
+        "manifest_failure",
+        "capacity",
+        "overload",
+        "cancellation",
+        "timeout",
+        "internal_failure"
+      ],
+      "type": "string"
+    }
+  },
+  "properties": {
+    "code": {
+      "$ref": "#/definitions/ProcgenFailureCode"
+    },
+    "fallback_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "message": {
+      "type": "string"
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "procgen-failure-1"
+    },
+    "stage": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "code",
+    "message",
+    "retryable",
+    "schema_version",
+    "stage"
+  ],
+  "title": "procgen-failure-1",
+  "type": "object"
+}

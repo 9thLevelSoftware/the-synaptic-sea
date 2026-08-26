@@ -1,1 +1,22 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"player-model-1","type":"object","additionalProperties":false,"required":["schema_version","signals"],"properties":{"schema_version":{"const":"player-model-1"},"signals":{"type":"array","items":{"type":"integer"}}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "player-model-1"
+    },
+    "signals": {
+      "items": {
+        "format": "int32",
+        "type": "integer"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "signals"
+  ],
+  "title": "player-model-1",
+  "type": "object"
+}

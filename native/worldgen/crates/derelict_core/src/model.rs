@@ -20,7 +20,8 @@ pub const INTACT_MAX: Intactness = 10_000;
 
 pub type TileCoord = i32;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct GridPos {
     pub x: TileCoord,
     pub y: TileCoord,
@@ -33,7 +34,7 @@ impl GridPos {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
 #[repr(u8)]
 pub enum FloorTile {
     /// Open space / no floor (outside hull, or a breach hole).
@@ -50,7 +51,7 @@ impl FloorTile {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
 #[repr(u8)]
 pub enum WallEdge {
     #[default]
@@ -76,7 +77,8 @@ impl WallEdge {
 
 /// PZ-style: walls live on tile EDGES. Each tile stores its north and west
 /// edges; a tile's south edge is its south neighbor's north edge, etc.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct TileWalls {
     pub north: WallEdge,
     pub west: WallEdge,
@@ -94,7 +96,8 @@ pub mod decal {
 pub const NO_ROOM: u16 = 0;
 
 /// One deck's tile data as flat row-major arrays (index = y * width + x).
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct DeckLayer {
     pub width: u16,
     pub height: u16,
@@ -168,7 +171,7 @@ impl DeckLayer {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum Side {
     North,
     South,
@@ -188,7 +191,8 @@ impl Side {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct RoomNode {
     pub id: u16,
     pub deck: u8,
@@ -203,7 +207,7 @@ pub struct RoomNode {
     pub spans_room_id: Option<u16>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum EdgeKind {
     Door,
     OpenCorridor,
@@ -211,14 +215,16 @@ pub enum EdgeKind {
     Breach,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct RoomEdge {
     pub a: u16,
     pub b: u16,
     pub kind: EdgeKind,
 }
 
-#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct RoomGraph {
     pub nodes: Vec<RoomNode>,
     pub edges: Vec<RoomEdge>,
@@ -233,7 +239,7 @@ impl RoomGraph {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum EntityKind {
     Door,
     Container,
@@ -244,13 +250,15 @@ pub enum EntityKind {
     ItemPile,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ItemStack {
     pub item_id: u32,
     pub qty: u16,
 }
 
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct EntitySpec {
     /// Stable within this ship; assigned in deterministic order. Save diffs
     /// and co-op mutation replication address entities by this id.
@@ -269,7 +277,7 @@ pub struct EntitySpec {
     pub tags: Vec<String>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum CauseOfLoss {
     ReactorBreach,
     Depressurization,
@@ -279,7 +287,7 @@ pub enum CauseOfLoss {
     Unknown,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum DamageEventKind {
     Breach,
     ScorchZone,
@@ -287,7 +295,8 @@ pub enum DamageEventKind {
     DebrisField,
 }
 
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct DamageEvent {
     pub kind: DamageEventKind,
     pub deck: u8,
@@ -299,7 +308,8 @@ pub struct DamageEvent {
 /// already laid out in final world-local coordinates (fragments are baked
 /// apart into the shared deck grid), so this exists for debugging/AI hints,
 /// not for rendering math.
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ShipFragment {
     pub id: u8,
     /// Room ids belonging to this fragment.
@@ -308,12 +318,14 @@ pub struct ShipFragment {
     pub drift: (TileCoord, TileCoord),
 }
 
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Deck {
     pub layer: DeckLayer,
 }
 
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Ship {
     pub generator_version: u32,
     pub seed: u64,
@@ -347,7 +359,8 @@ impl Ship {
 }
 
 /// Generation request parameters (everything besides the seed).
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct GenParams {
     pub archetype_id: String,
     /// None = rolled from seed.
@@ -372,7 +385,7 @@ impl GenParams {
 // Persistence: mutation diffs
 // ---------------------------------------------------------------------------
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum TileDestruction {
     FloorBreached,
     WallBreached { side_north: bool },
@@ -381,7 +394,8 @@ pub enum TileDestruction {
 /// Everything that can change about a ship after generation. The base ship is
 /// never saved — only this diff. Ordered collections only (byte-stable
 /// serialization; diffs are hashed for co-op sync verification).
-#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ShipMutationDiff {
     pub generator_version: u32,
     pub seed: u64,

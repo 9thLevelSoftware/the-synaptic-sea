@@ -7,34 +7,36 @@ use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
-pub const PROCGEN_REQUEST_SCHEMA: &str = "procgen-request-1";
-pub const PROCGEN_BUNDLE_SCHEMA: &str = "procgen-bundle-1";
-pub const WORLD_IR_SCHEMA: &str = "world-ir-1";
-pub const SITE_IR_SCHEMA: &str = "site-ir-1";
-pub const GAMEPLAY_IR_SCHEMA: &str = "gameplay-ir-1";
-pub const PRESENTATION_IR_SCHEMA: &str = "presentation-ir-1";
-pub const GENERATION_TRACE_SCHEMA: &str = "generation-trace-1";
-pub const ADAPTIVE_PROPOSAL_SCHEMA: &str = "adaptive-proposal-1";
+pub const PROCGEN_REQUEST_SCHEMA: &str = crate::manifest::PROCGEN_REQUEST_SCHEMA;
+pub const PROCGEN_BUNDLE_SCHEMA: &str = crate::manifest::PROCGEN_BUNDLE_SCHEMA;
+pub const WORLD_IR_SCHEMA: &str = crate::manifest::WORLD_IR_SCHEMA;
+pub const SITE_IR_SCHEMA: &str = crate::manifest::SITE_IR_SCHEMA;
+pub const GAMEPLAY_IR_SCHEMA: &str = crate::manifest::GAMEPLAY_IR_SCHEMA;
+pub const PRESENTATION_IR_SCHEMA: &str = crate::manifest::PRESENTATION_IR_SCHEMA;
+pub const GENERATION_TRACE_SCHEMA: &str = crate::manifest::GENERATION_TRACE_SCHEMA;
+pub const ADAPTIVE_PROPOSAL_SCHEMA: &str = crate::manifest::ADAPTIVE_PROPOSAL_SCHEMA;
 pub const PLAYER_MODEL_SCHEMA: &str = "player-model-1";
 pub const FAILURE_SCHEMA: &str = "procgen-failure-1";
+pub const GENERATION_METRICS_SCHEMA: &str = "generation-metrics-1";
+const RNG_CHANNELS: [&str; 16] = ["meta", "hull", "template", "topology", "residual_fill", "door", "furnish", "story", "intact", "breach", "scorch", "seal", "bodies", "fracture", "debris", "loot"];
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Domain { World, Site, Gameplay, Presentation }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SiteRequest {
     pub site_id: String, pub x: i32, pub y: i32, pub archetype_id: String, pub kit_id: String,
     pub intactness_override_bp: Option<u16>, pub cause_of_loss: Option<CauseOfLoss>, pub loot_richness_bp: u16,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlayerModel { pub schema_version: String, pub signals: Vec<i32> }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PresentationRequest { pub seed: u64, pub locale: String }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProcgenRequest {
     pub schema_version: String, pub world_seed: u64, pub site: SiteRequest, pub difficulty_id: String,
@@ -42,34 +44,46 @@ pub struct ProcgenRequest {
     pub content_manifest_hash: String, pub presentation: PresentationRequest,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct VersionEnvelope { pub generator_version: u32, pub content_manifest_hash: String, pub export_schemas: ExportSchemas }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct WorldIR { pub schema_version: String, pub world_seed: u64, pub site_id: String, pub x: i32, pub y: i32, pub archetype_id: String }
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SiteIR { pub schema_version: String, pub ship: Ship }
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct GameplayIR { pub schema_version: String, pub legacy_slice: Value }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GameplayIR { pub schema_version: String, pub legacy_slice: GameplaySlice }
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GameplaySlice { pub schema_version: String, pub document_kind: String, pub program_id: String, pub start_room: String, pub goal_room: String, pub critical_path: Vec<String>, pub fire_zones: Vec<FireZone>, pub objectives: Vec<Objective>, pub loot_containers: Vec<LootContainer>, pub summary: String }
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FireZone {}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Objective { pub id: String, pub sequence: u32, #[serde(rename = "type")] pub objective_type: String, pub kind: String, pub room_id: String, pub room_role: String, pub semantic: String, pub cell: [i32; 3], pub approach_cell: [i32; 3], pub approach_distance_cells: u32, pub interactable: bool }
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LootContainer { pub id: String, pub kind: String, pub room_id: String, pub approach_cell: [i32; 3], pub loot_table: String }
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PresentationIR { pub schema_version: String, pub kit_id: String, pub locale: String, pub seed: u64, pub approved_bindings: BTreeMap<String, String> }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema, Default)]
 #[serde(deny_unknown_fields)]
 pub struct GenerationTrace {
     pub schema_version: String, pub rng_channels: Vec<String>, pub candidate_decisions: Vec<String>,
     pub failed_constraints: Vec<String>, pub repairs: Vec<String>, pub retries: Vec<String>,
     pub fallback: Option<String>, pub stage_timings_micros: BTreeMap<String, u128>,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema, Default)]
 #[serde(deny_unknown_fields)]
-pub struct GenerationMetrics { pub pipeline_executions: u32, pub room_count: u32, pub entity_count: u32, pub structural_placement_count: u32, pub stage_timings_micros: BTreeMap<String, u128> }
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GenerationMetrics { pub schema_version: String, pub pipeline_executions: u32, pub room_count: u32, pub entity_count: u32, pub structural_placement_count: u32, pub stage_timings_micros: BTreeMap<String, u128> }
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProcgenBundle {
     pub schema_version: String, pub version: VersionEnvelope, pub request: ProcgenRequest,
@@ -94,17 +108,27 @@ impl ProcgenBundle {
         check_schema(&self.site_ir.schema_version, SITE_IR_SCHEMA)?;
         check_schema(&self.gameplay_ir.schema_version, GAMEPLAY_IR_SCHEMA)?;
         check_schema(&self.presentation_ir.schema_version, PRESENTATION_IR_SCHEMA)?;
+        check_schema(&self.trace.schema_version, GENERATION_TRACE_SCHEMA)?;
+        check_schema(&self.metrics.schema_version, GENERATION_METRICS_SCHEMA)?;
+        if self.metrics.pipeline_executions != 1 || self.trace.rng_channels.is_empty() { return Err(ProcgenError::InvalidRequest("metrics_trace")); }
         if self.version.generator_version != self.request.generator_version || self.version.content_manifest_hash != self.request.content_manifest_hash { return Err(ProcgenError::InvalidRequest("version")); }
         if self.version.export_schemas != ExportSchemas::v1() { return Err(ProcgenError::InvalidRequest("export_schemas")); }
+        if self.world_ir.world_seed != self.request.world_seed || self.world_ir.site_id != self.request.site.site_id || self.world_ir.x != self.request.site.x || self.world_ir.y != self.request.site.y || self.world_ir.archetype_id != self.request.site.archetype_id { return Err(ProcgenError::InvalidRequest("world_identity")); }
+        if self.presentation_ir.kit_id != self.request.site.kit_id || self.presentation_ir.locale != self.request.presentation.locale || self.presentation_ir.seed != self.request.presentation.seed { return Err(ProcgenError::InvalidRequest("presentation_identity")); }
+        if self.site_ir.ship.generator_version != self.request.generator_version || self.site_ir.ship.seed != self.request.world_seed || self.site_ir.ship.archetype_id != self.request.site.archetype_id { return Err(ProcgenError::InvalidRequest("ship_identity")); }
+        let expected_placements = self.site_ir.ship.plan.placements.len().checked_add(self.site_ir.ship.plan.floor_placements.len()).and_then(|n| n.checked_add(self.site_ir.ship.plan.ceiling_placements.len())).and_then(|n| u32::try_from(n).ok()).ok_or(ProcgenError::InvalidRequest("metrics"))?;
+        if self.metrics.room_count != u32::try_from(self.site_ir.ship.room_graph.nodes.len()).map_err(|_| ProcgenError::InvalidRequest("metrics"))? || self.metrics.entity_count != u32::try_from(self.site_ir.ship.entities.len()).map_err(|_| ProcgenError::InvalidRequest("metrics"))? || self.metrics.structural_placement_count != expected_placements { return Err(ProcgenError::InvalidRequest("metrics")); }
+        if self.trace.rng_channels.iter().map(String::as_str).collect::<Vec<_>>() != RNG_CHANNELS { return Err(ProcgenError::InvalidRequest("rng_channels")); }
+        if self.trace.candidate_decisions.len() > 4096 || self.trace.failed_constraints.len() > 4096 || self.trace.retries.len() > 4096 { return Err(ProcgenError::InvalidRequest("trace_bounds")); }
         if self.semantic_hash != semantic_hash(self)? { return Err(ProcgenError::InvalidRequest("semantic_hash")); }
         Ok(())
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ProcgenFailureCode { InvalidRequest, UnsupportedSchema, UnsupportedDomain, GeneratorContentMismatch, GenerationFailure, ValidationFailure, FallbackFailure, AdapterFailure, ManifestFailure, Capacity, Overload, Cancellation, Timeout, InternalFailure }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProcgenFailure { pub schema_version: String, pub code: ProcgenFailureCode, pub stage: String, pub message: String, pub retryable: bool, pub fallback_id: Option<String> }
 
@@ -113,10 +137,10 @@ impl ProcgenFailure {
     pub fn validate(&self) -> Result<(), ProcgenError> { check_schema(&self.schema_version, FAILURE_SCHEMA)?; if self.stage.is_empty() || self.message.is_empty() { return Err(ProcgenError::InvalidRequest("failure")); } Ok(()) }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum AdaptiveAction { NoOp, SelectCandidate { candidate_id: String }, AdjustEncounter { encounter_id: String, pacing_delta: i32 } }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AdaptiveProposal { pub schema_version: String, pub score: i32, pub rationale_codes: Vec<String>, pub confidence_bp: u16, pub rule_model_version: String, pub action: AdaptiveAction }
 
@@ -145,6 +169,7 @@ impl ProcgenRequest {
 }
 
 impl AdaptiveProposal {
+    pub fn from_json(json: &str) -> Result<Self, ProcgenError> { let value: Value = serde_json::from_str(json)?; let proposal: Self = serde_json::from_value(value)?; proposal.validate()?; Ok(proposal) }
     pub fn validate(&self) -> Result<(), ProcgenError> {
         check_schema(&self.schema_version, ADAPTIVE_PROPOSAL_SCHEMA)?;
         if self.rationale_codes.is_empty() || self.rationale_codes.iter().any(|s| s.is_empty()) || self.rule_model_version.is_empty() { return Err(ProcgenError::InvalidRequest("adaptive_proposal.identifiers")); }
@@ -168,20 +193,20 @@ where F: FnOnce() -> Result<crate::pipeline::GenReport, crate::pipeline::GenErro
     let legacy_slice = crate::structural::export::to_gameplay_slice_json(&ship);
     let world_ir = WorldIR { schema_version: WORLD_IR_SCHEMA.into(), world_seed: request.world_seed, site_id: request.site.site_id.clone(), x: request.site.x, y: request.site.y, archetype_id: request.site.archetype_id.clone() };
     let site_ir = SiteIR { schema_version: SITE_IR_SCHEMA.into(), ship: ship.clone() };
-    let gameplay_ir = GameplayIR { schema_version: GAMEPLAY_IR_SCHEMA.into(), legacy_slice };
+    let gameplay_ir = GameplayIR { schema_version: GAMEPLAY_IR_SCHEMA.into(), legacy_slice: serde_json::from_value(legacy_slice).map_err(|e| failure(ProcgenFailureCode::InternalFailure, "gameplay", e.to_string(), false))? };
     let presentation_ir = PresentationIR { schema_version: PRESENTATION_IR_SCHEMA.into(), kit_id: request.site.kit_id.clone(), locale: request.presentation.locale.clone(), seed: request.presentation.seed, approved_bindings: BTreeMap::new() };
     let version = VersionEnvelope { generator_version: request.generator_version, content_manifest_hash: request.content_manifest_hash.clone(), export_schemas: ExportSchemas::v1() };
     let room_count = u32::try_from(ship.room_graph.nodes.len()).map_err(|_| failure(ProcgenFailureCode::Capacity, "metrics", "room count exceeds u32".into(), false))?;
     let entity_count = u32::try_from(ship.entities.len()).map_err(|_| failure(ProcgenFailureCode::Capacity, "metrics", "entity count exceeds u32".into(), false))?;
     let structural_placement_count = ship.plan.placements.len().checked_add(ship.plan.floor_placements.len()).and_then(|n| n.checked_add(ship.plan.ceiling_placements.len())).and_then(|n| u32::try_from(n).ok()).ok_or_else(|| failure(ProcgenFailureCode::Capacity, "metrics", "placement count exceeds u32".into(), false))?;
-    let metrics = GenerationMetrics { pipeline_executions: 1, room_count, entity_count, structural_placement_count, stage_timings_micros: report.stage_micros.iter().map(|(k,v)| ((*k).into(), *v)).collect() };
-    let trace = GenerationTrace { schema_version: GENERATION_TRACE_SCHEMA.into(), rng_channels: vec!["meta".into(), "hull".into(), "template".into(), "topology".into(), "residual_fill".into(), "door".into(), "furnish".into(), "story".into(), "intact".into(), "breach".into(), "scorch".into(), "seal".into(), "bodies".into(), "fracture".into(), "debris".into(), "loot".into()], candidate_decisions: report.candidate_decisions, failed_constraints: report.failed_constraints, retries: report.retries, stage_timings_micros: metrics.stage_timings_micros.clone(), ..Default::default() };
+    let metrics = GenerationMetrics { schema_version: GENERATION_METRICS_SCHEMA.into(), pipeline_executions: 1, room_count, entity_count, structural_placement_count, stage_timings_micros: report.stage_micros.iter().map(|(k,v)| ((*k).into(), *v)).collect() };
+    let trace = GenerationTrace { schema_version: GENERATION_TRACE_SCHEMA.into(), rng_channels: RNG_CHANNELS.iter().map(|s| (*s).into()).collect(), candidate_decisions: report.candidate_decisions, failed_constraints: report.failed_constraints, retries: report.retries, stage_timings_micros: metrics.stage_timings_micros.clone(), ..Default::default() };
     let mut bundle = ProcgenBundle { schema_version: PROCGEN_BUNDLE_SCHEMA.into(), version, request, world_ir, site_ir, gameplay_ir, presentation_ir, semantic_hash: String::new(), metrics, trace };
     bundle.semantic_hash = semantic_hash(&bundle).map_err(|e| failure(ProcgenFailureCode::InternalFailure, "hash", e.to_string(), false))?; Ok(bundle)
 }
 
 pub fn migration_layout(bundle: &ProcgenBundle) -> Result<Value, ProcgenError> { bundle.validate()?; Ok(crate::structural::export::to_layout_json(&bundle.site_ir.ship, &crate::structural::export::ExportOptions { kit_id: bundle.presentation_ir.kit_id.clone(), ..Default::default() })) }
-pub fn migration_gameplay(bundle: &ProcgenBundle) -> Result<Value, ProcgenError> { bundle.validate()?; Ok(bundle.gameplay_ir.legacy_slice.clone()) }
+pub fn migration_gameplay(bundle: &ProcgenBundle) -> Result<Value, ProcgenError> { bundle.validate()?; Ok(serde_json::to_value(&bundle.gameplay_ir.legacy_slice)?) }
 pub fn canonical_json_hash(value: &Value) -> Result<String, ProcgenError> { let bytes = serde_json::to_vec(&canonical(value.clone()))?; let digest = Sha256::digest(bytes); Ok(digest.iter().map(|b| format!("{b:02x}")).collect()) }
 
 pub fn semantic_hash(bundle: &ProcgenBundle) -> Result<String, ProcgenError> {
@@ -204,6 +229,5 @@ fn reject_unknown_bundle_fields(value: &Value) -> Result<(), ProcgenError> {
     }
     let nested = [("version", ["generator_version", "content_manifest_hash", "export_schemas"].as_slice()), ("world_ir", ["schema_version", "world_seed", "site_id", "x", "y", "archetype_id"].as_slice()), ("site_ir", ["schema_version", "ship"].as_slice()), ("gameplay_ir", ["schema_version", "legacy_slice"].as_slice()), ("presentation_ir", ["schema_version", "kit_id", "locale", "seed", "approved_bindings"].as_slice()), ("metrics", ["pipeline_executions", "room_count", "entity_count", "structural_placement_count", "stage_timings_micros"].as_slice()), ("trace", ["schema_version", "rng_channels", "candidate_decisions", "failed_constraints", "repairs", "retries", "fallback", "stage_timings_micros"].as_slice())];
     for (name, fields) in nested { if let Some(child) = obj.get(name).and_then(Value::as_object) { if child.keys().any(|k| !fields.contains(&k.as_str())) { return Err(ProcgenError::InvalidRequest("bundle.nested_unknown_field")); } } }
-    if let Some(slice) = obj.get("gameplay_ir").and_then(|v| v.get("legacy_slice")).and_then(Value::as_object) { let fields = ["schema_version", "document_kind", "program_id", "start_room", "goal_room", "critical_path", "fire_zones", "objectives", "loot_containers", "summary"]; if slice.keys().any(|k| !fields.contains(&k.as_str())) { return Err(ProcgenError::InvalidRequest("gameplay_ir.legacy_slice.unknown_field")); } }
     Ok(())
 }

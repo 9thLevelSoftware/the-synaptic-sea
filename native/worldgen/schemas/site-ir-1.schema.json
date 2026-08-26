@@ -1,1 +1,1095 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"site-ir-1","type":"object","additionalProperties":false,"required":["schema_version","ship"],"properties":{"schema_version":{"const":"site-ir-1"},"ship":{"type":"object","additionalProperties":false,"required":["generator_version","seed","archetype_id","template_id","intactness","cause_of_loss","topology","plan","entry_room","goal_room","critical_path","decks","room_graph","entities","damage_events","fractured","fragments"],"properties":{"generator_version":{"type":"integer"},"seed":{"type":"integer","minimum":0},"archetype_id":{"type":"string"},"template_id":{"type":"string"},"intactness":{"type":"integer"},"cause_of_loss":{"type":"string"},"topology":{"type":"object"},"plan":{"type":"object"},"entry_room":{"type":"integer"},"goal_room":{"type":"integer"},"critical_path":{"type":"array"},"decks":{"type":"array"},"room_graph":{"type":"object"},"entities":{"type":"array"},"damage_events":{"type":"array"},"fractured":{"type":"boolean"},"fragments":{"type":"array"}}}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "CauseOfLoss": {
+      "enum": [
+        "ReactorBreach",
+        "Depressurization",
+        "PirateBoarding",
+        "Plague",
+        "DriveMisjump",
+        "Unknown"
+      ],
+      "type": "string"
+    },
+    "Cell": {
+      "additionalProperties": false,
+      "properties": {
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deck",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "CellRecord": {
+      "additionalProperties": false,
+      "description": "One occupied cell.",
+      "properties": {
+        "cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "decal": {
+          "description": "Cosmetic damage decal id (never affects validation/topology).",
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "module_id": {
+          "type": "string"
+        },
+        "room_id": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "variant": {
+          "$ref": "#/definitions/DamageVariant"
+        }
+      },
+      "required": [
+        "cell",
+        "decal",
+        "module_id",
+        "room_id",
+        "variant"
+      ],
+      "type": "object"
+    },
+    "DamageEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/definitions/DamageEventKind"
+        },
+        "origin": {
+          "items": true,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "int32",
+              "type": "integer"
+            },
+            {
+              "format": "int32",
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "radius": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deck",
+        "kind",
+        "origin",
+        "radius"
+      ],
+      "type": "object"
+    },
+    "DamageEventKind": {
+      "enum": [
+        "Breach",
+        "ScorchZone",
+        "StructuralFracture",
+        "DebrisField"
+      ],
+      "type": "string"
+    },
+    "DamageVariant": {
+      "description": "Asset damage variant, resolved at export time against the kit's intact/damaged/breached module variants. Structural role (`module_id`) stays stable; only the rendered asset changes.",
+      "enum": [
+        "Intact",
+        "Damaged",
+        "Breached"
+      ],
+      "type": "string"
+    },
+    "Deck": {
+      "additionalProperties": false,
+      "properties": {
+        "layer": {
+          "$ref": "#/definitions/DeckLayer"
+        }
+      },
+      "required": [
+        "layer"
+      ],
+      "type": "object"
+    },
+    "DeckLayer": {
+      "additionalProperties": false,
+      "description": "One deck's tile data as flat row-major arrays (index = y * width + x).",
+      "properties": {
+        "decal": {
+          "items": {
+            "format": "uint8",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "floor": {
+          "items": {
+            "$ref": "#/definitions/FloorTile"
+          },
+          "type": "array"
+        },
+        "height": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "room_id": {
+          "description": "Room id per tile; NO_ROOM (0) = not part of any room (void/space).",
+          "items": {
+            "format": "uint16",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "walls": {
+          "items": {
+            "$ref": "#/definitions/TileWalls"
+          },
+          "type": "array"
+        },
+        "width": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "decal",
+        "floor",
+        "height",
+        "room_id",
+        "walls",
+        "width"
+      ],
+      "type": "object"
+    },
+    "Dir": {
+      "enum": [
+        "North",
+        "South",
+        "East",
+        "West"
+      ],
+      "type": "string"
+    },
+    "EdgeKind": {
+      "oneOf": [
+        {
+          "enum": [
+            "Solid",
+            "Door",
+            "Locked",
+            "Hatch",
+            "Breach"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Interior of a multi-cell room: no wall, never materialized.",
+          "enum": [
+            "Open"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "EdgeKind2": {
+      "enum": [
+        "Door",
+        "OpenCorridor",
+        "VerticalShaft",
+        "Breach"
+      ],
+      "type": "string"
+    },
+    "EdgeRecord": {
+      "additionalProperties": false,
+      "description": "One canonical boundary.",
+      "properties": {
+        "cell": {
+          "$ref": "#/definitions/Cell",
+          "description": "The cell/direction this edge was first derived from (either side is valid; edge_key is what's canonical)."
+        },
+        "direction": {
+          "$ref": "#/definitions/Dir"
+        },
+        "edge_key": {
+          "type": "string"
+        },
+        "exterior": {
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/definitions/EdgeKind"
+        },
+        "module_id": {
+          "type": "string"
+        },
+        "portal": {
+          "type": "boolean"
+        },
+        "position": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "room_ids": {
+          "description": "(owning-side room, other-side room); NO_ROOM = exterior/void.",
+          "items": true,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "uint16",
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            {
+              "format": "uint16",
+              "minimum": 0.0,
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "source_cells": {
+          "items": {
+            "$ref": "#/definitions/Cell"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "variant": {
+          "$ref": "#/definitions/DamageVariant"
+        },
+        "wrapper_required": {
+          "description": "Whether this edge demands a materialized placement (Open and BREACH holes don't).",
+          "type": "boolean"
+        },
+        "yaw_degrees": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cell",
+        "direction",
+        "edge_key",
+        "exterior",
+        "kind",
+        "module_id",
+        "portal",
+        "position",
+        "room_ids",
+        "source_cells",
+        "variant",
+        "wrapper_required",
+        "yaw_degrees"
+      ],
+      "type": "object"
+    },
+    "EntityKind": {
+      "enum": [
+        "Door",
+        "Container",
+        "Terminal",
+        "Furniture",
+        "Debris",
+        "Body",
+        "ItemPile"
+      ],
+      "type": "string"
+    },
+    "EntitySpec": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Stable within this ship; assigned in deterministic order. Save diffs and co-op mutation replication address entities by this id.",
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "inventory": {
+          "items": {
+            "$ref": "#/definitions/ItemStack"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/definitions/EntityKind"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "open": {
+          "type": "boolean"
+        },
+        "pos": {
+          "$ref": "#/definitions/GridPos"
+        },
+        "proto": {
+          "description": "Prototype key, maps to a scene/visual on the Godot side (\"bed\", \"locker\", \"helm_console\", \"hull_plate_debris\", ...).",
+          "type": "string"
+        },
+        "rotation": {
+          "description": "0..=3, 90-degree steps. For doors: 0 = sits on north edge of pos, 1 = west edge.",
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "inventory",
+        "kind",
+        "locked",
+        "open",
+        "pos",
+        "proto",
+        "rotation",
+        "tags"
+      ],
+      "type": "object"
+    },
+    "FloorPlacement": {
+      "additionalProperties": false,
+      "properties": {
+        "cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "cell_key": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "module_id": {
+          "type": "string"
+        },
+        "position": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "room_id": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "variant": {
+          "$ref": "#/definitions/DamageVariant"
+        },
+        "yaw_degrees": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cell",
+        "cell_key",
+        "id",
+        "module_id",
+        "position",
+        "room_id",
+        "variant",
+        "yaw_degrees"
+      ],
+      "type": "object"
+    },
+    "FloorTile": {
+      "oneOf": [
+        {
+          "enum": [
+            "Deck",
+            "Grated",
+            "DamagedDeck"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Open space / no floor (outside hull, or a breach hole).",
+          "enum": [
+            "Void"
+          ],
+          "type": "string"
+        }
+      ]
+    },
+    "GridPos": {
+      "additionalProperties": false,
+      "properties": {
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "x": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deck",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "ItemStack": {
+      "additionalProperties": false,
+      "properties": {
+        "item_id": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "qty": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "item_id",
+        "qty"
+      ],
+      "type": "object"
+    },
+    "PortalIntent": {
+      "additionalProperties": false,
+      "description": "Authored doorway between two rooms sharing a real cardinal cell edge. Created at placement time by the topology stage — never derived post-hoc.",
+      "properties": {
+        "exterior": {
+          "description": "Exterior door (to_room == NO_ROOM): airlock onto space.",
+          "type": "boolean"
+        },
+        "from_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "from_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "state": {
+          "$ref": "#/definitions/EdgeKind"
+        },
+        "to_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "to_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "exterior",
+        "from_cell",
+        "from_room",
+        "state",
+        "to_cell",
+        "to_room"
+      ],
+      "type": "object"
+    },
+    "Role": {
+      "enum": [
+        "Airlock",
+        "Dock",
+        "Corridor",
+        "MainSpine",
+        "Hub",
+        "Ramp",
+        "Elevator",
+        "Bridge",
+        "Engineering",
+        "Reactor",
+        "LifeSupport",
+        "Maintenance",
+        "Cargo",
+        "Hangar",
+        "Storage",
+        "Armory",
+        "Security",
+        "Medical",
+        "CrewQuarters",
+        "MessHall",
+        "Compartment"
+      ],
+      "type": "string"
+    },
+    "RoomEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "a": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "b": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/definitions/EdgeKind2"
+        }
+      },
+      "required": [
+        "a",
+        "b",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "RoomGraph": {
+      "additionalProperties": false,
+      "properties": {
+        "edges": {
+          "items": {
+            "$ref": "#/definitions/RoomEdge"
+          },
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/definitions/RoomNode"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "edges",
+        "nodes"
+      ],
+      "type": "object"
+    },
+    "RoomNode": {
+      "additionalProperties": false,
+      "properties": {
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "depressurized": {
+          "type": "boolean"
+        },
+        "id": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/definitions/Role"
+        },
+        "max": {
+          "items": true,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "int32",
+              "type": "integer"
+            },
+            {
+              "format": "int32",
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "min": {
+          "description": "AABB in deck-local tile coords (min inclusive, max inclusive).",
+          "items": true,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "int32",
+              "type": "integer"
+            },
+            {
+              "format": "int32",
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "spans_room_id": {
+          "description": "For multi-deck logical systems (engineering spanning decks): the room id of the same logical room on the deck below, if any.",
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tile_count": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deck",
+        "depressurized",
+        "id",
+        "kind",
+        "max",
+        "min",
+        "tile_count"
+      ],
+      "type": "object"
+    },
+    "RoomSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "cells": {
+          "items": {
+            "$ref": "#/definitions/Cell"
+          },
+          "type": "array"
+        },
+        "deck": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "id": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "role": {
+          "$ref": "#/definitions/Role"
+        }
+      },
+      "required": [
+        "cells",
+        "deck",
+        "id",
+        "role"
+      ],
+      "type": "object"
+    },
+    "Ship": {
+      "additionalProperties": false,
+      "properties": {
+        "archetype_id": {
+          "type": "string"
+        },
+        "cause_of_loss": {
+          "$ref": "#/definitions/CauseOfLoss"
+        },
+        "critical_path": {
+          "items": {
+            "format": "uint16",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "damage_events": {
+          "items": {
+            "$ref": "#/definitions/DamageEvent"
+          },
+          "type": "array"
+        },
+        "decks": {
+          "items": {
+            "$ref": "#/definitions/Deck"
+          },
+          "type": "array"
+        },
+        "entities": {
+          "items": {
+            "$ref": "#/definitions/EntitySpec"
+          },
+          "type": "array"
+        },
+        "entry_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "fractured": {
+          "type": "boolean"
+        },
+        "fragments": {
+          "items": {
+            "$ref": "#/definitions/ShipFragment"
+          },
+          "type": "array"
+        },
+        "generator_version": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "goal_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "intactness": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "plan": {
+          "$ref": "#/definitions/StructuralPlan",
+          "description": "The canonical structural plan — the AUTHORITATIVE geometry. Deck raster layers below are a derived projection of this."
+        },
+        "room_graph": {
+          "$ref": "#/definitions/RoomGraph"
+        },
+        "seed": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "template_id": {
+          "description": "Topology template that authored this ship.",
+          "type": "string"
+        },
+        "topology": {
+          "$ref": "#/definitions/Topology",
+          "description": "Authored topology (rooms with explicit occupancy, portal intents, vertical connections) — the compile input, kept for validation and export cross-checks."
+        }
+      },
+      "required": [
+        "archetype_id",
+        "cause_of_loss",
+        "critical_path",
+        "damage_events",
+        "decks",
+        "entities",
+        "entry_room",
+        "fractured",
+        "fragments",
+        "generator_version",
+        "goal_room",
+        "intactness",
+        "plan",
+        "room_graph",
+        "seed",
+        "template_id",
+        "topology"
+      ],
+      "type": "object"
+    },
+    "ShipFragment": {
+      "additionalProperties": false,
+      "description": "Metadata about one hull piece after a structural fracture. Tile data is already laid out in final world-local coordinates (fragments are baked apart into the shared deck grid), so this exists for debugging/AI hints, not for rendering math.",
+      "properties": {
+        "drift": {
+          "description": "Translation that was applied to this fragment when baking it apart.",
+          "items": true,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "int32",
+              "type": "integer"
+            },
+            {
+              "format": "int32",
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "id": {
+          "format": "uint8",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "rooms": {
+          "description": "Room ids belonging to this fragment.",
+          "items": {
+            "format": "uint16",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "drift",
+        "id",
+        "rooms"
+      ],
+      "type": "object"
+    },
+    "SocketBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "neighbor_placement_id": {
+          "type": "string"
+        },
+        "neighbor_socket_id": {
+          "type": "string"
+        },
+        "placement_id": {
+          "type": "string"
+        },
+        "socket_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "neighbor_placement_id",
+        "neighbor_socket_id",
+        "placement_id",
+        "socket_id"
+      ],
+      "type": "object"
+    },
+    "StructuralPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "ceiling_placements": {
+          "items": {
+            "$ref": "#/definitions/FloorPlacement"
+          },
+          "type": "array"
+        },
+        "edges": {
+          "additionalProperties": {
+            "$ref": "#/definitions/EdgeRecord"
+          },
+          "type": "object"
+        },
+        "errors": {
+          "description": "Compiler diagnostics; non-empty fails validation.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "floor_placements": {
+          "items": {
+            "$ref": "#/definitions/FloorPlacement"
+          },
+          "type": "array"
+        },
+        "occupancy": {
+          "additionalProperties": {
+            "$ref": "#/definitions/CellRecord"
+          },
+          "type": "object"
+        },
+        "placements": {
+          "description": "Materialized non-Open, wrapper-required edges (sorted by edge_key).",
+          "items": {
+            "$ref": "#/definitions/EdgeRecord"
+          },
+          "type": "array"
+        },
+        "socket_bindings": {
+          "items": {
+            "$ref": "#/definitions/SocketBinding"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "ceiling_placements",
+        "edges",
+        "errors",
+        "floor_placements",
+        "occupancy",
+        "placements",
+        "socket_bindings"
+      ],
+      "type": "object"
+    },
+    "TileWalls": {
+      "additionalProperties": false,
+      "description": "PZ-style: walls live on tile EDGES. Each tile stores its north and west edges; a tile's south edge is its south neighbor's north edge, etc.",
+      "properties": {
+        "north": {
+          "$ref": "#/definitions/WallEdge"
+        },
+        "west": {
+          "$ref": "#/definitions/WallEdge"
+        }
+      },
+      "required": [
+        "north",
+        "west"
+      ],
+      "type": "object"
+    },
+    "Topology": {
+      "additionalProperties": false,
+      "description": "Everything the structural compiler consumes.",
+      "properties": {
+        "portals": {
+          "items": {
+            "$ref": "#/definitions/PortalIntent"
+          },
+          "type": "array"
+        },
+        "rooms": {
+          "items": {
+            "$ref": "#/definitions/RoomSpec"
+          },
+          "type": "array"
+        },
+        "verticals": {
+          "items": {
+            "$ref": "#/definitions/VerticalConnection"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "portals",
+        "rooms",
+        "verticals"
+      ],
+      "type": "object"
+    },
+    "VerticalConnection": {
+      "additionalProperties": false,
+      "properties": {
+        "from_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "from_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "to_cell": {
+          "$ref": "#/definitions/Cell"
+        },
+        "to_room": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "from_cell",
+        "from_room",
+        "to_cell",
+        "to_room"
+      ],
+      "type": "object"
+    },
+    "WallEdge": {
+      "oneOf": [
+        {
+          "enum": [
+            "None"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Exterior hull wall.",
+          "enum": [
+            "Hull"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Interior partition wall.",
+          "enum": [
+            "Interior"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Door frame opening (a Door entity sits on this edge).",
+          "enum": [
+            "Doorway"
+          ],
+          "type": "string"
+        },
+        {
+          "description": "Wall destroyed by damage; passable, jagged.",
+          "enum": [
+            "Breached"
+          ],
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "site-ir-1"
+    },
+    "ship": {
+      "$ref": "#/definitions/Ship"
+    }
+  },
+  "required": [
+    "schema_version",
+    "ship"
+  ],
+  "title": "site-ir-1",
+  "type": "object"
+}

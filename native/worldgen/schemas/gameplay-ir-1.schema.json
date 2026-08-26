@@ -1,1 +1,186 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"gameplay-ir-1","type":"object","additionalProperties":false,"required":["schema_version","legacy_slice"],"properties":{"schema_version":{"const":"gameplay-ir-1"},"legacy_slice":{"type":"object"}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "definitions": {
+    "FireZone": {
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "GameplaySlice": {
+      "additionalProperties": false,
+      "properties": {
+        "critical_path": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "document_kind": {
+          "type": "string"
+        },
+        "fire_zones": {
+          "items": {
+            "$ref": "#/definitions/FireZone"
+          },
+          "type": "array"
+        },
+        "goal_room": {
+          "type": "string"
+        },
+        "loot_containers": {
+          "items": {
+            "$ref": "#/definitions/LootContainer"
+          },
+          "type": "array"
+        },
+        "objectives": {
+          "items": {
+            "$ref": "#/definitions/Objective"
+          },
+          "type": "array"
+        },
+        "program_id": {
+          "type": "string"
+        },
+        "schema_version": {
+          "type": "string"
+        },
+        "start_room": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "critical_path",
+        "document_kind",
+        "fire_zones",
+        "goal_room",
+        "loot_containers",
+        "objectives",
+        "program_id",
+        "schema_version",
+        "start_room",
+        "summary"
+      ],
+      "type": "object"
+    },
+    "LootContainer": {
+      "additionalProperties": false,
+      "properties": {
+        "approach_cell": {
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "loot_table": {
+          "type": "string"
+        },
+        "room_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "approach_cell",
+        "id",
+        "kind",
+        "loot_table",
+        "room_id"
+      ],
+      "type": "object"
+    },
+    "Objective": {
+      "additionalProperties": false,
+      "properties": {
+        "approach_cell": {
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "approach_distance_cells": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "cell": {
+          "items": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "interactable": {
+          "type": "boolean"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "room_id": {
+          "type": "string"
+        },
+        "room_role": {
+          "type": "string"
+        },
+        "semantic": {
+          "type": "string"
+        },
+        "sequence": {
+          "format": "uint32",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "approach_cell",
+        "approach_distance_cells",
+        "cell",
+        "id",
+        "interactable",
+        "kind",
+        "room_id",
+        "room_role",
+        "semantic",
+        "sequence",
+        "type"
+      ],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "legacy_slice": {
+      "$ref": "#/definitions/GameplaySlice"
+    },
+    "schema_version": {
+      "const": "gameplay-ir-1"
+    }
+  },
+  "required": [
+    "legacy_slice",
+    "schema_version"
+  ],
+  "title": "gameplay-ir-1",
+  "type": "object"
+}

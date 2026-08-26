@@ -3,8 +3,16 @@ use serde::{Deserialize, Serialize};
 
 pub const MANIFEST_SCHEMA: &str = "procgen-build-manifest-1";
 pub const CONTENT_MANIFEST_SCHEMA: &str = "procgen-content-manifest-1";
+pub const PROCGEN_REQUEST_SCHEMA: &str = "procgen-request-1";
+pub const PROCGEN_BUNDLE_SCHEMA: &str = "procgen-bundle-1";
+pub const WORLD_IR_SCHEMA: &str = "world-ir-1";
+pub const SITE_IR_SCHEMA: &str = "site-ir-1";
+pub const GAMEPLAY_IR_SCHEMA: &str = "gameplay-ir-1";
+pub const PRESENTATION_IR_SCHEMA: &str = "presentation-ir-1";
+pub const GENERATION_TRACE_SCHEMA: &str = "generation-trace-1";
+pub const ADAPTIVE_PROPOSAL_SCHEMA: &str = "adaptive-proposal-1";
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, schemars::JsonSchema, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct BuildManifest {
     pub manifest_schema: String,
@@ -17,12 +25,13 @@ pub struct BuildManifest {
     pub export_schemas: ExportSchemas,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, schemars::JsonSchema, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Artifact { pub kind: String, pub path: String, pub sha256: String }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+#[derive(schemars::JsonSchema)]
 pub struct ExportSchemas {
     pub procgen_request: String,
     pub procgen_bundle: String,
@@ -37,9 +46,9 @@ pub struct ExportSchemas {
 impl ExportSchemas {
     pub fn v1() -> Self {
         Self {
-            procgen_request: "procgen-request-1".into(), procgen_bundle: "procgen-bundle-1".into(),
-            world_ir: "world-ir-1".into(), site_ir: "site-ir-1".into(), gameplay_ir: "gameplay-ir-1".into(),
-            presentation_ir: "presentation-ir-1".into(), generation_trace: "generation-trace-1".into(), adaptive_proposal: "adaptive-proposal-1".into(),
+            procgen_request: PROCGEN_REQUEST_SCHEMA.into(), procgen_bundle: PROCGEN_BUNDLE_SCHEMA.into(),
+            world_ir: WORLD_IR_SCHEMA.into(), site_ir: SITE_IR_SCHEMA.into(), gameplay_ir: GAMEPLAY_IR_SCHEMA.into(),
+            presentation_ir: PRESENTATION_IR_SCHEMA.into(), generation_trace: GENERATION_TRACE_SCHEMA.into(), adaptive_proposal: ADAPTIVE_PROPOSAL_SCHEMA.into(),
         }
     }
 }

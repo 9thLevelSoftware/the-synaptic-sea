@@ -1,1 +1,35 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"presentation-ir-1","type":"object","additionalProperties":false,"required":["schema_version","kit_id","locale","seed","approved_bindings"],"properties":{"schema_version":{"const":"presentation-ir-1"},"kit_id":{"type":"string","minLength":1},"locale":{"type":"string","minLength":1},"seed":{"type":"integer","minimum":0},"approved_bindings":{"type":"object","additionalProperties":{"type":"string"}}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "approved_bindings": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "kit_id": {
+      "type": "string"
+    },
+    "locale": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "presentation-ir-1"
+    },
+    "seed": {
+      "format": "uint64",
+      "minimum": 0.0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "approved_bindings",
+    "kit_id",
+    "locale",
+    "schema_version",
+    "seed"
+  ],
+  "title": "presentation-ir-1",
+  "type": "object"
+}
